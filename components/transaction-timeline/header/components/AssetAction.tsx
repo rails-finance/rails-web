@@ -11,7 +11,7 @@ export function AssetAction({ action, asset, amount }: AssetActionProps) {
   return (
     <div className="flex items-center space-x-1">
       <span className="text-slate-400 mr-1">{action}</span>
-      {amount && <span className="font-medium">{amount}</span>}
+      {amount && <span className="font-medium sm:hidden">{amount}</span>}
       <TokenIcon assetSymbol={asset} />
     </div>
   );
