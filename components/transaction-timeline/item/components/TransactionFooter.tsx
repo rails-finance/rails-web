@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { formatTimestamp } from "@/lib/date";
 
 interface TransactionFooterProps {
   timestamp: number;
@@ -12,7 +13,7 @@ export function TransactionFooter({ timestamp, txIndex, txHash, isExpanded }: Tr
     <div className={"flex justify-between items-center"}>
       <div className="text-xs text-slate-600 font-bold flex items-center">
         <span className="mr-1 px-1 text-slate-500 rounded bg-slate-950/30 inline-block">{txIndex}</span>
-        {timestamp}
+        {formatTimestamp(timestamp)}
       </div>
       {isExpanded && txHash && (
         <Button href="#" variant="primary" className="p-2 w-full sm:w-auto">
