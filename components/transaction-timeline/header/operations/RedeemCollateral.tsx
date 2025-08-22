@@ -3,6 +3,7 @@ import { OperationBadge } from "../components/OperationBadge";
 import { AssetAction } from "../components/AssetAction";
 
 export function RedeemCollateralHeader({ tx }: { tx: TroveRedemptionTransaction }) {
+  const { collChangeFromOperation, debtChangeFromOperation } = tx.troveOperation;
   return (
     <>
       <OperationBadge label="REDEMPTION" color="orange" />
@@ -12,8 +13,8 @@ export function RedeemCollateralHeader({ tx }: { tx: TroveRedemptionTransaction 
         </span>
       )}
       <div className="flex items-center gap-1">
-        <AssetAction action="Redeemed" asset={tx.collateralType} />
-        <AssetAction action="Burned" asset={tx.assetType} />
+        <AssetAction action="Redeemed" asset={tx.collateralType} amount={Math.abs(collChangeFromOperation)} alwaysShowAmount />
+        <AssetAction action="Burned" asset={tx.assetType} amount={Math.abs(debtChangeFromOperation)} alwaysShowAmount />
       </div>
     </>
   );
