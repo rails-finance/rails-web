@@ -64,8 +64,8 @@ function getOperationLabel(operation: string): string {
     liquidate: "Liquidation",
     redeemCollateral: "Redemption",
     transferTrove: "Transfer",
-    setInterestBatchManager: "Join Batch",
-    removeFromBatch: "Leave Batch",
+    setInterestBatchManager: "Delegate",
+    removeFromBatch: "Leave Delegate",
   };
   return labels[operation] || operation;
 }

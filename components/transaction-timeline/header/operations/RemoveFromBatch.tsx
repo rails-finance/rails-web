@@ -10,7 +10,7 @@ export function RemoveFromBatchHeader({ tx }: { tx: TroveTransaction }) {
       <div className="flex items-center flex-wrap gap-2">
         <div className="flex items-center gap-1">
           <OperationBadge
-            label="LEAVE BATCH"
+            label="LEAVE DELEGATE"
             color="purple"
             icon={
               <>
