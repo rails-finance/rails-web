@@ -1,6 +1,7 @@
 import { Transaction } from "@/types/api/troveHistory";
 import { SingleStepIcon } from "../layouts/SingleStepIcon";
-import { PercentIcon } from "../symbols/PercentIcon";
+import { PercentIncreaseIcon } from "../symbols/PercentIncreaseIcon";
+import { PercentDecreaseIcon } from "../symbols/PercentDecreaseIcon";
 
 export function InterestRateAdjustIcon({ tx }: { tx: Transaction }) {
   const rateAfter = tx.stateAfter.annualInterestRate;
@@ -10,7 +11,7 @@ export function InterestRateAdjustIcon({ tx }: { tx: Transaction }) {
 
   return (
     <SingleStepIcon>
-      <PercentIcon isIncrease={isIncrease} />
+      {isIncrease ? <PercentIncreaseIcon /> : <PercentDecreaseIcon />}
     </SingleStepIcon>
   );
 }

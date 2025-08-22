@@ -2,7 +2,8 @@ import { Transaction } from "@/types/api/troveHistory";
 import { SingleStepIcon } from "../layouts/SingleStepIcon";
 import { MultiStepIcon } from "../layouts/MultiStepIcon";
 import { RedistributionIcon } from "../symbols/RedistributionIcon";
-import { PercentIcon } from "../symbols/PercentIcon";
+import { PercentIncreaseIcon } from "../symbols/PercentIncreaseIcon";
+import { PercentDecreaseIcon } from "../symbols/PercentDecreaseIcon";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { TimelineIconStep } from "@/types";
 
@@ -19,7 +20,7 @@ export function ApplyPendingDebtIcon({ tx }: { tx: Transaction }) {
       arrowDirection: "in",
     };
     const secondStep: TimelineIconStep = {
-      children: <PercentIcon isIncrease={true} />,
+      children: debtChangeFromOperation > 0 ? <PercentIncreaseIcon /> : <PercentDecreaseIcon />,
       arrowDirection: "in",
     };
     return <MultiStepIcon firstStep={firstStep} secondStep={secondStep} />;
@@ -52,7 +53,7 @@ export function ApplyPendingDebtIcon({ tx }: { tx: Transaction }) {
   if (hasInterest) {
     return (
       <SingleStepIcon arrowDirection="in">
-        <PercentIcon isIncrease={true} />
+        {debtChangeFromOperation > 0 ? <PercentIncreaseIcon /> : <PercentDecreaseIcon />}
       </SingleStepIcon>
     );
   }
