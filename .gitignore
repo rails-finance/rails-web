@@ -10,6 +10,8 @@
 !.yarn/releases
 !.yarn/versions
 package-lock.json
+.claude
+.playwright-mcp/*
 
 # testing
 /coverage
