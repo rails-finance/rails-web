@@ -19,10 +19,12 @@
     "wagmi": "^2.16.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "playwright": "^1.55.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
