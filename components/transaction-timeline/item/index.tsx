@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Transaction } from "@/types/api/troveHistory";
 import { TransactionIcon } from "../icon";
-import { TransactionValueDisplay } from "../value-display";
+import { LeftValueDisplay } from "../value-display/components/LeftValueDisplay";
+import { RightValueDisplay } from "../value-display/components/RightValueDisplay";
 import { TransactionItemHeader } from "../header";
 import { TransactionContainer } from "./components/TransactionContainer";
 import { TransactionContent } from "./components/TransactionContent";
@@ -23,11 +24,14 @@ export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionIte
 
   return (
     <TransactionContainer className="flex w-full">
-      {/* Transaction value display */}
-      <TransactionValueDisplay tx={tx} />
+      {/* Left values - outbound to protocol */}
+      <LeftValueDisplay tx={tx} />
 
       {/* Transaction icon/timeline */}
       <TransactionIcon tx={tx} isFirst={isFirst} isLast={isLast} />
+
+      {/* Right values - inbound from protocol */}
+      <RightValueDisplay tx={tx} />
 
       {/* Transaction details */}
       <TransactionContent isInBatch={tx.isInBatch} isExpanded={isExpanded} onClick={toggleExpanded}>
