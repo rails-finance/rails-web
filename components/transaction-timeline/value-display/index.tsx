@@ -20,7 +20,7 @@ export function TransactionValueDisplay({ tx }: { tx: Transaction }) {
   const orderedChanges = orderChanges(tx);
 
   return (
-    <div className="w-32 p-4 flex flex-col hidden sm:flex">
+    <div className="hidden md:flex w-32 shrink-0 flex-col justify-start items-end py-4 px-2">
       {orderedChanges.map((change, index) => (
         <ChangeValue key={`change-${index}`} amount={change.amount} />
       ))}
