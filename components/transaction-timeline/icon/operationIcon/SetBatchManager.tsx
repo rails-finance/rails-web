@@ -1,10 +1,10 @@
 import { SingleStepIcon } from "../layouts/SingleStepIcon";
-import { BatchIcon } from "../symbols/BatchIcon";
+import { JoinBatchIcon } from "../symbols/JoinBatchIcon";
 
 export function SetBatchManagerIcon() {
   return (
     <SingleStepIcon arrowDirection="in">
-      <BatchIcon />
+      <JoinBatchIcon />
     </SingleStepIcon>
   );
 }

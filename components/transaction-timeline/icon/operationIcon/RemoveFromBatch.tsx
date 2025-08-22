@@ -1,10 +1,10 @@
 import { SingleStepIcon } from "../layouts/SingleStepIcon";
-import { BatchIcon } from "../symbols/BatchIcon";
+import { ExitBatchIcon } from "../symbols/ExitBatchIcon";
 
 export function RemoveFromBatchIcon() {
   return (
     <SingleStepIcon arrowDirection="out">
-      <BatchIcon />
+      <ExitBatchIcon />
     </SingleStepIcon>
   );
 }
