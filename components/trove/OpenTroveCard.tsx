@@ -1,8 +1,12 @@
+"use client";
+
+import { useMemo } from "react";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { Icon } from "@/components/icons/icon";
 import { TroveCardHeader } from "./components/TroveCardHeader";
 import { TroveCardFooter } from "./components/TroveCardFooter";
 import { TroveData } from "@/types/api/trove";
+import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
 
 interface OpenTroveCardProps {
   trove: TroveData;
@@ -10,6 +14,13 @@ interface OpenTroveCardProps {
 }
 
 export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardProps) {
+  const batchManagerInfo = useMemo(() => {
+    if (trove.batchMembership?.batchManager) {
+      return getBatchManagerInfo(trove.batchMembership.batchManager);
+    }
+    return undefined;
+  }, [trove.batchMembership?.batchManager]);
+
   return (
     <div className="rounded-lg text-slate-500 bg-slate-900 grid grid-cols-1 p-4 gap-4">
       <TroveCardHeader status="open" assetType={trove.assetType} isDelegated={trove.batchMembership?.isMember} />
@@ -61,7 +72,18 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
           </div>
           {trove.batchMembership.isMember && (
             <>
-              <p className="text-xs text-slate-400 mt-1">Batch Manager</p>
+              {batchManagerInfo?.website ? (
+                <a 
+                  href={batchManagerInfo.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-400 hover:text-blue-300 mt-1 underline underline-offset-2 block"
+                >
+                  {batchManagerInfo.name}
+                </a>
+              ) : (
+                <p className="text-xs text-slate-400 mt-1">{batchManagerInfo?.name || "Batch Manager"}</p>
+              )}
               <p className="text-xs text-slate-400">+ {trove.batchMembership.managementFeeRate}% mgmt fee</p>
             </>
           )}
