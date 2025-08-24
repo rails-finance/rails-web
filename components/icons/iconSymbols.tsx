@@ -67,6 +67,9 @@ export const IconSymbols = () => (
       <rect width="14" height="14" x="8" y="8" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
       <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" stroke="currentColor" strokeWidth="2" />
     </symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24">
+      <polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" strokeWidth="2" />
+    </symbol>
     <symbol id="icon-user" viewBox="0 0 24 24">
       <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" />
       <circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" strokeWidth="2" />

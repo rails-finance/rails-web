@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
 
 interface BatchManagerInfoProps {
@@ -11,6 +11,8 @@ interface BatchManagerInfoProps {
 }
 
 export function BatchManagerInfo({ batchManager, batchManagerLabel, color = "blue" }: BatchManagerInfoProps) {
+  const [copied, setCopied] = useState(false);
+  
   if (!batchManager) return null;
 
   const managerInfo = useMemo(() => {
@@ -51,27 +53,50 @@ export function BatchManagerInfo({ batchManager, batchManagerLabel, color = "blu
         <div className="relative inline-block group">
           <button
             className="mx-1.5 text-slate-400 hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
-            aria-label="Copy to clipboard"
+            aria-label={copied ? "Copied to clipboard" : "Copy to clipboard"}
             onClick={(e) => {
               e.stopPropagation();
               navigator.clipboard.writeText(batchManager);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
             }}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-            </svg>
+            {copied ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+              </svg>
+            )}
           </button>
+          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 pointer-events-none z-10">
+            <div className={`bg-slate-700 text-slate-200 px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity duration-200 ${copied ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+              {copied ? 'Copied!' : 'Copy'}
+            </div>
+          </div>
         </div>
       </span>
     </div>
