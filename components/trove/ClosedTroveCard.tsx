@@ -14,7 +14,7 @@ export function ClosedTroveCard({ trove, showViewButton = false }: ClosedTroveCa
 
       {/* Main value */}
       <div>
-        <div className="text-sm mb-1">At peak</div>
+        <div className="text-sm mb-1">Debt at peak</div>
         <div className="flex items-center">
           <h3 className="text-3xl font-bold text-white">{trove.peakValue}</h3>
           <span className="ml-2 text-green-400 text-lg">
@@ -25,7 +25,7 @@ export function ClosedTroveCard({ trove, showViewButton = false }: ClosedTroveCa
 
       {/* Backed by section */}
       <div>
-        <p className="text-sm">Backed at peak by</p>
+        <p className="text-sm">Highest recorded collateral</p>
         <div className="flex items-center">
           <div className="flex items-center">
             <p className="text-xl font-medium text-white mr-1">{trove.backedBy.peakAmount}</p>
