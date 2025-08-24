@@ -56,7 +56,7 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
             </span>
             <div className="ml-1 flex items-center">
               <span className="text-xs flex items-center text-green-400 border border-green-400 rounded-sm px-1 py-0">
-                ${trove.backedBy.valueUsd}
+                ${trove.backedBy.valueUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
               </span>
             </div>
           </div>
