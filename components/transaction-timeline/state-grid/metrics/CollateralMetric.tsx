@@ -27,7 +27,7 @@ export function CollateralMetric({
         {hasChange && (
           <>
             <div className="flex items-center space-x-1">
-              <span className="text-slate-700">{before}</span>
+              <span className="text-slate-600">{before}</span>
               {beforeInUsd && beforeInUsd > 0 && (
                 <span className="text-xs flex items-center text-slate-600 border border-slate-600 font-medium rounded-sm px-1 py-0">
                   ${beforeInUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}

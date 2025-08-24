@@ -22,7 +22,7 @@ export function InterestRateMetric({
       <StateTransition>
         {hasChange && (
           <>
-            <div className="text-slate-700">{before}</div>
+            <div className="text-slate-600">{before}</div>
             <TransitionArrow />
           </>
         )}

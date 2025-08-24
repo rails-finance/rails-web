@@ -17,7 +17,7 @@ export function DebtMetric({ assetType, before, after, isCloseTrove }: DebtMetri
       <StateTransition>
         {hasChange && (
           <>
-            <div className="text-slate-700">{before}</div>
+            <div className="text-slate-600">{before}</div>
             <TransitionArrow />
           </>
         )}
