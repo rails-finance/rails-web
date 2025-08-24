@@ -22,6 +22,8 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
           collateralType={collateralType}
           before={stateBefore?.coll}
           after={stateAfter.coll}
+          afterInUsd={tx.collateralPrice ? stateAfter.coll * tx.collateralPrice : undefined}
+          beforeInUsd={stateBefore?.coll && tx.collateralPrice ? stateBefore.coll * tx.collateralPrice : undefined}
           isCloseTrove={isCloseTrove}
         />
 
