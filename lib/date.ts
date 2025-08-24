@@ -13,3 +13,72 @@ export function formatTimestamp(timestamp: number): string {
   // This will format dates according to their regional preferences
   return date.toLocaleString(undefined, options);
 }
+
+export function formatDate(dateInput: string | number | Date): string {
+  let date: Date;
+  
+  if (typeof dateInput === 'number') {
+    // Assume timestamp in seconds if number
+    date = new Date(dateInput * 1000);
+  } else if (typeof dateInput === 'string') {
+    date = new Date(dateInput);
+  } else {
+    date = dateInput;
+  }
+  
+  const options: Intl.DateTimeFormatOptions = {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  };
+  
+  // Use undefined for locale to automatically use the visitor's browser locale
+  return date.toLocaleDateString(undefined, options);
+}
+
+export function formatDateRange(startDate: string | number | Date, endDate: string | number | Date): string {
+  let startDateObj: Date;
+  let endDateObj: Date;
+  
+  // Convert to Date objects
+  if (typeof startDate === 'number') {
+    startDateObj = new Date(startDate * 1000);
+  } else if (typeof startDate === 'string') {
+    startDateObj = new Date(startDate);
+  } else {
+    startDateObj = startDate;
+  }
+  
+  if (typeof endDate === 'number') {
+    endDateObj = new Date(endDate * 1000);
+  } else if (typeof endDate === 'string') {
+    endDateObj = new Date(endDate);
+  } else {
+    endDateObj = endDate;
+  }
+  
+  const startYear = startDateObj.getFullYear();
+  const endYear = endDateObj.getFullYear();
+  
+  // For consistency, use a simple format that works well internationally
+  // This will produce: "30 Jul 2025 - 20 Aug 2025" or "30 Jul - 20 Aug 2025"
+  
+  if (startYear === endYear) {
+    // Same year: show abbreviated format
+    const startFormatted = startDateObj.toLocaleDateString(undefined, { 
+      day: 'numeric', 
+      month: 'short' 
+    });
+    const endFormatted = endDateObj.toLocaleDateString(undefined, { 
+      day: 'numeric', 
+      month: 'short',
+      year: 'numeric'
+    });
+    return `${startFormatted} - ${endFormatted}`;
+  }
+  
+  // Different years: show full dates
+  const startFormatted = formatDate(startDateObj);
+  const endFormatted = formatDate(endDateObj);
+  return `${startFormatted} - ${endFormatted}`;
+}
