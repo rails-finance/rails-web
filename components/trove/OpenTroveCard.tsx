@@ -7,6 +7,7 @@ import { TroveCardHeader } from "./components/TroveCardHeader";
 import { TroveCardFooter } from "./components/TroveCardFooter";
 import { TroveData } from "@/types/api/trove";
 import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
+import { formatDate } from "@/lib/date";
 
 interface OpenTroveCardProps {
   trove: TroveData;
@@ -93,7 +94,7 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
       <TroveCardFooter
         trove={trove}
         showViewButton={showViewButton}
-        dateText={`Active for ${trove.activity.lifetimeDays} days`}
+        dateText={`Opened ${formatDate(trove.activity.created)}`}
       />
     </div>
   );
