@@ -4,7 +4,7 @@ import { ChangeValue } from "./ChangeValue";
 export function LeftValueDisplay({ tx }: { tx: Transaction }) {
   // Only show values for TroveTransactions
   if (!isTroveTransaction(tx)) {
-    return <div className="hidden md:block w-24 shrink-0" />;
+    return <div className="hidden sm:block w-24 shrink-0" />;
   }
 
   const { debtChangeFromOperation, collChangeFromOperation } = tx.troveOperation;
@@ -19,7 +19,7 @@ export function LeftValueDisplay({ tx }: { tx: Transaction }) {
     if (debtIncrease && collIncrease) {
       // Borrow + Deposit: User receives debt (first arrow points left)
       return (
-        <div className="hidden md:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
           <ChangeValue amount={Math.abs(debtChangeFromOperation)} />
           <div className="opacity-0 pointer-events-none">
             <ChangeValue amount={Math.abs(collChangeFromOperation)} />
@@ -29,7 +29,7 @@ export function LeftValueDisplay({ tx }: { tx: Transaction }) {
     } else if (!debtIncrease && !collIncrease) {
       // Repay + Withdraw: User receives collateral (first arrow points left)
       return (
-        <div className="hidden md:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
           <ChangeValue amount={Math.abs(collChangeFromOperation)} />
           <div className="opacity-0 pointer-events-none">
             <ChangeValue amount={Math.abs(debtChangeFromOperation)} />
@@ -39,33 +39,33 @@ export function LeftValueDisplay({ tx }: { tx: Transaction }) {
     } else if (debtIncrease && !collIncrease) {
       // Withdraw + Borrow: Both arrows point left (user receives both)
       return (
-        <div className="hidden md:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
           <ChangeValue amount={Math.abs(collChangeFromOperation)} />
           <ChangeValue amount={Math.abs(debtChangeFromOperation)} />
         </div>
       );
     } else {
       // Repay + Deposit: Both arrows point right (user sends both), no left values
-      return <div className="hidden md:block w-24 shrink-0" />;
+      return <div className="hidden sm:block w-24 shrink-0" />;
     }
   } else {
     // Single operation - user receives
     if (debtChangeFromOperation > 0) {
       // Borrow - user receives (arrow points left)
       return (
-        <div className="hidden md:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
           <ChangeValue amount={Math.abs(debtChangeFromOperation)} />
         </div>
       );
     } else if (collChangeFromOperation < 0) {
       // Withdraw - user receives (arrow points left)
       return (
-        <div className="hidden md:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
           <ChangeValue amount={Math.abs(collChangeFromOperation)} />
         </div>
       );
     }
     // Repay or Deposit - user sends (arrow points right), no left values
-    return <div className="hidden md:block w-24 shrink-0" />;
+    return <div className="hidden sm:block w-24 shrink-0" />;
   }
 }

@@ -1,3 +1,3 @@
 export function EmptySpace() {
-  return <div className="hidden md:block w-32 shrink-0" />;
+  return <div className="hidden sm:block w-32 shrink-0" />;
 }
