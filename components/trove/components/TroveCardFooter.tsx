@@ -92,7 +92,7 @@ export function TroveCardFooter({ trove, showViewButton, dateText }: TroveCardFo
           </div>
         </div>
         {showViewButton && (
-          <Button href={`/${trove.troveId}`} className="flex items-center w-full sm:w-auto justify-center">
+          <Button href={`/trove/${trove.collateralType}/${trove.troveId}`} className="flex items-center w-full sm:w-auto justify-center">
             View Trove
             <Icon name="arrow-right" size={14} className="ml-1" />
           </Button>

@@ -11,7 +11,8 @@ import { TransactionTimeline } from "@/components/transaction-timeline";
 export default function TrovePage() {
   const params = useParams();
   const troveId = params.troveId as string;
-  
+  const collateralType = params.collateralType as string;
+
   const [troveData, setTroveData] = useState<TroveData | null>(null);
   const [timelineData, setTimelineData] = useState<TimelineData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,11 +26,13 @@ export default function TrovePage() {
     try {
       setLoading(true);
       setError(null);
+      console.log("collateralType", collateralType);
+      console.log("troveId", troveId);
 
       // Fetch both trove data and timeline data in parallel
       const [troveResponse, timelineResponse] = await Promise.all([
-        fetch(`/api/troves?troveId=${troveId}`),
-        fetch(`/api/trove/${troveId}`)  // No limit - fetch all transactions
+        fetch(`/api/troves?troveId=${troveId}&collateralType=${collateralType}`),
+        fetch(`/api/trove/${collateralType}/${troveId}`),
       ]);
 
       if (!troveResponse.ok) {
@@ -37,10 +40,10 @@ export default function TrovePage() {
       }
 
       const troveData: TrovesResponse = await troveResponse.json();
-      
+
       if (!troveData.data || troveData.data.length === 0) {
         setError("Trove not found");
-        setLoading(false);  // Always set loading to false
+        setLoading(false); // Always set loading to false
         return;
       }
 
@@ -90,10 +93,7 @@ export default function TrovePage() {
         </Button>
         <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">
           <p className="text-red-400">{error || "Trove not found"}</p>
-          <button
-            onClick={loadData}
-            className="mt-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white text-sm"
-          >
+          <button onClick={loadData} className="mt-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white text-sm">
             Retry
           </button>
         </div>
