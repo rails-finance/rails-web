@@ -41,7 +41,7 @@ export interface TroveData {
   backedBy: TroveBackedBy;
   metrics: TroveMetrics;
   activity: TroveActivity;
-  walletAddress: string | null;
+  ownerAddress: string | null;
   walletEns: null; // Always null for now
   batchMembership: TroveBatchMembership;
 }
@@ -62,7 +62,7 @@ export interface TrovesQueryParams {
   offset?: number;
   status?: "open" | "closed" | "liquidated";
   collateralType?: string;
-  walletAddress?: string;
+  ownerAddress?: string;
   troveId?: string;
 }
 
