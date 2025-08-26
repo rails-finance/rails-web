@@ -11,7 +11,7 @@ interface TroveCardFooterProps {
 }
 
 export function TroveCardFooter({ trove, showViewButton, dateText }: TroveCardFooterProps) {
-  const [copiedWallet, setCopiedWallet] = useState(false);
+  const [copiedOwnerAddress, setCopiedOwnerAddress] = useState(false);
   const [copiedTrove, setCopiedTrove] = useState(false);
   return (
     <div className="text-xs">
@@ -21,30 +21,35 @@ export function TroveCardFooter({ trove, showViewButton, dateText }: TroveCardFo
             <span>{dateText}</span>
           </div>
           <div className="flex flex-wrap sm:flex-row gap-3">
-            {trove.walletAddress && (
+            {trove.ownerAddress && (
               <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
                 <span className="text-slate-400 flex items-center gap-1">
                   <Icon name="user" size={12} />
                   <span>
-                    {trove.walletEns || `${trove.walletAddress.substring(0, 6)}...${trove.walletAddress.substring(38)}`}
+                    {}
+                    {trove.walletEns || `${trove.ownerAddress.substring(0, 6)}...${trove.ownerAddress.substring(38)}`}
                   </span>
                   <div className="relative inline-block group">
                     <button
                       className="mx-1.5 text-slate-400 hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
-                      aria-label={copiedWallet ? "Copied to clipboard" : "Copy to clipboard"}
+                      aria-label={copiedOwnerAddress ? "Copied to clipboard" : "Copy to clipboard"}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        navigator.clipboard.writeText(trove.walletAddress);
-                        setCopiedWallet(true);
-                        setTimeout(() => setCopiedWallet(false), 2000);
+                        navigator.clipboard.writeText(trove.ownerAddress);
+                        setCopiedOwnerAddress(true);
+                        setTimeout(() => setCopiedOwnerAddress(false), 2000);
                       }}
                     >
-                      <Icon name={copiedWallet ? "check" : "copy"} size={14} />
+                      <Icon name={copiedOwnerAddress ? "check" : "copy"} size={14} />
                     </button>
                     <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 pointer-events-none">
-                      <div className={`bg-slate-700 text-slate-200 px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity duration-200 ${copiedWallet ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                        {copiedWallet ? 'Copied!' : 'Copy'}
+                      <div
+                        className={`bg-slate-700 text-slate-200 px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity duration-200 ${
+                          copiedOwnerAddress ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        }`}
+                      >
+                        {copiedOwnerAddress ? "Copied!" : "Copy"}
                       </div>
                     </div>
                   </div>
@@ -72,8 +77,12 @@ export function TroveCardFooter({ trove, showViewButton, dateText }: TroveCardFo
                     <Icon name={copiedTrove ? "check" : "copy"} size={14} />
                   </button>
                   <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 pointer-events-none">
-                    <div className={`bg-slate-700 text-slate-200 px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity duration-200 ${copiedTrove ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                      {copiedTrove ? 'Copied!' : 'Copy'}
+                    <div
+                      className={`bg-slate-700 text-slate-200 px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity duration-200 ${
+                        copiedTrove ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                      }`}
+                    >
+                      {copiedTrove ? "Copied!" : "Copy"}
                     </div>
                   </div>
                 </div>
@@ -92,7 +101,10 @@ export function TroveCardFooter({ trove, showViewButton, dateText }: TroveCardFo
           </div>
         </div>
         {showViewButton && (
-          <Button href={`/${trove.troveId}`} className="flex items-center w-full sm:w-auto justify-center">
+          <Button
+            href={`/trove/${trove.collateralType}/${trove.troveId}`}
+            className="flex items-center w-full sm:w-auto justify-center"
+          >
             View Trove
             <Icon name="arrow-right" size={14} className="ml-1" />
           </Button>
