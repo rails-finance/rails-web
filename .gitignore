@@ -44,5 +44,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+CLAUDE.md
+server.sh
 
 server.sh

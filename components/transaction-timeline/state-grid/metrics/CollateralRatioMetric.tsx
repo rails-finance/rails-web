@@ -22,14 +22,14 @@ export function CollateralRatioMetric({
       <StateTransition>
         {hasChange && (
           <>
-            <div className="text-slate-600">{before}</div>
+            <div className="text-slate-600">{before}<span className="ml-0.5">%</span></div>
             <TransitionArrow />
           </>
         )}
         {isCloseTrove ? (
           <ClosedStateLabel />
         ) : (
-          <span className="text-sm font-semibold text-white">{after}</span>
+          <span className="text-sm font-semibold text-white">{after}<span className="ml-0.5">%</span></span>
         )}
       </StateTransition>
     </StateMetric>

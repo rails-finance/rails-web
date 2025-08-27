@@ -7,14 +7,14 @@ import { Icon } from "@/components/icons/icon";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 
 const sampleAddresses = {
-  "Multiple Troves": "0x03719ee8f7cee79be9b467bcd82f882de428bcbb",
-  Redemption: "108550162375459801081263175493506884375415170607601597105767494617691416279914",
-  Liquidation: "37074809567919752442189907000666523308270530793726257191383299205622979408716",
-  "Sizeable loan": "108944359109208165624092356986168793957147284372283522328459696677773946197825",
-  "Adjust Interest Rate": "61010792625571153425067473455212148956727512052795796603835829351408505245957",
-  "Trove Transfer": "67872479288899261507793697577754208586488365819754818403051389498986683142732",
-  "Zombie Trove": "95820990254409912827054397309958850335014404990634110562055610547259397124124",
-  "Switch Delegate": "54495587837920133815632508166260258833637212972586767178860236873613556271151",
+  "Multiple Troves": { type: "address", value: "0x6665e62ef6f6db29d5f8191fbac472222c2cc80f" },
+  "Redemption": { type: "trove", value: "108550162375459801081263175493506884375415170607601597105767494617691416279914", collateral: "WETH" },
+  "Liquidation": { type: "trove", value: "37074809567919752442189907000666523308270530793726257191383299205622979408716", collateral: "WETH" },
+  "Sizeable loan": { type: "trove", value: "108944359109208165624092356986168793957147284372283522328459696677773946197825", collateral: "WETH" },
+  "Adjust Interest Rate": { type: "trove", value: "61010792625571153425067473455212148956727512052795796603835829351408505245957", collateral: "WETH" },
+  "Trove Transfer": { type: "trove", value: "67872479288899261507793697577754208586488365819754818403051389498986683142732", collateral: "wstETH" },
+  "Zombie Trove": { type: "trove", value: "95820990254409912827054397309958850335014404990634110562055610547259397124124", collateral: "WETH" },
+  "Switch Delegate": { type: "trove", value: "54495587837920133815632508166260258833637212972586767178860236873613556271151", collateral: "WETH" },
 };
 
 export default function Home() {
@@ -27,7 +27,12 @@ export default function Home() {
   };
 
   const handleSampleClick = (sample: keyof typeof sampleAddresses) => {
-    router.push(`/address/${sampleAddresses[sample]}`);
+    const sampleData = sampleAddresses[sample];
+    if (sampleData.type === "address") {
+      router.push(`/address/${sampleData.value}`);
+    } else if (sampleData.type === "trove") {
+      router.push(`/trove/${sampleData.collateral}/${sampleData.value}`);
+    }
   };
 
   return (
