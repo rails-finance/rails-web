@@ -18,22 +18,6 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
       return 0;
     };
     
-    // Helper to format gas fee display
-    const getGasFeeDisplay = () => {
-      // Don't show gas fees for operations not initiated by the user
-      const noGasOps = ['liquidate', 'redeemCollateral'];
-      if (noGasOps.includes(tx.operation)) {
-        return '';
-      }
-      
-      // Don't show gas fee for delegate IR adjustments (batch manager operations)
-      if (tx.operation === 'adjustTroveInterestRate' && tx.batchUpdate) {
-        return '';
-      }
-      
-      return '';
-    };
-    
     switch (tx.operation) {
       case 'openTrove':
         const openFee = getUpfrontFee();
@@ -96,7 +80,6 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
           adjustmentDesc += ` An upfront fee of ${adjustFee} ${tx.assetType} was charged.`;
         }
         
-        adjustmentDesc += getGasFeeDisplay();
         
         return adjustmentDesc;
       
