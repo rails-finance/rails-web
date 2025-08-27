@@ -39,23 +39,22 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
         const openFee = getUpfrontFee();
         const principalBorrowed = tx.stateAfter.debt - openFee;
         const collRatio = tx.stateAfter.collateralRatio ? `${tx.stateAfter.collateralRatio.toFixed(1)}%` : 'N/A';
-        // Placeholders for USD values - to be provided by backend
-        const collUsdValue = '{coll_after_usd_value}'; // Placeholder for collateral USD value
-        const priceDisplay = tx.collateralPrice ? `$${tx.collateralPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '{price}';
-        return `This transaction opened a new Trove position with ${tx.stateAfter.coll} ${tx.collateralType} (${collUsdValue}) collateral and borrowed ${principalBorrowed} ${tx.assetType} at a ${tx.stateAfter.annualInterestRate}% annual interest rate.${openFee > 0 ? ` An upfront fee of ${openFee} ${tx.assetType} was charged based on the interest rate, making total debt ${tx.stateAfter.debt} ${tx.assetType}.` : ''} The initial collateral ratio is ${collRatio}. ${tx.collateralType}/USD was ${priceDisplay} at the time of the transaction.`;
+        const collUsdValue = tx.stateAfter.collateralInUsd ? `$${tx.stateAfter.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+        const priceDisplay = tx.collateralPrice ? `$${tx.collateralPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+        return `This transaction opened a new Trove position with ${tx.stateAfter.coll} ${tx.collateralType}${collUsdValue ? ` (${collUsdValue})` : ''} collateral and borrowed ${principalBorrowed} ${tx.assetType} at a ${tx.stateAfter.annualInterestRate}% annual interest rate.${openFee > 0 ? ` An upfront fee of ${openFee} ${tx.assetType} was charged based on the interest rate, making total debt ${tx.stateAfter.debt} ${tx.assetType}.` : ''} The initial collateral ratio is ${collRatio}.${priceDisplay ? `` : ''}`;
       
       case 'openTroveAndJoinBatch':
         const batchOpenFee = getUpfrontFee();
         const batchPrincipalBorrowed = tx.stateAfter.debt - batchOpenFee;
         const batchCollRatio = tx.stateAfter.collateralRatio ? `${tx.stateAfter.collateralRatio.toFixed(1)}%` : 'N/A';
-        // Placeholders for USD values - to be provided by backend
-        const batchCollUsdValue = '{coll_after_usd_value}'; // Placeholder for collateral USD value
-        const batchPriceDisplay = tx.collateralPrice ? `$${tx.collateralPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '{price}';
-        return `This transaction opened a new Trove position with ${tx.stateAfter.coll} ${tx.collateralType} (${batchCollUsdValue}) collateral and borrowed ${batchPrincipalBorrowed} ${tx.assetType}. The position was immediately added to a batch with a ${tx.stateAfter.annualInterestRate}% annual interest rate.${batchOpenFee > 0 ? ` An upfront fee of ${batchOpenFee} ${tx.assetType} was charged making total debt ${tx.stateAfter.debt} ${tx.assetType}.` : ''} The initial collateral ratio is ${batchCollRatio}. ${tx.collateralType}/USD was ${batchPriceDisplay} at the time of the transaction.`;
+        const batchCollUsdValue = tx.stateAfter.collateralInUsd ? `$${tx.stateAfter.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+        const batchPriceDisplay = tx.collateralPrice ? `$${tx.collateralPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+        return `This transaction opened a new Trove position with ${tx.stateAfter.coll} ${tx.collateralType}${batchCollUsdValue ? ` (${batchCollUsdValue})` : ''} collateral and borrowed ${batchPrincipalBorrowed} ${tx.assetType}. The position was immediately added to a batch with a ${tx.stateAfter.annualInterestRate}% annual interest rate.${batchOpenFee > 0 ? ` An upfront fee of ${batchOpenFee} ${tx.assetType} was charged making total debt ${tx.stateAfter.debt} ${tx.assetType}.` : ''} The initial collateral ratio is ${batchCollRatio}.${batchPriceDisplay ? `.` : ''}`;
       
       case 'closeTrove':
         const stateBefore = tx.stateBefore || tx.stateAfter;
-        return `This transaction closed the Trove position, returning ${stateBefore.coll} ${tx.collateralType} collateral to the owner and repaying ${stateBefore.debt} ${tx.assetType} debt.`;
+        const closeCollUsdValue = stateBefore.collateralInUsd ? `$${stateBefore.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+        return `This transaction closed the Trove position, returning ${stateBefore.coll} ${tx.collateralType}${closeCollUsdValue ? ` (${closeCollUsdValue})` : ''} collateral to the owner and repaying ${stateBefore.debt} ${tx.assetType} debt.`;
       
       case 'adjustTrove':
         if (!isTroveTransaction(tx)) return null;
@@ -68,9 +67,17 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
         const adjustFee = getUpfrontFee();
         
         if (collChange > 0) {
-          parts.push(`adding ${collChange} ${tx.collateralType} (collUsdValue) collateral, increasing the collateral from X to Y`);
+          const beforeColl = tx.stateBefore?.coll || 0;
+          const afterColl = tx.stateAfter.coll;
+          const beforeCollUsd = tx.stateBefore?.collateralInUsd ? `$${tx.stateBefore.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+          const afterCollUsd = tx.stateAfter.collateralInUsd ? `$${tx.stateAfter.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+          parts.push(`adding ${collChange} ${tx.collateralType} collateral, increasing from ${beforeColl} ${tx.collateralType}${beforeCollUsd ? ` (${beforeCollUsd})` : ''} to ${afterColl} ${tx.collateralType}${afterCollUsd ? ` (${afterCollUsd})` : ''}`);
         } else if (collChange < 0) {
-          parts.push(`withdrawing ${Math.abs(collChange)} ${tx.collateralType} collateral, reducing the collateral from X to Y`);
+          const beforeColl = tx.stateBefore?.coll || 0;
+          const afterColl = tx.stateAfter.coll;
+          const beforeCollUsd = tx.stateBefore?.collateralInUsd ? `$${tx.stateBefore.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+          const afterCollUsd = tx.stateAfter.collateralInUsd ? `$${tx.stateAfter.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+          parts.push(`withdrawing ${Math.abs(collChange)} ${tx.collateralType} collateral, reducing from ${beforeColl} ${tx.collateralType}${beforeCollUsd ? ` (${beforeCollUsd})` : ''} to ${afterColl} ${tx.collateralType}${afterCollUsd ? ` (${afterCollUsd})` : ''}`);
         }
         
         if (debtChange > 0) {
@@ -101,7 +108,8 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
       case 'liquidate':
         const liquidatedColl = tx.stateBefore?.coll || tx.stateAfter.coll;
         const liquidatedDebt = tx.stateBefore?.debt || tx.stateAfter.debt;
-        return `This transaction liquidated the Trove position due to insufficient collateral ratio. ${liquidatedColl} ${tx.collateralType} collateral was seized and ${liquidatedDebt} ${tx.assetType} debt was cleared. The liquidation was triggered when the collateral ratio fell below the minimum requirement.`;
+        const liquidatedCollUsd = tx.stateBefore?.collateralInUsd ? `$${tx.stateBefore.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+        return `This transaction liquidated the Trove position due to insufficient collateral ratio. ${liquidatedColl} ${tx.collateralType}${liquidatedCollUsd ? ` (${liquidatedCollUsd})` : ''} collateral was seized and ${liquidatedDebt} ${tx.assetType} debt was cleared. The liquidation was triggered when the collateral ratio fell below the minimum requirement.`;
       
       case 'redeemCollateral':
         if (!isRedemptionTransaction(tx)) return null;
@@ -120,7 +128,14 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
         const netAmount = Math.abs(netLoss);
         
         // Build the explanation as plain text
-        let explanation = `THIS NEEDS CHECKING - A ${tx.assetType} holder redeemed ${debtRedeemed} ${tx.assetType} against this Trove, resulting in ${collRedeemed} ${tx.collateralType} (collRedeemed_usd_value) collateral being transferred to the redeemer and ${debtRedeemed} ${tx.assetType} debt being cleared.`;
+        // Calculate the difference in USD values from before to after for the redeemed collateral
+        const beforeCollUsd = tx.stateBefore?.collateralInUsd || 0;
+        const afterCollUsd = tx.stateAfter.collateralInUsd || 0;
+        const collRedeemedUsdValue = beforeCollUsd > afterCollUsd ? `$${(beforeCollUsd - afterCollUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+        
+        let explanation = collRedeemed > 0 
+          ? `A ${tx.assetType} holder redeemed ${debtRedeemed} ${tx.assetType} against this Trove, resulting in ${collRedeemed} ${tx.collateralType}${collRedeemedUsdValue ? ` (${collRedeemedUsdValue})` : ''} collateral being transferred to the redeemer and ${debtRedeemed} ${tx.assetType} debt being cleared.`
+          : `A ${tx.assetType} holder redeemed ${debtRedeemed} ${tx.assetType} against this zombie Trove. No collateral was transferred as the Trove has insufficient collateral, but ${debtRedeemed} ${tx.assetType} debt was cleared.`;
         
         if (redemptionFee > 0) {
           explanation += ` The Trove owner received ${redemptionFee} ${tx.collateralType} as a redemption fee.`;
