@@ -21,9 +21,9 @@ export function RightValueDisplay({ tx }: { tx: Transaction }) {
       return (
         <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-4 pr-2 pl-0.5">
           <div className="opacity-0 pointer-events-none">
-            <ChangeValue amount={Math.abs(debtChangeFromOperation)} />
+            <ChangeValue amount={Math.abs(debtChangeFromOperation)} type="debt" />
           </div>
-          <ChangeValue amount={Math.abs(collChangeFromOperation)} />
+          <ChangeValue amount={Math.abs(collChangeFromOperation)} type="collateral" />
         </div>
       );
     } else if (!debtIncrease && !collIncrease) {
@@ -31,17 +31,17 @@ export function RightValueDisplay({ tx }: { tx: Transaction }) {
       return (
         <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-4 pr-2 pl-0.5">
           <div className="opacity-0 pointer-events-none">
-            <ChangeValue amount={Math.abs(collChangeFromOperation)} />
+            <ChangeValue amount={Math.abs(collChangeFromOperation)} type="collateral" />
           </div>
-          <ChangeValue amount={Math.abs(debtChangeFromOperation)} />
+          <ChangeValue amount={Math.abs(debtChangeFromOperation)} type="debt" />
         </div>
       );
     } else if (!debtIncrease && collIncrease) {
       // Repay + Deposit: Both arrows point right (user sends both)
       return (
         <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-4 pr-2 pl-0.5">
-          <ChangeValue amount={Math.abs(debtChangeFromOperation)} />
-          <ChangeValue amount={Math.abs(collChangeFromOperation)} />
+          <ChangeValue amount={Math.abs(debtChangeFromOperation)} type="debt" />
+          <ChangeValue amount={Math.abs(collChangeFromOperation)} type="collateral" />
         </div>
       );
     } else {
@@ -54,14 +54,14 @@ export function RightValueDisplay({ tx }: { tx: Transaction }) {
       // Repay - user sends (arrow points right)
       return (
         <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-4 pr-2 pl-0.5">
-          <ChangeValue amount={Math.abs(debtChangeFromOperation)} />
+          <ChangeValue amount={Math.abs(debtChangeFromOperation)} type="debt" />
         </div>
       );
     } else if (collChangeFromOperation > 0) {
       // Deposit - user sends (arrow points right)
       return (
         <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-4 pr-2 pl-0.5">
-          <ChangeValue amount={Math.abs(collChangeFromOperation)} />
+          <ChangeValue amount={Math.abs(collChangeFromOperation)} type="collateral" />
         </div>
       );
     }

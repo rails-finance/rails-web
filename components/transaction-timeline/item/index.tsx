@@ -10,6 +10,7 @@ import { TransactionContainer } from "./components/TransactionContainer";
 import { TransactionContent } from "./components/TransactionContent";
 import { TransactionFooter } from "./components/TransactionFooter";
 import { ExpandedContent } from "./components/ExpandedContent";
+import { HoverProvider } from "../context/HoverContext";
 
 interface TransactionItemProps {
   tx: Transaction;
@@ -23,30 +24,32 @@ export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionIte
   const toggleExpanded = () => setIsExpanded(!isExpanded);
 
   return (
-    <TransactionContainer className="flex w-full">
-      {/* Left values - outbound to protocol */}
-      <LeftValueDisplay tx={tx} />
+    <HoverProvider>
+      <TransactionContainer className="flex w-full">
+        {/* Left values - outbound to protocol */}
+        <LeftValueDisplay tx={tx} />
 
-      {/* Transaction icon/timeline */}
-      <TransactionIcon tx={tx} isFirst={isFirst} isLast={isLast} />
+        {/* Transaction icon/timeline */}
+        <TransactionIcon tx={tx} isFirst={isFirst} isLast={isLast} />
 
-      {/* Right values - inbound from protocol */}
-      <RightValueDisplay tx={tx} />
+        {/* Right values - inbound from protocol */}
+        <RightValueDisplay tx={tx} />
 
-      {/* Transaction details */}
-      <TransactionContent isInBatch={tx.isInBatch} isExpanded={isExpanded}>
-        <TransactionItemHeader tx={tx} isExpanded={isExpanded} onClick={toggleExpanded} />
+        {/* Transaction details */}
+        <TransactionContent isInBatch={tx.isInBatch} isExpanded={isExpanded}>
+          <TransactionItemHeader tx={tx} isExpanded={isExpanded} onClick={toggleExpanded} />
 
-        {isExpanded && <ExpandedContent tx={tx} />}
+          {isExpanded && <ExpandedContent tx={tx} />}
 
-        <TransactionFooter
-          timestamp={tx.timestamp}
-          txIndex={txIndex}
-          txHash={tx.transactionHash}
-          isExpanded={isExpanded}
-          onClick={toggleExpanded}
-        />
-      </TransactionContent>
-    </TransactionContainer>
+          <TransactionFooter
+            timestamp={tx.timestamp}
+            txIndex={txIndex}
+            txHash={tx.transactionHash}
+            isExpanded={isExpanded}
+            onClick={toggleExpanded}
+          />
+        </TransactionContent>
+      </TransactionContainer>
+    </HoverProvider>
   );
 }

@@ -1,5 +1,8 @@
+'use client';
+
 import React from 'react';
 import { Transaction, isRedemptionTransaction, isTroveTransaction } from '@/types/api/troveHistory';
+import { HighlightableValue } from './HighlightableValue';
 
 interface EventExplanationProps {
   transaction: Transaction;
@@ -25,7 +28,41 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
         const collRatio = tx.stateAfter.collateralRatio ? `${tx.stateAfter.collateralRatio}%` : 'N/A';
         const collUsdValue = tx.stateAfter.collateralInUsd ? `$${tx.stateAfter.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
         const priceDisplay = tx.collateralPrice ? `$${tx.collateralPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
-        return `This transaction opened a new Trove position with ${tx.stateAfter.coll} ${tx.collateralType}${collUsdValue ? ` (${collUsdValue})` : ''} collateral and borrowed ${principalBorrowed} ${tx.assetType} at a ${tx.stateAfter.annualInterestRate}% annual interest rate.${openFee > 0 ? ` An upfront fee of ${openFee} ${tx.assetType} was charged based on the interest rate, making total debt ${tx.stateAfter.debt} ${tx.assetType}.` : ''} The initial collateral ratio is ${collRatio}.`;
+        return (
+          <>
+            This transaction opened a new Trove position with{' '}
+            <HighlightableValue type="collateral" state="after" value={tx.stateAfter.coll}>
+              {tx.stateAfter.coll} {tx.collateralType}
+            </HighlightableValue>
+            {collUsdValue ? ` (${collUsdValue})` : ''} collateral and borrowed{' '}
+            <HighlightableValue type="debt" state="change" value={principalBorrowed}>
+              {principalBorrowed} {tx.assetType}
+            </HighlightableValue>
+            {' '}at a{' '}
+            <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
+              {tx.stateAfter.annualInterestRate}%
+            </HighlightableValue>
+            {' '}annual interest rate.
+            {openFee > 0 ? (
+              <>
+                {' '}An upfront fee of{' '}
+                <HighlightableValue type="upfrontFee" state="fee" value={openFee}>
+                  {openFee} {tx.assetType}
+                </HighlightableValue>
+                {' '}was charged based on the interest rate, making total debt{' '}
+                <HighlightableValue type="debt" state="after" value={tx.stateAfter.debt}>
+                  {tx.stateAfter.debt} {tx.assetType}
+                </HighlightableValue>
+                .
+              </>
+            ) : ''}
+            {' '}The initial collateral ratio is{' '}
+            <HighlightableValue type="collRatio" state="after" value={tx.stateAfter.collateralRatio}>
+              {collRatio}
+            </HighlightableValue>
+            .
+          </>
+        );
       
       case 'openTroveAndJoinBatch':
         const batchOpenFee = getUpfrontFee();
@@ -33,12 +70,59 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
         const batchCollRatio = tx.stateAfter.collateralRatio ? `${tx.stateAfter.collateralRatio.toFixed(1)}%` : 'N/A';
         const batchCollUsdValue = tx.stateAfter.collateralInUsd ? `$${tx.stateAfter.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
         const batchPriceDisplay = tx.collateralPrice ? `$${tx.collateralPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
-        return `This transaction opened a new Trove position with ${tx.stateAfter.coll} ${tx.collateralType}${batchCollUsdValue ? ` (${batchCollUsdValue})` : ''} collateral and borrowed ${batchPrincipalBorrowed} ${tx.assetType}. The position was immediately added to a batch with a ${tx.stateAfter.annualInterestRate}% annual interest rate.${batchOpenFee > 0 ? ` An upfront fee of ${batchOpenFee} ${tx.assetType} was charged making total debt ${tx.stateAfter.debt} ${tx.assetType}.` : ''} The initial collateral ratio is ${batchCollRatio}.${batchPriceDisplay ? `.` : ''}`;
+        return (
+          <>
+            This transaction opened a new Trove position with{' '}
+            <HighlightableValue type="collateral" state="after" value={tx.stateAfter.coll}>
+              {tx.stateAfter.coll} {tx.collateralType}
+            </HighlightableValue>
+            {batchCollUsdValue ? ` (${batchCollUsdValue})` : ''} collateral and borrowed{' '}
+            <HighlightableValue type="debt" state="change" value={batchPrincipalBorrowed}>
+              {batchPrincipalBorrowed} {tx.assetType}
+            </HighlightableValue>
+            . The position was immediately added to a batch with a{' '}
+            <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
+              {tx.stateAfter.annualInterestRate}%
+            </HighlightableValue>
+            {' '}annual interest rate.
+            {batchOpenFee > 0 ? (
+              <>
+                {' '}An upfront fee of{' '}
+                <HighlightableValue type="upfrontFee" state="fee" value={batchOpenFee}>
+                  {batchOpenFee} {tx.assetType}
+                </HighlightableValue>
+                {' '}was charged making total debt{' '}
+                <HighlightableValue type="debt" state="after" value={tx.stateAfter.debt}>
+                  {tx.stateAfter.debt} {tx.assetType}
+                </HighlightableValue>
+                .
+              </>
+            ) : ''}
+            {' '}The initial collateral ratio is{' '}
+            <HighlightableValue type="collRatio" state="after" value={tx.stateAfter.collateralRatio}>
+              {batchCollRatio}
+            </HighlightableValue>
+            .
+            {batchPriceDisplay ? `.` : ''}
+          </>
+        );
       
       case 'closeTrove':
         const stateBefore = tx.stateBefore || tx.stateAfter;
         const closeCollUsdValue = stateBefore.collateralInUsd ? `$${stateBefore.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
-        return `This transaction closed the Trove position, returning ${stateBefore.coll} ${tx.collateralType}${closeCollUsdValue ? ` (${closeCollUsdValue})` : ''} collateral to the owner and repaying ${stateBefore.debt} ${tx.assetType} debt.`;
+        return (
+          <>
+            This transaction closed the Trove position, returning{' '}
+            <HighlightableValue type="collateral" state="before" value={stateBefore.coll}>
+              {stateBefore.coll} {tx.collateralType}
+            </HighlightableValue>
+            {closeCollUsdValue ? ` (${closeCollUsdValue})` : ''} collateral to the owner and repaying{' '}
+            <HighlightableValue type="debt" state="before" value={stateBefore.debt}>
+              {stateBefore.debt} {tx.assetType}
+            </HighlightableValue>
+            {' '}debt.
+          </>
+        );
       
       case 'adjustTrove':
         if (!isTroveTransaction(tx)) return null;
@@ -55,44 +139,129 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
           const afterColl = tx.stateAfter.coll;
           const beforeCollUsd = tx.stateBefore?.collateralInUsd ? `$${tx.stateBefore.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
           const afterCollUsd = tx.stateAfter.collateralInUsd ? `$${tx.stateAfter.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
-          parts.push(`adding ${collChange} ${tx.collateralType} collateral, increasing from ${beforeColl} ${tx.collateralType}${beforeCollUsd ? ` (${beforeCollUsd})` : ''} to ${afterColl} ${tx.collateralType}${afterCollUsd ? ` (${afterCollUsd})` : ''}`);
+          parts.push(
+            <>
+              adding{' '}
+              <HighlightableValue type="collateral" state="change" value={collChange}>
+                {collChange} {tx.collateralType}
+              </HighlightableValue>
+              {' '}collateral, increasing from{' '}
+              <HighlightableValue type="collateral" state="before" value={beforeColl}>
+                {beforeColl} {tx.collateralType}
+              </HighlightableValue>
+              {beforeCollUsd ? ` (${beforeCollUsd})` : ''} to{' '}
+              <HighlightableValue type="collateral" state="after" value={afterColl}>
+                {afterColl} {tx.collateralType}
+              </HighlightableValue>
+              {afterCollUsd ? ` (${afterCollUsd})` : ''}
+            </>
+          );
         } else if (collChange < 0) {
           const beforeColl = tx.stateBefore?.coll || 0;
           const afterColl = tx.stateAfter.coll;
           const beforeCollUsd = tx.stateBefore?.collateralInUsd ? `$${tx.stateBefore.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
           const afterCollUsd = tx.stateAfter.collateralInUsd ? `$${tx.stateAfter.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
-          parts.push(`withdrawing ${Math.abs(collChange)} ${tx.collateralType} collateral, reducing from ${beforeColl} ${tx.collateralType}${beforeCollUsd ? ` (${beforeCollUsd})` : ''} to ${afterColl} ${tx.collateralType}${afterCollUsd ? ` (${afterCollUsd})` : ''}`);
+          parts.push(
+            <>
+              withdrawing{' '}
+              <HighlightableValue type="collateral" state="change" value={Math.abs(collChange)}>
+                {Math.abs(collChange)} {tx.collateralType}
+              </HighlightableValue>
+              {' '}collateral, reducing from{' '}
+              <HighlightableValue type="collateral" state="before" value={beforeColl}>
+                {beforeColl} {tx.collateralType}
+              </HighlightableValue>
+              {beforeCollUsd ? ` (${beforeCollUsd})` : ''} to{' '}
+              <HighlightableValue type="collateral" state="after" value={afterColl}>
+                {afterColl} {tx.collateralType}
+              </HighlightableValue>
+              {afterCollUsd ? ` (${afterCollUsd})` : ''}
+            </>
+          );
         }
         
         if (debtChange > 0) {
-          parts.push(`borrowing ${debtChange} ${tx.assetType}`);
+          parts.push(
+            <>
+              borrowing{' '}
+              <HighlightableValue type="debt" state="change" value={debtChange}>
+                {debtChange} {tx.assetType}
+              </HighlightableValue>
+            </>
+          );
         } else if (debtChange < 0) {
-          parts.push(`repaying ${Math.abs(debtChange)} ${tx.assetType}`);
+          parts.push(
+            <>
+              repaying{' '}
+              <HighlightableValue type="debt" state="change" value={Math.abs(debtChange)}>
+                {Math.abs(debtChange)} {tx.assetType}
+              </HighlightableValue>
+            </>
+          );
         }
         
-        if (parts.length > 0) {
-          adjustmentDesc += ' by ' + parts.join(' and ') + '.';
-        } else {
-          adjustmentDesc += '.';
-        }
-        
-        if (adjustFee > 0) {
-          adjustmentDesc += ` An upfront fee of ${adjustFee} ${tx.assetType} was charged.`;
-        }
-        
-        
-        return adjustmentDesc;
+        return (
+          <>
+            {adjustmentDesc}
+            {parts.length > 0 && (
+              <>
+                {' '}by{' '}
+                {parts.map((part, index) => (
+                  <React.Fragment key={index}>
+                    {index > 0 && ' and '}
+                    {part}
+                  </React.Fragment>
+                ))}
+                .
+              </>
+            )}
+            {parts.length === 0 && '.'}
+            {adjustFee > 0 && (
+              <>
+                {' '}An upfront fee of{' '}
+                <HighlightableValue type="upfrontFee" state="fee" value={adjustFee}>
+                  {adjustFee} {tx.assetType}
+                </HighlightableValue>
+                {' '}was charged.
+              </>
+            )}
+          </>
+        );
       
       case 'adjustTroveInterestRate':
         const prevRate = tx.stateBefore?.annualInterestRate || 0;
         const newRate = tx.stateAfter.annualInterestRate;
-        return `This transaction changed the Trove's interest rate from ${prevRate}% to ${newRate}%.`;
+        return (
+          <>
+            This transaction changed the Trove's interest rate from{' '}
+            <HighlightableValue type="interestRate" state="before" value={prevRate}>
+              {prevRate}%
+            </HighlightableValue>
+            {' '}to{' '}
+            <HighlightableValue type="interestRate" state="after" value={newRate}>
+              {newRate}%
+            </HighlightableValue>
+            .
+          </>
+        );
       
       case 'liquidate':
         const liquidatedColl = tx.stateBefore?.coll || tx.stateAfter.coll;
         const liquidatedDebt = tx.stateBefore?.debt || tx.stateAfter.debt;
         const liquidatedCollUsd = tx.stateBefore?.collateralInUsd ? `$${tx.stateBefore.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
-        return `This transaction liquidated the Trove position due to insufficient collateral ratio. ${liquidatedColl} ${tx.collateralType}${liquidatedCollUsd ? ` (${liquidatedCollUsd})` : ''} collateral was seized and ${liquidatedDebt} ${tx.assetType} debt was cleared. The liquidation was triggered when the collateral ratio fell below the minimum requirement.`;
+        return (
+          <>
+            This transaction liquidated the Trove position due to insufficient collateral ratio.{' '}
+            <HighlightableValue type="collateral" state="before" value={liquidatedColl}>
+              {liquidatedColl} {tx.collateralType}
+            </HighlightableValue>
+            {liquidatedCollUsd ? ` (${liquidatedCollUsd})` : ''} collateral was seized and{' '}
+            <HighlightableValue type="debt" state="before" value={liquidatedDebt}>
+              {liquidatedDebt} {tx.assetType}
+            </HighlightableValue>
+            {' '}debt was cleared. The liquidation was triggered when the collateral ratio fell below the minimum requirement.
+          </>
+        );
       
       case 'redeemCollateral':
         if (!isRedemptionTransaction(tx)) return null;
@@ -119,45 +288,130 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
         const afterCollUsd = tx.stateAfter.collateralInUsd || 0;
         const collRedeemedUsdValue = beforeCollUsd > afterCollUsd ? `$${(beforeCollUsd - afterCollUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
         
-        let explanation = collRedeemed > 0 
-          ? `A ${tx.assetType} holder redeemed ${debtRedeemed} ${tx.assetType} against this Trove, resulting in ${collateralTransferredOut} ${tx.collateralType}${collValueLost > 0 ? ` ($${collValueLost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : ''} collateral being transferred to the redeemer and ${debtRedeemed} ${tx.assetType} debt being cleared.`
-          : `A ${tx.assetType} holder redeemed ${debtRedeemed} ${tx.assetType} against this zombie Trove. No collateral was transferred as the Trove has insufficient collateral, but ${debtRedeemed} ${tx.assetType} debt was cleared.`;
-        
-        if (redemptionFee > 0) {
-          explanation += ` A redemption fee of ${redemptionFee} ${tx.collateralType} was retained in the Trove as collateral, improving the collateral ratio.`;
-        } else {
-          explanation += ` No redemption fee was retained in the Trove for this transaction.`;
-        }
-        
-        if (redemptionPrice > 0) {
-          explanation += ` The Trove owner experienced a net ${isProfit ? 'profit' : 'loss'} of $${netAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from this redemption ($${collValueLost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} collateral transferred out minus $${debtRedeemed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} debt cleared).`;
-        }
-        
-        if (isZombieTrove) {
-          if (finalDebt === 0) {
-            explanation += ` This redemption created a zombie trove (zero debt) that can be revived by borrowing at least 2000 ${tx.assetType}.`;
-          } else {
-            explanation += ` This redemption created a zombie trove with only ${finalDebt} ${tx.assetType} debt, below the 2000 ${tx.assetType} minimum.`;
-          }
-        }
-        
-        return explanation;
+        return (
+          <>
+            {collRedeemed > 0 ? (
+              <>
+                A {tx.assetType} holder redeemed{' '}
+                <HighlightableValue type="debt" state="change" value={debtRedeemed}>
+                  {debtRedeemed} {tx.assetType}
+                </HighlightableValue>
+                {' '}against this Trove, resulting in{' '}
+                <HighlightableValue type="collateral" state="change" value={collateralTransferredOut}>
+                  {collateralTransferredOut} {tx.collateralType}
+                </HighlightableValue>
+                {collValueLost > 0 ? ` ($${collValueLost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : ''} collateral being transferred to the redeemer and{' '}
+                <HighlightableValue type="debt" state="change" value={debtRedeemed}>
+                  {debtRedeemed} {tx.assetType}
+                </HighlightableValue>
+                {' '}debt being cleared.
+              </>
+            ) : (
+              <>
+                A {tx.assetType} holder redeemed{' '}
+                <HighlightableValue type="debt" state="change" value={debtRedeemed}>
+                  {debtRedeemed} {tx.assetType}
+                </HighlightableValue>
+                {' '}against this zombie Trove. No collateral was transferred as the Trove has insufficient collateral, but{' '}
+                <HighlightableValue type="debt" state="change" value={debtRedeemed}>
+                  {debtRedeemed} {tx.assetType}
+                </HighlightableValue>
+                {' '}debt was cleared.
+              </>
+            )}
+            
+            {redemptionFee > 0 ? (
+              <>
+                {' '}A redemption fee of{' '}
+                <HighlightableValue type="collateral" state="fee" value={redemptionFee}>
+                  {redemptionFee} {tx.collateralType}
+                </HighlightableValue>
+                {' '}was retained in the Trove as collateral, improving the collateral ratio.
+              </>
+            ) : (
+              <> No redemption fee was retained in the Trove for this transaction.</>
+            )}
+            
+            {redemptionPrice > 0 && (
+              <>
+                {' '}The Trove owner experienced a net {isProfit ? 'profit' : 'loss'} of ${netAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from this redemption ($
+                {collValueLost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} collateral transferred out minus ${debtRedeemed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} debt cleared).
+              </>
+            )}
+            
+            {isZombieTrove && (
+              <>
+                {finalDebt === 0 ? (
+                  <> This redemption created a zombie trove (zero debt) that can be revived by borrowing at least 2000 {tx.assetType}.</>
+                ) : (
+                  <>
+                    {' '}This redemption created a zombie trove with only{' '}
+                    <HighlightableValue type="debt" state="after" value={finalDebt}>
+                      {finalDebt} {tx.assetType}
+                    </HighlightableValue>
+                    {' '}debt, below the 2000 {tx.assetType} minimum.
+                  </>
+                )}
+              </>
+            )}
+          </>
+        );
       
       case 'setInterestBatchManager':
         const joinRate = tx.stateAfter.annualInterestRate;
         const prevIndividualRate = tx.stateBefore?.annualInterestRate || joinRate;
-        return `This transaction moved the Trove from individual management to batch management, changing the interest rate from ${prevIndividualRate}% to ${joinRate}%. Batch management may include annual management fees.`;
+        return (
+          <>
+            This transaction moved the Trove from individual management to batch management, changing the interest rate from{' '}
+            <HighlightableValue type="interestRate" state="before" value={prevIndividualRate}>
+              {prevIndividualRate}%
+            </HighlightableValue>
+            {' '}to{' '}
+            <HighlightableValue type="interestRate" state="after" value={joinRate}>
+              {joinRate}%
+            </HighlightableValue>
+            . Batch management may include annual management fees.
+          </>
+        );
       
       case 'removeFromBatch':
         const exitRate = tx.stateAfter.annualInterestRate;
         const prevBatchRate = tx.stateBefore?.annualInterestRate || exitRate;
-        return `This transaction removed the Trove from batch management, returning it to individual management. The interest rate changed from ${prevBatchRate}% to ${exitRate}%.`;
+        return (
+          <>
+            This transaction removed the Trove from batch management, returning it to individual management. The interest rate changed from{' '}
+            <HighlightableValue type="interestRate" state="before" value={prevBatchRate}>
+              {prevBatchRate}%
+            </HighlightableValue>
+            {' '}to{' '}
+            <HighlightableValue type="interestRate" state="after" value={exitRate}>
+              {exitRate}%
+            </HighlightableValue>
+            .
+          </>
+        );
       
       case 'applyPendingDebt':
-        return `This transaction applied pending interest and fee updates to the Trove. The debt was updated to reflect accumulated interest and any management fees.`;
+        return (
+          <>
+            This transaction applied pending interest and fee updates to the Trove. The debt was updated to reflect accumulated interest and any management fees.
+          </>
+        );
       
       default:
-        return `This ${tx.operation.replace(/([A-Z])/g, ' $1').toLowerCase().trim()} transaction modified the Trove position. The final state shows ${tx.stateAfter.debt} ${tx.assetType} debt and ${tx.stateAfter.coll} ${tx.collateralType} collateral.`;
+        return (
+          <>
+            This {tx.operation.replace(/([A-Z])/g, ' $1').toLowerCase().trim()} transaction modified the Trove position. The final state shows{' '}
+            <HighlightableValue type="debt" state="after" value={tx.stateAfter.debt}>
+              {tx.stateAfter.debt} {tx.assetType}
+            </HighlightableValue>
+            {' '}debt and{' '}
+            <HighlightableValue type="collateral" state="after" value={tx.stateAfter.coll}>
+              {tx.stateAfter.coll} {tx.collateralType}
+            </HighlightableValue>
+            {' '}collateral.
+          </>
+        );
     }
   };
 
