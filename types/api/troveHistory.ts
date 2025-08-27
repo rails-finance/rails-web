@@ -154,7 +154,7 @@ export interface TroveRedemptionTransaction extends BaseTransaction {
     attemptedBoldAmount: number;
     actualBoldAmount: number;
     ETHSent: number;
-    ETHFee: number;
+    ETHFee: string;
     price: number;
     redemptionPrice: number;
   };
@@ -182,7 +182,7 @@ export interface TroveRedemptionTransaction extends BaseTransaction {
   };
 
   // From RedemptionFeePaidToTrove event
-  redemptionFee?: number;
+  redemptionFee?: string;
 
   // Backend calculated
   stateBefore?: TroveState;

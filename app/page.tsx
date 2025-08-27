@@ -23,6 +23,7 @@ export default function Home() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    router.push(`/address/${searchValue}`);
   };
 
   const handleSampleClick = (sample: keyof typeof sampleAddresses) => {

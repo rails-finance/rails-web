@@ -11,6 +11,7 @@
 !.yarn/versions
 package-lock.json
 .claude
+CLAUDE.md
 .playwright-mcp/*
 
 # testing
@@ -44,4 +45,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 CLAUDE.md
+server.sh
+
 server.sh
