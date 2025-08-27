@@ -26,8 +26,7 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
           collateralType={collateralType}
           before={stateBefore?.coll}
           after={stateAfter.coll}
-          afterInUsd="{coll_after_usd_value}" // Placeholder: USD value to be provided by backend
-          beforeInUsd="{coll_before_usd_value}" // Placeholder: USD value to be provided by backend
+          afterInUsd={stateAfter.collateralInUsd}
           isCloseTrove={isCloseTrove}
         />
 

@@ -29,7 +29,7 @@ export function LiquidatedTroveCard({ trove, showViewButton = false }: Liquidate
         <p className="text-sm">Collateral at liquidation</p>
         <div className="flex items-center">
           <div className="flex items-center">
-            <p className="text-xl font-medium text-white mr-1">{trove.backedBy.preLiquidationAmount}</p>
+            <p className="text-xl font-medium text-white mr-1">{trove.backedBy.peakAmount}</p>
             <span className="flex items-center text-slate-400">
               <TokenIcon assetSymbol={trove.collateralType} />
             </span>

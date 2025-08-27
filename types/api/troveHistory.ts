@@ -39,6 +39,7 @@ export interface TroveState {
   stake: number;
   annualInterestRate: number; // Direct or from batch data
   collateralRatio: number; // Backend calculated: (coll * price) / debt * 100
+  collateralInUsd: number; // Total collateral value in USD from coll_usd field
 
   // Optional batch-specific fields
   interestBatchManager?: string; // From BatchedTroveUpdated
@@ -59,6 +60,8 @@ interface BaseTransaction {
   protocolName: string;
   assetType: string;
   collateralType: string;
+  gasFee: number; // Gas fee in ETH
+  gasFeeUsd: number; // Gas fee in USD
 }
 
 // Standard trove operation (open, close, adjust, etc.)
