@@ -1,24 +1,20 @@
 import {
   isLiquidationTransaction,
-  isRedemptionTransaction,
-  isTroveTransaction,
   Transaction,
 } from "@/types/api/troveHistory";
 import { TransactionStateGrid } from "../../state-grid";
-import { ZombieWarning } from "../../special-case-details/ZombieWarning";
-import { LiquidationEvent } from "../../special-case-details/LiquidationEvent";
-import { RedemptionDetails } from "../../special-case-details/RedemptionDetails";
+import { EventExplanation } from "../../explanation/EventExplanation";
+import { TransactionLinks } from "./TransactionLinks";
 
 export function ExpandedContent({ tx }: { tx: Transaction }) {
   return (
-    <>
-      {tx.isZombieTrove && <ZombieWarning tx={tx} />}
+    <div className="px-4 sm:px-6 pb-2 space-y-4">
 
       <TransactionStateGrid tx={tx} />
-
-      {isLiquidationTransaction(tx) && <LiquidationEvent />}
-
-      {isRedemptionTransaction(tx) && <RedemptionDetails tx={tx} />}
-    </>
+      
+      <EventExplanation transaction={tx} />
+      
+      <TransactionLinks transaction={tx} />
+    </div>
   );
 }

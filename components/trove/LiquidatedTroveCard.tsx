@@ -1,6 +1,7 @@
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { TroveCardHeader } from "./components/TroveCardHeader";
 import { TroveCardFooter } from "./components/TroveCardFooter";
+import { formatDateRange } from "@/lib/date";
 
 interface LiquidatedTroveCardProps {
   trove: any;
@@ -36,10 +37,10 @@ export function LiquidatedTroveCard({ trove, showViewButton = false }: Liquidate
         </div>
       </div>
 
-      <TroveCardFooter 
-        trove={trove} 
+      <TroveCardFooter
+        trove={trove}
         showViewButton={showViewButton}
-        dateText={`Liquidated after ${trove.activity.lifetimeDays} days`}
+        dateText={`${formatDateRange(trove.activity.created, trove.activity.lastActivity)}`}
       />
     </div>
   );
