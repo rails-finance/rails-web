@@ -94,7 +94,7 @@ export interface TroveTransaction extends BaseTransaction {
 
   collateralPrice?: number;
   isInBatch: boolean; // Helper to know which event type was used
-  isZombieTrove?: boolean; // debt < MIN_DEBT (200 BOLD)
+  isZombieTrove?: boolean; // debt < MIN_DEBT (2000 BOLD)
 }
 
 // Liquidation affecting a specific trove
