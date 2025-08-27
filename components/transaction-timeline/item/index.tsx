@@ -34,8 +34,8 @@ export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionIte
       <RightValueDisplay tx={tx} />
 
       {/* Transaction details */}
-      <TransactionContent isInBatch={tx.isInBatch} isExpanded={isExpanded} onClick={toggleExpanded}>
-        <TransactionItemHeader tx={tx} />
+      <TransactionContent isInBatch={tx.isInBatch} isExpanded={isExpanded}>
+        <TransactionItemHeader tx={tx} isExpanded={isExpanded} onClick={toggleExpanded} />
 
         {isExpanded && <ExpandedContent tx={tx} />}
 
@@ -44,6 +44,7 @@ export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionIte
           txIndex={txIndex}
           txHash={tx.transactionHash}
           isExpanded={isExpanded}
+          onClick={toggleExpanded}
         />
       </TransactionContent>
     </TransactionContainer>
