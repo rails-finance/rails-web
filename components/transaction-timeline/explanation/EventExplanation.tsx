@@ -104,9 +104,12 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
         const isZombieTrove = finalDebt >= 0 && finalDebt < 2000; // MIN_DEBT in BOLD
         
         // Calculate net impact values
-        const collValueLost = redemptionPrice > 0 ? collRedeemed * redemptionPrice : 0;
-        const feeValueReceived = redemptionPrice > 0 ? redemptionFee * redemptionPrice : 0;
-        const netLoss = collValueLost - debtRedeemed - feeValueReceived;
+        // The actual collateral transferred to redeemer (excluding fee that stays in Trove)
+        const collateralTransferredOut = collRedeemed - redemptionFee;
+        const collValueLost = redemptionPrice > 0 ? collateralTransferredOut * redemptionPrice : 0;
+        const feeValueRetained = redemptionPrice > 0 ? redemptionFee * redemptionPrice : 0;
+        // Net loss = Value of collateral transferred out - Debt cleared
+        const netLoss = collValueLost - debtRedeemed;
         const isProfit = netLoss < 0;
         const netAmount = Math.abs(netLoss);
         
@@ -117,17 +120,17 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
         const collRedeemedUsdValue = beforeCollUsd > afterCollUsd ? `$${(beforeCollUsd - afterCollUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
         
         let explanation = collRedeemed > 0 
-          ? `A ${tx.assetType} holder redeemed ${debtRedeemed} ${tx.assetType} against this Trove, resulting in ${collRedeemed} ${tx.collateralType}${collRedeemedUsdValue ? ` (${collRedeemedUsdValue})` : ''} collateral being transferred to the redeemer and ${debtRedeemed} ${tx.assetType} debt being cleared.`
+          ? `A ${tx.assetType} holder redeemed ${debtRedeemed} ${tx.assetType} against this Trove, resulting in ${collateralTransferredOut} ${tx.collateralType}${collValueLost > 0 ? ` ($${collValueLost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : ''} collateral being transferred to the redeemer and ${debtRedeemed} ${tx.assetType} debt being cleared.`
           : `A ${tx.assetType} holder redeemed ${debtRedeemed} ${tx.assetType} against this zombie Trove. No collateral was transferred as the Trove has insufficient collateral, but ${debtRedeemed} ${tx.assetType} debt was cleared.`;
         
         if (redemptionFee > 0) {
-          explanation += ` The Trove owner received ${redemptionFee} ${tx.collateralType} as a redemption fee.`;
+          explanation += ` A redemption fee of ${redemptionFee} ${tx.collateralType} was retained in the Trove as collateral, improving the collateral ratio.`;
         } else {
-          explanation += ` No redemption fee was paid to the Trove owner for this transaction.`;
+          explanation += ` No redemption fee was retained in the Trove for this transaction.`;
         }
         
         if (redemptionPrice > 0) {
-          explanation += ` At the redemption price of $${redemptionPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per ${tx.collateralType}, the Trove owner experienced a net ${isProfit ? 'profit' : 'loss'} of $${netAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from this redemption ($${collValueLost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} collateral value lost minus $${debtRedeemed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} debt cleared${redemptionFee > 0 ? ` minus $${feeValueReceived.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} fee compensation` : ''}).`;
+          explanation += ` The Trove owner experienced a net ${isProfit ? 'profit' : 'loss'} of $${netAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from this redemption ($${collValueLost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} collateral transferred out minus $${debtRedeemed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} debt cleared).`;
         }
         
         if (isZombieTrove) {
