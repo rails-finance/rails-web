@@ -31,7 +31,7 @@ export function DebtMetric({ assetType, before, after, isCloseTrove, upfrontFee 
         </StateTransition>
         {upfrontFee !== undefined && upfrontFee > 0 && (
           <div className="">
-            <span className="text-xs text-slate-500 mt-0.5 block">Fee: {upfrontFee}</span>
+            <span className="text-xs text-slate-500 mt-0.5 block">{upfrontFee} fee</span>
           </div>
         )}
       </div>

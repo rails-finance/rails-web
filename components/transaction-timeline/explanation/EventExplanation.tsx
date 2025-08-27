@@ -22,10 +22,10 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
       case 'openTrove':
         const openFee = getUpfrontFee();
         const principalBorrowed = tx.stateAfter.debt - openFee;
-        const collRatio = tx.stateAfter.collateralRatio ? `${tx.stateAfter.collateralRatio.toFixed(1)}%` : 'N/A';
+        const collRatio = tx.stateAfter.collateralRatio ? `${tx.stateAfter.collateralRatio}%` : 'N/A';
         const collUsdValue = tx.stateAfter.collateralInUsd ? `$${tx.stateAfter.collateralInUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
         const priceDisplay = tx.collateralPrice ? `$${tx.collateralPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
-        return `This transaction opened a new Trove position with ${tx.stateAfter.coll} ${tx.collateralType}${collUsdValue ? ` (${collUsdValue})` : ''} collateral and borrowed ${principalBorrowed} ${tx.assetType} at a ${tx.stateAfter.annualInterestRate}% annual interest rate.${openFee > 0 ? ` An upfront fee of ${openFee} ${tx.assetType} was charged based on the interest rate, making total debt ${tx.stateAfter.debt} ${tx.assetType}.` : ''} The initial collateral ratio is ${collRatio}.${priceDisplay ? `` : ''}`;
+        return `This transaction opened a new Trove position with ${tx.stateAfter.coll} ${tx.collateralType}${collUsdValue ? ` (${collUsdValue})` : ''} collateral and borrowed ${principalBorrowed} ${tx.assetType} at a ${tx.stateAfter.annualInterestRate}% annual interest rate.${openFee > 0 ? ` An upfront fee of ${openFee} ${tx.assetType} was charged based on the interest rate, making total debt ${tx.stateAfter.debt} ${tx.assetType}.` : ''} The initial collateral ratio is ${collRatio}.`;
       
       case 'openTroveAndJoinBatch':
         const batchOpenFee = getUpfrontFee();

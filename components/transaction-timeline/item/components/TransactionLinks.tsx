@@ -107,11 +107,8 @@ export function TransactionLinks({ transaction }: TransactionLinksProps) {
         {getCollateralPricePerUnit() && (
           <div className="flex items-center gap-1">
             {/* Overlapping icons container */}
-            <div className="relative flex items-center mr-1">
+            <div className="relative flex items-center mr-0.5">
               <TokenIcon assetSymbol={tx.collateralType} className="w-4 h-4" />
-              <div className="absolute -right-1 -bottom-0.5 w-3 h-3 bg-slate-800 rounded-full flex items-center justify-center border border-slate-600">
-                <span className="text-[9px] font-bold text-green-400">$</span>
-              </div>
             </div>
             <span className="font-medium">
               ${getCollateralPricePerUnit()?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
