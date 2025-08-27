@@ -164,7 +164,7 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
   const explanation = generateExplanation();
   
   return (
-    <div className="text-slate-300 leading-relaxed text-sm space-y-4">
+    <div className="text-slate-500 leading-relaxed text-sm space-y-4 mb-8">
       {explanation}
     </div>
   );

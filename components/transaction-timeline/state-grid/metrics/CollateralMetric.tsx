@@ -29,7 +29,7 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
         ) : (
           <div className="flex items-center space-x-1">
             <span className="text-sm font-semibold text-white">{after}</span>
-            <span className="text-xs flex items-center text-slate-600 border border-slate-600 font-medium rounded-sm px-1 py-0">
+            <span className="text-xs flex items-center text-slate-600 border-l border-r border-slate-600 font-medium rounded-sm px-1 py-0">
               ${afterInUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
