@@ -18,6 +18,22 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
       return 0;
     };
     
+    // Helper to format gas fee display
+    const getGasFeeDisplay = () => {
+      // Don't show gas fees for operations not initiated by the user
+      const noGasOps = ['liquidate', 'redeemCollateral'];
+      if (noGasOps.includes(tx.operation)) {
+        return '';
+      }
+      
+      // Don't show gas fee for delegate IR adjustments (batch manager operations)
+      if (tx.operation === 'adjustTroveInterestRate' && tx.batchUpdate) {
+        return '';
+      }
+      
+      return '';
+    };
+    
     switch (tx.operation) {
       case 'openTrove':
         const openFee = getUpfrontFee();
@@ -26,8 +42,7 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
         // Placeholders for USD values - to be provided by backend
         const collUsdValue = '{coll_after_usd_value}'; // Placeholder for collateral USD value
         const priceDisplay = tx.collateralPrice ? `$${tx.collateralPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '{price}';
-        const gasFeeDisplay = '{gas_fee}'; // Placeholder for gas fee
-        return `This transaction opened a new Trove position with ${tx.stateAfter.coll} ${tx.collateralType} (${collUsdValue}) collateral and borrowed ${principalBorrowed} ${tx.assetType} at a ${tx.stateAfter.annualInterestRate}% annual interest rate.${openFee > 0 ? ` An upfront fee of ${openFee} ${tx.assetType} was charged based on the interest rate, making total debt ${tx.stateAfter.debt} ${tx.assetType}.` : ''} The initial collateral ratio is ${collRatio}. ${tx.collateralType}/USD was ${priceDisplay} at the time of the transaction. `;
+        return `This transaction opened a new Trove position with ${tx.stateAfter.coll} ${tx.collateralType} (${collUsdValue}) collateral and borrowed ${principalBorrowed} ${tx.assetType} at a ${tx.stateAfter.annualInterestRate}% annual interest rate.${openFee > 0 ? ` An upfront fee of ${openFee} ${tx.assetType} was charged based on the interest rate, making total debt ${tx.stateAfter.debt} ${tx.assetType}.` : ''} The initial collateral ratio is ${collRatio}. ${tx.collateralType}/USD was ${priceDisplay} at the time of the transaction.`;
       
       case 'openTroveAndJoinBatch':
         const batchOpenFee = getUpfrontFee();
@@ -36,8 +51,7 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
         // Placeholders for USD values - to be provided by backend
         const batchCollUsdValue = '{coll_after_usd_value}'; // Placeholder for collateral USD value
         const batchPriceDisplay = tx.collateralPrice ? `$${tx.collateralPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '{price}';
-        const batchGasFeeDisplay = '{gas_fee}'; // Placeholder for gas fee
-        return `This transaction opened a new Trove position with ${tx.stateAfter.coll} ${tx.collateralType} (${batchCollUsdValue}) collateral and borrowed ${batchPrincipalBorrowed} ${tx.assetType}. The position was immediately added to a batch with a ${tx.stateAfter.annualInterestRate}% annual interest rate.${batchOpenFee > 0 ? ` An upfront fee of ${batchOpenFee} ${tx.assetType} was charged making total debt ${tx.stateAfter.debt} ${tx.assetType}.` : ''} The initial collateral ratio is ${batchCollRatio}. ${tx.collateralType}/USD was ${batchPriceDisplay} at the time of the transaction. `;
+        return `This transaction opened a new Trove position with ${tx.stateAfter.coll} ${tx.collateralType} (${batchCollUsdValue}) collateral and borrowed ${batchPrincipalBorrowed} ${tx.assetType}. The position was immediately added to a batch with a ${tx.stateAfter.annualInterestRate}% annual interest rate.${batchOpenFee > 0 ? ` An upfront fee of ${batchOpenFee} ${tx.assetType} was charged making total debt ${tx.stateAfter.debt} ${tx.assetType}.` : ''} The initial collateral ratio is ${batchCollRatio}. ${tx.collateralType}/USD was ${batchPriceDisplay} at the time of the transaction.`;
       
       case 'closeTrove':
         const stateBefore = tx.stateBefore || tx.stateAfter;
@@ -74,6 +88,8 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
         if (adjustFee > 0) {
           adjustmentDesc += ` An upfront fee of ${adjustFee} ${tx.assetType} was charged.`;
         }
+        
+        adjustmentDesc += getGasFeeDisplay();
         
         return adjustmentDesc;
       

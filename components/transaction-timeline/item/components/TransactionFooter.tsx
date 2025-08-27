@@ -12,7 +12,7 @@ interface TransactionFooterProps {
 export function TransactionFooter({ timestamp, txIndex, txHash, isExpanded, onClick }: TransactionFooterProps) {
   return (
     <div 
-      className="px-4 sm:px-6 pb-4 sm:pb-6 rounded-b-md cursor-pointer relative overflow-hidden group/footer"
+      className={`px-4 sm:px-6 pb-4 sm:pb-6 ${isExpanded ? 'pt-5' : ''} rounded-b-md cursor-pointer relative overflow-hidden group/footer`}
       onClick={onClick}
       role="button"
       aria-expanded={isExpanded}
