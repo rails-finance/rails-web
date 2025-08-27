@@ -6,11 +6,16 @@ import { TroveData } from "@/types/api/trove";
 interface TroveCardProps {
   trove: TroveData;
   showViewButton?: boolean;
+  collateralAtLiquidation?: number;
 }
 
-export function TroveCard({ trove, showViewButton = false }: TroveCardProps) {
+export function TroveCard({ trove, showViewButton = false, collateralAtLiquidation }: TroveCardProps) {
   if (trove.status === "liquidated") {
-    return <LiquidatedTroveCard trove={trove} showViewButton={showViewButton} />;
+    return <LiquidatedTroveCard 
+      trove={trove} 
+      showViewButton={showViewButton} 
+      collateralAtLiquidation={collateralAtLiquidation}
+    />;
   }
 
   if (trove.status === "open") {
