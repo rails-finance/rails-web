@@ -7,10 +7,15 @@ import { Icon } from "@/components/icons/icon";
 interface TroveCardFooterProps {
   trove: any;
   showViewButton?: boolean;
-  dateText: string;
+  dateText?: string;
+  dateInfo?: {
+    prefix: string;
+    date: string;
+    suffix?: string;
+  };
 }
 
-export function TroveCardFooter({ trove, showViewButton, dateText }: TroveCardFooterProps) {
+export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: TroveCardFooterProps) {
   const [copiedOwnerAddress, setCopiedOwnerAddress] = useState(false);
   const [copiedTrove, setCopiedTrove] = useState(false);
   return (
@@ -18,7 +23,18 @@ export function TroveCardFooter({ trove, showViewButton, dateText }: TroveCardFo
       <div className="flex flex-col sm:flex-row sm:justify-between gap-2 sm:gap-0 sm:items-center">
         <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-2 sm:space-x-3">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-            <span>{dateText}</span>
+            <span>
+              {dateInfo ? (
+                <>
+                  {dateInfo.prefix} {dateInfo.date}
+                  {dateInfo.suffix && (
+                    <span className="text-slate-500 ml-1">({dateInfo.suffix})</span>
+                  )}
+                </>
+              ) : (
+                dateText
+              )}
+            </span>
           </div>
           <div className="flex flex-wrap sm:flex-row gap-3">
             {trove.ownerAddress && (

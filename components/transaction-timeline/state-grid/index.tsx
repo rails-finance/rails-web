@@ -1,4 +1,4 @@
-import { Transaction } from "@/types/api/troveHistory";
+import { Transaction, isTroveTransaction } from "@/types/api/troveHistory";
 import { DebtMetric } from "./metrics/DebtMetric";
 import { CollateralMetric } from "./metrics/CollateralMetric";
 import { InterestRateMetric } from "./metrics/InterestRateMetric";
@@ -7,6 +7,9 @@ import { CollateralRatioMetric } from "./metrics/CollateralRatioMetric";
 export function TransactionStateGrid({ tx }: { tx: Transaction }) {
   const { stateBefore, stateAfter, assetType, collateralType } = tx;
   const isCloseTrove = tx.operation === "closeTrove";
+  
+  // Get upfront fee if available (only for trove transactions)
+  const upfrontFee = isTroveTransaction(tx) ? tx.troveOperation.debtIncreaseFromUpfrontFee : undefined;
 
   return (
     <div className="space-y-4 mb-4">
@@ -16,6 +19,7 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
           before={stateBefore?.debt}
           after={stateAfter.debt}
           isCloseTrove={isCloseTrove}
+          upfrontFee={upfrontFee}
         />
 
         <CollateralMetric

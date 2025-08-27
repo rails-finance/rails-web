@@ -83,15 +83,13 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
         {interestInfo && (
           <div className="mt-2 text-xs text-slate-500 space-y-0.5">
             <div className="flex items-center gap-1">
-              <Icon name="calculator" size={14} className="flex-shrink-0" />
               <span>{interestInfo.recordedDebt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + {interestInfo.accruedInterest.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} interest</span>
-            </div>
             {interestInfo.isBatchMember && interestInfo.accruedManagementFees !== undefined && interestInfo.accruedManagementFees > 0 && (
-              <div className="flex justify-between">
-                <span>Management fees</span>
-                <span className="font-mono text-orange-400">+{interestInfo.accruedManagementFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              </div>
+              <span>
+                + {interestInfo.accruedManagementFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} delegate fee
+              </span>
             )}
+            </div>
           </div>
         )}
       </div>
@@ -123,31 +121,36 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
           </p>
         </div>
         <div>
-          <p className="text-sm">Interest Rate</p>
+          <p className="text-sm">{trove.batchMembership.isMember ? 'Delegated ' : ''}Interest Rate</p>
           <div className="text-xl font-medium">
             <span className="text-white">{trove.metrics.interestRate}%</span>
           </div>
           {interestInfo && (
             <div className="text-xs text-slate-500 mt-0.5 space-y-0.5">
-              <div>~{dailyInterestCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {trove.assetType}/day</div>
-              <div>~{annualInterestCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {trove.assetType}/year</div>
+              <div>~ {dailyInterestCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} day • {annualInterestCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} year</div>
             </div>
           )}
           {trove.batchMembership.isMember && (
             <>
+              <p className="text-xs text-slate-500">+ {trove.batchMembership.managementFeeRate}% 
               {batchManagerInfo?.website ? (
                 <a 
                   href={batchManagerInfo.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-blue-400 hover:text-blue-300 mt-1 underline underline-offset-2 block"
+                  className="text-xs text-blue-400 hover:text-blue-300 mt-1 underline underline-offset-2 ml-0.5"
                 >
                   {batchManagerInfo.name}
                 </a>
               ) : (
-                <p className="text-xs text-slate-400 mt-1">{batchManagerInfo?.name || "Batch Manager"}</p>
+                <span>{batchManagerInfo?.name || "Batch Manager"}</span>
               )}
-              <p className="text-xs text-slate-400">+ {trove.batchMembership.managementFeeRate}% mgmt fee</p>
+            </p>
+            {interestInfo && (
+              <div className="text-xs text-slate-500 mt-0.5">
+                ~ {((interestInfo.recordedDebt * trove.batchMembership.managementFeeRate / 100) / 365).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} day • {(interestInfo.recordedDebt * trove.batchMembership.managementFeeRate / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} year
+              </div>
+            )}
             </>
           )}
         </div>
@@ -156,7 +159,11 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
       <TroveCardFooter
         trove={trove}
         showViewButton={showViewButton}
-        dateText={`Opened ${formatDate(trove.activity.created)}`}
+        dateInfo={{
+          prefix: "Opened",
+          date: formatDate(trove.activity.created),
+          suffix: `${trove.activity.lifetimeDays} days`
+        }}
       />
     </div>
   );
