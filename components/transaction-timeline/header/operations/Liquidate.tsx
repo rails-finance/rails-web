@@ -8,8 +8,8 @@ export function LiquidateHeader({ tx }: { tx: TroveLiquidationTransaction }) {
     <>
       <OperationBadge label="LIQUIDATION" color="red" />
       <div className="flex items-center gap-1">
-        <AssetAction action="Liquidated" asset={tx.collateralType} amount={Math.abs(collChangeFromOperation)} alwaysShowAmount />
-        <AssetAction action="Cleared" asset={tx.assetType} amount={Math.abs(debtChangeFromOperation)} alwaysShowAmount />
+        <AssetAction action="Liquidated" asset={tx.collateralType} amount={Math.abs(collChangeFromOperation)} alwaysShowAmount valueType="collateral" />
+        <AssetAction action="Cleared" asset={tx.assetType} amount={Math.abs(debtChangeFromOperation)} alwaysShowAmount valueType="debt" />
       </div>
     </>
   );

@@ -8,11 +8,11 @@ interface ChangeValueProps {
 }
 
 export function ChangeValue({ amount, type }: ChangeValueProps) {
-  const { hoveredValue, setHoveredValue } = useHover();
+  const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
   
-  const isHighlighted = type && shouldHighlight(hoveredValue, type, 'change');
+  const isHighlighted = hoverEnabled && type && shouldHighlight(hoveredValue, type, 'change');
   
-  if (!type) {
+  if (!type || !hoverEnabled) {
     return <span className="font-medium text-white min-h-10 flex items-center justify-end">{amount}</span>;
   }
   

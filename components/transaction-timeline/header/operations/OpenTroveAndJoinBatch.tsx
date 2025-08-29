@@ -17,8 +17,8 @@ export function OpenTroveAndJoinBatchHeader({ tx }: { tx: TroveTransaction }) {
             icon={<BatchIcon className="w-3 h-3 mr-1" />}
           />
           <InterestRateBadge rate={tx.stateAfter.annualInterestRate} />
-          <AssetAction action="Supply" asset={tx.collateralType} amount={collChangeFromOperation} />
-          <AssetAction action="Borrow" asset={tx.assetType} amount={debtChangeFromOperation} />
+          <AssetAction action="Supply" asset={tx.collateralType} amount={collChangeFromOperation} valueType="collateral" />
+          <AssetAction action="Borrow" asset={tx.assetType} amount={debtChangeFromOperation} valueType="debt" />
         </div>
       </div>
       <BatchManagerInfo batchManager={tx.stateAfter.interestBatchManager} color="blue" />

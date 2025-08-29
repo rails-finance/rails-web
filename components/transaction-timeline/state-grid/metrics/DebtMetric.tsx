@@ -15,23 +15,19 @@ interface DebtMetricProps {
 }
 
 export function DebtMetric({ assetType, before, after, isCloseTrove, upfrontFee }: DebtMetricProps) {
-  const { hoveredValue, setHoveredValue } = useHover();
+  const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
   const hasChange = before && before !== after;
   
-  const isBeforeHighlighted = shouldHighlight(hoveredValue, 'debt', 'before');
-  const isAfterHighlighted = shouldHighlight(hoveredValue, 'debt', 'after');
-  const isFeeHighlighted = shouldHighlight(hoveredValue, 'upfrontFee', 'fee');
+  // Only highlight when hover is enabled
+  const isAfterHighlighted = hoverEnabled && shouldHighlight(hoveredValue, 'debt', 'after');
+  const isFeeHighlighted = hoverEnabled && shouldHighlight(hoveredValue, 'upfrontFee', 'fee');
   return (
     <StateMetric label="Debt" icon={<TokenIcon assetSymbol={assetType} className="mr-2 w-5 h-5 text-green-400" />}>
       <div>
         <StateTransition>
           {hasChange && (
             <>
-              <div 
-                className={`text-slate-600 cursor-pointer transition-all ${isBeforeHighlighted ? 'underline decoration-dotted underline-offset-2' : ''}`}
-                onMouseEnter={() => setHoveredValue({ type: 'debt', state: 'before', value: before })}
-                onMouseLeave={() => setHoveredValue(null)}
-              >
+              <div className="text-slate-600">
                 {before}
               </div>
               <TransitionArrow />
@@ -41,9 +37,9 @@ export function DebtMetric({ assetType, before, after, isCloseTrove, upfrontFee 
             <div className="flex flex-row">
               {isCloseTrove ? <ClosedStateLabel /> : (
                 <div 
-                  className={`text-sm font-semibold text-white cursor-pointer transition-all ${isAfterHighlighted ? 'underline decoration-dotted underline-offset-2' : ''}`}
-                  onMouseEnter={() => setHoveredValue({ type: 'debt', state: 'after', value: after })}
-                  onMouseLeave={() => setHoveredValue(null)}
+                  className={`text-sm font-semibold text-white ${hoverEnabled ? 'cursor-pointer' : ''} transition-all ${isAfterHighlighted ? 'underline decoration-dotted underline-offset-2' : ''}`}
+                  onMouseEnter={hoverEnabled ? () => setHoveredValue({ type: 'debt', state: 'after', value: after }) : undefined}
+                  onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
                 >
                   {after}
                 </div>
@@ -54,9 +50,9 @@ export function DebtMetric({ assetType, before, after, isCloseTrove, upfrontFee 
         {upfrontFee !== undefined && upfrontFee > 0 && (
           <div className="">
             <span 
-              className={`text-xs text-slate-500 mt-0.5 block cursor-pointer transition-all ${isFeeHighlighted ? 'underline decoration-dotted underline-offset-2' : ''}`}
-              onMouseEnter={() => setHoveredValue({ type: 'upfrontFee', state: 'fee', value: upfrontFee })}
-              onMouseLeave={() => setHoveredValue(null)}
+              className={`text-xs text-slate-500 mt-0.5 block ${hoverEnabled ? 'cursor-pointer' : ''} transition-all ${isFeeHighlighted ? 'underline decoration-dotted underline-offset-2' : ''}`}
+              onMouseEnter={hoverEnabled ? () => setHoveredValue({ type: 'upfrontFee', state: 'fee', value: upfrontFee }) : undefined}
+              onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
             >
               {upfrontFee} fee
             </span>

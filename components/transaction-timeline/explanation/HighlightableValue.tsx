@@ -15,17 +15,19 @@ export function HighlightableValue({
   state, 
   value 
 }: HighlightableValueProps) {
-  const { hoveredValue, setHoveredValue } = useHover();
+  const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
   
-  const isHighlighted = hoveredValue?.type === type && hoveredValue?.state === state;
+  // Skip hover interactions for 'before' states or when hover is disabled
+  const shouldEnableHover = hoverEnabled && state !== 'before';
+  const isHighlighted = shouldEnableHover && hoveredValue?.type === type && hoveredValue?.state === state;
   
   return (
     <span
-      className={`cursor-pointer text-slate-200 ${
+      className={`${shouldEnableHover ? 'cursor-pointer' : ''} text-slate-200 ${
         isHighlighted ? 'underline decoration-dotted underline-offset-2 text-slate-200' : ''
       }`}
-      onMouseEnter={() => setHoveredValue({ type, state, value })}
-      onMouseLeave={() => setHoveredValue(null)}
+      onMouseEnter={shouldEnableHover ? () => setHoveredValue({ type, state, value }) : undefined}
+      onMouseLeave={shouldEnableHover ? () => setHoveredValue(null) : undefined}
     >
       {children}
     </span>

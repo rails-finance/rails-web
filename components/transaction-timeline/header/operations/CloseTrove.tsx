@@ -8,8 +8,8 @@ export function CloseTroveHeader({ tx }: { tx: TroveTransaction }) {
     <>
       <OperationBadge label="CLOSE" color="red" />
       <div className="flex items-center gap-1">
-        <AssetAction action="Repay" asset={tx.assetType} amount={Math.abs(debtChangeFromOperation)} />
-        <AssetAction action="Withdraw" asset={tx.collateralType} amount={Math.abs(collChangeFromOperation)} />
+        <AssetAction action="Repay" asset={tx.assetType} amount={Math.abs(debtChangeFromOperation)} valueType="debt" />
+        <AssetAction action="Withdraw" asset={tx.collateralType} amount={Math.abs(collChangeFromOperation)} valueType="collateral" />
       </div>
     </>
   );

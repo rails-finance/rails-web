@@ -15,23 +15,19 @@ interface CollateralMetricProps {
 }
 
 export function CollateralMetric({ collateralType, before, after, afterInUsd, isCloseTrove }: CollateralMetricProps) {
-  const { hoveredValue, setHoveredValue } = useHover();
+  const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
   const hasChange = before && before !== after;
   
-  const isBeforeHighlighted = shouldHighlight(hoveredValue, 'collateral', 'before');
-  const isAfterHighlighted = shouldHighlight(hoveredValue, 'collateral', 'after');
-  const isChangeHighlighted = shouldHighlight(hoveredValue, 'collateral', 'change');
+  // Only highlight when hover is enabled
+  const isAfterHighlighted = hoverEnabled && shouldHighlight(hoveredValue, 'collateral', 'after');
+  const isChangeHighlighted = hoverEnabled && shouldHighlight(hoveredValue, 'collateral', 'change');
   return (
     <StateMetric label="Collateral" icon={<TokenIcon assetSymbol={collateralType} className="mr-2 w-5 h-5" />}>
       <StateTransition>
         {hasChange && (
           <>
             <div className="flex items-center space-x-1">
-              <span 
-                className={`text-slate-600 cursor-pointer transition-all ${isBeforeHighlighted ? 'underline decoration-dotted underline-offset-2' : ''}`}
-                onMouseEnter={() => setHoveredValue({ type: 'collateral', state: 'before', value: before })}
-                onMouseLeave={() => setHoveredValue(null)}
-              >
+              <span className="text-slate-600">
                 {before}
               </span>
             </div>
@@ -43,9 +39,9 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
         ) : (
           <div className="flex items-center space-x-1">
             <span 
-              className={`text-sm font-semibold text-white cursor-pointer transition-all ${isAfterHighlighted ? 'underline decoration-dotted underline-offset-2' : ''}`}
-              onMouseEnter={() => setHoveredValue({ type: 'collateral', state: 'after', value: after })}
-              onMouseLeave={() => setHoveredValue(null)}
+              className={`text-sm font-semibold text-white ${hoverEnabled ? 'cursor-pointer' : ''} transition-all ${isAfterHighlighted ? 'underline decoration-dotted underline-offset-2' : ''}`}
+              onMouseEnter={hoverEnabled ? () => setHoveredValue({ type: 'collateral', state: 'after', value: after }) : undefined}
+              onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
             >
               {after}
             </span>

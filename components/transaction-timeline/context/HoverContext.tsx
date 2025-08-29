@@ -14,15 +14,18 @@ export interface HoveredValue {
 interface HoverContextType {
   hoveredValue: HoveredValue | null;
   setHoveredValue: (value: HoveredValue | null) => void;
+  hoverEnabled: boolean;
+  setHoverEnabled: (enabled: boolean) => void;
 }
 
 const HoverContext = createContext<HoverContextType | undefined>(undefined);
 
 export function HoverProvider({ children }: { children: ReactNode }) {
   const [hoveredValue, setHoveredValue] = useState<HoveredValue | null>(null);
+  const [hoverEnabled, setHoverEnabled] = useState<boolean>(false);
 
   return (
-    <HoverContext.Provider value={{ hoveredValue, setHoveredValue }}>
+    <HoverContext.Provider value={{ hoveredValue, setHoveredValue, hoverEnabled, setHoverEnabled }}>
       {children}
     </HoverContext.Provider>
   );

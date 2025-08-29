@@ -19,21 +19,17 @@ export function CollateralRatioMetric({
   after,
   isCloseTrove,
 }: CollateralRatioMetricProps) {
-  const { hoveredValue, setHoveredValue } = useHover();
+  const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
   const hasChange = before && before !== after;
   
-  const isBeforeHighlighted = shouldHighlight(hoveredValue, 'collRatio', 'before');
-  const isAfterHighlighted = shouldHighlight(hoveredValue, 'collRatio', 'after');
+  // Only highlight when hover is enabled
+  const isAfterHighlighted = hoverEnabled && shouldHighlight(hoveredValue, 'collRatio', 'after');
   return (
     <StateMetric label="Collateral Ratio">
       <StateTransition>
         {hasChange && (
           <>
-            <div 
-              className={`text-slate-600 cursor-pointer transition-all ${isBeforeHighlighted ? 'underline decoration-dotted underline-offset-2' : ''}`}
-              onMouseEnter={() => setHoveredValue({ type: 'collRatio', state: 'before', value: before })}
-              onMouseLeave={() => setHoveredValue(null)}
-            >
+            <div className="text-slate-600">
               {before}<span className="ml-0.5">%</span>
             </div>
             <TransitionArrow />
@@ -43,9 +39,9 @@ export function CollateralRatioMetric({
           <ClosedStateLabel />
         ) : (
           <span 
-            className={`text-sm font-semibold text-white cursor-pointer transition-all ${isAfterHighlighted ? 'underline decoration-dotted underline-offset-2' : ''}`}
-            onMouseEnter={() => setHoveredValue({ type: 'collRatio', state: 'after', value: after })}
-            onMouseLeave={() => setHoveredValue(null)}
+            className={`text-sm font-semibold text-white ${hoverEnabled ? 'cursor-pointer' : ''} transition-all ${isAfterHighlighted ? 'underline decoration-dotted underline-offset-2' : ''}`}
+            onMouseEnter={hoverEnabled ? () => setHoveredValue({ type: 'collRatio', state: 'after', value: after }) : undefined}
+            onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
           >
             {after}<span className="ml-0.5">%</span>
           </span>
