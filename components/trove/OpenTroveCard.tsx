@@ -156,15 +156,37 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
         </div>
       </div>
 
-      <TroveCardFooter
-        trove={trove}
-        showViewButton={showViewButton}
-        dateInfo={{
-          prefix: "Opened",
-          date: formatDate(trove.activity.created),
-          suffix: `${trove.activity.lifetimeDays} days`
-        }}
-      />
+      {showViewButton ? (
+        <TroveCardFooter
+          trove={trove}
+          showViewButton={showViewButton}
+          dateInfo={{
+            prefix: "Opened",
+            date: formatDate(trove.activity.created),
+            suffix: `${trove.activity.lifetimeDays} days`
+          }}
+        />
+      ) : (
+        <div className="flex justify-between items-end">
+          <TroveCardFooter
+            trove={trove}
+            showViewButton={showViewButton}
+            dateInfo={{
+              prefix: "Opened",
+              date: formatDate(trove.activity.created),
+              suffix: `${trove.activity.lifetimeDays} days`
+            }}
+          />
+          
+          {/* Latest collateral value - only show on trove view page */}
+          <div className="flex items-center gap-1">
+            <TokenIcon assetSymbol={trove.collateralType} />
+            <span className="text-sm text-white font-medium">
+              ${(trove.backedBy.valueUsd / trove.backedBy.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
