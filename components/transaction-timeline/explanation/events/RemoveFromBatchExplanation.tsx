@@ -66,6 +66,6 @@ export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFrom
   }
   
   return (
-    <ExplanationPanel items={batchExitItems} onToggle={onToggle} />
+    <ExplanationPanel items={batchExitItems} onToggle={onToggle} defaultOpen={false} />
   );
 }

@@ -63,6 +63,6 @@ export function ApplyPendingDebtExplanation({ transaction, onToggle }: ApplyPend
   }
   
   return (
-    <ExplanationPanel items={pendingDebtItems} onToggle={onToggle} />
+    <ExplanationPanel items={pendingDebtItems} onToggle={onToggle} defaultOpen={false} />
   );
 }

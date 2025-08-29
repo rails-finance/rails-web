@@ -162,6 +162,6 @@ export function AdjustTroveExplanation({ transaction, onToggle }: AdjustTroveExp
   }
   
   return (
-    <ExplanationPanel items={adjustTroveItems} onToggle={onToggle} />
+    <ExplanationPanel items={adjustTroveItems} onToggle={onToggle} defaultOpen={false} />
   );
 }

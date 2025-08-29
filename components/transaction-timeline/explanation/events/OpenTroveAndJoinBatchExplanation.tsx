@@ -106,6 +106,6 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
   );
   
   return (
-    <ExplanationPanel items={batchItems} onToggle={onToggle} />
+    <ExplanationPanel items={batchItems} onToggle={onToggle} defaultOpen={false} />
   );
 }

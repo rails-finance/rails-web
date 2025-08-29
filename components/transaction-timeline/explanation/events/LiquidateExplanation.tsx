@@ -79,6 +79,6 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
   );
   
   return (
-    <ExplanationPanel items={liquidateItems} onToggle={onToggle} />
+    <ExplanationPanel items={liquidateItems} onToggle={onToggle} defaultOpen={false} />
   );
 }

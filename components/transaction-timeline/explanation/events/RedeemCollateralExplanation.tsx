@@ -158,6 +158,6 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
   }
 
   return (
-    <ExplanationPanel items={redeemItems} onToggle={onToggle} />
+    <ExplanationPanel items={redeemItems} onToggle={onToggle} defaultOpen={false} />
   );
 }

@@ -6,17 +6,17 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 interface ExplanationPanelProps {
   items: React.ReactNode[];
   onToggle?: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function ExplanationPanel({ items, onToggle }: ExplanationPanelProps) {
-  const [isOpen, setIsOpen] = useState(false); // Start closed to match SSR
+export function ExplanationPanel({ items, onToggle, defaultOpen = true }: ExplanationPanelProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen); // Use defaultOpen directly
   const [isHydrated, setIsHydrated] = useState(false);
   
   useEffect(() => {
     setIsHydrated(true);
-    setIsOpen(true); // Open after hydration
-    onToggle?.(true); // Enable hover context
-  }, [onToggle]);
+    onToggle?.(isOpen); // Enable hover context based on current state
+  }, [onToggle, isOpen]);
   
   const handleToggle = () => {
     const newState = !isOpen;
@@ -28,8 +28,8 @@ export function ExplanationPanel({ items, onToggle }: ExplanationPanelProps) {
     return null;
   }
 
-  // During SSR and initial client render, show closed state to prevent hydration mismatch
-  const shouldShowOpen = isHydrated && isOpen;
+  // Show the appropriate state based on isOpen
+  const shouldShowOpen = isOpen;
 
   return (
     <div className="bg-slate-800/40 rounded-lg">
