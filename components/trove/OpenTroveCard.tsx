@@ -77,14 +77,14 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
             {interestInfo ? formatPrice(debtWithInterest) : formatPrice(trove.mainValue)}
           </h3>
           <span className="ml-2 text-green-400 text-lg">
-            <TokenIcon assetSymbol={trove.assetType} />
+            <TokenIcon assetSymbol={trove.assetType} className="w-7 h-7 relative top-0" />
           </span>
         </div>
         {/* Debt breakdown */}
         {interestInfo && (
           <div className="mt-2 text-xs text-slate-500 space-y-0.5">
-            <div className="flex items-center gap-1">
-              <span>{formatPrice(interestInfo.recordedDebt)} + {formatPrice(interestInfo.accruedInterest)} interest</span>
+            <div className="flex items-center gap-1 ">
+              <span className="bg-slate-950 border border-slate-700 rounded px-1.5">{formatPrice(interestInfo.recordedDebt)} + {formatPrice(interestInfo.accruedInterest)} interest</span>
             {interestInfo.isBatchMember && interestInfo.accruedManagementFees !== undefined && interestInfo.accruedManagementFees > 0 && (
               <span>
                 + {formatPrice(interestInfo.accruedManagementFees)} delegate fee
@@ -98,10 +98,10 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
       {/* Metrics grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <p className="text-sm">Backed by</p>
+          <p className="text-sm font-semibold ">Backed by</p>
           <div className="flex items-center">
             <span className="flex items-center">
-              <p className="text-xl font-medium text-white mr-1">{trove.backedBy.amount}</p>
+              <p className="text-xl font-bold text-white mr-1">{trove.backedBy.amount}</p>
               <span className="flex items-center">
                 <TokenIcon assetSymbol={trove.collateralType} />
               </span>
@@ -115,7 +115,7 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
         </div>
         <div>
           <p className="text-sm">Collateral Ratio</p>
-          <p className="text-xl font-medium text-white">
+          <p className="text-xl font-semibold text-white">
             {interestInfo && trove.backedBy.valueUsd > 0 
               ? `${((trove.backedBy.valueUsd / debtWithInterest) * 100).toFixed(1)}%`
               : `${trove.metrics.collateralRatio}%`}
@@ -128,12 +128,12 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
           </div>
           {interestInfo && (
             <div className="text-xs text-slate-500 mt-0.5 space-y-0.5">
-              <div>~ {formatPrice(dailyInterestCost)} day • {formatPrice(annualInterestCost)} year</div>
+              <span className="bg-slate-950 border border-slate-700 rounded px-1.5">~ {formatPrice(dailyInterestCost)} day / {formatPrice(annualInterestCost)} year</span>
             </div>
           )}
           {trove.batchMembership.isMember && (
             <>
-              <p className="text-xs text-slate-500">+ {trove.batchMembership.managementFeeRate}% 
+              <p className="text-xs text-slate-500 mt-0.5">+ {trove.batchMembership.managementFeeRate}% 
               {batchManagerInfo?.website ? (
                 <a 
                   href={batchManagerInfo.website}
@@ -144,12 +144,12 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
                   {batchManagerInfo.name}
                 </a>
               ) : (
-                <span>{batchManagerInfo?.name || "Batch Manager"}</span>
+                <span> {batchManagerInfo?.name || "Batch Manager"}</span>
               )}
             </p>
             {interestInfo && (
               <div className="text-xs text-slate-500 mt-0.5">
-                ~ {formatPrice((interestInfo.recordedDebt * trove.batchMembership.managementFeeRate / 100) / 365)} day • {formatPrice(interestInfo.recordedDebt * trove.batchMembership.managementFeeRate / 100)} year
+                ~ {formatPrice((interestInfo.recordedDebt * trove.batchMembership.managementFeeRate / 100) / 365)} day / {formatPrice(interestInfo.recordedDebt * trove.batchMembership.managementFeeRate / 100)} year
               </div>
             )}
             </>
