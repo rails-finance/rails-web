@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { Info, CircleQuestionMark, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ExplanationPanelProps {
   items: React.ReactNode[];
@@ -31,21 +31,33 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true }: Explan
   // Show the appropriate state based on isOpen
   const shouldShowOpen = isOpen;
 
+
   return (
-    <div className="bg-slate-800/40 rounded-lg">
+    <div className={`rounded-b-lg shadow-inner ${shouldShowOpen ? 'bg-slate-950' : 'bg-slate-950 shadow-inner w-22'}`}>
       {!shouldShowOpen ? (
         <button
           onClick={handleToggle}
-          className="cursor-pointer w-full p-4 flex items-center justify-center gap-2 text-slate-400 hover:text-slate-300 transition-colors"
+          className="cursor-pointer w-full py-1 flex items-center justify-center gap-1 text-slate-400 hover:text-slate-200 transition-colors"
           aria-expanded={shouldShowOpen}
           aria-label="Show transaction details"
         >
-          <ChevronDown className="w-4 h-4" />
-          <span className="text-sm">Show details</span>
+          <Info className="w-4 h-5" />
+          <span className="text-xs"> Show</span>
         </button>
       ) : (
-        <div className="p-4">
-          <div className="text-white space-y-2 text-sm mb-3">
+        <div className="">
+          <button
+            onClick={handleToggle}
+          className="cursor-pointer w-full py-1 px-4.5 flex items-center justify-right gap-1 text-slate-400 hover:text-slate-200 transition-colors"
+          aria-expanded={shouldShowOpen}
+          aria-label="Show transaction details"
+        >
+          <Info className="w-4 h-5" />
+          <span className="text-xs">Hide</span>
+          </button>
+        <div className="p-4 pb-2">
+          
+          <div className="text-white space-y-2 text-sm">
             {items.map((item, index) => (
               <div key={index} className="flex items-start gap-2">
                 <span className="text-slate-400 mt-0.5">•</span>
@@ -53,15 +65,14 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true }: Explan
               </div>
             ))}
           </div>
-          
+        </div>
           <button
             onClick={handleToggle}
-            className="cursor-pointer w-full pt-3 border-t border-slate-700/30 flex items-center justify-center gap-2 text-slate-400 hover:text-slate-300 transition-colors"
+            className="cursor-pointer w-full py-1 flex items-center justify-center gap-1 text-slate-600 hover:text-slate-300 transition-colors"
             aria-expanded={shouldShowOpen}
             aria-label="Hide transaction details"
           >
-            <ChevronUp className="w-4 h-4" />
-            <span className="text-sm">Hide details</span>
+            <span className="text-xs h-4"></span>
           </button>
         </div>
       )}

@@ -17,13 +17,15 @@ import { DefaultExplanation } from './events/DefaultExplanation';
 
 interface EventExplanationProps {
   transaction: Transaction;
+  onToggle: (isOpen: boolean) => void;
 }
 
-export function EventExplanation({ transaction }: EventExplanationProps) {
+export function EventExplanation({ transaction, onToggle }: EventExplanationProps) {
   const { setHoverEnabled } = useHover();
   
   const handleToggle = (isOpen: boolean) => {
     setHoverEnabled(isOpen);
+    onToggle(isOpen);
   };
   
   const generateExplanation = (): React.ReactNode => {
@@ -67,9 +69,5 @@ export function EventExplanation({ transaction }: EventExplanationProps) {
 
   const explanation = generateExplanation();
   
-  return (
-    <div className="mb-6">
-      {explanation}
-    </div>
-  );
+  return explanation;
 }
