@@ -9,7 +9,7 @@ interface ExplanationPanelProps {
 }
 
 export function ExplanationPanel({ items, onToggle }: ExplanationPanelProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   
   const handleToggle = () => {
     const newState = !isOpen;
