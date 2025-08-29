@@ -13,8 +13,8 @@ export function RedeemCollateralHeader({ tx }: { tx: TroveRedemptionTransaction 
         </span>
       )}
       <div className="flex items-center gap-1">
-        <AssetAction action="Redeemed" asset={tx.collateralType} amount={Math.abs(collChangeFromOperation)} alwaysShowAmount />
-        <AssetAction action="Burned" asset={tx.assetType} amount={Math.abs(debtChangeFromOperation)} alwaysShowAmount />
+        <AssetAction action="Redeemed" asset={tx.collateralType} amount={Math.abs(collChangeFromOperation)} alwaysShowAmount valueType="collateral" />
+        <AssetAction action="Burned" asset={tx.assetType} amount={Math.abs(debtChangeFromOperation)} alwaysShowAmount valueType="debt" />
       </div>
     </>
   );

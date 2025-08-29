@@ -133,6 +133,7 @@ export default function Home() {
                 </tbody>
               </table>
             </div>
+            <p className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"><a href="/troves">Browse all troves...</a></p>
             <p className="text-green-600 font-semibold">More protocols coming soon...</p>
           </div>
 

@@ -12,7 +12,7 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
   const upfrontFee = isTroveTransaction(tx) ? tx.troveOperation.debtIncreaseFromUpfrontFee : undefined;
 
   return (
-    <div className="space-y-4 mb-4">
+    <div className="space-y-4 mb-8">
       <div className="grid md:grid-cols-2 xl:grid-cols-2 gap-6">
         <DebtMetric
           assetType={assetType}

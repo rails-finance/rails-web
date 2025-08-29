@@ -10,8 +10,8 @@ export function OpenTroveHeader({ tx }: { tx: TroveTransaction }) {
       <OperationBadge label="OPEN" color="green" />
       <div className="flex items-center gap-1">
         <InterestRateBadge rate={annualInterestRate} />
-        <AssetAction action="Supply" asset={tx.collateralType} amount={collChangeFromOperation} />
-        <AssetAction action="Borrow" asset={tx.assetType} amount={debtChangeFromOperation} />
+        <AssetAction action="Supply" asset={tx.collateralType} amount={collChangeFromOperation} valueType="collateral" />
+        <AssetAction action="Borrow" asset={tx.assetType} amount={debtChangeFromOperation} valueType="debt" />
       </div>
     </>
   );

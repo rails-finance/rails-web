@@ -1,4 +1,6 @@
-import { Transaction } from "@/types/api/troveHistory";
+import { Transaction, isTroveTransaction } from "@/types/api/troveHistory";
+import { TokenIcon } from "@/components/icons/tokenIcon";
+import { Fuel } from "lucide-react";
 
 interface TransactionLinksProps {
   transaction: Transaction;
@@ -10,16 +12,48 @@ export function TransactionLinks({ transaction }: TransactionLinksProps) {
   if (!tx.transactionHash) {
     return null;
   }
+  
+  // Determine if gas fee should be shown
+  const shouldShowGasFee = () => {
+    // Don't show gas fees for operations not initiated by the user
+    const noGasOps = ['liquidate', 'redeemCollateral'];
+    if (noGasOps.includes(tx.operation)) {
+      return false;
+    }
+    
+    // Don't show gas fee for delegate IR adjustments (batch manager operations)
+    if (tx.operation === 'adjustTroveInterestRate' && tx.batchUpdate) {
+      return false;
+    }
+    
+    return true;
+  };
+  
+  // Get collateral price per unit in USD
+  const getCollateralPricePerUnit = () => {
+    // Use collateralPrice if available
+    if (tx.collateralPrice) {
+      return tx.collateralPrice;
+    }
+    
+    // Otherwise calculate from total value and amount
+    const state = tx.operation === 'liquidate' && tx.stateBefore ? tx.stateBefore : tx.stateAfter;
+    if (state?.collateralInUsd && state?.coll && state.coll > 0) {
+      return state.collateralInUsd / state.coll;
+    }
+    
+    return null;
+  };
 
   return (
     <div className="flex justify-between items-center gap-1 text-xs text-slate-600 py-2 border-y border-slate-700/30">
-      <div>
-        <span>View on </span>
+      <div className="flex items-center gap-1">
+        <span>View on</span>
         <a
           href={`https://etherscan.io/tx/${tx.transactionHash}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 px-2 py-1 hover:text-slate-300 transition-colors"
+          className="inline-flex items-center gap-1 px-1 py-1 hover:text-slate-300 transition-colors"
           aria-label="View on Etherscan"
           onClick={(e) => e.stopPropagation()}
         >
@@ -45,7 +79,7 @@ export function TransactionLinks({ transaction }: TransactionLinksProps) {
           href={`https://liquityv2.defiexplore.com/tx/${tx.transactionHash}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 px-2 py-1 hover:text-slate-300 transition-colors"
+          className="inline-flex items-center gap-1 px-1 py-1 hover:text-slate-300 transition-colors"
           aria-label="View on DeFiExplore"
           onClick={(e) => e.stopPropagation()}
         >
@@ -58,11 +92,29 @@ export function TransactionLinks({ transaction }: TransactionLinksProps) {
           </svg>
         </a>
       </div>
-      <div>
-        <span>
-          {tx.gasFee} ETH | $
-          {tx.gasFeeUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </span>
+      <div className="flex flex-col sm:flex-row gap-1 sm:gap-3 items-end sm:items-center text-xs">
+        {shouldShowGasFee() && tx.gasFee && tx.gasFeeUsd && (
+          <div className="flex items-center gap-1">
+            <Fuel className="w-3 h-3 text-slate-500" />
+            <span className="font-medium">
+              {tx.gasFee.toFixed(6)} ETH
+            </span>
+            <span className="text-slate-400 ml-1">
+              ≈ ${tx.gasFeeUsd.toFixed(2)}
+            </span>
+          </div>
+        )}
+        {getCollateralPricePerUnit() && (
+          <div className="flex items-center gap-1">
+            {/* Overlapping icons container */}
+            <div className="relative flex items-center mr-0.5">
+              <TokenIcon assetSymbol={tx.collateralType} className="w-4 h-4" />
+            </div>
+            <span className="font-medium">
+              ${getCollateralPricePerUnit()?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

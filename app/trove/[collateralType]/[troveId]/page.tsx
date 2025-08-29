@@ -73,7 +73,7 @@ export default function TrovePage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Button href="/troves" className="mb-4">
+        <Button onClick={() => window.history.back()} className="mb-4">
           ← Back
         </Button>
         <div className="bg-slate-700 rounded-lg h-48 animate-pulse" />
@@ -88,7 +88,7 @@ export default function TrovePage() {
   if (error || !troveData) {
     return (
       <div className="space-y-6">
-        <Button href="/troves" className="mb-4">
+        <Button onClick={() => window.history.back()} className="mb-4">
           ← Back
         </Button>
         <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">
@@ -103,7 +103,7 @@ export default function TrovePage() {
 
   return (
     <div className="space-y-6">
-      <Button href="/troves" className="mb-4">
+      <Button onClick={() => window.history.back()} className="mb-4">
         ← Back
       </Button>
 
