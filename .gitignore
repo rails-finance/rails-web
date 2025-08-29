@@ -47,3 +47,4 @@ next-env.d.ts
 CLAUDE.md
 server.sh
 reference/*
+.zip.py

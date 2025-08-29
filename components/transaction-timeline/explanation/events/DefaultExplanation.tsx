@@ -1,5 +1,6 @@
 import React from 'react';
 import { Transaction } from '@/types/api/troveHistory';
+import { toLocaleStringHelper } from '@/lib/utils/format';
 
 interface DefaultExplanationProps {
   transaction: Transaction;
@@ -20,24 +21,24 @@ export function DefaultExplanation({ transaction, onToggle }: DefaultExplanation
       <div className="text-white space-y-2 text-sm">
         <div className="flex items-start gap-2">
           <span className="text-slate-400 mt-0.5">•</span>
-          <span>{tx.operation.replace(/([A-Z])/g, ' $1').toLowerCase().trim()} executed</span>
+          <span className="text-slate-400">{tx.operation.replace(/([A-Z])/g, ' $1').toLowerCase().trim()} executed</span>
         </div>
         {defaultBeforeDebt !== undefined && (
           <div className="flex items-start gap-2">
             <span className="text-slate-400 mt-0.5">•</span>
-            <span>Debt changed from {defaultBeforeDebt.toLocaleString()} to {defaultAfterDebt.toLocaleString()} {tx.assetType}</span>
+            <span className="text-slate-400">Debt changed from {toLocaleStringHelper(defaultBeforeDebt)} to {toLocaleStringHelper(defaultAfterDebt)} {tx.assetType}</span>
           </div>
         )}
         {defaultBeforeColl !== undefined && (
           <div className="flex items-start gap-2">
             <span className="text-slate-400 mt-0.5">•</span>
-            <span>Collateral changed from {defaultBeforeColl} to {defaultAfterColl} {tx.collateralType}</span>
+            <span className="text-slate-400">Collateral changed from {defaultBeforeColl} to {defaultAfterColl} {tx.collateralType}</span>
           </div>
         )}
       </div>
       {defaultBeforeRatio && defaultAfterRatio && (
         <div className="pt-2 mt-2 border-t border-slate-700/50 flex items-center gap-4 text-sm text-slate-300">
-          <span>Collateral ratio {defaultBeforeRatio}% → {defaultAfterRatio}%</span>
+          <span className="text-slate-400">Collateral ratio {defaultBeforeRatio}% → {defaultAfterRatio}%</span>
         </div>
       )}
     </div>

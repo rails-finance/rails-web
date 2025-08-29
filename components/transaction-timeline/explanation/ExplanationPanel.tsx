@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ExplanationPanelProps {
@@ -9,7 +9,14 @@ interface ExplanationPanelProps {
 }
 
 export function ExplanationPanel({ items, onToggle }: ExplanationPanelProps) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false); // Start closed to match SSR
+  const [isHydrated, setIsHydrated] = useState(false);
+  
+  useEffect(() => {
+    setIsHydrated(true);
+    setIsOpen(true); // Open after hydration
+    onToggle?.(true); // Enable hover context
+  }, [onToggle]);
   
   const handleToggle = () => {
     const newState = !isOpen;
@@ -21,13 +28,16 @@ export function ExplanationPanel({ items, onToggle }: ExplanationPanelProps) {
     return null;
   }
 
+  // During SSR and initial client render, show closed state to prevent hydration mismatch
+  const shouldShowOpen = isHydrated && isOpen;
+
   return (
     <div className="bg-slate-800/40 rounded-lg">
-      {!isOpen ? (
+      {!shouldShowOpen ? (
         <button
           onClick={handleToggle}
           className="cursor-pointer w-full p-4 flex items-center justify-center gap-2 text-slate-400 hover:text-slate-300 transition-colors"
-          aria-expanded={false}
+          aria-expanded={shouldShowOpen}
           aria-label="Show transaction details"
         >
           <ChevronDown className="w-4 h-4" />
@@ -47,7 +57,7 @@ export function ExplanationPanel({ items, onToggle }: ExplanationPanelProps) {
           <button
             onClick={handleToggle}
             className="cursor-pointer w-full pt-3 border-t border-slate-700/30 flex items-center justify-center gap-2 text-slate-400 hover:text-slate-300 transition-colors"
-            aria-expanded={true}
+            aria-expanded={shouldShowOpen}
             aria-label="Hide transaction details"
           >
             <ChevronUp className="w-4 h-4" />

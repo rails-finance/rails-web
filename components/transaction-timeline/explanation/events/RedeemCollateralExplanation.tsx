@@ -2,7 +2,10 @@ import React from 'react';
 import { Transaction, isRedemptionTransaction } from '@/types/api/troveHistory';
 import { HighlightableValue } from '../HighlightableValue';
 import { ExplanationPanel } from '../ExplanationPanel';
-import { formatCurrency, formatUsdValue, isZombieTrove } from '../shared/eventHelpers';
+import { InfoButton } from '../InfoButton';
+import { FAQ_URLS } from '../shared/faqUrls';
+import { formatCurrency, formatUsdValue } from '@/lib/utils/format';
+import { isZombieTrove } from '../shared/eventHelpers';
 
 interface RedeemCollateralExplanationProps {
   transaction: Transaction;
@@ -35,10 +38,11 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
   const redeemAfterCollRatio = tx.stateAfter.collateralRatio;
   
   const redeemItems: React.ReactNode[] = [
-    <span key="selection">
+    <span key="selection" className="text-slate-500">
       A {tx.assetType} holder redeemed against this Trove (selected due to its {tx.stateAfter.annualInterestRate}% interest rate)
+      <InfoButton href={FAQ_URLS.REDEMPTION_SELECTION} />
     </span>,
-    <span key="received">
+    <span key="received" className="text-slate-500">
       The redeemer received{' '}
       <HighlightableValue type="collateral" state="change" value={collateralTransferredOut}>
         {collateralTransferredOut} {tx.collateralType}
@@ -46,18 +50,19 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
       {collValueLost > 0 ? ` valued at ${formatUsdValue(collValueLost)}` : ''}
       {' '}from the Trove's collateral
     </span>,
-    <span key="debtReduction">
+    <span key="debtReduction" className="text-slate-500">
       The Trove's debt was reduced by{' '}
       <HighlightableValue type="debt" state="change" value={debtRedeemed}>
         {formatCurrency(debtRedeemed, tx.assetType)}
       </HighlightableValue>
       {' '}in exchange for the redeemed collateral
+      <InfoButton href={FAQ_URLS.REDEMPTIONS} />
     </span>
   ];
 
   if (redemptionFee > 0) {
     redeemItems.push(
-      <span key="fee">
+      <span key="fee" className="text-slate-500">
         A redemption fee of{' '}
         <HighlightableValue type="collateral" state="fee" value={redemptionFee}>
           {redemptionFee} {tx.collateralType}
@@ -69,7 +74,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
   }
 
   redeemItems.push(
-    <span key="postRedemption">
+    <span key="postRedemption" className="text-slate-500">
       Post-redemption: Debt is{' '}
       <HighlightableValue type="debt" state="after" value={redeemAfterDebt}>
         {formatCurrency(redeemAfterDebt, tx.assetType)}
@@ -83,16 +88,24 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
 
   if (redeemAfterCollUsd > 0) {
     redeemItems.push(
-      <span key="currentValue">
-        Current collateral value: {formatUsdValue(redeemAfterCollUsd)}
-        {tx.collateralPrice && ` (at market price of ${formatUsdValue(tx.collateralPrice)}/${tx.collateralType})`}
+      <span key="currentValue" className="text-slate-500">
+        Current collateral value: <HighlightableValue type="collateralUsd" state="after" value={redeemAfterCollUsd}>
+          {formatUsdValue(redeemAfterCollUsd)}
+        </HighlightableValue>
+        {tx.collateralPrice && ` (at market price of `}
+        {tx.collateralPrice && (
+          <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
+            {formatUsdValue(tx.collateralPrice)}
+          </HighlightableValue>
+        )}
+        {tx.collateralPrice && `/${tx.collateralType})`}
       </span>
     );
   }
 
   if (redeemAfterCollRatio !== undefined) {
     redeemItems.push(
-      <span key="improvedRatio">
+      <span key="improvedRatio" className="text-slate-500">
         Collateral ratio improved to{' '}
         <HighlightableValue type="collRatio" state="after" value={redeemAfterCollRatio}>
           {redeemAfterCollRatio}%
@@ -102,7 +115,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
   }
 
   redeemItems.push(
-    <span key="interestRate">
+    <span key="interestRate" className="text-slate-500">
       Interest rate unchanged at{' '}
       <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
         {tx.stateAfter.annualInterestRate}%
@@ -121,8 +134,16 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
     // Always show both prices for transparency
     redeemItems.push(
       <span key="prices" className="text-slate-400 text-xs">
-        Protocol redemption price: {formatUsdValue(redemptionPrice)}/{tx.collateralType}
-        {tx.collateralPrice ? ` • Current market price: ${formatUsdValue(tx.collateralPrice)}/${tx.collateralType}` : ''}
+        Protocol redemption price: <HighlightableValue type="collateralPrice" state="before" value={redemptionPrice}>
+          {formatUsdValue(redemptionPrice)}
+        </HighlightableValue>/{tx.collateralType}
+        {tx.collateralPrice && ` • Current market price: `}
+        {tx.collateralPrice && (
+          <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
+            {formatUsdValue(tx.collateralPrice)}
+          </HighlightableValue>
+        )}
+        {tx.collateralPrice && `/${tx.collateralType}`}
       </span>
     );
   }
@@ -131,6 +152,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
     redeemItems.push(
       <span key="zombie" className="text-yellow-500">
         ⚠️ Zombie trove created {finalDebt === 0 ? '(zero debt)' : `(${finalDebt.toFixed(2)} ${tx.assetType} debt below 2000 minimum)`}
+        <InfoButton href={FAQ_URLS.MINIMUM_DEBT} />
       </span>
     );
   }

@@ -2,6 +2,7 @@
 
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { useHover, ValueType, shouldHighlight } from '../../context/HoverContext';
+import { toLocaleStringHelper } from '@/lib/utils/format';
 
 interface AssetActionProps {
   action: string;
@@ -30,7 +31,7 @@ export function AssetAction({ action, asset, amount, alwaysShowAmount = false, v
           onMouseEnter={hoverEnabled && valueType ? () => setHoveredValue({ type: valueType, state: 'change', value: amount }) : undefined}
           onMouseLeave={hoverEnabled && valueType ? () => setHoveredValue(null) : undefined}
         >
-          {amount}
+          {toLocaleStringHelper(amount)}
         </span>
       )}
       <TokenIcon assetSymbol={asset} />

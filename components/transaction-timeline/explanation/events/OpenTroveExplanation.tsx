@@ -2,15 +2,13 @@ import React from 'react';
 import { Transaction } from '@/types/api/troveHistory';
 import { HighlightableValue } from '../HighlightableValue';
 import { ExplanationPanel } from '../ExplanationPanel';
+import { InfoButton } from '../InfoButton';
+import { FAQ_URLS } from '../shared/faqUrls';
 import { 
   getUpfrontFee, 
-  formatCurrency, 
-  formatPrice, 
-  formatUsdValue, 
   isHighRisk, 
   isConservative, 
-  calculateFeePercentage,
-  LIQUIDATION_RESERVE 
+  LIQUIDATION_RESERVE_ETH 
 } from '../shared/eventHelpers';
 
 interface OpenTroveExplanationProps {
@@ -29,83 +27,94 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
   const isConservativePosition = isConservative(collRatio);
   
   const openTroveItems: React.ReactNode[] = [
-    <span key="deposit">
-      Deposited{' '}
+    <span key="deposit" className="text-slate-500">
       <HighlightableValue type="collateral" state="change" value={tx.stateAfter.coll}>
         {tx.stateAfter.coll} {tx.collateralType}
       </HighlightableValue>
-      {' '}to secure the loan
+      {' '}deposited providing <HighlightableValue type="collateral" state="after" value={tx.stateAfter.coll}>
+        {tx.stateAfter.coll} {tx.collateralType}
+      </HighlightableValue> collateral to secure loan
     </span>,
-    <span key="borrow">
-      Borrowed{' '}
+    <span key="borrow" className="text-slate-500">
       <HighlightableValue type="debt" state="change" value={principalBorrowed}>
-        {formatCurrency(principalBorrowed, tx.assetType)}
+        {principalBorrowed.toLocaleString()} {tx.assetType}
       </HighlightableValue>
-      {' '}against this collateral
+      {' '}Borrowed
     </span>
   ];
 
   if (openFee > 0) {
     openTroveItems.push(
-      <span key="fee">
+      <span key="fee" className="text-slate-500">
         A one-time borrowing fee of{' '}
         <HighlightableValue type="upfrontFee" state="fee" value={openFee}>
           {openFee.toFixed(2)} {tx.assetType}
         </HighlightableValue>
-        {' '}({calculateFeePercentage(openFee, principalBorrowed)}%) was added to the debt
-      </span>
-    );
-  }
-
-  if (LIQUIDATION_RESERVE > 0) {
-    openTroveItems.push(
-      <span key="reserve">
-        A {LIQUIDATION_RESERVE} {tx.assetType} liquidation reserve was set aside (refundable on close)
+        {' '}(7 days of average interest)
+        <InfoButton href={FAQ_URLS.BORROWING_FEES} />
       </span>
     );
   }
 
   openTroveItems.push(
-    <span key="totalDebt">
+    <span key="totalDebt" className="text-slate-500">
       Total initial debt is{' '}
       <HighlightableValue type="debt" state="after" value={tx.stateAfter.debt}>
-        {formatCurrency(tx.stateAfter.debt, tx.assetType)}
+        {tx.stateAfter.debt.toLocaleString()} {tx.assetType}
       </HighlightableValue>
       {openFee > 0 && ' including the borrowing fee'}
     </span>
   );
 
+  if (LIQUIDATION_RESERVE_ETH > 0) {
+    openTroveItems.push(
+      <span key="reserve" className="text-slate-500">
+        A {LIQUIDATION_RESERVE_ETH} ETH liquidation reserve was set aside (refundable on close)
+        <InfoButton href={FAQ_URLS.LIQUIDATION_RESERVE} />
+      </span>
+    );
+  }
+
   if (collUsdValue) {
     openTroveItems.push(
-      <span key="collValue">
-        Collateral value at opening: {formatUsdValue(collUsdValue)}
-        {priceDisplay && ` (${tx.collateralType} price: ${formatUsdValue(priceDisplay)})`}
+      <span key="collValue" className="text-slate-500">
+        Collateral USD value at opening <HighlightableValue type="collateralUsd" state="after" value={collUsdValue}>
+          ${collUsdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </HighlightableValue>
+        {priceDisplay && ` (${tx.collateralType} price: `}
+        {priceDisplay && (
+          <HighlightableValue type="collateralPrice" state="after" value={priceDisplay}>
+            ${priceDisplay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </HighlightableValue>
+        )}
+        {priceDisplay && `)`}
       </span>
     );
   }
 
   openTroveItems.push(
-    <span key="collRatio">
+    <span key="collRatio" className="text-slate-500">
       Position opened with a{' '}
       <HighlightableValue type="collRatio" state="after" value={collRatio}>
         {collRatio}%
       </HighlightableValue>
       {' '}collateralization ratio
-      {isHighRiskPosition && ' (aggressive - higher liquidation risk)'}
-      {isConservativePosition && ' (conservative - lower liquidation risk)'}
+      <InfoButton href={FAQ_URLS.LTV_COLLATERAL_RATIO} />
     </span>,
-    <span key="interestRate">
+    <span key="interestRate" className="text-slate-500">
       Annual interest rate set at{' '}
       <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
         {tx.stateAfter.annualInterestRate}%
       </HighlightableValue>
       , compounding continuously
+      <InfoButton href={FAQ_URLS.USER_SET_RATES} />
     </span>
   );
   
   openTroveItems.push(
-    <span key="success" className="text-slate-300">
+    <span key="success" className="text-slate-500">
       Liquity Trove successfully opened
+      <InfoButton href={FAQ_URLS.WHAT_IS_TROVE} />
     </span>
   );
   

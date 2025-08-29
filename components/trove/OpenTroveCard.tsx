@@ -8,6 +8,7 @@ import { TroveCardFooter } from "./components/TroveCardFooter";
 import { TroveData } from "@/types/api/trove";
 import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
 import { formatDate } from "@/lib/date";
+import { toLocaleStringHelper, formatPrice, formatUsdValue } from "@/lib/utils/format";
 import { InterestCalculator } from "@/lib/utils/interest-calculator";
 
 interface OpenTroveCardProps {
@@ -73,7 +74,7 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
         </div>
         <div className="flex items-center">
           <h3 className="text-3xl font-bold text-white">
-            {interestInfo ? debtWithInterest.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : trove.mainValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {interestInfo ? formatPrice(debtWithInterest) : formatPrice(trove.mainValue)}
           </h3>
           <span className="ml-2 text-green-400 text-lg">
             <TokenIcon assetSymbol={trove.assetType} />
@@ -83,10 +84,10 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
         {interestInfo && (
           <div className="mt-2 text-xs text-slate-500 space-y-0.5">
             <div className="flex items-center gap-1">
-              <span>{interestInfo.recordedDebt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + {interestInfo.accruedInterest.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} interest</span>
+              <span>{formatPrice(interestInfo.recordedDebt)} + {formatPrice(interestInfo.accruedInterest)} interest</span>
             {interestInfo.isBatchMember && interestInfo.accruedManagementFees !== undefined && interestInfo.accruedManagementFees > 0 && (
               <span>
-                + {interestInfo.accruedManagementFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} delegate fee
+                + {formatPrice(interestInfo.accruedManagementFees)} delegate fee
               </span>
             )}
             </div>
@@ -107,7 +108,7 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
             </span>
             <div className="ml-1 flex items-center">
               <span className="text-xs flex items-center text-green-400 border-l border-r border-green-400 rounded-sm px-1 py-0">
-                ${trove.backedBy.valueUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                {formatUsdValue(trove.backedBy.valueUsd)}
               </span>
             </div>
           </div>
@@ -127,7 +128,7 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
           </div>
           {interestInfo && (
             <div className="text-xs text-slate-500 mt-0.5 space-y-0.5">
-              <div>~ {dailyInterestCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} day • {annualInterestCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} year</div>
+              <div>~ {formatPrice(dailyInterestCost)} day • {formatPrice(annualInterestCost)} year</div>
             </div>
           )}
           {trove.batchMembership.isMember && (
@@ -148,7 +149,7 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
             </p>
             {interestInfo && (
               <div className="text-xs text-slate-500 mt-0.5">
-                ~ {((interestInfo.recordedDebt * trove.batchMembership.managementFeeRate / 100) / 365).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} day • {(interestInfo.recordedDebt * trove.batchMembership.managementFeeRate / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} year
+                ~ {formatPrice((interestInfo.recordedDebt * trove.batchMembership.managementFeeRate / 100) / 365)} day • {formatPrice(interestInfo.recordedDebt * trove.batchMembership.managementFeeRate / 100)} year
               </div>
             )}
             </>
@@ -181,8 +182,8 @@ export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardPr
           {/* Latest collateral value - only show on trove view page */}
           <div className="flex items-center gap-1">
             <TokenIcon assetSymbol={trove.collateralType} />
-            <span className="text-sm text-white font-medium">
-              ${(trove.backedBy.valueUsd / trove.backedBy.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <span className="text-xs flex items-center text-green-400">
+              {formatUsdValue(trove.backedBy.valueUsd / trove.backedBy.amount)}
             </span>
           </div>
         </div>

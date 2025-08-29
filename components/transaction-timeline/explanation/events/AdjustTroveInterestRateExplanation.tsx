@@ -2,7 +2,9 @@ import React from 'react';
 import { Transaction } from '@/types/api/troveHistory';
 import { HighlightableValue } from '../HighlightableValue';
 import { ExplanationPanel } from '../ExplanationPanel';
-import { formatCurrency, formatUsdValue } from '../shared/eventHelpers';
+import { InfoButton } from '../InfoButton';
+import { FAQ_URLS } from '../shared/faqUrls';
+import { formatCurrency, formatUsdValue, toLocaleStringHelper } from '@/lib/utils/format';
 
 interface AdjustTroveInterestRateExplanationProps {
   transaction: Transaction;
@@ -23,28 +25,25 @@ export function AdjustTroveInterestRateExplanation({ transaction, onToggle }: Ad
   const isRateIncrease = rateDifference > 0;
   
   const interestRateItems: React.ReactNode[] = [
-    <span key="rateChange">
-      {isRateIncrease ? 'Increased' : 'Decreased'} the interest rate from{' '}
-      <HighlightableValue type="interestRate" state="before" value={prevRate}>
-        {prevRate}%
-      </HighlightableValue>
-      {' '}to{' '}
+    <span key="rateChange" className="text-slate-500">
+      {isRateIncrease ? 'Increased' : 'Decreased'} the interest rate to{' '}
       <HighlightableValue type="interestRate" state="after" value={newRate}>
         {newRate}%
       </HighlightableValue>
       {' '}annual
+      <InfoButton href={FAQ_URLS.USER_SET_RATES} />
     </span>,
-    <span key="rateDiff">
+    <span key="rateDiff" className="text-slate-500">
       This is a {Math.abs(rateDifference).toFixed(2)} percentage point {isRateIncrease ? 'increase' : 'decrease'} in borrowing cost
     </span>
   ];
 
   if (rateBeforeDebt !== rateAfterDebt) {
     interestRateItems.push(
-      <span key="debtUpdate">
+      <span key="debtUpdate" className="text-slate-500">
         Debt updated from{' '}
         <HighlightableValue type="debt" state="before" value={rateBeforeDebt}>
-          {rateBeforeDebt.toLocaleString()}
+          {toLocaleStringHelper(rateBeforeDebt)}
         </HighlightableValue>
         {' '}to{' '}
         <HighlightableValue type="debt" state="after" value={rateAfterDebt}>
@@ -55,7 +54,7 @@ export function AdjustTroveInterestRateExplanation({ transaction, onToggle }: Ad
     );
   } else {
     interestRateItems.push(
-      <span key="debtSame">
+      <span key="debtSame" className="text-slate-500">
         Debt remains at{' '}
         <HighlightableValue type="debt" state="after" value={rateAfterDebt}>
           {formatCurrency(rateAfterDebt, tx.assetType)}
@@ -65,7 +64,7 @@ export function AdjustTroveInterestRateExplanation({ transaction, onToggle }: Ad
   }
 
   interestRateItems.push(
-    <span key="collateral">
+    <span key="collateral" className="text-slate-500">
       Collateral remains at{' '}
       <HighlightableValue type="collateral" state="after" value={rateAfterColl}>
         {rateAfterColl} {tx.collateralType}
@@ -75,16 +74,24 @@ export function AdjustTroveInterestRateExplanation({ transaction, onToggle }: Ad
 
   if (tx.stateAfter.collateralInUsd) {
     interestRateItems.push(
-      <span key="collValue">
-        Current collateral value: {formatUsdValue(tx.stateAfter.collateralInUsd)}
-        {tx.collateralPrice && ` (${tx.collateralType} price: ${formatUsdValue(tx.collateralPrice)})`}
+      <span key="collValue" className="text-slate-500">
+        Current collateral value: <HighlightableValue type="collateralUsd" state="after" value={tx.stateAfter.collateralInUsd}>
+          {formatUsdValue(tx.stateAfter.collateralInUsd)}
+        </HighlightableValue>
+        {tx.collateralPrice && ` (${tx.collateralType} price: `}
+        {tx.collateralPrice && (
+          <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
+            {formatUsdValue(tx.collateralPrice)}
+          </HighlightableValue>
+        )}
+        {tx.collateralPrice && `)`}
       </span>
     );
   }
 
   if (rateBeforeCollRatio !== undefined && rateBeforeCollRatio !== rateAfterCollRatio) {
     interestRateItems.push(
-      <span key="collRatioAdjusted">
+      <span key="collRatioAdjusted" className="text-slate-500">
         Collateral ratio adjusted to{' '}
         <HighlightableValue type="collRatio" state="after" value={rateAfterCollRatio}>
           {rateAfterCollRatio}%
@@ -94,7 +101,7 @@ export function AdjustTroveInterestRateExplanation({ transaction, onToggle }: Ad
     );
   } else if (rateAfterCollRatio !== undefined) {
     interestRateItems.push(
-      <span key="collRatioSame">
+      <span key="collRatioSame" className="text-slate-500">
         Collateral ratio remains at{' '}
         <HighlightableValue type="collRatio" state="after" value={rateAfterCollRatio}>
           {rateAfterCollRatio}%

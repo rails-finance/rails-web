@@ -1,7 +1,8 @@
 import React from 'react';
 import { Transaction } from '@/types/api/troveHistory';
 import { HighlightableValue } from '../HighlightableValue';
-import { ExplanationItem } from '../ExplanationItem';
+import { ExplanationPanel } from '../ExplanationPanel';
+import { formatCurrency } from '../shared/eventHelpers';
 
 interface RemoveFromBatchExplanationProps {
   transaction: Transaction;
@@ -19,59 +20,52 @@ export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFrom
   const exitBeforeRatio = tx.stateBefore?.collateralRatio;
   const exitAfterRatio = tx.stateAfter.collateralRatio;
   
+  const batchExitItems: React.ReactNode[] = [
+    <span key="action" className="text-slate-500">
+      Removed Trove from batch management and returned to individual management
+    </span>,
+    <span key="debt" className="text-slate-500">
+      Debt updated from{' '}
+      <HighlightableValue type="debt" state="before" value={exitBeforeDebt}>
+        {formatCurrency(exitBeforeDebt, tx.assetType)}
+      </HighlightableValue>
+      {' '}to{' '}
+      <HighlightableValue type="debt" state="after" value={exitAfterDebt}>
+        {formatCurrency(exitAfterDebt, tx.assetType)}
+      </HighlightableValue>
+      {exitBeforeDebt === exitAfterDebt ? ' (unchanged)' : ' (reflects accrued interest)'}
+    </span>,
+    <span key="collateral" className="text-slate-500">
+      Collateral remains{' '}
+      <HighlightableValue type="collateral" state="after" value={exitAfterColl}>
+        {exitAfterColl} {tx.collateralType}
+      </HighlightableValue>
+    </span>,
+    <span key="interestRate" className="text-slate-500">
+      Interest rate changed from{' '}
+      <HighlightableValue type="interestRate" state="before" value={prevBatchRate}>
+        {prevBatchRate}%
+      </HighlightableValue>
+      {' '}to{' '}
+      <HighlightableValue type="interestRate" state="after" value={exitRate}>
+        {exitRate}%
+      </HighlightableValue>
+      {' '}(individual rate)
+    </span>
+  ];
+
+  if (exitBeforeRatio !== undefined) {
+    batchExitItems.push(
+      <span key="collRatio" className="text-slate-500">
+        Collateral ratio: {' '}
+        <HighlightableValue type="collRatio" state="after" value={exitAfterRatio}>
+          {exitAfterRatio}%
+        </HighlightableValue>
+      </span>
+    );
+  }
+  
   return (
-    <ul className="space-y-1.5 text-sm">
-        <ExplanationItem label="Action">
-          Removed Trove from batch management
-        </ExplanationItem>
-        
-        <ExplanationItem label="Management">
-          Returned to individual management
-        </ExplanationItem>
-        
-        <ExplanationItem label="Debt">
-          <HighlightableValue type="debt" state="before" value={exitBeforeDebt}>
-            {exitBeforeDebt} {tx.assetType}
-          </HighlightableValue>
-          {' → '}
-          <HighlightableValue type="debt" state="after" value={exitAfterDebt}>
-            {exitAfterDebt} {tx.assetType}
-          </HighlightableValue>
-        </ExplanationItem>
-        
-        <ExplanationItem label="Collateral">
-          <HighlightableValue type="collateral" state="before" value={exitBeforeColl}>
-            {exitBeforeColl} {tx.collateralType}
-          </HighlightableValue>
-          {' → '}
-          <HighlightableValue type="collateral" state="after" value={exitAfterColl}>
-            {exitAfterColl} {tx.collateralType}
-          </HighlightableValue>
-          {' (unchanged)'}
-        </ExplanationItem>
-        
-        <ExplanationItem label="Interest rate">
-          <HighlightableValue type="interestRate" state="before" value={prevBatchRate}>
-            {prevBatchRate}%
-          </HighlightableValue>
-          {' → '}
-          <HighlightableValue type="interestRate" state="after" value={exitRate}>
-            {exitRate}%
-          </HighlightableValue>
-          {' (individual rate)'}
-        </ExplanationItem>
-        
-        {exitBeforeRatio !== undefined && (
-          <ExplanationItem label="Collateral ratio">
-            <HighlightableValue type="collRatio" state="before" value={exitBeforeRatio}>
-              {exitBeforeRatio}%
-            </HighlightableValue>
-            {' → '}
-            <HighlightableValue type="collRatio" state="after" value={exitAfterRatio}>
-              {exitAfterRatio}%
-            </HighlightableValue>
-          </ExplanationItem>
-        )}
-    </ul>
+    <ExplanationPanel items={batchExitItems} onToggle={onToggle} />
   );
 }

@@ -2,7 +2,10 @@ import React from 'react';
 import { Transaction } from '@/types/api/troveHistory';
 import { HighlightableValue } from '../HighlightableValue';
 import { ExplanationPanel } from '../ExplanationPanel';
-import { formatCurrency, formatUsdValue } from '../shared/eventHelpers';
+import { InfoButton } from '../InfoButton';
+import { FAQ_URLS } from '../shared/faqUrls';
+import { formatCurrency, formatUsdValue } from '@/lib/utils/format';
+import { LIQUIDATION_RESERVE_ETH } from '../shared/eventHelpers';
 
 interface CloseTroveExplanationProps {
   transaction: Transaction;
@@ -17,13 +20,13 @@ export function CloseTroveExplanation({ transaction, onToggle }: CloseTroveExpla
   const beforeCollRatioClose = stateBefore.collateralRatio;
   
   const closeTroveItems: React.ReactNode[] = [
-    <span key="repayDebt">
+    <span key="repayDebt" className="text-slate-500">
       Fully repaid the outstanding debt of{' '}
       <HighlightableValue type="debt" state="change" value={stateBefore.debt}>
         {formatCurrency(stateBefore.debt, tx.assetType)}
       </HighlightableValue>
     </span>,
-    <span key="retrieveCollateral">
+    <span key="retrieveCollateral" className="text-slate-500">
       Retrieved all{' '}
       <HighlightableValue type="collateral" state="change" value={stateBefore.coll}>
         {stateBefore.coll} {tx.collateralType}
@@ -35,8 +38,9 @@ export function CloseTroveExplanation({ transaction, onToggle }: CloseTroveExpla
         </span>
       )}
     </span>,
-    <span key="reserve">
-      The 200 {tx.assetType} liquidation reserve was returned
+    <span key="reserve" className="text-slate-500">
+      The {LIQUIDATION_RESERVE_ETH} ETH liquidation reserve was returned
+      <InfoButton href={FAQ_URLS.LIQUIDATION_RESERVE} />
     </span>
   ];
 

@@ -2,7 +2,8 @@ import React from 'react';
 import { Transaction } from '@/types/api/troveHistory';
 import { HighlightableValue } from '../HighlightableValue';
 import { ExplanationPanel } from '../ExplanationPanel';
-import { getUpfrontFee, formatCurrency, formatUsdValue } from '../shared/eventHelpers';
+import { formatCurrency, formatUsdValue } from '@/lib/utils/format';
+import { getUpfrontFee } from '../shared/eventHelpers';
 
 interface OpenTroveAndJoinBatchExplanationProps {
   transaction: Transaction;
@@ -17,18 +18,18 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
   const batchCollUsdValue = tx.stateAfter.collateralInUsd;
   
   const batchItems: React.ReactNode[] = [
-    <span key="opened">
+    <span key="opened" className="text-slate-500">
       Opened a new Trove and joined batch management under{' '}
       <span className="font-medium">{tx.stateAfter.interestBatchManager || 'Unknown manager'}</span>
     </span>,
-    <span key="deposited">
+    <span key="deposited" className="text-slate-500">
       Deposited{' '}
       <HighlightableValue type="collateral" state="change" value={tx.stateAfter.coll}>
         {tx.stateAfter.coll} {tx.collateralType}
       </HighlightableValue>
       {' '}as collateral
     </span>,
-    <span key="borrowed">
+    <span key="borrowed" className="text-slate-500">
       Borrowed{' '}
       <HighlightableValue type="debt" state="change" value={batchPrincipalBorrowed}>
         {formatCurrency(batchPrincipalBorrowed, tx.assetType)}
@@ -39,7 +40,7 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
 
   if (batchOpenFee > 0) {
     batchItems.push(
-      <span key="fee">
+      <span key="fee" className="text-slate-500">
         Paid a{' '}
         <HighlightableValue type="upfrontFee" state="fee" value={batchOpenFee}>
           {batchOpenFee.toFixed(2)} {tx.assetType}
@@ -50,7 +51,7 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
   }
 
   batchItems.push(
-    <span key="totalDebt">
+    <span key="totalDebt" className="text-slate-500">
       Total debt is{' '}
       <HighlightableValue type="debt" state="after" value={tx.stateAfter.debt}>
         {formatCurrency(tx.stateAfter.debt, tx.assetType)}
@@ -61,21 +62,29 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
 
   if (batchCollUsdValue) {
     batchItems.push(
-      <span key="collValue">
-        Collateral value at opening: {formatUsdValue(batchCollUsdValue)}
-        {tx.collateralPrice && ` (${tx.collateralType} price: ${formatUsdValue(tx.collateralPrice)})`}
+      <span key="collValue" className="text-slate-500">
+        Collateral value at opening <HighlightableValue type="collateralUsd" state="after" value={batchCollUsdValue}>
+          {formatUsdValue(batchCollUsdValue)}
+        </HighlightableValue>
+        {tx.collateralPrice && ` (${tx.collateralType} price: `}
+        {tx.collateralPrice && (
+          <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
+            {formatUsdValue(tx.collateralPrice)}
+          </HighlightableValue>
+        )}
+        {tx.collateralPrice && `)`}
       </span>
     );
   }
 
   batchItems.push(
-    <span key="collRatio">
+    <span key="collRatio" className="text-slate-500">
       Starting collateral ratio:{' '}
       <HighlightableValue type="collRatio" state="after" value={batchCollRatio}>
         {batchCollRatio ? batchCollRatio.toFixed(1) : '0'}%
       </HighlightableValue>
     </span>,
-    <span key="interestRate">
+    <span key="interestRate" className="text-slate-500">
       Batch interest rate:{' '}
       <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
         {tx.stateAfter.annualInterestRate}%
