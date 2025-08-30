@@ -2,6 +2,8 @@ import { TroveTransaction } from "@/types/api/troveHistory";
 import { OperationBadge } from "../components/OperationBadge";
 import { InterestRateBadge } from "../components/InterestRateBadge";
 import { AssetAction } from "../components/AssetAction";
+import { Image, Link2 } from "lucide-react";
+
 
 export function OpenTroveHeader({ tx }: { tx: TroveTransaction }) {
   const { annualInterestRate, collChangeFromOperation, debtChangeFromOperation } = tx.troveOperation;
@@ -12,6 +14,10 @@ export function OpenTroveHeader({ tx }: { tx: TroveTransaction }) {
         <InterestRateBadge rate={annualInterestRate} />
         <AssetAction action="Supply" asset={tx.collateralType} amount={collChangeFromOperation} valueType="collateral" />
         <AssetAction action="Borrow" asset={tx.assetType} amount={debtChangeFromOperation} valueType="debt" />
+        <div className="flex items-center space-x-1">
+      		<span className="text-slate-400 mr-1">Mint</span>
+		      <Image size={16} className="text-slate-300" />
+		    </div>
       </div>
     </>
   );

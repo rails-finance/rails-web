@@ -6,6 +6,7 @@ import { InfoButton } from '../InfoButton';
 import { FAQ_URLS } from '../shared/faqUrls';
 import { formatCurrency, formatUsdValue } from '@/lib/utils/format';
 import { LIQUIDATION_RESERVE_ETH } from '../shared/eventHelpers';
+import { getTroveNftUrl } from '@/lib/utils/nft-utils';
 
 interface CloseTroveExplanationProps {
   transaction: Transaction;
@@ -56,6 +57,17 @@ export function CloseTroveExplanation({ transaction, onToggle }: CloseTroveExpla
     closeTroveItems.push(
       <span key="collRatio" className="text-slate-400">
         Closed with a {beforeCollRatioClose}% collateral ratio
+      </span>
+    );
+  }
+
+  // Add NFT burn explanation if NFT URL is available
+  const nftUrl = getTroveNftUrl(tx.collateralType, tx.troveId);
+  if (nftUrl) {
+    closeTroveItems.push(
+      <span key="nftBurn" className="text-slate-500">
+        Trove NFT was sent to the burn address, ending token ownership
+        <InfoButton href={FAQ_URLS.NFT_TROVES} />
       </span>
     );
   }

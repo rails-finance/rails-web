@@ -10,7 +10,7 @@ interface TransactionItemHeaderProps {
 export function TransactionItemHeader({ tx, isExpanded, onClick }: TransactionItemHeaderProps) {
   return (
     <div
-      className="p-4 sm:px-6 cursor-pointer rounded-t-md relative overflow-hidden group/header"
+      className="px-4 pt-4 pb-2 sm:px-6 cursor-pointer rounded-t-md relative overflow-hidden group/header"
       onClick={onClick}
       role="button"
       aria-expanded={isExpanded}

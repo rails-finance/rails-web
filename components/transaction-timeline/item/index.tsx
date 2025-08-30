@@ -39,7 +39,7 @@ export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionIte
           <RightValueDisplay tx={tx} />
 
           {/* Transaction details wrapper */}
-          <div className="grow self-start mt-1.5 mb-2.5">
+          <div className="grow self-start mb-2.5">
             <TransactionContent isInBatch={tx.isInBatch} isExpanded={isExpanded}>
               <TransactionItemHeader tx={tx} isExpanded={isExpanded} onClick={toggleExpanded} />
 

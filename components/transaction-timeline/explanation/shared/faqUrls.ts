@@ -8,5 +8,6 @@ export const FAQ_URLS = {
   REDEMPTION_SELECTION: 'https://docs.liquity.org/v2-faq/redemptions-and-delegation#what-happens-if-my-trove-gets-redeemed',
   WHAT_IS_TROVE: 'https://docs.liquity.org/v2-faq/borrowing-and-liquidations#what-is-a-trove',
   MINIMUM_DEBT: 'https://docs.liquity.org/v2-faq/borrowing-and-liquidations#is-there-a-minimum-debt',
-  COLLATERAL_TYPES: 'https://docs.liquity.org/v2-faq/borrowing-and-liquidations#what-types-of-collateral-can-i-use'
+  COLLATERAL_TYPES: 'https://docs.liquity.org/v2-faq/borrowing-and-liquidations#what-types-of-collateral-can-i-use',
+  NFT_TROVES: 'https://docs.liquity.org/v2-faq/borrowing-and-liquidations#how-many-troves-loans-can-i-open-with-the-same-address'
 } as const;

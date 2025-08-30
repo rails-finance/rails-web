@@ -23,7 +23,7 @@ export function HighlightableValue({
   
   return (
     <span
-      className={`font-semibold ${shouldEnableHover ? 'cursor-pointer' : ''} text-slate-200 ${
+      className={`font-semibold ${shouldEnableHover ? 'cursor-pointer ' : ''} ${
         isHighlighted ? 'underline decoration-dotted underline-offset-2 text-slate-200' : ''
       }`}
       onMouseEnter={shouldEnableHover ? () => setHoveredValue({ type, state, value }) : undefined}

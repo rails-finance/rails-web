@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Info, CircleQuestionMark, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Info, CircleQuestionMark, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ExplanationPanelProps {
   items: React.ReactNode[];
@@ -33,28 +33,32 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true }: Explan
 
 
   return (
-    <div className={`rounded-b-lg shadow-inner ${shouldShowOpen ? 'bg-slate-950' : 'bg-slate-950 shadow-inner w-22'}`}>
+    <div className={`rounded-b-lg shadow-inner py-1 ${shouldShowOpen ? 'bg-slate-950 w-full' : 'bg-slate-950 shadow-inner w-fit'}`}>
       {!shouldShowOpen ? (
         <button
           onClick={handleToggle}
-          className="cursor-pointer w-full py-1 flex items-center justify-center gap-1 text-slate-400 hover:text-slate-200 transition-colors"
+          className="cursor-pointer px-4.5 flex items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors"
           aria-expanded={shouldShowOpen}
           aria-label="Show transaction details"
         >
           <Info className="w-4 h-5" />
-          <span className="text-xs"> Show</span>
+          <ChevronDown className="w-3 h-3" />
+          <span className="text-xs"></span>
         </button>
       ) : (
         <div className="">
           <button
             onClick={handleToggle}
-          className="cursor-pointer w-full py-1 px-4.5 flex items-center justify-right gap-1 text-slate-400 hover:text-slate-200 transition-colors"
+          className="cursor-pointer w-full px-4.5 flex items-center justify-between gap-1 text-slate-400 hover:text-slate-200 transition-colors"
           aria-expanded={shouldShowOpen}
           aria-label="Show transaction details"
         >
-          <Info className="w-4 h-5" />
-          <span className="text-xs">Hide</span>
+          <div className="flex items-center gap-1"><Info className="w-4 h-5" />
+          <ChevronUp className="w-3 h-3" /></div>
+          
+          <div><X className="w-3 h-3" /></div>
           </button>
+
         <div className="p-4 pb-2">
           
           <div className="text-white space-y-2 text-sm">

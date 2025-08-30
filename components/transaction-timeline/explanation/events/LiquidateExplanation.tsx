@@ -5,6 +5,7 @@ import { ExplanationPanel } from '../ExplanationPanel';
 import { InfoButton } from '../InfoButton';
 import { FAQ_URLS } from '../shared/faqUrls';
 import { formatCurrency, formatUsdValue } from '@/lib/utils/format';
+import { getTroveNftUrl } from '@/lib/utils/nft-utils';
 
 interface LiquidateExplanationProps {
   transaction: Transaction;
@@ -72,7 +73,21 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
     <span key="warning" className="text-yellow-500">
       ⚠️ Liquidation occurs when collateral ratio falls below the minimum threshold
       <InfoButton href={FAQ_URLS.LIQUIDATIONS} />
-    </span>,
+    </span>
+  );
+
+  // Add NFT burn explanation if NFT URL is available
+  const nftUrl = getTroveNftUrl(tx.collateralType, tx.troveId);
+  if (nftUrl) {
+    liquidateItems.push(
+      <span key="nftBurn" className="text-slate-500">
+        Trove NFT was sent to the burn address during liquidation
+        <InfoButton href={FAQ_URLS.NFT_TROVES} />
+      </span>
+    );
+  }
+
+  liquidateItems.push(
     <span key="closed" className="text-slate-300">
       Trove closed through liquidation
     </span>

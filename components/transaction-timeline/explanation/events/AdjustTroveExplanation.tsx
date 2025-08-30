@@ -60,9 +60,6 @@ export function AdjustTroveExplanation({ transaction, onToggle }: AdjustTroveExp
         <HighlightableValue type="debt" state="change" value={Math.abs(debtChange)}>
           {formatCurrency(Math.abs(debtChange), tx.assetType)}
         </HighlightableValue>
-        {debtChange > 0 
-          ? ', increasing leverage' 
-          : ' of the outstanding debt'}
       </span>
     );
   }

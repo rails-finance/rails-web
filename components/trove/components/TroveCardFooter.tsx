@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/icons/icon";
+import { Image, Link2 } from "lucide-react";
+import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 
 interface TroveCardFooterProps {
   trove: any;
@@ -18,6 +20,14 @@ interface TroveCardFooterProps {
 export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: TroveCardFooterProps) {
   const [copiedOwnerAddress, setCopiedOwnerAddress] = useState(false);
   const [copiedTrove, setCopiedTrove] = useState(false);
+  
+  // Debug logging
+  const nftUrl = getTroveNftUrl(trove.collateralType, trove.troveId);
+  console.log('NFT Debug:', { 
+    collateralType: trove.collateralType, 
+    troveId: trove.troveId, 
+    nftUrl 
+  });
   return (
     <div className="text-xs">
       <div className="flex flex-col sm:flex-row sm:justify-between gap-2 sm:gap-0 sm:items-center">
@@ -104,6 +114,20 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
                 </div>
               </span>
             </span>
+            {getTroveNftUrl(trove.collateralType, trove.troveId) && (
+              <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
+                <a
+                  href={getTroveNftUrl(trove.collateralType, trove.troveId)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-slate-400 hover:text-slate-200 justify-center ml-0.5 bg-slate-800 w-8 h-4 rounded-full transition-colors"
+                  aria-label="View NFT on OpenSea"
+                >
+                <Image size={14} className="" />
+                <Link2 size={14} className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors" />
+                </a>
+              </span>
+            )}
             <span className="inline-flex items-center">
               <Icon name="arrow-left-right" size={12} />
               <span className="ml-1">{trove.activity?.transactionCount || 0}</span>
