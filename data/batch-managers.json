@@ -3,25 +3,25 @@
   "last_updated": "2024-01-15",
   "batch_managers": [
     {
-      "name": "SummerStone",
+      "name": "Summerstone",
       "address": "0x0000000000704f94ce2fe636dab92677a9745dc3",
-      "description": "SummerStone: Balanced rETH",
+      "description": "Summerstone: Balanced rETH",
       "website": "https://summerstone.xyz",
       "asset_symbol": "wstETH",
       "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045"
     },
     {
-      "name": "SummerStone",
+      "name": "Summerstone",
       "address": "0x000000000017d2a7b863e9ebbe6f9ab7255eb7c5",
-      "description": "SummerStone: Balanced wstETH",
+      "description": "Summerstone: Balanced wstETH",
       "website": "https://summerstone.xyz",
       "asset_symbol": "ETH",
       "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
     },
     {
-      "name": "SummerStone",
+      "name": "Summerstone",
       "address": "0x00000000001991cee928c561e37725816cbf73ba",
-      "description": "SummerStone: Balanced ETH",
+      "description": "Summerstone: Balanced ETH",
       "website": "https://summerstone.xyz",
       "asset_symbol": "rETH",
       "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276"

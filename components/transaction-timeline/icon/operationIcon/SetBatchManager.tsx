@@ -3,7 +3,7 @@ import { JoinBatchIcon } from "../symbols/JoinBatchIcon";
 
 export function SetBatchManagerIcon() {
   return (
-    <SingleStepIcon arrowDirection="in">
+    <SingleStepIcon>
       <JoinBatchIcon />
     </SingleStepIcon>
   );

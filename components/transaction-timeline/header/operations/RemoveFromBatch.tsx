@@ -1,8 +1,8 @@
 import { TroveTransaction } from "@/types/api/troveHistory";
 import { OperationBadge } from "../components/OperationBadge";
 import { InterestRateBadge } from "../components/InterestRateBadge";
-import { BatchManagerInfo } from "../components/BatchManagerInfo";
 import { BatchIcon } from "../components/BatchIcon";
+import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
 
 export function RemoveFromBatchHeader({ tx }: { tx: TroveTransaction }) {
   return (
@@ -22,7 +22,6 @@ export function RemoveFromBatchHeader({ tx }: { tx: TroveTransaction }) {
           <InterestRateBadge rate={tx.stateAfter.annualInterestRate} />
         </div>
       </div>
-      <BatchManagerInfo batchManager={tx.stateBefore?.interestBatchManager} color="purple" />
     </div>
   );
 }

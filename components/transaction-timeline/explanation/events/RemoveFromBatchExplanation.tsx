@@ -3,6 +3,8 @@ import { Transaction } from '@/types/api/troveHistory';
 import { HighlightableValue } from '../HighlightableValue';
 import { ExplanationPanel } from '../ExplanationPanel';
 import { formatCurrency } from '../shared/eventHelpers';
+import { Link2 } from 'lucide-react';
+import { getBatchManagerInfo } from '@/lib/utils/batch-manager-utils';
 
 interface RemoveFromBatchExplanationProps {
   transaction: Transaction;
@@ -20,7 +22,27 @@ export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFrom
   const exitBeforeRatio = tx.stateBefore?.collateralRatio;
   const exitAfterRatio = tx.stateAfter.collateralRatio;
   
+  // Get batch manager info for the delegate we're leaving
+  const batchManagerInfo = getBatchManagerInfo(tx.stateBefore?.interestBatchManager || '');
+  
   const batchExitItems: React.ReactNode[] = [
+    <span key="delegate" className="text-slate-500">
+      Left delegate:{' '}
+      <span className="font-medium inline-flex items-center gap-1">
+        {batchManagerInfo?.name || 'Unknown'}
+        {batchManagerInfo?.website && (
+          <a
+            href={batchManagerInfo.website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center text-blue-400 hover:text-blue-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Link2 className="w-3 h-3" />
+          </a>
+        )}
+      </span>
+    </span>,
     <span key="action" className="text-slate-500">
       Removed Trove from batch management and returned to individual management
     </span>,
