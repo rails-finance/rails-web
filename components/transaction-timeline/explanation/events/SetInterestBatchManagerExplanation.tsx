@@ -30,7 +30,7 @@ export function SetInterestBatchManagerExplanation({ transaction, onToggle }: Se
   
   const batchJoinItems: React.ReactNode[] = [
     <span key="action" className="text-slate-500">
-      Moved Trove from individual to delegated ({batchManagerInfo?.name}) interest rate management {batchManagerInfo?.website && (
+      Moved Trove from individual to delegated ({batchManagerInfo?.name}) {batchManagerInfo?.website && (
         <>
           <a
             href={batchManagerInfo.website}
@@ -42,7 +42,7 @@ export function SetInterestBatchManagerExplanation({ transaction, onToggle }: Se
             <Link2 className="w-3 h-3" />
           </a>
         </>
-      )}
+      )} interest rate management 
     </span>,
     <span key="debt" className="text-slate-500">
       Debt updated from{' '}

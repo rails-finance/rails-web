@@ -35,7 +35,7 @@ export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFrom
             href={batchManagerInfo.website}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center text-blue-400 hover:text-blue-300"
+            className={`-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors`}
             onClick={(e) => e.stopPropagation()}
           >
             <Link2 className="w-3 h-3" />
