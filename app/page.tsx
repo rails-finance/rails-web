@@ -58,8 +58,8 @@ export default function Home() {
           </form>
 
           <p className="text-gray-600 text-2xl font-semibold">
-            <span className="text-green-600">Rails</span> transforms complex protocol data into intuitive timelines with
-            clear explanations and in-depth transaction analysis.
+            <span className="text-green-600">Rails</span> creates DeFi event timelines with
+            simple explanations and detailed analysis.
           </p>
 
           {/* Protocol table */}
@@ -134,7 +134,7 @@ export default function Home() {
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"><a href="/troves">Browse all troves...</a></p>
+            <p ><a className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2" href="/troves">Browse all troves...</a> <a className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2" href="/trove/WETH/mock-all-events">Mock events</a></p>
             <p className="text-green-600 font-semibold">More protocols coming soon...</p>
           </div>
 
