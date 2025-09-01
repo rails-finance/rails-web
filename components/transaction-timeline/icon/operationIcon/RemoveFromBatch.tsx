@@ -3,7 +3,7 @@ import { ExitBatchIcon } from "../symbols/ExitBatchIcon";
 
 export function RemoveFromBatchIcon() {
   return (
-    <SingleStepIcon arrowDirection="out">
+    <SingleStepIcon>
       <ExitBatchIcon />
     </SingleStepIcon>
   );

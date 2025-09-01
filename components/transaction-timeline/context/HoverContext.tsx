@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-export type ValueType = 'debt' | 'collateral' | 'interestRate' | 'collRatio' | 'upfrontFee';
+export type ValueType = 'debt' | 'collateral' | 'collateralUsd' | 'interestRate' | 'collRatio' | 'upfrontFee' | 'collateralPrice' | 'peakDebt' | 'peakCollateral';
 export type ValueState = 'before' | 'after' | 'change' | 'fee';
 
 export interface HoveredValue {

@@ -5,6 +5,7 @@ import { StateMetric } from "../components/StateMetric";
 import { StateTransition, TransitionArrow } from "../components/StateTransition";
 import { ClosedStateLabel } from "../components/ClosedStateLabel";
 import { useHover, shouldHighlight } from "../../context/HoverContext";
+import { formatUsdValue } from "@/lib/utils/format";
 
 interface CollateralMetricProps {
   collateralType: string;
@@ -21,6 +22,8 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
   // Only highlight when hover is enabled
   const isAfterHighlighted = hoverEnabled && shouldHighlight(hoveredValue, 'collateral', 'after');
   const isChangeHighlighted = hoverEnabled && shouldHighlight(hoveredValue, 'collateral', 'change');
+  const isCollateralUsdHighlighted = hoverEnabled && shouldHighlight(hoveredValue, 'collateralUsd');
+  const isCollateralPriceHighlighted = hoverEnabled && shouldHighlight(hoveredValue, 'collateralPrice');
   return (
     <StateMetric label="Collateral" icon={<TokenIcon assetSymbol={collateralType} className="mr-2 w-5 h-5" />}>
       <StateTransition>
@@ -45,8 +48,12 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
             >
               {after}
             </span>
-            <span className="text-xs flex items-center text-slate-600 border-l border-r border-slate-600 font-medium rounded-sm px-1 py-0">
-              ${afterInUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <span 
+              className={`text-xs flex items-center text-slate-600 border-l border-r border-slate-600 font-medium rounded-sm px-1 py-0 transition-all ${hoverEnabled ? 'cursor-pointer' : ''} ${isCollateralUsdHighlighted || isCollateralPriceHighlighted ? 'underline decoration-dotted underline-offset-2 text-slate-200' : ''}`}
+              onMouseEnter={hoverEnabled ? () => setHoveredValue({ type: 'collateralUsd', state: 'after', value: afterInUsd }) : undefined}
+              onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
+            >
+              {formatUsdValue(afterInUsd)}
             </span>
           </div>
         )}

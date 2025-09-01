@@ -46,5 +46,6 @@ yarn-error.log*
 next-env.d.ts
 CLAUDE.md
 server.sh
-
-server.sh
+reference/*
+.zip.py
+rails*.zip

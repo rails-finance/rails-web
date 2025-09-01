@@ -3,58 +3,58 @@
   "last_updated": "2024-01-15",
   "batch_managers": [
     {
-      "name": "SummerStone: Balanced rETH",
+      "name": "Summerstone",
       "address": "0x0000000000704f94ce2fe636dab92677a9745dc3",
-      "description": "SummerStone balanced rate batch manager",
+      "description": "Summerstone: Balanced rETH",
       "website": "https://summerstone.xyz",
       "asset_symbol": "wstETH",
       "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045"
     },
     {
-      "name": "SummerStone: Balanced wstETH",
+      "name": "Summerstone",
       "address": "0x000000000017d2a7b863e9ebbe6f9ab7255eb7c5",
-      "description": "SummerStone balanced rate batch manager",
+      "description": "Summerstone: Balanced wstETH",
       "website": "https://summerstone.xyz",
       "asset_symbol": "ETH",
       "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
     },
     {
-      "name": "SummerStone: Balanced ETH",
+      "name": "Summerstone",
       "address": "0x00000000001991cee928c561e37725816cbf73ba",
-      "description": "SummerStone balanced rate batch manager",
+      "description": "Summerstone: Balanced ETH",
       "website": "https://summerstone.xyz",
       "asset_symbol": "rETH",
       "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276"
     },
     {
-      "name": "Caramila Capital",
+      "name": "Caramila",
       "address": "0x1578ed833d986c1188d1a998aa5fecd418bef5da",
-      "description": "Caramila Capital batch manager",
-      "website": "",
+      "description": "Caramila Capital",
+      "website": "https://etherscan.io/name-lookup-search?id=caramila.eth",
       "asset_symbol": "ETH",
       "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
     },
     {
-      "name": "Bolder: I",
+      "name": "Bolder",
       "address": "0x25bc01fd5a01b1864a7dbaddb05bfed642340da2",
-      "description": "Bolder: I batch manager",
-      "website": "https://bolder.xyz",
+      "description": "Bolder: I",
+      "website": "https://bolder.cash",
       "asset_symbol": "ETH",
       "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
     },
     {
-      "name": "Bolder: II",
+      "name": "Bolder",
       "address": "0x50bc019abdb9951602bc4fe92947d3c15d5e45df",
-      "description": "Bolder: II batch manager",
-      "website": "https://bolder.xyz",
+      "description": "Bolder: II",
+      "website": "https://bolder.cash",
       "asset_symbol": "rETH",
       "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276"
     },
     {
-      "name": "Bolder: III",
+      "name": "Bolder",
       "address": "0x75bc01bf1e21ed33915777c131b62bb13b5f2552",
-      "description": "Bolder: III batch manager",
-      "website": "https://bolder.xyz",
+      "description": "Bolder: III",
+      "website": "https://bolder.cash",
       "asset_symbol": "wstETH",
       "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045"
     },
@@ -67,74 +67,50 @@
       "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
     },
     {
-      "name": "Bolder: Low",
+      "name": "Bolder",
       "address": "0x25bc0272217fb0fd7a2ff0d62cebe1aba15e4d91",
-      "description": "Bolder: Low Rate batch manager",
-      "website": "https://bolder.xyz",
+      "description": "Bolder: Low",
+      "website": "https://bolder.cash",
       "asset_symbol": "ETH",
       "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
     },
     {
-      "name": "Bolder: Mid",
+      "name": "Bolder",
       "address": "0x50bc02c6c7124e6e1b8333b80a0416e504e2d044",
-      "description": "Bolder: Mid Rate batch manager",
-      "website": "https://bolder.xyz",
+      "description": "Bolder: Mid",
+      "website": "https://bolder.cash",
       "asset_symbol": "rETH",
       "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276"
     },
     {
-      "name": "Bolder: High",
+      "name": "Bolder",
       "address": "0x75bc02022344159b7ef50a3ff5291dd2bc6918c7",
-      "description": "Bolder: High Rate batch manager",
-      "website": "https://bolder.xyz",
+      "description": "Bolder: High",
+      "website": "https://bolder.cash",
       "asset_symbol": "wstETH",
       "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045"
     },
     {
-      "name": "ETH Batch Manager",
-      "address": "0x7bcb64b2c9206a5b699ed43363f6f98d4776cf5a",
-      "description": "Generic ETH batch manager",
-      "website": "",
-      "asset_symbol": "ETH",
-      "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
-    },
-    {
-      "name": "rETH Batch Manager",
-      "address": "0xa2895d6a3bf110561dfe4b71ca539d84e1928b22",
-      "description": "Generic rETH batch manager",
-      "website": "",
-      "asset_symbol": "rETH",
-      "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276"
-    },
-    {
-      "name": "wstETH Batch Manager",
-      "address": "0xb2b2abeb5c357a234363ff5d180912d319e3e19e",
-      "description": "Generic wstETH batch manager",
-      "website": "",
-      "asset_symbol": "wstETH",
-      "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045"
-    },
-    {
-      "name": "wstETH ARM",
+      "name": "ARM",
       "address": "0x8869a6fb59a8df330f90d9fbf46ebfaff6d4bc14",
-      "description": "ARM wstETH",
-      "website": "",
+      "description": "wstETH Autonomous Interest Rate Manager",
+      "website": "https://www.liquity.org/blog/autonomous-interest-manager",
       "asset_symbol": "wstETH",
       "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045"
     },
     {
-      "name": "ETH ARM",
+      "name": "ARM",
       "address": "0xe507e4d0763851a6287238aadd243948d18ab60a",
-      "description": "ARM ETH",
-      "website": "",
-      "asset_symbol": "ETH",
+      "description": "ETH Autonomous Interest Rate Manager",
+      "website": "https://www.liquity.org/blog/autonomous-interest-manager",
+      "asset_symbol": "ETH ",
       "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
     },
     {
-      "name": "rETH ARM",
+      "name": "ARM",
       "address": "0x7700b2d305f47ae82e9598bab6d7ccb57299a82b",
-      "description": "ARM rETH",
-      "website": "",
+      "description": "rETH Autonomous Interest Rate Manager",
+      "website": "https://www.liquity.org/blog/autonomous-interest-manager",
       "asset_symbol": "rETH",
       "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276"
     }

@@ -5,6 +5,7 @@ import { StateMetric } from "../components/StateMetric";
 import { StateTransition, TransitionArrow } from "../components/StateTransition";
 import { ClosedStateLabel } from "../components/ClosedStateLabel";
 import { useHover, shouldHighlight } from "../../context/HoverContext";
+import { toLocaleStringHelper } from "@/lib/utils/format";
 
 interface DebtMetricProps {
   assetType: string;
@@ -28,7 +29,7 @@ export function DebtMetric({ assetType, before, after, isCloseTrove, upfrontFee 
           {hasChange && (
             <>
               <div className="text-slate-600">
-                {before}
+                {toLocaleStringHelper(before)}
               </div>
               <TransitionArrow />
             </>
@@ -41,7 +42,7 @@ export function DebtMetric({ assetType, before, after, isCloseTrove, upfrontFee 
                   onMouseEnter={hoverEnabled ? () => setHoveredValue({ type: 'debt', state: 'after', value: after }) : undefined}
                   onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
                 >
-                  {after}
+                  {toLocaleStringHelper(after)}
                 </div>
               )}
             </div>
@@ -54,7 +55,7 @@ export function DebtMetric({ assetType, before, after, isCloseTrove, upfrontFee 
               onMouseEnter={hoverEnabled ? () => setHoveredValue({ type: 'upfrontFee', state: 'fee', value: upfrontFee }) : undefined}
               onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
             >
-              {upfrontFee} fee
+              {toLocaleStringHelper(upfrontFee)} fee
             </span>
           </div>
         )}

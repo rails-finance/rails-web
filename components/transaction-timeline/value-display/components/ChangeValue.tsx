@@ -1,6 +1,7 @@
 'use client';
 
 import { useHover, shouldHighlight, ValueType } from '../../context/HoverContext';
+import { toLocaleStringHelper } from '@/lib/utils/format';
 
 interface ChangeValueProps {
   amount: number;
@@ -13,7 +14,7 @@ export function ChangeValue({ amount, type }: ChangeValueProps) {
   const isHighlighted = hoverEnabled && type && shouldHighlight(hoveredValue, type, 'change');
   
   if (!type || !hoverEnabled) {
-    return <span className="font-medium text-white min-h-10 flex items-center justify-end">{amount}</span>;
+    return <span className="font-medium text-white min-h-10 flex items-center justify-end">{toLocaleStringHelper(amount)}</span>;
   }
   
   return (
@@ -22,7 +23,7 @@ export function ChangeValue({ amount, type }: ChangeValueProps) {
       onMouseEnter={() => setHoveredValue({ type, state: 'change', value: amount })}
       onMouseLeave={() => setHoveredValue(null)}
     >
-      {amount}
+      {toLocaleStringHelper(amount)}
     </span>
   );
 }

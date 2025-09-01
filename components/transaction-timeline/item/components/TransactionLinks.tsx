@@ -1,6 +1,8 @@
 import { Transaction, isTroveTransaction } from "@/types/api/troveHistory";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { Fuel } from "lucide-react";
+import { formatUsdValue } from "@/lib/utils/format";
+import { HighlightableValue } from "../../explanation/HighlightableValue";
 
 interface TransactionLinksProps {
   transaction: Transaction;
@@ -110,9 +112,11 @@ export function TransactionLinks({ transaction }: TransactionLinksProps) {
             <div className="relative flex items-center mr-0.5">
               <TokenIcon assetSymbol={tx.collateralType} className="w-4 h-4" />
             </div>
-            <span className="font-medium">
-              ${getCollateralPricePerUnit()?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
+            <HighlightableValue type="collateralPrice" state="after" value={getCollateralPricePerUnit()!}>
+              <span className="font-medium">
+                {getCollateralPricePerUnit() ? formatUsdValue(getCollateralPricePerUnit()!) : ''}
+              </span>
+            </HighlightableValue>
           </div>
         )}
       </div>

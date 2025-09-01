@@ -7,7 +7,7 @@ interface TransactionContentProps {
 }
 
 export function TransactionContent({ children, isInBatch, isExpanded }: TransactionContentProps) {
-  let containerClassName = "grow self-start mt-1.5 mb-2.5 rounded-md group transition-colors duration-150";
+  let containerClassName = "grow self-start mt-1.5 mt-2.5 rounded-md group transition-colors duration-150";
 
   if (isExpanded) {
     containerClassName += " bg-slate-900";
