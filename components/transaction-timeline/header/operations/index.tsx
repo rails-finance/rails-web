@@ -44,8 +44,8 @@ export function HeaderContent({ tx }: { tx: Transaction }) {
     case "removeFromBatch":
       return <RemoveFromBatchHeader tx={tx} />;
 
-    // case "transferTrove":
-    //   return <TransferTroveHeader transaction={transaction} />;
+    case "transferTrove":
+      return <TransferTroveHeader tx={tx} />;
 
     default:
       return <DefaultHeader tx={tx} />;

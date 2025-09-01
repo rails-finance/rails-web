@@ -47,8 +47,8 @@ export function OperationIcon({ tx }: { tx: Transaction }) {
     case "removeFromBatch":
       return <RemoveFromBatchIcon />;
 
-    // case "transferTrove":
-    //   return <TransferTroveIcon />;
+    case "transferTrove":
+      return <TransferTroveIcon />;
 
     default:
       return <DefaultIcon />;

@@ -60,8 +60,8 @@ interface BaseTransaction {
   protocolName: string;
   assetType: string;
   collateralType: string;
-  gasFee: number; // Gas fee in ETH
-  gasFeeUsd: number; // Gas fee in USD
+  gasFee: number;
+  gasFeeUsd: number;
 }
 
 // Standard trove operation (open, close, adjust, etc.)
@@ -195,12 +195,34 @@ export interface TroveRedemptionTransaction extends BaseTransaction {
   isZombieTrove?: boolean;
 }
 
+// Transfer of trove ownership
+export interface TroveTransferTransaction extends BaseTransaction {
+  type: "transfer";
+  operation: "transferTrove";
+
+  // Transfer details
+  fromAddress: string;
+  toAddress: string;
+  transferType: "mint" | "burn" | "transfer"; // From transfer processor
+
+  // State after transfer (from latest TroveUpdated at time of transfer)
+  stateAfter: TroveState;
+
+  collateralPrice?: number;
+  isInBatch: boolean;
+  isZombieTrove?: boolean;
+}
+
 // ============================================
 // UNION AND RESPONSE TYPES
 // ============================================
 
 // Union type for all transactions
-export type Transaction = TroveTransaction | TroveLiquidationTransaction | TroveRedemptionTransaction;
+export type Transaction =
+  | TroveTransaction
+  | TroveLiquidationTransaction
+  | TroveRedemptionTransaction
+  | TroveTransferTransaction;
 
 // Timeline interface for API response
 export interface TransactionTimeline {
@@ -223,6 +245,10 @@ export function isLiquidationTransaction(tx: Transaction): tx is TroveLiquidatio
 
 export function isRedemptionTransaction(tx: Transaction): tx is TroveRedemptionTransaction {
   return tx.type === "redemption";
+}
+
+export function isTransferTransaction(tx: Transaction): tx is TroveTransferTransaction {
+  return tx.type === "transfer";
 }
 
 // Helper type guard for checking if transaction has batch info
