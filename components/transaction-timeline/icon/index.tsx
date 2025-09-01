@@ -9,6 +9,18 @@ interface TransactionIconProps {
 }
 
 export function TransactionIcon({ tx, isFirst = false, isLast = false }: TransactionIconProps) {
+  if (tx.type === "transfer") {
+    return (
+      <div className={`transaction-timeline-column ${tx.operation ? `operation-${tx.operation}` : ""}`}>
+        <TimelineConnector type="top" show={!isFirst} operation={tx.operation} isMultiStep={false} />
+
+        <OperationIcon tx={tx} />
+
+        <TimelineConnector type="bottom" show={!isLast} operation={tx.operation} isMultiStep={false} />
+      </div>
+    );
+  }
+
   const { operation, troveOperation } = tx;
   const { debtChangeFromOperation, collChangeFromOperation } = troveOperation;
   // Check if this is a multi-step operation
