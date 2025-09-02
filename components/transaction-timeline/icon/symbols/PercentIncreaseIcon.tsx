@@ -8,24 +8,26 @@ interface PercentIncreaseIconProps {
 }
 
 export function PercentIncreaseIcon({
-  x = 400,
-  y = 200,
-  r = 100,
-  fillColor = "#64748b",
-  textColor = "white",
-  fontSize = 120,
+  x = 210,
+  y = 10,
+  r = 190,
 }: PercentIncreaseIconProps) {
   return (
-    <g transform={`translate(${x}, ${y})`}>
-      <circle cx="0" cy="0" r={r} fill={fillColor} />
-      <text x="0" y="25" textAnchor="middle" fill={textColor} fontSize={fontSize} fontWeight="bold">
-        %
-      </text>
-      <g transform="translate(80, 40)">
-        <circle cx="0" cy="0" r="40" fill="#10B981" />
-        <path d="M-20 0 L20 0" stroke="white" strokeWidth="6" strokeLinecap="round" />
-        <path d="M0 -20 L0 20" stroke="white" strokeWidth="6" strokeLinecap="round" />
-      </g>
-    </g>
+    <foreignObject 
+      x={x} 
+      y={y} 
+      width={r * 2} 
+      height={r * 2}
+    >
+      <img 
+        src="/icons/icons.002.png" 
+        alt="Percent Increase"
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+        }}
+      />
+    </foreignObject>
   );
 }

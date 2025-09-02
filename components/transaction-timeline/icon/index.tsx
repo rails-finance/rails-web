@@ -12,11 +12,11 @@ export function TransactionIcon({ tx, isFirst = false, isLast = false }: Transac
   if (tx.type === "transfer") {
     return (
       <div className={`transaction-timeline-column ${tx.operation ? `operation-${tx.operation}` : ""}`}>
-        <TimelineConnector type="top" show={!isFirst} operation={tx.operation} isMultiStep={false} />
+        <TimelineConnector type="top" show={!isFirst} operation={tx.operation} isMultiStep={false} tx={tx} />
 
         <OperationIcon tx={tx} />
 
-        <TimelineConnector type="bottom" show={!isLast} operation={tx.operation} isMultiStep={false} />
+        <TimelineConnector type="bottom" show={!isLast} operation={tx.operation} isMultiStep={false} tx={tx} />
       </div>
     );
   }
@@ -28,11 +28,11 @@ export function TransactionIcon({ tx, isFirst = false, isLast = false }: Transac
 
   return (
     <div className={`transaction-timeline-column ${operation ? `operation-${operation}` : ""}`}>
-      <TimelineConnector type="top" show={!isFirst} operation={operation} isMultiStep={isMultiStep} />
+      <TimelineConnector type="top" show={!isFirst} operation={operation} isMultiStep={isMultiStep} tx={tx} />
 
       <OperationIcon tx={tx} />
 
-      <TimelineConnector type="bottom" show={!isLast} operation={operation} isMultiStep={isMultiStep} />
+      <TimelineConnector type="bottom" show={!isLast} operation={operation} isMultiStep={isMultiStep} tx={tx} />
     </div>
   );
 }

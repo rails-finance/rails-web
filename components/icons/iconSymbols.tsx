@@ -74,11 +74,23 @@ export const IconSymbols = () => (
       <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" />
       <circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" strokeWidth="2" />
     </symbol>
-    <symbol id="icon-hash" viewBox="0 0 24 24">
-      <line x1="4" x2="20" y1="9" y2="9" stroke="currentColor" strokeWidth="2" />
-      <line x1="4" x2="20" y1="15" y2="15" stroke="currentColor" strokeWidth="2" />
-      <line x1="10" x2="8" y1="3" y2="21" stroke="currentColor" strokeWidth="2" />
-      <line x1="16" x2="14" y1="3" y2="21" stroke="currentColor" strokeWidth="2" />
+    <symbol id="icon-trove-id"  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" >
+  <polyline points="3,2 21,2" opacity="0.1"/>
+  <polyline points="3,21.75 21,21.75" opacity="0.1"/>
+  <polyline points="2,3 2,21" opacity="0.1"/>
+  <polyline points="21.75,3 21.75,21" opacity="0.1"/>
+  
+
+  <polyline points="7,6 7,18"/>
+  
+
+  <polyline points="11,6 11,18"/>
+  <polyline points="10.5,6.5 15,6.5"/>
+  <polyline points="10.5,17 15,17"/>
+  <polyline points="16,7.5 16,9"/>
+  <polyline points="16,15 16,16.5"/>
+  <polyline points="17,9 17,15"/>
+
     </symbol>
     <symbol id="icon-arrow-left-right" viewBox="0 0 24 24">
       <path d="M8 3 4 7l4 4" stroke="currentColor" strokeWidth="2" />

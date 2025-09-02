@@ -32,7 +32,7 @@ export function OperationIcon({ tx }: { tx: Transaction }) {
       return <ApplyPendingDebtIcon tx={tx} />;
 
     case "liquidate":
-      return <LiquidateIcon />;
+      return <LiquidateIcon tx={tx} />;
 
     case "redeemCollateral":
       return <RedeemCollateralIcon />;

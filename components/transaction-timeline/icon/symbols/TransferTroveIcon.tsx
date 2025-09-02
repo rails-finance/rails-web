@@ -1,4 +1,4 @@
-interface PercentDecreaseIconProps {
+interface TransferTroveIconProps {
   x?: number;
   y?: number;
   r?: number;
@@ -7,11 +7,11 @@ interface PercentDecreaseIconProps {
   fontSize?: number;
 }
 
-export function PercentDecreaseIcon({
+export function TransferTroveIcon({
   x = 210,
   y = 10,
   r = 190,
-}: PercentDecreaseIconProps) {
+}: TransferTroveIconProps) {
   return (
     <foreignObject 
       x={x} 
@@ -20,8 +20,8 @@ export function PercentDecreaseIcon({
       height={r * 2}
     >
       <img 
-        src="/icons/icons.001.png" 
-        alt="Percent decrease"
+        src="/icons/icons.003.png" 
+        alt="Transfer Trove"
         style={{
           width: "100%",
           height: "100%",

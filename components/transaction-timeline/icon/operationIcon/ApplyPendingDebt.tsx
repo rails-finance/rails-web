@@ -1,9 +1,9 @@
 import { Transaction } from "@/types/api/troveHistory";
 import { SingleStepIcon } from "../layouts/SingleStepIcon";
 import { MultiStepIcon } from "../layouts/MultiStepIcon";
+import { IconWrapper } from "../base/IconWrapper";
 import { RedistributionIcon } from "../symbols/RedistributionIcon";
-import { PercentIncreaseIcon } from "../symbols/PercentIncreaseIcon";
-import { PercentDecreaseIcon } from "../symbols/PercentDecreaseIcon";
+import { ApplyDebtIcon } from "../symbols/ApplyDebtIcon";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { TimelineIconStep } from "@/types";
 
@@ -20,7 +20,7 @@ export function ApplyPendingDebtIcon({ tx }: { tx: Transaction }) {
       arrowDirection: "in",
     };
     const secondStep: TimelineIconStep = {
-      children: debtChangeFromOperation > 0 ? <PercentIncreaseIcon /> : <PercentDecreaseIcon />,
+      children: <ApplyDebtIcon />,
       arrowDirection: "in",
     };
     return <MultiStepIcon firstStep={firstStep} secondStep={secondStep} />;
@@ -41,27 +41,39 @@ export function ApplyPendingDebtIcon({ tx }: { tx: Transaction }) {
       return <MultiStepIcon firstStep={firstStep} secondStep={secondStep} />;
     }
 
-    // Single redistribution icon
+    // Single redistribution icon - no outer circle since this is a batch manager action
     return (
-      <SingleStepIcon arrowDirection="in">
-        <RedistributionIcon />
-      </SingleStepIcon>
+      <div className="transaction-single" style={{ position: "relative", zIndex: 1 }}>
+        <div className="transaction-step step-single">
+          <IconWrapper>
+            <RedistributionIcon />
+          </IconWrapper>
+        </div>
+      </div>
     );
   }
 
-  // Only interest
+  // Only interest - no outer circle since this is a batch manager action
   if (hasInterest) {
     return (
-      <SingleStepIcon arrowDirection="in">
-        {debtChangeFromOperation > 0 ? <PercentIncreaseIcon /> : <PercentDecreaseIcon />}
-      </SingleStepIcon>
+      <div className="transaction-single" style={{ position: "relative", zIndex: 1 }}>
+        <div className="transaction-step step-single">
+          <IconWrapper>
+            <ApplyDebtIcon />
+          </IconWrapper>
+        </div>
+      </div>
     );
   }
 
-  // Fallback - shouldn't happen normally
+  // Fallback - shouldn't happen normally - no outer circle
   return (
-    <SingleStepIcon>
-      <RedistributionIcon />
-    </SingleStepIcon>
+    <div className="transaction-single" style={{ position: "relative", zIndex: 1 }}>
+      <div className="transaction-step step-single">
+        <IconWrapper>
+          <RedistributionIcon />
+        </IconWrapper>
+      </div>
+    </div>
   );
 }

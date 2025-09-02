@@ -1,10 +1,10 @@
 import { SingleStepIcon } from "../layouts/SingleStepIcon";
-import { NFTIcon } from "../symbols/NFTIcon";
+import { TransferTroveIcon as TransferTroveSymbol } from "../symbols/TransferTroveIcon";
 
 export function TransferTroveIcon() {
   return (
     <SingleStepIcon>
-      <NFTIcon />
+      <TransferTroveSymbol />
     </SingleStepIcon>
   );
 }
