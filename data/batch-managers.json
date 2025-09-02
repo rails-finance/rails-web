@@ -113,6 +113,22 @@
       "website": "https://www.liquity.org/blog/autonomous-interest-manager",
       "asset_symbol": "rETH",
       "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276"
+    },
+    {
+      "name": "Mock Delegate Manager",
+      "address": "0x9876543210fedcba9876543210fedcba98765432",
+      "description": "Mock batch manager for testing delegation features",
+      "website": "https://mock-delegate.example.com",
+      "asset_symbol": "WETH",
+      "asset_contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    },
+    {
+      "name": "Mock Delegate Manager",
+      "address": "0xbatch1234567890abcdef1234567890abcdef123456",
+      "description": "Mock batch manager for testing delegation features",
+      "website": "https://mock-delegate.example.com",
+      "asset_symbol": "WETH",
+      "asset_contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
     }
   ]
 }
