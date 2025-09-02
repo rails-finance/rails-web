@@ -159,6 +159,6 @@ export function AdjustTroveExplanation({ transaction, onToggle }: AdjustTroveExp
   }
   
   return (
-    <ExplanationPanel items={adjustTroveItems} onToggle={onToggle} defaultOpen={false} />
+    <ExplanationPanel items={adjustTroveItems} onToggle={onToggle} defaultOpen={false} transactionHash={transaction.transactionHash} />
   );
 }

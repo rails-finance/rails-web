@@ -29,7 +29,7 @@ export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFrom
     <span key="delegate" className="text-slate-500">
       Left delegate:{' '}
       <span className="font-medium inline-flex items-center gap-1">
-        {batchManagerInfo?.name || 'Unknown'}
+        {batchManagerInfo?.name || 'Unknown delegate'}
         {batchManagerInfo?.website && (
           <a
             href={batchManagerInfo.website}
@@ -88,6 +88,6 @@ export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFrom
   }
   
   return (
-    <ExplanationPanel items={batchExitItems} onToggle={onToggle} defaultOpen={false} />
+    <ExplanationPanel items={batchExitItems} onToggle={onToggle} defaultOpen={false} transactionHash={transaction.transactionHash} />
   );
 }

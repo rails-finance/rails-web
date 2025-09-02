@@ -79,6 +79,6 @@ export function CloseTroveExplanation({ transaction, onToggle }: CloseTroveExpla
   );
   
   return (
-    <ExplanationPanel items={closeTroveItems} onToggle={onToggle} defaultOpen={false} />
+    <ExplanationPanel items={closeTroveItems} onToggle={onToggle} defaultOpen={false} transactionHash={transaction.transactionHash} />
   );
 }

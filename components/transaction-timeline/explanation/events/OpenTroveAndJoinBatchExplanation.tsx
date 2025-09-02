@@ -133,6 +133,6 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
   );
   
   return (
-    <ExplanationPanel items={batchItems} onToggle={onToggle} defaultOpen={false} />
+    <ExplanationPanel items={batchItems} onToggle={onToggle} defaultOpen={false} transactionHash={transaction.transactionHash} />
   );
 }

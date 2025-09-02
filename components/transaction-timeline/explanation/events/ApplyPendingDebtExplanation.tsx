@@ -22,7 +22,7 @@ export function ApplyPendingDebtExplanation({ transaction, onToggle }: ApplyPend
   
   const pendingDebtItems: React.ReactNode[] = [
     <span key="action" className="text-slate-500">
-      Applied pending interest and fee updates to the Trove
+      Batch manager applied pending interest and fee updates to this Trove
     </span>,
     <span key="debt" className="text-slate-500">
       Debt updated from{' '}
@@ -33,7 +33,7 @@ export function ApplyPendingDebtExplanation({ transaction, onToggle }: ApplyPend
       <HighlightableValue type="debt" state="after" value={applyAfterDebt}>
         {formatCurrency(applyAfterDebt, tx.assetType)}
       </HighlightableValue>
-      {' '}(reflects accumulated interest)
+      {' '}(reflects interest accumulated since last update)
     </span>,
     <span key="collateral" className="text-slate-500">
       Collateral remains{' '}
@@ -63,6 +63,6 @@ export function ApplyPendingDebtExplanation({ transaction, onToggle }: ApplyPend
   }
   
   return (
-    <ExplanationPanel items={pendingDebtItems} onToggle={onToggle} defaultOpen={false} />
+    <ExplanationPanel items={pendingDebtItems} onToggle={onToggle} defaultOpen={false} transactionHash={transaction.transactionHash} />
   );
 }

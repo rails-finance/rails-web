@@ -139,6 +139,6 @@ export function SetInterestBatchManagerExplanation({ transaction, onToggle }: Se
   );
   
   return (
-    <ExplanationPanel items={batchJoinItems} onToggle={onToggle} defaultOpen={false} />
+    <ExplanationPanel items={batchJoinItems} onToggle={onToggle} defaultOpen={false} transactionHash={transaction.transactionHash} />
   );
 }

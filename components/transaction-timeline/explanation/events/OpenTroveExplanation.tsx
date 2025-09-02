@@ -144,6 +144,6 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
   );
   
   return (
-    <ExplanationPanel items={openTroveItems} onToggle={onToggle} defaultOpen={false} />
+    <ExplanationPanel items={openTroveItems} onToggle={onToggle} defaultOpen={false} transactionHash={transaction.transactionHash} />
   );
 }

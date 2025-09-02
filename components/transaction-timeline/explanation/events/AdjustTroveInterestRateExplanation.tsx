@@ -117,6 +117,6 @@ export function AdjustTroveInterestRateExplanation({ transaction, onToggle }: Ad
   );
   
   return (
-    <ExplanationPanel items={interestRateItems} onToggle={onToggle} defaultOpen={false} />
+    <ExplanationPanel items={interestRateItems} onToggle={onToggle} defaultOpen={false} transactionHash={transaction.transactionHash} />
   );
 }
