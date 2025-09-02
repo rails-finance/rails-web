@@ -16,7 +16,8 @@ export type TroveOperationType =
   | "redeemCollateral"
   | "openTroveAndJoinBatch"
   | "setInterestBatchManager"
-  | "removeFromBatch";
+  | "removeFromBatch"
+  | "transferTrove";
 
 // Batch operation types
 export type BatchOperationType =
