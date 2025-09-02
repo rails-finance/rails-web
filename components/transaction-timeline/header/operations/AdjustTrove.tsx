@@ -16,5 +16,10 @@ export function AdjustTroveHeader({ tx }: { tx: TroveTransaction }) {
     content.push(<AssetAction key="debt" action={action} asset={tx.assetType} amount={Math.abs(debtChangeFromOperation)} valueType="debt" />);
   }
 
+  // Handle case where there are no actual changes (e.g., delegate operations)
+  if (content.length === 0) {
+    return <span className="text-white font-medium">Adjust Trove</span>;
+  }
+
   return <div className="flex items-center gap-1">{content}</div>;
 }

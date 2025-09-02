@@ -7,32 +7,30 @@ import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
 
 export function SetBatchManagerHeader({ tx }: { tx: TroveTransaction }) {
   const batchManagerInfo = getBatchManagerInfo(tx.stateAfter.interestBatchManager || '');
-  const batchManagerName = batchManagerInfo?.name || 'Unknown';
+  const batchManagerName = batchManagerInfo?.name || 'Unknown delegate';
   const managementFee = tx.batchUpdate?.annualManagementFee || 0;
+  const isJoiningExistingDelegate = tx.batchUpdate?.operation === "joinBatch";
+  const isBecomingDelegate = tx.batchUpdate?.operation === "registerBatchManager";
 
   return (
     <div>
       <div className="flex items-center flex-wrap gap-2">
         <div className="flex items-center gap-1">
           <OperationBadge
-            label="DELEGATE"
-            color="blue"
-            icon={
-              <>
-                <span className="mr-1">→</span>
-                <BatchIcon className="w-3 h-3 mr-1" />
-              </>
-            }
+            label="Delegate"
+            color="none"
           />
-          <div className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded text-slate-300 bg-slate-800 border border-slate-600">
-            {tx.stateAfter.annualInterestRate}<span className="ml-0.5">%</span>
-            {managementFee > 0 && (
-              <>
-                <span className="mx-1">+</span>
-                {managementFee}<span className="ml-0.5">%</span>
-              </>
-            )}
-          </div>
+          <InterestRateBadge 
+            rate={tx.stateAfter.annualInterestRate} 
+            isDelegate={isJoiningExistingDelegate}
+            isNewDelegate={isBecomingDelegate}
+          />
+          {managementFee > 0 && (
+            <div className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded text-slate-300 bg-slate-800 border border-slate-600">
+              <span className="mx-1">+</span>
+              {managementFee}<span className="ml-0.5">%</span>
+            </div>
+          )}
           <span className="text-slate-300 font-medium">{batchManagerName}</span>
         </div>
       </div>

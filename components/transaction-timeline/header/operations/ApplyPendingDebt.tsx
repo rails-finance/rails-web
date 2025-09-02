@@ -10,11 +10,11 @@ export function ApplyPendingDebtHeader({ tx }: { tx: TroveTransaction }) {
 
   return (
     <>
-      <OperationBadge label="APPLY PENDING DEBT" color="purple" />
+      <OperationBadge label="BATCH MANAGER UPDATE" color="purple" />
       <div className="flex items-center gap-1">
         {hasRedistribution && (
           <>
-            <span className="text-slate-400">Redistribution</span>
+            <span className="text-slate-400">Redistribution applied</span>
             {collIncreaseFromRedist > 0 && <AssetAction action="+" asset={tx.collateralType} />}
             {debtIncreaseFromRedist > 0 && <AssetAction action="+" asset={tx.assetType} />}
           </>
@@ -22,7 +22,7 @@ export function ApplyPendingDebtHeader({ tx }: { tx: TroveTransaction }) {
         {hasInterest && (
           <>
             {hasRedistribution && <span className="text-slate-500">•</span>}
-            <span className="text-slate-400">Interest</span>
+            <span className="text-slate-400">Interest applied</span>
             <AssetAction action="+" asset={tx.assetType} />
           </>
         )}

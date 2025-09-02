@@ -2,7 +2,7 @@ import { TroveTransaction } from "@/types/api/troveHistory";
 import { OperationBadge } from "../components/OperationBadge";
 import { InterestRateBadge } from "../components/InterestRateBadge";
 import { AssetAction } from "../components/AssetAction";
-import { Image, Link2 } from "lucide-react";
+import { Image, Plus } from "lucide-react";
 
 
 export function OpenTroveHeader({ tx }: { tx: TroveTransaction }) {

@@ -4,20 +4,27 @@ import { InterestRateBadge } from "../components/InterestRateBadge";
 import { BatchManagerInfo } from "../components/BatchManagerInfo";
 import { BatchIcon } from "../components/BatchIcon";
 import { AssetAction } from "../components/AssetAction";
-import { Image } from "lucide-react";
+import { Image, Plus, Users } from "lucide-react";
+import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
 
 export function OpenTroveAndJoinBatchHeader({ tx }: { tx: TroveTransaction }) {
   const { collChangeFromOperation, debtChangeFromOperation } = tx.troveOperation;
+  const isJoiningExistingDelegate = tx.batchUpdate?.operation === "joinBatch";
+  const isBecomingDelegate = tx.batchUpdate?.operation === "registerBatchManager";
+  
   return (
     <div>
       <div className="flex items-center flex-wrap gap-2">
         <div className="flex items-center gap-1">
           <OperationBadge
-            label="OPEN + DELEGATE"
-            color="gradient-green-blue"
-            icon={<BatchIcon className="w-3 h-3 mr-1" />}
+            label="OPEN"
+            color="green"
           />
-          <InterestRateBadge rate={tx.stateAfter.annualInterestRate} />
+          <InterestRateBadge 
+            rate={tx.stateAfter.annualInterestRate} 
+            isDelegate={isJoiningExistingDelegate}
+            isNewDelegate={isBecomingDelegate}
+          />
           <AssetAction action="Supply" asset={tx.collateralType} amount={collChangeFromOperation} valueType="collateral" />
           <AssetAction action="Borrow" asset={tx.assetType} amount={debtChangeFromOperation} valueType="debt" />
           <div className="flex items-center space-x-1">
@@ -26,7 +33,6 @@ export function OpenTroveAndJoinBatchHeader({ tx }: { tx: TroveTransaction }) {
 		     </div>
         </div>
       </div>
-      <BatchManagerInfo batchManager={tx.stateAfter.interestBatchManager} color="blue" />
     </div>
   );
 }

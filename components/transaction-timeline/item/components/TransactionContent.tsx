@@ -11,8 +11,6 @@ export function TransactionContent({ children, isInBatch, isExpanded }: Transact
 
   if (isExpanded) {
     containerClassName += " bg-slate-900";
-  } else if (isInBatch) {
-    containerClassName += " bg-fuchsia-900/10 hover:bg-fuchsia-900/20";
   } else {
     containerClassName += " hover:bg-slate-900";
   }
