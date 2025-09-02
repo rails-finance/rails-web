@@ -129,14 +129,16 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
       </div>
 
       {/* Hover context panel - moved outside the main card */}
-      <ExplanationPanel 
-        items={hoverContextItems} 
-        onToggle={(isOpen) => {
-          setShowHoverContext(isOpen);
-          setHoverEnabled(isOpen);
-        }}
-        defaultOpen={false}
-      />
+      <div className="px-2.5">
+        <ExplanationPanel 
+          items={hoverContextItems} 
+          onToggle={(isOpen) => {
+            setShowHoverContext(isOpen);
+            setHoverEnabled(isOpen);
+          }}
+          defaultOpen={false}
+        />
+      </div>
     </div>
   );
 }

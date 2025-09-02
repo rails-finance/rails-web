@@ -84,7 +84,7 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
             )}
             <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
               <span className="text-slate-400 flex items-center gap-1">
-                <Icon name="hash" size={12} />
+                <Icon name="trove-id" size={12} />
                 {trove.troveId ? `${trove.troveId.substring(0, 8)}...` : "n/a"}
                 <div className="relative inline-block group">
                   <button
