@@ -1,4 +1,9 @@
-import { isLiquidationTransaction, isRedemptionTransaction, Transaction } from "@/types/api/troveHistory";
+import {
+  isLiquidationTransaction,
+  isRedemptionTransaction,
+  isTransferTransaction,
+  Transaction,
+} from "@/types/api/troveHistory";
 import { OpenTroveHeader } from "./OpenTrove";
 import { CloseTroveHeader } from "./CloseTrove";
 import { AdjustTroveHeader } from "./AdjustTrove";
@@ -45,7 +50,7 @@ export function HeaderContent({ tx }: { tx: Transaction }) {
       return <RemoveFromBatchHeader tx={tx} />;
 
     case "transferTrove":
-      return <TransferTroveHeader tx={tx} />;
+      return isTransferTransaction(tx) ? <TransferTroveHeader tx={tx} /> : <DefaultHeader tx={tx} />;
 
     default:
       return <DefaultHeader tx={tx} />;
