@@ -17,7 +17,7 @@ export function Providers({ children, initialState }: Props) {
   const [queryClient] = useState(() => new QueryClient());
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem suppressHydrationWarning>
       <WagmiProvider config={config} initialState={initialState}>
         <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
       </WagmiProvider>

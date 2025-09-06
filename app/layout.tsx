@@ -32,7 +32,7 @@ export default async function RootLayout({
   const initialState = cookieToInitialState(getConfig(), (await headers()).get("cookie"));
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-800 text-white min-h-screen overflow-x-hidden`}
       >
