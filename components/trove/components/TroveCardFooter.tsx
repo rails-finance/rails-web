@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/icons/icon";
 import { Image, Link2 } from "lucide-react";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
+import { TroveSummary } from "@/types/api/trove";
 
 interface TroveCardFooterProps {
-  trove: any;
+  trove: TroveSummary;
   showViewButton?: boolean;
   dateText?: string;
   dateInfo?: {
@@ -22,10 +23,10 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
   const [copiedTrove, setCopiedTrove] = useState(false);
   
   // Debug logging
-  const nftUrl = getTroveNftUrl(trove.collateralType, trove.troveId);
+  const nftUrl = getTroveNftUrl(trove.collateralType, trove.id);
   console.log('NFT Debug:', { 
     collateralType: trove.collateralType, 
-    troveId: trove.troveId, 
+    troveId: trove.id, 
     nftUrl 
   });
   return (
@@ -47,13 +48,13 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
             </span>
           </div>
           <div className="flex flex-wrap sm:flex-row gap-3">
-            {trove.ownerAddress && (
+            {trove.owner && (
               <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
                 <span className="text-slate-400 flex items-center gap-1">
                   <Icon name="user" size={12} />
                   <span>
                     {}
-                    {trove.walletEns || `${trove.ownerAddress.substring(0, 6)}...${trove.ownerAddress.substring(38)}`}
+                    {trove.ownerEns || `${trove.owner.substring(0, 6)}...${trove.owner.substring(38)}`}
                   </span>
                   <div className="relative inline-block group">
                     <button
@@ -62,9 +63,11 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        navigator.clipboard.writeText(trove.ownerAddress);
-                        setCopiedOwnerAddress(true);
-                        setTimeout(() => setCopiedOwnerAddress(false), 2000);
+                        if (trove.owner) {
+                          navigator.clipboard.writeText(trove.owner);
+                          setCopiedOwnerAddress(true);
+                          setTimeout(() => setCopiedOwnerAddress(false), 2000);
+                        }
                       }}
                     >
                       <Icon name={copiedOwnerAddress ? "check" : "copy"} size={14} />
@@ -85,7 +88,7 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
             <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
               <span className="text-slate-400 flex items-center gap-1">
                 <Icon name="trove-id" size={12} />
-                {trove.troveId ? `${trove.troveId.substring(0, 8)}...` : "n/a"}
+                {trove.id ? `${trove.id.substring(0, 8)}...` : "n/a"}
                 <div className="relative inline-block group">
                   <button
                     className="mx-1.5 text-slate-400 hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
@@ -93,8 +96,8 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      if (trove.troveId) {
-                        navigator.clipboard.writeText(trove.troveId);
+                      if (trove.id) {
+                        navigator.clipboard.writeText(trove.id);
                         setCopiedTrove(true);
                         setTimeout(() => setCopiedTrove(false), 2000);
                       }
@@ -114,10 +117,10 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
                 </div>
               </span>
             </span>
-            {getTroveNftUrl(trove.collateralType, trove.troveId) && (
+            {getTroveNftUrl(trove.collateralType, trove.id) && (
               <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
                 <a
-                  href={getTroveNftUrl(trove.collateralType, trove.troveId)!}
+                  href={getTroveNftUrl(trove.collateralType, trove.id)!}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center text-slate-400 hover:text-slate-200 justify-center ml-0.5 bg-slate-800 w-8 h-4 rounded-full transition-colors"
@@ -130,19 +133,19 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
             )}
             <span className="inline-flex items-center">
               <Icon name="arrow-left-right" size={12} />
-              <span className="ml-1">{trove.activity?.transactionCount || 0}</span>
+              <span className="ml-1">{trove.activity.transactionCount}</span>
             </span>
-            {trove.metrics?.redemptionCount > 0 && (
+            {trove.activity.redemptionCount > 0 && (
               <span className="inline-flex items-center text-orange-400">
                 <Icon name="triangle" size={12} />
-                <span className="ml-1">{trove.metrics.redemptionCount}</span>
+                <span className="ml-1">{trove.activity.redemptionCount}</span>
               </span>
             )}
           </div>
         </div>
         {showViewButton && (
           <Button
-            href={`/trove/${trove.collateralType}/${trove.troveId}`}
+            href={`/trove/${trove.collateralType}/${trove.id}`}
             className="flex items-center w-full sm:w-auto justify-center"
           >
             View Trove

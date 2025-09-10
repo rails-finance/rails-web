@@ -1,8 +1,47 @@
 // Comprehensive mock trove with every permutation of Liquity protocol events
 // This mock includes all possible transaction types, operations, and state combinations
 
-import type { TransactionTimeline, Transaction, TroveTransaction, TroveLiquidationTransaction, TroveRedemptionTransaction, TroveTransferTransaction } from './types/api/troveHistory';
-import type { TroveData } from './types/api/trove';
+import type { TransactionTimeline, Transaction, TroveTransaction, TroveLiquidationTransaction, TroveRedemptionTransaction, TroveTransferTransaction } from '@/types/api/troveHistory';
+
+// Keep old TroveData type for mockData compatibility
+export interface TroveData {
+  troveId: string;
+  assetType: string;
+  collateralType: string;
+  status: string;
+  mainValue: number;
+  mainValueRaw: string;
+  peakValue: number;
+  peakValueRaw: string;
+  backedBy: {
+    amount: number;
+    amountRaw: string;
+    valueUsd: number;
+    symbol: string;
+    peakAmount: number;
+    peakAmountRaw: string;
+  };
+  metrics: {
+    interestRate: number;
+    redemptionCount: number;
+    collateralRatio: number;
+  };
+  activity: {
+    created: number;
+    lastActivity: number;
+    lifetimeDays: number;
+    transactionCount: number;
+  };
+  ownerAddress: string;
+  walletEns: string | null;
+  delegateAddress: string;
+  batchMembership: {
+    isMember: boolean;
+    batchManager: string;
+    batchInterestRate: number;
+    managementFeeRate: number;
+  };
+}
 
 export const mockTroveData: TroveData = {
   troveId: "comprehensive-mock",

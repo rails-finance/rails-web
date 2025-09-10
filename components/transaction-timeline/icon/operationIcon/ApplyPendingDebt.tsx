@@ -1,4 +1,4 @@
-import { Transaction } from "@/types/api/troveHistory";
+import { Transaction, isTroveTransaction } from "@/types/api/troveHistory";
 import { SingleStepIcon } from "../layouts/SingleStepIcon";
 import { MultiStepIcon } from "../layouts/MultiStepIcon";
 import { IconWrapper } from "../base/IconWrapper";
@@ -8,6 +8,14 @@ import { TokenIcon } from "@/components/icons/tokenIcon";
 import { TimelineIconStep } from "@/types";
 
 export function ApplyPendingDebtIcon({ tx }: { tx: Transaction }) {
+  if (!isTroveTransaction(tx)) {
+    return (
+      <SingleStepIcon arrowDirection="in">
+        <ApplyDebtIcon />
+      </SingleStepIcon>
+    );
+  }
+  
   const { debtIncreaseFromRedist, collIncreaseFromRedist, debtChangeFromOperation } = tx.troveOperation;
 
   const hasRedistribution = debtIncreaseFromRedist > 0 || collIncreaseFromRedist > 0;

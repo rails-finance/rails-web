@@ -15,7 +15,7 @@ export async function GET(
     const customizedMock = {
       ...mockTroveComprehensive,
       troveId: troveId,
-      transactions: mockTroveComprehensive.transactions.map(tx => ({
+      transactions: mockTroveComprehensive.transactions.map((tx: any) => ({
         ...tx,
         troveId: troveId,
         // Keep assetType as BOLD, only update collateralType

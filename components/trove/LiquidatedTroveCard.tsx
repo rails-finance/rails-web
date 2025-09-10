@@ -10,9 +10,10 @@ import { useHover, HoverProvider } from "@/components/transaction-timeline/conte
 import { InfoButton } from "@/components/transaction-timeline/explanation/InfoButton";
 import { FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
+import { TroveSummary } from "@/types/api/trove";
 
 interface LiquidatedTroveCardProps {
-  trove: any;
+  trove: TroveSummary;
   showViewButton?: boolean;
 }
 
@@ -35,30 +36,30 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
     // Debt at liquidation
     items.push(
       <span key="liquidated-debt" className="text-slate-500">
-        Total debt of <HighlightableValue type="debt" state="after" value={trove.peakValue}>{formatPrice(trove.peakValue)} {trove.assetType}</HighlightableValue> was liquidated
+        Total debt of <HighlightableValue type="debt" state="after" value={trove.debt.peak}>{formatPrice(trove.debt.peak)} BOLD</HighlightableValue> was liquidated
       </span>
     );
 
     // Collateral seized
     items.push(
       <span key="collateral-seized" className="text-slate-500">
-        <HighlightableValue type="collateral" state="after" value={trove.backedBy.peakAmount}>{formatPrice(trove.backedBy.peakAmount)} {trove.collateralType}</HighlightableValue> collateral was seized during liquidation
+        <HighlightableValue type="collateral" state="after" value={trove.collateral.peakAmount}>{formatPrice(trove.collateral.peakAmount)} {trove.collateralType}</HighlightableValue> collateral was seized during liquidation
       </span>
     );
 
     // Trove lifecycle
-    const openDate = new Date(trove.activity.created);
-    const liquidationDate = new Date(trove.activity.lastActivity);
+    const openDate = new Date(trove.activity.createdAt);
+    const liquidationDate = new Date(trove.activity.lastActivityAt);
     const lifetimeDays = Math.floor((liquidationDate.getTime() - openDate.getTime()) / (1000 * 60 * 60 * 24));
     
     items.push(
       <span key="lifecycle" className="text-slate-500">
-        Trove was active for <strong className="text-white">{lifetimeDays} days</strong> before liquidation from {formatDateRange(trove.activity.created, trove.activity.lastActivity)}
+        Trove was active for <strong className="text-white">{lifetimeDays} days</strong> before liquidation from {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
       </span>
     );
 
     // Add NFT information if NFT URL is available
-    const nftUrl = getTroveNftUrl(trove.collateralType, trove.troveId);
+    const nftUrl = getTroveNftUrl(trove.collateralType, trove.id);
     if (nftUrl) {
       items.push(
         <span key="nft-info" className="text-slate-500">
@@ -87,19 +88,19 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
   return (
     <div>
       <div className="rounded-lg text-slate-500 bg-red-950 text-red-800 border border-red-900 grid grid-cols-1 p-4 gap-4">
-        <TroveCardHeader status="liquidated" assetType={trove.assetType} />
+        <TroveCardHeader status="liquidated" assetType="BOLD" />
 
         {/* Main value */}
         <div>
           <div className="text-sm mb-1">Liquidated Amount</div>
           <div className="flex items-center">
             <h3 className="text-3xl font-bold text-white">
-              <HighlightableValue type="debt" state="after" value={trove.peakValue}>
-                {formatPrice(trove.peakValue)}
+              <HighlightableValue type="debt" state="after" value={trove.debt.peak}>
+                {formatPrice(trove.debt.peak)}
               </HighlightableValue>
             </h3>
             <span className="ml-2 text-green-400 text-lg">
-              <TokenIcon assetSymbol={trove.assetType} />
+              <TokenIcon assetSymbol="BOLD" />
             </span>
           </div>
         </div>
@@ -110,8 +111,8 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
           <div className="flex items-center">
             <div className="flex items-center">
               <p className="text-xl font-medium text-white mr-1">
-                <HighlightableValue type="collateral" state="after" value={trove.backedBy.peakAmount}>
-                  {formatPrice(trove.backedBy.peakAmount)}
+                <HighlightableValue type="collateral" state="after" value={trove.collateral.peakAmount}>
+                  {formatPrice(trove.collateral.peakAmount)}
                 </HighlightableValue>
               </p>
               <span className="flex items-center text-slate-400">
@@ -124,7 +125,7 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
         <TroveCardFooter
           trove={trove}
           showViewButton={showViewButton}
-          dateText={`${formatDateRange(trove.activity.created, trove.activity.lastActivity)}`}
+          dateText={`${formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}`}
         />
       </div>
 

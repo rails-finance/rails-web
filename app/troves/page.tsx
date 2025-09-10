@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { TroveCard } from "@/components/trove/TroveCard";
-import { TroveData, TrovesResponse } from "@/types/api/trove";
+import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 
 export default function TrovesPage() {
   const searchParams = useSearchParams();
@@ -12,13 +12,13 @@ export default function TrovesPage() {
   // Get page from URL, default to 1
   const currentPage = Number(searchParams.get('page')) || 1;
   
-  const [troves, setTroves] = useState<TroveData[]>([]);
+  const [troves, setTroves] = useState<TroveSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({
     total: 0,
     limit: 20,
-    hasMore: false,
+    page: 1,
   });
   
   // Update URL when page changes
@@ -49,11 +49,13 @@ export default function TrovesPage() {
       
       const data: TrovesResponse = await response.json();
       setTroves(data.data);
-      setPagination({
-        total: data.pagination.total,
-        limit: data.pagination.limit,
-        hasMore: data.pagination.hasMore,
-      });
+      if (data.pagination) {
+        setPagination({
+          total: data.pagination.total,
+          limit: data.pagination.limit,
+          page: data.pagination.page,
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load troves");
       console.error("Error loading troves:", err);
@@ -146,7 +148,7 @@ export default function TrovesPage() {
         {troves.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 mb-8">
             {troves.map((trove) => (
-              <TroveCard key={trove.troveId} trove={trove} showViewButton />
+              <TroveCard key={trove.id} trove={trove} showViewButton />
             ))}
           </div>
         ) : (

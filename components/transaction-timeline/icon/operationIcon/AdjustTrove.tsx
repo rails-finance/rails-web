@@ -1,10 +1,18 @@
-import { Transaction } from "@/types/api/troveHistory";
+import { Transaction, isTroveTransaction } from "@/types/api/troveHistory";
 import { SingleStepIcon } from "../layouts/SingleStepIcon";
 import { MultiStepIcon } from "../layouts/MultiStepIcon";
 import { TimelineIconStep } from "@/types";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 
 export function AdjustTroveIcon({ tx }: { tx: Transaction }) {
+  if (!isTroveTransaction(tx)) {
+    return (
+      <SingleStepIcon>
+        <TokenIcon assetSymbol={tx.collateralType} isTimeline />
+      </SingleStepIcon>
+    );
+  }
+  
   const { debtChangeFromOperation, collChangeFromOperation } = tx.troveOperation;
   const debtChange = debtChangeFromOperation !== 0;
   const collChange = collChangeFromOperation !== 0;

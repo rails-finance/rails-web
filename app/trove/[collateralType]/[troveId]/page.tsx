@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { TroveData, TrovesResponse } from "@/types/api/trove";
+import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 import type { TransactionTimeline as TimelineData } from "@/types/api/troveHistory";
 import { TroveCard } from "@/components/trove/TroveCard";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ export default function TrovePage() {
   const troveId = params.troveId as string;
   const collateralType = params.collateralType as string;
 
-  const [troveData, setTroveData] = useState<TroveData | null>(null);
+  const [troveData, setTroveData] = useState<TroveSummary | null>(null);
   const [timelineData, setTimelineData] = useState<TimelineData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

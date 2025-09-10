@@ -7,7 +7,7 @@ import { CollateralRatioMetric } from "./metrics/CollateralRatioMetric";
 export function TransactionStateGrid({ tx }: { tx: Transaction }) {
   const { stateBefore, stateAfter, assetType, collateralType } = tx;
   const isCloseTrove = tx.operation === "closeTrove";
-  
+
   // Get upfront fee if available (only for trove transactions)
   const upfrontFee = isTroveTransaction(tx) ? tx.troveOperation.debtIncreaseFromUpfrontFee : undefined;
 
@@ -16,7 +16,7 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
       <div className="grid md:grid-cols-2 xl:grid-cols-2 gap-6">
         <DebtMetric
           assetType={assetType}
-          before={stateBefore?.debt}
+          before={stateBefore.debt}
           after={stateAfter.debt}
           isCloseTrove={isCloseTrove}
           upfrontFee={upfrontFee}
@@ -24,20 +24,20 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
 
         <CollateralMetric
           collateralType={collateralType}
-          before={stateBefore?.coll}
+          before={stateBefore.coll}
           after={stateAfter.coll}
           afterInUsd={stateAfter.collateralInUsd}
           isCloseTrove={isCloseTrove}
         />
 
         <InterestRateMetric
-          before={stateBefore?.annualInterestRate}
+          before={stateBefore.annualInterestRate}
           after={stateAfter.annualInterestRate}
           isCloseTrove={isCloseTrove}
         />
 
         <CollateralRatioMetric
-          before={stateBefore?.collateralRatio}
+          before={stateBefore.collateralRatio}
           after={stateAfter.collateralRatio}
           isCloseTrove={isCloseTrove}
         />

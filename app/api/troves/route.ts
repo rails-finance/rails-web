@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { TrovesResponse, TroveData } from "@/types/api/trove";
+import { TrovesResponse } from "@/types/api/trove";
 import { mockTroveData } from "@/lib/mockData";
 
 const RAILS_API_URL = process.env.RAILS_API_URL;
