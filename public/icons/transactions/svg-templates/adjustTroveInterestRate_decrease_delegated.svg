@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" xmlns:bx="https://boxy-svg.com">
+  <circle cx="40" cy="20" r="18" fill="rgb(23, 27, 36)" stroke="none" style="stroke-width: 2px;"/>
+  <circle cx="35.709" cy="15.245" r="2.935" style="fill-rule: evenodd; fill: none; stroke: rgb(69, 85, 108); stroke-width: 2;"/>
+  <line x1="33.127" y1="26.745" x2="47.211" y2="12.661" stroke-linecap="round" style="stroke: rgb(69, 85, 108); stroke-width: 2;"/>
+  <circle cx="44.291" cy="24.755" r="2.935" style="fill-rule: evenodd; fill: none; stroke: rgb(69, 85, 108); stroke-width: 2;"/>
+  <path d="M 16 21.4 H 30 L 30 18 L 38 23 L 30 28 L 30 24.6 H 16 V 21.4 Z" bx:shape="arrow 16 18 22 10 3.2 8 0 1@d78f9eee" style="stroke-linecap: round; stroke-linejoin: round; transform-box: fill-box; transform-origin: 50% 50%; stroke: rgb(255, 0, 0); fill: rgb(255, 0, 0);" transform="matrix(0, 1, -1, 0, 41.999985, -3.000003)"/>
+</svg> 

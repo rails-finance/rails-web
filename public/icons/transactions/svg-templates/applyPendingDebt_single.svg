@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+  <rect x="-17.085" y="-8.513" width="109.144" height="61.184" style="fill: rgba(0, 0, 0, 0);"/>
+  <circle cx="14.901" cy="24.386" r="12.791" fill="rgb(23, 27, 36)" style="stroke-width: 1.407;"/>
+  <circle cx="37.675" cy="25.861" r="12.791" fill="rgb(23, 27, 36)" style="stroke-width: 1.407;" transform="matrix(1, 0, 0, 0.859958, 0, 1.830353)"/>
+  <circle cx="60.879" cy="24.542" r="14.785" fill="rgb(23, 27, 36)" style="stroke-width: 1.407;"/>
+  <circle cx="37.43" cy="20.645" r="2.065" style="fill-rule: evenodd; fill: none; stroke-width: 1; stroke: rgb(102, 113, 130);"/>
+  <line x1="35.365" y1="28.491" x2="45.275" y2="18.58" stroke-linecap="round" style="stroke-width: 1; stroke: rgb(102, 113, 130);"/>
+  <circle cx="43.21" cy="26.426" r="2.065" style="fill-rule: evenodd; fill: none; stroke-width: 1; stroke: rgb(102, 113, 130);"/>
+  <g transform="matrix(1, 0, 0, 1, 51, 12)">
+    <ellipse style="fill: rgb(216, 216, 216); stroke-width: 1;" cx="12" cy="12" rx="12" ry="12"/>
+    <use href="#DEBT_ICON" width="24" height="24" transform=""/>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, 8, 17.5)">
+    <ellipse style="fill: rgb(216, 216, 216); " cx="7" cy="7" rx="7" ry="7"/>
+    <use href="#DEBT_ICON" width="14" height="14" transform=""/>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, 0.036152, 4.599815)"/>
+  <line x1="27" x2="33" y1="24" y2="24" stroke-width="2" style="stroke-linecap: round; stroke-width: 1; stroke: rgb(102, 113, 130);"/>
+  <line x1="30" x2="30" y1="21" y2="27" stroke-width="2" style="stroke-linecap: round; stroke-width: 1; stroke: rgb(102, 113, 130);"/>
+</svg>

@@ -1,65 +1,44 @@
 import { Transaction } from "@/types/api/troveHistory";
-import { OpenTroveIcon } from "./OpenTrove";
-import { CloseTroveIcon } from "./CloseTrove";
-import { AdjustTroveIcon } from "./AdjustTrove";
-import { LiquidateIcon } from "./Liquidate";
-import { RedeemCollateralIcon } from "./RedeemCollateral";
-import { SetBatchManagerIcon } from "./SetBatchManager";
-import { RemoveFromBatchIcon } from "./RemoveFromBatch";
-import { InterestRateAdjustIcon } from "./InterestRateAdjust";
-import { TransferTroveIcon } from "./TransferTrove";
-import { ApplyPendingDebtIcon } from "./ApplyPendingDebt";
-import { OpenTroveAndJoinBatchIcon } from "./OpenTroveAndJoinBatch";
-import { SingleStepIcon } from "../layouts/SingleStepIcon";
-import { Circle } from "../base/Circle";
+import { TransactionImage } from "../TransactionImage";
 
 // Internal component for selecting the right icon based on operation
-export function OperationIcon({ tx }: { tx: Transaction }) {
-  switch (tx.operation) {
-    case "openTrove":
-      return <OpenTroveIcon tx={tx} />;
-
-    case "closeTrove":
-      return <CloseTroveIcon tx={tx} />;
-
-    case "adjustTrove":
-      return <AdjustTroveIcon tx={tx} />;
-
-    case "adjustTroveInterestRate":
-      return <InterestRateAdjustIcon tx={tx} />;
-
-    case "applyPendingDebt":
-      return <ApplyPendingDebtIcon tx={tx} />;
-
-    case "liquidate":
-      return <LiquidateIcon tx={tx} />;
-
-    case "redeemCollateral":
-      return <RedeemCollateralIcon />;
-
-    // batch management
-    case "openTroveAndJoinBatch":
-      return <OpenTroveAndJoinBatchIcon tx={tx} />;
-
-    case "setInterestBatchManager":
-      return <SetBatchManagerIcon />;
-
-    case "removeFromBatch":
-      return <RemoveFromBatchIcon />;
-
-    case "transferTrove":
-      return <TransferTroveIcon />;
-
-    default:
-      return <DefaultIcon />;
-  }
+interface OperationIconProps {
+  tx: Transaction;
+  isFirst?: boolean;
+  isLast?: boolean;
+  isExpanded?: boolean;
 }
 
-// Default icon for unknown/missing operations
-function DefaultIcon() {
+export function OperationIcon({ tx, isFirst, isLast, isExpanded }: OperationIconProps) {
+  // For batch operations that should override the primary operation display,
+  // we modify the transaction object to use the batch operation as the primary operation
+  let displayTx = tx;
+  
+  if (tx.type === "trove" && tx.batchUpdate?.operation) {
+    // Don't override if primary operation already includes batch handling or should remain primary
+    if (tx.operation !== "openTroveAndJoinBatch" && 
+        tx.operation !== "removeFromBatch" && 
+        tx.operation !== "closeTrove") {
+      // For other operations, check if batch operation should be displayed instead
+      if (tx.batchUpdate.operation === "joinBatch" || tx.batchUpdate.operation === "exitBatch") {
+        displayTx = {
+          ...tx,
+          operation: tx.batchUpdate.operation as any
+        };
+      }
+    }
+  }
+
+  // All operations use the unified TransactionImage component
+  // The TransactionImage component handles all the SVG loading logic and determines 
+  // the correct image based on the transaction data
   return (
-    <SingleStepIcon>
-      <Circle cx={400} cy={200} r={100} fill="#DC2626" />
-    </SingleStepIcon>
+    <TransactionImage 
+      tx={displayTx} 
+      isFirst={isFirst} 
+      isLast={isLast} 
+      isExpanded={isExpanded} 
+    />
   );
 }
+

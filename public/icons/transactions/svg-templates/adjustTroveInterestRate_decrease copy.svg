@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+  <rect x="25" width="30" height="26.731" style="fill: rgb(23, 27, 36);"/>
+  <rect x="25" width="30" height="80" style="fill: rgba(216, 216, 216,0.01); "/>
+  <circle cx="35.155" cy="7.518" r="3.332" style="fill-rule: evenodd; fill: none; stroke: rgb(255, 255, 255); stroke-width: 2px;"/>
+  <line x1="32.224" y1="20.573" x2="48.212" y2="4.585" stroke-linecap="round" style="stroke: rgb(255, 255, 255); stroke-width: 2px;"/>
+  <circle cx="44.897" cy="18.314" r="3.332" style="fill-rule: evenodd; fill: none; stroke: rgb(255, 255, 255); stroke-width: 2px;"/>
+  <path d="M 70.645 3.073 L 70.645 17.341 L 74.017 17.341 L 68.272 25.264 L 62.527 17.341 L 65.899 17.341 L 65.899 2.858 L 70.645 2.858 L 70.645 3.073 Z" style="fill: rgb(0, 121, 255);"/>
+</svg>

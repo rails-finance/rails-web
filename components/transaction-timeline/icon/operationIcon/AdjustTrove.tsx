@@ -1,88 +1,67 @@
-import { Transaction } from "@/types/api/troveHistory";
-import { SingleStepIcon } from "../layouts/SingleStepIcon";
-import { MultiStepIcon } from "../layouts/MultiStepIcon";
-import { TimelineIconStep } from "@/types";
-import { TokenIcon } from "@/components/icons/tokenIcon";
+import { Transaction, isTroveTransaction } from "@/types/api/troveHistory";
+import { TimelineBackground } from "../TimelineBackground";
+import { getTransactionImageKey } from "@/lib/utils/transactionImages";
+import { loadTransactionSvg } from "@/lib/utils/svgMapping";
+import { useEffect, useState } from "react";
 
-export function AdjustTroveIcon({ tx }: { tx: Transaction }) {
-  const { debtChangeFromOperation, collChangeFromOperation } = tx.troveOperation;
-  const debtChange = debtChangeFromOperation !== 0;
-  const collChange = collChangeFromOperation !== 0;
+interface AdjustTroveIconProps {
+  tx: Transaction;
+  isFirst?: boolean;
+  isLast?: boolean;
+  isExpanded?: boolean;
+}
 
-  const debtIncrease = debtChangeFromOperation > 0; // Borrow
-  const collIncrease = collChangeFromOperation > 0; // Deposit
+export function AdjustTroveIcon({ tx, isFirst = false, isLast = false, isExpanded = false }: AdjustTroveIconProps) {
+  const [svgContent, setSvgContent] = useState<string>('');
 
-  // Multi-step if both change
-  if (debtChange && collChange) {
-    let firstStep: TimelineIconStep;
-    let secondStep: TimelineIconStep;
+  if (!isTroveTransaction(tx)) {
+    return null;
+  }
 
-    if (debtIncrease && collIncrease) {
-      // Borrow + Deposit
-      firstStep = {
-        children: <TokenIcon assetSymbol={tx.assetType} isTimeline />,
-        arrowDirection: "in",
-      };
-      secondStep = {
-        children: <TokenIcon assetSymbol={tx.collateralType} isTimeline />,
-        arrowDirection: "out",
-      };
-    } else if (!debtIncrease && !collIncrease) {
-      // Repay + Withdraw
-      firstStep = {
-        children: <TokenIcon assetSymbol={tx.collateralType} isTimeline />,
-        arrowDirection: "in",
-      };
-      secondStep = {
-        children: <TokenIcon assetSymbol={tx.assetType} isTimeline />,
-        arrowDirection: "out",
-      };
-    } else if (!debtIncrease && collIncrease) {
-      // Repay + Deposit (both TO protocol)
-      firstStep = {
-        children: <TokenIcon assetSymbol={tx.assetType} isTimeline />,
-        arrowDirection: "out",
-      };
-      secondStep = {
-        children: <TokenIcon assetSymbol={tx.collateralType} isTimeline />,
-        arrowDirection: "out",
-      };
-    } else {
-      // Withdraw + Borrow (both FROM protocol)
-      firstStep = {
-        children: <TokenIcon assetSymbol={tx.collateralType} isTimeline />,
-        arrowDirection: "in",
-      };
-      secondStep = {
-        children: <TokenIcon assetSymbol={tx.assetType} isTimeline />,
-        arrowDirection: "in",
-      };
+  // Use existing logic to determine the transaction image key
+  const imageKey = getTransactionImageKey(tx);
+  
+  // Extract asset types from transaction data
+  const collateralAsset = tx.collateralType; // e.g., "WETH", "rETH", "wstETH"
+  const debtAsset = tx.assetType; // e.g., "BOLD"
+  
+
+  useEffect(() => {
+    async function loadAndProcessSVG() {
+      // Only handle adjustTrove operations with this component
+      if (!imageKey.startsWith('adjustTrove_')) {
+        setSvgContent('');
+        return;
+      }
+
+      const svgText = await loadTransactionSvg(imageKey, debtAsset, collateralAsset);
+      setSvgContent(svgText || '');
     }
 
-    return <MultiStepIcon firstStep={firstStep} secondStep={secondStep} />;
-  }
+    loadAndProcessSVG();
+  }, [imageKey, debtAsset, collateralAsset]);
 
-  // Single step
-  if (debtChange) {
-    return (
-      <SingleStepIcon arrowDirection={debtIncrease ? "in" : "out"}>
-        <TokenIcon assetSymbol={tx.assetType} isTimeline />
-      </SingleStepIcon>
-    );
-  }
-
-  if (collChange) {
-    return (
-      <SingleStepIcon arrowDirection={collIncrease ? "out" : "in"}>
-        <TokenIcon assetSymbol={tx.collateralType} isTimeline />
-      </SingleStepIcon>
-    );
-  }
-
-  // Fallback (shouldn't happen)
   return (
-    <SingleStepIcon>
-      <TokenIcon assetSymbol={tx.collateralType} isTimeline />
-    </SingleStepIcon>
+    <>
+      {/* Timeline Background - extends full height of transaction row */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-full z-10 pointer-events-none">
+        <TimelineBackground 
+          tx={tx} 
+          isFirst={isFirst} 
+          isLast={isLast} 
+          isExpanded={isExpanded} 
+        />
+      </div>
+      
+      {/* Transaction Graphic - loaded from SVG template */}
+      <div className="relative z-20 w-20 h-20 flex items-center justify-center ">
+        {svgContent ? (
+          <div dangerouslySetInnerHTML={{ __html: svgContent }} />
+        ) : (
+          <div>Loading...</div>
+        )}
+      </div>
+    </>
   );
 }
+

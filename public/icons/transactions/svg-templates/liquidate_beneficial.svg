@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" xmlns:bx="https://boxy-svg.com">
+  <ellipse style="fill: rgb(23, 27, 36);" cx="40" cy="23" rx="23" ry="23"/>
+  <path d="M 40 12.562 L 51.861 33.439 L 28.138 33.439 L 40 12.562 Z" bx:shape="triangle 28.138 12.562 23.723 20.877 0.5 0 1@57294f1b" style="stroke-linejoin: round; stroke-linecap: round; fill: none; stroke-width: 4px; stroke: oklch(62.7% 0.194 149.214); "/>
+</svg>

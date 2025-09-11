@@ -7,6 +7,15 @@ export function LeftValueDisplay({ tx }: { tx: Transaction }) {
     return <div className="hidden sm:block w-24 shrink-0" />;
   }
 
+  // For applyPendingDebt operations that are interest-only (no redistribution), don't show values
+  if (tx.operation === "applyPendingDebt") {
+    const { debtIncreaseFromRedist, collIncreaseFromRedist } = tx.troveOperation;
+    const hasRedistribution = debtIncreaseFromRedist > 0 || collIncreaseFromRedist > 0;
+    if (!hasRedistribution) {
+      return <div className="hidden sm:block w-24 shrink-0" />;
+    }
+  }
+
   const { debtChangeFromOperation, collChangeFromOperation } = tx.troveOperation;
   
   // LEFT SIDE: Values USER RECEIVES (arrow points left/in)
