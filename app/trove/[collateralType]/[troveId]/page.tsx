@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { TroveData, TrovesResponse } from "@/types/api/trove";
 import type { TransactionTimeline as TimelineData } from "@/types/api/troveHistory";
+import { isRedemptionTransaction } from "@/types/api/troveHistory";
 import { TroveCard } from "@/components/trove/TroveCard";
 import { Button } from "@/components/ui/button";
 import { TransactionTimeline } from "@/components/transaction-timeline";
@@ -17,6 +18,7 @@ export default function TrovePage() {
   const [timelineData, setTimelineData] = useState<TimelineData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hideRedemptions, setHideRedemptions] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -109,9 +111,33 @@ export default function TrovePage() {
 
       <TroveCard trove={troveData} />
 
-      <h3 className="text-xl font-semibold mb-4 text-white">Trove Timeline</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xl font-semibold text-white">Trove Timeline</h3>
+        {timelineData && timelineData.transactions.some(tx => isRedemptionTransaction(tx)) && (
+          <button
+            onClick={() => setHideRedemptions(!hideRedemptions)}
+            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+              hideRedemptions
+                ? 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+            }`}
+          >
+            {hideRedemptions 
+              ? `Show ${timelineData.transactions.filter(tx => isRedemptionTransaction(tx)).length} Redemptions`
+              : `Hide ${timelineData.transactions.filter(tx => isRedemptionTransaction(tx)).length} Redemptions`
+            }
+          </button>
+        )}
+      </div>
       {timelineData && timelineData.transactions.length > 0 ? (
-        <TransactionTimeline timeline={timelineData} />
+        <TransactionTimeline 
+          timeline={{
+            ...timelineData,
+            transactions: hideRedemptions 
+              ? timelineData.transactions.filter(tx => !isRedemptionTransaction(tx))
+              : timelineData.transactions
+          }} 
+        />
       ) : (
         <div className="text-center py-8 text-slate-400">No transaction history available</div>
       )}
