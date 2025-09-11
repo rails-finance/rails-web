@@ -166,14 +166,23 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
   return (
     <div>
       {/* Main trove card */}
-      <div className="rounded-lg text-slate-500 bg-slate-900 grid grid-cols-1 p-4 gap-4">
-        <TroveCardHeader status="open" assetType={trove.assetType} isDelegated={trove.batchMembership?.isMember} />
+      <div className="relative rounded-lg text-slate-500 bg-slate-900">
+        {/* Header section with no padding on sides to allow full-width header */}
+        <div className="flex items-center ">
+          <TroveCardHeader status="open" assetType={trove.assetType} isDelegated={trove.batchMembership?.isMember} />
+          
+          {/* Status and label aligned with logo */}
+          <div className="flex items-center ml-4">
+            <span className="text-xs font-semibold px-2 py-0.5 bg-green-900 text-green-400 rounded-xs mr-2">ACTIVE</span>
+            <span className="text-xs font-bold text-slate-400">Debt</span>
+          </div>
+        </div>
+
+        {/* Content section with standard grid layout */}
+        <div className="grid grid-cols-1 pt-2 p-4 gap-4">
 
         {/* Main value */}
         <div>
-          <div className="text-xs font-bold text-slate-400 mb-1">
-            Debt
-          </div>
           <div className="flex items-center">
             <h3 className="text-3xl font-bold">
               <HighlightableValue type="debt" state="after" value={interestInfo ? debtWithInterest : trove.mainValue}>
@@ -236,7 +245,12 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
             </p>
           </div>
           <div>
-            <p className="text-sm">{trove.batchMembership.isMember ? 'Delegated ' : ''}Interest Rate</p>
+            <p className="text-sm">
+              {trove.batchMembership.isMember && (
+                <span className="text-xs font-semibold px-1 py-0.5 bg-blue-900 text-blue-400 rounded-xs mr-1">DELEGATED</span>
+              )}
+              Interest Rate
+            </p>
             <div className="text-xl font-medium">
               <HighlightableValue type="interestRate" state="after" value={trove.metrics.interestRate}>
                 {trove.metrics.interestRate}%
@@ -304,6 +318,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* Drawer - 20px narrower than the card above */}
