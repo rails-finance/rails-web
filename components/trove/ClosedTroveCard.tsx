@@ -91,10 +91,9 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
         <div className="flex items-center">
           <TroveCardHeader status="closed" assetType={trove.assetType} />
           
-          {/* Status and label aligned with logo */}
+          {/* Status aligned with logo */}
           <div className="flex items-center ml-4">
             <span className="text-xs font-semibold px-2 py-1 bg-slate-800 text-slate-400 rounded mr-2">CLOSED</span>
-            <span className="text-sm text-slate-400">Debt at peak</span>
           </div>
         </div>
 
@@ -103,6 +102,7 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
 
       {/* Main value */}
       <div>
+        <p className="text-xs text-slate-400 mb-1">Debt</p>
         <div className="flex items-center">
           <h3 className="text-3xl font-bold">
             <HighlightableValue type="peakDebt" state="after" value={trove.peakValue}>
@@ -110,27 +110,12 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
             </HighlightableValue>
           </h3>
           <span className="ml-2 text-green-400 text-lg">
-            <TokenIcon assetSymbol={trove.assetType} />
+            <TokenIcon assetSymbol={trove.assetType} className="w-7 h-7 relative top-0" />
           </span>
+          <span className="ml-2 text-slate-400 text-sm">at peak</span>
         </div>
       </div>
 
-      {/* Backed by section */}
-      <div>
-        <p className="text-sm">Highest recorded collateral</p>
-        <div className="flex items-center">
-          <div className="flex items-center">
-            <p className="text-xl font-medium mr-1">
-              <HighlightableValue type="peakCollateral" state="after" value={trove.backedBy.peakAmount}>
-                {formatPrice(trove.backedBy.peakAmount)}
-              </HighlightableValue>
-            </p>
-            <span className="flex items-center text-slate-400">
-              <TokenIcon assetSymbol={trove.collateralType} />
-            </span>
-          </div>
-        </div>
-      </div>
 
         {showViewButton ? (
           <TroveCardFooter

@@ -99,7 +99,7 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
               </HighlightableValue>
             </h3>
             <span className="ml-2 text-green-400 text-lg">
-              <TokenIcon assetSymbol={trove.assetType} />
+              <TokenIcon assetSymbol={trove.assetType} className="w-7 h-7 relative top-0" />
             </span>
           </div>
         </div>

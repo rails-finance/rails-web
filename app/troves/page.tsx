@@ -3,7 +3,12 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { TroveCard } from "@/components/trove/TroveCard";
+import { SimplifiedTroveCard } from "@/components/trove/SimplifiedTroveCard";
+import { CompactTroveTable } from "@/components/trove/CompactTroveTable";
+import { ViewToggle } from "@/components/trove/ViewToggle";
 import { TroveData, TrovesResponse } from "@/types/api/trove";
+
+type ViewMode = "standard" | "simplified" | "table";
 
 export default function TrovesPage() {
   const searchParams = useSearchParams();
@@ -15,6 +20,7 @@ export default function TrovesPage() {
   const [troves, setTroves] = useState<TroveData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("standard");
   const [pagination, setPagination] = useState({
     total: 0,
     limit: 20,
@@ -106,7 +112,7 @@ export default function TrovesPage() {
   return (
     <main className="min-h-screen">
       <div className="space-y-6">
-        {/* Header with pagination info */}
+        {/* Header with pagination info and view toggle */}
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <div className="text-sm text-slate-400">
@@ -118,7 +124,12 @@ export default function TrovesPage() {
                 "No troves found"
               )}
             </div>
-            {totalPages > 1 && (
+            <div className="flex items-center gap-4">
+              <ViewToggle 
+                viewMode={viewMode} 
+                onChange={setViewMode}
+              />
+              {totalPages > 1 && (
               <div className="flex gap-2">
                 <button
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
@@ -137,17 +148,32 @@ export default function TrovesPage() {
                 >
                   Next
                 </button>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Results grid */}
+        {/* Results display */}
         {troves.length > 0 ? (
-          <div className="grid grid-cols-1 gap-6 mb-8">
-            {troves.map((trove) => (
-              <TroveCard key={trove.troveId} trove={trove} showViewButton />
-            ))}
+          <div className="mb-8">
+            {viewMode === "table" ? (
+              <div className="overflow-x-auto">
+                <CompactTroveTable troves={troves} showViewButton />
+              </div>
+            ) : viewMode === "simplified" ? (
+              <div className="grid grid-cols-1 gap-6">
+                {troves.map((trove) => (
+                  <SimplifiedTroveCard key={trove.troveId} trove={trove} showViewButton />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6">
+                {troves.map((trove) => (
+                  <TroveCard key={trove.troveId} trove={trove} showViewButton />
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center py-12 text-slate-400">

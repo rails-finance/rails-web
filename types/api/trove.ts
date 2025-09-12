@@ -1,5 +1,7 @@
 // Type definitions for Trove API responses
 
+import { InterestInfo } from "@/lib/utils/interest-calculator";
+
 export interface TroveBackedBy {
   amount: number;
   amountRaw: string; // Raw value from DB (NUMERIC stored as string)
@@ -44,6 +46,7 @@ export interface TroveData {
   ownerAddress: string | null;
   walletEns: null; // Always null for now
   batchMembership: TroveBatchMembership;
+  interestInfo?: InterestInfo; // Optional interest calculation data
 }
 
 // API Response types

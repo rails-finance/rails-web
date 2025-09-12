@@ -171,10 +171,9 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
         <div className="flex items-center ">
           <TroveCardHeader status="open" assetType={trove.assetType} isDelegated={trove.batchMembership?.isMember} />
           
-          {/* Status and label aligned with logo */}
+          {/* Status aligned with logo */}
           <div className="flex items-center ml-4">
             <span className="text-xs font-semibold px-2 py-0.5 bg-green-900 text-green-400 rounded-xs mr-2">ACTIVE</span>
-            <span className="text-xs font-bold text-slate-400">Debt</span>
           </div>
         </div>
 
@@ -183,6 +182,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
 
         {/* Main value */}
         <div>
+          <p className="text-xs text-slate-400 mb-1">Debt</p>
           <div className="flex items-center">
             <h3 className="text-3xl font-bold">
               <HighlightableValue type="debt" state="after" value={interestInfo ? debtWithInterest : trove.mainValue}>
@@ -197,12 +197,12 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
           {interestInfo && (
             <div className="mt-2 text-xs text-slate-500 space-y-0.5">
               <div className="flex items-center gap-1 ">
-                <span className="bg-slate-950 border border-slate-700 rounded px-1.5">{formatPrice(interestInfo.recordedDebt)} + {formatPrice(interestInfo.accruedInterest)} interest</span>
-              {interestInfo.isBatchMember && interestInfo.accruedManagementFees !== undefined && interestInfo.accruedManagementFees > 0 && (
-                <span>
-                  + {formatPrice(interestInfo.accruedManagementFees)} delegate fee
+                <span className="bg-slate-950 rounded px-1.5  py-0.5">
+                  {formatPrice(interestInfo.recordedDebt)} + {formatPrice(interestInfo.accruedInterest)} interest
+                  {interestInfo.isBatchMember && interestInfo.accruedManagementFees !== undefined && interestInfo.accruedManagementFees > 0 && (
+                    <> + {formatPrice(interestInfo.accruedManagementFees)} delegate fee</>
+                  )}
                 </span>
-              )}
               </div>
             </div>
           )}
@@ -211,7 +211,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
         {/* Metrics grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <p className="text-sm font-semibold ">Backed by</p>
+            <p className="text-xs text-slate-400 mb-1">Backed by</p>
             <div className="flex items-center">
               <span className="flex items-center">
                 <p className="text-xl font-bold mr-1">
@@ -233,7 +233,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
             </div>
           </div>
           <div>
-            <p className="text-sm">Collateral Ratio</p>
+            <p className="text-xs text-slate-400 mb-1">Collateral Ratio</p>
             <p className="text-xl font-semibold">
               <HighlightableValue type="collRatio" state="after" value={interestInfo && trove.backedBy.valueUsd > 0 
                 ? parseFloat(((trove.backedBy.valueUsd / debtWithInterest) * 100).toFixed(1))
@@ -245,12 +245,12 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
             </p>
           </div>
           <div>
-            <p className="text-sm">
+            <div className="flex items-center gap-1 mb-1">
               {trove.batchMembership.isMember && (
-                <span className="text-xs font-semibold px-1 py-0.5 bg-blue-900 text-blue-400 rounded-xs mr-1">DELEGATED</span>
+                <span className="text-xs font-semibold px-1 py-0.5 bg-blue-900 text-blue-400 rounded-xs">DELEGATED</span>
               )}
-              Interest Rate
-            </p>
+              <p className="text-xs text-slate-400">Interest Rate</p>
+            </div>
             <div className="text-xl font-medium">
               <HighlightableValue type="interestRate" state="after" value={trove.metrics.interestRate}>
                 {trove.metrics.interestRate}%
@@ -258,7 +258,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
             </div>
             {interestInfo && (
               <div className="text-xs text-slate-500 mt-0.5 space-y-0.5">
-                <span className="bg-slate-950 border border-slate-700 rounded px-1.5">~ {formatPrice(dailyInterestCost)} day / {formatPrice(annualInterestCost)} year</span>
+                <span className="bg-slate-950 rounded px-1.5 py-0.5">~ {formatPrice(dailyInterestCost)} day / {formatPrice(annualInterestCost)} year</span>
               </div>
             )}
             {trove.batchMembership.isMember && (
