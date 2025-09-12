@@ -6,7 +6,9 @@ import Image from "next/image";
 import { Icon } from "@/components/icons/icon";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 
-const sampleAddresses = {
+type SampleAddress = { type: "address"; value: string } | { type: "trove"; value: string; collateral: string };
+
+const sampleAddresses: Record<string, SampleAddress> = {
   "Multiple Troves": { type: "address", value: "0x6665e62ef6f6db29d5f8191fbac472222c2cc80f" },
   "Redemption": { type: "trove", value: "108550162375459801081263175493506884375415170607601597105767494617691416279914", collateral: "WETH" },
   "Liquidation": { type: "trove", value: "37074809567919752442189907000666523308270530793726257191383299205622979408716", collateral: "WETH" },
@@ -27,7 +29,7 @@ export default function Home() {
     router.push(`/address/${searchValue}`);
   };
 
-  const handleSampleClick = (sample: keyof typeof sampleAddresses) => {
+  const handleSampleClick = (sample: string) => {
     const sampleData = sampleAddresses[sample];
     if (sampleData.type === "address") {
       router.push(`/address/${sampleData.value}`);
@@ -134,7 +136,13 @@ export default function Home() {
                 </tbody>
               </table>
             </div>
-            <p ><a className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2" href="/troves">Browse all troves...</a> <a className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2" href="/trove/WETH/mock-all-events">Mock events</a></p>
+            <p>
+              <a className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2" href="/stats">📊 Protocol Stats</a>
+              <span className="text-xs text-gray-400 mx-2">•</span>
+              <a className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2" href="/troves">Browse all troves...</a>
+              <span className="text-xs text-gray-400 mx-2">•</span>
+              <a className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2" href="/trove/WETH/mock-all-events">Mock events</a>
+            </p>
             <p className="text-green-600 font-semibold">More protocols coming soon...</p>
           </div>
 

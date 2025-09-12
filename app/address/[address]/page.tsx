@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { TroveData, TrovesResponse } from "@/types/api/trove";
+import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 import { TroveCard } from "@/components/trove/TroveCard";
 
 export default function AddressTrovesPage() {
   const params = useParams();
   const address = params.address as string;
 
-  const [troves, setTroves] = useState<TroveData[]>([]);
+  const [troves, setTroves] = useState<TroveSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,7 +108,7 @@ export default function AddressTrovesPage() {
         {troves.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 mb-8">
             {troves.map((trove) => (
-              <TroveCard key={trove.troveId} trove={trove} showViewButton />
+              <TroveCard key={trove.id} trove={trove} showViewButton />
             ))}
           </div>
         ) : (

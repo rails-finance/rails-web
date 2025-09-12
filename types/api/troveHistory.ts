@@ -16,8 +16,7 @@ export type TroveOperationType =
   | "redeemCollateral"
   | "openTroveAndJoinBatch"
   | "setInterestBatchManager"
-  | "removeFromBatch"
-  | "transferTrove";
+  | "removeFromBatch";
 
 // Batch operation types
 export type BatchOperationType =
@@ -51,7 +50,7 @@ export interface TroveState {
 // TRANSACTION TYPES
 // ============================================
 
-// Base transaction data
+// Base transaction data - ALL transactions have these fields
 interface BaseTransaction {
   id: string; // Unique ID for frontend (txHash + logIndex)
   transactionHash: string;
@@ -63,6 +62,13 @@ interface BaseTransaction {
   collateralType: string;
   gasFee: number;
   gasFeeUsd: number;
+
+  stateBefore: TroveState;
+  stateAfter: TroveState;
+
+  collateralPrice: number;
+  isInBatch: boolean;
+  isZombieTrove: boolean;
 }
 
 // Standard trove operation (open, close, adjust, etc.)
@@ -80,9 +86,6 @@ export interface TroveTransaction extends BaseTransaction {
     collChangeFromOperation: number;
   };
 
-  // State after the operation
-  stateAfter: TroveState;
-
   // From BatchUpdated event (only for batch operations)
   batchUpdate?: {
     operation: BatchOperationType;
@@ -92,13 +95,6 @@ export interface TroveTransaction extends BaseTransaction {
     annualManagementFee: number;
     totalDebtShares: number;
   };
-
-  // Backend calculated/fetched (previous state)
-  stateBefore?: TroveState;
-
-  collateralPrice?: number;
-  isInBatch: boolean; // Helper to know which event type was used
-  isZombieTrove?: boolean; // debt < MIN_DEBT (2000 BOLD)
 }
 
 // Liquidation affecting a specific trove
@@ -126,9 +122,6 @@ export interface TroveLiquidationTransaction extends BaseTransaction {
     collChangeFromOperation: number; // negative (entire coll)
   };
 
-  // State after liquidation (always zero)
-  stateAfter: TroveState;
-
   // If trove was in batch, BatchUpdated(exitBatch) is also emitted
   batchExitUpdate?: {
     operation: "exitBatch";
@@ -139,13 +132,6 @@ export interface TroveLiquidationTransaction extends BaseTransaction {
     annualManagementFee: number;
     totalDebtShares: number;
   };
-
-  // Backend calculated
-  stateBefore?: TroveState;
-
-  collateralPrice?: number;
-  isInBatch: boolean; // Was trove in batch before liquidation
-  isZombieTrove?: boolean;
 }
 
 // Redemption affecting a specific trove
@@ -172,9 +158,6 @@ export interface TroveRedemptionTransaction extends BaseTransaction {
     collChangeFromOperation: number; // negative (collateral taken)
   };
 
-  // State after redemption
-  stateAfter: TroveState;
-
   // From BatchUpdated event (if trove was in batch)
   batchUpdate?: {
     operation: "troveChange";
@@ -185,15 +168,8 @@ export interface TroveRedemptionTransaction extends BaseTransaction {
     totalDebtShares: number;
   };
 
-  // From RedemptionFeePaidToTrove event
-  redemptionFee?: string;
-
-  // Backend calculated
-  stateBefore?: TroveState;
-
-  collateralPrice?: number;
-  isInBatch: boolean;
-  isZombieTrove?: boolean;
+  // From RedemptionFeePaidToTrove event (always emitted, might be "0")
+  redemptionFee: string;
 }
 
 // Transfer of trove ownership
@@ -202,16 +178,9 @@ export interface TroveTransferTransaction extends BaseTransaction {
   operation: "transferTrove";
 
   // Transfer details
+  transferType: "mint" | "burn" | "transfer";
   fromAddress: string;
   toAddress: string;
-  transferType: "mint" | "burn" | "transfer"; // From transfer processor
-
-  // State after transfer (from latest TroveUpdated at time of transfer)
-  stateAfter: TroveState;
-
-  collateralPrice?: number;
-  isInBatch: boolean;
-  isZombieTrove?: boolean;
 }
 
 // ============================================
@@ -230,6 +199,11 @@ export interface TransactionTimeline {
   troveId: string;
   transactions: Transaction[];
   totalTransactions: number;
+  pagination?: {
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
 }
 
 // ============================================

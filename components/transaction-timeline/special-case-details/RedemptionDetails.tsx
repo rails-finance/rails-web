@@ -6,7 +6,7 @@ import { ZombieStatus } from "./ZombieStatus";
 export function RedemptionDetails({ tx }: { tx: TroveRedemptionTransaction }) {
   const debtCleared = Math.abs(tx.troveOperation.debtChangeFromOperation);
   const collateralRedeemed = Math.abs(tx.troveOperation.collChangeFromOperation);
-  const redemptionFee = tx.systemRedemption.ETHFee;
+  const redemptionFee = parseFloat(tx.systemRedemption.ETHFee);
 
   return (
     <div className="mt-6 p-4 space-y-2 bg-slate-800 rounded-md">

@@ -1,4 +1,4 @@
-import { Transaction } from "@/types/api/troveHistory";
+import { Transaction, isTroveTransaction } from "@/types/api/troveHistory";
 import { IconWrapper } from "../base/IconWrapper";
 import { RedistributionIcon } from "../symbols/RedistributionIcon";
 import { ApplyDebtIcon } from "../symbols/ApplyDebtIcon";

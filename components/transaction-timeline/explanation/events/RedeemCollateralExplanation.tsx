@@ -19,7 +19,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
   
   const collRedeemed = Math.abs(tx.troveOperation.collChangeFromOperation);
   const debtRedeemed = Math.abs(tx.troveOperation.debtChangeFromOperation);
-  const redemptionFee = tx.systemRedemption?.ETHFee || 0;
+  const redemptionFee = parseFloat(tx.systemRedemption?.ETHFee || '0');
   const redemptionPrice = tx.systemRedemption?.redemptionPrice || 0;
   const finalDebt = tx.stateAfter.debt;
   const isZombie = isZombieTrove(finalDebt);

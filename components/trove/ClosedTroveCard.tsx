@@ -10,9 +10,10 @@ import { useHover, HoverProvider } from "@/components/transaction-timeline/conte
 import { InfoButton } from "@/components/transaction-timeline/explanation/InfoButton";
 import { FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
+import { TroveSummary } from "@/types/api/trove";
 
 interface ClosedTroveCardProps {
-  trove: any;
+  trove: TroveSummary;
   showViewButton?: boolean;
 }
 
@@ -27,25 +28,25 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
     // Peak debt explanation
     items.push(
       <span key="peak-debt" className="text-slate-500">
-        This trove reached a maximum debt of <HighlightableValue type="peakDebt" state="after" value={trove.peakValue}>{formatPrice(trove.peakValue)} {trove.assetType}</HighlightableValue> during its lifetime
+        This trove reached a maximum debt of <HighlightableValue type="peakDebt" state="after" value={trove.debt.peak}>{formatPrice(trove.debt.peak)} BOLD</HighlightableValue> during its lifetime
       </span>
     );
 
     // Peak collateral explanation
     items.push(
       <span key="peak-collateral" className="text-slate-500">
-        The highest recorded collateral was <HighlightableValue type="peakCollateral" state="after" value={trove.backedBy.peakAmount}>{formatPrice(trove.backedBy.peakAmount)} {trove.collateralType}</HighlightableValue>
+        The highest recorded collateral was <HighlightableValue type="peakCollateral" state="after" value={trove.collateral.peakAmount}>{formatPrice(trove.collateral.peakAmount)} {trove.collateralType}</HighlightableValue>
       </span>
     );
 
     // Trove lifecycle
-    const openDate = new Date(trove.activity.created);
-    const closeDate = new Date(trove.activity.lastActivity);
+    const openDate = new Date(trove.activity.createdAt);
+    const closeDate = new Date(trove.activity.lastActivityAt);
     const lifetimeDays = Math.floor((closeDate.getTime() - openDate.getTime()) / (1000 * 60 * 60 * 24));
     
     items.push(
       <span key="lifecycle" className="text-slate-500">
-        Trove was active for <strong className="text-white">{lifetimeDays} days</strong> from {formatDateRange(trove.activity.created, trove.activity.lastActivity)}
+        Trove was active for <strong className="text-white">{lifetimeDays} days</strong> from {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
       </span>
     );
 
@@ -57,7 +58,7 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
     );
 
     // Add NFT information if NFT URL is available
-    const nftUrl = getTroveNftUrl(trove.collateralType, trove.troveId);
+    const nftUrl = getTroveNftUrl(trove.collateralType, trove.id);
     if (nftUrl) {
       items.push(
         <span key="nft-info" className="text-slate-500">
@@ -89,7 +90,7 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
       <div className="relative rounded-lg text-slate-500 bg-slate-700">
         {/* Header section with no padding on sides to allow full-width header */}
         <div className="flex items-center">
-          <TroveCardHeader status="closed" assetType={trove.assetType} />
+          <TroveCardHeader status="closed" assetType="BOLD" />
           
           {/* Status aligned with logo */}
           <div className="flex items-center ml-4">
@@ -105,12 +106,12 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
         <p className="text-xs text-slate-400 mb-1">Debt</p>
         <div className="flex items-center">
           <h3 className="text-3xl font-bold">
-            <HighlightableValue type="peakDebt" state="after" value={trove.peakValue}>
-              {formatPrice(trove.peakValue)}
+            <HighlightableValue type="peakDebt" state="after" value={trove.debt.peak}>
+              {formatPrice(trove.debt.peak)}
             </HighlightableValue>
           </h3>
           <span className="ml-2 text-green-400 text-lg">
-            <TokenIcon assetSymbol={trove.assetType} className="w-7 h-7 relative top-0" />
+            <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
           </span>
           <span className="ml-2 text-slate-400 text-sm">at peak</span>
         </div>

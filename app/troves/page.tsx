@@ -6,7 +6,8 @@ import { TroveCard } from "@/components/trove/TroveCard";
 import { SimplifiedTroveCard } from "@/components/trove/SimplifiedTroveCard";
 import { CompactTroveTable } from "@/components/trove/CompactTroveTable";
 import { ViewToggle } from "@/components/trove/ViewToggle";
-import { TroveData, TrovesResponse } from "@/types/api/trove";
+import { TroveFilters, TroveFilterParams } from "@/components/trove/TroveFilters";
+import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 
 type ViewMode = "standard" | "simplified" | "table";
 
@@ -17,26 +18,122 @@ export default function TrovesPage() {
   // Get page from URL, default to 1
   const currentPage = Number(searchParams.get('page')) || 1;
   
-  const [troves, setTroves] = useState<TroveData[]>([]);
+  const [troves, setTroves] = useState<TroveSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("standard");
   const [pagination, setPagination] = useState({
     total: 0,
     limit: 20,
-    hasMore: false,
+    page: 1,
   });
   
-  // Update URL when page changes
-  const setCurrentPage = (page: number) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('page', page.toString());
+  // Parse filters from URL
+  const getFiltersFromUrl = (): TroveFilterParams => {
+    const filters: TroveFilterParams = {};
+    
+    // Trove ID filter
+    const troveId = searchParams.get('troveId');
+    if (troveId) filters.troveId = troveId;
+    
+    // Status filter
+    const status = searchParams.get('status');
+    if (status) filters.status = status;
+    
+    // Collateral type filter
+    const collateralType = searchParams.get('collateralType');
+    if (collateralType) filters.collateralType = collateralType;
+    
+    // Owner address
+    const ownerAddress = searchParams.get('ownerAddress');
+    if (ownerAddress) filters.ownerAddress = ownerAddress;
+    
+    // Time filters
+    const activeWithin = searchParams.get('activeWithin');
+    if (activeWithin) filters.activeWithin = activeWithin;
+    
+    const createdWithin = searchParams.get('createdWithin');
+    if (createdWithin) filters.createdWithin = createdWithin;
+    
+    // Trove type filter
+    const troveType = searchParams.get('troveType');
+    if (troveType === 'batch' || troveType === 'individual') filters.troveType = troveType;
+    
+    const hasRedemptions = searchParams.get('hasRedemptions');
+    if (hasRedemptions === 'true') filters.hasRedemptions = true;
+    
+    // Sort options
+    const sortBy = searchParams.get('sortBy');
+    if (sortBy) filters.sortBy = sortBy;
+    
+    const sortOrder = searchParams.get('sortOrder');
+    if (sortOrder === 'asc' || sortOrder === 'desc') filters.sortOrder = sortOrder;
+    
+    return filters;
+  };
+  
+  const [filters, setFilters] = useState<TroveFilterParams>(getFiltersFromUrl());
+  
+  // Update URL when page or filters change
+  const updateUrl = (newFilters?: TroveFilterParams, newPage?: number) => {
+    const params = new URLSearchParams();
+    
+    // Add page
+    params.set('page', (newPage || currentPage).toString());
+    
+    // Add filters
+    const appliedFilters = newFilters || filters;
+    if (appliedFilters.troveId) {
+      params.set('troveId', appliedFilters.troveId);
+    }
+    if (appliedFilters.status) {
+      params.set('status', appliedFilters.status);
+    }
+    if (appliedFilters.collateralType) {
+      params.set('collateralType', appliedFilters.collateralType);
+    }
+    if (appliedFilters.ownerAddress) {
+      params.set('ownerAddress', appliedFilters.ownerAddress);
+    }
+    if (appliedFilters.activeWithin) {
+      params.set('activeWithin', appliedFilters.activeWithin);
+    }
+    if (appliedFilters.createdWithin) {
+      params.set('createdWithin', appliedFilters.createdWithin);
+    }
+    if (appliedFilters.troveType) {
+      params.set('troveType', appliedFilters.troveType);
+    }
+    if (appliedFilters.hasRedemptions) {
+      params.set('hasRedemptions', 'true');
+    }
+    if (appliedFilters.sortBy) {
+      params.set('sortBy', appliedFilters.sortBy);
+    }
+    if (appliedFilters.sortOrder) {
+      params.set('sortOrder', appliedFilters.sortOrder);
+    }
+    
     router.push(`/troves?${params.toString()}`);
+  };
+  
+  const setCurrentPage = (page: number) => {
+    updateUrl(filters, page);
+  };
+  
+  const handleFiltersChange = (newFilters: TroveFilterParams) => {
+    setFilters(newFilters);
+    updateUrl(newFilters, 1); // Reset to page 1 when filters change
+  };
+  
+  const handleFiltersReset = () => {
+    setFilters({});
+    router.push('/troves');
   };
 
   useEffect(() => {
     loadTroves();
-  }, [currentPage]);
+  }, [currentPage, filters]);
 
   const loadTroves = async () => {
     try {
@@ -48,6 +145,40 @@ export default function TrovesPage() {
         offset: ((currentPage - 1) * pagination.limit).toString(),
       });
       
+      // Add filter parameters
+      if (filters.troveId) {
+        params.set('troveId', filters.troveId);
+      }
+      if (filters.status) {
+        params.set('status', filters.status);
+      }
+      if (filters.collateralType) {
+        params.set('collateralType', filters.collateralType);
+      }
+      if (filters.ownerAddress) {
+        params.set('ownerAddress', filters.ownerAddress);
+      }
+      if (filters.activeWithin) {
+        params.set('activeWithin', filters.activeWithin);
+      }
+      if (filters.createdWithin) {
+        params.set('createdWithin', filters.createdWithin);
+      }
+      if (filters.troveType === 'batch') {
+        params.set('batchOnly', 'true');
+      } else if (filters.troveType === 'individual') {
+        params.set('individualOnly', 'true');
+      }
+      if (filters.hasRedemptions) {
+        params.set('hasRedemptions', 'true');
+      }
+      if (filters.sortBy) {
+        params.set('sortBy', filters.sortBy);
+      }
+      if (filters.sortOrder) {
+        params.set('sortOrder', filters.sortOrder);
+      }
+      
       const response = await fetch(`/api/troves?${params}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch troves: ${response.statusText}`);
@@ -55,11 +186,13 @@ export default function TrovesPage() {
       
       const data: TrovesResponse = await response.json();
       setTroves(data.data);
-      setPagination({
-        total: data.pagination.total,
-        limit: data.pagination.limit,
-        hasMore: data.pagination.hasMore,
-      });
+      if (data.pagination) {
+        setPagination({
+          total: data.pagination.total,
+          limit: data.pagination.limit,
+          page: data.pagination.page,
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load troves");
       console.error("Error loading troves:", err);
@@ -112,6 +245,13 @@ export default function TrovesPage() {
   return (
     <main className="min-h-screen">
       <div className="space-y-6">
+        {/* Filters */}
+        <TroveFilters 
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+          onReset={handleFiltersReset}
+        />
+        
         {/* Header with pagination info and view toggle */}
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
@@ -164,13 +304,13 @@ export default function TrovesPage() {
             ) : viewMode === "simplified" ? (
               <div className="grid grid-cols-1 gap-6">
                 {troves.map((trove) => (
-                  <SimplifiedTroveCard key={trove.troveId} trove={trove} showViewButton />
+                  <SimplifiedTroveCard key={trove.id} trove={trove} showViewButton />
                 ))}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-6">
                 {troves.map((trove) => (
-                  <TroveCard key={trove.troveId} trove={trove} showViewButton />
+                  <TroveCard key={trove.id} trove={trove} showViewButton />
                 ))}
               </div>
             )}
