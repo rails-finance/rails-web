@@ -13,6 +13,11 @@ interface ApplyPendingDebtIconProps {
 }
 
 export function ApplyPendingDebtIcon({ tx, isFirst = false, isLast = false, isExpanded = false }: ApplyPendingDebtIconProps) {
+  // Only trove, liquidation, and redemption transactions have troveOperation
+  if (!isTroveTransaction(tx) && tx.type !== "liquidation" && tx.type !== "redemption") {
+    return null;
+  }
+
   const { debtIncreaseFromRedist, collIncreaseFromRedist, debtChangeFromOperation } = tx.troveOperation;
 
   const hasRedistribution = debtIncreaseFromRedist > 0 || collIncreaseFromRedist > 0;

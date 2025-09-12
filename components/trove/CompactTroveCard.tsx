@@ -3,14 +3,14 @@
 import { useMemo } from "react";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { TroveCardHeader } from "./components/TroveCardHeader";
-import { TroveData } from "@/types/api/trove";
+import { TroveSummary } from "@/types/api/trove";
 import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
 import { formatPrice, formatUsdValue } from "@/lib/utils/format";
 import { InterestCalculator } from "@/lib/utils/interest-calculator";
 import { Square } from "lucide-react";
 
 interface CompactTroveCardProps {
-  trove: TroveData;
+  trove: TroveSummary;
   showViewButton?: boolean;
 }
 
@@ -18,48 +18,48 @@ export function CompactTroveCard({ trove, showViewButton = false }: CompactTrove
   const calculator = useMemo(() => new InterestCalculator(), []);
   
   const batchManagerInfo = useMemo(() => {
-    if (trove.batchMembership?.batchManager) {
-      return getBatchManagerInfo(trove.batchMembership.batchManager);
+    if (trove.batch?.manager) {
+      return getBatchManagerInfo(trove.batch.manager);
     }
     return undefined;
-  }, [trove.batchMembership?.batchManager]);
+  }, [trove.batch?.manager]);
 
   // Generate interest info for open troves
   const interestInfo = useMemo(() => {
-    if (trove.status !== "open" || trove.interestInfo) {
-      return trove.interestInfo;
+    if (trove.status !== "open") {
+      return null;
     }
     
     // Mock data for demonstration - in production this should come from the API
     const mockLastUpdate = Date.now() / 1000 - (68 * 24 * 60 * 60); // 68 days ago
-    const recordedDebt = parseFloat(trove.mainValueRaw) / 1e18;
+    const recordedDebt = parseFloat(trove.debt.currentRaw) / 1e18;
     const interestRate = trove.metrics.interestRate;
     
     return calculator.generateInterestInfo(
       recordedDebt,
       interestRate,
       mockLastUpdate,
-      trove.batchMembership.isMember,
-      trove.batchMembership.managementFeeRate,
-      trove.batchMembership.batchManager || undefined
+      trove.batch.isMember,
+      trove.batch.managementFee,
+      trove.batch.manager || undefined
     );
   }, [trove, calculator]);
 
   // Calculate display value with interest for open troves
-  const debtWithInterest = trove.status === "open" && interestInfo ? interestInfo.entireDebt : trove.mainValue;
+  const debtWithInterest = trove.status === "open" && interestInfo ? interestInfo.entireDebt : trove.debt.current;
   
   // Determine main value based on trove status
-  const mainValue = trove.status === "closed" ? trove.peakValue : debtWithInterest;
+  const mainValue = trove.status === "closed" ? trove.debt.peak : debtWithInterest;
   const mainValueLabel = trove.status === "closed" ? "Debt at peak" : "Debt";
   
   // Determine collateral value and label based on trove status
-  const collateralValue = trove.status === "closed" ? trove.backedBy.peakAmount : trove.backedBy.amount;
+  const collateralValue = trove.status === "closed" ? trove.collateral.peakAmount : trove.collateral.amount;
   const collateralLabel = trove.status === "closed" ? "Highest recorded collateral" : "Collateral";
-  const collateralUsd = trove.status === "closed" ? null : trove.backedBy.valueUsd;
+  const collateralUsd = trove.status === "closed" ? null : trove.collateral.valueUsd;
 
   // Calculate current collateral ratio for open troves
-  const currentCollateralRatio = trove.status === "open" && interestInfo && trove.backedBy.valueUsd > 0 
-    ? ((trove.backedBy.valueUsd / debtWithInterest) * 100).toFixed(1)
+  const currentCollateralRatio = trove.status === "open" && interestInfo && trove.collateral.valueUsd > 0 
+    ? ((trove.collateral.valueUsd / debtWithInterest) * 100).toFixed(1)
     : trove.metrics.collateralRatio;
 
   return (
@@ -73,7 +73,7 @@ export function CompactTroveCard({ trove, showViewButton = false }: CompactTrove
           {/* Protocol Icon */}
           <div className="flex items-center gap-2">
             <div className="flex-shrink-0">
-              <TroveCardHeader status={trove.status} assetType={trove.assetType} isDelegated={trove.batchMembership?.isMember} />
+              <TroveCardHeader status={trove.status} assetType={trove.assetType} isDelegated={trove.batch?.isMember} />
             </div>
             
             {/* Status Pill */}
@@ -87,7 +87,7 @@ export function CompactTroveCard({ trove, showViewButton = false }: CompactTrove
           </div>
 
           {/* Delegated Icon for open delegated troves */}
-          {trove.status === "open" && trove.batchMembership?.isMember && (
+          {trove.status === "open" && trove.batch?.isMember && (
             <div className="flex items-center">
               <Square className="w-3 h-3 text-blue-400 fill-current" />
             </div>
@@ -106,7 +106,7 @@ export function CompactTroveCard({ trove, showViewButton = false }: CompactTrove
                 <span className="text-lg font-bold text-white">
                   {formatPrice(mainValue)}
                 </span>
-                <TokenIcon assetSymbol={trove.assetType} className="w-4 h-4" />
+                <TokenIcon assetSymbol="BOLD" className="w-4 h-4" />
               </div>
             </div>
 
@@ -141,7 +141,7 @@ export function CompactTroveCard({ trove, showViewButton = false }: CompactTrove
               {/* Interest Rate */}
               <div>
                 <div className="flex items-center gap-1 mb-1">
-                  {trove.batchMembership.isMember && (
+                  {trove.batch.isMember && (
                     <span className="text-xs font-semibold px-1 py-0.5 bg-blue-900 text-blue-400 rounded-xs">DEL</span>
                   )}
                   <p className="text-xs text-slate-400">Interest Rate</p>
@@ -150,13 +150,13 @@ export function CompactTroveCard({ trove, showViewButton = false }: CompactTrove
                   <span className="text-sm font-medium text-white">
                     {trove.metrics.interestRate}%
                   </span>
-                  {trove.batchMembership.isMember && (
+                  {trove.batch.isMember && (
                     <span className="text-xs text-slate-500">
-                      +{trove.batchMembership.managementFeeRate}%
+                      +{trove.batch.managementFee}%
                     </span>
                   )}
                 </div>
-                {trove.batchMembership.isMember && batchManagerInfo && (
+                {trove.batch.isMember && batchManagerInfo && (
                   <p className="text-xs text-slate-500 mt-0.5 truncate">
                     {batchManagerInfo.name}
                   </p>

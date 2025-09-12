@@ -4,6 +4,8 @@ import { Transaction } from "@/types/api/troveHistory";
 export type TransactionImageKey = 
   | "openTrove"
   | "closeTrove" 
+  | "closeTrove_repayAndWithdraw"
+  | "closeTrove_withdrawOnly"
   // AdjustTrove variations - dual asset operations
   | "adjustTrove_borrowAndDeposit"     // debtChange > 0, collChange > 0
   | "adjustTrove_repayAndWithdraw"     // debtChange < 0, collChange < 0

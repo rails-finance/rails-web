@@ -29,7 +29,7 @@ export function RemoveFromBatchIcon({ tx, isFirst = false, isLast = false, isExp
       }
 
       const svgText = await loadTransactionSvg(imageKey);
-      setSvgContent(svgText);
+      setSvgContent(svgText || '');
     }
 
     loadAndProcessSVG();

@@ -165,7 +165,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
       <div className="relative rounded-lg text-slate-500 bg-slate-900">
         {/* Header section with no padding on sides to allow full-width header */}
         <div className="flex items-center ">
-          <TroveCardHeader status="open" assetType="BOLD" isDelegated={trove.batch?.isMember} />
+          <TroveCardHeader status="open" assetType={trove.assetType} isDelegated={trove.batch?.isMember} />
           
           {/* Status aligned with logo */}
           <div className="flex items-center ml-4">

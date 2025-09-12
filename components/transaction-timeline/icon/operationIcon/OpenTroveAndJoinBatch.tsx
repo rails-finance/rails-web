@@ -28,7 +28,7 @@ export function OpenTroveAndJoinBatchIcon({ tx, isFirst = false, isLast = false,
   useEffect(() => {
     async function loadAndProcessSVG() {
       const svgText = await loadTransactionSvg(imageKey, debtAsset, collateralAsset);
-      setSvgContent(svgText);
+      setSvgContent(svgText || '');
     }
 
     loadAndProcessSVG();

@@ -90,7 +90,7 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
       <div className="relative rounded-lg text-slate-500 bg-slate-700">
         {/* Header section with no padding on sides to allow full-width header */}
         <div className="flex items-center">
-          <TroveCardHeader status="closed" assetType="BOLD" />
+          <TroveCardHeader status="closed" assetType={trove.assetType} />
           
           {/* Status aligned with logo */}
           <div className="flex items-center ml-4">
@@ -124,7 +124,7 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
             showViewButton={showViewButton}
             dateInfo={{
               prefix: "Closed",
-              date: formatDateRange(trove.activity.created, trove.activity.lastActivity),
+              date: formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt),
               suffix: ""
             }}
           />
@@ -134,7 +134,7 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
             showViewButton={showViewButton}
             dateInfo={{
               prefix: "Closed",
-              date: formatDateRange(trove.activity.created, trove.activity.lastActivity),
+              date: formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt),
               suffix: ""
             }}
           />

@@ -36,7 +36,7 @@ export function CloseTroveIcon({ tx, isFirst = false, isLast = false, isExpanded
       }
 
       const svgText = await loadTransactionSvg('closeTrove', debtAsset, collateralAsset, templateName);
-      setSvgContent(svgText);
+      setSvgContent(svgText || '');
     }
 
     loadAndProcessSVG();
