@@ -17,6 +17,10 @@
 :root {
   --background: #171b24; /* custom slate-800 - darker */
   --foreground: #ffffff;
+  
+  /* Protocol-specific gradient colors */
+  --liquity-grad-1: #323E91; /* blue-600 */
+  --liquity-grad-2: #29336D; /* blue-800 */
 }
 
 .dark {
@@ -64,5 +68,16 @@ body {
     width: 80px;
     height: 40px;
     z-index: 1;
+  }
+
+  /* Protocol-specific classes */
+  .liquityv2 {
+    --protocol-grad-1: var(--liquity-grad-1);
+    --protocol-grad-2: var(--liquity-grad-2);
+  }
+
+  /* Protocol trove header gradient */
+  .protocol-trove-header {
+    background: linear-gradient(to bottom, var(--protocol-grad-1), var(--protocol-grad-2));
   }
 }

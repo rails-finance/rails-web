@@ -12,6 +12,7 @@ import { TransactionFooter } from "./components/TransactionFooter";
 import { ExpandedContent } from "./components/ExpandedContent";
 import { HoverProvider } from "../context/HoverContext";
 import { EventExplanation } from "../explanation/EventExplanation";
+import { TimelineBackground } from "../icon/TimelineBackground";
 
 interface TransactionItemProps {
   tx: Transaction;
@@ -27,13 +28,14 @@ export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionIte
 
   return (
     <HoverProvider>
-      <div>
-        <TransactionContainer className="flex w-full">
+      <div style={{ position: 'relative' }}>
+
+        <TransactionContainer className="flex w-full" style={{ position: 'relative', zIndex: 2 }}>
           {/* Left values - outbound to protocol */}
           <LeftValueDisplay tx={tx} />
 
-          {/* Transaction icon/timeline */}
-          <TransactionIcon tx={tx} isFirst={isFirst} isLast={isLast} />
+          {/* Transaction icon (no timeline - just graphic) */}
+          <TransactionIcon tx={tx} isFirst={isFirst} isLast={isLast} isExpanded={isExpanded} />
 
           {/* Right values - inbound from protocol */}
           <RightValueDisplay tx={tx} />

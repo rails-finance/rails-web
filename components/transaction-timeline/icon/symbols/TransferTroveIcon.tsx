@@ -13,21 +13,24 @@ export function TransferTroveIcon({
   r = 190,
 }: TransferTroveIconProps) {
   return (
-    <foreignObject 
-      x={x} 
-      y={y} 
-      width={r * 2} 
-      height={r * 2}
-    >
-      <img 
-        src="/icons/icons.003.png" 
-        alt="Transfer Trove"
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "contain",
-        }}
-      />
-    </foreignObject>
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" width={r * 2} height={r * 2} x={x} y={y}>
+      {/* Green arc (top-right to bottom) */}
+      <path d="M 125 45
+               A 55 55 0 0 1 175 100
+               A 55 55 0 0 1 125 155"
+            stroke="#22C55E" 
+            strokeWidth="20" 
+            fill="none"
+            strokeLinecap="round" />
+      
+      {/* Red arc (bottom-left to top) */}
+      <path d="M 75 155
+               A 55 55 0 0 1 25 100
+               A 55 55 0 0 1 75 45"
+            stroke="#EF4444" 
+            strokeWidth="20" 
+            fill="none"
+            strokeLinecap="round" />
+    </svg>
   );
 }

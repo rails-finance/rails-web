@@ -24,11 +24,6 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
   
   // Debug logging
   const nftUrl = getTroveNftUrl(trove.collateralType, trove.id);
-  console.log('NFT Debug:', { 
-    collateralType: trove.collateralType, 
-    troveId: trove.id, 
-    nftUrl 
-  });
   return (
     <div className="text-xs">
       <div className="flex flex-col sm:flex-row sm:justify-between gap-2 sm:gap-0 sm:items-center">

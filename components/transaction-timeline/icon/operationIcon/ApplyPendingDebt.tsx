@@ -1,87 +1,54 @@
 import { Transaction, isTroveTransaction } from "@/types/api/troveHistory";
-import { SingleStepIcon } from "../layouts/SingleStepIcon";
-import { MultiStepIcon } from "../layouts/MultiStepIcon";
 import { IconWrapper } from "../base/IconWrapper";
 import { RedistributionIcon } from "../symbols/RedistributionIcon";
 import { ApplyDebtIcon } from "../symbols/ApplyDebtIcon";
-import { TokenIcon } from "@/components/icons/tokenIcon";
-import { TimelineIconStep } from "@/types";
+import { TimelineBackground } from "../TimelineBackground";
 
-export function ApplyPendingDebtIcon({ tx }: { tx: Transaction }) {
-  if (!isTroveTransaction(tx)) {
-    return (
-      <SingleStepIcon arrowDirection="in">
-        <ApplyDebtIcon />
-      </SingleStepIcon>
-    );
+
+interface ApplyPendingDebtIconProps {
+  tx: Transaction;
+  isFirst?: boolean;
+  isLast?: boolean;
+  isExpanded?: boolean;
+}
+
+export function ApplyPendingDebtIcon({ tx, isFirst = false, isLast = false, isExpanded = false }: ApplyPendingDebtIconProps) {
+  // Only trove, liquidation, and redemption transactions have troveOperation
+  if (!isTroveTransaction(tx) && tx.type !== "liquidation" && tx.type !== "redemption") {
+    return null;
   }
-  
+
   const { debtIncreaseFromRedist, collIncreaseFromRedist, debtChangeFromOperation } = tx.troveOperation;
 
   const hasRedistribution = debtIncreaseFromRedist > 0 || collIncreaseFromRedist > 0;
   const hasInterest = debtChangeFromOperation > 0;
 
-  // If both redistribution and interest, show multi-step
-  if (hasRedistribution && hasInterest) {
-    const firstStep: TimelineIconStep = {
-      children: <RedistributionIcon />,
-      arrowDirection: "in",
-    };
-    const secondStep: TimelineIconStep = {
-      children: <ApplyDebtIcon />,
-      arrowDirection: "in",
-    };
-    return <MultiStepIcon firstStep={firstStep} secondStep={secondStep} />;
-  }
-
-  // Only redistribution
+  // For simplicity, just show the most relevant icon in a single step
+  // Priority: redistribution > interest > fallback
+  let iconContent = <RedistributionIcon />;
+  
   if (hasRedistribution) {
-    // If both collateral and debt redistribution, could show multi-step
-    if (collIncreaseFromRedist > 0 && debtIncreaseFromRedist > 0) {
-      const firstStep: TimelineIconStep = {
-        children: <TokenIcon assetSymbol={tx.collateralType} isTimeline />,
-        arrowDirection: "in",
-      };
-      const secondStep: TimelineIconStep = {
-        children: <TokenIcon assetSymbol={tx.assetType} isTimeline />,
-        arrowDirection: "in",
-      };
-      return <MultiStepIcon firstStep={firstStep} secondStep={secondStep} />;
-    }
-
-    // Single redistribution icon - no outer circle since this is a batch manager action
-    return (
-      <div className="transaction-single" style={{ position: "relative", zIndex: 1 }}>
-        <div className="transaction-step step-single">
-          <IconWrapper>
-            <RedistributionIcon />
-          </IconWrapper>
-        </div>
-      </div>
-    );
+    iconContent = <RedistributionIcon />;
+  } else if (hasInterest) {
+    iconContent = <ApplyDebtIcon />;
   }
 
-  // Only interest - no outer circle since this is a batch manager action
-  if (hasInterest) {
-    return (
-      <div className="transaction-single" style={{ position: "relative", zIndex: 1 }}>
-        <div className="transaction-step step-single">
-          <IconWrapper>
-            <ApplyDebtIcon />
-          </IconWrapper>
-        </div>
-      </div>
-    );
-  }
-
-  // Fallback - shouldn't happen normally - no outer circle
   return (
-    <div className="transaction-single" style={{ position: "relative", zIndex: 1 }}>
-      <div className="transaction-step step-single">
-        <IconWrapper>
-          <RedistributionIcon />
-        </IconWrapper>
+    <>
+      {/* Timeline Background - extends full height of transaction row */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-full z-10 pointer-events-none">
+        <TimelineBackground 
+          tx={tx} 
+          isFirst={isFirst} 
+          isLast={isLast} 
+          isExpanded={isExpanded} 
+        />
       </div>
-    </div>
+      
+      {/* Transaction Graphic */}
+      <div className="relative z-20 w-30 h-25 flex items-center justify-center sm:w-25">
+          {iconContent}
+      </div>
+    </>
   );
 }

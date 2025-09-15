@@ -405,10 +405,10 @@ export const mockTroveComprehensive: TransactionTimeline = {
 
     // 8. ZOMBIE TROVE REDEMPTION (creates zombie trove by reducing debt to zero)
     {
-      id: "0xzombiered-0",
+      id: "0xzombiered-1",
       type: "redemption",
       operation: "redeemCollateral",
-      transactionHash: "0xzombiered234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+      transactionHash: "0xzombie1ed234567890abcdef1234567890abcdef1234567890abcdef1234567890",
       blockNumber: 18501150,
       timestamp: 1699811500,
       troveId: "0x1234567890abcdef1234567890abcdef12345682",
@@ -628,9 +628,52 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransaction,
 
-    // 11. ZOMBIE TROVE SCENARIO - Low debt amount
+    // 11. WITHDRAW ONLY - Pure collateral withdrawal without debt changes
     {
-      id: "0xzombie-0",
+      id: "0xwithdraw-0",
+      type: "trove",
+      operation: "adjustTrove",
+      transactionHash: "0xwithdraw234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd",
+      blockNumber: 18500360,
+      timestamp: 1699803600,
+      troveId: "0x1234567890abcdef1234567890abcdef12345678",
+      protocolName: "Liquity V2",
+      assetType: "BOLD",
+      collateralType: "ETH",
+      gasFee: 0.003,
+      gasFeeUsd: 6.30,
+      troveOperation: {
+        annualInterestRate: 5.5,
+        debtIncreaseFromRedist: 10,
+        debtIncreaseFromUpfrontFee: 0,
+        debtChangeFromOperation: 0,
+        collIncreaseFromRedist: 0.005,
+        collChangeFromOperation: -1.5,
+      },
+      stateBefore: {
+        debt: 8215,
+        coll: 5.537,
+        stake: 5.537,
+        annualInterestRate: 5.5,
+        collateralRatio: 336.10,
+        collateralInUsd: 13842.5,
+      },
+      stateAfter: {
+        debt: 8225,
+        coll: 4.042,
+        stake: 4.042,
+        annualInterestRate: 5.5,
+        collateralRatio: 245.38,
+        collateralInUsd: 10105,
+      },
+      collateralPrice: 2500,
+      isInBatch: false,
+      isZombieTrove: false,
+    } as TroveTransaction,
+
+    // 12. ZOMBIE TROVE SCENARIO - Low debt amount
+    {
+      id: "0xzombie-2", 
       type: "trove",
       operation: "adjustTrove",
       transactionHash: "0xzombie234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd",
@@ -670,8 +713,92 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isInBatch: false,
       isZombieTrove: true,
     } as TroveTransaction,
+    // 12. ZOMBIE TROVE SCENARIO - Low debt amount
+    {
+      id: "0xzombie-3", 
+      type: "trove",
+      operation: "adjustTrove",
+      transactionHash: "0xzombie334567890abcdef1234567890abcdef1234567890abcdef1234567890abcd",
+      blockNumber: 18501500,
+      timestamp: 1699815000,
+      troveId: "0x1234567890abcdef1234567890abcdef12345685",
+      protocolName: "Liquity V2",
+      assetType: "BOLD",
+      collateralType: "ETH",
+      gasFee: 0.003,
+      gasFeeUsd: 6.00,
+      troveOperation: {
+        annualInterestRate: 8.0,
+        debtIncreaseFromRedist: 0,
+        debtIncreaseFromUpfrontFee: 0,
+        debtChangeFromOperation: 6500,
+        collIncreaseFromRedist: 0,
+        collChangeFromOperation: -3.25,
+      },
+      stateBefore: {
+        debt: 8000,
+        coll: 4,
+        stake: 4,
+        annualInterestRate: 8.0,
+        collateralRatio: 200.0,
+        collateralInUsd: 8000,
+      },
+      stateAfter: {
+        debt: 1500,
+        coll: 0.75,
+        stake: 0.75,
+        annualInterestRate: 8.0,
+        collateralRatio: 200.0,
+        collateralInUsd: 1500,
+      },
+      collateralPrice: 2000,
+      isInBatch: false,
+      isZombieTrove: true,
+    } as TroveTransaction,
+    // 12. ZOMBIE TROVE SCENARIO - Low debt amount
+    {
+      id: "0xzombie-0", 
+      type: "trove",
+      operation: "adjustTrove",
+      transactionHash: "0xzombie234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd",
+      blockNumber: 18501500,
+      timestamp: 1699815000,
+      troveId: "0x1234567890abcdef1234567890abcdef12345685",
+      protocolName: "Liquity V2",
+      assetType: "BOLD",
+      collateralType: "ETH",
+      gasFee: 0.003,
+      gasFeeUsd: 6.00,
+      troveOperation: {
+        annualInterestRate: 8.0,
+        debtIncreaseFromRedist: 0,
+        debtIncreaseFromUpfrontFee: 0,
+        debtChangeFromOperation: -6500,
+        collIncreaseFromRedist: 0,
+        collChangeFromOperation: 3.25,
+      },
+      stateBefore: {
+        debt: 8000,
+        coll: 4,
+        stake: 4,
+        annualInterestRate: 8.0,
+        collateralRatio: 200.0,
+        collateralInUsd: 8000,
+      },
+      stateAfter: {
+        debt: 1500,
+        coll: 0.75,
+        stake: 0.75,
+        annualInterestRate: 8.0,
+        collateralRatio: 200.0,
+        collateralInUsd: 1500,
+      },
+      collateralPrice: 2000,
+      isInBatch: false,
+      isZombieTrove: true,
+    } as TroveTransaction,
 
-    // 12. MAXIMUM COLLATERAL RATIO (very safe position)
+    // 13. MAXIMUM COLLATERAL RATIO (very safe position)
     {
       id: "0xmaxcr-0",
       type: "trove",
@@ -714,7 +841,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransaction,
 
-    // 13. NEAR-LIQUIDATION THRESHOLD (risky position)
+    // 14. NEAR-LIQUIDATION THRESHOLD (risky position)
     {
       id: "0xrisky-0",
       type: "trove",
@@ -757,7 +884,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransaction,
 
-    // 13. BATCH TROVE ADJUSTMENT
+    // 15. BATCH TROVE ADJUSTMENT
     {
       id: "0xbatchop-0",
       type: "trove",
@@ -814,7 +941,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
 
     // === INTEREST RATE OPERATIONS ===
 
-    // 14. ADJUST TROVE INTEREST RATE
+    // 16. ADJUST TROVE INTEREST RATE
     {
       id: "0xadjustir-0",
       type: "trove",
@@ -857,7 +984,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransaction,
 
-    // 15. DECREASE INTEREST RATE (back to 5.5%)
+    // 17. DECREASE INTEREST RATE (back to 5.5%)
     {
       id: "0xhighir-0",
       type: "trove",
@@ -900,7 +1027,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransaction,
 
-    // 16. DELEGATED INTEREST RATE INCREASE (by delegate)
+    // 18. DELEGATED INTEREST RATE INCREASE (by delegate)
     {
       id: "0xdelegateir1-0",
       type: "trove",
@@ -955,7 +1082,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransaction,
 
-    // 17. DELEGATED INTEREST RATE DECREASE (by delegate)
+    // 19. DELEGATED INTEREST RATE DECREASE (by delegate)
     {
       id: "0xdelegateir2-0",
       type: "trove",
@@ -1012,7 +1139,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
 
     // === BATCH OPERATIONS ===
 
-    // 17. SET INTEREST BATCH MANAGER (Join Batch)
+    // 20. SET INTEREST BATCH MANAGER (Join Batch)
     {
       id: "0xsetbatch-0",
       type: "trove",
@@ -1065,7 +1192,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransaction,
 
-    // 17.5. SET INTEREST BATCH MANAGER (Create New Delegate)
+    // 21. SET INTEREST BATCH MANAGER (Create New Delegate)
     {
       id: "0xsetbatch-new-0",
       type: "trove",
@@ -1118,12 +1245,22 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransaction,
 
-    // 18. APPLY PENDING DEBT (in batch)
+    // 22. APPLY PENDING DEBT (in batch)
     {
       id: "0xapplydebt-0",
       type: "trove",
       operation: "applyPendingDebt",
-      transactionHash: "0xapplydebt234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+      transactionHash: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <g fill="#333333" transform="matrix(1.338017, 0, 0, 1.338017, -22.748203, -15.316317)" style="">
+    <circle cx="37.336" cy="37.336" r="8.336" style="fill-rule: evenodd; fill: none; stroke-width: 3.73687px; stroke: rgb(255, 255, 255);"></circle>
+    <line x1="30" y1="70" x2="70" y2="30" stroke-width="4" stroke-linecap="round" style="stroke: rgb(255, 255, 255);"></line>
+    <circle cx="61.704" cy="64.344" r="8.336" style="fill-rule: evenodd; fill: none; stroke-width: 3.73687px; stroke: rgb(255, 255, 255);"></circle>
+  </g>
+  <g transform="matrix(0.673252, 0, 0, 0.673252, 90.413162, 51.66016)" style="">
+    <circle cx="0" cy="0" r="20" fill="#22C55E"></circle>
+    <path d="M 0 -10 L 0 10 M -10 0 L 10 0" stroke="white" stroke-width="4" stroke-linecap="round"></path>
+  </g>
+</svg>`,
       blockNumber: 18500600,
       timestamp: 1699806000,
       troveId: "0x1234567890abcdef1234567890abcdef12345678",
@@ -1173,7 +1310,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransaction,
 
-    // 19. REMOVE FROM BATCH
+    // 23. REMOVE FROM BATCH
     {
       id: "0xremovebatch-0",
       type: "trove",
@@ -1226,12 +1363,22 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransaction,
 
-    // 20. BATCH MANAGER FEE ADJUSTMENT
+    // 24. BATCH MANAGER FEE ADJUSTMENT
     {
       id: "0xlowerbatchfee-0",
       type: "trove",
       operation: "applyPendingDebt",
-      transactionHash: "0xlowerbatchfee234567890abcdef1234567890abcdef1234567890abcdef123456789",
+      transactionHash: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <g fill="#333333" transform="matrix(1.338017, 0, 0, 1.338017, -22.748203, -15.316317)" style="">
+    <circle cx="37.336" cy="37.336" r="8.336" style="fill-rule: evenodd; fill: none; stroke-width: 3.73687px; stroke: rgb(255, 255, 255);"></circle>
+    <line x1="30" y1="70" x2="70" y2="30" stroke-width="4" stroke-linecap="round" style="stroke: rgb(255, 255, 255);"></line>
+    <circle cx="61.704" cy="64.344" r="8.336" style="fill-rule: evenodd; fill: none; stroke-width: 3.73687px; stroke: rgb(255, 255, 255);"></circle>
+  </g>
+  <g transform="matrix(0.673252, 0, 0, 0.673252, 90.413162, 51.66016)" style="">
+    <circle cx="0" cy="0" r="20" fill="#22C55E"></circle>
+    <path d="M 0 -10 L 0 10 M -10 0 L 10 0" stroke="white" stroke-width="4" stroke-linecap="round"></path>
+  </g>
+</svg>`,
       blockNumber: 18502800,
       timestamp: 1699828000,
       troveId: "0x1234567890abcdef1234567890abcdef12345697",
@@ -1281,12 +1428,22 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransaction,
 
-    // 21. SET BATCH INTEREST RATE
+    // 25. SET BATCH INTEREST RATE
     {
       id: "0xsetbatchir-0",
       type: "trove",
       operation: "applyPendingDebt",
-      transactionHash: "0xsetbatchir234567890abcdef1234567890abcdef1234567890abcdef1234567890ab",
+      transactionHash: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <g fill="#333333" transform="matrix(1.338017, 0, 0, 1.338017, -22.748203, -15.316317)" style="">
+    <circle cx="37.336" cy="37.336" r="8.336" style="fill-rule: evenodd; fill: none; stroke-width: 3.73687px; stroke: rgb(255, 255, 255);"></circle>
+    <line x1="30" y1="70" x2="70" y2="30" stroke-width="4" stroke-linecap="round" style="stroke: rgb(255, 255, 255);"></line>
+    <circle cx="61.704" cy="64.344" r="8.336" style="fill-rule: evenodd; fill: none; stroke-width: 3.73687px; stroke: rgb(255, 255, 255);"></circle>
+  </g>
+  <g transform="matrix(0.673252, 0, 0, 0.673252, 90.413162, 51.66016)" style="">
+    <circle cx="0" cy="0" r="20" fill="#22C55E"></circle>
+    <path d="M 0 -10 L 0 10 M -10 0 L 10 0" stroke="white" stroke-width="4" stroke-linecap="round"></path>
+  </g>
+</svg>`,
       blockNumber: 18502900,
       timestamp: 1699829000,
       troveId: "0x1234567890abcdef1234567890abcdef12345697",
@@ -1338,7 +1495,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
 
     // === DELEGATION OPERATIONS ===
 
-    // 22. TROVE TRANSFER
+    // 26. TROVE TRANSFER
     {
       id: "0xtrovetransfer-0",
       type: "transfer",
@@ -1368,7 +1525,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransferTransaction,
 
-    // 23. DELEGATE OPERATION (management by delegate)
+    // 27. DELEGATE OPERATION (management by delegate)
     {
       id: "0xdelegate-0",
       type: "trove",
@@ -1414,7 +1571,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
     // === TROVE OPENINGS (Earliest events) ===
 
 
-    // 25. LARGE SIZEABLE LOAN SCENARIO
+    // 28. LARGE SIZEABLE LOAN SCENARIO
     {
       id: "0xlarge-0",
       type: "trove",
@@ -1449,7 +1606,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransaction,
 
-    // 24. OPEN TROVE AND JOIN BATCH
+    // 29. OPEN TROVE AND JOIN BATCH
     {
       id: "0xopenbatch-0",
       type: "trove",
@@ -1494,7 +1651,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isZombieTrove: false,
     } as TroveTransaction,
 
-    // 26. BATCH MANAGER REGISTRATION
+    // 30. BATCH MANAGER REGISTRATION
     {
       id: "0xregisterbatch-0",
       type: "trove",

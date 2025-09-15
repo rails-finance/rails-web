@@ -22,8 +22,7 @@ export function ApplyPendingDebtHeader({ tx }: { tx: TroveTransaction }) {
         {hasInterest && (
           <>
             {hasRedistribution && <span className="text-slate-500">•</span>}
-            <span className="text-slate-400">Interest applied</span>
-            <AssetAction action="+" asset={tx.assetType} />
+            <AssetAction action="Interest applied" asset={tx.assetType} amount={debtChangeFromOperation} alwaysShowAmount valueType="debt" />
           </>
         )}
       </div>

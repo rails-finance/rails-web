@@ -88,7 +88,7 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
   return (
     <div>
       <div className="rounded-lg text-slate-500 bg-red-950 text-red-800 border border-red-900 grid grid-cols-1 p-4 gap-4">
-        <TroveCardHeader status="liquidated" assetType="BOLD" />
+        <TroveCardHeader status="liquidated" assetType={trove.assetType} />
 
         {/* Main value */}
         <div>
@@ -100,7 +100,7 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
               </HighlightableValue>
             </h3>
             <span className="ml-2 text-green-400 text-lg">
-              <TokenIcon assetSymbol="BOLD" />
+              <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
             </span>
           </div>
         </div>

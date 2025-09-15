@@ -2,30 +2,43 @@ interface TroveCardHeaderProps {
   status: "open" | "closed" | "liquidated";
   assetType: string;
   isDelegated?: boolean;
+  compact?: boolean;
 }
 
-export function TroveCardHeader({ status, assetType, isDelegated }: TroveCardHeaderProps) {
-  const statusBadge = () => {
-    switch (status) {
-      case "open":
-        return <span className="text-xs font-semibold px-2 py-1 bg-green-900 text-green-400 rounded">OPEN</span>;
-      case "liquidated":
-        return <span className="text-xs font-semibold px-2 py-1 bg-red-900 text-red-400 rounded">LIQUIDATED</span>;
-      default:
-        return <span className="text-xs font-semibold px-2 py-1 bg-slate-800 text-slate-400 rounded">CLOSED</span>;
-    }
-  };
+function getProtocolConfig(assetType: string): { icon: string; className: string } {
+  // For now, default to Liquity since it's the current protocol
+  // In the future, this can be expanded to map different assetTypes to different protocols
+  switch (assetType?.toLowerCase()) {
+    case "bold":
+    default:
+      return {
+        icon: "icon-liquity",
+        className: "liquityv2"
+      };
+  }
+}
 
-  return (
-    <div>
-      <div className="flex justify-between items-center">
-        <div className="flex items-center">
-          <span className="mr-2 text-slate-200 font-bold">{assetType.toUpperCase()} LOAN</span>
-          {statusBadge()}
-          {isDelegated && status === "open" && (
-            <span className="text-xs font-semibold px-2 py-1 bg-blue-900 text-blue-400 rounded ml-2">DELEGATED</span>
-          )}
+export function TroveCardHeader({ status, assetType, isDelegated, compact = false }: TroveCardHeaderProps) {
+  const { icon: protocolIcon, className: protocolClass } = getProtocolConfig(assetType);
+  
+  if (compact) {
+    return (
+      <div className={`px-4 rounded-br-lg rounded-tl-lg py-1  protocol-trove-header flex items-center justify-center ${protocolClass}`}>
+        <div className="w-5 h-5  rounded-full flex items-center justify-center">
+          <svg className="w-5 h-5 " viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+            <use href={`#${protocolIcon}`} />
+          </svg>
         </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className={`pl-4 pr-5 rounded-br-lg rounded-tl-lg py-2 protocol-trove-header flex items-center justify-center ${protocolClass}`}>
+      <div className="w-7 h-7 rounded-full flex items-center justify-center">
+        <svg className="w-7 h-7" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+          <use href={`#${protocolIcon}`} />
+        </svg>
       </div>
     </div>
   );
