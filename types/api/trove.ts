@@ -45,12 +45,15 @@ export interface TroveBatch {
 export interface TroveSummary {
   // Identifiers
   id: string; // Trove NFT ID
-  owner: string | null; // Current owner address
+  owner: string | null; // Current owner address (null if closed)
+  lastOwner: string | null; // Last known owner (preserved after closure)
   ownerEns: string | null; // ENS name (future feature)
 
   // Status
   status: "open" | "closed" | "liquidated";
   collateralType: string; // "WETH", "wstETH", or "rETH"
+  assetType: string; // "BOLD", "afUSD", etc.
+  protocolId: string; // "liquity_v2", etc.
 
   // Core data
   debt: TroveDebt; // Debt information

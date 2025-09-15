@@ -21,7 +21,8 @@ interface TroveCardFooterProps {
 export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: TroveCardFooterProps) {
   const [copiedOwnerAddress, setCopiedOwnerAddress] = useState(false);
   const [copiedTrove, setCopiedTrove] = useState(false);
-  
+  const owner = trove.owner || trove.lastOwner;
+
   // Debug logging
   const nftUrl = getTroveNftUrl(trove.collateralType, trove.id);
   return (
@@ -33,9 +34,7 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
               {dateInfo ? (
                 <>
                   {dateInfo.prefix} {dateInfo.date}
-                  {dateInfo.suffix && (
-                    <span className="text-slate-500 ml-1">({dateInfo.suffix})</span>
-                  )}
+                  {dateInfo.suffix && <span className="text-slate-500 ml-1">({dateInfo.suffix})</span>}
                 </>
               ) : (
                 dateText
@@ -43,13 +42,13 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
             </span>
           </div>
           <div className="flex flex-wrap sm:flex-row gap-3">
-            {trove.owner && (
+            {owner && (
               <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
                 <span className="text-slate-400 flex items-center gap-1">
                   <Icon name="user" size={12} />
                   <span>
                     {}
-                    {trove.ownerEns || `${trove.owner.substring(0, 6)}...${trove.owner.substring(38)}`}
+                    {trove.ownerEns || `${owner.substring(0, 6)}...${owner.substring(38)}`}
                   </span>
                   <div className="relative inline-block group">
                     <button
@@ -58,11 +57,9 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (trove.owner) {
-                          navigator.clipboard.writeText(trove.owner);
-                          setCopiedOwnerAddress(true);
-                          setTimeout(() => setCopiedOwnerAddress(false), 2000);
-                        }
+                        navigator.clipboard.writeText(owner);
+                        setCopiedOwnerAddress(true);
+                        setTimeout(() => setCopiedOwnerAddress(false), 2000);
                       }}
                     >
                       <Icon name={copiedOwnerAddress ? "check" : "copy"} size={14} />
@@ -121,8 +118,11 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo }: T
                   className="inline-flex items-center text-slate-400 hover:text-slate-200 justify-center ml-0.5 bg-slate-800 w-8 h-4 rounded-full transition-colors"
                   aria-label="View NFT on OpenSea"
                 >
-                <Image size={14} className="" />
-                <Link2 size={14} className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors" />
+                  <Image size={14} className="" />
+                  <Link2
+                    size={14}
+                    className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors"
+                  />
                 </a>
               </span>
             )}
