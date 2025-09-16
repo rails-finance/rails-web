@@ -20,10 +20,17 @@ export function TransactionItemHeader({ tx, isExpanded, onClick }: TransactionIt
       {isExpanded && (
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950/[0.25] to-transparent opacity-0 group-hover/header:opacity-200 transition-opacity duration-100 pointer-events-none" />
       )}
-      
+
       <div className="relative flex items-start justify-between">
         <div className="grow mt-1 mb-2 mr-3">
           <div className="flex items-center flex-wrap gap-2">
+            {tx.blockGrouping.isGrouped && (
+              <div className="flex items-center px-2 py-0.5 bg-blue-800/50 rounded-md">
+                <span className="text-xs text-slate-400">
+                  {tx.blockGrouping.sameBlockIndex} of {tx.blockGrouping.sameBlockCount}
+                </span>
+              </div>
+            )}
             <HeaderContent tx={tx} />
           </div>
         </div>

@@ -29,7 +29,7 @@ export type BatchOperationType =
   | "troveChange";
 
 // ============================================
-// STATE REPRESENTATION
+// COMMON DATA STRUCTURES
 // ============================================
 
 // Trove state at a point in time (before or after an operation)
@@ -46,9 +46,26 @@ export interface TroveState {
   batchDebtShares?: number; // From BatchedTroveUpdated (converted to number)
 }
 
+// TroveOperation event data - emitted for all operations
+export interface TroveOperationData {
+  annualInterestRate: number;
+  debtIncreaseFromRedist: number;
+  debtIncreaseFromUpfrontFee: number;
+  debtChangeFromOperation: number;
+  collIncreaseFromRedist: number;
+  collChangeFromOperation: number;
+}
+
 // ============================================
 // TRANSACTION TYPES
 // ============================================
+
+// Same-block operation grouping info
+export interface BlockGrouping {
+  isGrouped: boolean; // true if multiple operations in same block
+  sameBlockCount: number; // total operations in this block (e.g., 3)
+  sameBlockIndex: number; // position within block (e.g., 1, 2, 3)
+}
 
 // Base transaction data - ALL transactions have these fields
 interface BaseTransaction {
@@ -69,6 +86,9 @@ interface BaseTransaction {
   collateralPrice: number;
   isInBatch: boolean;
   isZombieTrove: boolean;
+
+  // Same-block operation grouping
+  blockGrouping: BlockGrouping;
 }
 
 // Standard trove operation (open, close, adjust, etc.)
@@ -77,14 +97,7 @@ export interface TroveTransaction extends BaseTransaction {
   operation: TroveOperationType;
 
   // From TroveOperation event
-  troveOperation: {
-    annualInterestRate: number;
-    debtIncreaseFromRedist: number;
-    debtIncreaseFromUpfrontFee: number;
-    debtChangeFromOperation: number;
-    collIncreaseFromRedist: number;
-    collChangeFromOperation: number;
-  };
+  troveOperation: TroveOperationData;
 
   // From BatchUpdated event (only for batch operations)
   batchUpdate?: {
@@ -114,13 +127,9 @@ export interface TroveLiquidationTransaction extends BaseTransaction {
     price: number;
   };
 
-  // From TroveOperation event for this trove
-  troveOperation: {
-    debtIncreaseFromRedist: number;
-    collIncreaseFromRedist: number;
-    debtChangeFromOperation: number; // negative (entire debt)
-    collChangeFromOperation: number; // negative (entire coll)
-  };
+  // From TroveOperation event
+  troveOperation: TroveOperationData;
+  // Note: debtChangeFromOperation and collChangeFromOperation are negative (amounts redeemed/taken)
 
   // If trove was in batch, BatchUpdated(exitBatch) is also emitted
   batchExitUpdate?: {
@@ -150,13 +159,8 @@ export interface TroveRedemptionTransaction extends BaseTransaction {
   };
 
   // From TroveOperation event for this trove
-  troveOperation: {
-    annualInterestRate: number;
-    debtIncreaseFromRedist: number;
-    collIncreaseFromRedist: number;
-    debtChangeFromOperation: number; // negative (amount redeemed)
-    collChangeFromOperation: number; // negative (collateral taken)
-  };
+  troveOperation: TroveOperationData;
+  // Note: debtChangeFromOperation and collChangeFromOperation are negative (amounts redeemed/taken)
 
   // From BatchUpdated event (if trove was in batch)
   batchUpdate?: {
