@@ -3,11 +3,10 @@
 import { useMemo, useState } from "react";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { Icon } from "@/components/icons/icon";
-import { TroveCardHeader } from "./components/TroveCardHeader";
 import { TroveCardFooter } from "./components/TroveCardFooter";
 import { TroveSummary } from "@/types/api/trove";
 import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
-import { formatDate } from "@/lib/date";
+import { formatDate, formatDuration } from "@/lib/date";
 import { toLocaleStringHelper, formatPrice, formatUsdValue } from "@/lib/utils/format";
 import { InterestCalculator } from "@/lib/utils/interest-calculator";
 import { ExplanationPanel } from "@/components/transaction-timeline/explanation/ExplanationPanel";
@@ -163,13 +162,31 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
     <div>
       {/* Main trove card */}
       <div className="relative rounded-lg text-slate-500 bg-slate-900">
-        {/* Header section with no padding on sides to allow full-width header */}
-        <div className="flex items-center ">
-          <TroveCardHeader status="open" assetType={trove.assetType} isDelegated={trove.batch?.isMember} />
-          
-          {/* Status aligned with logo */}
-          <div className="flex items-center ml-4">
-            <span className="text-xs font-semibold px-2 py-0.5 bg-green-900 text-green-400 rounded-xs mr-2">ACTIVE</span>
+        {/* Header section */}
+        <div className="flex items-center justify-between p-4 pb-0">
+          <div className="flex items-center">
+            {/* Status and metrics */}
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-semibold px-2 py-0.5 bg-green-900 text-green-400 rounded-xs">ACTIVE</span>
+              {!showViewButton && (
+                <span className="text-slate-400">
+                  Opened {formatDate(trove.activity.createdAt)}
+                </span>
+              )}
+              <span className="text-slate-400">
+                {formatDuration(trove.activity.createdAt, new Date())}
+              </span>
+              <span className="inline-flex items-center text-slate-400">
+                <Icon name="arrow-left-right" size={12} />
+                <span className="ml-1">{trove.activity.transactionCount}</span>
+              </span>
+              {trove.activity.redemptionCount > 0 && (
+                <span className="inline-flex items-center text-orange-400">
+                  <Icon name="triangle" size={12} />
+                  <span className="ml-1">{trove.activity.redemptionCount}</span>
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -289,8 +306,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
             showViewButton={showViewButton}
             dateInfo={{
               prefix: "Opened",
-              date: formatDate(trove.activity.createdAt),
-              suffix: `${trove.activity.lifetimeDays} days`
+              date: formatDate(trove.activity.createdAt)
             }}
           />
         ) : (
@@ -298,11 +314,6 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
             <TroveCardFooter
               trove={trove}
               showViewButton={showViewButton}
-              dateInfo={{
-                prefix: "Opened",
-                date: formatDate(trove.activity.createdAt),
-                suffix: `${trove.activity.lifetimeDays} days`
-              }}
             />
             
             {/* Latest collateral value - only show on trove view page */}
