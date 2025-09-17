@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { TokenIcon } from "@/components/icons/tokenIcon";
-import { TroveCardHeader } from "./components/TroveCardHeader";
 import { TroveCardFooter } from "./components/TroveCardFooter";
-import { formatDateRange } from "@/lib/date";
+import { formatDate, formatDateRange, formatDuration } from "@/lib/date";
+import { Icon } from "@/components/icons/icon";
 import { formatPrice } from "@/lib/utils/format";
 import { ExplanationPanel } from "@/components/transaction-timeline/explanation/ExplanationPanel";
 import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
@@ -48,13 +48,11 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
     );
 
     // Trove lifecycle
-    const openDate = new Date(trove.activity.createdAt);
-    const liquidationDate = new Date(trove.activity.lastActivityAt);
-    const lifetimeDays = Math.floor((liquidationDate.getTime() - openDate.getTime()) / (1000 * 60 * 60 * 24));
-    
+    const duration = formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt);
+
     items.push(
       <span key="lifecycle" className="text-slate-500">
-        Trove was active for <strong className="text-white">{lifetimeDays} days</strong> before liquidation from {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
+        Trove was active for <strong className="text-white">{duration}</strong> before liquidation from {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
       </span>
     );
 
@@ -87,8 +85,37 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
 
   return (
     <div>
-      <div className="rounded-lg text-slate-500 bg-red-950 text-red-800 border border-red-900 grid grid-cols-1 p-4 gap-4">
-        <TroveCardHeader status="liquidated" assetType={trove.assetType} />
+      <div className="rounded-lg text-slate-500 bg-red-950 text-red-800 border border-red-900">
+        {/* Header section */}
+        <div className="flex items-center justify-between p-4 pb-0">
+          <div className="flex items-center">
+            {/* Status and metrics */}
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-semibold px-2 py-0.5 bg-red-900 text-red-400 rounded-xs">LIQUIDATED</span>
+              {!showViewButton && (
+                <span className="text-slate-400">
+                  {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
+                </span>
+              )}
+              <span className="text-slate-400">
+                {formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt)}
+              </span>
+              <span className="inline-flex items-center text-slate-400">
+                <Icon name="arrow-left-right" size={12} />
+                <span className="ml-1">{trove.activity.transactionCount}</span>
+              </span>
+              {trove.activity.redemptionCount > 0 && (
+                <span className="inline-flex items-center text-orange-400">
+                  <Icon name="triangle" size={12} />
+                  <span className="ml-1">{trove.activity.redemptionCount}</span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Content section with standard grid layout */}
+        <div className="grid grid-cols-1 pt-2 p-4 gap-4">
 
         {/* Main value */}
         <div>
@@ -125,8 +152,9 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
         <TroveCardFooter
           trove={trove}
           showViewButton={showViewButton}
-          dateText={`${formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}`}
+          dateText={showViewButton ? `${formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}` : undefined}
         />
+        </div>
       </div>
 
       {/* Explanation Panel */}
