@@ -82,11 +82,11 @@ export default function TrovesPage() {
   
   const [filters, setFilters] = useState<TroveFilterParams>(getFiltersFromUrl());
 
-  // Synchronize filters with URL on mount
+  // Synchronize filters with URL when searchParams change
   useEffect(() => {
     const urlFilters = getFiltersFromUrl();
     setFilters(urlFilters);
-  }, []);
+  }, [searchParams]);
   
   // Update URL when page, view, or filters change
   const updateUrl = (newFilters?: TroveFilterParams, newPage?: number, newView?: 'open' | 'closed') => {
@@ -170,12 +170,16 @@ export default function TrovesPage() {
   }, [currentPage, filters, currentView]);
 
   useEffect(() => {
-    // Load collateral stats on initial mount if collateralType is in URL
+    // Load collateral stats when collateralType changes in URL
     const collateralType = searchParams.get('collateralType');
     if (collateralType) {
       loadCollateralStats(collateralType);
+    } else {
+      // Clear stats if no collateral type selected
+      setCollateralStats(null);
+      setTotalTVL(0);
     }
-  }, [searchParams]);
+  }, [searchParams.get('collateralType')]);
 
   const needsSingleApiCall = () => {
     // If any specific filters are applied that work better with single calls
@@ -209,22 +213,24 @@ export default function TrovesPage() {
       if (filters.sortBy) baseParams.set('sortBy', filters.sortBy);
       if (filters.sortOrder) baseParams.set('sortOrder', filters.sortOrder);
 
-      // Make two parallel API calls
-      const [openResponse, zombieResponse] = await Promise.all([
-        fetch(`/api/troves?${baseParams.toString()}&status=open&limit=100&offset=0`),
-        fetch(`/api/troves?${baseParams.toString()}&status=zombie&limit=100&offset=0`)
-      ]);
+      // Fetch only open troves (which includes zombie troves as they have isZombieTrove flag)
+      const openResponse = await fetch(`/api/troves?${baseParams.toString()}&status=open&limit=200&offset=0`);
 
       if (!openResponse.ok) throw new Error(`Failed to fetch open troves: ${openResponse.statusText}`);
-      if (!zombieResponse.ok) throw new Error(`Failed to fetch zombie troves: ${zombieResponse.statusText}`);
 
-      const [openData, zombieData] = await Promise.all([
-        openResponse.json(),
-        zombieResponse.json()
-      ]);
+      const openData = await openResponse.json();
 
-      // Combine and sort the results
-      const allTroves = [...(openData.data || []), ...(zombieData.data || [])];
+      // Filter based on zombie filter setting
+      let allTroves: TroveSummary[] = openData.data || [];
+
+      if (filters.zombieFilter === 'only') {
+        // Show only zombie troves
+        allTroves = allTroves.filter((trove) => trove.isZombieTrove === true);
+      } else if (filters.zombieFilter === 'hide') {
+        // Hide zombie troves
+        allTroves = allTroves.filter((trove) => trove.isZombieTrove !== true);
+      }
+      // else show all (both zombie and non-zombie)
 
       // Apply sorting
       const sortedTroves = sortTroves(allTroves, filters.sortBy || 'lastActivity', filters.sortOrder || 'desc');
@@ -403,14 +409,8 @@ export default function TrovesPage() {
 
       // Set status based on current view
       if (currentView === 'open') {
-        // Handle zombie trove filtering in open view
-        if (filters.zombieFilter === 'only') {
-          params.set('status', 'zombie');
-        } else if (filters.zombieFilter === 'hide') {
-          params.set('status', 'open');
-        } else {
-          params.set('status', 'open,zombie');
-        }
+        // Always fetch open troves, zombie filtering will be done client-side based on isZombieTrove field
+        params.set('status', 'open');
       } else {
         // For closed view, show liquidated only when filter is active
         if (filters.liquidatedOnly) {
@@ -450,12 +450,23 @@ export default function TrovesPage() {
       if (!response.ok) {
         throw new Error(`Failed to fetch troves: ${response.statusText}`);
       }
-      
+
       const data: TrovesResponse = await response.json();
-      setTroves(data.data);
+      let trovesData = data.data;
+
+      // Apply zombie filtering on client side for open troves
+      if (currentView === 'open' && filters.zombieFilter) {
+        if (filters.zombieFilter === 'only') {
+          trovesData = trovesData.filter((trove) => trove.isZombieTrove === true);
+        } else if (filters.zombieFilter === 'hide') {
+          trovesData = trovesData.filter((trove) => trove.isZombieTrove !== true);
+        }
+      }
+
+      setTroves(trovesData);
       if (data.pagination) {
         setPagination({
-          total: data.pagination.total,
+          total: trovesData.length,
           limit: data.pagination.limit,
           page: data.pagination.page,
         });

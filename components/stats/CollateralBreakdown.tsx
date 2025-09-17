@@ -190,7 +190,10 @@ export function CollateralBreakdown({
             className="group bg-white rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer"
           >
             <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center">
               <TokenIcon assetSymbol={collateralType.toLowerCase()} className="w-12 h-12" />
+              <TokenIcon assetSymbol="bold" className="w-12 h-12 -ml-1.5" />
+              </div>
               <div>
                 <div className="text-gray-900 font-semibold text-xl">{collateralType}</div>
                 <div className="text-sm text-gray-500">
@@ -245,8 +248,11 @@ export function CollateralBreakdown({
       <div className="bg-slate-800 rounded-lg overflow-hidden mb-6">
         <div className="">
           <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-            <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="flex items-center">
               <TokenIcon assetSymbol={collateralType.toLowerCase()} className="w-12 h-12" />
+              <TokenIcon assetSymbol="bold" className="w-12 h-12 -ml-1.5" />
+              </div>
               <div>
                 <div className="relative" ref={dropdownRef}>
                   <button
