@@ -20,7 +20,14 @@ export async function GET(request: NextRequest) {
   // Extract and validate parameters
   const troveId = searchParams.get('troveId');
   const status = searchParams.get('status');
-  const validStatus = status && VALID_STATUSES.includes(status) ? status : null;
+
+  // Handle comma-separated status values
+  let validStatus = null;
+  if (status) {
+    const statusValues = status.split(',').map(s => s.trim());
+    const allValid = statusValues.every(s => VALID_STATUSES.includes(s));
+    validStatus = allValid ? status : null;
+  }
   const collateralType = searchParams.get('collateralType');
   const validCollateralType = collateralType && VALID_COLLATERAL_TYPES.includes(collateralType) ? collateralType : null;
   const ownerAddress = searchParams.get('ownerAddress');
