@@ -2,6 +2,40 @@
 
 import { useState, useEffect } from "react";
 
+// Three-state filter values
+export type FilterState = 'all' | 'hide' | 'only';
+
+// Segmented Control Component
+interface SegmentedControlProps {
+  label: string;
+  value: FilterState;
+  onChange: (value: FilterState) => void;
+  options: { value: FilterState; label: string }[];
+}
+
+function SegmentedControl({ label, value, onChange, options }: SegmentedControlProps) {
+  return (
+    <div className="space-y-2">
+      <span className="text-xs font-medium text-slate-300">{label}</span>
+      <div className="flex bg-slate-700 rounded p-1">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            onClick={() => onChange(option.value)}
+            className={`flex-1 px-3 py-1 text-xs font-medium rounded transition-all ${
+              value === option.value
+                ? "bg-slate-600 text-white shadow-sm"
+                : "text-slate-300 hover:text-white hover:bg-slate-600"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export interface TroveFilterParams {
   troveId?: string;
   status?: string;
@@ -9,8 +43,15 @@ export interface TroveFilterParams {
   ownerAddress?: string;
   activeWithin?: string;
   createdWithin?: string;
-  troveType?: "batch" | "individual";
-  hasRedemptions?: boolean;
+
+  // Three-state filters
+  zombieFilter?: FilterState;
+  redemptionFilter?: FilterState;
+  batchFilter?: FilterState;
+
+  // Legacy closed view filter
+  liquidatedOnly?: boolean;
+
   sortBy?: string;
   sortOrder?: "asc" | "desc";
 }
@@ -19,38 +60,37 @@ interface TroveFiltersProps {
   filters: TroveFilterParams;
   onFiltersChange: (filters: TroveFilterParams) => void;
   onReset: () => void;
+  currentView: 'open' | 'closed';
+  onViewChange: (view: 'open' | 'closed') => void;
+  showAllFilters?: boolean;
+  onToggleFilters?: () => void;
+  isMobile?: boolean;
 }
 
 const TIME_OPTIONS = [
-  { value: "", label: "All time" },
-  { value: "86400000", label: "Last 24 hours" },
-  { value: "604800000", label: "Last 7 days" },
-  { value: "2592000000", label: "Last 30 days" },
-  { value: "7776000000", label: "Last 90 days" },
+  { value: "", label: "All" },
+  { value: "86400000", label: "1" },
+  { value: "604800000", label: "7" },
+  { value: "2592000000", label: "30" },
+  { value: "7776000000", label: "90" },
 ];
 
-const SORT_OPTIONS = [
-  { value: "lastActivity", label: "Last Activity" },
-  { value: "debt", label: "Debt" },
-  { value: "coll", label: "Collateral" },
-  { value: "collUsd", label: "Collateral USD" },
-  { value: "ratio", label: "Collateral Ratio" },
-  { value: "interestRate", label: "Interest Rate" },
-  { value: "created", label: "Created Date" },
-  { value: "redemptions", label: "Redemptions" },
-  { value: "transactions", label: "Transactions" },
-  { value: "peakDebt", label: "Peak Debt" },
-  { value: "peakColl", label: "Peak Collateral" },
-  { value: "batchRate", label: "Batch Rate" },
-  { value: "managementFee", label: "Management Fee" },
-];
 
-export function TroveFilters({ filters, onFiltersChange, onReset }: TroveFiltersProps) {
+export function TroveFilters({
+  filters,
+  onFiltersChange,
+  onReset,
+  currentView,
+  onViewChange,
+  showAllFilters = true,
+  onToggleFilters = () => {},
+  isMobile = false
+}: TroveFiltersProps) {
   const [localFilters, setLocalFilters] = useState<TroveFilterParams>(filters);
-
   useEffect(() => {
     setLocalFilters(filters);
   }, [filters]);
+
 
   const handleStatusChange = (status: string) => {
     // If clicking the same status, deselect it
@@ -60,33 +100,7 @@ export function TroveFilters({ filters, onFiltersChange, onReset }: TroveFilters
     onFiltersChange(newFilters);
   };
 
-  const handleCollateralChange = (collateral: string) => {
-    // If clicking the same collateral, deselect it
-    const newCollateral = localFilters.collateralType === collateral ? undefined : collateral;
-    const newFilters = { ...localFilters, collateralType: newCollateral };
-    setLocalFilters(newFilters);
-    onFiltersChange(newFilters);
-  };
 
-  const handleOwnerAddressChange = (value: string) => {
-    const newFilters = { ...localFilters, ownerAddress: value || undefined };
-    setLocalFilters(newFilters);
-    // Debounce the API call
-    const timeoutId = setTimeout(() => {
-      onFiltersChange(newFilters);
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  };
-
-  const handleTroveIdChange = (value: string) => {
-    const newFilters = { ...localFilters, troveId: value || undefined };
-    setLocalFilters(newFilters);
-    // Debounce the API call
-    const timeoutId = setTimeout(() => {
-      onFiltersChange(newFilters);
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  };
 
   const handleTimeFilterChange = (field: "activeWithin" | "createdWithin", value: string) => {
     const newFilters = { ...localFilters, [field]: value || undefined };
@@ -94,38 +108,31 @@ export function TroveFilters({ filters, onFiltersChange, onReset }: TroveFilters
     onFiltersChange(newFilters);
   };
 
-  const handleTroveTypeChange = (type: string) => {
-    // If clicking the same type, deselect it
-    const newType = localFilters.troveType === type ? undefined : (type as "batch" | "individual" | undefined);
-    const newFilters = { ...localFilters, troveType: newType };
+
+  const handleLiquidatedChange = () => {
+    const newStatus = localFilters.liquidatedOnly ? undefined : 'liquidated';
+    const newFilters = {
+      ...localFilters,
+      liquidatedOnly: !localFilters.liquidatedOnly,
+      status: newStatus
+    };
     setLocalFilters(newFilters);
     onFiltersChange(newFilters);
   };
 
-  const handleRedemptionsChange = () => {
-    const newFilters = { ...localFilters, hasRedemptions: !localFilters.hasRedemptions };
+  const handleThreeStateChange = (filterType: 'zombieFilter' | 'redemptionFilter' | 'batchFilter', value: FilterState) => {
+    const newFilters = { ...localFilters, [filterType]: value === 'all' ? undefined : value };
     setLocalFilters(newFilters);
     onFiltersChange(newFilters);
   };
 
-  const handleSortChange = (field: "sortBy" | "sortOrder", value: string) => {
-    const newFilters = { ...localFilters, [field]: value as any };
-    setLocalFilters(newFilters);
-    onFiltersChange(newFilters);
-  };
 
   const hasActiveFilters = () => {
     return (
-      localFilters.troveId ||
-      localFilters.status ||
-      localFilters.collateralType ||
-      localFilters.ownerAddress ||
-      localFilters.activeWithin ||
-      localFilters.createdWithin ||
-      localFilters.troveType ||
-      localFilters.hasRedemptions ||
-      localFilters.sortBy ||
-      localFilters.sortOrder !== "desc"
+      localFilters.zombieFilter ||
+      localFilters.redemptionFilter ||
+      localFilters.batchFilter ||
+      localFilters.liquidatedOnly
     );
   };
 
@@ -134,231 +141,259 @@ export function TroveFilters({ filters, onFiltersChange, onReset }: TroveFilters
     onReset();
   };
 
+
+  // Mobile layout
+  if (isMobile) {
+    return (
+      <div className="bg-slate-800/50 rounded-lg p-4 space-y-4">
+        {/* Always visible section on mobile */}
+        <div className="space-y-4">
+          {/* Status Toggle - Full width on mobile */}
+          <div className="space-y-2">
+            <span className="text-xs font-medium text-slate-300">Status</span>
+            <div className="flex gap-1 bg-slate-700 rounded p-1">
+              <button
+                onClick={() => onViewChange('open')}
+                className={`cursor-pointer flex-1 px-4 py-2 text-sm font-semibold rounded transition-all ${
+                  currentView === 'open'
+                    ? "bg-green-900 text-green-400 shadow-sm"
+                    : "text-slate-300 hover:text-white hover:bg-slate-600"
+                }`}
+              >
+                ACTIVE
+              </button>
+              <button
+                onClick={() => onViewChange('closed')}
+                className={`cursor-pointer flex-1 px-4 py-2 text-sm font-semibold rounded transition-all ${
+                  currentView === 'closed'
+                    ? "bg-slate-900 text-white shadow-sm"
+                    : "text-slate-300 hover:text-white hover:bg-slate-600"
+                }`}
+              >
+                CLOSED
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Collapsible advanced filters */}
+        {showAllFilters && (
+          <div className="space-y-4 pt-4 border-t border-slate-700">
+            {/* View-specific filters */}
+            {currentView === 'open' && (
+              <div className="space-y-3">
+                <SegmentedControl
+                  label="Redemptions"
+                  value={localFilters.redemptionFilter || 'all'}
+                  onChange={(value) => handleThreeStateChange('redemptionFilter', value)}
+                  options={[
+                    { value: 'all', label: 'All' },
+                    { value: 'hide', label: 'None' },
+                    { value: 'only', label: 'Has' }
+                  ]}
+                />
+
+                <SegmentedControl
+                  label="Trove Type"
+                  value={localFilters.batchFilter || 'all'}
+                  onChange={(value) => handleThreeStateChange('batchFilter', value)}
+                  options={[
+                    { value: 'all', label: 'All' },
+                    { value: 'hide', label: 'Indiv.' },
+                    { value: 'only', label: 'Batch' }
+                  ]}
+                />
+
+                <SegmentedControl
+                  label="Zombie Troves"
+                  value={localFilters.zombieFilter || 'all'}
+                  onChange={(value) => handleThreeStateChange('zombieFilter', value)}
+                  options={[
+                    { value: 'all', label: 'All' },
+                    { value: 'hide', label: 'Hide' },
+                    { value: 'only', label: 'Only' }
+                  ]}
+                />
+              </div>
+            )}
+
+            {currentView === 'closed' && (
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer hover:text-slate-200 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={localFilters.liquidatedOnly || false}
+                    onChange={handleLiquidatedChange}
+                    className="rounded bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-600"
+                  />
+                  <span className="text-sm">Liquidated Only</span>
+                </label>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Toggle button for advanced filters */}
+        <button
+          onClick={onToggleFilters}
+          className="w-full py-2 text-sm text-slate-300 hover:text-white transition-colors flex items-center justify-center gap-2"
+        >
+          <span>{showAllFilters ? 'Hide Filters' : 'Show More Filters'}</span>
+          <svg
+            className={`w-4 h-4 transition-transform ${showAllFilters ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {/* Reset button if filters are active */}
+        {hasActiveFilters() && (
+          <button
+            onClick={handleReset}
+            className="w-full py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded text-sm transition-all"
+          >
+            Reset Filters
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop layout - horizontal for top placement
   return (
-    <div className="bg-slate-800/50 rounded-lg p-3 mb-4">
-      <div className="space-y-2.5">
-        {/* First Row: Status, Collateral, and Trove Type */}
-        <div className="flex items-center gap-6">
-          {/* Status */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-500">Status:</span>
-            <div className="flex gap-2">
-              <label className="flex items-center gap-1 cursor-pointer hover:text-slate-200 transition-colors">
-                <input
-                  type="radio"
-                  name="status"
-                  checked={!localFilters.status}
-                  onChange={() => handleStatusChange("")}
-                  className="bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-600 w-3.5 h-3.5"
-                />
-                <span className="text-xs">All</span>
-              </label>
-              {["open", "closed", "liquidated"].map((status) => (
-                <label
-                  key={status}
-                  className="flex items-center gap-1 cursor-pointer hover:text-slate-200 transition-colors"
-                >
-                  <input
-                    type="radio"
-                    name="status"
-                    checked={localFilters.status === status}
-                    onChange={() => handleStatusChange(status)}
-                    className="bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-600 w-3.5 h-3.5"
-                  />
-                  <span className="text-xs capitalize">{status}</span>
-                </label>
-              ))}
-            </div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-4">
+        {/* View Toggle */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-slate-300">Status:</span>
+          <div className="flex gap-1 bg-slate-700 rounded p-1">
+            <button
+              onClick={() => onViewChange('open')}
+              className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded transition-all ${
+                currentView === 'open'
+                  ? "bg-green-900 text-green-400 shadow-sm"
+                  : "text-slate-300 hover:text-white hover:bg-slate-600"
+              }`}
+            >
+              ACTIVE
+            </button>
+            <button
+              onClick={() => onViewChange('closed')}
+              className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded transition-all ${
+                currentView === 'closed'
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "text-slate-300 hover:text-white hover:bg-slate-600"
+              }`}
+            >
+              CLOSED
+            </button>
           </div>
+        </div>
 
-          <div className="h-4 w-px bg-slate-700" />
-
-          {/* Collateral */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-500">Collateral:</span>
-            <div className="flex gap-2">
-              <label className="flex items-center gap-1 cursor-pointer hover:text-slate-200 transition-colors">
-                <input
-                  type="radio"
-                  name="collateral"
-                  checked={!localFilters.collateralType}
-                  onChange={() => handleCollateralChange("")}
-                  className="bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-600 w-3.5 h-3.5"
-                />
-                <span className="text-xs">All</span>
-              </label>
-              {["WETH", "wstETH", "rETH"].map((collateral) => (
-                <label
-                  key={collateral}
-                  className="flex items-center gap-1 cursor-pointer hover:text-slate-200 transition-colors"
-                >
-                  <input
-                    type="radio"
-                    name="collateral"
-                    checked={localFilters.collateralType === collateral}
-                    onChange={() => handleCollateralChange(collateral)}
-                    className="bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-600 w-3.5 h-3.5"
-                  />
-                  <span className="text-xs">{collateral}</span>
-                </label>
-              ))}
+        {/* View-specific filters */}
+        {currentView === 'open' && (
+          <>
+            {/* Redemptions Filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-slate-300">Redemptions:</span>
+              <div className="flex bg-slate-700 rounded p-1">
+                {[
+                  { value: 'all', label: 'All' },
+                  { value: 'hide', label: 'None' },
+                  { value: 'only', label: 'Has' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => handleThreeStateChange('redemptionFilter', option.value as FilterState)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
+                      (localFilters.redemptionFilter || 'all') === option.value
+                        ? "bg-slate-600 text-white shadow-sm"
+                        : "text-slate-300 hover:text-white hover:bg-slate-600"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="h-4 w-px bg-slate-700" />
-
-          {/* Trove Type */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-500">Type:</span>
-            <div className="flex gap-2">
-              <label className="flex items-center gap-1 cursor-pointer hover:text-slate-200 transition-colors">
-                <input
-                  type="radio"
-                  name="troveType"
-                  checked={!localFilters.troveType}
-                  onChange={() => handleTroveTypeChange("")}
-                  className="bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-600 w-3.5 h-3.5"
-                />
-                <span className="text-xs">All</span>
-              </label>
-              <label className="flex items-center gap-1 cursor-pointer hover:text-slate-200 transition-colors">
-                <input
-                  type="radio"
-                  name="troveType"
-                  checked={localFilters.troveType === "batch"}
-                  onChange={() => handleTroveTypeChange("batch")}
-                  className="bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-600 w-3.5 h-3.5"
-                />
-                <span className="text-xs">Batch</span>
-              </label>
-              <label className="flex items-center gap-1 cursor-pointer hover:text-slate-200 transition-colors">
-                <input
-                  type="radio"
-                  name="troveType"
-                  checked={localFilters.troveType === "individual"}
-                  onChange={() => handleTroveTypeChange("individual")}
-                  className="bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-600 w-3.5 h-3.5"
-                />
-                <span className="text-xs">Individual</span>
-              </label>
+            {/* Batch/Individual Filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-slate-300">Type:</span>
+              <div className="flex bg-slate-700 rounded p-1">
+                {[
+                  { value: 'all', label: 'All' },
+                  { value: 'hide', label: 'Individual' },
+                  { value: 'only', label: 'Batch' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => handleThreeStateChange('batchFilter', option.value as FilterState)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
+                      (localFilters.batchFilter || 'all') === option.value
+                        ? "bg-slate-600 text-white shadow-sm"
+                        : "text-slate-300 hover:text-white hover:bg-slate-600"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="h-4 w-px bg-slate-700" />
+            {/* Zombie Filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-slate-300">Zombie:</span>
+              <div className="flex bg-slate-700 rounded p-1">
+                {[
+                  { value: 'all', label: 'All' },
+                  { value: 'hide', label: 'Hide' },
+                  { value: 'only', label: 'Only' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => handleThreeStateChange('zombieFilter', option.value as FilterState)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
+                      (localFilters.zombieFilter || 'all') === option.value
+                        ? "bg-slate-600 text-white shadow-sm"
+                        : "text-slate-300 hover:text-white hover:bg-slate-600"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
 
-          {/* Redemptions */}
+        {currentView === 'closed' && (
           <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1 cursor-pointer hover:text-slate-200 transition-colors">
+            <label className="flex items-center gap-2 cursor-pointer hover:text-slate-200 transition-colors">
               <input
                 type="checkbox"
-                checked={localFilters.hasRedemptions || false}
-                onChange={handleRedemptionsChange}
+                checked={localFilters.liquidatedOnly || false}
+                onChange={handleLiquidatedChange}
                 className="rounded bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-600 w-3.5 h-3.5"
               />
-              <span className="text-xs">Has Redemptions</span>
+              <span className="text-xs">Liquidated Only</span>
             </label>
           </div>
-        </div>
+        )}
 
-        {/* Second Row: Time and Sort */}
-        <div className="flex items-center gap-3">
-          {/* Time filters */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Active:</span>
-            <select
-              value={localFilters.activeWithin || ""}
-              onChange={(e) => handleTimeFilterChange("activeWithin", e.target.value)}
-              className="px-2 py-1 bg-slate-700 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-600 min-w-[100px]"
-            >
-              {TIME_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Created:</span>
-            <select
-              value={localFilters.createdWithin || ""}
-              onChange={(e) => handleTimeFilterChange("createdWithin", e.target.value)}
-              className="px-2 py-1 bg-slate-700 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-600 min-w-[100px]"
-            >
-              {TIME_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="h-4 w-px bg-slate-700" />
-
-          {/* Sort */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Sort by:</span>
-            <select
-              value={localFilters.sortBy || "lastActivity"}
-              onChange={(e) => handleSortChange("sortBy", e.target.value)}
-              className="px-2 py-1 bg-slate-700 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-600 min-w-[120px]"
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={localFilters.sortOrder || "desc"}
-              onChange={(e) => handleSortChange("sortOrder", e.target.value)}
-              className="px-2 py-1 bg-slate-700 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-600 min-w-[100px]"
-            >
-              <option value="desc">↓ Newest first</option>
-              <option value="asc">↑ Oldest first</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Third Row: Trove ID, Owner Address and Clear */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Trove ID:</span>
-            <input
-              type="text"
-              value={localFilters.troveId || ""}
-              onChange={(e) => handleTroveIdChange(e.target.value)}
-              placeholder="Enter trove ID..."
-              className="px-2 py-1 bg-slate-700 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-600 w-[200px]"
-            />
-          </div>
-
-          <div className="h-4 w-px bg-slate-700" />
-
-          <div className="flex items-center gap-2 flex-1">
-            <span className="text-xs text-slate-500">Owner:</span>
-            <input
-              type="text"
-              value={localFilters.ownerAddress || ""}
-              onChange={(e) => handleOwnerAddressChange(e.target.value)}
-              placeholder="Enter owner address 0x..."
-              className="flex-1 px-2 py-1 bg-slate-700 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-600 max-w-[300px]"
-            />
-          </div>
-
-          {/* Clear All */}
-          {hasActiveFilters() && (
-            <>
-              <div className="h-4 w-px bg-slate-700" />
-              <button
-                onClick={handleReset}
-                className="text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 hover:bg-slate-700 rounded"
-              >
-                Clear all filters
-              </button>
-            </>
-          )}
-        </div>
+        {/* Reset button */}
+        {hasActiveFilters() && (
+          <button
+            onClick={handleReset}
+            className="ml-auto px-4 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded text-xs transition-all"
+          >
+            Reset Filters
+          </button>
+        )}
       </div>
     </div>
   );
