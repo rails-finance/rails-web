@@ -130,7 +130,7 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
         </div>
 
         {/* Desktop layout - all on one line with 5 columns */}
-        <div className="hidden md:grid md:grid-cols-5 md:gap-6 md:items-end">
+        <div className="hidden md:grid md:gap-6 md:items-end" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr auto' }}>
           {/* Main debt value */}
           <div>
             {!hideLabels && <p className="text-xs text-slate-400 mb-1">Debt</p>}
@@ -250,26 +250,63 @@ function SimplifiedClosedTroveCard({ trove, showViewButton = false, hideLabels =
 
       {/* Content section */}
       <div className="grid grid-cols-1 pt-2 p-4 gap-4">
-        {/* Peak debt value - same for both mobile and desktop */}
-        <div>
-          <p className="text-xs text-slate-400 mb-1">Peak Debt</p>
-          <div className="flex items-center">
-            <h3 className="text-3xl font-bold">
-              {formatPrice(trove.debt.peak)}
-            </h3>
-            <span className="ml-2 text-green-400 text-lg">
-              <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
-            </span>
+        {/* Mobile layout */}
+        <div className="md:hidden">
+          {/* Peak debt value */}
+          <div className="mb-4">
+            <p className="text-xs text-slate-400 mb-1">Peak Debt</p>
+            <div className="flex items-center">
+              <h3 className="text-3xl font-bold">
+                {formatPrice(trove.debt.peak)}
+              </h3>
+              <span className="ml-2 text-green-400 text-lg">
+                <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Desktop layout - with view link */}
+        <div className="hidden md:grid md:gap-6 md:items-end" style={{ gridTemplateColumns: '1fr auto' }}>
+          {/* Peak debt value */}
+          <div>
+            {!hideLabels && <p className="text-xs text-slate-400 mb-1">Peak Debt</p>}
+            <div className="flex items-center">
+              <h3 className="text-3xl font-bold">
+                {formatPrice(trove.debt.peak)}
+              </h3>
+              <span className="ml-2 text-green-400 text-lg">
+                <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
+              </span>
+            </div>
+          </div>
+
+          {/* View link */}
+          {showViewButton && (
+            <div className="flex justify-end items-center">
+              <span className="text-sm text-blue-400 group-hover:text-blue-300 font-medium transition-colors">
+                View Trove →
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Footer - without view button since it's now inline */}
         <TroveCardFooter
           trove={trove}
-          showViewButton={showViewButton}
+          showViewButton={false}
           dateText={formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt)}
           showDetailedInfo={false}
         />
+
+        {/* Mobile view link - still shown in footer on mobile */}
+        {showViewButton && (
+          <div className="md:hidden mt-4">
+            <span className="block text-left text-sm text-blue-400 group-hover:text-blue-300 font-medium transition-colors">
+              View Trove →
+            </span>
+          </div>
+        )}
       </div>
     </Link>
   );

@@ -286,9 +286,6 @@ export function CollateralBreakdown({
                     </div>
                   )}
                 </div>
-                <div className="text-sm text-slate-400">
-                  {formatNumber(stats.totalCollateral)} {collateralType} total collateral
-                </div>
               </div>
             </div>
 
@@ -329,6 +326,9 @@ export function CollateralBreakdown({
               <div className="text-2xl font-bold text-white">
                 ${formatNumber(stats.totalCollateralUsd)}
               </div>
+                <div className="text-sm text-slate-400">
+                  {formatNumber(stats.totalCollateral)} {collateralType}
+                </div>
             </div>
 
             <div className="bg-slate-900 rounded-lg p-4">

@@ -86,10 +86,10 @@ export function MinimalFilters({
       </div>
 
       {/* Separator */}
-      <span className="text-slate-600 hidden md:inline">|</span>
+      <span className="text-slate-600 hidden md:inline"></span>
 
       {/* Filter pills - Desktop */}
-      <div className="hidden md:flex items-center gap-2">
+      <div className="flex items-center gap-2">
         {currentView === 'open' && (
           <>
             {/* Redemption Filter */}
@@ -147,62 +147,6 @@ export function MinimalFilters({
         )}
       </div>
 
-      {/* Filter pills - Mobile (icons) */}
-      <div className="md:hidden flex items-center gap-1">
-        {currentView === 'open' && (
-          <>
-            <button
-              onClick={() => cycleThreeState('redemptionFilter', filters.redemptionFilter)}
-              className={`p-1.5 rounded transition-all ${
-                filters.redemptionFilter && filters.redemptionFilter !== 'all'
-                  ? 'bg-blue-900 text-blue-400'
-                  : 'bg-slate-700 text-slate-400'
-              }`}
-              title={getFilterPillText('redemptionFilter', filters.redemptionFilter) || 'Redemptions'}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                <path d="M3 3v5h5" />
-              </svg>
-            </button>
-
-            <button
-              onClick={() => cycleThreeState('batchFilter', filters.batchFilter)}
-              className={`p-1.5 rounded transition-all ${
-                filters.batchFilter && filters.batchFilter !== 'all'
-                  ? 'bg-purple-900 text-purple-400'
-                  : 'bg-slate-700 text-slate-400'
-              }`}
-              title={getFilterPillText('batchFilter', filters.batchFilter) || 'Type'}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {filters.batchFilter === 'only' ? (
-                  <g>
-                    <circle cx="9" cy="9" r="3" />
-                    <circle cx="15" cy="9" r="3" />
-                    <circle cx="9" cy="15" r="3" />
-                    <circle cx="15" cy="15" r="3" />
-                  </g>
-                ) : (
-                  <circle cx="12" cy="12" r="4" />
-                )}
-              </svg>
-            </button>
-
-            <button
-              onClick={() => cycleThreeState('zombieFilter', filters.zombieFilter)}
-              className={`p-1.5 rounded transition-all ${
-                filters.zombieFilter && filters.zombieFilter !== 'all'
-                  ? 'bg-orange-900 text-orange-400'
-                  : 'bg-slate-700 text-slate-400'
-              }`}
-              title={getFilterPillText('zombieFilter', filters.zombieFilter) || 'Zombies'}
-            >
-              💀
-            </button>
-          </>
-        )}
-      </div>
 
       {/* Reset button - only show when filters active */}
       {hasActiveFilters() && (

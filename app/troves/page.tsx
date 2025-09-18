@@ -312,8 +312,12 @@ export default function TrovesPage() {
           bVal = new Date(b.createdAt || b.closedAt || 0).getTime();
           break;
         case 'debt':
-          aVal = parseFloat(a.debt || a.peakDebt || 0);
-          bVal = parseFloat(b.debt || b.peakDebt || 0);
+          aVal = parseFloat(a.debt?.current || a.debt?.currentRaw || 0);
+          bVal = parseFloat(b.debt?.current || b.debt?.currentRaw || 0);
+          break;
+        case 'peakDebt':
+          aVal = parseFloat(a.debt?.peak || 0);
+          bVal = parseFloat(b.debt?.peak || 0);
           break;
         case 'coll':
           aVal = parseFloat(a.backedBy?.amount || a.collateralAtLiquidation || 0);
@@ -486,113 +490,46 @@ export default function TrovesPage() {
   if (loading) {
     return (
       <main className="min-h-screen">
-        {/* Mobile/Tablet: Filters skeleton at top */}
-        <div className="lg:hidden mb-6">
-          <div className="bg-slate-800 rounded-lg p-4 animate-pulse">
-            <div className="flex gap-2 mb-4">
-              <div className="h-10 bg-slate-700 rounded w-24"></div>
-              <div className="h-10 bg-slate-700 rounded w-24"></div>
-            </div>
-            <div className="h-10 bg-slate-700 rounded w-full"></div>
-          </div>
-        </div>
-
-        {/* Desktop layout with sidebar */}
-        <div className="lg:flex lg:gap-6">
-          {/* Desktop: Sidebar skeleton */}
-          <div className="hidden lg:block w-72 flex-shrink-0">
-            <div className="bg-slate-800 rounded-lg p-4 animate-pulse">
-              <div className="space-y-4">
-                <div className="h-10 bg-slate-700 rounded"></div>
-                <div className="h-10 bg-slate-700 rounded"></div>
-                <div className="h-8 bg-slate-700 rounded w-3/4"></div>
-                <div className="h-8 bg-slate-700 rounded w-2/3"></div>
-              </div>
+        <div className="space-y-4">
+          {/* Top section - count and filters */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="flex flex-col md:flex-row md:items-center gap-3">
+              <div className="h-10 bg-slate-700 rounded w-48 animate-pulse"></div>  
             </div>
           </div>
 
-          {/* Main Content */}
-          <div className="flex-1 space-y-6">
-            {/* Header with count skeleton */}
-            <div className="mb-6">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="h-4 bg-slate-700 rounded w-32 animate-pulse"></div>
-              </div>
+          {/* Desktop column headers */}
+          <div className="hidden md:grid md:grid-cols-5 md:gap-6 mb-3 px-4 text-xs">
+            <div className="flex items-center gap-2">
             </div>
+          </div>
 
-            {/* Trove card skeletons */}
-            <div className="grid grid-cols-1 gap-6 mb-8">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="relative rounded-lg bg-slate-900 animate-pulse">
-                  {/* Header section skeleton */}
-                  <div className="flex items-center justify-between p-4 pb-2">
-                    <div className="flex items-center">
-                      {/* Icon placeholder */}
-                      <div className="w-10 h-10 bg-slate-800 rounded-full"></div>
-                      <div className="flex items-center ml-4 gap-2">
-                        <div className="h-5 bg-slate-800 rounded w-16"></div>
-                        <div className="h-4 bg-slate-800 rounded w-20"></div>
-                        <div className="h-4 bg-slate-800 rounded w-12"></div>
-                      </div>
-                    </div>
+
+          {/* Trove rows */}
+          <div className="grid grid-cols-1 gap-6">
+            {[...Array(11)].map((_, i) => (
+              <div key={i} className="rounded-lg bg-slate-900 p-4 animate-pulse">
+                <div className="grid h-12  md:grid-cols-5 md:gap-6 md:items-center">
+                  {/* Status/Activity column */}
+                  <div className="flex items-center gap-2 mb-3 md:mb-0">
                   </div>
 
-                  {/* Content section skeleton */}
-                  <div className="p-4 pt-2">
-                    {/* Main debt value skeleton */}
-                    <div className="mb-4">
-                      <div className="h-3 bg-slate-800 rounded w-12 mb-2"></div>
-                      <div className="flex items-center">
-                        <div className="h-9 bg-slate-800 rounded w-32"></div>
-                        <div className="ml-2 w-7 h-7 bg-slate-800 rounded-full"></div>
-                      </div>
-                    </div>
+                  {/* Debt column */}
+                  <div className="flex items-center gap-2 mb-3 md:mb-0">
+                  </div>
 
-                    {/* Desktop metrics skeleton */}
-                    <div className="hidden md:grid md:grid-cols-4 md:gap-6 md:mb-4">
-                      <div>
-                        <div className="h-3 bg-slate-800 rounded w-16 mb-2"></div>
-                        <div className="h-6 bg-slate-800 rounded w-24"></div>
-                      </div>
-                      <div>
-                        <div className="h-3 bg-slate-800 rounded w-20 mb-2"></div>
-                        <div className="h-6 bg-slate-800 rounded w-28"></div>
-                      </div>
-                      <div>
-                        <div className="h-3 bg-slate-800 rounded w-24 mb-2"></div>
-                        <div className="h-6 bg-slate-800 rounded w-16"></div>
-                      </div>
-                      <div>
-                        <div className="h-3 bg-slate-800 rounded w-20 mb-2"></div>
-                        <div className="h-6 bg-slate-800 rounded w-12"></div>
-                      </div>
-                    </div>
+                  {/* Collateral column */}
+                  <div className="mb-3 md:mb-0">
+                  </div>
 
-                    {/* Mobile metrics skeleton */}
-                    <div className="md:hidden grid grid-cols-1 gap-4 mb-4">
-                      <div>
-                        <div className="h-3 bg-slate-800 rounded w-16 mb-2"></div>
-                        <div className="h-6 bg-slate-800 rounded w-24"></div>
-                      </div>
-                      <div>
-                        <div className="h-3 bg-slate-800 rounded w-20 mb-2"></div>
-                        <div className="h-6 bg-slate-800 rounded w-16"></div>
-                      </div>
-                      <div>
-                        <div className="h-3 bg-slate-800 rounded w-20 mb-2"></div>
-                        <div className="h-6 bg-slate-800 rounded w-12"></div>
-                      </div>
-                    </div>
+                  {/* Ratio column */}
 
-                    {/* Footer skeleton */}
-                    <div className="flex justify-between items-center pt-2 border-t border-slate-800">
-                      <div className="h-4 bg-slate-800 rounded w-48"></div>
-                      <div className="h-8 bg-slate-800 rounded w-20"></div>
-                    </div>
+                  {/* Interest/Action column */}
+                  <div className="flex items-center justify-between md:justify-end gap-2">
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
       </main>
@@ -695,97 +632,149 @@ export default function TrovesPage() {
         {troves.length > 0 ? (
           <div className="mb-8">
             {/* Table header for desktop only */}
-            <div className="hidden md:grid md:grid-cols-5 md:gap-6 md:items-end mb-3 px-4 text-xs">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const newOrder = filters.sortBy === 'lastActivity' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
-                    handleFiltersChange({ ...filters, sortBy: 'lastActivity', sortOrder: newOrder });
-                  }}
-                  className={`flex items-center justify-center w-5 h-5 rounded hover:bg-slate-700 transition-colors ${
-                    filters.sortBy === 'lastActivity' ? 'text-white' : 'text-slate-400'
-                  }`}
-                  title="Sort by recent activity"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+            {currentView === 'open' ? (
+              <div className="hidden md:grid md:gap-6 md:items-end mb-3 px-4 text-xs" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr auto' }}>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const newOrder = filters.sortBy === 'lastActivity' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
+                      handleFiltersChange({ ...filters, sortBy: 'lastActivity', sortOrder: newOrder });
+                    }}
+                    className={`flex items-center justify-center w-5 h-5 rounded hover:bg-slate-700 transition-colors ${
+                      filters.sortBy === 'lastActivity' ? 'text-white' : 'text-slate-400'
+                    }`}
+                    title="Sort by recent activity"
                   >
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12 6 12 12 16 14"></polyline>
-                  </svg>
-                  {filters.sortBy === 'lastActivity' && (
-                    <span className="text-slate-300 ml-0.5 text-[10px]">
-                      {filters.sortOrder === 'asc' ? '↑' : '↓'}
-                    </span>
-                  )}
-                </button>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    {filters.sortBy === 'lastActivity' && (
+                      <span className="text-slate-300 ml-0.5 text-[10px]">
+                        {filters.sortOrder === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newOrder = filters.sortBy === 'debt' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
+                      handleFiltersChange({ ...filters, sortBy: 'debt', sortOrder: newOrder });
+                    }}
+                    className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-left"
+                  >
+                    Debt
+                    {filters.sortBy === 'debt' && (
+                      <span className="text-slate-300">
+                        {filters.sortOrder === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </button>
+                </div>
                 <button
                   onClick={() => {
-                    const newOrder = filters.sortBy === 'debt' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
-                    handleFiltersChange({ ...filters, sortBy: 'debt', sortOrder: newOrder });
+                    const newOrder = filters.sortBy === 'coll' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
+                    handleFiltersChange({ ...filters, sortBy: 'coll', sortOrder: newOrder });
                   }}
                   className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-left"
                 >
-                  Debt
-                  {filters.sortBy === 'debt' && (
+                  Backed by
+                  {filters.sortBy === 'coll' && (
                     <span className="text-slate-300">
                       {filters.sortOrder === 'asc' ? '↑' : '↓'}
                     </span>
                   )}
                 </button>
+                <button
+                  onClick={() => {
+                    const newOrder = filters.sortBy === 'ratio' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
+                    handleFiltersChange({ ...filters, sortBy: 'ratio', sortOrder: newOrder });
+                  }}
+                  className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-left"
+                >
+                  Collateral Ratio
+                  {filters.sortBy === 'ratio' && (
+                    <span className="text-slate-300">
+                      {filters.sortOrder === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    const newOrder = filters.sortBy === 'interestRate' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
+                    handleFiltersChange({ ...filters, sortBy: 'interestRate', sortOrder: newOrder });
+                  }}
+                  className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-left"
+                >
+                  Interest Rate
+                  {filters.sortBy === 'interestRate' && (
+                    <span className="text-slate-300">
+                      {filters.sortOrder === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </button>
+                <div></div> {/* Empty header for the action column */}
               </div>
-              <button
-                onClick={() => {
-                  const newOrder = filters.sortBy === 'coll' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
-                  handleFiltersChange({ ...filters, sortBy: 'coll', sortOrder: newOrder });
-                }}
-                className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-left"
-              >
-                Backed by
-                {filters.sortBy === 'coll' && (
-                  <span className="text-slate-300">
-                    {filters.sortOrder === 'asc' ? '↑' : '↓'}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  const newOrder = filters.sortBy === 'ratio' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
-                  handleFiltersChange({ ...filters, sortBy: 'ratio', sortOrder: newOrder });
-                }}
-                className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-left"
-              >
-                Collateral Ratio
-                {filters.sortBy === 'ratio' && (
-                  <span className="text-slate-300">
-                    {filters.sortOrder === 'asc' ? '↑' : '↓'}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  const newOrder = filters.sortBy === 'interestRate' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
-                  handleFiltersChange({ ...filters, sortBy: 'interestRate', sortOrder: newOrder });
-                }}
-                className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-left"
-              >
-                Interest Rate
-                {filters.sortBy === 'interestRate' && (
-                  <span className="text-slate-300">
-                    {filters.sortOrder === 'asc' ? '↑' : '↓'}
-                  </span>
-                )}
-              </button>
-              <div></div> {/* Empty header for the action column */}
-            </div>
+            ) : (
+              <div className="hidden md:grid md:gap-6 md:items-end mb-3 px-4 text-xs" style={{ gridTemplateColumns: '1fr auto' }}>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const newOrder = filters.sortBy === 'lastActivity' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
+                      handleFiltersChange({ ...filters, sortBy: 'lastActivity', sortOrder: newOrder });
+                    }}
+                    className={`flex items-center justify-center w-5 h-5 rounded hover:bg-slate-700 transition-colors ${
+                      filters.sortBy === 'lastActivity' ? 'text-white' : 'text-slate-400'
+                    }`}
+                    title="Sort by recent activity"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    {filters.sortBy === 'lastActivity' && (
+                      <span className="text-slate-300 ml-0.5 text-[10px]">
+                        {filters.sortOrder === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newOrder = filters.sortBy === 'peakDebt' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
+                      handleFiltersChange({ ...filters, sortBy: 'peakDebt', sortOrder: newOrder });
+                    }}
+                    className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-left"
+                  >
+                    Peak Debt
+                    {filters.sortBy === 'peakDebt' && (
+                      <span className="text-slate-300">
+                        {filters.sortOrder === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </button>
+                </div>
+                <div></div> {/* Empty header for the action column */}
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-6">
               {troves.map((trove) => (
                 <SimplifiedTroveCard key={trove.id} trove={trove} showViewButton hideLabels />
