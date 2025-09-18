@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { cookieToInitialState } from "wagmi";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
 import { getConfig } from "./wagmi";
 import { Providers } from "./providers";
 import { IconSymbols } from "@/components/icons/iconSymbols";
 import { Header } from "@/components/header";
+
+const inter = Inter({ subsets: ["latin"] });
 
 
 export const metadata: Metadata = {
@@ -24,8 +27,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className="antialiased bg-slate-800 text-white min-h-screen overflow-x-hidden"
-        style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+        className={`${inter.className} antialiased bg-slate-800 text-white min-h-screen overflow-x-hidden`}
       >
         <IconSymbols />
         <Providers initialState={initialState}>

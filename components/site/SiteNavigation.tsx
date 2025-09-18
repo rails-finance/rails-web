@@ -12,7 +12,7 @@ export function SiteNavigation() {
   return (
     <>
       {/* Header */}
-      <header className="bg-white/90 backdrop-blur-sm  border-gray-200/50">
+      <header className="" >
         <div className="max-w-7xl mx-auto px-6 pb-6">
           <div className="flex justify-between items-center">
             {/* Logo with tagline */}
@@ -23,9 +23,9 @@ export function SiteNavigation() {
                 </svg>
               </div>
               <div>
-                <h1 className="p-2 text-2xl/6 sm:text-3xl/8 font-medium">
-                	<span className="text-green-600 font-bold">Rails</span>
-                	<br /><span className="text-slate-600 font-bold">DeFi Self-Service Support</span></h1>
+                <h1 className="p-2 text-2xl/6 sm:text-3xl/8 font-extrabold tracking-tight">
+                	<span className="text-green-600 font-extrabold">Rails</span>
+                	<br /><span className="text-slate-600 font-extrabold">DeFi Self-Service Support</span></h1>
                               </div>
             </Link>
 

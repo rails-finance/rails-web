@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { Icon } from "@/components/icons/icon";
 import { TroveCardFooter } from "./components/TroveCardFooter";
@@ -41,7 +42,10 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
   const debtWithInterest = interestInfo ? interestInfo.entireDebt : trove.debt.current;
 
   return (
-    <div className="relative rounded-lg text-slate-500 bg-slate-900">
+    <Link
+      href={`/trove/${trove.collateralType}/${trove.id}`}
+      className="block relative rounded-lg text-slate-500 bg-slate-900 hover:shadow-lg transition-shadow cursor-pointer group"
+    >
       {/* Header section */}
       <div className="flex items-center justify-between p-4 pb-0">
         <div className="flex items-center">
@@ -185,15 +189,12 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
             </div>
           </div>
 
-          {/* 5th column with View button */}
+          {/* 5th column with view link */}
           {showViewButton && (
             <div className="flex justify-end items-center">
-              <a
-                href={`/trove/${trove.collateralType}/${trove.id}`}
-                className="flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm transition-colors"
-              >
-                <Icon name="arrow-right" size={14} />
-              </a>
+              <span className="text-sm text-blue-400 group-hover:text-blue-300 font-medium transition-colors">
+                View Trove →
+              </span>
             </div>
           )}
         </div>
@@ -206,26 +207,25 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
           showDetailedInfo={false}
         />
 
-        {/* Mobile view button - still shown in footer on mobile */}
+        {/* Mobile view link - still shown in footer on mobile */}
         {showViewButton && (
           <div className="md:hidden mt-4">
-            <a
-              href={`/trove/${trove.collateralType}/${trove.id}`}
-              className="flex items-center justify-center w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm transition-colors"
-            >
-              View
-              <Icon name="arrow-right" size={14} className="ml-1" />
-            </a>
+            <span className="block text-left text-sm text-blue-400 group-hover:text-blue-300 font-medium transition-colors">
+              View Trove →
+            </span>
           </div>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
 
 function SimplifiedClosedTroveCard({ trove, showViewButton = false, hideLabels = false }: { trove: TroveSummary; showViewButton?: boolean; hideLabels?: boolean }) {
   return (
-    <div className="relative rounded-lg text-slate-500 bg-slate-700">
+    <Link
+      href={`/trove/${trove.collateralType}/${trove.id}`}
+      className="block relative rounded-lg text-slate-500 bg-slate-700 hover:shadow-lg transition-shadow cursor-pointer group"
+    >
       {/* Header section */}
       <div className="flex items-center justify-between p-4 pb-0">
         <div className="flex items-center">
@@ -271,13 +271,16 @@ function SimplifiedClosedTroveCard({ trove, showViewButton = false, hideLabels =
           showDetailedInfo={false}
         />
       </div>
-    </div>
+    </Link>
   );
 }
 
 function SimplifiedLiquidatedTroveCard({ trove, showViewButton = false, collateralAtLiquidation, hideLabels = false }: { trove: TroveSummary; showViewButton?: boolean; collateralAtLiquidation?: number; hideLabels?: boolean }) {
   return (
-    <div className="relative rounded-lg text-slate-500 bg-slate-800">
+    <Link
+      href={`/trove/${trove.collateralType}/${trove.id}`}
+      className="block relative rounded-lg text-slate-500 bg-slate-800 hover:shadow-lg transition-shadow cursor-pointer group"
+    >
       {/* Header section */}
       <div className="flex items-center justify-between p-4 pb-0">
         <div className="flex items-center">
@@ -383,7 +386,7 @@ function SimplifiedLiquidatedTroveCard({ trove, showViewButton = false, collater
           showDetailedInfo={false}
         />
       </div>
-    </div>
+    </Link>
   );
 }
 
