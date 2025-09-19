@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { Icon } from "@/components/icons/icon";
+import { Workflow, ChevronRight } from "lucide-react";
 import { TroveCardFooter } from "./components/TroveCardFooter";
 import { TroveSummary } from "@/types/api/trove";
 import { formatDate, formatDuration } from "@/lib/date";
@@ -191,9 +192,11 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
 
           {/* 5th column with view link */}
           {showViewButton && (
-            <div className="flex justify-end items-center">
-              <span className="text-sm text-blue-400 group-hover:text-blue-300 font-medium transition-colors">
-                View Trove →
+            <div className="flex justify-end items-center bg-slate-700 rounded-full pl-3 pr-2 py-1">
+              <span className="text-sm text-blue-400 group-hover:text-blue-300 font-medium transition-colors flex items-center gap-1" aria-label="View Trove">
+                <Workflow className="w-6 h-6" />
+                View
+                <ChevronRight className="w-4 h-4" />
               </span>
             </div>
           )}
@@ -210,8 +213,10 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
         {/* Mobile view link - still shown in footer on mobile */}
         {showViewButton && (
           <div className="md:hidden mt-4">
-            <span className="block text-left text-sm text-blue-400 group-hover:text-blue-300 font-medium transition-colors">
-              View Trove →
+            <span className="flex items-center gap-1 text-sm text-blue-400 group-hover:text-blue-300 font-medium transition-colors" aria-label="View Trove">
+                <Workflow className="w-6 h-6" />
+                View
+                <ChevronRight className="w-4 h-4" />
             </span>
           </div>
         )}
@@ -284,8 +289,10 @@ function SimplifiedClosedTroveCard({ trove, showViewButton = false, hideLabels =
           {/* View link */}
           {showViewButton && (
             <div className="flex justify-end items-center">
-              <span className="text-sm text-blue-400 group-hover:text-blue-300 font-medium transition-colors">
-                View Trove →
+              <span className="text-sm text-blue-400 group-hover:text-blue-300 font-medium transition-colors flex items-center gap-1" aria-label="View Trove">
+                <Workflow className="w-6 h-6" />
+                View
+                <ChevronRight className="w-4 h-4" />
               </span>
             </div>
           )}
@@ -302,8 +309,10 @@ function SimplifiedClosedTroveCard({ trove, showViewButton = false, hideLabels =
         {/* Mobile view link - still shown in footer on mobile */}
         {showViewButton && (
           <div className="md:hidden mt-4">
-            <span className="block text-left text-sm text-blue-400 group-hover:text-blue-300 font-medium transition-colors">
-              View Trove →
+            <span className="flex items-center gap-1 text-sm text-blue-400 group-hover:text-blue-300 font-medium transition-colors" aria-label="View Trove">
+                <Workflow className="w-6 h-6" />
+                View
+                <ChevronRight className="w-4 h-4" />
             </span>
           </div>
         )}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 import type { TransactionTimeline as TimelineData } from "@/types/api/troveHistory";
 import { isRedemptionTransaction } from "@/types/api/troveHistory";
@@ -76,7 +77,8 @@ export default function TrovePage() {
     return (
       <div className="space-y-6">
         <Button onClick={() => window.history.back()} className="mb-4">
-          ← Back
+        <ChevronLeft className="w-4 h-4" />
+          Back
         </Button>
         <div className="bg-slate-700 rounded-lg h-48 animate-pulse" />
         <div className="space-y-4">
@@ -91,7 +93,8 @@ export default function TrovePage() {
     return (
       <div className="space-y-6">
         <Button onClick={() => window.history.back()} className="mb-4">
-          ← Back
+        <ChevronLeft className="w-4 h-4" />
+          Back
         </Button>
         <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">
           <p className="text-red-400">{error || "Trove not found"}</p>
@@ -106,7 +109,8 @@ export default function TrovePage() {
   return (
     <div className="space-y-6">
       <Button onClick={() => window.history.back()} className="mb-4">
-        ← Back
+        <ChevronLeft className="w-4 h-4" />
+          Back
       </Button>
 
       <TroveCard trove={troveData} />

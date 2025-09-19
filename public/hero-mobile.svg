@@ -44,7 +44,7 @@
     <path d="M 20,90 Q 90,90 90,20" stroke="var(--color-B-5,#888888)" stroke-width="var(--stroke-width-thick,9)" fill="none"/>
     <path d="M 20,75 Q 75,75 75,20" stroke="var(--color-B-6,#888888)" stroke-width="var(--stroke-width-thick,9)" fill="none"/>
   </g>
-  <g transform="matrix(-0.900193, 0, 0, -0.900193, 12.202878, 143.893967)" style="transform-origin: 85px 85px;">
+  <g transform="matrix(-0.900193, 0, 0, -0.900193, 13.202878, 143.893967)" style="transform-origin: 85px 85px;">
     <path d="M 20,150 Q 150,150 150,20" stroke="var(--color-B-1,#888888)" stroke-width="var(--stroke-width-thick,9)" fill="none"/>
     <path d="M 20,135 Q 135,135 135,20" stroke="var(--color-B-2,#888888)" stroke-width="var(--stroke-width-thick,9)" fill="none"/>
     <path d="M 20,120 Q 120,120 120,20" stroke="var(--color-B-3,#888888)" stroke-width="var(--stroke-width-thick,9)" fill="none"/>

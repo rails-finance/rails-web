@@ -36,21 +36,21 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="bg-white text-gray-900 min-h-screen">
+    <div className="bg-white text-slate-900 min-h-screen">
       {/* Hero Section - Responsive */}
       <div className="relative pt-24">
         {/* Desktop Layout Container */}
-        <div className="md:relative md:h-[600px] md:flex">
+        <div className="md:relative md:h-[500px] md:flex">
 
           {/* Content - Responsive positioning */}
-          <div className="px-4 pt-8 md:px-0 md:pt-0 md:w-1/2 md:max-w-[640px] md:mx-0 md:ml-auto md:relative">
+          <div className="px-4 pt-8 md:px-0 md:pt-0 md:w-1/2 md:max-w-[560px] md:mx-0 md:ml-auto md:relative">
             <div className="md:flex md:flex-col md:h-full">
               {/* Text Content - Same for both mobile and desktop */}
               <div className="md:flex-1 md:px-6 md:py-8 md:flex md:flex-col md:justify-center md:relative md:z-10">
-                <p className="text-gray-700 text-xl md:text-2xl font-semibold mb-4 tracking-tight">
+                <p className="text-slate-700 text-xl md:text-2xl font-semibold mb-4 tracking-tight">
                   <span className="text-green-600">Rails</span> displays your DeFi activity on simple timelines with clear explanations and in-depth transaction analysis.
                 </p>
-                <p className="text-gray-700 mb-4 tracking-tight">
+                <p className="text-slate-700 mb-4 tracking-tight">
                   Rails is building essential DeFi support infrastructure, starting with Liquity v2. Our roadmap includes integration with Liquity v2 forks and expansion across the broader DeFi ecosystem. Discover our approach
                   <a className="text-green-500" href="about/"> here</a>.
                 </p>
@@ -99,7 +99,7 @@ export default function Home() {
       </div>
 
         <div className="relative overflow-x-hidden pb-12">
-          <div className="relative z-10 w-full mx-auto px-4 max-w-7xl">
+          <div className="relative z-10 w-full mx-auto px-4 max-w-6xl">
             <div className="md:flex gap-8">
 
               {/* Content Column continued */}
@@ -107,24 +107,32 @@ export default function Home() {
 
                 {/* Liquity v2 Protocol Card */}
                 <div className="space-y-6">
-                  <div className="bg-gray-50 rounded-lg overflow-hidden">
+                  <div className="bg-slate-50 rounded-lg overflow-hidden">
                     <div className="p-4 space-y-6">
                       <div className="flex items-center gap-2 mb-4">
-                            <svg className="w-7 h-7" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                            <svg className="w-12 h-12" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                               <use href="#icon-liquity" />
                             </svg>
-                        <span className="text-lg text-slate-700 font-bold">Explore Liquity v2</span>
+                        <span className="text-2xl text-slate-600 font-extrabold">Explore Liquity v2</span>
                       </div>
 
-                      {/* Desktop: Text left, Search right */}
-                      <div className="md:flex md:gap-8 md:items-start">
-                        <p className="text-slate-500 text-sm leading-relaxed md:flex-1 mb-4 md:mb-0">
-                          <strong>Liquity v2</strong> is a fully immutable, governance-free borrowing protocol where users can deposit ETH, wstETH, or rETH as collateral to mint BOLD stablecoins at user-set interest rates (0.5%-250% APR). Explore <strong>Liquity v2</strong> with Rails:
-                        </p>
+                      {/* Mobile: Stacked, Desktop: Two columns */}
+                      <div className="flex flex-col md:flex-row md:gap-8 md:items-center">
+                        <div className="text-slate-500 font-medium text-sm leading-relaxed md:flex-1 flex items-center mb-6 md:mb-0">
+                          <object
+                            data="/network-graphic.svg"
+                            type="image/svg+xml"
+                            className="w-10 h-25 mx-4 flex-shrink-0"
+                            aria-label="Rails protocol map visual metaphor"
+                          />
+                          <p>
+                            <span className="font-extrabold">Liquity v2</span> is an immutable, governance-free lending protocol. Users can deposit ETH, wstETH, or rETH as collateral to mint BOLD stablecoins and set their own interest rates.
+                          </p>
+                        </div>
 
-                        {/* Search Box - Desktop */}
-                        <div className="md:flex-1 md:bg-white md:rounded-lg md:p-4 md:border md:border-gray-200 md:transition-shadow md:hover:shadow-lg">
-                          <p className="hidden md:block text-slate-600 text-sm mb-3">Enter your ENS, etc in the field below</p>
+                        {/* Search Box - Mobile and Desktop */}
+                        <div className="md:flex-1 bg-white rounded-lg p-4  transition-shadow hover:shadow-lg">
+                          <p className="text-slate-600 font-medium mb-3">View your Liquity v2 Trove on Rails. Enter borrower address, ENS, Trove ID or delegate below.</p>
                           <div className="relative">
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
@@ -136,30 +144,45 @@ export default function Home() {
                               strokeWidth="2"
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              className="absolute left-4 md:left-3 top-1/2 transform -translate-y-1/2 text-slate-500"
+                              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500"
                             >
                               <circle cx="11" cy="11" r="8" />
                               <path d="m21 21-4.3-4.3" />
                             </svg>
                             <input
                               type="text"
-                              placeholder="Borrower address, ENS, Trove ID or delegate"
-                              className="w-full pl-12 md:pl-10 pr-4 py-3 md:py-2 text-base md:text-sm bg-white text-gray-900 border-2 md:border border-gray-300 hover:border-gray-400 focus:border-blue-500 focus:outline-none transition-colors placeholder-gray-500 rounded-full md:rounded md:placeholder-transparent"
+                              placeholder=""
+                              className="w-full pl-10 pr-4 py-2 text-sm bg-white text-slate-900 border border-slate-300 hover:border-slate-400 focus:border-blue-500 focus:outline-none transition-colors placeholder-slate-500 rounded-full"
                               value={searchValue}
                               onChange={(e) => setSearchValue(e.target.value)}
                             />
                           </div>
                         </div>
                       </div>
-
-                {/* Collateral Overview */}
-                <CollateralBreakdown
-                  data={liquityStats?.byCollateral || {}}
-                  mode="overview"
-                  loading={statsLoading}
-                />
-                  </div>
+											{/* Collateral Overview */}
+											<CollateralBreakdown
+												data={liquityStats?.byCollateral || {}}
+												mode="overview"
+												loading={statsLoading}
+											/>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Our Supporters Section */}
+        <div className="w-full pb-24">
+          <div className="max-w-6xl mx-auto px-4">
+            <h2 className="text-2xl font-extrabold text-slate-500 text-center mb-8">Our supporters</h2>
+            <div className="flex justify-center">
+              <div className="bg-slate-50 rounded-lg p-8" style={{ width: '400px', height: '120px' }}>
+                <div className="flex items-center justify-center h-full">
+                  <a href="https://liquity.org" target="_blank" rel="noopener noreferrer" className="h-full">
+                    <img src="/liquity-logo.svg" alt="Liquity" className="h-full w-auto" />
+                  </a>
                 </div>
               </div>
             </div>

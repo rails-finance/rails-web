@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, Fragment } from "react";
 import Link from "next/link";
-import { Info, ChevronDown, ChevronUp, X, Search } from "lucide-react";
+import { Info, ChevronRight, ChevronDown, ChevronUp, X, Search } from "lucide-react";
 import { CollateralStats } from "@/types/api/stats";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
@@ -147,10 +147,10 @@ export function CollateralBreakdown({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
             <div key={i} className="bg-white rounded-lg p-6 animate-pulse">
-              <div className="h-12 bg-gray-200 rounded mb-4" />
+              <div className="h-12 bg-slate-200 rounded mb-4" />
               <div className="space-y-2">
-                <div className="h-6 bg-gray-100 rounded w-3/4" />
-                <div className="h-4 bg-gray-100 rounded w-1/2" />
+                <div className="h-6 bg-slate-100 rounded w-3/4" />
+                <div className="h-4 bg-slate-100 rounded w-1/2" />
               </div>
             </div>
           ))}
@@ -195,8 +195,8 @@ export function CollateralBreakdown({
               <TokenIcon assetSymbol="bold" className="w-12 h-12 -ml-1.5" />
               </div>
               <div>
-                <div className="text-gray-900 font-semibold text-xl">{collateralType}</div>
-                <div className="text-sm text-gray-500">
+                <div className="text-slate-900 font-semibold text-xl">{collateralType}</div>
+                <div className="text-sm text-slate-500">
                   {formatNumber(stats.totalCollateral)} {collateralType}
                 </div>
               </div>
@@ -204,30 +204,36 @@ export function CollateralBreakdown({
 
             <div className="space-y-3">
               <div>
-                <div className="text-xs text-gray-500 uppercase tracking-wider">TVL</div>
-                <div className="text-2xl font-semibold text-gray-900">
+                <div className="text-xs text-slate-500 uppercase tracking-wider">TVL</div>
+                <div className="text-2xl font-semibold text-slate-900">
                   ${formatNumber(stats.totalCollateralUsd)}
                 </div>
               </div>
               <div className="flex justify-between items-center">
                 <div>
-                  <div className="text-xs text-gray-500">Total Debt</div>
-                  <div className="text-lg font-medium text-gray-700">
+                  <div className="text-xs text-slate-500">Total Debt</div>
+                  <div className="text-lg font-medium text-slate-700">
                     ${formatNumber(stats.totalDebt)}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500">Active Troves</div>
-                  <div className="text-lg font-medium text-gray-700">
+                  <div className="text-xs text-slate-500">Active Troves</div>
+                  <div className="text-lg font-medium text-slate-700">
                     {stats.openTroveCount.toLocaleString()}
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <span className="text-sm text-blue-600 group-hover:text-blue-700 font-medium">
-                View Troves →
+            <div className="mt-4 pt-4">
+              <span className="text-sm text-blue-500 group-hover:text-blue-700 font-medium inline-flex items-center gap-1 rounded-full w-fit py-1 bg-slate-200 pl-3 pr-2" aria-label="View Troves">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="2.705 3.653 18.598 17.336" width="19" height="17">
+                  <rect x="2.705" y="4.153" width="18.598" height="3.5" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="1"/>
+                  <rect x="2.705" y="10.418" width="18.598" height="3.5" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="1"/>
+                  <rect x="2.705" y="16.683" width="18.598" height="3.5" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="1"/>
+                </svg>
+                View
+                <ChevronRight className="w-4 h-4" />
               </span>
             </div>
           </Link>
