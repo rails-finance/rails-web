@@ -6,6 +6,7 @@ import { Icon } from "@/components/icons/icon";
 import { Image, Link2 } from "lucide-react";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 import { TroveSummary } from "@/types/api/trove";
+import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
 
 interface TroveCardFooterProps {
   trove: TroveSummary;
@@ -31,9 +32,9 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, sho
               <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
                 <span className="text-slate-400 flex items-center gap-1">
                   <Icon name="user" size={12} />
-                  <span>
+                  <HighlightableValue type="ownerAddress" state="after" className="text-slate-400">
                     {trove.ownerEns || `${trove.owner.substring(0, 6)}...${trove.owner.substring(38)}`}
-                  </span>
+                  </HighlightableValue>
                   <div className="relative inline-block group">
                     <button
                       className="mx-1.5 text-slate-400 hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
@@ -67,7 +68,9 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, sho
               <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
                 <span className="text-slate-400 flex items-center gap-1">
                   <Icon name="trove-id" size={12} />
-                  {trove.id ? `${trove.id.substring(0, 8)}...` : "n/a"}
+                  <HighlightableValue type="troveId" state="after" className="text-slate-400" value={trove.id ? parseInt(trove.id) : undefined}>
+                    {trove.id ? `${trove.id.substring(0, 8)}...` : "n/a"}
+                  </HighlightableValue>
                   <div className="relative inline-block group">
                     <button
                       className="mx-1.5 text-slate-400 hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
@@ -99,16 +102,18 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, sho
             )}
             {showDetailedInfo && getTroveNftUrl(trove.collateralType, trove.id) && (
               <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
-                <a
-                  href={getTroveNftUrl(trove.collateralType, trove.id)!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center text-slate-400 hover:text-slate-200 justify-center ml-0.5 bg-slate-800 w-8 h-4 rounded-full transition-colors"
-                  aria-label="View NFT on OpenSea"
-                >
-                <Image size={14} className="" />
-                <Link2 size={14} className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors" />
-                </a>
+                <HighlightableValue type="nftToken" state="after" className="text-slate-400">
+                  <a
+                    href={getTroveNftUrl(trove.collateralType, trove.id)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center text-slate-400 hover:text-slate-200 justify-center ml-0.5 bg-slate-800 w-8 h-4 rounded-full transition-colors"
+                    aria-label="View NFT on OpenSea"
+                  >
+                  <Image size={14} className="" />
+                  <Link2 size={14} className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors" />
+                  </a>
+                </HighlightableValue>
               </span>
             )}
           </div>
