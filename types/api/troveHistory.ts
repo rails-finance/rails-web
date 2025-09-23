@@ -62,9 +62,9 @@ export interface TroveOperationData {
 
 // Same-block operation grouping info
 export interface BlockGrouping {
-  isGrouped: boolean; // true if multiple operations in same block
-  sameBlockCount: number; // total operations in this block (e.g., 3)
-  sameBlockIndex: number; // position within block (e.g., 1, 2, 3)
+  isGrouped: boolean;        // true if multiple operations in same block
+  sameBlockCount: number;     // total operations in this block (e.g., 3)
+  sameBlockIndex: number;     // position within block (e.g., 1, 2, 3)
 }
 
 // Base transaction data - ALL transactions have these fields
@@ -86,7 +86,7 @@ interface BaseTransaction {
   collateralPrice: number;
   isInBatch: boolean;
   isZombieTrove: boolean;
-
+  
   // Same-block operation grouping
   blockGrouping: BlockGrouping;
 }
@@ -107,6 +107,13 @@ export interface TroveTransaction extends BaseTransaction {
     annualInterestRate: number;
     annualManagementFee: number;
     totalDebtShares: number;
+  };
+
+  // Transfer details for openTrove (mint) and closeTrove (burn)
+  relatedTransfer?: {
+    transferType: "mint" | "burn";
+    fromAddress: string;
+    toAddress: string;
   };
 }
 
@@ -218,15 +225,21 @@ export function isTroveTransaction(tx: Transaction): tx is TroveTransaction {
   return tx.type === "trove";
 }
 
-export function isLiquidationTransaction(tx: Transaction): tx is TroveLiquidationTransaction {
+export function isLiquidationTransaction(
+  tx: Transaction
+): tx is TroveLiquidationTransaction {
   return tx.type === "liquidation";
 }
 
-export function isRedemptionTransaction(tx: Transaction): tx is TroveRedemptionTransaction {
+export function isRedemptionTransaction(
+  tx: Transaction
+): tx is TroveRedemptionTransaction {
   return tx.type === "redemption";
 }
 
-export function isTransferTransaction(tx: Transaction): tx is TroveTransferTransaction {
+export function isTransferTransaction(
+  tx: Transaction
+): tx is TroveTransferTransaction {
   return tx.type === "transfer";
 }
 

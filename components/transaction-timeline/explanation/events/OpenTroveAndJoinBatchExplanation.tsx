@@ -22,7 +22,10 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
   
   const batchItems: React.ReactNode[] = [
     <span key="opened" className="text-slate-500">
-      Opened a new Trove and joined batch management under{' '}
+      <HighlightableValue type="owner" state="change" value={tx.relatedTransfer.toAddress}>
+        {tx.relatedTransfer.toAddress}
+      </HighlightableValue>
+      {' '}opened a new trove and joined batch management under{' '}
       <span className="font-medium">{tx.stateAfter.interestBatchManager || 'Unknown manager'}</span>
     </span>,
     <span key="deposited" className="text-slate-500">

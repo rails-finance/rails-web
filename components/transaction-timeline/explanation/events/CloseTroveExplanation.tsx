@@ -21,6 +21,12 @@ export function CloseTroveExplanation({ transaction, onToggle }: CloseTroveExpla
   const beforeCollRatioClose = stateBefore.collateralRatio;
   
   const closeTroveItems: React.ReactNode[] = [
+    <span key="owner" className="text-slate-500">
+      <HighlightableValue type="owner" state="change" value={tx.relatedTransfer.fromAddress}>
+        {tx.relatedTransfer.fromAddress}
+      </HighlightableValue>
+      {' '}closed trove
+    </span>,
     <span key="repayDebt" className="text-slate-500">
       Fully repaid the outstanding debt of{' '}
       <HighlightableValue type="debt" state="change" value={stateBefore.debt}>

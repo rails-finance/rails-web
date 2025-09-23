@@ -28,6 +28,12 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
   const isConservativePosition = isConservative(collRatio);
   
   const openTroveItems: React.ReactNode[] = [
+    <span key="owner" className="text-slate-500">
+      <HighlightableValue type="owner" state="change" value={tx.relatedTransfer.toAddress}>
+        {tx.relatedTransfer.toAddress}
+      </HighlightableValue>
+      {' '}opened a new trove
+    </span>,
     <span key="deposit" className="text-slate-500">
       <HighlightableValue type="collateral" state="change" value={tx.stateAfter.coll}>
         {tx.stateAfter.coll} {tx.collateralType}
