@@ -31,22 +31,29 @@ export default function TrovesPage() {
   // Parse filters from URL
   const getFiltersFromUrl = (): TroveFilterParams => {
     const filters: TroveFilterParams = {};
-    
+
     // Trove ID filter
     const troveId = searchParams.get('troveId');
     if (troveId) filters.troveId = troveId;
-    
+
     // Status filter
     const status = searchParams.get('status');
     if (status) filters.status = status;
-    
+
     // Collateral type filter
     const collateralType = searchParams.get('collateralType');
     if (collateralType) filters.collateralType = collateralType;
-    
-    // Owner address
+
+    // Owner address or ENS
     const ownerAddress = searchParams.get('ownerAddress');
-    if (ownerAddress) filters.ownerAddress = ownerAddress;
+    const ownerEns = searchParams.get('ownerEns');
+    if (ownerAddress) {
+      filters.ownerAddress = ownerAddress;
+      filters.owner = ownerAddress;
+    } else if (ownerEns) {
+      filters.ownerEns = ownerEns;
+      filters.owner = ownerEns;
+    }
     
     // Time filters
     const activeWithin = searchParams.get('activeWithin');
@@ -94,6 +101,9 @@ export default function TrovesPage() {
     }
     if (appliedFilters.ownerAddress) {
       params.set('ownerAddress', appliedFilters.ownerAddress);
+    }
+    if (appliedFilters.ownerEns) {
+      params.set('ownerEns', appliedFilters.ownerEns);
     }
     if (appliedFilters.activeWithin) {
       params.set('activeWithin', appliedFilters.activeWithin);
@@ -157,6 +167,9 @@ export default function TrovesPage() {
       }
       if (filters.ownerAddress) {
         params.set('ownerAddress', filters.ownerAddress);
+      }
+      if (filters.ownerEns) {
+        params.set('ownerEns', filters.ownerEns);
       }
       if (filters.activeWithin) {
         params.set('activeWithin', filters.activeWithin);

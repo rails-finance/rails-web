@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export interface TroveFilterParams {
   troveId?: string;
   status?: string;
   collateralType?: string;
   ownerAddress?: string;
+  ownerEns?: string;
+  owner?: string; // Combined field for UI input
   activeWithin?: string;
   createdWithin?: string;
   troveType?: "batch" | "individual";
@@ -47,10 +49,18 @@ const SORT_OPTIONS = [
 
 export function TroveFilters({ filters, onFiltersChange, onReset }: TroveFiltersProps) {
   const [localFilters, setLocalFilters] = useState<TroveFilterParams>(filters);
+  const ownerDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setLocalFilters(filters);
   }, [filters]);
+
+  useEffect(() => {
+    // Cleanup debounce timer on unmount
+    return () => {
+      if (ownerDebounceRef.current) clearTimeout(ownerDebounceRef.current);
+    };
+  }, []);
 
   const handleStatusChange = (status: string) => {
     // If clicking the same status, deselect it
@@ -69,23 +79,33 @@ export function TroveFilters({ filters, onFiltersChange, onReset }: TroveFilters
   };
 
   const handleOwnerAddressChange = (value: string) => {
-    const newFilters = { ...localFilters, ownerAddress: value || undefined };
+    // Detect if it's an ENS name or Ethereum address
+    const isEns = value && value.toLowerCase().endsWith('.eth');
+    const isAddress = value && /^0x[a-fA-F0-9]{40}$/.test(value);
+
+    const newFilters = {
+      ...localFilters,
+      owner: value || undefined,
+      ownerAddress: isAddress ? value : undefined,
+      ownerEns: isEns ? value : undefined
+    };
     setLocalFilters(newFilters);
+
+    // Clear existing timeout
+    if (ownerDebounceRef.current) {
+      clearTimeout(ownerDebounceRef.current);
+    }
+
     // Debounce the API call
-    const timeoutId = setTimeout(() => {
+    ownerDebounceRef.current = setTimeout(() => {
       onFiltersChange(newFilters);
-    }, 500);
-    return () => clearTimeout(timeoutId);
+    }, 1000);
   };
 
   const handleTroveIdChange = (value: string) => {
     const newFilters = { ...localFilters, troveId: value || undefined };
     setLocalFilters(newFilters);
-    // Debounce the API call
-    const timeoutId = setTimeout(() => {
-      onFiltersChange(newFilters);
-    }, 500);
-    return () => clearTimeout(timeoutId);
+    onFiltersChange(newFilters);
   };
 
   const handleTimeFilterChange = (field: "activeWithin" | "createdWithin", value: string) => {
@@ -119,7 +139,7 @@ export function TroveFilters({ filters, onFiltersChange, onReset }: TroveFilters
       localFilters.troveId ||
       localFilters.status ||
       localFilters.collateralType ||
-      localFilters.ownerAddress ||
+      localFilters.owner ||
       localFilters.activeWithin ||
       localFilters.createdWithin ||
       localFilters.troveType ||
@@ -339,9 +359,9 @@ export function TroveFilters({ filters, onFiltersChange, onReset }: TroveFilters
             <span className="text-xs text-slate-500">Owner:</span>
             <input
               type="text"
-              value={localFilters.ownerAddress || ""}
+              value={localFilters.owner || ""}
               onChange={(e) => handleOwnerAddressChange(e.target.value)}
-              placeholder="Enter owner address 0x..."
+              placeholder="Enter address (0x...) or ENS name (.eth)"
               className="flex-1 px-2 py-1 bg-slate-700 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-600 max-w-[300px]"
             />
           </div>

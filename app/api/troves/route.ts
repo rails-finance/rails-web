@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
   const collateralType = searchParams.get('collateralType');
   const validCollateralType = collateralType && VALID_COLLATERAL_TYPES.includes(collateralType) ? collateralType : null;
   const ownerAddress = searchParams.get('ownerAddress');
+  const ownerEns = searchParams.get('ownerEns');
   const activeWithin = searchParams.get('activeWithin');
   const createdWithin = searchParams.get('createdWithin');
   const troveType = searchParams.get('troveType');
@@ -94,6 +95,17 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  // Validate ENS name format - basic check for .eth suffix and minimum length
+  if (ownerEns) {
+    const ensLower = ownerEns.toLowerCase();
+    if (!ensLower.endsWith('.eth') || ensLower.length < 7) { // min 3 chars + .eth
+      return NextResponse.json(
+        { error: 'Invalid ENS name format' },
+        { status: 400 }
+      );
+    }
+  }
   
   // Return mock data for specific fake trove ID
   if (troveId === "mock-all-events") {
@@ -133,6 +145,7 @@ export async function GET(request: NextRequest) {
     if (validStatus) backendParams.set('status', validStatus);
     if (validCollateralType) backendParams.set('collateralType', validCollateralType);
     if (ownerAddress) backendParams.set('ownerAddress', ownerAddress);
+    if (ownerEns) backendParams.set('ownerEns', ownerEns);
     if (activeWithin) backendParams.set('activeWithin', activeWithin);
     if (createdWithin) backendParams.set('createdWithin', createdWithin);
     if (batchOnly) backendParams.set('batchOnly', 'true');
