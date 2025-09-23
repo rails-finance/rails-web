@@ -91,19 +91,15 @@ export function AdjustTroveExplanation({ transaction, onToggle }: AdjustTroveExp
     </span>
   );
 
-  if (afterCollUsd) {
+  if (afterCollUsd && tx.collateralPrice) {
     adjustTroveItems.push(
       <span key="collValue" className="text-slate-500">
-        Current collateral value: <HighlightableValue type="collateralUsd" state="after" value={afterCollUsd}>
+        Current collateral valued at <HighlightableValue type="collateralUsd" state="after" value={afterCollUsd}>
           {formatUsdValue(afterCollUsd)}
+        </HighlightableValue> with historic price of {tx.collateralType} priced at{' '}
+        <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
+          {formatUsdValue(tx.collateralPrice)}/{tx.collateralType}
         </HighlightableValue>
-        {tx.collateralPrice && ` (${tx.collateralType} price: `}
-        {tx.collateralPrice && (
-          <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
-            {formatUsdValue(tx.collateralPrice)}
-          </HighlightableValue>
-        )}
-        {tx.collateralPrice && `)`}
       </span>
     );
   }
@@ -113,7 +109,7 @@ export function AdjustTroveExplanation({ transaction, onToggle }: AdjustTroveExp
       <span key="improvedRatio" className="text-slate-500">
         Improved collateral ratio to{' '}
         <HighlightableValue type="collRatio" state="after" value={afterCollRatio}>
-          {afterCollRatio}%
+          {afterCollRatio.toFixed(1)}%
         </HighlightableValue>
         , reducing liquidation risk
         <InfoButton href={FAQ_URLS.LTV_COLLATERAL_RATIO} />
@@ -124,7 +120,7 @@ export function AdjustTroveExplanation({ transaction, onToggle }: AdjustTroveExp
       <span key="changedRatio" className="text-slate-500">
         Collateral ratio changed to{' '}
         <HighlightableValue type="collRatio" state="after" value={afterCollRatio}>
-          {afterCollRatio}%
+          {afterCollRatio.toFixed(1)}%
         </HighlightableValue>
         {afterCollRatio < beforeCollRatio ? ', increasing liquidation risk' : ''}
         <InfoButton href={FAQ_URLS.LTV_COLLATERAL_RATIO} />
@@ -136,9 +132,9 @@ export function AdjustTroveExplanation({ transaction, onToggle }: AdjustTroveExp
     adjustTroveItems.push(
       <span key="rateChange" className="text-slate-500">
         Interest rate adjusted from{' '}
-        <HighlightableValue type="interestRate" state="before" value={beforeInterestRate || 0}>
+        
           {beforeInterestRate || 0}%
-        </HighlightableValue>
+        
         {' '}to{' '}
         <HighlightableValue type="interestRate" state="after" value={afterInterestRate}>
           {afterInterestRate}%

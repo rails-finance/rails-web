@@ -102,18 +102,18 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, sho
             )}
             {showDetailedInfo && getTroveNftUrl(trove.collateralType, trove.id) && (
               <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
-                <HighlightableValue type="nftToken" state="after" className="text-slate-400">
-                  <a
-                    href={getTroveNftUrl(trove.collateralType, trove.id)!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center text-slate-400 hover:text-slate-200 justify-center ml-0.5 bg-slate-800 w-8 h-4 rounded-full transition-colors"
-                    aria-label="View NFT on OpenSea"
-                  >
-                  <Image size={14} className="" />
+                <a
+                  href={getTroveNftUrl(trove.collateralType, trove.id)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-slate-400 hover:text-slate-200 justify-center ml-0.5 transition-colors"
+                  aria-label="View NFT on OpenSea"
+                >
+                  <HighlightableValue type="nftToken" state="after" className="text-slate-400">
+                    <Image size={14} className="" />
+                  </HighlightableValue>
                   <Link2 size={14} className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors" />
-                  </a>
-                </HighlightableValue>
+                </a>
               </span>
             )}
           </div>

@@ -34,7 +34,7 @@ export function InterestRateMetric({ before, after, isCloseTrove }: InterestRate
         ) : (
           <span
             className={`text-sm font-semibold text-white ${hoverEnabled ? "cursor-pointer" : ""} transition-all ${
-              isAfterHighlighted ? "underline decoration-dotted underline-offset-2" : ""
+              isAfterHighlighted ? "-mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded" : ""
             }`}
             onMouseEnter={
               hoverEnabled ? () => setHoveredValue({ type: "interestRate", state: "after", value: after }) : undefined

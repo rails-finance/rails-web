@@ -22,11 +22,11 @@ export function AssetAction({ action, asset, amount, alwaysShowAmount = false, v
     <div className="flex items-center space-x-1">
       <span className="text-slate-400 mr-1">{action}</span>
       {amount && (
-        <span 
+        <span
           className={`font-medium ${alwaysShowAmount ? '' : 'sm:hidden'} ${
             hoverEnabled && valueType ? 'cursor-pointer transition-all' : ''
           } ${
-            isHighlighted ? 'underline decoration-dotted underline-offset-2' : ''
+            isHighlighted ? '-mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded' : ''
           }`}
           onMouseEnter={hoverEnabled && valueType ? () => setHoveredValue({ type: valueType, state: 'change', value: amount }) : undefined}
           onMouseLeave={hoverEnabled && valueType ? () => setHoveredValue(null) : undefined}

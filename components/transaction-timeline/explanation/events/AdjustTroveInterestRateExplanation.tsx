@@ -72,19 +72,15 @@ export function AdjustTroveInterestRateExplanation({ transaction, onToggle }: Ad
     </span>
   );
 
-  if (tx.stateAfter.collateralInUsd) {
+  if (tx.stateAfter.collateralInUsd && tx.collateralPrice) {
     interestRateItems.push(
       <span key="collValue" className="text-slate-500">
-        Current collateral value: <HighlightableValue type="collateralUsd" state="after" value={tx.stateAfter.collateralInUsd}>
+        Current collateral valued at <HighlightableValue type="collateralUsd" state="after" value={tx.stateAfter.collateralInUsd}>
           {formatUsdValue(tx.stateAfter.collateralInUsd)}
+        </HighlightableValue> with historic price of {tx.collateralType} priced at{' '}
+        <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
+          {formatUsdValue(tx.collateralPrice)}/{tx.collateralType}
         </HighlightableValue>
-        {tx.collateralPrice && ` (${tx.collateralType} price: `}
-        {tx.collateralPrice && (
-          <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
-            {formatUsdValue(tx.collateralPrice)}
-          </HighlightableValue>
-        )}
-        {tx.collateralPrice && `)`}
       </span>
     );
   }
@@ -94,7 +90,7 @@ export function AdjustTroveInterestRateExplanation({ transaction, onToggle }: Ad
       <span key="collRatioAdjusted" className="text-slate-500">
         Collateral ratio adjusted to{' '}
         <HighlightableValue type="collRatio" state="after" value={rateAfterCollRatio}>
-          {rateAfterCollRatio}%
+          {rateAfterCollRatio.toFixed(1)}%
         </HighlightableValue>
         {' '}due to debt changes
       </span>
@@ -104,14 +100,14 @@ export function AdjustTroveInterestRateExplanation({ transaction, onToggle }: Ad
       <span key="collRatioSame" className="text-slate-500">
         Collateral ratio remains at{' '}
         <HighlightableValue type="collRatio" state="after" value={rateAfterCollRatio}>
-          {rateAfterCollRatio}%
+          {rateAfterCollRatio.toFixed(1)}%
         </HighlightableValue>
       </span>
     );
   }
 
   interestRateItems.push(
-    <span key="success" className="text-slate-300">
+    <span key="success" className="text-slate-500">
       Interest rate successfully adjusted
     </span>
   );

@@ -36,7 +36,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="bg-white text-slate-900 min-h-screen">
+    <div className="bg-white text-slate-600 min-h-screen">
       {/* Hero Section - Responsive */}
       <div className="relative pt-24">
         {/* Desktop Layout Container */}
@@ -118,12 +118,11 @@ export default function Home() {
 
                       {/* Mobile: Stacked, Desktop: Two columns */}
                       <div className="flex flex-col md:flex-row md:gap-8 md:items-center">
-                        <div className="text-slate-500 font-medium text-sm leading-relaxed md:flex-1 flex items-center mb-6 md:mb-0">
-                          <object
-                            data="/network-graphic.svg"
-                            type="image/svg+xml"
+                        <div className="text-slate-600 font-medium text-sm leading-relaxed md:flex-1 flex items-center mb-6 md:mb-0">
+                          <img
+                            src="/network-graphic.svg"
                             className="w-10 h-25 mx-4 flex-shrink-0"
-                            aria-label="Rails protocol map visual metaphor"
+                            alt="Rails protocol map visual metaphor"
                           />
                           <p>
                             <span className="font-extrabold">Liquity v2</span> is an immutable, governance-free lending protocol. Users can deposit ETH, wstETH, or rETH as collateral to mint BOLD stablecoins and set their own interest rates.
@@ -152,7 +151,7 @@ export default function Home() {
                             <input
                               type="text"
                               placeholder=""
-                              className="w-full pl-10 pr-4 py-2 text-sm bg-white text-slate-900 border border-slate-300 hover:border-slate-400 focus:border-blue-500 focus:outline-none transition-colors placeholder-slate-500 rounded-full"
+                              className="w-full pl-10 pr-4 py-2 text-sm bg-white text-slate-600 border border-slate-300 hover:border-slate-400 focus:border-blue-500 focus:outline-none transition-colors placeholder-slate-500 rounded-full"
                               value={searchValue}
                               onChange={(e) => setSearchValue(e.target.value)}
                             />
@@ -176,7 +175,7 @@ export default function Home() {
         {/* Our Supporters Section */}
         <div className="w-full pb-24">
           <div className="max-w-6xl mx-auto px-4">
-            <h2 className="text-2xl font-extrabold text-slate-500 text-center mb-8">Our supporters</h2>
+            <h2 className="text-2xl font-extrabold text-slate-500 text-center mb-8">Our Supporters</h2>
             <div className="flex justify-center">
               <div className="bg-slate-50 rounded-lg p-8" style={{ width: '400px', height: '120px' }}>
                 <div className="flex items-center justify-center h-full">

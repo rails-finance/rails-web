@@ -85,10 +85,11 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
     }
 
     // Collateral info
+    const currentPrice = trove.collateral.valueUsd / trove.collateral.amount;
     items.push(
       <span key="collateral-info" className="text-slate-500">
         <HighlightableValue type="collateral" state="after" value={trove.collateral.amount}>{trove.collateral.amount} {trove.collateralType}</HighlightableValue> collateral worth{" "}
-        <HighlightableValue type="collateralUsd" state="after" value={trove.collateral.valueUsd}>{formatUsdValue(trove.collateral.valueUsd)}</HighlightableValue> secures this position
+        <HighlightableValue type="collateralUsd" state="after" value={trove.collateral.valueUsd}>{formatUsdValue(trove.collateral.valueUsd)}</HighlightableValue> at current price of <HighlightableValue type="currentPrice" state="after" value={currentPrice}>{formatUsdValue(currentPrice)}/{trove.collateralType}</HighlightableValue> secures this position
       </span>
     );
 
@@ -105,12 +106,55 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
     );
 
     // Interest rate info
-    if (trove.batch.isMember) {
+    if (trove.batch.isMember && interestInfo) {
+      const dailyManagementFee = (interestInfo.recordedDebt * trove.batch.managementFee / 100) / 365;
+      const annualManagementFee = interestInfo.recordedDebt * trove.batch.managementFee / 100;
+
       items.push(
         <span key="delegated-rate" className="text-slate-500">
-          Interest rate of <HighlightableValue type="interestRate" state="after" value={trove.metrics.interestRate}>{trove.metrics.interestRate}%</HighlightableValue> is managed by{" "}
-          {batchManagerInfo?.name || "Batch Manager"} with additional{" "}
-          {trove.batch.managementFee}% management fee
+          <HighlightableValue type="interestRate" state="after" value={trove.metrics.interestRate}>{trove.metrics.interestRate}%</HighlightableValue> interest rate managed by{" "}
+          <HighlightableValue type="delegateName" state="after">{batchManagerInfo?.name || "Batch Manager"}</HighlightableValue>
+          {batchManagerInfo?.website && (
+            <a
+              href={batchManagerInfo.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors hover:bg-slate-700"
+              aria-label={`Visit ${batchManagerInfo.name} website`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-link2 lucide-link-2 w-3 h-3 text-slate-500" aria-hidden="true">
+                <path d="M9 17H7A5 5 0 0 1 7 7h2"></path>
+                <path d="M15 7h2a5 5 0 1 1 0 10h-2"></path>
+                <line x1="8" x2="16" y1="12" y2="12"></line>
+              </svg>
+            </a>
+          )}{" "}with{" "}
+          +<HighlightableValue type="managementFeeRate" state="after" value={trove.batch.managementFee}>{trove.batch.managementFee}%</HighlightableValue> management fee costing{" "}
+          ~<HighlightableValue type="dailyManagementFee" state="after" value={dailyManagementFee}>{formatPrice(dailyManagementFee)} BOLD</HighlightableValue> per day or{" "}
+          <HighlightableValue type="annualManagementFee" state="after" value={annualManagementFee}>{formatPrice(annualManagementFee)} BOLD</HighlightableValue> per year
+        </span>
+      );
+    } else if (trove.batch.isMember) {
+      items.push(
+        <span key="delegated-rate" className="text-slate-500">
+          <HighlightableValue type="interestRate" state="after" value={trove.metrics.interestRate}>{trove.metrics.interestRate}%</HighlightableValue> interest rate managed by{" "}
+          <HighlightableValue type="delegateName" state="after">{batchManagerInfo?.name || "Batch Manager"}</HighlightableValue>
+          {batchManagerInfo?.website && (
+            <a
+              href={batchManagerInfo.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors hover:bg-slate-700"
+              aria-label={`Visit ${batchManagerInfo.name} website`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-link2 lucide-link-2 w-3 h-3 text-slate-500" aria-hidden="true">
+                <path d="M9 17H7A5 5 0 0 1 7 7h2"></path>
+                <path d="M15 7h2a5 5 0 1 1 0 10h-2"></path>
+                <line x1="8" x2="16" y1="12" y2="12"></line>
+              </svg>
+            </a>
+          )}{" "}with{" "}
+          +<HighlightableValue type="managementFeeRate" state="after" value={trove.batch.managementFee}>{trove.batch.managementFee}%</HighlightableValue> management fee
         </span>
       );
     } else {
@@ -121,11 +165,19 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
       );
     }
 
-    // Interest cost breakdown
-    if (interestInfo) {
+    // Interest cost breakdown (only for self-managed or when no management fee info)
+    if (interestInfo && !trove.batch.isMember) {
       items.push(
         <span key="interest-cost" className="text-slate-500">
           Current interest costs approximately <HighlightableValue type="dailyInterest" state="after" value={dailyInterestCost}>{formatPrice(dailyInterestCost)} BOLD</HighlightableValue> per day
+          or <HighlightableValue type="annualInterest" state="after" value={annualInterestCost}>{formatPrice(annualInterestCost)} BOLD</HighlightableValue> per year
+        </span>
+      );
+    } else if (interestInfo) {
+      // For batch members, show interest costs separately
+      items.push(
+        <span key="interest-cost" className="text-slate-500">
+          Base interest costs approximately <HighlightableValue type="dailyInterest" state="after" value={dailyInterestCost}>{formatPrice(dailyInterestCost)} BOLD</HighlightableValue> per day
           or <HighlightableValue type="annualInterest" state="after" value={annualInterestCost}>{formatPrice(annualInterestCost)} BOLD</HighlightableValue> per year
         </span>
       );
@@ -259,7 +311,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
           <div>
             <div className="flex items-center gap-1 mb-1">
               {trove.batch.isMember && (
-                <span className="text-xs font-semibold px-1 py-0.5 bg-blue-900 text-blue-400 rounded-xs">DELEGATED</span>
+                <span className="text-xs font-semibold px-1 py-0.5 bg-pink-900/50 text-pink-400 rounded-xs">DELEGATED</span>
               )}
               <p className="text-xs text-slate-400">Interest Rate</p>
             </div>
@@ -281,20 +333,26 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
             )}
             {trove.batch.isMember && (
               <>
-                <p className="text-xs text-slate-500 mt-0.5">+ {trove.batch.managementFee}% 
-                {batchManagerInfo?.website ? (
-                  <a 
-                    href={batchManagerInfo.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-400 hover:text-blue-300 mt-1 underline underline-offset-2 ml-0.5"
-                  >
-                    {batchManagerInfo.name}
-                  </a>
-                ) : (
-                  <span> {batchManagerInfo?.name || "Batch Manager"}</span>
-                )}
-              </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  + <HighlightableValue type="managementFeeRate" state="after" value={trove.batch.managementFee} className="text-slate-500">
+                    {trove.batch.managementFee}%
+                  </HighlightableValue>
+                  {" "}
+                  <HighlightableValue type="delegateName" state="after" className="text-slate-500">
+                    {batchManagerInfo?.name || "Batch Manager"}
+                  </HighlightableValue>
+                  {batchManagerInfo?.website && (
+                    <a
+                      href={batchManagerInfo.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center ml-1 text-blue-400 hover:text-blue-300"
+                      aria-label={`Visit ${batchManagerInfo.name} website`}
+                    >
+                      <Icon name="external-link" size={10} />
+                    </a>
+                  )}
+                </p>
               {interestInfo && (
                 <div className="text-xs text-slate-500 mt-0.5">
                   ~ <HighlightableValue type="dailyManagementFee" state="after" className="text-slate-500" value={(interestInfo.recordedDebt * trove.batch.managementFee / 100) / 365}>
@@ -326,11 +384,16 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
             />
             
             {/* Latest collateral value - only show on trove view page */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 bg-slate-700 shadow-b shadow-slate-900/50 rounded-l p-2 -mr-4.5">
               <TokenIcon assetSymbol={trove.collateralType} />
-              <span className="text-xs flex items-center text-green-400">
+              <HighlightableValue
+                type="currentPrice"
+                state="after"
+                className="text-xs text-green-400"
+                value={trove.collateral.valueUsd / trove.collateral.amount}
+              >
                 {formatUsdValue(trove.collateral.valueUsd / trove.collateral.amount)}
-              </span>
+              </HighlightableValue>
             </div>
           </div>
         )}

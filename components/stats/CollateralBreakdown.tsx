@@ -195,7 +195,7 @@ export function CollateralBreakdown({
               <TokenIcon assetSymbol="bold" className="w-12 h-12 -ml-1.5" />
               </div>
               <div>
-                <div className="text-slate-900 font-semibold text-xl">{collateralType}</div>
+                <div className="text-slate-600 font-semibold text-xl">{collateralType}</div>
                 <div className="text-sm text-slate-500">
                   {formatNumber(stats.totalCollateral)} {collateralType}
                 </div>
@@ -205,7 +205,7 @@ export function CollateralBreakdown({
             <div className="space-y-3">
               <div>
                 <div className="text-xs text-slate-500 uppercase tracking-wider">TVL</div>
-                <div className="text-2xl font-semibold text-slate-900">
+                <div className="text-2xl font-semibold text-slate-600">
                   ${formatNumber(stats.totalCollateralUsd)}
                 </div>
               </div>
@@ -225,12 +225,14 @@ export function CollateralBreakdown({
               </div>
             </div>
 
-            <div className="mt-4 pt-4">
-              <span className="text-sm text-blue-500 group-hover:text-blue-700 font-medium inline-flex items-center gap-1 rounded-full w-fit py-1 bg-slate-200 pl-3 pr-2" aria-label="View Troves">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="2.705 3.653 18.598 17.336" width="19" height="17">
-                  <rect x="2.705" y="4.153" width="18.598" height="3.5" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="1"/>
-                  <rect x="2.705" y="10.418" width="18.598" height="3.5" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="1"/>
-                  <rect x="2.705" y="16.683" width="18.598" height="3.5" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="1"/>
+            <div className="mt-4 flex justify-end">
+              <span className="text-sm text-white group-hover:text-white font-medium inline-flex items-center gap-1 rounded-full transition-all w-fit py-1 group-hover:bg-blue-500 bg-slate-300 pl-3 pr-2" aria-label="View Troves">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 19 18" width="19" height="18">
+                  <rect x="0" y="2"  width="5" height="3" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="2"/>
+                  <rect x="6" y="2"  width="6" height="3" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="2"/>
+                  <rect x="13" y="2"  width="5" height="3" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="2"/>
+                  <rect x="0" y="7"  width="18"  height="3" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="2"/>
+                  <rect x="0" y="12" width="18" height="3" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="2"/>
                 </svg>
                 View
                 <ChevronRight className="w-4 h-4" />

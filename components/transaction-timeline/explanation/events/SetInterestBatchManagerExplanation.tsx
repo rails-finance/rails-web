@@ -62,11 +62,10 @@ export function SetInterestBatchManagerExplanation({ transaction, onToggle }: Se
       </HighlightableValue>
     </span>,
     <span key="interestRate" className="text-slate-500">
-      Interest rate changed {' '}to{' '}
+      Interest rate changed delegated rate{' '}
       <HighlightableValue type="interestRate" state="after" value={joinRate}>
         {joinRate}%
       </HighlightableValue>
-      {' '}(batch rate)
     </span>
   ];
 
@@ -75,17 +74,11 @@ export function SetInterestBatchManagerExplanation({ transaction, onToggle }: Se
       <span key="collRatio" className="text-slate-500">
         Collateral ratio: {' '}
         <HighlightableValue type="collRatio" state="after" value={joinAfterRatio}>
-          {joinAfterRatio}%
+          {joinAfterRatio.toFixed(1)}%
         </HighlightableValue>
       </span>
     );
   }
-
-  batchJoinItems.push(
-    <span key="warning" className="text-slate-500">
-      Delegating interest rates may include annual management fees
-    </span>
-  );
 
   // Add batch manager address with copy button
   batchJoinItems.push(

@@ -19,7 +19,7 @@ export function ChangeValue({ amount, type }: ChangeValueProps) {
   
   return (
     <span 
-      className={`font-medium text-white min-h-8 flex items-center justify-end cursor-pointer transition-all ${isHighlighted ? 'underline decoration-dotted underline-offset-2' : ''}`}
+      className={`font-medium text-white min-h-8 flex items-center justify-end cursor-pointer transition-all ${isHighlighted ? '-mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded' : ''}`}
       onMouseEnter={() => setHoveredValue({ type, state: 'change', value: amount })}
       onMouseLeave={() => setHoveredValue(null)}
     >

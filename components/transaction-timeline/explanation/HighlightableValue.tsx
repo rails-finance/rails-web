@@ -16,7 +16,7 @@ export function HighlightableValue({
   type,
   state,
   value,
-  className = 'text-slate-300',
+  className = 'text-slate-200',
   asBlock = false
 }: HighlightableValueProps) {
   const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
@@ -30,7 +30,9 @@ export function HighlightableValue({
   return (
     <Component
       className={`${asBlock ? 'inline-block' : 'font-semibold'} ${shouldEnableHover ? 'cursor-pointer ' : ''} ${
-        isHighlighted ? 'text-blue-100 -mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded' : className
+        className || 'text-slate-500'
+      } ${
+        isHighlighted ? '-mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded' : ''
       }`}
       onMouseEnter={shouldEnableHover ? () => setHoveredValue({ type, state, value }) : undefined}
       onMouseLeave={shouldEnableHover ? () => setHoveredValue(null) : undefined}

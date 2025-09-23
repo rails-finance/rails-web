@@ -43,7 +43,7 @@ export function SiteNavigation() {
           <div className="flex justify-between items-center">
             {/* Logo with tagline */}
             <Link href="/" className="flex items-top space-x-3">
-              <div className="bg-green-600 rounded-b-lg p-3 sm:p-4 w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
+              <div className="bg-green-600 rounded-b-lg p-3 sm:p-5 w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
                 <svg className="w-10 h-10 sm:w-12 sm:h-12" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                   <use href="#icon-rails" />
                 </svg>
@@ -60,7 +60,7 @@ export function SiteNavigation() {
               <button
                 onClick={isMobile ? toggleMenu : undefined}
                 onMouseEnter={handleMouseEnter}
-                className="p-3 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-3 cursor-pointer rounded-lg transition-colors"
                 aria-label="Toggle menu"
               >
                 {/* Custom Hamburger Icon */}
@@ -92,7 +92,7 @@ export function SiteNavigation() {
               {/* Desktop Tooltip Modal */}
               {!isMobile && isHoverMenuOpen && (
                 <div
-                  className="absolute top-full right-0 mt-2 w-80 bg-white shadow-2xl rounded-lg border border-slate-200 p-6 z-50"
+                  className="absolute top-full right-0 mt-2 w-60 bg-white shadow-2xl rounded-lg border border-slate-200 p-6 z-50"
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
                 >
@@ -127,7 +127,7 @@ export function SiteNavigation() {
                     <use href="#icon-rails" />
                   </svg>
                 </div>
-                <div className="text-lg font-bold text-slate-900">Rails</div>
+                <div className="text-lg font-bold text-slate-600">Rails</div>
               </div>
               <button
                 onClick={toggleMenu}

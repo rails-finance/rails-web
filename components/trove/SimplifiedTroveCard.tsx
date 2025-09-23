@@ -119,7 +119,7 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
             <div>
               <div className="flex items-center gap-1 mb-1">
                 {trove.batch.isMember && (
-                  <span className="text-xs font-semibold px-1 py-0.5 bg-blue-900 text-blue-400 rounded-xs">DELEGATED</span>
+                  <span className="text-xs font-semibold px-1 py-0.5 bg-pink-900/50 text-pink-400 rounded-xs">DELEGATED</span>
                 )}
                 <p className="text-xs text-slate-400">Interest Rate</p>
               </div>
@@ -183,7 +183,7 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
               </div>
             )}
             {hideLabels && trove.batch.isMember && (
-              <span className="text-xs font-semibold px-1 py-0.5 bg-blue-900 text-blue-400 rounded-xs mb-1 inline-block">DELEGATED</span>
+              <span className="text-xs font-semibold px-1 py-0.5 bg-fuchsia-900 text-fuchsia-400 rounded-xs mb-1 inline-block">DELEGATED</span>
             )}
             <div className="text-xl font-medium">
               {trove.metrics.interestRate}%
@@ -192,8 +192,8 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
 
           {/* 5th column with view link */}
           {showViewButton && (
-            <div className="flex justify-end items-center bg-slate-700 rounded-full pl-3 pr-2 py-1">
-              <span className="text-sm text-blue-400 group-hover:text-blue-300 font-medium transition-colors flex items-center gap-1" aria-label="View Trove">
+            <div className="flex justify-end items-center bg-slate-800  group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
+              <span className="text-sm text-slate-500 group-hover:text-white font-medium flex items-center gap-1" aria-label="View Trove">
                 <Workflow className="w-6 h-6" />
                 View
                 <ChevronRight className="w-4 h-4" />

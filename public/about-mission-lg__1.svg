@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="180px" height="360px" viewBox="0 0 180 360">
+  <style>
+    :root {
+
+      --color-A-6: #89C7F0;
+      --color-A-5: #4FAEEA;
+      --color-A-4: #4090D1;
+      --color-A-3: #3270B8;
+      --color-A-2: #2F56A8;
+      --color-A-1: #2C308B;
+
+      --color-A-6: #D5E38D;
+      --color-A-5: #C0D651;
+      --color-A-4: #71A450;
+      --color-A-3: #79A950;
+      --color-A-2: #507D49;
+      --color-A-1: #4D6928;
+
+
+      --stroke-width-thin: 3;
+      --stroke-width-thick: 9px;
+   
+
+
+
+
+
+
+
+
+      --color-B-1: #89C7F0;
+      --color-B-2: #4FAEEA;
+      --color-B-3: #4090D1;
+      --color-B-4: #3270B8;
+      --color-B-5: #2F56A8;
+      --color-B-6: #2C308B;
+
+      --color-6: #8000ff;
+      --stroke-width-thin: 3;
+      --stroke-width-thick: 9px;
+    }
+  &lt;/style&gt;
+</style>
+  <g transform="matrix(2.095126, 0, 0, 0.900193, 9.437988, 387.373627)" style="transform-origin: 90px 52.5px;"/>
+  <g transform="matrix(-9.436682, 0.000006, 0, -1.058346, 262.1922, 669.482544)" style="transform-origin: 90px 52.5px;"/>
+  <path stroke="var(--color-A-6,#888888)" d="M 191.427 176.878 L 82.979 176.812 C 31.622 176.745 4.369 149.495 4.304 95.072 C 4.238 40.652 31.488 13.399 82.649 13.303 C 133.809 13.207 161.059 40.46 161.059 94.961 L 160.78 120.294" fill="none" style="stroke-width: 7px; transform-origin: 97.865px 94px; stroke-linecap: round;"/>
+  <path stroke="var(--color-A-4,#888888)" d="M 191.427 157.678 L 82.979 157.78 C 44.199 157.882 23.234 136.916 23.168 95.072 C 23.101 53.228 44.067 32.263 82.649 31.632 C 121.23 31 142.196 51.965 142.196 93.889 L 141.715 119.651" fill="none" style="stroke-width: 7px; transform-origin: 97.865px 94px; stroke-linecap: round;"/>
+  <path stroke="var(--color-A-3,#888888)" d="M 191.427 148.078 L 82.979 148.262 C 50.486 148.446 32.666 130.628 32.602 95.072 C 32.537 59.515 50.355 41.695 82.649 41.6 C 114.942 41.504 132.76 59.324 132.76 94.961 L 132.221 120.132" fill="none" style="stroke-width: 7px; transform-origin: 97.865px 94px; stroke-linecap: round;"/>
+  <path stroke="var(--color-A-2,#888888)" d="M 191.427 138.478 L 82.979 138.747 C 56.777 139.017 42.102 124.339 42.034 95.072 C 41.966 65.807 56.644 51.132 82.649 51.036 C 108.653 50.94 123.331 65.615 123.331 94.961 L 123.546 120.385" fill="none" style="stroke-width: 7px; transform-origin: 97.865px 94px; stroke-linecap: round;"/>
+  <path stroke="var(--color-A-5,#888888)" d="M 151.555 120.447 L 151.626 94.961 C 151.626 46.747 127.521 22 82.649 22.734 C 37.776 22.83 13.671 46.938 13.736 95.072 C 13.801 143.207 37.909 167.312 82.979 167.295 L 191.427 167.278" fill="none" style="stroke-width: 7; transform-origin: 97.865px 94px; stroke-linecap: round;"/>
+  <path stroke="var(--color-B-6,#888888)" d="M 57.476 323.852 L 113.679 323.757 C 168.183 323.757 195.433 296.504 195.433 242.003" fill="none" style="stroke-width: 7; stroke-linecap: round; transform-origin: 154.557px 282.878px;" transform="matrix(0, 1, -1, 0, 0.000005, 0.000019)"/>
+  <path stroke="var(--color-B-5,#888888)" d="M 67.076 313.964 L 123.112 314.322 C 171.328 314.322 195.433 290.214 195.433 242" fill="none" style="stroke-width: 7; stroke-linecap: round; transform-origin: 159.272px 278.16px;" transform="matrix(0, 1, -1, 0, 0.000005, 0)"/>
+  <path stroke="var(--color-B-4,#888888)" d="M 76.611 304.611 L 132.547 304.892 C 174.472 304.892 195.438 283.927 195.438 242.003" fill="none" style="stroke-width: 7; stroke-linecap: round; transform-origin: 163.991px 273.444px;" transform="matrix(0, 1, -1, 0, 0.000005, -0.000011)"/>
+  <path stroke="var(--color-B-3,#888888)" d="M 86.008 295.239 L 141.975 295.458 C 177.612 295.458 195.43 277.638 195.43 242.001" fill="none" style="stroke-width: 7; stroke-linecap: round; transform-origin: 168.704px 268.729px;" transform="matrix(0, 1, -1, 0, 0.000016, -0.000006)"/>
+  <path stroke="var(--color-B-2,#888888)" d="M 95.877 285.595 L 151.41 286.025 C 180.758 286.025 195.436 271.35 195.436 242.004" fill="none" style="stroke-width: 7; stroke-linecap: round; transform-origin: 173.423px 264.013px;" transform="matrix(0, 1, -1, 0, 0.000001, -0.000002)"/>
+  <path stroke="var(--color-B-1,#888888)" d="M 106.4 276.442 L 161.997 276.588 C 185.057 276.588 195.82 266.616 195.82 243.555" fill="none" style="stroke-width: 7; stroke-linecap: round; transform-origin: 179.292px 259.296px;" transform="matrix(0, 1, -1, 0, 0.000005, 0.000027)"/>
+  <path stroke="var(--color-A-2,#888888)" d="M 192.035 129.485 L 83.102 129.696 C 63.261 129.909 52.149 118.356 52.098 95.319 C 52.047 72.285 63.161 60.734 82.852 60.66 C 102.542 60.584 113.657 72.134 113.657 95.232 L 113.821 120.28" fill="none" style="stroke-width: 7px; stroke-linecap: round; transform-origin: 94.374px 94.476px;"/>
+</svg>

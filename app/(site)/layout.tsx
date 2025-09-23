@@ -7,7 +7,7 @@ export default function SiteLayout({
 }) {
   return (
     <div
-      className="fixed inset-0 bg-white text-slate-900 z-50 overflow-auto"
+      className="fixed inset-0 bg-white text-slate-600 z-50 overflow-auto"
       style={{
         background: '#ffffff',
         color: '#111827'
