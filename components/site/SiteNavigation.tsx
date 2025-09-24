@@ -39,7 +39,7 @@ export function SiteNavigation() {
     <>
       {/* Header */}
       <header className="" >
-        <div className="max-w-6xl mx-auto px-4 md:px-6 pb-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 pb-6">
           <div className="flex justify-between items-center">
             {/* Logo with tagline */}
             <Link href="/" className="flex items-top space-x-3">

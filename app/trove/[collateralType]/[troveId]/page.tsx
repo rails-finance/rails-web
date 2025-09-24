@@ -9,6 +9,8 @@ import { isRedemptionTransaction } from "@/types/api/troveHistory";
 import { TroveCard } from "@/components/trove/TroveCard";
 import { Button } from "@/components/ui/button";
 import { TransactionTimeline } from "@/components/transaction-timeline";
+import { formatDuration } from "@/lib/date";
+import { Icon } from "@/components/icons/icon";
 
 export default function TrovePage() {
   const params = useParams();
@@ -76,7 +78,8 @@ export default function TrovePage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+    <div className="space-y-6 py-8">
+    <h1 class="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
         <Button onClick={() => router.back()} className="mb-4">
         <ChevronLeft className="w-4 h-4" />
           Back
@@ -92,7 +95,7 @@ export default function TrovePage() {
 
   if (error || !troveData) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 py-8">
         <Button onClick={() => router.back()} className="mb-4">
         <ChevronLeft className="w-4 h-4" />
           Back
@@ -108,7 +111,8 @@ export default function TrovePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 py-8">
+    <h1 class="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
       <Button onClick={() => router.back()} className="mb-4">
         <ChevronLeft className="w-4 h-4" />
           Back
@@ -117,7 +121,15 @@ export default function TrovePage() {
       <TroveCard trove={troveData} />
 
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-semibold text-white">Trove Timeline</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-xl font-semibold text-white">Trove Timeline</h3>
+          {troveData.activity?.lastActivityAt && (
+            <span className="text-xs text-slate-500 flex baseline gap-1 rounded-full pl-1 pr-2 py-0.5 bg-slate-900">
+              <Icon name="clock-zap" size={14} />
+              {formatDuration(troveData.activity.lastActivityAt, new Date())} ago
+            </span>
+          )}
+        </div>
         {timelineData && timelineData.transactions.some(tx => isRedemptionTransaction(tx)) && (
           <button
             onClick={() => setHideRedemptions(!hideRedemptions)}
@@ -127,7 +139,7 @@ export default function TrovePage() {
                 : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
             }`}
           >
-            {hideRedemptions 
+            {hideRedemptions
               ? `Show ${timelineData.transactions.filter(tx => isRedemptionTransaction(tx)).length} Redemptions`
               : `Hide ${timelineData.transactions.filter(tx => isRedemptionTransaction(tx)).length} Redemptions`
             }

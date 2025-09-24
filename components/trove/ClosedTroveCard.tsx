@@ -89,28 +89,29 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
         {/* Header section */}
         <div className="flex items-center justify-between p-4 pb-0">
           <div className="flex items-center">
-            {/* Status and metrics */}
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-semibold px-2 py-0.5 bg-slate-800 text-slate-400 rounded-xs">CLOSED</span>
-              {!showViewButton && (
-                <span className="text-slate-400">
-                  {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
-                </span>
-              )}
+            {/* Status */}
+            <span className="font-semibold px-2 py-0.5 bg-slate-800 text-slate-400 rounded-xs text-xs">CLOSED</span>
+          </div>
+          {/* Metrics moved to the right */}
+          <div className="flex items-center gap-2 text-xs">
+            {!showViewButton && (
               <span className="text-slate-400">
-                {formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt)}
+                {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
               </span>
-              <span className="inline-flex items-center text-slate-400">
-                <Icon name="arrow-left-right" size={12} />
-                <span className="ml-1">{trove.activity.transactionCount}</span>
+            )}
+            <span className="text-slate-400">
+              {formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt)}
+            </span>
+            {trove.activity.redemptionCount > 0 && (
+              <span className="inline-flex items-center text-orange-400">
+                <Icon name="triangle" size={12} />
+                <span className="ml-1">{trove.activity.redemptionCount}</span>
               </span>
-              {trove.activity.redemptionCount > 0 && (
-                <span className="inline-flex items-center text-orange-400">
-                  <Icon name="triangle" size={12} />
-                  <span className="ml-1">{trove.activity.redemptionCount}</span>
-                </span>
-              )}
-            </div>
+            )}
+            <span className="inline-flex items-center text-slate-400">
+              <Icon name="arrow-left-right" size={12} />
+              <span className="ml-1">{trove.activity.transactionCount}</span>
+            </span>
           </div>
         </div>
 

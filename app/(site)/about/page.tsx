@@ -2,7 +2,7 @@ export default function AboutPage() {
   
 
   return (
-    <div className="container mx-auto px-4 pt-32 pb-12 max-w-6xl">
+    <div className="container mx-auto md:px-6 px-4 pt-32 pb-12 max-w-7xl">
 
       <div className="prose prose-lg max-w-none text-slate-800">
         <p className="text-xl mb-8">

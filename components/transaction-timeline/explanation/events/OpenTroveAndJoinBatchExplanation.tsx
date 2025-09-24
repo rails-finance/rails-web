@@ -22,7 +22,7 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
   
   const batchItems: React.ReactNode[] = [
     <span key="opened" className="text-slate-500">
-      Opened a new Trove and joined batch management under{' '}
+      Opened a new Trove and delegated interest management to{' '}
       <span className="font-medium">{tx.stateAfter.interestBatchManager || 'Unknown manager'}</span>
     </span>,
     <span key="deposited" className="text-slate-500">
@@ -96,11 +96,6 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
     </span>
   );
 
-  batchItems.push(
-    <span key="warning" className="text-yellow-500">
-      ⚠️ Batch management may include additional annual management fees
-    </span>
-  );
   
   // Add NFT minting explanation if NFT URL is available
   const nftUrl = getTroveNftUrl(tx.collateralType, tx.troveId);

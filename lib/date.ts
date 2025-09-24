@@ -69,7 +69,7 @@ export function formatDuration(startDate: string | number | Date, endDate: strin
       }
       return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
     }
-    return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+    return `${hours} ${hours === 1 ? 'hr' : 'hrs'}`;
   }
 
   return `${days} ${days === 1 ? 'day' : 'days'}`;

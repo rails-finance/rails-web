@@ -27,6 +27,12 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, sho
     <div className="text-xs">
       <div className="flex flex-col sm:flex-row sm:justify-between gap-2 sm:gap-0 sm:items-center">
         <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-2 sm:space-x-3">
+          {dateText && (
+            <span className="text-slate-400 flex items-center gap-1">
+              <Icon name="clock-zap" size={14} />
+              {dateText.replace('Latest activity ', '')}
+            </span>
+          )}
           <div className="flex flex-wrap sm:flex-row gap-3">
             {showDetailedInfo && trove.owner && (
               <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">

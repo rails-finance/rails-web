@@ -1,5 +1,5 @@
 /**
- * Interest calculation utilities for Liquity v2 protocol
+ * Interest calculation utilities for Liquity V2 protocol
  * Implements real-time interest accrual calculations
  */
 

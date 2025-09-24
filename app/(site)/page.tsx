@@ -99,7 +99,7 @@ export default function Home() {
         <div className="md:relative md:h-[500px] md:flex">
 
           {/* Content - Responsive positioning */}
-          <div className="px-4 pt-8 md:px-0 md:pt-0 md:w-1/2 md:max-w-[560px] md:mx-0 md:ml-auto md:relative">
+          <div className="px-4 pt-8 md:px-0 md:pt-0 md:w-1/2 md:max-w-[640px] md:mx-0 md:ml-auto md:relative">
             <div className="md:flex md:flex-col md:h-full">
               {/* Text Content - Same for both mobile and desktop */}
               <div className="md:flex-1 md:px-6 md:py-8 md:flex md:flex-col md:justify-center md:relative md:z-10">
@@ -107,7 +107,7 @@ export default function Home() {
                   <span className="text-green-600">Rails</span> displays your DeFi activity on simple timelines with clear explanations and in-depth transaction analysis.
                 </p>
                 <p className="text-slate-700 mb-4 tracking-tight">
-                  Rails is building essential DeFi support infrastructure, starting with Liquity v2. Our roadmap includes integration with Liquity v2 forks and expansion across the broader DeFi ecosystem. Discover our approach
+                  Rails is building essential DeFi support infrastructure, starting with Liquity V2. Our roadmap includes integration with Liquity V2 forks and expansion across the broader DeFi ecosystem. Discover our approach
                   <a className="text-green-500" href="about/"> here</a>.
                 </p>
               </div>
@@ -155,13 +155,13 @@ export default function Home() {
       </div>
 
         <div className="relative overflow-x-hidden pb-12">
-          <div className="relative z-10 w-full mx-auto px-4 max-w-6xl">
+          <div className="relative z-10 w-full mx-auto px-4 max-w-7xl">
             <div className="md:flex gap-8">
 
               {/* Content Column continued */}
               <div>
 
-                {/* Liquity v2 Protocol Card */}
+                {/* Liquity V2 Protocol Card */}
                 <div className="space-y-6">
                   <div className="bg-slate-50 rounded-lg overflow-hidden">
                     <div className="p-4 space-y-6">
@@ -169,7 +169,7 @@ export default function Home() {
                             <svg className="w-12 h-12" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                               <use href="#icon-liquity" />
                             </svg>
-                        <span className="text-2xl text-slate-600 font-extrabold">Explore Liquity v2</span>
+                        <span className="text-2xl text-slate-600 font-extrabold">Explore Liquity V2</span>
                       </div>
 
                       {/* Mobile: Stacked, Desktop: Two columns */}
@@ -181,13 +181,13 @@ export default function Home() {
                             alt="Rails protocol map visual metaphor"
                           />
                           <p>
-                            <span className="font-extrabold">Liquity v2</span> is an immutable, governance-free lending protocol. Users can deposit ETH, wstETH, or rETH as collateral to mint BOLD stablecoins and set their own interest rates.
+                            <span className="font-extrabold">Liquity V2</span> is an immutable, governance-free lending protocol. Users can deposit ETH, wstETH, or rETH as collateral to mint BOLD stablecoins and set their own interest rates.
                           </p>
                         </div>
 
                         {/* Search Box - Mobile and Desktop */}
                         <div className="md:flex-1 bg-white rounded-lg p-4  transition-shadow hover:shadow-lg">
-                          <p className="text-slate-600 font-medium mb-3">View your Liquity v2 Trove on Rails. Enter borrower address, ENS, or Trove ID below.</p>
+                          <p className="text-slate-600 font-medium mb-3">View your Liquity V2 Trove on Rails. Enter borrower address, ENS, or Trove ID below.</p>
                           <form onSubmit={handleSearch}>
                             <div className="relative">
                               <svg
@@ -231,7 +231,7 @@ export default function Home() {
 
         {/* Our Supporters Section */}
         <div className="w-full pb-24">
-          <div className="max-w-6xl mx-auto px-4">
+          <div className="max-w-7xl mx-auto px-4">
             <h2 className="text-2xl font-extrabold text-slate-500 text-center mb-8">Our Supporters</h2>
             <div className="flex justify-center">
               <div className="bg-slate-50 rounded-lg p-8" style={{ width: '400px', height: '120px' }}>

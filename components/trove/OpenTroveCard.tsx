@@ -205,28 +205,29 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
         {/* Header section */}
         <div className="flex items-center justify-between p-4 pb-0">
           <div className="flex items-center">
-            {/* Status and metrics */}
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-semibold px-2 py-0.5 bg-green-900 text-green-400 rounded-xs">ACTIVE</span>
+            {/* Status */}
+            <span className="font-semibold px-2 py-0.5 bg-green-900 text-green-400 rounded-xs text-xs">ACTIVE</span>
+          </div>
+          {/* Metrics moved to the right */}
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-slate-400">
+              {formatDuration(trove.activity.createdAt, new Date())}
+            </span>
+            {!showViewButton && (
               <span className="text-slate-400">
-                {formatDuration(trove.activity.createdAt, new Date())}
+                Opened {formatDate(trove.activity.createdAt)}
               </span>
-              {!showViewButton && (
-                <span className="text-slate-400">
-                  Opened {formatDate(trove.activity.createdAt)}
-                </span>
-              )}
-              <span className="inline-flex items-center text-slate-400">
-                <Icon name="arrow-left-right" size={12} />
-                <span className="ml-1">{trove.activity.transactionCount}</span>
+            )}
+            {trove.activity.redemptionCount > 0 && (
+              <span className="inline-flex items-center text-orange-400">
+                <Icon name="triangle" size={12} />
+                <span className="ml-1">{trove.activity.redemptionCount}</span>
               </span>
-              {trove.activity.redemptionCount > 0 && (
-                <span className="inline-flex items-center text-orange-400">
-                  <Icon name="triangle" size={12} />
-                  <span className="ml-1">{trove.activity.redemptionCount}</span>
-                </span>
-              )}
-            </div>
+            )}
+            <span className="inline-flex items-center text-slate-400">
+              <Icon name="arrow-left-right" size={12} />
+              <span className="ml-1">{trove.activity.transactionCount}</span>
+            </span>
           </div>
         </div>
 
@@ -255,7 +256,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
           {interestInfo && (
             <div className="mt-2 text-xs text-slate-500 space-y-0.5">
               <div className="flex items-center gap-1 ">
-                <span className="bg-slate-950 rounded px-1.5  py-0.5">
+                <span>
                   <HighlightableValue type="principal" state="after" className="text-slate-500" value={interestInfo.recordedDebt}>
                     {formatPrice(interestInfo.recordedDebt)}
                   </HighlightableValue> + <HighlightableValue type="interest" state="after"  className="text-slate-500"  value={interestInfo.accruedInterest}>
@@ -322,7 +323,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
             </div>
             {interestInfo && (
               <div className="text-xs text-slate-500 mt-0.5 space-y-0.5">
-                <span className="bg-slate-950 rounded px-1.5 py-0.5">
+                <span>
                   ~ <HighlightableValue type="dailyInterest" state="after" className="text-slate-500" value={dailyInterestCost}>
                     {formatPrice(dailyInterestCost)}
                   </HighlightableValue> day / <HighlightableValue type="annualInterest" state="after" className="text-slate-500" value={annualInterestCost}>

@@ -32,7 +32,7 @@ export default async function RootLayout({
         <IconSymbols />
         <Providers initialState={initialState}>
           <Header />
-          <main className="max-w-7xl mx-auto px-4">{children}</main>
+          <main className="max-w-7xl mx-auto px-4 md:px-6">{children}</main>
         </Providers>
       </body>
     </html>

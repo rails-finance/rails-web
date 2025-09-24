@@ -3,7 +3,7 @@ import Link from "next/link";
 export function Header() {
   return (
     <header className="pt-0 pb-2 relative mb-4">
-      <div className="max-w-7xl mx-auto px-4 relative flex items-start gap-3">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 relative flex items-start gap-3">
         {/* Rails Logo */}
         <Link href="/" className="">
           <div className="bg-green-600 rounded-b p-2 w-9 h-9 flex items-center justify-center">
