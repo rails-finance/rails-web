@@ -513,8 +513,8 @@ export default function TrovesPage() {
     { value: 'debt', label: 'Debt' },
     { value: 'collateral', label: 'Collateral' },
     { value: 'ratio', label: 'Ratio' },
-    { value: 'interestRate', label: 'Interest %' },
-    { value: 'activity', label: 'Activity' }
+    { value: 'interestRate', label: 'Interest Rate' },
+    { value: 'activity', label: 'Latest Activity' }
   ];
 
   // Pagination calculations
@@ -609,13 +609,28 @@ export default function TrovesPage() {
       <main className="min-h-screen">
         <div className="max-w-7xl mx-auto py-8">
           <h1 className="text-2xl font-bold text-white mb-6">Liquity V2 Troves</h1>
-          <div className="animate-pulse">
-            <div className="h-8 bg-slate-700 rounded w-1/3 mb-8"></div>
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-32 bg-slate-800 rounded-lg"></div>
-              ))}
-            </div>
+          <div className="animate-pulse flex space-x-3">
+            <div className="h-10 bg-slate-700 rounded w-1/3 mb-3"></div>
+            <div className="h-10 bg-slate-700 rounded w-1/3 mb-3"></div>
+            <div className="h-10 bg-slate-700 rounded w-1/3 mb-3"></div>
+          </div>
+          <div className="animate-pulse  flex sm:hidden space-x-3">
+            <div className="h-10 bg-slate-700 rounded w-full mb-3"></div>
+          </div>
+          <div className="animate-pulse  flex sm:hidden space-x-3">
+            <div className="h-10 bg-slate-700 rounded w-full mb-3"></div>
+          </div>
+          <div className="animate-pulse flex space-x-3">
+            <div className="h-40 bg-slate-700 rounded-lg w-full mt-3 mb-6"></div>
+          </div>
+          <div className="animate-pulse flex space-x-3">
+            <div className="h-40 bg-slate-700/75 rounded-lg w-full mb-6"></div>
+          </div>
+          <div className="animate-pulse flex space-x-3">
+            <div className="h-40 bg-slate-700/50 rounded-lg w-full mb-6"></div>
+          </div>
+          <div className="animate-pulse flex space-x-3">
+            <div className="h-40 bg-slate-700/25 rounded-lg w-full mb-6"></div>
           </div>
         </div>
       </main>
@@ -720,8 +735,11 @@ export default function TrovesPage() {
                           : 'opacity-25 border-slate-600 border hover:border-slate-500'
                       }`}
                     >
-                      <svg className="w-5 h-5">
+                      <svg className="w-5 h-5 z-1">
                         <use href={`#icon-${type.toLowerCase().replace('weth', 'eth')}`} />
+                      </svg>
+                      <svg className="w-5 h-5 -ml-2.5">
+                        <use href={`#icon-bold`} />
                       </svg>
                       <span className="text-white font-semibold text-sm md:text-base">{type}</span>
                     </button>

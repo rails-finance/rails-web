@@ -184,7 +184,7 @@ export function CollateralBreakdown({
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="flex items-center">
-              <TokenIcon assetSymbol={collateralType.toLowerCase()} className="w-12 h-12" />
+              <TokenIcon assetSymbol={collateralType.toLowerCase()} className="w-12 h-12 z-1" />
               <TokenIcon assetSymbol="bold" className="w-12 h-12 -ml-1.5" />
               </div>
               <div>

@@ -212,7 +212,7 @@ function SimplifiedClosedTroveCard({ trove, showViewButton = false, hideLabels =
           <div>
             {!hideLabels && <p className="text-xs text-slate-600 mb-1 font-bold">Peak Debt</p>}
             <div className="flex items-center">
-              <h3 className="text-2xl md:text-3xl font-bold">
+              <h3 className="text-2xl md:text-3xl font-bold text-slate-200">
                 {formatPrice(trove.debt.peak)}
               </h3>
               <span className="ml-2 text-green-400">

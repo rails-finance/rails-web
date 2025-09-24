@@ -80,7 +80,7 @@ export default function TrovePage() {
     return (
     <div className="space-y-6 py-8">
     <h1 class="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
-        <Button onClick={() => router.back()} className="mb-4">
+        <Button onClick={() => router.back()} className="mb-4 pl-2">
         <ChevronLeft className="w-4 h-4" />
           Back
         </Button>
@@ -96,7 +96,7 @@ export default function TrovePage() {
   if (error || !troveData) {
     return (
       <div className="space-y-6 py-8">
-        <Button onClick={() => router.back()} className="mb-4">
+        <Button onClick={() => router.back()} className="mb-4 pl-2">
         <ChevronLeft className="w-4 h-4" />
           Back
         </Button>
@@ -113,7 +113,7 @@ export default function TrovePage() {
   return (
     <div className="space-y-6 py-8">
     <h1 class="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
-      <Button onClick={() => router.back()} className="mb-4">
+      <Button onClick={() => router.back()} className="mb-4 pl-2">
         <ChevronLeft className="w-4 h-4" />
           Back
       </Button>
