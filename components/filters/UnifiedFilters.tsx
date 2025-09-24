@@ -1,21 +1,24 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Filter, ChevronDown, Check, Minus } from "lucide-react";
+import { Filter, ChevronDown, Check } from "lucide-react";
 
-export type FilterState = 'all' | 'only' | 'hide';
+export type RedemptionState = 'all' | 'with' | 'without';
+export type TypeState = 'all' | 'batch' | 'individual';
+export type HealthState = 'all' | 'zombies' | 'healthy';
+export type StatusState = 'all' | 'active' | 'closed';
 
 export interface UnifiedFilters {
   // Status
-  status?: 'open' | 'closed' | 'both';
+  status?: StatusState;
 
   // Collateral types (multi-select)
   collateralTypes?: string[];
 
-  // Three-state filters
-  redemptionFilter?: FilterState;
-  batchFilter?: FilterState;
-  zombieFilter?: FilterState;
+  // Segmented filters
+  redemptionFilter?: RedemptionState;
+  typeFilter?: TypeState;
+  healthFilter?: HealthState;
 
   // Search query
   searchQuery?: string;
@@ -66,48 +69,18 @@ export function UnifiedFiltersDropdown({
     });
   };
 
-  const cycleThreeState = (filterKey: 'redemptionFilter' | 'batchFilter' | 'zombieFilter') => {
-    const states: FilterState[] = ['all', 'only', 'hide'];
-    const currentValue = filters[filterKey] || 'all';
-    const currentIndex = states.indexOf(currentValue);
-    const nextValue = states[(currentIndex + 1) % states.length];
-
-    onFiltersChange({
-      ...filters,
-      [filterKey]: nextValue === 'all' ? undefined : nextValue
-    });
-  };
-
-  const getThreeStateIcon = (state: FilterState | undefined) => {
-    if (!state || state === 'all') {
-      return <div className="w-4 h-4 border border-slate-500 rounded" />;
-    } else if (state === 'only') {
-      return (
-        <div className="w-4 h-4 border border-blue-500 bg-blue-500 rounded flex items-center justify-center">
-          <Check className="w-3 h-3 text-white" />
-        </div>
-      );
-    } else {
-      return (
-        <div className="w-4 h-4 border border-red-500 bg-red-500 rounded flex items-center justify-center">
-          <Minus className="w-3 h-3 text-white" />
-        </div>
-      );
-    }
-  };
 
   const getActiveFilterCount = () => {
     let count = 0;
 
-    // Count selected collateral types
-    if (filters.collateralTypes && filters.collateralTypes.length > 0) {
-      count++;
-    }
+    // Don't count collateral types - they're more of a data source selector than a filter
 
-    // Count three-state filters
+    // Count segmented filters
+    if (filters.status && filters.status !== 'all') count++;
     if (filters.redemptionFilter && filters.redemptionFilter !== 'all') count++;
-    if (filters.batchFilter && filters.batchFilter !== 'all') count++;
-    if (filters.zombieFilter && filters.zombieFilter !== 'all') count++;
+    if (filters.typeFilter && filters.typeFilter !== 'all') count++;
+    // Only count health filter if status is active (when it's visible)
+    if (filters.status === 'active' && filters.healthFilter && filters.healthFilter !== 'all') count++;
 
     return count;
   };
@@ -119,16 +92,16 @@ export function UnifiedFiltersDropdown({
     if (activeFilterCount > 0) {
       return `Filter${activeFilterCount > 1 ? 's' : ''}`;
     }
-    return 'Filters';
+    return '';
   };
 
   const resetFilters = () => {
     onFiltersChange({
-      status: filters.status,
+      status: 'all',
       collateralTypes: undefined,
       redemptionFilter: undefined,
-      batchFilter: undefined,
-      zombieFilter: undefined
+      typeFilter: undefined,
+      healthFilter: undefined
     });
   };
 
@@ -136,15 +109,12 @@ export function UnifiedFiltersDropdown({
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white font-medium transition-colors"
+        className="flex cursor-pointer items-center gap-2 px-4 h-10 py-2 bg-slate-900 hover:bg-slate-700 rounded-lg text-white font-medium transition-colors"
       >
         <Filter className="w-4 h-4 text-slate-400" />
-        <span>
-          {getFilterSummary()}
-          {activeFilterCount > 0 && (
-            <span className="text-slate-400 ml-1">({activeFilterCount})</span>
-          )}
-        </span>
+        {activeFilterCount > 0 && (
+          <span className="px-2 py-0.5 bg-slate-600 rounded-full text-xs text-slate-200">{activeFilterCount}</span>
+        )}
         <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
@@ -156,9 +126,19 @@ export function UnifiedFiltersDropdown({
               <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">Status</div>
               <div className="flex bg-slate-900 rounded-lg p-1">
                 <button
-                  onClick={() => onFiltersChange({ ...filters, status: 'open' })}
+                  onClick={() => onFiltersChange({ ...filters, status: 'all', healthFilter: undefined })}
                   className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
-                    filters.status === 'open'
+                    filters.status === 'all' || !filters.status
+                      ? 'bg-blue-900 text-blue-400 font-semibold'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => onFiltersChange({ ...filters, status: 'active' })}
+                  className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
+                    filters.status === 'active'
                       ? 'bg-green-900 text-green-400 font-semibold'
                       : 'text-slate-400 hover:text-white'
                   }`}
@@ -166,7 +146,7 @@ export function UnifiedFiltersDropdown({
                   Active
                 </button>
                 <button
-                  onClick={() => onFiltersChange({ ...filters, status: 'closed' })}
+                  onClick={() => onFiltersChange({ ...filters, status: 'closed', healthFilter: undefined })}
                   className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                     filters.status === 'closed'
                       ? 'bg-slate-700 text-white font-semibold'
@@ -174,16 +154,6 @@ export function UnifiedFiltersDropdown({
                   }`}
                 >
                   Closed
-                </button>
-                <button
-                  onClick={() => onFiltersChange({ ...filters, status: 'both' })}
-                  className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
-                    filters.status === 'both' || !filters.status
-                      ? 'bg-blue-900 text-blue-400 font-semibold'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Both
                 </button>
               </div>
             </div>
@@ -236,50 +206,119 @@ export function UnifiedFiltersDropdown({
 
           {/* Advanced Filters */}
           {showAdvancedFilters && (
-            <div className="p-3 border-b border-slate-700">
-              <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">Advanced Filters</div>
-              <div className="space-y-2">
-                {/* Redemptions Filter */}
-                <button
-                  onClick={() => cycleThreeState('redemptionFilter')}
-                  className="flex items-center gap-3 w-full text-left px-2 py-1.5 hover:bg-slate-700 rounded transition-colors"
-                >
-                  {getThreeStateIcon(filters.redemptionFilter)}
-                  <span className="text-white">
-                    {filters.redemptionFilter === 'only' ? 'Has Redemptions' :
-                     filters.redemptionFilter === 'hide' ? 'No Redemptions' :
-                     'All (Redemptions)'}
-                  </span>
-                </button>
-
-                {/* Batch Filter */}
-                <button
-                  onClick={() => cycleThreeState('batchFilter')}
-                  className="flex items-center gap-3 w-full text-left px-2 py-1.5 hover:bg-slate-700 rounded transition-colors"
-                >
-                  {getThreeStateIcon(filters.batchFilter)}
-                  <span className="text-white">
-                    {filters.batchFilter === 'only' ? 'Batch Only' :
-                     filters.batchFilter === 'hide' ? 'Individual Only' :
-                     'All (Type)'}
-                  </span>
-                </button>
-
-                {/* Zombie Filter - only show for open status */}
-                {filters.status === 'open' && (
+            <div className="p-3 border-b border-slate-700 space-y-3">
+              {/* Redemptions Filter */}
+              <div>
+                <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">Redemptions</div>
+                <div className="flex bg-slate-900 rounded-lg p-1">
                   <button
-                    onClick={() => cycleThreeState('zombieFilter')}
-                    className="flex items-center gap-3 w-full text-left px-2 py-1.5 hover:bg-slate-700 rounded transition-colors"
+                    onClick={() => onFiltersChange({ ...filters, redemptionFilter: 'all' })}
+                    className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
+                      filters.redemptionFilter === 'all' || !filters.redemptionFilter
+                        ? 'bg-blue-900 text-blue-400 font-semibold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
                   >
-                    {getThreeStateIcon(filters.zombieFilter)}
-                    <span className="text-white">
-                      {filters.zombieFilter === 'only' ? 'Zombies Only' :
-                       filters.zombieFilter === 'hide' ? 'Hide Zombies' :
-                       'All (Zombies)'}
-                    </span>
+                    All
                   </button>
-                )}
+                  <button
+                    onClick={() => onFiltersChange({ ...filters, redemptionFilter: 'with' })}
+                    className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
+                      filters.redemptionFilter === 'with'
+                        ? 'bg-orange-900 text-orange-400 font-semibold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    With
+                  </button>
+                  <button
+                    onClick={() => onFiltersChange({ ...filters, redemptionFilter: 'without' })}
+                    className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
+                      filters.redemptionFilter === 'without'
+                        ? 'bg-slate-700 text-white font-semibold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Without
+                  </button>
+                </div>
               </div>
+
+              {/* Interest Rate Management Filter */}
+              <div>
+                <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">Interest Rate Management</div>
+                <div className="flex bg-slate-900 rounded-lg p-1">
+                  <button
+                    onClick={() => onFiltersChange({ ...filters, typeFilter: 'all' })}
+                    className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
+                      filters.typeFilter === 'all' || !filters.typeFilter
+                        ? 'bg-blue-900 text-blue-400 font-semibold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => onFiltersChange({ ...filters, typeFilter: 'batch' })}
+                    className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
+                      filters.typeFilter === 'batch'
+                        ? 'bg-purple-900 text-purple-400 font-semibold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Delegated
+                  </button>
+                  <button
+                    onClick={() => onFiltersChange({ ...filters, typeFilter: 'individual' })}
+                    className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
+                      filters.typeFilter === 'individual'
+                        ? 'bg-slate-700 text-white font-semibold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Individual
+                  </button>
+                </div>
+              </div>
+
+              {/* Health Filter - only show for active status */}
+              {filters.status === 'active' && (
+                <div>
+                  <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">Health</div>
+                  <div className="flex bg-slate-900 rounded-lg p-1">
+                    <button
+                      onClick={() => onFiltersChange({ ...filters, healthFilter: 'all' })}
+                      className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
+                        filters.healthFilter === 'all' || !filters.healthFilter
+                          ? 'bg-blue-900 text-blue-400 font-semibold'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => onFiltersChange({ ...filters, healthFilter: 'zombies' })}
+                      className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
+                        filters.healthFilter === 'zombies'
+                          ? 'bg-red-900 text-red-400 font-semibold'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Zombies
+                    </button>
+                    <button
+                      onClick={() => onFiltersChange({ ...filters, healthFilter: 'healthy' })}
+                      className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
+                        filters.healthFilter === 'healthy'
+                          ? 'bg-green-900 text-green-400 font-semibold'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Healthy
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -288,7 +327,7 @@ export function UnifiedFiltersDropdown({
             <div className="p-3">
               <button
                 onClick={resetFilters}
-                className="w-full px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-sm text-white transition-colors"
+                className="cursor-pointer w-full px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-sm text-white transition-colors"
               >
                 Reset Filters
               </button>

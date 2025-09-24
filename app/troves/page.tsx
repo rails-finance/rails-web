@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { SimplifiedTroveCard } from "@/components/trove/SimplifiedTroveCard";
 import { TroveFilterParams } from "@/components/trove/TroveFilters";
-import { UnifiedFiltersDropdown, UnifiedFilters, FilterState } from "@/components/filters/UnifiedFilters";
+import { UnifiedFiltersDropdown, UnifiedFilters } from "@/components/filters/UnifiedFilters";
 import { TroveSummary } from "@/types/api/trove";
 import { CollateralBreakdown } from "@/components/stats/CollateralBreakdown";
 import { CollateralStats } from "@/types/api/stats";
@@ -29,7 +29,7 @@ export default function TrovesPage() {
 
   // Filter and sort state - initialize from URL
   const [filters, setFilters] = useState<TroveFilterParams>(() => {
-    const status = searchParams.get('status') || 'both';
+    const status = searchParams.get('status') || 'all';
     // Support both old collateralType and new collateralTypes for backwards compatibility
     const collateralTypesParam = searchParams.getAll('collateral').filter(Boolean);
     const collateralTypeParam = searchParams.get('collateralType');
@@ -55,7 +55,7 @@ export default function TrovesPage() {
     const searchQuery = searchParams.get('q') || undefined;
 
     return {
-      status: status as 'open' | 'closed' | 'both',
+      status: status as 'all' | 'active' | 'closed',
       collateralTypes,
       redemptionFilter,
       batchFilter,
@@ -102,7 +102,7 @@ export default function TrovesPage() {
     if (params.get('page') === '1') params.delete('page');
     if (params.get('sortBy') === 'activity') params.delete('sortBy');
     if (params.get('sortOrder') === 'desc') params.delete('sortOrder');
-    if (params.get('status') === 'both') params.delete('status');
+    if (params.get('status') === 'all') params.delete('status');
     // Remove old parameters if present
     params.delete('collateralType');
     params.delete('collateralTypes');
@@ -120,23 +120,64 @@ export default function TrovesPage() {
 
   // Convert filters for unified component
   const convertToUnifiedFilters = (params: TroveFilterParams): UnifiedFilters => {
+    // Map old filter values to new UI values
+    const mapRedemptionForUI = (val?: string) => {
+      if (val === 'only') return 'with' as const;
+      if (val === 'hide') return 'without' as const;
+      return 'all' as const;
+    };
+
+    const mapTypeForUI = (val?: string) => {
+      if (val === 'only') return 'batch' as const;
+      if (val === 'hide') return 'individual' as const;
+      return 'all' as const;
+    };
+
+    const mapHealthForUI = (val?: string) => {
+      if (val === 'only') return 'zombies' as const;
+      if (val === 'hide') return 'healthy' as const;
+      return 'all' as const;
+    };
+
     return {
-      status: params.status as 'open' | 'closed' | 'both' || 'both',
+      status: params.status as 'all' | 'active' | 'closed' || 'all',
       collateralTypes: params.collateralTypes,
-      redemptionFilter: params.redemptionFilter as FilterState || undefined,
-      batchFilter: params.batchFilter as FilterState || undefined,
-      zombieFilter: params.zombieFilter as FilterState || undefined,
+      redemptionFilter: mapRedemptionForUI(params.redemptionFilter),
+      typeFilter: mapTypeForUI(params.batchFilter),
+      healthFilter: mapHealthForUI(params.zombieFilter),
       searchQuery: params.searchQuery
     };
   };
 
   const convertFromUnifiedFilters = (unified: UnifiedFilters): TroveFilterParams => {
+    // Map new filter values back to old values for backward compatibility
+    const mapRedemptionFilter = (val?: string) => {
+      if (val === 'with') return 'only' as const;
+      if (val === 'without') return 'hide' as const;
+      if (val === 'all') return undefined;
+      return val as any;
+    };
+
+    const mapTypeFilter = (val?: string) => {
+      if (val === 'batch') return 'only' as const;
+      if (val === 'individual') return 'hide' as const;
+      if (val === 'all') return undefined;
+      return val as any;
+    };
+
+    const mapHealthFilter = (val?: string) => {
+      if (val === 'zombies') return 'only' as const;
+      if (val === 'healthy') return 'hide' as const;
+      if (val === 'all') return undefined;
+      return val as any;
+    };
+
     return {
-      status: unified.status || 'both',
+      status: unified.status || 'all',
       collateralTypes: unified.collateralTypes,
-      redemptionFilter: unified.redemptionFilter as 'only' | 'hide' | 'all' | undefined,
-      batchFilter: unified.batchFilter as 'only' | 'hide' | 'all' | undefined,
-      zombieFilter: unified.zombieFilter as 'only' | 'hide' | 'all' | undefined,
+      redemptionFilter: mapRedemptionFilter(unified.redemptionFilter),
+      batchFilter: mapTypeFilter(unified.typeFilter),
+      zombieFilter: mapHealthFilter(unified.healthFilter),
       searchQuery: unified.searchQuery
     };
   };
@@ -162,7 +203,7 @@ export default function TrovesPage() {
       page: undefined, // Reset to page 1
       collateral: collateralParam,
       collateralTypes: undefined, // Remove old parameter if it exists
-      status: newFilters.status !== 'both' ? newFilters.status : undefined,
+      status: newFilters.status !== 'all' ? newFilters.status : undefined,
       redemptionFilter: newFilters.redemptionFilter !== 'all' ? newFilters.redemptionFilter : undefined,
       batchFilter: newFilters.batchFilter !== 'all' ? newFilters.batchFilter : undefined,
       zombieFilter: newFilters.zombieFilter !== 'all' ? newFilters.zombieFilter : undefined,
@@ -188,7 +229,7 @@ export default function TrovesPage() {
 
       // For complex filters or search filters, fetch all and paginate client-side
       const needsClientSidePagination =
-        filters.status === 'both' ||
+        filters.status === 'all' ||
         filters.redemptionFilter ||
         filters.batchFilter ||
         filters.zombieFilter ||
@@ -209,7 +250,7 @@ export default function TrovesPage() {
         };
 
         // Regular filter-based fetch
-        if (filters.status === 'both' || !filters.status) {
+        if (filters.status === 'all' || !filters.status) {
             // Only fetch if collateral types are selected
             if (filters.collateralTypes && filters.collateralTypes.length > 0) {
               for (const collType of filters.collateralTypes) {
@@ -235,7 +276,8 @@ export default function TrovesPage() {
             // Fetch specific status
             if (filters.collateralTypes && filters.collateralTypes.length > 0) {
               for (const collType of filters.collateralTypes) {
-                const response = await fetch(buildApiUrl(filters.status, collType));
+                const apiStatus = filters.status === 'active' ? 'open' : filters.status === 'closed' ? 'closed' : 'open';
+                const response = await fetch(buildApiUrl(apiStatus, collType));
                 const data = await response.json();
                 allTroves.push(...(data.data || []));
               }
@@ -248,9 +290,9 @@ export default function TrovesPage() {
         // Apply client-side filters
         let filtered = [...allTroves];
 
-        if (filters.redemptionFilter === 'only') {
+        if (filters.redemptionFilter === 'with') {
           filtered = filtered.filter(t => t.activity?.redemptionCount && t.activity.redemptionCount > 0);
-        } else if (filters.redemptionFilter === 'hide') {
+        } else if (filters.redemptionFilter === 'without') {
           filtered = filtered.filter(t => !t.activity?.redemptionCount || t.activity.redemptionCount === 0);
         }
 
@@ -332,7 +374,7 @@ export default function TrovesPage() {
         if (filters.collateralTypes && filters.collateralTypes.length > 0) {
           for (const collType of filters.collateralTypes) {
             const params = new URLSearchParams();
-            params.set('status', filters.status || 'open');
+            params.set('status', filters.status === 'active' ? 'open' : filters.status === 'closed' ? 'closed' : 'open');
             params.set('collateralType', collType);
             params.set('limit', '500');
             params.set('offset', '0');
@@ -375,7 +417,7 @@ export default function TrovesPage() {
           setTroves(allTroves.slice(offset, offset + itemsPerPage));
         } else {
           const params = new URLSearchParams();
-          params.set('status', filters.status || 'open');
+          params.set('status', filters.status === 'active' ? 'open' : filters.status === 'closed' ? 'closed' : 'open');
           params.set('limit', String(itemsPerPage));
           params.set('offset', String(offset));
 
@@ -470,9 +512,9 @@ export default function TrovesPage() {
   const sortOptions = [
     { value: 'debt', label: 'Debt' },
     { value: 'collateral', label: 'Collateral' },
-    { value: 'ratio', label: 'Collateral Ratio' },
-    { value: 'interestRate', label: 'Interest Rate' },
-    { value: 'activity', label: 'Recent Activity' }
+    { value: 'ratio', label: 'Ratio' },
+    { value: 'interestRate', label: 'Interest %' },
+    { value: 'activity', label: 'Activity' }
   ];
 
   // Pagination calculations
@@ -498,7 +540,7 @@ export default function TrovesPage() {
     }
 
     return (
-      <div className="flex items-center justify-between mt-8 px-4">
+      <div className="flex items-center justify-between mt-8">
         <div className="text-sm text-slate-400">
           Showing {showingFrom}-{showingTo} of {totalCount} troves
         </div>
@@ -507,7 +549,7 @@ export default function TrovesPage() {
           <button
             onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage === 1}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="cursor-pointer p-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -516,7 +558,7 @@ export default function TrovesPage() {
             <>
               <button
                 onClick={() => goToPage(1)}
-                className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+                className="cursor-pointer px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
               >
                 1
               </button>
@@ -528,9 +570,9 @@ export default function TrovesPage() {
             <button
               key={num}
               onClick={() => goToPage(num)}
-              className={`px-3 py-2 rounded-lg transition-colors ${
+              className={`cursor-pointer px-3 py-1 rounded-lg transition-colors ${
                 num === currentPage
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-slate-600 text-white'
                   : 'bg-slate-800 hover:bg-slate-700'
               }`}
             >
@@ -543,7 +585,7 @@ export default function TrovesPage() {
               {end < totalPages - 1 && <span className="text-slate-400">...</span>}
               <button
                 onClick={() => goToPage(totalPages)}
-                className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+                className="cursor-pointer px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
               >
                 {totalPages}
               </button>
@@ -553,7 +595,7 @@ export default function TrovesPage() {
           <button
             onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage === totalPages}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="cursor-pointer p-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -565,7 +607,8 @@ export default function TrovesPage() {
   if (loading && troves.length === 0) {
     return (
       <main className="min-h-screen">
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto py-8">
+          <h1 className="text-2xl font-bold text-white mb-6">Liquity V2 Troves</h1>
           <div className="animate-pulse">
             <div className="h-8 bg-slate-700 rounded w-1/3 mb-8"></div>
             <div className="space-y-4">
@@ -607,53 +650,10 @@ export default function TrovesPage() {
 
   return (
     <main className="min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header with Collateral Checkboxes */}
-        <div className="mb-8">
-          <div className="flex items-center gap-6">
-            {availableCollateralTypes.map(type => {
-              const isSelected = filters.collateralTypes?.includes(type);
-              return (
-                <button
-                  key={type}
-                  onClick={() => {
-                    const current = filters.collateralTypes || [];
-                    const newTypes = current.includes(type)
-                      ? current.filter(t => t !== type)
-                      : [...current, type];
-                    handleFiltersChange({
-                      ...filters,
-                      collateralTypes: newTypes
-                    });
-                  }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                    isSelected
-                      ? 'bg-slate-800 border-2 border-blue-500'
-                      : 'bg-slate-900 border-2 border-slate-700 opacity-60 hover:opacity-100'
-                  }`}
-                >
-                  <div className={`w-5 h-5 border rounded flex items-center justify-center transition-all ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-500'
-                      : 'border-slate-500'
-                  }`}>
-                    {isSelected && <Check className="w-3 h-3 text-white" />}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <svg className="w-6 h-6">
-                      <use href={`#icon-${type.toLowerCase().replace('weth', 'eth')}`} />
-                    </svg>
-                    <span className="text-sm text-slate-400">/</span>
-                    <svg className="w-6 h-6">
-                      <use href="#icon-bold" />
-                    </svg>
-                    <span className="text-white font-semibold ml-1">{type}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      <div className="max-w-7xl mx-auto py-8">
+
+        {/* Page Header */}
+        <h1 className="text-2xl font-bold text-white mb-6">Liquity V2 Troves</h1>
 
         {/* Stats */}
         {filters.collateralTypes?.length === 1 && collateralStats && (
@@ -664,24 +664,80 @@ export default function TrovesPage() {
           />
         )}
 
-        {/* Filters and Sort */}
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-1">
-            <UnifiedFiltersDropdown
-              filters={convertToUnifiedFilters(filters)}
-              onFiltersChange={(unified) => handleFiltersChange(convertFromUnifiedFilters(unified))}
-              availableCollateralTypes={availableCollateralTypes}
-              showCollateralFilter={false}
-            />
+        {/* Filters and Sort - Responsive layout */}
+        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
+          {/* Filter and Collateral row on mobile, inline on desktop */}
+          <div className="flex flex-col md:flex-row md:items-center gap-3 md:flex-1">
+            {/* First row on mobile: Filter button and collateral buttons */}
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <UnifiedFiltersDropdown
+                filters={convertToUnifiedFilters(filters)}
+                onFiltersChange={(unified) => handleFiltersChange(convertFromUnifiedFilters(unified))}
+                availableCollateralTypes={availableCollateralTypes}
+                showCollateralFilter={false}
+              />
 
-            {/* Search Input */}
-            <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
+              {/* Collateral Type Buttons */}
+              <div className="flex items-center gap-2 flex-1 md:flex-initial">
+                {availableCollateralTypes.map(type => {
+                  const isSelected = filters.collateralTypes?.includes(type);
+                  const isOnlySelected = filters.collateralTypes?.length === 1 && isSelected;
+                  return (
+                    <button
+                      key={type}
+                      title={isOnlySelected ? 'At least one collateral must be selected' : undefined}
+                      onClick={() => {
+                        const current = filters.collateralTypes || [];
+
+                        // If trying to deselect
+                        if (current.includes(type)) {
+                          // Don't allow deselecting if it's the only one selected
+                          if (current.length === 1) {
+                            return; // Keep at least one selected
+                          }
+                          // Otherwise, allow deselection
+                          const newTypes = current.filter(t => t !== type);
+                          handleFiltersChange({
+                            ...filters,
+                            collateralTypes: newTypes
+                          });
+                        } else {
+                          // Always allow selecting
+                          const newTypes = [...current, type];
+                          handleFiltersChange({
+                            ...filters,
+                            collateralTypes: newTypes
+                          });
+                        }
+                      }}
+                      className={`flex items-center h-10  justify-center gap-1 md:gap-2 px-2 md:px-3 py-2 rounded-lg transition-all flex-1 md:flex-initial ${
+                        isOnlySelected
+                          ? 'cursor-not-allowed'
+                          : 'cursor-pointer'
+                      } ${
+                        isSelected
+                          ? 'bg-slate-900 border border-slate-900 hover:opacity-70'
+                          : 'opacity-25 border-slate-600 border hover:border-slate-500'
+                      }`}
+                    >
+                      <svg className="w-5 h-5">
+                        <use href={`#icon-${type.toLowerCase().replace('weth', 'eth')}`} />
+                      </svg>
+                      <span className="text-white font-semibold text-sm md:text-base">{type}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Second row on mobile: Search Input */}
+            <form onSubmit={handleSearchSubmit} className="relative w-full md:flex-1">
               <input
                 type="text"
-                placeholder="Filter by address, ENS, ID, or delegate..."
+                placeholder="Address, ENS, ID, or delegate..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full px-4 py-2 pr-10 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full px-4 py-2 pr-10 bg-slate-800 h-10 border border-slate-700 rounded-lg text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
               {searchInput ? (
                 <button
@@ -698,18 +754,26 @@ export default function TrovesPage() {
             </form>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative" ref={sortDropdownRef}>
+          {/* Third row on mobile: Sort controls */}
+          <div className="flex items-center gap-1 w-full md:w-auto">
+            <button
+              onClick={() => handleSortChange(sortBy, sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="flex items-center justify-center w-10 h-10 bg-slate-900 hover:bg-slate-700 rounded-lg transition-colors text-white"
+              title={sortOrder === 'asc' ? 'Sort Ascending' : 'Sort Descending'}
+            >
+              {sortOrder === 'asc' ? '↑' : '↓'}
+            </button>
+            <div className="relative h-10 flex-1 md:flex-initial" ref={sortDropdownRef}>
               <button
                 onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-700 rounded-lg text-white font-medium transition-colors min-w-[160px]"
+                className="w-full md:w-auto flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-700 rounded-lg text-white font-medium transition-colors md:min-w-[160px]"
               >
                 <span>{sortOptions.find(o => o.value === sortBy)?.label || 'Sort'}</span>
                 <ChevronDown className={`w-4 h-4 text-slate-400 ml-auto transition-transform ${isSortDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {isSortDropdownOpen && (
-                <div className="absolute top-full right-0 mt-2 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 min-w-[200px] overflow-hidden">
+                <div className="absolute top-full left-0 md:left-auto right-0 mt-2 bg-slate-900/95 border border-slate-700 rounded-lg shadow-xl z-50 min-w-[200px] overflow-hidden">
                   {sortOptions.map(option => (
                     <button
                       key={option.value}
@@ -717,8 +781,8 @@ export default function TrovesPage() {
                         handleSortChange(option.value);
                         setIsSortDropdownOpen(false);
                       }}
-                      className={`block w-full text-left px-4 py-3 text-white hover:bg-slate-700 transition-colors ${
-                        sortBy === option.value ? 'bg-slate-700' : ''
+                      className={`block w-full text-left px-4 py-3 text-white hover:bg-slate-700/50 transition-colors ${
+                        sortBy === option.value ? 'bg-slate-800/50' : ''
                       }`}
                     >
                       {option.label}
@@ -727,14 +791,6 @@ export default function TrovesPage() {
                 </div>
               )}
             </div>
-
-            <button
-              onClick={() => handleSortChange(sortBy, sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="flex items-center justify-center w-10 h-10 bg-slate-900 hover:bg-slate-700 rounded-lg transition-colors text-white"
-              title={sortOrder === 'asc' ? 'Sort Ascending' : 'Sort Descending'}
-            >
-              {sortOrder === 'asc' ? '↑' : '↓'}
-            </button>
           </div>
         </div>
 
