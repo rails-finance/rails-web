@@ -67,7 +67,7 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
           <div className="text-white space-y-2 text-sm">
             {items.map((item, index) => (
               <div key={index} className="flex items-start gap-2">
-                <span className="text-slate-400 mt-0.5">•</span>
+                <span className="text-slate-400">•</span>
                 {item}
               </div>
             ))}

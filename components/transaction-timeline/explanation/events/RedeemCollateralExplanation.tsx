@@ -91,10 +91,10 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
       <span key="currentValue" className="text-slate-500">
         Current collateral valued at <HighlightableValue type="collateralUsd" state="after" value={redeemAfterCollUsd}>
           {formatUsdValue(redeemAfterCollUsd)}
-        </HighlightableValue> with historic price of {tx.collateralType} priced at{' '}
+        </HighlightableValue> with historic price of{' '}
         <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
-          {formatUsdValue(tx.collateralPrice)}/{tx.collateralType}
-        </HighlightableValue>
+          {formatUsdValue(tx.collateralPrice)}
+        </HighlightableValue>{' '}/{' '}{tx.collateralType}
       </span>
     );
   }

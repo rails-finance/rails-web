@@ -20,18 +20,18 @@ export function DefaultExplanation({ transaction, onToggle }: DefaultExplanation
     <div className="bg-slate-800/40 rounded-lg p-4 space-y-2">
       <div className="text-white space-y-2 text-sm">
         <div className="flex items-start gap-2">
-          <span className="text-slate-400 mt-0.5">•</span>
+          <span className="text-slate-400">•</span>
           <span className="text-slate-400">{tx.operation.replace(/([A-Z])/g, ' $1').toLowerCase().trim()} executed</span>
         </div>
         {defaultBeforeDebt !== undefined && (
           <div className="flex items-start gap-2">
-            <span className="text-slate-400 mt-0.5">•</span>
+            <span className="text-slate-400">•</span>
             <span className="text-slate-400">Debt changed from {toLocaleStringHelper(defaultBeforeDebt)} to {toLocaleStringHelper(defaultAfterDebt)} {tx.assetType}</span>
           </div>
         )}
         {defaultBeforeColl !== undefined && (
           <div className="flex items-start gap-2">
-            <span className="text-slate-400 mt-0.5">•</span>
+            <span className="text-slate-400">•</span>
             <span className="text-slate-400">Collateral changed from {defaultBeforeColl} to {defaultAfterColl} {tx.collateralType}</span>
           </div>
         )}
