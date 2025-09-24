@@ -74,23 +74,13 @@ export const IconSymbols = () => (
       <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" />
       <circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" strokeWidth="2" />
     </symbol>
-    <symbol id="icon-trove-id"  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" >
-  <polyline points="3,2 21,2" opacity="0.1"/>
-  <polyline points="3,21.75 21,21.75" opacity="0.1"/>
-  <polyline points="2,3 2,21" opacity="0.1"/>
-  <polyline points="21.75,3 21.75,21" opacity="0.1"/>
-  
-
-  <polyline points="7,6 7,18"/>
-  
-
-  <polyline points="11,6 11,18"/>
-  <polyline points="10.5,6.5 15,6.5"/>
-  <polyline points="10.5,17 15,17"/>
-  <polyline points="16,7.5 16,9"/>
-  <polyline points="16,15 16,16.5"/>
-  <polyline points="17,9 17,15"/>
-
+    <symbol id="icon-trove-id" viewBox="0 0 24 24">
+      <polyline points="7 7 7 17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M 17 12 C 17 17 12 17 12 17 L 12 7 C 11 7 17 7 17 12 Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="17 2 22 2 22 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="7 2 2 2 2 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="7 22 2 22 2 17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="17 22 22 22 22 17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </symbol>
     <symbol id="icon-arrow-left-right" viewBox="0 0 24 24">
       <path d="M8 3 4 7l4 4" stroke="currentColor" strokeWidth="2" />
