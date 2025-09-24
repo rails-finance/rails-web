@@ -14,16 +14,18 @@ export function ChangeValue({ amount, type }: ChangeValueProps) {
   const isHighlighted = hoverEnabled && type && shouldHighlight(hoveredValue, type, 'change');
   
   if (!type || !hoverEnabled) {
-    return <span className="font-medium text-white min-h-8 flex items-center justify-end">{toLocaleStringHelper(amount)}</span>;
+    return <span className="min-h-8 flex items-center"><span className="font-medium flex text-white items-center ${isHighlighted ? 'bg-blue-900 rounded' : ''}">{toLocaleStringHelper(amount)}</span></span>;
   }
   
   return (
+    <span className=" min-h-8 flex items-center ">
     <span 
-      className={`font-medium text-white min-h-8 flex items-center justify-end cursor-pointer transition-all ${isHighlighted ? '-mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded' : ''}`}
+      className={`font-medium text-white justify-end cursor-pointer transition-all ${isHighlighted ? 'bg-blue-900 rounded' : ''}`}
       onMouseEnter={() => setHoveredValue({ type, state: 'change', value: amount })}
       onMouseLeave={() => setHoveredValue(null)}
     >
       {toLocaleStringHelper(amount)}
+    </span>
     </span>
   );
 }

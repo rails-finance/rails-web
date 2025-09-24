@@ -53,10 +53,10 @@ export function DebtMetric({ assetType, before, after, isCloseTrove, upfrontFee 
           </div>
         </StateTransition>
         {upfrontFee !== undefined && upfrontFee > 0 && (
-          <div className="">
+          <div className="text-xs text-slate-500 mt-0.5 block">
             <span
-              className={`text-xs text-slate-500 mt-0.5 block ${hoverEnabled ? "cursor-pointer" : ""} transition-all ${
-                isFeeHighlighted ? "-mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded" : ""
+              className={`${hoverEnabled ? "cursor-pointer" : ""} transition-all ${
+                isFeeHighlighted ? "-mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded text-white" : ""
               }`}
               onMouseEnter={
                 hoverEnabled
@@ -65,8 +65,9 @@ export function DebtMetric({ assetType, before, after, isCloseTrove, upfrontFee 
               }
               onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
             >
-              {toLocaleStringHelper(upfrontFee)} fee
+              {toLocaleStringHelper(upfrontFee)}
             </span>
+            <span className="ml-1">fee</span>
           </div>
         )}
       </div>

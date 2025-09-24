@@ -89,7 +89,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
     items.push(
       <span key="collateral-info" className="text-slate-500">
         <HighlightableValue type="collateral" state="after" value={trove.collateral.amount}>{trove.collateral.amount} {trove.collateralType}</HighlightableValue> collateral worth{" "}
-        <HighlightableValue type="collateralUsd" state="after" value={trove.collateral.valueUsd}>{formatUsdValue(trove.collateral.valueUsd)}</HighlightableValue> at current price of <HighlightableValue type="currentPrice" state="after" value={currentPrice}>{formatUsdValue(currentPrice)}/{trove.collateralType}</HighlightableValue> secures this position
+        <HighlightableValue type="collateralUsd" state="after" value={trove.collateral.valueUsd}>{formatUsdValue(trove.collateral.valueUsd)}</HighlightableValue> at current price of <HighlightableValue type="currentPrice" state="after" value={currentPrice}>{formatUsdValue(currentPrice)}</HighlightableValue> / {trove.collateralType} secures this position
       </span>
     );
 
