@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 import type { TransactionTimeline as TimelineData } from "@/types/api/troveHistory";
@@ -12,6 +12,7 @@ import { TransactionTimeline } from "@/components/transaction-timeline";
 
 export default function TrovePage() {
   const params = useParams();
+  const router = useRouter();
   const troveId = params.troveId as string;
   const collateralType = params.collateralType as string;
 
@@ -76,7 +77,7 @@ export default function TrovePage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Button onClick={() => window.history.back()} className="mb-4">
+        <Button onClick={() => router.back()} className="mb-4">
         <ChevronLeft className="w-4 h-4" />
           Back
         </Button>
@@ -92,7 +93,7 @@ export default function TrovePage() {
   if (error || !troveData) {
     return (
       <div className="space-y-6">
-        <Button onClick={() => window.history.back()} className="mb-4">
+        <Button onClick={() => router.back()} className="mb-4">
         <ChevronLeft className="w-4 h-4" />
           Back
         </Button>
@@ -108,7 +109,7 @@ export default function TrovePage() {
 
   return (
     <div className="space-y-6">
-      <Button onClick={() => window.history.back()} className="mb-4">
+      <Button onClick={() => router.back()} className="mb-4">
         <ChevronLeft className="w-4 h-4" />
           Back
       </Button>

@@ -20,6 +20,13 @@ interface SimplifiedTroveCardProps {
 
 function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = false }: { trove: TroveSummary; showViewButton?: boolean; hideLabels?: boolean }) {
   const calculator = useMemo(() => new InterestCalculator(), []);
+
+  // Save scroll position when navigating to trove detail
+  const handleClick = (e: React.MouseEvent) => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('troves-scroll-position', String(window.scrollY));
+    }
+  };
   
   // Generate interest info if not provided by backend
   const interestInfo = useMemo(() => {
@@ -45,6 +52,7 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
   return (
     <Link
       href={`/trove/${trove.collateralType}/${trove.id}`}
+      onClick={handleClick}
       className="block relative rounded-lg text-slate-500 bg-slate-900 hover:shadow-lg transition-shadow cursor-pointer group"
     >
       {/* Header section */}
@@ -89,7 +97,7 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
           {/* Essential metrics grid */}
           <div className="grid grid-cols-1 gap-4">
             <div>
-              <p className="text-xs text-slate-400 mb-1">Backed by</p>
+              <p className="text-xs text-slate-500 mb-1 font-bold">Backed by</p>
               <div className="flex items-center">
                 <span className="flex items-center">
                   <p className="text-xl font-bold mr-1">
@@ -146,10 +154,10 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
           </div>
 
           <div>
-            {!hideLabels && <p className="text-xs text-slate-400 mb-1">Backed by</p>}
+            {!hideLabels && <p className="text-xs text-slate-600 mb-1 font-bold">Backed by</p>}
             <div className="flex items-center">
               <span className="flex items-center">
-                <p className="text-xl font-bold mr-1">
+                <p className="text-xl font-bold mr-1 text-slate-300">
                   {trove.collateral.amount}
                 </p>
                 <span className="flex items-center">
@@ -226,9 +234,17 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
 }
 
 function SimplifiedClosedTroveCard({ trove, showViewButton = false, hideLabels = false }: { trove: TroveSummary; showViewButton?: boolean; hideLabels?: boolean }) {
+  // Save scroll position when navigating to trove detail
+  const handleClick = (e: React.MouseEvent) => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('troves-scroll-position', String(window.scrollY));
+    }
+  };
+
   return (
     <Link
       href={`/trove/${trove.collateralType}/${trove.id}`}
+      onClick={handleClick}
       className="block relative rounded-lg text-slate-500 bg-slate-700 hover:shadow-lg transition-shadow cursor-pointer group"
     >
       {/* Header section */}
@@ -322,9 +338,17 @@ function SimplifiedClosedTroveCard({ trove, showViewButton = false, hideLabels =
 }
 
 function SimplifiedLiquidatedTroveCard({ trove, showViewButton = false, collateralAtLiquidation, hideLabels = false }: { trove: TroveSummary; showViewButton?: boolean; collateralAtLiquidation?: number; hideLabels?: boolean }) {
+  // Save scroll position when navigating to trove detail
+  const handleClick = (e: React.MouseEvent) => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('troves-scroll-position', String(window.scrollY));
+    }
+  };
+
   return (
     <Link
       href={`/trove/${trove.collateralType}/${trove.id}`}
+      onClick={handleClick}
       className="block relative rounded-lg text-slate-500 bg-slate-800 hover:shadow-lg transition-shadow cursor-pointer group"
     >
       {/* Header section */}

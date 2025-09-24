@@ -19,7 +19,6 @@ export default function AboutPage() {
 				<h3 className="text-2xl font-bold text-slate-600 mb-6">The Definitive DeFi Support Platform</h3>
 				<p className="text-lg">
 					<span className="font-bold">Our mission</span> is to make DeFi more understandable and accessible for everyone.
-					By translating intricate protocol interactions into clear insights that anyone can understand.
 				</p>
 			</div>
     </div>

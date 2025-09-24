@@ -37,10 +37,8 @@ function SegmentedControl({ label, value, onChange, options }: SegmentedControlP
 }
 
 export interface TroveFilterParams {
-  troveId?: string;
   status?: string;
-  collateralType?: string;
-  ownerAddress?: string;
+  collateralTypes?: string[];
   activeWithin?: string;
   createdWithin?: string;
 
@@ -48,6 +46,9 @@ export interface TroveFilterParams {
   zombieFilter?: FilterState;
   redemptionFilter?: FilterState;
   batchFilter?: FilterState;
+
+  // Search query
+  searchQuery?: string;
 
   // Legacy closed view filter
   liquidatedOnly?: boolean;

@@ -12,9 +12,65 @@ export default function Home() {
   const [statsLoading, setStatsLoading] = useState(true);
   const router = useRouter();
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push(`/address/${searchValue}`);
+    const query = searchValue.trim();
+
+    if (!query) return;
+
+    // Try to detect which collateral types this address/ID has
+    try {
+      // Fetch all troves for this specific search query
+      const collateralTypes = ['WETH', 'wstETH', 'rETH'];
+      const foundCollaterals = new Set<string>();
+
+      // Check each collateral type for matches
+      await Promise.all(collateralTypes.map(async (collType) => {
+        const responses = await Promise.all([
+          fetch(`/api/troves?status=open&collateralType=${collType}&limit=500`),
+          fetch(`/api/troves?status=closed&collateralType=${collType}&limit=500`)
+        ]);
+
+        for (const response of responses) {
+          if (response.ok) {
+            const data = await response.json();
+            const troves = data.data || [];
+
+            // Check if any trove matches the search query
+            const hasMatch = troves.some((trove: any) => {
+              const queryLower = query.toLowerCase();
+              return (
+                trove.id?.toLowerCase() === queryLower ||
+                trove.owner?.toLowerCase() === queryLower ||
+                trove.lastOwner?.toLowerCase() === queryLower ||
+                trove.ownerEns?.toLowerCase() === queryLower
+              );
+            });
+
+            if (hasMatch) {
+              foundCollaterals.add(collType);
+            }
+          }
+        }
+      }));
+
+      // Build URL with found collateral types
+      const params = new URLSearchParams();
+      params.set('q', query);
+
+      // Only add collateral params if we found specific matches
+      if (foundCollaterals.size > 0) {
+        foundCollaterals.forEach(collType => {
+          params.append('collateral', collType);
+        });
+      }
+
+      router.push(`/troves?${params.toString()}`);
+    } catch (error) {
+      // If detection fails, fall back to default behavior
+      console.error('Failed to detect collateral types:', error);
+      router.push(`/troves?q=${encodeURIComponent(query)}`);
+    }
   };
 
 
@@ -131,31 +187,32 @@ export default function Home() {
 
                         {/* Search Box - Mobile and Desktop */}
                         <div className="md:flex-1 bg-white rounded-lg p-4  transition-shadow hover:shadow-lg">
-                          <p className="text-slate-600 font-medium mb-3">View your Liquity v2 Trove on Rails. Enter borrower address, ENS, Trove ID or delegate below.</p>
-                          <div className="relative">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="20"
-                              height="20"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500"
-                            >
-                              <circle cx="11" cy="11" r="8" />
-                              <path d="m21 21-4.3-4.3" />
-                            </svg>
-                            <input
-                              type="text"
-                              placeholder=""
-                              className="w-full pl-10 pr-4 py-2 text-sm bg-white text-slate-600 border border-slate-300 hover:border-slate-400 focus:border-blue-500 focus:outline-none transition-colors placeholder-slate-500 rounded-full"
-                              value={searchValue}
-                              onChange={(e) => setSearchValue(e.target.value)}
-                            />
-                          </div>
+                          <p className="text-slate-600 font-medium mb-3">View your Liquity v2 Trove on Rails. Enter borrower address, ENS, or Trove ID below.</p>
+                          <form onSubmit={handleSearch}>
+                            <div className="relative">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500"
+                              >
+                                <circle cx="11" cy="11" r="8" />
+                                <path d="m21 21-4.3-4.3" />
+                              </svg>
+                              <input
+                                type="text"
+                                className="w-full pl-10 pr-4 py-2 text-sm bg-white text-slate-600 border border-slate-300 hover:border-slate-400 focus:border-blue-500 focus:outline-none transition-colors placeholder-slate-500 rounded-full"
+                                value={searchValue}
+                                onChange={(e) => setSearchValue(e.target.value)}
+                              />
+                            </div>
+                          </form>
                         </div>
                       </div>
 											{/* Collateral Overview */}

@@ -6,7 +6,7 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 relative flex items-start gap-3">
         {/* Rails Logo */}
         <Link href="/" className="">
-          <div className="bg-green-600 rounded-b p-3 w-9 h-9 flex items-center justify-center">
+          <div className="bg-green-600 rounded-b p-2 w-9 h-9 flex items-center justify-center">
             <svg className="" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
               <use href="#icon-rails" />
             </svg>

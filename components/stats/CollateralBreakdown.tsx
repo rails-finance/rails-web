@@ -98,35 +98,28 @@ export function CollateralBreakdown({
   };
 
   const handleSearch = (value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-
-    // Clear previous search params
-    params.delete('troveId');
-    params.delete('ownerAddress');
-
+    // If we have a search value, redirect to the troves page with search query
     if (value.trim()) {
-      // Detect if it's a trove ID (64 char hex) or address/ENS/delegate name
-      if (value.startsWith('0x') && value.length === 66) {
-        // Likely a trove ID
-        params.set('troveId', value);
-      } else {
-        // Could be address, ENS, or delegate name
-        params.set('ownerAddress', value);
-      }
-    }
-
-    const newUrl = pathname !== '/troves'
-      ? `/troves?${params.toString()}`
-      : `${pathname}?${params.toString()}`;
-
-    // Safari fix: Use replace instead of push for same-page navigation
-    if (pathname === '/troves') {
-      router.replace(newUrl);
-      setTimeout(() => {
-        window.dispatchEvent(new Event('popstate'));
-      }, 0);
+      router.push(`/troves?q=${encodeURIComponent(value.trim())}`);
     } else {
-      router.push(newUrl);
+      // If clearing search, just remove the filter params on the current page
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('troveId');
+      params.delete('ownerAddress');
+
+      const newUrl = pathname !== '/troves'
+        ? `/troves?${params.toString()}`
+        : `${pathname}?${params.toString()}`;
+
+      // Safari fix: Use replace instead of push for same-page navigation
+      if (pathname === '/troves') {
+        router.replace(newUrl);
+        setTimeout(() => {
+          window.dispatchEvent(new Event('popstate'));
+        }, 0);
+      } else {
+        router.push(newUrl);
+      }
     }
   };
 
@@ -186,7 +179,7 @@ export function CollateralBreakdown({
         {sortedData.map(([collateralType, stats]) => (
           <Link
             key={collateralType}
-            href={`/troves?page=1&view=open&collateralType=${collateralType}`}
+            href={`/troves?collateral=${collateralType}`}
             className="group bg-white rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer"
           >
             <div className="flex items-center gap-3 mb-4">
@@ -278,7 +271,7 @@ export function CollateralBreakdown({
                           key={collateral.symbol}
                           onClick={() => {
                             setIsDropdownOpen(false);
-                            const url = `/troves?page=1&view=open&collateralType=${collateral.symbol}`;
+                            const url = `/troves?collateral=${collateral.symbol}`;
                             router.replace(url);
                             setTimeout(() => {
                               window.dispatchEvent(new Event('popstate'));
@@ -311,7 +304,7 @@ export function CollateralBreakdown({
                         handleClearSearch();
                       }
                     }}
-                    placeholder="Search by Trove ID, address, ENS, or delegate..."
+                    placeholder="Search: address, ENS, Trove ID, or delegate name..."
                     className="w-full pl-10 pr-10 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                   />
                   {searchValue && (
@@ -460,7 +453,7 @@ export function CollateralBreakdown({
                       </td>
                       <td className="px-6 py-4 text-right">
                         <Link
-                          href={`/troves?page=1&view=open&collateralType=${collateralType}`}
+                          href={`/troves?collateral=${collateralType}`}
                           className="text-white hover:text-blue-400 transition-colors"
                         >
                           {stats.openTroveCount.toLocaleString()}

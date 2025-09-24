@@ -1,535 +1,578 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { SimplifiedTroveCard } from "@/components/trove/SimplifiedTroveCard";
 import { TroveFilterParams } from "@/components/trove/TroveFilters";
-import { MinimalFilters } from "@/components/trove/MinimalFilters";
-import { TroveSummary, TrovesResponse } from "@/types/api/trove";
+import { UnifiedFiltersDropdown, UnifiedFilters, FilterState } from "@/components/filters/UnifiedFilters";
+import { TroveSummary } from "@/types/api/trove";
 import { CollateralBreakdown } from "@/components/stats/CollateralBreakdown";
 import { CollateralStats } from "@/types/api/stats";
-
+import { ChevronDown, ChevronLeft, ChevronRight, Search, X, Check } from "lucide-react";
+import batchManagerService from '@/lib/services/batch-manager-service';
 
 export default function TrovesPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Get page from URL, default to 1
-  const currentPage = Number(searchParams.get('page')) || 1;
-
-  // Get view from URL, default to 'open'
-  const currentView = (searchParams.get('view') as 'open' | 'closed') || 'open';
-
+  // State management
   const [troves, setTroves] = useState<TroveSummary[]>([]);
+  const [isRestoringScroll, setIsRestoringScroll] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState({
-    total: 0,
-    limit: 20,
-    page: 1,
+  const [totalCount, setTotalCount] = useState(0);
+  const [searchInput, setSearchInput] = useState<string>(searchParams.get('q') || '');  // Local state for input
+
+  // Pagination state - stored in URL for persistence
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  const itemsPerPage = 10;
+
+  // Filter and sort state - initialize from URL
+  const [filters, setFilters] = useState<TroveFilterParams>(() => {
+    const status = searchParams.get('status') || 'both';
+    // Support both old collateralType and new collateralTypes for backwards compatibility
+    const collateralTypesParam = searchParams.getAll('collateral').filter(Boolean);
+    const collateralTypeParam = searchParams.get('collateralType');
+
+    let collateralTypes: string[];
+    if (collateralTypesParam?.length) {
+      // Check for special 'none' value
+      if (collateralTypesParam.length === 1 && collateralTypesParam[0] === 'none') {
+        collateralTypes = []; // No collaterals selected
+      } else {
+        collateralTypes = collateralTypesParam; // Use explicit selections
+      }
+    } else if (collateralTypeParam) {
+      collateralTypes = [collateralTypeParam]; // Old single param support
+    } else {
+      // No params - default to all selected (for backward compatibility)
+      collateralTypes = ['WETH', 'wstETH', 'rETH'];
+    }
+
+    const redemptionFilter = searchParams.get('redemptionFilter') as 'only' | 'hide' | 'all' | undefined;
+    const batchFilter = searchParams.get('batchFilter') as 'only' | 'hide' | 'all' | undefined;
+    const zombieFilter = searchParams.get('zombieFilter') as 'only' | 'hide' | 'all' | undefined;
+    const searchQuery = searchParams.get('q') || undefined;
+
+    return {
+      status: status as 'open' | 'closed' | 'both',
+      collateralTypes,
+      redemptionFilter,
+      batchFilter,
+      zombieFilter,
+      searchQuery,
+    };
   });
+
+  const [sortBy, setSortBy] = useState<string>(searchParams.get('sortBy') || 'activity');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>((searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc');
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+  const sortDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Collateral stats
   const [collateralStats, setCollateralStats] = useState<CollateralStats | null>(null);
   const [totalTVL, setTotalTVL] = useState<number>(0);
-  const [statsLoading, setStatsLoading] = useState(false);
-  
-  // Parse filters from URL
-  const getFiltersFromUrl = (): TroveFilterParams => {
-    const filters: TroveFilterParams = {};
-    
-    // Trove ID filter
-    const troveId = searchParams.get('troveId');
-    if (troveId) filters.troveId = troveId;
-    
-    // Status filter
-    const status = searchParams.get('status');
-    if (status) filters.status = status;
-    
-    // Collateral type filter
-    const collateralType = searchParams.get('collateralType');
-    if (collateralType) filters.collateralType = collateralType;
-    
-    // Owner address
-    const ownerAddress = searchParams.get('ownerAddress');
-    if (ownerAddress) filters.ownerAddress = ownerAddress;
-    
-    
-    // Trove type filter
-    const troveType = searchParams.get('troveType');
-    if (troveType === 'batch' || troveType === 'individual') filters.troveType = troveType;
-    
-    const hasRedemptions = searchParams.get('hasRedemptions');
-    if (hasRedemptions === 'true') filters.hasRedemptions = true;
 
-    // Three-state filters
-    const zombieFilter = searchParams.get('zombieFilter');
-    if (zombieFilter === 'hide' || zombieFilter === 'only') filters.zombieFilter = zombieFilter;
+  const availableCollateralTypes = ['WETH', 'wstETH', 'rETH'];
 
-    const redemptionFilter = searchParams.get('redemptionFilter');
-    if (redemptionFilter === 'hide' || redemptionFilter === 'only') filters.redemptionFilter = redemptionFilter;
-
-    const batchFilter = searchParams.get('batchFilter');
-    if (batchFilter === 'hide' || batchFilter === 'only') filters.batchFilter = batchFilter;
-
-    // Sort options
-    const sortBy = searchParams.get('sortBy');
-    if (sortBy) filters.sortBy = sortBy;
-    
-    const sortOrder = searchParams.get('sortOrder');
-    if (sortOrder === 'asc' || sortOrder === 'desc') filters.sortOrder = sortOrder;
-    
-    return filters;
-  };
-  
-  const [filters, setFilters] = useState<TroveFilterParams>(getFiltersFromUrl());
-
-  // Synchronize filters with URL when searchParams change
-  useEffect(() => {
-    const urlFilters = getFiltersFromUrl();
-    setFilters(urlFilters);
-  }, [searchParams]);
-  
-  // Update URL when page, view, or filters change
-  const updateUrl = (newFilters?: TroveFilterParams, newPage?: number, newView?: 'open' | 'closed') => {
-    const params = new URLSearchParams();
-
-    // Add page
-    params.set('page', (newPage || currentPage).toString());
-
-    // Add view
-    params.set('view', newView || currentView);
-    
-    // Add filters
-    const appliedFilters = newFilters || filters;
-    if (appliedFilters.troveId) {
-      params.set('troveId', appliedFilters.troveId);
+  // Save scroll position before navigating away
+  const saveScrollPosition = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('troves-scroll-position', String(window.scrollY));
     }
-    if (appliedFilters.status) {
-      params.set('status', appliedFilters.status);
-    }
-    if (appliedFilters.collateralType) {
-      params.set('collateralType', appliedFilters.collateralType);
-    }
-    if (appliedFilters.ownerAddress) {
-      params.set('ownerAddress', appliedFilters.ownerAddress);
-    }
-    if (appliedFilters.troveType) {
-      params.set('troveType', appliedFilters.troveType);
-    }
-    if (appliedFilters.hasRedemptions) {
-      params.set('hasRedemptions', 'true');
-    }
-    // Three-state filters
-    if (appliedFilters.zombieFilter) {
-      params.set('zombieFilter', appliedFilters.zombieFilter);
-    }
-    if (appliedFilters.redemptionFilter) {
-      params.set('redemptionFilter', appliedFilters.redemptionFilter);
-    }
-    if (appliedFilters.batchFilter) {
-      params.set('batchFilter', appliedFilters.batchFilter);
-    }
-    if (appliedFilters.sortBy) {
-      params.set('sortBy', appliedFilters.sortBy);
-    }
-    if (appliedFilters.sortOrder) {
-      params.set('sortOrder', appliedFilters.sortOrder);
-    }
-    
-    router.push(`/troves?${params.toString()}`);
-  };
-  
-  const setCurrentPage = (page: number) => {
-    updateUrl(filters, page);
-  };
+  }, []);
 
-  const handleViewChange = (view: 'open' | 'closed') => {
-    // Reset filters (except collateralType) and page when switching views
-    const preservedFilters: TroveFilterParams = {
-      collateralType: filters.collateralType
-    };
-    setFilters(preservedFilters);
-    updateUrl(preservedFilters, 1, view);
-  };
+  // Update URL without causing page refresh, preserving scroll position
+  const updateUrl = useCallback((updates: Record<string, string | number | string[] | undefined>, options?: { scroll?: boolean }) => {
+    const params = new URLSearchParams(window.location.search);
 
-  const handleFiltersChange = (newFilters: TroveFilterParams) => {
-    setFilters(newFilters);
-    updateUrl(newFilters, 1); // Reset to page 1 when filters change
-  };
-
-  const handleFiltersReset = () => {
-    // Reset filters but preserve collateralType
-    const preservedFilters: TroveFilterParams = {
-      collateralType: filters.collateralType
-    };
-    setFilters(preservedFilters);
-    updateUrl(preservedFilters, 1, currentView);
-  };
-
-  useEffect(() => {
-    loadTroves();
-  }, [currentPage, filters, currentView]);
-
-  useEffect(() => {
-    // Load collateral stats when collateralType changes in URL
-    const collateralType = searchParams.get('collateralType');
-    if (collateralType) {
-      loadCollateralStats(collateralType);
-    } else {
-      // Clear stats if no collateral type selected
-      setCollateralStats(null);
-      setTotalTVL(0);
-    }
-  }, [searchParams.get('collateralType')]);
-
-  const needsSingleApiCall = () => {
-    // If any specific filters are applied that work better with single calls
-    return (
-      filters.zombieFilter === 'only' ||
-      filters.zombieFilter === 'hide' ||
-      filters.redemptionFilter === 'only' ||
-      filters.redemptionFilter === 'hide' ||
-      filters.batchFilter === 'only' ||
-      filters.batchFilter === 'hide'
-    );
-  };
-
-  const loadOpenAndZombieTroves = async () => {
-    try {
-      const baseParams = new URLSearchParams();
-
-      // Add common filter parameters
-      if (filters.troveId) baseParams.set('troveId', filters.troveId);
-      if (filters.collateralType) baseParams.set('collateralType', filters.collateralType);
-      if (filters.ownerAddress) baseParams.set('ownerAddress', filters.ownerAddress);
-
-      // Handle batch filter
-      if (filters.batchFilter === 'only') baseParams.set('batchOnly', 'true');
-      else if (filters.batchFilter === 'hide') baseParams.set('individualOnly', 'true');
-
-      // Handle redemption filter
-      if (filters.redemptionFilter === 'only') baseParams.set('hasRedemptions', 'true');
-      else if (filters.redemptionFilter === 'hide') baseParams.set('excludeRedemptions', 'true');
-
-      if (filters.sortBy) baseParams.set('sortBy', filters.sortBy);
-      if (filters.sortOrder) baseParams.set('sortOrder', filters.sortOrder);
-
-      // Fetch only open troves (which includes zombie troves as they have isZombieTrove flag)
-      const openResponse = await fetch(`/api/troves?${baseParams.toString()}&status=open&limit=200&offset=0`);
-
-      if (!openResponse.ok) throw new Error(`Failed to fetch open troves: ${openResponse.statusText}`);
-
-      const openData = await openResponse.json();
-
-      // Filter based on zombie filter setting
-      let allTroves: TroveSummary[] = openData.data || [];
-
-      if (filters.zombieFilter === 'only') {
-        // Show only zombie troves
-        allTroves = allTroves.filter((trove) => trove.isZombieTrove === true);
-      } else if (filters.zombieFilter === 'hide') {
-        // Hide zombie troves
-        allTroves = allTroves.filter((trove) => trove.isZombieTrove !== true);
-      }
-      // else show all (both zombie and non-zombie)
-
-      // Apply sorting
-      const sortedTroves = sortTroves(allTroves, filters.sortBy || 'lastActivity', filters.sortOrder || 'desc');
-
-      // Apply pagination
-      const startIndex = (currentPage - 1) * pagination.limit;
-      const endIndex = startIndex + pagination.limit;
-      const paginatedTroves = sortedTroves.slice(startIndex, endIndex);
-
-      setTroves(paginatedTroves);
-      setPagination({
-        total: sortedTroves.length,
-        limit: pagination.limit,
-        page: currentPage,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load troves");
-      console.error("Error loading open and zombie troves:", err);
-    }
-  };
-
-  const loadClosedAndLiquidatedTroves = async () => {
-    try {
-      const baseParams = new URLSearchParams();
-
-      // Add common filter parameters
-      if (filters.troveId) baseParams.set('troveId', filters.troveId);
-      if (filters.collateralType) baseParams.set('collateralType', filters.collateralType);
-      if (filters.ownerAddress) baseParams.set('ownerAddress', filters.ownerAddress);
-      if (filters.troveType === 'batch') baseParams.set('batchOnly', 'true');
-      else if (filters.troveType === 'individual') baseParams.set('individualOnly', 'true');
-      if (filters.sortBy) baseParams.set('sortBy', filters.sortBy);
-      if (filters.sortOrder) baseParams.set('sortOrder', filters.sortOrder);
-
-      // Make two parallel API calls
-      const [closedResponse, liquidatedResponse] = await Promise.all([
-        fetch(`/api/troves?${baseParams.toString()}&status=closed&limit=100&offset=0`),
-        fetch(`/api/troves?${baseParams.toString()}&status=liquidated&limit=100&offset=0`)
-      ]);
-
-      if (!closedResponse.ok) throw new Error(`Failed to fetch closed troves: ${closedResponse.statusText}`);
-      if (!liquidatedResponse.ok) throw new Error(`Failed to fetch liquidated troves: ${liquidatedResponse.statusText}`);
-
-      const [closedData, liquidatedData] = await Promise.all([
-        closedResponse.json(),
-        liquidatedResponse.json()
-      ]);
-
-      // Combine and sort the results
-      const allTroves = [...(closedData.data || []), ...(liquidatedData.data || [])];
-
-      // Apply sorting if needed
-      const sortedTroves = sortTroves(allTroves, filters.sortBy || 'created', filters.sortOrder || 'desc');
-
-      // Apply pagination
-      const startIndex = (currentPage - 1) * pagination.limit;
-      const endIndex = startIndex + pagination.limit;
-      const paginatedTroves = sortedTroves.slice(startIndex, endIndex);
-
-      setTroves(paginatedTroves);
-      setPagination({
-        total: sortedTroves.length,
-        limit: pagination.limit,
-        page: currentPage,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load troves");
-      console.error("Error loading closed and liquidated troves:", err);
-    }
-  };
-
-  const sortTroves = (troves: any[], sortBy: string, sortOrder: string) => {
-    return [...troves].sort((a, b) => {
-      let aVal, bVal;
-
-      switch (sortBy) {
-        case 'created':
-          aVal = new Date(a.createdAt || a.closedAt || 0).getTime();
-          bVal = new Date(b.createdAt || b.closedAt || 0).getTime();
-          break;
-        case 'debt':
-          aVal = parseFloat(a.debt?.current || a.debt?.currentRaw || 0);
-          bVal = parseFloat(b.debt?.current || b.debt?.currentRaw || 0);
-          break;
-        case 'peakDebt':
-          aVal = parseFloat(a.debt?.peak || 0);
-          bVal = parseFloat(b.debt?.peak || 0);
-          break;
-        case 'coll':
-          aVal = parseFloat(a.backedBy?.amount || a.collateralAtLiquidation || 0);
-          bVal = parseFloat(b.backedBy?.amount || b.collateralAtLiquidation || 0);
-          break;
-        case 'ratio':
-          aVal = parseFloat(a.collateralRatio || 0);
-          bVal = parseFloat(b.collateralRatio || 0);
-          break;
-        default:
-          return 0;
-      }
-
-      if (sortOrder === 'asc') return aVal - bVal;
-      return bVal - aVal;
-    });
-  };
-
-  const loadCollateralStats = async (collateralType: string) => {
-    try {
-      console.log('Loading stats for collateral type:', collateralType);
-      setStatsLoading(true);
-      const response = await fetch('/api/stats');
-      if (response.ok) {
-        const rawData = await response.json();
-        console.log('Raw API response:', rawData);
-
-        // The API wraps the data in a success/data structure
-        const data = rawData.data || rawData;
-        console.log('Extracted data:', data);
-
-        // Use the collateralType exactly as provided in the URL
-        if (data.byCollateral) {
-          console.log('Available collateral types:', Object.keys(data.byCollateral));
-          console.log('Looking for:', collateralType);
-
-          if (data.byCollateral[collateralType]) {
-            console.log('Found stats for', collateralType, ':', data.byCollateral[collateralType]);
-            setCollateralStats(data.byCollateral[collateralType]);
-
-            // Calculate total TVL from all collateral types
-            const total = Object.values(data.byCollateral as Record<string, CollateralStats>).reduce(
-              (sum, stats: any) => sum + stats.totalCollateralUsd,
-              0
-            );
-            setTotalTVL(total);
-            console.log('Total TVL calculated:', total);
-          } else {
-            console.log('No stats found for collateral type:', collateralType);
-          }
-        } else {
-          console.log('No byCollateral data in response');
-        }
+    Object.entries(updates).forEach(([key, value]) => {
+      if (key === 'collateral' && Array.isArray(value)) {
+        // Handle collateral array specially - use multiple params with same name
+        params.delete('collateral');
+        value.forEach(v => params.append('collateral', v));
+      } else if (value !== undefined && value !== '') {
+        params.set(key, String(value));
       } else {
-        console.error('Response not ok:', response.status);
+        params.delete(key);
       }
-    } catch (error) {
-      console.error('Error loading collateral stats:', error);
-    } finally {
-      setStatsLoading(false);
-    }
+    });
+
+    // Remove defaults to keep URL clean
+    if (params.get('page') === '1') params.delete('page');
+    if (params.get('sortBy') === 'activity') params.delete('sortBy');
+    if (params.get('sortOrder') === 'desc') params.delete('sortOrder');
+    if (params.get('status') === 'both') params.delete('status');
+    // Remove old parameters if present
+    params.delete('collateralType');
+    params.delete('collateralTypes');
+
+    const newUrl = params.toString() ? `/troves?${params.toString()}` : '/troves';
+
+    // Use router.replace with scroll option (default to false to preserve position)
+    router.replace(newUrl, { scroll: options?.scroll ?? false });
+  }, [router]);
+
+  // Handle page changes - scroll to top when changing pages
+  const goToPage = useCallback((page: number) => {
+    updateUrl({ page: page > 1 ? String(page) : undefined }, { scroll: true });
+  }, [updateUrl]);
+
+  // Convert filters for unified component
+  const convertToUnifiedFilters = (params: TroveFilterParams): UnifiedFilters => {
+    return {
+      status: params.status as 'open' | 'closed' | 'both' || 'both',
+      collateralTypes: params.collateralTypes,
+      redemptionFilter: params.redemptionFilter as FilterState || undefined,
+      batchFilter: params.batchFilter as FilterState || undefined,
+      zombieFilter: params.zombieFilter as FilterState || undefined,
+      searchQuery: params.searchQuery
+    };
   };
 
-  const loadTroves = async () => {
+  const convertFromUnifiedFilters = (unified: UnifiedFilters): TroveFilterParams => {
+    return {
+      status: unified.status || 'both',
+      collateralTypes: unified.collateralTypes,
+      redemptionFilter: unified.redemptionFilter as 'only' | 'hide' | 'all' | undefined,
+      batchFilter: unified.batchFilter as 'only' | 'hide' | 'all' | undefined,
+      zombieFilter: unified.zombieFilter as 'only' | 'hide' | 'all' | undefined,
+      searchQuery: unified.searchQuery
+    };
+  };
+
+  // Handle filter changes
+  const handleFiltersChange = useCallback((newFilters: TroveFilterParams) => {
+    setFilters(newFilters);
+
+    // Always include collateral params for consistency
+    let collateralParam: string[] | string | undefined;
+    if (!newFilters.collateralTypes || newFilters.collateralTypes.length === 0) {
+      // No collaterals selected - use special 'none' value
+      collateralParam = ['none'];
+    } else if (newFilters.collateralTypes.length === availableCollateralTypes.length) {
+      // All collaterals selected - explicitly list them
+      collateralParam = newFilters.collateralTypes;
+    } else {
+      // Some collaterals selected
+      collateralParam = newFilters.collateralTypes;
+    }
+
+    updateUrl({
+      page: undefined, // Reset to page 1
+      collateral: collateralParam,
+      collateralTypes: undefined, // Remove old parameter if it exists
+      status: newFilters.status !== 'both' ? newFilters.status : undefined,
+      redemptionFilter: newFilters.redemptionFilter !== 'all' ? newFilters.redemptionFilter : undefined,
+      batchFilter: newFilters.batchFilter !== 'all' ? newFilters.batchFilter : undefined,
+      zombieFilter: newFilters.zombieFilter !== 'all' ? newFilters.zombieFilter : undefined,
+      q: newFilters.searchQuery,
+    });
+  }, [updateUrl, availableCollateralTypes]);
+
+  // Handle sort changes
+  const handleSortChange = useCallback((newSortBy: string, newSortOrder?: 'asc' | 'desc') => {
+    setSortBy(newSortBy);
+    if (newSortOrder) setSortOrder(newSortOrder);
+    updateUrl({
+      sortBy: newSortBy !== 'activity' ? newSortBy : undefined,
+      sortOrder: newSortOrder && newSortOrder !== 'desc' ? newSortOrder : undefined,
+    });
+  }, [updateUrl]);
+
+  // Load troves for current page
+  const loadTroves = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // For closed view showing both closed and liquidated, we need to make two API calls
-      if (currentView === 'closed' && !filters.liquidatedOnly) {
-        await loadClosedAndLiquidatedTroves();
-        return;
-      }
+      // For complex filters or search filters, fetch all and paginate client-side
+      const needsClientSidePagination =
+        filters.status === 'both' ||
+        filters.redemptionFilter ||
+        filters.batchFilter ||
+        filters.zombieFilter ||
+        filters.searchQuery;
 
-      // For open view showing both open and zombie, we need to make two API calls
-      // Only when zombie filter is 'all' and no conflicting filters
-      if (currentView === 'open' &&
-          (!filters.zombieFilter || filters.zombieFilter === 'all') &&
-          !needsSingleApiCall()) {
-        await loadOpenAndZombieTroves();
-        return;
-      }
+      if (needsClientSidePagination) {
+        // Fetch all troves and handle pagination client-side
+        let allTroves: TroveSummary[] = [];
 
-      const params = new URLSearchParams({
-        limit: pagination.limit.toString(),
-        offset: ((currentPage - 1) * pagination.limit).toString(),
-      });
+        // Build API parameters
+        const buildApiUrl = (status: string, collateralType?: string) => {
+          const params = new URLSearchParams();
+          params.set('status', status);
+          params.set('limit', '500');
+          params.set('offset', '0');
+          if (collateralType) params.set('collateralType', collateralType);
+          return `/api/troves?${params.toString()}`;
+        };
 
-      // Add filter parameters
-      if (filters.troveId) {
-        params.set('troveId', filters.troveId);
-      }
+        // Regular filter-based fetch
+        if (filters.status === 'both' || !filters.status) {
+            // Only fetch if collateral types are selected
+            if (filters.collateralTypes && filters.collateralTypes.length > 0) {
+              for (const collType of filters.collateralTypes) {
+                const [openRes, closedRes, liquidatedRes] = await Promise.all([
+                  fetch(buildApiUrl('open', collType)),
+                  fetch(buildApiUrl('closed', collType)),
+                  fetch(buildApiUrl('liquidated', collType))
+                ]);
 
-      // Set status based on current view
-      if (currentView === 'open') {
-        // Always fetch open troves, zombie filtering will be done client-side based on isZombieTrove field
-        params.set('status', 'open');
-      } else {
-        // For closed view, show liquidated only when filter is active
-        if (filters.liquidatedOnly) {
-          params.set('status', 'liquidated');
-        } else {
-          // This shouldn't happen now due to the early return above
-          params.set('status', 'closed');
+                const [openData, closedData, liquidatedData] = await Promise.all([
+                  openRes.json(),
+                  closedRes.json(),
+                  liquidatedRes.json()
+                ]);
+
+                allTroves.push(...(openData.data || []), ...(closedData.data || []), ...(liquidatedData.data || []));
+              }
+            } else {
+              // No collateral types selected = no results
+              allTroves = [];
+            }
+          } else {
+            // Fetch specific status
+            if (filters.collateralTypes && filters.collateralTypes.length > 0) {
+              for (const collType of filters.collateralTypes) {
+                const response = await fetch(buildApiUrl(filters.status, collType));
+                const data = await response.json();
+                allTroves.push(...(data.data || []));
+              }
+            } else {
+              // No collateral types selected = no results
+              allTroves = [];
+            }
         }
-      }
-      if (filters.collateralType) {
-        params.set('collateralType', filters.collateralType);
-      }
-      if (filters.ownerAddress) {
-        params.set('ownerAddress', filters.ownerAddress);
-      }
-      // Handle batch filter
-      if (filters.batchFilter === 'only') {
-        params.set('batchOnly', 'true');
-      } else if (filters.batchFilter === 'hide') {
-        params.set('individualOnly', 'true');
-      }
 
-      // Handle redemption filter
-      if (filters.redemptionFilter === 'only') {
-        params.set('hasRedemptions', 'true');
-      } else if (filters.redemptionFilter === 'hide') {
-        params.set('excludeRedemptions', 'true');
-      }
-      if (filters.sortBy) {
-        params.set('sortBy', filters.sortBy);
-      }
-      if (filters.sortOrder) {
-        params.set('sortOrder', filters.sortOrder);
-      }
-      
-      const response = await fetch(`/api/troves?${params}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch troves: ${response.statusText}`);
-      }
+        // Apply client-side filters
+        let filtered = [...allTroves];
 
-      const data: TrovesResponse = await response.json();
-      let trovesData = data.data;
+        if (filters.redemptionFilter === 'only') {
+          filtered = filtered.filter(t => t.activity?.redemptionCount && t.activity.redemptionCount > 0);
+        } else if (filters.redemptionFilter === 'hide') {
+          filtered = filtered.filter(t => !t.activity?.redemptionCount || t.activity.redemptionCount === 0);
+        }
 
-      // Apply zombie filtering on client side for open troves
-      if (currentView === 'open' && filters.zombieFilter) {
+        if (filters.batchFilter === 'only') {
+          filtered = filtered.filter(t => t.batch?.isMember === true);
+        } else if (filters.batchFilter === 'hide') {
+          filtered = filtered.filter(t => t.batch?.isMember !== true);
+        }
+
         if (filters.zombieFilter === 'only') {
-          trovesData = trovesData.filter((trove) => trove.isZombieTrove === true);
+          filtered = filtered.filter(t => t.isZombieTrove === true);
         } else if (filters.zombieFilter === 'hide') {
-          trovesData = trovesData.filter((trove) => trove.isZombieTrove !== true);
+          filtered = filtered.filter(t => t.isZombieTrove !== true);
         }
-      }
 
-      setTroves(trovesData);
-      if (data.pagination) {
-        setPagination({
-          total: trovesData.length,
-          limit: data.pagination.limit,
-          page: data.pagination.page,
+        // Apply search filter if query exists
+        if (filters.searchQuery) {
+          const query = filters.searchQuery.toLowerCase();
+          filtered = filtered.filter(trove => {
+            // Check trove ID
+            if (trove.id && trove.id.toLowerCase().includes(query)) return true;
+
+            // Check owner address (for open troves)
+            if (trove.owner && trove.owner.toLowerCase().includes(query)) return true;
+
+            // Check last owner address (for closed troves)
+            if (trove.lastOwner && trove.lastOwner.toLowerCase().includes(query)) return true;
+
+            // Check ENS name if available
+            if (trove.ownerEns && trove.ownerEns.toLowerCase().includes(query)) return true;
+
+            // Check batch manager address (delegate search)
+            if (trove.batch?.manager && trove.batch.manager.toLowerCase().includes(query)) return true;
+
+            return false;
+          });
+        }
+
+        // Sort
+        filtered.sort((a, b) => {
+          let aVal, bVal;
+          switch (sortBy) {
+            case 'debt':
+              aVal = parseFloat(a.debt?.current || a.debt?.peak || '0');
+              bVal = parseFloat(b.debt?.current || b.debt?.peak || '0');
+              break;
+            case 'collateral':
+              aVal = parseFloat(a.collateral?.amount || '0');
+              bVal = parseFloat(b.collateral?.amount || '0');
+              break;
+            case 'ratio':
+              aVal = a.metrics?.collateralRatio || 0;
+              bVal = b.metrics?.collateralRatio || 0;
+              break;
+            case 'interestRate':
+              aVal = a.metrics?.interestRate || 0;
+              bVal = b.metrics?.interestRate || 0;
+              break;
+            case 'activity':
+            default:
+              aVal = new Date(a.activity?.lastActivityAt || a.activity?.createdAt || 0).getTime();
+              bVal = new Date(b.activity?.lastActivityAt || b.activity?.createdAt || 0).getTime();
+              break;
+          }
+          return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
         });
+
+        // Paginate
+        setTotalCount(filtered.length);
+        const startIdx = (currentPage - 1) * itemsPerPage;
+        const endIdx = startIdx + itemsPerPage;
+        setTroves(filtered.slice(startIdx, endIdx));
+      } else {
+        // Simple server-side pagination
+        const allTroves: TroveSummary[] = [];
+        const offset = (currentPage - 1) * itemsPerPage;
+
+        // If collateral types are specified, fetch for each type
+        if (filters.collateralTypes && filters.collateralTypes.length > 0) {
+          for (const collType of filters.collateralTypes) {
+            const params = new URLSearchParams();
+            params.set('status', filters.status || 'open');
+            params.set('collateralType', collType);
+            params.set('limit', '500');
+            params.set('offset', '0');
+
+            const response = await fetch(`/api/troves?${params.toString()}`);
+            const data = await response.json();
+            allTroves.push(...(data.data || []));
+          }
+
+          // Sort and paginate
+          allTroves.sort((a, b) => {
+            let aVal, bVal;
+            switch (sortBy) {
+              case 'debt':
+                aVal = parseFloat(a.debt?.current || a.debt?.peak || '0');
+                bVal = parseFloat(b.debt?.current || b.debt?.peak || '0');
+                break;
+              case 'collateral':
+                aVal = parseFloat(a.collateral?.amount || '0');
+                bVal = parseFloat(b.collateral?.amount || '0');
+                break;
+              case 'ratio':
+                aVal = a.metrics?.collateralRatio || 0;
+                bVal = b.metrics?.collateralRatio || 0;
+                break;
+              case 'interestRate':
+                aVal = a.metrics?.interestRate || 0;
+                bVal = b.metrics?.interestRate || 0;
+                break;
+              case 'activity':
+              default:
+                aVal = new Date(a.activity?.lastActivityAt || a.activity?.createdAt || 0).getTime();
+                bVal = new Date(b.activity?.lastActivityAt || b.activity?.createdAt || 0).getTime();
+                break;
+            }
+            return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+          });
+
+          setTotalCount(allTroves.length);
+          setTroves(allTroves.slice(offset, offset + itemsPerPage));
+        } else {
+          const params = new URLSearchParams();
+          params.set('status', filters.status || 'open');
+          params.set('limit', String(itemsPerPage));
+          params.set('offset', String(offset));
+
+          const response = await fetch(`/api/troves?${params.toString()}`);
+          const data = await response.json();
+
+          setTroves(data.data || []);
+          setTotalCount(data.totalCount || 0);
+        }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load troves");
-      console.error("Error loading troves:", err);
+      setError(err instanceof Error ? err.message : 'Failed to load troves');
     } finally {
       setLoading(false);
     }
+  }, [filters, currentPage, sortBy, sortOrder]);
+
+  // Load collateral stats
+  const loadCollateralStats = async (collateralType: string) => {
+    try {
+      const response = await fetch('/api/stats');
+      if (!response.ok) throw new Error('Failed to load stats');
+
+      const data = await response.json();
+      if (data.success && data.data) {
+        const { overall, byCollateral } = data.data;
+
+        // Find stats for selected collateral
+        const selectedStats = byCollateral[collateralType];
+        if (selectedStats) {
+          setCollateralStats(selectedStats);
+
+          // Calculate total TVL from all collaterals
+          const total = Object.values(byCollateral).reduce((sum: number, stats: any) => {
+            return sum + (stats.totalCollateralUSD || 0);
+          }, 0);
+          setTotalTVL(total);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load collateral stats:', err);
+    }
   };
 
-  const totalPages = Math.ceil(pagination.total / pagination.limit);
-  const startItem = (currentPage - 1) * pagination.limit + 1;
-  const endItem = Math.min(currentPage * pagination.limit, pagination.total);
+  // Load troves when dependencies change
+  useEffect(() => {
+    loadTroves();
+  }, [loadTroves]);
 
-  if (loading) {
+  // Restore scroll position after troves are loaded
+  useEffect(() => {
+    if (!loading && troves.length > 0 && !isRestoringScroll) {
+      const savedPosition = sessionStorage.getItem('troves-scroll-position');
+      if (savedPosition) {
+        setIsRestoringScroll(true);
+        // Use requestAnimationFrame to ensure DOM is updated
+        requestAnimationFrame(() => {
+          window.scrollTo(0, parseInt(savedPosition, 10));
+          sessionStorage.removeItem('troves-scroll-position');
+          setIsRestoringScroll(false);
+        });
+      }
+    }
+  }, [loading, troves.length, isRestoringScroll]);
+
+  // Load stats when collateral types change
+  useEffect(() => {
+    if (filters.collateralTypes && filters.collateralTypes.length === 1) {
+      loadCollateralStats(filters.collateralTypes[0]);
+    } else {
+      setCollateralStats(null);
+    }
+  }, [filters.collateralTypes]);
+
+  // Close sort dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target as Node)) {
+        setIsSortDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Sync search input with filters when filters change from URL
+  useEffect(() => {
+    setSearchInput(filters.searchQuery || '');
+  }, [filters.searchQuery]);
+
+  // Sort options
+  const sortOptions = [
+    { value: 'debt', label: 'Debt' },
+    { value: 'collateral', label: 'Collateral' },
+    { value: 'ratio', label: 'Collateral Ratio' },
+    { value: 'interestRate', label: 'Interest Rate' },
+    { value: 'activity', label: 'Recent Activity' }
+  ];
+
+  // Pagination calculations
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
+  const showingFrom = (currentPage - 1) * itemsPerPage + 1;
+  const showingTo = Math.min(currentPage * itemsPerPage, totalCount);
+
+  // Pagination controls
+  const PaginationControls = () => {
+    if (totalPages <= 1) return null;
+
+    const pageNumbers = [];
+    const maxVisible = 5;
+    let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let end = Math.min(totalPages, start + maxVisible - 1);
+
+    if (end - start + 1 < maxVisible) {
+      start = Math.max(1, end - maxVisible + 1);
+    }
+
+    for (let i = start; i <= end; i++) {
+      pageNumbers.push(i);
+    }
+
+    return (
+      <div className="flex items-center justify-between mt-8 px-4">
+        <div className="text-sm text-slate-400">
+          Showing {showingFrom}-{showingTo} of {totalCount} troves
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+
+          {start > 1 && (
+            <>
+              <button
+                onClick={() => goToPage(1)}
+                className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+              >
+                1
+              </button>
+              {start > 2 && <span className="text-slate-400">...</span>}
+            </>
+          )}
+
+          {pageNumbers.map(num => (
+            <button
+              key={num}
+              onClick={() => goToPage(num)}
+              className={`px-3 py-2 rounded-lg transition-colors ${
+                num === currentPage
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-800 hover:bg-slate-700'
+              }`}
+            >
+              {num}
+            </button>
+          ))}
+
+          {end < totalPages && (
+            <>
+              {end < totalPages - 1 && <span className="text-slate-400">...</span>}
+              <button
+                onClick={() => goToPage(totalPages)}
+                className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+              >
+                {totalPages}
+              </button>
+            </>
+          )}
+
+          <button
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading && troves.length === 0) {
     return (
       <main className="min-h-screen">
-        <div className="space-y-4">
-          {/* Top section - count and filters */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div className="flex flex-col md:flex-row md:items-center gap-3">
-              <div className="h-10 bg-slate-700 rounded w-48 animate-pulse"></div>  
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-slate-700 rounded w-1/3 mb-8"></div>
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-32 bg-slate-800 rounded-lg"></div>
+              ))}
             </div>
-          </div>
-
-          {/* Desktop column headers */}
-          <div className="hidden md:grid md:grid-cols-5 md:gap-6 mb-3 px-4 text-xs">
-            <div className="flex items-center gap-2">
-            </div>
-          </div>
-
-
-          {/* Trove rows */}
-          <div className="grid grid-cols-1 gap-6">
-            {[...Array(11)].map((_, i) => (
-              <div key={i} className="rounded-lg bg-slate-900 p-4 animate-pulse">
-                <div className="grid h-12  md:grid-cols-5 md:gap-6 md:items-center">
-                  {/* Status/Activity column */}
-                  <div className="flex items-center gap-2 mb-3 md:mb-0">
-                  </div>
-
-                  {/* Debt column */}
-                  <div className="flex items-center gap-2 mb-3 md:mb-0">
-                  </div>
-
-                  {/* Collateral column */}
-                  <div className="mb-3 md:mb-0">
-                  </div>
-
-                  {/* Ratio column */}
-
-                  {/* Interest/Action column */}
-                  <div className="flex items-center justify-between md:justify-end gap-2">
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </main>
@@ -539,276 +582,199 @@ export default function TrovesPage() {
   if (error) {
     return (
       <main className="min-h-screen">
-        <div className="space-y-6">
-          <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">
-            <p className="text-red-400">Error: {error}</p>
-            <button
-              onClick={loadTroves}
-              className="mt-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white text-sm"
-            >
-              Retry
-            </button>
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="bg-red-900/20 border border-red-500 rounded-lg p-6">
+            <h2 className="text-xl font-bold mb-2">Error</h2>
+            <p className="text-red-400">{error}</p>
           </div>
         </div>
       </main>
     );
   }
 
-  console.log('Render check - filters.collateralType:', filters.collateralType);
-  console.log('Render check - collateralStats:', collateralStats);
-  console.log('Render check - statsLoading:', statsLoading);
+  // Handle search form submit
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedValue = searchInput.trim();
+    handleFiltersChange({ ...filters, searchQuery: trimmedValue || undefined });
+  };
+
+  // Handle clear search
+  const handleClearSearch = () => {
+    setSearchInput('');
+    handleFiltersChange({ ...filters, searchQuery: undefined });
+  };
 
   return (
     <main className="min-h-screen">
-      <div className="space-y-4">
-        {/* Individual Collateral Breakdown */}
-        {filters.collateralType && (
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header with Collateral Checkboxes */}
+        <div className="mb-8">
+          <div className="flex items-center gap-6">
+            {availableCollateralTypes.map(type => {
+              const isSelected = filters.collateralTypes?.includes(type);
+              return (
+                <button
+                  key={type}
+                  onClick={() => {
+                    const current = filters.collateralTypes || [];
+                    const newTypes = current.includes(type)
+                      ? current.filter(t => t !== type)
+                      : [...current, type];
+                    handleFiltersChange({
+                      ...filters,
+                      collateralTypes: newTypes
+                    });
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                    isSelected
+                      ? 'bg-slate-800 border-2 border-blue-500'
+                      : 'bg-slate-900 border-2 border-slate-700 opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <div className={`w-5 h-5 border rounded flex items-center justify-center transition-all ${
+                    isSelected
+                      ? 'border-blue-500 bg-blue-500'
+                      : 'border-slate-500'
+                  }`}>
+                    {isSelected && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <svg className="w-6 h-6">
+                      <use href={`#icon-${type.toLowerCase().replace('weth', 'eth')}`} />
+                    </svg>
+                    <span className="text-sm text-slate-400">/</span>
+                    <svg className="w-6 h-6">
+                      <use href="#icon-bold" />
+                    </svg>
+                    <span className="text-white font-semibold ml-1">{type}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Stats */}
+        {filters.collateralTypes?.length === 1 && collateralStats && (
           <CollateralBreakdown
-            collateralType={filters.collateralType}
-            stats={collateralStats || {
-              totalCollateral: 0,
-              totalCollateralUsd: 0,
-              totalDebt: 0,
-              openTroveCount: 0,
-              troveCount: 0
-            }}
+            stats={collateralStats}
             totalTVL={totalTVL}
-            mode="individual"
-            showSearch={true}
-            loading={statsLoading || !collateralStats}
+            selectedCollateral={filters.collateralTypes[0]}
           />
         )}
-        {/* Results count, filters and mobile sort - all in one line */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex flex-col md:flex-row md:items-center gap-3">
-            <div className="text-sm text-slate-400">
-              {pagination.total > 0 ? (
-                <>
-                  Showing {startItem} - {endItem} of {pagination.total} troves
-                </>
+
+        {/* Filters and Sort */}
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-1">
+            <UnifiedFiltersDropdown
+              filters={convertToUnifiedFilters(filters)}
+              onFiltersChange={(unified) => handleFiltersChange(convertFromUnifiedFilters(unified))}
+              availableCollateralTypes={availableCollateralTypes}
+              showCollateralFilter={false}
+            />
+
+            {/* Search Input */}
+            <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
+              <input
+                type="text"
+                placeholder="Filter by address, ENS, ID, or delegate..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="w-full px-4 py-2 pr-10 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              />
+              {searchInput ? (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white transition-colors"
+                  title="Clear filter"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               ) : (
-                "No troves found"
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              )}
+            </form>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="relative" ref={sortDropdownRef}>
+              <button
+                onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-700 rounded-lg text-white font-medium transition-colors min-w-[160px]"
+              >
+                <span>{sortOptions.find(o => o.value === sortBy)?.label || 'Sort'}</span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 ml-auto transition-transform ${isSortDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isSortDropdownOpen && (
+                <div className="absolute top-full right-0 mt-2 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 min-w-[200px] overflow-hidden">
+                  {sortOptions.map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => {
+                        handleSortChange(option.value);
+                        setIsSortDropdownOpen(false);
+                      }}
+                      className={`block w-full text-left px-4 py-3 text-white hover:bg-slate-700 transition-colors ${
+                        sortBy === option.value ? 'bg-slate-700' : ''
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
 
-            {/* Minimal inline filters */}
-            <MinimalFilters
-              filters={filters}
-              onFiltersChange={handleFiltersChange}
-              currentView={currentView}
-              onViewChange={handleViewChange}
-              onReset={handleFiltersReset}
-            />
-          </div>
-
-          {/* Mobile sort dropdown */}
-          <div className="md:hidden flex items-center gap-2">
-            <span className="text-xs text-slate-400">Sort:</span>
-            <select
-              value={filters.sortBy || (currentView === 'open' ? 'lastActivity' : 'created')}
-              onChange={(e) => handleFiltersChange({ ...filters, sortBy: e.target.value })}
-              className="px-2 py-1 bg-slate-700 rounded text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
-            >
-              <option value="lastActivity">Recent Activity</option>
-              <option value="debt">Debt</option>
-              <option value="coll">Collateral</option>
-              <option value="ratio">Collateral Ratio</option>
-              <option value="interestRate">Interest Rate</option>
-            </select>
             <button
-              onClick={() => {
-                const newOrder = filters.sortOrder === 'asc' ? 'desc' : 'asc';
-                handleFiltersChange({ ...filters, sortOrder: newOrder });
-              }}
-              className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs transition-all"
-              title={filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+              onClick={() => handleSortChange(sortBy, sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="flex items-center justify-center w-10 h-10 bg-slate-900 hover:bg-slate-700 rounded-lg transition-colors text-white"
+              title={sortOrder === 'asc' ? 'Sort Ascending' : 'Sort Descending'}
             >
-              {filters.sortOrder === 'asc' ? '↑' : '↓'}
+              {sortOrder === 'asc' ? '↑' : '↓'}
             </button>
           </div>
         </div>
 
-        {/* Results display */}
+        {/* Troves */}
         {troves.length > 0 ? (
-          <div className="mb-8">
-            {/* Table header for desktop only */}
-            {currentView === 'open' ? (
-              <div className="hidden md:grid md:gap-6 md:items-end mb-3 px-4 text-xs" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr auto' }}>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      const newOrder = filters.sortBy === 'lastActivity' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
-                      handleFiltersChange({ ...filters, sortBy: 'lastActivity', sortOrder: newOrder });
-                    }}
-                    className={`flex items-center justify-center w-5 h-5 rounded hover:bg-slate-700 transition-colors ${
-                      filters.sortBy === 'lastActivity' ? 'text-white' : 'text-slate-400'
-                    }`}
-                    title="Sort by recent activity"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                    {filters.sortBy === 'lastActivity' && (
-                      <span className="text-slate-300 ml-0.5 text-[10px]">
-                        {filters.sortOrder === 'asc' ? '↑' : '↓'}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const newOrder = filters.sortBy === 'debt' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
-                      handleFiltersChange({ ...filters, sortBy: 'debt', sortOrder: newOrder });
-                    }}
-                    className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-left"
-                  >
-                    Debt
-                    {filters.sortBy === 'debt' && (
-                      <span className="text-slate-300">
-                        {filters.sortOrder === 'asc' ? '↑' : '↓'}
-                      </span>
-                    )}
-                  </button>
-                </div>
-                <button
-                  onClick={() => {
-                    const newOrder = filters.sortBy === 'coll' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
-                    handleFiltersChange({ ...filters, sortBy: 'coll', sortOrder: newOrder });
-                  }}
-                  className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-left"
-                >
-                  Backed by
-                  {filters.sortBy === 'coll' && (
-                    <span className="text-slate-300">
-                      {filters.sortOrder === 'asc' ? '↑' : '↓'}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    const newOrder = filters.sortBy === 'ratio' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
-                    handleFiltersChange({ ...filters, sortBy: 'ratio', sortOrder: newOrder });
-                  }}
-                  className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-left"
-                >
-                  Collateral Ratio
-                  {filters.sortBy === 'ratio' && (
-                    <span className="text-slate-300">
-                      {filters.sortOrder === 'asc' ? '↑' : '↓'}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    const newOrder = filters.sortBy === 'interestRate' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
-                    handleFiltersChange({ ...filters, sortBy: 'interestRate', sortOrder: newOrder });
-                  }}
-                  className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-left"
-                >
-                  Interest Rate
-                  {filters.sortBy === 'interestRate' && (
-                    <span className="text-slate-300">
-                      {filters.sortOrder === 'asc' ? '↑' : '↓'}
-                    </span>
-                  )}
-                </button>
-                <div></div> {/* Empty header for the action column */}
-              </div>
-            ) : (
-              <div className="hidden md:grid md:gap-6 md:items-end mb-3 px-4 text-xs" style={{ gridTemplateColumns: '1fr auto' }}>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      const newOrder = filters.sortBy === 'lastActivity' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
-                      handleFiltersChange({ ...filters, sortBy: 'lastActivity', sortOrder: newOrder });
-                    }}
-                    className={`flex items-center justify-center w-5 h-5 rounded hover:bg-slate-700 transition-colors ${
-                      filters.sortBy === 'lastActivity' ? 'text-white' : 'text-slate-400'
-                    }`}
-                    title="Sort by recent activity"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                    {filters.sortBy === 'lastActivity' && (
-                      <span className="text-slate-300 ml-0.5 text-[10px]">
-                        {filters.sortOrder === 'asc' ? '↑' : '↓'}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const newOrder = filters.sortBy === 'peakDebt' && filters.sortOrder === 'desc' ? 'asc' : 'desc';
-                      handleFiltersChange({ ...filters, sortBy: 'peakDebt', sortOrder: newOrder });
-                    }}
-                    className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors text-left"
-                  >
-                    Peak Debt
-                    {filters.sortBy === 'peakDebt' && (
-                      <span className="text-slate-300">
-                        {filters.sortOrder === 'asc' ? '↑' : '↓'}
-                      </span>
-                    )}
-                  </button>
-                </div>
-                <div></div> {/* Empty header for the action column */}
-              </div>
-            )}
-            <div className="grid grid-cols-1 gap-6">
-              {troves.map((trove) => (
-                <SimplifiedTroveCard key={trove.id} trove={trove} showViewButton hideLabels />
-              ))}
-            </div>
+          <div className="grid grid-cols-1 gap-6">
+            {troves.map((trove) => (
+              <SimplifiedTroveCard
+                key={trove.id}
+                trove={trove}
+                showViewButton
+                hideLabels={false}
+              />
+            ))}
           </div>
         ) : (
-          <div className="text-center py-12 text-slate-400">
-            <p>No troves available</p>
+          <div className="text-center py-12">
+            <div className="text-slate-400 text-lg">
+              {(!filters.collateralTypes || filters.collateralTypes.length === 0) ? (
+                <>
+                  <p className="mb-2">No collateral types selected</p>
+                  <p className="text-sm">Please select at least one collateral type from the filter dropdown</p>
+                </>
+              ) : filters.searchQuery ? (
+                <>
+                  <p className="mb-2">No troves found for "{filters.searchQuery}"</p>
+                  <p className="text-sm">Try adjusting your search or filters</p>
+                </>
+              ) : (
+                <>
+                  <p className="mb-2">No troves found</p>
+                  <p className="text-sm">Try adjusting your filters</p>
+                </>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Bottom pagination */}
-        {totalPages > 1 && (
-          <div className="flex justify-center gap-2 pb-8">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-sm"
-            >
-              Previous
-            </button>
-            <span className="px-3 py-1 text-sm">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-sm"
-            >
-              Next
-            </button>
-          </div>
-        )}
+        {/* Pagination */}
+        <PaginationControls />
       </div>
     </main>
   );
