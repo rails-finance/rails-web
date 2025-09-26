@@ -22,8 +22,7 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
   // Only highlight when hover is enabled
   const isAfterHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "collateral", "after");
   const isChangeHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "collateral", "change");
-  const isCollateralUsdHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "collateralUsd");
-  const isCollateralPriceHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "collateralPrice");
+  const isCollateralUsdHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "collateralUsd", "after");
   return (
     <StateMetric label="Collateral" icon={<TokenIcon assetSymbol={collateralType} className="mr-2 w-5 h-5" />}>
       <StateTransition>
@@ -38,10 +37,10 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
         {isCloseTrove ? (
           <ClosedStateLabel />
         ) : (
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center">
             <span
-              className={`text-sm font-semibold text-white ${hoverEnabled ? "cursor-pointer" : ""} transition-all ${
-                isAfterHighlighted ? "underline decoration-dotted underline-offset-2" : ""
+              className={`text-sm font-semibold text-white -mx-1 px-1 -my-0.5 py-0.5  rounded ${hoverEnabled ? "cursor-pointer" : ""} transition-all ${
+                isAfterHighlighted ? "bg-blue-900 " : ""
               }`}
               onMouseEnter={
                 hoverEnabled ? () => setHoveredValue({ type: "collateral", state: "after", value: after }) : undefined
@@ -51,11 +50,11 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
               {after}
             </span>
             <span
-              className={`text-xs flex items-center text-slate-600 border-l border-r border-slate-600 font-medium rounded-sm px-1 py-0 transition-all ${
+              className={`text-xs flex items-center text-slate-600 border-l border-r ml-2 border-slate-600 font-medium rounded-sm px-1 py-0 transition-all ${
                 hoverEnabled ? "cursor-pointer" : ""
               } ${
-                isCollateralUsdHighlighted || isCollateralPriceHighlighted
-                  ? "underline decoration-dotted underline-offset-2 text-slate-200"
+                isCollateralUsdHighlighted
+                  ? "bg-blue-900 text-white py-0.5 -my-0.5"
                   : ""
               }`}
               onMouseEnter={

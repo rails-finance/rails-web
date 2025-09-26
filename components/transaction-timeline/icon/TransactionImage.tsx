@@ -59,7 +59,7 @@ export function TransactionImage({
             dangerouslySetInnerHTML={{ __html: svgContent }} 
           />
         ) : (
-          <div className="text-xs text-gray-500 text-center p-2 border rounded">
+          <div className="text-xs text-slate-500 text-center p-2 border rounded">
             {imageKey}
           </div>
         )}

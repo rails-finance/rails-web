@@ -55,7 +55,7 @@ export function ApplyPendingDebtExplanation({ transaction, onToggle }: ApplyPend
       <span key="collRatio" className="text-slate-500">
         Collateral ratio: {' '}
         <HighlightableValue type="collRatio" state="after" value={applyAfterRatio}>
-          {applyAfterRatio}%
+          {applyAfterRatio.toFixed(1)}%
         </HighlightableValue>
         {' '}(adjusted due to debt increase)
       </span>

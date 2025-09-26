@@ -7,29 +7,37 @@ interface HighlightableValueProps {
   type: ValueType;
   state: ValueState;
   value?: number;
+  className?: string;
+  asBlock?: boolean;
 }
 
-export function HighlightableValue({ 
-  children, 
-  type, 
-  state, 
-  value 
+export function HighlightableValue({
+  children,
+  type,
+  state,
+  value,
+  className = 'text-slate-200',
+  asBlock = false
 }: HighlightableValueProps) {
   const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
-  
+
   // Skip hover interactions for 'before' states or when hover is disabled
   const shouldEnableHover = hoverEnabled && state !== 'before';
   const isHighlighted = shouldEnableHover && hoveredValue?.type === type && hoveredValue?.state === state;
-  
+
+  const Component = asBlock ? 'div' : 'span';
+
   return (
-    <span
-      className={`font-semibold ${shouldEnableHover ? 'cursor-pointer ' : ''} ${
-        isHighlighted ? 'underline decoration-dotted underline-offset-2 text-slate-200' : ''
+    <Component
+      className={`${asBlock ? 'inline-block' : 'font-semibold'} ${shouldEnableHover ? 'cursor-pointer ' : ''} ${
+        className || 'text-slate-500'
+      } ${
+        isHighlighted ? '-mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded' : ''
       }`}
       onMouseEnter={shouldEnableHover ? () => setHoveredValue({ type, state, value }) : undefined}
       onMouseLeave={shouldEnableHover ? () => setHoveredValue(null) : undefined}
     >
       {children}
-    </span>
+    </Component>
   );
 }

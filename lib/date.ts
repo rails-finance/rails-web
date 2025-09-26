@@ -36,6 +36,45 @@ export function formatDate(dateInput: string | number | Date): string {
   return date.toLocaleDateString(undefined, options);
 }
 
+export function formatDuration(startDate: string | number | Date, endDate: string | number | Date): string {
+  let startDateObj: Date;
+  let endDateObj: Date;
+
+  // Convert to Date objects
+  if (typeof startDate === 'number') {
+    startDateObj = new Date(startDate * 1000);
+  } else if (typeof startDate === 'string') {
+    startDateObj = new Date(startDate);
+  } else {
+    startDateObj = startDate;
+  }
+
+  if (typeof endDate === 'number') {
+    endDateObj = new Date(endDate * 1000);
+  } else if (typeof endDate === 'string') {
+    endDateObj = new Date(endDate);
+  } else {
+    endDateObj = endDate;
+  }
+
+  const durationMs = endDateObj.getTime() - startDateObj.getTime();
+  const hours = Math.floor(durationMs / (1000 * 60 * 60));
+  const days = Math.floor(hours / 24);
+
+  if (hours < 24) {
+    if (hours === 0) {
+      const minutes = Math.floor(durationMs / (1000 * 60));
+      if (minutes === 0) {
+        return 'less than a minute';
+      }
+      return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+    }
+    return `${hours} ${hours === 1 ? 'hr' : 'hrs'}`;
+  }
+
+  return `${days} ${days === 1 ? 'day' : 'days'}`;
+}
+
 export function formatDateRange(startDate: string | number | Date, endDate: string | number | Date): string {
   let startDateObj: Date;
   let endDateObj: Date;

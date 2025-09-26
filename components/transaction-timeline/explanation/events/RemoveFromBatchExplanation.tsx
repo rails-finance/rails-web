@@ -81,7 +81,7 @@ export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFrom
       <span key="collRatio" className="text-slate-500">
         Collateral ratio: {' '}
         <HighlightableValue type="collRatio" state="after" value={exitAfterRatio}>
-          {exitAfterRatio}%
+          {exitAfterRatio.toFixed(1)}%
         </HighlightableValue>
       </span>
     );

@@ -51,6 +51,7 @@ export interface TroveSummary {
 
   // Status
   status: "open" | "closed" | "liquidated";
+  isZombieTrove?: boolean; // True if trove is a zombie (undercollateralized but not liquidatable)
   collateralType: string; // "WETH", "wstETH", or "rETH"
   assetType: string; // "BOLD", "afUSD", etc.
   protocolId: string; // "liquity_v2", etc.

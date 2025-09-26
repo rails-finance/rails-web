@@ -74,23 +74,13 @@ export const IconSymbols = () => (
       <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" />
       <circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" strokeWidth="2" />
     </symbol>
-    <symbol id="icon-trove-id"  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" >
-  <polyline points="3,2 21,2" opacity="0.1"/>
-  <polyline points="3,21.75 21,21.75" opacity="0.1"/>
-  <polyline points="2,3 2,21" opacity="0.1"/>
-  <polyline points="21.75,3 21.75,21" opacity="0.1"/>
-  
-
-  <polyline points="7,6 7,18"/>
-  
-
-  <polyline points="11,6 11,18"/>
-  <polyline points="10.5,6.5 15,6.5"/>
-  <polyline points="10.5,17 15,17"/>
-  <polyline points="16,7.5 16,9"/>
-  <polyline points="16,15 16,16.5"/>
-  <polyline points="17,9 17,15"/>
-
+    <symbol id="icon-trove-id" viewBox="0 0 24 24">
+      <polyline points="7 7 7 17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M 17 12 C 17 17 12 17 12 17 L 12 7 C 11 7 17 7 17 12 Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="17 2 22 2 22 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="7 2 2 2 2 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="7 22 2 22 2 17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="17 22 22 22 22 17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </symbol>
     <symbol id="icon-arrow-left-right" viewBox="0 0 24 24">
       <path d="M8 3 4 7l4 4" stroke="currentColor" strokeWidth="2" />
@@ -121,12 +111,8 @@ export const IconSymbols = () => (
         fill="#405AE5"
       ></path>
     </symbol>
-    <symbol id="icon-rails" viewBox="0 0 100 100">
-      <circle cx="86.25" cy="48.75" r="13.75" fill="white"></circle>
-      <path
-        fill="white"
-        d="M0 0 L38.64 0 L44.75 0 L51.09 1.64 L56.42 4.66 L59.99 8.46 L62.96 12.1 L65.1 16.93 L66.27 21.1 L66.75 25.22 L66.12 31.22 L64.5 35.96 L62.04 39.69 L59.56 42.8 L56.85 45.4 L54.11 46.86 L51.12 48.3 L52.78 49.22 L55.35 50.84 L58.22 53.34 L60.82 57.36 L77.86 100 L57.09 100 L41.44 61.45 L39.55 58.08 L36.89 55.31 L33.96 54.3 L29.84 54.03 L18.99 53.97 L19.17 38.39 L33.76 38.67 L39.83 36.91 L41.56 35.18 L43.8 33.25 L44.25 30.41 L44.21 27.52 L44.35 23.76 L44.15 21.22 L42.82 18.73 L38.86 16.05 L33.52 16.1 L19.17 16.1 L19.17 84.32 L0 84.32 Z"
-      ></path>
+    <symbol id="icon-rails" viewBox="0 0 200 200">
+      <path fill="white" d="M 130.8 139.446 C 134.744 147.335 154.467 198.616 154.467 198.616 L 113.048 198.616 L 83.463 121.696 C 83.463 121.696 75.574 109.862 63.74 107.889 L 38.099 107.889 L 38.099 167.059 L 0.625 167.059 L 0.625 1.383 L 81.491 1.383 C 109.104 1.383 132.772 23.079 132.772 50.691 C 132.772 70.414 120.938 88.166 103.186 96.055 C 109.104 100 113.048 103.944 116.993 109.862 C 122.91 117.751 126.855 127.612 130.8 139.446 Z M 71.629 30.968 L 38.099 30.968 L 38.099 76.332 L 71.629 76.332 C 83.463 76.332 93.325 66.47 93.325 54.438 C 93.325 40.829 83.463 30.968 71.629 30.968 Z M 199.375 98.692 C 199.375 113.669 187.233 125.811 172.256 125.811 C 157.279 125.811 145.137 113.669 145.137 98.692 C 145.137 83.715 157.279 71.573 172.256 71.573 C 187.233 71.573 199.375 83.715 199.375 98.692 Z" ></path>
     </symbol>
     <symbol id="icon-search" viewBox="0 0 24 24">
       <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2" fill="none" />
@@ -139,6 +125,30 @@ export const IconSymbols = () => (
         strokeWidth="2"
         fill="none"
       />
+    </symbol>
+    <symbol id="icon-menu" viewBox="0 0 24 24">
+      <line x1="4" x2="20" y1="6" y2="6" stroke="currentColor" strokeWidth="2" />
+      <line x1="4" x2="20" y1="12" y2="12" stroke="currentColor" strokeWidth="2" />
+      <line x1="4" x2="20" y1="18" y2="18" stroke="currentColor" strokeWidth="2" />
+    </symbol>
+    <symbol id="icon-x" viewBox="0 0 24 24">
+      <path d="m18 6-12 12" stroke="currentColor" strokeWidth="2" />
+      <path d="m6 6 12 12" stroke="currentColor" strokeWidth="2" />
+    </symbol>
+    <symbol id="icon-clock-zap" viewBox="0 0 24 24">
+   <path d="M 12.146 5.668 L 12.155 12.159 C 12.155 12.159 7.9 14.856 7.913 14.869" stroke="currentColor" strokewidth="2" fill="none"/>
+  <path d="M 12.337 21.994 C 4.643 22.253 -0.446 14.086 3.177 7.294 C 6.8 0.501 16.417 0.178 20.488 6.711 C 21.699 8.655 21.521 8.817 21.929 10.35" stroke="currentColor" strokewidth="2" fill="none"/>
+  <path d="M 20.316 14.916 L 16.316 18.916 L 22.316 18.916 L 18.316 22.916" stroke="currentColor" strokewidth="2" fill="none"/>
+
+    </symbol>
+    <symbol id="icon-timeline" viewBox="0 0 24 24">
+      <circle cx="12" cy="7" r="3" stroke="currentColor" strokeWidth="2" fill="none"/>
+      <circle cx="12" cy="17" r="3" stroke="currentColor" strokeWidth="2" fill="none"/>
+      <path d="M 5 9 L 2 6 L 5 3" stroke="currentColor" strokeWidth="2" fill="none"/>
+      <path d="M 8 6 L 5 6" stroke="currentColor" strokeWidth="2" fill="none"/>
+      <path d="M 19 15 L 22 18 L 19 21" stroke="currentColor" strokeWidth="2" fill="none"/>
+      <path d="M 16 18 L 19 18" stroke="currentColor" strokeWidth="2" fill="none"/>
+      <path d="M 12 10 L 12 14" stroke="currentColor" strokeWidth="2" fill="none"/>
     </symbol>
   </svg>
 );

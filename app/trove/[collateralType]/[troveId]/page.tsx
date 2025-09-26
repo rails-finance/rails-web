@@ -1,16 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 import type { TransactionTimeline as TimelineData } from "@/types/api/troveHistory";
 import { isRedemptionTransaction } from "@/types/api/troveHistory";
 import { TroveCard } from "@/components/trove/TroveCard";
 import { Button } from "@/components/ui/button";
 import { TransactionTimeline } from "@/components/transaction-timeline";
+import { formatDuration } from "@/lib/date";
+import { Icon } from "@/components/icons/icon";
 
 export default function TrovePage() {
   const params = useParams();
+  const router = useRouter();
   const troveId = params.troveId as string;
   const collateralType = params.collateralType as string;
 
@@ -74,9 +78,11 @@ export default function TrovePage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <Button onClick={() => window.history.back()} className="mb-4">
-          ← Back
+    <div className="space-y-6 py-8">
+    <h1 class="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
+        <Button onClick={() => router.back()} className="mb-4 pl-2">
+        <ChevronLeft className="w-4 h-4" />
+          Back
         </Button>
         <div className="bg-slate-700 rounded-lg h-48 animate-pulse" />
         <div className="space-y-4">
@@ -89,9 +95,10 @@ export default function TrovePage() {
 
   if (error || !troveData) {
     return (
-      <div className="space-y-6">
-        <Button onClick={() => window.history.back()} className="mb-4">
-          ← Back
+      <div className="space-y-6 py-8">
+        <Button onClick={() => router.back()} className="mb-4 pl-2">
+        <ChevronLeft className="w-4 h-4" />
+          Back
         </Button>
         <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">
           <p className="text-red-400">{error || "Trove not found"}</p>
@@ -104,15 +111,25 @@ export default function TrovePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <Button onClick={() => window.history.back()} className="mb-4">
-        ← Back
+    <div className="space-y-6 py-8">
+    <h1 class="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
+      <Button onClick={() => router.back()} className="mb-4 pl-2">
+        <ChevronLeft className="w-4 h-4" />
+          Back
       </Button>
 
       <TroveCard trove={troveData} />
 
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-semibold text-white">Trove Timeline</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-xl font-semibold text-white">Trove Timeline</h3>
+          {troveData.activity?.lastActivityAt && (
+            <span className="text-xs text-slate-500 flex baseline gap-1 rounded-full pl-1 pr-2 py-0.5 bg-slate-900">
+              <Icon name="clock-zap" size={14} />
+              {formatDuration(troveData.activity.lastActivityAt, new Date())} ago
+            </span>
+          )}
+        </div>
         {timelineData && timelineData.transactions.some(tx => isRedemptionTransaction(tx)) && (
           <button
             onClick={() => setHideRedemptions(!hideRedemptions)}
@@ -122,7 +139,7 @@ export default function TrovePage() {
                 : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
             }`}
           >
-            {hideRedemptions 
+            {hideRedemptions
               ? `Show ${timelineData.transactions.filter(tx => isRedemptionTransaction(tx)).length} Redemptions`
               : `Hide ${timelineData.transactions.filter(tx => isRedemptionTransaction(tx)).length} Redemptions`
             }

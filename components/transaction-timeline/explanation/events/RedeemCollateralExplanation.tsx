@@ -86,19 +86,15 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
     </span>
   );
 
-  if (redeemAfterCollUsd > 0) {
+  if (redeemAfterCollUsd > 0 && tx.collateralPrice) {
     redeemItems.push(
       <span key="currentValue" className="text-slate-500">
-        Current collateral value: <HighlightableValue type="collateralUsd" state="after" value={redeemAfterCollUsd}>
+        Current collateral valued at <HighlightableValue type="collateralUsd" state="after" value={redeemAfterCollUsd}>
           {formatUsdValue(redeemAfterCollUsd)}
-        </HighlightableValue>
-        {tx.collateralPrice && ` (at market price of `}
-        {tx.collateralPrice && (
-          <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
-            {formatUsdValue(tx.collateralPrice)}
-          </HighlightableValue>
-        )}
-        {tx.collateralPrice && `/${tx.collateralType})`}
+        </HighlightableValue> with historic price of{' '}
+        <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
+          {formatUsdValue(tx.collateralPrice)}
+        </HighlightableValue>{' '}/{' '}{tx.collateralType}
       </span>
     );
   }
@@ -108,7 +104,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
       <span key="improvedRatio" className="text-slate-500">
         Collateral ratio improved to{' '}
         <HighlightableValue type="collRatio" state="after" value={redeemAfterCollRatio}>
-          {redeemAfterCollRatio}%
+          {redeemAfterCollRatio.toFixed(1)}%
         </HighlightableValue>
       </span>
     );

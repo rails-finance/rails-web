@@ -103,7 +103,7 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
     <span key="collRatio" className="text-slate-500">
       Position opened with a{' '}
       <HighlightableValue type="collRatio" state="after" value={collRatio}>
-        {collRatio}%
+        {collRatio.toFixed(1)}%
       </HighlightableValue>
       {' '}collateralization ratio
       <InfoButton href={FAQ_URLS.LTV_COLLATERAL_RATIO} />
