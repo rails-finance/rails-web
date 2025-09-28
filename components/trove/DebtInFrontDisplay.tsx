@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { TroveSummary } from "@/types/api/trove";
 import { DebtInFrontCalculator, DebtInFrontResult, TroveWithCalculatedDebt } from "@/lib/utils/debt-in-front-calculator";
 import { InterestCalculator } from "@/lib/utils/interest-calculator";
 import { formatPrice, formatUsdValue } from "@/lib/utils/format";
 import { Icon } from "@/components/icons/icon";
-import { BringToFront, SquareStack, ShieldEllipsis, RotateCw } from "lucide-react";
+import { X, ChevronUp, ChevronDown, ChevronRight, ChevronLeft, BringToFront, ShieldEllipsis, RotateCw, BetweenHorizontalStart } from "lucide-react";
 import Link from "next/link";
 
 interface DebtInFrontDisplayProps {
@@ -15,7 +15,6 @@ interface DebtInFrontDisplayProps {
   showAsButton?: boolean;
   autoCalculate?: boolean;
   onCalculated?: (result: DebtInFrontResult) => void;
-  compactView?: boolean;
 }
 
 export function DebtInFrontDisplay({
@@ -23,8 +22,7 @@ export function DebtInFrontDisplay({
   className = "",
   showAsButton = true,
   autoCalculate = false,
-  onCalculated,
-  compactView = false
+  onCalculated
 }: DebtInFrontDisplayProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [debtData, setDebtData] = useState<DebtInFrontResult | null>(null);
@@ -65,7 +63,7 @@ export function DebtInFrontDisplay({
     try {
       const result = await calculator.calculateDebtInFront(trove);
       setDebtData(result);
-      if (!autoCalculate && !compactView) {
+      if (!autoCalculate) {
         setIsExpanded(true);
       }
       if (onCalculated) {
@@ -77,7 +75,7 @@ export function DebtInFrontDisplay({
     } finally {
       setIsLoading(false);
     }
-  }, [trove, calculator, autoCalculate, compactView, onCalculated]);
+  }, [trove, calculator, autoCalculate, onCalculated]);
 
 
   // Auto-calculate on mount if requested
@@ -86,6 +84,40 @@ export function DebtInFrontDisplay({
       calculateDebtInFront();
     }
   }, [autoCalculate, debtData, isLoading, calculateDebtInFront]);
+
+  // Common display component for debt and position info
+  const renderDebtPositionInfo = () => {
+    if (isLoading) {
+      return "Calculating...";
+    }
+
+    if (!debtData) {
+      return "Calculate Position";
+    }
+
+    return (
+      <div className="flex items-center">
+        <div className="flex items-center gap-1">
+          <span className="text-slate-500">Debt in front</span>
+          <span className="font-bold">{calculator.formatDebtAmount(debtData.debtInFront)}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              calculateDebtInFront();
+            }}
+            disabled={isLoading}
+            className="ml-1 p-0.5 cursor-pointer hover:bg-slate-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh"
+          >
+            <RotateCw className={`h-2.5 w-2.5 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   const renderTroveTable = (troves: TroveWithCalculatedDebt[], troveBehind?: TroveWithCalculatedDebt) => {
     const allTroves = [...troves];
@@ -139,11 +171,11 @@ export function DebtInFrontDisplay({
         <table className="w-full text-xs">
           <thead className="bg-slate-800">
             <tr>
-              <th className="px-2 py-1.5 text-left">Position</th>
-              <th className="px-2 py-1.5 text-left flex align-center gap-1"><Icon name="trove-id" size={12} className="inline" />Trove ID</th>
-              <th className="px-2 py-1.5 text-left">Owner</th>
+              <th className="px-2 py-1.5 text-left">#</th>
+              <th className="px-2 py-1.5 text-left"><span className=" inline-flex items-center gap-1"><Icon name="trove-id" size={12} className="inline" /></span></th>
+              <th className="px-2 py-1.5 text-left"><span className=" inline-flex items-center gap-1"><Icon name="user" size={12} className="inline" /></span></th>
               <th className="px-2 py-1.5 text-right">Interest Rate</th>
-              <th className="px-2 py-1.5 text-right">Total Debt</th>
+              <th className="px-2 py-1.5 text-right">Debt</th>
             </tr>
           </thead>
           <tbody>
@@ -157,90 +189,69 @@ export function DebtInFrontDisplay({
               const hiddenBetween = shouldShowHiddenIndicator ? (actualPosition - prevPosition - 1) : 0;
 
               return (
-                <>
+                <React.Fragment key={item.trove.id}>
                   {shouldShowHiddenIndicator && (
-                    <tr key={`hidden-${index}`} className="bg-slate-900/50">
-                      <td colSpan={5} className="px-2 py-2 text-center">
+                    <tr className="bg-slate-950">
+                      <td colSpan={5} className="px-2 py-2">
                         <button
                           onClick={() => setShowAllTroves(true)}
-                          className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                          className="text-xs text-blue-200 hover:text-white transition-colors cursor-pointer rounded px-1.5 py-0.25 bg-blue-600"
                         >
-                          ... {hiddenBetween} more trove{hiddenBetween > 1 ? 's' : ''} ...
+                          +{hiddenBetween} more Trove{hiddenBetween > 1 ? 's' : ''}
                         </button>
                       </td>
                     </tr>
                   )}
                   <tr
-                    key={item.trove.id}
                     className="hover:bg-slate-50 hover:bg-slate-900 transition-colors"
                   >
                     <td className="px-2 py-1.5 text-slate-400">{actualPosition}</td>
                     <td className="px-2 py-1.5">
                       <Link
                         href={`/trove/${item.trove.collateralType}/${item.trove.id}`}
-                        className="text-blue-500 hover:text-blue-600 font-mono inline-flex items-center gap-1"
+                        className="text-slate-500 hover:text-slate-400 inline-flex items-center gap-1"
                       >
                         {item.trove.id ? `${item.trove.id.substring(0, 8)}...` : "n/a"}
                       </Link>
                     </td>
-                    <td className="px-2 py-1.5 font-mono text-slate-400">
+                    <td className="px-2 py-1.5 text-slate-400">
                       {item.trove.owner ?
                         (item.trove.ownerEns || `${item.trove.owner.slice(0, 6)}...${item.trove.owner.slice(-4)}`) :
                         '-'
                       }
                     </td>
-                    <td className="px-2 py-1.5 text-right font-mono">
+                    <td className="px-2 py-1.5 text-right">
                       {item.trove.metrics.interestRate.toFixed(2)}%
                     </td>
-                    <td className="px-2 py-1.5 text-right font-mono font-semibold group relative">
-                      <span className="cursor-help">
+                    <td className="px-2 py-1.5 text-right font-semibold group relative">
                         {formatPrice(item.totalDebt)}
-                      </span>
-                      <div className="absolute right-0 top-full mt-1 z-10 hidden group-hover:block bg-slate-800 border border-slate-700 rounded p-2 text-xs whitespace-nowrap">
-                        <div className="text-slate-400">Principal: {formatPrice(item.recordedDebt)}</div>
-                        <div className="text-orange-400">Interest: +{formatPrice(item.accruedInterest)}</div>
-                        {item.managementFees > 0 && (
-                          <div className="text-purple-400">Mgmt Fee: +{formatPrice(item.managementFees)}</div>
-                        )}
-                      </div>
+                      
                     </td>
                   </tr>
-                </>
+                </React.Fragment>
               );
             }
             )}
 
             {/* Current trove (this trove) */}
-            <tr className="bg-green-950 text-green-400">
-              <td className="px-2 py-1.5">{allTroves.length + 1}</td>
-              <td className="px-2 py-1.5">
-                <Link
-                  href={`/trove/${trove.collateralType}/${trove.id}`}
-                  className="text-green-400 hover:text-green-300 font-mono inline-flex items-center gap-1"
-                >
+            <tr>
+              <td className="px-2 py-1.5"><span className="text-white font-extrabold flex items-center"><ChevronRight className="h-3 w-3 -ml-3" /> {allTroves.length + 1}</span></td>
+              <td className="px-2 py-1.5"><span className="text-white font-extrabold">
                   {trove.id ? `${trove.id.substring(0, 8)}...` : "n/a"}
-                </Link>
+</span>
+
               </td>
-              <td className="px-2 py-1.5 font-mono">
-                {trove.owner ?
+              <td className="px-2 py-1.5">
+                <span  className="text-white font-extrabold">{trove.owner ?
                   (trove.ownerEns || `${trove.owner.slice(0, 6)}...${trove.owner.slice(-4)}`) :
                   '-'
-                }
+                }</span>
               </td>
-              <td className="px-2 py-1.5 text-right font-mono">
-                {currentTroveCalculated.interestRate.toFixed(2)}%
+              <td className="px-2 py-1.5 text-right">
+                <span  className="text-white font-extrabold">{currentTroveCalculated.interestRate.toFixed(2)}%</span>
               </td>
-              <td className="px-2 py-1.5 text-right font-mono font-semibold group relative">
-                <span className="cursor-help">
-                  {formatPrice(currentTroveCalculated.totalDebt)}
-                </span>
-                <div className="absolute right-0 top-full mt-1 z-10 hidden group-hover:block bg-slate-800 border border-slate-700 rounded p-2 text-xs whitespace-nowrap">
-                  <div className="text-slate-400">Principal: {formatPrice(currentTroveCalculated.recordedDebt)}</div>
-                  <div className="text-orange-400">Interest: +{formatPrice(currentTroveCalculated.accruedInterest)}</div>
-                  {currentTroveCalculated.managementFees > 0 && (
-                    <div className="text-purple-400">Mgmt Fee: +{formatPrice(currentTroveCalculated.managementFees)}</div>
-                  )}
-                </div>
+              <td className="px-2 py-1.5 text-right font-semibold group relative">
+                  <span  className="text-white font-extrabold">{formatPrice(currentTroveCalculated.totalDebt)}</span>
               </td>
             </tr>
 
@@ -251,36 +262,25 @@ export function DebtInFrontDisplay({
                 <td className="px-2 py-1.5">
                   <Link
                     href={`/trove/${troveBehind.trove.collateralType}/${troveBehind.trove.id}`}
-                    className="text-blue-500 hover:text-blue-600 font-mono inline-flex items-center gap-1"
+                    className="text-slate-500 hover:text-blue-600 inline-flex items-center gap-1"
                   >
                     {troveBehind.trove.id ? `${troveBehind.trove.id.substring(0, 8)}...` : "n/a"}
                   </Link>
                 </td>
-                <td className="px-2 py-1.5 font-mono text-slate-400">
+                <td className="px-2 py-1.5 text-slate-400">
                   {troveBehind.trove.owner ?
                     (troveBehind.trove.ownerEns || `${troveBehind.trove.owner.slice(0, 6)}...${troveBehind.trove.owner.slice(-4)}`) :
                     '-'
                   }
                 </td>
-                <td className="px-2 py-1.5 text-right font-mono">
+                <td className="px-2 py-1.5 text-right">
                   {troveBehind.trove.metrics.interestRate.toFixed(2)}%
                 </td>
-                <td className="px-2 py-1.5 text-right font-mono font-semibold group relative">
-                  <span className="cursor-help">
+                <td className="px-2 py-1.5 text-right font-semibold group relative">
                     {formatPrice(troveBehind.totalDebt)}
-                  </span>
-                  <div className="absolute right-0 top-full mt-1 z-10 hidden group-hover:block bg-slate-800 border border-slate-700 rounded p-2 text-xs whitespace-nowrap">
-                    <div className="text-slate-400">Principal: {formatPrice(troveBehind.recordedDebt)}</div>
-                    <div className="text-orange-400">Interest: +{formatPrice(troveBehind.accruedInterest)}</div>
-                    {troveBehind.managementFees > 0 && (
-                      <div className="text-purple-400">Mgmt Fee: +{formatPrice(troveBehind.managementFees)}</div>
-                    )}
-                  </div>
                 </td>
               </tr>
             )}
-
-            
           </tbody>
         </table>
       </div>
@@ -318,96 +318,35 @@ export function DebtInFrontDisplay({
 
         {/* Information Note */}
         <div className="py-2 text-xs text-slate-400">
-          Troves with lower interest rates are redeemed first. The debt shown above protects your position from redemptions.
           {showAllTroves && debtData && debtData.troveDetails.length > 8 && (
             <button
               onClick={() => setShowAllTroves(false)}
-              className="ml-2 text-blue-400 hover:text-blue-300 transition-colors"
+              className="text-xs text-blue-200 hover:text-white transition-colors cursor-pointer rounded px-1.5 py-0.25 bg-blue-600"
             >
               Show less
             </button>
           )}
         </div>
-
-        {/* Last Updated */}
-        <div className="text-xs text-slate-400 pt-2">
-          <span></span>
-        </div>
       </div>
     );
   };
 
-  // Compact view - just show the summary inline
-  if (compactView && debtData) {
-    return (
-      <div className={`flex items-center justify-between text-sm ${className}`}>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <SquareStack className="h-4 w-4 text-slate-400" />
-            <span className="text-slate-400">Debt in front:</span>
-            <span className="font-mono font-bold">{calculator.formatDebtAmount(debtData.debtInFront)}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400">Position:</span>
-            <span className="font-mono">#{debtData.trovesAhead + 1}</span>
-          </div>
-        </div>
-        <a
-          href="https://docs.liquity.org/v2-faq/redemptions-and-delegation"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-blue-500 hover:text-blue-600 underline whitespace-nowrap"
-        >
-          Learn about redemptions →
-        </a>
-      </div>
-    );
-  }
-
-  // Loading state for compact view
-  if (compactView && isLoading) {
-    return (
-      <div className={`flex items-center gap-2 text-sm ${className}`}>
-        <div className="animate-spin h-4 w-4 rounded-full" />
-        <span className="text-slate-400">Calculating debt position...</span>
-      </div>
-    );
-  }
-
   // Show button when not expanded (either before or after calculation)
   if (showAsButton && !isExpanded) {
     return (
-      <div className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-slate-800 text-slate-300 ${className}`}>
+      <div className={`w-full flex items-center gap-2 text-sm font-medium rounded text-slate-300 ${className}`}>
+        <div className="flex-1 inline-flex items-center gap-2">
         <button
           onClick={debtData ? () => setIsExpanded(true) : calculateDebtInFront}
           disabled={isLoading}
-          className="flex-1 inline-flex items-center gap-2 hover:text-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          className="py-1 px-2 flex gap-1 items-center cursor-pointer bg-slate-950 hover:bg-slate-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={debtData ? "Show details" : "Calculate position"}
         >
-          <SquareStack className="h-4 w-4" />
-          {isLoading ? (
-            "Calculating..."
-          ) : debtData ? (
-            <div className="flex items-center">
-                <span className="font-mono font-bold">{calculator.formatDebtAmount(debtData.debtInFront)} debt in front, position {debtData.trovesAhead + 1}</span>
-            </div>
-          ) : (
-            "Calculate Position"
-          )}
+           <BetweenHorizontalStart className="h-4 w-4" />{debtData ? debtData.trovesAhead + 1 : '?'}
         </button>
-        {debtData && (
-          <>
-            <span className="text-xs text-slate-500">Last updated: {debtData.lastCalculated.toLocaleTimeString()}</span>
-            <button
-              onClick={calculateDebtInFront}
-              disabled={isLoading}
-              className="cursor-pointer p-1 hover:bg-slate-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Refresh"
-            >
-              <RotateCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
-          </>
-        )}
+          {renderDebtPositionInfo()}
 
+</div>
       </div>
     );
   }
@@ -416,52 +355,34 @@ export function DebtInFrontDisplay({
   return (
     <div className={`${className}`}>
       {/* Button/Header - always visible */}
-      <div className={`
-        w-full inline-flex items-center justify-between gap-2 px-3 py-1.5
-        text-sm font-medium rounded-lg
-        bg-slate-800
-        text-slate-300
-        ${isExpanded ? 'rounded-b-none' : ''}
-      `}>
+            <div className={`w-full flex items-center gap-2 text-sm font-medium rounded bg-slate-950 text-slate-300 ${className}`}>
+        <div className="flex-1 inline-flex items-center gap-2">
         <button
           onClick={isExpanded ? () => setIsExpanded(false) : (debtData ? () => setIsExpanded(true) : calculateDebtInFront)}
           disabled={isLoading}
-          className="cursor-pointer flex-1 inline-flex items-center gap-2 hover:text-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="py-1 px-2 flex gap-1 items-center cursor-pointer hover:text-blue-400 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={isExpanded ? "Hide details" : (debtData ? "Show details" : "Calculate position")}
         >
-          <SquareStack className="h-4 w-4" />
-          {isLoading ? (
-            "Calculating..."
-          ) : debtData ? (
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
-                <span className="font-mono font-bold">{calculator.formatDebtAmount(debtData.debtInFront)} debt in front, position {debtData.trovesAhead + 1} Last updated: {debtData.lastCalculated.toLocaleTimeString()}</span> 
-              </div>
-            </div>
-          ) : (
-            "Calculate Position"
-          )}
+          <BetweenHorizontalStart className={`h-4 w-4`} />
+          {debtData ? debtData.trovesAhead + 1 : '?'} 
+          
         </button>
-        <div className="flex items-center gap-2">
- 
-          {debtData && (
-            <button
-              onClick={calculateDebtInFront}
-              disabled={isLoading}
-              className="cursor-pointer p-1 hover:bg-slate-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Refresh"
-            >
-              <RotateCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
-          )}
-          {isExpanded && debtData && (
-            <Icon name="chevron-up" className="h-4 w-4" />
-          )}
-        </div>
+          {renderDebtPositionInfo()}
+        </div> 
+        <button
+          onClick={isExpanded ? () => setIsExpanded(false) : (debtData ? () => setIsExpanded(true) : calculateDebtInFront)}
+          disabled={isLoading}
+          className="py-1 px-2 flex gap-1 items-center cursor-pointer rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={isExpanded ? "Hide details" : (debtData ? "Show details" : "Calculate position")}
+        >
+          <X className={`h-4 w-4`} />
+          
+        </button>
       </div>
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="p-4 rounded-b-lg bg-slate-900 border border-t-0 border-slate-700">
+        <div className="p-2 rounded-b-lg bg-slate-950">
           {renderContent()}
         </div>
       )}

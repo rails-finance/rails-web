@@ -199,13 +199,13 @@ export class DebtInFrontCalculator {
    */
   formatDebtAmount(amount: number): string {
     if (amount < 1000) {
-      return `${amount.toFixed(0)} BOLD`;
+      return `${amount.toFixed(0)}`;
     } else if (amount < 1000000) {
-      return `${(amount / 1000).toFixed(1)}K BOLD`;
+      return `${(amount / 1000).toFixed(1)}K`;
     } else if (amount < 1000000000) {
-      return `${(amount / 1000000).toFixed(2)}M BOLD`;
+      return `${(amount / 1000000).toFixed(2)}M`;
     } else {
-      return `${(amount / 1000000000).toFixed(2)}B BOLD`;
+      return `${(amount / 1000000000).toFixed(2)}B`;
     }
   }
 
