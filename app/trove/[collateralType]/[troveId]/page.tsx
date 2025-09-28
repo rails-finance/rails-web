@@ -81,8 +81,8 @@ export default function TrovePage() {
     return (
     <div className="space-y-6 py-8">
     <h1 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-      <TokenIcon assetSymbol={collateralType} className="w-7 h-7" />
-      <TokenIcon assetSymbol="BOLD" className="w-7 h-7" />
+      <TokenIcon assetSymbol={collateralType} className="w-7 h-7 z-1" />
+      <TokenIcon assetSymbol="BOLD" className="w-7 h-7 -ml-3" />
       Liquity V2 Trove
     </h1>
         <Button onClick={() => router.back()} className="mb-4 pl-2">
