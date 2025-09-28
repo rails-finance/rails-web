@@ -15,6 +15,7 @@ import { useHover, HoverProvider } from "@/components/transaction-timeline/conte
 import { InfoButton } from "@/components/transaction-timeline/explanation/InfoButton";
 import { FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
+import { DebtInFrontDisplay } from "./DebtInFrontDisplay";
 
 interface OpenTroveCardProps {
   trove: TroveSummary;
@@ -23,6 +24,7 @@ interface OpenTroveCardProps {
 
 function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardProps) {
   const [showHoverContext, setShowHoverContext] = useState(false);
+  const [debtInFrontData, setDebtInFrontData] = useState<any>(null);
   const { hoveredValue, hoverEnabled, setHoverEnabled } = useHover();
   const calculator = useMemo(() => new InterestCalculator(), []);
   
@@ -35,17 +37,16 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
 
   // Generate interest info if not provided by backend
   const interestInfo = useMemo(() => {
-    // Mock data for demonstration - in production this should come from the API
-    // Using the example values from the prototype
-    const mockLastUpdate = Date.now() / 1000 - (68 * 24 * 60 * 60); // 68 days ago
     // Convert from wei (18 decimals) to normal units
     const recordedDebt = parseFloat(trove.debt.currentRaw) / 1e18;
     const interestRate = trove.metrics.interestRate;
-    
+    // Use actual lastActivityAt timestamp from trove data
+    const lastUpdateTime = trove.activity.lastActivityAt;
+
     return calculator.generateInterestInfo(
       recordedDebt,
       interestRate,
-      mockLastUpdate,
+      lastUpdateTime,
       trove.batch.isMember,
       trove.batch.managementFee,
       trove.batch.manager || undefined
@@ -210,14 +211,14 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
           </div>
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-400">
-              {formatDuration(trove.activity.createdAt, new Date())}
-            </span>
             {!showViewButton && (
               <span className="text-slate-400">
                 Opened {formatDate(trove.activity.createdAt)}
               </span>
             )}
+            <span className="text-slate-400 bg-slate-700 rounded-lg px-2">
+              {formatDuration(trove.activity.createdAt, new Date())}
+            </span>
             {trove.activity.redemptionCount > 0 && (
               <span className="inline-flex items-center text-orange-400">
                 <Icon name="triangle" size={12} />
@@ -276,7 +277,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
         {/* Metrics grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <p className="text-xs text-slate-400 mb-1">Backed by</p>
+            <p className="text-sm text-slate-500 font-medium mb-1">Backed by</p>
             <div className="flex items-center">
               <span className="flex items-center">
                 <p className="text-xl font-bold mr-1">
@@ -298,7 +299,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
             </div>
           </div>
           <div>
-            <p className="text-xs text-slate-400 mb-1">Collateral Ratio</p>
+            <p className="text-sm text-slate-500 font-medium mb-1">Collateral Ratio</p>
             <p className="text-xl font-semibold">
               <HighlightableValue type="collRatio" state="after" value={interestInfo && trove.collateral.valueUsd > 0 
                 ? parseFloat(((trove.collateral.valueUsd / debtWithInterest) * 100).toFixed(1))
@@ -314,7 +315,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
               {trove.batch.isMember && (
                 <span className="text-xs font-semibold px-1 py-0.5 bg-pink-900/50 text-pink-400 rounded-xs">DELEGATED</span>
               )}
-              <p className="text-xs text-slate-400">Interest Rate</p>
+              <p className="text-sm text-slate-500 font-medium">Interest Rate</p>
             </div>
             <div className="text-xl font-medium">
               <HighlightableValue type="interestRate" state="after" value={trove.metrics.interestRate}>
@@ -366,6 +367,17 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
               </>
             )}
           </div>
+        </div>
+
+        {/* Single Debt in Front component - auto-calculates on individual trove pages */}
+        <div className="">
+          <DebtInFrontDisplay
+            trove={trove}
+            showAsButton={true}
+            autoCalculate={!showViewButton}
+            compactView={false}
+            onCalculated={(data) => setDebtInFrontData(data)}
+          />
         </div>
 
         {showViewButton ? (

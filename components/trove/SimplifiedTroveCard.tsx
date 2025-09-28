@@ -30,16 +30,15 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
 
   // Generate interest info if not provided by backend
   const interestInfo = useMemo(() => {
-    // Remove this - new API doesn't have interestInfo property
-
-    const mockLastUpdate = Date.now() / 1000 - (68 * 24 * 60 * 60); // 68 days ago
     const recordedDebt = parseFloat(trove.debt.currentRaw) / 1e18;
     const interestRate = trove.metrics.interestRate;
+    // Use actual lastActivityAt timestamp from trove data
+    const lastUpdateTime = trove.activity.lastActivityAt;
 
     return calculator.generateInterestInfo(
       recordedDebt,
       interestRate,
-      mockLastUpdate,
+      lastUpdateTime,
       trove.batch.isMember,
       trove.batch.managementFee,
       trove.batch.manager || undefined
