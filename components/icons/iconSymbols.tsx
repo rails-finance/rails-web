@@ -136,9 +136,9 @@ export const IconSymbols = () => (
       <path d="m6 6 12 12" stroke="currentColor" strokeWidth="2" />
     </symbol>
     <symbol id="icon-clock-zap" viewBox="0 0 24 24">
-   <path d="M 12.146 5.668 L 12.155 12.159 C 12.155 12.159 7.9 14.856 7.913 14.869" stroke="currentColor" strokewidth="2" fill="none"/>
-  <path d="M 12.337 21.994 C 4.643 22.253 -0.446 14.086 3.177 7.294 C 6.8 0.501 16.417 0.178 20.488 6.711 C 21.699 8.655 21.521 8.817 21.929 10.35" stroke="currentColor" strokewidth="2" fill="none"/>
-  <path d="M 20.316 14.916 L 16.316 18.916 L 22.316 18.916 L 18.316 22.916" stroke="currentColor" strokewidth="2" fill="none"/>
+   <path d="M 12.146 5.668 L 12.155 12.159 C 12.155 12.159 7.9 14.856 7.913 14.869" stroke="currentColor" strokeWidth="2" fill="none"/>
+  <path d="M 12.337 21.994 C 4.643 22.253 -0.446 14.086 3.177 7.294 C 6.8 0.501 16.417 0.178 20.488 6.711 C 21.699 8.655 21.521 8.817 21.929 10.35" stroke="currentColor" strokeWidth="2" fill="none"/>
+  <path d="M 20.316 14.916 L 16.316 18.916 L 22.316 18.916 L 18.316 22.916" stroke="currentColor" strokeWidth="2" fill="none"/>
 
     </symbol>
     <symbol id="icon-timeline" viewBox="0 0 24 24">

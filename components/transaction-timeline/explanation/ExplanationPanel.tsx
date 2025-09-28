@@ -74,7 +74,7 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
           </div>
         </div>
           {transactionHash && (
-            <div className="px-4 pb-2">
+            <div className="">
               <div className="pt-2 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1 text-xs text-slate-600">
