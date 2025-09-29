@@ -16,28 +16,25 @@ const VALID_SORT_ORDERS = ['asc', 'desc'];
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  
-  // Extract and validate parameters
+
+  // Extract parameters
   const troveId = searchParams.get('troveId');
   const status = searchParams.get('status');
-
-  // Handle comma-separated status values
-  let validStatus = null;
-  if (status) {
-    const statusValues = status.split(',').map(s => s.trim());
-    const allValid = statusValues.every(s => VALID_STATUSES.includes(s));
-    validStatus = allValid ? status : null;
-  }
   const collateralType = searchParams.get('collateralType');
-  const validCollateralType = collateralType && VALID_COLLATERAL_TYPES.includes(collateralType) ? collateralType : null;
   const ownerAddress = searchParams.get('ownerAddress');
   const ownerEns = searchParams.get('ownerEns');
   const activeWithin = searchParams.get('activeWithin');
   const createdWithin = searchParams.get('createdWithin');
-  const troveType = searchParams.get('troveType');
-  const batchOnly = troveType === 'batch' || searchParams.get('batchOnly') === 'true';
-  const individualOnly = troveType === 'individual' || searchParams.get('individualOnly') === 'true';
-  const hasRedemptions = searchParams.get('hasRedemptions') === 'true';
+  const batchOnlyParam = searchParams.get('batchOnly');
+  const individualOnlyParam = searchParams.get('individualOnly');
+  const hasRedemptionsParam = searchParams.get('hasRedemptions');
+
+  // Parse boolean parameters
+  const batchOnly = batchOnlyParam === 'true';
+  const individualOnly = individualOnlyParam === 'true';
+  let hasRedemptions: boolean | undefined;
+  if (hasRedemptionsParam === 'true') hasRedemptions = true;
+  if (hasRedemptionsParam === 'false') hasRedemptions = false;
   const sortBy = searchParams.get('sortBy');
   const sortOrder = searchParams.get('sortOrder');
   const limit = searchParams.get('limit');
@@ -116,7 +113,7 @@ export async function GET(request: NextRequest) {
   
   // Return mock data for specific fake trove ID
   if (troveId === "mock-all-events") {
-    const mockCollateral = validCollateralType || 'WETH';
+    const mockCollateral = collateralType || 'WETH';
     const customizedMock = {
       ...mockTroveData,
       troveId: troveId,
@@ -126,7 +123,7 @@ export async function GET(request: NextRequest) {
         symbol: mockCollateral,
       }
     };
-    
+
     return NextResponse.json({
       data: [customizedMock],
       pagination: {
@@ -146,18 +143,25 @@ export async function GET(request: NextRequest) {
   try {
     // Build clean query params for backend
     const backendParams = new URLSearchParams();
-    
-    // Add all validated parameters
+
+    // Add parameters with inline validation
     if (troveId) backendParams.set('troveId', troveId);
-    if (validStatus) backendParams.set('status', validStatus);
-    if (validCollateralType) backendParams.set('collateralType', validCollateralType);
+    if (status && VALID_STATUSES.includes(status)) {
+      backendParams.set('status', status);
+    }
+    if (collateralType && VALID_COLLATERAL_TYPES.includes(collateralType)) {
+      backendParams.set('collateralType', collateralType);
+    }
     if (ownerAddress) backendParams.set('ownerAddress', ownerAddress);
     if (ownerEns) backendParams.set('ownerEns', ownerEns);
     if (activeWithin) backendParams.set('activeWithin', activeWithin);
     if (createdWithin) backendParams.set('createdWithin', createdWithin);
+    // Pass boolean parameters with values to backend
     if (batchOnly) backendParams.set('batchOnly', 'true');
     if (individualOnly) backendParams.set('individualOnly', 'true');
-    if (hasRedemptions) backendParams.set('hasRedemptions', 'true');
+    if (hasRedemptions !== undefined) {
+      backendParams.set('hasRedemptions', String(hasRedemptions));
+    }
     if (sortBy) backendParams.set('sortBy', sortBy);
     if (sortOrder) backendParams.set('sortOrder', sortOrder);
     if (limit) backendParams.set('limit', limit);
