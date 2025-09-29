@@ -24,6 +24,11 @@ export function AppFooter() {
                   About Rails
                 </Link>
               </li>
+              <li>
+                <Link href="/how-it-works" className="text-slate-400 hover:text-white text-sm transition-colors">
+                  How It Works
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -118,9 +123,19 @@ export function AppFooter() {
 
         {/* Bottom Section */}
         <div className="mt-6 pt-6 border-t border-slate-700">
-          <p className="text-slate-500 text-xs text-center">
-            © {new Date().getFullYear()} Rails • Built with support from Liquity
-          </p>
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <p className="text-slate-500 text-xs mb-2 md:mb-0">
+              © {new Date().getFullYear()} Rails • Built with support from Liquity
+            </p>
+            <div className="flex gap-4">
+              <Link href="/privacy" className="text-slate-500 hover:text-slate-300 text-xs transition-colors">
+                Privacy Policy
+              </Link>
+              <Link href="/terms" className="text-slate-500 hover:text-slate-300 text-xs transition-colors">
+                Terms of Service
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </footer>

@@ -63,6 +63,11 @@ export function SiteFooter() {
                 </Link>
               </li>
               <li>
+                <Link href="/how-it-works" className="text-slate-600 hover:text-green-600 text-sm transition-colors">
+                  How It Works
+                </Link>
+              </li>
+              <li>
                 <Link href="/troves" className="text-slate-600 hover:text-green-600 text-sm transition-colors">
                   Explore Troves
                 </Link>
@@ -90,9 +95,19 @@ export function SiteFooter() {
         {/* Bottom Section */}
         <div className="mt-8 pt-8 border-t border-slate-200">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-slate-500 text-xs mb-4 md:mb-0">
-              © {new Date().getFullYear()} Rails. Built with support from Liquity.
-            </p>
+            <div className="flex flex-col md:flex-row items-center gap-4 mb-4 md:mb-0">
+              <p className="text-slate-500 text-xs">
+                © {new Date().getFullYear()} Rails. Built with support from Liquity.
+              </p>
+              <div className="flex gap-4">
+                <Link href="/privacy" className="text-slate-500 hover:text-slate-700 text-xs transition-colors">
+                  Privacy Policy
+                </Link>
+                <Link href="/terms" className="text-slate-500 hover:text-slate-700 text-xs transition-colors">
+                  Terms of Service
+                </Link>
+              </div>
+            </div>
             <div className="flex items-center">
               <span className="text-slate-500 text-xs mr-2">Supported by</span>
               <a href="https://liquity.org" target="_blank" rel="noopener noreferrer">
