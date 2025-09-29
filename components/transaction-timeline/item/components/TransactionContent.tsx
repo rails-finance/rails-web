@@ -10,9 +10,9 @@ export function TransactionContent({ children, isInBatch, isExpanded }: Transact
   let containerClassName = "grow self-start mt-1.5 mt-2.5 rounded-md group transition-colors duration-150";
 
   if (isExpanded) {
-    containerClassName += " bg-slate-900";
+    containerClassName += " bg-slate-50 dark:bg-slate-900 ";
   } else {
-    containerClassName += " hover:bg-slate-900";
+    containerClassName += " hover:bg-slate-50 dark:hover:bg-slate-900";
   }
 
   return <div className={containerClassName}>{children}</div>;

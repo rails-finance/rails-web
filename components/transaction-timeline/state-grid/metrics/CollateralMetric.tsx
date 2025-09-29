@@ -39,8 +39,8 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
         ) : (
           <div className="flex items-center">
             <span
-              className={`text-sm font-semibold text-white -mx-1 px-1 -my-0.5 py-0.5  rounded ${hoverEnabled ? "cursor-pointer" : ""} transition-all ${
-                isAfterHighlighted ? "bg-blue-900 " : ""
+              className={`text-sm font-semibold text-slate-900 dark:text-white -mx-1 px-1 -my-0.5 py-0.5  rounded ${hoverEnabled ? "cursor-pointer" : ""} transition-all ${
+                isAfterHighlighted ? "bg-blue-200 dark:bg-blue-900 " : ""
               }`}
               onMouseEnter={
                 hoverEnabled ? () => setHoveredValue({ type: "collateral", state: "after", value: after }) : undefined

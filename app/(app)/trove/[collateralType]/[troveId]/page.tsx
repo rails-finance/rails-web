@@ -80,7 +80,7 @@ export default function TrovePage() {
   if (loading) {
     return (
     <div className="space-y-6 py-8">
-    <h1 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+    <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
       <TokenIcon assetSymbol={collateralType} className="w-7 h-7 z-1" />
       <TokenIcon assetSymbol="BOLD" className="w-7 h-7 -ml-3" />
       Liquity V2 Trove
@@ -117,7 +117,7 @@ export default function TrovePage() {
 
   return (
     <div className="space-y-6 py-8">
-    <h1 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+    <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
       <TokenIcon assetSymbol={collateralType} className="w-7 h-7 z-1" />
       <TokenIcon assetSymbol="BOLD" className="w-7 h-7 -ml-3" />
       Liquity V2 Trove
@@ -131,9 +131,9 @@ export default function TrovePage() {
 
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <h3 className="text-xl font-semibold text-white">Trove Timeline</h3>
+          <h3 className="text-xl font-semibold text-slate-900 dark:text-white">Trove Timeline</h3>
           {troveData.activity?.lastActivityAt && (
-            <span className="text-xs text-slate-500 flex baseline gap-1 rounded-full pl-1 pr-2 py-0.5 bg-slate-900">
+            <span className="text-xs text-slate-600 dark:text-slate-500 flex baseline gap-1 rounded-full pl-1 pr-2 py-0.5 bg-slate-100 dark:bg-slate-900">
               <Icon name="clock-zap" size={14} />
               {formatDuration(troveData.activity.lastActivityAt, new Date())} ago
             </span>

@@ -38,8 +38,8 @@ export function DebtMetric({ assetType, before, after, isCloseTrove, upfrontFee 
                 <ClosedStateLabel />
               ) : (
                 <div
-                  className={`text-sm font-semibold text-white ${hoverEnabled ? "cursor-pointer" : ""} transition-all ${
-                    isAfterHighlighted ? "-mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded" : ""
+                  className={`text-sm font-semibold text-slate-900 dark:text-white ${hoverEnabled ? "cursor-pointer" : ""} transition-all ${
+                    isAfterHighlighted ? "-mx-1 px-1 -my-0.5 py-0.5 bg-blue-200 dark:bg-blue-900 rounded" : ""
                   }`}
                   onMouseEnter={
                     hoverEnabled ? () => setHoveredValue({ type: "debt", state: "after", value: after }) : undefined

@@ -58,7 +58,7 @@ export function HeaderContent({ tx }: { tx: Transaction }) {
 }
 
 function DefaultHeader({ tx }: { tx: Transaction }) {
-  return <span className="text-white font-medium">{getOperationLabel(tx.operation)}</span>;
+  return <span className="text-slate-900 dark:text-white font-medium">{getOperationLabel(tx.operation)}</span>;
 }
 
 function getOperationLabel(operation: string): string {

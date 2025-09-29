@@ -35,15 +35,15 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, sho
           )}
           <div className="flex flex-wrap sm:flex-row gap-3">
             {showDetailedInfo && trove.owner && (
-              <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
-                <span className="text-slate-400 flex items-center gap-1">
+              <span className="bg-slate-100 dark:bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
+                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                   <Icon name="user" size={12} />
-                  <HighlightableValue type="ownerAddress" state="after" className="text-slate-400">
+                  <HighlightableValue type="ownerAddress" state="after" className="text-slate-600 dark:text-slate-400">
                     {trove.ownerEns || `${trove.owner.substring(0, 6)}...${trove.owner.substring(38)}`}
                   </HighlightableValue>
                   <div className="relative inline-block group">
                     <button
-                      className="mx-1.5 text-slate-400 hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
+                      className="mx-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
                       aria-label={copiedOwnerAddress ? "Copied to clipboard" : "Copy to clipboard"}
                       onClick={(e) => {
                         e.preventDefault();
@@ -59,7 +59,7 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, sho
                     </button>
                     <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 pointer-events-none">
                       <div
-                        className={`bg-slate-700 text-slate-200 px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity duration-200 ${
+                        className={`bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-200 px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity duration-200 ${
                           copiedOwnerAddress ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                         }`}
                       >
@@ -71,15 +71,15 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, sho
               </span>
             )}
             {showDetailedInfo && (
-              <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
-                <span className="text-slate-400 flex items-center gap-1">
+              <span className="bg-slate-100 dark:bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
+                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                   <Icon name="trove-id" size={12} />
-                  <HighlightableValue type="troveId" state="after" className="text-slate-400" value={trove.id ? parseInt(trove.id) : undefined}>
+                  <HighlightableValue type="troveId" state="after" className="text-slate-600 dark:text-slate-400" value={trove.id ? parseInt(trove.id) : undefined}>
                     {trove.id ? `${trove.id.substring(0, 8)}...` : "n/a"}
                   </HighlightableValue>
                   <div className="relative inline-block group">
                     <button
-                      className="mx-1.5 text-slate-400 hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
+                      className="mx-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
                       aria-label={copiedTrove ? "Copied to clipboard" : "Copy to clipboard"}
                       onClick={(e) => {
                         e.preventDefault();
@@ -95,7 +95,7 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, sho
                     </button>
                     <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 pointer-events-none">
                       <div
-                        className={`bg-slate-700 text-slate-200 px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity duration-200 ${
+                        className={`bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-200 px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity duration-200 ${
                           copiedTrove ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                         }`}
                       >
@@ -107,18 +107,18 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, sho
               </span>
             )}
             {showDetailedInfo && getTroveNftUrl(trove.collateralType, trove.id) && (
-              <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
+              <span className="bg-slate-100 dark:bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
                 <a
                   href={getTroveNftUrl(trove.collateralType, trove.id)!}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center text-slate-400 hover:text-slate-200 justify-center ml-0.5 transition-colors"
+                  className="inline-flex items-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 justify-center ml-0.5 transition-colors"
                   aria-label="View NFT on OpenSea"
                 >
-                  <HighlightableValue type="nftToken" state="after" className="text-slate-400">
+                  <HighlightableValue type="nftToken" state="after" className="text-slate-600 dark:text-slate-400">
                     <Image size={14} className="" />
                   </HighlightableValue>
-                  <Link2 size={14} className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors" />
+                  <Link2 size={14} className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-200 dark:bg-slate-800 w-4 h-4 rounded-full transition-colors" />
                 </a>
               </span>
             )}

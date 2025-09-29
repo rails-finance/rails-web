@@ -541,7 +541,7 @@ export default function TrovesPage() {
 
     return (
       <div className="flex items-center justify-between mt-8">
-        <div className="text-sm text-slate-400">
+        <div className="text-sm text-slate-600 dark:text-slate-400">
           Showing {showingFrom}-{showingTo} of {totalCount} troves
         </div>
 
@@ -549,7 +549,7 @@ export default function TrovesPage() {
           <button
             onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage === 1}
-            className="cursor-pointer p-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="cursor-pointer p-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -558,11 +558,11 @@ export default function TrovesPage() {
             <>
               <button
                 onClick={() => goToPage(1)}
-                className="cursor-pointer px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+                className="cursor-pointer px-3 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
               >
                 1
               </button>
-              {start > 2 && <span className="text-slate-400">...</span>}
+              {start > 2 && <span className="text-slate-600 dark:text-slate-400">...</span>}
             </>
           )}
 
@@ -572,8 +572,8 @@ export default function TrovesPage() {
               onClick={() => goToPage(num)}
               className={`cursor-pointer px-3 py-1 rounded-lg transition-colors ${
                 num === currentPage
-                  ? 'bg-slate-600 text-white'
-                  : 'bg-slate-800 hover:bg-slate-700'
+                  ? 'bg-slate-500 dark:bg-slate-600 text-white'
+                  : 'bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700'
               }`}
             >
               {num}
@@ -582,10 +582,10 @@ export default function TrovesPage() {
 
           {end < totalPages && (
             <>
-              {end < totalPages - 1 && <span className="text-slate-400">...</span>}
+              {end < totalPages - 1 && <span className="text-slate-600 dark:text-slate-400">...</span>}
               <button
                 onClick={() => goToPage(totalPages)}
-                className="cursor-pointer px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+                className="cursor-pointer px-3 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
               >
                 {totalPages}
               </button>
@@ -595,7 +595,7 @@ export default function TrovesPage() {
           <button
             onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage === totalPages}
-            className="cursor-pointer p-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="cursor-pointer p-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -731,8 +731,8 @@ export default function TrovesPage() {
                           : 'cursor-pointer'
                       } ${
                         isSelected
-                          ? 'bg-slate-900 border border-slate-900 hover:opacity-70'
-                          : 'opacity-25 border-slate-600 border hover:border-slate-500'
+                          ? 'bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-900 hover:opacity-70'
+                          : 'opacity-25 border-slate-400 dark:border-slate-600 border hover:border-slate-300 dark:hover:border-slate-500'
                       }`}
                     >
                       <svg className="w-5 h-5 z-1">
@@ -755,19 +755,19 @@ export default function TrovesPage() {
                 placeholder="Address, ENS, ID, or delegate..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full px-4 py-2 pr-10 bg-slate-800 h-10 border border-slate-700 rounded-lg text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full px-4 py-2 pr-10 bg-white dark:bg-slate-800 h-10 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
               {searchInput ? (
                 <button
                   type="button"
                   onClick={handleClearSearch}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                   title="Clear filter"
                 >
                   <X className="w-4 h-4" />
                 </button>
               ) : (
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 dark:text-slate-400 pointer-events-none" />
               )}
             </form>
           </div>
@@ -776,7 +776,7 @@ export default function TrovesPage() {
           <div className="flex items-center gap-1 w-full md:w-auto">
             <button
               onClick={() => handleSortChange(sortBy, sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="flex items-center justify-center w-10 h-10 bg-slate-900 hover:bg-slate-700 rounded-lg transition-colors text-white"
+              className="flex items-center justify-center w-10 h-10 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-900 dark:text-white border border-slate-300 dark:border-transparent"
               title={sortOrder === 'asc' ? 'Sort Ascending' : 'Sort Descending'}
             >
               {sortOrder === 'asc' ? '↑' : '↓'}
@@ -784,14 +784,14 @@ export default function TrovesPage() {
             <div className="relative h-10 flex-1 md:flex-initial" ref={sortDropdownRef}>
               <button
                 onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-                className="w-full md:w-auto flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-700 rounded-lg text-white font-medium transition-colors md:min-w-[160px]"
+                className="w-full md:w-auto flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-900 dark:text-white font-medium transition-colors md:min-w-[160px] border border-slate-300 dark:border-transparent"
               >
                 <span>{sortOptions.find(o => o.value === sortBy)?.label || 'Sort'}</span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 ml-auto transition-transform ${isSortDropdownOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-slate-600 dark:text-slate-400 ml-auto transition-transform ${isSortDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {isSortDropdownOpen && (
-                <div className="absolute top-full left-0 md:left-auto right-0 mt-2 bg-slate-900/95 border border-slate-700 rounded-lg shadow-xl z-50 min-w-[200px] overflow-hidden">
+                <div className="absolute top-full left-0 md:left-auto right-0 mt-2 bg-white dark:bg-slate-900/95 border border-slate-300 dark:border-slate-700 rounded-lg shadow-xl z-50 min-w-[200px] overflow-hidden">
                   {sortOptions.map(option => (
                     <button
                       key={option.value}
@@ -799,8 +799,8 @@ export default function TrovesPage() {
                         handleSortChange(option.value);
                         setIsSortDropdownOpen(false);
                       }}
-                      className={`block w-full text-left px-4 py-3 text-white hover:bg-slate-700/50 transition-colors ${
-                        sortBy === option.value ? 'bg-slate-800/50' : ''
+                      className={`block w-full text-left px-4 py-3 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors ${
+                        sortBy === option.value ? 'bg-slate-200 dark:bg-slate-800/50' : ''
                       }`}
                     >
                       {option.label}
@@ -826,7 +826,7 @@ export default function TrovesPage() {
           </div>
         ) : (
           <div className="text-center py-12">
-            <div className="text-slate-400 text-lg">
+            <div className="text-slate-600 dark:text-slate-400 text-lg">
               {(!filters.collateralTypes || filters.collateralTypes.length === 0) ? (
                 <>
                   <p className="mb-2">No collateral types selected</p>

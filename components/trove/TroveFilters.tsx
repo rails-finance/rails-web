@@ -16,16 +16,16 @@ interface SegmentedControlProps {
 function SegmentedControl({ label, value, onChange, options }: SegmentedControlProps) {
   return (
     <div className="space-y-2">
-      <span className="text-xs font-medium text-slate-300">{label}</span>
-      <div className="flex bg-slate-700 rounded p-1">
+      <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{label}</span>
+      <div className="flex bg-slate-200 dark:bg-slate-700 rounded p-1">
         {options.map((option) => (
           <button
             key={option.value}
             onClick={() => onChange(option.value)}
             className={`flex-1 px-3 py-1 text-xs font-medium rounded transition-all ${
               value === option.value
-                ? "bg-slate-600 text-white shadow-sm"
-                : "text-slate-300 hover:text-white hover:bg-slate-600"
+                ? "bg-slate-400 dark:bg-slate-600 text-white shadow-sm"
+                : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
             }`}
           >
             {option.label}
@@ -146,19 +146,19 @@ export function TroveFilters({
   // Mobile layout
   if (isMobile) {
     return (
-      <div className="bg-slate-800/50 rounded-lg p-4 space-y-4">
+      <div className="bg-slate-100 dark:bg-slate-800/50 rounded-lg p-4 space-y-4 border border-slate-200 dark:border-transparent">
         {/* Always visible section on mobile */}
         <div className="space-y-4">
           {/* Status Toggle - Full width on mobile */}
           <div className="space-y-2">
             <span className="text-xs font-medium text-slate-300">Status</span>
-            <div className="flex gap-1 bg-slate-700 rounded p-1">
+            <div className="flex gap-1 bg-slate-200 dark:bg-slate-700 rounded p-1">
               <button
                 onClick={() => onViewChange('open')}
                 className={`cursor-pointer flex-1 px-4 py-2 text-sm font-semibold rounded transition-all ${
                   currentView === 'open'
-                    ? "bg-green-900 text-green-400 shadow-sm"
-                    : "text-slate-300 hover:text-white hover:bg-slate-600"
+                    ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400 shadow-sm"
+                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
                 }`}
               >
                 ACTIVE
@@ -167,8 +167,8 @@ export function TroveFilters({
                 onClick={() => onViewChange('closed')}
                 className={`cursor-pointer flex-1 px-4 py-2 text-sm font-semibold rounded transition-all ${
                   currentView === 'closed'
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "text-slate-300 hover:text-white hover:bg-slate-600"
+                    ? "bg-slate-700 dark:bg-slate-900 text-white shadow-sm"
+                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
                 }`}
               >
                 CLOSED
@@ -226,7 +226,7 @@ export function TroveFilters({
                     type="checkbox"
                     checked={localFilters.liquidatedOnly || false}
                     onChange={handleLiquidatedChange}
-                    className="rounded bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-600"
+                    className="rounded bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-600"
                   />
                   <span className="text-sm">Liquidated Only</span>
                 </label>
@@ -271,13 +271,13 @@ export function TroveFilters({
         {/* View Toggle */}
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-slate-300">Status:</span>
-          <div className="flex gap-1 bg-slate-700 rounded p-1">
+          <div className="flex gap-1 bg-slate-200 dark:bg-slate-700 rounded p-1">
             <button
               onClick={() => onViewChange('open')}
               className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded transition-all ${
                 currentView === 'open'
                   ? "bg-green-900 text-green-400 shadow-sm"
-                  : "text-slate-300 hover:text-white hover:bg-slate-600"
+                  : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
               }`}
             >
               ACTIVE
@@ -287,7 +287,7 @@ export function TroveFilters({
               className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded transition-all ${
                 currentView === 'closed'
                   ? "bg-slate-900 text-white shadow-sm"
-                  : "text-slate-300 hover:text-white hover:bg-slate-600"
+                  : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
               }`}
             >
               CLOSED
@@ -301,7 +301,7 @@ export function TroveFilters({
             {/* Redemptions Filter */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-slate-300">Redemptions:</span>
-              <div className="flex bg-slate-700 rounded p-1">
+              <div className="flex bg-slate-200 dark:bg-slate-700 rounded p-1">
                 {[
                   { value: 'all', label: 'All' },
                   { value: 'hide', label: 'None' },
@@ -312,8 +312,8 @@ export function TroveFilters({
                     onClick={() => handleThreeStateChange('redemptionFilter', option.value as FilterState)}
                     className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
                       (localFilters.redemptionFilter || 'all') === option.value
-                        ? "bg-slate-600 text-white shadow-sm"
-                        : "text-slate-300 hover:text-white hover:bg-slate-600"
+                        ? "bg-slate-400 dark:bg-slate-600 text-white shadow-sm"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
                     }`}
                   >
                     {option.label}
@@ -325,7 +325,7 @@ export function TroveFilters({
             {/* Batch/Individual Filter */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-slate-300">Type:</span>
-              <div className="flex bg-slate-700 rounded p-1">
+              <div className="flex bg-slate-200 dark:bg-slate-700 rounded p-1">
                 {[
                   { value: 'all', label: 'All' },
                   { value: 'hide', label: 'Individual' },
@@ -336,8 +336,8 @@ export function TroveFilters({
                     onClick={() => handleThreeStateChange('batchFilter', option.value as FilterState)}
                     className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
                       (localFilters.batchFilter || 'all') === option.value
-                        ? "bg-slate-600 text-white shadow-sm"
-                        : "text-slate-300 hover:text-white hover:bg-slate-600"
+                        ? "bg-slate-400 dark:bg-slate-600 text-white shadow-sm"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
                     }`}
                   >
                     {option.label}
@@ -349,7 +349,7 @@ export function TroveFilters({
             {/* Zombie Filter */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-slate-300">Zombie:</span>
-              <div className="flex bg-slate-700 rounded p-1">
+              <div className="flex bg-slate-200 dark:bg-slate-700 rounded p-1">
                 {[
                   { value: 'all', label: 'All' },
                   { value: 'hide', label: 'Hide' },
@@ -360,8 +360,8 @@ export function TroveFilters({
                     onClick={() => handleThreeStateChange('zombieFilter', option.value as FilterState)}
                     className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
                       (localFilters.zombieFilter || 'all') === option.value
-                        ? "bg-slate-600 text-white shadow-sm"
-                        : "text-slate-300 hover:text-white hover:bg-slate-600"
+                        ? "bg-slate-400 dark:bg-slate-600 text-white shadow-sm"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
                     }`}
                   >
                     {option.label}
@@ -379,7 +379,7 @@ export function TroveFilters({
                 type="checkbox"
                 checked={localFilters.liquidatedOnly || false}
                 onChange={handleLiquidatedChange}
-                className="rounded bg-slate-700 border-slate-600 text-blue-600 focus:ring-blue-600 w-3.5 h-3.5"
+                className="rounded bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-600 w-3.5 h-3.5"
               />
               <span className="text-xs">Liquidated Only</span>
             </label>

@@ -33,8 +33,8 @@ export function InterestRateMetric({ before, after, isCloseTrove }: InterestRate
           <ClosedStateLabel />
         ) : (
           <span
-            className={`text-sm font-semibold text-white ${hoverEnabled ? "cursor-pointer" : ""} transition-all ${
-              isAfterHighlighted ? "-mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded" : ""
+            className={`text-sm font-semibold text-slate-900 dark:text-white ${hoverEnabled ? "cursor-pointer" : ""} transition-all ${
+              isAfterHighlighted ? "-mx-1 px-1 -my-0.5 py-0.5 bg-blue-200 dark:bg-blue-900 rounded" : ""
             }`}
             onMouseEnter={
               hoverEnabled ? () => setHoveredValue({ type: "interestRate", state: "after", value: after }) : undefined

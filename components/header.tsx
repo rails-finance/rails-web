@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { NavigationContent } from "./site/NavigationContent";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -55,12 +56,14 @@ export function Header() {
                 <svg className="w-6 h-6" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
                   <use href="#icon-liquity" />
                 </svg>
-                <h1 className="text-xs font-semibold text-white">Liquity V2 Trove Explorer</h1>
+                <h1 className="text-xs font-semibold text-slate-700 dark:text-white">Liquity V2 Trove Explorer</h1>
               </div>
             </div>
 
-            {/* Menu Toggle Button */}
-            <div className="relative">
+            {/* Theme Toggle and Menu Toggle Button */}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <div className="relative">
               <button
                 onClick={isMobile ? toggleMenu : undefined}
                 onMouseEnter={handleMouseEnter}
@@ -70,21 +73,21 @@ export function Header() {
                 {/* Custom Hamburger Icon */}
                 <div className="w-6 h-5 relative flex flex-col justify-center">
                   <span
-                    className={`absolute w-full h-0.5 bg-white dark:bg-slate-300 transition-all duration-300 ease-in-out ${
+                    className={`absolute w-full h-0.5 bg-slate-700 dark:bg-slate-300 transition-all duration-300 ease-in-out ${
                       (isHovered && !isMobile) || (isMenuOpen && isMobile)
                         ? 'rotate-45 translate-y-0'
                         : '-translate-y-2'
                     }`}
                   />
                   <span
-                    className={`absolute w-full h-0.5 bg-white dark:bg-slate-300 transition-all duration-300 ease-in-out ${
+                    className={`absolute w-full h-0.5 bg-slate-700 dark:bg-slate-300 transition-all duration-300 ease-in-out ${
                       (isHovered && !isMobile) || (isMenuOpen && isMobile)
                         ? 'opacity-0'
                         : 'opacity-100'
                     }`}
                   />
                   <span
-                    className={`absolute w-full h-0.5 bg-white dark:bg-slate-300 transition-all duration-300 ease-in-out ${
+                    className={`absolute w-full h-0.5 bg-slate-700 dark:bg-slate-300 transition-all duration-300 ease-in-out ${
                       (isHovered && !isMobile) || (isMenuOpen && isMobile)
                         ? '-rotate-45 translate-y-0'
                         : 'translate-y-2'
@@ -114,6 +117,7 @@ export function Header() {
                   <NavigationContent />
                 </div>
               )}
+            </div>
             </div>
         </div>
       </header>

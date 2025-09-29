@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { NavigationContent } from "./NavigationContent";
+import { ThemeToggle } from "../ThemeToggle";
 
 export function SiteNavigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -55,8 +56,10 @@ export function SiteNavigation() {
                               </div>
             </Link>
 
-            {/* Menu Toggle Button */}
-            <div className="relative">
+            {/* Theme Toggle and Menu Toggle Button */}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <div className="relative">
               <button
                 onClick={isMobile ? toggleMenu : undefined}
                 onMouseEnter={handleMouseEnter}
@@ -111,6 +114,7 @@ export function SiteNavigation() {
                   </div>
                 )}
               </div>
+            </div>
           </div>
         </div>
       </header>
