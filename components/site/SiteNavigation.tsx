@@ -16,9 +16,9 @@ export function SiteNavigation() {
     };
 
     checkMobile();
-    window.addEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
 
-    return () => window.removeEventListener('resize', checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
@@ -38,7 +38,7 @@ export function SiteNavigation() {
   return (
     <>
       {/* Header */}
-      <header className="" >
+      <header className="">
         <div className="max-w-7xl mx-auto px-4 md:px-6 pb-6">
           <div className="flex justify-between items-center">
             {/* Logo with tagline */}
@@ -50,9 +50,11 @@ export function SiteNavigation() {
               </div>
               <div>
                 <h1 className="p-2 text-2xl/6 sm:text-3xl/8 font-extrabold tracking-tight">
-                	<span className="text-green-600 font-extrabold">Rails</span>
-                	<br /><span className="text-slate-600 font-extrabold">DeFi Self-Service Support</span></h1>
-                              </div>
+                  <span className="text-green-600 font-extrabold">Rails</span>
+                  <br />
+                  <span className="text-slate-600 font-extrabold">DeFi Self-Service Support</span>
+                </h1>
+              </div>
             </Link>
 
             {/* Menu Toggle Button */}
@@ -68,22 +70,20 @@ export function SiteNavigation() {
                   <span
                     className={`absolute w-full h-0.5 bg-slate-700 transition-all duration-300 ease-in-out ${
                       (isHovered && !isMobile) || (isMenuOpen && isMobile)
-                        ? 'rotate-45 translate-y-0'
-                        : '-translate-y-2'
+                        ? "rotate-45 translate-y-0"
+                        : "-translate-y-2"
+                    }`}
+                  />
+                  <span
+                    className={`absolute w-full h-0.5 bg-slate-700 transition-all duration-300 ease-in-out ${
+                      (isHovered && !isMobile) || (isMenuOpen && isMobile) ? "opacity-0" : "opacity-100"
                     }`}
                   />
                   <span
                     className={`absolute w-full h-0.5 bg-slate-700 transition-all duration-300 ease-in-out ${
                       (isHovered && !isMobile) || (isMenuOpen && isMobile)
-                        ? 'opacity-0'
-                        : 'opacity-100'
-                    }`}
-                  />
-                  <span
-                    className={`absolute w-full h-0.5 bg-slate-700 transition-all duration-300 ease-in-out ${
-                      (isHovered && !isMobile) || (isMenuOpen && isMobile)
-                        ? '-rotate-45 translate-y-0'
-                        : 'translate-y-2'
+                        ? "-rotate-45 translate-y-0"
+                        : "translate-y-2"
                     }`}
                   />
                 </div>
@@ -97,7 +97,8 @@ export function SiteNavigation() {
                   onMouseLeave={handleMouseLeave}
                 >
                   {/* Triangle Pointer */}
-                  <div className="absolute -top-2 right-4 w-0 h-0
+                  <div
+                    className="absolute -top-2 right-4 w-0 h-0
                     border-l-[8px] border-l-transparent
                     border-r-[8px] border-r-transparent
                     border-b-[8px] border-b-white
@@ -129,15 +130,12 @@ export function SiteNavigation() {
                 </div>
                 <div className="text-lg font-bold text-slate-600">Rails</div>
               </div>
-              <button
-                onClick={toggleMenu}
-                className="p-3 hover:bg-slate-100 rounded-lg transition-colors"
-              >
+              <button onClick={toggleMenu} className="p-3 hover:bg-slate-100 rounded-lg transition-colors">
                 {/* X Icon */}
                 <div className="w-6 h-5 relative flex flex-col justify-center">
-                  <span className="absolute w-full h-0.5 bg-slate-700 rotate-45 translate-y-0"/>
-                  <span className="absolute w-full h-0.5 bg-slate-700 opacity-0"/>
-                  <span className="absolute w-full h-0.5 bg-slate-700 -rotate-45 translate-y-0"/>
+                  <span className="absolute w-full h-0.5 bg-slate-700 rotate-45 translate-y-0" />
+                  <span className="absolute w-full h-0.5 bg-slate-700 opacity-0" />
+                  <span className="absolute w-full h-0.5 bg-slate-700 -rotate-45 translate-y-0" />
                 </div>
               </button>
             </div>

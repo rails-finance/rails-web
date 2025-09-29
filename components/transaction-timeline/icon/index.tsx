@@ -13,12 +13,7 @@ export function TransactionIcon({ tx, isFirst = false, isLast = false, isExpande
 
   return (
     <div className={`transaction-timeline-column ${operation ? `operation-${operation}` : ""}`}>
-      <OperationIcon 
-        tx={tx} 
-        isFirst={isFirst} 
-        isLast={isLast} 
-        isExpanded={isExpanded} 
-      />
+      <OperationIcon tx={tx} isFirst={isFirst} isLast={isLast} isExpanded={isExpanded} />
     </div>
   );
 }

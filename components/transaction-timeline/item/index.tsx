@@ -28,9 +28,8 @@ export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionIte
 
   return (
     <HoverProvider>
-      <div style={{ position: 'relative' }}>
-
-        <TransactionContainer className="flex w-full" style={{ position: 'relative', zIndex: 2 }}>
+      <div style={{ position: "relative" }}>
+        <TransactionContainer className="flex w-full" style={{ position: "relative", zIndex: 2 }}>
           {/* Left values - outbound to protocol */}
           <LeftValueDisplay tx={tx} />
 
@@ -55,14 +54,11 @@ export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionIte
                 onClick={toggleExpanded}
               />
             </TransactionContent>
-            
+
             {/* Event explanation panel - positioned beneath TransactionContent, 20px narrower */}
             {isExpanded && (
               <div className="px-2.5">
-                <EventExplanation 
-                  transaction={tx} 
-                  onToggle={(isOpen) => setShowExplanation(isOpen)} 
-                />
+                <EventExplanation transaction={tx} onToggle={(isOpen) => setShowExplanation(isOpen)} />
               </div>
             )}
           </div>

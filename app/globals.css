@@ -11,7 +11,7 @@
   --color-slate-700: #232a37;
   --color-slate-800: #171b24;
   --color-slate-900: #12151e;
-  --color-slate-950: #0D0F15;
+  --color-slate-950: #0d0f15;
 
   --color-green-600: #008900;
 }
@@ -19,10 +19,10 @@
 :root {
   --background: #171b24; /* custom slate-800 - darker */
   --foreground: #ffffff;
-  
+
   /* Protocol-specific gradient colors */
-  --liquity-grad-1: #323E91; /* blue-600 */
-  --liquity-grad-2: #29336D; /* blue-800 */
+  --liquity-grad-1: #323e91; /* blue-600 */
+  --liquity-grad-2: #29336d; /* blue-800 */
 }
 
 .dark {
@@ -47,7 +47,6 @@ body {
     padding: 16px 0;
     overflow: hidden;
   }
-  
 
   /* Timeline connector positioning */
   .timeline-connector {
@@ -56,7 +55,7 @@ body {
     transform: translateX(-50%);
     z-index: 0;
   }
-  
+
   /* Transaction layouts - styles are inline in components, keeping minimal CSS here */
   .transaction-multi-step {
     display: flex;

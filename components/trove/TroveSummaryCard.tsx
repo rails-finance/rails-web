@@ -9,9 +9,7 @@ interface TroveSummaryCardProps {
 
 export function TroveSummaryCard({ trove }: TroveSummaryCardProps) {
   if (trove.status === "liquidated") {
-    return <LiquidatedSummaryCard
-      trove={trove}
-    />;
+    return <LiquidatedSummaryCard trove={trove} />;
   }
 
   if (trove.status === "open") {

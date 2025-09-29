@@ -1,7 +1,4 @@
-import {
-  isLiquidationTransaction,
-  Transaction,
-} from "@/types/api/troveHistory";
+import { isLiquidationTransaction, Transaction } from "@/types/api/troveHistory";
 import { TransactionStateGrid } from "../../state-grid";
 import { TransactionLinks } from "./TransactionLinks";
 import { TokenIcon } from "@/components/icons/tokenIcon";
@@ -19,7 +16,10 @@ export function ExpandedContent({ tx }: { tx: Transaction }) {
     }
 
     // Otherwise calculate from total value and amount
-    const state = transaction.operation === 'liquidate' && transaction.stateBefore ? transaction.stateBefore : transaction.stateAfter;
+    const state =
+      transaction.operation === "liquidate" && transaction.stateBefore
+        ? transaction.stateBefore
+        : transaction.stateAfter;
     if (state?.collateralInUsd && state?.coll && state.coll > 0) {
       return state.collateralInUsd / state.coll;
     }

@@ -28,14 +28,13 @@ interface TroveListFiltersProps {
   availableCollateralTypes?: string[];
 }
 
-
 export function TroveListFilters({
   filters,
   onFiltersChange,
   sortBy = "lastActivity",
   sortOrder = "desc",
   onSortChange,
-  availableCollateralTypes = ["WETH", "wstETH", "rETH"]
+  availableCollateralTypes = ["WETH", "wstETH", "rETH"],
 }: TroveListFiltersProps) {
   const [searchInput, setSearchInput] = useState<string>(filters.owner || "");
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
@@ -58,8 +57,8 @@ export function TroveListFilters({
         setIsFilterDropdownOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -67,14 +66,14 @@ export function TroveListFilters({
     const trimmedValue = searchInput.trim();
 
     // Detect if it's an ENS name or Ethereum address
-    const isEns = trimmedValue && trimmedValue.toLowerCase().endsWith('.eth');
+    const isEns = trimmedValue && trimmedValue.toLowerCase().endsWith(".eth");
     const isAddress = trimmedValue && /^0x[a-fA-F0-9]{40}$/.test(trimmedValue);
 
     onFiltersChange({
       ...filters,
       owner: trimmedValue || undefined,
       ownerAddress: isAddress ? trimmedValue : undefined,
-      ownerEns: isEns ? trimmedValue : undefined
+      ownerEns: isEns ? trimmedValue : undefined,
     });
   };
 
@@ -84,10 +83,9 @@ export function TroveListFilters({
       ...filters,
       owner: undefined,
       ownerAddress: undefined,
-      ownerEns: undefined
+      ownerEns: undefined,
     });
   };
-
 
   const getActiveFilterCount = () => {
     let count = 0;
@@ -110,17 +108,17 @@ export function TroveListFilters({
       status: undefined,
       batchOnly: undefined,
       individualOnly: undefined,
-      hasRedemptions: undefined
+      hasRedemptions: undefined,
     });
   };
 
   // Sort options - map UI labels to backend field names
   const sortOptions = [
-    { value: 'lastActivity', label: 'Latest Activity' },
-    { value: 'debt', label: 'Debt' },
-    { value: 'coll', label: 'Collateral' },
-    { value: 'ratio', label: 'Ratio' },
-    { value: 'interestRate', label: 'Interest Rate' }
+    { value: "lastActivity", label: "Latest Activity" },
+    { value: "debt", label: "Debt" },
+    { value: "coll", label: "Collateral" },
+    { value: "ratio", label: "Ratio" },
+    { value: "interestRate", label: "Interest Rate" },
   ];
 
   return (
@@ -137,9 +135,13 @@ export function TroveListFilters({
             >
               <Filter className="w-4 h-4 text-slate-400" />
               {activeFilterCount > 0 && (
-                <span className="px-2 py-0.5 bg-slate-600 rounded-full text-xs text-slate-200">{activeFilterCount}</span>
+                <span className="px-2 py-0.5 bg-slate-600 rounded-full text-xs text-slate-200">
+                  {activeFilterCount}
+                </span>
               )}
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown
+                className={`w-4 h-4 text-slate-400 transition-transform ${isFilterDropdownOpen ? "rotate-180" : ""}`}
+              />
             </button>
 
             {isFilterDropdownOpen && (
@@ -151,29 +153,27 @@ export function TroveListFilters({
                     <button
                       onClick={() => handleFilterChange({ status: undefined })}
                       className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
-                        !filters.status
-                          ? 'bg-blue-900 text-blue-400 font-semibold'
-                          : 'text-slate-400 hover:text-white'
+                        !filters.status ? "bg-blue-900 text-blue-400 font-semibold" : "text-slate-400 hover:text-white"
                       }`}
                     >
                       All
                     </button>
                     <button
-                      onClick={() => handleFilterChange({ status: 'open' })}
+                      onClick={() => handleFilterChange({ status: "open" })}
                       className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
-                        filters.status === 'open'
-                          ? 'bg-green-900 text-green-400 font-semibold'
-                          : 'text-slate-400 hover:text-white'
+                        filters.status === "open"
+                          ? "bg-green-900 text-green-400 font-semibold"
+                          : "text-slate-400 hover:text-white"
                       }`}
                     >
                       Active
                     </button>
                     <button
-                      onClick={() => handleFilterChange({ status: 'closed' })}
+                      onClick={() => handleFilterChange({ status: "closed" })}
                       className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
-                        filters.status === 'closed'
-                          ? 'bg-slate-700 text-white font-semibold'
-                          : 'text-slate-400 hover:text-white'
+                        filters.status === "closed"
+                          ? "bg-slate-700 text-white font-semibold"
+                          : "text-slate-400 hover:text-white"
                       }`}
                     >
                       Closed
@@ -191,8 +191,8 @@ export function TroveListFilters({
                         onClick={() => handleFilterChange({ hasRedemptions: undefined })}
                         className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                           filters.hasRedemptions === undefined
-                            ? 'bg-blue-900 text-blue-400 font-semibold'
-                            : 'text-slate-400 hover:text-white'
+                            ? "bg-blue-900 text-blue-400 font-semibold"
+                            : "text-slate-400 hover:text-white"
                         }`}
                       >
                         All
@@ -201,8 +201,8 @@ export function TroveListFilters({
                         onClick={() => handleFilterChange({ hasRedemptions: true })}
                         className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                           filters.hasRedemptions === true
-                            ? 'bg-orange-900 text-orange-400 font-semibold'
-                            : 'text-slate-400 hover:text-white'
+                            ? "bg-orange-900 text-orange-400 font-semibold"
+                            : "text-slate-400 hover:text-white"
                         }`}
                       >
                         With
@@ -211,8 +211,8 @@ export function TroveListFilters({
                         onClick={() => handleFilterChange({ hasRedemptions: false })}
                         className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                           filters.hasRedemptions === false
-                            ? 'bg-slate-700 text-white font-semibold'
-                            : 'text-slate-400 hover:text-white'
+                            ? "bg-slate-700 text-white font-semibold"
+                            : "text-slate-400 hover:text-white"
                         }`}
                       >
                         Without
@@ -228,8 +228,8 @@ export function TroveListFilters({
                         onClick={() => handleFilterChange({ batchOnly: undefined, individualOnly: undefined })}
                         className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                           !filters.batchOnly && !filters.individualOnly
-                            ? 'bg-blue-900 text-blue-400 font-semibold'
-                            : 'text-slate-400 hover:text-white'
+                            ? "bg-blue-900 text-blue-400 font-semibold"
+                            : "text-slate-400 hover:text-white"
                         }`}
                       >
                         All
@@ -238,8 +238,8 @@ export function TroveListFilters({
                         onClick={() => handleFilterChange({ batchOnly: true, individualOnly: undefined })}
                         className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                           filters.batchOnly
-                            ? 'bg-purple-900 text-purple-400 font-semibold'
-                            : 'text-slate-400 hover:text-white'
+                            ? "bg-purple-900 text-purple-400 font-semibold"
+                            : "text-slate-400 hover:text-white"
                         }`}
                       >
                         Delegated
@@ -248,8 +248,8 @@ export function TroveListFilters({
                         onClick={() => handleFilterChange({ batchOnly: undefined, individualOnly: true })}
                         className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                           filters.individualOnly
-                            ? 'bg-slate-700 text-white font-semibold'
-                            : 'text-slate-400 hover:text-white'
+                            ? "bg-slate-700 text-white font-semibold"
+                            : "text-slate-400 hover:text-white"
                         }`}
                       >
                         Individual
@@ -274,7 +274,7 @@ export function TroveListFilters({
           </div>
           {/* Collateral Type Buttons */}
           <div className="flex items-center gap-2 flex-1 md:flex-initial">
-            {availableCollateralTypes.map(type => {
+            {availableCollateralTypes.map((type) => {
               const isSelected = filters.collateralType === type;
 
               return (
@@ -284,17 +284,17 @@ export function TroveListFilters({
                     // Single select behavior - clicking same button deselects, clicking different selects
                     onFiltersChange({
                       ...filters,
-                      collateralType: filters.collateralType === type ? undefined : type
+                      collateralType: filters.collateralType === type ? undefined : type,
                     });
                   }}
                   className={`flex items-center h-10 justify-center gap-1 md:gap-2 px-2 md:px-3 py-2 rounded-lg transition-all flex-1 md:flex-initial cursor-pointer ${
                     isSelected
-                      ? 'bg-slate-900 border border-slate-900 hover:opacity-70'
-                      : 'opacity-25 border-slate-600 border hover:border-slate-500'
+                      ? "bg-slate-900 border border-slate-900 hover:opacity-70"
+                      : "opacity-25 border-slate-600 border hover:border-slate-500"
                   }`}
                 >
                   <svg className="w-5 h-5 z-1">
-                    <use href={`#icon-${type.toLowerCase().replace('weth', 'eth')}`} />
+                    <use href={`#icon-${type.toLowerCase().replace("weth", "eth")}`} />
                   </svg>
                   <svg className="w-5 h-5 -ml-2.5">
                     <use href={`#icon-bold`} />
@@ -333,24 +333,26 @@ export function TroveListFilters({
       {/* Third row on mobile: Sort controls */}
       <div className="flex items-center gap-1 w-full md:w-auto">
         <button
-          onClick={() => onSortChange?.(sortBy, sortOrder === 'asc' ? 'desc' : 'asc')}
+          onClick={() => onSortChange?.(sortBy, sortOrder === "asc" ? "desc" : "asc")}
           className="flex items-center justify-center w-10 h-10 bg-slate-900 hover:bg-slate-700 rounded-lg transition-colors text-white"
-          title={sortOrder === 'asc' ? 'Sort Ascending' : 'Sort Descending'}
+          title={sortOrder === "asc" ? "Sort Ascending" : "Sort Descending"}
         >
-          {sortOrder === 'asc' ? '↑' : '↓'}
+          {sortOrder === "asc" ? "↑" : "↓"}
         </button>
         <div className="relative h-10 flex-1 md:flex-initial" ref={sortDropdownRef}>
           <button
             onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
             className="w-full md:w-auto flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-700 rounded-lg text-white font-medium transition-colors md:min-w-[160px]"
           >
-            <span>{sortOptions.find(o => o.value === sortBy)?.label || 'Sort'}</span>
-            <ChevronDown className={`w-4 h-4 text-slate-400 ml-auto transition-transform ${isSortDropdownOpen ? 'rotate-180' : ''}`} />
+            <span>{sortOptions.find((o) => o.value === sortBy)?.label || "Sort"}</span>
+            <ChevronDown
+              className={`w-4 h-4 text-slate-400 ml-auto transition-transform ${isSortDropdownOpen ? "rotate-180" : ""}`}
+            />
           </button>
 
           {isSortDropdownOpen && (
             <div className="absolute top-full left-0 md:left-auto right-0 mt-2 bg-slate-900/95 border border-slate-700 rounded-lg shadow-xl z-50 min-w-[200px] overflow-hidden">
-              {sortOptions.map(option => (
+              {sortOptions.map((option) => (
                 <button
                   key={option.value}
                   onClick={() => {
@@ -358,7 +360,7 @@ export function TroveListFilters({
                     setIsSortDropdownOpen(false);
                   }}
                   className={`block w-full text-left px-4 py-3 text-white hover:bg-slate-700/50 transition-colors ${
-                    sortBy === option.value ? 'bg-slate-800/50' : ''
+                    sortBy === option.value ? "bg-slate-800/50" : ""
                   }`}
                 >
                   {option.label}

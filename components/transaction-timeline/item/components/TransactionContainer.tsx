@@ -1,4 +1,4 @@
-import { ReactNode, CSSProperties } from 'react';
+import { ReactNode, CSSProperties } from "react";
 
 interface TransactionContainerProps {
   children: ReactNode;

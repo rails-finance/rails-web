@@ -17,10 +17,10 @@ export function LeftValueDisplay({ tx }: { tx: Transaction }) {
   }
 
   const { debtChangeFromOperation, collChangeFromOperation } = tx.troveOperation;
-  
+
   // LEFT SIDE: Values USER RECEIVES (arrow points left/in)
   const isMultiStep = debtChangeFromOperation !== 0 && collChangeFromOperation !== 0;
-  
+
   if (isMultiStep) {
     const debtIncrease = debtChangeFromOperation > 0;
     const collIncrease = collChangeFromOperation > 0;

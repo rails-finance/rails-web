@@ -12,7 +12,7 @@ interface LiquidateIconProps {
 }
 
 export function LiquidateIcon({ tx, isFirst = false, isLast = false, isExpanded = false }: LiquidateIconProps) {
-  const [svgContent, setSvgContent] = useState<string>('');
+  const [svgContent, setSvgContent] = useState<string>("");
 
   // Use existing logic to determine the transaction image key
   const imageKey = getTransactionImageKey(tx);
@@ -21,18 +21,18 @@ export function LiquidateIcon({ tx, isFirst = false, isLast = false, isExpanded 
     async function loadSVG() {
       try {
         // Only handle liquidation operations
-        if (!imageKey.startsWith('liquidate_')) {
+        if (!imageKey.startsWith("liquidate_")) {
           return;
         }
 
         const templatePath = `/icons/transactions/svg-templates/${imageKey}.svg`;
-        
+
         const response = await fetch(templatePath);
-        
+
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const svgText = await response.text();
         setSvgContent(svgText);
       } catch (error) {
@@ -42,7 +42,7 @@ export function LiquidateIcon({ tx, isFirst = false, isLast = false, isExpanded 
         const { collIncreaseFromRedist } = liquidationTx.troveOperation || {};
         const isBeneficial = liquidationTx.stateAfter.debt > 0 && collIncreaseFromRedist > 0;
         const color = isBeneficial ? "#22C55E" : "#EF4444";
-        
+
         setSvgContent(`
           <svg width="120" height="100" viewBox="0 0 120 100" xmlns="http://www.w3.org/2000/svg">
             <g transform="translate(60, 50) scale(0.3)">
@@ -66,16 +66,11 @@ export function LiquidateIcon({ tx, isFirst = false, isLast = false, isExpanded 
     <>
       {/* Timeline Background - extends full height of transaction row */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-full z-10 pointer-events-none">
-        <TimelineBackground 
-          tx={tx} 
-          isFirst={isFirst} 
-          isLast={isLast} 
-          isExpanded={isExpanded} 
-        />
+        <TimelineBackground tx={tx} isFirst={isFirst} isLast={isLast} isExpanded={isExpanded} />
       </div>
-      
+
       {/* Transaction Graphic - loaded from SVG template */}
-      <div 
+      <div
         className="relative z-20 w-30 h-25 flex items-center justify-center sm:w-25"
         dangerouslySetInnerHTML={{ __html: svgContent }}
       />

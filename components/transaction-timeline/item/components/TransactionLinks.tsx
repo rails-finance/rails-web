@@ -11,17 +11,17 @@ export function TransactionLinks({ transaction }: TransactionLinksProps) {
   if (!tx.transactionHash) {
     return null;
   }
-  
+
   // Determine if gas fee should be shown
   const shouldShowGasFee = () => {
     // Don't show gas fees for operations not initiated by the user
-    const noGasOps = ['liquidate', 'redeemCollateral'];
+    const noGasOps = ["liquidate", "redeemCollateral"];
     if (noGasOps.includes(tx.operation)) {
       return false;
     }
 
     // Don't show gas fee for delegate IR adjustments (batch manager operations)
-    if (tx.operation === 'adjustTroveInterestRate' && tx.batchUpdate) {
+    if (tx.operation === "adjustTroveInterestRate" && tx.batchUpdate) {
       return false;
     }
 
@@ -33,12 +33,8 @@ export function TransactionLinks({ transaction }: TransactionLinksProps) {
       {shouldShowGasFee() && tx.gasFee && tx.gasFeeUsd ? (
         <div className="flex items-center gap-1">
           <Fuel className="w-3 h-3 text-slate-500" />
-          <span className="font-medium">
-            {tx.gasFee.toFixed(6)} ETH
-          </span>
-          <span className="text-slate-400 ml-1">
-            ≈ ${tx.gasFeeUsd.toFixed(2)}
-          </span>
+          <span className="font-medium">{tx.gasFee.toFixed(6)} ETH</span>
+          <span className="text-slate-400 ml-1">≈ ${tx.gasFeeUsd.toFixed(2)}</span>
         </div>
       ) : (
         <div></div>

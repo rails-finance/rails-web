@@ -12,11 +12,16 @@ export function TimelineConnector({ type, show, operation = "", isMultiStep = fa
   if (!show) return null;
 
   // Determine connector style based on operation
-  const isDelegatedInterestRateAdjust = operation === "adjustTroveInterestRate" && tx && 'isInBatch' in tx && tx.isInBatch;
-  const isDashed = operation === "liquidate" || operation === "redeemCollateral" || operation === "applyPendingDebt" || isDelegatedInterestRateAdjust;
-  
+  const isDelegatedInterestRateAdjust =
+    operation === "adjustTroveInterestRate" && tx && "isInBatch" in tx && tx.isInBatch;
+  const isDashed =
+    operation === "liquidate" ||
+    operation === "redeemCollateral" ||
+    operation === "applyPendingDebt" ||
+    isDelegatedInterestRateAdjust;
+
   let connectorColor = "#45556C"; // default
-  
+
   if (isDashed) {
     if (operation === "redeemCollateral") {
       connectorColor = "#FB923C";

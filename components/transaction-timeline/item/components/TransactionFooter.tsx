@@ -11,8 +11,8 @@ interface TransactionFooterProps {
 
 export function TransactionFooter({ timestamp, txIndex, txHash, isExpanded, onClick }: TransactionFooterProps) {
   return (
-    <div 
-      className={`px-4 sm:px-6 pb-4 sm:pb-6 ${isExpanded ? 'pt-5' : ''} rounded-b-md cursor-pointer relative overflow-hidden group/footer`}
+    <div
+      className={`px-4 sm:px-6 pb-4 sm:pb-6 ${isExpanded ? "pt-5" : ""} rounded-b-md cursor-pointer relative overflow-hidden group/footer`}
       onClick={onClick}
       role="button"
       aria-expanded={isExpanded}
@@ -22,11 +22,9 @@ export function TransactionFooter({ timestamp, txIndex, txHash, isExpanded, onCl
       {isExpanded && (
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/[0.25] to-transparent opacity-0 group-hover/footer:opacity-200 transition-opacity duration-100 pointer-events-none" />
       )}
-      
+
       <div className="relative flex justify-between items-center">
-        <div className="text-xs text-slate-600 font-bold">
-          {formatTimestamp(timestamp)}
-        </div>
+        <div className="text-xs text-slate-600 font-bold">{formatTimestamp(timestamp)}</div>
         <span className="px-1 text-xs text-slate-500 rounded bg-slate-950/30">{txIndex}</span>
       </div>
     </div>

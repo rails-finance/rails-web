@@ -1,5 +1,5 @@
-import { isAddress } from 'viem';
-import batchManagerService from '@/lib/services/batch-manager-service';
+import { isAddress } from "viem";
+import batchManagerService from "@/lib/services/batch-manager-service";
 
 export function getBatchManagerName(address: string): string | undefined {
   if (!isAddress(address)) return undefined;

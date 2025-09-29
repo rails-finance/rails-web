@@ -9,7 +9,7 @@ import { PaginationControls } from "@/components/troves/components/PaginationCon
 
 // Constants
 const ITEMS_PER_PAGE = 20;
-const AVAILABLE_COLLATERAL_TYPES = ['WETH', 'wstETH', 'rETH'];
+const AVAILABLE_COLLATERAL_TYPES = ["WETH", "wstETH", "rETH"];
 
 export default function TrovesPage() {
   const searchParams = useSearchParams();
@@ -22,23 +22,23 @@ export default function TrovesPage() {
   const [totalCount, setTotalCount] = useState(0);
 
   // Get page from URL
-  const currentPage = Number(searchParams.get('page')) || 1;
+  const currentPage = Number(searchParams.get("page")) || 1;
 
   // Parse filters from URL - simple and direct
   const getFiltersFromUrl = (): TroveListFilterParams => {
     const filters: TroveListFilterParams = {};
 
-    const troveId = searchParams.get('troveId');
+    const troveId = searchParams.get("troveId");
     if (troveId) filters.troveId = troveId;
 
-    const status = searchParams.get('status');
+    const status = searchParams.get("status");
     if (status) filters.status = status;
 
-    const collateralType = searchParams.get('collateralType');
+    const collateralType = searchParams.get("collateralType");
     if (collateralType) filters.collateralType = collateralType;
 
-    const ownerAddress = searchParams.get('ownerAddress');
-    const ownerEns = searchParams.get('ownerEns');
+    const ownerAddress = searchParams.get("ownerAddress");
+    const ownerEns = searchParams.get("ownerEns");
     if (ownerAddress) {
       filters.ownerAddress = ownerAddress;
       filters.owner = ownerAddress;
@@ -47,29 +47,29 @@ export default function TrovesPage() {
       filters.owner = ownerEns;
     }
 
-    const activeWithin = searchParams.get('activeWithin');
+    const activeWithin = searchParams.get("activeWithin");
     if (activeWithin) filters.activeWithin = activeWithin;
 
-    const createdWithin = searchParams.get('createdWithin');
+    const createdWithin = searchParams.get("createdWithin");
     if (createdWithin) filters.createdWithin = createdWithin;
 
     // Parse boolean parameters
-    const batchOnlyParam = searchParams.get('batchOnly');
-    if (batchOnlyParam === 'true') filters.batchOnly = true;
+    const batchOnlyParam = searchParams.get("batchOnly");
+    if (batchOnlyParam === "true") filters.batchOnly = true;
 
-    const individualOnlyParam = searchParams.get('individualOnly');
-    if (individualOnlyParam === 'true') filters.individualOnly = true;
+    const individualOnlyParam = searchParams.get("individualOnly");
+    if (individualOnlyParam === "true") filters.individualOnly = true;
 
     // Handle hasRedemptions with true/false values
-    const hasRedemptionsParam = searchParams.get('hasRedemptions');
-    if (hasRedemptionsParam === 'true') filters.hasRedemptions = true;
-    if (hasRedemptionsParam === 'false') filters.hasRedemptions = false;
+    const hasRedemptionsParam = searchParams.get("hasRedemptions");
+    if (hasRedemptionsParam === "true") filters.hasRedemptions = true;
+    if (hasRedemptionsParam === "false") filters.hasRedemptions = false;
 
-    const sortBy = searchParams.get('sortBy');
+    const sortBy = searchParams.get("sortBy");
     if (sortBy) filters.sortBy = sortBy;
 
-    const sortOrder = searchParams.get('sortOrder');
-    if (sortOrder === 'asc' || sortOrder === 'desc') filters.sortOrder = sortOrder;
+    const sortOrder = searchParams.get("sortOrder");
+    if (sortOrder === "asc" || sortOrder === "desc") filters.sortOrder = sortOrder;
 
     return filters;
   };
@@ -82,29 +82,29 @@ export default function TrovesPage() {
 
     // Add pagination if requested
     if (includePageAndLimit) {
-      params.set('limit', ITEMS_PER_PAGE.toString());
+      params.set("limit", ITEMS_PER_PAGE.toString());
       // For API calls, we need to calculate offset from the page number
-      params.set('offset', (((page || currentPage) - 1) * ITEMS_PER_PAGE).toString());
+      params.set("offset", (((page || currentPage) - 1) * ITEMS_PER_PAGE).toString());
     } else if (page && page > 1) {
       // For URL updates, only include page if > 1
-      params.set('page', page.toString());
+      params.set("page", page.toString());
     }
 
     // Add filters
-    if (filterParams.troveId) params.set('troveId', filterParams.troveId);
-    if (filterParams.status) params.set('status', filterParams.status);
-    if (filterParams.collateralType) params.set('collateralType', filterParams.collateralType);
-    if (filterParams.ownerAddress) params.set('ownerAddress', filterParams.ownerAddress);
-    if (filterParams.ownerEns) params.set('ownerEns', filterParams.ownerEns);
-    if (filterParams.activeWithin) params.set('activeWithin', filterParams.activeWithin);
-    if (filterParams.createdWithin) params.set('createdWithin', filterParams.createdWithin);
-    if (filterParams.batchOnly) params.set('batchOnly', 'true');
-    if (filterParams.individualOnly) params.set('individualOnly', 'true');
+    if (filterParams.troveId) params.set("troveId", filterParams.troveId);
+    if (filterParams.status) params.set("status", filterParams.status);
+    if (filterParams.collateralType) params.set("collateralType", filterParams.collateralType);
+    if (filterParams.ownerAddress) params.set("ownerAddress", filterParams.ownerAddress);
+    if (filterParams.ownerEns) params.set("ownerEns", filterParams.ownerEns);
+    if (filterParams.activeWithin) params.set("activeWithin", filterParams.activeWithin);
+    if (filterParams.createdWithin) params.set("createdWithin", filterParams.createdWithin);
+    if (filterParams.batchOnly) params.set("batchOnly", "true");
+    if (filterParams.individualOnly) params.set("individualOnly", "true");
     if (filterParams.hasRedemptions !== undefined) {
-      params.set('hasRedemptions', String(filterParams.hasRedemptions));
+      params.set("hasRedemptions", String(filterParams.hasRedemptions));
     }
-    if (filterParams.sortBy) params.set('sortBy', filterParams.sortBy);
-    if (filterParams.sortOrder) params.set('sortOrder', filterParams.sortOrder);
+    if (filterParams.sortBy) params.set("sortBy", filterParams.sortBy);
+    if (filterParams.sortOrder) params.set("sortOrder", filterParams.sortOrder);
 
     return params;
   };
@@ -114,7 +114,7 @@ export default function TrovesPage() {
     const appliedFilters = newFilters || filters;
     const page = newPage || currentPage;
     const params = buildSearchParams(appliedFilters, page);
-    const url = params.toString() ? `/troves?${params.toString()}` : '/troves';
+    const url = params.toString() ? `/troves?${params.toString()}` : "/troves";
     router.push(url);
   };
 
@@ -126,11 +126,11 @@ export default function TrovesPage() {
     updateUrl(newFilters, 1); // Reset to page 1 when filters change
   };
 
-  const handleSortChange = (newSortBy: string, newSortOrder?: 'asc' | 'desc') => {
+  const handleSortChange = (newSortBy: string, newSortOrder?: "asc" | "desc") => {
     const updatedFilters = {
       ...filters,
       sortBy: newSortBy,
-      sortOrder: newSortOrder || filters.sortOrder || 'desc'
+      sortOrder: newSortOrder || filters.sortOrder || "desc",
     };
     updateUrl(updatedFilters, currentPage);
   };
@@ -154,8 +154,8 @@ export default function TrovesPage() {
         setTotalCount(data.pagination.total || 0);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load troves');
-      console.error('Error loading troves:', err);
+      setError(err instanceof Error ? err.message : "Failed to load troves");
+      console.error("Error loading troves:", err);
     } finally {
       setLoading(false);
     }
@@ -224,7 +224,6 @@ export default function TrovesPage() {
   return (
     <main className="min-h-screen">
       <div className="max-w-7xl mx-auto py-8">
-
         {/* Page Header */}
         <h1 className="text-2xl font-bold text-white mb-6">Liquity V2 Troves</h1>
 
@@ -232,8 +231,8 @@ export default function TrovesPage() {
         <TroveListFilters
           filters={filters}
           onFiltersChange={handleFiltersChange}
-          sortBy={filters.sortBy || 'lastActivity'}
-          sortOrder={filters.sortOrder || 'desc'}
+          sortBy={filters.sortBy || "lastActivity"}
+          sortOrder={filters.sortOrder || "desc"}
           onSortChange={handleSortChange}
           availableCollateralTypes={AVAILABLE_COLLATERAL_TYPES}
         />
@@ -242,11 +241,7 @@ export default function TrovesPage() {
         {troves.length > 0 ? (
           <div className="grid grid-cols-1 gap-6">
             {troves.map((trove) => (
-              <TroveListingCard
-                key={trove.id}
-                trove={trove}
-                hideLabels={false}
-              />
+              <TroveListingCard key={trove.id} trove={trove} hideLabels={false} />
             ))}
           </div>
         ) : (

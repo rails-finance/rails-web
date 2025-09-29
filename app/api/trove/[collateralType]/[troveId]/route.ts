@@ -9,7 +9,7 @@ export async function GET(
   context: { params: Promise<{ collateralType: string; troveId: string }> },
 ) {
   const { collateralType, troveId } = await context.params;
-  
+
   // Return mock data for specific fake trove ID
   if (troveId === "mock-all-events") {
     const customizedMock = {
@@ -20,9 +20,9 @@ export async function GET(
         troveId: troveId,
         // Keep assetType as BOLD, only update collateralType
         collateralType: collateralType,
-      }))
+      })),
     };
-    
+
     return NextResponse.json(customizedMock);
   }
 

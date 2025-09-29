@@ -1,5 +1,5 @@
 type FormatOptions = {
-  style?: 'decimal' | 'currency' | 'percent';
+  style?: "decimal" | "currency" | "percent";
   currency?: string;
   minimumFractionDigits?: number;
   maximumFractionDigits?: number;
@@ -9,12 +9,12 @@ type FormatOptions = {
 
 export const toLocaleStringHelper = (value: number, options: FormatOptions = {}): string => {
   const {
-    style = 'decimal',
+    style = "decimal",
     currency,
     minimumFractionDigits,
     maximumFractionDigits,
-    prefix = '',
-    suffix = ''
+    prefix = "",
+    suffix = "",
   } = options;
 
   const formatOptions: Intl.NumberFormatOptions = {
@@ -23,11 +23,11 @@ export const toLocaleStringHelper = (value: number, options: FormatOptions = {})
     maximumFractionDigits,
   };
 
-  if (style === 'currency' && currency) {
+  if (style === "currency" && currency) {
     formatOptions.currency = currency;
   }
 
-  const formatted = value.toLocaleString('en-US', formatOptions);
+  const formatted = value.toLocaleString("en-US", formatOptions);
   return `${prefix}${formatted}${suffix}`;
 };
 
@@ -37,17 +37,17 @@ export const formatCurrency = (value: number, currency: string): string => {
 };
 
 export const formatPrice = (value: number): string => {
-  return toLocaleStringHelper(value, { 
-    minimumFractionDigits: 2, 
-    maximumFractionDigits: 2 
+  return toLocaleStringHelper(value, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 };
 
 export const formatUsdValue = (value: number): string => {
-  return toLocaleStringHelper(value, { 
-    prefix: '$',
-    minimumFractionDigits: 2, 
-    maximumFractionDigits: 2 
+  return toLocaleStringHelper(value, {
+    prefix: "$",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 };
 

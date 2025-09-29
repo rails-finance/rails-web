@@ -67,9 +67,7 @@ export function PaginationControls({
             key={num}
             onClick={() => onPageChange(num)}
             className={`cursor-pointer px-3 py-1 rounded-lg transition-colors ${
-              num === currentPage
-                ? "bg-slate-600 text-white"
-                : "bg-slate-800 hover:bg-slate-700"
+              num === currentPage ? "bg-slate-600 text-white" : "bg-slate-800 hover:bg-slate-700"
             }`}
           >
             {num}

@@ -78,10 +78,10 @@ export default function TrovePage() {
 
   if (loading) {
     return (
-    <div className="space-y-6 py-8">
-    <h1 className="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
+      <div className="space-y-6 py-8">
+        <h1 className="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
         <Button onClick={() => router.back()} className="mb-4 pl-2">
-        <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft className="w-4 h-4" />
           Back
         </Button>
         <div className="bg-slate-700 rounded-lg h-48 animate-pulse" />
@@ -97,7 +97,7 @@ export default function TrovePage() {
     return (
       <div className="space-y-6 py-8">
         <Button onClick={() => router.back()} className="mb-4 pl-2">
-        <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft className="w-4 h-4" />
           Back
         </Button>
         <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">
@@ -112,10 +112,10 @@ export default function TrovePage() {
 
   return (
     <div className="space-y-6 py-8">
-    <h1 className="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
+      <h1 className="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
       <Button onClick={() => router.back()} className="mb-4 pl-2">
         <ChevronLeft className="w-4 h-4" />
-          Back
+        Back
       </Button>
 
       <TroveSummaryCard trove={troveData} />
@@ -130,30 +130,29 @@ export default function TrovePage() {
             </span>
           )}
         </div>
-        {timelineData && timelineData.transactions.some(tx => isRedemptionTransaction(tx)) && (
+        {timelineData && timelineData.transactions.some((tx) => isRedemptionTransaction(tx)) && (
           <button
             onClick={() => setHideRedemptions(!hideRedemptions)}
             className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
               hideRedemptions
-                ? 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
-                : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                ? "bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600"
+                : "bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700"
             }`}
           >
             {hideRedemptions
-              ? `Show ${timelineData.transactions.filter(tx => isRedemptionTransaction(tx)).length} Redemptions`
-              : `Hide ${timelineData.transactions.filter(tx => isRedemptionTransaction(tx)).length} Redemptions`
-            }
+              ? `Show ${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length} Redemptions`
+              : `Hide ${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length} Redemptions`}
           </button>
         )}
       </div>
       {timelineData && timelineData.transactions.length > 0 ? (
-        <TransactionTimeline 
+        <TransactionTimeline
           timeline={{
             ...timelineData,
-            transactions: hideRedemptions 
-              ? timelineData.transactions.filter(tx => !isRedemptionTransaction(tx))
-              : timelineData.transactions
-          }} 
+            transactions: hideRedemptions
+              ? timelineData.transactions.filter((tx) => !isRedemptionTransaction(tx))
+              : timelineData.transactions,
+          }}
         />
       ) : (
         <div className="text-center py-8 text-slate-400">No transaction history available</div>

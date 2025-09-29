@@ -1,8 +1,8 @@
-import React from 'react';
-import { Transaction } from '@/types/api/troveHistory';
-import { HighlightableValue } from '../HighlightableValue';
-import { ExplanationPanel } from '../ExplanationPanel';
-import { formatCurrency } from '../shared/eventHelpers';
+import React from "react";
+import { Transaction } from "@/types/api/troveHistory";
+import { HighlightableValue } from "../HighlightableValue";
+import { ExplanationPanel } from "../ExplanationPanel";
+import { formatCurrency } from "../shared/eventHelpers";
 
 interface ApplyPendingDebtExplanationProps {
   transaction: Transaction;
@@ -19,50 +19,55 @@ export function ApplyPendingDebtExplanation({ transaction, onToggle }: ApplyPend
   const applyAfterRate = tx.stateAfter.annualInterestRate;
   const applyBeforeRatio = tx.stateBefore?.collateralRatio;
   const applyAfterRatio = tx.stateAfter.collateralRatio;
-  
+
   const pendingDebtItems: React.ReactNode[] = [
     <span key="action" className="text-slate-500">
       Batch manager applied pending interest and fee updates to this Trove
     </span>,
     <span key="debt" className="text-slate-500">
-      Debt updated from{' '}
+      Debt updated from{" "}
       <HighlightableValue type="debt" state="before" value={applyBeforeDebt}>
         {formatCurrency(applyBeforeDebt, tx.assetType)}
-      </HighlightableValue>
-      {' '}to{' '}
+      </HighlightableValue>{" "}
+      to{" "}
       <HighlightableValue type="debt" state="after" value={applyAfterDebt}>
         {formatCurrency(applyAfterDebt, tx.assetType)}
-      </HighlightableValue>
-      {' '}(reflects interest accumulated since last update)
+      </HighlightableValue>{" "}
+      (reflects interest accumulated since last update)
     </span>,
     <span key="collateral" className="text-slate-500">
-      Collateral remains{' '}
+      Collateral remains{" "}
       <HighlightableValue type="collateral" state="after" value={applyAfterColl}>
         {applyAfterColl} {tx.collateralType}
       </HighlightableValue>
     </span>,
     <span key="interestRate" className="text-slate-500">
-      Interest rate: {' '}
+      Interest rate:{" "}
       <HighlightableValue type="interestRate" state="after" value={applyAfterRate}>
         {applyAfterRate}%
-      </HighlightableValue>
-      {' '}annual {applyBeforeRate === applyAfterRate ? '(unchanged)' : '(updated)'}
-    </span>
+      </HighlightableValue>{" "}
+      annual {applyBeforeRate === applyAfterRate ? "(unchanged)" : "(updated)"}
+    </span>,
   ];
 
   if (applyBeforeRatio !== undefined) {
     pendingDebtItems.push(
       <span key="collRatio" className="text-slate-500">
-        Collateral ratio: {' '}
+        Collateral ratio:{" "}
         <HighlightableValue type="collRatio" state="after" value={applyAfterRatio}>
           {applyAfterRatio.toFixed(1)}%
-        </HighlightableValue>
-        {' '}(adjusted due to debt increase)
-      </span>
+        </HighlightableValue>{" "}
+        (adjusted due to debt increase)
+      </span>,
     );
   }
-  
+
   return (
-    <ExplanationPanel items={pendingDebtItems} onToggle={onToggle} defaultOpen={false} transactionHash={transaction.transactionHash} />
+    <ExplanationPanel
+      items={pendingDebtItems}
+      onToggle={onToggle}
+      defaultOpen={false}
+      transactionHash={transaction.transactionHash}
+    />
   );
 }

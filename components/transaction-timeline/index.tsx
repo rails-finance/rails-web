@@ -18,8 +18,10 @@ export function TransactionTimeline({ timeline }: TransactionTimelineProps) {
 
   // Get the most recent transaction (first in the array) to check if trove is active
   const mostRecentTx = timeline.transactions[0];
-  const isActive = !(mostRecentTx.operation === "closeTrove" || 
-    (mostRecentTx.type === "liquidation" && mostRecentTx.stateAfter.debt === 0 && !mostRecentTx.isZombieTrove));
+  const isActive = !(
+    mostRecentTx.operation === "closeTrove" ||
+    (mostRecentTx.type === "liquidation" && mostRecentTx.stateAfter.debt === 0 && !mostRecentTx.isZombieTrove)
+  );
 
   return (
     <div className="relative">
@@ -28,7 +30,7 @@ export function TransactionTimeline({ timeline }: TransactionTimelineProps) {
         <div className="flex items-center">
           {/* Empty div to mimic hidden value columns on desktop */}
           <div className="hidden md:flex w-24 shrink-0"></div>
-          
+
           {/* Timeline position with pulsing dot */}
           <div className="w-20 h-4 shrink-0 flex justify-center items-center relative">
             <span className="flex size-2 transform translate-y-1 z-10">
@@ -36,7 +38,7 @@ export function TransactionTimeline({ timeline }: TransactionTimelineProps) {
               <span className="absolute inline-flex size-2 rounded-full bg-green-500"></span>
             </span>
           </div>
-          
+
           {/* Empty div to mimic right value columns on desktop */}
           <div className="hidden md:flex flex-1"></div>
         </div>

@@ -30,21 +30,28 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
       <span key="liquidation" className="text-slate-500">
         This trove was liquidated when the collateral ratio fell below the minimum threshold (110%)
         <InfoButton href={FAQ_URLS.LIQUIDATIONS} />
-      </span>
+      </span>,
     );
 
     // Debt at liquidation
     items.push(
       <span key="liquidated-debt" className="text-slate-500">
-        Total debt of <HighlightableValue type="debt" state="after" value={trove.debt.peak}>{formatPrice(trove.debt.peak)} BOLD</HighlightableValue> was liquidated
-      </span>
+        Total debt of{" "}
+        <HighlightableValue type="debt" state="after" value={trove.debt.peak}>
+          {formatPrice(trove.debt.peak)} BOLD
+        </HighlightableValue>{" "}
+        was liquidated
+      </span>,
     );
 
     // Collateral seized
     items.push(
       <span key="collateral-seized" className="text-slate-500">
-        <HighlightableValue type="collateral" state="after" value={trove.collateral.peakAmount}>{formatPrice(trove.collateral.peakAmount)} {trove.collateralType}</HighlightableValue> collateral was seized during liquidation
-      </span>
+        <HighlightableValue type="collateral" state="after" value={trove.collateral.peakAmount}>
+          {formatPrice(trove.collateral.peakAmount)} {trove.collateralType}
+        </HighlightableValue>{" "}
+        collateral was seized during liquidation
+      </span>,
     );
 
     // Trove lifecycle
@@ -52,8 +59,9 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
 
     items.push(
       <span key="lifecycle" className="text-slate-500">
-        Trove was active for <strong className="text-white">{duration}</strong> before liquidation from {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
-      </span>
+        Trove was active for <strong className="text-white">{duration}</strong> before liquidation from{" "}
+        {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
+      </span>,
     );
 
     // Add NFT information if NFT URL is available
@@ -70,13 +78,25 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
             className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors"
             aria-label="View NFT on OpenSea"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-link2 lucide-link-2 w-3 h-3 text-slate-500" aria-hidden="true">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="lucide lucide-link2 lucide-link-2 w-3 h-3 text-slate-500"
+              aria-hidden="true"
+            >
               <path d="M9 17H7A5 5 0 0 1 7 7h2"></path>
               <path d="M15 7h2a5 5 0 1 1 0 10h-2"></path>
               <line x1="8" x2="16" y1="12" y2="12"></line>
             </svg>
           </a>
-        </span>
+        </span>,
       );
     }
 
@@ -117,50 +137,51 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
 
         {/* Content section with standard grid layout */}
         <div className="grid grid-cols-1 pt-2 p-4 gap-4">
-
-        {/* Main value */}
-        <div>
-          <div className="text-sm mb-1">Liquidated Amount</div>
-          <div className="flex items-center">
-            <h3 className="text-3xl font-bold text-white">
-              <HighlightableValue type="debt" state="after" value={trove.debt.peak}>
-                {formatPrice(trove.debt.peak)}
-              </HighlightableValue>
-            </h3>
-            <span className="ml-2 text-green-400 text-lg">
-              <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
-            </span>
-          </div>
-        </div>
-
-        {/* Collateral at liquidation */}
-        <div>
-          <p className="text-sm">Collateral at liquidation</p>
-          <div className="flex items-center">
+          {/* Main value */}
+          <div>
+            <div className="text-sm mb-1">Liquidated Amount</div>
             <div className="flex items-center">
-              <p className="text-xl font-medium text-white mr-1">
-                <HighlightableValue type="collateral" state="after" value={trove.collateral.peakAmount}>
-                  {formatPrice(trove.collateral.peakAmount)}
+              <h3 className="text-3xl font-bold text-white">
+                <HighlightableValue type="debt" state="after" value={trove.debt.peak}>
+                  {formatPrice(trove.debt.peak)}
                 </HighlightableValue>
-              </p>
-              <span className="flex items-center text-slate-400">
-                <TokenIcon assetSymbol={trove.collateralType} />
+              </h3>
+              <span className="ml-2 text-green-400 text-lg">
+                <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
               </span>
             </div>
           </div>
-        </div>
 
-        <CardFooter
-          trove={trove}
-          dateText={showViewButton ? `${formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}` : undefined}
-        />
+          {/* Collateral at liquidation */}
+          <div>
+            <p className="text-sm">Collateral at liquidation</p>
+            <div className="flex items-center">
+              <div className="flex items-center">
+                <p className="text-xl font-medium text-white mr-1">
+                  <HighlightableValue type="collateral" state="after" value={trove.collateral.peakAmount}>
+                    {formatPrice(trove.collateral.peakAmount)}
+                  </HighlightableValue>
+                </p>
+                <span className="flex items-center text-slate-400">
+                  <TokenIcon assetSymbol={trove.collateralType} />
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <CardFooter
+            trove={trove}
+            dateText={
+              showViewButton ? `${formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}` : undefined
+            }
+          />
         </div>
       </div>
 
       {/* Explanation Panel */}
       <div className="px-2.5">
-        <ExplanationPanel 
-          items={hoverContextItems} 
+        <ExplanationPanel
+          items={hoverContextItems}
           onToggle={(isOpen) => {
             setShowHoverContext(isOpen);
             setHoverEnabled(isOpen);

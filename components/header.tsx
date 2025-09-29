@@ -18,7 +18,7 @@ export function Header() {
           <svg className="w-6 h-6" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
             <use href="#icon-liquity" />
           </svg>
-            <h1 className="text-xs font-semibold text-white">Liquity V2 Trove Explorer</h1>
+          <h1 className="text-xs font-semibold text-white">Liquity V2 Trove Explorer</h1>
         </div>
       </div>
     </header>

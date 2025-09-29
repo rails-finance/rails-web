@@ -1,10 +1,10 @@
-import React from 'react';
-import { Transaction } from '@/types/api/troveHistory';
-import { HighlightableValue } from '../HighlightableValue';
-import { ExplanationPanel } from '../ExplanationPanel';
-import { formatCurrency } from '../shared/eventHelpers';
-import { Link2 } from 'lucide-react';
-import { getBatchManagerInfo } from '@/lib/utils/batch-manager-utils';
+import React from "react";
+import { Transaction } from "@/types/api/troveHistory";
+import { HighlightableValue } from "../HighlightableValue";
+import { ExplanationPanel } from "../ExplanationPanel";
+import { formatCurrency } from "../shared/eventHelpers";
+import { Link2 } from "lucide-react";
+import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
 
 interface RemoveFromBatchExplanationProps {
   transaction: Transaction;
@@ -21,15 +21,15 @@ export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFrom
   const exitAfterColl = tx.stateAfter.coll;
   const exitBeforeRatio = tx.stateBefore?.collateralRatio;
   const exitAfterRatio = tx.stateAfter.collateralRatio;
-  
+
   // Get batch manager info for the delegate we're leaving
-  const batchManagerInfo = getBatchManagerInfo(tx.stateBefore?.interestBatchManager || '');
-  
+  const batchManagerInfo = getBatchManagerInfo(tx.stateBefore?.interestBatchManager || "");
+
   const batchExitItems: React.ReactNode[] = [
     <span key="delegate" className="text-slate-500">
-      Left delegate:{' '}
+      Left delegate:{" "}
       <span className="font-medium inline-flex items-center gap-1">
-        {batchManagerInfo?.name || 'Unknown delegate'}
+        {batchManagerInfo?.name || "Unknown delegate"}
         {batchManagerInfo?.website && (
           <a
             href={batchManagerInfo.website}
@@ -47,47 +47,52 @@ export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFrom
       Removed Trove from batch management and returned to individual management
     </span>,
     <span key="debt" className="text-slate-500">
-      Debt updated from{' '}
+      Debt updated from{" "}
       <HighlightableValue type="debt" state="before" value={exitBeforeDebt}>
         {formatCurrency(exitBeforeDebt, tx.assetType)}
-      </HighlightableValue>
-      {' '}to{' '}
+      </HighlightableValue>{" "}
+      to{" "}
       <HighlightableValue type="debt" state="after" value={exitAfterDebt}>
         {formatCurrency(exitAfterDebt, tx.assetType)}
       </HighlightableValue>
-      {exitBeforeDebt === exitAfterDebt ? ' (unchanged)' : ' (reflects accrued interest)'}
+      {exitBeforeDebt === exitAfterDebt ? " (unchanged)" : " (reflects accrued interest)"}
     </span>,
     <span key="collateral" className="text-slate-500">
-      Collateral remains{' '}
+      Collateral remains{" "}
       <HighlightableValue type="collateral" state="after" value={exitAfterColl}>
         {exitAfterColl} {tx.collateralType}
       </HighlightableValue>
     </span>,
     <span key="interestRate" className="text-slate-500">
-      Interest rate changed from{' '}
+      Interest rate changed from{" "}
       <HighlightableValue type="interestRate" state="before" value={prevBatchRate}>
         {prevBatchRate}%
-      </HighlightableValue>
-      {' '}to{' '}
+      </HighlightableValue>{" "}
+      to{" "}
       <HighlightableValue type="interestRate" state="after" value={exitRate}>
         {exitRate}%
-      </HighlightableValue>
-      {' '}(individual rate)
-    </span>
+      </HighlightableValue>{" "}
+      (individual rate)
+    </span>,
   ];
 
   if (exitBeforeRatio !== undefined) {
     batchExitItems.push(
       <span key="collRatio" className="text-slate-500">
-        Collateral ratio: {' '}
+        Collateral ratio:{" "}
         <HighlightableValue type="collRatio" state="after" value={exitAfterRatio}>
           {exitAfterRatio.toFixed(1)}%
         </HighlightableValue>
-      </span>
+      </span>,
     );
   }
-  
+
   return (
-    <ExplanationPanel items={batchExitItems} onToggle={onToggle} defaultOpen={false} transactionHash={transaction.transactionHash} />
+    <ExplanationPanel
+      items={batchExitItems}
+      onToggle={onToggle}
+      defaultOpen={false}
+      transactionHash={transaction.transactionHash}
+    />
   );
 }

@@ -17,10 +17,10 @@ export function RightValueDisplay({ tx }: { tx: Transaction }) {
   }
 
   const { debtChangeFromOperation, collChangeFromOperation } = tx.troveOperation;
-  
+
   // RIGHT SIDE: Values USER SENDS to protocol (arrow points right/out)
   const isMultiStep = debtChangeFromOperation !== 0 && collChangeFromOperation !== 0;
-  
+
   if (isMultiStep) {
     const debtIncrease = debtChangeFromOperation > 0;
     const collIncrease = collChangeFromOperation > 0;

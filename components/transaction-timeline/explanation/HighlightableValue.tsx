@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useHover, ValueType, ValueState } from '../context/HoverContext';
+import { useHover, ValueType, ValueState } from "../context/HoverContext";
 
 interface HighlightableValueProps {
   children: React.ReactNode;
@@ -16,24 +16,22 @@ export function HighlightableValue({
   type,
   state,
   value,
-  className = 'text-slate-200',
-  asBlock = false
+  className = "text-slate-200",
+  asBlock = false,
 }: HighlightableValueProps) {
   const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
 
   // Skip hover interactions for 'before' states or when hover is disabled
-  const shouldEnableHover = hoverEnabled && state !== 'before';
+  const shouldEnableHover = hoverEnabled && state !== "before";
   const isHighlighted = shouldEnableHover && hoveredValue?.type === type && hoveredValue?.state === state;
 
-  const Component = asBlock ? 'div' : 'span';
+  const Component = asBlock ? "div" : "span";
 
   return (
     <Component
-      className={`${asBlock ? 'inline-block' : 'font-semibold'} ${shouldEnableHover ? 'cursor-pointer ' : ''} ${
-        className || 'text-slate-500'
-      } ${
-        isHighlighted ? '-mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded' : ''
-      }`}
+      className={`${asBlock ? "inline-block" : "font-semibold"} ${shouldEnableHover ? "cursor-pointer " : ""} ${
+        className || "text-slate-500"
+      } ${isHighlighted ? "-mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded" : ""}`}
       onMouseEnter={shouldEnableHover ? () => setHoveredValue({ type, state, value }) : undefined}
       onMouseLeave={shouldEnableHover ? () => setHoveredValue(null) : undefined}
     >

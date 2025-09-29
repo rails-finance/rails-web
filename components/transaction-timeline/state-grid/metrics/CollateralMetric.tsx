@@ -52,11 +52,7 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
             <span
               className={`text-xs flex items-center text-slate-600 border-l border-r ml-2 border-slate-600 font-medium rounded-sm px-1 py-0 transition-all ${
                 hoverEnabled ? "cursor-pointer" : ""
-              } ${
-                isCollateralUsdHighlighted
-                  ? "bg-blue-900 text-white py-0.5 -my-0.5"
-                  : ""
-              }`}
+              } ${isCollateralUsdHighlighted ? "bg-blue-900 text-white py-0.5 -my-0.5" : ""}`}
               onMouseEnter={
                 hoverEnabled
                   ? () => setHoveredValue({ type: "collateralUsd", state: "after", value: afterInUsd })

@@ -20,6 +20,6 @@ export function getTroveNftUrl(collateralType: string, troveId: string): string 
   if (!contractAddress || !troveId) {
     return null;
   }
-  
+
   return `https://opensea.io/item/ethereum/${contractAddress}/${troveId}`;
 }

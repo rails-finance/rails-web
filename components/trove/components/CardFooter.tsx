@@ -23,7 +23,7 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
           {dateText && (
             <span className="text-slate-400 flex items-center gap-1">
               <Icon name="clock-zap" size={14} />
-              {dateText.replace('Latest activity ', '')}
+              {dateText.replace("Latest activity ", "")}
             </span>
           )}
           <div className="flex flex-wrap sm:flex-row gap-3">
@@ -67,7 +67,12 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
               <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
                 <span className="text-slate-400 flex items-center gap-1">
                   <Icon name="trove-id" size={12} />
-                  <HighlightableValue type="troveId" state="after" className="text-slate-400" value={trove.id ? parseInt(trove.id) : undefined}>
+                  <HighlightableValue
+                    type="troveId"
+                    state="after"
+                    className="text-slate-400"
+                    value={trove.id ? parseInt(trove.id) : undefined}
+                  >
                     {trove.id ? `${trove.id.substring(0, 8)}...` : "n/a"}
                   </HighlightableValue>
                   <div className="relative inline-block group">
@@ -111,7 +116,10 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
                   <HighlightableValue type="nftToken" state="after" className="text-slate-400">
                     <Image size={14} className="" />
                   </HighlightableValue>
-                  <Link2 size={14} className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors" />
+                  <Link2
+                    size={14}
+                    className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors"
+                  />
                 </a>
               </span>
             )}

@@ -8,7 +8,6 @@ import { Header } from "@/components/header";
 
 const inter = Inter({ subsets: ["latin"] });
 
-
 export const metadata: Metadata = {
   title: "Rails",
   description: "Rails Web3 App",
@@ -21,9 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${inter.className} antialiased bg-slate-800 text-white min-h-screen overflow-x-hidden`}
-      >
+      <body className={`${inter.className} antialiased bg-slate-800 text-white min-h-screen overflow-x-hidden`}>
         <IconSymbols />
         <Providers>
           <Header />

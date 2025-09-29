@@ -4,7 +4,6 @@ import { RedistributionIcon } from "../symbols/RedistributionIcon";
 import { ApplyDebtIcon } from "../symbols/ApplyDebtIcon";
 import { TimelineBackground } from "../TimelineBackground";
 
-
 interface ApplyPendingDebtIconProps {
   tx: Transaction;
   isFirst?: boolean;
@@ -12,7 +11,12 @@ interface ApplyPendingDebtIconProps {
   isExpanded?: boolean;
 }
 
-export function ApplyPendingDebtIcon({ tx, isFirst = false, isLast = false, isExpanded = false }: ApplyPendingDebtIconProps) {
+export function ApplyPendingDebtIcon({
+  tx,
+  isFirst = false,
+  isLast = false,
+  isExpanded = false,
+}: ApplyPendingDebtIconProps) {
   // Only trove, liquidation, and redemption transactions have troveOperation
   if (!isTroveTransaction(tx) && tx.type !== "liquidation" && tx.type !== "redemption") {
     return null;
@@ -26,7 +30,7 @@ export function ApplyPendingDebtIcon({ tx, isFirst = false, isLast = false, isEx
   // For simplicity, just show the most relevant icon in a single step
   // Priority: redistribution > interest > fallback
   let iconContent = <RedistributionIcon />;
-  
+
   if (hasRedistribution) {
     iconContent = <RedistributionIcon />;
   } else if (hasInterest) {
@@ -37,18 +41,11 @@ export function ApplyPendingDebtIcon({ tx, isFirst = false, isLast = false, isEx
     <>
       {/* Timeline Background - extends full height of transaction row */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-full z-10 pointer-events-none">
-        <TimelineBackground 
-          tx={tx} 
-          isFirst={isFirst} 
-          isLast={isLast} 
-          isExpanded={isExpanded} 
-        />
+        <TimelineBackground tx={tx} isFirst={isFirst} isLast={isLast} isExpanded={isExpanded} />
       </div>
-      
+
       {/* Transaction Graphic */}
-      <div className="relative z-20 w-30 h-25 flex items-center justify-center sm:w-25">
-          {iconContent}
-      </div>
+      <div className="relative z-20 w-30 h-25 flex items-center justify-center sm:w-25">{iconContent}</div>
     </>
   );
 }
