@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
-import { cookieToInitialState } from "wagmi";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
-import { getConfig } from "./wagmi";
 import { Providers } from "./providers";
 import { IconSymbols } from "@/components/icons/iconSymbols";
 import { Header } from "@/components/header";
@@ -17,20 +14,18 @@ export const metadata: Metadata = {
   description: "Rails Web3 App",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const initialState = cookieToInitialState(getConfig(), (await headers()).get("cookie"));
-
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${inter.className} antialiased bg-slate-800 text-white min-h-screen overflow-x-hidden`}
       >
         <IconSymbols />
-        <Providers initialState={initialState}>
+        <Providers>
           <Header />
           <main className="max-w-7xl mx-auto px-4 md:px-6">{children}</main>
         </Providers>
