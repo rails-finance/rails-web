@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { SimplifiedTroveCard } from "@/components/troves/SimplifiedTroveCard";
-import { TroveListFilters, TroveListFilterParams } from "@/components/troves/TroveListFilters";
+import { TroveListingCard } from "@/components/troves/TroveListingCard";
+import { TroveListFilters, TroveListFilterParams } from "@/components/troves/components/TroveListFilters";
 import { TroveSummary } from "@/types/api/trove";
-import { PaginationControls } from "@/components/troves/PaginationControls";
+import { PaginationControls } from "@/components/troves/components/PaginationControls";
 
 // Constants
 const ITEMS_PER_PAGE = 20;
@@ -242,7 +242,7 @@ export default function TrovesPage() {
         {troves.length > 0 ? (
           <div className="grid grid-cols-1 gap-6">
             {troves.map((trove) => (
-              <SimplifiedTroveCard
+              <TroveListingCard
                 key={trove.id}
                 trove={trove}
                 showViewButton
