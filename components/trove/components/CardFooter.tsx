@@ -20,7 +20,7 @@ interface TroveCardFooterProps {
   showDetailedInfo?: boolean;
 }
 
-export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, showDetailedInfo = true }: TroveCardFooterProps) {
+export function CardFooter({ trove, showViewButton, dateText, dateInfo, showDetailedInfo = true }: TroveCardFooterProps) {
   const [copiedOwnerAddress, setCopiedOwnerAddress] = useState(false);
   const [copiedTrove, setCopiedTrove] = useState(false);
   return (

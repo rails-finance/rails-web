@@ -2,7 +2,11 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-export type ValueType = 'debt' | 'collateral' | 'collateralUsd' | 'interestRate' | 'collRatio' | 'upfrontFee' | 'collateralPrice' | 'peakDebt' | 'peakCollateral' | 'owner';
+export type ValueType = 'debt' | 'collateral' | 'collateralUsd' | 'interestRate' | 'collRatio' |
+  'upfrontFee' | 'collateralPrice' | 'peakDebt' | 'peakCollateral' | 'owner' |
+  'principal' | 'interest' | 'managementFee' | 'currentPrice' | 'delegateName' |
+  'managementFeeRate' | 'dailyManagementFee' | 'annualManagementFee' |
+  'dailyInterest' | 'annualInterest' | 'nftToken' | 'troveId' | 'ownerAddress';
 export type ValueState = 'before' | 'after' | 'change' | 'fee';
 
 export interface HoveredValue {

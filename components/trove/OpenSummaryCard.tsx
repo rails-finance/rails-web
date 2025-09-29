@@ -3,11 +3,11 @@
 import { useMemo, useState } from "react";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { Icon } from "@/components/icons/icon";
-import { TroveCardFooter } from "./components/TroveCardFooter";
+import { CardFooter } from "./components/CardFooter";
 import { TroveSummary } from "@/types/api/trove";
 import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
 import { formatDate, formatDuration } from "@/lib/date";
-import { toLocaleStringHelper, formatPrice, formatUsdValue } from "@/lib/utils/format";
+import { formatPrice, formatUsdValue } from "@/lib/utils/format";
 import { InterestCalculator } from "@/lib/utils/interest-calculator";
 import { ExplanationPanel } from "@/components/transaction-timeline/explanation/ExplanationPanel";
 import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
@@ -23,7 +23,7 @@ interface OpenTroveCardProps {
 
 function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardProps) {
   const [showHoverContext, setShowHoverContext] = useState(false);
-  const { hoveredValue, hoverEnabled, setHoverEnabled } = useHover();
+  const { hoveredValue, setHoverEnabled } = useHover();
   const calculator = useMemo(() => new InterestCalculator(), []);
   
   const batchManagerInfo = useMemo(() => {
@@ -369,7 +369,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
         </div>
 
         {showViewButton ? (
-          <TroveCardFooter
+          <CardFooter
             trove={trove}
             showViewButton={showViewButton}
             dateInfo={{
@@ -379,7 +379,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
           />
         ) : (
           <div className="flex justify-between items-end">
-            <TroveCardFooter
+            <CardFooter
               trove={trove}
               showViewButton={showViewButton}
             />
@@ -416,7 +416,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
   );
 }
 
-export function OpenTroveCard({ trove, showViewButton = false }: OpenTroveCardProps) {
+export function OpenSummaryCard({ trove, showViewButton = false }: OpenTroveCardProps) {
   return (
     <HoverProvider>
       <OpenTroveCardContent trove={trove} showViewButton={showViewButton} />

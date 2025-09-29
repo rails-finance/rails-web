@@ -18,7 +18,7 @@ function getProtocolConfig(assetType: string): { icon: string; className: string
   }
 }
 
-export function TroveCardHeader({ status, assetType, isDelegated, compact = false }: TroveCardHeaderProps) {
+export function CardHeader({ status, assetType, isDelegated, compact = false }: TroveCardHeaderProps) {
   const { icon: protocolIcon, className: protocolClass } = getProtocolConfig(assetType);
   
   if (compact) {

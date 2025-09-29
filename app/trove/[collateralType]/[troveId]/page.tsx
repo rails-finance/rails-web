@@ -6,7 +6,7 @@ import { ChevronLeft } from "lucide-react";
 import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 import type { TransactionTimeline as TimelineData } from "@/types/api/troveHistory";
 import { isRedemptionTransaction } from "@/types/api/troveHistory";
-import { TroveCard } from "@/components/trove/TroveCard";
+import { TroveSummaryCard } from "@/components/trove/TroveSummaryCard";
 import { Button } from "@/components/ui/button";
 import { TransactionTimeline } from "@/components/transaction-timeline";
 import { formatDuration } from "@/lib/date";
@@ -79,7 +79,7 @@ export default function TrovePage() {
   if (loading) {
     return (
     <div className="space-y-6 py-8">
-    <h1 class="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
+    <h1 className="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
         <Button onClick={() => router.back()} className="mb-4 pl-2">
         <ChevronLeft className="w-4 h-4" />
           Back
@@ -112,13 +112,13 @@ export default function TrovePage() {
 
   return (
     <div className="space-y-6 py-8">
-    <h1 class="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
+    <h1 className="text-2xl font-bold text-white mb-6">Liquity V2 Trove</h1>
       <Button onClick={() => router.back()} className="mb-4 pl-2">
         <ChevronLeft className="w-4 h-4" />
           Back
       </Button>
 
-      <TroveCard trove={troveData} />
+      <TroveSummaryCard trove={troveData} />
 
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
