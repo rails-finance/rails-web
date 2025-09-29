@@ -245,7 +245,6 @@ export default function TrovesPage() {
               <TroveListingCard
                 key={trove.id}
                 trove={trove}
-                showViewButton
                 hideLabels={false}
               />
             ))}

@@ -18,10 +18,9 @@ import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 
 interface OpenTroveCardProps {
   trove: TroveSummary;
-  showViewButton?: boolean;
 }
 
-function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardProps) {
+function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
   const [showHoverContext, setShowHoverContext] = useState(false);
   const { hoveredValue, setHoverEnabled } = useHover();
   const calculator = useMemo(() => new InterestCalculator(), []);
@@ -211,13 +210,11 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs">
             <span className="text-slate-400">
-              {formatDuration(trove.activity.createdAt, new Date())}
+              Opened {formatDate(trove.activity.createdAt)}
             </span>
-            {!showViewButton && (
-              <span className="text-slate-400">
-                Opened {formatDate(trove.activity.createdAt)}
-              </span>
-            )}
+            <span className="text-slate-400">
+              ({formatDuration(trove.activity.createdAt, new Date())})
+            </span>
             {trove.activity.redemptionCount > 0 && (
               <span className="inline-flex items-center text-orange-400">
                 <Icon name="triangle" size={12} />
@@ -368,36 +365,26 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
           </div>
         </div>
 
-        {showViewButton ? (
+
+        <div className="flex justify-between items-end">
           <CardFooter
             trove={trove}
-            showViewButton={showViewButton}
-            dateInfo={{
-              prefix: "Opened",
-              date: formatDate(trove.activity.createdAt)
-            }}
           />
-        ) : (
-          <div className="flex justify-between items-end">
-            <CardFooter
-              trove={trove}
-              showViewButton={showViewButton}
-            />
-            
-            {/* Latest collateral value - only show on trove view page */}
-            <div className="flex items-center gap-1 bg-slate-700 shadow-b shadow-slate-900/50 rounded-l p-2 -mr-4.5">
-              <TokenIcon assetSymbol={trove.collateralType} />
-              <HighlightableValue
-                type="currentPrice"
-                state="after"
-                className="text-xs text-green-400"
-                value={trove.collateral.valueUsd / trove.collateral.amount}
-              >
-                {formatUsdValue(trove.collateral.valueUsd / trove.collateral.amount)}
-              </HighlightableValue>
-            </div>
+          
+          {/* Latest collateral value - only show on trove view page */}
+          <div className="flex items-center gap-1 bg-slate-700 shadow-b shadow-slate-900/50 rounded-l p-2 -mr-4.5">
+            <TokenIcon assetSymbol={trove.collateralType} />
+            <HighlightableValue
+              type="currentPrice"
+              state="after"
+              className="text-xs text-green-400"
+              value={trove.collateral.valueUsd / trove.collateral.amount}
+            >
+              {formatUsdValue(trove.collateral.valueUsd / trove.collateral.amount)}
+            </HighlightableValue>
           </div>
-        )}
+        </div>
+
         </div>
       </div>
 
@@ -416,10 +403,10 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
   );
 }
 
-export function OpenSummaryCard({ trove, showViewButton = false }: OpenTroveCardProps) {
+export function OpenSummaryCard({ trove }: OpenTroveCardProps) {
   return (
     <HoverProvider>
-      <OpenTroveCardContent trove={trove} showViewButton={showViewButton} />
+      <OpenTroveCardContent trove={trove} />
     </HoverProvider>
   );
 }

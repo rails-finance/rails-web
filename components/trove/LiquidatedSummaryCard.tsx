@@ -152,7 +152,6 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
 
         <CardFooter
           trove={trove}
-          showViewButton={showViewButton}
           dateText={showViewButton ? `${formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}` : undefined}
         />
         </div>

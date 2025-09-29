@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/icons/icon";
 import { Image, Link2 } from "lucide-react";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
@@ -10,17 +9,11 @@ import { HighlightableValue } from "@/components/transaction-timeline/explanatio
 
 interface TroveCardFooterProps {
   trove: TroveSummary;
-  showViewButton?: boolean;
   dateText?: string;
-  dateInfo?: {
-    prefix: string;
-    date: string;
-    suffix?: string;
-  };
   showDetailedInfo?: boolean;
 }
 
-export function CardFooter({ trove, showViewButton, dateText, dateInfo, showDetailedInfo = true }: TroveCardFooterProps) {
+export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCardFooterProps) {
   const [copiedOwnerAddress, setCopiedOwnerAddress] = useState(false);
   const [copiedTrove, setCopiedTrove] = useState(false);
   return (
@@ -124,14 +117,6 @@ export function CardFooter({ trove, showViewButton, dateText, dateInfo, showDeta
             )}
           </div>
         </div>
-        {showViewButton && (
-          <Button
-            href={`/trove/${trove.collateralType}/${trove.id}`}
-            className="flex items-center w-full sm:w-auto justify-center"
-          >
-            <Icon name="arrow-right" size={14} className="ml-1" />
-          </Button>
-        )}
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ import { ChevronRight } from "lucide-react";
 import { formatDuration } from "@/lib/date";
 import { TokenIcon } from "../icons/tokenIcon";
 
-export function ClosedListingCard({ trove, showViewButton = false, hideLabels = false }: { trove: TroveSummary; showViewButton?: boolean; hideLabels?: boolean }) {
+export function ClosedListingCard({ trove, hideLabels = false }: { trove: TroveSummary; hideLabels?: boolean }) {
     // Save scroll position when navigating to trove detail
     const handleClick = (e: React.MouseEvent) => {
       if (typeof window !== 'undefined') {
@@ -62,19 +62,16 @@ export function ClosedListingCard({ trove, showViewButton = false, hideLabels = 
           <div className="flex items-center justify-between">
             <CardFooter
               trove={trove}
-              showViewButton={false}
               dateText={`Latest activity ${formatDuration(trove.activity.lastActivityAt, new Date())} ago`}
               showDetailedInfo={false}
             />
-            {showViewButton && (
-              <div className="flex items-center bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
-                <span className="text-sm text-slate-500 group-hover:text-white font-medium flex items-center gap-1" aria-label="View Trove">
-                  <Icon name="timeline" size={20} />
-                  View
-                  <ChevronRight className="w-4 h-4" />
-                </span>
-              </div>
-            )}
+            <div className="flex items-center bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
+            <span className="text-sm text-slate-500 group-hover:text-white font-medium flex items-center gap-1" aria-label="View Trove">
+                <Icon name="timeline" size={20} />
+                View
+                <ChevronRight className="w-4 h-4" />
+            </span>
+            </div>
           </div>
   
         </div>

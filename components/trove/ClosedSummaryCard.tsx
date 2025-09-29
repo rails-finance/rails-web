@@ -118,38 +118,24 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
         {/* Content section with standard grid layout */}
         <div className="grid grid-cols-1 pt-2 p-4 gap-4">
 
-      {/* Main value */}
-      <div>
-        <p className="text-xs text-slate-400 mb-1">Debt</p>
-        <div className="flex items-center">
-          <h3 className="text-3xl font-bold">
-            <HighlightableValue type="peakDebt" state="after" value={trove.debt.peak}>
-              {formatPrice(trove.debt.peak)}
-            </HighlightableValue>
-          </h3>
-          <span className="ml-2 text-green-400 text-lg">
-            <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
-          </span>
-          <span className="ml-2 text-slate-400 text-sm">at peak</span>
+        {/* Main value */}
+        <div>
+          <p className="text-xs text-slate-400 mb-1">Debt</p>
+          <div className="flex items-center">
+            <h3 className="text-3xl font-bold">
+              <HighlightableValue type="peakDebt" state="after" value={trove.debt.peak}>
+                {formatPrice(trove.debt.peak)}
+              </HighlightableValue>
+            </h3>
+            <span className="ml-2 text-green-400 text-lg">
+              <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
+            </span>
+            <span className="ml-2 text-slate-400 text-sm">at peak</span>
+          </div>
         </div>
-      </div>
 
-
-        {showViewButton ? (
-          <CardFooter
-            trove={trove}
-            showViewButton={showViewButton}
-            dateInfo={{
-              prefix: "Closed",
-              date: formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)
-            }}
-          />
-        ) : (
-          <CardFooter
-            trove={trove}
-            showViewButton={showViewButton}
-          />
-        )}
+        <CardFooter trove={trove} />
+        
         </div>
       </div>
 

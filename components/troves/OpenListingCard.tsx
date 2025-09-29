@@ -9,7 +9,7 @@ import { ChevronRight, Users } from "lucide-react";
 import { CardFooter } from "../trove/components/CardFooter";
 import { formatDuration } from "@/lib/date";
 
-export function OpenListingCard({ trove, showViewButton = false, hideLabels = false }: { trove: TroveSummary; showViewButton?: boolean; hideLabels?: boolean }) {
+export function OpenListingCard({ trove, hideLabels = false }: { trove: TroveSummary; hideLabels?: boolean }) {
     const calculator = useMemo(() => new InterestCalculator(), []);
   
     // Save scroll position when navigating to trove detail
@@ -142,19 +142,16 @@ export function OpenListingCard({ trove, showViewButton = false, hideLabels = fa
           <div className="flex items-center justify-between">
             <CardFooter
               trove={trove}
-              showViewButton={false}
               dateText={`Latest activity ${formatDuration(trove.activity.lastActivityAt, new Date())} ago`}
               showDetailedInfo={false}
             />
-            {showViewButton && (
-              <div className="flex items-center bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
+            <div className="flex items-center bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
                 <span className="text-sm text-slate-500 group-hover:text-white font-medium flex items-center gap-1" aria-label="View Trove">
-                  <Icon name="timeline" size={20} />
-                  View
-                  <ChevronRight className="w-4 h-4" />
+                    <Icon name="timeline" size={20} />
+                    View
+                    <ChevronRight className="w-4 h-4" />
                 </span>
-              </div>
-            )}
+            </div>
           </div>
   
         </div>
