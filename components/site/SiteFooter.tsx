@@ -2,13 +2,13 @@ import Link from "next/link";
 
 export function SiteFooter() {
   return (
-    <footer className="bg-slate-50 border-t border-slate-200 mt-24">
+    <footer className="bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 mt-24 transition-colors">
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Rails Info */}
           <div className="md:col-span-2">
-            <h3 className="text-xl font-bold text-green-600 mb-3">Rails</h3>
-            <p className="text-slate-600 text-sm leading-relaxed mb-4">
+            <h3 className="text-xl font-bold text-green-600 dark:text-green-400 mb-3">Rails</h3>
+            <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mb-4">
               Making DeFi more understandable and accessible for everyone. Rails displays your DeFi activity on simple timelines with clear explanations and in-depth transaction analysis.
             </p>
             <div className="flex items-center gap-4">
@@ -16,7 +16,7 @@ export function SiteFooter() {
                 href="https://x.com/rails_finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 hover:text-green-600 transition-colors"
+                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
                 title="Follow Rails on X"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -27,7 +27,7 @@ export function SiteFooter() {
                 href="https://www.youtube.com/@rails_finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 hover:text-green-600 transition-colors"
+                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
                 title="Rails Finance on YouTube"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -38,7 +38,7 @@ export function SiteFooter() {
                 href="https://github.com/rails-finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 hover:text-green-600 transition-colors"
+                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
                 title="Rails on GitHub"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -50,25 +50,25 @@ export function SiteFooter() {
 
           {/* Quick Links */}
           <div>
-            <h4 className="text-sm font-semibold text-slate-700 mb-3">Quick Links</h4>
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Quick Links</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/" className="text-slate-600 hover:text-green-600 text-sm transition-colors">
+                <Link href="/" className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 text-sm transition-colors">
                   Home
                 </Link>
               </li>
               <li>
-                <Link href="/about" className="text-slate-600 hover:text-green-600 text-sm transition-colors">
+                <Link href="/about" className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 text-sm transition-colors">
                   About
                 </Link>
               </li>
               <li>
-                <Link href="/how-it-works" className="text-slate-600 hover:text-green-600 text-sm transition-colors">
+                <Link href="/how-it-works" className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 text-sm transition-colors">
                   How It Works
                 </Link>
               </li>
               <li>
-                <Link href="/troves" className="text-slate-600 hover:text-green-600 text-sm transition-colors">
+                <Link href="/troves" className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 text-sm transition-colors">
                   Explore Troves
                 </Link>
               </li>
@@ -77,13 +77,13 @@ export function SiteFooter() {
 
           {/* Support */}
           <div>
-            <h4 className="text-sm font-semibold text-slate-700 mb-3">Support Rails</h4>
-            <p className="text-slate-600 text-sm mb-3">
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Support Rails</h4>
+            <p className="text-slate-600 dark:text-slate-300 text-sm mb-3">
               Help us continue building tools for the DeFi community
             </p>
             <a
               href="https://etherscan.io/name-lookup-search?id=donate.rails.eth"
-              className="inline-block bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors"
+              className="inline-block bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -93,23 +93,23 @@ export function SiteFooter() {
         </div>
 
         {/* Bottom Section */}
-        <div className="mt-8 pt-8 border-t border-slate-200">
+        <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex flex-col md:flex-row items-center gap-4 mb-4 md:mb-0">
-              <p className="text-slate-500 text-xs">
+              <p className="text-slate-500 dark:text-slate-400 text-xs">
                 © {new Date().getFullYear()} Rails. Built with support from Liquity.
               </p>
               <div className="flex gap-4">
-                <Link href="/privacy" className="text-slate-500 hover:text-slate-700 text-xs transition-colors">
+                <Link href="/privacy" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 text-xs transition-colors">
                   Privacy Policy
                 </Link>
-                <Link href="/terms" className="text-slate-500 hover:text-slate-700 text-xs transition-colors">
+                <Link href="/terms" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 text-xs transition-colors">
                   Terms of Service
                 </Link>
               </div>
             </div>
             <div className="flex items-center">
-              <span className="text-slate-500 text-xs mr-2">Supported by</span>
+              <span className="text-slate-500 dark:text-slate-400 text-xs mr-2">Supported by</span>
               <a href="https://liquity.org" target="_blank" rel="noopener noreferrer">
                 <img src="/liquity-logo.svg" alt="Liquity" className="h-6" />
               </a>

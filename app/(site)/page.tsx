@@ -92,7 +92,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="bg-white text-slate-600 min-h-screen">
+    <div className="bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 min-h-screen transition-colors">
       {/* Hero Section - Responsive */}
       <div className="relative pt-24">
         {/* Desktop Layout Container */}
@@ -103,12 +103,12 @@ export default function Home() {
             <div className="md:flex md:flex-col md:h-full">
               {/* Text Content - Same for both mobile and desktop */}
               <div className="md:flex-1 md:px-6 md:py-8 md:flex md:flex-col md:justify-center md:relative md:z-10">
-                <p className="text-slate-700 text-xl md:text-2xl font-semibold mb-4 tracking-tight">
-                  <span className="text-green-600">Rails</span> displays your DeFi activity on simple timelines with clear explanations and in-depth transaction analysis.
+                <p className="text-slate-700 dark:text-slate-200 text-xl md:text-2xl font-semibold mb-4 tracking-tight">
+                  <span className="text-green-600 dark:text-green-400">Rails</span> displays your DeFi activity on simple timelines with clear explanations and in-depth transaction analysis.
                 </p>
-                <p className="text-slate-700 mb-4 tracking-tight">
+                <p className="text-slate-700 dark:text-slate-300 mb-4 tracking-tight">
                   Rails is building essential DeFi support infrastructure, starting with Liquity V2. Our roadmap includes integration with Liquity V2 forks and expansion across the broader DeFi ecosystem. Discover our approach
-                  <a className="text-green-500" href="about/"> here</a>.
+                  <a className="text-green-500 dark:text-green-400" href="about/"> here</a>.
                 </p>
               </div>
 
@@ -163,31 +163,31 @@ export default function Home() {
 
                 {/* Liquity V2 Protocol Card */}
                 <div className="space-y-6">
-                  <div className="bg-slate-50 rounded-lg overflow-hidden">
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-lg overflow-hidden">
                     <div className="p-4 space-y-6">
                       <div className="flex items-center gap-2 mb-4">
                             <svg className="w-12 h-12" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                               <use href="#icon-liquity" />
                             </svg>
-                        <span className="text-2xl text-slate-600 font-extrabold">Explore Liquity V2</span>
+                        <span className="text-2xl text-slate-600 dark:text-slate-300 font-extrabold">Explore Liquity V2</span>
                       </div>
 
                       {/* Mobile: Stacked, Desktop: Two columns */}
                       <div className="flex flex-col md:flex-row md:gap-8 md:items-center">
-                        <div className="text-slate-600 font-medium text-sm leading-relaxed md:flex-1 flex items-center mb-6 md:mb-0">
+                        <div className="text-slate-600 dark:text-slate-400 font-medium text-sm leading-relaxed md:flex-1 flex items-center mb-6 md:mb-0">
                           <img
                             src="/network-graphic.svg"
                             className="w-10 h-25 mx-4 flex-shrink-0"
                             alt="Rails protocol map visual metaphor"
                           />
                           <p>
-                            <span className="font-extrabold">Liquity V2</span> is an immutable, governance-free lending protocol. Users can deposit ETH, wstETH, or rETH as collateral to mint BOLD stablecoins and set their own interest rates.
+                            <span className="font-extrabold text-slate-700 dark:text-slate-300">Liquity V2</span> is an immutable, governance-free lending protocol. Users can deposit ETH, wstETH, or rETH as collateral to mint BOLD stablecoins and set their own interest rates.
                           </p>
                         </div>
 
                         {/* Search Box - Mobile and Desktop */}
-                        <div className="md:flex-1 bg-white rounded-lg p-4  transition-shadow hover:shadow-lg">
-                          <p className="text-slate-600 font-medium mb-3">View your Liquity V2 Trove on Rails. Enter borrower address, ENS, or Trove ID below.</p>
+                        <div className="md:flex-1 bg-white dark:bg-slate-900 rounded-lg p-4 transition-shadow hover:shadow-lg">
+                          <p className="text-slate-600 dark:text-slate-400 font-medium mb-3">View your Liquity V2 Trove on Rails. Enter borrower address, ENS, or Trove ID below.</p>
                           <form onSubmit={handleSearch}>
                             <div className="relative">
                               <svg
@@ -200,14 +200,14 @@ export default function Home() {
                                 strokeWidth="2"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
-                                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500"
+                                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 dark:text-slate-400"
                               >
                                 <circle cx="11" cy="11" r="8" />
                                 <path d="m21 21-4.3-4.3" />
                               </svg>
                               <input
                                 type="text"
-                                className="w-full pl-10 pr-4 py-2 text-sm bg-white text-slate-600 border border-slate-300 hover:border-slate-400 focus:border-blue-500 focus:outline-none transition-colors placeholder-slate-500 rounded-full"
+                                className="w-full pl-10 pr-4 py-2 text-sm bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors placeholder-slate-500 dark:placeholder-slate-400 rounded-full"
                                 value={searchValue}
                                 onChange={(e) => setSearchValue(e.target.value)}
                               />
@@ -232,9 +232,9 @@ export default function Home() {
         {/* Our Supporters Section */}
         <div className="w-full pb-24">
           <div className="max-w-7xl mx-auto px-4">
-            <h2 className="text-2xl font-extrabold text-slate-500 text-center mb-8">Our Supporters</h2>
+            <h2 className="text-2xl font-extrabold text-slate-500 dark:text-slate-400 text-center mb-8">Our Supporters</h2>
             <div className="flex justify-center">
-              <div className="bg-slate-50 rounded-lg p-8" style={{ width: '400px', height: '120px' }}>
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-8" style={{ width: '400px', height: '120px' }}>
                 <div className="flex items-center justify-center h-full">
                   <a href="https://liquity.org" target="_blank" rel="noopener noreferrer" className="h-full">
                     <img src="/liquity-logo.svg" alt="Liquity" className="h-full w-auto" />

@@ -2,30 +2,30 @@ import Link from "next/link";
 
 export function AppFooter() {
   return (
-    <footer className="bg-slate-900 border-t border-slate-700 mt-16">
+    <footer className="bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 mt-16 transition-colors">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* App Links */}
           <div>
-            <h4 className="text-sm font-semibold text-slate-300 mb-3">Navigation</h4>
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Navigation</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/troves" className="text-slate-400 hover:text-white text-sm transition-colors">
+                <Link href="/troves" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors">
                   Explore Troves
                 </Link>
               </li>
               <li>
-                <Link href="/" className="text-slate-400 hover:text-white text-sm transition-colors">
+                <Link href="/" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors">
                   Home
                 </Link>
               </li>
               <li>
-                <Link href="/about" className="text-slate-400 hover:text-white text-sm transition-colors">
+                <Link href="/about" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors">
                   About Rails
                 </Link>
               </li>
               <li>
-                <Link href="/how-it-works" className="text-slate-400 hover:text-white text-sm transition-colors">
+                <Link href="/how-it-works" className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors">
                   How It Works
                 </Link>
               </li>
@@ -34,14 +34,14 @@ export function AppFooter() {
 
           {/* Resources */}
           <div>
-            <h4 className="text-sm font-semibold text-slate-300 mb-3">Resources</h4>
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Resources</h4>
             <ul className="space-y-2">
               <li>
                 <a
                   href="https://liquity.org"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-slate-400 hover:text-white text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors"
                 >
                   Liquity Protocol
                 </a>
@@ -51,7 +51,7 @@ export function AppFooter() {
                   href="https://docs.liquity.org"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-slate-400 hover:text-white text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors"
                 >
                   Documentation
                 </a>
@@ -61,7 +61,7 @@ export function AppFooter() {
                   href="https://github.com/rails-finance"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-slate-400 hover:text-white text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors"
                 >
                   GitHub
                 </a>
@@ -71,13 +71,13 @@ export function AppFooter() {
 
           {/* Connect */}
           <div>
-            <h4 className="text-sm font-semibold text-slate-300 mb-3">Connect</h4>
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Connect</h4>
             <div className="flex items-center gap-3 mb-4">
               <a
                 href="https://x.com/rails_finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                 title="Follow Rails on X"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -88,7 +88,7 @@ export function AppFooter() {
                 href="https://www.youtube.com/@rails_finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                 title="Rails Finance on YouTube"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -99,7 +99,7 @@ export function AppFooter() {
                 href="https://github.com/rails-finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                 title="Rails on GitHub"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -107,12 +107,12 @@ export function AppFooter() {
                 </svg>
               </a>
             </div>
-            <p className="text-slate-500 text-xs">
+            <p className="text-slate-600 dark:text-slate-500 text-xs">
               Support Rails development:
             </p>
             <a
               href="https://etherscan.io/name-lookup-search?id=donate.rails.eth"
-              className="text-green-400 hover:text-green-300 text-xs font-semibold transition-colors"
+              className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-xs font-semibold transition-colors"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -122,16 +122,16 @@ export function AppFooter() {
         </div>
 
         {/* Bottom Section */}
-        <div className="mt-6 pt-6 border-t border-slate-700">
+        <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-slate-500 text-xs mb-2 md:mb-0">
+            <p className="text-slate-600 dark:text-slate-500 text-xs mb-2 md:mb-0">
               © {new Date().getFullYear()} Rails • Built with support from Liquity
             </p>
             <div className="flex gap-4">
-              <Link href="/privacy" className="text-slate-500 hover:text-slate-300 text-xs transition-colors">
+              <Link href="/privacy" className="text-slate-600 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 text-xs transition-colors">
                 Privacy Policy
               </Link>
-              <Link href="/terms" className="text-slate-500 hover:text-slate-300 text-xs transition-colors">
+              <Link href="/terms" className="text-slate-600 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 text-xs transition-colors">
                 Terms of Service
               </Link>
             </div>

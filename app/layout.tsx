@@ -8,6 +8,7 @@ import { getConfig } from "./wagmi";
 import { Providers } from "./providers";
 import { IconSymbols } from "@/components/icons/iconSymbols";
 import { Header } from "@/components/header";
+import { ThemeScript } from "@/components/ThemeScript";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -26,8 +27,11 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body
-        className={`${inter.className} antialiased bg-slate-800 text-white min-h-screen overflow-x-hidden`}
+        className={`${inter.className} antialiased bg-slate-800 dark:bg-slate-900 text-white dark:text-slate-100 min-h-screen overflow-x-hidden transition-colors`}
       >
         <IconSymbols />
         <Providers initialState={initialState}>
