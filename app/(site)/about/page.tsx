@@ -201,7 +201,7 @@ export default function AboutPage() {
               <div className="space-y-3">
                 <div className="flex items-center">
                   <div className="w-5 h-5 mr-3 text-green-600"></div>
-                  <a href="https://github.com/rails-defi/rails" className="text-blue-600 hover:text-blue-700" target="_blank">
+                  <a href="https://github.com/rails-finance" className="text-blue-600 hover:text-blue-700" target="_blank">
                     GitHub 
                   </a>
                 </div>

@@ -1,4 +1,5 @@
 import { SiteNavigation } from "@/components/site/SiteNavigation";
+import { SiteFooter } from "@/components/site/SiteFooter";
 
 export default function SiteLayout({
   children,
@@ -18,6 +19,7 @@ export default function SiteLayout({
       </div>
       <div className="relative">
         {children}
+        <SiteFooter />
       </div>
     </div>
   );
