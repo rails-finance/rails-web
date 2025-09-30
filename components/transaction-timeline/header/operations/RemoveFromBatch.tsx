@@ -2,7 +2,7 @@ import { TroveTransaction } from "@/types/api/troveHistory";
 import { OperationBadge } from "../components/OperationBadge";
 import { InterestRateBadge } from "../components/InterestRateBadge";
 import { BatchIcon } from "../components/BatchIcon";
-import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
+import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 
 export function RemoveFromBatchHeader({ tx }: { tx: TroveTransaction }) {
   return (

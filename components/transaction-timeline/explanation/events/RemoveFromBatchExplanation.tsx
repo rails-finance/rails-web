@@ -4,7 +4,7 @@ import { HighlightableValue } from "../HighlightableValue";
 import { ExplanationPanel } from "../ExplanationPanel";
 import { formatCurrency } from "../shared/eventHelpers";
 import { Link2 } from "lucide-react";
-import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
+import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 
 interface RemoveFromBatchExplanationProps {
   transaction: Transaction;
@@ -23,7 +23,7 @@ export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFrom
   const exitAfterRatio = tx.stateAfter.collateralRatio;
 
   // Get batch manager info for the delegate we're leaving
-  const batchManagerInfo = getBatchManagerInfo(tx.stateBefore?.interestBatchManager || "");
+  const batchManagerInfo = getBatchManagerByAddress(tx.stateBefore?.interestBatchManager || "");
 
   const batchExitItems: React.ReactNode[] = [
     <span key="delegate" className="text-slate-500">

@@ -3,10 +3,10 @@ import { OperationBadge } from "../components/OperationBadge";
 import { InterestRateBadge } from "../components/InterestRateBadge";
 import { BatchManagerInfo } from "../components/BatchManagerInfo";
 import { BatchIcon } from "../components/BatchIcon";
-import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
+import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 
 export function SetBatchManagerHeader({ tx }: { tx: TroveTransaction }) {
-  const batchManagerInfo = getBatchManagerInfo(tx.stateAfter.interestBatchManager || "");
+  const batchManagerInfo = getBatchManagerByAddress(tx.stateAfter.interestBatchManager || "");
   const batchManagerName = batchManagerInfo?.name || "Unknown delegate";
   const managementFee = tx.batchUpdate?.annualManagementFee || 0;
   const isJoiningExistingDelegate = tx.batchUpdate?.operation === "joinBatch";

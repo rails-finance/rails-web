@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
+import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 
 interface BatchManagerInfoProps {
   batchManager?: string | null;
@@ -14,7 +14,7 @@ export function BatchManagerInfo({ batchManager, batchManagerLabel, color = "blu
   if (!batchManager) return null;
 
   const managerInfo = useMemo(() => {
-    return getBatchManagerInfo(batchManager);
+    return getBatchManagerByAddress(batchManager);
   }, [batchManager]);
 
   const displayName =

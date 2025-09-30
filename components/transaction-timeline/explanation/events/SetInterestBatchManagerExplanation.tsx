@@ -4,7 +4,7 @@ import { HighlightableValue } from "../HighlightableValue";
 import { ExplanationPanel } from "../ExplanationPanel";
 import { formatCurrency } from "../shared/eventHelpers";
 import { Link2 } from "lucide-react";
-import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
+import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 
 interface SetInterestBatchManagerExplanationProps {
   transaction: Transaction;
@@ -24,7 +24,7 @@ export function SetInterestBatchManagerExplanation({ transaction, onToggle }: Se
   const joinAfterRatio = tx.stateAfter.collateralRatio;
 
   // Get batch manager info for website link
-  const batchManagerInfo = getBatchManagerInfo(tx.stateAfter.interestBatchManager || "");
+  const batchManagerInfo = getBatchManagerByAddress(tx.stateAfter.interestBatchManager || "");
   const batchManagerAddress = tx.stateAfter.interestBatchManager || "";
   const shortAddress = `${batchManagerAddress.slice(0, 6)}...${batchManagerAddress.slice(-4)}`;
 

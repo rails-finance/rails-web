@@ -5,7 +5,7 @@ import { BatchManagerInfo } from "../components/BatchManagerInfo";
 import { BatchIcon } from "../components/BatchIcon";
 import { AssetAction } from "../components/AssetAction";
 import { Image, Plus, Users } from "lucide-react";
-import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
+import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 
 export function OpenTroveAndJoinBatchHeader({ tx }: { tx: TroveTransaction }) {
   const { collChangeFromOperation, debtChangeFromOperation } = tx.troveOperation;
