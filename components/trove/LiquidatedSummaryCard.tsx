@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { CardFooter } from "./components/CardFooter";
 import { formatDate, formatDateRange, formatDuration } from "@/lib/date";
@@ -14,12 +14,10 @@ import { TroveSummary } from "@/types/api/trove";
 
 interface LiquidatedTroveCardProps {
   trove: TroveSummary;
-  showViewButton?: boolean;
 }
 
-function LiquidatedTroveCardContent({ trove, showViewButton = false }: LiquidatedTroveCardProps) {
-  const [showHoverContext, setShowHoverContext] = useState(false);
-  const { hoveredValue, hoverEnabled, setHoverEnabled } = useHover();
+function LiquidatedTroveCardContent({ trove }: LiquidatedTroveCardProps) {
+  const { hoveredValue, setHoverEnabled } = useHover();
 
   // Create hover context items for liquidated trove
   const hoverContextItems = useMemo(() => {
@@ -114,11 +112,9 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
           </div>
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs">
-            {!showViewButton && (
-              <span className="text-slate-400">
-                {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
-              </span>
-            )}
+            <span className="text-slate-400">
+              {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
+            </span>
             <span className="text-slate-400">
               {formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt)}
             </span>
@@ -169,12 +165,7 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
             </div>
           </div>
 
-          <CardFooter
-            trove={trove}
-            dateText={
-              showViewButton ? `${formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}` : undefined
-            }
-          />
+          <CardFooter trove={trove} />
         </div>
       </div>
 
@@ -183,7 +174,6 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
         <ExplanationPanel
           items={hoverContextItems}
           onToggle={(isOpen) => {
-            setShowHoverContext(isOpen);
             setHoverEnabled(isOpen);
           }}
           defaultOpen={false}
@@ -193,10 +183,10 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
   );
 }
 
-export function LiquidatedSummaryCard({ trove, showViewButton = false }: LiquidatedTroveCardProps) {
+export function LiquidatedSummaryCard({ trove }: LiquidatedTroveCardProps) {
   return (
     <HoverProvider>
-      <LiquidatedTroveCardContent trove={trove} showViewButton={showViewButton} />
+      <LiquidatedTroveCardContent trove={trove} />
     </HoverProvider>
   );
 }

@@ -23,7 +23,7 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
           {dateText && (
             <span className="text-slate-400 flex items-center gap-1">
               <Icon name="clock-zap" size={14} />
-              {dateText.replace("Latest activity ", "")}
+              {dateText}
             </span>
           )}
           <div className="flex flex-wrap sm:flex-row gap-3">

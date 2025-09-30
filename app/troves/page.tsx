@@ -241,7 +241,7 @@ export default function TrovesPage() {
         {troves.length > 0 ? (
           <div className="grid grid-cols-1 gap-6">
             {troves.map((trove) => (
-              <TroveListingCard key={trove.id} trove={trove} hideLabels={false} />
+              <TroveListingCard key={trove.id} trove={trove} />
             ))}
           </div>
         ) : (

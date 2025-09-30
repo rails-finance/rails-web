@@ -7,7 +7,7 @@ import { ChevronRight } from "lucide-react";
 import { formatDuration } from "@/lib/date";
 import { TokenIcon } from "../icons/tokenIcon";
 
-export function ClosedListingCard({ trove, hideLabels = false }: { trove: TroveSummary; hideLabels?: boolean }) {
+export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
   // Save scroll position when navigating to trove detail
   const handleClick = (e: React.MouseEvent) => {
     if (typeof window !== "undefined") {
@@ -46,7 +46,7 @@ export function ClosedListingCard({ trove, hideLabels = false }: { trove: TroveS
         <div className="grid grid-cols-1 gap-4 md:gap-6 md:items-end">
           {/* Peak debt value */}
           <div>
-            {!hideLabels && <p className="text-xs text-slate-600 mb-1 font-bold">Peak Debt</p>}
+            <p className="text-xs text-slate-600 mb-1 font-bold">Peak Debt</p>
             <div className="flex items-center">
               <h3 className="text-2xl md:text-3xl font-bold text-slate-200">{formatPrice(trove.debt.peak)}</h3>
               <span className="ml-2 text-green-400">
@@ -60,7 +60,7 @@ export function ClosedListingCard({ trove, hideLabels = false }: { trove: TroveS
         <div className="flex items-center justify-between">
           <CardFooter
             trove={trove}
-            dateText={`Latest activity ${formatDuration(trove.activity.lastActivityAt, new Date())} ago`}
+            dateText={`${formatDuration(trove.activity.lastActivityAt, new Date())} ago`}
             showDetailedInfo={false}
           />
           <div className="flex items-center bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">

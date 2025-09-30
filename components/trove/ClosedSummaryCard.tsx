@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { CardFooter } from "./components/CardFooter";
 import { formatDateRange, formatDuration } from "@/lib/date";
@@ -14,11 +14,9 @@ import { TroveSummary } from "@/types/api/trove";
 
 interface ClosedTroveCardProps {
   trove: TroveSummary;
-  showViewButton?: boolean;
 }
 
-function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCardProps) {
-  const [showHoverContext, setShowHoverContext] = useState(false);
+function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
   const { hoveredValue, setHoverEnabled } = useHover();
 
   // Create hover context items for closed trove
@@ -115,11 +113,9 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
           </div>
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs">
-            {!showViewButton && (
-              <span className="text-slate-400">
-                {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
-              </span>
-            )}
+            <span className="text-slate-400">
+              {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
+            </span>
             <span className="text-slate-400">
               {formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt)}
             </span>
@@ -163,7 +159,6 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
         <ExplanationPanel
           items={hoverContextItems}
           onToggle={(isOpen) => {
-            setShowHoverContext(isOpen);
             setHoverEnabled(isOpen);
           }}
           defaultOpen={false}
@@ -173,10 +168,10 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
   );
 }
 
-export function ClosedSummaryCard({ trove, showViewButton = false }: ClosedTroveCardProps) {
+export function ClosedSummaryCard({ trove }: ClosedTroveCardProps) {
   return (
     <HoverProvider>
-      <ClosedTroveCardContent trove={trove} showViewButton={showViewButton} />
+      <ClosedTroveCardContent trove={trove} />
     </HoverProvider>
   );
 }
