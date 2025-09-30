@@ -11,10 +11,10 @@ export default function SiteLayout({
       <div className="absolute top-0 left-0 right-0 z-50">
         <SiteNavigation />
       </div>
-      <div className="relative">
+      <main className="relative">
         {children}
-        <SiteFooter />
-      </div>
+      </main>
+      <SiteFooter />
     </div>
   );
 }
