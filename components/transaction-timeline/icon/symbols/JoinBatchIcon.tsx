@@ -16,7 +16,7 @@ export function JoinBatchIcon({ x = 290, y = 80, scale = 9 }: JoinBatchIconProps
           <circle cx="9" cy="7" r="4"/>
           {/* Plus sign */}
          <g transform="translate(-36,0)">
-          <circle cx="29" cy="27" r="8" fill="#171B24" stroke="green" />
+          <circle cx="29" cy="27" r="8" fill="var(--svg-inner-bg)" stroke="green" />
           <line x1="25" x2="32" y1="27" y2="27" stroke="green" strokeWidth="2" />
           <line x1="29" x2="29" y1="24" y2="30"  stroke="green" strokeWidth="2" />
         </g>

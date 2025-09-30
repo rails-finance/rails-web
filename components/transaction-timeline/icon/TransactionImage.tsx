@@ -42,7 +42,7 @@ export function TransactionImage({
   return (
     <>
       {/* Timeline Background - extends full height of transaction row */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-full z-10 pointer-events-none">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-full z-10 pointer-events-none text-slate-300 dark:text-slate-600">
         <TimelineBackground 
           tx={tx} 
           isFirst={isFirst} 
@@ -52,11 +52,11 @@ export function TransactionImage({
       </div>
       
       {/* Transaction Graphic - loaded from SVG template or placeholder */}
-      <div className="relative z-20 w-20 h-20 flex items-center justify-center ">
+      <div className="relative z-20 w-20 h-20 flex items-center justify-center text-slate-300 dark:text-slate-500">
         {svgContent ? (
-          <div 
+          <div
             className="max-w-full max-h-full"
-            dangerouslySetInnerHTML={{ __html: svgContent }} 
+            dangerouslySetInnerHTML={{ __html: svgContent }}
           />
         ) : (
           <div className="text-xs text-slate-500 text-center p-2 border rounded">

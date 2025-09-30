@@ -37,6 +37,9 @@
   /* Protocol-specific gradient colors for light mode */
   --liquity-grad-1: #4B5EDB;
   --liquity-grad-2: #3B4EAB;
+
+  /* SVG inner background for timeline icons */
+  --svg-inner-bg: #ffffff;
 }
 
 .dark {
@@ -57,6 +60,9 @@
   /* Protocol-specific gradient colors for dark mode */
   --liquity-grad-1: #323E91;
   --liquity-grad-2: #29336D;
+
+  /* SVG inner background for timeline icons */
+  --svg-inner-bg: #171b24;
 }
 
 body {

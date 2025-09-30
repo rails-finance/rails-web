@@ -37,7 +37,7 @@ export function OpenTroveAndJoinBatchIcon({ tx, isFirst = false, isLast = false,
   return (
     <>
       {/* Timeline Background - extends full height of transaction row */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-full z-10 pointer-events-none">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-full z-10 pointer-events-none text-red-300">
         <TimelineBackground 
           tx={tx} 
           isFirst={isFirst} 
@@ -47,7 +47,7 @@ export function OpenTroveAndJoinBatchIcon({ tx, isFirst = false, isLast = false,
       </div>
       
       {/* Transaction Graphic - loaded from SVG template */}
-      <div className="relative z-20 w-30 h-25 flex items-center justify-center sm:w-25">
+      <div className="relative z-20 w-30 h-25 flex items-center justify-center sm:w-25 text-slate-700 dark:text-slate-300">
         {svgContent ? (
           <div dangerouslySetInnerHTML={{ __html: svgContent }} />
         ) : (

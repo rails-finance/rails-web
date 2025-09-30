@@ -1,10 +1,10 @@
 <svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="40" cy="20" r="18" fill="rgb(23, 27, 36)" stroke="rgb(69, 85, 108)" style="stroke-width: 2px;"/>
-  <path d="M 44.429 27.507 L 44.429 25.303 C 44.429 22.869 42.454 20.895 40.02 20.895 L 33.408 20.895 C 30.974 20.895 29 22.869 29 25.303 L 29 27.507" style="stroke: rgb(69, 85, 108); stroke-linecap: round; fill: none; stroke-width: 2px;"/>
-  <path d="M 43.341 9.137 C 46.537 9.967 47.639 13.944 45.322 16.298 C 44.777 16.853 44.093 17.247 43.341 17.442" style="stroke: rgb(69, 85, 108); stroke-linecap: round; fill: none; stroke-width: 2px;"/>
-  <path d="M 50 27.507 L 50 25.303 C 49.998 23.293 48.639 21.54 46.695 21.038" style="stroke: rgb(69, 85, 108); stroke-linecap: round; fill: none; stroke-width: 2px;"/>
-  <circle cx="36.847" cy="13.29" r="4.29" style="stroke: rgb(69, 85, 108); stroke-linecap: round; fill: none; stroke-width: 2px;"/>
-  <circle cx="18" cy="20" r="7" fill="#171B24" stroke="green" style="stroke-width: 2px;"/>
+  <circle cx="40" cy="20" r="18" fill="var(--svg-inner-bg)" stroke="currentColor" style="stroke-width: 2px;"/>
+  <path d="M 44.429 27.507 L 44.429 25.303 C 44.429 22.869 42.454 20.895 40.02 20.895 L 33.408 20.895 C 30.974 20.895 29 22.869 29 25.303 L 29 27.507" style="stroke: currentColor; stroke-linecap: round; fill: none; stroke-width: 2px;"/>
+  <path d="M 43.341 9.137 C 46.537 9.967 47.639 13.944 45.322 16.298 C 44.777 16.853 44.093 17.247 43.341 17.442" style="stroke: currentColor; stroke-linecap: round; fill: none; stroke-width: 2px;"/>
+  <path d="M 50 27.507 L 50 25.303 C 49.998 23.293 48.639 21.54 46.695 21.038" style="stroke: currentColor; stroke-linecap: round; fill: none; stroke-width: 2px;"/>
+  <circle cx="36.847" cy="13.29" r="4.29" style="stroke: currentColor; stroke-linecap: round; fill: none; stroke-width: 2px;"/>
+  <circle cx="18" cy="20" r="7" fill="var(--svg-inner-bg)" stroke="green" style="stroke-width: 2px;"/>
   <line x1="14" x2="22" y1="20" y2="20" stroke="green" stroke-width="2" style="stroke-linecap: round;"/>
   <line x1="18" x2="18" y1="16" y2="24" stroke="green" stroke-width="2" style="stroke-linecap: round;"/>
 </svg>
