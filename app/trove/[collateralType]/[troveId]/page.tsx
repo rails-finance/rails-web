@@ -32,8 +32,6 @@ export default function TrovePage() {
     try {
       setLoading(true);
       setError(null);
-      console.log("collateralType", collateralType);
-      console.log("troveId", troveId);
 
       // Fetch both trove data and timeline data in parallel
       const [troveResponse, timelineResponse] = await Promise.all([
