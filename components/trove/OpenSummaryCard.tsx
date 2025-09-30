@@ -1,14 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { Icon } from "@/components/icons/icon";
 import { CardFooter } from "./components/CardFooter";
 import { TroveSummary } from "@/types/api/trove";
-import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
+import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 import { formatDate, formatDuration } from "@/lib/date";
 import { formatPrice, formatUsdValue } from "@/lib/utils/format";
-import { InterestCalculator } from "@/lib/utils/interest-calculator";
+import { generateInterestInfo } from "@/lib/utils/interest-calculator";
 import { ExplanationPanel } from "@/components/transaction-timeline/explanation/ExplanationPanel";
 import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
 import { useHover, HoverProvider } from "@/components/transaction-timeline/context/HoverContext";
@@ -21,86 +21,67 @@ interface OpenTroveCardProps {
 }
 
 function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
-  const [showHoverContext, setShowHoverContext] = useState(false);
   const { hoveredValue, setHoverEnabled } = useHover();
-  const calculator = useMemo(() => new InterestCalculator(), []);
 
-  const batchManagerInfo = useMemo(() => {
-    if (trove.batch?.manager) {
-      return getBatchManagerInfo(trove.batch.manager);
-    }
-    return undefined;
-  }, [trove.batch?.manager]);
+  const batchManagerInfo = getBatchManagerByAddress(trove.batch.manager);
 
-  // Generate interest info if not provided by backend
   const interestInfo = useMemo(() => {
-    // Mock data for demonstration - in production this should come from the API
-    // Using the example values from the prototype
-    const mockLastUpdate = Date.now() / 1000 - 68 * 24 * 60 * 60; // 68 days ago
-    // Convert from wei (18 decimals) to normal units
-    const recordedDebt = parseFloat(trove.debt.currentRaw) / 1e18;
+    // Use actual lastActivityAt as the last debt update timestamp
+    const lastUpdate = trove.activity.lastActivityAt;
+    const recordedDebt = trove.debt.current;
     const interestRate = trove.metrics.interestRate;
 
-    return calculator.generateInterestInfo(
+    return generateInterestInfo(
       recordedDebt,
       interestRate,
-      mockLastUpdate,
+      lastUpdate,
       trove.batch.isMember,
       trove.batch.managementFee,
       trove.batch.manager || undefined,
     );
-  }, [trove, calculator]);
+  }, [trove]);
 
   // Calculate display value with interest
-  const debtWithInterest = interestInfo ? interestInfo.entireDebt : trove.debt.current;
+  const debtWithInterest = interestInfo.entireDebt;
 
   // Calculate daily and annual interest cost
-  const dailyInterestCost = useMemo(() => {
-    if (!interestInfo) return 0;
-    return (interestInfo.recordedDebt * interestInfo.annualInterestRatePercent) / 100 / 365;
-  }, [interestInfo]);
-
-  const annualInterestCost = useMemo(() => {
-    if (!interestInfo) return 0;
-    return (interestInfo.recordedDebt * interestInfo.annualInterestRatePercent) / 100;
-  }, [interestInfo]);
+  const dailyInterestCost = (interestInfo.recordedDebt * interestInfo.annualInterestRatePercent) / 100 / 365;
+  const annualInterestCost = (interestInfo.recordedDebt * interestInfo.annualInterestRatePercent) / 100;
 
   // Create hover context items
   const hoverContextItems = useMemo(() => {
     const items: React.ReactNode[] = [];
 
     // Debt breakdown
-    if (interestInfo) {
-      items.push(
-        <span key="debt-breakdown" className="text-slate-500">
-          Current debt of{" "}
-          <HighlightableValue type="debt" state="after" value={debtWithInterest}>
-            {formatPrice(debtWithInterest)} BOLD
-          </HighlightableValue>{" "}
-          consists of{" "}
-          <HighlightableValue type="principal" state="after" value={interestInfo.recordedDebt}>
-            {formatPrice(interestInfo.recordedDebt)} BOLD
-          </HighlightableValue>{" "}
-          principal plus{" "}
-          <HighlightableValue type="interest" state="after" value={interestInfo.accruedInterest}>
-            {formatPrice(interestInfo.accruedInterest)} BOLD
-          </HighlightableValue>{" "}
-          accrued interest
-          {interestInfo.isBatchMember &&
-            interestInfo.accruedManagementFees !== undefined &&
-            interestInfo.accruedManagementFees > 0 && (
-              <span>
-                {" "}
-                and{" "}
-                <HighlightableValue type="managementFee" state="after" value={interestInfo.accruedManagementFees}>
-                  {formatPrice(interestInfo.accruedManagementFees)} BOLD
-                </HighlightableValue>{" "}
-                delegate fees
-              </span>
-            )}
-        </span>,
-      );
-    }
+    items.push(
+      <span key="debt-breakdown" className="text-slate-500">
+        Current debt of{" "}
+        <HighlightableValue type="debt" state="after" value={debtWithInterest}>
+          {formatPrice(debtWithInterest)} BOLD
+        </HighlightableValue>{" "}
+        consists of{" "}
+        <HighlightableValue type="principal" state="after" value={interestInfo.recordedDebt}>
+          {formatPrice(interestInfo.recordedDebt)} BOLD
+        </HighlightableValue>{" "}
+        principal plus{" "}
+        <HighlightableValue type="interest" state="after" value={interestInfo.accruedInterest}>
+          {formatPrice(interestInfo.accruedInterest)} BOLD
+        </HighlightableValue>{" "}
+        accrued interest
+        {interestInfo.isBatchMember &&
+          interestInfo.accruedManagementFees !== undefined &&
+          interestInfo.accruedManagementFees > 0 && (
+            <span>
+              {" "}
+              and{" "}
+              <HighlightableValue type="managementFee" state="after" value={interestInfo.accruedManagementFees}>
+                {formatPrice(interestInfo.accruedManagementFees)} BOLD
+              </HighlightableValue>{" "}
+              delegate fees
+            </span>
+          )}
+      </span>,
+    );
 
     // Collateral info
     const currentPrice = trove.collateral.valueUsd / trove.collateral.amount;
@@ -122,10 +103,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
     );
 
     // Collateral ratio explanation
-    const currentCollateralRatio =
-      interestInfo && trove.collateral.valueUsd > 0
-        ? ((trove.collateral.valueUsd / debtWithInterest) * 100).toFixed(1)
-        : trove.metrics.collateralRatio;
+    const currentCollateralRatio = trove.metrics.collateralRatio.toFixed(1);
 
     items.push(
       <span key="collateral-ratio" className="text-slate-500">
@@ -144,7 +122,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
     );
 
     // Interest rate info
-    if (trove.batch.isMember && interestInfo) {
+    if (trove.batch.isMember) {
       const dailyManagementFee = (interestInfo.recordedDebt * trove.batch.managementFee) / 100 / 365;
       const annualManagementFee = (interestInfo.recordedDebt * trove.batch.managementFee) / 100;
 
@@ -256,7 +234,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
     }
 
     // Interest cost breakdown (only for self-managed or when no management fee info)
-    if (interestInfo && !trove.batch.isMember) {
+    if (!trove.batch.isMember) {
       items.push(
         <span key="interest-cost" className="text-slate-500">
           Current interest costs approximately{" "}
@@ -270,7 +248,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
           per year
         </span>,
       );
-    } else if (interestInfo) {
+    } else {
       // For batch members, show interest costs separately
       items.push(
         <span key="interest-cost" className="text-slate-500">
@@ -347,64 +325,55 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
           {/* Main value */}
           <div>
             <p className="text-xs text-slate-400 mb-1">Debt</p>
-            <HighlightableValue
-              type="debt"
-              state="after"
-              value={interestInfo ? debtWithInterest : trove.debt.current}
-              asBlock={true}
-            >
+            <HighlightableValue type="debt" state="after" value={debtWithInterest} asBlock={true}>
               <div className="flex items-center">
-                <h3 className="text-3xl font-bold">
-                  {interestInfo ? formatPrice(debtWithInterest) : formatPrice(trove.debt.current)}
-                </h3>
+                <h3 className="text-3xl font-bold">{formatPrice(debtWithInterest)}</h3>
                 <span className="ml-2 text-green-400 text-lg">
                   <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
                 </span>
               </div>
             </HighlightableValue>
             {/* Debt breakdown */}
-            {interestInfo && (
-              <div className="mt-2 text-xs text-slate-500 space-y-0.5">
-                <div className="flex items-center gap-1 ">
-                  <span>
-                    <HighlightableValue
-                      type="principal"
-                      state="after"
-                      className="text-slate-500"
-                      value={interestInfo.recordedDebt}
-                    >
-                      {formatPrice(interestInfo.recordedDebt)}
-                    </HighlightableValue>{" "}
-                    +{" "}
-                    <HighlightableValue
-                      type="interest"
-                      state="after"
-                      className="text-slate-500"
-                      value={interestInfo.accruedInterest}
-                    >
-                      {formatPrice(interestInfo.accruedInterest)}
-                    </HighlightableValue>{" "}
-                    interest
-                    {interestInfo.isBatchMember &&
-                      interestInfo.accruedManagementFees !== undefined &&
-                      interestInfo.accruedManagementFees > 0 && (
-                        <>
-                          {" "}
-                          +{" "}
-                          <HighlightableValue
-                            type="managementFee"
-                            state="after"
-                            value={interestInfo.accruedManagementFees}
-                          >
-                            {formatPrice(interestInfo.accruedManagementFees)}
-                          </HighlightableValue>{" "}
-                          delegate fee
-                        </>
-                      )}
-                  </span>
-                </div>
+            <div className="mt-2 text-xs text-slate-500 space-y-0.5">
+              <div className="flex items-center gap-1 ">
+                <span>
+                  <HighlightableValue
+                    type="principal"
+                    state="after"
+                    className="text-slate-500"
+                    value={interestInfo.recordedDebt}
+                  >
+                    {formatPrice(interestInfo.recordedDebt)}
+                  </HighlightableValue>{" "}
+                  +{" "}
+                  <HighlightableValue
+                    type="interest"
+                    state="after"
+                    className="text-slate-500"
+                    value={interestInfo.accruedInterest}
+                  >
+                    {formatPrice(interestInfo.accruedInterest)}
+                  </HighlightableValue>{" "}
+                  interest
+                  {interestInfo.isBatchMember &&
+                    interestInfo.accruedManagementFees !== undefined &&
+                    interestInfo.accruedManagementFees > 0 && (
+                      <>
+                        {" "}
+                        +{" "}
+                        <HighlightableValue
+                          type="managementFee"
+                          state="after"
+                          value={interestInfo.accruedManagementFees}
+                        >
+                          {formatPrice(interestInfo.accruedManagementFees)}
+                        </HighlightableValue>{" "}
+                        delegate fee
+                      </>
+                    )}
+                </span>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Metrics grid */}
@@ -442,15 +411,9 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
                 <HighlightableValue
                   type="collRatio"
                   state="after"
-                  value={
-                    interestInfo && trove.collateral.valueUsd > 0
-                      ? parseFloat(((trove.collateral.valueUsd / debtWithInterest) * 100).toFixed(1))
-                      : trove.metrics.collateralRatio
-                  }
+                  value={parseFloat(trove.metrics.collateralRatio.toFixed(1))}
                 >
-                  {interestInfo && trove.collateral.valueUsd > 0
-                    ? `${((trove.collateral.valueUsd / debtWithInterest) * 100).toFixed(1)}%`
-                    : `${trove.metrics.collateralRatio}%`}
+                  {trove.metrics.collateralRatio.toFixed(1)}%
                 </HighlightableValue>
               </p>
             </div>
@@ -468,31 +431,29 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
                   {trove.metrics.interestRate}%
                 </HighlightableValue>
               </div>
-              {interestInfo && (
-                <div className="text-xs text-slate-500 mt-0.5 space-y-0.5">
-                  <span>
-                    ~{" "}
-                    <HighlightableValue
-                      type="dailyInterest"
-                      state="after"
-                      className="text-slate-500"
-                      value={dailyInterestCost}
-                    >
-                      {formatPrice(dailyInterestCost)}
-                    </HighlightableValue>{" "}
-                    day /{" "}
-                    <HighlightableValue
-                      type="annualInterest"
-                      state="after"
-                      className="text-slate-500"
-                      value={annualInterestCost}
-                    >
-                      {formatPrice(annualInterestCost)}
-                    </HighlightableValue>{" "}
-                    year
-                  </span>
-                </div>
-              )}
+              <div className="text-xs text-slate-500 mt-0.5 space-y-0.5">
+                <span>
+                  ~{" "}
+                  <HighlightableValue
+                    type="dailyInterest"
+                    state="after"
+                    className="text-slate-500"
+                    value={dailyInterestCost}
+                  >
+                    {formatPrice(dailyInterestCost)}
+                  </HighlightableValue>{" "}
+                  day /{" "}
+                  <HighlightableValue
+                    type="annualInterest"
+                    state="after"
+                    className="text-slate-500"
+                    value={annualInterestCost}
+                  >
+                    {formatPrice(annualInterestCost)}
+                  </HighlightableValue>{" "}
+                  year
+                </span>
+              </div>
               {trove.batch.isMember && (
                 <>
                   <p className="text-xs text-slate-500 mt-0.5">
@@ -520,29 +481,27 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
                       </a>
                     )}
                   </p>
-                  {interestInfo && (
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      ~{" "}
-                      <HighlightableValue
-                        type="dailyManagementFee"
-                        state="after"
-                        className="text-slate-500"
-                        value={(interestInfo.recordedDebt * trove.batch.managementFee) / 100 / 365}
-                      >
-                        {formatPrice((interestInfo.recordedDebt * trove.batch.managementFee) / 100 / 365)}
-                      </HighlightableValue>{" "}
-                      day /{" "}
-                      <HighlightableValue
-                        type="annualManagementFee"
-                        state="after"
-                        className="text-slate-500"
-                        value={(interestInfo.recordedDebt * trove.batch.managementFee) / 100}
-                      >
-                        {formatPrice((interestInfo.recordedDebt * trove.batch.managementFee) / 100)}
-                      </HighlightableValue>{" "}
-                      year
-                    </div>
-                  )}
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    ~{" "}
+                    <HighlightableValue
+                      type="dailyManagementFee"
+                      state="after"
+                      className="text-slate-500"
+                      value={(interestInfo.recordedDebt * trove.batch.managementFee) / 100 / 365}
+                    >
+                      {formatPrice((interestInfo.recordedDebt * trove.batch.managementFee) / 100 / 365)}
+                    </HighlightableValue>{" "}
+                    day /{" "}
+                    <HighlightableValue
+                      type="annualManagementFee"
+                      state="after"
+                      className="text-slate-500"
+                      value={(interestInfo.recordedDebt * trove.batch.managementFee) / 100}
+                    >
+                      {formatPrice((interestInfo.recordedDebt * trove.batch.managementFee) / 100)}
+                    </HighlightableValue>{" "}
+                    year
+                  </div>
                 </>
               )}
             </div>
@@ -572,7 +531,6 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
         <ExplanationPanel
           items={hoverContextItems}
           onToggle={(isOpen) => {
-            setShowHoverContext(isOpen);
             setHoverEnabled(isOpen);
           }}
           defaultOpen={false}

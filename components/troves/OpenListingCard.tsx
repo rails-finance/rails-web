@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import Link from "next/link";
-import { InterestCalculator } from "@/lib/utils/interest-calculator";
+import { generateInterestInfo } from "@/lib/utils/interest-calculator";
 import { TroveSummary } from "@/types/api/trove";
 import { Icon } from "../icons/icon";
 import { formatPrice, formatUsdValue } from "@/lib/utils/format";
@@ -9,36 +9,34 @@ import { ChevronRight, Users } from "lucide-react";
 import { CardFooter } from "../trove/components/CardFooter";
 import { formatDuration } from "@/lib/date";
 
-export function OpenListingCard({ trove, hideLabels = false }: { trove: TroveSummary; hideLabels?: boolean }) {
-  const calculator = useMemo(() => new InterestCalculator(), []);
-
+export function OpenListingCard({ trove }: { trove: TroveSummary }) {
   // Save scroll position when navigating to trove detail
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = () => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem("troves-scroll-position", String(window.scrollY));
     }
   };
 
-  // Generate interest info if not provided by backend
+  // Calculate interest breakdown using real lastActivityAt timestamp
   const interestInfo = useMemo(() => {
-    // Remove this - new API doesn't have interestInfo property
-
-    const mockLastUpdate = Date.now() / 1000 - 68 * 24 * 60 * 60; // 68 days ago
-    const recordedDebt = parseFloat(trove.debt.currentRaw) / 1e18;
+    // Use actual lastActivityAt as the last debt update timestamp
+    const lastUpdate = trove.activity.lastActivityAt;
+    // Use pre-calculated debt value from backend (already converted from wei)
+    const recordedDebt = trove.debt.current;
     const interestRate = trove.metrics.interestRate;
 
-    return calculator.generateInterestInfo(
+    return generateInterestInfo(
       recordedDebt,
       interestRate,
-      mockLastUpdate,
+      lastUpdate,
       trove.batch.isMember,
       trove.batch.managementFee,
       trove.batch.manager || undefined,
     );
-  }, [trove, calculator]);
+  }, [trove]);
 
   // Calculate display value with interest
-  const debtWithInterest = interestInfo ? interestInfo.entireDebt : trove.debt.current;
+  const debtWithInterest = interestInfo.entireDebt;
 
   return (
     <Link
@@ -71,7 +69,7 @@ export function OpenListingCard({ trove, hideLabels = false }: { trove: TroveSum
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 md:items-end">
           {/* Debt - spans 2 columns on mobile */}
           <div className="col-span-2 md:col-span-1">
-            {!hideLabels && <p className="text-xs text-slate-600 mb-1 font-bold">Debt</p>}
+            <p className="text-xs text-slate-600 mb-1 font-bold">Debt</p>
             <div className="flex items-center">
               <h3 className="text-2xl md:text-3xl font-bold  text-slate-200">{formatPrice(debtWithInterest)}</h3>
               <span className="ml-2 text-green-400">
@@ -82,7 +80,7 @@ export function OpenListingCard({ trove, hideLabels = false }: { trove: TroveSum
 
           {/* Backed by */}
           <div className="md:col-span-1">
-            {!hideLabels && <p className="text-xs text-slate-600 mb-1 font-bold">Backed by</p>}
+            <p className="text-xs text-slate-600 mb-1 font-bold">Backed by</p>
             <div className="flex items-center">
               <span className="flex items-center">
                 <p className="text-lg md:text-xl font-bold mr-1 text-slate-200">{trove.collateral.amount}</p>
@@ -98,36 +96,25 @@ export function OpenListingCard({ trove, hideLabels = false }: { trove: TroveSum
 
           {/* Collateral Ratio */}
           <div className="md:col-span-1">
-            {!hideLabels && (
-              <p className="text-xs text-slate-600 mb-1 font-bold">
-                <span className="lg:hidden">Ratio</span>
-                <span className="hidden lg:inline">Collateral Ratio</span>
-              </p>
-            )}
+            <p className="text-xs text-slate-600 mb-1 font-bold">
+              <span className="lg:hidden">Ratio</span>
+              <span className="hidden lg:inline">Collateral Ratio</span>
+            </p>
             <p className="text-lg md:text-xl font-semibold  text-slate-200">
-              {interestInfo && trove.collateral.valueUsd > 0
-                ? `${((trove.collateral.valueUsd / debtWithInterest) * 100).toFixed(1)}%`
-                : `${trove.metrics.collateralRatio}%`}
+              {trove.metrics.collateralRatio.toFixed(1)}%
             </p>
           </div>
 
           {/* Interest Rate */}
           <div className="md:col-span-1">
-            {!hideLabels && (
-              <div className="flex items-center gap-1 mb-1">
-                {trove.batch.isMember && (
-                  <span className="inline-flex items-center text-xs font-semibold px-1 py-0.5 bg-pink-900/50 md:bg-fuchsia-900 text-pink-400 md:text-fuchsia-400 rounded-xs">
-                    <Users className="w-3 h-3" aria-hidden="true" />
-                  </span>
-                )}
-                <p className="text-xs text-slate-600 font-bold">Interest Rate</p>
-              </div>
-            )}
-            {hideLabels && trove.batch.isMember && (
-              <span className="inline-flex items-center text-xs font-semibold px-1 py-0.5 bg-pink-900/50 md:bg-fuchsia-900 text-pink-400 md:text-fuchsia-400 rounded-xs mb-1">
-                <Users className="w-3 h-3" aria-hidden="true" />
-              </span>
-            )}
+            <div className="flex items-center gap-1 mb-1">
+              {trove.batch.isMember && (
+                <span className="inline-flex items-center text-xs font-semibold px-1 py-0.5 bg-pink-900/50 md:bg-fuchsia-900 text-pink-400 md:text-fuchsia-400 rounded-xs">
+                  <Users className="w-3 h-3" aria-hidden="true" />
+                </span>
+              )}
+              <p className="text-xs text-slate-600 font-bold">Interest Rate</p>
+            </div>
             <div className="text-lg md:text-xl font-bold text-slate-200">{trove.metrics.interestRate}%</div>
           </div>
         </div>
@@ -136,7 +123,7 @@ export function OpenListingCard({ trove, hideLabels = false }: { trove: TroveSum
         <div className="flex items-center justify-between">
           <CardFooter
             trove={trove}
-            dateText={`Latest activity ${formatDuration(trove.activity.lastActivityAt, new Date())} ago`}
+            dateText={`${formatDuration(trove.activity.lastActivityAt, new Date())} ago`}
             showDetailedInfo={false}
           />
           <div className="flex items-center bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
