@@ -41,10 +41,9 @@ export default function TrovesPage() {
     const ownerEns = searchParams.get("ownerEns");
     if (ownerAddress) {
       filters.ownerAddress = ownerAddress;
-      filters.owner = ownerAddress;
-    } else if (ownerEns) {
+    }
+    if (ownerEns) {
       filters.ownerEns = ownerEns;
-      filters.owner = ownerEns;
     }
 
     const activeWithin = searchParams.get("activeWithin");

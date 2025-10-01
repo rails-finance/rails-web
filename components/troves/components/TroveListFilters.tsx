@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown, Search, X, Filter } from "lucide-react";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 
 export interface TroveListFilterParams {
   troveId?: string;
@@ -9,7 +10,6 @@ export interface TroveListFilterParams {
   collateralType?: string;
   ownerAddress?: string;
   ownerEns?: string;
-  owner?: string; // Combined field for UI input
   activeWithin?: string;
   createdWithin?: string;
   batchOnly?: boolean;
@@ -36,16 +36,37 @@ export function TroveListFilters({
   onSortChange,
   availableCollateralTypes = ["WETH", "wstETH", "rETH"],
 }: TroveListFiltersProps) {
-  const [searchInput, setSearchInput] = useState<string>(filters.owner || "");
+  // Initialize with actual filter value that's set (troveId, address, or ENS)
+  const initialSearchValue = filters.troveId || filters.ownerAddress || filters.ownerEns || "";
+  const [searchInput, setSearchInput] = useState<string>(initialSearchValue);
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Debounce search input to reduce API calls
+  const debouncedSearchInput = useDebounce(searchInput, 500);
+
   // Keep search input in sync with filters from props
   useEffect(() => {
-    setSearchInput(filters.owner || "");
-  }, [filters.owner]);
+    // Sync with the actual filter value that was set
+    const filterValue = filters.troveId || filters.ownerAddress || filters.ownerEns || "";
+    setSearchInput(filterValue);
+  }, [filters.troveId, filters.ownerAddress, filters.ownerEns]);
+
+  // Trigger search when debounced value changes
+  useEffect(() => {
+    // If empty, clear immediately (no debounce delay)
+    if (!debouncedSearchInput.trim()) {
+      if (filters.troveId || filters.ownerAddress || filters.ownerEns) {
+        handleClearSearch();
+      }
+      return;
+    }
+
+    // Trigger search with debounced value
+    handleSearchSubmit();
+  }, [debouncedSearchInput]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -61,17 +82,18 @@ export function TroveListFilters({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
     const trimmedValue = searchInput.trim();
 
-    // Detect if it's an ENS name or Ethereum address
+    // Detect input type
+    const isTroveId = trimmedValue && /^\d+$/.test(trimmedValue);
     const isEns = trimmedValue && trimmedValue.toLowerCase().endsWith(".eth");
     const isAddress = trimmedValue && /^0x[a-fA-F0-9]{40}$/.test(trimmedValue);
 
     onFiltersChange({
       ...filters,
-      owner: trimmedValue || undefined,
+      troveId: isTroveId ? trimmedValue : undefined,
       ownerAddress: isAddress ? trimmedValue : undefined,
       ownerEns: isEns ? trimmedValue : undefined,
     });
@@ -81,7 +103,7 @@ export function TroveListFilters({
     setSearchInput("");
     onFiltersChange({
       ...filters,
-      owner: undefined,
+      troveId: undefined,
       ownerAddress: undefined,
       ownerEns: undefined,
     });
@@ -310,7 +332,7 @@ export function TroveListFilters({
         <form onSubmit={handleSearchSubmit} className="relative w-full md:flex-1">
           <input
             type="text"
-            placeholder="Address, ENS, ID, or delegate..."
+            placeholder="Owner addr, ENS, or Trove ID..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="w-full px-4 py-2 pr-10 bg-slate-800 h-10 border border-slate-700 rounded-lg text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
