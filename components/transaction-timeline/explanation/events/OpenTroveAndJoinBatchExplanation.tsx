@@ -7,6 +7,7 @@ import { formatCurrency, formatUsdValue } from '@/lib/utils/format';
 import { getUpfrontFee } from '../shared/eventHelpers';
 import { getTroveNftUrl } from '@/lib/utils/nft-utils';
 import { FAQ_URLS } from '../shared/faqUrls';
+import { ExternalLinkIcon } from '@/components/ExternalLinkIcon';
 
 interface OpenTroveAndJoinBatchExplanationProps {
   transaction: Transaction;
@@ -103,26 +104,15 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
     batchItems.push(
       <span key="nftMint" className="text-slate-500">
         Trove is represented by an ERC-721 NFT token
-        <a
-          href={nftUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors"
-          aria-label="View NFT on OpenSea"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-link2 lucide-link-2 w-3 h-3 text-slate-500" aria-hidden="true">
-            <path d="M9 17H7A5 5 0 0 1 7 7h2"></path>
-            <path d="M15 7h2a5 5 0 1 1 0 10h-2"></path>
-            <line x1="8" x2="16" y1="12" y2="12"></line>
-          </svg>
-        </a>
- representing ownership        <InfoButton href={FAQ_URLS.NFT_TROVES} />
+        <ExternalLinkIcon href={nftUrl} label="View NFT on OpenSea" />
+        {' '}representing ownership
+        <InfoButton href={FAQ_URLS.NFT_TROVES} />
       </span>
     );
   }
 
   batchItems.push(
-    <span key="success" className="text-slate-300">
+    <span key="success" className="text-slate-500">
       Trove opened with batch management
     </span>
   );
