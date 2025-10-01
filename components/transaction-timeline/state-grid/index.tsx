@@ -11,12 +11,24 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
   // Get upfront fee if available (only for trove transactions)
   const upfrontFee = isTroveTransaction(tx) ? tx.troveOperation.debtIncreaseFromUpfrontFee : undefined;
 
+  // For closeTrove, stateBefore values are 0, so we need to calculate from troveOperation
+  let beforeDebt = stateBefore.debt;
+  let beforeColl = stateBefore.coll;
+  let beforeCollInUsd = stateBefore.collateralInUsd;
+
+  if (isCloseTrove && isTroveTransaction(tx)) {
+    beforeDebt = Math.abs(tx.troveOperation.debtChangeFromOperation);
+    beforeColl = Math.abs(tx.troveOperation.collChangeFromOperation);
+    // Keep beforeCollInUsd from stateBefore if available
+    beforeCollInUsd = stateBefore.collateralInUsd;
+  }
+
   return (
     <div className="space-y-4 mb-8">
       <div className="grid md:grid-cols-2 xl:grid-cols-2 gap-6">
         <DebtMetric
           assetType={assetType}
-          before={stateBefore.debt}
+          before={beforeDebt}
           after={stateAfter.debt}
           isCloseTrove={isCloseTrove}
           upfrontFee={upfrontFee}
@@ -24,7 +36,7 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
 
         <CollateralMetric
           collateralType={collateralType}
-          before={stateBefore.coll}
+          before={beforeColl}
           after={stateAfter.coll}
           afterInUsd={stateAfter.collateralInUsd}
           isCloseTrove={isCloseTrove}
