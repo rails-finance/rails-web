@@ -20,13 +20,13 @@ export function AssetAction({ action, asset, amount, alwaysShowAmount = false, v
   
   return (
     <div className="flex items-center space-x-1">
-      <span className="text-slate-400 mr-1">{action}</span>
+      <span className="font-bold text-slate-400 mr-1">{action}</span>
       {amount && (
         <span
           className={`font-medium ${alwaysShowAmount ? '' : 'sm:hidden'} ${
-            hoverEnabled && valueType ? 'cursor-pointer transition-all' : ''
+            hoverEnabled && valueType ? 'cursor-pointer' : ''
           } ${
-            isHighlighted ? '-mx-1 px-1 -my-0.5 py-0.5 bg-blue-900 rounded' : ''
+            isHighlighted ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse' : ''
           }`}
           onMouseEnter={hoverEnabled && valueType ? () => setHoveredValue({ type: valueType, state: 'change', value: amount }) : undefined}
           onMouseLeave={hoverEnabled && valueType ? () => setHoveredValue(null) : undefined}

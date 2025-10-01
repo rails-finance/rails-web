@@ -36,7 +36,7 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
 
 
   return (
-    <div className={`rounded-b-lg shadow-inner py-1 ${shouldShowOpen ? 'bg-slate-50 dark:bg-slate-950 w-full border-t border-slate-200 dark:border-transparent' : 'bg-slate-50 dark:bg-slate-950 shadow-inner w-fit border-t border-slate-200 dark:border-transparent'}`}>
+    <div className={`rounded-b-lg py-1 ${shouldShowOpen ? 'bg-slate-200 dark:bg-slate-950 w-full' : 'bg-slate-50 dark:bg-slate-950 w-fit'}`}>
       {!shouldShowOpen ? (
         <button
           onClick={handleToggle}
@@ -75,7 +75,7 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
         </div>
           {transactionHash && (
             <div className="">
-              <div className="pt-2 flex justify-between items-center">
+              <div className="pt-2 px-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1 text-xs text-slate-700 dark:text-slate-600">
                     <span>View on</span>
