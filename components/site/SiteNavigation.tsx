@@ -51,14 +51,13 @@ export function SiteNavigation() {
               </div>
               <div>
                 <h1 className="p-2 text-2xl/6 sm:text-3xl/8 font-extrabold tracking-tight">
-                	<span className="text-green-600 dark:text-green-400 font-extrabold">Rails</span>
+                	<span className="text-green-600 font-extrabold">Rails</span>
                 	<br /><span className="text-slate-600 dark:text-slate-300 font-extrabold">DeFi Self-Service Support</span></h1>
                               </div>
             </Link>
 
             {/* Theme Toggle and Menu Toggle Button */}
             <div className="flex items-center gap-2">
-              <ThemeToggle />
               <div className="relative">
               <button
                 onClick={isMobile ? toggleMenu : undefined}

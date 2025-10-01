@@ -123,7 +123,7 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
           <div className="text-sm mb-1">Liquidated Amount</div>
           <div className="flex items-center">
             <h3 className="text-3xl font-bold text-white">
-              <HighlightableValue type="debt" state="after" value={trove.debt.peak}>
+              <HighlightableValue type="debt" state="after" value={trove.debt.peak} variant="card">
                 {formatPrice(trove.debt.peak)}
               </HighlightableValue>
             </h3>
@@ -139,7 +139,7 @@ function LiquidatedTroveCardContent({ trove, showViewButton = false }: Liquidate
           <div className="flex items-center">
             <div className="flex items-center">
               <p className="text-xl font-medium text-white mr-1">
-                <HighlightableValue type="collateral" state="after" value={trove.collateral.peakAmount}>
+                <HighlightableValue type="collateral" state="after" value={trove.collateral.peakAmount} variant="card">
                   {formatPrice(trove.collateral.peakAmount)}
                 </HighlightableValue>
               </p>

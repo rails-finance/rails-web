@@ -109,28 +109,28 @@ export function UnifiedFiltersDropdown({
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex cursor-pointer items-center gap-2 px-4 h-10 py-2 bg-slate-900 hover:bg-slate-700 rounded-lg text-white font-medium transition-colors"
+        className="flex cursor-pointer items-center gap-2 px-4 h-10 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-900 dark:hover:bg-slate-700 rounded-lg text-slate-900 dark:text-white font-medium transition-colors"
       >
-        <Filter className="w-4 h-4 text-slate-400" />
+        <Filter className="w-4 h-4 text-slate-500 dark:text-slate-400" />
         {activeFilterCount > 0 && (
-          <span className="px-2 py-0.5 bg-slate-600 rounded-full text-xs text-slate-200">{activeFilterCount}</span>
+          <span className="px-2 py-0.5 bg-gray-300 dark:bg-slate-600 rounded-full text-xs text-gray-700 dark:text-slate-200">{activeFilterCount}</span>
         )}
-        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-slate-500 dark:text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 min-w-[280px] max-h-[400px] overflow-y-auto">
+        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl z-50 min-w-[280px] max-h-[400px] overflow-y-auto">
           {/* Status Toggle */}
           {showStatusToggle && (
-            <div className="p-3 border-b border-slate-700">
-              <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">Status</div>
-              <div className="flex bg-slate-900 rounded-lg p-1">
+            <div className="p-3 border-b border-gray-200 dark:border-slate-700">
+              <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Status</div>
+              <div className="flex bg-gray-50 dark:bg-slate-900 rounded-lg p-1">
                 <button
                   onClick={() => onFiltersChange({ ...filters, status: 'all', healthFilter: undefined })}
                   className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                     filters.status === 'all' || !filters.status
-                      ? 'bg-blue-900 text-blue-400 font-semibold'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-400 font-semibold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   All
@@ -139,8 +139,8 @@ export function UnifiedFiltersDropdown({
                   onClick={() => onFiltersChange({ ...filters, status: 'active' })}
                   className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                     filters.status === 'active'
-                      ? 'bg-green-900 text-green-400 font-semibold'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-400 font-semibold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   Active
@@ -149,8 +149,8 @@ export function UnifiedFiltersDropdown({
                   onClick={() => onFiltersChange({ ...filters, status: 'closed', healthFilter: undefined })}
                   className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                     filters.status === 'closed'
-                      ? 'bg-slate-700 text-white font-semibold'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-white font-semibold'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   Closed
@@ -161,9 +161,9 @@ export function UnifiedFiltersDropdown({
 
           {/* Collateral Types */}
           {showCollateralFilter && availableCollateralTypes.length > 0 && (
-            <div className="p-3 border-b border-slate-700">
+            <div className="p-3 border-b border-gray-200 dark:border-slate-700">
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs text-slate-400 uppercase tracking-wider">Collateral</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">Collateral</div>
                 <button
                   onClick={() => {
                     const allSelected = filters.collateralTypes?.length === availableCollateralTypes.length ||
@@ -173,7 +173,7 @@ export function UnifiedFiltersDropdown({
                       collateralTypes: allSelected ? [] : availableCollateralTypes
                     });
                   }}
-                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                  className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
                 >
                   {filters.collateralTypes?.length === availableCollateralTypes.length ? 'Clear All' :
                    !filters.collateralTypes || filters.collateralTypes.length === 0 ? 'Select All' :
@@ -187,16 +187,16 @@ export function UnifiedFiltersDropdown({
                     <button
                       key={type}
                       onClick={() => toggleCollateralType(type)}
-                      className="flex items-center gap-3 w-full text-left px-2 py-1.5 hover:bg-slate-700 rounded transition-colors"
+                      className="flex items-center gap-3 w-full text-left px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
                     >
                       <div className={`w-4 h-4 border rounded flex items-center justify-center transition-all ${
                         isSelected
                           ? 'border-blue-500 bg-blue-500'
-                          : 'border-slate-500'
+                          : 'border-gray-300 dark:border-slate-500'
                       }`}>
                         {isSelected && <Check className="w-3 h-3 text-white" />}
                       </div>
-                      <span className="text-white">{type}</span>
+                      <span className="text-slate-900 dark:text-white">{type}</span>
                     </button>
                   );
                 })}
@@ -206,17 +206,17 @@ export function UnifiedFiltersDropdown({
 
           {/* Advanced Filters */}
           {showAdvancedFilters && (
-            <div className="p-3 border-b border-slate-700 space-y-3">
+            <div className="p-3 border-b border-gray-200 dark:border-slate-700 space-y-3">
               {/* Redemptions Filter */}
               <div>
-                <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">Redemptions</div>
-                <div className="flex bg-slate-900 rounded-lg p-1">
+                <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Redemptions</div>
+                <div className="flex bg-gray-50 dark:bg-slate-900 rounded-lg p-1">
                   <button
                     onClick={() => onFiltersChange({ ...filters, redemptionFilter: 'all' })}
                     className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                       filters.redemptionFilter === 'all' || !filters.redemptionFilter
-                        ? 'bg-blue-900 text-blue-400 font-semibold'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-400 font-semibold'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     All
@@ -225,8 +225,8 @@ export function UnifiedFiltersDropdown({
                     onClick={() => onFiltersChange({ ...filters, redemptionFilter: 'with' })}
                     className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                       filters.redemptionFilter === 'with'
-                        ? 'bg-orange-900 text-orange-400 font-semibold'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-400 font-semibold'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     With
@@ -235,8 +235,8 @@ export function UnifiedFiltersDropdown({
                     onClick={() => onFiltersChange({ ...filters, redemptionFilter: 'without' })}
                     className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                       filters.redemptionFilter === 'without'
-                        ? 'bg-slate-700 text-white font-semibold'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-white font-semibold'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     Without
@@ -246,14 +246,14 @@ export function UnifiedFiltersDropdown({
 
               {/* Interest Rate Management Filter */}
               <div>
-                <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">Interest Rate Management</div>
-                <div className="flex bg-slate-900 rounded-lg p-1">
+                <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Interest Rate Management</div>
+                <div className="flex bg-gray-50 dark:bg-slate-900 rounded-lg p-1">
                   <button
                     onClick={() => onFiltersChange({ ...filters, typeFilter: 'all' })}
                     className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                       filters.typeFilter === 'all' || !filters.typeFilter
-                        ? 'bg-blue-900 text-blue-400 font-semibold'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-400 font-semibold'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     All
@@ -262,8 +262,8 @@ export function UnifiedFiltersDropdown({
                     onClick={() => onFiltersChange({ ...filters, typeFilter: 'batch' })}
                     className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                       filters.typeFilter === 'batch'
-                        ? 'bg-purple-900 text-purple-400 font-semibold'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-400 font-semibold'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     Delegated
@@ -272,8 +272,8 @@ export function UnifiedFiltersDropdown({
                     onClick={() => onFiltersChange({ ...filters, typeFilter: 'individual' })}
                     className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                       filters.typeFilter === 'individual'
-                        ? 'bg-slate-700 text-white font-semibold'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-white font-semibold'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     Individual
@@ -284,14 +284,14 @@ export function UnifiedFiltersDropdown({
               {/* Health Filter - only show for active status */}
               {filters.status === 'active' && (
                 <div>
-                  <div className="text-xs text-slate-400 uppercase tracking-wider mb-2">Health</div>
-                  <div className="flex bg-slate-900 rounded-lg p-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Health</div>
+                  <div className="flex bg-gray-50 dark:bg-slate-900 rounded-lg p-1">
                     <button
                       onClick={() => onFiltersChange({ ...filters, healthFilter: 'all' })}
                       className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                         filters.healthFilter === 'all' || !filters.healthFilter
-                          ? 'bg-blue-900 text-blue-400 font-semibold'
-                          : 'text-slate-400 hover:text-white'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-400 font-semibold'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       All
@@ -300,8 +300,8 @@ export function UnifiedFiltersDropdown({
                       onClick={() => onFiltersChange({ ...filters, healthFilter: 'zombies' })}
                       className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                         filters.healthFilter === 'zombies'
-                          ? 'bg-red-900 text-red-400 font-semibold'
-                          : 'text-slate-400 hover:text-white'
+                          ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-400 font-semibold'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       Zombies
@@ -310,8 +310,8 @@ export function UnifiedFiltersDropdown({
                       onClick={() => onFiltersChange({ ...filters, healthFilter: 'healthy' })}
                       className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                         filters.healthFilter === 'healthy'
-                          ? 'bg-green-900 text-green-400 font-semibold'
-                          : 'text-slate-400 hover:text-white'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-400 font-semibold'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       Healthy
@@ -327,7 +327,7 @@ export function UnifiedFiltersDropdown({
             <div className="p-3">
               <button
                 onClick={resetFilters}
-                className="cursor-pointer w-full px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-sm text-white transition-colors"
+                className="cursor-pointer w-full px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 rounded text-sm text-gray-700 dark:text-white transition-colors"
               >
                 Reset Filters
               </button>

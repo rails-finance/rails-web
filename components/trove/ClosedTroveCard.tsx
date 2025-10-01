@@ -41,10 +41,11 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
 
     // Trove lifecycle
     const duration = formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt);
+    const durationInSeconds = (new Date(trove.activity.lastActivityAt).getTime() - new Date(trove.activity.createdAt).getTime()) / 1000;
 
     items.push(
       <span key="lifecycle" className="text-slate-600 dark:text-slate-500">
-        Trove was active for <strong className="text-white">{duration}</strong> from {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
+        Trove was active for <HighlightableValue type="duration" state="after" value={durationInSeconds}>{duration}</HighlightableValue> from <HighlightableValue type="dateRange" state="after" value={`${trove.activity.createdAt}-${trove.activity.lastActivityAt}`}>{formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}</HighlightableValue>
       </span>
     );
 
@@ -90,17 +91,21 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
         <div className="flex items-center justify-between p-4 pb-0">
           <div className="flex items-center">
             {/* Status */}
-            <span className="font-semibold px-2 py-0.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-400 rounded-xs text-xs">CLOSED</span>
+            <span className="font-bold px-2 py-0.5 bg-slate-500 dark:bg-slate-800 text-white dark:text-slate-400 rounded text-xs">CLOSED</span>
           </div>
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs">
             {!showViewButton && (
               <span className="text-slate-600 dark:text-slate-400">
-                {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
+                <HighlightableValue type="dateRange" state="after" value={`${trove.activity.createdAt}-${trove.activity.lastActivityAt}`} variant="card">
+                  {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
+                </HighlightableValue>
               </span>
             )}
             <span className="text-slate-600 dark:text-slate-400">
-              {formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt)}
+              <HighlightableValue type="duration" state="after" value={(new Date(trove.activity.lastActivityAt).getTime() - new Date(trove.activity.createdAt).getTime()) / 1000} variant="card">
+                {formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt)}
+              </HighlightableValue>
             </span>
             {trove.activity.redemptionCount > 0 && (
               <span className="inline-flex items-center text-orange-400">
@@ -120,17 +125,17 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
 
       {/* Main value */}
       <div>
-        <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Debt</p>
+        <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Debt at peak</span>
         <div className="flex items-center">
-          <h3 className="text-3xl font-bold">
-            <HighlightableValue type="peakDebt" state="after" value={trove.debt.peak}>
+          <span className="text-3xl font-bold">
+            <HighlightableValue type="peakDebt" state="after" value={trove.debt.peak} variant="card">
               {formatPrice(trove.debt.peak)}
             </HighlightableValue>
-          </h3>
+          </span>
           <span className="ml-2 text-green-400 text-lg">
             <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
           </span>
-          <span className="ml-2 text-slate-600 dark:text-slate-400 text-sm">at peak</span>
+          <span className="ml-2 text-slate-600 dark:text-slate-400 text-sm"></span>
         </div>
       </div>
 

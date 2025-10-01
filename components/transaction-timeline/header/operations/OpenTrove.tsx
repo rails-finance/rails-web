@@ -15,8 +15,8 @@ export function OpenTroveHeader({ tx }: { tx: TroveTransaction }) {
         <AssetAction action="Supply" asset={tx.collateralType} amount={collChangeFromOperation} valueType="collateral" />
         <AssetAction action="Borrow" asset={tx.assetType} amount={debtChangeFromOperation} valueType="debt" />
         <div className="flex items-center space-x-1">
-      		<span className="text-slate-400 mr-1">Mint</span>
-		      <Image size={16} className="text-slate-300" />
+      		<span className="font-bold text-slate-400 mr-1">Mint</span>
+		      <Image size={16} className="text-slate-400" />
 		    </div>
       </div>
     </>

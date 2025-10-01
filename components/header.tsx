@@ -40,7 +40,7 @@ export function Header() {
     <>
       {/* Header */}
       <header className="pt-0 pb-2 relative mb-4 z-40">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 relative flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 relative flex justify-between">
             {/* Left side - Rails Logo and Liquity V2 Branding */}
             <div className="flex items-start gap-3">
               <Link href="/" className="">
@@ -62,7 +62,6 @@ export function Header() {
 
             {/* Theme Toggle and Menu Toggle Button */}
             <div className="flex items-center gap-2">
-              <ThemeToggle />
               <div className="relative">
               <button
                 onClick={isMobile ? toggleMenu : undefined}

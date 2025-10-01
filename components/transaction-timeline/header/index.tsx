@@ -26,7 +26,7 @@ export function TransactionItemHeader({ tx, isExpanded, onClick }: TransactionIt
           <div className="flex items-center flex-wrap gap-2">
             {tx.blockGrouping.isGrouped && (
               <div className="flex items-center px-2 py-0.5 bg-blue-800/50 rounded-md">
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-white dark:text-slate-400">
                   {tx.blockGrouping.sameBlockIndex} of {tx.blockGrouping.sameBlockCount}
                 </span>
               </div>

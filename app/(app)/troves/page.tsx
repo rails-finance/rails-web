@@ -6,10 +6,10 @@ import { SimplifiedTroveCard } from "@/components/trove/SimplifiedTroveCard";
 import { TroveFilterParams } from "@/components/trove/TroveFilters";
 import { UnifiedFiltersDropdown, UnifiedFilters } from "@/components/filters/UnifiedFilters";
 import { TroveSummary } from "@/types/api/trove";
-import { CollateralBreakdown } from "@/components/stats/CollateralBreakdown";
 import { CollateralStats } from "@/types/api/stats";
 import { ChevronDown, ChevronLeft, ChevronRight, Search, X, Check } from "lucide-react";
 import batchManagerService from '@/lib/services/batch-manager-service';
+import { FeedbackButton } from "@/components/FeedbackButton";
 
 export default function TrovesPage() {
   const searchParams = useSearchParams();
@@ -549,7 +549,7 @@ export default function TrovesPage() {
           <button
             onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage === 1}
-            className="cursor-pointer p-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="cursor-pointer p-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -558,7 +558,7 @@ export default function TrovesPage() {
             <>
               <button
                 onClick={() => goToPage(1)}
-                className="cursor-pointer px-3 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
+                className="cursor-pointer px-3 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
               >
                 1
               </button>
@@ -573,7 +573,7 @@ export default function TrovesPage() {
               className={`cursor-pointer px-3 py-1 rounded-lg transition-colors ${
                 num === currentPage
                   ? 'bg-slate-500 dark:bg-slate-600 text-white'
-                  : 'bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700'
+                  : 'bg-slate-200 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700'
               }`}
             >
               {num}
@@ -585,7 +585,7 @@ export default function TrovesPage() {
               {end < totalPages - 1 && <span className="text-slate-600 dark:text-slate-400">...</span>}
               <button
                 onClick={() => goToPage(totalPages)}
-                className="cursor-pointer px-3 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
+                className="cursor-pointer px-3 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
               >
                 {totalPages}
               </button>
@@ -595,7 +595,7 @@ export default function TrovesPage() {
           <button
             onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage === totalPages}
-            className="cursor-pointer p-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="cursor-pointer p-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -608,29 +608,29 @@ export default function TrovesPage() {
     return (
       <main className="min-h-screen">
         <div className="max-w-7xl mx-auto py-8">
-          <h1 className="text-2xl font-bold text-white mb-6">Liquity V2 Troves</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Liquity V2 Troves</h1>
           <div className="animate-pulse flex space-x-3">
-            <div className="h-10 bg-slate-700 rounded w-1/3 mb-3"></div>
-            <div className="h-10 bg-slate-700 rounded w-1/3 mb-3"></div>
-            <div className="h-10 bg-slate-700 rounded w-1/3 mb-3"></div>
+            <div className="h-10 bg-slate-100 dark:bg-slate-700 rounded w-1/3 mb-3"></div>
+            <div className="h-10 bg-slate-100 dark:bg-slate-700 rounded w-1/3 mb-3"></div>
+            <div className="h-10 bg-slate-100 dark:bg-slate-700 rounded w-1/3 mb-3"></div>
           </div>
           <div className="animate-pulse  flex sm:hidden space-x-3">
-            <div className="h-10 bg-slate-700 rounded w-full mb-3"></div>
+            <div className="h-10 bg-slate-100 dark:bg-slate-700 rounded w-full mb-3"></div>
           </div>
           <div className="animate-pulse  flex sm:hidden space-x-3">
-            <div className="h-10 bg-slate-700 rounded w-full mb-3"></div>
+            <div className="h-10 bg-slate-100 dark:bg-slate-700 rounded w-full mb-3"></div>
           </div>
           <div className="animate-pulse flex space-x-3">
-            <div className="h-40 bg-slate-700 rounded-lg w-full mt-3 mb-6"></div>
+            <div className="h-40 bg-slate-100 dark:bg-slate-700 rounded-lg w-full mt-3 mb-6"></div>
           </div>
           <div className="animate-pulse flex space-x-3">
-            <div className="h-40 bg-slate-700/75 rounded-lg w-full mb-6"></div>
+            <div className="h-40 bg-slate-100/75 dark:bg-slate-700/75 rounded-lg w-full mb-6"></div>
           </div>
           <div className="animate-pulse flex space-x-3">
-            <div className="h-40 bg-slate-700/50 rounded-lg w-full mb-6"></div>
+            <div className="h-40 bg-slate-100/50 dark:bg-slate-700/50 rounded-lg w-full mb-6"></div>
           </div>
           <div className="animate-pulse flex space-x-3">
-            <div className="h-40 bg-slate-700/25 rounded-lg w-full mb-6"></div>
+            <div className="h-40 bg-slate-100/25 dark:bg-slate-700/25 rounded-lg w-full mb-6"></div>
           </div>
         </div>
       </main>
@@ -665,19 +665,12 @@ export default function TrovesPage() {
 
   return (
     <main className="min-h-screen">
+      <FeedbackButton />
       <div className="max-w-7xl mx-auto py-8">
 
         {/* Page Header */}
-        <h1 className="text-2xl font-bold text-white mb-6">Liquity V2 Troves</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Liquity V2 Troves</h1>
 
-        {/* Stats */}
-        {filters.collateralTypes?.length === 1 && collateralStats && (
-          <CollateralBreakdown
-            stats={collateralStats}
-            totalTVL={totalTVL}
-            selectedCollateral={filters.collateralTypes[0]}
-          />
-        )}
 
         {/* Filters and Sort - Responsive layout */}
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
@@ -741,7 +734,7 @@ export default function TrovesPage() {
                       <svg className="w-5 h-5 -ml-2.5">
                         <use href={`#icon-bold`} />
                       </svg>
-                      <span className="text-white font-semibold text-sm md:text-base">{type}</span>
+                      <span className="text-slate-500 dark:text-white font-semibold text-sm md:text-base">{type}</span>
                     </button>
                   );
                 })}

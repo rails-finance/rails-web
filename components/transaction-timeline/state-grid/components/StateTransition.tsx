@@ -5,7 +5,7 @@ export function StateTransition({ children }: { children: React.ReactNode }) {
 export function TransitionArrow() {
   return (
     <svg
-      className="w-4 h-4 text-slate-600"
+      className="w-4 h-4 text-slate-300 dark:text-slate-600"
       fill="currentColor"
       viewBox="0 0 20 20"
     >

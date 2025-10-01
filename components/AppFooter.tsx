@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function AppFooter() {
   return (
-    <footer className="w-full bg-gradient-to-b from-slate-100 dark:from-slate-900 to-transparent border-t border-slate-200 dark:border-slate-700 mt-16 transition-colors">
+    <footer className="w-full bg-gradient-to-b from-slate-100 dark:from-slate-900 to-transparent mt-16 transition-colors">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* App Links */}

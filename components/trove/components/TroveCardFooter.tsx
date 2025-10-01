@@ -38,7 +38,7 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, sho
               <span className="bg-slate-100 dark:bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
                 <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                   <Icon name="user" size={12} />
-                  <HighlightableValue type="ownerAddress" state="after" className="text-slate-600 dark:text-slate-400">
+                  <HighlightableValue type="ownerAddress" state="after" className="text-slate-600 dark:text-slate-400" variant="card">
                     {trove.ownerEns || `${trove.owner.substring(0, 6)}...${trove.owner.substring(38)}`}
                   </HighlightableValue>
                   <div className="relative inline-block group">
@@ -74,7 +74,7 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, sho
               <span className="bg-slate-100 dark:bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
                 <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                   <Icon name="trove-id" size={12} />
-                  <HighlightableValue type="troveId" state="after" className="text-slate-600 dark:text-slate-400" value={trove.id ? parseInt(trove.id) : undefined}>
+                  <HighlightableValue type="troveId" state="after" className="text-slate-600 dark:text-slate-400" value={trove.id ? parseInt(trove.id) : undefined} variant="card">
                     {trove.id ? `${trove.id.substring(0, 8)}...` : "n/a"}
                   </HighlightableValue>
                   <div className="relative inline-block group">
@@ -115,7 +115,7 @@ export function TroveCardFooter({ trove, showViewButton, dateText, dateInfo, sho
                   className="inline-flex items-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 justify-center ml-0.5 transition-colors"
                   aria-label="View NFT on OpenSea"
                 >
-                  <HighlightableValue type="nftToken" state="after" className="text-slate-600 dark:text-slate-400">
+                  <HighlightableValue type="nftToken" state="after" className="text-slate-600 dark:text-slate-400" variant="card">
                     <Image size={14} className="" />
                   </HighlightableValue>
                   <Link2 size={14} className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-200 dark:bg-slate-800 w-4 h-4 rounded-full transition-colors" />

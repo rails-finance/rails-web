@@ -150,5 +150,17 @@ export const IconSymbols = () => (
       <path d="M 16 18 L 19 18" stroke="currentColor" strokeWidth="2" fill="none"/>
       <path d="M 12 10 L 12 14" stroke="currentColor" strokeWidth="2" fill="none"/>
     </symbol>
+    <symbol id="icon-view-troves" viewBox="0 0 19 18">
+      <rect x="0" y="2"  width="5" height="3" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="2"/>
+      <rect x="6" y="2"  width="6" height="3" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="2"/>
+      <rect x="13" y="2"  width="5" height="3" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="2"/>
+      <rect x="0" y="7"  width="18"  height="3" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="2"/>
+      <rect x="0" y="12" width="18" height="3" style={{ strokeWidth: '1px', stroke: 'none', fill: 'currentColor' }} rx="2"/>
+    </symbol>
+    <symbol id="icon-external-link" viewBox="0 0 24 24">
+      <path d="M9 17H7A5 5 0 0 1 7 7h2" stroke="currentColor" strokeWidth="2" fill="none"/>
+      <path d="M15 7h2a5 5 0 1 1 0 10h-2" stroke="currentColor" strokeWidth="2" fill="none"/>
+      <line x1="8" x2="16" y1="12" y2="12" stroke="currentColor" strokeWidth="2"/>
+    </symbol>
   </svg>
 );

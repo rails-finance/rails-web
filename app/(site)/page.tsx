@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CollateralBreakdown } from "@/components/stats/CollateralBreakdown";
 import { ProtocolStats } from "@/types/api/stats";
+import { LiquityLogo } from "@/components/LiquityLogo";
+import { NetworkGraphic } from "@/components/NetworkGraphic";
 
 export default function Home() {
   const [searchValue, setSearchValue] = useState("");
@@ -175,18 +177,14 @@ export default function Home() {
                       {/* Mobile: Stacked, Desktop: Two columns */}
                       <div className="flex flex-col md:flex-row md:gap-8 md:items-center">
                         <div className="text-slate-600 dark:text-slate-400 font-medium text-sm leading-relaxed md:flex-1 flex items-center mb-6 md:mb-0">
-                          <img
-                            src="/network-graphic.svg"
-                            className="w-10 h-25 mx-4 flex-shrink-0"
-                            alt="Rails protocol map visual metaphor"
-                          />
+                          <NetworkGraphic className="w-10 h-25 mx-4 flex-shrink-0" />
                           <p>
                             <span className="font-extrabold text-slate-700 dark:text-slate-300">Liquity V2</span> is an immutable, governance-free lending protocol. Users can deposit ETH, wstETH, or rETH as collateral to mint BOLD stablecoins and set their own interest rates.
                           </p>
                         </div>
 
                         {/* Search Box - Mobile and Desktop */}
-                        <div className="md:flex-1 bg-white dark:bg-slate-900 rounded-lg p-4 transition-shadow hover:shadow-lg">
+                        <div className="md:flex-1 bg-white dark:bg-slate-900 rounded-lg p-4 transition-shadow hover:shadow-sm">
                           <p className="text-slate-600 dark:text-slate-400 font-medium mb-3">View your Liquity V2 Trove on Rails. Enter borrower address, ENS, or Trove ID below.</p>
                           <form onSubmit={handleSearch}>
                             <div className="relative">
@@ -237,7 +235,7 @@ export default function Home() {
               <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-8" style={{ width: '400px', height: '120px' }}>
                 <div className="flex items-center justify-center h-full">
                   <a href="https://liquity.org" target="_blank" rel="noopener noreferrer" className="h-full">
-                    <img src="/liquity-logo.svg" alt="Liquity" className="h-full w-auto" />
+                    <LiquityLogo />
                   </a>
                 </div>
               </div>

@@ -97,7 +97,7 @@ export function SiteFooter() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex flex-col md:flex-row items-center gap-4 mb-4 md:mb-0">
               <p className="text-slate-500 dark:text-slate-400 text-xs">
-                © {new Date().getFullYear()} Rails. Built with support from Liquity.
+                © {new Date().getFullYear()} Rails
               </p>
               <div className="flex gap-4">
                 <Link href="/privacy" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 text-xs transition-colors">
@@ -109,10 +109,10 @@ export function SiteFooter() {
               </div>
             </div>
             <div className="flex items-center">
-              <span className="text-slate-500 dark:text-slate-400 text-xs mr-2">Supported by</span>
-              <a href="https://liquity.org" target="_blank" rel="noopener noreferrer">
-                <img src="/liquity-logo.svg" alt="Liquity" className="h-6" />
-              </a>
+              <span className="text-slate-500 dark:text-slate-400 text-xs mr-2">Built with support from {' '}
+              <a href="https://liquity.org" target="_blank" rel="noopener noreferrer" className="hover:underline">
+                Liquity
+              </a></span>
             </div>
           </div>
         </div>

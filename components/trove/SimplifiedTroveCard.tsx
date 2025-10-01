@@ -52,12 +52,12 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
     <Link
       href={`/trove/${trove.collateralType}/${trove.id}`}
       onClick={handleClick}
-      className="block relative rounded-lg text-slate-600 dark:text-slate-500 bg-white dark:bg-slate-900 hover:shadow-lg transition-shadow cursor-pointer group border border-slate-200 dark:border-transparent"
+      className="block relative rounded-lg text-slate-600 dark:text-slate-500 bg-slate-50 dark:bg-slate-900 hover:shadow-sm transition-shadow cursor-pointer group"
     >
       {/* Header section */}
       <div className="flex items-center justify-between p-4 pb-0">
         <div className="flex items-center gap-2 text-xs">
-          <span className="font-semibold px-2 py-0.5 bg-green-900 text-green-400 rounded-xs">ACTIVE</span>
+          <span className="font-extrabold px-2 py-0.5 text-white bg-green-500 dark:bg-green-900 dark:text-green-400 rounded-xs text-xs">ACTIVE</span>
         </div>
         <div className="flex items-center gap-2 text-xs">
           {trove.activity.redemptionCount > 0 && (
@@ -79,11 +79,11 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 md:items-end">
           {/* Debt - spans 2 columns on mobile */}
           <div className="col-span-2 md:col-span-1">
-            {!hideLabels && <p className="text-xs text-slate-700 dark:text-slate-600 mb-1 font-bold">Debt</p>}
+            {!hideLabels && <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Debt</span>}
             <div className="flex items-center">
-              <h3 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-200">
+              <span className="text-xl font-bold text-slate-800 milodon dark:text-slate-300">
                 {formatPrice(debtWithInterest)}
-              </h3>
+              </span>
               <span className="ml-2 text-green-400">
                 <TokenIcon assetSymbol="BOLD" className="w-6 md:w-7 h-6 md:h-7 relative top-0" />
               </span>
@@ -92,12 +92,12 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
 
           {/* Backed by */}
           <div className="md:col-span-1">
-            {!hideLabels && <p className="text-xs text-slate-700 dark:text-slate-600 mb-1 font-bold">Backed by</p>}
+            {!hideLabels && <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Backed by</span>}
             <div className="flex items-center">
               <span className="flex items-center">
-                <p className="text-lg md:text-xl font-bold mr-1 text-slate-900 dark:text-slate-200">
+                <span className="text-xl font-bold text-slate-800 milodon dark:text-slate-300">
                   {trove.collateral.amount}
-                </p>
+                </span>
                 <TokenIcon assetSymbol={trove.collateralType} />
               </span>
               <div className="ml-1 flex items-center">
@@ -110,39 +110,40 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
 
           {/* Collateral Ratio */}
           <div className="md:col-span-1">
+              <div className="flex items-center gap-1">
             {!hideLabels && (
-              <p className="text-xs text-slate-700 dark:text-slate-600 mb-1 font-bold">
-                <span className="lg:hidden">Ratio</span>
-                <span className="hidden lg:inline">Collateral Ratio</span>
-              </p>
+              <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">
+                <span className="">Collateral Ratio</span>
+              </span>
             )}
-            <p className="text-lg md:text-xl font-semibold text-slate-900 dark:text-slate-200">
+          </div>
+            <span className="text-xl font-bold text-slate-800 milodon dark:text-slate-300">
               {interestInfo && trove.collateral.valueUsd > 0
                 ? `${((trove.collateral.valueUsd / debtWithInterest) * 100).toFixed(1)}%`
                 : `${trove.metrics.collateralRatio}%`}
-            </p>
+            </span>
           </div>
 
           {/* Interest Rate */}
           <div className="md:col-span-1">
             {!hideLabels && (
-              <div className="flex items-center gap-1 mb-1">
+              <div className="flex items-center gap-1">
                 {trove.batch.isMember && (
-                  <span className="inline-flex items-center text-xs font-semibold px-1 py-0.5 bg-pink-900/50 md:bg-fuchsia-900 text-pink-400 md:text-fuchsia-400 rounded-xs">
+                  <span className="inline-flex items-center text-xs font-semibold px-1 py-0.5 bg-pink-300 text-white dark:bg-pink-900/50 dark:text-pink-400 rounded-xs">
                     <Users className="w-3 h-3" aria-hidden="true" />
                   </span>
                 )}
-                <p className="text-xs text-slate-700 dark:text-slate-600 font-bold">Interest Rate</p>
+                <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Interest Rate</span>
               </div>
             )}
             {hideLabels && trove.batch.isMember && (
-              <span className="inline-flex items-center text-xs font-semibold px-1 py-0.5 bg-pink-900/50 md:bg-fuchsia-900 text-pink-400 md:text-fuchsia-400 rounded-xs mb-1">
+              <span className="inline-flex items-center text-xs font-semibold px-1 py-0.5 bg-pink-300 text-white dark:bg-pink-900/50 dark:text-pink-400 rounded-xs">
                 <Users className="w-3 h-3" aria-hidden="true" />
               </span>
             )}
-            <div className="text-lg md:text-xl font-bold text-slate-900 dark:text-slate-200">
+            <span className="text-xl font-bold text-slate-800 milodon dark:text-slate-300">
               {trove.metrics.interestRate}%
-            </div>
+            </span>
           </div>
         </div>
 
@@ -182,12 +183,12 @@ function SimplifiedClosedTroveCard({ trove, showViewButton = false, hideLabels =
     <Link
       href={`/trove/${trove.collateralType}/${trove.id}`}
       onClick={handleClick}
-      className="block relative rounded-lg text-slate-600 dark:text-slate-500 bg-gray-100 dark:bg-slate-700 hover:shadow-lg transition-shadow cursor-pointer group border border-slate-200 dark:border-transparent"
+      className="block relative rounded-lg text-slate-600 dark:text-slate-500 bg-gray-100 dark:bg-slate-700 hover:shadow-sm transition-shadow cursor-pointer group"
     >
       {/* Header section */}
       <div className="flex items-center justify-between p-4 pb-0">
         <div className="flex items-center gap-2 text-xs">
-          <span className="font-semibold px-2 py-0.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-400 rounded-xs">CLOSED</span>
+          <span className="font-bold px-2 py-0.5 bg-slate-500 dark:bg-slate-800 text-white dark:text-slate-400 rounded text-xs">CLOSED</span>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <span className="inline-flex items-center text-slate-600 dark:text-slate-400">
@@ -209,11 +210,11 @@ function SimplifiedClosedTroveCard({ trove, showViewButton = false, hideLabels =
         <div className="grid grid-cols-1 gap-4 md:gap-6 md:items-end">
           {/* Peak debt value */}
           <div>
-            {!hideLabels && <p className="text-xs text-slate-700 dark:text-slate-600 mb-1 font-bold">Peak Debt</p>}
+            {!hideLabels && <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Debt At Peak</span>}
             <div className="flex items-center">
-              <h3 className="text-2xl md:text-3xl font-bold text-slate-200">
+              <span className="text-xl font-bold text-slate-800 milodon dark:text-slate-300">
                 {formatPrice(trove.debt.peak)}
-              </h3>
+              </span>
               <span className="ml-2 text-green-400">
                 <TokenIcon assetSymbol="BOLD" className="w-6 md:w-7 h-6 md:h-7 relative top-0" />
               </span>
@@ -257,7 +258,7 @@ function SimplifiedLiquidatedTroveCard({ trove, showViewButton = false, collater
     <Link
       href={`/trove/${trove.collateralType}/${trove.id}`}
       onClick={handleClick}
-      className="block relative rounded-lg text-slate-600 dark:text-slate-500 bg-red-50 dark:bg-slate-800 hover:shadow-lg transition-shadow cursor-pointer group border border-red-200 dark:border-transparent"
+      className="block relative rounded-lg text-slate-600 dark:text-slate-500 bg-red-50 dark:bg-slate-800 hover:shadow-sm transition-shadow cursor-pointer group "
     >
       {/* Header section */}
       <div className="flex items-center justify-between p-4 pb-0">
@@ -284,11 +285,11 @@ function SimplifiedLiquidatedTroveCard({ trove, showViewButton = false, collater
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 md:items-end">
           {/* Liquidated debt value */}
           <div>
-            {!hideLabels && <p className="text-xs text-slate-700 dark:text-slate-600 mb-1 font-bold">Liquidated Debt</p>}
+            {!hideLabels && <span className="text-xs text-slate-700 dark:text-slate-600 mb-1 font-bold">Liquidated Debt</span>}
             <div className="flex items-center">
-              <h3 className="text-2xl md:text-3xl font-bold text-slate-200">
+              <span className="text-xl font-bold text-slate-800 milodon dark:text-slate-300">
                 {formatPrice(trove.debt.current)}
-              </h3>
+              </span>
               <span className="ml-2 text-green-400">
                 <TokenIcon assetSymbol="BOLD" className="w-6 md:w-7 h-6 md:h-7 relative top-0" />
               </span>
@@ -297,11 +298,11 @@ function SimplifiedLiquidatedTroveCard({ trove, showViewButton = false, collater
 
           {/* Collateral at liquidation */}
           <div>
-            {!hideLabels && <p className="text-xs text-slate-700 dark:text-slate-600 mb-1 font-bold">Collateral at Liquidation</p>}
+            {!hideLabels && <span className="text-xs text-slate-700 dark:text-slate-600 mb-1 font-bold">Collateral at Liquidation</span>}
             <div className="flex items-center">
-              <p className="text-lg md:text-xl font-bold mr-1">
+              <span className="text-lg md:text-xl font-bold mr-1">
                 {collateralAtLiquidation ? collateralAtLiquidation.toFixed(4) : '—'}
-              </p>
+              </span>
               {collateralAtLiquidation && (
                 <TokenIcon assetSymbol={trove.collateralType} />
               )}
@@ -310,7 +311,7 @@ function SimplifiedLiquidatedTroveCard({ trove, showViewButton = false, collater
 
           {/* Final interest rate */}
           <div>
-            {!hideLabels && <p className="text-xs text-slate-700 dark:text-slate-600 mb-1 font-bold">Final Interest Rate</p>}
+            {!hideLabels && <span className="text-xs text-slate-700 dark:text-slate-600 mb-1 font-bold">Final Interest Rate</span>}
             <div className="text-lg md:text-xl font-medium">
               {trove.metrics.interestRate}%
             </div>
