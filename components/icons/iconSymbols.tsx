@@ -184,19 +184,19 @@ export const IconSymbols = () => (
       <path
         d="M 12.146 5.668 L 12.155 12.159 C 12.155 12.159 7.9 14.856 7.913 14.869"
         stroke="currentColor"
-        strokewidth="2"
+        strokeWidth="2"
         fill="none"
       />
       <path
         d="M 12.337 21.994 C 4.643 22.253 -0.446 14.086 3.177 7.294 C 6.8 0.501 16.417 0.178 20.488 6.711 C 21.699 8.655 21.521 8.817 21.929 10.35"
         stroke="currentColor"
-        strokewidth="2"
+        strokeWidth="2"
         fill="none"
       />
       <path
         d="M 20.316 14.916 L 16.316 18.916 L 22.316 18.916 L 18.316 22.916"
         stroke="currentColor"
-        strokewidth="2"
+        strokeWidth="2"
         fill="none"
       />
     </symbol>
@@ -208,6 +208,53 @@ export const IconSymbols = () => (
       <path d="M 19 15 L 22 18 L 19 21" stroke="currentColor" strokeWidth="2" fill="none" />
       <path d="M 16 18 L 19 18" stroke="currentColor" strokeWidth="2" fill="none" />
       <path d="M 12 10 L 12 14" stroke="currentColor" strokeWidth="2" fill="none" />
+    </symbol>
+    <symbol id="icon-view-troves" viewBox="0 0 19 18">
+      <rect
+        x="0"
+        y="2"
+        width="5"
+        height="3"
+        style={{ strokeWidth: "1px", stroke: "none", fill: "currentColor" }}
+        rx="2"
+      />
+      <rect
+        x="6"
+        y="2"
+        width="6"
+        height="3"
+        style={{ strokeWidth: "1px", stroke: "none", fill: "currentColor" }}
+        rx="2"
+      />
+      <rect
+        x="13"
+        y="2"
+        width="5"
+        height="3"
+        style={{ strokeWidth: "1px", stroke: "none", fill: "currentColor" }}
+        rx="2"
+      />
+      <rect
+        x="0"
+        y="7"
+        width="18"
+        height="3"
+        style={{ strokeWidth: "1px", stroke: "none", fill: "currentColor" }}
+        rx="2"
+      />
+      <rect
+        x="0"
+        y="12"
+        width="18"
+        height="3"
+        style={{ strokeWidth: "1px", stroke: "none", fill: "currentColor" }}
+        rx="2"
+      />
+    </symbol>
+    <symbol id="icon-external-link" viewBox="0 0 24 24">
+      <path d="M9 17H7A5 5 0 0 1 7 7h2" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path d="M15 7h2a5 5 0 1 1 0 10h-2" stroke="currentColor" strokeWidth="2" fill="none" />
+      <line x1="8" x2="16" y1="12" y2="12" stroke="currentColor" strokeWidth="2" />
     </symbol>
   </svg>
 );

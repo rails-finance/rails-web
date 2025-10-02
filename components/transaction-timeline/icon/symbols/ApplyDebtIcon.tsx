@@ -15,7 +15,7 @@ export function ApplyDebtIcon({ x = 210, y = 10, r = 190 }: ApplyDebtIconProps) 
           cx="37.336"
           cy="37.336"
           r="8.336"
-          style={{ fillRule: "evenodd", fill: "none", strokeWidth: "3.73687px", stroke: "rgb(255, 255, 255)" }}
+          style={{ fillRule: "evenodd", fill: "none", strokeWidth: "3.73687px", stroke: "currentColor" }}
         ></circle>
         <line
           x1="30"
@@ -24,18 +24,18 @@ export function ApplyDebtIcon({ x = 210, y = 10, r = 190 }: ApplyDebtIconProps) 
           y2="30"
           strokeWidth="4"
           strokeLinecap="round"
-          style={{ stroke: "rgb(255, 255, 255)" }}
+          style={{ stroke: "currentColor" }}
         ></line>
         <circle
           cx="61.704"
           cy="64.344"
           r="8.336"
-          style={{ fillRule: "evenodd", fill: "none", strokeWidth: "3.73687px", stroke: "rgb(255, 255, 255)" }}
+          style={{ fillRule: "evenodd", fill: "none", strokeWidth: "3.73687px", stroke: "currentColor" }}
         ></circle>
       </g>
       <g transform="matrix(0.673252, 0, 0, 0.673252, 90.413162, 51.66016)">
         <circle cx="0" cy="0" r="20" fill="#22C55E"></circle>
-        <path d="M 0 -10 L 0 10 M -10 0 L 10 0" stroke="white" strokeWidth="4" strokeLinecap="round"></path>
+        <path d="M 0 -10 L 0 10 M -10 0 L 10 0" stroke="currentColor" strokeWidth="4" strokeLinecap="round"></path>
       </g>
     </svg>
   );

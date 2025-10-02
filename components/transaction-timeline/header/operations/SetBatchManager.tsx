@@ -19,12 +19,17 @@ export function SetBatchManagerHeader({ tx }: { tx: TroveTransaction }) {
           <OperationBadge label="Delegate" color="none" />
           <InterestRateBadge
             rate={tx.stateAfter.annualInterestRate}
+          <OperationBadge label="Delegate" color="none" />
+          <InterestRateBadge
+            rate={tx.stateAfter.annualInterestRate}
             isDelegate={isJoiningExistingDelegate}
             isNewDelegate={isBecomingDelegate}
           />
           {managementFee > 0 && (
             <div className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded text-slate-300 bg-slate-800 border border-slate-600">
               <span className="mx-1">+</span>
+              {managementFee}
+              <span className="ml-0.5">%</span>
               {managementFee}
               <span className="ml-0.5">%</span>
             </div>

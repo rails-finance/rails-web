@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
-  <path d="M 64.656 35.916 L 64.656 51.708 L 68.318 51.708 L 60.376 60.476 L 52.434 51.708 L 56.096 51.708 L 56.096 35.678 L 63.656 35.678 L 64.656 35.916 Z" style="fill: rgb(69, 85, 108); stroke-width: 1; transform-origin: 60.376px 48.077px;" transform="matrix(0, -1, 1, 0, 0.000001, 0.000001)"/> 
-  <path d="M 31.74 11.936 L 16.157 11.95 L 16.157 8.25 L 7.504 16.266 L 16.157 24.266 L 16.157 20.566 L 31.975 20.552 L 31.975 12.936 L 31.74 11.936 Z" style="stroke-width: 1; fill: rgb(69, 85, 108); transform-origin: 19.739px 16.255px;"/>
-  <rect style="fill: rgb(69, 85, 108);" x="24" y="1" width="32" height="64" rx="16" ry="16"></rect>
-   <ellipse style="fill: rgb(23, 27, 36)" cx="40" cy="17" rx="14" ry="14"></ellipse>
-   <ellipse style="fill: rgb(23, 27, 36)" cx="40" cy="49" rx="14" ry="14"></ellipse>
+  <path d="M 64.656 35.916 L 64.656 51.708 L 68.318 51.708 L 60.376 60.476 L 52.434 51.708 L 56.096 51.708 L 56.096 35.678 L 63.656 35.678 L 64.656 35.916 Z" style="fill: green; stroke-width: 1; transform-origin: 60.376px 48.077px;" transform="matrix(0, -1, 1, 0, 0.000001, 0.000001)"/> 
+  <path d="M 31.74 11.936 L 16.157 11.95 L 16.157 8.25 L 7.504 16.266 L 16.157 24.266 L 16.157 20.566 L 31.975 20.552 L 31.975 12.936 L 31.74 11.936 Z" style="stroke-width: 1; fill: green; transform-origin: 19.739px 16.255px;"/>
+  <rect style="fill: green;" x="24" y="1" width="32" height="64" rx="16" ry="16"></rect>
+   <ellipse style="fill: var(--svg-inner-bg)" cx="40" cy="17" rx="14" ry="14"></ellipse>
+   <ellipse style="fill: var(--svg-inner-bg)" cx="40" cy="49" rx="14" ry="14"></ellipse>
    
-  <rect style="stroke: oklch(62.7% 0.194 149.214); fill: none; stroke-width: 2px;" x="25" y="2" width="30" height="62" rx="16" ry="16"/>
   <use href="#DEBT_ICON" width="24" height="24" transform="matrix(1, 0, 0, 1, 28, 5)" style="transform-origin: 0px 12px;"/>
   <use href="#COLLATERAL_ICON" width="24" height="24" transform="matrix(1, 0, 0, 1, 28, 37)"/>
 </svg>

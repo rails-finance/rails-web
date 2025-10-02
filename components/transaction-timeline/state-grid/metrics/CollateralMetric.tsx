@@ -17,7 +17,8 @@ interface CollateralMetricProps {
 
 export function CollateralMetric({ collateralType, before, after, afterInUsd, isCloseTrove }: CollateralMetricProps) {
   const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
-  const hasChange = before != 0 && before !== after;
+  // For closeTrove, always show transition even if before is 0
+  const hasChange = isCloseTrove ? before !== after : before != 0 && before !== after;
 
   // Only highlight when hover is enabled
   const isAfterHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "collateral", "after");
@@ -29,7 +30,7 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
         {hasChange && (
           <>
             <div className="flex items-center space-x-1">
-              <span className="text-slate-600">{before}</span>
+              <span className="text-slate-300 font-bold dark:text-slate-600">{before}</span>
             </div>
             <TransitionArrow />
           </>
@@ -39,8 +40,10 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
         ) : (
           <div className="flex items-center">
             <span
-              className={`text-sm font-semibold text-white -mx-1 px-1 -my-0.5 py-0.5  rounded ${hoverEnabled ? "cursor-pointer" : ""} transition-all ${
-                isAfterHighlighted ? "bg-blue-900 " : ""
+              className={`text-sm font-bold text-slate-800 milodon dark:text-slate-300 ${hoverEnabled ? "cursor-pointer" : ""} ${
+                isAfterHighlighted
+                  ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
+                  : ""
               }`}
               onMouseEnter={
                 hoverEnabled ? () => setHoveredValue({ type: "collateral", state: "after", value: after }) : undefined
@@ -50,9 +53,13 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
               {after}
             </span>
             <span
-              className={`text-xs flex items-center text-slate-600 border-l border-r ml-2 border-slate-600 font-medium rounded-sm px-1 py-0 transition-all ${
+              className={`text-xs flex items-center text-slate-300 dark:text-slate-600 border-l border-r ml-2 border-slate-300 dark:border-slate-600 font-medium rounded-sm px-1 py-0 ${
                 hoverEnabled ? "cursor-pointer" : ""
-              } ${isCollateralUsdHighlighted ? "bg-blue-900 text-white py-0.5 -my-0.5" : ""}`}
+              } ${
+                isCollateralUsdHighlighted
+                  ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
+                  : ""
+              }`}
               onMouseEnter={
                 hoverEnabled
                   ? () => setHoveredValue({ type: "collateralUsd", state: "after", value: afterInUsd })

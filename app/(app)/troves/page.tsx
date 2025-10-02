@@ -222,6 +222,7 @@ export default function TrovesPage() {
 
   return (
     <main className="min-h-screen">
+      <FeedbackButton />
       <div className="max-w-7xl mx-auto py-8">
         {/* Page Header */}
         <h1 className="text-2xl font-bold text-white mb-6">Liquity V2 Troves</h1>

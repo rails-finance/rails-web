@@ -16,7 +16,7 @@ export function ExitBatchIcon({ x = 290, y = 80, scale = 9 }: ExitBatchIconProps
           <circle cx="9" cy="7" r="4" />
           {/* Minus sign */}
           <g transform="translate(3,0)">
-            <circle cx="29" cy="27" r="8" fill="#171B24" stroke="red" />
+            <circle cx="29" cy="27" r="8" fill="var(--svg-inner-bg)" stroke="red" />
             <line x1="26" x2="32" y1="27" y2="27" stroke="red" strokeWidth="2" />
           </g>
         </g>

@@ -29,12 +29,13 @@ export function TransactionLinks({ transaction }: TransactionLinksProps) {
   };
 
   return (
-    <div className="flex justify-between items-center gap-1 text-xs text-slate-600 py-2">
+    <div className="flex justify-between items-center gap-1 text-xs text-slate-500 font-bold py-2">
       {shouldShowGasFee() && tx.gasFee && tx.gasFeeUsd ? (
         <div className="flex items-center gap-1">
           <Fuel className="w-3 h-3 text-slate-500" />
-          <span className="font-medium">{tx.gasFee.toFixed(6)} ETH</span>
-          <span className="text-slate-400 ml-1">≈ ${tx.gasFeeUsd.toFixed(2)}</span>
+          <span>
+            {tx.gasFee.toFixed(6)} ≈ ${tx.gasFeeUsd.toFixed(2)}
+          </span>
         </div>
       ) : (
         <div></div>

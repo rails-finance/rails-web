@@ -20,12 +20,14 @@ export function TransactionFooter({ timestamp, txIndex, txHash, isExpanded, onCl
     >
       {/* Gradient overlay that appears on hover - bottom to top, only when expanded */}
       {isExpanded && (
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/[0.25] to-transparent opacity-0 group-hover/footer:opacity-200 transition-opacity duration-100 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-200/[0.25] dark:from-slate-950/[0.25] to-transparent opacity-0 group-hover/footer:opacity-200 transition-opacity duration-100 pointer-events-none" />
       )}
 
       <div className="relative flex justify-between items-center">
-        <div className="text-xs text-slate-600 font-bold">{formatTimestamp(timestamp)}</div>
-        <span className="px-1 text-xs text-slate-500 rounded bg-slate-950/30">{txIndex}</span>
+        <div className="text-xs text-slate-300 dark:text-slate-600">{formatTimestamp(timestamp)}</div>
+        <span className="px-1 font-bold text-xs text-slate-300 dark:text-slate-500 rounded bg-slate-100 dark:bg-slate-950/30">
+          {txIndex}
+        </span>
       </div>
     </div>
   );

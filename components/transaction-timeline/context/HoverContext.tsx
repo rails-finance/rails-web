@@ -11,21 +11,7 @@ export type ValueType =
   | "upfrontFee"
   | "collateralPrice"
   | "peakDebt"
-  | "peakCollateral"
-  | "owner"
-  | "principal"
-  | "interest"
-  | "managementFee"
-  | "currentPrice"
-  | "delegateName"
-  | "managementFeeRate"
-  | "dailyManagementFee"
-  | "annualManagementFee"
-  | "dailyInterest"
-  | "annualInterest"
-  | "nftToken"
-  | "troveId"
-  | "ownerAddress";
+  | "peakCollateral";
 export type ValueState = "before" | "after" | "change" | "fee";
 
 export interface HoveredValue {

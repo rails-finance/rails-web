@@ -25,7 +25,7 @@ function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
 
     // Peak debt explanation
     items.push(
-      <span key="peak-debt" className="text-slate-500">
+      <span key="peak-debt" className="text-slate-600 dark:text-slate-500">
         This trove reached a maximum debt of{" "}
         <HighlightableValue type="peakDebt" state="after" value={trove.debt.peak}>
           {formatPrice(trove.debt.peak)} BOLD
@@ -36,7 +36,7 @@ function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
 
     // Peak collateral explanation
     items.push(
-      <span key="peak-collateral" className="text-slate-500">
+      <span key="peak-collateral" className="text-slate-600 dark:text-slate-500">
         The highest recorded collateral was{" "}
         <HighlightableValue type="peakCollateral" state="after" value={trove.collateral.peakAmount}>
           {formatPrice(trove.collateral.peakAmount)} {trove.collateralType}
@@ -46,17 +46,29 @@ function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
 
     // Trove lifecycle
     const duration = formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt);
+    const durationInSeconds =
+      (new Date(trove.activity.lastActivityAt).getTime() - new Date(trove.activity.createdAt).getTime()) / 1000;
 
     items.push(
-      <span key="lifecycle" className="text-slate-500">
-        Trove was active for <strong className="text-white">{duration}</strong> from{" "}
-        {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
+      <span key="lifecycle" className="text-slate-600 dark:text-slate-500">
+        Trove was active for{" "}
+        <HighlightableValue type="duration" state="after" value={durationInSeconds}>
+          {duration}
+        </HighlightableValue>{" "}
+        from{" "}
+        <HighlightableValue
+          type="dateRange"
+          state="after"
+          value={`${trove.activity.createdAt}-${trove.activity.lastActivityAt}`}
+        >
+          {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
+        </HighlightableValue>
       </span>,
     );
 
     // Closure context
     items.push(
-      <span key="closure" className="text-slate-500">
+      <span key="closure" className="text-slate-600 dark:text-slate-500">
         The trove has been closed and all debt has been repaid. Any collateral above the liquidation reserve was
         returned to the owner
       </span>,
@@ -66,13 +78,13 @@ function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
     const nftUrl = getTroveNftUrl(trove.collateralType, trove.id);
     if (nftUrl) {
       items.push(
-        <span key="nft-info" className="text-slate-500">
+        <span key="nft-info" className="text-slate-600 dark:text-slate-500">
           Trove is represented by an ERC-721 NFT token
           <a
             href={nftUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors"
+            className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-200 dark:bg-slate-800 w-4 h-4 rounded-full transition-colors"
             aria-label="View NFT on OpenSea"
           >
             <svg
@@ -104,20 +116,39 @@ function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
 
   return (
     <div>
-      <div className="relative rounded-lg text-slate-500 bg-slate-700">
+      <div className="relative rounded-lg text-slate-600 dark:text-slate-500 bg-gray-100 dark:bg-slate-700 border border-slate-200 dark:border-transparent">
         {/* Header section */}
         <div className="flex items-center justify-between p-4 pb-0">
           <div className="flex items-center">
             {/* Status */}
-            <span className="font-semibold px-2 py-0.5 bg-slate-800 text-slate-400 rounded-xs text-xs">CLOSED</span>
+            <span className="font-bold px-2 py-0.5 bg-slate-500 dark:bg-slate-800 text-white dark:text-slate-400 rounded text-xs">
+              CLOSED
+            </span>
           </div>
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-400">
-              {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
+            <span className="text-slate-600 dark:text-slate-400">
+              <HighlightableValue
+                type="dateRange"
+                state="after"
+                value={`${trove.activity.createdAt}-${trove.activity.lastActivityAt}`}
+                variant="card"
+              >
+                {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
+              </HighlightableValue>
             </span>
-            <span className="text-slate-400">
-              {formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt)}
+            <span className="text-slate-600 dark:text-slate-400">
+              <HighlightableValue
+                type="duration"
+                state="after"
+                value={
+                  (new Date(trove.activity.lastActivityAt).getTime() - new Date(trove.activity.createdAt).getTime()) /
+                  1000
+                }
+                variant="card"
+              >
+                {formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt)}
+              </HighlightableValue>
             </span>
             {trove.activity.redemptionCount > 0 && (
               <span className="inline-flex items-center text-orange-400">
@@ -125,7 +156,7 @@ function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
                 <span className="ml-1">{trove.activity.redemptionCount}</span>
               </span>
             )}
-            <span className="inline-flex items-center text-slate-400">
+            <span className="inline-flex items-center text-slate-600 dark:text-slate-400">
               <Icon name="arrow-left-right" size={12} />
               <span className="ml-1">{trove.activity.transactionCount}</span>
             </span>
@@ -136,17 +167,17 @@ function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
         <div className="grid grid-cols-1 pt-2 p-4 gap-4">
           {/* Main value */}
           <div>
-            <p className="text-xs text-slate-400 mb-1">Debt</p>
+            <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Debt at peak</span>
             <div className="flex items-center">
-              <h3 className="text-3xl font-bold">
-                <HighlightableValue type="peakDebt" state="after" value={trove.debt.peak}>
+              <span className="text-3xl font-bold">
+                <HighlightableValue type="peakDebt" state="after" value={trove.debt.peak} variant="card">
                   {formatPrice(trove.debt.peak)}
                 </HighlightableValue>
-              </h3>
+              </span>
               <span className="ml-2 text-green-400 text-lg">
                 <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
               </span>
-              <span className="ml-2 text-slate-400 text-sm">at peak</span>
+              <span className="ml-2 text-slate-600 dark:text-slate-400 text-sm"></span>
             </div>
           </div>
 

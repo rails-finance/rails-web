@@ -15,7 +15,7 @@ export function PercentDecreaseIcon({ x = 210, y = 10, r = 190 }: PercentDecreas
           cx="37.336"
           cy="37.336"
           r="8.336"
-          style={{ fillRule: "evenodd", fill: "none", strokeWidth: "3.73687px", stroke: "rgb(255, 255, 255)" }}
+          style={{ fillRule: "evenodd", fill: "none", strokeWidth: "3.73687px", stroke: "currentColor" }}
         ></circle>
         <line
           x1="30"
@@ -24,13 +24,13 @@ export function PercentDecreaseIcon({ x = 210, y = 10, r = 190 }: PercentDecreas
           y2="30"
           strokeWidth="4"
           strokeLinecap="round"
-          style={{ stroke: "rgb(255, 255, 255)" }}
+          style={{ stroke: "currentColor" }}
         ></line>
         <circle
           cx="61.704"
           cy="64.344"
           r="8.336"
-          style={{ fillRule: "evenodd", fill: "none", strokeWidth: "3.73687px", stroke: "rgb(255, 255, 255)" }}
+          style={{ fillRule: "evenodd", fill: "none", strokeWidth: "3.73687px", stroke: "currentColor" }}
         ></circle>
       </g>
       <path

@@ -5,6 +5,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { IconSymbols } from "@/components/icons/iconSymbols";
 import { Header } from "@/components/header";
+import { ThemeScript } from "@/components/ThemeScript";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,11 +21,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} antialiased bg-slate-800 text-white min-h-screen overflow-x-hidden`}>
+      <head>
+        <ThemeScript />
+      </head>
+      <body
+        className={`${inter.className} antialiased bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen overflow-x-hidden transition-colors`}
+      >
         <IconSymbols />
         <Providers>
           <Header />
-          <main className="max-w-7xl mx-auto px-4 md:px-6">{children}</main>
+          {children}
         </Providers>
       </body>
     </html>

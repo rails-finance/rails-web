@@ -73,7 +73,11 @@ export function calculateManagementFees(
 /**
  * Calculate the entire debt including all components
  */
-export function calculateEntireDebt(recordedDebt: number, accruedInterest: number, accruedManagementFees: number = 0): number {
+export function calculateEntireDebt(
+  recordedDebt: number,
+  accruedInterest: number,
+  accruedManagementFees: number = 0,
+): number {
   return recordedDebt + accruedInterest + accruedManagementFees;
 }
 
@@ -89,21 +93,11 @@ export function generateInterestInfo(
   batchManager?: string,
   currentTime: number = Date.now() / 1000,
 ): InterestInfo {
-  const accruedInterest = calculateAccruedInterest(
-    recordedDebt,
-    annualInterestRate,
-    lastUpdateTimestamp,
-    currentTime,
-  );
+  const accruedInterest = calculateAccruedInterest(recordedDebt, annualInterestRate, lastUpdateTimestamp, currentTime);
 
   let accruedManagementFees = 0;
   if (isBatchMember && managementFeeRate !== undefined) {
-    accruedManagementFees = calculateManagementFees(
-      recordedDebt,
-      managementFeeRate,
-      lastUpdateTimestamp,
-      currentTime,
-    );
+    accruedManagementFees = calculateManagementFees(recordedDebt, managementFeeRate, lastUpdateTimestamp, currentTime);
   }
 
   const entireDebt = calculateEntireDebt(recordedDebt, accruedInterest, accruedManagementFees);

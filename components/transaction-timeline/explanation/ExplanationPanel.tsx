@@ -36,12 +36,12 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
 
   return (
     <div
-      className={`rounded-b-lg shadow-inner py-1 ${shouldShowOpen ? "bg-slate-950 w-full" : "bg-slate-950 shadow-inner w-fit"}`}
+      className={`rounded-b-lg py-1 ${shouldShowOpen ? "bg-slate-200 dark:bg-slate-950 w-full" : "bg-slate-50 dark:bg-slate-950 w-fit"}`}
     >
       {!shouldShowOpen ? (
         <button
           onClick={handleToggle}
-          className="cursor-pointer px-4.5 flex items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors"
+          className="cursor-pointer px-4.5 flex items-center gap-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
           aria-expanded={shouldShowOpen}
           aria-label="Show transaction details"
         >
@@ -68,26 +68,26 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
           </button>
 
           <div className="p-4 pb-2">
-            <div className="text-white space-y-2 text-sm">
+            <div className="text-slate-900 dark:text-white space-y-2 text-sm">
               {items.map((item, index) => (
                 <div key={index} className="flex items-start gap-2">
-                  <span className="text-slate-400">•</span>
+                  <span className="text-slate-600 dark:text-slate-400">•</span>
                   {item}
                 </div>
               ))}
             </div>
           </div>
           {transactionHash && (
-            <div className="px-4 pb-2">
-              <div className="pt-2 flex justify-between items-center">
+            <div className="">
+              <div className="pt-2 px-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1 text-xs text-slate-600">
+                  <div className="flex items-center gap-1 text-xs text-slate-700 dark:text-slate-600">
                     <span>View on</span>
                     <a
                       href={`https://etherscan.io/tx/${transactionHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-1 py-1 hover:text-slate-300 transition-colors"
+                      className="inline-flex items-center gap-1 px-1 py-1 hover:text-blue-600 dark:hover:text-slate-300 transition-colors"
                       aria-label="View on Etherscan"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -113,7 +113,7 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
                       href={`https://liquityv2.defiexplore.com/tx/${transactionHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-1 py-1 hover:text-slate-300 transition-colors"
+                      className="inline-flex items-center gap-1 px-1 py-1 hover:text-blue-600 dark:hover:text-slate-300 transition-colors"
                       aria-label="View on DeFiExplore"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -127,13 +127,13 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
                     </a>
                   </div>
                 </div>
-                <span className="bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
-                  <span className="text-slate-400  text-xs flex items-center gap-1">
+                <span className="bg-slate-100 dark:bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
+                  <span className="text-slate-600 dark:text-slate-400 text-xs flex items-center gap-1">
                     <Hash size={12} />
                     {transactionHash.substring(0, 8)}...
                     <div className="relative inline-block group">
                       <button
-                        className="mx-1.5 text-slate-400 hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
+                        className="mx-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
                         aria-label={copiedTxHash ? "Copied to clipboard" : "Copy to clipboard"}
                         onClick={(e) => {
                           e.preventDefault();
@@ -147,7 +147,7 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
                       </button>
                       <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 pointer-events-none">
                         <div
-                          className={`bg-slate-700 text-slate-200 px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity duration-200 ${
+                          className={`bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-200 px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity duration-200 ${
                             copiedTxHash ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                           }`}
                         >
@@ -162,7 +162,7 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
           )}
           <button
             onClick={handleToggle}
-            className="cursor-pointer w-full py-1 flex items-center justify-center gap-1 text-slate-600 hover:text-slate-300 transition-colors"
+            className="cursor-pointer w-full py-1 flex items-center justify-center gap-1 text-slate-600 dark:text-slate-600 hover:text-slate-900 dark:hover:text-slate-300 transition-colors"
             aria-expanded={shouldShowOpen}
             aria-label="Hide transaction details"
           >

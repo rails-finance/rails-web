@@ -13,7 +13,7 @@ export function TimelineBackground({ tx, isFirst, isLast, isExpanded = false }: 
   const showBottomConnection = !isLast;
 
   // Determine connector color based on operation type
-  let connectorColor = "#45556C"; // default
+  let connectorColor = "currentColor"; // default
   const isDashed =
     tx.operation === "liquidate" ||
     tx.operation === "redeemCollateral" ||
@@ -102,13 +102,16 @@ export function TimelineBackground({ tx, isFirst, isLast, isExpanded = false }: 
 
       {/* Cover top line for closed troves */}
       {isClosedTrove && (
-        <div className="absolute top-0 left-0 w-4 h-5 bg-slate-800" style={{ transform: "translateX(-6px)" }} />
+        <div
+          className="absolute top-0 left-0 w-4 h-5 bg-white dark:bg-slate-800"
+          style={{ transform: "translateX(-6px)" }}
+        />
       )}
 
       {/* Cover bottom line only for openTrove operations when expanded */}
       {(tx.operation === "openTrove" || tx.operation === "openTroveAndJoinBatch") && isExpanded && (
         <div
-          className="absolute bottom-0 left-0 w-4 bg-slate-800"
+          className="absolute bottom-0 left-0 w-4 bg-white dark:bg-slate-800"
           style={{
             transform: "translateX(-6px)",
             height: "calc(100% - 80px)", // Leave space for the transaction graphic

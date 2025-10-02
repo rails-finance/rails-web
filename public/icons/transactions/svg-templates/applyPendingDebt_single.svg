@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
   <rect x="-17.085" y="-8.513" width="109.144" height="61.184" style="fill: rgba(0, 0, 0, 0);"/>
-  <circle cx="14.901" cy="24.386" r="12.791" fill="rgb(23, 27, 36)" style="stroke-width: 1.407;"/>
-  <circle cx="37.675" cy="25.861" r="12.791" fill="rgb(23, 27, 36)" style="stroke-width: 1.407;" transform="matrix(1, 0, 0, 0.859958, 0, 1.830353)"/>
-  <circle cx="60.879" cy="24.542" r="14.785" fill="rgb(23, 27, 36)" style="stroke-width: 1.407;"/>
+  <circle cx="14.901" cy="24.386" r="12.791" fill="var(--svg-inner-bg)" style="stroke-width: 1.407;"/>
+  <circle cx="37.675" cy="25.861" r="12.791" fill="var(--svg-inner-bg)" style="stroke-width: 1.407;" transform="matrix(1, 0, 0, 0.859958, 0, 1.830353)"/>
+  <circle cx="60.879" cy="24.542" r="14.785" fill="var(--svg-inner-bg)" style="stroke-width: 1.407;"/>
   <circle cx="37.43" cy="20.645" r="2.065" style="fill-rule: evenodd; fill: none; stroke-width: 1; stroke: rgb(102, 113, 130);"/>
   <line x1="35.365" y1="28.491" x2="45.275" y2="18.58" stroke-linecap="round" style="stroke-width: 1; stroke: rgb(102, 113, 130);"/>
   <circle cx="43.21" cy="26.426" r="2.065" style="fill-rule: evenodd; fill: none; stroke-width: 1; stroke: rgb(102, 113, 130);"/>

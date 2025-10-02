@@ -34,8 +34,8 @@ export function AdjustTroveHeader({ tx }: { tx: TroveTransaction }) {
 
   // Handle case where there are no actual changes (e.g., delegate operations)
   if (content.length === 0) {
-    return <span className="text-white font-medium">Adjust Trove</span>;
+    return <span className="font-bold text-slate-900 dark:text-white ">Adjust Trove</span>;
   }
 
-  return <div className="flex items-center gap-1">{content}</div>;
+  return <div className="font-bold flex items-center gap-1">{content}</div>;
 }

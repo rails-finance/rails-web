@@ -14,7 +14,9 @@ export function InterestRateBadge({
   return (
     <div
       className={`inline-flex items-center px-2 py-0.5 text-xs font-bold rounded ${
-        isDelegated ? "text-pink-400 bg-pink-900/50" : "text-slate-200 bg-slate-900"
+        isDelegated
+          ? "bg-pink-300 text-white dark:bg-pink-900/50 dark:text-pink-400"
+          : "text-white dark:text-slate-200 bg-slate-600 dark:bg-slate-900"
       }`}
     >
       {isNewDelegate && <UserPlus className="w-3 h-3 mr-1" />}
