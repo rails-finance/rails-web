@@ -16,10 +16,6 @@ export function TransactionItemHeader({ tx, isExpanded, onClick }: TransactionIt
       aria-expanded={isExpanded}
       aria-label={`${isExpanded ? "Collapse" : "Expand"} transaction details`}
     >
-      {/* Gradient overlay that appears on hover - only when expanded */}
-      {isExpanded && (
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-200/[0.25] dark:from-slate-950/[0.25] to-transparent opacity-0 group-hover/header:opacity-200 transition-opacity duration-100 pointer-events-none" />
-      )}
 
       <div className="relative flex items-start justify-between">
         <div className="grow mt-1 mb-2 mr-3">

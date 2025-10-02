@@ -18,11 +18,6 @@ export function TransactionFooter({ timestamp, txIndex, txHash, isExpanded, onCl
       aria-expanded={isExpanded}
       aria-label={`${isExpanded ? "Collapse" : "Expand"} transaction details`}
     >
-      {/* Gradient overlay that appears on hover - bottom to top, only when expanded */}
-      {isExpanded && (
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-200/[0.25] dark:from-slate-950/[0.25] to-transparent opacity-0 group-hover/footer:opacity-200 transition-opacity duration-100 pointer-events-none" />
-      )}
-      
       <div className="relative flex justify-between items-center font-bold">
         <div className="text-xs text-slate-300 dark:text-slate-600">
           {formatTimestamp(timestamp)}
