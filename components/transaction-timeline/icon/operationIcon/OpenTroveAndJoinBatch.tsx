@@ -11,8 +11,13 @@ interface OpenTroveAndJoinBatchIconProps {
   isExpanded?: boolean;
 }
 
-export function OpenTroveAndJoinBatchIcon({ tx, isFirst = false, isLast = false, isExpanded = false }: OpenTroveAndJoinBatchIconProps) {
-  const [svgContent, setSvgContent] = useState<string>('');
+export function OpenTroveAndJoinBatchIcon({
+  tx,
+  isFirst = false,
+  isLast = false,
+  isExpanded = false,
+}: OpenTroveAndJoinBatchIconProps) {
+  const [svgContent, setSvgContent] = useState<string>("");
 
   if (!isTroveTransaction(tx)) {
     return null;
@@ -20,7 +25,7 @@ export function OpenTroveAndJoinBatchIcon({ tx, isFirst = false, isLast = false,
 
   // Use existing logic to determine the transaction image key
   const imageKey = getTransactionImageKey(tx);
-  
+
   // Extract asset types from transaction data
   const collateralAsset = tx.collateralType; // e.g., "WETH", "rETH", "wstETH"
   const debtAsset = tx.assetType; // e.g., "BOLD"
@@ -28,7 +33,7 @@ export function OpenTroveAndJoinBatchIcon({ tx, isFirst = false, isLast = false,
   useEffect(() => {
     async function loadAndProcessSVG() {
       const svgText = await loadTransactionSvg(imageKey, debtAsset, collateralAsset);
-      setSvgContent(svgText || '');
+      setSvgContent(svgText || "");
     }
 
     loadAndProcessSVG();
@@ -38,21 +43,12 @@ export function OpenTroveAndJoinBatchIcon({ tx, isFirst = false, isLast = false,
     <>
       {/* Timeline Background - extends full height of transaction row */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-full z-10 pointer-events-none text-red-300">
-        <TimelineBackground 
-          tx={tx} 
-          isFirst={isFirst} 
-          isLast={isLast} 
-          isExpanded={isExpanded} 
-        />
+        <TimelineBackground tx={tx} isFirst={isFirst} isLast={isLast} isExpanded={isExpanded} />
       </div>
-      
+
       {/* Transaction Graphic - loaded from SVG template */}
       <div className="relative z-20 w-30 h-25 flex items-center justify-center sm:w-25 text-slate-700 dark:text-slate-300">
-        {svgContent ? (
-          <div dangerouslySetInnerHTML={{ __html: svgContent }} />
-        ) : (
-          <div>Loading...</div>
-        )}
+        {svgContent ? <div dangerouslySetInnerHTML={{ __html: svgContent }} /> : <div>Loading...</div>}
       </div>
     </>
   );

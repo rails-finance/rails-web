@@ -1,4 +1,4 @@
-import { Transaction, isTroveTransaction } from '@/types/api/troveHistory';
+import { Transaction, isTroveTransaction } from "@/types/api/troveHistory";
 
 export const getUpfrontFee = (tx: Transaction): number => {
   if (isTroveTransaction(tx)) {
@@ -13,13 +13,12 @@ export const formatCurrency = (value: number, currency: string): string => {
 };
 
 export const formatPrice = (value: number): string => {
-  return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 export const formatUsdValue = (value: number): string => {
-  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
-
 
 export const isHighRisk = (collRatio?: number): boolean => {
   return collRatio ? collRatio < 150 : false;

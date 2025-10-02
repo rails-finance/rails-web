@@ -13,7 +13,7 @@
   --color-slate-700: #232a37;
   --color-slate-800: #171b24;
   --color-slate-900: #12151e;
-  --color-slate-950: #0D0F15;
+  --color-slate-950: #0d0f15;
 
   --color-green-600: #008900;
   --color-green-400: #4ade80;
@@ -22,7 +22,7 @@
 :root {
   /* Light mode colors (default) */
   --background: #ffffff;
-  --foreground: #0D0F15;
+  --foreground: #0d0f15;
 
   /* Light mode specific colors */
   --card-background: #f9fafb;
@@ -35,8 +35,8 @@
   --secondary-foreground: #171b24;
 
   /* Protocol-specific gradient colors for light mode */
-  --liquity-grad-1: #4B5EDB;
-  --liquity-grad-2: #3B4EAB;
+  --liquity-grad-1: #4b5edb;
+  --liquity-grad-2: #3b4eab;
 
   /* SVG inner background for timeline icons */
   --svg-inner-bg: #ffffff;
@@ -58,8 +58,8 @@
   --secondary-foreground: #ffffff;
 
   /* Protocol-specific gradient colors for dark mode */
-  --liquity-grad-1: #323E91;
-  --liquity-grad-2: #29336D;
+  --liquity-grad-1: #323e91;
+  --liquity-grad-2: #29336d;
 
   /* SVG inner background for timeline icons */
   --svg-inner-bg: #171b24;
@@ -82,7 +82,6 @@ body {
     padding: 16px 0;
     overflow: hidden;
   }
-  
 
   /* Timeline connector positioning */
   .timeline-connector {
@@ -91,7 +90,7 @@ body {
     transform: translateX(-50%);
     z-index: 0;
   }
-  
+
   /* Transaction layouts - styles are inline in components, keeping minimal CSS here */
   .transaction-multi-step {
     display: flex;

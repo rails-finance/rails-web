@@ -14,15 +14,12 @@ export async function GET(request: NextRequest) {
     const url = `${RAILS_API_URL}/api/stats${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 
     const response = await fetch(url, {
-      next: { revalidate: 30 } // Cache for 30 seconds
+      next: { revalidate: 30 }, // Cache for 30 seconds
     });
 
     if (!response.ok) {
       console.error(`Backend API error: ${response.status} ${response.statusText}`);
-      return NextResponse.json(
-        { error: `Backend error: ${response.statusText}` },
-        { status: response.status }
-      );
+      return NextResponse.json({ error: `Backend error: ${response.statusText}` }, { status: response.status });
     }
 
     const data: StatsResponse = await response.json();

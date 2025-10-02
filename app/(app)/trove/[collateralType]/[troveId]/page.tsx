@@ -80,16 +80,16 @@ export default function TrovePage() {
 
   if (loading) {
     return (
-    <>
-      <FeedbackButton />
-      <div className="space-y-6 py-8">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-        <TokenIcon assetSymbol={collateralType} className="w-7 h-7 z-1" />
-        <TokenIcon assetSymbol="BOLD" className="w-7 h-7 -ml-3" />
-        Liquity V2 Trove
-      </h1>
+      <>
+        <FeedbackButton />
+        <div className="space-y-6 py-8">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+            <TokenIcon assetSymbol={collateralType} className="w-7 h-7 z-1" />
+            <TokenIcon assetSymbol="BOLD" className="w-7 h-7 -ml-3" />
+            Liquity V2 Trove
+          </h1>
           <Button onClick={() => router.back()} className="mb-4 pl-2">
-          <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-4 h-4" />
             Back
           </Button>
           <div className="bg-slate-100 dark:bg-slate-700 rounded-lg h-48 animate-pulse" />
@@ -108,12 +108,15 @@ export default function TrovePage() {
         <FeedbackButton />
         <div className="space-y-6 py-8">
           <Button onClick={() => router.back()} className="mb-4 pl-2">
-          <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-4 h-4" />
             Back
           </Button>
           <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">
             <p className="text-red-400">{error || "Trove not found"}</p>
-            <button onClick={loadData} className="mt-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white text-sm">
+            <button
+              onClick={loadData}
+              className="mt-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white text-sm"
+            >
               Retry
             </button>
           </div>
@@ -126,14 +129,14 @@ export default function TrovePage() {
     <>
       <FeedbackButton />
       <div className="space-y-6 py-8">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-        <TokenIcon assetSymbol={collateralType} className="w-7 h-7 z-1" />
-        <TokenIcon assetSymbol="BOLD" className="w-7 h-7 -ml-3" />
-        Liquity V2 Trove
-      </h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+          <TokenIcon assetSymbol={collateralType} className="w-7 h-7 z-1" />
+          <TokenIcon assetSymbol="BOLD" className="w-7 h-7 -ml-3" />
+          Liquity V2 Trove
+        </h1>
         <Button onClick={() => router.back()} className="mb-4 pl-2">
           <ChevronLeft className="w-4 h-4" />
-            Back
+          Back
         </Button>
 
         <TroveCard trove={troveData} />
@@ -148,15 +151,14 @@ export default function TrovePage() {
               </span>
             )}
           </div>
-          {timelineData && timelineData.transactions.some(tx => isRedemptionTransaction(tx)) && (
+          {timelineData && timelineData.transactions.some((tx) => isRedemptionTransaction(tx)) && (
             <button
               onClick={() => setHideRedemptions(!hideRedemptions)}
               className={`cursor-pointer px-2 py-0.5 text-sm rounded transition-colors bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-300 dark:hover:bg-slate-600`}
             >
               {hideRedemptions
-                ? `Show ${timelineData.transactions.filter(tx => isRedemptionTransaction(tx)).length} Redemptions`
-                : `Hide ${timelineData.transactions.filter(tx => isRedemptionTransaction(tx)).length} Redemptions`
-              }
+                ? `Show ${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length} Redemptions`
+                : `Hide ${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length} Redemptions`}
             </button>
           )}
         </div>
@@ -165,8 +167,8 @@ export default function TrovePage() {
             timeline={{
               ...timelineData,
               transactions: hideRedemptions
-                ? timelineData.transactions.filter(tx => !isRedemptionTransaction(tx))
-                : timelineData.transactions
+                ? timelineData.transactions.filter((tx) => !isRedemptionTransaction(tx))
+                : timelineData.transactions,
             }}
           />
         ) : (

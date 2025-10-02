@@ -1,12 +1,12 @@
-import React from 'react';
-import { Transaction } from '@/types/api/troveHistory';
-import { HighlightableValue } from '../HighlightableValue';
-import { ExplanationPanel } from '../ExplanationPanel';
-import { InfoButton } from '../InfoButton';
-import { FAQ_URLS } from '../shared/faqUrls';
-import { formatCurrency, formatUsdValue } from '@/lib/utils/format';
-import { LIQUIDATION_RESERVE_ETH } from '../shared/eventHelpers';
-import { getTroveNftUrl } from '@/lib/utils/nft-utils';
+import React from "react";
+import { Transaction } from "@/types/api/troveHistory";
+import { HighlightableValue } from "../HighlightableValue";
+import { ExplanationPanel } from "../ExplanationPanel";
+import { InfoButton } from "../InfoButton";
+import { FAQ_URLS } from "../shared/faqUrls";
+import { formatCurrency, formatUsdValue } from "@/lib/utils/format";
+import { LIQUIDATION_RESERVE_ETH } from "../shared/eventHelpers";
+import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 
 interface CloseTroveExplanationProps {
   transaction: Transaction;
@@ -33,47 +33,43 @@ export function CloseTroveExplanation({ transaction, onToggle }: CloseTroveExpla
   if (debtRepaid > 0) {
     closeTroveItems.push(
       <span key="repayDebt" className="text-slate-500">
-        Fully repaid the outstanding debt of{' '}
+        Fully repaid the outstanding debt of{" "}
         <HighlightableValue type="debt" state="change" value={debtRepaid}>
           {formatCurrency(debtRepaid, tx.assetType)}
         </HighlightableValue>
-      </span>
+      </span>,
     );
   } else {
     closeTroveItems.push(
       <span key="noDebt" className="text-slate-500">
         Debt was already 0, so no repayment necessary
-      </span>
+      </span>,
     );
   }
 
   closeTroveItems.push(
     <span key="retrieveCollateral" className="text-slate-500">
-      Retrieved all{' '}
+      Retrieved all{" "}
       <HighlightableValue type="collateral" state="change" value={collateralWithdrawn}>
         {collateralWithdrawn} {tx.collateralType}
-      </HighlightableValue>
-      {' '}collateral
-      {closeCollUsdValue && (
-        <span className="text-slate-400">
-          {' '}(valued at {formatUsdValue(closeCollUsdValue)})
-        </span>
-      )}
-    </span>
+      </HighlightableValue>{" "}
+      collateral
+      {closeCollUsdValue && <span className="text-slate-400"> (valued at {formatUsdValue(closeCollUsdValue)})</span>}
+    </span>,
   );
 
   closeTroveItems.push(
     <span key="reserve" className="text-slate-500">
       The {LIQUIDATION_RESERVE_ETH} ETH liquidation reserve was returned
       <InfoButton href={FAQ_URLS.LIQUIDATION_RESERVE} />
-    </span>
+    </span>,
   );
 
   if (beforeInterestRateClose) {
     closeTroveItems.push(
       <span key="interestRate" className="text-slate-400">
         Position was paying {beforeInterestRateClose}% annual interest before closure
-      </span>
+      </span>,
     );
   }
 
@@ -81,7 +77,7 @@ export function CloseTroveExplanation({ transaction, onToggle }: CloseTroveExpla
     closeTroveItems.push(
       <span key="collRatio" className="text-slate-400">
         Closed with a {beforeCollRatioClose}% collateral ratio
-      </span>
+      </span>,
     );
   }
 
@@ -92,17 +88,22 @@ export function CloseTroveExplanation({ transaction, onToggle }: CloseTroveExpla
       <span key="nftBurn" className="text-slate-500">
         Trove NFT was sent to the burn address, ending token ownership
         <InfoButton href={FAQ_URLS.NFT_TROVES} />
-      </span>
+      </span>,
     );
   }
-  
+
   closeTroveItems.push(
     <span key="success" className="text-slate-500">
       Trove successfully closed - all obligations settled
-    </span>
+    </span>,
   );
-  
+
   return (
-    <ExplanationPanel items={closeTroveItems} onToggle={onToggle} defaultOpen={false} transactionHash={transaction.transactionHash} />
+    <ExplanationPanel
+      items={closeTroveItems}
+      onToggle={onToggle}
+      defaultOpen={false}
+      transactionHash={transaction.transactionHash}
+    />
   );
 }

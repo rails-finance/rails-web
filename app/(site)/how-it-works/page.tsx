@@ -38,7 +38,8 @@ export default function HowItWorksPage() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-slate-600 dark:text-slate-300 mb-4">What Rails Does</h2>
               <p className="text-slate-700 dark:text-slate-300 mb-4">
-                Rails is a specialized analytics platform that makes DeFi activity easy to understand. We take complex blockchain data from protocols like Liquity V2 and transform it into clear, actionable insights.
+                Rails is a specialized analytics platform that makes DeFi activity easy to understand. We take complex
+                blockchain data from protocols like Liquity V2 and transform it into clear, actionable insights.
               </p>
 
               <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-6 mb-6">
@@ -60,28 +61,38 @@ export default function HowItWorksPage() {
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
                   <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">1. Data Collection</h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    We continuously monitor the Ethereum blockchain for Liquity V2 events. Every transaction, state change, and protocol interaction is captured in real-time.
+                    We continuously monitor the Ethereum blockchain for Liquity V2 events. Every transaction, state
+                    change, and protocol interaction is captured in real-time.
                   </p>
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
-                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">2. Context Enrichment</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                    2. Context Enrichment
+                  </h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    Raw blockchain events are enriched with transaction context. We analyze why transfers happened, what operations triggered them, and how they affect protocol state.
+                    Raw blockchain events are enriched with transaction context. We analyze why transfers happened, what
+                    operations triggered them, and how they affect protocol state.
                   </p>
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
-                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">3. Processing & Analysis</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                    3. Processing & Analysis
+                  </h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    Our processors analyze complete transactions to understand complex operations like batch updates, interest rate changes, and liquidations.
+                    Our processors analyze complete transactions to understand complex operations like batch updates,
+                    interest rate changes, and liquidations.
                   </p>
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
-                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">4. User-Friendly Display</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                    4. User-Friendly Display
+                  </h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    Processed data is transformed into intuitive visualizations, timelines, and explanations that make DeFi activity understandable at a glance.
+                    Processed data is transformed into intuitive visualizations, timelines, and explanations that make
+                    DeFi activity understandable at a glance.
                   </p>
                 </div>
               </div>
@@ -92,23 +103,30 @@ export default function HowItWorksPage() {
 
               <div className="space-y-4">
                 <div className="border-l-4 border-green-500 pl-4">
-                  <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Complete Transaction Context</h3>
+                  <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                    Complete Transaction Context
+                  </h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    Unlike simple block explorers, Rails understands the complete context of each transaction. We show not just what happened, but why it happened and what it means.
+                    Unlike simple block explorers, Rails understands the complete context of each transaction. We show
+                    not just what happened, but why it happened and what it means.
                   </p>
                 </div>
 
                 <div className="border-l-4 border-blue-500 pl-4">
-                  <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Protocol-Specific Intelligence</h3>
+                  <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                    Protocol-Specific Intelligence
+                  </h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    Rails deeply understands Liquity V2's mechanics. We decode complex operations, calculate interest impacts, and explain protocol-specific events in plain language.
+                    Rails deeply understands Liquity V2's mechanics. We decode complex operations, calculate interest
+                    impacts, and explain protocol-specific events in plain language.
                   </p>
                 </div>
 
                 <div className="border-l-4 border-purple-500 pl-4">
                   <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Real-Time Processing</h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    Data is processed as it happens on-chain. You see your transactions and their effects immediately, with rich context and explanations.
+                    Data is processed as it happens on-chain. You see your transactions and their effects immediately,
+                    with rich context and explanations.
                   </p>
                 </div>
               </div>
@@ -143,7 +161,8 @@ export default function HowItWorksPage() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Technical Architecture</h2>
               <p className="text-slate-700 dark:text-slate-300 mb-4">
-                Rails uses a sophisticated multi-layer architecture to process and serve blockchain data efficiently and accurately.
+                Rails uses a sophisticated multi-layer architecture to process and serve blockchain data efficiently and
+                accurately.
               </p>
             </section>
 
@@ -152,7 +171,9 @@ export default function HowItWorksPage() {
 
               <div className="space-y-6">
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
-                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">1. Blockchain Indexer (Ponder)</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                    1. Blockchain Indexer (Ponder)
+                  </h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
                     Connects directly to Ethereum nodes and monitors all Liquity V2 contracts in real-time.
                   </p>
@@ -165,7 +186,9 @@ export default function HowItWorksPage() {
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
-                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">2. Message Queue (RabbitMQ)</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                    2. Message Queue (RabbitMQ)
+                  </h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
                     Manages event flow and ensures reliable processing of all blockchain events.
                   </p>
@@ -204,7 +227,9 @@ export default function HowItWorksPage() {
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
-                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">4. Database Layer (PostgreSQL)</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                    4. Database Layer (PostgreSQL)
+                  </h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
                     Stores processed data with rich context and pre-computed summaries.
                   </p>
@@ -229,7 +254,9 @@ export default function HowItWorksPage() {
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
-                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">6. Frontend (Next.js + React)</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                    6. Frontend (Next.js + React)
+                  </h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
                     Modern, responsive interface for data visualization and exploration.
                   </p>
@@ -246,7 +273,9 @@ export default function HowItWorksPage() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Data Flow Example</h2>
               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-5">
-                <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-3">When a user opens a trove:</h3>
+                <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-3">
+                  When a user opens a trove:
+                </h3>
                 <ol className="list-decimal pl-6 space-y-2 text-blue-700 dark:text-blue-400">
                   <li>Transaction occurs on Ethereum blockchain</li>
                   <li>Ponder captures TroveOperation event with full transaction receipt</li>
@@ -264,30 +293,36 @@ export default function HowItWorksPage() {
               <h2 className="text-2xl font-semibold text-slate-600 dark:text-slate-300 mb-4">Key Innovations</h2>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="border border-slate-200 dark:border-slate-600 rounded-lg p-4">
-                  <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Transaction Receipt Analysis</h3>
+                  <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                    Transaction Receipt Analysis
+                  </h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    By analyzing complete transaction receipts, we understand the full context of every operation, not just individual events.
+                    By analyzing complete transaction receipts, we understand the full context of every operation, not
+                    just individual events.
                   </p>
                 </div>
 
                 <div className="border border-slate-200 dark:border-slate-600 rounded-lg p-4">
                   <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Pre-computed Summaries</h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Data is processed and summarized at ingestion time, enabling instant API responses without runtime calculations.
+                    Data is processed and summarized at ingestion time, enabling instant API responses without runtime
+                    calculations.
                   </p>
                 </div>
 
                 <div className="border border-slate-200 dark:border-slate-600 rounded-lg p-4">
                   <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Event Correlation</h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Multiple events from the same transaction are correlated to provide complete operation understanding.
+                    Multiple events from the same transaction are correlated to provide complete operation
+                    understanding.
                   </p>
                 </div>
 
                 <div className="border border-slate-200 dark:border-slate-600 rounded-lg p-4">
                   <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Protocol-Aware Processing</h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Deep understanding of Liquity V2 mechanics enables accurate interest calculations and operation decoding.
+                    Deep understanding of Liquity V2 mechanics enables accurate interest calculations and operation
+                    decoding.
                   </p>
                 </div>
               </div>
@@ -299,7 +334,10 @@ export default function HowItWorksPage() {
                 Rails is committed to transparency. Our codebase is open source and available for review:
               </p>
               <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-                <a href="https://github.com/rails-finance" className="text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 font-medium">
+                <a
+                  href="https://github.com/rails-finance"
+                  className="text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 font-medium"
+                >
                   View Rails on GitHub →
                 </a>
               </div>

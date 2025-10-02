@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { Transaction } from '@/types/api/troveHistory';
-import { HighlightableValue } from '../HighlightableValue';
-import { ExplanationPanel } from '../ExplanationPanel';
-import { formatCurrency } from '../shared/eventHelpers';
-import { Link2 } from 'lucide-react';
-import { getBatchManagerInfo } from '@/lib/utils/batch-manager-utils';
-import { Icon } from '@/components/icons/icon';
+import React, { useState } from "react";
+import { Transaction } from "@/types/api/troveHistory";
+import { HighlightableValue } from "../HighlightableValue";
+import { ExplanationPanel } from "../ExplanationPanel";
+import { formatCurrency } from "../shared/eventHelpers";
+import { Link2 } from "lucide-react";
+import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
+import { Icon } from "@/components/icons/icon";
 
 interface SetInterestBatchManagerExplanationProps {
   transaction: Transaction;
@@ -23,15 +23,16 @@ export function SetInterestBatchManagerExplanation({ transaction, onToggle }: Se
   const joinAfterColl = tx.stateAfter.coll;
   const joinBeforeRatio = tx.stateBefore?.collateralRatio;
   const joinAfterRatio = tx.stateAfter.collateralRatio;
-  
+
   // Get batch manager info for website link
-  const batchManagerInfo = getBatchManagerInfo(tx.stateAfter.interestBatchManager || '');
-  const batchManagerAddress = tx.stateAfter.interestBatchManager || '';
+  const batchManagerInfo = getBatchManagerInfo(tx.stateAfter.interestBatchManager || "");
+  const batchManagerAddress = tx.stateAfter.interestBatchManager || "";
   const shortAddress = `${batchManagerAddress.slice(0, 6)}...${batchManagerAddress.slice(-4)}`;
-  
+
   const batchJoinItems: React.ReactNode[] = [
     <span key="action" className="text-slate-500">
-      Moved Trove from individual to delegated ({batchManagerInfo?.name}) {batchManagerInfo?.website && (
+      Moved Trove from individual to delegated ({batchManagerInfo?.name}){" "}
+      {batchManagerInfo?.website && (
         <>
           <a
             href={batchManagerInfo.website}
@@ -43,48 +44,49 @@ export function SetInterestBatchManagerExplanation({ transaction, onToggle }: Se
             <Link2 className="w-3 h-3" />
           </a>
         </>
-      )} interest rate management 
+      )}{" "}
+      interest rate management
     </span>,
     <span key="debt" className="text-slate-500">
-      Debt updated from{' '}
+      Debt updated from{" "}
       <HighlightableValue type="debt" state="before" value={joinBeforeDebt}>
         {formatCurrency(joinBeforeDebt, tx.assetType)}
-      </HighlightableValue>
-      {' '}to{' '}
+      </HighlightableValue>{" "}
+      to{" "}
       <HighlightableValue type="debt" state="after" value={joinAfterDebt}>
         {formatCurrency(joinAfterDebt, tx.assetType)}
       </HighlightableValue>
-      {joinBeforeDebt === joinAfterDebt ? ' (unchanged)' : ' (reflects accrued interest)'}
+      {joinBeforeDebt === joinAfterDebt ? " (unchanged)" : " (reflects accrued interest)"}
     </span>,
     <span key="collateral" className="text-slate-500">
-      Collateral remains{' '}
+      Collateral remains{" "}
       <HighlightableValue type="collateral" state="after" value={joinAfterColl}>
         {joinAfterColl} {tx.collateralType}
       </HighlightableValue>
     </span>,
     <span key="interestRate" className="text-slate-500">
-      Interest rate changed delegated rate{' '}
+      Interest rate changed delegated rate{" "}
       <HighlightableValue type="interestRate" state="after" value={joinRate}>
         {joinRate}%
       </HighlightableValue>
-    </span>
+    </span>,
   ];
 
   if (joinBeforeRatio !== undefined) {
     batchJoinItems.push(
       <span key="collRatio" className="text-slate-500">
-        Collateral ratio: {' '}
+        Collateral ratio:{" "}
         <HighlightableValue type="collRatio" state="after" value={joinAfterRatio}>
           {joinAfterRatio.toFixed(1)}%
         </HighlightableValue>
-      </span>
+      </span>,
     );
   }
 
   // Add batch manager address with copy button
   batchJoinItems.push(
     <span key="address" className="text-slate-500">
-      Batch manager address:{' '}
+      Batch manager address:{" "}
       <span className="inline-flex items-center gap-1">
         <span className="font-medium text-blue-400">{shortAddress}</span>
         <button
@@ -100,10 +102,15 @@ export function SetInterestBatchManagerExplanation({ transaction, onToggle }: Se
           <Icon name={copied ? "check" : "copy"} className="w-3.5 h-3.5" />
         </button>
       </span>
-    </span>
+    </span>,
   );
-  
+
   return (
-    <ExplanationPanel items={batchJoinItems} onToggle={onToggle} defaultOpen={false} transactionHash={transaction.transactionHash} />
+    <ExplanationPanel
+      items={batchJoinItems}
+      onToggle={onToggle}
+      defaultOpen={false}
+      transactionHash={transaction.transactionHash}
+    />
   );
 }

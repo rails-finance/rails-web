@@ -2,11 +2,25 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { TroveSummary } from "@/types/api/trove";
-import { DebtInFrontCalculator, DebtInFrontResult, TroveWithCalculatedDebt } from "@/lib/utils/debt-in-front-calculator";
+import {
+  DebtInFrontCalculator,
+  DebtInFrontResult,
+  TroveWithCalculatedDebt,
+} from "@/lib/utils/debt-in-front-calculator";
 import { InterestCalculator } from "@/lib/utils/interest-calculator";
 import { formatPrice, formatUsdValue } from "@/lib/utils/format";
 import { Icon } from "@/components/icons/icon";
-import { X, ChevronUp, ChevronDown, ChevronRight, ChevronLeft, BringToFront, ShieldEllipsis, RotateCw, BetweenHorizontalStart } from "lucide-react";
+import {
+  X,
+  ChevronUp,
+  ChevronDown,
+  ChevronRight,
+  ChevronLeft,
+  BringToFront,
+  ShieldEllipsis,
+  RotateCw,
+  BetweenHorizontalStart,
+} from "lucide-react";
 import Link from "next/link";
 
 interface DebtInFrontDisplayProps {
@@ -22,7 +36,7 @@ export function DebtInFrontDisplay({
   className = "",
   showAsButton = true,
   autoCalculate = false,
-  onCalculated
+  onCalculated,
 }: DebtInFrontDisplayProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [debtData, setDebtData] = useState<DebtInFrontResult | null>(null);
@@ -44,7 +58,7 @@ export function DebtInFrontDisplay({
       lastUpdateTime,
       trove.batch.isMember,
       trove.batch.managementFee,
-      trove.batch.manager || undefined
+      trove.batch.manager || undefined,
     );
 
     return {
@@ -52,7 +66,7 @@ export function DebtInFrontDisplay({
       accruedInterest: interestInfo.accruedInterest,
       managementFees: interestInfo.accruedManagementFees || 0,
       totalDebt: interestInfo.entireDebt,
-      interestRate: trove.metrics.interestRate
+      interestRate: trove.metrics.interestRate,
     };
   }, [trove]);
 
@@ -76,7 +90,6 @@ export function DebtInFrontDisplay({
       setIsLoading(false);
     }
   }, [trove, calculator, autoCalculate, onCalculated]);
-
 
   // Auto-calculate on mount if requested
   useEffect(() => {
@@ -102,7 +115,6 @@ export function DebtInFrontDisplay({
           <span className="font-bold">{calculator.formatDebtAmount(debtData.debtInFront)}</span>
         </div>
         <div className="flex items-center gap-1">
-          
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -112,7 +124,7 @@ export function DebtInFrontDisplay({
             className="ml-1 p-0.5 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Refresh"
           >
-            <RotateCw className={`h-2.5 w-2.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <RotateCw className={`h-2.5 w-2.5 ${isLoading ? "animate-spin" : ""}`} />
           </button>
         </div>
       </div>
@@ -123,9 +135,7 @@ export function DebtInFrontDisplay({
     const allTroves = [...troves];
 
     if (troves.length === 0 && !troveBehind) {
-      return (
-        <p className="text-sm text-slate-600 dark:text-slate-400 italic">No other troves found</p>
-      );
+      return <p className="text-sm text-slate-600 dark:text-slate-400 italic">No other troves found</p>;
     }
 
     // Determine which troves to show
@@ -147,7 +157,7 @@ export function DebtInFrontDisplay({
       const uniqueTroveIds = new Set<string>();
       trovesToDisplay = [];
 
-      [...highRiskTroves, ...nearbyTroves].forEach(t => {
+      [...highRiskTroves, ...nearbyTroves].forEach((t) => {
         if (!uniqueTroveIds.has(t.trove.id)) {
           uniqueTroveIds.add(t.trove.id);
           trovesToDisplay.push(t);
@@ -172,21 +182,29 @@ export function DebtInFrontDisplay({
           <thead className="bg-slate-100 dark:bg-slate-800">
             <tr>
               <th className="px-2 py-1.5 text-left">#</th>
-              <th className="px-2 py-1.5 text-left"><span className=" inline-flex items-center gap-1"><Icon name="trove-id" size={12} className="inline" /></span></th>
-              <th className="px-2 py-1.5 text-left"><span className=" inline-flex items-center gap-1"><Icon name="user" size={12} className="inline" /></span></th>
+              <th className="px-2 py-1.5 text-left">
+                <span className=" inline-flex items-center gap-1">
+                  <Icon name="trove-id" size={12} className="inline" />
+                </span>
+              </th>
+              <th className="px-2 py-1.5 text-left">
+                <span className=" inline-flex items-center gap-1">
+                  <Icon name="user" size={12} className="inline" />
+                </span>
+              </th>
               <th className="px-2 py-1.5 text-right">Interest Rate</th>
               <th className="px-2 py-1.5 text-right">Debt</th>
             </tr>
           </thead>
           <tbody>
             {trovesToDisplay.map((item, index) => {
-              const actualPosition = allTroves.findIndex(t => t.trove.id === item.trove.id) + 1;
+              const actualPosition = allTroves.findIndex((t) => t.trove.id === item.trove.id) + 1;
               const prevItem = index > 0 ? trovesToDisplay[index - 1] : null;
-              const prevPosition = prevItem ? allTroves.findIndex(t => t.trove.id === prevItem.trove.id) + 1 : 0;
+              const prevPosition = prevItem ? allTroves.findIndex((t) => t.trove.id === prevItem.trove.id) + 1 : 0;
 
               // Check if there's a gap between positions (hidden troves)
-              const shouldShowHiddenIndicator = !showAllTroves && prevItem && (actualPosition - prevPosition > 1);
-              const hiddenBetween = shouldShowHiddenIndicator ? (actualPosition - prevPosition - 1) : 0;
+              const shouldShowHiddenIndicator = !showAllTroves && prevItem && actualPosition - prevPosition > 1;
+              const hiddenBetween = shouldShowHiddenIndicator ? actualPosition - prevPosition - 1 : 0;
 
               return (
                 <React.Fragment key={item.trove.id}>
@@ -197,14 +215,12 @@ export function DebtInFrontDisplay({
                           onClick={() => setShowAllTroves(true)}
                           className="text-xs text-blue-200 hover:text-white transition-colors cursor-pointer rounded px-1.5 py-0.25 bg-blue-600"
                         >
-                          +{hiddenBetween} more Trove{hiddenBetween > 1 ? 's' : ''}
+                          +{hiddenBetween} more Trove{hiddenBetween > 1 ? "s" : ""}
                         </button>
                       </td>
                     </tr>
                   )}
-                  <tr
-                    className="hover:bg-slate-200 dark:hover:bg-slate-900 transition-colors"
-                  >
+                  <tr className="hover:bg-slate-200 dark:hover:bg-slate-900 transition-colors">
                     <td className="px-2 py-1.5 text-slate-600 dark:text-slate-400">{actualPosition}</td>
                     <td className="px-2 py-1.5">
                       <Link
@@ -215,43 +231,39 @@ export function DebtInFrontDisplay({
                       </Link>
                     </td>
                     <td className="px-2 py-1.5 text-slate-600 dark:text-slate-400">
-                      {item.trove.owner ?
-                        (item.trove.ownerEns || `${item.trove.owner.slice(0, 6)}...${item.trove.owner.slice(-4)}`) :
-                        '-'
-                      }
+                      {item.trove.owner
+                        ? item.trove.ownerEns || `${item.trove.owner.slice(0, 6)}...${item.trove.owner.slice(-4)}`
+                        : "-"}
                     </td>
-                    <td className="px-2 py-1.5 text-right">
-                      {item.trove.metrics.interestRate.toFixed(2)}%
-                    </td>
+                    <td className="px-2 py-1.5 text-right">{item.trove.metrics.interestRate.toFixed(2)}%</td>
                     <td className="px-2 py-1.5 text-right font-semibold group relative">
-                        {formatPrice(item.totalDebt)}
-                      
+                      {formatPrice(item.totalDebt)}
                     </td>
                   </tr>
                 </React.Fragment>
               );
-            }
-            )}
+            })}
 
             {/* Current trove (this trove) */}
             <tr>
-              <td className="px-2 py-1.5"><span className="text-white font-extrabold flex items-center"><ChevronRight className="h-3 w-3 -ml-3" /> {allTroves.length + 1}</span></td>
-              <td className="px-2 py-1.5"><span className="text-white font-extrabold">
-                  {trove.id ? `${trove.id.substring(0, 8)}...` : "n/a"}
-</span>
-
+              <td className="px-2 py-1.5">
+                <span className="text-white font-extrabold flex items-center">
+                  <ChevronRight className="h-3 w-3 -ml-3" /> {allTroves.length + 1}
+                </span>
               </td>
               <td className="px-2 py-1.5">
-                <span  className="text-white font-extrabold">{trove.owner ?
-                  (trove.ownerEns || `${trove.owner.slice(0, 6)}...${trove.owner.slice(-4)}`) :
-                  '-'
-                }</span>
+                <span className="text-white font-extrabold">{trove.id ? `${trove.id.substring(0, 8)}...` : "n/a"}</span>
+              </td>
+              <td className="px-2 py-1.5">
+                <span className="text-white font-extrabold">
+                  {trove.owner ? trove.ownerEns || `${trove.owner.slice(0, 6)}...${trove.owner.slice(-4)}` : "-"}
+                </span>
               </td>
               <td className="px-2 py-1.5 text-right">
-                <span  className="text-white font-extrabold">{currentTroveCalculated.interestRate.toFixed(2)}%</span>
+                <span className="text-white font-extrabold">{currentTroveCalculated.interestRate.toFixed(2)}%</span>
               </td>
               <td className="px-2 py-1.5 text-right font-semibold group relative">
-                  <span  className="text-white font-extrabold">{formatPrice(currentTroveCalculated.totalDebt)}</span>
+                <span className="text-white font-extrabold">{formatPrice(currentTroveCalculated.totalDebt)}</span>
               </td>
             </tr>
 
@@ -268,16 +280,14 @@ export function DebtInFrontDisplay({
                   </Link>
                 </td>
                 <td className="px-2 py-1.5 text-slate-600 dark:text-slate-400">
-                  {troveBehind.trove.owner ?
-                    (troveBehind.trove.ownerEns || `${troveBehind.trove.owner.slice(0, 6)}...${troveBehind.trove.owner.slice(-4)}`) :
-                    '-'
-                  }
+                  {troveBehind.trove.owner
+                    ? troveBehind.trove.ownerEns ||
+                      `${troveBehind.trove.owner.slice(0, 6)}...${troveBehind.trove.owner.slice(-4)}`
+                    : "-"}
                 </td>
-                <td className="px-2 py-1.5 text-right">
-                  {troveBehind.trove.metrics.interestRate.toFixed(2)}%
-                </td>
+                <td className="px-2 py-1.5 text-right">{troveBehind.trove.metrics.interestRate.toFixed(2)}%</td>
                 <td className="px-2 py-1.5 text-right font-semibold group relative">
-                    {formatPrice(troveBehind.totalDebt)}
+                  {formatPrice(troveBehind.totalDebt)}
                 </td>
               </tr>
             )}
@@ -298,11 +308,7 @@ export function DebtInFrontDisplay({
     }
 
     if (error) {
-      return (
-        <div className="text-sm text-red-500">
-          Error: {error}
-        </div>
-      );
+      return <div className="text-sm text-red-500">Error: {error}</div>;
     }
 
     if (!debtData) {
@@ -312,9 +318,7 @@ export function DebtInFrontDisplay({
     return (
       <div className="space-y-3">
         {/* Trove Table - Always show when expanded */}
-        <div>
-          {renderTroveTable(debtData.troveDetails, debtData.troveBehind)}
-        </div>
+        <div>{renderTroveTable(debtData.troveDetails, debtData.troveBehind)}</div>
 
         {/* Information Note */}
         <div className="py-2 text-xs text-slate-600 dark:text-slate-400">
@@ -334,58 +338,59 @@ export function DebtInFrontDisplay({
   // Show button when not expanded (either before or after calculation)
   if (showAsButton && !isExpanded) {
     return (
-      <div className={`w-full flex items-center gap-2 text-sm font-medium rounded text-slate-700 dark:text-slate-300 ${className}`}>
+      <div
+        className={`w-full flex items-center gap-2 text-sm font-medium rounded text-slate-700 dark:text-slate-300 ${className}`}
+      >
         <div className="flex-1 inline-flex items-center gap-2">
-        <button
-          onClick={debtData ? () => setIsExpanded(true) : calculateDebtInFront}
-          disabled={isLoading}
-          className="py-1 px-2 flex gap-1 items-center cursor-pointer bg-slate-50 dark:bg-slate-950 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={debtData ? "Show details" : "Calculate position"}
-        >
-           <BetweenHorizontalStart className="h-4 w-4" />{debtData ? debtData.trovesAhead + 1 : '?'}
-        </button>
+          <button
+            onClick={debtData ? () => setIsExpanded(true) : calculateDebtInFront}
+            disabled={isLoading}
+            className="py-1 px-2 flex gap-1 items-center cursor-pointer bg-slate-50 dark:bg-slate-950 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={debtData ? "Show details" : "Calculate position"}
+          >
+            <BetweenHorizontalStart className="h-4 w-4" />
+            {debtData ? debtData.trovesAhead + 1 : "?"}
+          </button>
           {renderDebtPositionInfo()}
-
-</div>
+        </div>
       </div>
     );
   }
 
-
   return (
     <div className={`${className}`}>
       {/* Button/Header - always visible */}
-            <div className={`w-full flex items-center gap-2 text-sm font-medium rounded bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 ${className}`}>
+      <div
+        className={`w-full flex items-center gap-2 text-sm font-medium rounded bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 ${className}`}
+      >
         <div className="flex-1 inline-flex items-center gap-2">
-        <button
-          onClick={isExpanded ? () => setIsExpanded(false) : (debtData ? () => setIsExpanded(true) : calculateDebtInFront)}
-          disabled={isLoading}
-          className="py-1 px-2 flex gap-1 items-center cursor-pointer hover:text-blue-400 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={isExpanded ? "Hide details" : (debtData ? "Show details" : "Calculate position")}
-        >
-          <BetweenHorizontalStart className={`h-4 w-4`} />
-          {debtData ? debtData.trovesAhead + 1 : '?'} 
-          
-        </button>
+          <button
+            onClick={
+              isExpanded ? () => setIsExpanded(false) : debtData ? () => setIsExpanded(true) : calculateDebtInFront
+            }
+            disabled={isLoading}
+            className="py-1 px-2 flex gap-1 items-center cursor-pointer hover:text-blue-400 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={isExpanded ? "Hide details" : debtData ? "Show details" : "Calculate position"}
+          >
+            <BetweenHorizontalStart className={`h-4 w-4`} />
+            {debtData ? debtData.trovesAhead + 1 : "?"}
+          </button>
           {renderDebtPositionInfo()}
-        </div> 
+        </div>
         <button
-          onClick={isExpanded ? () => setIsExpanded(false) : (debtData ? () => setIsExpanded(true) : calculateDebtInFront)}
+          onClick={
+            isExpanded ? () => setIsExpanded(false) : debtData ? () => setIsExpanded(true) : calculateDebtInFront
+          }
           disabled={isLoading}
           className="py-1 px-2 flex gap-1 items-center cursor-pointer rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={isExpanded ? "Hide details" : (debtData ? "Show details" : "Calculate position")}
+          title={isExpanded ? "Hide details" : debtData ? "Show details" : "Calculate position"}
         >
           <X className={`h-4 w-4`} />
-          
         </button>
       </div>
 
       {/* Expanded content */}
-      {isExpanded && (
-        <div className="p-2 rounded-b-lg bg-slate-950">
-          {renderContent()}
-        </div>
-      )}
+      {isExpanded && <div className="p-2 rounded-b-lg bg-slate-950">{renderContent()}</div>}
     </div>
   );
 }

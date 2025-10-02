@@ -29,7 +29,7 @@ export class DebtInFrontCalculator {
   private interestCalculator: InterestCalculator;
   private apiBaseUrl: string;
 
-  constructor(apiBaseUrl: string = '/api') {
+  constructor(apiBaseUrl: string = "/api") {
     this.interestCalculator = new InterestCalculator();
     this.apiBaseUrl = apiBaseUrl;
   }
@@ -37,17 +37,15 @@ export class DebtInFrontCalculator {
   /**
    * Fetch troves with lower interest rates for the same collateral type
    */
-  async fetchTrovesWithLowerRates(
-    targetTrove: TroveSummary
-  ): Promise<TroveSummary[]> {
+  async fetchTrovesWithLowerRates(targetTrove: TroveSummary): Promise<TroveSummary[]> {
     // Build query to get all open troves with same collateral type
     // The backend should ideally support interest rate filtering
     const params = new URLSearchParams({
-      status: 'open',
+      status: "open",
       collateralType: targetTrove.collateralType,
-      sortBy: 'interestRate',
-      sortOrder: 'asc',
-      limit: '100' // Start with smaller limit for debugging
+      sortBy: "interestRate",
+      sortOrder: "asc",
+      limit: "100", // Start with smaller limit for debugging
     });
 
     const url = `${this.apiBaseUrl}/troves?${params}`;
@@ -60,9 +58,9 @@ export class DebtInFrontCalculator {
     const data = await response.json();
 
     // Filter for troves with strictly lower interest rates
-    const trovesWithLowerRates = data.data.filter((trove: TroveSummary) =>
-      trove.metrics.interestRate < targetTrove.metrics.interestRate &&
-      trove.id !== targetTrove.id
+    const trovesWithLowerRates = data.data.filter(
+      (trove: TroveSummary) =>
+        trove.metrics.interestRate < targetTrove.metrics.interestRate && trove.id !== targetTrove.id,
     );
 
     return trovesWithLowerRates;
@@ -73,15 +71,15 @@ export class DebtInFrontCalculator {
    */
   async calculateDebtInFront(
     targetTrove: TroveSummary,
-    includeAccruedInterest: boolean = true
+    includeAccruedInterest: boolean = true,
   ): Promise<DebtInFrontResult> {
     // Fetch all troves for sorting
     const params = new URLSearchParams({
-      status: 'open',
+      status: "open",
       collateralType: targetTrove.collateralType,
-      sortBy: 'interestRate',
-      sortOrder: 'asc',
-      limit: '100'
+      sortBy: "interestRate",
+      sortOrder: "asc",
+      limit: "100",
     });
 
     const url = `${this.apiBaseUrl}/troves?${params}`;
@@ -97,26 +95,28 @@ export class DebtInFrontCalculator {
     // Troves are ahead if they have:
     // 1. Lower interest rate, OR
     // 2. Same interest rate but lower ID (tiebreaker)
-    const trovesAhead = data.data.filter((trove: TroveSummary) =>
-      trove.id !== targetTrove.id && (
-        trove.metrics.interestRate < targetTrove.metrics.interestRate ||
-        (trove.metrics.interestRate === targetTrove.metrics.interestRate &&
-         trove.id < targetTrove.id)
-      )
+    const trovesAhead = data.data.filter(
+      (trove: TroveSummary) =>
+        trove.id !== targetTrove.id &&
+        (trove.metrics.interestRate < targetTrove.metrics.interestRate ||
+          (trove.metrics.interestRate === targetTrove.metrics.interestRate && trove.id < targetTrove.id)),
     );
 
     // Find the trove immediately behind (next higher rate)
-    const troveBehindList = data.data.filter((trove: TroveSummary) =>
-      (trove.metrics.interestRate > targetTrove.metrics.interestRate ||
-      (trove.metrics.interestRate === targetTrove.metrics.interestRate && trove.id > targetTrove.id)) &&
-      trove.id !== targetTrove.id
-    ).sort((a: TroveSummary, b: TroveSummary) => {
-      const rateDiff = a.metrics.interestRate - b.metrics.interestRate;
-      if (Math.abs(rateDiff) < 0.0001) {
-        return a.id.localeCompare(b.id);
-      }
-      return rateDiff;
-    });
+    const troveBehindList = data.data
+      .filter(
+        (trove: TroveSummary) =>
+          (trove.metrics.interestRate > targetTrove.metrics.interestRate ||
+            (trove.metrics.interestRate === targetTrove.metrics.interestRate && trove.id > targetTrove.id)) &&
+          trove.id !== targetTrove.id,
+      )
+      .sort((a: TroveSummary, b: TroveSummary) => {
+        const rateDiff = a.metrics.interestRate - b.metrics.interestRate;
+        if (Math.abs(rateDiff) < 0.0001) {
+          return a.id.localeCompare(b.id);
+        }
+        return rateDiff;
+      });
 
     let totalDebtInFront = 0;
     const troveDetails: TroveWithCalculatedDebt[] = [];
@@ -151,17 +151,14 @@ export class DebtInFrontCalculator {
       collateralType: targetTrove.collateralType,
       targetInterestRate: targetTrove.metrics.interestRate,
       troveDetails,
-      troveBehind
+      troveBehind,
     };
   }
 
   /**
    * Calculate debt for a single trove
    */
-  private calculateTroveDebt(
-    trove: TroveSummary,
-    includeAccruedInterest: boolean
-  ): TroveWithCalculatedDebt {
+  private calculateTroveDebt(trove: TroveSummary, includeAccruedInterest: boolean): TroveWithCalculatedDebt {
     const recordedDebt = parseFloat(trove.debt.currentRaw) / 1e18;
     let accruedInterest = 0;
     let managementFees = 0;
@@ -175,7 +172,7 @@ export class DebtInFrontCalculator {
         lastUpdateTime,
         trove.batch.isMember,
         trove.batch.managementFee,
-        trove.batch.manager || undefined
+        trove.batch.manager || undefined,
       );
 
       accruedInterest = interestInfo.accruedInterest;
@@ -190,7 +187,7 @@ export class DebtInFrontCalculator {
       recordedDebt,
       accruedInterest,
       managementFees,
-      totalDebt
+      totalDebt,
     };
   }
 

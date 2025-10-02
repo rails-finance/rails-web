@@ -1,7 +1,14 @@
 // Comprehensive mock trove with every permutation of Liquity protocol events
 // This mock includes all possible transaction types, operations, and state combinations
 
-import type { TransactionTimeline, Transaction, TroveTransaction, TroveLiquidationTransaction, TroveRedemptionTransaction, TroveTransferTransaction } from '@/types/api/troveHistory';
+import type {
+  TransactionTimeline,
+  Transaction,
+  TroveTransaction,
+  TroveLiquidationTransaction,
+  TroveRedemptionTransaction,
+  TroveTransferTransaction,
+} from "@/types/api/troveHistory";
 
 // Keep old TroveData type for mockData compatibility
 export interface TroveData {
@@ -87,7 +94,6 @@ export const mockTroveComprehensive: TransactionTimeline = {
   totalTransactions: 30,
   transactions: [
     // === CLOSURES & LIQUIDATIONS (Latest events) ===
-    
 
     // 2. CLOSE TROVE (standard)
     {
@@ -102,7 +108,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.005,
-      gasFeeUsd: 10.00,
+      gasFeeUsd: 10.0,
       troveOperation: {
         annualInterestRate: 0,
         debtIncreaseFromRedist: 0,
@@ -145,7 +151,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.007,
-      gasFeeUsd: 14.00,
+      gasFeeUsd: 14.0,
       troveOperation: {
         annualInterestRate: 0,
         debtIncreaseFromRedist: 0,
@@ -188,7 +194,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
     // 3. LIQUIDATION (this trove gets liquidated)
     {
       id: "0xliquidated-0",
-      type: "liquidation", 
+      type: "liquidation",
       operation: "liquidate",
       transactionHash: "0xliquidated234567890abcdef1234567890abcdef1234567890abcdef1234567890",
       blockNumber: 18500900,
@@ -198,7 +204,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.012,
-      gasFeeUsd: 24.00,
+      gasFeeUsd: 24.0,
       systemLiquidation: {
         debtOffsetBySP: 9000,
         debtRedistributed: 1500,
@@ -249,7 +255,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.008,
-      gasFeeUsd: 16.80,
+      gasFeeUsd: 16.8,
       systemLiquidation: {
         debtOffsetBySP: 8000,
         debtRedistributed: 2000,
@@ -302,7 +308,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.003,
-      gasFeeUsd: 5.40,
+      gasFeeUsd: 5.4,
       systemRedemption: {
         attemptedBoldAmount: 5000,
         actualBoldAmount: 4800,
@@ -353,7 +359,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.004,
-      gasFeeUsd: 7.20,
+      gasFeeUsd: 7.2,
       systemRedemption: {
         attemptedBoldAmount: 8000,
         actualBoldAmount: 7500,
@@ -512,7 +518,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.003,
-      gasFeeUsd: 6.30,
+      gasFeeUsd: 6.3,
       troveOperation: {
         annualInterestRate: 5.5,
         debtIncreaseFromRedist: 50,
@@ -555,7 +561,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.004,
-      gasFeeUsd: 8.40,
+      gasFeeUsd: 8.4,
       troveOperation: {
         annualInterestRate: 5.5,
         debtIncreaseFromRedist: 25,
@@ -598,7 +604,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.003,
-      gasFeeUsd: 6.30,
+      gasFeeUsd: 6.3,
       troveOperation: {
         annualInterestRate: 5.5,
         debtIncreaseFromRedist: 15,
@@ -620,7 +626,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
         coll: 5.537,
         stake: 5.537,
         annualInterestRate: 5.5,
-        collateralRatio: 336.10,
+        collateralRatio: 336.1,
         collateralInUsd: 13842.5,
       },
       collateralPrice: 2500,
@@ -641,7 +647,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.003,
-      gasFeeUsd: 6.30,
+      gasFeeUsd: 6.3,
       troveOperation: {
         annualInterestRate: 5.5,
         debtIncreaseFromRedist: 10,
@@ -655,7 +661,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
         coll: 5.537,
         stake: 5.537,
         annualInterestRate: 5.5,
-        collateralRatio: 336.10,
+        collateralRatio: 336.1,
         collateralInUsd: 13842.5,
       },
       stateAfter: {
@@ -673,7 +679,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
 
     // 12. ZOMBIE TROVE SCENARIO - Low debt amount
     {
-      id: "0xzombie-2", 
+      id: "0xzombie-2",
       type: "trove",
       operation: "adjustTrove",
       transactionHash: "0xzombie234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd",
@@ -684,7 +690,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.003,
-      gasFeeUsd: 6.00,
+      gasFeeUsd: 6.0,
       troveOperation: {
         annualInterestRate: 8.0,
         debtIncreaseFromRedist: 0,
@@ -715,7 +721,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
     } as TroveTransaction,
     // 12. ZOMBIE TROVE SCENARIO - Low debt amount
     {
-      id: "0xzombie-3", 
+      id: "0xzombie-3",
       type: "trove",
       operation: "adjustTrove",
       transactionHash: "0xzombie334567890abcdef1234567890abcdef1234567890abcdef1234567890abcd",
@@ -726,7 +732,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.003,
-      gasFeeUsd: 6.00,
+      gasFeeUsd: 6.0,
       troveOperation: {
         annualInterestRate: 8.0,
         debtIncreaseFromRedist: 0,
@@ -757,7 +763,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
     } as TroveTransaction,
     // 12. ZOMBIE TROVE SCENARIO - Low debt amount
     {
-      id: "0xzombie-0", 
+      id: "0xzombie-0",
       type: "trove",
       operation: "adjustTrove",
       transactionHash: "0xzombie234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd",
@@ -768,7 +774,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.003,
-      gasFeeUsd: 6.00,
+      gasFeeUsd: 6.0,
       troveOperation: {
         annualInterestRate: 8.0,
         debtIncreaseFromRedist: 0,
@@ -811,7 +817,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.006,
-      gasFeeUsd: 12.00,
+      gasFeeUsd: 12.0,
       troveOperation: {
         annualInterestRate: 1.5,
         debtIncreaseFromRedist: 0,
@@ -854,7 +860,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.004,
-      gasFeeUsd: 8.00,
+      gasFeeUsd: 8.0,
       troveOperation: {
         annualInterestRate: 12.0,
         debtIncreaseFromRedist: 0,
@@ -897,7 +903,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.005,
-      gasFeeUsd: 10.00,
+      gasFeeUsd: 10.0,
       troveOperation: {
         annualInterestRate: 3.5,
         debtIncreaseFromRedist: 0,
@@ -954,7 +960,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.002,
-      gasFeeUsd: 4.20,
+      gasFeeUsd: 4.2,
       troveOperation: {
         annualInterestRate: 6.0,
         debtIncreaseFromRedist: 30,
@@ -997,7 +1003,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.004,
-      gasFeeUsd: 8.00,
+      gasFeeUsd: 8.0,
       troveOperation: {
         annualInterestRate: 5.5,
         debtIncreaseFromRedist: 15,
@@ -1019,7 +1025,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
         coll: 5.55,
         stake: 5.55,
         annualInterestRate: 5.5,
-        collateralRatio: 246.20,
+        collateralRatio: 246.2,
         collateralInUsd: 13875,
       },
       collateralPrice: 2500,
@@ -1040,7 +1046,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.003,
-      gasFeeUsd: 6.00,
+      gasFeeUsd: 6.0,
       troveOperation: {
         annualInterestRate: 4.8,
         debtIncreaseFromRedist: 0,
@@ -1095,7 +1101,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.003,
-      gasFeeUsd: 6.00,
+      gasFeeUsd: 6.0,
       troveOperation: {
         annualInterestRate: 3.8,
         debtIncreaseFromRedist: 0,
@@ -1152,7 +1158,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.006,
-      gasFeeUsd: 12.60,
+      gasFeeUsd: 12.6,
       troveOperation: {
         annualInterestRate: 4.5,
         debtIncreaseFromRedist: 15,
@@ -1205,7 +1211,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.008,
-      gasFeeUsd: 16.80,
+      gasFeeUsd: 16.8,
       troveOperation: {
         annualInterestRate: 5.2,
         debtIncreaseFromRedist: 0,
@@ -1268,7 +1274,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.001,
-      gasFeeUsd: 2.10,
+      gasFeeUsd: 2.1,
       troveOperation: {
         annualInterestRate: 4.5,
         debtIncreaseFromRedist: 0,
@@ -1323,7 +1329,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.005,
-      gasFeeUsd: 10.50,
+      gasFeeUsd: 10.5,
       troveOperation: {
         annualInterestRate: 5.8,
         debtIncreaseFromRedist: 10,
@@ -1386,7 +1392,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "RETH",
       gasFee: 0.002,
-      gasFeeUsd: 4.00,
+      gasFeeUsd: 4.0,
       troveOperation: {
         annualInterestRate: 3.8,
         debtIncreaseFromRedist: 0,
@@ -1451,7 +1457,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "RETH",
       gasFee: 0.003,
-      gasFeeUsd: 6.00,
+      gasFeeUsd: 6.0,
       troveOperation: {
         annualInterestRate: 4.2,
         debtIncreaseFromRedist: 0,
@@ -1508,7 +1514,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "WETH",
       gasFee: 0.006,
-      gasFeeUsd: 12.60,
+      gasFeeUsd: 12.6,
       fromAddress: "0x1234567890abcdef1234567890abcdef12345678",
       toAddress: "0x9876543210fedcba9876543210fedcba98765432",
       transferType: "transfer",
@@ -1535,10 +1541,10 @@ export const mockTroveComprehensive: TransactionTimeline = {
       timestamp: 1699822000,
       troveId: "0x1234567890abcdef1234567890abcdef12345692",
       protocolName: "Liquity V2",
-      assetType: "BOLD", 
+      assetType: "BOLD",
       collateralType: "wstETH",
       gasFee: 0.004,
-      gasFeeUsd: 8.00,
+      gasFeeUsd: 8.0,
       troveOperation: {
         annualInterestRate: 4.5,
         debtIncreaseFromRedist: 0,
@@ -1570,7 +1576,6 @@ export const mockTroveComprehensive: TransactionTimeline = {
 
     // === TROVE OPENINGS (Earliest events) ===
 
-
     // 28. LARGE SIZEABLE LOAN SCENARIO
     {
       id: "0xlarge-0",
@@ -1584,7 +1589,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "WETH",
       gasFee: 0.015,
-      gasFeeUsd: 30.00,
+      gasFeeUsd: 30.0,
       troveOperation: {
         annualInterestRate: 3.2,
         debtIncreaseFromRedist: 0,
@@ -1619,7 +1624,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "ETH",
       gasFee: 0.007,
-      gasFeeUsd: 14.70,
+      gasFeeUsd: 14.7,
       troveOperation: {
         annualInterestRate: 4.8,
         debtIncreaseFromRedist: 0,
@@ -1664,7 +1669,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       assetType: "BOLD",
       collateralType: "RETH",
       gasFee: 0.012,
-      gasFeeUsd: 24.00,
+      gasFeeUsd: 24.0,
       troveOperation: {
         annualInterestRate: 3.8,
         debtIncreaseFromRedist: 0,
@@ -1695,7 +1700,7 @@ export const mockTroveComprehensive: TransactionTimeline = {
       isInBatch: true,
       isZombieTrove: false,
     } as TroveTransaction,
-  ]
+  ],
 };
 
 export default mockTroveComprehensive;

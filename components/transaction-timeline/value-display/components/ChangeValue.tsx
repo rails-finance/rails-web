@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useHover, shouldHighlight, ValueType } from '../../context/HoverContext';
-import { toLocaleStringHelper } from '@/lib/utils/format';
+import { useHover, shouldHighlight, ValueType } from "../../context/HoverContext";
+import { toLocaleStringHelper } from "@/lib/utils/format";
 
 interface ChangeValueProps {
   amount: number;
@@ -10,22 +10,28 @@ interface ChangeValueProps {
 
 export function ChangeValue({ amount, type }: ChangeValueProps) {
   const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
-  
-  const isHighlighted = hoverEnabled && type && shouldHighlight(hoveredValue, type, 'change');
-  
+
+  const isHighlighted = hoverEnabled && type && shouldHighlight(hoveredValue, type, "change");
+
   if (!type || !hoverEnabled) {
-    return <span className="min-h-8 flex items-center"><span className="text-sm font-bold text-slate-800 milodon dark:text-slate-300 items-center">{toLocaleStringHelper(amount)}</span></span>;
+    return (
+      <span className="min-h-8 flex items-center">
+        <span className="text-sm font-bold text-slate-800 milodon dark:text-slate-300 items-center">
+          {toLocaleStringHelper(amount)}
+        </span>
+      </span>
+    );
   }
 
   return (
     <span className="min-h-8 flex items-center">
-    <span
-      className={`text-sm font-bold text-slate-800 milodon dark:text-slate-300 items-center cursor-pointer ${isHighlighted ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse' : ''}`}
-      onMouseEnter={() => setHoveredValue({ type, state: 'change', value: amount })}
-      onMouseLeave={() => setHoveredValue(null)}
-    >
-      {toLocaleStringHelper(amount)}
-    </span>
+      <span
+        className={`text-sm font-bold text-slate-800 milodon dark:text-slate-300 items-center cursor-pointer ${isHighlighted ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse' : ""}`}
+        onMouseEnter={() => setHoveredValue({ type, state: "change", value: amount })}
+        onMouseLeave={() => setHoveredValue(null)}
+      >
+        {toLocaleStringHelper(amount)}
+      </span>
     </span>
   );
 }

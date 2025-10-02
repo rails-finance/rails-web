@@ -9,10 +9,10 @@ import { Icon } from "@/components/icons/icon";
 interface CollateralBreakdownProps {
   data: { [key: string]: CollateralStats };
   loading?: boolean;
-  mode?: 'overview'; // Keep for backwards compatibility, but only support overview
+  mode?: "overview"; // Keep for backwards compatibility, but only support overview
 }
 
-export function CollateralBreakdown({ data, loading, mode = 'overview' }: CollateralBreakdownProps) {
+export function CollateralBreakdown({ data, loading, mode = "overview" }: CollateralBreakdownProps) {
   const formatNumber = (num: number, decimals: number = 2) => {
     if (num >= 1e9) return `${(num / 1e9).toFixed(decimals)}B`;
     if (num >= 1e6) return `${(num / 1e6).toFixed(decimals)}M`;
@@ -24,7 +24,7 @@ export function CollateralBreakdown({ data, loading, mode = 'overview' }: Collat
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[1, 2, 3].map(i => (
+        {[1, 2, 3].map((i) => (
           <div key={i} className="bg-white dark:bg-slate-900 rounded-lg p-6 animate-pulse">
             <div className="h-12 bg-slate-200 rounded mb-4" />
             <div className="space-y-2">
@@ -59,7 +59,9 @@ export function CollateralBreakdown({ data, loading, mode = 'overview' }: Collat
                 <span className="text-xl font-semibold text-slate-600 dark:text-slate-100">{collateralType}</span>
               </div>
               <div>
-                <span className="text-sm text-slate-500">{formatNumber(stats.totalCollateral)} {collateralType}</span>
+                <span className="text-sm text-slate-500">
+                  {formatNumber(stats.totalCollateral)} {collateralType}
+                </span>
               </div>
             </div>
           </div>
@@ -70,7 +72,9 @@ export function CollateralBreakdown({ data, loading, mode = 'overview' }: Collat
                 <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">TVL</span>
               </div>
               <div>
-                <span className="text-2xl font-bold text-slate-800 milodon dark:text-slate-300">${formatNumber(stats.totalCollateralUsd)}</span>
+                <span className="text-2xl font-bold text-slate-800 milodon dark:text-slate-300">
+                  ${formatNumber(stats.totalCollateralUsd)}
+                </span>
               </div>
             </div>
             <div className="flex justify-between items-center">
@@ -79,7 +83,9 @@ export function CollateralBreakdown({ data, loading, mode = 'overview' }: Collat
                   <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Total Debt</span>
                 </div>
                 <div>
-                  <span className="text-lg font-bold text-slate-800 milodon dark:text-slate-300">${formatNumber(stats.totalDebt)}</span>
+                  <span className="text-lg font-bold text-slate-800 milodon dark:text-slate-300">
+                    ${formatNumber(stats.totalDebt)}
+                  </span>
                 </div>
               </div>
               <div>
@@ -87,14 +93,19 @@ export function CollateralBreakdown({ data, loading, mode = 'overview' }: Collat
                   <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Active Troves</span>
                 </div>
                 <div>
-                  <span className="text-lg font-bold text-slate-800 milodon dark:text-slate-300">{stats.openTroveCount.toLocaleString()}</span>
+                  <span className="text-lg font-bold text-slate-800 milodon dark:text-slate-300">
+                    {stats.openTroveCount.toLocaleString()}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
           <div className="mt-4 flex justify-end">
-            <span className="text-sm text-white group-hover:text-white font-medium dark:bg-slate-700 inline-flex items-center gap-1 rounded-full transition-all w-fit py-1 group-hover:bg-blue-500 bg-slate-300 pl-3 pr-2" aria-label="View Troves">
+            <span
+              className="text-sm text-white group-hover:text-white font-medium dark:bg-slate-700 inline-flex items-center gap-1 rounded-full transition-all w-fit py-1 group-hover:bg-blue-500 bg-slate-300 pl-3 pr-2"
+              aria-label="View Troves"
+            >
               <Icon name="view-troves" className="w-[19px] h-[18px]" />
               View
               <ChevronRight className="w-4 h-4" />

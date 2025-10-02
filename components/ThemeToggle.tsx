@@ -37,10 +37,7 @@ export function ThemeToggle() {
   // Avoid hydration mismatch
   if (!mounted) {
     return (
-      <button
-        className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 transition-colors"
-        aria-label="Toggle theme"
-      >
+      <button className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 transition-colors" aria-label="Toggle theme">
         <div className="w-5 h-5" />
       </button>
     );

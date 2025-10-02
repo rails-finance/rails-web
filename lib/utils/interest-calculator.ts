@@ -27,7 +27,7 @@ export class InterestCalculator {
     recordedDebt: number,
     annualInterestRate: number,
     lastDebtUpdateTime: number,
-    currentTime: number = Date.now() / 1000
+    currentTime: number = Date.now() / 1000,
   ): number {
     // Calculate time period in seconds
     const timePeriod = Math.max(0, currentTime - lastDebtUpdateTime);
@@ -54,31 +54,27 @@ export class InterestCalculator {
     recordedDebt: number,
     managementFeeRate: number,
     lastUpdateTime: number,
-    currentTime: number = Date.now() / 1000
+    currentTime: number = Date.now() / 1000,
   ): number {
     const timePeriod = Math.max(0, currentTime - lastUpdateTime);
-    
+
     if (timePeriod === 0) {
       return 0;
     }
 
     // Convert management fee rate percentage to decimal
     const feeRateDecimal = managementFeeRate / 100;
-    
+
     // Management fees are calculated similarly to interest
     const managementFees = recordedDebt * feeRateDecimal * (timePeriod / this.ONE_YEAR);
-    
+
     return managementFees;
   }
 
   /**
    * Calculate the entire debt including all components
    */
-  calculateEntireDebt(
-    recordedDebt: number,
-    accruedInterest: number,
-    accruedManagementFees: number = 0
-  ): number {
+  calculateEntireDebt(recordedDebt: number, accruedInterest: number, accruedManagementFees: number = 0): number {
     return recordedDebt + accruedInterest + accruedManagementFees;
   }
 
@@ -92,13 +88,13 @@ export class InterestCalculator {
     isBatchMember: boolean = false,
     managementFeeRate?: number,
     batchManager?: string,
-    currentTime: number = Date.now() / 1000
+    currentTime: number = Date.now() / 1000,
   ): InterestInfo {
     const accruedInterest = this.calculateAccruedInterest(
       recordedDebt,
       annualInterestRate,
       lastUpdateTimestamp,
-      currentTime
+      currentTime,
     );
 
     let accruedManagementFees = 0;
@@ -107,15 +103,11 @@ export class InterestCalculator {
         recordedDebt,
         managementFeeRate,
         lastUpdateTimestamp,
-        currentTime
+        currentTime,
       );
     }
 
-    const entireDebt = this.calculateEntireDebt(
-      recordedDebt,
-      accruedInterest,
-      accruedManagementFees
-    );
+    const entireDebt = this.calculateEntireDebt(recordedDebt, accruedInterest, accruedManagementFees);
 
     const daysSinceUpdate = (currentTime - lastUpdateTimestamp) / (24 * 60 * 60);
 

@@ -1,11 +1,11 @@
-import React from 'react';
-import { Transaction, isTroveTransaction } from '@/types/api/troveHistory';
-import { HighlightableValue } from '../HighlightableValue';
-import { ExplanationPanel } from '../ExplanationPanel';
-import { InfoButton } from '../InfoButton';
-import { FAQ_URLS } from '../shared/faqUrls';
-import { formatCurrency, formatUsdValue } from '@/lib/utils/format';
-import { getUpfrontFee } from '../shared/eventHelpers';
+import React from "react";
+import { Transaction, isTroveTransaction } from "@/types/api/troveHistory";
+import { HighlightableValue } from "../HighlightableValue";
+import { ExplanationPanel } from "../ExplanationPanel";
+import { InfoButton } from "../InfoButton";
+import { FAQ_URLS } from "../shared/faqUrls";
+import { formatCurrency, formatUsdValue } from "@/lib/utils/format";
+import { getUpfrontFee } from "../shared/eventHelpers";
 
 interface AdjustTroveExplanationProps {
   transaction: Transaction;
@@ -14,9 +14,9 @@ interface AdjustTroveExplanationProps {
 
 export function AdjustTroveExplanation({ transaction, onToggle }: AdjustTroveExplanationProps) {
   const tx = transaction as any;
-  
+
   if (!isTroveTransaction(tx)) return null;
-  
+
   // Calculate changes
   const collChange = tx.troveOperation.collChangeFromOperation;
   const debtChange = tx.troveOperation.debtChangeFromOperation;
@@ -31,130 +31,132 @@ export function AdjustTroveExplanation({ transaction, onToggle }: AdjustTroveExp
   const afterCollUsd = tx.stateAfter.collateralInUsd;
   const beforeInterestRate = tx.stateBefore?.annualInterestRate;
   const afterInterestRate = tx.stateAfter.annualInterestRate;
-  
+
   // Determine the type of adjustment
   const isDeleveraging = collChange < 0 || debtChange < 0;
   const isLeveraging = collChange > 0 || debtChange > 0;
   const collRatioImproved = afterCollRatio && beforeCollRatio && afterCollRatio > beforeCollRatio;
-  
+
   const adjustTroveItems: React.ReactNode[] = [];
 
   if (collChange !== 0) {
     adjustTroveItems.push(
       <span key="collChange" className="text-slate-500">
-        {collChange > 0 ? 'Added ' : 'Withdrew '}
+        {collChange > 0 ? "Added " : "Withdrew "}
         <HighlightableValue type="collateral" state="change" value={Math.abs(collChange)}>
           {Math.abs(collChange)} {tx.collateralType}
         </HighlightableValue>
-        {collChange > 0 
-          ? ' to strengthen the position' 
-          : ' from collateral, reducing exposure'}
-      </span>
+        {collChange > 0 ? " to strengthen the position" : " from collateral, reducing exposure"}
+      </span>,
     );
   }
 
   if (debtChange !== 0) {
     adjustTroveItems.push(
       <span key="debtChange" className="text-slate-500">
-        {debtChange > 0 ? 'Borrowed an additional ' : 'Paid down '}
+        {debtChange > 0 ? "Borrowed an additional " : "Paid down "}
         <HighlightableValue type="debt" state="change" value={Math.abs(debtChange)}>
           {formatCurrency(Math.abs(debtChange), tx.assetType)}
         </HighlightableValue>
-      </span>
+      </span>,
     );
   }
 
   if (adjustFee > 0) {
     adjustTroveItems.push(
       <span key="fee" className="text-slate-500">
-        Adjustment incurred a{' '}
+        Adjustment incurred a{" "}
         <HighlightableValue type="upfrontFee" state="fee" value={adjustFee}>
           {adjustFee.toFixed(2)} {tx.assetType}
-        </HighlightableValue>
-        {' '}borrowing fee (7 days of average interest on the respective borrow market)
+        </HighlightableValue>{" "}
+        borrowing fee (7 days of average interest on the respective borrow market)
         <InfoButton href={FAQ_URLS.BORROWING_FEES} />
-      </span>
+      </span>,
     );
   }
 
   adjustTroveItems.push(
     <span key="currentPosition" className="text-slate-500">
-      Position now holds{' '}
+      Position now holds{" "}
       <HighlightableValue type="collateral" state="after" value={afterColl}>
         {afterColl} {tx.collateralType}
-      </HighlightableValue>
-      {' '}collateral against{' '}
+      </HighlightableValue>{" "}
+      collateral against{" "}
       <HighlightableValue type="debt" state="after" value={afterDebt}>
         {formatCurrency(afterDebt, tx.assetType)}
-      </HighlightableValue>
-      {' '}debt
-    </span>
+      </HighlightableValue>{" "}
+      debt
+    </span>,
   );
 
   if (afterCollUsd && tx.collateralPrice) {
     adjustTroveItems.push(
       <span key="collValue" className="text-slate-500">
-        Current collateral valued at <HighlightableValue type="collateralUsd" state="after" value={afterCollUsd}>
+        Current collateral valued at{" "}
+        <HighlightableValue type="collateralUsd" state="after" value={afterCollUsd}>
           {formatUsdValue(afterCollUsd)}
-        </HighlightableValue> with historic price of{' '}
+        </HighlightableValue>{" "}
+        with historic price of{" "}
         <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
           {formatUsdValue(tx.collateralPrice)}
-        </HighlightableValue>{' '}/{' '}{tx.collateralType}
-      </span>
+        </HighlightableValue>{" "}
+        / {tx.collateralType}
+      </span>,
     );
   }
 
   if (collRatioImproved) {
     adjustTroveItems.push(
       <span key="improvedRatio" className="text-slate-500">
-        Improved collateral ratio to{' '}
+        Improved collateral ratio to{" "}
         <HighlightableValue type="collRatio" state="after" value={afterCollRatio}>
           {afterCollRatio.toFixed(1)}%
         </HighlightableValue>
         , reducing liquidation risk
         <InfoButton href={FAQ_URLS.LTV_COLLATERAL_RATIO} />
-      </span>
+      </span>,
     );
   } else if (beforeCollRatio && afterCollRatio && beforeCollRatio !== afterCollRatio) {
     adjustTroveItems.push(
       <span key="changedRatio" className="text-slate-500">
-        Collateral ratio changed to{' '}
+        Collateral ratio changed to{" "}
         <HighlightableValue type="collRatio" state="after" value={afterCollRatio}>
           {afterCollRatio.toFixed(1)}%
         </HighlightableValue>
-        {afterCollRatio < beforeCollRatio ? ', increasing liquidation risk' : ''}
+        {afterCollRatio < beforeCollRatio ? ", increasing liquidation risk" : ""}
         <InfoButton href={FAQ_URLS.LTV_COLLATERAL_RATIO} />
-      </span>
+      </span>,
     );
   }
 
   if (beforeInterestRate !== afterInterestRate) {
     adjustTroveItems.push(
       <span key="rateChange" className="text-slate-500">
-        Interest rate adjusted from{' '}
-        
-          {beforeInterestRate || 0}%
-        
-        {' '}to{' '}
+        Interest rate adjusted from {beforeInterestRate || 0}% to{" "}
         <HighlightableValue type="interestRate" state="after" value={afterInterestRate}>
           {afterInterestRate}%
-        </HighlightableValue>
-        {' '}annual
-      </span>
+        </HighlightableValue>{" "}
+        annual
+      </span>,
     );
   } else {
     adjustTroveItems.push(
       <span key="rateSame" className="text-slate-500">
-        Interest rate remains at{' '}
+        Interest rate remains at{" "}
         <HighlightableValue type="interestRate" state="after" value={afterInterestRate}>
           {afterInterestRate}%
-        </HighlightableValue>
-        {' '}annual
-      </span>
+        </HighlightableValue>{" "}
+        annual
+      </span>,
     );
   }
-  
+
   return (
-    <ExplanationPanel items={adjustTroveItems} onToggle={onToggle} defaultOpen={false} transactionHash={transaction.transactionHash} />
+    <ExplanationPanel
+      items={adjustTroveItems}
+      onToggle={onToggle}
+      defaultOpen={false}
+      transactionHash={transaction.transactionHash}
+    />
   );
 }

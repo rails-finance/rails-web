@@ -11,17 +11,17 @@ export function TransactionLinks({ transaction }: TransactionLinksProps) {
   if (!tx.transactionHash) {
     return null;
   }
-  
+
   // Determine if gas fee should be shown
   const shouldShowGasFee = () => {
     // Don't show gas fees for operations not initiated by the user
-    const noGasOps = ['liquidate', 'redeemCollateral'];
+    const noGasOps = ["liquidate", "redeemCollateral"];
     if (noGasOps.includes(tx.operation)) {
       return false;
     }
 
     // Don't show gas fee for delegate IR adjustments (batch manager operations)
-    if (tx.operation === 'adjustTroveInterestRate' && tx.batchUpdate) {
+    if (tx.operation === "adjustTroveInterestRate" && tx.batchUpdate) {
       return false;
     }
 

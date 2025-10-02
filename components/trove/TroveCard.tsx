@@ -10,10 +10,7 @@ interface TroveCardProps {
 
 export function TroveCard({ trove, showViewButton = false }: TroveCardProps) {
   if (trove.status === "liquidated") {
-    return <LiquidatedTroveCard 
-      trove={trove} 
-      showViewButton={showViewButton}
-    />;
+    return <LiquidatedTroveCard trove={trove} showViewButton={showViewButton} />;
   }
 
   if (trove.status === "open") {

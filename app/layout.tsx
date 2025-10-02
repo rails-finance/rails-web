@@ -12,7 +12,6 @@ import { ThemeScript } from "@/components/ThemeScript";
 
 const inter = Inter({ subsets: ["latin"] });
 
-
 export const metadata: Metadata = {
   title: "Rails",
   description: "Rails Web3 App",

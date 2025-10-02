@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { Link2 } from 'lucide-react';
+import React from "react";
+import { Link2 } from "lucide-react";
 
 interface InfoButtonProps {
   href: string;
   className?: string;
 }
 
-export function InfoButton({ href, className = '' }: InfoButtonProps) {
+export function InfoButton({ href, className = "" }: InfoButtonProps) {
   return (
     <a
       href={href}

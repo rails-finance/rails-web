@@ -1,9 +1,18 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from "react";
 
-export type ValueType = 'debt' | 'collateral' | 'collateralUsd' | 'interestRate' | 'collRatio' | 'upfrontFee' | 'collateralPrice' | 'peakDebt' | 'peakCollateral';
-export type ValueState = 'before' | 'after' | 'change' | 'fee';
+export type ValueType =
+  | "debt"
+  | "collateral"
+  | "collateralUsd"
+  | "interestRate"
+  | "collRatio"
+  | "upfrontFee"
+  | "collateralPrice"
+  | "peakDebt"
+  | "peakCollateral";
+export type ValueState = "before" | "after" | "change" | "fee";
 
 export interface HoveredValue {
   type: ValueType;
@@ -34,24 +43,20 @@ export function HoverProvider({ children }: { children: ReactNode }) {
 export function useHover() {
   const context = useContext(HoverContext);
   if (!context) {
-    throw new Error('useHover must be used within a HoverProvider');
+    throw new Error("useHover must be used within a HoverProvider");
   }
   return context;
 }
 
 // Helper function to check if a value should be highlighted
-export function shouldHighlight(
-  hoveredValue: HoveredValue | null,
-  type: ValueType,
-  state?: ValueState
-): boolean {
+export function shouldHighlight(hoveredValue: HoveredValue | null, type: ValueType, state?: ValueState): boolean {
   if (!hoveredValue) return false;
-  
+
   // Match type
   if (hoveredValue.type !== type) return false;
-  
+
   // If state is provided, match it too
   if (state && hoveredValue.state !== state) return false;
-  
+
   return true;
 }

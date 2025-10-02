@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 
 // Three-state filter values
-export type FilterState = 'all' | 'hide' | 'only';
+export type FilterState = "all" | "hide" | "only";
 
 // Segmented Control Component
 interface SegmentedControlProps {
@@ -61,8 +61,8 @@ interface TroveFiltersProps {
   filters: TroveFilterParams;
   onFiltersChange: (filters: TroveFilterParams) => void;
   onReset: () => void;
-  currentView: 'open' | 'closed';
-  onViewChange: (view: 'open' | 'closed') => void;
+  currentView: "open" | "closed";
+  onViewChange: (view: "open" | "closed") => void;
   showAllFilters?: boolean;
   onToggleFilters?: () => void;
   isMobile?: boolean;
@@ -76,7 +76,6 @@ const TIME_OPTIONS = [
   { value: "7776000000", label: "90" },
 ];
 
-
 export function TroveFilters({
   filters,
   onFiltersChange,
@@ -85,13 +84,12 @@ export function TroveFilters({
   onViewChange,
   showAllFilters = true,
   onToggleFilters = () => {},
-  isMobile = false
+  isMobile = false,
 }: TroveFiltersProps) {
   const [localFilters, setLocalFilters] = useState<TroveFilterParams>(filters);
   useEffect(() => {
     setLocalFilters(filters);
   }, [filters]);
-
 
   const handleStatusChange = (status: string) => {
     // If clicking the same status, deselect it
@@ -101,32 +99,31 @@ export function TroveFilters({
     onFiltersChange(newFilters);
   };
 
-
-
   const handleTimeFilterChange = (field: "activeWithin" | "createdWithin", value: string) => {
     const newFilters = { ...localFilters, [field]: value || undefined };
     setLocalFilters(newFilters);
     onFiltersChange(newFilters);
   };
 
-
   const handleLiquidatedChange = () => {
-    const newStatus = localFilters.liquidatedOnly ? undefined : 'liquidated';
+    const newStatus = localFilters.liquidatedOnly ? undefined : "liquidated";
     const newFilters = {
       ...localFilters,
       liquidatedOnly: !localFilters.liquidatedOnly,
-      status: newStatus
+      status: newStatus,
     };
     setLocalFilters(newFilters);
     onFiltersChange(newFilters);
   };
 
-  const handleThreeStateChange = (filterType: 'zombieFilter' | 'redemptionFilter' | 'batchFilter', value: FilterState) => {
-    const newFilters = { ...localFilters, [filterType]: value === 'all' ? undefined : value };
+  const handleThreeStateChange = (
+    filterType: "zombieFilter" | "redemptionFilter" | "batchFilter",
+    value: FilterState,
+  ) => {
+    const newFilters = { ...localFilters, [filterType]: value === "all" ? undefined : value };
     setLocalFilters(newFilters);
     onFiltersChange(newFilters);
   };
-
 
   const hasActiveFilters = () => {
     return (
@@ -142,7 +139,6 @@ export function TroveFilters({
     onReset();
   };
 
-
   // Mobile layout
   if (isMobile) {
     return (
@@ -154,9 +150,9 @@ export function TroveFilters({
             <span className="text-xs font-medium text-slate-300">Status</span>
             <div className="flex gap-1 bg-slate-200 dark:bg-slate-700 rounded p-1">
               <button
-                onClick={() => onViewChange('open')}
+                onClick={() => onViewChange("open")}
                 className={`cursor-pointer flex-1 px-4 py-2 text-sm font-semibold rounded transition-all ${
-                  currentView === 'open'
+                  currentView === "open"
                     ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400 shadow-sm"
                     : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
                 }`}
@@ -164,9 +160,9 @@ export function TroveFilters({
                 ACTIVE
               </button>
               <button
-                onClick={() => onViewChange('closed')}
+                onClick={() => onViewChange("closed")}
                 className={`cursor-pointer flex-1 px-4 py-2 text-sm font-semibold rounded transition-all ${
-                  currentView === 'closed'
+                  currentView === "closed"
                     ? "bg-slate-700 dark:bg-slate-900 text-white shadow-sm"
                     : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
                 }`}
@@ -175,51 +171,50 @@ export function TroveFilters({
               </button>
             </div>
           </div>
-
         </div>
 
         {/* Collapsible advanced filters */}
         {showAllFilters && (
           <div className="space-y-4 pt-4 border-t border-slate-700">
             {/* View-specific filters */}
-            {currentView === 'open' && (
+            {currentView === "open" && (
               <div className="space-y-3">
                 <SegmentedControl
                   label="Redemptions"
-                  value={localFilters.redemptionFilter || 'all'}
-                  onChange={(value) => handleThreeStateChange('redemptionFilter', value)}
+                  value={localFilters.redemptionFilter || "all"}
+                  onChange={(value) => handleThreeStateChange("redemptionFilter", value)}
                   options={[
-                    { value: 'all', label: 'All' },
-                    { value: 'hide', label: 'None' },
-                    { value: 'only', label: 'Has' }
+                    { value: "all", label: "All" },
+                    { value: "hide", label: "None" },
+                    { value: "only", label: "Has" },
                   ]}
                 />
 
                 <SegmentedControl
                   label="Trove Type"
-                  value={localFilters.batchFilter || 'all'}
-                  onChange={(value) => handleThreeStateChange('batchFilter', value)}
+                  value={localFilters.batchFilter || "all"}
+                  onChange={(value) => handleThreeStateChange("batchFilter", value)}
                   options={[
-                    { value: 'all', label: 'All' },
-                    { value: 'hide', label: 'Indiv.' },
-                    { value: 'only', label: 'Batch' }
+                    { value: "all", label: "All" },
+                    { value: "hide", label: "Indiv." },
+                    { value: "only", label: "Batch" },
                   ]}
                 />
 
                 <SegmentedControl
                   label="Zombie Troves"
-                  value={localFilters.zombieFilter || 'all'}
-                  onChange={(value) => handleThreeStateChange('zombieFilter', value)}
+                  value={localFilters.zombieFilter || "all"}
+                  onChange={(value) => handleThreeStateChange("zombieFilter", value)}
                   options={[
-                    { value: 'all', label: 'All' },
-                    { value: 'hide', label: 'Hide' },
-                    { value: 'only', label: 'Only' }
+                    { value: "all", label: "All" },
+                    { value: "hide", label: "Hide" },
+                    { value: "only", label: "Only" },
                   ]}
                 />
               </div>
             )}
 
-            {currentView === 'closed' && (
+            {currentView === "closed" && (
               <div className="space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer hover:text-slate-200 transition-colors">
                   <input
@@ -240,9 +235,9 @@ export function TroveFilters({
           onClick={onToggleFilters}
           className="w-full py-2 text-sm text-slate-300 hover:text-white transition-colors flex items-center justify-center gap-2"
         >
-          <span>{showAllFilters ? 'Hide Filters' : 'Show More Filters'}</span>
+          <span>{showAllFilters ? "Hide Filters" : "Show More Filters"}</span>
           <svg
-            className={`w-4 h-4 transition-transform ${showAllFilters ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 transition-transform ${showAllFilters ? "rotate-180" : ""}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -273,9 +268,9 @@ export function TroveFilters({
           <span className="text-xs font-medium text-slate-300">Status:</span>
           <div className="flex gap-1 bg-slate-200 dark:bg-slate-700 rounded p-1">
             <button
-              onClick={() => onViewChange('open')}
+              onClick={() => onViewChange("open")}
               className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded transition-all ${
-                currentView === 'open'
+                currentView === "open"
                   ? "bg-green-900 text-green-400 shadow-sm"
                   : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
               }`}
@@ -283,9 +278,9 @@ export function TroveFilters({
               ACTIVE
             </button>
             <button
-              onClick={() => onViewChange('closed')}
+              onClick={() => onViewChange("closed")}
               className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded transition-all ${
-                currentView === 'closed'
+                currentView === "closed"
                   ? "bg-slate-900 text-white shadow-sm"
                   : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
               }`}
@@ -296,22 +291,22 @@ export function TroveFilters({
         </div>
 
         {/* View-specific filters */}
-        {currentView === 'open' && (
+        {currentView === "open" && (
           <>
             {/* Redemptions Filter */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-slate-300">Redemptions:</span>
               <div className="flex bg-slate-200 dark:bg-slate-700 rounded p-1">
                 {[
-                  { value: 'all', label: 'All' },
-                  { value: 'hide', label: 'None' },
-                  { value: 'only', label: 'Has' }
+                  { value: "all", label: "All" },
+                  { value: "hide", label: "None" },
+                  { value: "only", label: "Has" },
                 ].map((option) => (
                   <button
                     key={option.value}
-                    onClick={() => handleThreeStateChange('redemptionFilter', option.value as FilterState)}
+                    onClick={() => handleThreeStateChange("redemptionFilter", option.value as FilterState)}
                     className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                      (localFilters.redemptionFilter || 'all') === option.value
+                      (localFilters.redemptionFilter || "all") === option.value
                         ? "bg-slate-400 dark:bg-slate-600 text-white shadow-sm"
                         : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
                     }`}
@@ -327,15 +322,15 @@ export function TroveFilters({
               <span className="text-xs font-medium text-slate-300">Type:</span>
               <div className="flex bg-slate-200 dark:bg-slate-700 rounded p-1">
                 {[
-                  { value: 'all', label: 'All' },
-                  { value: 'hide', label: 'Individual' },
-                  { value: 'only', label: 'Batch' }
+                  { value: "all", label: "All" },
+                  { value: "hide", label: "Individual" },
+                  { value: "only", label: "Batch" },
                 ].map((option) => (
                   <button
                     key={option.value}
-                    onClick={() => handleThreeStateChange('batchFilter', option.value as FilterState)}
+                    onClick={() => handleThreeStateChange("batchFilter", option.value as FilterState)}
                     className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                      (localFilters.batchFilter || 'all') === option.value
+                      (localFilters.batchFilter || "all") === option.value
                         ? "bg-slate-400 dark:bg-slate-600 text-white shadow-sm"
                         : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
                     }`}
@@ -351,15 +346,15 @@ export function TroveFilters({
               <span className="text-xs font-medium text-slate-300">Zombie:</span>
               <div className="flex bg-slate-200 dark:bg-slate-700 rounded p-1">
                 {[
-                  { value: 'all', label: 'All' },
-                  { value: 'hide', label: 'Hide' },
-                  { value: 'only', label: 'Only' }
+                  { value: "all", label: "All" },
+                  { value: "hide", label: "Hide" },
+                  { value: "only", label: "Only" },
                 ].map((option) => (
                   <button
                     key={option.value}
-                    onClick={() => handleThreeStateChange('zombieFilter', option.value as FilterState)}
+                    onClick={() => handleThreeStateChange("zombieFilter", option.value as FilterState)}
                     className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                      (localFilters.zombieFilter || 'all') === option.value
+                      (localFilters.zombieFilter || "all") === option.value
                         ? "bg-slate-400 dark:bg-slate-600 text-white shadow-sm"
                         : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
                     }`}
@@ -372,7 +367,7 @@ export function TroveFilters({
           </>
         )}
 
-        {currentView === 'closed' && (
+        {currentView === "closed" && (
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-2 cursor-pointer hover:text-slate-200 transition-colors">
               <input

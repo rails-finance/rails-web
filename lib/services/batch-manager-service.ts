@@ -1,6 +1,6 @@
-import { BatchManager, BatchManagerData, BatchManagerIndexes, BatchManagerSearchResult } from '@/types/batch-manager';
-import { isAddress, getAddress } from 'viem';
-import batchManagersData from '@/data/batch-managers.json';
+import { BatchManager, BatchManagerData, BatchManagerIndexes, BatchManagerSearchResult } from "@/types/batch-manager";
+import { isAddress, getAddress } from "viem";
+import batchManagersData from "@/data/batch-managers.json";
 
 class BatchManagerService {
   private data: BatchManagerData;
@@ -22,11 +22,11 @@ class BatchManagerService {
 
     for (const manager of this.data.batch_managers) {
       const normalizedAddress = manager.address.toLowerCase();
-      
+
       this.indexes.byAddress.set(normalizedAddress, manager);
-      
+
       this.indexes.byName.set(manager.name.toLowerCase(), manager);
-      
+
       const assetSymbol = manager.asset_symbol.toUpperCase();
       if (!this.indexes.byAssetSymbol.has(assetSymbol)) {
         this.indexes.byAssetSymbol.set(assetSymbol, []);
@@ -52,7 +52,7 @@ class BatchManagerService {
 
   search(query: string): BatchManagerSearchResult[] {
     const searchTerm = query.toLowerCase().trim();
-    
+
     if (!searchTerm) {
       return this.data.batch_managers;
     }
@@ -67,27 +67,27 @@ class BatchManagerService {
 
     for (const manager of this.data.batch_managers) {
       let relevance = 0;
-      
+
       if (manager.name.toLowerCase() === searchTerm) {
         relevance = 100;
       } else if (manager.name.toLowerCase().includes(searchTerm)) {
         relevance = 80;
       }
-      
+
       if (manager.asset_symbol.toLowerCase() === searchTerm) {
         relevance = Math.max(relevance, 90);
       } else if (manager.asset_symbol.toLowerCase().includes(searchTerm)) {
         relevance = Math.max(relevance, 70);
       }
-      
+
       if (manager.description.toLowerCase().includes(searchTerm)) {
         relevance = Math.max(relevance, 60);
       }
-      
+
       if (manager.website && manager.website.toLowerCase().includes(searchTerm)) {
         relevance = Math.max(relevance, 50);
       }
-      
+
       if (manager.address.toLowerCase().includes(searchTerm)) {
         relevance = Math.max(relevance, 40);
       }
@@ -121,7 +121,7 @@ class BatchManagerService {
       stats.byAsset[symbol] = managers.length;
     }
 
-    stats.withWebsite = this.data.batch_managers.filter(m => m.website).length;
+    stats.withWebsite = this.data.batch_managers.filter((m) => m.website).length;
 
     return stats;
   }

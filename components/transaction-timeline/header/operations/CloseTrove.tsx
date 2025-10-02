@@ -12,13 +12,23 @@ export function CloseTroveHeader({ tx }: { tx: TroveTransaction }) {
       <OperationBadge label="CLOSE" color="red" />
       <div className="flex items-center gap-1">
         {hasDebt && (
-          <AssetAction action="Repay" asset={tx.assetType} amount={Math.abs(debtChangeFromOperation)} valueType="debt" />
+          <AssetAction
+            action="Repay"
+            asset={tx.assetType}
+            amount={Math.abs(debtChangeFromOperation)}
+            valueType="debt"
+          />
         )}
-        <AssetAction action="Withdraw" asset={tx.collateralType} amount={Math.abs(collChangeFromOperation)} valueType="collateral" />
-          <div className="flex items-center space-x-1">
-        		<span className="font-bold text-slate-400 mr-1">Burn</span>
-		        <Image size={16} className="text-slate-400" />
-		     </div>
+        <AssetAction
+          action="Withdraw"
+          asset={tx.collateralType}
+          amount={Math.abs(collChangeFromOperation)}
+          valueType="collateral"
+        />
+        <div className="flex items-center space-x-1">
+          <span className="font-bold text-slate-400 mr-1">Burn</span>
+          <Image size={16} className="text-slate-400" />
+        </div>
       </div>
     </>
   );
