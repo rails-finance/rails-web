@@ -12,7 +12,7 @@ export function TransactionContent({ children, isInBatch, isExpanded }: Transact
   if (isExpanded) {
     containerClassName += " bg-slate-50 dark:bg-slate-900 ";
   } else {
-    containerClassName += " hover:bg-slate-50 dark:hover:bg-slate-900";
+    containerClassName += " hover:bg-slate-50/70 dark:hover:bg-slate-900/70";
   }
 
   return <div className={containerClassName}>{children}</div>;

@@ -122,7 +122,7 @@ export function AppFooter() {
             <p className="text-slate-600 dark:text-slate-500 text-xs">Support Rails development:</p>
             <a
               href="https://etherscan.io/name-lookup-search?id=donate.rails.eth"
-              className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-xs font-semibold transition-colors"
+              className="text-green-600 dark:text-green-600 hover:text-green-700 dark:hover:text-green-300 text-xs font-semibold transition-colors"
               target="_blank"
               rel="noopener noreferrer"
             >

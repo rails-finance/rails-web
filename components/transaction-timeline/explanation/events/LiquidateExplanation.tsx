@@ -36,7 +36,7 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
     const netBenefit = collateralGainedUsd - debtInherited;
 
     liquidateItems = [
-      <span key="redistributionGain" className="text-green-400">
+      <span key="redistributionGain" className="text-green-600">
         ✅ Your trove benefited from another trove's liquidation through redistribution
         <InfoButton href={FAQ_URLS.LIQUIDATIONS} />
       </span>,
@@ -54,7 +54,7 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
         </HighlightableValue>{" "}
         proportional to your collateral amount
       </span>,
-      <span key="netBenefit" className={netBenefit >= 0 ? "text-green-400" : "text-yellow-500"}>
+      <span key="netBenefit" className={netBenefit >= 0 ? "text-green-600" : "text-yellow-500"}>
         Net impact: {netBenefit >= 0 ? "+" : ""}
         {formatUsdValue(netBenefit)}
         {netBenefit >= 0 ? " (beneficial due to liquidation penalty)" : " (small cost)"}
@@ -144,7 +144,7 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
   } else {
     // Additional context for beneficial liquidations
     liquidateItems.push(
-      <span key="collateralRatioImproved" className="text-green-400">
+      <span key="collateralRatioImproved" className="text-green-600">
         Your collateral ratio improved from {tx.stateBefore?.collateralRatio}% to {tx.stateAfter.collateralRatio}%
       </span>,
       <span key="troveStillActive" className="text-slate-300">

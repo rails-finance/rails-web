@@ -47,7 +47,7 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
         <Link
           key={collateralType}
           href={`/troves?collateral=${collateralType}`}
-          className="group bg-white dark:bg-slate-900 dark:hover:bg-slate-950 rounded-lg p-6 hover:shadow-lg dark:hover:border-b-slate-700 transition-all cursor-pointer"
+          className="group bg-white dark:bg-slate-900 dark:hover:bg-slate-900/50 rounded-lg p-6 hover:bg-white-50/50 hover:shadow-lg transition-all cursor-pointer"
         >
           <div className="flex items-center gap-3 mb-4">
             <div className="flex items-center">
@@ -72,7 +72,7 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
                 <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">TVL</span>
               </div>
               <div>
-                <span className="text-2xl font-bold text-slate-800 milodon dark:text-slate-300">
+                <span className="text-2xl font-bold text-slate-600 milodon dark:text-slate-300">
                   ${formatNumber(stats.totalCollateralUsd)}
                 </span>
               </div>
@@ -83,7 +83,7 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
                   <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Total Debt</span>
                 </div>
                 <div>
-                  <span className="text-lg font-bold text-slate-800 milodon dark:text-slate-300">
+                  <span className="text-lg font-bold text-slate-600 milodon dark:text-slate-300">
                     ${formatNumber(stats.totalDebt)}
                   </span>
                 </div>
@@ -93,7 +93,7 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
                   <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Active Troves</span>
                 </div>
                 <div>
-                  <span className="text-lg font-bold text-slate-800 milodon dark:text-slate-300">
+                  <span className="text-lg font-bold text-slate-600 milodon dark:text-slate-300">
                     {stats.openTroveCount.toLocaleString()}
                   </span>
                 </div>

@@ -53,8 +53,8 @@ export function TimelineBackground({ tx, isFirst, isLast, isExpanded = false }: 
 
   if (isDashed) {
     // For dashed lines, render individual dots that fill the space
-    const dotSpacing = 8; // Space between dot centers in pixels
-    const dotRadius = 1.5; // Radius in pixels
+    const dotSpacing = 8.2; // Space between dot centers in pixels
+    const dotRadius = 2; // Radius in pixels
 
     return (
       <svg width="4" height="100%" className="timeline-line" style={{ overflow: "visible" }}>
@@ -103,7 +103,7 @@ export function TimelineBackground({ tx, isFirst, isLast, isExpanded = false }: 
       {/* Cover top line for closed troves */}
       {isClosedTrove && (
         <div
-          className="absolute top-0 left-0 w-4 h-5 bg-white dark:bg-slate-800"
+          className="absolute top-0 left-0 w-4 h-8 bg-white dark:bg-slate-800"
           style={{ transform: "translateX(-6px)" }}
         />
       )}

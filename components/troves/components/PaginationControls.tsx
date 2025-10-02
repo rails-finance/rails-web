@@ -45,7 +45,7 @@ export function PaginationControls({
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="cursor-pointer p-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="cursor-pointer p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -54,7 +54,7 @@ export function PaginationControls({
           <>
             <button
               onClick={() => onPageChange(1)}
-              className="cursor-pointer px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+              className="cursor-pointer px-3 py-0.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors"
             >
               1
             </button>
@@ -66,8 +66,8 @@ export function PaginationControls({
           <button
             key={num}
             onClick={() => onPageChange(num)}
-            className={`cursor-pointer px-3 py-1 rounded-lg transition-colors ${
-              num === currentPage ? "bg-slate-600 text-white" : "bg-slate-800 hover:bg-slate-700"
+            className={`cursor-pointer px-3 py-0.5 rounded-lg transition-colors ${
+              num === currentPage ? "bg-slate-500 dark:bg-slate-600 text-white" : "hover:bg-slate-100 dark:hover:bg-slate-700"
             }`}
           >
             {num}
@@ -79,7 +79,7 @@ export function PaginationControls({
             {end < totalPages - 1 && <span className="text-slate-400">...</span>}
             <button
               onClick={() => onPageChange(totalPages)}
-              className="cursor-pointer px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+              className="cursor-pointer px-3 py-0.5 rounded-lg dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors"
             >
               {totalPages}
             </button>
@@ -89,7 +89,7 @@ export function PaginationControls({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="cursor-pointer p-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="cursor-pointer p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronRight className="w-5 h-5" />
         </button>

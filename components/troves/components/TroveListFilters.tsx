@@ -189,7 +189,7 @@ export function TroveListFilters({
                       onClick={() => handleFilterChange({ status: "open" })}
                       className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                         filters.status === "open"
-                          ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400 font-semibold"
+                          ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-600 font-semibold"
                           : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                       }`}
                     >
@@ -377,7 +377,7 @@ export function TroveListFilters({
             placeholder="Address, ENS, or ID..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="w-full px-4 py-2 pr-10 bg-white dark:bg-slate-800 h-10 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full px-4 py-2 pr-10 bg-white dark:bg-slate-800 h-10 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-700 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
           {searchInput ? (
             <button
@@ -398,7 +398,7 @@ export function TroveListFilters({
       <div className="flex items-center gap-1 w-full md:w-auto">
         <button
           onClick={() => onSortChange?.(sortBy, sortOrder === "asc" ? "desc" : "asc")}
-          className="flex items-center justify-center w-10 h-10 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-900 dark:text-white border border-slate-300 dark:border-transparent"
+          className="flex items-center justify-center w-10 h-10 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700/75 rounded-lg transition-colors text-slate-700 dark:text-white border border-slate-300 dark:border-transparent"
           title={sortOrder === "asc" ? "Sort Ascending" : "Sort Descending"}
         >
           {sortOrder === "asc" ? "↑" : "↓"}
@@ -406,7 +406,7 @@ export function TroveListFilters({
         <div className="relative h-10 flex-1 md:flex-initial" ref={sortDropdownRef}>
           <button
             onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-            className="w-full md:w-auto flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-900 dark:text-white font-medium transition-colors md:min-w-[160px] border border-slate-300 dark:border-transparent"
+            className="w-full md:w-auto flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700/75 rounded-lg text-slate-700 dark:text-white font-medium transition-colors md:min-w-[160px] border border-slate-300 dark:border-transparent"
           >
             <span>{sortOptions.find((o) => o.value === sortBy)?.label || "Sort"}</span>
             <ChevronDown
@@ -423,7 +423,7 @@ export function TroveListFilters({
                     onSortChange?.(option.value);
                     setIsSortDropdownOpen(false);
                   }}
-                  className={`block w-full text-left px-4 py-3 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors ${
+                  className={`block w-full text-left px-4 py-3 text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors ${
                     sortBy === option.value ? "bg-slate-200 dark:bg-slate-800/50" : ""
                   }`}
                 >

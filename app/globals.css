@@ -21,8 +21,7 @@
 
 :root {
   /* Light mode colors (default) */
-  --background: #ffffff;
-  --foreground: #0d0f15;
+  --foreground: #0D0F15;
 
   /* Light mode specific colors */
   --card-background: #f9fafb;
@@ -44,7 +43,6 @@
 
 .dark {
   /* Dark mode colors (current theme as dark) */
-  --background: #171b24;
   --foreground: #ffffff;
 
   /* Dark mode specific colors */
@@ -66,8 +64,6 @@
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
 }
 
 @layer components {

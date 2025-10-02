@@ -36,7 +36,7 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
 
   return (
     <div
-      className={`rounded-b-lg py-1 ${shouldShowOpen ? "bg-slate-200 dark:bg-slate-950 w-full" : "bg-slate-50 dark:bg-slate-950 w-fit"}`}
+      className={`rounded-b-lg py-1 ${shouldShowOpen ? "bg-slate-100 dark:bg-slate-950 w-full" : "bg-slate-100 dark:bg-slate-950 w-fit"}`}
     >
       {!shouldShowOpen ? (
         <button
@@ -53,7 +53,7 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
         <div className="">
           <button
             onClick={handleToggle}
-            className="cursor-pointer w-full px-4.5 flex items-center justify-between gap-1 text-slate-400 hover:text-slate-200 transition-colors"
+            className="cursor-pointer w-full px-4.5 flex items-center justify-between gap-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
             aria-expanded={shouldShowOpen}
             aria-label="Show transaction details"
           >

@@ -42,12 +42,12 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
     <Link
       href={`/trove/${trove.collateralType}/${trove.id}`}
       onClick={handleClick}
-      className="block relative rounded-lg text-slate-600 dark:text-slate-500 bg-slate-50 dark:bg-slate-900 hover:shadow-lg transition-shadow cursor-pointer group"
+      className="block relative rounded-lg text-slate-600 dark:text-slate-500 bg-slate-50 dark:bg-slate-900 hover:dark:bg-slate-900/70 hover:bg-slate-50/70 transition-all cursor-pointer group"
     >
       {/* Header section */}
       <div className="flex items-center justify-between p-4 pb-0">
         <div className="flex items-center gap-2 text-xs">
-          <span className="font-semibold px-2 py-0.5 bg-green-500 dark:bg-green-900 text-white dark:text-green-400 rounded-xs">ACTIVE</span>
+          <span className="font-bold tracking-wider px-2 py-0.5 text-white bg-green-500 dark:bg-green-950 dark:text-green-500/70 rounded-xs text-xs">ACTIVE</span>
         </div>
         <div className="flex items-center gap-2 text-xs">
           {trove.activity.redemptionCount > 0 && (
@@ -71,8 +71,8 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
           <div className="col-span-2 md:col-span-1">
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Debt</p>
             <div className="flex items-center">
-              <h3 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-slate-200">{formatPrice(debtWithInterest)}</h3>
-              <span className="ml-2 text-green-400">
+              <h3 className="text-2xl md:text-3xl font-bold text-slate-600 dark:text-slate-200">{formatPrice(debtWithInterest)}</h3>
+              <span className="ml-2 font-bold text-green-500">
                 <TokenIcon assetSymbol="BOLD" className="w-6 md:w-7 h-6 md:h-7 relative top-0" />
               </span>
             </div>
@@ -83,11 +83,11 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Backed by</p>
             <div className="flex items-center">
               <span className="flex items-center">
-                <p className="text-lg md:text-xl font-bold mr-1 text-slate-800 dark:text-slate-200">{trove.collateral.amount}</p>
+                <p className="text-lg md:text-xl font-bold mr-1 text-slate-600 dark:text-slate-200">{trove.collateral.amount}</p>
                 <TokenIcon assetSymbol={trove.collateralType} />
               </span>
               <div className="ml-1 flex items-center">
-                <span className="text-xs flex items-center text-green-400 border-l border-r border-green-400 rounded-sm px-1 py-0">
+                <span className="text-xs flex items-center font-bold text-green-500 border-l-2 border-r-2 border-green-500 rounded-sm px-1 py-0">
                   {formatUsdValue(trove.collateral.valueUsd)}
                 </span>
               </div>
@@ -100,7 +100,7 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
               <span className="lg:hidden">Ratio</span>
               <span className="hidden lg:inline">Collateral Ratio</span>
             </p>
-            <p className="text-lg md:text-xl font-semibold text-slate-800 dark:text-slate-200">
+            <p className="text-lg md:text-xl font-semibold text-slate-600 dark:text-slate-200">
               {trove.metrics.collateralRatio.toFixed(1)}%
             </p>
           </div>
@@ -115,7 +115,7 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
               )}
               <p className="text-xs text-slate-400 dark:text-slate-600 font-bold">Interest Rate</p>
             </div>
-            <div className="text-lg md:text-xl font-bold text-slate-800 dark:text-slate-200">{trove.metrics.interestRate}%</div>
+            <div className="text-lg md:text-xl font-bold text-slate-600 dark:text-slate-200">{trove.metrics.interestRate}%</div>
           </div>
         </div>
 
@@ -128,7 +128,7 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
           />
           <div className="flex items-center bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
             <span
-              className="text-sm text-slate-500 group-hover:text-white font-medium flex items-center gap-1"
+              className="text-sm text-slate-600 dark:text-slate-500 group-hover:text-white font-bold flex items-center gap-1"
               aria-label="View Trove"
             >
               <Icon name="timeline" size={20} />

@@ -13,7 +13,7 @@ export function ExplanationItem({ label, children, type = "default" }: Explanati
     default: "",
     warning: "text-yellow-400",
     error: "text-red-400",
-    success: "text-green-400",
+    success: "text-green-600",
   };
 
   return (

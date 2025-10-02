@@ -7,7 +7,7 @@ export function SiteFooter() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Rails Info */}
           <div className="md:col-span-2">
-            <h3 className="text-xl font-bold text-green-600 dark:text-green-400 mb-3">Rails</h3>
+            <h3 className="text-xl font-bold text-green-600 dark:text-green-600 mb-3">Rails</h3>
             <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mb-4">
               Making DeFi more understandable and accessible for everyone. Rails displays your DeFi activity on simple
               timelines with clear explanations and in-depth transaction analysis.
@@ -17,7 +17,7 @@ export function SiteFooter() {
                 href="https://x.com/rails_finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
                 title="Follow Rails on X"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -28,7 +28,7 @@ export function SiteFooter() {
                 href="https://www.youtube.com/@rails_finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
                 title="Rails Finance on YouTube"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -39,7 +39,7 @@ export function SiteFooter() {
                 href="https://github.com/rails-finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
                 title="Rails on GitHub"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -56,7 +56,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/"
-                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors"
                 >
                   Home
                 </Link>
@@ -64,7 +64,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/about"
-                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors"
                 >
                   About
                 </Link>
@@ -72,7 +72,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/how-it-works"
-                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors"
                 >
                   How It Works
                 </Link>
@@ -80,7 +80,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/troves"
-                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors"
                 >
                   Explore Troves
                 </Link>

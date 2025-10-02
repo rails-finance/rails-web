@@ -9,7 +9,7 @@ export function InterestRateAdjustHeader({ tx }: { tx: TroveTransaction }) {
 
   return (
     <>
-      <span className="text-slate-400 font-medium">{rateChangeText}</span>
+      <span className="text-slate-400 font-bold">{rateChangeText}</span>
       <InterestRateBadge rate={tx.troveOperation.annualInterestRate} />
     </>
   );

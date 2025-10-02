@@ -19,7 +19,7 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
     <Link
       href={`/trove/${trove.collateralType}/${trove.id}`}
       onClick={handleClick}
-      className="block relative rounded-lg text-slate-600 dark:text-slate-500 bg-gray-100 dark:bg-slate-700 hover:shadow-lg transition-shadow cursor-pointer group"
+      className="block relative rounded-lg text-slate-600 dark:text-slate-500 bg-slate-200 dark:bg-slate-700 hover:dark:bg-slate-700/70 hover:bg-slate-200/70 transition-all cursor-pointer group"
     >
       {/* Header section */}
       <div className="flex items-center justify-between p-4 pb-0">
@@ -48,8 +48,8 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
           <div>
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Peak Debt</p>
             <div className="flex items-center">
-              <h3 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-slate-200">{formatPrice(trove.debt.peak)}</h3>
-              <span className="ml-2 text-green-400">
+              <h3 className="text-2xl md:text-3xl font-bold text-slate-600 dark:text-slate-200">{formatPrice(trove.debt.peak)}</h3>
+              <span className="ml-2 text-green-600">
                 <TokenIcon assetSymbol="BOLD" className="w-6 md:w-7 h-6 md:h-7 relative top-0" />
               </span>
             </div>
@@ -65,7 +65,7 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
           />
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
             <span
-              className="text-sm text-slate-700 dark:text-slate-500 group-hover:text-white font-medium flex items-center gap-1"
+              className="text-sm text-slate-600 dark:text-slate-500 group-hover:text-white font-bold flex items-center gap-1"
               aria-label="View Trove"
             >
               <Icon name="timeline" size={20} />
