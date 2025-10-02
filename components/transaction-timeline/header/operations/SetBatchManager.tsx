@@ -1,8 +1,6 @@
 import { TroveTransaction } from "@/types/api/troveHistory";
 import { OperationBadge } from "../components/OperationBadge";
 import { InterestRateBadge } from "../components/InterestRateBadge";
-import { BatchManagerInfo } from "../components/BatchManagerInfo";
-import { BatchIcon } from "../components/BatchIcon";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 
 export function SetBatchManagerHeader({ tx }: { tx: TroveTransaction }) {
@@ -19,17 +17,12 @@ export function SetBatchManagerHeader({ tx }: { tx: TroveTransaction }) {
           <OperationBadge label="Delegate" color="none" />
           <InterestRateBadge
             rate={tx.stateAfter.annualInterestRate}
-          <OperationBadge label="Delegate" color="none" />
-          <InterestRateBadge
-            rate={tx.stateAfter.annualInterestRate}
             isDelegate={isJoiningExistingDelegate}
             isNewDelegate={isBecomingDelegate}
           />
           {managementFee > 0 && (
             <div className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded text-slate-300 bg-slate-800 border border-slate-600">
               <span className="mx-1">+</span>
-              {managementFee}
-              <span className="ml-0.5">%</span>
               {managementFee}
               <span className="ml-0.5">%</span>
             </div>

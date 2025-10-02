@@ -7,8 +7,6 @@ const RAILS_API_URL = process.env.RAILS_API_URL;
 // Valid parameter values for validation
 const VALID_STATUSES = ["open", "closed", "liquidated"];
 const VALID_COLLATERAL_TYPES = ["WETH", "wstETH", "rETH"];
-const VALID_STATUSES = ["open", "closed", "liquidated"];
-const VALID_COLLATERAL_TYPES = ["WETH", "wstETH", "rETH"];
 const VALID_SORT_FIELDS = [
   "debt",
   "coll",
@@ -23,21 +21,7 @@ const VALID_SORT_FIELDS = [
   "peakColl",
   "batchRate",
   "managementFee",
-  "debt",
-  "coll",
-  "collUsd",
-  "ratio",
-  "interestRate",
-  "created",
-  "lastActivity",
-  "redemptions",
-  "transactions",
-  "peakDebt",
-  "peakColl",
-  "batchRate",
-  "managementFee",
 ];
-const VALID_SORT_ORDERS = ["asc", "desc"];
 const VALID_SORT_ORDERS = ["asc", "desc"];
 
 export async function GET(request: NextRequest) {
@@ -71,49 +55,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { error: `Invalid sortBy parameter. Valid values: ${VALID_SORT_FIELDS.join(", ")}` },
       { status: 400 },
-      { error: `Invalid sortBy parameter. Valid values: ${VALID_SORT_FIELDS.join(", ")}` },
-      { status: 400 },
     );
   }
 
-
   if (sortOrder && !VALID_SORT_ORDERS.includes(sortOrder)) {
     return NextResponse.json({ error: "Invalid sortOrder parameter. Valid values: asc, desc" }, { status: 400 });
-    return NextResponse.json({ error: "Invalid sortOrder parameter. Valid values: asc, desc" }, { status: 400 });
   }
-
 
   // Validate mutual exclusivity
   if (batchOnly && individualOnly) {
     return NextResponse.json({ error: "batchOnly and individualOnly cannot both be true" }, { status: 400 });
-    return NextResponse.json({ error: "batchOnly and individualOnly cannot both be true" }, { status: 400 });
   }
-
 
   // Validate numeric parameters
   if (activeWithin && isNaN(Number(activeWithin))) {
     return NextResponse.json({ error: "activeWithin must be a valid number (milliseconds)" }, { status: 400 });
-    return NextResponse.json({ error: "activeWithin must be a valid number (milliseconds)" }, { status: 400 });
   }
-
 
   if (createdWithin && isNaN(Number(createdWithin))) {
     return NextResponse.json({ error: "createdWithin must be a valid number (milliseconds)" }, { status: 400 });
-    return NextResponse.json({ error: "createdWithin must be a valid number (milliseconds)" }, { status: 400 });
   }
-
 
   if (limit && (isNaN(Number(limit)) || Number(limit) < 1 || Number(limit) > 1000)) {
     return NextResponse.json({ error: "limit must be a number between 1 and 1000" }, { status: 400 });
-    return NextResponse.json({ error: "limit must be a number between 1 and 1000" }, { status: 400 });
   }
-
 
   if (offset && (isNaN(Number(offset)) || Number(offset) < 0)) {
     return NextResponse.json({ error: "offset must be a non-negative number" }, { status: 400 });
-    return NextResponse.json({ error: "offset must be a non-negative number" }, { status: 400 });
   }
-
 
   // Validate Ethereum address format
   if (ownerAddress && !/^0x[a-fA-F0-9]{40}$/.test(ownerAddress)) {
@@ -129,7 +98,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
-
   // Return mock data for specific fake trove ID
   if (troveId === "mock-all-events") {
     const mockCollateral = collateralType || "WETH";
@@ -141,9 +109,7 @@ export async function GET(request: NextRequest) {
         ...mockTroveData.backedBy,
         symbol: mockCollateral,
       },
-      },
     };
-
 
     return NextResponse.json({
       data: [customizedMock],
@@ -194,7 +160,6 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       console.error(`Backend API error: ${response.status} ${response.statusText}`);
-      return NextResponse.json({ error: `Backend error: ${response.statusText}` }, { status: response.status });
       return NextResponse.json({ error: `Backend error: ${response.statusText}` }, { status: response.status });
     }
 

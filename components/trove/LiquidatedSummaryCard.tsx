@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { CardFooter } from "./components/CardFooter";
-import { formatDate, formatDateRange, formatDuration } from "@/lib/date";
+import { formatDateRange, formatDuration } from "@/lib/date";
 import { Icon } from "@/components/icons/icon";
 import { formatPrice } from "@/lib/utils/format";
 import { ExplanationPanel } from "@/components/transaction-timeline/explanation/ExplanationPanel";

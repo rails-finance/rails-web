@@ -6,7 +6,7 @@ interface HighlightableValueProps {
   children: React.ReactNode;
   type: ValueType;
   state: ValueState;
-  value?: number;
+  value?: number | string;
   className?: string;
   asBlock?: boolean;
   variant?: "explanation" | "card";

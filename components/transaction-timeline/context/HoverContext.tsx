@@ -11,13 +11,18 @@ export type ValueType =
   | "upfrontFee"
   | "collateralPrice"
   | "peakDebt"
-  | "peakCollateral";
+  | "peakCollateral"
+  | "duration"
+  | "dateRange"
+  | "ownerAddress"
+  | "troveId"
+  | "nftToken";
 export type ValueState = "before" | "after" | "change" | "fee";
 
 export interface HoveredValue {
   type: ValueType;
   state: ValueState;
-  value?: number;
+  value?: number | string;
 }
 
 interface HoverContextType {
