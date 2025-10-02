@@ -65,6 +65,11 @@ export default function TrovesPage() {
     if (hasRedemptionsParam === "true") filters.hasRedemptions = true;
     if (hasRedemptionsParam === "false") filters.hasRedemptions = false;
 
+    // Handle showZombie with true/false values
+    const showZombieParam = searchParams.get("showZombie");
+    if (showZombieParam === "true") filters.showZombie = true;
+    if (showZombieParam === "false") filters.showZombie = false;
+
     const sortBy = searchParams.get("sortBy");
     if (sortBy) filters.sortBy = sortBy;
 
@@ -102,6 +107,9 @@ export default function TrovesPage() {
     if (filterParams.individualOnly) params.set("individualOnly", "true");
     if (filterParams.hasRedemptions !== undefined) {
       params.set("hasRedemptions", String(filterParams.hasRedemptions));
+    }
+    if (filterParams.showZombie !== undefined) {
+      params.set("showZombie", String(filterParams.showZombie));
     }
     if (filterParams.sortBy) params.set("sortBy", filterParams.sortBy);
     if (filterParams.sortOrder) params.set("sortOrder", filterParams.sortOrder);

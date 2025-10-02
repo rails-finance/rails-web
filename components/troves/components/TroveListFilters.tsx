@@ -15,7 +15,7 @@ export interface TroveListFilterParams {
   batchOnly?: boolean;
   individualOnly?: boolean;
   hasRedemptions?: boolean;
-  zombieFilter?: "only" | "hide";
+  showZombie?: boolean;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
 }
@@ -116,7 +116,7 @@ export function TroveListFilters({
     if (filters.batchOnly) count++;
     if (filters.individualOnly) count++;
     if (filters.hasRedemptions !== undefined) count++;
-    if (filters.zombieFilter) count++;
+    if (filters.showZombie !== undefined) count++;
     return count;
   };
 
@@ -133,7 +133,7 @@ export function TroveListFilters({
       batchOnly: undefined,
       individualOnly: undefined,
       hasRedemptions: undefined,
-      zombieFilter: undefined,
+      showZombie: undefined,
     });
   };
 
@@ -289,9 +289,9 @@ export function TroveListFilters({
                     <div className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Zombie Troves</div>
                     <div className="flex bg-slate-100 dark:bg-slate-900 rounded-lg p-1">
                       <button
-                        onClick={() => handleFilterChange({ zombieFilter: undefined })}
+                        onClick={() => handleFilterChange({ showZombie: undefined })}
                         className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
-                          !filters.zombieFilter
+                          filters.showZombie === undefined
                             ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-400 font-semibold"
                             : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                         }`}
@@ -299,9 +299,9 @@ export function TroveListFilters({
                         All
                       </button>
                       <button
-                        onClick={() => handleFilterChange({ zombieFilter: "only" })}
+                        onClick={() => handleFilterChange({ showZombie: true })}
                         className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
-                          filters.zombieFilter === "only"
+                          filters.showZombie === true
                             ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-400 font-semibold"
                             : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                         }`}
@@ -309,9 +309,9 @@ export function TroveListFilters({
                         Show Zombies
                       </button>
                       <button
-                        onClick={() => handleFilterChange({ zombieFilter: "hide" })}
+                        onClick={() => handleFilterChange({ showZombie: false })}
                         className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
-                          filters.zombieFilter === "hide"
+                          filters.showZombie === false
                             ? "bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white font-semibold"
                             : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                         }`}

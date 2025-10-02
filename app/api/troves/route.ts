@@ -45,6 +45,11 @@ export async function GET(request: NextRequest) {
   let hasRedemptions: boolean | undefined;
   if (hasRedemptionsParam === "true") hasRedemptions = true;
   if (hasRedemptionsParam === "false") hasRedemptions = false;
+
+  const showZombieParam = searchParams.get("showZombie");
+  let showZombie: boolean | undefined;
+  if (showZombieParam === "true") showZombie = true;
+  if (showZombieParam === "false") showZombie = false;
   const sortBy = searchParams.get("sortBy");
   const sortOrder = searchParams.get("sortOrder");
   const limit = searchParams.get("limit");
@@ -148,6 +153,9 @@ export async function GET(request: NextRequest) {
     if (individualOnly) backendParams.set("individualOnly", "true");
     if (hasRedemptions !== undefined) {
       backendParams.set("hasRedemptions", String(hasRedemptions));
+    }
+    if (showZombie !== undefined) {
+      backendParams.set("showZombie", String(showZombie));
     }
     if (sortBy) backendParams.set("sortBy", sortBy);
     if (sortOrder) backendParams.set("sortOrder", sortOrder);
