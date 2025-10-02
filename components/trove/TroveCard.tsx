@@ -1,6 +1,6 @@
-import { OpenTroveCard } from "./OpenTroveCard";
-import { ClosedTroveCard } from "./ClosedTroveCard";
-import { LiquidatedTroveCard } from "./LiquidatedTroveCard";
+import { OpenTroveCard } from "./OpenSummaryCard";
+import { ClosedTroveCard } from "./ClosedSummaryCard";
+import { LiquidatedTroveCard } from "./LiquidatedSummaryCard";
 import { TroveSummary } from "@/types/api/trove";
 
 interface TroveCardProps {

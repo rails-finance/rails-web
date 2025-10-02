@@ -5,7 +5,7 @@ import Link from "next/link";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { Icon } from "@/components/icons/icon";
 import { ChevronRight, Users } from "lucide-react";
-import { TroveCardFooter } from "./components/TroveCardFooter";
+import { TroveCardFooter } from "./components/CardFooter";
 import { TroveSummary } from "@/types/api/trove";
 import { formatDate, formatDuration } from "@/lib/date";
 import { formatPrice, formatUsdValue } from "@/lib/utils/format";

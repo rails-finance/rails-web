@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { TokenIcon } from "@/components/icons/tokenIcon";
-import { TroveCardFooter } from "./components/TroveCardFooter";
+import { TroveCardFooter } from "./components/CardFooter";
 import { formatDate, formatDateRange, formatDuration } from "@/lib/date";
 import { Icon } from "@/components/icons/icon";
 import { formatPrice, formatUsdValue } from "@/lib/utils/format";

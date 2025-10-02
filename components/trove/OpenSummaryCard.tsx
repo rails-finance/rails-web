@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { Icon } from "@/components/icons/icon";
-import { TroveCardFooter } from "./components/TroveCardFooter";
+import { TroveCardFooter } from "./components/CardFooter";
 import { TroveSummary } from "@/types/api/trove";
 import { getBatchManagerInfo } from "@/lib/utils/batch-manager-utils";
 import { formatDate, formatDuration } from "@/lib/date";
