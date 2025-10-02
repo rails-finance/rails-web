@@ -126,9 +126,9 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
             dateText={`${formatDuration(trove.activity.lastActivityAt, new Date())} ago`}
             showDetailedInfo={false}
           />
-          <div className="flex items-center bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
+          <div className="flex items-center bg-slate-300 dark:bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
             <span
-              className="text-sm text-slate-600 dark:text-slate-500 group-hover:text-white font-bold flex items-center gap-1"
+              className="text-sm text-slate-50 dark:text-slate-500 group-hover:text-white font-bold flex items-center gap-1"
               aria-label="View Trove"
             >
               <Icon name="timeline" size={20} />

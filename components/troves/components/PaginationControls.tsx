@@ -45,7 +45,7 @@ export function PaginationControls({
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="cursor-pointer p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="cursor-pointer p-1.5 text-slate-700 dark:text-slate-50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -54,11 +54,11 @@ export function PaginationControls({
           <>
             <button
               onClick={() => onPageChange(1)}
-              className="cursor-pointer px-3 py-0.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors"
+              className="cursor-pointer text-slate-700 dark:text-slate-50 px-3 py-0.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors"
             >
               1
             </button>
-            {start > 2 && <span className="text-slate-400">...</span>}
+            {start > 2 && <span className="font-bold text-slate-700 dark:text-slate-50">...</span>}
           </>
         )}
 
@@ -66,8 +66,8 @@ export function PaginationControls({
           <button
             key={num}
             onClick={() => onPageChange(num)}
-            className={`cursor-pointer px-3 py-0.5 rounded-lg transition-colors ${
-              num === currentPage ? "bg-slate-500 dark:bg-slate-600 text-white" : "hover:bg-slate-100 dark:hover:bg-slate-700"
+            className={`cursor-pointer text-slate-700 dark:text-slate-50 px-3 py-0.5 font-bold rounded-lg transition-colors ${
+              num === currentPage ? "bg-slate-200 dark:bg-slate-600 text-slate-700" : "hover:bg-slate-100 dark:hover:bg-slate-700"
             }`}
           >
             {num}
@@ -76,10 +76,10 @@ export function PaginationControls({
 
         {end < totalPages && (
           <>
-            {end < totalPages - 1 && <span className="text-slate-400">...</span>}
+            {end < totalPages - 1 && <span className="font-bold text-slate-700 dark:text-slate-50">...</span>}
             <button
               onClick={() => onPageChange(totalPages)}
-              className="cursor-pointer px-3 py-0.5 rounded-lg dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors"
+              className="cursor-pointer px-3 py-0.5 font-bold text-slate-700 dark:text-slate-50 rounded-lg dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors"
             >
               {totalPages}
             </button>
@@ -89,7 +89,7 @@ export function PaginationControls({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="cursor-pointer p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="cursor-pointer text-slate-700 dark:text-slate-50 p-1.5 font-bold rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronRight className="w-5 h-5" />
         </button>

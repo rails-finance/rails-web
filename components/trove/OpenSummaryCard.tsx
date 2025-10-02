@@ -301,7 +301,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
         <div className="flex items-center justify-between p-4 pb-0">
           <div className="flex items-center">
             {/* Status */}
-            <span className="font-semibold px-2 py-0.5 bg-green-500 dark:bg-green-900 text-white dark:text-green-400 rounded-xs text-xs">ACTIVE</span>
+            <span className="font-bold tracking-wider px-2 py-0.5 text-white bg-green-500 dark:bg-green-950 dark:text-green-500/70 rounded-xs text-xs">ACTIVE</span>
           </div>
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs">
@@ -328,7 +328,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
             <HighlightableValue type="debt" state="after" value={debtWithInterest} asBlock={true}>
               <div className="flex items-center">
                 <h3 className="text-3xl font-bold">{formatPrice(debtWithInterest)}</h3>
-                <span className="ml-2 text-green-400 text-lg">
+                <span className="ml-2 text-green-600 text-lg">
                   <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
                 </span>
               </div>
@@ -392,9 +392,9 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
                   </span>
                 </span>
                 <div className="ml-1 flex items-center">
-                  <span className="text-xs flex items-center border-l border-r border-green-400 rounded-sm px-1 py-0">
+                  <span className="text-xs flex items-center border-l-2 border-r-2 border-green-500 rounded-sm px-1 py-0">
                     <HighlightableValue
-                      className="text-green-400"
+                      className="text-green-500"
                       type="collateralUsd"
                       state="after"
                       value={trove.collateral.valueUsd}
@@ -516,7 +516,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
               <HighlightableValue
                 type="currentPrice"
                 state="after"
-                className="text-xs text-green-400"
+                className="text-xs text-green-600"
                 value={trove.collateral.valueUsd / trove.collateral.amount}
               >
                 {formatUsdValue(trove.collateral.valueUsd / trove.collateral.amount)}
