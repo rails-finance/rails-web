@@ -140,7 +140,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
               href={batchManagerInfo.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors hover:bg-slate-700"
+              className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-200 dark:bg-slate-800 w-4 h-4 rounded-full transition-colors hover:bg-slate-300 dark:hover:bg-slate-700"
               aria-label={`Visit ${batchManagerInfo.name} website`}
             >
               <svg
@@ -192,7 +192,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
               href={batchManagerInfo.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-800 w-4 h-4 rounded-full transition-colors hover:bg-slate-700"
+              className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-200 dark:bg-slate-800 w-4 h-4 rounded-full transition-colors hover:bg-slate-300 dark:hover:bg-slate-700"
               aria-label={`Visit ${batchManagerInfo.name} website`}
             >
               <svg
@@ -296,24 +296,24 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
   return (
     <div>
       {/* Main trove card */}
-      <div className="relative rounded-lg text-slate-500 bg-slate-900">
+      <div className="relative rounded-lg text-slate-600 dark:text-slate-500 bg-slate-50 dark:bg-slate-900">
         {/* Header section */}
         <div className="flex items-center justify-between p-4 pb-0">
           <div className="flex items-center">
             {/* Status */}
-            <span className="font-semibold px-2 py-0.5 bg-green-900 text-green-400 rounded-xs text-xs">ACTIVE</span>
+            <span className="font-semibold px-2 py-0.5 bg-green-500 dark:bg-green-900 text-white dark:text-green-400 rounded-xs text-xs">ACTIVE</span>
           </div>
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-400">Opened {formatDate(trove.activity.createdAt)}</span>
-            <span className="text-slate-400">({formatDuration(trove.activity.createdAt, new Date())})</span>
+            <span className="text-slate-600 dark:text-slate-400">Opened {formatDate(trove.activity.createdAt)}</span>
+            <span className="text-slate-600 dark:text-slate-400">({formatDuration(trove.activity.createdAt, new Date())})</span>
             {trove.activity.redemptionCount > 0 && (
               <span className="inline-flex items-center text-orange-400">
                 <Icon name="triangle" size={12} />
                 <span className="ml-1">{trove.activity.redemptionCount}</span>
               </span>
             )}
-            <span className="inline-flex items-center text-slate-400">
+            <span className="inline-flex items-center text-slate-600 dark:text-slate-400">
               <Icon name="arrow-left-right" size={12} />
               <span className="ml-1">{trove.activity.transactionCount}</span>
             </span>

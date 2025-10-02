@@ -42,12 +42,12 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
     <Link
       href={`/trove/${trove.collateralType}/${trove.id}`}
       onClick={handleClick}
-      className="block relative rounded-lg text-slate-500 bg-slate-900 hover:shadow-lg transition-shadow cursor-pointer group"
+      className="block relative rounded-lg text-slate-600 dark:text-slate-500 bg-slate-50 dark:bg-slate-900 hover:shadow-lg transition-shadow cursor-pointer group"
     >
       {/* Header section */}
       <div className="flex items-center justify-between p-4 pb-0">
         <div className="flex items-center gap-2 text-xs">
-          <span className="font-semibold px-2 py-0.5 bg-green-900 text-green-400 rounded-xs">ACTIVE</span>
+          <span className="font-semibold px-2 py-0.5 bg-green-500 dark:bg-green-900 text-white dark:text-green-400 rounded-xs">ACTIVE</span>
         </div>
         <div className="flex items-center gap-2 text-xs">
           {trove.activity.redemptionCount > 0 && (
@@ -56,7 +56,7 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
               <span className="ml-1">{trove.activity.redemptionCount}</span>
             </span>
           )}
-          <span className="inline-flex items-center text-slate-400">
+          <span className="inline-flex items-center text-slate-600 dark:text-slate-400">
             <Icon name="arrow-left-right" size={12} />
             <span className="ml-1">{trove.activity.transactionCount}</span>
           </span>
@@ -69,9 +69,9 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 md:items-end">
           {/* Debt - spans 2 columns on mobile */}
           <div className="col-span-2 md:col-span-1">
-            <p className="text-xs text-slate-600 mb-1 font-bold">Debt</p>
+            <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Debt</p>
             <div className="flex items-center">
-              <h3 className="text-2xl md:text-3xl font-bold  text-slate-200">{formatPrice(debtWithInterest)}</h3>
+              <h3 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-slate-200">{formatPrice(debtWithInterest)}</h3>
               <span className="ml-2 text-green-400">
                 <TokenIcon assetSymbol="BOLD" className="w-6 md:w-7 h-6 md:h-7 relative top-0" />
               </span>
@@ -80,10 +80,10 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
 
           {/* Backed by */}
           <div className="md:col-span-1">
-            <p className="text-xs text-slate-600 mb-1 font-bold">Backed by</p>
+            <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Backed by</p>
             <div className="flex items-center">
               <span className="flex items-center">
-                <p className="text-lg md:text-xl font-bold mr-1 text-slate-200">{trove.collateral.amount}</p>
+                <p className="text-lg md:text-xl font-bold mr-1 text-slate-800 dark:text-slate-200">{trove.collateral.amount}</p>
                 <TokenIcon assetSymbol={trove.collateralType} />
               </span>
               <div className="ml-1 flex items-center">
@@ -96,11 +96,11 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
 
           {/* Collateral Ratio */}
           <div className="md:col-span-1">
-            <p className="text-xs text-slate-600 mb-1 font-bold">
+            <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">
               <span className="lg:hidden">Ratio</span>
               <span className="hidden lg:inline">Collateral Ratio</span>
             </p>
-            <p className="text-lg md:text-xl font-semibold  text-slate-200">
+            <p className="text-lg md:text-xl font-semibold text-slate-800 dark:text-slate-200">
               {trove.metrics.collateralRatio.toFixed(1)}%
             </p>
           </div>
@@ -109,13 +109,13 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
           <div className="md:col-span-1">
             <div className="flex items-center gap-1 mb-1">
               {trove.batch.isMember && (
-                <span className="inline-flex items-center text-xs font-semibold px-1 py-0.5 bg-pink-900/50 md:bg-fuchsia-900 text-pink-400 md:text-fuchsia-400 rounded-xs">
+                <span className="inline-flex items-center text-xs font-semibold px-1 py-0.5 bg-pink-300 text-white dark:bg-pink-900/50 dark:text-pink-400 rounded-xs">
                   <Users className="w-3 h-3" aria-hidden="true" />
                 </span>
               )}
-              <p className="text-xs text-slate-600 font-bold">Interest Rate</p>
+              <p className="text-xs text-slate-400 dark:text-slate-600 font-bold">Interest Rate</p>
             </div>
-            <div className="text-lg md:text-xl font-bold text-slate-200">{trove.metrics.interestRate}%</div>
+            <div className="text-lg md:text-xl font-bold text-slate-800 dark:text-slate-200">{trove.metrics.interestRate}%</div>
           </div>
         </div>
 

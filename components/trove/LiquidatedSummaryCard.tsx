@@ -103,7 +103,7 @@ function LiquidatedTroveCardContent({ trove }: LiquidatedTroveCardProps) {
 
   return (
     <div>
-      <div className="rounded-lg text-slate-500 bg-red-950 text-red-800 border border-red-900">
+      <div className="rounded-lg text-slate-600 dark:text-slate-500 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900">
         {/* Header section */}
         <div className="flex items-center justify-between p-4 pb-0">
           <div className="flex items-center">
