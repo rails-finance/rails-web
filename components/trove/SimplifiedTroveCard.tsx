@@ -156,8 +156,8 @@ function SimplifiedOpenTroveCard({ trove, showViewButton = false, hideLabels = f
             showDetailedInfo={false}
           />
           {showViewButton && (
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
-              <span className="text-sm text-slate-600 dark:text-slate-500 group-hover:text-white font-bold flex items-center gap-1" aria-label="View Trove">
+            <div className="flex items-center bg-slate-300 dark:bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
+              <span className="text-sm text-slate-50 dark:text-slate-500 group-hover:text-white font-bold flex items-center gap-1" aria-label="View Trove">
                 <Icon name="timeline" size={20} />
                 View
                 <ChevronRight className="w-4 h-4" />
@@ -231,8 +231,8 @@ function SimplifiedClosedTroveCard({ trove, showViewButton = false, hideLabels =
             showDetailedInfo={false}
           />
           {showViewButton && (
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
-              <span className="text-sm text-slate-600 dark:text-slate-500 group-hover:text-white font-bold flex items-center gap-1" aria-label="View Trove">
+            <div className="flex items-center bg-slate-300 dark:bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
+              <span className="text-sm text-slate-50 dark:text-slate-500 group-hover:text-white font-bold flex items-center gap-1" aria-label="View Trove">
                 <Icon name="timeline" size={20} />
                 View
                 <ChevronRight className="w-4 h-4" />

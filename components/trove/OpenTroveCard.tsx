@@ -220,13 +220,13 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs">
             {!showViewButton && (
-              <span className="text-slate-400">
+              <span className="text-slate-400 font-bold">
                 Opened <HighlightableValue type="openedDate" state="after" value={trove.activity.createdAt} variant="card">
                   {formatDate(trove.activity.createdAt)}
                 </HighlightableValue>
               </span>
             )}
-            <span className="text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 rounded-lg px-2">
+            <span className="text-slate-600 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 rounded-lg px-2">
               <HighlightableValue type="activeDuration" state="after" value={(new Date().getTime() - new Date(trove.activity.createdAt).getTime()) / 1000} variant="card">
                 {formatDuration(trove.activity.createdAt, new Date())}
               </HighlightableValue>
