@@ -157,7 +157,7 @@ export function TroveFilters({
                 onClick={() => onViewChange('open')}
                 className={`cursor-pointer flex-1 px-4 py-2 text-sm font-semibold rounded transition-all ${
                   currentView === 'open'
-                    ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400 shadow-sm"
+                    ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-600 shadow-sm"
                     : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
                 }`}
               >
@@ -276,7 +276,7 @@ export function TroveFilters({
               onClick={() => onViewChange('open')}
               className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded transition-all ${
                 currentView === 'open'
-                  ? "bg-green-900 text-green-400 shadow-sm"
+                  ? "bg-green-900 text-green-600 shadow-sm"
                   : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-600"
               }`}
             >

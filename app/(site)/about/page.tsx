@@ -164,7 +164,7 @@ export default function AboutPage() {
               <div className="flex-1">
                 <div className="flex items-center mb-4 h-full">
                   <a href="https://liquity.org" target="_blank" rel="noopener noreferrer" className="h-full">
-                    <img src="/liquity-logo.svg" alt="Liquity" className="h-full w-auto" />
+                    <LiquityLogo className="h-full w-auto" />
                   </a>
                 </div>
                 <p className="text-slate-700 dark:text-slate-300 mb-3">

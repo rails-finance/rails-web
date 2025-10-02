@@ -86,7 +86,7 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
 
   return (
     <div>
-      <div className="relative rounded-lg text-slate-600 dark:text-slate-500 bg-gray-100 dark:bg-slate-700 border border-slate-200 dark:border-transparent">
+      <div className="relative rounded-lg text-slate-600 dark:text-slate-500 bg-slate-200 dark:bg-slate-700 dark:border-transparent">
         {/* Header section */}
         <div className="flex items-center justify-between p-4 pb-0">
           <div className="flex items-center">
@@ -132,7 +132,7 @@ function ClosedTroveCardContent({ trove, showViewButton = false }: ClosedTroveCa
               {formatPrice(trove.debt.peak)}
             </HighlightableValue>
           </span>
-          <span className="ml-2 text-green-400 text-lg">
+          <span className="ml-2 text-green-600 text-lg">
             <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
           </span>
           <span className="ml-2 text-slate-600 dark:text-slate-400 text-sm"></span>

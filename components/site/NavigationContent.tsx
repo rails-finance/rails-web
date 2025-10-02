@@ -48,8 +48,8 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
               href={item.href}
               className={`flex items-center gap-3 text-lg font-medium py-2 transition-colors ${
                 isActive
-                  ? 'text-green-600 dark:text-green-400 pointer-events-none'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400'
+                  ? 'text-green-600 dark:text-green-600 pointer-events-none'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-600'
               }`}
               onClick={isActive ? undefined : onLinkClick}
             >
@@ -83,7 +83,7 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
             href="https://t.me/rails_finance"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
             title="Join Rails on Telegram"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
@@ -94,7 +94,7 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
             href="https://x.com/rails_finance"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
             title="Follow Rails on X"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
@@ -105,7 +105,7 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
             href="https://www.youtube.com/@rails_finance"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
             title="Rails Finance on YouTube"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
@@ -116,7 +116,7 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
             href="https://github.com/rails-finance"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
             title="Rails Finance on GitHub"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">

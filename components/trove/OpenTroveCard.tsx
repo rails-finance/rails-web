@@ -15,7 +15,7 @@ import { useHover, HoverProvider } from "@/components/transaction-timeline/conte
 import { InfoButton } from "@/components/transaction-timeline/explanation/InfoButton";
 import { FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
-import { DebtInFrontDisplay } from "./DebtInFrontDisplay";
+
 
 interface OpenTroveCardProps {
   trove: TroveSummary;
@@ -215,7 +215,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
         <div className="flex items-center justify-between p-4 pb-0">
           <div className="flex items-center">
             {/* Status */}
-            <span className="font-extrabold px-2 py-0.5 text-white bg-green-500 dark:bg-green-900 dark:text-green-400 rounded-xs text-xs">ACTIVE</span>
+            <span className="font-bold tracking-wider px-2 py-0.5 text-white bg-green-500 dark:bg-green-950 dark:text-green-500/70 rounded-xs text-xs">ACTIVE</span>
           </div>
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs">
@@ -261,7 +261,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
               <span className="text-3xl font-bold">
                 {interestInfo ? formatPrice(debtWithInterest) : formatPrice(trove.debt.current)}
               </span>
-              <span className="ml-2 text-green-400 text-lg">
+              <span className="ml-2 text-green-600 text-lg">
                 <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
               </span>
             </div>
@@ -303,8 +303,8 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
                 </span>
               </span>
               <div className="ml-1 flex items-center">
-                <span className="text-xs flex items-center border-l border-r border-green-400 rounded-sm px-1 py-0">
-                  <HighlightableValue className="text-green-400" type="collateralUsd" state="after" value={trove.collateral.valueUsd} variant="card">
+                <span className="text-xs flex items-center border-l-2 border-r-2 border-green-500 rounded-sm px-1 py-0">
+                  <HighlightableValue className="text-green-500" type="collateralUsd" state="after" value={trove.collateral.valueUsd} variant="card">
                     {formatUsdValue(trove.collateral.valueUsd)}
                   </HighlightableValue>
                 </span>
@@ -382,17 +382,6 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
           </div>
         </div>
 
-        {/* Single Debt in Front component - auto-calculates on individual trove pages */}
-        <div className="">
-          <DebtInFrontDisplay
-            trove={trove}
-            showAsButton={true}
-            autoCalculate={!showViewButton}
-            compactView={false}
-            onCalculated={(data) => setDebtInFrontData(data)}
-          />
-        </div>
-
         {showViewButton ? (
           <TroveCardFooter
             trove={trove}
@@ -415,7 +404,7 @@ function OpenTroveCardContent({ trove, showViewButton = false }: OpenTroveCardPr
               <HighlightableValue
                 type="currentPrice"
                 state="after"
-                className="text-xs text-green-400"
+                className="text-xs text-green-600"
                 value={trove.collateral.valueUsd / trove.collateral.amount}
                 variant="card"
               >

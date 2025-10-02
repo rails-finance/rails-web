@@ -29,7 +29,7 @@ export function ProfitLossCalculator({
 
       <div className="text-slate-400 text-xs">
         Net impact
-        <span className={`font-medium ${isProfit ? "text-green-400" : "text-red-400"}`}>
+        <span className={`font-medium ${isProfit ? "text-green-600" : "text-red-400"}`}>
           {isProfit ? " +" : " -"}
           {netAmount}
         </span>

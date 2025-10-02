@@ -31,7 +31,7 @@ export default async function RootLayout({
         <ThemeScript />
       </head>
       <body
-        className={`${inter.className} antialiased bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen overflow-x-hidden transition-colors`}
+        className={`${inter.className} antialiased bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-100 min-h-screen overflow-x-hidden transition-colors`}
       >
         <IconSymbols />
         <Providers initialState={initialState}>

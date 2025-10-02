@@ -83,12 +83,12 @@ export default function TrovePage() {
     <>
       <FeedbackButton />
       <div className="space-y-6 py-8">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+      <h1 className="text-2xl font-bold text-slate-700 dark:text-white mb-6 flex items-center gap-2">
         <TokenIcon assetSymbol={collateralType} className="w-7 h-7 z-1" />
         <TokenIcon assetSymbol="BOLD" className="w-7 h-7 -ml-3" />
         Liquity V2 Trove
       </h1>
-          <Button onClick={() => router.back()} className="mb-4 pl-2">
+          <Button onClick={() => router.back()} className="mb-4 pl-2 font-bold">
           <ChevronLeft className="w-4 h-4" />
             Back
           </Button>
@@ -107,7 +107,7 @@ export default function TrovePage() {
       <>
         <FeedbackButton />
         <div className="space-y-6 py-8">
-          <Button onClick={() => router.back()} className="mb-4 pl-2">
+          <Button onClick={() => router.back()} className="mb-4 pl-2 font-bold">
           <ChevronLeft className="w-4 h-4" />
             Back
           </Button>
@@ -126,12 +126,12 @@ export default function TrovePage() {
     <>
       <FeedbackButton />
       <div className="space-y-6 py-8">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+      <h1 className="text-2xl font-bold text-slate-700 dark:text-white mb-6 flex items-center gap-2">
         <TokenIcon assetSymbol={collateralType} className="w-7 h-7 z-1" />
         <TokenIcon assetSymbol="BOLD" className="w-7 h-7 -ml-3" />
         Liquity V2 Trove
       </h1>
-        <Button onClick={() => router.back()} className="mb-4 pl-2">
+        <Button onClick={() => router.back()} className="mb-4 pl-2 font-bold">
           <ChevronLeft className="w-4 h-4" />
             Back
         </Button>
@@ -140,7 +140,7 @@ export default function TrovePage() {
 
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <h3 className="text-xl font-semibold text-slate-900 dark:text-white">Trove Timeline</h3>
+            <h3 className="text-xl font-semibold text-slate-700 dark:text-white">Trove Timeline</h3>
             {troveData.activity?.lastActivityAt && (
               <span className="text-xs text-slate-600 dark:text-slate-500 flex baseline gap-1 rounded-full pl-1 pr-2 py-0.5 bg-slate-100 dark:bg-slate-900">
                 <Icon name="clock-zap" size={14} />

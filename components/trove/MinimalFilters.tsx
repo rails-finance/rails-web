@@ -67,7 +67,7 @@ export function MinimalFilters({
           onClick={() => onViewChange('open')}
           className={`px-3 py-1 rounded-l transition-all ${
             currentView === 'open'
-              ? 'bg-green-900 text-green-400 font-semibold'
+              ? 'bg-green-900 text-green-600 font-semibold'
               : 'bg-slate-700 text-slate-400 hover:text-white'
           }`}
         >

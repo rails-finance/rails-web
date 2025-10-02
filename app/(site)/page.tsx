@@ -106,11 +106,11 @@ export default function Home() {
               {/* Text Content - Same for both mobile and desktop */}
               <div className="md:flex-1 md:px-6 md:py-8 md:flex md:flex-col md:justify-center md:relative md:z-10">
                 <p className="text-slate-700 dark:text-slate-200 text-xl md:text-2xl font-semibold mb-4 tracking-tight">
-                  <span className="text-green-600 dark:text-green-400">Rails</span> displays your DeFi activity on simple timelines with clear explanations and in-depth transaction analysis.
+                  <span className="text-green-600 font-bold dark:text-green-600">Rails</span> displays your DeFi activity on simple timelines with clear explanations and in-depth transaction analysis.
                 </p>
                 <p className="text-slate-700 dark:text-slate-300 mb-4 tracking-tight">
                   Rails is building essential DeFi support infrastructure, starting with Liquity V2. Our roadmap includes integration with Liquity V2 forks and expansion across the broader DeFi ecosystem. Discover our approach
-                  <a className="text-green-500 dark:text-green-400" href="about/"> here</a>.
+                  <a className="text-green-500 dark:text-green-600" href="about/"> here</a>.
                 </p>
               </div>
 
@@ -165,7 +165,7 @@ export default function Home() {
 
                 {/* Liquity V2 Protocol Card */}
                 <div className="space-y-6">
-                  <div className="bg-slate-50 dark:bg-slate-800 rounded-lg overflow-hidden">
+                  <div className="bg-slate-100/50 dark:bg-slate-800 rounded-lg overflow-hidden">
                     <div className="p-4 space-y-6">
                       <div className="flex items-center gap-2 mb-4">
                             <svg className="w-12 h-12" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">

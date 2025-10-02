@@ -122,7 +122,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
 
   if (redemptionPrice > 0) {
     redeemItems.push(
-      <span key="economicImpact" className={isProfit ? "text-green-400" : "text-red-400"}>
+      <span key="economicImpact" className={isProfit ? "text-green-600" : "text-red-400"}>
         Economic impact: {formatUsdValue(netAmount)} net {isProfit ? 'profit' : 'loss'} to Trove owner
       </span>
     );

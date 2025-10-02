@@ -139,7 +139,7 @@ export function UnifiedFiltersDropdown({
                   onClick={() => onFiltersChange({ ...filters, status: 'active' })}
                   className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                     filters.status === 'active'
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-400 font-semibold'
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-600 font-semibold'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
@@ -310,7 +310,7 @@ export function UnifiedFiltersDropdown({
                       onClick={() => onFiltersChange({ ...filters, healthFilter: 'healthy' })}
                       className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                         filters.healthFilter === 'healthy'
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-400 font-semibold'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-600 font-semibold'
                           : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
