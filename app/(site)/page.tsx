@@ -16,65 +16,32 @@ export default function Home() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const query = searchValue.trim();
+    const trimmedValue = searchValue.trim();
 
-    if (!query) return;
+    if (!trimmedValue) return;
 
-    // Try to detect which collateral types this address/ID has
-    try {
-      // Fetch all troves for this specific search query
-      const collateralTypes = ["WETH", "wstETH", "rETH"];
-      const foundCollaterals = new Set<string>();
+    // Detect input type (same logic as TroveListFilters)
+    const isTroveId = /^\d+$/.test(trimmedValue);
+    const isEns = trimmedValue.toLowerCase().endsWith(".eth");
+    const isAddress = /^0x[a-fA-F0-9]{40}$/.test(trimmedValue);
 
-      // Check each collateral type for matches
-      await Promise.all(
-        collateralTypes.map(async (collType) => {
-          const responses = await Promise.all([
-            fetch(`/api/troves?status=open&collateralType=${collType}&limit=500`),
-            fetch(`/api/troves?status=closed&collateralType=${collType}&limit=500`),
-          ]);
-
-          for (const response of responses) {
-            if (response.ok) {
-              const data = await response.json();
-              const troves = data.data || [];
-
-              // Check if any trove matches the search query
-              const hasMatch = troves.some((trove: any) => {
-                const queryLower = query.toLowerCase();
-                return (
-                  trove.id?.toLowerCase() === queryLower ||
-                  trove.owner?.toLowerCase() === queryLower ||
-                  trove.lastOwner?.toLowerCase() === queryLower ||
-                  trove.ownerEns?.toLowerCase() === queryLower
-                );
-              });
-
-              if (hasMatch) {
-                foundCollaterals.add(collType);
-              }
-            }
-          }
-        }),
-      );
-
-      // Build URL with found collateral types
-      const params = new URLSearchParams();
-      params.set("q", query);
-
-      // Only add collateral params if we found specific matches
-      if (foundCollaterals.size > 0) {
-        foundCollaterals.forEach((collType) => {
-          params.append("collateral", collType);
-        });
-      }
-
-      router.push(`/troves?${params.toString()}`);
-    } catch (error) {
-      // If detection fails, fall back to default behavior
-      console.error("Failed to detect collateral types:", error);
-      router.push(`/troves?q=${encodeURIComponent(query)}`);
+    // Only navigate if input matches a valid pattern
+    if (!isTroveId && !isAddress && !isEns) {
+      return;
     }
+
+    // Build URL params
+    const params = new URLSearchParams();
+
+    if (isTroveId) {
+      params.set("troveId", trimmedValue);
+    } else if (isAddress) {
+      params.set("ownerAddress", trimmedValue);
+    } else if (isEns) {
+      params.set("ownerEns", trimmedValue);
+    }
+
+    router.push(`/troves?${params.toString()}`);
   };
 
   useEffect(() => {
