@@ -28,14 +28,17 @@ export default function AboutPage() {
               </p>
             </div>
           </div>
-          <div id="cell_2" className="hidden lg:block row-span-3 col-start-2">
-            <object
-              data="/about-mission-lg__1.svg"
-              type="image/svg+xml"
-              className="w-full h-full"
-              aria-label="Hero decoration"
-            />
-          </div>
+          <div
+            id="cell_2"
+            className="hidden lg:block row-span-3 col-start-2 bg-white dark:bg-slate-900 rounded-lg"
+            style={{
+              backgroundImage: "url(/about-mission-lg__1.svg)",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "center center",
+              backgroundSize: "contain"
+            }}
+            aria-label="Mission decoration"
+          />
           <div id="cell_3" className="col-start-3 row-start-2">
             <div className="rounded-lg p-5 border-2 border-green-600 mb-2 lg:mb-0 lg:h-full lg:flex lg:flex-col">
               <div className="flex items-start justify-between mb-3">
@@ -116,15 +119,15 @@ export default function AboutPage() {
           </div>
           <div
             id="cell_7"
-            className=" hidden lg:block row-span-2  col-span-2 col-start-2 row-start-4 justify-start mt-2"
-          >
-            <object
-              data="/about-mission-lg__2.svg"
-              type="image/svg+xml"
-              className="w-full h-full"
-              aria-label="Hero decoration"
-            />
-          </div>
+            className=" hidden lg:block row-span-2  col-span-2 col-start-2 row-start-4 justify-start mt-2 bg-white dark:bg-slate-900 rounded-lg"
+            style={{
+              backgroundImage: "url(/about-mission-lg__2.svg)",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "center center",
+              backgroundSize: "contain"
+            }}
+            aria-label="Roadmap decoration"
+          />
         </div>
 
         {/* Team Section */}

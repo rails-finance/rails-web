@@ -511,7 +511,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
             <CardFooter trove={trove} />
 
             {/* Latest collateral value - only show on trove view page */}
-            <div className="flex items-center gap-1 bg-slate-700 shadow-b shadow-slate-900/50 rounded-l p-2 -mr-4.5">
+            <div className="flex items-center gap-1 bg-slate-200 dark:bg-slate-700 shadow-b shadow-slate-900/50 rounded-l p-2 -mr-4.5">
               <TokenIcon assetSymbol={trove.collateralType} />
               <HighlightableValue
                 type="currentPrice"
