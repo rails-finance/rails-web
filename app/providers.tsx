@@ -1,26 +1,16 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
-import { type ReactNode, useState } from "react";
-import { type State, WagmiProvider } from "wagmi";
-
-import { getConfig } from "./wagmi";
+import { type ReactNode } from "react";
 
 type Props = {
   children: ReactNode;
-  initialState: State | undefined;
 };
 
-export function Providers({ children, initialState }: Props) {
-  const [config] = useState(() => getConfig());
-  const [queryClient] = useState(() => new QueryClient());
-
+export function Providers({ children }: Props) {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <WagmiProvider config={config} initialState={initialState}>
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-      </WagmiProvider>
+      {children}
     </ThemeProvider>
   );
 }

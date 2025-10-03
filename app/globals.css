@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-black: #000;
   --color-white: #fff;
@@ -11,22 +13,57 @@
   --color-slate-700: #232a37;
   --color-slate-800: #171b24;
   --color-slate-900: #12151e;
-  --color-slate-950: #0D0F15;
+  --color-slate-950: #0d0f15;
+
+  --color-green-600: #008900;
+  --color-green-400: #4ade80;
 }
 
 :root {
-  --background: #171b24; /* custom slate-800 - darker */
-  --foreground: #ffffff;
+  /* Light mode colors (default) */
+  --foreground: #0d0f15;
+
+  /* Light mode specific colors */
+  --card-background: #f9fafb;
+  --card-border: #e5e7eb;
+  --muted: #f3f4f6;
+  --muted-foreground: #6c7280;
+  --accent: #f3f4f6;
+  --accent-foreground: #171b24;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #171b24;
+
+  /* Protocol-specific gradient colors for light mode */
+  --liquity-grad-1: #4b5edb;
+  --liquity-grad-2: #3b4eab;
+
+  /* SVG inner background for timeline icons */
+  --svg-inner-bg: #ffffff;
 }
 
 .dark {
-  --background: #171b24; /* custom slate-800 - darker */
+  /* Dark mode colors (current theme as dark) */
   --foreground: #ffffff;
+
+  /* Dark mode specific colors */
+  --card-background: #12151e;
+  --card-border: #232a37;
+  --muted: #232a37;
+  --muted-foreground: #9da3ae;
+  --accent: #232a37;
+  --accent-foreground: #ffffff;
+  --secondary: #1e2530;
+  --secondary-foreground: #ffffff;
+
+  /* Protocol-specific gradient colors for dark mode */
+  --liquity-grad-1: #323e91;
+  --liquity-grad-2: #29336d;
+
+  /* SVG inner background for timeline icons */
+  --svg-inner-bg: #171b24;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
 }
 
 @layer components {
@@ -41,7 +78,6 @@ body {
     padding: 16px 0;
     overflow: hidden;
   }
-  
 
   /* Timeline connector positioning */
   .timeline-connector {
@@ -50,7 +86,7 @@ body {
     transform: translateX(-50%);
     z-index: 0;
   }
-  
+
   /* Transaction layouts - styles are inline in components, keeping minimal CSS here */
   .transaction-multi-step {
     display: flex;
@@ -64,5 +100,16 @@ body {
     width: 80px;
     height: 40px;
     z-index: 1;
+  }
+
+  /* Protocol-specific classes */
+  .liquityv2 {
+    --protocol-grad-1: var(--liquity-grad-1);
+    --protocol-grad-2: var(--liquity-grad-2);
+  }
+
+  /* Protocol trove header gradient */
+  .protocol-trove-header {
+    background: linear-gradient(to bottom, var(--protocol-grad-1), var(--protocol-grad-2));
   }
 }

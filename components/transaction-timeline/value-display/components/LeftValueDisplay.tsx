@@ -7,11 +7,20 @@ export function LeftValueDisplay({ tx }: { tx: Transaction }) {
     return <div className="hidden sm:block w-24 shrink-0" />;
   }
 
+  // For applyPendingDebt operations that are interest-only (no redistribution), don't show values
+  if (tx.operation === "applyPendingDebt") {
+    const { debtIncreaseFromRedist, collIncreaseFromRedist } = tx.troveOperation;
+    const hasRedistribution = debtIncreaseFromRedist > 0 || collIncreaseFromRedist > 0;
+    if (!hasRedistribution) {
+      return <div className="hidden sm:block w-24 shrink-0" />;
+    }
+  }
+
   const { debtChangeFromOperation, collChangeFromOperation } = tx.troveOperation;
-  
+
   // LEFT SIDE: Values USER RECEIVES (arrow points left/in)
   const isMultiStep = debtChangeFromOperation !== 0 && collChangeFromOperation !== 0;
-  
+
   if (isMultiStep) {
     const debtIncrease = debtChangeFromOperation > 0;
     const collIncrease = collChangeFromOperation > 0;
@@ -19,7 +28,7 @@ export function LeftValueDisplay({ tx }: { tx: Transaction }) {
     if (debtIncrease && collIncrease) {
       // Borrow + Deposit: User receives debt (first arrow points left)
       return (
-        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-6 pl-2 pr-0.5">
           <ChangeValue amount={Math.abs(debtChangeFromOperation)} type="debt" />
           <div className="opacity-0 pointer-events-none">
             <ChangeValue amount={Math.abs(collChangeFromOperation)} type="collateral" />
@@ -29,7 +38,7 @@ export function LeftValueDisplay({ tx }: { tx: Transaction }) {
     } else if (!debtIncrease && !collIncrease) {
       // Repay + Withdraw: User receives collateral (first arrow points left)
       return (
-        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-6 pl-2 pr-0.5">
           <ChangeValue amount={Math.abs(collChangeFromOperation)} type="collateral" />
           <div className="opacity-0 pointer-events-none">
             <ChangeValue amount={Math.abs(debtChangeFromOperation)} type="debt" />
@@ -39,7 +48,7 @@ export function LeftValueDisplay({ tx }: { tx: Transaction }) {
     } else if (debtIncrease && !collIncrease) {
       // Withdraw + Borrow: Both arrows point left (user receives both)
       return (
-        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-6 pl-2 pr-0.5">
           <ChangeValue amount={Math.abs(collChangeFromOperation)} type="collateral" />
           <ChangeValue amount={Math.abs(debtChangeFromOperation)} type="debt" />
         </div>
@@ -53,14 +62,14 @@ export function LeftValueDisplay({ tx }: { tx: Transaction }) {
     if (debtChangeFromOperation > 0) {
       // Borrow - user receives (arrow points left)
       return (
-        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-6 pl-2 pr-0.5">
           <ChangeValue amount={Math.abs(debtChangeFromOperation)} type="debt" />
         </div>
       );
     } else if (collChangeFromOperation < 0) {
       // Withdraw - user receives (arrow points left)
       return (
-        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-4 pl-2 pr-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-end py-6 pl-2 pr-0.5">
           <ChangeValue amount={Math.abs(collChangeFromOperation)} type="collateral" />
         </div>
       );

@@ -11,7 +11,7 @@ export function StateMetric({ label, icon, children }: StateMetricProps) {
     <div>
       <div className="flex items-center mb-1">
         {icon}
-        <span className="text-slate-500 font-medium">{label}</span>
+        <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">{label}</span>
       </div>
       {children}
     </div>

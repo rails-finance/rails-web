@@ -7,11 +7,20 @@ export function RightValueDisplay({ tx }: { tx: Transaction }) {
     return <div className="hidden sm:block w-24 shrink-0" />;
   }
 
+  // For applyPendingDebt operations that are interest-only (no redistribution), don't show values
+  if (tx.operation === "applyPendingDebt") {
+    const { debtIncreaseFromRedist, collIncreaseFromRedist } = tx.troveOperation;
+    const hasRedistribution = debtIncreaseFromRedist > 0 || collIncreaseFromRedist > 0;
+    if (!hasRedistribution) {
+      return <div className="hidden sm:block w-24 shrink-0" />;
+    }
+  }
+
   const { debtChangeFromOperation, collChangeFromOperation } = tx.troveOperation;
-  
+
   // RIGHT SIDE: Values USER SENDS to protocol (arrow points right/out)
   const isMultiStep = debtChangeFromOperation !== 0 && collChangeFromOperation !== 0;
-  
+
   if (isMultiStep) {
     const debtIncrease = debtChangeFromOperation > 0;
     const collIncrease = collChangeFromOperation > 0;
@@ -19,7 +28,7 @@ export function RightValueDisplay({ tx }: { tx: Transaction }) {
     if (debtIncrease && collIncrease) {
       // Borrow + Deposit: User sends collateral (second arrow points right)
       return (
-        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-4 pr-2 pl-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-6 pr-2 pl-0.5">
           <div className="opacity-0 pointer-events-none">
             <ChangeValue amount={Math.abs(debtChangeFromOperation)} type="debt" />
           </div>
@@ -29,7 +38,7 @@ export function RightValueDisplay({ tx }: { tx: Transaction }) {
     } else if (!debtIncrease && !collIncrease) {
       // Repay + Withdraw: User sends debt (second arrow points right)
       return (
-        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-4 pr-2 pl-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-6 pr-2 pl-0.5">
           <div className="opacity-0 pointer-events-none">
             <ChangeValue amount={Math.abs(collChangeFromOperation)} type="collateral" />
           </div>
@@ -39,7 +48,7 @@ export function RightValueDisplay({ tx }: { tx: Transaction }) {
     } else if (!debtIncrease && collIncrease) {
       // Repay + Deposit: Both arrows point right (user sends both)
       return (
-        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-4 pr-2 pl-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-6 pr-2 pl-0.5">
           <ChangeValue amount={Math.abs(debtChangeFromOperation)} type="debt" />
           <ChangeValue amount={Math.abs(collChangeFromOperation)} type="collateral" />
         </div>
@@ -53,14 +62,14 @@ export function RightValueDisplay({ tx }: { tx: Transaction }) {
     if (debtChangeFromOperation < 0) {
       // Repay - user sends (arrow points right)
       return (
-        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-4 pr-2 pl-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-6 pr-2 pl-0.5">
           <ChangeValue amount={Math.abs(debtChangeFromOperation)} type="debt" />
         </div>
       );
     } else if (collChangeFromOperation > 0) {
       // Deposit - user sends (arrow points right)
       return (
-        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-4 pr-2 pl-0.5">
+        <div className="hidden sm:flex w-24 shrink-0 flex-col justify-start items-start py-6 pr-2 pl-0.5">
           <ChangeValue amount={Math.abs(collChangeFromOperation)} type="collateral" />
         </div>
       );

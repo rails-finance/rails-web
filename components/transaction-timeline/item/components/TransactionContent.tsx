@@ -7,14 +7,12 @@ interface TransactionContentProps {
 }
 
 export function TransactionContent({ children, isInBatch, isExpanded }: TransactionContentProps) {
-  let containerClassName = "grow self-start mt-1.5 mb-2.5 rounded-md group transition-colors duration-150";
+  let containerClassName = "grow self-start mt-1.5 mt-2.5 rounded-md group transition-colors duration-150";
 
   if (isExpanded) {
-    containerClassName += " bg-slate-900";
-  } else if (isInBatch) {
-    containerClassName += " bg-fuchsia-900/10 hover:bg-fuchsia-900/20";
+    containerClassName += " bg-slate-50 dark:bg-slate-900 ";
   } else {
-    containerClassName += " hover:bg-slate-900";
+    containerClassName += " hover:bg-slate-50/70 dark:hover:bg-slate-900/70";
   }
 
   return <div className={containerClassName}>{children}</div>;

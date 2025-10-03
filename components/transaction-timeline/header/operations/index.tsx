@@ -1,4 +1,9 @@
-import { isLiquidationTransaction, isRedemptionTransaction, Transaction } from "@/types/api/troveHistory";
+import {
+  isLiquidationTransaction,
+  isRedemptionTransaction,
+  isTransferTransaction,
+  Transaction,
+} from "@/types/api/troveHistory";
 import { OpenTroveHeader } from "./OpenTrove";
 import { CloseTroveHeader } from "./CloseTrove";
 import { AdjustTroveHeader } from "./AdjustTrove";
@@ -44,8 +49,8 @@ export function HeaderContent({ tx }: { tx: Transaction }) {
     case "removeFromBatch":
       return <RemoveFromBatchHeader tx={tx} />;
 
-    // case "transferTrove":
-    //   return <TransferTroveHeader transaction={transaction} />;
+    case "transferTrove":
+      return isTransferTransaction(tx) ? <TransferTroveHeader tx={tx} /> : <DefaultHeader tx={tx} />;
 
     default:
       return <DefaultHeader tx={tx} />;
@@ -53,7 +58,7 @@ export function HeaderContent({ tx }: { tx: Transaction }) {
 }
 
 function DefaultHeader({ tx }: { tx: Transaction }) {
-  return <span className="text-white font-medium">{getOperationLabel(tx.operation)}</span>;
+  return <span className="text-slate-900 dark:text-white font-medium">{getOperationLabel(tx.operation)}</span>;
 }
 
 function getOperationLabel(operation: string): string {

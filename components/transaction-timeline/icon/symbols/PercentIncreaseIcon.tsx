@@ -7,25 +7,37 @@ interface PercentIncreaseIconProps {
   fontSize?: number;
 }
 
-export function PercentIncreaseIcon({
-  x = 400,
-  y = 200,
-  r = 100,
-  fillColor = "#64748b",
-  textColor = "white",
-  fontSize = 120,
-}: PercentIncreaseIconProps) {
+export function PercentIncreaseIcon({ x = 210, y = 10, r = 190 }: PercentIncreaseIconProps) {
   return (
-    <g transform={`translate(${x}, ${y})`}>
-      <circle cx="0" cy="0" r={r} fill={fillColor} />
-      <text x="0" y="25" textAnchor="middle" fill={textColor} fontSize={fontSize} fontWeight="bold">
-        %
-      </text>
-      <g transform="translate(80, 40)">
-        <circle cx="0" cy="0" r="40" fill="#10B981" />
-        <path d="M-20 0 L20 0" stroke="white" strokeWidth="6" strokeLinecap="round" />
-        <path d="M0 -20 L0 20" stroke="white" strokeWidth="6" strokeLinecap="round" />
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width={r * 2} height={r * 2} x={x} y={y}>
+      <g fill="#333333" transform="matrix(1.338017, 0, 0, 1.338017, -22.748203, -15.316317)">
+        <circle
+          cx="37.336"
+          cy="37.336"
+          r="8.336"
+          style={{ fillRule: "evenodd", fill: "none", strokeWidth: "3.73687px", stroke: "currentColor" }}
+        ></circle>
+        <line
+          x1="30"
+          y1="70"
+          x2="70"
+          y2="30"
+          strokeWidth="4"
+          strokeLinecap="round"
+          style={{ stroke: "currentColor" }}
+        ></line>
+        <circle
+          cx="61.704"
+          cy="64.344"
+          r="8.336"
+          style={{ fillRule: "evenodd", fill: "none", strokeWidth: "3.73687px", stroke: "currentColor" }}
+        ></circle>
       </g>
-    </g>
+      <path
+        d="M 96.608 85.1065 H 144.474 L 144.474 76.869 L 168.99 90.1065 L 144.474 103.344 L 144.474 95.1065 H 96.608 V 85.1065 Z"
+        style={{ fill: "rgb(30, 158, 0)" }}
+        transform="matrix(0, -1, 1, 0, 6.50235, 186.714371)"
+      ></path>
+    </svg>
   );
 }

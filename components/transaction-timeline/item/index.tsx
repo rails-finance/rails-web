@@ -11,6 +11,8 @@ import { TransactionContent } from "./components/TransactionContent";
 import { TransactionFooter } from "./components/TransactionFooter";
 import { ExpandedContent } from "./components/ExpandedContent";
 import { HoverProvider } from "../context/HoverContext";
+import { EventExplanation } from "../explanation/EventExplanation";
+import { TimelineBackground } from "../icon/TimelineBackground";
 
 interface TransactionItemProps {
   tx: Transaction;
@@ -21,35 +23,47 @@ interface TransactionItemProps {
 
 export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false);
   const toggleExpanded = () => setIsExpanded(!isExpanded);
 
   return (
     <HoverProvider>
-      <TransactionContainer className="flex w-full">
-        {/* Left values - outbound to protocol */}
-        <LeftValueDisplay tx={tx} />
+      <div style={{ position: "relative" }}>
+        <TransactionContainer className="flex w-full" style={{ position: "relative", zIndex: 2 }}>
+          {/* Left values - outbound to protocol */}
+          <LeftValueDisplay tx={tx} />
 
-        {/* Transaction icon/timeline */}
-        <TransactionIcon tx={tx} isFirst={isFirst} isLast={isLast} />
+          {/* Transaction icon (no timeline - just graphic) */}
+          <TransactionIcon tx={tx} isFirst={isFirst} isLast={isLast} isExpanded={isExpanded} />
 
-        {/* Right values - inbound from protocol */}
-        <RightValueDisplay tx={tx} />
+          {/* Right values - inbound from protocol */}
+          <RightValueDisplay tx={tx} />
 
-        {/* Transaction details */}
-        <TransactionContent isInBatch={tx.isInBatch} isExpanded={isExpanded}>
-          <TransactionItemHeader tx={tx} isExpanded={isExpanded} onClick={toggleExpanded} />
+          {/* Transaction details wrapper */}
+          <div className="grow self-start mb-2.5">
+            <TransactionContent isInBatch={tx.isInBatch} isExpanded={isExpanded}>
+              <TransactionItemHeader tx={tx} isExpanded={isExpanded} onClick={toggleExpanded} />
 
-          {isExpanded && <ExpandedContent tx={tx} />}
+              {isExpanded && <ExpandedContent tx={tx} />}
 
-          <TransactionFooter
-            timestamp={tx.timestamp}
-            txIndex={txIndex}
-            txHash={tx.transactionHash}
-            isExpanded={isExpanded}
-            onClick={toggleExpanded}
-          />
-        </TransactionContent>
-      </TransactionContainer>
+              <TransactionFooter
+                timestamp={tx.timestamp}
+                txIndex={txIndex}
+                txHash={tx.transactionHash}
+                isExpanded={isExpanded}
+                onClick={toggleExpanded}
+              />
+            </TransactionContent>
+
+            {/* Event explanation panel - positioned beneath TransactionContent, 20px narrower */}
+            {isExpanded && (
+              <div className="px-2.5">
+                <EventExplanation transaction={tx} onToggle={(isOpen) => setShowExplanation(isOpen)} />
+              </div>
+            )}
+          </div>
+        </TransactionContainer>
+      </div>
     </HoverProvider>
   );
 }
