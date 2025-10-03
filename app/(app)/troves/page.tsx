@@ -1,18 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { TroveListingCard } from "@/components/troves/TroveListingCard";
 import { TroveListFilters, TroveListFilterParams } from "@/components/troves/components/TroveListFilters";
 import { TroveSummary } from "@/types/api/trove";
 import { PaginationControls } from "@/components/troves/components/PaginationControls";
+import { TroveListLoadingSkeleton } from "@/components/troves/components/TroveListLoadingSkeleton";
+import { TroveListError } from "@/components/troves/components/TroveListError";
 import { FeedbackButton } from "@/components/FeedbackButton";
 
 // Constants
 const ITEMS_PER_PAGE = 20;
 const AVAILABLE_COLLATERAL_TYPES = ["WETH", "wstETH", "rETH"];
 
-export default function TrovesPage() {
+function TrovesPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -177,56 +179,12 @@ export default function TrovesPage() {
   // Pagination calculations
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
-  // Render loading skeleton
-  const renderLoadingSkeleton = () => (
-    <main className="min-h-screen">
-      <div className="max-w-7xl mx-auto py-8">
-        <h1 className="text-2xl font-bold text-slate-700 dark:text-white mb-6">Liquity V2 Troves</h1>
-        <div className="animate-pulse flex space-x-3">
-          <div className="h-10 bg-slate-50 dark:bg-slate-700/75 rounded w-1/3 mb-3"></div>
-          <div className="h-10 bg-slate-50 dark:bg-slate-700/75 rounded w-1/3 mb-3"></div>
-          <div className="h-10 bg-slate-50 dark:bg-slate-700/75 rounded w-1/3 mb-3"></div>
-        </div>
-        <div className="animate-pulse  flex sm:hidden space-x-3">
-          <div className="h-10 bg-slate-50 dark:bg-slate-700/75 rounded w-full mb-3"></div>
-        </div>
-        <div className="animate-pulse  flex sm:hidden space-x-3">
-          <div className="h-10 bg-slate-50 dark:bg-slate-700/75 rounded w-full mb-3"></div>
-        </div>
-        <div className="animate-pulse flex space-x-3">
-          <div className="h-40 bg-slate-50 dark:bg-slate-700/75 rounded-lg w-full mt-3 mb-6"></div>
-        </div>
-        <div className="animate-pulse flex space-x-3">
-          <div className="h-40 bg-slate-100/75 dark:bg-slate-700/75 rounded-lg w-full mb-6"></div>
-        </div>
-        <div className="animate-pulse flex space-x-3">
-          <div className="h-40 bg-slate-100/50 dark:bg-slate-700/50 rounded-lg w-full mb-6"></div>
-        </div>
-        <div className="animate-pulse flex space-x-3">
-          <div className="h-40 bg-slate-100/25 dark:bg-slate-700/25 rounded-lg w-full mb-6"></div>
-        </div>
-      </div>
-    </main>
-  );
-
   if (loading && troves.length === 0) {
-    return renderLoadingSkeleton();
+    return <TroveListLoadingSkeleton />;
   }
 
-  // Render error state
-  const renderError = (errorMessage: string) => (
-    <main className="min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="bg-red-900/20 border border-red-500 rounded-lg p-6">
-          <h2 className="text-xl font-bold mb-2">Error</h2>
-          <p className="text-red-400">{errorMessage}</p>
-        </div>
-      </div>
-    </main>
-  );
-
   if (error) {
-    return renderError(error);
+    return <TroveListError message={error} />;
   }
 
   return (
@@ -272,5 +230,13 @@ export default function TrovesPage() {
         />
       </div>
     </main>
+  );
+}
+
+export default function TrovesPage() {
+  return (
+    <Suspense fallback={<TroveListLoadingSkeleton />}>
+      <TrovesPageContent />
+    </Suspense>
   );
 }
