@@ -83,8 +83,7 @@ export function TimelineBackground({ tx, isFirst, isLast, isExpanded = false }: 
     );
   }
 
-  const isClosedTrove =
-    tx.operation === "closeTrove" || (tx.type === "liquidation" && tx.stateAfter.debt === 0 && !tx.isZombieTrove);
+  const isClosedTrove = tx.operation === "closeTrove";
 
   return (
     <div className="relative h-full">

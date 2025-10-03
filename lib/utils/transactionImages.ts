@@ -136,11 +136,11 @@ export function getTransactionImageKey(tx: Transaction): TransactionImageKey {
     case "transferTrove":
       return "transferTrove";
 
-    case "joinBatch":
-      return "joinBatch";
+    // case "joinBatch":
+    //   return "joinBatch";
 
-    case "exitBatch":
-      return "exitBatch";
+    // case "exitBatch":
+    //   return "exitBatch";
 
     default:
       return "default";

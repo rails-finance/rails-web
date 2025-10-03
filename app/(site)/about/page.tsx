@@ -179,7 +179,7 @@ export default function AboutPage() {
                 </div>
               </div>
               <p className="text-slate-700 dark:text-slate-300">
-                Passionate about building tools that make DeFi more understandable and accessible.
+                Web3 developer with expertise in Rust and Solidity. Focused on building infrastructure that makes DeFi protocols accessible and understandable.
               </p>
             </div>
           </div>
