@@ -221,7 +221,7 @@ export default function AboutPage() {
                 <div className="flex items-center">
                   <div className="w-5 h-5 mr-3 text-green-600"></div>
                   <a
-                    href="https://twitter.com/railsdefi"
+                    href="https://x.com/rails_finance"
                     className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
                     target="_blank"
                   >
