@@ -38,6 +38,13 @@ export function getTransactionImageKey(tx: Transaction): TransactionImageKey {
   // Check batch operations first (from batchUpdate.operation)
   if (tx.type === "trove" && tx.batchUpdate?.operation) {
     if (tx.batchUpdate.operation === "joinBatch") {
+      // Don't override if the main operation already handles the batch join
+      if (tx.operation === "openTrove") {
+        return "openTroveAndJoinBatch";
+      }
+      if (tx.operation === "openTroveAndJoinBatch") {
+        return "openTroveAndJoinBatch";
+      }
       return "joinBatch";
     }
     if (tx.batchUpdate.operation === "exitBatch") {

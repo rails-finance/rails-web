@@ -17,6 +17,7 @@ export function OperationIcon({ tx, isFirst, isLast, isExpanded }: OperationIcon
   if (tx.type === "trove" && tx.batchUpdate?.operation) {
     // Don't override if primary operation already includes batch handling or should remain primary
     if (
+      tx.operation !== "openTrove" &&
       tx.operation !== "openTroveAndJoinBatch" &&
       tx.operation !== "removeFromBatch" &&
       tx.operation !== "closeTrove"
