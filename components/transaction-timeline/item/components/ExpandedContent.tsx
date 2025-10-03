@@ -40,7 +40,10 @@ export function ExpandedContent({ tx }: { tx: Transaction }) {
       {/* Collateral price - positioned in the bottom right corner */}
       {collateralPrice && (
         <div className="absolute bottom-2 -right-0.5 flex items-center gap-1 bg-slate-200 dark:bg-slate-700 shadow-b shadow-slate-900/50 rounded-l p-2">
-          <TokenIcon assetSymbol={transaction.collateralType} className="inline-block w-4 h-4 grayscale opacity-40 mr-0.5" />
+          <TokenIcon
+            assetSymbol={transaction.collateralType}
+            className="inline-block w-4 h-4 grayscale opacity-40 mr-0.5"
+          />
           <HighlightableValue
             type="collateralPrice"
             state="after"

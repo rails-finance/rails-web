@@ -12,9 +12,7 @@ interface TroveListingCardProps {
 
 export function TroveListingCard({ trove, collateralAtLiquidation }: TroveListingCardProps) {
   if (trove.status === "liquidated") {
-    return (
-      <LiquidatedListingCard trove={trove} collateralAtLiquidation={collateralAtLiquidation} />
-    );
+    return <LiquidatedListingCard trove={trove} collateralAtLiquidation={collateralAtLiquidation} />;
   }
 
   if (trove.status === "open") {

@@ -16,7 +16,6 @@ export function TransactionItemHeader({ tx, isExpanded, onClick }: TransactionIt
       aria-expanded={isExpanded}
       aria-label={`${isExpanded ? "Collapse" : "Expand"} transaction details`}
     >
-
       <div className="relative flex items-start justify-between">
         <div className="grow mt-1 mb-2 mr-3">
           <div className="flex items-center flex-wrap gap-2">

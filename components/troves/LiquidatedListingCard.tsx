@@ -54,7 +54,9 @@ export function LiquidatedListingCard({
           <div>
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Liquidated Debt</p>
             <div className="flex items-center">
-              <h3 className="text-2xl md:text-3xl font-bold text-slate-600 dark:text-slate-200">{formatPrice(trove.debt.current)}</h3>
+              <h3 className="text-2xl md:text-3xl font-bold text-slate-600 dark:text-slate-200">
+                {formatPrice(trove.debt.current)}
+              </h3>
               <span className="ml-2 text-green-600">
                 <TokenIcon assetSymbol="BOLD" className="w-6 md:w-7 h-6 md:h-7 relative top-0" />
               </span>
@@ -75,7 +77,9 @@ export function LiquidatedListingCard({
           {/* Final interest rate */}
           <div>
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Final Interest Rate</p>
-            <div className="text-lg md:text-xl font-medium text-slate-600 dark:text-slate-200">{trove.metrics.interestRate}%</div>
+            <div className="text-lg md:text-xl font-medium text-slate-600 dark:text-slate-200">
+              {trove.metrics.interestRate}%
+            </div>
           </div>
         </div>
 

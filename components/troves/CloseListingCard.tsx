@@ -24,7 +24,9 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
       {/* Header section */}
       <div className="flex items-center justify-between p-4 pb-0">
         <div className="flex items-center gap-2 text-xs">
-          <span className="font-semibold px-2 py-0.5 bg-slate-500 dark:bg-slate-800 text-white dark:text-slate-400 rounded-xs">CLOSED</span>
+          <span className="font-semibold px-2 py-0.5 bg-slate-500 dark:bg-slate-800 text-white dark:text-slate-400 rounded-xs">
+            CLOSED
+          </span>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <span className="inline-flex items-center text-slate-600 dark:text-slate-400">
@@ -48,7 +50,9 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
           <div>
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Peak Debt</p>
             <div className="flex items-center">
-              <h3 className="text-2xl md:text-3xl font-bold text-slate-600 dark:text-slate-200">{formatPrice(trove.debt.peak)}</h3>
+              <h3 className="text-2xl md:text-3xl font-bold text-slate-600 dark:text-slate-200">
+                {formatPrice(trove.debt.peak)}
+              </h3>
               <span className="ml-2 text-green-600">
                 <TokenIcon assetSymbol="BOLD" className="w-6 md:w-7 h-6 md:h-7 relative top-0" />
               </span>

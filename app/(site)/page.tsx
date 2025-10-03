@@ -106,8 +106,8 @@ export default function Home() {
               {/* Text Content - Same for both mobile and desktop */}
               <div className="md:flex-1 md:px-6 md:py-8 md:flex md:flex-col md:justify-center md:relative md:z-10">
                 <p className="text-slate-700 dark:text-slate-200 text-xl md:text-2xl font-semibold mb-4 tracking-tight">
-                  <span className="text-green-600 font-bold dark:text-green-600">Rails</span> displays your DeFi activity on
-                  simple timelines with clear explanations and in-depth transaction analysis.
+                  <span className="text-green-600 font-bold dark:text-green-600">Rails</span> displays your DeFi
+                  activity on simple timelines with clear explanations and in-depth transaction analysis.
                 </p>
                 <p className="text-slate-700 dark:text-slate-300 mb-4 tracking-tight">
                   Rails is building essential DeFi support infrastructure, starting with Liquity V2. Our roadmap

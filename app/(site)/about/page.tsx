@@ -35,7 +35,7 @@ export default function AboutPage() {
               backgroundImage: "url(/about-mission-lg__1.svg)",
               backgroundRepeat: "no-repeat",
               backgroundPosition: "center center",
-              backgroundSize: "contain"
+              backgroundSize: "contain",
             }}
             aria-label="Mission decoration"
           />
@@ -124,7 +124,7 @@ export default function AboutPage() {
               backgroundImage: "url(/about-mission-lg__2.svg)",
               backgroundRepeat: "no-repeat",
               backgroundPosition: "center center",
-              backgroundSize: "contain"
+              backgroundSize: "contain",
             }}
             aria-label="Roadmap decoration"
           />
@@ -179,7 +179,8 @@ export default function AboutPage() {
                 </div>
               </div>
               <p className="text-slate-700 dark:text-slate-300">
-                Web3 developer with expertise in Rust and Solidity. Focused on building infrastructure that makes DeFi protocols accessible and understandable.
+                Web3 developer with expertise in Rust and Solidity. Focused on building infrastructure that makes DeFi
+                protocols accessible and understandable.
               </p>
             </div>
           </div>

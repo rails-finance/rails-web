@@ -212,7 +212,9 @@ export function TroveListFilters({
                 <div className="p-3 border-b border-slate-300 dark:border-slate-700 space-y-3">
                   {/* Redemptions Filter */}
                   <div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Redemptions</div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      Redemptions
+                    </div>
                     <div className="flex bg-slate-100 dark:bg-slate-900 rounded-lg p-1">
                       <button
                         onClick={() => handleFilterChange({ hasRedemptions: undefined })}
@@ -249,7 +251,9 @@ export function TroveListFilters({
 
                   {/* Interest Rate Management Filter */}
                   <div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Interest Rate Management</div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      Interest Rate Management
+                    </div>
                     <div className="flex bg-slate-100 dark:bg-slate-900 rounded-lg p-1">
                       <button
                         onClick={() => handleFilterChange({ batchOnly: undefined, individualOnly: undefined })}
@@ -286,7 +290,9 @@ export function TroveListFilters({
 
                   {/* Zombie Troves Filter */}
                   <div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">Zombie Troves</div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      Zombie Troves
+                    </div>
                     <div className="flex bg-slate-100 dark:bg-slate-900 rounded-lg p-1">
                       <button
                         onClick={() => handleFilterChange({ showZombie: undefined })}

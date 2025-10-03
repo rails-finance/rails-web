@@ -301,12 +301,16 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
         <div className="flex items-center justify-between p-4 pb-0">
           <div className="flex items-center">
             {/* Status */}
-            <span className="font-bold tracking-wider px-2 py-0.5 text-white bg-green-500 dark:bg-green-950 dark:text-green-500/70 rounded-xs text-xs">ACTIVE</span>
+            <span className="font-bold tracking-wider px-2 py-0.5 text-white bg-green-500 dark:bg-green-950 dark:text-green-500/70 rounded-xs text-xs">
+              ACTIVE
+            </span>
           </div>
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs">
             <span className="text-slate-600 dark:text-slate-400">Opened {formatDate(trove.activity.createdAt)}</span>
-            <span className="text-slate-600 dark:text-slate-400">({formatDuration(trove.activity.createdAt, new Date())})</span>
+            <span className="text-slate-600 dark:text-slate-400">
+              ({formatDuration(trove.activity.createdAt, new Date())})
+            </span>
             {trove.activity.redemptionCount > 0 && (
               <span className="inline-flex items-center text-orange-400">
                 <Icon name="triangle" size={12} />
