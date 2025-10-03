@@ -65,7 +65,7 @@ export function AppFooter() {
                   rel="noopener noreferrer"
                   className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors"
                 >
-                  Documentation
+                  Liquity V2 Documentation
                 </a>
               </li>
               <li>

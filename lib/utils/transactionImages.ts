@@ -35,6 +35,16 @@ export type TransactionImageKey =
 
 // Get transaction image key based on transaction data
 export function getTransactionImageKey(tx: Transaction): TransactionImageKey {
+  // Check batch operations first (from batchUpdate.operation)
+  if (tx.type === "trove" && tx.batchUpdate?.operation) {
+    if (tx.batchUpdate.operation === "joinBatch") {
+      return "joinBatch";
+    }
+    if (tx.batchUpdate.operation === "exitBatch") {
+      return "exitBatch";
+    }
+  }
+
   switch (tx.operation) {
     case "openTrove":
       return "openTrove";
@@ -135,12 +145,6 @@ export function getTransactionImageKey(tx: Transaction): TransactionImageKey {
 
     case "transferTrove":
       return "transferTrove";
-
-    // case "joinBatch":
-    //   return "joinBatch";
-
-    // case "exitBatch":
-    //   return "exitBatch";
 
     default:
       return "default";

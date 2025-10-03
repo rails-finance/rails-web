@@ -25,9 +25,7 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
 
   const openTroveItems: React.ReactNode[] = [
     <span key="owner" className="text-slate-500">
-      <HighlightableValue type="owner" state="change" value={tx.relatedTransfer.toAddress}>
-        {tx.relatedTransfer.toAddress}
-      </HighlightableValue>{" "}
+        Wallet {' '}{tx.relatedTransfer.toAddress}{' '}
       opened a new trove
     </span>,
     <span key="deposit" className="text-slate-500">
