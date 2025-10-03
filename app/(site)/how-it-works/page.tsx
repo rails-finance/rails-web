@@ -178,9 +178,10 @@ export default function HowItWorksPage() {
                     Connects directly to Ethereum nodes and monitors all Liquity V2 contracts in real-time.
                   </p>
                   <ul className="list-disc pl-6 text-sm text-slate-600 dark:text-slate-400">
-                    <li>Captures events with full transaction receipts for complete context</li>
-                    <li>Processes TroveOperation, TroveUpdated, and Transfer events</li>
-                    <li>Routes events to appropriate processing queues</li>
+                    <li>Captures events from 6 smart contracts (3 collateral types: WETH, wstETH, rETH)</li>
+                    <li>Processes Transfer, TroveOperation, TroveUpdated, Liquidation, Redemption, and Batch events</li>
+                    <li>Fetches oracle prices from Chainlink for accurate USD valuations</li>
+                    <li>Routes events to appropriate processing queues via RabbitMQ</li>
                     <li>Maintains real-time synchronization with blockchain state</li>
                   </ul>
                 </div>
@@ -193,69 +194,87 @@ export default function HowItWorksPage() {
                     Manages event flow and ensures reliable processing of all blockchain events.
                   </p>
                   <ul className="list-disc pl-6 text-sm text-slate-600 dark:text-slate-400">
-                    <li>Separate queues for ownership, transaction, and summary events</li>
+                    <li>9 separate queues for different event types</li>
                     <li>Guarantees event processing even during high load</li>
-                    <li>Dead letter queue for error handling and retry logic</li>
+                    <li>Enables decoupled, scalable architecture</li>
+                    <li>Triggers materialized view refreshes after processing</li>
                   </ul>
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
-                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">3. Event Processors</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">3. Event Processor</h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
-                    Specialized processors that understand and enrich blockchain events.
+                    Specialized processor that understands and enriches blockchain events.
                   </p>
+                  <ul className="list-disc pl-6 text-sm text-slate-600 dark:text-slate-400">
+                    <li>Enriches events with USD values using oracle prices</li>
+                    <li>Resolves ENS names for better user experience</li>
+                    <li>Calculates transaction costs in ETH and USD</li>
+                    <li>Processes complex Liquity operations including batch management</li>
+                    <li>Handles NFT transfers for trove ownership tracking</li>
+                  </ul>
+                </div>
 
-                  <div className="grid md:grid-cols-2 gap-4 mt-4">
-                    <div className="border-l-4 border-blue-400 pl-3">
-                      <h4 className="font-medium text-slate-700 dark:text-slate-200">Ownership Processor</h4>
-                      <ul className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                        <li>• Tracks NFT mints, transfers, and burns</li>
-                        <li>• Links transfers to their triggering operations</li>
-                        <li>• Maintains ownership history</li>
-                      </ul>
-                    </div>
-
-                    <div className="border-l-4 border-green-400 pl-3">
-                      <h4 className="font-medium text-slate-700 dark:text-slate-200">Transaction Processor</h4>
-                      <ul className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                        <li>• Processes complex Liquity operations</li>
-                        <li>• Calculates interest and fee impacts</li>
-                        <li>• Handles batch operations</li>
-                      </ul>
-                    </div>
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
+                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                    4. Database Layer (Dual PostgreSQL)
+                  </h3>
+                  <p className="text-slate-600 dark:text-slate-400 mb-3">
+                    Stores processed data with rich context and pre-computed summaries.
+                  </p>
+                  <div className="mb-3">
+                    <h4 className="font-medium text-slate-600 dark:text-slate-300 text-sm mb-2">
+                      Two-Database Strategy:
+                    </h4>
+                    <ul className="list-disc pl-6 text-sm text-slate-600 dark:text-slate-400">
+                      <li>Indexer Database: Raw blockchain events as captured by Ponder</li>
+                      <li>API Database: Enriched, processed events and 9 materialized views</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-slate-600 dark:text-slate-300 text-sm mb-2">Materialized Views:</h4>
+                    <ul className="list-disc pl-6 text-sm text-slate-600 dark:text-slate-400">
+                      <li>Current trove states with zombie detection</li>
+                      <li>Ownership history with ENS resolution</li>
+                      <li>Operation history with before/after states</li>
+                      <li>Protocol-wide statistics and metrics</li>
+                      <li>Batch management status and peak values tracking</li>
+                    </ul>
                   </div>
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
                   <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">
-                    4. Database Layer (PostgreSQL)
+                    5. Materialized View Updater
                   </h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
-                    Stores processed data with rich context and pre-computed summaries.
+                    Maintains pre-computed data views for instant API responses.
                   </p>
                   <ul className="list-disc pl-6 text-sm text-slate-600 dark:text-slate-400">
-                    <li>Optimized schema for multi-collateral (ETH, wstETH, rETH) queries</li>
-                    <li>Pre-computed JSON summaries for instant API responses</li>
-                    <li>Full transaction history with operation context</li>
-                    <li>Efficient indexing for address and trove lookups</li>
+                    <li>Event-driven refresh (only when data changes)</li>
+                    <li>Respects dependency order between views</li>
+                    <li>Non-blocking concurrent refreshes</li>
+                    <li>Ensures data consistency across all views</li>
                   </ul>
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
-                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">5. API Gateway</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">6. API Gateway</h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
                     Serves pre-processed data to the frontend with minimal latency.
                   </p>
                   <ul className="list-disc pl-6 text-sm text-slate-600 dark:text-slate-400">
                     <li>RESTful endpoints for trove, transaction, and stats queries</li>
-                    <li>Redis caching for frequently accessed data</li>
-                    <li>Real-time WebSocket updates for live data</li>
+                    <li>Advanced filtering and sorting capabilities</li>
+                    <li>Pagination support for large datasets</li>
+                    <li>5-second query timeout for performance</li>
+                    <li>Response caching for frequently accessed data</li>
                   </ul>
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
                   <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-3">
-                    6. Frontend (Next.js + React)
+                    7. Frontend (Next.js + React)
                   </h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
                     Modern, responsive interface for data visualization and exploration.
@@ -263,7 +282,7 @@ export default function HowItWorksPage() {
                   <ul className="list-disc pl-6 text-sm text-slate-600 dark:text-slate-400">
                     <li>Server-side rendering for optimal performance</li>
                     <li>Interactive timelines and data visualizations</li>
-                    <li>Real-time updates via WebSocket connections</li>
+                    <li>Real-time updates as blockchain events occur</li>
                     <li>Mobile-responsive design</li>
                   </ul>
                 </div>
@@ -278,14 +297,39 @@ export default function HowItWorksPage() {
                 </h3>
                 <ol className="list-decimal pl-6 space-y-2 text-blue-700 dark:text-blue-400">
                   <li>Transaction occurs on Ethereum blockchain</li>
-                  <li>Ponder captures TroveOperation event with full transaction receipt</li>
-                  <li>Event routed to transaction processor via RabbitMQ</li>
-                  <li>Processor analyzes receipt, finds NFT mint in same transaction</li>
-                  <li>Creates rich operation record: "openTrove with NFT mint to user"</li>
-                  <li>Ownership processor updates ownership with operation context</li>
-                  <li>Summary processor creates comprehensive JSON for API</li>
-                  <li>Frontend displays complete operation with timeline and explanations</li>
+                  <li>
+                    Ponder captures multiple events from the transaction:
+                    <ul className="list-disc pl-6 mt-1">
+                      <li>Transfer event (NFT mint representing trove ownership)</li>
+                      <li>TroveOperation event (the "openTrove" action)</li>
+                      <li>TroveUpdated event (new trove state)</li>
+                    </ul>
+                  </li>
+                  <li>Events routed through RabbitMQ to ensure reliable processing</li>
+                  <li>
+                    Processor enriches each event:
+                    <ul className="list-disc pl-6 mt-1">
+                      <li>Adds USD values using current oracle prices</li>
+                      <li>Resolves ENS name for the trove owner</li>
+                      <li>Calculates gas costs in ETH and USD</li>
+                      <li>Links the NFT mint to the trove operation</li>
+                    </ul>
+                  </li>
+                  <li>Database updated with enriched event data</li>
+                  <li>
+                    Views refreshed to include the new trove:
+                    <ul className="list-disc pl-6 mt-1">
+                      <li>Current state view shows the open trove</li>
+                      <li>Ownership view links trove to owner</li>
+                      <li>Stats view updates protocol totals</li>
+                    </ul>
+                  </li>
+                  <li>API serves complete trove data with all context</li>
+                  <li>Frontend displays the new trove with timeline and current values</li>
                 </ol>
+                <p className="text-blue-600 dark:text-blue-300 mt-4 text-sm font-medium">
+                  The entire process completes in 1-2 seconds from blockchain to user interface.
+                </p>
               </div>
             </section>
 
@@ -294,26 +338,26 @@ export default function HowItWorksPage() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="border border-slate-200 dark:border-slate-600 rounded-lg p-4">
                   <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">
-                    Transaction Receipt Analysis
+                    Transaction Context Understanding
                   </h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    By analyzing complete transaction receipts, we understand the full context of every operation, not
-                    just individual events.
+                    By processing complete transactions with all their events, Rails understands the full context of
+                    every operation, not just individual events.
                   </p>
                 </div>
 
                 <div className="border border-slate-200 dark:border-slate-600 rounded-lg p-4">
-                  <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Pre-computed Summaries</h3>
+                  <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Pre-computed Data Views</h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Data is processed and summarized at ingestion time, enabling instant API responses without runtime
-                    calculations.
+                    Data is processed and organized at ingestion time through materialized views, enabling instant API
+                    responses without runtime calculations.
                   </p>
                 </div>
 
                 <div className="border border-slate-200 dark:border-slate-600 rounded-lg p-4">
                   <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Event Correlation</h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Multiple events from the same transaction are correlated to provide complete operation
+                    Multiple events from the same transaction are automatically correlated to provide complete operation
                     understanding.
                   </p>
                 </div>
@@ -321,8 +365,16 @@ export default function HowItWorksPage() {
                 <div className="border border-slate-200 dark:border-slate-600 rounded-lg p-4">
                   <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Protocol-Aware Processing</h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Deep understanding of Liquity V2 mechanics enables accurate interest calculations and operation
-                    decoding.
+                    Deep understanding of Liquity V2 mechanics enables accurate tracking of interest rate changes, batch
+                    management, liquidations, zombie troves, and collateral ratio calculations.
+                  </p>
+                </div>
+
+                <div className="border border-slate-200 dark:border-slate-600 rounded-lg p-4">
+                  <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2">Multi-Collateral Support</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Seamlessly handles three different collateral types (WETH, wstETH, rETH) with their specific price
+                    feeds and exchange rates.
                   </p>
                 </div>
               </div>
