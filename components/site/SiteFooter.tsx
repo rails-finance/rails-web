@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function SiteFooter() {
   return (
-    <footer className="bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 mt-24 transition-colors">
+    <footer className="bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 mt-24">
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Rails Info */}
@@ -17,7 +17,7 @@ export function SiteFooter() {
                 href="https://x.com/rails_finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
+                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors duration-150"
                 title="Follow Rails on X"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -28,7 +28,7 @@ export function SiteFooter() {
                 href="https://www.youtube.com/@rails_finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
+                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors duration-150"
                 title="Rails Finance on YouTube"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -39,7 +39,7 @@ export function SiteFooter() {
                 href="https://github.com/rails-finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
+                className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors duration-150"
                 title="Rails on GitHub"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -56,7 +56,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/"
-                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors duration-150"
                 >
                   Home
                 </Link>
@@ -64,7 +64,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/about"
-                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors duration-150"
                 >
                   About
                 </Link>
@@ -72,7 +72,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/how-it-works"
-                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors duration-150"
                 >
                   How It Works
                 </Link>
@@ -80,7 +80,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/troves"
-                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors duration-150"
                 >
                   Explore Troves
                 </Link>
@@ -96,7 +96,7 @@ export function SiteFooter() {
             </p>
             <a
               href="https://etherscan.io/name-lookup-search?id=donate.rails.eth"
-              className="inline-block bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors"
+              className="inline-block bg-fuchsia-600 hover:bg-fuchsia-700 dark:bg-fuchsia-500 dark:hover:bg-fuchsia-600 text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors duration-150"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -113,13 +113,13 @@ export function SiteFooter() {
               <div className="flex gap-4">
                 <Link
                   href="/privacy"
-                  className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 text-xs transition-colors"
+                  className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 text-xs transition-colors duration-150"
                 >
                   Privacy Policy
                 </Link>
                 <Link
                   href="/terms"
-                  className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 text-xs transition-colors"
+                  className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 text-xs transition-colors duration-150"
                 >
                   Terms of Service
                 </Link>

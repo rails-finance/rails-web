@@ -79,7 +79,7 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
             href="https://t.me/rails_finance"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
+            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors duration-150"
             title="Join Rails on Telegram"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
@@ -90,7 +90,7 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
             href="https://x.com/rails_finance"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
+            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors duration-150"
             title="Follow Rails on X"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
@@ -101,7 +101,7 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
             href="https://www.youtube.com/@rails_finance"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
+            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors duration-150"
             title="Rails Finance on YouTube"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
@@ -112,7 +112,7 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
             href="https://github.com/rails-finance"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
+            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors duration-150"
             title="Rails Finance on GitHub"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">

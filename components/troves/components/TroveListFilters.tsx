@@ -156,7 +156,7 @@ export function TroveListFilters({
           <div className="relative" ref={filterDropdownRef}>
             <button
               onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-              className="flex cursor-pointer items-center gap-2 px-4 h-10 py-2 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-900 dark:text-white font-medium transition-colors"
+              className="flex cursor-pointer items-center gap-2 px-4 h-10 py-2 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-900 dark:text-white font-medium transition-colors duration-150"
             >
               <Filter className="w-4 h-4 text-slate-600 dark:text-slate-400" />
               {activeFilterCount > 0 && (
@@ -333,7 +333,7 @@ export function TroveListFilters({
                   <div className="p-3">
                     <button
                       onClick={resetFilters}
-                      className="cursor-pointer w-full px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-sm text-slate-900 dark:text-white transition-colors"
+                      className="cursor-pointer w-full px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-sm text-slate-900 dark:text-white transition-colors duration-150"
                     >
                       Reset Filters
                     </button>
@@ -389,7 +389,7 @@ export function TroveListFilters({
             <button
               type="button"
               onClick={handleClearSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors duration-150"
               title="Clear filter"
             >
               <X className="w-4 h-4" />

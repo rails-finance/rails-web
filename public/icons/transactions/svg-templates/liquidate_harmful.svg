@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" xmlns:bx="https://boxy-svg.com">
-  <ellipse style="fill: var(--svg-inner-bg);" cx="40" cy="31" rx="23" ry="23"/>
+  <ellipse style="fill: var(--svg-inner-bg);" cx="40" cy="29.694" rx="22.553" ry="21.694"/>
   <path d="M 40 20.562 L 51.861 41.439 L 28.138 41.439 L 40 20.562 Z" bx:shape="triangle 28.138 20.562 23.723 20.877 0.5 0 1@0b9a0e46" style="stroke-linejoin: round; stroke-linecap: round; fill: none; stroke-width: 4px; stroke: rgb(255, 0, 0);"/>
 </svg>

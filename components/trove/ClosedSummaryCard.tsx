@@ -84,7 +84,7 @@ function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
             href={nftUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-200 dark:bg-slate-800 w-4 h-4 rounded-full transition-colors"
+            className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-200 dark:bg-slate-800 w-4 h-4 rounded-full transition-colors duration-150"
             aria-label="View NFT on OpenSea"
           >
             <svg
@@ -167,7 +167,7 @@ function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
         <div className="grid grid-cols-1 pt-2 p-4 gap-4">
           {/* Main value */}
           <div>
-            <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Debt at peak</span>
+            <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Debt at peak</span>
             <div className="flex items-center">
               <span className="text-3xl font-bold">
                 <HighlightableValue type="peakDebt" state="after" value={trove.debt.peak} variant="card">

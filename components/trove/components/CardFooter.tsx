@@ -116,7 +116,7 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
                   href={getTroveNftUrl(trove.collateralType, trove.id)!}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 justify-center ml-0.5 transition-colors"
+                  className="inline-flex items-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 justify-center ml-0.5 transition-colors duration-150"
                   aria-label="View NFT on OpenSea"
                 >
                   <HighlightableValue
@@ -129,7 +129,7 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
                   </HighlightableValue>
                   <Link2
                     size={14}
-                    className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-200 dark:bg-slate-800 w-4 h-4 rounded-full transition-colors"
+                    className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-200 dark:bg-slate-800 w-4 h-4 rounded-full transition-colors duration-150"
                   />
                 </a>
               </span>

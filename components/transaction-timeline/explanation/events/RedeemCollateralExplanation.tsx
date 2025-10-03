@@ -132,13 +132,12 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
 
     // Always show both prices for transparency
     redeemItems.push(
-      <span key="prices" className="text-slate-400 text-xs">
+      <span key="prices" className="text-slate-400 text-sm">
         Protocol redemption price:{" "}
         <HighlightableValue type="collateralPrice" state="before" value={redemptionPrice}>
           {formatUsdValue(redemptionPrice)}
         </HighlightableValue>
         /{tx.collateralType}
-        {tx.collateralPrice && ` • Current market price: `}
         {tx.collateralPrice && (
           <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
             {formatUsdValue(tx.collateralPrice)}
@@ -152,7 +151,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
   if (isZombie) {
     redeemItems.push(
       <span key="zombie" className="text-yellow-500">
-        ⚠️ Zombie trove created{" "}
+        'Zombie' Trove{" "}
         {finalDebt === 0 ? "(zero debt)" : `(${finalDebt.toFixed(2)} ${tx.assetType} debt below 2000 minimum)`}
         <InfoButton href={FAQ_URLS.MINIMUM_DEBT} />
       </span>,

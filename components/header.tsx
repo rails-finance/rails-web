@@ -66,7 +66,7 @@ export function Header() {
               <button
                 onClick={isMobile ? toggleMenu : undefined}
                 onMouseEnter={handleMouseEnter}
-                className="p-3 cursor-pointer rounded-lg transition-colors"
+                className="p-3 cursor-pointer rounded-lg transition-colors duration-150"
                 aria-label="Toggle menu"
               >
                 {/* Custom Hamburger Icon */}
@@ -139,7 +139,7 @@ export function Header() {
               </div>
               <button
                 onClick={toggleMenu}
-                className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-150"
               >
                 {/* X Icon */}
                 <div className="w-6 h-5 relative flex flex-col justify-center">

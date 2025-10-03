@@ -54,7 +54,6 @@ export function CloseTroveExplanation({ transaction, onToggle }: CloseTroveExpla
         {collateralWithdrawn} {tx.collateralType}
       </HighlightableValue>{" "}
       collateral
-      {closeCollUsdValue && <span className="text-slate-400"> (valued at {formatUsdValue(closeCollUsdValue)})</span>}
     </span>,
   );
 

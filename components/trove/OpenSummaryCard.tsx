@@ -383,7 +383,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
           {/* Metrics grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-xs text-slate-400 mb-1">Backed by</p>
+              <p className="text-xs font-bold text-slate-400 dark:text-slate-600">Backed by</p>
               <div className="flex items-center">
                 <span className="flex items-center">
                   <p className="text-xl font-bold mr-1">
@@ -410,7 +410,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
               </div>
             </div>
             <div>
-              <p className="text-xs text-slate-400 mb-1">Collateral Ratio</p>
+              <p className="text-xs font-bold text-slate-400 dark:text-slate-600">Collateral Ratio</p>
               <p className="text-xl font-semibold">
                 <HighlightableValue
                   type="collRatio"
@@ -428,7 +428,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
                     DELEGATED
                   </span>
                 )}
-                <p className="text-xs text-slate-400">Interest Rate</p>
+                <p className="text-xs font-bold text-slate-400 dark:text-slate-600">Interest Rate</p>
               </div>
               <div className="text-xl font-medium">
                 <HighlightableValue type="interestRate" state="after" value={trove.metrics.interestRate}>
@@ -520,7 +520,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
               <HighlightableValue
                 type="currentPrice"
                 state="after"
-                className="text-xs text-green-600"
+                className="text-xs text-green-500"
                 value={trove.collateral.valueUsd / trove.collateral.amount}
               >
                 {formatUsdValue(trove.collateral.valueUsd / trove.collateral.amount)}

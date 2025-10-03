@@ -45,7 +45,7 @@ export function PaginationControls({
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="cursor-pointer p-1.5 text-slate-700 dark:text-slate-50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="cursor-pointer p-1.5 text-slate-700 dark:text-slate-50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -54,7 +54,7 @@ export function PaginationControls({
           <>
             <button
               onClick={() => onPageChange(1)}
-              className="cursor-pointer text-slate-700 dark:text-slate-50 px-3 py-0.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors"
+              className="cursor-pointer text-slate-700 dark:text-slate-50 px-3 py-0.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors duration-150"
             >
               1
             </button>
@@ -81,7 +81,7 @@ export function PaginationControls({
             {end < totalPages - 1 && <span className="font-bold text-slate-700 dark:text-slate-50">...</span>}
             <button
               onClick={() => onPageChange(totalPages)}
-              className="cursor-pointer px-3 py-0.5 font-bold text-slate-700 dark:text-slate-50 rounded-lg dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors"
+              className="cursor-pointer px-3 py-0.5 font-bold text-slate-700 dark:text-slate-50 rounded-lg dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors duration-150"
             >
               {totalPages}
             </button>
@@ -91,7 +91,7 @@ export function PaginationControls({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="cursor-pointer text-slate-700 dark:text-slate-50 p-1.5 font-bold rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="cursor-pointer text-slate-700 dark:text-slate-50 p-1.5 font-bold rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
         >
           <ChevronRight className="w-5 h-5" />
         </button>

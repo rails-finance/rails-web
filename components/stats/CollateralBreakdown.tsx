@@ -69,10 +69,10 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
           <div className="space-y-3">
             <div>
               <div className="mb-1">
-                <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">TVL</span>
+                <span className="text-xs font-bold text-slate-400 dark:text-slate-600">TVL</span>
               </div>
               <div>
-                <span className="text-2xl font-bold text-slate-600 milodon dark:text-slate-300">
+                <span className="text-2xl font-bold text-slate-600 dark:text-slate-300">
                   ${formatNumber(stats.totalCollateralUsd)}
                 </span>
               </div>
@@ -80,20 +80,20 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
             <div className="flex justify-between items-center">
               <div>
                 <div className="mb-1">
-                  <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Total Debt</span>
+                  <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Total Debt</span>
                 </div>
                 <div>
-                  <span className="text-lg font-bold text-slate-600 milodon dark:text-slate-300">
+                  <span className="text-lg font-bold text-slate-600 dark:text-slate-300">
                     ${formatNumber(stats.totalDebt)}
                   </span>
                 </div>
               </div>
               <div>
                 <div className="mb-1">
-                  <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Active Troves</span>
+                  <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Active Troves</span>
                 </div>
                 <div>
-                  <span className="text-lg font-bold text-slate-600 milodon dark:text-slate-300">
+                  <span className="text-lg font-bold text-slate-600 dark:text-slate-300">
                     {stats.openTroveCount.toLocaleString()}
                   </span>
                 </div>

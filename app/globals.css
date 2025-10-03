@@ -3,6 +3,8 @@
 @variant dark (&:where(.dark, .dark *));
 
 @theme {
+  /* Set default transition duration to 0 to prevent halo effect on theme switch */
+  --default-transition-duration: 0s;
   --color-black: #000;
   --color-white: #fff;
   --color-slate-200: #e5e7eb;

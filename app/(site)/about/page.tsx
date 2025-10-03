@@ -198,15 +198,12 @@ export default function AboutPage() {
                   </a>
                 </div>
                 <p className="text-slate-700 dark:text-slate-300 mb-3">
-                  Liquity has been instrumental in getting Rails off the ground, providing a 20,000 BOLD grant to
+                  Liquity has been instrumental in getting Rails off the ground, providing a grant to
                   kickstart our development. Their support enables us to build critical infrastructure for the Liquity
                   ecosystem and beyond. Thank you to Liquity!
                 </p>
               </div>
-              <div className="ml-6 flex flex-col items-center rounded-xl bg-green-600 p-8">
-                <div className="text-3xl font-bold text-green-50 mb-1 drop-shadow">20K</div>
-                <div className="text-sm font-extrabold text-slate-100  drop-shadow">BOLD Grant</div>
-              </div>
+              
             </div>
           </div>
         </div>

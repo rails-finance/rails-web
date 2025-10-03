@@ -31,7 +31,7 @@ export function FeedbackButton() {
         >
           <button
             onClick={() => setIsOpen(false)}
-            className="absolute top-3 right-3 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            className="absolute top-3 right-3 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors duration-150"
             aria-label="Close feedback"
           >
             <X className="w-4 h-4" />
@@ -46,19 +46,7 @@ export function FeedbackButton() {
 
           <div className="space-y-3">
             <a
-              href="https://t.me/milescumming"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18.717-2.558 11.42-3.005 13.831-.189 1.02-.562 1.36-.922 1.394-.784.072-1.378-.518-2.136-1.015-1.184-.777-1.852-1.261-3.002-2.018-1.329-.876-.467-1.357.29-2.146.198-.206 3.643-3.338 3.71-3.625.008-.036.016-.17-.063-.241-.079-.071-.196-.047-.28-.027-.119.028-2.011 1.278-5.673 3.75-.537.371-.023.567.535.793 1.913.847 4.23 1.474 4.23 1.474s.703.234 1.076.119c.373-.115 1.175-.581 1.175-.581s1.724-1.104 3.078-2.084c.454-.328.151-.522-.217-.742z" />
-              </svg>
-              Contact Miles on Telegram
-            </a>
-
-            <a
-              href="https://x.com/LiquityProtocol"
+              href="https://x.com/rails_finance"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"

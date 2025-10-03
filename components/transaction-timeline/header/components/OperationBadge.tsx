@@ -10,19 +10,17 @@ interface OperationBadgeProps {
 export function OperationBadge({ label, color = "blue", icon, className = "" }: OperationBadgeProps) {
   const colorClasses = {
     green: "bg-green-600",
-    red: "bg-red-600",
+    red: "bg-red-700",
     blue: "bg-blue-600",
     purple: "bg-purple-600",
-    orange: "bg-orange-600",
-    "gradient-green-blue": "bg-gradient-to-r from-green-600 to-blue-600",
-    "gradient-purple-blue": "bg-gradient-to-r from-purple-600 to-blue-600",
+    orange: "bg-orange-500",
     none: "",
   };
 
   const baseClasses =
     color === "none"
-      ? "inline-flex items-center text-xs font-bold text-white"
-      : "inline-flex items-center px-2 py-0.5 text-xs font-bold rounded-full text-white";
+      ? "inline-flex tracking-wider items-center text-xs font-bold text-white"
+      : "inline-flex tracking-wider items-center px-2 py-0.5 text-xs font-bold rounded-full text-white";
 
   return (
     <span className={`${baseClasses} ${colorClasses[color]} ${className}`}>

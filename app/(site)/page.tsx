@@ -62,7 +62,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 min-h-screen transition-colors">
+    <div className="bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 min-h-screen">
       {/* Hero Section - Responsive */}
       <div className="relative pt-24">
         {/* Desktop Layout Container */}
