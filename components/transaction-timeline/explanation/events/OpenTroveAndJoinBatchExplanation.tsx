@@ -8,6 +8,7 @@ import { getUpfrontFee } from "../shared/eventHelpers";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 import { FAQ_URLS } from "../shared/faqUrls";
 import { ExternalLinkIcon } from "@/components/ExternalLinkIcon";
+import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 
 interface OpenTroveAndJoinBatchExplanationProps {
   transaction: Transaction;
@@ -21,10 +22,14 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
   const batchCollRatio = tx.stateAfter.collateralRatio;
   const batchCollUsdValue = tx.stateAfter.collateralInUsd;
 
+  // Get batch manager info
+  const batchManagerInfo = getBatchManagerByAddress(tx.stateAfter.interestBatchManager || "");
+  const delegateDisplay = batchManagerInfo?.description || batchManagerInfo?.name || tx.stateAfter.interestBatchManager || "Unknown manager";
+
   const batchItems: React.ReactNode[] = [
     <span key="opened" className="text-slate-500">
       Opened a new Trove and delegated interest management to{" "}
-      <span className="font-medium">{tx.stateAfter.interestBatchManager || "Unknown manager"}</span>
+      <span className="font-medium">{delegateDisplay}</span>
     </span>,
     <span key="deposited" className="text-slate-500">
       Deposited{" "}

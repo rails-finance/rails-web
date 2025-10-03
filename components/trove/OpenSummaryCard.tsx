@@ -424,7 +424,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
             <div>
               <div className="flex items-center gap-1 mb-1">
                 {trove.batch.isMember && (
-                  <span className="text-xs font-semibold px-1 py-0.5 bg-pink-900/50 text-pink-400 rounded-xs">
+                  <span className="text-xs tracking-wide font-bold px-1 py-0.5 bg-pink-300 text-white dark:bg-pink-900/50 dark:text-pink-400 rounded-xs">
                     DELEGATED
                   </span>
                 )}
