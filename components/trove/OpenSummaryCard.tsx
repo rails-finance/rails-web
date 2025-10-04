@@ -294,7 +294,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
             )}
             <span className="inline-flex items-center text-slate-600 dark:text-slate-400">
               <Icon name="arrow-left-right" size={12} />
-              <span className="ml-1">{trove.activity.transactionCount}</span>
+              <span className="ml-1">{trove.activity.transactionCount - trove.activity.redemptionCount}</span>
             </span>
           </div>
         </div>
