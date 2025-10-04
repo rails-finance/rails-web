@@ -331,18 +331,19 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
                   {interestInfo.isBatchMember &&
                     interestInfo.accruedManagementFees !== undefined &&
                     interestInfo.accruedManagementFees > 0 && (
-                      <>
+                      <span className="text-pink-500">
                         {" "}
                         +{" "}
                         <HighlightableValue
                           type="managementFee"
                           state="after"
+                          className="text-pink-500"
                           value={interestInfo.accruedManagementFees}
                         >
                           {formatPrice(interestInfo.accruedManagementFees)}
                         </HighlightableValue>{" "}
                         delegate fee
-                      </>
+                      </span>
                     )}
                 </span>
               </div>
@@ -435,20 +436,20 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
                       type="managementFeeRate"
                       state="after"
                       value={trove.batch.managementFee}
-                      className="text-slate-500"
+                      className="text-pink-500"
                     >
                       {trove.batch.managementFee}%
                     </HighlightableValue>{" "}
-                    <HighlightableValue type="delegateName" state="after" className="text-slate-500">
+                    <HighlightableValue type="delegateName" state="after" className="text-pink-500">
                       {batchManagerInfo?.name || "Batch Manager"}
                     </HighlightableValue>
                   </p>
-                  <div className="text-xs text-slate-500 mt-0.5">
+                  <div className="text-xs text-pink-500 mt-0.5">
                     ~{" "}
                     <HighlightableValue
                       type="dailyManagementFee"
                       state="after"
-                      className="text-slate-500"
+                      className="text-pink-500"
                       value={(interestInfo.recordedDebt * trove.batch.managementFee) / 100 / 365}
                     >
                       {formatPrice((interestInfo.recordedDebt * trove.batch.managementFee) / 100 / 365)}
@@ -457,7 +458,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
                     <HighlightableValue
                       type="annualManagementFee"
                       state="after"
-                      className="text-slate-500"
+                      className="text-pink-500"
                       value={(interestInfo.recordedDebt * trove.batch.managementFee) / 100}
                     >
                       {formatPrice((interestInfo.recordedDebt * trove.batch.managementFee) / 100)}

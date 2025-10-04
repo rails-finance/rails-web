@@ -14,26 +14,34 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
     {
       href: "/",
       label: "Home",
-      icon: <Home size={20} />,
+      icon: <Home size={16} />,
       iconBg: "bg-green-600",
+      activeColor: "text-green-600 dark:text-green-600",
+      hoverColor: "hover:text-green-600 dark:hover:text-green-600",
     },
     {
       href: "/about",
       label: "About",
-      icon: <Users size={20} />,
+      icon: <Users size={16} />,
       iconBg: "bg-blue-600",
+      activeColor: "text-blue-600 dark:text-blue-600",
+      hoverColor: "hover:text-blue-600 dark:hover:text-blue-600",
     },
     {
       href: "/how-it-works",
       label: "How It Works",
-      icon: <BookOpen size={20} />,
+      icon: <BookOpen size={16} />,
       iconBg: "bg-purple-600",
+      activeColor: "text-purple-600 dark:text-purple-600",
+      hoverColor: "hover:text-purple-600 dark:hover:text-purple-600",
     },
     {
       href: "/troves",
       label: "Explore Troves",
-      icon: <Search size={20} />,
+      icon: <Search size={16} />,
       iconBg: "bg-indigo-600",
+      activeColor: "text-indigo-600 dark:text-indigo-600",
+      hoverColor: "hover:text-indigo-600 dark:hover:text-indigo-600",
     },
   ];
 
@@ -48,12 +56,12 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
               href={item.href}
               className={`flex items-center gap-3 text-lg font-medium py-2 transition-colors ${
                 isActive
-                  ? "text-green-600 dark:text-green-600 pointer-events-none"
-                  : "text-slate-600 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-600"
+                  ? `${item.activeColor} pointer-events-none`
+                  : `text-slate-600 dark:text-slate-300 ${item.hoverColor}`
               }`}
               onClick={isActive ? undefined : onLinkClick}
             >
-              <div className={`flex ${item.iconBg} text-white p-2 rounded ${isActive ? "opacity-60" : ""}`}>
+              <div className={`flex ${item.iconBg} text-white p-1.5 rounded`}>
                 {item.icon}
               </div>
               <span>{item.label}</span>

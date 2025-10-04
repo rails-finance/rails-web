@@ -369,7 +369,7 @@ export function TroveListFilters({
                   <svg className="w-5 h-5 -ml-2.5">
                     <use href={`#icon-bold`} />
                   </svg>
-                  <span className="text-slate-500 dark:text-white font-semibold text-sm md:text-base">{type}</span>
+                  <span className="text-slate-700 dark:text-white font-bold text-sm md:text-base">{type}</span>
                 </button>
               );
             })}
