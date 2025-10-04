@@ -202,9 +202,9 @@ export default function Home() {
 					<p className="sm:text-center text-xl md:text-2xl leading-8 text-slate-700 dark:text-slate-300 mb-4">
 						Rails is building essential DeFi support infrastructure, starting with Liquity V2. Our roadmap
 						includes integration with Liquity V2 forks and expansion across the broader DeFi ecosystem.
-						<a className="text-green-500 dark:text-green-600" href="about/">
-							{" "}
-							Discover our approach here <ArrowRight className="inline" />
+													{" "}
+<a className="text-green-500  dark:text-green-600 hover:underline underline-offset-2 duration-150" href="about/">
+							Learn about Rails here<ArrowRight className="inline mr-1" />
 						</a>
 					</p>
 				</div>
