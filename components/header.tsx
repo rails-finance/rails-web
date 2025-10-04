@@ -57,7 +57,7 @@ export function Header() {
                 <use href="#icon-liquity" />
               </svg>
               <h1 className="text-xs font-semibold text-slate-700 dark:text-white">Liquity V2 Trove Explorer</h1>
-              <span class="text-base/5 text-slate-400"><span class="relative -top-0.5 border pb-0.5 text-[0.7em] border-orange-500 font-bold px-0.5 bg-orange-500 rounded-tl rounded-bl text-slate-800 italic">Alpha</span><span class="rounded-tr rounded-br border text-slate-800 relative -top-0.5 border-orange-500 text-[0.7em] text-slate-400 dark:text-white text-xs font-semibold  px-1 pb-0.5">2.0</span></span>
+              
             </div>
           </div>
 
@@ -158,6 +158,11 @@ export function Header() {
           </div>
         </div>
       )}
+
+      {/* Fixed Alpha Label */}
+      <div className="fixed bottom-0 left-0 bg-orange-500 dark:bg-orange-600 text-shadow text-white text-xs font-bold px-8 py-1 rotate-45 -translate-x-6 -translate-y-4 shadow-md z-50">
+        Alpha V2
+      </div>
     </>
   );
 }

@@ -152,11 +152,14 @@ export default function TrovePage() {
           {timelineData && timelineData.transactions.some((tx) => isRedemptionTransaction(tx)) && (
             <button
               onClick={() => setHideRedemptions(!hideRedemptions)}
-              className={`cursor-pointer px-2 py-0.5 text-sm rounded transition-colors bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-300 dark:hover:bg-slate-600`}
-            >
+              className={`cursor-pointer px-2 py-0.5 text-sm rounded transition-colors flex items-center gap-1 bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/70`}>
               {hideRedemptions
-                ? `Show ${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length} Redemptions`
-                : `Hide ${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length} Redemptions`}
+                ? `Show`
+                : `Hide`}{' '}
+              <Icon name="triangle" size={14} className={hideRedemptions ? "" : "text-orange-500"} />
+              {hideRedemptions
+                ? `${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length} Redemptions`
+                : `${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length} Redemptions`}
             </button>
           )}
         </div>

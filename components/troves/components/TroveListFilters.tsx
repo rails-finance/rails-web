@@ -157,11 +157,11 @@ export function TroveListFilters({
           <div className="relative" ref={filterDropdownRef}>
             <button
               onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-              className="flex cursor-pointer items-center gap-2 px-4 h-10 py-2 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-900 dark:text-white font-medium transition-colors duration-150"
+              className="flex cursor-pointer items-center gap-2 px-4 h-10 py-2 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-900 dark:text-white font-bold transition-colors duration-150"
             >
               <Filter className="w-4 h-4 text-slate-600 dark:text-slate-400" />
               {activeFilterCount > 0 && (
-                <span className="px-2 py-0.5 bg-slate-300 dark:bg-slate-600 rounded-full text-xs text-slate-700 dark:text-slate-200">
+                <span className="px-1.5 py-0.5 border-blue-500 bg-white dark:bg-transparent border dark:border-blue-600 rounded-full text-xs text-blue-500 dark:text-blue-600">
                   {activeFilterCount}
                 </span>
               )}
@@ -373,7 +373,7 @@ export function TroveListFilters({
                     isExclusivelySelected
                       ? "border-blue-700  "
                       : isVisible
-                      ? "border-slate-700 hover:border-blue-700/50"
+                      ? "border-slate-300 dark:border-slate-700 hover:border-blue-700/50"
                       : isPreviewHighlighted
                       ? "border-blue-400 dark:border-slate-700/50 opacity-75 "
                       : "border-slate-200 dark:border-slate-700 hover:dark:border-blue-700/50 "

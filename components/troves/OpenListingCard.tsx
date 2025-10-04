@@ -52,16 +52,16 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs">
+          <span className="inline-flex items-center text-slate-600 dark:text-slate-400">
+            <Icon name="arrow-left-right" size={12} />
+            <span className="ml-1">{trove.activity.transactionCount - trove.activity.redemptionCount}</span>
+          </span>
           {trove.activity.redemptionCount > 0 && (
             <span className="inline-flex items-center text-orange-400">
               <Icon name="triangle" size={12} />
               <span className="ml-1">{trove.activity.redemptionCount}</span>
             </span>
           )}
-          <span className="inline-flex items-center text-slate-600 dark:text-slate-400">
-            <Icon name="arrow-left-right" size={12} />
-            <span className="ml-1">{trove.activity.transactionCount - trove.activity.redemptionCount}</span>
-          </span>
         </div>
       </div>
 
