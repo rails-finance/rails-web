@@ -8,6 +8,7 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
   const { stateBefore, stateAfter, assetType, collateralType } = tx;
   const isCloseTrove = tx.operation === "closeTrove";
   const isLiquidation = tx.operation === "liquidate";
+  const isRedemption = tx.operation === "redeemCollateral";
 
   // Get upfront fee if available (only for trove transactions)
   const upfrontFee = isTroveTransaction(tx) ? tx.troveOperation.debtIncreaseFromUpfrontFee : undefined;
@@ -36,6 +37,21 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
     beforeCollInUsd = totalCollLiquidated * (tx.collateralPrice || 0);
 
     // Try to get the collateral ratio before liquidation
+    if (beforeCollInUsd > 0 && beforeDebt > 0) {
+      beforeCollRatio = (beforeCollInUsd / beforeDebt) * 100;
+    }
+  }
+
+  // For redemptions, calculate the before state from operation data when trove ends at zero debt
+  if (isRedemption && tx.type === "redemption") {
+    const debtChange = Math.abs(tx.troveOperation.debtChangeFromOperation);
+    const collChange = Math.abs(tx.troveOperation.collChangeFromOperation);
+
+    beforeDebt = stateAfter.debt + debtChange;
+    beforeColl = stateAfter.coll + collChange;
+    beforeCollInUsd = beforeColl * (tx.collateralPrice || 0);
+
+    // Calculate before collateral ratio
     if (beforeCollInUsd > 0 && beforeDebt > 0) {
       beforeCollRatio = (beforeCollInUsd / beforeDebt) * 100;
     }
