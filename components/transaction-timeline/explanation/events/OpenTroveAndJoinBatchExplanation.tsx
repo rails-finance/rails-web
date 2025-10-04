@@ -9,6 +9,7 @@ import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 import { FAQ_URLS } from "../shared/faqUrls";
 import { ExternalLinkIcon } from "@/components/ExternalLinkIcon";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
+import { Link2 } from "lucide-react";
 
 interface OpenTroveAndJoinBatchExplanationProps {
   transaction: Transaction;
@@ -29,7 +30,19 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
   const batchItems: React.ReactNode[] = [
     <span key="opened" className="text-slate-500">
       Opened a new Trove and delegated interest management to{" "}
-      <span className="font-medium">{delegateDisplay}</span>
+      <span className="text-pink-500/75">{delegateDisplay}</span>
+      {batchManagerInfo?.website && (
+        <a
+          href={batchManagerInfo.website}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-blue-500 w-4 h-4 rounded-full transition-colors hover:bg-blue-600 text-white"
+          aria-label={`Visit ${batchManagerInfo.name} website`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Link2 className="w-3 h-3" />
+        </a>
+      )}{" "}
     </span>,
     <span key="deposited" className="text-slate-500">
       Deposited{" "}

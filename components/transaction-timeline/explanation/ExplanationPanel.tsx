@@ -127,7 +127,7 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
                     </a>
                   </div>
                 </div>
-                <span className="bg-slate-100 dark:bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
+                <span className="bg-slate-200 dark:bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
                   <span className="text-slate-600 dark:text-slate-400 text-xs flex items-center gap-1">
                     <Hash size={12} />
                     {transactionHash.substring(0, 8)}...

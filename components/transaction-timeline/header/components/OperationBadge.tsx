@@ -19,8 +19,8 @@ export function OperationBadge({ label, color = "blue", icon, className = "" }: 
 
   const baseClasses =
     color === "none"
-      ? "inline-flex tracking-wider items-center text-xs font-bold text-white"
-      : "inline-flex tracking-wider items-center px-2 py-0.5 text-xs font-bold rounded-full text-white";
+      ? "inline-flex tems-center font-bold text-slate-400"
+      : "inline-flex tracking-wider items-center px-2 py-0.5 font-bold rounded-full text-xs text-white";
 
   return (
     <span className={`${baseClasses} ${colorClasses[color]} ${className}`}>

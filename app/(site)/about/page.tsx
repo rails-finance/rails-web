@@ -48,7 +48,7 @@ export default function AboutPage() {
                   </div>
                   <h4 className="text-lg font-semibold text-slate-600 dark:text-slate-300">Liquity V2 Support</h4>
                 </div>
-                <span className="text-xs font-extrabold text-green-100 bg-green-600 px-2 py-1 rounded-full">
+                <span className="text-xs font-extrabold text-green-100 bg-green-600 px-2 py-1 rounded">
                   Completed
                 </span>
               </div>
@@ -67,7 +67,7 @@ export default function AboutPage() {
                   </div>
                   <h4 className="text-lg font-semibold text-slate-600 dark:text-slate-300">Ecosystem Expansion</h4>
                 </div>
-                <span className="text-xs font-extrabold text-blue-100 bg-blue-600 px-2 py-1 rounded-full">
+                <span className="text-xs font-extrabold text-blue-100 bg-blue-600 px-2 py-1 rounded">
                   In Progress
                 </span>
               </div>
@@ -88,7 +88,7 @@ export default function AboutPage() {
                     Multi-Protocol Intelligence
                   </h4>
                 </div>
-                <span className="text-xs font-extrabold text-slate-100 bg-slate-400 px-2 py-1 rounded-full">
+                <span className="text-xs font-extrabold text-slate-100 bg-slate-400 px-2 py-1 rounded">
                   Planned
                 </span>
               </div>
@@ -107,7 +107,7 @@ export default function AboutPage() {
                   </div>
                   <h4 className="text-lg font-semibold text-slate-600 dark:text-slate-300">Modularisation</h4>
                 </div>
-                <span className="text-xs font-extrabold text-slate-100 bg-slate-400 px-2 py-1 rounded-full">
+                <span className="text-xs font-extrabold text-slate-100 bg-slate-400 px-2 py-1 rounded">
                   Planned
                 </span>
               </div>

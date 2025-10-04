@@ -15,6 +15,7 @@ import { useHover, HoverProvider } from "@/components/transaction-timeline/conte
 import { InfoButton } from "@/components/transaction-timeline/explanation/InfoButton";
 import { FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
+import { Link2 } from "lucide-react";
 
 interface OpenTroveCardProps {
   trove: TroveSummary;
@@ -140,26 +141,10 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
               href={batchManagerInfo.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-200 dark:bg-slate-800 w-4 h-4 rounded-full transition-colors hover:bg-slate-300 dark:hover:bg-slate-700"
+              className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-blue-500 w-4 h-4 rounded-full transition-colors hover:bg-blue-600 text-white"
               aria-label={`Visit ${batchManagerInfo.name} website`}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="lucide lucide-link2 lucide-link-2 w-3 h-3 text-slate-500"
-                aria-hidden="true"
-              >
-                <path d="M9 17H7A5 5 0 0 1 7 7h2"></path>
-                <path d="M15 7h2a5 5 0 1 1 0 10h-2"></path>
-                <line x1="8" x2="16" y1="12" y2="12"></line>
-              </svg>
+              <Link2 className="w-3 h-3" />
             </a>
           )}{" "}
           with +
@@ -192,26 +177,10 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
               href={batchManagerInfo.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-200 dark:bg-slate-800 w-4 h-4 rounded-full transition-colors hover:bg-slate-300 dark:hover:bg-slate-700"
+              className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-blue-500 w-4 h-4 rounded-full transition-colors hover:bg-blue-600 text-white"
               aria-label={`Visit ${batchManagerInfo.name} website`}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="lucide lucide-link2 lucide-link-2 w-3 h-3 text-slate-500"
-                aria-hidden="true"
-              >
-                <path d="M9 17H7A5 5 0 0 1 7 7h2"></path>
-                <path d="M15 7h2a5 5 0 1 1 0 10h-2"></path>
-                <line x1="8" x2="16" y1="12" y2="12"></line>
-              </svg>
+              <Link2 className="w-3 h-3" />
             </a>
           )}{" "}
           with +
@@ -308,8 +277,8 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs">
             <span className="text-slate-600 dark:text-slate-400">Opened {formatDate(trove.activity.createdAt)}</span>
-            <span className="text-slate-600 dark:text-slate-400">
-              ({formatDuration(trove.activity.createdAt, new Date())})
+            <span className="text-slate-600 dark:text-slate-400 rounded-lg bg-slate-200 dark:bg-slate-700 px-2">
+              {formatDuration(trove.activity.createdAt, new Date())}
             </span>
             {trove.activity.redemptionCount > 0 && (
               <span className="inline-flex items-center text-orange-400">
@@ -473,17 +442,6 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
                     <HighlightableValue type="delegateName" state="after" className="text-slate-500">
                       {batchManagerInfo?.name || "Batch Manager"}
                     </HighlightableValue>
-                    {batchManagerInfo?.website && (
-                      <a
-                        href={batchManagerInfo.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center ml-1 text-blue-400 hover:text-blue-300"
-                        aria-label={`Visit ${batchManagerInfo.name} website`}
-                      >
-                        <Icon name="external-link" size={10} />
-                      </a>
-                    )}
                   </p>
                   <div className="text-xs text-slate-500 mt-0.5">
                     ~{" "}

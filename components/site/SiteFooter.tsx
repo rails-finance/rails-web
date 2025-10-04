@@ -96,7 +96,7 @@ export function SiteFooter() {
             </p>
             <a
               href="https://etherscan.io/name-lookup-search?id=donate.rails.eth"
-              className="inline-block bg-fuchsia-600 hover:bg-fuchsia-700 dark:bg-fuchsia-500 dark:hover:bg-fuchsia-600 text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors duration-150"
+              className="inline-block bg-fuchsia-600 hover:bg-fuchsia-700 dark:bg-fuchsia-500 dark:hover:bg-fuchsia-600 text-white text-sm font-bold px-4 py-2 rounded-full transition-colors duration-150"
               target="_blank"
               rel="noopener noreferrer"
             >
