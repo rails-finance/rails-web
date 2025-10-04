@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { CollateralBreakdown } from "@/components/stats/CollateralBreakdown";
 import { ProtocolStats } from "@/types/api/stats";
@@ -75,16 +76,6 @@ export default function Home() {
                 <p className="text-slate-700 dark:text-slate-200 text-xl md:text-2xl font-semibold mb-4 tracking-tight">
                   <span className="text-green-600 font-bold dark:text-green-600">Rails</span> displays your DeFi
                   activity on simple timelines with clear explanations and in-depth transaction analysis.
-                </p>
-                <p className="text-slate-700 dark:text-slate-300 mb-4 tracking-tight">
-                  Rails is building essential DeFi support infrastructure, starting with Liquity V2. Our roadmap
-                  includes integration with Liquity V2 forks and expansion across the broader DeFi ecosystem. Discover
-                  our approach
-                  <a className="text-green-500 dark:text-green-600" href="about/">
-                    {" "}
-                    here
-                  </a>
-                  .
                 </p>
               </div>
 
@@ -206,6 +197,19 @@ export default function Home() {
       </div>
 
       {/* Our Supporters Section */}
+			<div className="w-full pb-24">
+				<div className="sm:max-w-5xl mx-auto px-4">
+					<p className="sm:text-center text-xl md:text-2xl leading-8 text-slate-700 dark:text-slate-300 mb-4">
+						Rails is building essential DeFi support infrastructure, starting with Liquity V2. Our roadmap
+						includes integration with Liquity V2 forks and expansion across the broader DeFi ecosystem.
+						<a className="text-green-500 dark:text-green-600" href="about/">
+							{" "}
+							Discover our approach here <ArrowRight className="inline" />
+						</a>
+					</p>
+				</div>
+			</div>
+      {/* Our Supporters Section */}
       <div className="w-full pb-24">
         <div className="max-w-7xl mx-auto px-4">
           <h2 className="text-2xl font-extrabold text-slate-500 dark:text-slate-400 text-center mb-8">
@@ -222,6 +226,7 @@ export default function Home() {
           </div>
         </div>
       </div>
+      
     </div>
   );
 }
