@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { Transaction } from "@/types/api/troveHistory";
 import { HighlightableValue } from "../HighlightableValue";
 import { ExplanationPanel } from "../ExplanationPanel";
@@ -28,21 +29,15 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
   const delegateDisplay = batchManagerInfo?.description || batchManagerInfo?.name || tx.stateAfter.interestBatchManager || "Unknown manager";
 
   const batchItems: React.ReactNode[] = [
-    <span key="opened" className="text-slate-500">
-      Opened a new Trove and delegated interest management to{" "}
-      <span className="text-pink-500/75">{delegateDisplay}</span>
-      {batchManagerInfo?.website && (
-        <a
-          href={batchManagerInfo.website}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-blue-500 w-4 h-4 rounded-full transition-colors hover:bg-blue-600 text-white"
-          aria-label={`Visit ${batchManagerInfo.name} website`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Link2 className="w-3 h-3" />
-        </a>
-      )}{" "}
+    <span key="owner" className="text-slate-500">
+      Wallet{" "}
+      <Link
+        href={`/troves?ownerAddress=${tx.relatedTransfer.toAddress}`}
+        className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+      >
+        {tx.relatedTransfer.toAddress}
+      </Link>{" "}
+      opened a new trove
     </span>,
     <span key="deposited" className="text-slate-500">
       Deposited{" "}
@@ -108,11 +103,24 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
       </HighlightableValue>
     </span>,
     <span key="interestRate" className="text-slate-500">
-      Batch interest rate:{" "}
+      Interest rate:{" "}
       <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
         {tx.stateAfter.annualInterestRate}%
       </HighlightableValue>{" "}
-      annual (managed by batch operator)
+      managed by{" "}
+      <span className="text-pink-500/75">{delegateDisplay}</span>
+      {batchManagerInfo?.website && (
+        <a
+          href={batchManagerInfo.website}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-blue-500 w-4 h-4 rounded-full transition-colors hover:bg-blue-600 text-white"
+          aria-label={`Visit ${batchManagerInfo.name} website`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Link2 className="w-3 h-3" />
+        </a>
+      )}
     </span>,
   );
 

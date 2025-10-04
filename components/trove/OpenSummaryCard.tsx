@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { Icon } from "@/components/icons/icon";
 import { CardFooter } from "./components/CardFooter";
@@ -251,9 +252,14 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
             value={parseInt(trove.id)}
           >{`${trove.id.substring(0, 8)}...`}</HighlightableValue>{" "}
           is held by wallet{" "}
-          <HighlightableValue type="ownerAddress" state="after">
-            {truncatedOwner}
-          </HighlightableValue>
+          <Link
+            href={`/troves?ownerAddress=${trove.owner}`}
+            className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+          >
+            <HighlightableValue type="ownerAddress" state="after">
+              {truncatedOwner}
+            </HighlightableValue>
+          </Link>
           <InfoButton href={FAQ_URLS.NFT_TROVES} />
         </span>,
       );

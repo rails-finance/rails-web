@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { Transaction } from "@/types/api/troveHistory";
 import { HighlightableValue } from "../HighlightableValue";
 import { ExplanationPanel } from "../ExplanationPanel";
@@ -25,7 +26,13 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
 
   const openTroveItems: React.ReactNode[] = [
     <span key="owner" className="text-slate-500">
-        Wallet {' '}{tx.relatedTransfer.toAddress}{' '}
+        Wallet{' '}
+        <Link
+          href={`/troves?ownerAddress=${tx.relatedTransfer.toAddress}`}
+          className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+        >
+          {tx.relatedTransfer.toAddress}
+        </Link>{' '}
       opened a new trove
     </span>,
     <span key="deposit" className="text-slate-500">
