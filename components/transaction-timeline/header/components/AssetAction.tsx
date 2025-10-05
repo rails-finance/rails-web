@@ -23,7 +23,7 @@ export function AssetAction({ action, asset, amount, alwaysShowAmount = false, v
       <span className="font-bold text-slate-400 mr-1">{action}</span>
       {amount && (
         <span
-          className={`font-medium ${alwaysShowAmount ? "" : "sm:hidden"} ${
+          className={`font-bold ${alwaysShowAmount ? "" : "sm:hidden"} ${
             hoverEnabled && valueType ? "cursor-pointer" : ""
           } ${
             isHighlighted

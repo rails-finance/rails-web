@@ -132,18 +132,18 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
 
     // Always show both prices for transparency
     redeemItems.push(
-      <span key="prices" className="text-slate-400 text-sm">
-        Protocol redemption price:{" "}
-        <HighlightableValue type="collateralPrice" state="before" value={redemptionPrice}>
+      <span key="prices" className="text-slate-500 text-sm">
+        Protocol redemption price{" "}
+        <HighlightableValue type="redemptionPrice" state="after" value={redemptionPrice}>
           {formatUsdValue(redemptionPrice)}
         </HighlightableValue>
-        /{tx.collateralType}
+        {' '}versus{' '}
         {tx.collateralPrice && (
           <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
             {formatUsdValue(tx.collateralPrice)}
           </HighlightableValue>
         )}
-        {tx.collateralPrice && `/${tx.collateralType}`}
+        {tx.collateralPrice && ` / ${tx.collateralType}`}
       </span>,
     );
   }
