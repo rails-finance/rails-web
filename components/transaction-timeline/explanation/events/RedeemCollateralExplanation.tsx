@@ -53,8 +53,10 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
 
   // 1. Transaction breakdown bullet points
   const transactionBreakdown = (
-    <div className="text-slate-900 dark:text-white space-y-2 text-sm/5.5">
-      <div className="flex items-start gap-2">
+    <div className="space-y-3">
+      <div className="font-semibold text-slate-900 dark:text-slate-200 text-sm">Event Details</div>
+      <div className="text-slate-900 dark:text-white space-y-2 text-sm/5.5">
+        <div className="flex items-start gap-2">
         <span className="text-slate-600 dark:text-slate-400">•</span>
         <div className="text-slate-500">
           This redemption clears the Trove owner's debt of {" "}
@@ -111,6 +113,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
           </HighlightableValue>{"."}
         </div>
       </div>
+    </div>
     </div>
   );
 
@@ -204,7 +207,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
                 className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline inline-flex items-center gap-1"
               >
                 9 min video
-                <ExternalLink className="w-3 h-3" />
+                <ExternalLink className="w-3 h-3 flex-shrink-0" />
               </a>
               {" "}on redemptions from Liquity to understand how they work and how to manage redemption risk.
             </div>
@@ -219,7 +222,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
               rel="noopener noreferrer"
               className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
             >
-              <ExternalLink className="w-3 h-3" />
+              <ExternalLink className="w-3 h-3 flex-shrink-0" />
               What are redemptions?
             </a>
             <a
@@ -228,7 +231,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
               rel="noopener noreferrer"
               className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
             >
-              <ExternalLink className="w-3 h-3" />
+              <ExternalLink className="w-3 h-3 flex-shrink-0" />
               What happens if my Trove gets redeemed?
             </a>
             <a
@@ -237,7 +240,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
               rel="noopener noreferrer"
               className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
             >
-              <ExternalLink className="w-3 h-3" />
+              <ExternalLink className="w-3 h-3 flex-shrink-0" />
               How can I stay protected?
             </a>
             <a
@@ -246,7 +249,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
               rel="noopener noreferrer"
               className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
             >
-              <ExternalLink className="w-3 h-3" />
+              <ExternalLink className="w-3 h-3 flex-shrink-0" />
               Is there a redemption fee?
             </a>
             {isZombie && (
@@ -256,7 +259,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
                 rel="noopener noreferrer"
                 className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
               >
-                <ExternalLink className="w-3 h-3" />
+                <ExternalLink className="w-3 h-3 flex-shrink-0" />
                 What happens if debt falls below 2000 BOLD?
               </a>
             )}
@@ -270,7 +273,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
                 rel="noopener noreferrer"
                 className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
               >
-                <ExternalLink className="w-3 h-3" />
+                <ExternalLink className="w-3 h-3 flex-shrink-0" />
                 BOLD GitHub Repository
               </a>
             </div>
@@ -303,7 +306,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
             className="text-fuchsia-400 hover:text-fuchsia-300 hover:underline inline-flex items-center gap-0.5"
           >
             X @rails_finance
-            <ExternalLink className="w-2.5 h-2.5" />
+            <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
           </a>
           {" "}and consider donating at{" "}
           <span className="text-fuchsia-400">donate.rails.eth</span>
