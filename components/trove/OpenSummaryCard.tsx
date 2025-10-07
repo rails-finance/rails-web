@@ -273,7 +273,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
       {/* Main trove card */}
       <div className="relative rounded-lg text-slate-600 dark:text-slate-500 bg-slate-50 dark:bg-slate-900">
         {/* Header section */}
-        <div className="flex items-center justify-between p-4 pb-0">
+        <div className="grid grid-cols-[auto_1fr] gap-2 p-4 pb-0 items-start">
           <div className="flex items-center">
             {/* Status */}
             <span className="font-bold tracking-wider px-2 py-0.5 text-white bg-green-500 dark:bg-green-950 dark:text-green-500/70 rounded-xs text-xs">
@@ -281,7 +281,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
             </span>
           </div>
           {/* Metrics moved to the right */}
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs flex-wrap justify-end pt-0.5">
             <span className="text-slate-600 dark:text-slate-400">Opened {formatDate(trove.activity.createdAt)}</span>
             <span className="text-slate-600 dark:text-slate-400 rounded-lg bg-slate-200 dark:bg-slate-700 px-2">
               {formatDuration(trove.activity.createdAt, new Date())}

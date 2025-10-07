@@ -1,7 +1,7 @@
 "use client";
 
 import { TokenIcon } from "@/components/icons/tokenIcon";
-import { useHover, ValueType, shouldHighlight } from "../../context/HoverContext";
+import { useHover, ValueType, ValueState, shouldHighlight } from "../../context/HoverContext";
 import { toLocaleStringHelper } from "@/lib/utils/format";
 
 interface AssetActionProps {
@@ -11,12 +11,13 @@ interface AssetActionProps {
   className?: string;
   alwaysShowAmount?: boolean;
   valueType?: ValueType; // 'debt' | 'collateral' | etc.
+  valueState?: ValueState; // 'change' | 'fee' | etc. (defaults to 'change')
 }
 
-export function AssetAction({ action, asset, amount, alwaysShowAmount = false, valueType }: AssetActionProps) {
+export function AssetAction({ action, asset, amount, alwaysShowAmount = false, valueType, valueState = "change" }: AssetActionProps) {
   const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
 
-  const isHighlighted = hoverEnabled && valueType && amount && shouldHighlight(hoveredValue, valueType, "change");
+  const isHighlighted = hoverEnabled && valueType && amount && shouldHighlight(hoveredValue, valueType, valueState);
 
   return (
     <div className="flex items-center space-x-1">
@@ -32,7 +33,7 @@ export function AssetAction({ action, asset, amount, alwaysShowAmount = false, v
           }`}
           onMouseEnter={
             hoverEnabled && valueType
-              ? () => setHoveredValue({ type: valueType, state: "change", value: amount })
+              ? () => setHoveredValue({ type: valueType, state: valueState, value: amount })
               : undefined
           }
           onMouseLeave={hoverEnabled && valueType ? () => setHoveredValue(null) : undefined}

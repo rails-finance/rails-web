@@ -141,11 +141,10 @@ export default function TrovePage() {
 
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <h3 className="text-xl font-semibold text-slate-700 dark:text-white">Trove Timeline</h3>
+            <h3 className="text-xl font-semibold text-slate-700 dark:text-white">Timeline</h3>
             {troveData.activity?.lastActivityAt && (
               <span className="text-xs text-slate-600 dark:text-slate-500 flex baseline gap-1 rounded-full pl-1 pr-2 py-0.5 bg-slate-100 dark:bg-slate-900">
-                <Icon name="clock-zap" size={14} />
-                {formatDuration(troveData.activity.lastActivityAt, new Date())} ago
+                <Icon name="clock-zap" size={14} />{formatDuration(troveData.activity.lastActivityAt, new Date())} ago
               </span>
             )}
           </div>
@@ -158,8 +157,8 @@ export default function TrovePage() {
                 : `Hide`}{' '}
               <Icon name="triangle" size={14} className={hideRedemptions ? "" : "text-orange-500"} />
               {hideRedemptions
-                ? `${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length} Redemptions`
-                : `${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length} Redemptions`}
+                ? `${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length}`
+                : `${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length}`}<span className="hidden sm:inline"></span>
             </button>
           )}
         </div>

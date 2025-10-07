@@ -13,9 +13,9 @@ export function OpenTroveAndJoinBatchHeader({ tx }: { tx: TroveTransaction }) {
   const isBecomingDelegate = tx.batchUpdate?.operation === "registerBatchManager";
 
   return (
-    <div>
-      <div className="flex items-center flex-wrap gap-2">
-        <div className="flex items-center gap-1">
+    <>
+      <div className="grid grid-cols-[1fr_auto] gap-1 w-full items-start">
+        <div className="flex items-center gap-1 flex-wrap">
           <OperationBadge label="OPEN" color="green" />
           <InterestRateBadge
             rate={tx.stateAfter.annualInterestRate}
@@ -35,6 +35,6 @@ export function OpenTroveAndJoinBatchHeader({ tx }: { tx: TroveTransaction }) {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

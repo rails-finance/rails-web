@@ -6,6 +6,7 @@ import { InfoButton } from "../InfoButton";
 import { FAQ_URLS } from "../shared/faqUrls";
 import { formatCurrency, formatUsdValue } from "@/lib/utils/format";
 import { isZombieTrove } from "../shared/eventHelpers";
+import { ExternalLink, Bell } from "lucide-react";
 
 interface RedeemCollateralExplanationProps {
   transaction: Transaction;
@@ -17,150 +18,305 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
 
   if (!isRedemptionTransaction(tx)) return null;
 
-  const collRedeemed = Math.abs(tx.troveOperation.collChangeFromOperation);
-  const debtRedeemed = Math.abs(tx.troveOperation.debtChangeFromOperation);
-  const redemptionFee = parseFloat(tx.systemRedemption?.ETHFee || "0");
-  const redemptionPrice = tx.systemRedemption?.redemptionPrice || 0;
-  const finalDebt = tx.stateAfter.debt;
-  const isZombie = isZombieTrove(finalDebt);
-
-  // Calculate net impact values
-  const collateralTransferredOut = collRedeemed - redemptionFee;
-  const collValueLost = redemptionPrice > 0 ? collateralTransferredOut * redemptionPrice : 0;
-  const feeValueRetained = redemptionPrice > 0 ? redemptionFee * redemptionPrice : 0;
-  const netLoss = collValueLost - debtRedeemed;
-  const isProfit = netLoss < 0;
-  const netAmount = Math.abs(netLoss);
+  // Values from API
+  const collRedeemed = Math.abs(tx.troveOperation.collChangeFromOperation); // Gross collateral removed
+  const debtRedeemed = Math.abs(tx.troveOperation.debtChangeFromOperation); // Debt cleared
+  const redemptionFee = parseFloat(tx.redemptionFee || "0"); // Trove-specific fee from RedemptionFeePaidToTrove event
+  const redemptionPrice = tx.systemRedemption?.redemptionPrice || 0; // Oracle price
+  const marketPrice = tx.collateralPrice || 0; // Market price
 
   const redeemAfterColl = tx.stateAfter.coll;
   const redeemAfterDebt = tx.stateAfter.debt;
-  const redeemAfterCollUsd = tx.stateAfter.collateralInUsd || 0;
   const redeemAfterCollRatio = tx.stateAfter.collateralRatio;
+  const redeemBeforeCollRatio = tx.stateBefore?.collateralRatio || 0;
+  const redeemBeforeDebt = tx.stateBefore?.debt || 0;
 
-  const redeemItems: React.ReactNode[] = [
-    <span key="selection" className="text-slate-500">
-      A {tx.assetType} holder redeemed against this Trove (selected due to its {tx.stateAfter.annualInterestRate}%
-      interest rate)
-      <InfoButton href={FAQ_URLS.REDEMPTION_SELECTION} />
-    </span>,
-    <span key="received" className="text-slate-500">
-      The redeemer received{" "}
-      <HighlightableValue type="collateral" state="change" value={collateralTransferredOut}>
-        {collateralTransferredOut} {tx.collateralType}
-      </HighlightableValue>
-      {collValueLost > 0 ? ` valued at ${formatUsdValue(collValueLost)}` : ""} from the Trove's collateral
-    </span>,
-    <span key="debtReduction" className="text-slate-500">
-      The Trove's debt was reduced by{" "}
-      <HighlightableValue type="debt" state="change" value={debtRedeemed}>
-        {formatCurrency(debtRedeemed, tx.assetType)}
-      </HighlightableValue>{" "}
-      in exchange for the redeemed collateral
-      <InfoButton href={FAQ_URLS.REDEMPTIONS} />
-    </span>,
-  ];
+  const isZombie = isZombieTrove(redeemAfterDebt);
 
-  if (redemptionFee > 0) {
-    redeemItems.push(
-      <span key="fee" className="text-slate-500">
-        A redemption fee of{" "}
-        <HighlightableValue type="collateral" state="fee" value={redemptionFee}>
-          {redemptionFee} {tx.collateralType}
-        </HighlightableValue>
-        {feeValueRetained > 0 ? ` (${formatUsdValue(feeValueRetained)})` : ""} was retained in the Trove as additional
-        collateral
-      </span>,
-    );
-  }
+  // Calculated values
+  // Note: collRedeemed is the actual amount sent (collLot in smart contract)
+  // The fee was deducted BEFORE sending, so it never left the trove
+  const collateralTransferredOut = collRedeemed; // This is already the net amount sent
+  const correspondingColl = collRedeemed + redemptionFee; // Theoretical collateral before fee deduction
+  const redeemBeforeColl = redeemAfterColl + collRedeemed; // Before = After + Amount sent out
+  const feeRate = redemptionFee > 0 ? (redemptionFee / correspondingColl) * 100 : 0;
 
-  redeemItems.push(
-    <span key="postRedemption" className="text-slate-500">
-      Post-redemption: Debt is{" "}
-      <HighlightableValue type="debt" state="after" value={redeemAfterDebt}>
-        {formatCurrency(redeemAfterDebt, tx.assetType)}
-      </HighlightableValue>
-      , Collateral is{" "}
-      <HighlightableValue type="collateral" state="after" value={redeemAfterColl}>
-        {redeemAfterColl} {tx.collateralType}
-      </HighlightableValue>
-    </span>,
+  const collValueOraclePrice = collateralTransferredOut * redemptionPrice;
+  const collValueMarketPrice = collateralTransferredOut * marketPrice;
+  const feeValueOraclePrice = redemptionFee * redemptionPrice;
+  const feeValueMarketPrice = redemptionFee * marketPrice;
+  const redeemAfterCollUsd = redeemAfterColl * marketPrice;
+
+  // Calculate the difference between debt cleared and collateral sent
+  const netProfitOracle = debtRedeemed - collValueOraclePrice;
+  const netProfitMarket = debtRedeemed - collValueMarketPrice;
+
+  // 1. Transaction breakdown bullet points
+  const transactionBreakdown = (
+    <div className="text-slate-900 dark:text-white space-y-2 text-sm/5.5">
+      <div className="flex items-start gap-2">
+        <span className="text-slate-600 dark:text-slate-400">•</span>
+        <div className="text-slate-500">
+          This redemption clears the Trove owner's debt of {" "}
+          <HighlightableValue type="debt" state="change" value={debtRedeemed}>
+            {formatCurrency(debtRedeemed, tx.assetType)}
+          </HighlightableValue>{" "}and reduces collateral by{" "}
+          <HighlightableValue type="collateral" state="change" value={collateralTransferredOut}>
+            {collateralTransferredOut.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </HighlightableValue> ({formatUsdValue(collValueMarketPrice)}) to <HighlightableValue type="collateral" state="after" value={redeemAfterColl}>
+            {redeemAfterColl.toFixed(4)}&nbsp;{tx.collateralType}
+          </HighlightableValue> (<HighlightableValue type="collateralUsd" state="after" value={redeemAfterCollUsd}>
+            {formatUsdValue(redeemAfterCollUsd)}
+          </HighlightableValue>).
+        </div>
+      </div>
+      <div className="flex items-start gap-2">
+        <span className="text-slate-600 dark:text-slate-400">•</span>
+        <div className="text-slate-500">
+          A {feeRate.toFixed(3)}% redemption fee of {redemptionFee.toFixed(6)} {tx.collateralType} ({formatUsdValue(feeValueMarketPrice)}), paid by the redeemer, remains in the Trove as additional collateral.
+        </div>
+      </div>
+      <div className="flex items-start gap-2">
+        <span className="text-slate-600 dark:text-slate-400">•</span>
+        <div className="text-slate-500">
+          <span>The Trove now has {redeemAfterDebt === 0 ? (
+            <>
+              <HighlightableValue type="debt" state="after" value={0}>
+                0 {tx.assetType}
+              </HighlightableValue>
+            </>
+          ) : (
+            <HighlightableValue type="debt" state="after" value={redeemAfterDebt}>
+              {formatCurrency(redeemAfterDebt, tx.assetType)}
+            </HighlightableValue>
+          )}{redeemAfterDebt === 0 ? (
+            <>{isZombie && (
+              <span> debt, remaining open with collateral only making it a 'Zombie Trove'. </span>
+            )}</>
+          ) : (
+            <>{", adjusting the collateral ratio proportionatly to "}<HighlightableValue type="collRatio" state="after" value={redeemAfterCollRatio}>
+              {redeemAfterCollRatio.toFixed(1)}%
+            </HighlightableValue>{isZombie && (
+              <span>. This creates a 'zombie' Trove since the debt of {redeemAfterDebt.toFixed(2)} {tx.assetType} is below the 2000 {tx.assetType} minimum threshold. It can be closed by repaying the remaining debt and withdrawing collateral, or by borrowing more to bring the debt above 2000 BOLD.</span>
+            )}</>
+          )}</span>
+        </div>
+      </div>
+      <div className="flex items-start gap-2">
+        <span className="text-slate-600 dark:text-slate-400">•</span>
+        <div className="text-slate-500">
+          Interest rates are not affected by redemptions and this remains at{" "}
+          <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
+            {tx.stateAfter.annualInterestRate}%
+          </HighlightableValue>{"."}
+        </div>
+      </div>
+    </div>
   );
 
-  if (redeemAfterCollUsd > 0 && tx.collateralPrice) {
-    redeemItems.push(
-      <span key="currentValue" className="text-slate-500">
-        Current collateral valued at{" "}
-        <HighlightableValue type="collateralUsd" state="after" value={redeemAfterCollUsd}>
-          {formatUsdValue(redeemAfterCollUsd)}
-        </HighlightableValue>{" "}
-        with historic price of{" "}
-        <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
-          {formatUsdValue(tx.collateralPrice)}
-        </HighlightableValue>{" "}
-        / {tx.collateralType}
-      </span>,
+  // 2. Economic Impact section
+  let economicImpactSection: React.ReactNode = null;
+  if (redemptionPrice > 0 && marketPrice > 0) {
+    const priceDiffPercent = ((redemptionPrice - marketPrice) / marketPrice) * 100;
+    const showOracleExplanation = Math.abs(priceDiffPercent) > 0.1; // Show if difference > 0.1%
+
+    economicImpactSection = (
+      <div className="bg-slate-100/80 dark:bg-slate-800/50 border border-slate-300/50 dark:border-slate-700/50 p-4 space-y-3">
+        <div className="font-semibold text-slate-900 dark:text-slate-200 text-sm">Price Mechanics</div>
+        <div className="space-y-2 text-sm">
+          {showOracleExplanation ? (
+            <>
+              <div className="text-slate-600 dark:text-slate-400">
+                Redemptions use Liquity's anti-manipulation price oracle{redemptionPrice > marketPrice
+                  ? ", which typically values collateral higher than the current market price"
+                  : ", which valued collateral differently than the current market price at this time"}.
+              </div>
+              <div className="space-y-1 text-slate-600 dark:text-slate-400">
+                <div>
+                  <span className="text-slate-600 dark:text-slate-400">Protocol price:</span>{" "}
+                  <HighlightableValue type="redemptionPrice" state="after" className="text-orange-600 dark:text-orange-400" value={redemptionPrice}>
+                    {formatUsdValue(redemptionPrice)}
+                  </HighlightableValue> / {tx.collateralType}
+                </div>
+                <div>
+                  <span className="text-slate-600 dark:text-slate-400">Market price:</span>{" "}
+                  <HighlightableValue type="collateralPrice" state="after" value={marketPrice}>
+                    {formatUsdValue(marketPrice)}
+                  </HighlightableValue> / {tx.collateralType}
+                </div>
+              </div>
+              <div className="text-slate-600 dark:text-slate-400">
+                {redemptionPrice > marketPrice ? (
+                  <>The redeemer paid {Math.abs(priceDiffPercent).toFixed(1)}% more than market price for this collateral.</>
+                ) : (
+                  <>The redeemer paid {Math.abs(priceDiffPercent).toFixed(1)}% less than market price for this collateral.</>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-slate-600 dark:text-slate-400">
+                Redemptions use Liquity's anti-manipulation price oracle to value collateral.
+              </div>
+              <div className="space-y-1 text-slate-600 dark:text-slate-400">
+                <div>
+                  <span className="text-slate-600 dark:text-slate-400">Redemption price:</span>{" "}
+                  <HighlightableValue type="redemptionPrice" state="after" className="text-orange-600 dark:text-orange-400" value={redemptionPrice}>
+                    {formatUsdValue(redemptionPrice)}
+                  </HighlightableValue> / {tx.collateralType}
+                </div>
+              </div>
+              <div className="text-slate-600 dark:text-slate-400">
+                The protocol and market prices were aligned at the time of this redemption.
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     );
   }
 
-  if (redeemAfterCollRatio !== undefined) {
-    redeemItems.push(
-      <span key="improvedRatio" className="text-slate-500">
-        Collateral ratio improved to{" "}
-        <HighlightableValue type="collRatio" state="after" value={redeemAfterCollRatio}>
-          {redeemAfterCollRatio.toFixed(1)}%
-        </HighlightableValue>
-      </span>,
-    );
-  }
-
-  redeemItems.push(
-    <span key="interestRate" className="text-slate-500">
-      Interest rate unchanged at{" "}
-      <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
-        {tx.stateAfter.annualInterestRate}%
-      </HighlightableValue>{" "}
-      annually
-    </span>,
+  // 3. How Redemptions Work section
+  const howRedemptionsWork = (
+    <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-sm">
+        <div className="font-semibold text-slate-900 dark:text-slate-100 mb-1">How Redemptions Work</div>
+        <div className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
+          Redemptions allow BOLD holders to exchange BOLD for collateral at face value ($1 per BOLD). This mechanism
+          helps maintain BOLD's USD peg - if BOLD trades below $1, arbitrageurs (typically automated bots) profit by buying cheap BOLD and redeeming
+          it for $1 worth of collateral. Troves are redeemed in ascending order of interest rates (lowest first). This Trove's{" "}
+          {tx.stateAfter.annualInterestRate}% rate was among the lowest in the {tx.collateralType} branch at redemption
+          time.
+        </div>
+        <div className="font-semibold text-slate-900 dark:text-slate-100 mb-1 mt-3">Learn More About Redemptions</div>
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 w-10 h-10 bg-red-500/10 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+            </svg>
+          </div>
+          <div className="flex-1">
+            <div className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
+              Watch this{" "}
+              <a
+                href="https://www.youtube.com/watch?v=CQVmjFx987A"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline inline-flex items-center gap-1"
+              >
+                9 min video
+                <ExternalLink className="w-3 h-3" />
+              </a>
+              {" "}on redemptions from Liquity to understand how they work and how to manage redemption risk.
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 space-y-1.5">
+          <div className="font-semibold text-slate-900 dark:text-slate-100 text-xs mb-2">Quick Links</div>
+          <div className="grid grid-cols-1 gap-1 text-xs">
+            <a
+              href="https://docs.liquity.org/v2-faq/redemptions-and-delegation#what-are-redemptions"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
+            >
+              <ExternalLink className="w-3 h-3" />
+              What are redemptions?
+            </a>
+            <a
+              href="https://docs.liquity.org/v2-faq/redemptions-and-delegation#what-happens-if-my-trove-gets-redeemed"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
+            >
+              <ExternalLink className="w-3 h-3" />
+              What happens if my Trove gets redeemed?
+            </a>
+            <a
+              href="https://docs.liquity.org/v2-faq/redemptions-and-delegation#how-can-i-stay-protected"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
+            >
+              <ExternalLink className="w-3 h-3" />
+              How can I stay protected?
+            </a>
+            <a
+              href="https://docs.liquity.org/v2-faq/redemptions-and-delegation#is-there-a-redemption-fee"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
+            >
+              <ExternalLink className="w-3 h-3" />
+              Is there a redemption fee?
+            </a>
+            {isZombie && (
+              <a
+                href="https://docs.liquity.org/v2-faq/redemptions-and-delegation#docs-internal-guid-927901d5-7fff-c7a0-2e9f-964ab271257a"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
+              >
+                <ExternalLink className="w-3 h-3" />
+                What happens if debt falls below 2000 BOLD?
+              </a>
+            )}
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+            <div className="font-semibold text-slate-900 dark:text-slate-100 text-xs mb-2">Technical Resources</div>
+            <div className="grid grid-cols-1 gap-1 text-xs">
+              <a
+                href="https://github.com/liquity/bold"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
+              >
+                <ExternalLink className="w-3 h-3" />
+                BOLD GitHub Repository
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
   );
 
-  if (redemptionPrice > 0) {
-    redeemItems.push(
-      <span key="economicImpact" className="text-slate-500">
-        Economic impact: {formatUsdValue(netAmount)} net {isProfit ? "profit" : "loss"} to Trove owner
-      </span>,
-    );
+  // 4. Left column content (Transaction breakdown + Economic Impact)
+  const leftColumnContent = (
+    <>
+      {transactionBreakdown}
+      {economicImpactSection}
+    </>
+  );
 
-    // Always show both prices for transparency
-    redeemItems.push(
-      <span key="prices" className="text-slate-500 text-sm">
-        Protocol redemption price{" "}
-        <HighlightableValue type="redemptionPrice" state="after" value={redemptionPrice}>
-          {formatUsdValue(redemptionPrice)}
-        </HighlightableValue>
-        {' '}versus{' '}
-        {tx.collateralPrice && (
-          <HighlightableValue type="collateralPrice" state="after" value={tx.collateralPrice}>
-            {formatUsdValue(tx.collateralPrice)}
-          </HighlightableValue>
-        )}
-        {tx.collateralPrice && ` / ${tx.collateralType}`}
-      </span>,
-    );
-  }
-
-  if (isZombie) {
-    redeemItems.push(
-      <span key="zombie" className="text-yellow-500">
-        'Zombie' Trove{" "}
-        {finalDebt === 0 ? "(zero debt)" : `(${finalDebt.toFixed(2)} ${tx.assetType} debt below 2000 minimum)`}
-        <InfoButton href={FAQ_URLS.MINIMUM_DEBT} />
-      </span>,
-    );
-  }
+  // 5. Rails promotion footer
+  const railsPromotion = (
+    <div className="bg-fuchsia-500/5 border border-fuchsia-500/20 rounded-lg p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 w-10 h-10 bg-fuchsia-500/10 rounded-full flex items-center justify-center">
+          <Bell className="w-5 h-5 text-fuchsia-400" />
+        </div>
+        <div className="flex-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+          <span className="text-slate-500 dark:text-slate-300 font-bold">Want redemption notifications?</span> Rails plans to build features to help you stay ahead of redemption risk. Your support helps us prioritize these tools—follow us on{" "}
+          <a
+            href="https://x.com/rails_finance"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-fuchsia-400 hover:text-fuchsia-300 hover:underline inline-flex items-center gap-0.5"
+          >
+            X @rails_finance
+            <ExternalLink className="w-2.5 h-2.5" />
+          </a>
+          {" "}and consider donating at{" "}
+          <span className="text-fuchsia-400">donate.rails.eth</span>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <ExplanationPanel
-      items={redeemItems}
+      leftColumn={leftColumnContent}
+      rightColumn={howRedemptionsWork}
+      footer={railsPromotion}
       onToggle={onToggle}
       defaultOpen={false}
       transactionHash={transaction.transactionHash}

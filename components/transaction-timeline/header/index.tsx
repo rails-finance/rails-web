@@ -17,11 +17,11 @@ export function TransactionItemHeader({ tx, isExpanded, onClick }: TransactionIt
       aria-label={`${isExpanded ? "Collapse" : "Expand"} transaction details`}
     >
       <div className="relative flex items-start justify-between">
-        <div className="grow mt-1 mb-2 mr-3">
+        <div className="grow mt-1 mb-2">
           <div className="flex items-center flex-wrap gap-2">
             {tx.blockGrouping.isGrouped && (
               <div className="flex items-center px-2 py-0.5 bg-blue-800/50 rounded-md">
-                <span className="text-xs text-white dark:text-slate-400">
+                <span className="text-xs text-white">
                   {tx.blockGrouping.sameBlockIndex} of {tx.blockGrouping.sameBlockCount}
                 </span>
               </div>

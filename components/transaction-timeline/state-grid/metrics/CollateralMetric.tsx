@@ -30,7 +30,7 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
         {hasChange && (
           <>
             <div className="flex items-center space-x-1">
-              <span className="font-bold text-slate-400 dark:text-slate-600">{before}</span>
+              <span className="font-bold text-slate-400 dark:text-slate-600">{before.toFixed(4)}</span>
             </div>
             <TransitionArrow />
           </>
@@ -50,7 +50,7 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
               }
               onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
             >
-              {after}
+              {after.toFixed(4)}
             </span>
             <span
               className={`text-xs flex font-bold items-center text-slate-300 dark:text-slate-600 border-l-2 border-r-2 ml-2 border-slate-300 dark:border-slate-600 rounded-sm px-1 py-0 ${

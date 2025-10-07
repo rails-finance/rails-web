@@ -78,7 +78,7 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
 
         <InterestRateMetric before={beforeInterestRate} after={stateAfter.annualInterestRate} isCloseTrove={isCloseTrove} />
 
-        <CollateralRatioMetric before={beforeCollRatio} after={stateAfter.collateralRatio} isCloseTrove={isCloseTrove} />
+        <CollateralRatioMetric before={beforeCollRatio} after={stateAfter.collateralRatio} afterDebt={stateAfter.debt} isCloseTrove={isCloseTrove} />
       </div>
     </div>
   );

@@ -34,6 +34,7 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
           {tx.relatedTransfer.toAddress}
         </Link>{' '}
       opened a new trove
+      <InfoButton href={FAQ_URLS.WHAT_IS_TROVE} />
     </span>,
     <span key="deposit" className="text-slate-500">
       <HighlightableValue type="collateral" state="change" value={tx.stateAfter.coll}>
@@ -134,12 +135,6 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
     );
   }
 
-  openTroveItems.push(
-    <span key="success" className="text-slate-500">
-      Liquity Trove successfully opened
-      <InfoButton href={FAQ_URLS.WHAT_IS_TROVE} />
-    </span>,
-  );
 
   return (
     <ExplanationPanel

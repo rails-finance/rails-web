@@ -5,13 +5,17 @@ import { X, Info, CircleQuestionMark, ChevronDown, ChevronUp, Hash } from "lucid
 import { Icon } from "@/components/icons/icon";
 
 interface ExplanationPanelProps {
-  items: React.ReactNode[];
+  items?: React.ReactNode[];
+  leftColumn?: React.ReactNode;
+  rightColumn?: React.ReactNode;
+  footer?: React.ReactNode;
   onToggle?: (isOpen: boolean) => void;
   defaultOpen?: boolean;
   transactionHash?: string;
+  noBullets?: boolean;
 }
 
-export function ExplanationPanel({ items, onToggle, defaultOpen = true, transactionHash }: ExplanationPanelProps) {
+export function ExplanationPanel({ items, leftColumn, rightColumn, footer, onToggle, defaultOpen = true, transactionHash, noBullets = false }: ExplanationPanelProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen); // Use defaultOpen directly
   const [isHydrated, setIsHydrated] = useState(false);
   const [copiedTxHash, setCopiedTxHash] = useState(false);
@@ -27,7 +31,11 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
     onToggle?.(newState);
   };
 
-  if (items.length === 0) {
+  if (!items && !leftColumn && !rightColumn) {
+    return null;
+  }
+
+  if (items && items.length === 0) {
     return null;
   }
 
@@ -68,15 +76,45 @@ export function ExplanationPanel({ items, onToggle, defaultOpen = true, transact
           </button>
 
           <div className="p-4 pb-2">
-            <div className="text-slate-900 dark:text-white space-y-2 text-sm">
-              {items.map((item, index) => (
-                <div key={index} className="flex items-start gap-2">
-                  <span className="text-slate-600 dark:text-slate-400">•</span>
-                  {item}
+            {leftColumn || rightColumn ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  {leftColumn}
                 </div>
-              ))}
-            </div>
+                <div className="space-y-4">
+                  {rightColumn}
+                </div>
+              </div>
+            ) : rightColumn ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="text-slate-900 dark:text-white space-y-2 text-sm">
+                  {items && items.map((item, index) => (
+                    <div key={index} className={noBullets ? "" : "flex items-start gap-2"}>
+                      {!noBullets && <span className="text-slate-600 dark:text-slate-400">•</span>}
+                      {item}
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  {rightColumn}
+                </div>
+              </div>
+            ) : (
+              <div className="text-slate-900 dark:text-white space-y-2 text-sm">
+                {items && items.map((item, index) => (
+                  <div key={index} className={noBullets ? "" : "flex items-start gap-2"}>
+                    {!noBullets && <span className="text-slate-600 dark:text-slate-400">•</span>}
+                    {item}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+          {footer && (
+            <div className="px-4 pb-2 pt-2">
+              {footer}
+            </div>
+          )}
           {transactionHash && (
             <div className="">
               <div className="pt-2 px-4 flex justify-between items-center">

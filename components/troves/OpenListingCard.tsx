@@ -82,8 +82,8 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
             </div>
           </div>
 
-          {/* Backed by */}
-          <div className="md:col-span-1">
+          {/* Backed by - full width on mobile */}
+          <div className="col-span-2 md:col-span-1">
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Backed by</p>
             <div className="flex items-center">
               <span className="flex items-center">
@@ -100,18 +100,7 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
             </div>
           </div>
 
-          {/* Collateral Ratio */}
-          <div className="md:col-span-1">
-            <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">
-              <span className="lg:hidden">Ratio</span>
-              <span className="hidden lg:inline">Collateral Ratio</span>
-            </p>
-            <p className="text-lg md:text-xl font-semibold text-slate-600 dark:text-slate-200">
-              {trove.metrics.collateralRatio.toFixed(1)}%
-            </p>
-          </div>
-
-          {/* Interest Rate */}
+          {/* Interest Rate - shares row with Ratio on mobile */}
           <div className="md:col-span-1">
             <div className="flex items-center gap-1 mb-1">
               {trove.batch.isMember && (
@@ -124,6 +113,17 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
             <div className="text-lg md:text-xl font-bold text-slate-600 dark:text-slate-200">
               {trove.metrics.interestRate}%
             </div>
+          </div>
+
+          {/* Collateral Ratio - shares row with Interest Rate on mobile */}
+          <div className="md:col-span-1">
+            <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">
+              <span className="lg:hidden">Ratio</span>
+              <span className="hidden lg:inline">Collateral Ratio</span>
+            </p>
+            <p className="text-lg md:text-xl font-semibold text-slate-600 dark:text-slate-200">
+              {trove.metrics.collateralRatio.toFixed(1)}%
+            </p>
           </div>
         </div>
 

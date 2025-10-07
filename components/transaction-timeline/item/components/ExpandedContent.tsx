@@ -48,28 +48,23 @@ export function ExpandedContent({ tx }: { tx: Transaction }) {
       </div>
 
       {/* Collateral price - positioned in the bottom right corner */}
-      {collateralPrice && (
+      {(collateralPrice || redemptionPrice) && (
         <div className="absolute bottom-2 -right-0.5 flex items-center gap-1 bg-slate-200 dark:bg-slate-700 shadow-b shadow-slate-900/50 rounded-l p-2">
           <TokenIcon
             assetSymbol={transaction.collateralType}
             className="inline-block w-4 h-4 grayscale opacity-40 mr-0.5"
           />
-          {redemptionPrice ? (
+          {redemptionPrice && collateralPrice && Math.abs(redemptionPrice - collateralPrice) > 0.1 ? (
             <span className="text-xs flex items-center gap-1">
               <HighlightableValue
                 type="redemptionPrice"
                 state="after"
-                className="text-orange-500 font-bold"
+                className="text-orange-400 font-bold"
                 value={redemptionPrice}
                 variant="card"
               >
                 {formatUsdValue(redemptionPrice)}
               </HighlightableValue>
-              {priceDiff !== null && (
-                <span className="text-slate-400">
-                  {priceDiff > 0 ? '▲' : priceDiff < 0 ? '▼' : ''}
-                </span>
-              )}
               <span className="text-slate-400">/</span>
               <HighlightableValue
                 type="collateralPrice"
@@ -81,7 +76,17 @@ export function ExpandedContent({ tx }: { tx: Transaction }) {
                 {formatUsdValue(collateralPrice)}
               </HighlightableValue>
             </span>
-          ) : (
+          ) : redemptionPrice ? (
+            <HighlightableValue
+              type="redemptionPrice"
+              state="after"
+              className="text-xs text-orange-400 font-bold"
+              value={redemptionPrice}
+              variant="card"
+            >
+              {formatUsdValue(redemptionPrice)}
+            </HighlightableValue>
+          ) : collateralPrice ? (
             <HighlightableValue
               type="collateralPrice"
               state="after"
@@ -91,7 +96,7 @@ export function ExpandedContent({ tx }: { tx: Transaction }) {
             >
               {formatUsdValue(collateralPrice)}
             </HighlightableValue>
-          )}
+          ) : null}
         </div>
       )}
     </div>

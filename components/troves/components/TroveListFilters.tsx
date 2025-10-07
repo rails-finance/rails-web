@@ -148,11 +148,11 @@ export function TroveListFilters({
   ];
 
   return (
-    <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
+    <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 xl:gap-4">
       {/* Filter and Collateral row on mobile, inline on desktop */}
-      <div className="flex flex-col md:flex-row md:items-center gap-3 md:flex-1">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:flex-1">
         {/* First row on mobile: Filter button and collateral buttons */}
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="flex items-center gap-2 w-full lg:w-auto">
           {/* Filter Dropdown */}
           <div className="relative" ref={filterDropdownRef}>
             <button
@@ -161,7 +161,7 @@ export function TroveListFilters({
             >
               <Filter className="w-4 h-4 text-slate-600 dark:text-slate-400" />
               {activeFilterCount > 0 && (
-                <span className="px-1.5 py-0.5 border-blue-500 bg-white dark:bg-transparent border dark:border-blue-600 rounded-full text-xs text-blue-500 dark:text-blue-600">
+                <span className="flex items-center justify-center w-5 h-5  bg-white dark:bg-slate-800 rounded-full text-xs text-slate-400 dark:text-slate-500">
                   {activeFilterCount}
                 </span>
               )}
@@ -190,7 +190,7 @@ export function TroveListFilters({
                       onClick={() => handleFilterChange({ status: "open" })}
                       className={`cursor-pointer flex-1 px-3 py-1.5 rounded text-sm transition-all ${
                         filters.status === "open"
-                          ? "text-white bg-green-500 dark:bg-green-950 dark:text-green-500 rounded-xs"
+                          ? "text-white bg-green-500 dark:bg-green-950 dark:text-green-500 rounded"
                           : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                       }`}
                     >
@@ -344,7 +344,7 @@ export function TroveListFilters({
             )}
           </div>
           {/* Collateral Type Buttons */}
-          <div className="flex items-center gap-2 flex-1 md:flex-initial">
+          <div className="flex items-center gap-2 flex-1 lg:flex-initial">
             {availableCollateralTypes.map((type) => {
               // isVisible = this collateral type is currently being shown in the list
               const isVisible = !filters.collateralType || filters.collateralType === type;
@@ -369,11 +369,11 @@ export function TroveListFilters({
                       collateralType: filters.collateralType === type ? undefined : type,
                     });
                   }}
-                  className={`cursor-pointer relative flex items-center duration-150 border-2 h-10 justify-center gap-1 md:gap-2 px-2 md:px-3 py-2 rounded-lg transition-colors flex-1 md:flex-initial cursor-pointer group ${
+                  className={`cursor-pointer relative flex items-center duration-150 border-2 h-10 justify-center gap-1 lg:gap-2 px-2 lg:px-3 py-2 rounded-lg transition-colors flex-1 lg:flex-initial cursor-pointer group ${
                     isExclusivelySelected
                       ? "border-blue-700  "
                       : isVisible
-                      ? "border-slate-300 dark:border-slate-700 hover:border-blue-700/50"
+                      ? "border-slate-200 dark:border-slate-700 hover:border-blue-700/50"
                       : isPreviewHighlighted
                       ? "border-blue-400 dark:border-slate-700/50 opacity-75 "
                       : "border-slate-200 dark:border-slate-700 hover:dark:border-blue-700/50 "
@@ -385,7 +385,7 @@ export function TroveListFilters({
                   <svg className="w-5 h-5 -ml-2.5">
                     <use href={`#icon-bold`} />
                   </svg>
-                  <span className="text-slate-700 dark:text-white font-bold text-sm md:text-base">{type}</span>
+                  <span className="hidden sm:inline text-slate-700 dark:text-white font-bold text-sm lg:text-base">{type}</span>
 
 
                 </button>
@@ -395,7 +395,7 @@ export function TroveListFilters({
         </div>
 
         {/* Second row on mobile: Search Input */}
-        <form onSubmit={handleSearchSubmit} className="relative w-full md:flex-1">
+        <form onSubmit={handleSearchSubmit} className="relative w-full lg:flex-1">
           <input
             type="text"
             placeholder="Address, ENS, or ID..."
@@ -419,18 +419,18 @@ export function TroveListFilters({
       </div>
 
       {/* Third row on mobile: Sort controls */}
-      <div className="flex items-center gap-1 w-full md:w-auto">
+      <div className="flex items-center gap-1 w-full lg:w-auto">
         <button
           onClick={() => onSortChange?.(sortBy, sortOrder === "asc" ? "desc" : "asc")}
-          className="cursor-pointer flex items-center justify-center w-10 h-10 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700/75 rounded-lg transition-colors text-slate-700 dark:text-white border border-slate-300 dark:border-transparent"
+          className="cursor-pointer flex items-center justify-center w-10 h-10 bg-slate-100 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700/75 rounded-lg transition-colors text-slate-700 dark:text-white dark:border-transparent"
           title={sortOrder === "asc" ? "Sort Ascending" : "Sort Descending"}
         >
           {sortOrder === "asc" ? "↑" : "↓"}
         </button>
-        <div className="relative h-10 flex-1 md:flex-initial" ref={sortDropdownRef}>
+        <div className="relative h-10 flex-1 lg:flex-initial" ref={sortDropdownRef}>
           <button
             onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-            className="cursor-pointer w-full md:w-auto flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700/75 rounded-lg text-slate-700 dark:text-white font-medium transition-colors md:min-w-[160px] border border-slate-300 dark:border-transparent"
+            className="cursor-pointer w-full lg:w-auto flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700/75 rounded-lg text-slate-700 dark:text-white font-medium transition-colors lg:min-w-[160px]  dark:border-transparent"
           >
             <span>{sortOptions.find((o) => o.value === sortBy)?.label || "Sort"}</span>
             <ChevronDown
@@ -439,7 +439,7 @@ export function TroveListFilters({
           </button>
 
           {isSortDropdownOpen && (
-            <div className="absolute top-full left-0 md:left-auto right-0 mt-2 bg-white dark:bg-slate-900/95 border border-slate-300 dark:border-slate-700 rounded-lg shadow-xl z-50 min-w-[200px] overflow-hidden">
+            <div className="absolute top-full left-0 lg:left-auto right-0 mt-2 bg-white dark:bg-slate-900/95 border border-slate-300 dark:border-slate-700 rounded-lg shadow-xl z-50 min-w-[200px] overflow-hidden">
               {sortOptions.map((option) => (
                 <button
                   key={option.value}

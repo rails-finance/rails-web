@@ -103,7 +103,7 @@ function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
     <div>
       <div className="relative rounded-lg text-slate-600 dark:text-slate-500 bg-slate-200 dark:bg-slate-700 dark:border-transparent">
         {/* Header section */}
-        <div className="flex items-center justify-between p-4 pb-0">
+        <div className="grid grid-cols-[auto_1fr] gap-2 p-4 pb-0 items-start">
           <div className="flex items-center">
             {/* Status */}
             <span className="font-bold px-2 py-0.5 bg-slate-500 dark:bg-slate-800 text-white dark:text-slate-400 rounded text-xs">
@@ -111,7 +111,7 @@ function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
             </span>
           </div>
           {/* Metrics moved to the right */}
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs flex-wrap justify-end pt-0.5">
             <span className="text-slate-600 dark:text-slate-400">
               <HighlightableValue
                 type="dateRange"
