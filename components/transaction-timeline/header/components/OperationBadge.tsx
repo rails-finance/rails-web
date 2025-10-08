@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 
 interface OperationBadgeProps {
   label: string;
-  color?: "green" | "red" | "blue" | "purple" | "orange" | "gradient-green-blue" | "gradient-purple-blue" | "none";
+  color?: "green" | "red" | "blue" | "purple" | "orange" | "none";
   icon?: ReactNode;
   className?: string;
 }

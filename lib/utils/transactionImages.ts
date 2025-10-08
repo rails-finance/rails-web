@@ -158,7 +158,7 @@ export function getTransactionImageKey(tx: Transaction): TransactionImageKey {
 
     case "setBatchManagerAnnualInterestRate": {
       const oldRate = tx.stateBefore?.annualInterestRate || 0;
-      const newRate = tx.type === "batch_manager" ? tx.batchUpdate.annualInterestRate : tx.stateAfter.annualInterestRate;
+      const newRate = tx.batchUpdate.annualInterestRate;
       const isIncrease = newRate > oldRate;
       return isIncrease ? "setBatchManagerAnnualInterestRate_increase" : "setBatchManagerAnnualInterestRate_decrease";
     }
