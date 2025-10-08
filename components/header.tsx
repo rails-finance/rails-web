@@ -13,7 +13,9 @@ export function Header() {
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isSmallScreen = window.innerWidth < 768;
+      setIsMobile(isTouchDevice || isSmallScreen);
     };
 
     checkMobile();
@@ -140,7 +142,8 @@ export function Header() {
               </div>
               <button
                 onClick={toggleMenu}
-                className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-150"
+                className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-150 cursor-pointer touch-manipulation"
+                aria-label="Close menu"
               >
                 {/* X Icon */}
                 <div className="w-6 h-5 relative flex flex-col justify-center">
