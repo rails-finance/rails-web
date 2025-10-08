@@ -64,6 +64,11 @@ export const SVG_FILE_MAPPING: Record<TransactionImageKey, string> = {
   joinBatch: "joinBatch.svg",
   exitBatch: "removeFromBatch.svg", // exitBatch uses removeFromBatch SVG
 
+  // Batch manager operations
+  setBatchManagerAnnualInterestRate_increase: "setBatchManagerAnnualInterestRate_increase.svg",
+  setBatchManagerAnnualInterestRate_decrease: "setBatchManagerAnnualInterestRate_decrease.svg",
+  lowerBatchManagerAnnualFee: "lowerBatchManagerAnnualFee.svg",
+
   // Default fallback
   default: "default.svg",
 };

@@ -15,6 +15,7 @@ import { RemoveFromBatchExplanation } from "./events/RemoveFromBatchExplanation"
 import { ApplyPendingDebtExplanation } from "./events/ApplyPendingDebtExplanation";
 import { TransferTroveExplanation } from "./events/TransferTroveExplanation";
 import { DefaultExplanation } from "./events/DefaultExplanation";
+import { BatchManagerInterestRateUpdateExplanation } from "./events/BatchManagerInterestRateUpdateExplanation";
 
 interface EventExplanationProps {
   transaction: Transaction;
@@ -65,6 +66,12 @@ export function EventExplanation({ transaction, onToggle }: EventExplanationProp
 
       case "transferTrove":
         return <TransferTroveExplanation transaction={transaction} onToggle={handleToggle} />;
+
+      case "setBatchManagerAnnualInterestRate":
+        return <BatchManagerInterestRateUpdateExplanation transaction={transaction} onToggle={handleToggle} />;
+
+      case "lowerBatchManagerAnnualFee":
+        return <BatchManagerInterestRateUpdateExplanation transaction={transaction} onToggle={handleToggle} />;
 
       default:
         return <DefaultExplanation transaction={transaction} onToggle={handleToggle} />;
