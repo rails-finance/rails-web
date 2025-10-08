@@ -1,4 +1,5 @@
 import {
+  isBatchManagerOperation,
   isLiquidationTransaction,
   isRedemptionTransaction,
   isTransferTransaction,
@@ -48,6 +49,12 @@ export function HeaderContent({ tx }: { tx: Transaction }) {
 
     case "removeFromBatch":
       return <RemoveFromBatchHeader tx={tx} />;
+
+    case "setBatchManagerAnnualInterestRate":
+      return isBatchManagerOperation(tx) ? <DefaultHeader tx={tx} /> : <DefaultHeader tx={tx} />;
+
+    case "lowerBatchManagerAnnualFee":
+      return isBatchManagerOperation(tx) ? <DefaultHeader tx={tx} /> : <DefaultHeader tx={tx} />;
 
     case "transferTrove":
       return isTransferTransaction(tx) ? <TransferTroveHeader tx={tx} /> : <DefaultHeader tx={tx} />;
