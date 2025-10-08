@@ -51,7 +51,7 @@ export function TransactionImage({
         {svgContent ? (
           <div className="max-w-full max-h-full" dangerouslySetInnerHTML={{ __html: svgContent }} />
         ) : (
-          <div className="text-xs text-slate-500 text-center p-2 border rounded">{imageKey}</div>
+          <div className="w-20 h-20" />
         )}
       </div>
     </>
