@@ -1,3 +1,21 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+  description:
+    "Rails Privacy Policy. Learn how we handle data and protect your privacy when using the Rails DeFi analytics platform.",
+  openGraph: {
+    title: "Privacy Policy | Rails",
+    description:
+      "Rails Privacy Policy. Learn how we handle data and protect your privacy.",
+    url: "https://rails.finance/privacy",
+  },
+  robots: {
+    index: true,
+    follow: false,
+  },
+};
+
 export default function PrivacyPage() {
   return (
     <div className="container mx-auto md:px-6 px-4 pt-32 pb-12 max-w-7xl">

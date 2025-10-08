@@ -1,4 +1,17 @@
 import { LiquityLogo } from "@/components/LiquityLogo";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "About Rails",
+  description:
+    "Learn about Rails and our mission to make DeFi more understandable and accessible for everyone. Building essential self-service support infrastructure for DeFi users, starting with Liquity V2.",
+  openGraph: {
+    title: "About Rails",
+    description:
+      "Learn about Rails and our mission to provide self-service support that makes DeFi more understandable and accessible for everyone.",
+    url: "https://rails.finance/about",
+  },
+};
 
 export default function AboutPage() {
   return (
@@ -7,8 +20,8 @@ export default function AboutPage() {
         <p className="text-xl mb-8 text-slate-800 dark:text-slate-200">
           We believe that decentralised finance (DeFi) represents the future of finance, but it's currently too complex
           for most users to understand and navigate safely. <span className="font-bold">Rails</span> bridges this gap by
-          providing clear, intuitive explanations of DeFi transactions and protocol events, keeping users informed about
-          their DeFi activity.
+          providing clear, intuitive explanations of DeFi transactions and protocol events, empowering users with
+          self-service support that keeps them informed and confident in their DeFi activity.
         </p>
 
         {/* Roadmap & Mission Section */}
