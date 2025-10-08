@@ -47,7 +47,7 @@ export function SiteNavigation() {
             {/* Logo with tagline */}
             <Link href="/" className="flex items-top space-x-3">
               <div className="bg-green-600 rounded-b-lg p-3 sm:p-5 w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
-                <svg className="w-10 h-10 sm:w-12 sm:h-12" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <svg className="w-8 h-8 sm:w-12 sm:h-12" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                   <use href="#icon-rails" />
                 </svg>
               </div>
@@ -55,7 +55,7 @@ export function SiteNavigation() {
                 <h1 className="p-2 sm:p-2 leading-none">
                   <span className="text-2xl sm:text-3xl dark:text-white text-slate-700 font-bold tracking-tight">Rails</span>
                   <br />
-                  <span className="text-md sm:text-xl tracking-tight text-slate-400 dark:text-slate-500 font-bold">DeFi Self-Service Support</span>
+                  <span className="text-md sm:text-xl tracking-tight text-slate-400 dark:text-slate-500 font-bold">DeFi Self&#8209;Service Support</span>
                 </h1>
               </div>
             </Link>

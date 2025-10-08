@@ -73,9 +73,9 @@ export default function Home() {
             <div className="md:flex md:flex-col md:h-full">
               {/* Text Content - Same for both mobile and desktop */}
               <div className="md:flex-1 md:px-6 md:py-8 md:flex md:flex-col md:justify-center md:relative md:z-10">
-                <p className="text-slate-700 dark:text-slate-200 text-xl md:text-2xl font-semibold mb-4 tracking-tight">
+                <p className="text-slate-700 dark:text-slate-200 text-xl md:text-2xl lg:text-3xl/10  font-bold mb-4">
                   <span className="text-green-600 font-bold dark:text-green-600">Rails</span> displays your DeFi
-                  activity on simple timelines with clear explanations and in-depth transaction analysis.
+                  activity on&nbsp;simple timelines with clear explanations and in&#8209;depth transaction analysis.
                 </p>
               </div>
 
