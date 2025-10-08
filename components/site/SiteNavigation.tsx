@@ -138,7 +138,8 @@ export function SiteNavigation() {
               </div>
               <button
                 onClick={toggleMenu}
-                className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-150"
+                className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-150 cursor-pointer touch-manipulation"
+                aria-label="Close menu"
               >
                 {/* X Icon */}
                 <div className="w-6 h-5 relative flex flex-col justify-center">

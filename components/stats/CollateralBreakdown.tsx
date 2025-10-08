@@ -41,8 +41,22 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
     );
   }
 
-  const sortedData = Object.entries(data).sort(([, a], [, b]) => {
-    return b.totalCollateralUsd - a.totalCollateralUsd;
+  const collateralOrder = ["WETH", "wstETH", "rETH"];
+
+  const sortedData = Object.entries(data).sort(([keyA], [keyB]) => {
+    const indexA = collateralOrder.indexOf(keyA);
+    const indexB = collateralOrder.indexOf(keyB);
+
+    // If both are in the order array, sort by their position
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB;
+    }
+    // If only keyA is in the order array, it comes first
+    if (indexA !== -1) return -1;
+    // If only keyB is in the order array, it comes first
+    if (indexB !== -1) return 1;
+    // If neither is in the order array, maintain original order
+    return 0;
   });
 
   return (
@@ -55,8 +69,8 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
         >
           <div className="flex items-center gap-3 mb-4">
             <div className="flex items-center">
-              <TokenIcon assetSymbol={collateralType.toLowerCase()} className="w-12 h-12 z-1" />
-              <TokenIcon assetSymbol="bold" className="w-12 h-12 -ml-1.5" />
+              <TokenIcon assetSymbol={collateralType.toLowerCase()} className="lg:w-12 lg:h-12 w-10 h-10 z-1" />
+              <TokenIcon assetSymbol="bold" className="lg:w-12 lg:h-12 w-10 h-10 -ml-1.5" />
             </div>
             <div>
               <div>

@@ -153,11 +153,11 @@ export default function AboutPage() {
               <div className="flex items-center mb-4">
                 <img
                   src="/about-team-milesessex.jpg"
-                  alt="Miles Essex"
+                  alt="Miles"
                   className="w-16 h-16 rounded-full mr-4 object-cover"
                 />
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300">Miles Essex</h3>
+                  <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300">Miles</h3>
                   <p className="text-slate-600 dark:text-slate-400">Designer</p>
                   <a
                     href="https://x.com/milesessex"
