@@ -111,12 +111,11 @@ export default function Home() {
 
         {/* Mobile SVG Section */}
         <div className="md:hidden w-full relative overflow-visible">
-          <object
-            data="/hero-mobile.svg"
-            type="image/svg+xml"
+          <img
+            src="/hero-mobile.svg"
+            alt="Hero mobile decoration"
             className="w-full"
             style={{ display: "block" }}
-            aria-label="Hero mobile decoration"
           />
         </div>
       </div>
