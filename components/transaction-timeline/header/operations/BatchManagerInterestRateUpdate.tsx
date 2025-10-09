@@ -1,5 +1,6 @@
 import { BatchManagerOperationTransaction } from "@/types/api/troveHistory";
 import { InterestRateBadge } from "../components/InterestRateBadge";
+import { AssetAction } from "../components/AssetAction";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 
 export function BatchManagerInterestRateUpdateHeader({ tx }: { tx: BatchManagerOperationTransaction }) {
@@ -13,6 +14,10 @@ export function BatchManagerInterestRateUpdateHeader({ tx }: { tx: BatchManagerO
 
   const isRateChange = tx.operation === "setBatchManagerAnnualInterestRate";
   const isFeeReduction = tx.operation === "lowerBatchManagerAnnualFee";
+
+  // Calculate accrued interest/debt change
+  const debtChange = tx.stateAfter.debt - tx.stateBefore.debt;
+  const hasAccruedInterest = Math.abs(debtChange) > 0.01;
 
   if (isRateChange) {
     const isIncrease = newRate > oldRate;
@@ -30,6 +35,15 @@ export function BatchManagerInterestRateUpdateHeader({ tx }: { tx: BatchManagerO
           </div>
         )}
         <span className="text-slate-400 font-bold">{batchManagerName}</span>
+        {hasAccruedInterest && (
+          <AssetAction
+            action="Interest applied"
+            asset={tx.assetType}
+            amount={debtChange}
+            alwaysShowAmount
+            valueType="debt"
+          />
+        )}
       </>
     );
   }
@@ -44,6 +58,15 @@ export function BatchManagerInterestRateUpdateHeader({ tx }: { tx: BatchManagerO
           <span className="ml-0.5">%</span>
         </div>
         <span className="text-slate-400 font-bold">{batchManagerName}</span>
+        {hasAccruedInterest && (
+          <AssetAction
+            action="Interest applied"
+            asset={tx.assetType}
+            amount={debtChange}
+            alwaysShowAmount
+            valueType="debt"
+          />
+        )}
       </>
     );
   }

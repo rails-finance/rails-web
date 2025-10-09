@@ -1,4 +1,4 @@
-import { Transaction } from "@/types/api/troveHistory";
+import { Transaction, isBatchManagerOperation } from "@/types/api/troveHistory";
 import { HeaderContent } from "./operations";
 
 interface TransactionItemHeaderProps {
@@ -8,13 +8,15 @@ interface TransactionItemHeaderProps {
 }
 
 export function TransactionItemHeader({ tx, isExpanded, onClick }: TransactionItemHeaderProps) {
+  const isBatchManager = isBatchManagerOperation(tx);
+
   return (
     <div
-      className="px-4 pt-4 pb-2 sm:px-6 cursor-pointer rounded-t-md relative overflow-hidden group/header"
-      onClick={onClick}
-      role="button"
-      aria-expanded={isExpanded}
-      aria-label={`${isExpanded ? "Collapse" : "Expand"} transaction details`}
+      className={`px-4 pt-4 pb-2 sm:px-6 ${isBatchManager ? "" : "cursor-pointer"} rounded-t-md relative overflow-hidden group/header`}
+      onClick={isBatchManager ? undefined : onClick}
+      role={isBatchManager ? undefined : "button"}
+      aria-expanded={isBatchManager ? undefined : isExpanded}
+      aria-label={isBatchManager ? undefined : `${isExpanded ? "Collapse" : "Expand"} transaction details`}
     >
       <div className="relative flex items-start justify-between">
         <div className="grow mt-1 mb-2">

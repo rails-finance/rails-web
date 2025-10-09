@@ -9,7 +9,7 @@ import { TroveSummary } from "@/types/api/trove";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 import { formatDate, formatDuration } from "@/lib/date";
 import { formatPrice, formatUsdValue } from "@/lib/utils/format";
-import { generateInterestInfo } from "@/lib/utils/interest-calculator";
+import { generateInterestInfo, generateInterestInfoWithTimeline } from "@/lib/utils/interest-calculator";
 import { ExplanationPanel } from "@/components/transaction-timeline/explanation/ExplanationPanel";
 import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
 import { useHover, HoverProvider } from "@/components/transaction-timeline/context/HoverContext";
@@ -17,18 +17,32 @@ import { InfoButton } from "@/components/transaction-timeline/explanation/InfoBu
 import { FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 import { Link2, Users } from "lucide-react";
+import type { Transaction } from "@/types/api/troveHistory";
 
 interface OpenTroveCardProps {
   trove: TroveSummary;
+  timeline?: Transaction[];
 }
 
-function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
+function OpenTroveCardContent({ trove, timeline }: OpenTroveCardProps) {
   const { hoveredValue, setHoverEnabled } = useHover();
 
   const batchManagerInfo = getBatchManagerByAddress(trove.batch.manager);
 
   const interestInfo = useMemo(() => {
-    // Use actual lastActivityAt as the last debt update timestamp
+    // Use timeline-based calculation if available and trove is in a batch
+    if (timeline && timeline.length > 0 && trove.batch.isMember) {
+      return generateInterestInfoWithTimeline(
+        timeline,
+        trove.debt.current,
+        trove.metrics.interestRate,
+        trove.batch.managementFee,
+        trove.batch.isMember,
+        trove.batch.manager || undefined,
+      );
+    }
+
+    // Fallback to simple calculation
     const lastUpdate = trove.activity.lastActivityAt;
     const recordedDebt = trove.debt.current;
     const interestRate = trove.metrics.interestRate;
@@ -41,7 +55,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
       trove.batch.managementFee,
       trove.batch.manager || undefined,
     );
-  }, [trove]);
+  }, [trove, timeline]);
 
   // Calculate display value with interest
   const debtWithInterest = interestInfo.entireDebt;
@@ -510,10 +524,10 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
   );
 }
 
-export function OpenSummaryCard({ trove }: OpenTroveCardProps) {
+export function OpenSummaryCard({ trove, timeline }: OpenTroveCardProps) {
   return (
     <HoverProvider>
-      <OpenTroveCardContent trove={trove} />
+      <OpenTroveCardContent trove={trove} timeline={timeline} />
     </HoverProvider>
   );
 }

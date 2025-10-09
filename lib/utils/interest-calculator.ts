@@ -3,6 +3,8 @@
  * Implements real-time interest accrual calculations
  */
 
+import type { Transaction, isBatchManagerOperation as isBatchManagerOperationType } from "@/types/api/troveHistory";
+
 export interface InterestInfo {
   recordedDebt: number;
   accruedInterest: number;
@@ -82,6 +84,142 @@ export function calculateEntireDebt(
 }
 
 /**
+ * Interest rate period for segmented calculation
+ */
+export interface RatePeriod {
+  startTime: number;
+  endTime: number;
+  interestRate: number;
+  managementFee: number;
+  startingDebt: number;
+}
+
+/**
+ * Calculate accrued interest across multiple rate periods
+ * This accounts for delegate rate changes over time
+ */
+export function calculateSegmentedInterest(
+  ratePeriods: RatePeriod[],
+  currentTime: number = Date.now() / 1000,
+): { accruedInterest: number; accruedManagementFees: number; totalAccrued: number } {
+  let totalAccruedInterest = 0;
+  let totalAccruedFees = 0;
+  let runningDebt = 0;
+
+  for (const period of ratePeriods) {
+    runningDebt = period.startingDebt;
+    const endTime = period.endTime || currentTime;
+    const timePeriod = Math.max(0, endTime - period.startTime);
+
+    // Calculate interest for this period
+    const periodInterest = calculateAccruedInterest(runningDebt, period.interestRate, period.startTime, endTime);
+    totalAccruedInterest += periodInterest;
+
+    // Calculate management fees for this period
+    const periodFees = calculateManagementFees(runningDebt, period.managementFee, period.startTime, endTime);
+    totalAccruedFees += periodFees;
+
+    // Debt compounds with each period
+    runningDebt += periodInterest + periodFees;
+  }
+
+  return {
+    accruedInterest: totalAccruedInterest,
+    accruedManagementFees: totalAccruedFees,
+    totalAccrued: totalAccruedInterest + totalAccruedFees,
+  };
+}
+
+/**
+ * Build rate periods from transaction timeline
+ * Extracts all rate changes and debt updates to calculate accurate interest
+ */
+export function buildRatePeriodsFromTimeline(
+  transactions: Transaction[],
+  currentDebt: number,
+  currentRate: number,
+  currentManagementFee: number,
+): RatePeriod[] {
+  if (transactions.length === 0) {
+    return [];
+  }
+
+  // Sort transactions by timestamp (oldest first)
+  const sortedTxs = [...transactions].sort((a, b) => a.timestamp - b.timestamp);
+
+  // Find the most recent borrower-initiated transaction (not batch manager rate changes)
+  let lastBorrowerTx = sortedTxs[sortedTxs.length - 1];
+  for (let i = sortedTxs.length - 1; i >= 0; i--) {
+    if (sortedTxs[i].type !== "batch_manager") {
+      lastBorrowerTx = sortedTxs[i];
+      break;
+    }
+  }
+
+  // Get all transactions after the last borrower transaction
+  const relevantTxs = sortedTxs.filter((tx) => tx.timestamp > lastBorrowerTx.timestamp);
+
+  // If no rate changes after last borrower transaction, return single period
+  if (relevantTxs.length === 0) {
+    return [
+      {
+        startTime: lastBorrowerTx.timestamp,
+        endTime: 0, // Will use currentTime in calculation
+        interestRate: currentRate,
+        managementFee: currentManagementFee,
+        startingDebt: lastBorrowerTx.stateAfter.debt,
+      },
+    ];
+  }
+
+  // Build periods from rate changes
+  const periods: RatePeriod[] = [];
+  let currentPeriodStart = lastBorrowerTx.timestamp;
+  let currentPeriodDebt = lastBorrowerTx.stateAfter.debt;
+  let currentPeriodRate = lastBorrowerTx.stateAfter.annualInterestRate;
+  let currentPeriodManagementFee = currentManagementFee;
+
+  for (const tx of relevantTxs) {
+    // Close the current period
+    periods.push({
+      startTime: currentPeriodStart,
+      endTime: tx.timestamp,
+      interestRate: currentPeriodRate,
+      managementFee: currentPeriodManagementFee,
+      startingDebt: currentPeriodDebt,
+    });
+
+    // Calculate the compounded debt at the end of this period
+    // This is critical for batch_manager transactions which don't emit individual trove debt
+    const periodInterest = calculateAccruedInterest(currentPeriodDebt, currentPeriodRate, currentPeriodStart, tx.timestamp);
+    const periodFees = calculateManagementFees(currentPeriodDebt, currentPeriodManagementFee, currentPeriodStart, tx.timestamp);
+    const compoundedDebt = currentPeriodDebt + periodInterest + periodFees;
+
+    // Start new period
+    currentPeriodStart = tx.timestamp;
+    // Use compounded debt for next period (important for batch_manager transactions)
+    currentPeriodDebt = compoundedDebt;
+    currentPeriodRate = tx.stateAfter.annualInterestRate;
+
+    // Update management fee if this is a batch manager transaction
+    if (tx.type === "batch_manager" && tx.batchUpdate) {
+      currentPeriodManagementFee = tx.batchUpdate.annualManagementFee;
+    }
+  }
+
+  // Add final period (from last rate change to now)
+  periods.push({
+    startTime: currentPeriodStart,
+    endTime: 0, // Will use currentTime in calculation
+    interestRate: currentRate,
+    managementFee: currentManagementFee,
+    startingDebt: currentPeriodDebt,
+  });
+
+  return periods;
+}
+
+/**
  * Generate interest info for display
  */
 export function generateInterestInfo(
@@ -111,6 +249,59 @@ export function generateInterestInfo(
     lastUpdateTimestamp,
     calculationTimestamp: currentTime,
     annualInterestRatePercent: annualInterestRate,
+    daysSinceUpdate,
+    isBatchMember,
+    accruedManagementFees: isBatchMember ? accruedManagementFees : undefined,
+    batchManager,
+  };
+}
+
+/**
+ * Generate interest info using transaction timeline for accurate calculation
+ * Accounts for delegate rate changes over time
+ */
+export function generateInterestInfoWithTimeline(
+  transactions: Transaction[],
+  currentDebt: number,
+  currentRate: number,
+  currentManagementFee: number,
+  isBatchMember: boolean,
+  batchManager?: string,
+  currentTime: number = Date.now() / 1000,
+): InterestInfo {
+  // Build rate periods from transaction history
+  const ratePeriods = buildRatePeriodsFromTimeline(transactions, currentDebt, currentRate, currentManagementFee);
+
+  // If no rate periods (shouldn't happen), fall back to simple calculation
+  if (ratePeriods.length === 0) {
+    return generateInterestInfo(
+      currentDebt,
+      currentRate,
+      currentTime,
+      isBatchMember,
+      currentManagementFee,
+      batchManager,
+      currentTime,
+    );
+  }
+
+  // Calculate segmented interest
+  const { accruedInterest, accruedManagementFees } = calculateSegmentedInterest(ratePeriods, currentTime);
+
+  // Get the starting debt from the first period
+  const recordedDebt = ratePeriods[0].startingDebt;
+  const entireDebt = calculateEntireDebt(recordedDebt, accruedInterest, accruedManagementFees);
+
+  const lastUpdateTimestamp = ratePeriods[0].startTime;
+  const daysSinceUpdate = (currentTime - lastUpdateTimestamp) / (24 * 60 * 60);
+
+  return {
+    recordedDebt,
+    accruedInterest,
+    entireDebt,
+    lastUpdateTimestamp,
+    calculationTimestamp: currentTime,
+    annualInterestRatePercent: currentRate,
     daysSinceUpdate,
     isBatchMember,
     accruedManagementFees: isBatchMember ? accruedManagementFees : undefined,

@@ -138,7 +138,7 @@ export default function TrovePage() {
           Back
         </Button>
 
-        <TroveSummaryCard trove={troveData} />
+        <TroveSummaryCard trove={troveData} timeline={timelineData?.transactions} />
 
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">

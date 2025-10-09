@@ -14,11 +14,15 @@ export function TimelineBackground({ tx, isFirst, isLast, isExpanded = false }: 
 
   // Determine connector color based on operation type
   let connectorColor = "currentColor"; // default
+  const isBatchManagerOperation =
+    tx.operation === "setBatchManagerAnnualInterestRate" ||
+    tx.operation === "lowerBatchManagerAnnualFee";
   const isDashed =
     tx.operation === "liquidate" ||
     tx.operation === "redeemCollateral" ||
     tx.operation === "applyPendingDebt" ||
-    (tx.operation === "adjustTroveInterestRate" && "isInBatch" in tx && tx.isInBatch);
+    (tx.operation === "adjustTroveInterestRate" && "isInBatch" in tx && tx.isInBatch) ||
+    isBatchManagerOperation;
 
   if (isDashed) {
     if (tx.operation === "redeemCollateral") {
@@ -36,6 +40,8 @@ export function TimelineBackground({ tx, isFirst, isLast, isExpanded = false }: 
       connectorColor = "#3B82F6"; // blue for batch manager operations
     } else if (tx.operation === "adjustTroveInterestRate" && "isInBatch" in tx && tx.isInBatch) {
       connectorColor = "#8B5CF6"; // purple for delegated operations
+    } else if (isBatchManagerOperation) {
+      connectorColor = "#64748B"; // slate for batch manager rate changes
     }
   }
 
