@@ -1,4 +1,7 @@
+"use client";
+
 import { Transaction } from "@/types/api/troveHistory";
+import { useTheme } from "next-themes";
 
 interface TimelineBackgroundProps {
   tx: Transaction;
@@ -8,6 +11,9 @@ interface TimelineBackgroundProps {
 }
 
 export function TimelineBackground({ tx, isFirst, isLast, isExpanded = false }: TimelineBackgroundProps) {
+  const { theme } = useTheme();
+  const isDarkMode = theme === "dark";
+
   // Determine timeline connection logic
   const showTopConnection = !isFirst;
   const showBottomConnection = !isLast;
@@ -26,22 +32,24 @@ export function TimelineBackground({ tx, isFirst, isLast, isExpanded = false }: 
 
   if (isDashed) {
     if (tx.operation === "redeemCollateral") {
-      connectorColor = "#FB923C"; // orange
+      connectorColor = isDarkMode ? "#FB923C" : "#FB923C"; // orange-400
     } else if (tx.operation === "liquidate") {
       // Check if it's a beneficial liquidation
       if ("collIncreaseFromRedist" in tx.troveOperation) {
         const { collIncreaseFromRedist } = tx.troveOperation;
         const isBeneficial = tx.stateAfter.debt > 0 && collIncreaseFromRedist > 0;
-        connectorColor = isBeneficial ? "#22C55E" : "#EF4444"; // green vs red
+        connectorColor = isBeneficial
+          ? (isDarkMode ? "#22C55E" : "#4ADE80") // green-500 : green-400
+          : (isDarkMode ? "#EF4444" : "#F87171"); // red-500 : red-400
       } else {
-        connectorColor = "#EF4444"; // default red for liquidation
+        connectorColor = isDarkMode ? "#EF4444" : "#F87171"; // red-500 : red-400
       }
     } else if (tx.operation === "applyPendingDebt") {
-      connectorColor = "#3B82F6"; // blue for batch manager operations
+      connectorColor = isDarkMode ? "#3B82F6" : "#60A5FA"; // blue-500 : blue-400
     } else if (tx.operation === "adjustTroveInterestRate" && "isInBatch" in tx && tx.isInBatch) {
-      connectorColor = "#8B5CF6"; // purple for delegated operations
+      connectorColor = isDarkMode ? "#8B5CF6" : "#A78BFA"; // purple-500 : purple-400
     } else if (isBatchManagerOperation) {
-      connectorColor = "#64748B"; // slate for batch manager rate changes
+      connectorColor = isDarkMode ? "#64748B" : "#4C5563"; // slate-500 : slate-400
     }
   }
 
@@ -68,7 +76,7 @@ export function TimelineBackground({ tx, isFirst, isLast, isExpanded = false }: 
           <pattern
             id={`dots-${tx.operation}-${connectorColor.replace("#", "")}`}
             x="0"
-            y="0"
+            y={dotRadius}
             width="4"
             height={dotSpacing}
             patternUnits="userSpaceOnUse"

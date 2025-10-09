@@ -50,7 +50,7 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
           <div>
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Peak Debt</p>
             <div className="flex items-center">
-              <h3 className="text-2xl md:text-3xl font-bold text-slate-600 dark:text-slate-200">
+              <h3 className="text-xl lg:text-3xl font-bold text-slate-600 dark:text-slate-200">
                 {formatPrice(trove.debt.peak)}
               </h3>
               <span className="ml-2 text-green-600">
