@@ -63,9 +63,7 @@ export function BatchManagerInterestRateUpdateExplanation({
     items.push(
       <span key="interestRate" className="text-slate-500">
         Interest rate changed from{" "}
-        <HighlightableValue type="interestRate" state="before" value={oldRate}>
-          {oldRate}%
-        </HighlightableValue>{" "}
+          {oldRate}%{" "}
         to{" "}
         <HighlightableValue type="interestRate" state="after" value={newRate}>
           {newRate}%
@@ -105,10 +103,8 @@ export function BatchManagerInterestRateUpdateExplanation({
   items.push(
     <span key="debt" className="text-slate-500">
       Debt updated from{" "}
-      <HighlightableValue type="debt" state="before" value={beforeDebt}>
         {formatCurrency(beforeDebt, tx.assetType)}
-      </HighlightableValue>{" "}
-      to{" "}
+      {" "}to{" "}
       <HighlightableValue type="debt" state="after" value={afterDebt}>
         {formatCurrency(afterDebt, tx.assetType)}
       </HighlightableValue>

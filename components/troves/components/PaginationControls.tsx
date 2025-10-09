@@ -36,12 +36,12 @@ export function PaginationControls({
   }
 
   return (
-    <div className="flex items-center justify-between mt-8">
-      <div className="text-sm text-slate-400">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
+      <div className="text-sm text-slate-400 whitespace-nowrap">
         Showing {showingFrom}-{showingTo} of {totalCount} troves
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
@@ -54,7 +54,7 @@ export function PaginationControls({
           <>
             <button
               onClick={() => onPageChange(1)}
-              className="cursor-pointer text-slate-700 dark:text-slate-50 px-3 py-0.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors duration-150"
+              className="cursor-pointer text-slate-700 dark:text-slate-50 px-2 sm:px-3 py-0.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors duration-150"
             >
               1
             </button>
@@ -66,7 +66,7 @@ export function PaginationControls({
           <button
             key={num}
             onClick={() => onPageChange(num)}
-            className={`cursor-pointer text-slate-700 dark:text-slate-50 px-3 py-0.5 font-bold rounded-lg transition-colors ${
+            className={`cursor-pointer text-slate-700 dark:text-slate-50 px-2 sm:px-3 py-0.5 font-bold rounded-lg transition-colors ${
               num === currentPage
                 ? "bg-slate-200 dark:bg-slate-600 text-slate-700"
                 : "hover:bg-slate-100 dark:hover:bg-slate-700"
@@ -81,7 +81,7 @@ export function PaginationControls({
             {end < totalPages - 1 && <span className="font-bold text-slate-700 dark:text-slate-50">...</span>}
             <button
               onClick={() => onPageChange(totalPages)}
-              className="cursor-pointer px-3 py-0.5 font-bold text-slate-700 dark:text-slate-50 rounded-lg dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors duration-150"
+              className="cursor-pointer px-2 sm:px-3 py-0.5 font-bold text-slate-700 dark:text-slate-50 rounded-lg dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/75 transition-colors duration-150"
             >
               {totalPages}
             </button>

@@ -49,9 +49,8 @@ export function SetInterestBatchManagerExplanation({ transaction, onToggle }: Se
     </span>,
     <span key="debt" className="text-slate-500">
       Debt updated from{" "}
-      <HighlightableValue type="debt" state="before" value={joinBeforeDebt}>
         {formatCurrency(joinBeforeDebt, tx.assetType)}
-      </HighlightableValue>{" "}
+      {" "}
       to{" "}
       <HighlightableValue type="debt" state="after" value={joinAfterDebt}>
         {formatCurrency(joinAfterDebt, tx.assetType)}

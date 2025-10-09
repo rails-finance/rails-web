@@ -26,10 +26,7 @@ export function ApplyPendingDebtExplanation({ transaction, onToggle }: ApplyPend
     </span>,
     <span key="debt" className="text-slate-500">
       Debt updated from{" "}
-      
-        {formatCurrency(applyBeforeDebt, tx.assetType)}
-      {" "}
-      to{" "}
+        {formatCurrency(applyBeforeDebt, tx.assetType)}{" "}to{" "}
       <HighlightableValue type="debt" state="after" value={applyAfterDebt}>
         {formatCurrency(applyAfterDebt, tx.assetType)}
       </HighlightableValue>{" "}
