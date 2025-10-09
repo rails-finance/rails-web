@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Users } from "lucide-react";
 import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 import type { TransactionTimeline as TimelineData } from "@/types/api/troveHistory";
-import { isRedemptionTransaction } from "@/types/api/troveHistory";
+import { isRedemptionTransaction, isBatchManagerOperation } from "@/types/api/troveHistory";
 import { TroveSummaryCard } from "@/components/trove/TroveSummaryCard";
 import { Button } from "@/components/ui/button";
 import { TransactionTimeline } from "@/components/transaction-timeline";
@@ -25,6 +25,7 @@ export default function TrovePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hideRedemptions, setHideRedemptions] = useState(false);
+  const [hideDelegateRates, setHideDelegateRates] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -148,27 +149,52 @@ export default function TrovePage() {
               </span>
             )}
           </div>
-          {timelineData && timelineData.transactions.some((tx) => isRedemptionTransaction(tx)) && (
-            <button
-              onClick={() => setHideRedemptions(!hideRedemptions)}
-              className={`cursor-pointer px-2 py-0.5 text-sm rounded transition-colors flex items-center gap-1 bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/70`}>
-              {hideRedemptions
-                ? `Show`
-                : `Hide`}{' '}
-              <Icon name="triangle" size={14} className={hideRedemptions ? "" : "text-orange-500"} />
-              {hideRedemptions
-                ? `${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length}`
-                : `${timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length}`}<span className="hidden sm:inline"></span>
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {timelineData && timelineData.transactions.some((tx) => isBatchManagerOperation(tx)) && (
+              <button
+                onClick={() => setHideDelegateRates(!hideDelegateRates)}
+                className={`cursor-pointer pl-0.5 pr-1.5 text-sm rounded-full transition-colors flex items-center bg-pink-100 dark:bg-pink-900/50 text-pink-600 dark:text-pink-400 hover:bg-pink-200 dark:hover:bg-pink-900/70`}>
+                <span className="w-5 h-5 flex items-center justify-center ">
+                  {hideDelegateRates ? (
+                    <Icon name="x" size={12} className="text-pink-600 dark:text-pink-400" />
+                  ) : (
+                    <Icon name="check" size={12} className="text-pink-600 dark:text-pink-400" />
+                  )}
+                </span>
+                <span className="flex items-center text-xs font-medium gap-1">
+                  <Users size={12} className="text-pink-500" />
+                  {timelineData.transactions.filter((tx) => isBatchManagerOperation(tx)).length}
+                </span>
+              </button>
+            )}
+            {timelineData && timelineData.transactions.some((tx) => isRedemptionTransaction(tx)) && (
+              <button
+                onClick={() => setHideRedemptions(!hideRedemptions)}
+                className={`cursor-pointer pl-0.5 pr-1.5 text-sm rounded-full transition-colors flex items-center bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/70`}>
+                <span className="w-5 h-5 flex items-center justify-center ">
+                  {hideRedemptions ? (
+                    <Icon name="x" size={12} className="text-orange-600 dark:text-orange-400" />
+                  ) : (
+                    <Icon name="check" size={12} className="text-orange-600 dark:text-orange-400" />
+                  )}
+                </span>
+                <span className="flex items-center text-xs font-medium gap-1">
+                  <Icon name="triangle" size={12} className="text-orange-500" />
+                  {timelineData.transactions.filter((tx) => isRedemptionTransaction(tx)).length}
+                </span>
+              </button>
+            )}
+          </div>
         </div>
         {timelineData && timelineData.transactions.length > 0 ? (
           <TransactionTimeline
             timeline={{
               ...timelineData,
-              transactions: hideRedemptions
-                ? timelineData.transactions.filter((tx) => !isRedemptionTransaction(tx))
-                : timelineData.transactions,
+              transactions: timelineData.transactions.filter((tx) => {
+                if (hideRedemptions && isRedemptionTransaction(tx)) return false;
+                if (hideDelegateRates && isBatchManagerOperation(tx)) return false;
+                return true;
+              }),
             }}
           />
         ) : (
