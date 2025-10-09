@@ -117,7 +117,7 @@ export function ExplanationPanel({ items, leftColumn, rightColumn, footer, onTog
           )}
           {transactionHash && (
             <div className="">
-              <div className="pt-2 px-4 flex justify-between items-center">
+              <div className="pt-2 px-4 flex flex-wrap justify-between items-center gap-2">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1 text-xs  text-slate-700 dark:text-slate-600">
                     <span>View on</span>

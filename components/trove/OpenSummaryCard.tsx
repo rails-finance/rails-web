@@ -283,6 +283,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs flex-wrap justify-end pt-0.5">
             <span className="text-slate-600 dark:text-slate-400">Opened {formatDate(trove.activity.createdAt)}</span>
+<div className="flex items-center gap-1">
             <span className="text-slate-600 dark:text-slate-400 rounded-lg bg-slate-200 dark:bg-slate-700 px-2">
               {formatDuration(trove.activity.createdAt, new Date())}
             </span>
@@ -296,6 +297,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
               <Icon name="arrow-left-right" size={12} />
               <span className="ml-1">{trove.activity.transactionCount - trove.activity.redemptionCount}</span>
             </span>
+          </div>
           </div>
         </div>
 
@@ -339,7 +341,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
                     interestInfo.accruedManagementFees > 0 && (
                       <span className="text-pink-500">
                         {" "}
-                        +{" "}
+                        +&nbsp;
                         <HighlightableValue
                           type="managementFee"
                           state="after"
@@ -347,8 +349,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
                           value={interestInfo.accruedManagementFees}
                         >
                           {formatPrice(interestInfo.accruedManagementFees)}
-                        </HighlightableValue>{" "}
-                        delegate fee
+                        </HighlightableValue>&nbsp;delegate&nbsp;fee
                       </span>
                     )}
                 </span>

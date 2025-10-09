@@ -28,18 +28,16 @@ export function TransactionLinks({ transaction }: TransactionLinksProps) {
     return true;
   };
 
+  if (!shouldShowGasFee() || !tx.gasFee || !tx.gasFeeUsd) {
+    return null;
+  }
+
   return (
-    <div className="flex justify-between items-center gap-1 text-xs text-slate-500 font-bold py-2">
-      {shouldShowGasFee() && tx.gasFee && tx.gasFeeUsd ? (
-        <div className="flex items-center gap-1">
-          <Fuel className="w-3 h-3 text-slate-500" />
-          <span>
-            {tx.gasFee.toFixed(6)} ≈ ${tx.gasFeeUsd.toFixed(2)}
-          </span>
-        </div>
-      ) : (
-        <div></div>
-      )}
+    <div className="flex items-center gap-1 text-xs text-slate-500 font-bold">
+      <Fuel className="w-3 h-3 text-slate-500" />
+      <span>
+        {tx.gasFee.toFixed(6)} ≈ ${tx.gasFeeUsd.toFixed(2)}
+      </span>
     </div>
   );
 }

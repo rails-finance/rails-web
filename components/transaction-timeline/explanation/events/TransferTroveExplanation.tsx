@@ -30,7 +30,7 @@ export function TransferTroveExplanation({ transaction, onToggle }: TransferTrov
           href={`/troves?ownerAddress=${toAddress}`}
           className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
         >
-          {toAddress}
+          {`${toAddress.substring(0, 6)}...${toAddress.substring(38)}`}
         </Link>
       </span>,
     );
@@ -42,7 +42,7 @@ export function TransferTroveExplanation({ transaction, onToggle }: TransferTrov
           href={`/troves?ownerAddress=${fromAddress}`}
           className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
         >
-          {fromAddress}
+          {`${fromAddress.substring(0, 6)}...${fromAddress.substring(38)}`}
         </Link>
       </span>,
     );
@@ -54,14 +54,14 @@ export function TransferTroveExplanation({ transaction, onToggle }: TransferTrov
           href={`/troves?ownerAddress=${fromAddress}`}
           className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
         >
-          {fromAddress}
+          {`${fromAddress.substring(0, 6)}...${fromAddress.substring(38)}`}
         </Link>{" "}
         to wallet{" "}
         <Link
           href={`/troves?ownerAddress=${toAddress}`}
           className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
         >
-          {toAddress}
+          {`${toAddress.substring(0, 6)}...${toAddress.substring(38)}`}
         </Link>
       </span>,
     );

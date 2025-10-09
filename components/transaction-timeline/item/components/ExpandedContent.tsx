@@ -40,65 +40,70 @@ export function ExpandedContent({ tx }: { tx: Transaction }) {
     : null;
 
   return (
-    <div className="relative">
+    <div>
       <div className="px-4 sm:px-6 pb-2 space-y-4">
         <TransactionStateGrid tx={tx} />
-
-        <TransactionLinks transaction={tx} />
       </div>
 
-      {/* Collateral price - positioned in the bottom right corner */}
-      {(collateralPrice || redemptionPrice) && (
-        <div className="absolute bottom-2 -right-0.5 flex items-center gap-1 bg-slate-200 dark:bg-slate-700 shadow-b shadow-slate-900/50 rounded-l p-2">
-          <TokenIcon
-            assetSymbol={transaction.collateralType}
-            className="inline-block w-4 h-4 grayscale opacity-40 mr-0.5"
-          />
-          {redemptionPrice && collateralPrice && Math.abs(redemptionPrice - collateralPrice) > 0.1 ? (
-            <span className="text-xs flex items-center gap-1">
-              <HighlightableValue
-                type="redemptionPrice"
-                state="after"
-                className="text-orange-400 font-bold"
-                value={redemptionPrice}
-                variant="card"
-              >
-                {formatUsdValue(redemptionPrice)}
-              </HighlightableValue>
-              <span className="text-slate-400">/</span>
-              <HighlightableValue
-                type="collateralPrice"
-                state="after"
-                className="text-slate-500 font-bold"
-                value={collateralPrice}
-                variant="card"
-              >
-                {formatUsdValue(collateralPrice)}
-              </HighlightableValue>
-            </span>
-          ) : redemptionPrice ? (
-            <HighlightableValue
-              type="redemptionPrice"
-              state="after"
-              className="text-xs text-orange-400 font-bold"
-              value={redemptionPrice}
-              variant="card"
-            >
-              {formatUsdValue(redemptionPrice)}
-            </HighlightableValue>
-          ) : collateralPrice ? (
-            <HighlightableValue
-              type="collateralPrice"
-              state="after"
-              className="text-xs text-slate-500 font-bold"
-              value={collateralPrice}
-              variant="card"
-            >
-              {formatUsdValue(collateralPrice)}
-            </HighlightableValue>
-          ) : null}
-        </div>
-      )}
+      {/* Gas cost and collateral price container - organic responsive layout */}
+      <div className="px-4 sm:px-6 pb-2 flex flex-wrap-reverse justify-between items-center gap-2">
+        <TransactionLinks transaction={tx} />
+
+        {/* Collateral price - pulled to the right with negative margin */}
+        {(collateralPrice || redemptionPrice) && (
+          <div className="flex justify-end -mr-4.5 sm:-mr-7">
+            <div className="flex items-center gap-1 bg-slate-200 dark:bg-slate-700 shadow-b shadow-slate-900/50 rounded p-2">
+              <TokenIcon
+                assetSymbol={transaction.collateralType}
+                className="inline-block w-4 h-4 grayscale opacity-40 mr-0.5"
+              />
+              {redemptionPrice && collateralPrice && Math.abs(redemptionPrice - collateralPrice) > 0.1 ? (
+                <span className="text-xs flex items-center gap-1">
+                  <HighlightableValue
+                    type="redemptionPrice"
+                    state="after"
+                    className="text-orange-400 font-bold"
+                    value={redemptionPrice}
+                    variant="card"
+                  >
+                    {formatUsdValue(redemptionPrice)}
+                  </HighlightableValue>
+                  <span className="text-slate-400">/</span>
+                  <HighlightableValue
+                    type="collateralPrice"
+                    state="after"
+                    className="text-slate-500 font-bold"
+                    value={collateralPrice}
+                    variant="card"
+                  >
+                    {formatUsdValue(collateralPrice)}
+                  </HighlightableValue>
+                </span>
+              ) : redemptionPrice ? (
+                <HighlightableValue
+                  type="redemptionPrice"
+                  state="after"
+                  className="text-xs text-orange-400 font-bold"
+                  value={redemptionPrice}
+                  variant="card"
+                >
+                  {formatUsdValue(redemptionPrice)}
+                </HighlightableValue>
+              ) : collateralPrice ? (
+                <HighlightableValue
+                  type="collateralPrice"
+                  state="after"
+                  className="text-xs text-slate-500 font-bold"
+                  value={collateralPrice}
+                  variant="card"
+                >
+                  {formatUsdValue(collateralPrice)}
+                </HighlightableValue>
+              ) : null}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

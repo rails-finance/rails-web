@@ -37,7 +37,7 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
             href={`/troves?ownerAddress=${tx.relatedTransfer.toAddress}`}
             className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
           >
-            {tx.relatedTransfer.toAddress}
+            {`${tx.relatedTransfer.toAddress.substring(0, 6)}...${tx.relatedTransfer.toAddress.substring(38)}`}
           </Link>{' '}
           opened a new Trove.
         </div>
@@ -161,7 +161,7 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
       </div>
       <div className="font-semibold text-slate-900 dark:text-slate-100 mb-1 mt-3">Learn More About Borrowing</div>
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-10 h-10 bg-red-500/10 rounded-full flex items-center justify-center">
+        <div className="flex-shrink-0 w-10 h-10 bg-red-500/10 rounded-full hidden sm:flex items-center justify-center">
           <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
             <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
           </svg>
@@ -173,7 +173,7 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
               href="https://www.youtube.com/watch?v=o1miCKLIPYs"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline inline-flex items-center gap-1"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
             >
               video guide
               <ExternalLink className="w-3 h-3 flex-shrink-0" />
@@ -264,7 +264,7 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
   const railsPromotion = (
     <div className="bg-fuchsia-500/5 border border-fuchsia-500/20 rounded-lg p-4">
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-10 h-10 bg-fuchsia-500/10 rounded-full flex items-center justify-center">
+        <div className="flex-shrink-0 w-10 h-10 bg-fuchsia-500/10 rounded-full hidden sm:flex items-center justify-center">
           <SearchCheck className="w-5 h-5 text-fuchsia-400" />
         </div>
         <div className="flex-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
