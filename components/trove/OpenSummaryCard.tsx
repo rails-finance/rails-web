@@ -16,7 +16,7 @@ import { useHover, HoverProvider } from "@/components/transaction-timeline/conte
 import { InfoButton } from "@/components/transaction-timeline/explanation/InfoButton";
 import { FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
-import { Link2 } from "lucide-react";
+import { Link2, Users } from "lucide-react";
 
 interface OpenTroveCardProps {
   trove: TroveSummary;
@@ -283,7 +283,7 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs flex-wrap justify-end pt-0.5">
             <span className="text-slate-600 dark:text-slate-400">Opened {formatDate(trove.activity.createdAt)}</span>
-<div className="flex items-center gap-1">
+						<div className="flex items-center gap-1">
             <span className="text-slate-600 dark:text-slate-400 rounded-lg bg-slate-200 dark:bg-slate-700 px-2">
               {formatDuration(trove.activity.createdAt, new Date())}
             </span>
@@ -401,8 +401,8 @@ function OpenTroveCardContent({ trove }: OpenTroveCardProps) {
             <div>
               <div className="flex items-center gap-1 mb-1">
                 {trove.batch.isMember && (
-                  <span className="text-xs tracking-wide font-bold px-1 py-0.5 bg-pink-300 text-white dark:bg-pink-900/50 dark:text-pink-400 rounded-xs">
-                    DELEGATED
+                  <span className="inline-flex items-center text-xs font-semibold px-1 py-0.5 bg-pink-300 text-white dark:bg-pink-900/50 dark:text-pink-400 rounded-xs">
+                    <Users className="w-3 h-3" aria-hidden="true" />
                   </span>
                 )}
                 <p className="text-xs font-bold text-slate-400 dark:text-slate-600">Interest Rate</p>
