@@ -1,3 +1,21 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Terms of Service",
+  description:
+    "Rails Terms of Service. Read about acceptable use, disclaimers, and limitations when using the Rails DeFi analytics platform.",
+  openGraph: {
+    title: "Terms of Service | Rails",
+    description:
+      "Rails Terms of Service. Read about acceptable use, disclaimers, and limitations.",
+    url: "https://rails.finance/terms",
+  },
+  robots: {
+    index: true,
+    follow: false,
+  },
+};
+
 export default function TermsPage() {
   return (
     <div className="container mx-auto md:px-6 px-4 pt-32 pb-12 max-w-7xl">

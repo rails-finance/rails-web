@@ -8,6 +8,7 @@ import { TokenIcon } from "../icons/tokenIcon";
 import { ChevronRight, Users } from "lucide-react";
 import { CardFooter } from "../trove/components/CardFooter";
 import { formatDuration } from "@/lib/date";
+import { formatBatchManagerDisplay } from "@/lib/services/batch-manager-service";
 
 export function OpenListingCard({ trove }: { trove: TroveSummary }) {
   // Save scroll position when navigating to trove detail
@@ -52,28 +53,28 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs">
+          <span className="inline-flex items-center text-slate-600 dark:text-slate-400">
+            <Icon name="arrow-left-right" size={12} />
+            <span className="ml-1">{trove.activity.transactionCount - trove.activity.redemptionCount}</span>
+          </span>
           {trove.activity.redemptionCount > 0 && (
             <span className="inline-flex items-center text-orange-400">
               <Icon name="triangle" size={12} />
               <span className="ml-1">{trove.activity.redemptionCount}</span>
             </span>
           )}
-          <span className="inline-flex items-center text-slate-600 dark:text-slate-400">
-            <Icon name="arrow-left-right" size={12} />
-            <span className="ml-1">{trove.activity.transactionCount}</span>
-          </span>
         </div>
       </div>
 
       {/* Content section - single responsive grid */}
       <div className="pt-2 p-4 space-y-4">
         {/* Main metrics grid - responsive columns */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 md:items-end">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 md:items-start">
           {/* Debt - spans 2 columns on mobile */}
           <div className="col-span-2 md:col-span-1">
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Debt</p>
             <div className="flex items-center">
-              <h3 className="text-2xl md:text-3xl font-bold text-slate-600 dark:text-slate-200">
+              <h3 className="text-xl lg:text-3xl font-bold text-slate-600 dark:text-slate-200">
                 {formatPrice(debtWithInterest)}
               </h3>
               <span className="ml-2 font-bold text-green-500">
@@ -82,8 +83,8 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
             </div>
           </div>
 
-          {/* Backed by */}
-          <div className="md:col-span-1">
+          {/* Backed by - full width on mobile */}
+          <div className="col-span-2 md:col-span-1">
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Backed by</p>
             <div className="flex items-center">
               <span className="flex items-center">
@@ -100,18 +101,7 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
             </div>
           </div>
 
-          {/* Collateral Ratio */}
-          <div className="md:col-span-1">
-            <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">
-              <span className="lg:hidden">Ratio</span>
-              <span className="hidden lg:inline">Collateral Ratio</span>
-            </p>
-            <p className="text-lg md:text-xl font-semibold text-slate-600 dark:text-slate-200">
-              {trove.metrics.collateralRatio.toFixed(1)}%
-            </p>
-          </div>
-
-          {/* Interest Rate */}
+          {/* Interest Rate - shares row with Ratio on mobile */}
           <div className="md:col-span-1">
             <div className="flex items-center gap-1 mb-1">
               {trove.batch.isMember && (
@@ -124,6 +114,22 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
             <div className="text-lg md:text-xl font-bold text-slate-600 dark:text-slate-200">
               {trove.metrics.interestRate}%
             </div>
+            {trove.batch.isMember && trove.batch.manager && (
+              <div className="text-xs font-medium text-pink-500 dark:text-pink-400 mt-1 truncate">
+                {formatBatchManagerDisplay(trove.batch.manager)}
+              </div>
+            )}
+          </div>
+
+          {/* Collateral Ratio - shares row with Interest Rate on mobile */}
+          <div className="md:col-span-1">
+            <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">
+              <span className="lg:hidden">Ratio</span>
+              <span className="hidden lg:inline">Collateral Ratio</span>
+            </p>
+            <p className="text-lg md:text-xl font-semibold text-slate-600 dark:text-slate-200">
+              {trove.metrics.collateralRatio.toFixed(1)}%
+            </p>
           </div>
         </div>
 

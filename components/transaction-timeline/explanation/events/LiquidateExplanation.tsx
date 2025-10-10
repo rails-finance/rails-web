@@ -20,11 +20,16 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
   const { collIncreaseFromRedist, debtIncreaseFromRedist } = tx.troveOperation || {};
   const isBeneficialLiquidation = tx.stateAfter.debt > 0 && collIncreaseFromRedist > 0;
 
-  const liquidatedColl = tx.stateBefore?.coll || tx.stateAfter.coll;
-  const liquidatedDebt = tx.stateBefore?.debt || tx.stateAfter.debt;
-  const liquidatedCollUsd = tx.stateBefore?.collateralInUsd;
   const liquidationBeforeCollRatio = tx.stateBefore?.collateralRatio;
   const liquidationBeforeInterestRate = tx.stateBefore?.annualInterestRate || tx.stateAfter.annualInterestRate;
+
+  // For destructive liquidations, use systemLiquidation data
+  const totalCollLiquidated =
+    tx.systemLiquidation?.collSentToSP +
+    tx.systemLiquidation?.collRedistributed +
+    tx.systemLiquidation?.collSurplus;
+  const totalDebtCleared = tx.systemLiquidation?.debtOffsetBySP + tx.systemLiquidation?.debtRedistributed;
+  const liquidatedCollUsd = totalCollLiquidated * (tx.collateralPrice || 0);
 
   let liquidateItems: React.ReactNode[] = [];
 
@@ -67,63 +72,75 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
   } else {
     // Destructive liquidation - this trove got liquidated
     liquidateItems = [
-      <span key="liquidated" className="text-red-400">
+      <span key="liquidated" className="text-slate-500">
         Trove was liquidated due to insufficient collateral ratio
         <InfoButton href={FAQ_URLS.LIQUIDATIONS} />
       </span>,
-      <span key="seizedCollateral" className="text-slate-500">
-        The protocol seized{" "}
-        <HighlightableValue type="collateral" state="change" value={liquidatedColl}>
-          {liquidatedColl} {tx.collateralType}
-        </HighlightableValue>
-        {liquidatedCollUsd ? ` valued at ${formatUsdValue(liquidatedCollUsd)}` : ""}
-      </span>,
-      <span key="clearedDebt" className="text-slate-500">
-        Outstanding debt of{" "}
-        <HighlightableValue type="debt" state="change" value={liquidatedDebt}>
-          {formatCurrency(liquidatedDebt, tx.assetType)}
-        </HighlightableValue>{" "}
-        was cleared by the liquidator
-      </span>,
     ];
+
+    // Show collateral distribution breakdown if available
+    if (tx.systemLiquidation) {
+      if (tx.systemLiquidation.collSentToSP > 0) {
+        liquidateItems.push(
+          <span key="collToSP" className="text-slate-500">
+            {formatCurrency(tx.systemLiquidation.collSentToSP, tx.collateralType)} collateral sent to Stability Pool
+          </span>,
+        );
+      }
+      if (tx.systemLiquidation.collRedistributed > 0) {
+        liquidateItems.push(
+          <span key="collRedistributed" className="text-slate-500">
+            {formatCurrency(tx.systemLiquidation.collRedistributed, tx.collateralType)} collateral redistributed to
+            other troves
+          </span>,
+        );
+      }
+      if (tx.systemLiquidation.collSurplus > 0) {
+        liquidateItems.push(
+          <span key="collSurplus" className="text-slate-500">
+            {formatCurrency(tx.systemLiquidation.collSurplus, tx.collateralType)} collateral surplus available for
+            owner to claim
+          </span>,
+        );
+      }
+
+      // Show debt distribution breakdown
+      if (tx.systemLiquidation.debtOffsetBySP > 0) {
+        liquidateItems.push(
+          <span key="debtToSP" className="text-slate-500">
+            {formatCurrency(tx.systemLiquidation.debtOffsetBySP, tx.assetType)} debt offset by Stability Pool
+          </span>,
+        );
+      }
+      if (tx.systemLiquidation.debtRedistributed > 0) {
+        liquidateItems.push(
+          <span key="debtRedistributed" className="text-slate-500">
+            {formatCurrency(tx.systemLiquidation.debtRedistributed, tx.assetType)} debt redistributed to other troves
+          </span>,
+        );
+      }
+    }
   }
 
   // Additional details for destructive liquidations only
   if (!isBeneficialLiquidation) {
-    if (liquidationBeforeCollRatio !== undefined) {
+    // Only show collateral ratio if it's a valid value (not 0)
+    if (liquidationBeforeCollRatio !== undefined && liquidationBeforeCollRatio > 0) {
       liquidateItems.push(
         <span key="ratioBeforeLiquidation" className="text-slate-500">
-          Collateral ratio had fallen to {liquidationBeforeCollRatio}% before liquidation
+          Collateral ratio had fallen to {liquidationBeforeCollRatio.toFixed(2)}% before liquidation
         </span>,
       );
     }
 
-    if (liquidationBeforeInterestRate !== undefined) {
+    // Only show interest rate if it's a valid value (not 0)
+    if (liquidationBeforeInterestRate !== undefined && liquidationBeforeInterestRate > 0) {
       liquidateItems.push(
         <span key="interestRateBeforeLiquidation" className="text-slate-500">
-          Interest rate was {liquidationBeforeInterestRate}% annual before closure
+          Interest rate was {liquidationBeforeInterestRate}% annual before liquidation
         </span>,
       );
     }
-
-    liquidateItems.push(
-      <span key="zeroCollateral" className="text-slate-500">
-        All collateral is now{" "}
-        <HighlightableValue type="collateral" state="after" value={0}>
-          0 {tx.collateralType}
-        </HighlightableValue>
-      </span>,
-      <span key="zeroDebt" className="text-slate-500">
-        All debt is now{" "}
-        <HighlightableValue type="debt" state="after" value={0}>
-          0 {tx.assetType}
-        </HighlightableValue>
-      </span>,
-      <span key="warning" className="text-yellow-500">
-        ⚠️ Liquidation occurs when collateral ratio falls below the minimum threshold
-        <InfoButton href={FAQ_URLS.LIQUIDATIONS} />
-      </span>,
-    );
 
     // Add NFT burn explanation if NFT URL is available (only for destructive liquidations)
     const nftUrl = getTroveNftUrl(tx.collateralType, tx.troveId);
@@ -137,14 +154,14 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
     }
 
     liquidateItems.push(
-      <span key="closed" className="text-slate-300">
+      <span key="closed" className="text-slate-500">
         Trove closed through liquidation
       </span>,
     );
   } else {
     // Additional context for beneficial liquidations
     liquidateItems.push(
-      <span key="collateralRatioImproved" className="text-green-600">
+      <span key="collateralRatioImproved" className="text-slate-600">
         Your collateral ratio improved from {tx.stateBefore?.collateralRatio}% to {tx.stateAfter.collateralRatio}%
       </span>,
       <span key="troveStillActive" className="text-slate-300">

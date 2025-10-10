@@ -256,5 +256,12 @@ export const IconSymbols = () => (
       <path d="M15 7h2a5 5 0 1 1 0 10h-2" stroke="currentColor" strokeWidth="2" fill="none" />
       <line x1="8" x2="16" y1="12" y2="12" stroke="currentColor" strokeWidth="2" />
     </symbol>
+    <symbol id="icon-trove-transfer" viewBox="0 0 24 24">
+      <path d="M 21 13.234 L 21 5 C 21 3.895 20.105 3 19 3 L 5 3 C 3.895 3 3 3.895 3 5 L 3 19 C 3 20.105 3.895 21 5 21 L 9.706 21" stroke="currentColor" strokeWidth="2" fill="none" />
+      <circle cx="9" cy="9" r="2" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path d="M 21 13.298 L 17.914 10.914 C 17.133 10.133 15.867 10.133 15.086 10.914 L 6 21" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path d="M 22.185 19.314 L 13.219 19.277" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path d="M 18.332 22.488 L 22.185 19.318 L 18.004 16.102" stroke="currentColor" strokeWidth="2" fill="none" />
+    </symbol>
   </svg>
 );

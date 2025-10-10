@@ -37,5 +37,11 @@ export function AdjustTroveHeader({ tx }: { tx: TroveTransaction }) {
     return <span className="font-bold text-slate-900 dark:text-white ">Adjust Trove</span>;
   }
 
-  return <div className="font-bold flex items-center gap-1">{content}</div>;
+  return (
+    <>
+      <div className="grid grid-cols-[1fr_auto] gap-1 w-full items-start">
+        <div className="font-bold flex items-center gap-1 flex-wrap">{content}</div>
+      </div>
+    </>
+  );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Transaction } from "@/types/api/troveHistory";
+import { Transaction, isBatchManagerOperation } from "@/types/api/troveHistory";
 import { TransactionIcon } from "../icon";
 import { LeftValueDisplay } from "../value-display/components/LeftValueDisplay";
 import { RightValueDisplay } from "../value-display/components/RightValueDisplay";
@@ -24,7 +24,14 @@ interface TransactionItemProps {
 export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
-  const toggleExpanded = () => setIsExpanded(!isExpanded);
+  const isBatchManager = isBatchManagerOperation(tx);
+
+  // Batch manager transactions don't expand - they only show rate changes
+  const toggleExpanded = () => {
+    if (!isBatchManager) {
+      setIsExpanded(!isExpanded);
+    }
+  };
 
   return (
     <HoverProvider>
@@ -41,22 +48,25 @@ export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionIte
 
           {/* Transaction details wrapper */}
           <div className="grow self-start mb-2.5">
-            <TransactionContent isInBatch={tx.isInBatch} isExpanded={isExpanded}>
+            <TransactionContent isInBatch={tx.isInBatch} isExpanded={isExpanded} isBatchManager={isBatchManager}>
               <TransactionItemHeader tx={tx} isExpanded={isExpanded} onClick={toggleExpanded} />
 
-              {isExpanded && <ExpandedContent tx={tx} />}
+              {/* Only show expanded content for non-batch-manager transactions */}
+              {isExpanded && !isBatchManager && <ExpandedContent tx={tx} />}
 
+              {/* Footer - always show, but non-interactive for batch managers */}
               <TransactionFooter
                 timestamp={tx.timestamp}
                 txIndex={txIndex}
                 txHash={tx.transactionHash}
                 isExpanded={isExpanded}
                 onClick={toggleExpanded}
+                isInteractive={!isBatchManager}
               />
             </TransactionContent>
 
-            {/* Event explanation panel - positioned beneath TransactionContent, 20px narrower */}
-            {isExpanded && (
+            {/* Event explanation panel - only for non-batch-manager transactions */}
+            {isExpanded && !isBatchManager && (
               <div className="px-2.5">
                 <EventExplanation transaction={tx} onToggle={(isOpen) => setShowExplanation(isOpen)} />
               </div>

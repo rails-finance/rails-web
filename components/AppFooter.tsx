@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function AppFooter() {
   return (
-    <footer className="w-full bg-gradient-to-b from-slate-100 dark:from-slate-900 to-transparent mt-16 transition-colors">
+    <footer className="w-full bg-gradient-to-b from-slate-100 dark:from-slate-900 to-transparent mt-16">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* App Links */}
@@ -12,7 +12,7 @@ export function AppFooter() {
               <li>
                 <Link
                   href="/troves"
-                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors duration-150"
                 >
                   Explore Troves
                 </Link>
@@ -20,7 +20,7 @@ export function AppFooter() {
               <li>
                 <Link
                   href="/"
-                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors duration-150"
                 >
                   Home
                 </Link>
@@ -28,7 +28,7 @@ export function AppFooter() {
               <li>
                 <Link
                   href="/about"
-                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors duration-150"
                 >
                   About Rails
                 </Link>
@@ -36,7 +36,7 @@ export function AppFooter() {
               <li>
                 <Link
                   href="/how-it-works"
-                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors duration-150"
                 >
                   How It Works
                 </Link>
@@ -53,7 +53,7 @@ export function AppFooter() {
                   href="https://liquity.org"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors duration-150"
                 >
                   Liquity Protocol
                 </a>
@@ -63,7 +63,7 @@ export function AppFooter() {
                   href="https://docs.liquity.org"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors duration-150"
                 >
                   Liquity V2 Documentation
                 </a>
@@ -73,7 +73,7 @@ export function AppFooter() {
                   href="https://github.com/rails-finance"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm transition-colors duration-150"
                 >
                   GitHub
                 </a>
@@ -89,7 +89,7 @@ export function AppFooter() {
                 href="https://x.com/rails_finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors duration-150"
                 title="Follow Rails on X"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -100,7 +100,7 @@ export function AppFooter() {
                 href="https://www.youtube.com/@rails_finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors duration-150"
                 title="Rails Finance on YouTube"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -111,7 +111,7 @@ export function AppFooter() {
                 href="https://github.com/rails-finance"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors duration-150"
                 title="Rails on GitHub"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -122,7 +122,7 @@ export function AppFooter() {
             <p className="text-slate-600 dark:text-slate-500 text-xs">Support Rails development:</p>
             <a
               href="https://etherscan.io/name-lookup-search?id=donate.rails.eth"
-              className="text-green-600 dark:text-green-600 hover:text-green-700 dark:hover:text-green-300 text-xs font-semibold transition-colors"
+              className="text-fuchsia-600 dark:text-fuchsia-600 hover:text-fuchsia-700 dark:hover:text-fuchsia-600 text-sm font-bold transition-colors duration-150"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -140,13 +140,13 @@ export function AppFooter() {
             <div className="flex gap-4">
               <Link
                 href="/privacy"
-                className="text-slate-600 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 text-xs transition-colors"
+                className="text-slate-600 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 text-xs transition-colors duration-150"
               >
                 Privacy Policy
               </Link>
               <Link
                 href="/terms"
-                className="text-slate-600 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 text-xs transition-colors"
+                className="text-slate-600 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 text-xs transition-colors duration-150"
               >
                 Terms of Service
               </Link>

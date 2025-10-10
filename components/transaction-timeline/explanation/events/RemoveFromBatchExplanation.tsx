@@ -48,9 +48,8 @@ export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFrom
     </span>,
     <span key="debt" className="text-slate-500">
       Debt updated from{" "}
-      <HighlightableValue type="debt" state="before" value={exitBeforeDebt}>
         {formatCurrency(exitBeforeDebt, tx.assetType)}
-      </HighlightableValue>{" "}
+      {" "}
       to{" "}
       <HighlightableValue type="debt" state="after" value={exitAfterDebt}>
         {formatCurrency(exitAfterDebt, tx.assetType)}
@@ -65,9 +64,8 @@ export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFrom
     </span>,
     <span key="interestRate" className="text-slate-500">
       Interest rate changed from{" "}
-      <HighlightableValue type="interestRate" state="before" value={prevBatchRate}>
         {prevBatchRate}%
-      </HighlightableValue>{" "}
+      {" "}
       to{" "}
       <HighlightableValue type="interestRate" state="after" value={exitRate}>
         {exitRate}%

@@ -4,14 +4,16 @@ interface TransactionContentProps {
   children: ReactNode;
   isInBatch: boolean;
   isExpanded: boolean;
+  isBatchManager?: boolean;
 }
 
-export function TransactionContent({ children, isInBatch, isExpanded }: TransactionContentProps) {
+export function TransactionContent({ children, isInBatch, isExpanded, isBatchManager = false }: TransactionContentProps) {
   let containerClassName = "grow self-start mt-1.5 mt-2.5 rounded-md group transition-colors duration-150";
 
   if (isExpanded) {
     containerClassName += " bg-slate-50 dark:bg-slate-900 ";
-  } else {
+  } else if (!isBatchManager) {
+    // Only add hover effect for non-batch-manager transactions
     containerClassName += " hover:bg-slate-50/70 dark:hover:bg-slate-900/70";
   }
 

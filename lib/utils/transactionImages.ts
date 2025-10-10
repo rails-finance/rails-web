@@ -31,6 +31,9 @@ export type TransactionImageKey =
   | "transferTrove"
   | "joinBatch"
   | "exitBatch"
+  | "setBatchManagerAnnualInterestRate_increase"
+  | "setBatchManagerAnnualInterestRate_decrease"
+  | "lowerBatchManagerAnnualFee"
   | "default";
 
 // Get transaction image key based on transaction data
@@ -38,6 +41,13 @@ export function getTransactionImageKey(tx: Transaction): TransactionImageKey {
   // Check batch operations first (from batchUpdate.operation)
   if (tx.type === "trove" && tx.batchUpdate?.operation) {
     if (tx.batchUpdate.operation === "joinBatch") {
+      // Don't override if the main operation already handles the batch join
+      if (tx.operation === "openTrove") {
+        return "openTroveAndJoinBatch";
+      }
+      if (tx.operation === "openTroveAndJoinBatch") {
+        return "openTroveAndJoinBatch";
+      }
       return "joinBatch";
     }
     if (tx.batchUpdate.operation === "exitBatch") {
@@ -145,6 +155,16 @@ export function getTransactionImageKey(tx: Transaction): TransactionImageKey {
 
     case "transferTrove":
       return "transferTrove";
+
+    case "setBatchManagerAnnualInterestRate": {
+      const oldRate = tx.stateBefore?.annualInterestRate || 0;
+      const newRate = tx.batchUpdate.annualInterestRate;
+      const isIncrease = newRate > oldRate;
+      return isIncrease ? "setBatchManagerAnnualInterestRate_increase" : "setBatchManagerAnnualInterestRate_decrease";
+    }
+
+    case "lowerBatchManagerAnnualFee":
+      return "lowerBatchManagerAnnualFee";
 
     default:
       return "default";

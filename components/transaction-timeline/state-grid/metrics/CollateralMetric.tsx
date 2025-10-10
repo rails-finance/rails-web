@@ -30,7 +30,7 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
         {hasChange && (
           <>
             <div className="flex items-center space-x-1">
-              <span className="font-bold text-slate-400 dark:text-slate-600">{before}</span>
+              <span className="font-bold text-slate-400 dark:text-slate-600">{before.toFixed(4)}</span>
             </div>
             <TransitionArrow />
           </>
@@ -40,7 +40,7 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
         ) : (
           <div className="flex items-center">
             <span
-              className={`text-sm font-bold text-slate-600 milodon dark:text-slate-300 ${hoverEnabled ? "cursor-pointer" : ""} ${
+              className={`text-sm font-bold text-slate-600 dark:text-slate-300 ${hoverEnabled ? "cursor-pointer" : ""} ${
                 isAfterHighlighted
                   ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
                   : ""
@@ -50,7 +50,7 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
               }
               onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
             >
-              {after}
+              {after.toFixed(4)}
             </span>
             <span
               className={`text-xs flex font-bold items-center text-slate-300 dark:text-slate-600 border-l-2 border-r-2 ml-2 border-slate-300 dark:border-slate-600 rounded-sm px-1 py-0 ${

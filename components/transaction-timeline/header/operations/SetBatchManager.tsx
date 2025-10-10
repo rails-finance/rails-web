@@ -11,9 +11,9 @@ export function SetBatchManagerHeader({ tx }: { tx: TroveTransaction }) {
   const isBecomingDelegate = tx.batchUpdate?.operation === "registerBatchManager";
 
   return (
-    <div>
-      <div className="flex items-center flex-wrap gap-2">
-        <div className="flex items-center gap-1">
+    <>
+      <div className="grid grid-cols-[1fr_auto] gap-1 w-full items-start">
+        <div className="flex items-center gap-1 flex-wrap">
           <OperationBadge label="Delegate" color="none" />
           <InterestRateBadge
             rate={tx.stateAfter.annualInterestRate}
@@ -21,15 +21,15 @@ export function SetBatchManagerHeader({ tx }: { tx: TroveTransaction }) {
             isNewDelegate={isBecomingDelegate}
           />
           {managementFee > 0 && (
-            <div className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded text-slate-300 bg-slate-800 border border-slate-600">
+            <div className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded text-pink-500/75 dark:text-pink-300 bg-slate-50 dark:bg-slate-800 border border-pink-500/75">
               <span className="mx-1">+</span>
               {managementFee}
               <span className="ml-0.5">%</span>
             </div>
           )}
-          <span className="text-slate-300 font-medium">{batchManagerName}</span>
+          <span className="text-slate-400 font-bold">{batchManagerName}</span>
         </div>
       </div>
-    </div>
+    </>
   );
 }

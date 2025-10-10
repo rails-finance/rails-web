@@ -3,8 +3,6 @@ import { OperationBadge } from "../components/OperationBadge";
 import { AssetAction } from "../components/AssetAction";
 
 export function LiquidateHeader({ tx }: { tx: TroveLiquidationTransaction }) {
-  const { collChangeFromOperation, debtChangeFromOperation } = tx.troveOperation;
-
   // Determine if this is a beneficial liquidation (trove gains from redistribution)
   // vs destructive liquidation (this trove gets liquidated)
   const { collIncreaseFromRedist, debtIncreaseFromRedist } = tx.troveOperation;
@@ -35,6 +33,11 @@ export function LiquidateHeader({ tx }: { tx: TroveLiquidationTransaction }) {
   }
 
   // Destructive liquidation (this trove gets liquidated)
+  // Calculate total collateral and debt from systemLiquidation
+  const totalCollLiquidated =
+    tx.systemLiquidation.collSentToSP + tx.systemLiquidation.collRedistributed + tx.systemLiquidation.collSurplus;
+  const totalDebtCleared = tx.systemLiquidation.debtOffsetBySP + tx.systemLiquidation.debtRedistributed;
+
   return (
     <>
       <OperationBadge label="LIQUIDATION" color="red" />
@@ -42,14 +45,14 @@ export function LiquidateHeader({ tx }: { tx: TroveLiquidationTransaction }) {
         <AssetAction
           action="Liquidated"
           asset={tx.collateralType}
-          amount={Math.abs(collChangeFromOperation)}
+          amount={totalCollLiquidated}
           alwaysShowAmount
           valueType="collateral"
         />
         <AssetAction
           action="Cleared"
           asset={tx.assetType}
-          amount={Math.abs(debtChangeFromOperation)}
+          amount={totalDebtCleared}
           alwaysShowAmount
           valueType="debt"
         />

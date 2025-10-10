@@ -29,16 +29,16 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs">
-          <span className="inline-flex items-center text-slate-600 dark:text-slate-400">
-            <Icon name="arrow-left-right" size={12} />
-            <span className="ml-1">{trove.activity.transactionCount}</span>
-          </span>
           {trove.activity.redemptionCount > 0 && (
             <span className="inline-flex items-center text-orange-400">
               <Icon name="triangle" size={12} />
               <span className="ml-1">{trove.activity.redemptionCount}</span>
             </span>
           )}
+          <span className="inline-flex items-center text-slate-600 dark:text-slate-400">
+            <Icon name="arrow-left-right" size={12} />
+            <span className="ml-1">{trove.activity.transactionCount - trove.activity.redemptionCount}</span>
+          </span>
         </div>
       </div>
 
@@ -50,7 +50,7 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
           <div>
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Peak Debt</p>
             <div className="flex items-center">
-              <h3 className="text-2xl md:text-3xl font-bold text-slate-600 dark:text-slate-200">
+              <h3 className="text-xl lg:text-3xl font-bold text-slate-600 dark:text-slate-200">
                 {formatPrice(trove.debt.peak)}
               </h3>
               <span className="ml-2 text-green-600">

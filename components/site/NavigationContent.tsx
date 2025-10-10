@@ -14,26 +14,34 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
     {
       href: "/",
       label: "Home",
-      icon: <Home size={20} />,
+      icon: <Home size={16} />,
       iconBg: "bg-green-600",
+      activeColor: "text-green-600 dark:text-green-600",
+      hoverColor: "hover:text-green-600 dark:hover:text-green-600",
     },
     {
       href: "/about",
       label: "About",
-      icon: <Users size={20} />,
+      icon: <Users size={16} />,
       iconBg: "bg-blue-600",
+      activeColor: "text-blue-600 dark:text-blue-600",
+      hoverColor: "hover:text-blue-600 dark:hover:text-blue-600",
     },
     {
       href: "/how-it-works",
       label: "How It Works",
-      icon: <BookOpen size={20} />,
+      icon: <BookOpen size={16} />,
       iconBg: "bg-purple-600",
+      activeColor: "text-purple-600 dark:text-purple-600",
+      hoverColor: "hover:text-purple-600 dark:hover:text-purple-600",
     },
     {
       href: "/troves",
       label: "Explore Troves",
-      icon: <Search size={20} />,
+      icon: <Search size={16} />,
       iconBg: "bg-indigo-600",
+      activeColor: "text-indigo-600 dark:text-indigo-600",
+      hoverColor: "hover:text-indigo-600 dark:hover:text-indigo-600",
     },
   ];
 
@@ -48,12 +56,12 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
               href={item.href}
               className={`flex items-center gap-3 text-lg font-medium py-2 transition-colors ${
                 isActive
-                  ? "text-green-600 dark:text-green-600 pointer-events-none"
-                  : "text-slate-600 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-600"
+                  ? `${item.activeColor} pointer-events-none`
+                  : `text-slate-600 dark:text-slate-300 ${item.hoverColor}`
               }`}
               onClick={isActive ? undefined : onLinkClick}
             >
-              <div className={`flex ${item.iconBg} text-white p-2 rounded ${isActive ? "opacity-60" : ""}`}>
+              <div className={`flex ${item.iconBg} text-white p-1.5 rounded`}>
                 {item.icon}
               </div>
               <span>{item.label}</span>
@@ -76,21 +84,10 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
         <div className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3">Connect With Us</div>
         <div className="flex items-center gap-4">
           <a
-            href="https://t.me/rails_finance"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
-            title="Join Rails on Telegram"
-          >
-            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
-            </svg>
-          </a>
-          <a
             href="https://x.com/rails_finance"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
+            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors duration-150"
             title="Follow Rails on X"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
@@ -101,7 +98,7 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
             href="https://www.youtube.com/@rails_finance"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
+            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors duration-150"
             title="Rails Finance on YouTube"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
@@ -112,7 +109,7 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
             href="https://github.com/rails-finance"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors"
+            className="text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-600 transition-colors duration-150"
             title="Rails Finance on GitHub"
           >
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">

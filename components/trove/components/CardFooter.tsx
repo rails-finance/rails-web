@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
 import { Image, Link2 } from "lucide-react";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
@@ -31,14 +32,19 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
               <span className="bg-slate-100 dark:bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
                 <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                   <Icon name="user" size={12} />
-                  <HighlightableValue
-                    type="ownerAddress"
-                    state="after"
-                    className="text-slate-600 dark:text-slate-400"
-                    variant="card"
+                  <Link
+                    href={`/troves?ownerAddress=${trove.owner}`}
+                    className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
                   >
-                    {trove.ownerEns || `${trove.owner.substring(0, 6)}...${trove.owner.substring(38)}`}
-                  </HighlightableValue>
+                    <HighlightableValue
+                      type="ownerAddress"
+                      state="after"
+                      className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                      variant="card"
+                    >
+                      {trove.ownerEns || `${trove.owner.substring(0, 6)}...${trove.owner.substring(38)}`}
+                    </HighlightableValue>
+                  </Link>
                   <div className="relative inline-block group">
                     <button
                       className="mx-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
@@ -116,7 +122,7 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
                   href={getTroveNftUrl(trove.collateralType, trove.id)!}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 justify-center ml-0.5 transition-colors"
+                  className="inline-flex items-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 justify-center ml-0.5 transition-colors duration-150"
                   aria-label="View NFT on OpenSea"
                 >
                   <HighlightableValue
@@ -129,7 +135,7 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
                   </HighlightableValue>
                   <Link2
                     size={14}
-                    className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-200 dark:bg-slate-800 w-4 h-4 rounded-full transition-colors"
+                    className="-rotate-45 inline-flex items-center justify-center ml-0.5 bg-slate-200 dark:bg-slate-800 w-4 h-4 rounded-full transition-colors duration-150"
                   />
                 </a>
               </span>

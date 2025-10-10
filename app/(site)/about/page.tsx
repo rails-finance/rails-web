@@ -1,4 +1,17 @@
 import { LiquityLogo } from "@/components/LiquityLogo";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "About Rails",
+  description:
+    "Learn about Rails and our mission to make DeFi more understandable and accessible for everyone. Building essential self-service support infrastructure for DeFi users, starting with Liquity V2.",
+  openGraph: {
+    title: "About Rails",
+    description:
+      "Learn about Rails and our mission to provide self-service support that makes DeFi more understandable and accessible for everyone.",
+    url: "https://rails.finance/about",
+  },
+};
 
 export default function AboutPage() {
   return (
@@ -7,8 +20,8 @@ export default function AboutPage() {
         <p className="text-xl mb-8 text-slate-800 dark:text-slate-200">
           We believe that decentralised finance (DeFi) represents the future of finance, but it's currently too complex
           for most users to understand and navigate safely. <span className="font-bold">Rails</span> bridges this gap by
-          providing clear, intuitive explanations of DeFi transactions and protocol events, keeping users informed about
-          their DeFi activity.
+          providing clear, intuitive explanations of DeFi transactions and protocol events, empowering users with
+          self-service support that keeps them informed and confident in their DeFi activity.
         </p>
 
         {/* Roadmap & Mission Section */}
@@ -48,7 +61,7 @@ export default function AboutPage() {
                   </div>
                   <h4 className="text-lg font-semibold text-slate-600 dark:text-slate-300">Liquity V2 Support</h4>
                 </div>
-                <span className="text-xs font-extrabold text-green-100 bg-green-600 px-2 py-1 rounded-full">
+                <span className="text-xs font-extrabold text-green-100 bg-green-600 px-2 py-1 rounded">
                   Completed
                 </span>
               </div>
@@ -67,7 +80,7 @@ export default function AboutPage() {
                   </div>
                   <h4 className="text-lg font-semibold text-slate-600 dark:text-slate-300">Ecosystem Expansion</h4>
                 </div>
-                <span className="text-xs font-extrabold text-blue-100 bg-blue-600 px-2 py-1 rounded-full">
+                <span className="text-xs font-extrabold text-blue-100 bg-blue-600 px-2 py-1 rounded">
                   In Progress
                 </span>
               </div>
@@ -88,7 +101,7 @@ export default function AboutPage() {
                     Multi-Protocol Intelligence
                   </h4>
                 </div>
-                <span className="text-xs font-extrabold text-slate-100 bg-slate-400 px-2 py-1 rounded-full">
+                <span className="text-xs font-extrabold text-slate-100 bg-slate-400 px-2 py-1 rounded">
                   Planned
                 </span>
               </div>
@@ -107,7 +120,7 @@ export default function AboutPage() {
                   </div>
                   <h4 className="text-lg font-semibold text-slate-600 dark:text-slate-300">Modularisation</h4>
                 </div>
-                <span className="text-xs font-extrabold text-slate-100 bg-slate-400 px-2 py-1 rounded-full">
+                <span className="text-xs font-extrabold text-slate-100 bg-slate-400 px-2 py-1 rounded">
                   Planned
                 </span>
               </div>
@@ -140,11 +153,11 @@ export default function AboutPage() {
               <div className="flex items-center mb-4">
                 <img
                   src="/about-team-milesessex.jpg"
-                  alt="Miles Essex"
+                  alt="Miles"
                   className="w-16 h-16 rounded-full mr-4 object-cover"
                 />
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300">Miles Essex</h3>
+                  <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300">Miles</h3>
                   <p className="text-slate-600 dark:text-slate-400">Designer</p>
                   <a
                     href="https://x.com/milesessex"
@@ -198,15 +211,12 @@ export default function AboutPage() {
                   </a>
                 </div>
                 <p className="text-slate-700 dark:text-slate-300 mb-3">
-                  Liquity has been instrumental in getting Rails off the ground, providing a 20,000 BOLD grant to
+                  Liquity has been instrumental in getting Rails off the ground, providing a grant to
                   kickstart our development. Their support enables us to build critical infrastructure for the Liquity
                   ecosystem and beyond. Thank you to Liquity!
                 </p>
               </div>
-              <div className="ml-6 flex flex-col items-center rounded-xl bg-green-600 p-8">
-                <div className="text-3xl font-bold text-green-50 mb-1 drop-shadow">20K</div>
-                <div className="text-sm font-extrabold text-slate-100  drop-shadow">BOLD Grant</div>
-              </div>
+              
             </div>
           </div>
         </div>

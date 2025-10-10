@@ -7,12 +7,11 @@ import { LiquidatedListingCard } from "./LiquidatedListingCard";
 
 interface TroveListingCardProps {
   trove: TroveSummary;
-  collateralAtLiquidation?: number;
 }
 
-export function TroveListingCard({ trove, collateralAtLiquidation }: TroveListingCardProps) {
+export function TroveListingCard({ trove }: TroveListingCardProps) {
   if (trove.status === "liquidated") {
-    return <LiquidatedListingCard trove={trove} collateralAtLiquidation={collateralAtLiquidation} />;
+    return <LiquidatedListingCard trove={trove} />;
   }
 
   if (trove.status === "open") {

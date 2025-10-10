@@ -10,6 +10,7 @@ export type ValueType =
   | "collateral"
   | "collateralUsd"
   | "collateralPrice"
+  | "redemptionPrice"
   | "currentPrice"
   | "interestRate"
   | "dailyInterest"

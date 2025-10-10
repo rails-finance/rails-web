@@ -1,3 +1,21 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+  description:
+    "Rails Privacy Policy. Learn how we handle data and protect your privacy when using the Rails DeFi analytics platform.",
+  openGraph: {
+    title: "Privacy Policy | Rails",
+    description:
+      "Rails Privacy Policy. Learn how we handle data and protect your privacy.",
+    url: "https://rails.finance/privacy",
+  },
+  robots: {
+    index: true,
+    follow: false,
+  },
+};
+
 export default function PrivacyPage() {
   return (
     <div className="container mx-auto md:px-6 px-4 pt-32 pb-12 max-w-7xl">
@@ -24,10 +42,10 @@ export default function PrivacyPage() {
 
           <h3 className="text-xl font-semibold text-slate-600 dark:text-slate-300 mb-3">Blockchain Data</h3>
           <ul className="list-disc pl-6 mb-4 text-slate-700 dark:text-slate-300">
-            <li>Wallet addresses and ENS names you search for</li>
-            <li>Trove IDs and transaction hashes you view</li>
+            <li>Publicly available wallet addresses and ENS names you search for</li>
+            <li>Publicly available Trove IDs and transaction hashes you view</li>
             <li>Publicly available transaction history from the Ethereum blockchain</li>
-            <li>Liquity V2 protocol interactions and events</li>
+            <li>Publicly available Liquity V2 protocol interactions and events</li>
           </ul>
           <p className="text-slate-700 dark:text-slate-300 mb-4">
             All blockchain data we display is publicly available on the Ethereum network. We do not have access to your

@@ -13,7 +13,9 @@ export function Header() {
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isSmallScreen = window.innerWidth < 768;
+      setIsMobile(isTouchDevice || isSmallScreen);
     };
 
     checkMobile();
@@ -57,6 +59,7 @@ export function Header() {
                 <use href="#icon-liquity" />
               </svg>
               <h1 className="text-xs font-semibold text-slate-700 dark:text-white">Liquity V2 Trove Explorer</h1>
+              
             </div>
           </div>
 
@@ -66,7 +69,7 @@ export function Header() {
               <button
                 onClick={isMobile ? toggleMenu : undefined}
                 onMouseEnter={handleMouseEnter}
-                className="p-3 cursor-pointer rounded-lg transition-colors"
+                className="p-3 cursor-pointer rounded-lg transition-colors duration-150"
                 aria-label="Toggle menu"
               >
                 {/* Custom Hamburger Icon */}
@@ -130,8 +133,8 @@ export function Header() {
             {/* Modal Header */}
             <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
+                  <svg className="w-4 h-4" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                     <use href="#icon-rails" />
                   </svg>
                 </div>
@@ -139,7 +142,8 @@ export function Header() {
               </div>
               <button
                 onClick={toggleMenu}
-                className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-150 cursor-pointer touch-manipulation"
+                aria-label="Close menu"
               >
                 {/* X Icon */}
                 <div className="w-6 h-5 relative flex flex-col justify-center">
@@ -157,6 +161,11 @@ export function Header() {
           </div>
         </div>
       )}
+
+      {/* Fixed Alpha Label */}
+      <div className="fixed bottom-0 left-0 bg-orange-500 dark:bg-orange-600 text-shadow text-white text-xs font-bold px-8 py-1 rotate-45 -translate-x-6 -translate-y-4 shadow-md z-50">
+        Alpha V2
+      </div>
     </>
   );
 }

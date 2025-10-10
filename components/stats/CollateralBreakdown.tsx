@@ -26,10 +26,14 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[1, 2, 3].map((i) => (
           <div key={i} className="bg-white dark:bg-slate-900 rounded-lg p-6 animate-pulse">
-            <div className="h-12 bg-slate-200 rounded mb-4" />
+            <div className="h-14 bg-slate-200 dark:bg-slate-800 rounded mb-4" />
             <div className="space-y-2">
-              <div className="h-6 bg-slate-100 rounded w-3/4" />
-              <div className="h-4 bg-slate-100 rounded w-1/2" />
+              <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-[3ch]" />
+              <div className="h-7 bg-slate-100 dark:bg-slate-800 rounded w-1/4 mb-5" />
+              <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-1/6" />
+              <div className="h-6 bg-slate-100 dark:bg-slate-800 rounded w-1/4 mb-6" />
+
+              <div className="h-6 bg-slate-100 dark:bg-slate-800 rounded-full w-1/4" />
             </div>
           </div>
         ))}
@@ -37,8 +41,22 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
     );
   }
 
-  const sortedData = Object.entries(data).sort(([, a], [, b]) => {
-    return b.totalCollateralUsd - a.totalCollateralUsd;
+  const collateralOrder = ["WETH", "wstETH", "rETH"];
+
+  const sortedData = Object.entries(data).sort(([keyA], [keyB]) => {
+    const indexA = collateralOrder.indexOf(keyA);
+    const indexB = collateralOrder.indexOf(keyB);
+
+    // If both are in the order array, sort by their position
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB;
+    }
+    // If only keyA is in the order array, it comes first
+    if (indexA !== -1) return -1;
+    // If only keyB is in the order array, it comes first
+    if (indexB !== -1) return 1;
+    // If neither is in the order array, maintain original order
+    return 0;
   });
 
   return (
@@ -51,8 +69,8 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
         >
           <div className="flex items-center gap-3 mb-4">
             <div className="flex items-center">
-              <TokenIcon assetSymbol={collateralType.toLowerCase()} className="w-12 h-12 z-1" />
-              <TokenIcon assetSymbol="bold" className="w-12 h-12 -ml-1.5" />
+              <TokenIcon assetSymbol={collateralType.toLowerCase()} className="lg:w-12 lg:h-12 w-10 h-10 z-1" />
+              <TokenIcon assetSymbol="bold" className="lg:w-12 lg:h-12 w-10 h-10 -ml-1.5" />
             </div>
             <div>
               <div>
@@ -69,10 +87,10 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
           <div className="space-y-3">
             <div>
               <div className="mb-1">
-                <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">TVL</span>
+                <span className="text-xs font-bold text-slate-400 dark:text-slate-600">TVL</span>
               </div>
               <div>
-                <span className="text-2xl font-bold text-slate-600 milodon dark:text-slate-300">
+                <span className="text-2xl font-bold text-slate-600 dark:text-slate-300">
                   ${formatNumber(stats.totalCollateralUsd)}
                 </span>
               </div>
@@ -80,20 +98,20 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
             <div className="flex justify-between items-center">
               <div>
                 <div className="mb-1">
-                  <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Total Debt</span>
+                  <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Total Debt</span>
                 </div>
                 <div>
-                  <span className="text-lg font-bold text-slate-600 milodon dark:text-slate-300">
+                  <span className="text-lg font-bold text-slate-600 dark:text-slate-300">
                     ${formatNumber(stats.totalDebt)}
                   </span>
                 </div>
               </div>
               <div>
                 <div className="mb-1">
-                  <span className="text-xs font-bold text-slate-400 milodon dark:text-slate-600">Active Troves</span>
+                  <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Active Troves</span>
                 </div>
                 <div>
-                  <span className="text-lg font-bold text-slate-600 milodon dark:text-slate-300">
+                  <span className="text-lg font-bold text-slate-600 dark:text-slate-300">
                     {stats.openTroveCount.toLocaleString()}
                   </span>
                 </div>

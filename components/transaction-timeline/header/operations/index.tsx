@@ -1,4 +1,5 @@
 import {
+  isBatchManagerOperation,
   isLiquidationTransaction,
   isRedemptionTransaction,
   isTransferTransaction,
@@ -15,6 +16,7 @@ import { InterestRateAdjustHeader } from "./InterestRateAdjust";
 import { ApplyPendingDebtHeader } from "./ApplyPendingDebt";
 import { OpenTroveAndJoinBatchHeader } from "./OpenTroveAndJoinBatch";
 import { TransferTroveHeader } from "./TransferTrove";
+import { BatchManagerInterestRateUpdateHeader } from "./BatchManagerInterestRateUpdate";
 
 export function HeaderContent({ tx }: { tx: Transaction }) {
   switch (tx.operation) {
@@ -49,6 +51,20 @@ export function HeaderContent({ tx }: { tx: Transaction }) {
     case "removeFromBatch":
       return <RemoveFromBatchHeader tx={tx} />;
 
+    case "setBatchManagerAnnualInterestRate":
+      return isBatchManagerOperation(tx) ? (
+        <BatchManagerInterestRateUpdateHeader tx={tx} />
+      ) : (
+        <DefaultHeader tx={tx} />
+      );
+
+    case "lowerBatchManagerAnnualFee":
+      return isBatchManagerOperation(tx) ? (
+        <BatchManagerInterestRateUpdateHeader tx={tx} />
+      ) : (
+        <DefaultHeader tx={tx} />
+      );
+
     case "transferTrove":
       return isTransferTransaction(tx) ? <TransferTroveHeader tx={tx} /> : <DefaultHeader tx={tx} />;
 
@@ -71,6 +87,8 @@ function getOperationLabel(operation: string): string {
     transferTrove: "Transfer",
     setInterestBatchManager: "Delegate",
     removeFromBatch: "Leave Delegate",
+    setBatchManagerAnnualInterestRate: "Delegate Rate Change",
+    lowerBatchManagerAnnualFee: "Delegate Fee Reduction",
   };
   return labels[operation] || operation;
 }

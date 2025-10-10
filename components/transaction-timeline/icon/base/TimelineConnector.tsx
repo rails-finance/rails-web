@@ -14,11 +14,15 @@ export function TimelineConnector({ type, show, operation = "", isMultiStep = fa
   // Determine connector style based on operation
   const isDelegatedInterestRateAdjust =
     operation === "adjustTroveInterestRate" && tx && "isInBatch" in tx && tx.isInBatch;
+  const isBatchManagerOperation =
+    operation === "setBatchManagerAnnualInterestRate" ||
+    operation === "lowerBatchManagerAnnualFee";
   const isDashed =
     operation === "liquidate" ||
     operation === "redeemCollateral" ||
     operation === "applyPendingDebt" ||
-    isDelegatedInterestRateAdjust;
+    isDelegatedInterestRateAdjust ||
+    isBatchManagerOperation;
 
   let connectorColor = "#45556C"; // default
 
@@ -39,6 +43,8 @@ export function TimelineConnector({ type, show, operation = "", isMultiStep = fa
       connectorColor = "#3B82F6"; // blue for batch manager operations
     } else if (isDelegatedInterestRateAdjust) {
       connectorColor = "#8B5CF6"; // purple for delegated operations
+    } else if (isBatchManagerOperation) {
+      connectorColor = "#64748B"; // slate for batch manager rate changes
     }
   }
 

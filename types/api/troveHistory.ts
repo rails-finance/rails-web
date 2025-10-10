@@ -194,6 +194,22 @@ export interface TroveTransferTransaction extends BaseTransaction {
   toAddress: string;
 }
 
+// Batch manager operation affecting all troves in batch
+export interface BatchManagerOperationTransaction extends BaseTransaction {
+  type: "batch_manager";
+  operation: BatchOperationType; // only setBatchManagerAnnualInterestRate and lowerBatchManagerAnnualFee.
+
+  // Batch details (what changed for the batch)
+  batchUpdate: {
+    operation: BatchOperationType;
+    batchDebt: number; // Total batch debt
+    batchColl: number; // Total batch collateral
+    annualInterestRate: number; // New rate for all troves in batch
+    annualManagementFee: number; // New fee for all troves in batch
+    totalDebtShares: number;
+  };
+}
+
 // ============================================
 // UNION AND RESPONSE TYPES
 // ============================================
@@ -203,7 +219,8 @@ export type Transaction =
   | TroveTransaction
   | TroveLiquidationTransaction
   | TroveRedemptionTransaction
-  | TroveTransferTransaction;
+  | TroveTransferTransaction
+  | BatchManagerOperationTransaction;
 
 // Timeline interface for API response
 export interface TransactionTimeline {
@@ -235,6 +252,10 @@ export function isRedemptionTransaction(tx: Transaction): tx is TroveRedemptionT
 
 export function isTransferTransaction(tx: Transaction): tx is TroveTransferTransaction {
   return tx.type === "transfer";
+}
+
+export function isBatchManagerOperation(tx: Transaction): tx is BatchManagerOperationTransaction {
+  return tx.type === "batch_manager";
 }
 
 // Helper type guard for checking if transaction has batch info

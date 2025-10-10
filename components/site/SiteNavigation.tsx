@@ -13,7 +13,9 @@ export function SiteNavigation() {
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isSmallScreen = window.innerWidth < 768;
+      setIsMobile(isTouchDevice || isSmallScreen);
     };
 
     checkMobile();
@@ -45,15 +47,15 @@ export function SiteNavigation() {
             {/* Logo with tagline */}
             <Link href="/" className="flex items-top space-x-3">
               <div className="bg-green-600 rounded-b-lg p-3 sm:p-5 w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
-                <svg className="w-10 h-10 sm:w-12 sm:h-12" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <svg className="w-8 h-8 sm:w-12 sm:h-12" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                   <use href="#icon-rails" />
                 </svg>
               </div>
               <div>
-                <h1 className="p-2 text-2xl/6 sm:text-3xl/8 font-extrabold tracking-tight">
-                  <span className="text-green-600 font-extrabold">Rails</span>
+                <h1 className="p-2 sm:p-2 leading-none">
+                  <span className="text-2xl sm:text-3xl dark:text-white text-slate-700 font-bold tracking-tight">Rails</span>
                   <br />
-                  <span className="text-slate-600 dark:text-slate-300 font-extrabold">DeFi Self-Service Support</span>
+                  <span className="text-md sm:text-xl tracking-tight text-slate-400 dark:text-slate-500 font-bold">DeFi Self&#8209;Service Support</span>
                 </h1>
               </div>
             </Link>
@@ -64,7 +66,7 @@ export function SiteNavigation() {
                 <button
                   onClick={isMobile ? toggleMenu : undefined}
                   onMouseEnter={handleMouseEnter}
-                  className="p-3 cursor-pointer rounded-lg transition-colors"
+                  className="p-3 cursor-pointer rounded-lg transition-colors duration-150"
                   aria-label="Toggle menu"
                 >
                   {/* Custom Hamburger Icon */}
@@ -129,7 +131,7 @@ export function SiteNavigation() {
             {/* Modal Header */}
             <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-green-600 rounded flex items-center justify-center">
                   <svg className="w-5 h-5" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                     <use href="#icon-rails" />
                   </svg>
@@ -138,7 +140,8 @@ export function SiteNavigation() {
               </div>
               <button
                 onClick={toggleMenu}
-                className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-150 cursor-pointer touch-manipulation"
+                aria-label="Close menu"
               >
                 {/* X Icon */}
                 <div className="w-6 h-5 relative flex flex-col justify-center">

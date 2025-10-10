@@ -29,7 +29,7 @@ export function TransactionTimeline({ timeline }: TransactionTimelineProps) {
       {isActive && (
         <div className="flex items-center">
           {/* Empty div to mimic hidden value columns on desktop */}
-          <div className="hidden md:flex w-24 shrink-0"></div>
+          <div className="hidden sm:flex w-24 shrink-0"></div>
 
           {/* Timeline position with pulsing dot */}
           <div className="w-20 h-4 shrink-0 flex justify-center items-center relative">
