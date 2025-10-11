@@ -51,7 +51,7 @@ export function ExpandedContent({ tx }: { tx: Transaction }) {
 
         {/* Collateral price - pulled to the right with negative margin */}
         {(collateralPrice || redemptionPrice) && (
-          <div className="flex justify-end -mr-4.5 sm:-mr-7">
+          <div className="flex justify-end -mr-4.5 sm:-mr-7 ml-auto">
             <div className="flex items-center gap-1 bg-slate-200 dark:bg-slate-700 shadow-b shadow-slate-900/50 rounded p-2">
               <TokenIcon
                 assetSymbol={transaction.collateralType}

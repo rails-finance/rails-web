@@ -6,6 +6,7 @@ import { StateTransition, TransitionArrow } from "../components/StateTransition"
 import { ClosedStateLabel } from "../components/ClosedStateLabel";
 import { useHover, shouldHighlight } from "../../context/HoverContext";
 import { formatUsdValue } from "@/lib/utils/format";
+import { HighlightableValue } from "../../explanation/HighlightableValue";
 
 interface CollateralMetricProps {
   collateralType: string;
@@ -13,12 +14,14 @@ interface CollateralMetricProps {
   after: number;
   afterInUsd: number;
   isCloseTrove: boolean;
+  collSurplus?: number;
 }
 
-export function CollateralMetric({ collateralType, before, after, afterInUsd, isCloseTrove }: CollateralMetricProps) {
+export function CollateralMetric({ collateralType, before, after, afterInUsd, isCloseTrove, collSurplus }: CollateralMetricProps) {
   const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
   // For closeTrove, always show transition even if before is 0
   const hasChange = isCloseTrove ? before !== after : before != 0 && before !== after;
+  const hasSurplus = collSurplus !== undefined && collSurplus > 0;
 
   // Only highlight when hover is enabled
   const isAfterHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "collateral", "after");
@@ -50,28 +53,37 @@ export function CollateralMetric({ collateralType, before, after, afterInUsd, is
               }
               onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
             >
-              {after.toFixed(4)}
+              {after === 0 ? "0" : after.toFixed(4)}
             </span>
-            <span
-              className={`text-xs flex font-bold items-center text-slate-300 dark:text-slate-600 border-l-2 border-r-2 ml-2 border-slate-300 dark:border-slate-600 rounded-sm px-1 py-0 ${
-                hoverEnabled ? "cursor-pointer" : ""
-              } ${
-                isCollateralUsdHighlighted
-                  ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
-                  : ""
-              }`}
-              onMouseEnter={
-                hoverEnabled
-                  ? () => setHoveredValue({ type: "collateralUsd", state: "after", value: afterInUsd })
-                  : undefined
-              }
-              onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
-            >
-              {formatUsdValue(afterInUsd)}
-            </span>
+            {after > 0 && (
+              <span
+                className={`text-xs flex font-bold items-center text-slate-300 dark:text-slate-600 border-l-2 border-r-2 ml-2 border-slate-300 dark:border-slate-600 rounded-sm px-1 py-0 ${
+                  hoverEnabled ? "cursor-pointer" : ""
+                } ${
+                  isCollateralUsdHighlighted
+                    ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
+                    : ""
+                }`}
+                onMouseEnter={
+                  hoverEnabled
+                    ? () => setHoveredValue({ type: "collateralUsd", state: "after", value: afterInUsd })
+                    : undefined
+                }
+                onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
+              >
+                {formatUsdValue(afterInUsd)}
+              </span>
+            )}
           </div>
         )}
       </StateTransition>
+      {hasSurplus && (
+        <div className="mt-2 text-xs text-green-600 dark:text-green-400">
+          <HighlightableValue type="collSurplus" state="after" value={collSurplus!}>
+            {collSurplus!.toFixed(4)} {collateralType}
+          </HighlightableValue> surplus available to claim
+        </div>
+      )}
     </StateMetric>
   );
 }

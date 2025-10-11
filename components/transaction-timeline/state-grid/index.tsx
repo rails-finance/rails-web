@@ -87,6 +87,7 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
           after={stateAfter.coll}
           afterInUsd={stateAfter.collateralInUsd}
           isCloseTrove={isCloseTrove}
+          collSurplus={isLiquidation && tx.type === "liquidation" ? tx.systemLiquidation.collSurplus : undefined}
         />
 
         <InterestRateMetric before={beforeInterestRate} after={stateAfter.annualInterestRate} isCloseTrove={isCloseTrove} />

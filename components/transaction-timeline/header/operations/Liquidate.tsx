@@ -11,8 +11,8 @@ export function LiquidateHeader({ tx }: { tx: TroveLiquidationTransaction }) {
   if (isBeneficialLiquidation) {
     return (
       <>
-        <OperationBadge label="LIQUIDATION GAIN" color="green" />
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap">
+          <OperationBadge label="LIQUIDATION GAIN" color="green" />
           <AssetAction
             action="Received"
             asset={tx.collateralType}
@@ -40,14 +40,15 @@ export function LiquidateHeader({ tx }: { tx: TroveLiquidationTransaction }) {
 
   return (
     <>
-      <OperationBadge label="LIQUIDATION" color="red" />
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-wrap">
+        <OperationBadge label="LIQUIDATION" color="red" />
         <AssetAction
           action="Liquidated"
           asset={tx.collateralType}
           amount={totalCollLiquidated}
           alwaysShowAmount
-          valueType="collateral"
+          valueType="totalCollLiquidated"
+          valueState="change"
         />
         <AssetAction
           action="Cleared"
