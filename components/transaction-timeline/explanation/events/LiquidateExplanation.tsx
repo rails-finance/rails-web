@@ -1,11 +1,17 @@
 import React from "react";
-import { Transaction } from "@/types/api/troveHistory";
+import { Transaction, TroveLiquidationTransaction } from "@/types/api/troveHistory";
 import { HighlightableValue } from "../HighlightableValue";
 import { ExplanationPanel } from "../ExplanationPanel";
 import { InfoButton } from "../InfoButton";
 import { FAQ_URLS } from "../shared/faqUrls";
 import { formatCurrency, formatUsdValue } from "@/lib/utils/format";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
+import {
+  getLiquidationThreshold,
+  getMaxLTV,
+  getLiquidationClaimUrl,
+  getPerTroveLiquidationData,
+} from "@/lib/utils/liquidation-utils";
 import { ExternalLink } from "lucide-react";
 
 interface LiquidateExplanationProps {
@@ -14,23 +20,12 @@ interface LiquidateExplanationProps {
 }
 
 export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplanationProps) {
-  const tx = transaction as any;
+  const tx = transaction as TroveLiquidationTransaction;
 
   // Determine if this is a beneficial liquidation (trove gains from redistribution)
   // vs destructive liquidation (this trove gets liquidated)
   const { collIncreaseFromRedist, debtIncreaseFromRedist } = tx.troveOperation || {};
   const isBeneficialLiquidation = tx.stateAfter.debt > 0 && collIncreaseFromRedist > 0;
-
-  const liquidationBeforeCollRatio = tx.stateBefore?.collateralRatio;
-  const liquidationBeforeInterestRate = tx.stateBefore?.annualInterestRate || tx.stateAfter.annualInterestRate;
-
-  // For destructive liquidations, use systemLiquidation data
-  const totalCollLiquidated =
-    tx.systemLiquidation?.collSentToSP +
-    tx.systemLiquidation?.collRedistributed +
-    tx.systemLiquidation?.collSurplus;
-  const totalDebtCleared = tx.systemLiquidation?.debtOffsetBySP + tx.systemLiquidation?.debtRedistributed;
-  const liquidatedCollUsd = totalCollLiquidated * (tx.collateralPrice || 0);
 
   if (isBeneficialLiquidation) {
     // Beneficial liquidation - this trove gained from redistribution
@@ -57,7 +52,15 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
               <HighlightableValue type="collateral" state="after" value={collateralGained}>
                 {collateralGained} {tx.collateralType}
               </HighlightableValue>
-              {collateralGainedUsd > 0 ? ` (≈ ${formatUsdValue(collateralGainedUsd)})` : ""} from the liquidated trove
+              {collateralGainedUsd > 0 ? (
+                <>
+                  {" "}(≈{" "}
+                  <HighlightableValue type="collateralUsd" state="after" value={collateralGainedUsd}>
+                    {formatUsdValue(collateralGainedUsd)}
+                  </HighlightableValue>
+                  )
+                </>
+              ) : ""} from the liquidated trove
             </div>
           </div>
           <div className="flex items-start gap-2">
@@ -87,7 +90,10 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
           <div className="flex items-start gap-2">
             <span className="text-slate-600 dark:text-slate-400">•</span>
             <div className="text-slate-600">
-              Your collateral ratio improved from {tx.stateBefore?.collateralRatio}% to {tx.stateAfter.collateralRatio}%
+              Your collateral ratio improved from {tx.stateBefore?.collateralRatio}% to{" "}
+              <HighlightableValue type="collRatio" state="after" value={tx.stateAfter.collateralRatio}>
+                {tx.stateAfter.collateralRatio}%
+              </HighlightableValue>
             </div>
           </div>
           <div className="flex items-start gap-2">
@@ -166,147 +172,159 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
     );
   } else {
     // Destructive liquidation - this trove got liquidated
+    // ✅ Use accurate per-trove calculation
+    const liquidationData = getPerTroveLiquidationData(tx);
+    const liquidationThreshold = getLiquidationThreshold(tx.collateralType);
+
+    // Surplus is only claimable when liquidation went through Stability Pool
+    // In full redistribution, all collateral is redistributed (no claimable surplus)
+    const hasClaimableSurplus = liquidationData.collSurplus > 0 && !liquidationData.wasFullyRedistributed;
 
     // Left column: Transaction breakdown
     const transactionBreakdown = (
-      <div className="space-y-3">
-        <div className="font-semibold text-slate-900 dark:text-slate-200 text-sm">Event Details</div>
-        <div className="text-slate-900 dark:text-white space-y-2 text-sm/5.5">
-          <div className="flex items-start gap-2">
-            <span className="text-slate-600 dark:text-slate-400">•</span>
-            <div className="text-slate-500">
-              Trove was liquidated due to insufficient collateral ratio
+      <div className="space-y-4">
+        {/* Batch Liquidation Warning */}
+        {liquidationData.isBatchLiquidation && (
+          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-300 dark:border-blue-700 rounded-lg p-3">
+            <div className="font-semibold text-blue-900 dark:text-blue-200 text-sm mb-1">
+              ℹ️ Batch Liquidation Detected
+            </div>
+            <div className="text-blue-700 dark:text-blue-300 text-xs leading-relaxed">
+              This transaction liquidated multiple troves simultaneously. Values shown are calculated specifically for
+              your trove based on This position's state changes.
             </div>
           </div>
+        )}
+
+        
+
+        {/* Event Breakdown */}
+        <div className="space-y-3">
+          <div className="font-semibold text-slate-900 dark:text-slate-200 text-sm">Event Breakdown</div>
+          {/* Show debt cleared */}
+            <div className="flex items-start gap-2">
+              <span className="text-slate-600 dark:text-slate-400">•</span>
+              <div className="text-slate-500">
+                <HighlightableValue type="debt" state="change" value={liquidationData.debtCleared}>
+                  {formatCurrency(liquidationData.debtCleared, tx.assetType)}
+                </HighlightableValue>{" "}
+                debt cleared
+              </div>
+            </div>
+          {/* Show total collateral liquidated */}
           <div className="flex items-start gap-2">
             <span className="text-slate-600 dark:text-slate-400">•</span>
             <div className="text-slate-500">
-              Total of <HighlightableValue type="totalCollLiquidated" state="change" value={totalCollLiquidated}>
-                {formatCurrency(totalCollLiquidated, tx.collateralType)}
-              </HighlightableValue> collateral liquidated
+              Collateral liquidated{" "}
+              <HighlightableValue type="collateral" state="before" value={liquidationData.collLiquidated}>
+                {formatCurrency(liquidationData.collLiquidated, tx.collateralType)}
+              </HighlightableValue>
+              <span className="text-slate-400 dark:text-slate-500 ml-1">
+                (<HighlightableValue type="collateralUsd" state="before" value={liquidationData.totalCollValueAtLiquidation}>
+                  {formatUsdValue(liquidationData.totalCollValueAtLiquidation)}
+                </HighlightableValue> at liquidation price)
+              </span>
             </div>
           </div>
+            {/* Surplus - only shown when claimable (not in full redistribution) */}
+					{hasClaimableSurplus && (
+						<div className="flex items-start gap-2">
+							<span className="text-slate-600 dark:text-slate-400">•</span>
+							<div className="text-slate-500">
+								Claimable Surplus{' '}<HighlightableValue type="collSurplus" state="after" value={liquidationData.collSurplus}>
+									{formatCurrency(liquidationData.collSurplus, tx.collateralType)}
+								</HighlightableValue>{' '}(
+								{formatUsdValue(liquidationData.collSurplusValueUsd)} at liquidation price)
+								{liquidationData.surplusIsAmbiguous && (
+									<div className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-300 dark:border-yellow-700 rounded p-2 mt-2">
+										⚠️ This surplus value is estimated. Connect your wallet to the Liquity app to see your exact
+										claimable amount.
+									</div>
+								)}
+							</div>
+						</div>
+					)}
+          <div className="text-slate-900 dark:text-white space-y-2 text-sm/5.5">
+            {/* Show collateral distribution breakdown */}
+            {liquidationData.collToSP > 0 && (
+              <div className="flex items-start gap-2">
+                <span className="text-slate-600 dark:text-slate-400">•</span>
+                <div className="text-slate-500">
+                  {formatCurrency(liquidationData.collToSP, tx.collateralType)}  ({formatUsdValue(liquidationData.collToSPValueUsd)}) sent to Liquity V2 Stability Pool
+                  
+                  
+                  
+                </div>
+              </div>
+            )}
+            {liquidationData.collGasCompensation > 0 && (
+              <div className="flex items-start gap-2">
+                <span className="text-slate-600 dark:text-slate-400">•</span>
+                <div className="text-slate-500">
+                  {formatCurrency(liquidationData.collGasCompensation, tx.collateralType)} gas compensation to liquidator
+                </div>
+              </div>
+            )}
+            {liquidationData.wasRedistributed && (
+              <div className="flex items-start gap-2">
+                <span className="text-slate-600 dark:text-slate-400">•</span>
+                <div className="text-slate-500">
+                  <span className="text-yellow-600 dark:text-yellow-400">
+                    ⚠️ Partial redistribution occurred (Stability Pool was insufficient)
+                  </span>
+                </div>
+              </div>
+            )}
 
-          {/* Show collateral distribution breakdown if available */}
-          {tx.systemLiquidation && (
-            <>
-              {tx.systemLiquidation.collSentToSP > 0 && (
-                <div className="flex items-start gap-2">
-                  <span className="text-slate-600 dark:text-slate-400">•</span>
-                  <div className="text-slate-500">
-                    
-                      {formatCurrency(tx.systemLiquidation.collSentToSP, tx.collateralType)}
-                    {' '}collateral sent to Stability Pool
-                  </div>
-                </div>
-              )}
-              {tx.systemLiquidation.collRedistributed > 0 && (
-                <div className="flex items-start gap-2">
-                  <span className="text-slate-600 dark:text-slate-400">•</span>
-                  <div className="text-slate-500">
-                    <HighlightableValue type="collRedistributed" state="after" value={tx.systemLiquidation.collRedistributed}>
-                      {formatCurrency(tx.systemLiquidation.collRedistributed, tx.collateralType)}
-                    </HighlightableValue> collateral redistributed to other troves
-                  </div>
-                </div>
-              )}
-              {tx.systemLiquidation.collSurplus > 0 && (
-                <div className="flex items-start gap-2">
-                  <span className="text-slate-600 dark:text-slate-400">•</span>
-                  <div className="text-slate-500">
-                    <HighlightableValue type="collSurplus" state="after" value={tx.systemLiquidation.collSurplus}>
-                      {formatCurrency(tx.systemLiquidation.collSurplus, tx.collateralType)}
-                    </HighlightableValue> collateral surplus available for owner to claim
-                  </div>
-                </div>
-              )}
-
-              {/* Show debt distribution breakdown */}
-              {tx.systemLiquidation.debtOffsetBySP > 0 && (
-                <div className="flex items-start gap-2">
-                  <span className="text-slate-600 dark:text-slate-400">•</span>
-                  <div className="text-slate-500">
-                    <HighlightableValue type="debtOffsetBySP" state="after" value={tx.systemLiquidation.debtOffsetBySP}>
-                      {formatCurrency(tx.systemLiquidation.debtOffsetBySP, tx.assetType)}
-                    </HighlightableValue> debt offset by Stability Pool
-                  </div>
-                </div>
-              )}
-              {tx.systemLiquidation.debtRedistributed > 0 && (
-                <div className="flex items-start gap-2">
-                  <span className="text-slate-600 dark:text-slate-400">•</span>
-                  <div className="text-slate-500">
-                    <HighlightableValue type="debtRedistributed" state="after" value={tx.systemLiquidation.debtRedistributed}>
-                      {formatCurrency(tx.systemLiquidation.debtRedistributed, tx.assetType)}
-                    </HighlightableValue> debt redistributed to other troves
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Only show collateral ratio if it's a valid value (not 0) */}
-          {liquidationBeforeCollRatio !== undefined && liquidationBeforeCollRatio > 0 && (
+            {/* Show liquidation penalty */}
             <div className="flex items-start gap-2">
               <span className="text-slate-600 dark:text-slate-400">•</span>
               <div className="text-slate-500">
-                Collateral ratio had fallen to {liquidationBeforeCollRatio.toFixed(2)}% before liquidation
+                Liquidation penalty: {formatUsdValue(liquidationData.penaltyValueUsd)} (5% of debt)
               </div>
             </div>
-          )}
 
-          {/* Only show interest rate if it's a valid value (not 0) */}
-          {liquidationBeforeInterestRate !== undefined && liquidationBeforeInterestRate > 0 && (
-            <div className="flex items-start gap-2">
-              <span className="text-slate-600 dark:text-slate-400">•</span>
-              <div className="text-slate-500">
-                Interest rate was <HighlightableValue type="interestRate" state="before" value={liquidationBeforeInterestRate}>
-                  {liquidationBeforeInterestRate}%
-                </HighlightableValue> annual before liquidation
-              </div>
-            </div>
-          )}
-
-          {/* Add NFT burn explanation if NFT URL is available (only for destructive liquidations) */}
-          {getTroveNftUrl(tx.collateralType, tx.troveId) && (
-            <div className="flex items-start gap-2">
-              <span className="text-slate-600 dark:text-slate-400">•</span>
-              <div className="text-slate-500">
-                Trove NFT was sent to the burn address during liquidation
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-start gap-2">
-            <span className="text-slate-600 dark:text-slate-400">•</span>
-            <div className="text-slate-500">
-              Trove closed through liquidation
-            </div>
+            
           </div>
         </div>
+
+        {/* Additional Details */}
+        {getTroveNftUrl(tx.collateralType, tx.troveId) && (
+          <div className="space-y-2 text-sm/5.5">
+            <div className="flex items-start gap-2">
+              <span className="text-slate-600 dark:text-slate-400">•</span>
+              <div className="text-slate-500">Trove NFT was sent to the burn address during liquidation</div>
+            </div>
+          </div>
+        )}
       </div>
     );
 
-    // Determine thresholds and penalty based on collateral type
-    const isETH = tx.collateralType === "WETH" || tx.collateralType === "ETH";
-    const minCollRatio = isETH ? "110%" : "120%";
-    const maxLTV = isETH ? "90.91%" : "83.33%";
-    const maxPenalty = isETH ? "10% of debt (9.09% of collateral)" : "20% of debt (16.67% of collateral)";
-
     // Right column: How Liquidations Work
+    const maxLTV = getMaxLTV(tx.collateralType);
+    const maxPenalty = tx.collateralType === "WETH" || tx.collateralType === "ETH"
+      ? "10% of debt (9.09% of collateral)"
+      : "20% of debt (16.67% of collateral)";
+
+    // Tailor explanation based on what actually happened
+    let mechanismExplanation = "";
+    if (liquidationData.wasFullyAbsorbedBySP) {
+      mechanismExplanation = `This position was liquidated via the ${tx.collateralType} Stability Pool, which absorbed the debt and received your collateral (minus surplus and gas compensation).`;
+    } else if (liquidationData.wasFullyRedistributed) {
+      mechanismExplanation = `This position was liquidated via redistribution because the ${tx.collateralType} Stability Pool was empty. Your debt and collateral were redistributed proportionally to other active borrowers in the same market.`;
+    } else if (liquidationData.wasPartiallyRedistributed) {
+      mechanismExplanation = `This position was liquidated using a combination of the ${tx.collateralType} Stability Pool (partial absorption) and redistribution to other borrowers because the Stability Pool had insufficient BOLD.`;
+    }
+
     const howLiquidationsWork = (
       <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-sm">
         <div className="font-semibold text-slate-900 dark:text-slate-100 mb-1">How Liquidations Work</div>
         <div className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
-          Troves get liquidated when the collateral ratio falls below the minimum threshold ({minCollRatio} for {tx.collateralType},
-          equivalent to a maximum {maxLTV} LTV). The {tx.collateralType} Stability Pool absorbs liquidated debt and collateral
-          as the primary mechanism. If the Stability Pool is empty, Just-In-Time liquidations or redistribution across borrowers
-          in the same market handle liquidations as a last resort.
+          Troves get liquidated when the collateral ratio falls below the minimum threshold ({liquidationThreshold}% for {tx.collateralType},
+          equivalent to a maximum {maxLTV} LTV).
         </div>
         <div className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed mt-2">
-          A liquidated borrower typically incurs a 5% penalty and can claim remaining collateral. In redistribution cases,
-          the maximum loss is {maxPenalty}. Liquidators receive gas compensation: 0.0375 WETH + min(0.5% of trove collateral,
-          2 units of collateral).
+          {mechanismExplanation}
         </div>
         <div className="font-semibold text-slate-900 dark:text-slate-100 mb-1 mt-3">Learn More About Liquidations</div>
         <div className="mt-3 space-y-1.5">

@@ -3,6 +3,7 @@ import { DebtMetric } from "./metrics/DebtMetric";
 import { CollateralMetric } from "./metrics/CollateralMetric";
 import { InterestRateMetric } from "./metrics/InterestRateMetric";
 import { CollateralRatioMetric } from "./metrics/CollateralRatioMetric";
+import { getPerTroveLiquidationData } from "@/lib/utils/liquidation-utils";
 
 export function TransactionStateGrid({ tx }: { tx: Transaction }) {
   const { stateBefore, stateAfter, assetType, collateralType } = tx;
@@ -13,6 +14,12 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
 
   // Get upfront fee if available (only for trove transactions)
   const upfrontFee = isTroveTransaction(tx) ? tx.troveOperation.debtIncreaseFromUpfrontFee : undefined;
+
+  // Get liquidation data if this is a liquidation
+  const liquidationData = isLiquidation && tx.type === "liquidation" ? getPerTroveLiquidationData(tx) : undefined;
+
+  // Only pass surplus if it's claimable (not in full redistribution cases)
+  const claimableSurplus = liquidationData && !liquidationData.wasFullyRedistributed ? liquidationData.collSurplus : undefined;
 
   // For closeTrove and liquidate, stateBefore values are 0, so we need to calculate from operation data
   let beforeDebt = stateBefore.debt;
@@ -27,20 +34,13 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
     beforeCollInUsd = stateBefore.collateralInUsd;
   }
 
-  // For liquidations, calculate from systemLiquidation data
-  if (isLiquidation && tx.type === "liquidation") {
-    const totalCollLiquidated =
-      tx.systemLiquidation.collSentToSP + tx.systemLiquidation.collRedistributed + tx.systemLiquidation.collSurplus;
-    const totalDebtCleared = tx.systemLiquidation.debtOffsetBySP + tx.systemLiquidation.debtRedistributed;
-
-    beforeDebt = totalDebtCleared;
-    beforeColl = totalCollLiquidated;
-    beforeCollInUsd = totalCollLiquidated * (tx.collateralPrice || 0);
-
-    // Try to get the collateral ratio before liquidation
-    if (beforeCollInUsd > 0 && beforeDebt > 0) {
-      beforeCollRatio = (beforeCollInUsd / beforeDebt) * 100;
-    }
+  // For liquidations, use accurate per-trove data
+  if (liquidationData) {
+    beforeDebt = liquidationData.debtCleared;
+    beforeColl = liquidationData.collLiquidated;
+    // Use liquidation price (not current price) for accurate CR at time of liquidation
+    beforeCollInUsd = liquidationData.totalCollValueAtLiquidation;
+    beforeCollRatio = liquidationData.crAtLiquidation;
   }
 
   // For redemptions, calculate the before state from operation data when trove ends at zero debt
@@ -85,9 +85,11 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
           collateralType={collateralType}
           before={beforeColl}
           after={stateAfter.coll}
+          beforeInUsd={beforeCollInUsd}
           afterInUsd={stateAfter.collateralInUsd}
           isCloseTrove={isCloseTrove}
-          collSurplus={isLiquidation && tx.type === "liquidation" ? tx.systemLiquidation.collSurplus : undefined}
+          isLiquidation={isLiquidation}
+          collSurplus={claimableSurplus}
         />
 
         <InterestRateMetric before={beforeInterestRate} after={stateAfter.annualInterestRate} isCloseTrove={isCloseTrove} />

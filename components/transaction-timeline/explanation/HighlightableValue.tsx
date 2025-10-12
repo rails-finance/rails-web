@@ -23,8 +23,8 @@ export function HighlightableValue({
 }: HighlightableValueProps) {
   const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
 
-  // Skip hover interactions for 'before' states or when hover is disabled
-  const shouldEnableHover = hoverEnabled && state !== "before";
+  // Enable hover interactions when hover is enabled
+  const shouldEnableHover = hoverEnabled;
   const isHighlighted = shouldEnableHover && hoveredValue?.type === type && hoveredValue?.state === state;
 
   const Component = asBlock ? "div" : "span";
