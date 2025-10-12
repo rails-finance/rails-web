@@ -201,11 +201,22 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
         {/* Event Breakdown */}
         <div className="space-y-3">
           <div className="font-semibold text-slate-900 dark:text-slate-200 text-sm">Event Breakdown</div>
+          {/* Collateral ratio at liquidation */}
+          <div className="flex items-start gap-2">
+            <span className="text-slate-600 dark:text-slate-400">•</span>
+            <div className="text-slate-500">
+              Collateral ratio dropped to{" "}
+              <HighlightableValue type="collRatio" state="before" value={liquidationData.crAtLiquidation}>
+                  {liquidationData.crAtLiquidation.toFixed(2)}%
+              </HighlightableValue>
+              {" "}(below the {liquidationThreshold}% threshold for {tx.collateralType}){" "}triggering a liquidation
+            </div>
+          </div>
           {/* Show debt cleared */}
             <div className="flex items-start gap-2">
               <span className="text-slate-600 dark:text-slate-400">•</span>
               <div className="text-slate-500">
-                <HighlightableValue type="debt" state="change" value={liquidationData.debtCleared}>
+                <HighlightableValue type="debt" state="before" value={liquidationData.debtCleared}>
                   {formatCurrency(liquidationData.debtCleared, tx.assetType)}
                 </HighlightableValue>{" "}
                 debt cleared
@@ -222,7 +233,11 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
               <span className="text-slate-400 dark:text-slate-500 ml-1">
                 (<HighlightableValue type="collateralUsd" state="before" value={liquidationData.totalCollValueAtLiquidation}>
                   {formatUsdValue(liquidationData.totalCollValueAtLiquidation)}
-                </HighlightableValue> at liquidation price)
+                </HighlightableValue> at{" "}
+                <HighlightableValue type="currentPrice" state="after" value={liquidationData.liquidationPrice}>
+                  {formatUsdValue(liquidationData.liquidationPrice)}
+                </HighlightableValue>
+                )
               </span>
             </div>
           </div>
@@ -251,9 +266,6 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
                 <span className="text-slate-600 dark:text-slate-400">•</span>
                 <div className="text-slate-500">
                   {formatCurrency(liquidationData.collToSP, tx.collateralType)}  ({formatUsdValue(liquidationData.collToSPValueUsd)}) sent to Liquity V2 Stability Pool
-                  
-                  
-                  
                 </div>
               </div>
             )}

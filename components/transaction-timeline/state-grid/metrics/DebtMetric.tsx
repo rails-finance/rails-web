@@ -21,6 +21,7 @@ export function DebtMetric({ assetType, before, after, isCloseTrove, upfrontFee 
   const hasChange = isCloseTrove ? before !== after : before != 0 && before !== after;
 
   // Only highlight when hover is enabled
+  const isBeforeHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "debt", "before");
   const isAfterHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "debt", "after");
   const isFeeHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "upfrontFee", "fee");
   return (
@@ -29,7 +30,17 @@ export function DebtMetric({ assetType, before, after, isCloseTrove, upfrontFee 
         <StateTransition>
           {hasChange && (
             <>
-              <div className="font-bold text-slate-400 dark:text-slate-600">{toLocaleStringHelper(before)}</div>
+              <span
+                className={`font-bold text-slate-400 dark:text-slate-600 ${hoverEnabled ? "cursor-pointer" : ""} ${
+                  isBeforeHighlighted
+                    ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
+                    : ""
+                }`}
+                onMouseEnter={hoverEnabled ? () => setHoveredValue({ type: "debt", state: "before", value: before }) : undefined}
+                onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
+              >
+                {toLocaleStringHelper(before)}
+              </span>
               <TransitionArrow />
             </>
           )}

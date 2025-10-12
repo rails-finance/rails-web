@@ -65,6 +65,7 @@ export function LiquidateHeader({ tx }: { tx: TroveLiquidationTransaction }) {
           amount={liquidationData.debtCleared}
           alwaysShowAmount
           valueType="debt"
+          valueState="before"
         />
         {hasClaimableSurplus && (
           <div className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-xs font-medium">
