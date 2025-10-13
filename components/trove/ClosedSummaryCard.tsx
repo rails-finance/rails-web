@@ -150,19 +150,36 @@ function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
 
         {/* Content section with standard grid layout */}
         <div className="grid grid-cols-1 pt-2 p-4 gap-4">
-          {/* Main value */}
-          <div>
-            <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Debt at peak</span>
-            <div className="flex items-center">
-              <span className="text-3xl font-bold">
-                <HighlightableValue type="peakDebt" state="after" value={trove.debt.peak} variant="card">
-                  {formatPrice(trove.debt.peak)}
-                </HighlightableValue>
-              </span>
-              <span className="ml-2 text-green-600 text-lg">
-                <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
-              </span>
-              <span className="ml-2 text-slate-600 dark:text-slate-400 text-sm"></span>
+          {/* Main values grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 md:items-start">
+            {/* Highest recorded debt - spans 2 columns on mobile */}
+            <div className="col-span-2 md:col-span-1">
+              <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Highest recorded debt</span>
+              <div className="flex items-center">
+                <span className="text-3xl font-bold">
+                  <HighlightableValue type="peakDebt" state="after" value={trove.debt.peak} variant="card">
+                    {formatPrice(trove.debt.peak)}
+                  </HighlightableValue>
+                </span>
+                <span className="ml-2 text-green-600 text-lg">
+                  <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
+                </span>
+              </div>
+            </div>
+
+            {/* Highest recorded collateral - full width on mobile */}
+            <div className="col-span-2 md:col-span-1">
+              <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Highest recorded collateral</span>
+              <div className="flex items-center">
+                <span className="flex items-center">
+                  <span className="text-2xl font-bold mr-1">
+                    <HighlightableValue type="peakCollateral" state="after" value={trove.collateral.peakAmount} variant="card">
+                      {formatPrice(trove.collateral.peakAmount)}
+                    </HighlightableValue>
+                  </span>
+                  <TokenIcon assetSymbol={trove.collateralType} />
+                </span>
+              </div>
             </div>
           </div>
 

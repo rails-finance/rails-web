@@ -45,16 +45,29 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
       {/* Content section - single responsive structure */}
       <div className="pt-2 p-4 space-y-4">
         {/* Main content grid */}
-        <div className="grid grid-cols-1 gap-4 md:gap-6 md:items-end">
-          {/* Peak debt value */}
-          <div>
-            <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Peak Debt</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 md:items-start">
+          {/* Highest recorded debt - spans 2 columns on mobile */}
+          <div className="col-span-2 md:col-span-1">
+            <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Highest recorded debt</p>
             <div className="flex items-center">
               <h3 className="text-xl lg:text-3xl font-bold text-slate-600 dark:text-slate-200">
                 {formatPrice(trove.debt.peak)}
               </h3>
               <span className="ml-2 text-green-600">
                 <TokenIcon assetSymbol="BOLD" className="w-6 md:w-7 h-6 md:h-7 relative top-0" />
+              </span>
+            </div>
+          </div>
+
+          {/* Highest recorded collateral - full width on mobile */}
+          <div className="col-span-2 md:col-span-1">
+            <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Highest recorded collateral</p>
+            <div className="flex items-center">
+              <span className="flex items-center">
+                <p className="text-lg md:text-xl font-bold mr-1 text-slate-600 dark:text-slate-200">
+                  {trove.collateral.peakAmount}
+                </p>
+                <TokenIcon assetSymbol={trove.collateralType} />
               </span>
             </div>
           </div>
