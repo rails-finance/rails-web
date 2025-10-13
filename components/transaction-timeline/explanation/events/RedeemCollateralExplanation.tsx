@@ -143,9 +143,8 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
                 </div>
                 <div>
                   <span className="text-slate-600 dark:text-slate-400">Market price:</span>{" "}
-                  <HighlightableValue type="collateralPrice" state="after" value={marketPrice}>
-                    {formatUsdValue(marketPrice)}
-                  </HighlightableValue> / {tx.collateralType}
+                    <span className="text-slate-600 dark:text-white">{formatUsdValue(marketPrice)}</span>
+                  {' '}/ {tx.collateralType}
                 </div>
               </div>
               <div className="text-slate-600 dark:text-slate-400">

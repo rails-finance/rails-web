@@ -42,7 +42,7 @@ export function CollateralMetric({ collateralType, before, after, beforeInUsd, a
               <span
                 className={`font-bold text-slate-400 dark:text-slate-600 ${hoverEnabled ? "cursor-pointer" : ""} ${
                   isBeforeHighlighted
-                    ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
+                    ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-x-[5px] before:border-b-[5px] before:border-x-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
                     : ""
                 }`}
                 onMouseEnter={
@@ -58,7 +58,7 @@ export function CollateralMetric({ collateralType, before, after, beforeInUsd, a
                     hoverEnabled ? "cursor-pointer" : ""
                   } ${
                     isBeforeUsdHighlighted
-                      ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
+                      ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-x-[5px] before:border-b-[5px] before:border-x-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
                       : ""
                   }`}
                   onMouseEnter={
@@ -82,7 +82,7 @@ export function CollateralMetric({ collateralType, before, after, beforeInUsd, a
             <span
               className={`text-sm font-bold text-slate-600 dark:text-slate-300 ${hoverEnabled && !isLiquidation ? "cursor-pointer" : ""} ${
                 isAfterHighlighted && !isLiquidation
-                  ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 border-l-transparent border-r-transparent border-b-black dark:border-b-white before:animate-pulse'
+                  ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-x-[5px] before:border-b-[5px] before:border-x-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
                   : ""
               }`}
               onMouseEnter={
@@ -98,7 +98,7 @@ export function CollateralMetric({ collateralType, before, after, beforeInUsd, a
                   hoverEnabled && !isLiquidation ? "cursor-pointer" : ""
                 } ${
                   isCollateralUsdHighlighted && !isLiquidation
-                    ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
+                    ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-x-[5px] before:border-b-[5px] before:border-x-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
                     : ""
                 }`}
                 onMouseEnter={

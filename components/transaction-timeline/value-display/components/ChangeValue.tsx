@@ -26,7 +26,7 @@ export function ChangeValue({ amount, type }: ChangeValueProps) {
   return (
     <span className="min-h-8 flex items-center">
       <span
-        className={`text-sm font-bold text-slate-600 dark:text-slate-300 items-center cursor-pointer ${isHighlighted ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse' : ""}`}
+        className={`text-sm font-bold text-slate-600 dark:text-slate-300 items-center cursor-pointer ${isHighlighted ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-x-[5px] before:border-b-[5px] before:border-x-transparent before:border-b-black dark:before:border-b-white before:animate-pulse' : ""}`}
         onMouseEnter={() => setHoveredValue({ type, state: "change", value: amount })}
         onMouseLeave={() => setHoveredValue(null)}
       >
