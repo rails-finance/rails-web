@@ -51,7 +51,10 @@ export function getTransactionImageKey(tx: Transaction): TransactionImageKey {
       return "joinBatch";
     }
     if (tx.batchUpdate.operation === "exitBatch") {
-      return "exitBatch";
+      // Don't override if the main operation is closeTrove - use the closeTrove icon instead
+      if (tx.operation !== "closeTrove") {
+        return "exitBatch";
+      }
     }
   }
 

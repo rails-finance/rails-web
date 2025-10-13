@@ -17,16 +17,25 @@ export function CollateralRatioMetric({ before, after, afterDebt, isCloseTrove }
   const hasChange = before != 0 && before !== after;
 
   // Only highlight when hover is enabled
+  const isBeforeHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "collRatio", "before");
   const isAfterHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "collRatio", "after");
   return (
     <StateMetric label="Collateral Ratio">
       <StateTransition>
         {hasChange && (
           <>
-            <div className="font-bold text-slate-400 dark:text-slate-600">
-              {before.toFixed(1)}
+            <span
+              className={`font-bold text-slate-400 dark:text-slate-600 ${hoverEnabled ? "cursor-pointer" : ""} ${
+                isBeforeHighlighted
+                  ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
+                  : ""
+              }`}
+              onMouseEnter={hoverEnabled ? () => setHoveredValue({ type: "collRatio", state: "before", value: before }) : undefined}
+              onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
+            >
+              {before.toFixed(2)}
               <span className="ml-0.5">%</span>
-            </div>
+            </span>
             <TransitionArrow />
           </>
         )}
@@ -48,7 +57,7 @@ export function CollateralRatioMetric({ before, after, afterDebt, isCloseTrove }
               <span className="text-slate-500">N/A</span>
             ) : (
               <>
-                {after.toFixed(1)}
+                {after.toFixed(2)}
                 <span className="ml-0.5">%</span>
               </>
             )}

@@ -10,6 +10,7 @@ export function Header() {
   const [isHoverMenuOpen, setIsHoverMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isAlphaModalOpen, setIsAlphaModalOpen] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -23,6 +24,19 @@ export function Header() {
 
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsAlphaModalOpen(false);
+      }
+    };
+
+    if (isAlphaModalOpen) {
+      window.addEventListener("keydown", handleEscape);
+      return () => window.removeEventListener("keydown", handleEscape);
+    }
+  }, [isAlphaModalOpen]);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const handleMouseEnter = () => {
@@ -163,9 +177,72 @@ export function Header() {
       )}
 
       {/* Fixed Alpha Label */}
-      <div className="fixed bottom-0 left-0 bg-orange-500 dark:bg-orange-600 text-shadow text-white text-xs font-bold px-8 py-1 rotate-45 -translate-x-6 -translate-y-4 shadow-md z-50">
+      <button
+        onClick={() => setIsAlphaModalOpen(true)}
+        className="fixed bottom-0 left-0 bg-orange-500 dark:bg-orange-600 hover:bg-orange-600 dark:hover:bg-orange-700 text-shadow text-white text-xs font-bold px-8 py-1 rotate-45 -translate-x-6 -translate-y-4 shadow-md z-50 cursor-pointer transition-colors duration-150"
+        aria-label="View Alpha version information"
+      >
         Alpha V2
-      </div>
+      </button>
+
+      {/* Alpha Modal */}
+      {isAlphaModalOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setIsAlphaModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-slate-800 rounded-lg shadow-2xl border border-slate-200 dark:border-slate-700 max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-orange-500 dark:bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded">
+                  Alpha V2
+                </div>
+                <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                  Active Development
+                </h2>
+              </div>
+              <button
+                onClick={() => setIsAlphaModalOpen(false)}
+                className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors duration-150"
+                aria-label="Close modal"
+              >
+                <svg
+                  className="w-5 h-5 text-slate-600 dark:text-slate-300"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
+              <p>
+                Rails is actively being developed. Some calculated values and interpretations may be incomplete or inaccurate. Please verify critical information independently.
+              </p>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setIsAlphaModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-medium transition-colors duration-150"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

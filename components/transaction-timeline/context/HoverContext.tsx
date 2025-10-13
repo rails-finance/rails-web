@@ -28,7 +28,11 @@ export type ValueType =
   | "owner"
   | "ownerAddress"
   | "troveId"
-  | "nftToken";
+  | "nftToken"
+  | "collSurplus"
+  | "debtOffsetBySP"
+  | "collToSP"
+  | "collGasCompensation";
 export type ValueState = "before" | "after" | "change" | "fee";
 
 export interface HoveredValue {

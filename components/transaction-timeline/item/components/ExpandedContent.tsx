@@ -29,6 +29,11 @@ export function ExpandedContent({ tx }: { tx: Transaction }) {
 
   const collateralPrice = getCollateralPricePerUnit();
 
+  // Get liquidation price if this is a liquidation transaction
+  const liquidationPrice = isLiquidationTransaction(transaction)
+    ? transaction.systemLiquidation?.price
+    : null;
+
   // Get redemption price if this is a redemption transaction
   const redemptionPrice = isRedemptionTransaction(transaction)
     ? transaction.systemRedemption?.redemptionPrice
@@ -49,15 +54,26 @@ export function ExpandedContent({ tx }: { tx: Transaction }) {
       <div className="px-4 sm:px-6 pb-2 flex flex-wrap-reverse justify-between items-center gap-2">
         <TransactionLinks transaction={tx} />
 
-        {/* Collateral price - pulled to the right with negative margin */}
-        {(collateralPrice || redemptionPrice) && (
-          <div className="flex justify-end -mr-4.5 sm:-mr-7">
+        {/* Transaction-specific price - pulled to the right with negative margin */}
+        {/* Shows liquidation price (red), redemption price (orange), or collateral price (gray) */}
+        {(collateralPrice || redemptionPrice || liquidationPrice) && (
+          <div className="flex justify-end -mr-4.5 sm:-mr-7 ml-auto">
             <div className="flex items-center gap-1 bg-slate-200 dark:bg-slate-700 shadow-b shadow-slate-900/50 rounded p-2">
               <TokenIcon
                 assetSymbol={transaction.collateralType}
                 className="inline-block w-4 h-4 grayscale opacity-40 mr-0.5"
               />
-              {redemptionPrice && collateralPrice && Math.abs(redemptionPrice - collateralPrice) > 0.1 ? (
+              {liquidationPrice ? (
+                <HighlightableValue
+                  type="currentPrice"
+                  state="after"
+                  className="text-xs text-slate-500 font-bold"
+                  value={liquidationPrice}
+                  variant="card"
+                >
+                  {formatUsdValue(liquidationPrice)}
+                </HighlightableValue>
+              ) : redemptionPrice && collateralPrice && Math.abs(redemptionPrice - collateralPrice) > 0.1 ? (
                 <span className="text-xs flex items-center gap-1">
                   <HighlightableValue
                     type="redemptionPrice"
