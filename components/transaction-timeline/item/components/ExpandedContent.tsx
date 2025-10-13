@@ -84,16 +84,6 @@ export function ExpandedContent({ tx }: { tx: Transaction }) {
                   >
                     {formatUsdValue(redemptionPrice)}
                   </HighlightableValue>
-                  <span className="text-slate-400">/</span>
-                  <HighlightableValue
-                    type="collateralPrice"
-                    state="after"
-                    className="text-slate-500 font-bold"
-                    value={collateralPrice}
-                    variant="card"
-                  >
-                    {formatUsdValue(collateralPrice)}
-                  </HighlightableValue>
                 </span>
               ) : redemptionPrice ? (
                 <HighlightableValue
