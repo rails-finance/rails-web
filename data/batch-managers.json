@@ -93,7 +93,7 @@
     {
       "name": "ARM",
       "address": "0x8869a6fb59a8df330f90d9fbf46ebfaff6d4bc14",
-      "description": "wstETH Autonomous Interest Rate Manager",
+      "description": "wstETH Autonomous Rate Manager",
       "website": "https://www.liquity.org/blog/autonomous-interest-manager",
       "asset_symbol": "wstETH",
       "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045"
@@ -101,7 +101,7 @@
     {
       "name": "ARM",
       "address": "0xe507e4d0763851a6287238aadd243948d18ab60a",
-      "description": "ETH Autonomous Interest Rate Manager",
+      "description": "ETH Autonomous Rate Manager",
       "website": "https://www.liquity.org/blog/autonomous-interest-manager",
       "asset_symbol": "ETH ",
       "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
@@ -109,7 +109,7 @@
     {
       "name": "ARM",
       "address": "0x7700b2d305f47ae82e9598bab6d7ccb57299a82b",
-      "description": "rETH Autonomous Interest Rate Manager",
+      "description": "rETH Autonomous Rate Manager",
       "website": "https://www.liquity.org/blog/autonomous-interest-manager",
       "asset_symbol": "rETH",
       "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276"
