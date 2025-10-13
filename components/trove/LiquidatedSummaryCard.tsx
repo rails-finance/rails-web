@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import Link from "next/link";
 import { CardFooter } from "./components/CardFooter";
 import { formatDateRange, formatDuration } from "@/lib/date";
 import { Icon } from "@/components/icons/icon";
@@ -26,6 +27,10 @@ function LiquidatedTroveCardContent({ trove }: LiquidatedTroveCardProps) {
     ? `${trove.id.slice(0, 6)}...${trove.id.slice(-4)}`
     : trove.id;
 
+  // Calculate date values outside useMemo for use in both header and explanation
+  const duration = formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt);
+  const dateRange = formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt);
+
   // Create hover context items for liquidated trove
   const hoverContextItems = useMemo(() => {
     const items: React.ReactNode[] = [];
@@ -47,18 +52,52 @@ function LiquidatedTroveCardContent({ trove }: LiquidatedTroveCardProps) {
     );
 
     // Trove lifecycle
-    const duration = formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt);
 
     items.push(
       <span key="lifecycle" className="text-slate-500">
-        Trove was active for {duration} before liquidation from{" "}
-        {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
+        Trove was active for{" "}
+        <HighlightableValue type="duration" state="after">
+          {duration}
+        </HighlightableValue>{" "}
+        before liquidation from{" "}
+        <HighlightableValue type="dateRange" state="after">
+          {dateRange}
+        </HighlightableValue>
       </span>,
     );
 
-    // Add NFT information if NFT URL is available
+    // Add NFT and owner information
     const nftUrl = getTroveNftUrl(trove.collateralType, trove.id);
-    if (nftUrl) {
+    if (nftUrl && trove.lastOwner) {
+      const truncatedOwner = trove.ownerEns || `${trove.lastOwner.substring(0, 6)}...${trove.lastOwner.substring(38)}`;
+      items.push(
+        <span key="nft-info" className="text-slate-500">
+          The{" "}
+          <HighlightableValue type="nftToken" state="after">
+            NFT
+          </HighlightableValue>{" "}
+          representing trove{" "}
+          <HighlightableValue
+            type="troveId"
+            state="after"
+            value={trove.id ? parseInt(trove.id) : undefined}
+          >
+            {`${trove.id.substring(0, 8)}...`}
+          </HighlightableValue>{" "}
+          was held by{" "}
+          <Link
+            href={`/troves?ownerAddress=${trove.lastOwner}`}
+            className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+          >
+            <HighlightableValue type="ownerAddress" state="after">
+              {truncatedOwner}
+            </HighlightableValue>
+          </Link>{" "}
+          at the time of liquidation
+          <InfoButton href={FAQ_URLS.NFT_TROVES} />
+        </span>,
+      );
+    } else if (nftUrl) {
       items.push(
         <span key="nft-info" className="text-slate-500">
           Trove is represented by an ERC-721 NFT token for ownership verification
@@ -68,41 +107,47 @@ function LiquidatedTroveCardContent({ trove }: LiquidatedTroveCardProps) {
     }
 
     return items;
-  }, [trove, hoveredValue, liquidationThreshold, truncatedTroveId]);
+  }, [trove, hoveredValue, liquidationThreshold, truncatedTroveId, duration, dateRange]);
 
   return (
     <div>
       <div className="rounded-lg text-slate-600 dark:text-slate-500 bg-red-50 dark:bg-red-950  dark:border-red-900">
         {/* Header section */}
-        <div className="flex items-center justify-between p-4 pb-0">
+        <div className="grid grid-cols-[auto_1fr] gap-2 p-4 pb-0 items-start">
           <div className="flex items-center">
             {/* Status */}
             <span className="font-bold tracking-wider px-2 py-0.5 bg-red-700 text-white rounded-xs text-xs">LIQUIDATED</span>
           </div>
           {/* Metrics moved to the right */}
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-400">
-              {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
-            </span>
-            <span className="text-slate-400">
-              {formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt)}
-            </span>
-            {trove.activity.redemptionCount > 0 && (
-              <span className="inline-flex items-center text-orange-400">
-                <Icon name="triangle" size={12} />
-                <span className="ml-1">{trove.activity.redemptionCount}</span>
+          <div className="flex items-center gap-2 text-xs flex-wrap justify-end pt-0.5">
+            <HighlightableValue type="dateRange" state="after">
+              <span className="text-slate-400">
+                {formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt)}
               </span>
-            )}
-            <span className="inline-flex items-center text-slate-400">
-              <Icon name="arrow-left-right" size={12} />
-              <span className="ml-1">{trove.activity.transactionCount - trove.activity.redemptionCount}</span>
-            </span>
+            </HighlightableValue>
+            <div className="flex items-center gap-1">
+              <HighlightableValue type="duration" state="after">
+                <span className="text-slate-600 dark:text-slate-400 rounded-lg bg-red-200 dark:bg-black/25 px-2">
+                  {formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt)}
+                </span>
+              </HighlightableValue>
+              {trove.activity.redemptionCount > 0 && (
+                <span className="inline-flex items-center text-orange-400">
+                  <Icon name="triangle" size={12} />
+                  <span className="ml-1">{trove.activity.redemptionCount}</span>
+                </span>
+              )}
+              <span className="inline-flex items-center text-slate-400">
+                <Icon name="arrow-left-right" size={12} />
+                <span className="ml-1">{trove.activity.transactionCount - trove.activity.redemptionCount}</span>
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Content section */}
         <div className="p-4 pt-2">
-          <CardFooter trove={trove} />
+          <CardFooter trove={trove} isLiquidated={true} />
         </div>
       </div>
 

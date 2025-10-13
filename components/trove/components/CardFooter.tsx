@@ -12,11 +12,22 @@ interface TroveCardFooterProps {
   trove: TroveSummary;
   dateText?: string;
   showDetailedInfo?: boolean;
+  isLiquidated?: boolean;
 }
 
-export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCardFooterProps) {
+export function CardFooter({ trove, dateText, showDetailedInfo = true, isLiquidated = false }: TroveCardFooterProps) {
   const [copiedOwnerAddress, setCopiedOwnerAddress] = useState(false);
   const [copiedTrove, setCopiedTrove] = useState(false);
+
+  // Use lastOwner for liquidated troves, otherwise use owner
+  const displayOwner = trove.owner || trove.lastOwner;
+  const isLastOwner = !trove.owner && trove.lastOwner;
+
+  // Different background colors for liquidated vs active troves
+  const badgeBgClass = isLiquidated
+    ? "bg-red-100 dark:bg-black/25"
+    : "bg-slate-100 dark:bg-slate-800";
+
   return (
     <div className="text-xs">
       <div className="flex flex-col sm:flex-row sm:justify-between gap-2 sm:gap-0 sm:items-center">
@@ -28,12 +39,12 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
             </span>
           )}
           <div className="flex flex-wrap sm:flex-row gap-3">
-            {showDetailedInfo && trove.owner && (
-              <span className="bg-slate-100 dark:bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
+            {showDetailedInfo && displayOwner && (
+              <span className={`${badgeBgClass} rounded-sm px-1.5 py-1 inline-flex items-center`}>
                 <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                   <Icon name="user" size={12} />
                   <Link
-                    href={`/troves?ownerAddress=${trove.owner}`}
+                    href={`/troves?ownerAddress=${displayOwner}`}
                     className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
                   >
                     <HighlightableValue
@@ -42,7 +53,7 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
                       className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                       variant="card"
                     >
-                      {trove.ownerEns || `${trove.owner.substring(0, 6)}...${trove.owner.substring(38)}`}
+                      {trove.ownerEns || `${displayOwner.substring(0, 6)}...${displayOwner.substring(38)}`}
                     </HighlightableValue>
                   </Link>
                   <div className="relative inline-block group">
@@ -52,8 +63,8 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (trove.owner) {
-                          navigator.clipboard.writeText(trove.owner);
+                        if (displayOwner) {
+                          navigator.clipboard.writeText(displayOwner);
                           setCopiedOwnerAddress(true);
                           setTimeout(() => setCopiedOwnerAddress(false), 2000);
                         }
@@ -75,7 +86,7 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
               </span>
             )}
             {showDetailedInfo && (
-              <span className="bg-slate-100 dark:bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
+              <span className={`${badgeBgClass} rounded-sm px-1.5 py-1 inline-flex items-center`}>
                 <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
                   <Icon name="trove-id" size={12} />
                   <HighlightableValue
@@ -117,7 +128,7 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true }: TroveCa
               </span>
             )}
             {showDetailedInfo && getTroveNftUrl(trove.collateralType, trove.id) && (
-              <span className="bg-slate-100 dark:bg-slate-800 rounded-sm px-1.5 py-1 inline-flex items-center">
+              <span className={`${badgeBgClass} rounded-sm px-1.5 py-1 inline-flex items-center`}>
                 <a
                   href={getTroveNftUrl(trove.collateralType, trove.id)!}
                   target="_blank"

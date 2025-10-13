@@ -78,6 +78,7 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
           before={beforeDebt}
           after={stateAfter.debt}
           isCloseTrove={isCloseTrove}
+          isLiquidation={isLiquidation}
           upfrontFee={upfrontFee}
         />
 

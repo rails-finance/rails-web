@@ -54,7 +54,9 @@ export function CollateralMetric({ collateralType, before, after, beforeInUsd, a
               </span>
               {isLiquidation && beforeInUsd > 0 && (
                 <span
-                  className={`text-xs font-bold text-slate-300 dark:text-slate-600 ${hoverEnabled ? "cursor-pointer" : ""} ${
+                  className={`text-xs flex font-bold items-center text-slate-300 dark:text-slate-600 border-l-2 border-r-2 ml-2 border-slate-300 dark:border-slate-600 rounded-sm px-1 py-0 ${
+                    hoverEnabled ? "cursor-pointer" : ""
+                  } ${
                     isBeforeUsdHighlighted
                       ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
                       : ""
@@ -66,7 +68,7 @@ export function CollateralMetric({ collateralType, before, after, beforeInUsd, a
                   }
                   onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
                 >
-                  ({formatUsdValue(beforeInUsd)})
+                  {formatUsdValue(beforeInUsd)}
                 </span>
               )}
             </div>
@@ -78,33 +80,33 @@ export function CollateralMetric({ collateralType, before, after, beforeInUsd, a
         ) : (
           <div className="flex items-center">
             <span
-              className={`text-sm font-bold text-slate-600 dark:text-slate-300 ${hoverEnabled ? "cursor-pointer" : ""} ${
-                isAfterHighlighted
-                  ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
+              className={`text-sm font-bold text-slate-600 dark:text-slate-300 ${hoverEnabled && !isLiquidation ? "cursor-pointer" : ""} ${
+                isAfterHighlighted && !isLiquidation
+                  ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 border-l-transparent border-r-transparent border-b-black dark:border-b-white before:animate-pulse'
                   : ""
               }`}
               onMouseEnter={
-                hoverEnabled ? () => setHoveredValue({ type: "collateral", state: "after", value: after }) : undefined
+                hoverEnabled && !isLiquidation ? () => setHoveredValue({ type: "collateral", state: "after", value: after }) : undefined
               }
-              onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
+              onMouseLeave={hoverEnabled && !isLiquidation ? () => setHoveredValue(null) : undefined}
             >
               {after === 0 ? "0" : after.toFixed(4)}
             </span>
             {after > 0 && (
               <span
                 className={`text-xs flex font-bold items-center text-slate-300 dark:text-slate-600 border-l-2 border-r-2 ml-2 border-slate-300 dark:border-slate-600 rounded-sm px-1 py-0 ${
-                  hoverEnabled ? "cursor-pointer" : ""
+                  hoverEnabled && !isLiquidation ? "cursor-pointer" : ""
                 } ${
-                  isCollateralUsdHighlighted
+                  isCollateralUsdHighlighted && !isLiquidation
                     ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-l-5 before:border-r-5 before:border-b-5 before:border-l-transparent before:border-r-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
                     : ""
                 }`}
                 onMouseEnter={
-                  hoverEnabled
+                  hoverEnabled && !isLiquidation
                     ? () => setHoveredValue({ type: "collateralUsd", state: "after", value: afterInUsd })
                     : undefined
                 }
-                onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
+                onMouseLeave={hoverEnabled && !isLiquidation ? () => setHoveredValue(null) : undefined}
               >
                 {formatUsdValue(afterInUsd)}
               </span>
