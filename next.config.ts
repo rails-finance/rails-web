@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
         destination: "/trove/:branch/:troveId",
         permanent: true, // 308 permanent redirect
       },
+      {
+        source: "/explorer",
+        destination: "/",
+        permanent: true,
+      },
     ];
   },
 };
