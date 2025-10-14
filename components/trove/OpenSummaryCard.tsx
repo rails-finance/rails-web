@@ -10,6 +10,7 @@ import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 import { formatDate, formatDuration } from "@/lib/date";
 import { formatPrice, formatUsdValue } from "@/lib/utils/format";
 import { generateInterestInfo, generateInterestInfoWithTimeline } from "@/lib/utils/interest-calculator";
+import { getLiquidationThreshold } from "@/lib/utils/liquidation-utils";
 import { ExplanationPanel } from "@/components/transaction-timeline/explanation/ExplanationPanel";
 import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
 import { useHover, HoverProvider } from "@/components/transaction-timeline/context/HoverContext";
@@ -120,6 +121,7 @@ function OpenTroveCardContent({ trove, timeline }: OpenTroveCardProps) {
 
     // Collateral ratio explanation
     const currentCollateralRatio = trove.metrics.collateralRatio.toFixed(1);
+    const liquidationThreshold = getLiquidationThreshold(trove.collateralType);
 
     items.push(
       <span key="collateral-ratio" className="text-slate-500">
@@ -133,7 +135,7 @@ function OpenTroveCardContent({ trove, timeline }: OpenTroveCardProps) {
         >
           {currentCollateralRatio}%
         </HighlightableValue>{" "}
-        means the collateral is worth {currentCollateralRatio}% more than the debt (minimum 110% to avoid liquidation)
+        means the collateral is worth {currentCollateralRatio}% more than the debt (minimum {liquidationThreshold}% to avoid liquidation)
       </span>,
     );
 
