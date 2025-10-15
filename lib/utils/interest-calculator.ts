@@ -308,3 +308,35 @@ export function generateInterestInfoWithTimeline(
     batchManager,
   };
 }
+
+/**
+ * Calculate accrued interest between two consecutive transactions
+ * This shows how much interest accumulated since the last operation
+ */
+export function calculateInterestBetweenTransactions(
+  currentTx: Transaction,
+  previousTx?: Transaction,
+): { accruedInterest: number; accruedManagementFees: number } {
+  // If no previous transaction, no interest has accrued
+  if (!previousTx) {
+    return { accruedInterest: 0, accruedManagementFees: 0 };
+  }
+
+  // Get the debt and rate from the previous transaction
+  const previousDebt = previousTx.stateAfter.debt;
+  const previousRate = previousTx.stateAfter.annualInterestRate;
+  const previousTimestamp = previousTx.timestamp;
+  const currentTimestamp = currentTx.timestamp;
+
+  // Calculate base interest accrued
+  const accruedInterest = calculateAccruedInterest(previousDebt, previousRate, previousTimestamp, currentTimestamp);
+
+  // Calculate management fees if in a batch
+  let accruedManagementFees = 0;
+  if (currentTx.isInBatch && "batchUpdate" in previousTx && previousTx.batchUpdate) {
+    const managementFeeRate = previousTx.batchUpdate.annualManagementFee;
+    accruedManagementFees = calculateManagementFees(previousDebt, managementFeeRate, previousTimestamp, currentTimestamp);
+  }
+
+  return { accruedInterest, accruedManagementFees };
+}

@@ -5,7 +5,7 @@ import { TokenIcon } from "@/components/icons/tokenIcon";
 import { formatUsdValue } from "@/lib/utils/format";
 import { HighlightableValue } from "../../explanation/HighlightableValue";
 
-export function ExpandedContent({ tx }: { tx: Transaction }) {
+export function ExpandedContent({ tx, previousTx }: { tx: Transaction; previousTx?: Transaction }) {
   const transaction = tx as any;
 
   // Get collateral price per unit in USD
@@ -47,7 +47,7 @@ export function ExpandedContent({ tx }: { tx: Transaction }) {
   return (
     <div>
       <div className="px-4 sm:px-6 pb-2 space-y-4">
-        <TransactionStateGrid tx={tx} />
+        <TransactionStateGrid tx={tx} previousTx={previousTx} />
       </div>
 
       {/* Gas cost and collateral price container - organic responsive layout */}

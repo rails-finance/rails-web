@@ -19,10 +19,11 @@ import { BatchManagerInterestRateUpdateExplanation } from "./events/BatchManager
 
 interface EventExplanationProps {
   transaction: Transaction;
+  previousTransaction?: Transaction;
   onToggle: (isOpen: boolean) => void;
 }
 
-export function EventExplanation({ transaction, onToggle }: EventExplanationProps) {
+export function EventExplanation({ transaction, previousTransaction, onToggle }: EventExplanationProps) {
   const { setHoverEnabled } = useHover();
 
   const handleToggle = (isOpen: boolean) => {
@@ -44,10 +45,10 @@ export function EventExplanation({ transaction, onToggle }: EventExplanationProp
         return <CloseTroveExplanation transaction={transaction} onToggle={handleToggle} />;
 
       case "adjustTrove":
-        return <AdjustTroveExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <AdjustTroveExplanation transaction={transaction} previousTransaction={previousTransaction} onToggle={handleToggle} />;
 
       case "adjustTroveInterestRate":
-        return <AdjustTroveInterestRateExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <AdjustTroveInterestRateExplanation transaction={transaction} previousTransaction={previousTransaction} onToggle={handleToggle} />;
 
       case "liquidate":
         return <LiquidateExplanation transaction={transaction} onToggle={handleToggle} />;

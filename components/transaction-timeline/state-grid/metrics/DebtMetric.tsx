@@ -14,9 +14,11 @@ interface DebtMetricProps {
   isCloseTrove: boolean;
   isLiquidation?: boolean;
   upfrontFee?: number;
+  accruedInterest?: number;
+  accruedManagementFees?: number;
 }
 
-export function DebtMetric({ assetType, before, after, isCloseTrove, isLiquidation = false, upfrontFee }: DebtMetricProps) {
+export function DebtMetric({ assetType, before, after, isCloseTrove, isLiquidation = false, upfrontFee, accruedInterest, accruedManagementFees }: DebtMetricProps) {
   const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
   // For closeTrove, always show transition even if before is 0
   const hasChange = isCloseTrove ? before !== after : before != 0 && before !== after;
@@ -25,6 +27,9 @@ export function DebtMetric({ assetType, before, after, isCloseTrove, isLiquidati
   const isBeforeHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "debt", "before");
   const isAfterHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "debt", "after");
   const isFeeHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "upfrontFee", "fee");
+  const isInterestHighlighted = hoverEnabled && shouldHighlight(hoveredValue, "interest", "fee");
+
+  const totalAccruedFees = (accruedInterest || 0) + (accruedManagementFees || 0);
   return (
     <StateMetric label="Debt" icon={<TokenIcon assetSymbol={assetType} className="mr-2 w-5 h-5 text-green-600" />}>
       <div>
@@ -67,26 +72,52 @@ export function DebtMetric({ assetType, before, after, isCloseTrove, isLiquidati
             </div>
           </div>
         </StateTransition>
-        {upfrontFee !== undefined && upfrontFee > 0 && (
+        {(upfrontFee !== undefined && upfrontFee > 0) || totalAccruedFees > 0.01 ? (
           <div className="text-xs text-slate-500 mt-0.5 block">
-            <span
-              className={`${hoverEnabled ? "cursor-pointer" : ""} ${
-                isFeeHighlighted
-                  ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-x-[5px] before:border-b-[5px] before:border-x-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
-                  : ""
-              }`}
-              onMouseEnter={
-                hoverEnabled
-                  ? () => setHoveredValue({ type: "upfrontFee", state: "fee", value: upfrontFee })
-                  : undefined
-              }
-              onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
-            >
-              {toLocaleStringHelper(upfrontFee)}
-            </span>
-            <span className="ml-1">fee</span>
+            {totalAccruedFees > 0.01 && (
+              <>
+                <span>incl. +</span>
+                <span
+                  className={`${hoverEnabled ? "cursor-pointer" : ""} ${
+                    isInterestHighlighted
+                      ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-x-[5px] before:border-b-[5px] before:border-x-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
+                      : ""
+                  }`}
+                  onMouseEnter={
+                    hoverEnabled
+                      ? () => setHoveredValue({ type: "interest", state: "fee", value: totalAccruedFees })
+                      : undefined
+                  }
+                  onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
+                >
+                  {totalAccruedFees.toFixed(2)}
+                </span>
+                <span> interest</span>
+              </>
+            )}
+            {upfrontFee !== undefined && upfrontFee > 0 && (
+              <>
+                {totalAccruedFees > 0.01 && <span> +</span>}
+                <span
+                  className={`${hoverEnabled ? "cursor-pointer" : ""} ${
+                    isFeeHighlighted
+                      ? 'relative before:content-[""] before:absolute before:-bottom-1.5 before:left-1/2 before:-translate-x-1/2 before:w-0 before:h-0 before:border-x-[5px] before:border-b-[5px] before:border-x-transparent before:border-b-black dark:before:border-b-white before:animate-pulse'
+                      : ""
+                  }`}
+                  onMouseEnter={
+                    hoverEnabled
+                      ? () => setHoveredValue({ type: "upfrontFee", state: "fee", value: upfrontFee })
+                      : undefined
+                  }
+                  onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
+                >
+                  {toLocaleStringHelper(upfrontFee)}
+                </span>
+                <span> fee</span>
+              </>
+            )}
           </div>
-        )}
+        ) : null}
       </div>
     </StateMetric>
   );

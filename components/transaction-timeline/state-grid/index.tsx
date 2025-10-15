@@ -4,8 +4,9 @@ import { CollateralMetric } from "./metrics/CollateralMetric";
 import { InterestRateMetric } from "./metrics/InterestRateMetric";
 import { CollateralRatioMetric } from "./metrics/CollateralRatioMetric";
 import { getPerTroveLiquidationData } from "@/lib/utils/liquidation-utils";
+import { calculateInterestBetweenTransactions } from "@/lib/utils/interest-calculator";
 
-export function TransactionStateGrid({ tx }: { tx: Transaction }) {
+export function TransactionStateGrid({ tx, previousTx }: { tx: Transaction; previousTx?: Transaction }) {
   const { stateBefore, stateAfter, assetType, collateralType } = tx;
   const isCloseTrove = tx.operation === "closeTrove";
   const isLiquidation = tx.operation === "liquidate";
@@ -14,6 +15,9 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
 
   // Get upfront fee if available (only for trove transactions)
   const upfrontFee = isTroveTransaction(tx) ? tx.troveOperation.debtIncreaseFromUpfrontFee : undefined;
+
+  // Calculate accrued interest since last operation
+  const { accruedInterest, accruedManagementFees } = calculateInterestBetweenTransactions(tx, previousTx);
 
   // Get liquidation data if this is a liquidation
   const liquidationData = isLiquidation && tx.type === "liquidation" ? getPerTroveLiquidationData(tx) : undefined;
@@ -80,6 +84,8 @@ export function TransactionStateGrid({ tx }: { tx: Transaction }) {
           isCloseTrove={isCloseTrove}
           isLiquidation={isLiquidation}
           upfrontFee={upfrontFee}
+          accruedInterest={accruedInterest}
+          accruedManagementFees={accruedManagementFees}
         />
 
         <CollateralMetric

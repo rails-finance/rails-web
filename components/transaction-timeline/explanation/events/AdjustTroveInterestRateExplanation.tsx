@@ -5,13 +5,15 @@ import { ExplanationPanel } from "../ExplanationPanel";
 import { InfoButton } from "../InfoButton";
 import { FAQ_URLS } from "../shared/faqUrls";
 import { formatCurrency, formatUsdValue, toLocaleStringHelper } from "@/lib/utils/format";
+import { calculateInterestBetweenTransactions } from "@/lib/utils/interest-calculator";
 
 interface AdjustTroveInterestRateExplanationProps {
   transaction: Transaction;
+  previousTransaction?: Transaction;
   onToggle: (isOpen: boolean) => void;
 }
 
-export function AdjustTroveInterestRateExplanation({ transaction, onToggle }: AdjustTroveInterestRateExplanationProps) {
+export function AdjustTroveInterestRateExplanation({ transaction, previousTransaction, onToggle }: AdjustTroveInterestRateExplanationProps) {
   const tx = transaction as any;
   const prevRate = tx.stateBefore?.annualInterestRate || 0;
   const newRate = tx.stateAfter.annualInterestRate;
@@ -24,6 +26,10 @@ export function AdjustTroveInterestRateExplanation({ transaction, onToggle }: Ad
   const rateDifference = newRate - prevRate;
   const isRateIncrease = rateDifference > 0;
 
+  // Calculate accrued interest since last operation
+  const { accruedInterest, accruedManagementFees } = calculateInterestBetweenTransactions(tx, previousTransaction);
+  const totalAccruedFees = accruedInterest + accruedManagementFees;
+
   const interestRateItems: React.ReactNode[] = [
     <span key="rateChange" className="text-slate-500">
       {isRateIncrease ? "Increased" : "Decreased"} the interest rate to{" "}
@@ -34,14 +40,35 @@ export function AdjustTroveInterestRateExplanation({ transaction, onToggle }: Ad
     </span>,
   ];
 
+  // Show accrued interest if significant
+  if (totalAccruedFees > 0.01) {
+    interestRateItems.push(
+      <span key="accruedInterest" className="text-slate-500">
+        Accrued interest since last operation:{" "}
+        <HighlightableValue type="interest" state="fee" value={totalAccruedFees}>
+          {totalAccruedFees.toFixed(2)} {tx.assetType}
+        </HighlightableValue>
+        {accruedManagementFees > 0 && (
+          <span className="text-slate-400 text-xs ml-1">
+            (including {accruedManagementFees.toFixed(2)} {tx.assetType} management fee)
+          </span>
+        )}
+      </span>,
+    );
+  }
+
   if (rateBeforeDebt !== rateAfterDebt) {
     interestRateItems.push(
       <span key="debtUpdate" className="text-slate-500">
         Debt increased to{" "}
         <HighlightableValue type="debt" state="after" value={rateAfterDebt}>
           {formatCurrency(rateAfterDebt, tx.assetType)}
-        </HighlightableValue>{" "}
-        from accrued interest since last event
+        </HighlightableValue>
+        {totalAccruedFees > 0.01 && (
+          <span className="text-slate-400 text-xs ml-1">
+            (from {formatCurrency(rateBeforeDebt, tx.assetType)} + {totalAccruedFees.toFixed(2)} accrued)
+          </span>
+        )}
       </span>,
     );
   } else {
