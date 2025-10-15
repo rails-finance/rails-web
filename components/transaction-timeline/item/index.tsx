@@ -16,12 +16,13 @@ import { TimelineBackground } from "../icon/TimelineBackground";
 
 interface TransactionItemProps {
   tx: Transaction;
+  previousTx?: Transaction;
   isFirst: boolean;
   isLast: boolean;
   txIndex: number;
 }
 
-export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionItemProps) {
+export function TransactionItem({ tx, previousTx, isFirst, isLast, txIndex }: TransactionItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
   const isBatchManager = isBatchManagerOperation(tx);
@@ -52,7 +53,7 @@ export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionIte
               <TransactionItemHeader tx={tx} isExpanded={isExpanded} onClick={toggleExpanded} />
 
               {/* Only show expanded content for non-batch-manager transactions */}
-              {isExpanded && !isBatchManager && <ExpandedContent tx={tx} />}
+              {isExpanded && !isBatchManager && <ExpandedContent tx={tx} previousTx={previousTx} />}
 
               {/* Footer - always show, but non-interactive for batch managers */}
               <TransactionFooter
@@ -68,7 +69,11 @@ export function TransactionItem({ tx, isFirst, isLast, txIndex }: TransactionIte
             {/* Event explanation panel - only for non-batch-manager transactions */}
             {isExpanded && !isBatchManager && (
               <div className="px-2.5">
-                <EventExplanation transaction={tx} onToggle={(isOpen) => setShowExplanation(isOpen)} />
+                <EventExplanation
+                  transaction={tx}
+                  previousTransaction={previousTx}
+                  onToggle={(isOpen) => setShowExplanation(isOpen)}
+                />
               </div>
             )}
           </div>

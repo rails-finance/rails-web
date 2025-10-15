@@ -6,13 +6,15 @@ import { InfoButton } from "../InfoButton";
 import { FAQ_URLS } from "../shared/faqUrls";
 import { formatCurrency, formatUsdValue } from "@/lib/utils/format";
 import { getUpfrontFee } from "../shared/eventHelpers";
+import { calculateInterestBetweenTransactions } from "@/lib/utils/interest-calculator";
 
 interface AdjustTroveExplanationProps {
   transaction: Transaction;
+  previousTransaction?: Transaction;
   onToggle: (isOpen: boolean) => void;
 }
 
-export function AdjustTroveExplanation({ transaction, onToggle }: AdjustTroveExplanationProps) {
+export function AdjustTroveExplanation({ transaction, previousTransaction, onToggle }: AdjustTroveExplanationProps) {
   const tx = transaction as any;
 
   if (!isTroveTransaction(tx)) return null;
@@ -31,6 +33,10 @@ export function AdjustTroveExplanation({ transaction, onToggle }: AdjustTroveExp
   const afterCollUsd = tx.stateAfter.collateralInUsd;
   const beforeInterestRate = tx.stateBefore?.annualInterestRate;
   const afterInterestRate = tx.stateAfter.annualInterestRate;
+
+  // Calculate accrued interest since last operation
+  const { accruedInterest, accruedManagementFees } = calculateInterestBetweenTransactions(tx, previousTransaction);
+  const totalAccruedFees = accruedInterest + accruedManagementFees;
 
   // Determine the type of adjustment
   const isDeleveraging = collChange < 0 || debtChange < 0;
@@ -62,6 +68,23 @@ export function AdjustTroveExplanation({ transaction, onToggle }: AdjustTroveExp
     );
   }
 
+  // Show accrued interest if there was a previous transaction
+  if (totalAccruedFees > 0.01) {
+    adjustTroveItems.push(
+      <span key="accruedInterest" className="text-slate-500">
+        Accrued interest since last operation:{" "}
+        <HighlightableValue type="interest" state="fee" value={totalAccruedFees}>
+          {totalAccruedFees.toFixed(2)} {tx.assetType}
+        </HighlightableValue>
+        {accruedManagementFees > 0 && (
+          <span className="text-slate-400 text-xs ml-1">
+            (including {accruedManagementFees.toFixed(2)} {tx.assetType} management fee)
+          </span>
+        )}
+      </span>,
+    );
+  }
+
   if (adjustFee > 0) {
     adjustTroveItems.push(
       <span key="fee" className="text-slate-500">
@@ -71,6 +94,24 @@ export function AdjustTroveExplanation({ transaction, onToggle }: AdjustTroveExp
         </HighlightableValue>{" "}
         borrowing fee (7 days of average interest on the respective borrow market)
         <InfoButton href={FAQ_URLS.BORROWING_FEES} />
+      </span>,
+    );
+  }
+
+  // Add debt breakdown if there's a combination of borrowed amount, fees, and accrued interest
+  if (debtChange > 0 && (adjustFee > 0 || totalAccruedFees > 0.01)) {
+    const totalDebtIncrease = afterDebt - beforeDebt;
+    adjustTroveItems.push(
+      <span key="debtBreakdown" className="text-slate-500">
+        Total debt increase:{" "}
+        <HighlightableValue type="debt" state="change" value={totalDebtIncrease}>
+          {formatCurrency(totalDebtIncrease, tx.assetType)}
+        </HighlightableValue>{" "}
+        <span className="text-slate-400 text-xs">
+          (borrowed: {formatCurrency(debtChange, tx.assetType)}
+          {totalAccruedFees > 0.01 && ` + accrued: ${totalAccruedFees.toFixed(2)}`}
+          {adjustFee > 0 && ` + fee: ${adjustFee.toFixed(2)}`})
+        </span>
       </span>,
     );
   }

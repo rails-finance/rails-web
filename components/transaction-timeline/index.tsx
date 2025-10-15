@@ -47,10 +47,14 @@ export function TransactionTimeline({ timeline }: TransactionTimelineProps) {
       {/* Transaction items */}
       <div className="space-y-0">
         {timeline.transactions.map((tx, index) => {
+          // Get previous transaction (next in array since transactions are reverse chronological)
+          const previousTx = index < txLength - 1 ? timeline.transactions[index + 1] : undefined;
+
           return (
             <TransactionItem
               key={tx.id}
               tx={tx}
+              previousTx={previousTx}
               isFirst={index === 0}
               isLast={index === txLength - 1}
               txIndex={txLength - index}
