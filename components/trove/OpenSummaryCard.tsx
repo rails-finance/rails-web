@@ -101,41 +101,12 @@ function OpenTroveCardContent({ trove, timeline }: OpenTroveCardProps) {
     );
 
     // Collateral info
-    const currentPrice = trove.collateral.valueUsd / trove.collateral.amount;
     items.push(
       <span key="collateral-info" className="text-slate-500">
         <HighlightableValue type="collateral" state="after" value={trove.collateral.amount}>
           {trove.collateral.amount} {trove.collateralType}
         </HighlightableValue>{" "}
-        collateral worth{" "}
-        <HighlightableValue type="collateralUsd" state="after" value={trove.collateral.valueUsd}>
-          {formatUsdValue(trove.collateral.valueUsd)}
-        </HighlightableValue>{" "}
-        at current price of{" "}
-        <HighlightableValue type="currentPrice" state="after" value={currentPrice}>
-          {formatUsdValue(currentPrice)}
-        </HighlightableValue>{" "}
-        / {trove.collateralType} secures this position
-      </span>,
-    );
-
-    // Collateral ratio explanation
-    const currentCollateralRatio = trove.metrics.collateralRatio.toFixed(1);
-    const liquidationThreshold = getLiquidationThreshold(trove.collateralType);
-
-    items.push(
-      <span key="collateral-ratio" className="text-slate-500">
-        Collateral ratio of{" "}
-        <HighlightableValue
-          type="collRatio"
-          state="after"
-          value={
-            typeof currentCollateralRatio === "string" ? parseFloat(currentCollateralRatio) : currentCollateralRatio
-          }
-        >
-          {currentCollateralRatio}%
-        </HighlightableValue>{" "}
-        means the collateral is worth {currentCollateralRatio}% more than the debt (minimum {liquidationThreshold}% to avoid liquidation)
+        collateral secures this position
       </span>,
     );
 
@@ -374,45 +345,19 @@ function OpenTroveCardContent({ trove, timeline }: OpenTroveCardProps) {
           </div>
 
           {/* Metrics grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <p className="text-xs font-bold text-slate-400 dark:text-slate-600">Backed by</p>
               <div className="flex items-center">
+                <p className="text-xl font-bold mr-1">
+                  <HighlightableValue type="collateral" state="after" value={trove.collateral.amount}>
+                    {trove.collateral.amount}
+                  </HighlightableValue>
+                </p>
                 <span className="flex items-center">
-                  <p className="text-xl font-bold mr-1">
-                    <HighlightableValue type="collateral" state="after" value={trove.collateral.amount}>
-                      {trove.collateral.amount}
-                    </HighlightableValue>
-                  </p>
-                  <span className="flex items-center">
-                    <TokenIcon assetSymbol={trove.collateralType} />
-                  </span>
+                  <TokenIcon assetSymbol={trove.collateralType} />
                 </span>
-                <div className="ml-1 flex items-center">
-                  <span className="text-xs flex items-center border-l-2 border-r-2 border-green-500 rounded-sm px-1 py-0">
-                    <HighlightableValue
-                      className="text-green-500"
-                      type="collateralUsd"
-                      state="after"
-                      value={trove.collateral.valueUsd}
-                    >
-                      {formatUsdValue(trove.collateral.valueUsd)}
-                    </HighlightableValue>
-                  </span>
-                </div>
               </div>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-400 dark:text-slate-600">Collateral Ratio</p>
-              <p className="text-xl font-semibold">
-                <HighlightableValue
-                  type="collRatio"
-                  state="after"
-                  value={parseFloat(trove.metrics.collateralRatio.toFixed(1))}
-                >
-                  {trove.metrics.collateralRatio.toFixed(1)}%
-                </HighlightableValue>
-              </p>
             </div>
             <div>
               <div className="flex items-center gap-1 mb-1">
@@ -495,19 +440,6 @@ function OpenTroveCardContent({ trove, timeline }: OpenTroveCardProps) {
 
           <div className="flex justify-between items-end">
             <CardFooter trove={trove} />
-
-            {/* Latest collateral value - only show on trove view page */}
-            <div className="flex items-center gap-1 bg-slate-200 dark:bg-slate-700 shadow-b shadow-slate-900/50 rounded-l p-2 -mr-4.5">
-              <TokenIcon assetSymbol={trove.collateralType} />
-              <HighlightableValue
-                type="currentPrice"
-                state="after"
-                className="text-xs text-green-500"
-                value={trove.collateral.valueUsd / trove.collateral.amount}
-              >
-                {formatUsdValue(trove.collateral.valueUsd / trove.collateral.amount)}
-              </HighlightableValue>
-            </div>
           </div>
         </div>
       </div>

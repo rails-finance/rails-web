@@ -45,7 +45,7 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
       {/* Content section - single responsive structure */}
       <div className="pt-2 p-4 space-y-4">
         {/* Main content grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 md:items-start">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 md:items-start">
           {/* Highest recorded debt - spans 2 columns on mobile */}
           <div className="col-span-2 md:col-span-1">
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Highest recorded debt</p>
@@ -63,12 +63,10 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
           <div className="col-span-2 md:col-span-1">
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Highest recorded collateral</p>
             <div className="flex items-center">
-              <span className="flex items-center">
-                <p className="text-lg md:text-xl font-bold mr-1 text-slate-600 dark:text-slate-200">
-                  {trove.collateral.peakAmount}
-                </p>
-                <TokenIcon assetSymbol={trove.collateralType} />
-              </span>
+              <p className="text-lg md:text-xl font-bold mr-1 text-slate-600 dark:text-slate-200">
+                {trove.collateral.peakAmount}
+              </p>
+              <TokenIcon assetSymbol={trove.collateralType} />
             </div>
           </div>
         </div>
