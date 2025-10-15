@@ -69,7 +69,7 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
       {/* Content section - single responsive grid */}
       <div className="pt-2 p-4 space-y-4">
         {/* Main metrics grid - responsive columns */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 md:items-start">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 md:items-start">
           {/* Debt - spans 2 columns on mobile */}
           <div className="col-span-2 md:col-span-1">
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Debt</p>
@@ -87,22 +87,15 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
           <div className="col-span-2 md:col-span-1">
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Backed by</p>
             <div className="flex items-center">
-              <span className="flex items-center">
-                <p className="text-lg md:text-xl font-bold mr-1 text-slate-600 dark:text-slate-200">
-                  {trove.collateral.amount}
-                </p>
-                <TokenIcon assetSymbol={trove.collateralType} />
-              </span>
-              <div className="ml-1 flex items-center">
-                <span className="text-xs flex items-center font-bold text-green-500 border-l-2 border-r-2 border-green-500 rounded-sm px-1 py-0">
-                  {formatUsdValue(trove.collateral.valueUsd)}
-                </span>
-              </div>
+              <p className="text-lg md:text-xl font-bold mr-1 text-slate-600 dark:text-slate-200">
+                {trove.collateral.amount}
+              </p>
+              <TokenIcon assetSymbol={trove.collateralType} />
             </div>
           </div>
 
-          {/* Interest Rate - shares row with Ratio on mobile */}
-          <div className="md:col-span-1">
+          {/* Interest Rate */}
+          <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-1 mb-1">
               {trove.batch.isMember && (
                 <span className="inline-flex items-center text-xs font-semibold px-1 py-0.5 bg-pink-300 text-white dark:bg-pink-900/50 dark:text-pink-400 rounded-xs">
@@ -119,17 +112,6 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
                 {formatBatchManagerDisplay(trove.batch.manager)}
               </div>
             )}
-          </div>
-
-          {/* Collateral Ratio - shares row with Interest Rate on mobile */}
-          <div className="md:col-span-1">
-            <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">
-              <span className="lg:hidden">Ratio</span>
-              <span className="hidden lg:inline">Collateral Ratio</span>
-            </p>
-            <p className="text-lg md:text-xl font-semibold text-slate-600 dark:text-slate-200">
-              {trove.metrics.collateralRatio.toFixed(1)}%
-            </p>
           </div>
         </div>
 
