@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TrovesResponse } from "@/types/api/trove";
 import { mockTroveData } from "@/lib/mockData";
+import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 
 const RAILS_API_URL = process.env.RAILS_API_URL;
 
@@ -164,7 +165,7 @@ export async function GET(request: NextRequest) {
 
     const url = `${RAILS_API_URL}/api/troves${backendParams.toString() ? `?${backendParams.toString()}` : ""}`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, createAuthFetchOptions());
 
     if (!response.ok) {
       console.error(`Backend API error: ${response.status} ${response.statusText}`);

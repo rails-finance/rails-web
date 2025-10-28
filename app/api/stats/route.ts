@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { StatsResponse } from "@/types/api/stats";
+import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 
 const RAILS_API_URL = process.env.RAILS_API_URL;
 
@@ -13,9 +14,12 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const url = `${RAILS_API_URL}/api/stats${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 
-    const response = await fetch(url, {
-      next: { revalidate: 30 }, // Cache for 30 seconds
-    });
+    const response = await fetch(
+      url,
+      createAuthFetchOptions({
+        next: { revalidate: 30 }, // Cache for 30 seconds
+      }),
+    );
 
     if (!response.ok) {
       console.error(`Backend API error: ${response.status} ${response.statusText}`);
