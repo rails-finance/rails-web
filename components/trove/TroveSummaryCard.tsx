@@ -3,19 +3,27 @@ import { ClosedSummaryCard } from "./ClosedSummaryCard";
 import { LiquidatedSummaryCard } from "./LiquidatedSummaryCard";
 import { TroveSummary } from "@/types/api/trove";
 import type { Transaction } from "@/types/api/troveHistory";
+import { TroveStateData } from "@/types/api/troveState";
+import { OraclePricesData } from "@/types/api/oracle";
 
 interface TroveSummaryCardProps {
   trove: TroveSummary;
   timeline?: Transaction[];
+  liveState?: TroveStateData;
+  prices?: OraclePricesData;
+  loadingStatus?: {
+    message: string | null;
+    snapshotDate?: number;
+  };
 }
 
-export function TroveSummaryCard({ trove, timeline }: TroveSummaryCardProps) {
+export function TroveSummaryCard({ trove, timeline, liveState, prices, loadingStatus }: TroveSummaryCardProps) {
   if (trove.status === "liquidated") {
     return <LiquidatedSummaryCard trove={trove} />;
   }
 
   if (trove.status === "open") {
-    return <OpenSummaryCard trove={trove} timeline={timeline} />;
+    return <OpenSummaryCard trove={trove} timeline={timeline} liveState={liveState} prices={prices} loadingStatus={loadingStatus} />;
   }
 
   return <ClosedSummaryCard trove={trove} />;
