@@ -13,6 +13,8 @@ import { formatDuration } from "@/lib/date";
 import { Icon } from "@/components/icons/icon";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { FeedbackButton } from "@/components/FeedbackButton";
+import { TroveStateData, TroveStateResponse } from "@/types/api/troveState";
+import { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
 
 export default function TrovePage() {
   const params = useParams();
@@ -26,6 +28,14 @@ export default function TrovePage() {
   const [error, setError] = useState<string | null>(null);
   const [hideRedemptions, setHideRedemptions] = useState(false);
   const [hideDelegateRates, setHideDelegateRates] = useState(false);
+
+  // Live blockchain data and prices
+  const [liveState, setLiveState] = useState<TroveStateData | undefined>(undefined);
+  const [prices, setPrices] = useState<OraclePricesData | undefined>(undefined);
+  const [enhancementLoading, setEnhancementLoading] = useState({
+    blockchain: false,
+    prices: false,
+  });
 
   useEffect(() => {
     loadData();
@@ -69,12 +79,66 @@ export default function TrovePage() {
           totalTransactions: 0,
         });
       }
+
+      // After successfully loading base data, fetch enhancements
+      setLoading(false);
+      loadEnhancements();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load trove data");
       console.error("Error loading trove data:", err);
-    } finally {
       setLoading(false);
     }
+  };
+
+  const loadEnhancements = async () => {
+    setEnhancementLoading({ blockchain: true, prices: true });
+
+    // Fetch blockchain state and prices in parallel
+    const results = await Promise.allSettled([
+      fetch(`/api/trove/state/${collateralType}/${troveId}`),
+      fetch(`/api/oracle/liquity-v2`),
+    ]);
+
+    // Handle blockchain state response
+    if (results[0].status === "fulfilled" && results[0].value.ok) {
+      try {
+        const stateResponse: TroveStateResponse = await results[0].value.json();
+        if (stateResponse.success && stateResponse.data) {
+          setLiveState(stateResponse.data);
+        }
+      } catch (err) {
+        console.error("Error parsing blockchain state:", err);
+      }
+    } else {
+      console.error("Failed to fetch blockchain state");
+    }
+    setEnhancementLoading((prev) => ({ ...prev, blockchain: false }));
+
+    // Handle prices response
+    if (results[1].status === "fulfilled" && results[1].value.ok) {
+      try {
+        const pricesResponse: OraclePricesResponse = await results[1].value.json();
+        if (pricesResponse.success && pricesResponse.data) {
+          setPrices(pricesResponse.data);
+        }
+      } catch (err) {
+        console.error("Error parsing oracle prices:", err);
+      }
+    } else {
+      console.error("Failed to fetch oracle prices");
+    }
+    setEnhancementLoading((prev) => ({ ...prev, prices: false }));
+  };
+
+  const getEnhancementStatus = (): string | null => {
+    const { blockchain, prices } = enhancementLoading;
+
+    if (!blockchain && !prices) return null;
+
+    if (blockchain) return "Loading current state...";
+    if (prices) return "Fetching current asset price...";
+
+    return null;
   };
 
   if (loading) {
@@ -138,7 +202,16 @@ export default function TrovePage() {
           Back
         </Button>
 
-        <TroveSummaryCard trove={troveData} timeline={timelineData?.transactions} />
+        <TroveSummaryCard
+          trove={troveData}
+          timeline={timelineData?.transactions}
+          liveState={liveState}
+          prices={prices}
+          loadingStatus={{
+            message: getEnhancementStatus(),
+            snapshotDate: timelineData?.transactions?.[0]?.timestamp,
+          }}
+        />
 
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">

@@ -9,10 +9,41 @@ import { PaginationControls } from "@/components/troves/components/PaginationCon
 import { TroveListLoadingSkeleton } from "@/components/troves/components/TroveListLoadingSkeleton";
 import { TroveListError } from "@/components/troves/components/TroveListError";
 import { FeedbackButton } from "@/components/FeedbackButton";
+import { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Constants
 const ITEMS_PER_PAGE = 20;
 const AVAILABLE_COLLATERAL_TYPES = ["WETH", "wstETH", "rETH"];
+
+// Animation variants for staggered list
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1, // 0.1s delay between each child
+    },
+  },
+  exit: {
+    opacity: 0,
+    transition: {
+      duration: 0.2,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.3,
+      ease: "easeOut" as const,
+    },
+  },
+};
 
 function TrovesPageContent() {
   const searchParams = useSearchParams();
@@ -23,6 +54,7 @@ function TrovesPageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
+  const [prices, setPrices] = useState<OraclePricesData | null>(null);
 
   // Get page from URL
   const currentPage = Number(searchParams.get("page")) || 1;
@@ -145,6 +177,22 @@ function TrovesPageContent() {
     updateUrl(updatedFilters, currentPage);
   };
 
+  // Load oracle prices - one-time fetch
+  const loadPrices = async () => {
+    try {
+      const response = await fetch("/api/oracle/liquity-v2");
+      if (response.ok) {
+        const data: OraclePricesResponse = await response.json();
+        if (data.success && data.data) {
+          setPrices(data.data);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading oracle prices:", err);
+      // Silently fail - prices are optional enhancement
+    }
+  };
+
   // Load troves - simple single API call based on URL params
   const loadTroves = async () => {
     try {
@@ -170,6 +218,11 @@ function TrovesPageContent() {
       setLoading(false);
     }
   };
+
+  // Load prices once on mount
+  useEffect(() => {
+    loadPrices();
+  }, []);
 
   // Load troves when URL changes (filters or pagination)
   useEffect(() => {
@@ -205,20 +258,37 @@ function TrovesPageContent() {
         />
 
         {/* Troves */}
-        {troves.length > 0 ? (
-          <div className="grid grid-cols-1 gap-6">
-            {troves.map((trove) => (
-              <TroveListingCard key={trove.id} trove={trove} />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <div className="text-slate-400 text-lg">
-              <p className="mb-2">No troves found</p>
-              <p className="text-sm">Try adjusting your filters</p>
-            </div>
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {troves.length > 0 ? (
+            <motion.div
+              key={searchParams.toString()}
+              className="grid grid-cols-1 gap-6"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              {troves.map((trove) => (
+                <motion.div key={trove.id} variants={itemVariants}>
+                  <TroveListingCard trove={trove} prices={prices} />
+                </motion.div>
+              ))}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="text-center py-12"
+            >
+              <div className="text-slate-400 text-lg">
+                <p className="mb-2">No troves found</p>
+                <p className="text-sm">Try adjusting your filters</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Pagination */}
         <PaginationControls
