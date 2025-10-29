@@ -204,7 +204,6 @@ export default function TrovePage() {
 
         <TroveSummaryCard
           trove={troveData}
-          timeline={timelineData?.transactions}
           liveState={liveState}
           prices={prices}
           loadingStatus={{
@@ -218,7 +217,8 @@ export default function TrovePage() {
             <h3 className="text-xl font-semibold text-slate-700 dark:text-white">Timeline</h3>
             {troveData.activity?.lastActivityAt && (
               <span className="text-xs text-slate-600 dark:text-slate-500 flex baseline gap-1 rounded-full pl-1 pr-2 py-0.5 bg-slate-100 dark:bg-slate-900">
-                <Icon name="clock-zap" size={14} />{formatDuration(troveData.activity.lastActivityAt, new Date())} ago
+                <Icon name="clock-zap" size={14} />
+                {formatDuration(troveData.activity.lastActivityAt, new Date())} ago
               </span>
             )}
           </div>
@@ -226,7 +226,8 @@ export default function TrovePage() {
             {timelineData && timelineData.transactions.some((tx) => isBatchManagerOperation(tx)) && (
               <button
                 onClick={() => setHideDelegateRates(!hideDelegateRates)}
-                className={`cursor-pointer pl-0.5 pr-1.5 text-sm rounded-full transition-colors flex items-center bg-pink-100 dark:bg-pink-900/50 text-pink-600 dark:text-pink-400 hover:bg-pink-200 dark:hover:bg-pink-900/70`}>
+                className={`cursor-pointer pl-0.5 pr-1.5 text-sm rounded-full transition-colors flex items-center bg-pink-100 dark:bg-pink-900/50 text-pink-600 dark:text-pink-400 hover:bg-pink-200 dark:hover:bg-pink-900/70`}
+              >
                 <span className="w-5 h-5 flex items-center justify-center ">
                   {hideDelegateRates ? (
                     <Icon name="x" size={12} className="text-pink-600 dark:text-pink-400" />
@@ -243,7 +244,8 @@ export default function TrovePage() {
             {timelineData && timelineData.transactions.some((tx) => isRedemptionTransaction(tx)) && (
               <button
                 onClick={() => setHideRedemptions(!hideRedemptions)}
-                className={`cursor-pointer pl-0.5 pr-1.5 text-sm rounded-full transition-colors flex items-center bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/70`}>
+                className={`cursor-pointer pl-0.5 pr-1.5 text-sm rounded-full transition-colors flex items-center bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/70`}
+              >
                 <span className="w-5 h-5 flex items-center justify-center ">
                   {hideRedemptions ? (
                     <Icon name="x" size={12} className="text-orange-600 dark:text-orange-400" />

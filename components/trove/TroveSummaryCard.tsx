@@ -8,7 +8,6 @@ import { OraclePricesData } from "@/types/api/oracle";
 
 interface TroveSummaryCardProps {
   trove: TroveSummary;
-  timeline?: Transaction[];
   liveState?: TroveStateData;
   prices?: OraclePricesData;
   loadingStatus?: {
@@ -17,13 +16,13 @@ interface TroveSummaryCardProps {
   };
 }
 
-export function TroveSummaryCard({ trove, timeline, liveState, prices, loadingStatus }: TroveSummaryCardProps) {
+export function TroveSummaryCard({ trove, liveState, prices, loadingStatus }: TroveSummaryCardProps) {
   if (trove.status === "liquidated") {
     return <LiquidatedSummaryCard trove={trove} />;
   }
 
   if (trove.status === "open") {
-    return <OpenSummaryCard trove={trove} timeline={timeline} liveState={liveState} prices={prices} loadingStatus={loadingStatus} />;
+    return <OpenSummaryCard trove={trove} liveState={liveState} prices={prices} loadingStatus={loadingStatus} />;
   }
 
   return <ClosedSummaryCard trove={trove} />;

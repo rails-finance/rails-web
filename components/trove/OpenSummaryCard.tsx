@@ -9,7 +9,6 @@ import { TroveSummary } from "@/types/api/trove";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 import { formatDate, formatDuration } from "@/lib/date";
 import { formatPrice, formatUsdValue } from "@/lib/utils/format";
-import { generateInterestInfo, generateInterestInfoWithTimeline } from "@/lib/utils/interest-calculator";
 import { getLiquidationThreshold } from "@/lib/utils/liquidation-utils";
 import { ExplanationPanel } from "@/components/transaction-timeline/explanation/ExplanationPanel";
 import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
@@ -21,11 +20,10 @@ import { Link2, Users } from "lucide-react";
 import type { Transaction } from "@/types/api/troveHistory";
 import { TroveStateData } from "@/types/api/troveState";
 import { OraclePricesData } from "@/types/api/oracle";
-import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { FadeNumber } from "@/components/ui/FadeNumber";
 
 interface OpenTroveCardProps {
   trove: TroveSummary;
-  timeline?: Transaction[];
   liveState?: TroveStateData;
   prices?: OraclePricesData;
   loadingStatus?: {
@@ -34,54 +32,25 @@ interface OpenTroveCardProps {
   };
 }
 
-function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatus }: OpenTroveCardProps) {
+function OpenTroveCardContent({ trove, liveState, prices, loadingStatus }: OpenTroveCardProps) {
   const { hoveredValue, setHoverEnabled } = useHover();
 
   const batchManagerInfo = getBatchManagerByAddress(trove.batch.manager);
 
-  const interestInfo = useMemo(() => {
-    // Use timeline-based calculation if available and trove is in a batch
-    if (timeline && timeline.length > 0 && trove.batch.isMember) {
-      return generateInterestInfoWithTimeline(
-        timeline,
-        trove.debt.current,
-        trove.metrics.interestRate,
-        trove.batch.managementFee,
-        trove.batch.isMember,
-        trove.batch.manager || undefined,
-      );
-    }
-
-    // Fallback to simple calculation
-    const lastUpdate = trove.activity.lastActivityAt;
-    const recordedDebt = trove.debt.current;
-    const interestRate = trove.metrics.interestRate;
-
-    return generateInterestInfo(
-      recordedDebt,
-      interestRate,
-      lastUpdate,
-      trove.batch.isMember,
-      trove.batch.managementFee,
-      trove.batch.manager || undefined,
-    );
-  }, [trove, timeline]);
-
-  // Use live blockchain data when available, otherwise use stale calculated data
-  const displayDebt = liveState ? liveState.debt.entire : interestInfo.entireDebt;
-  const displayRecordedDebt = liveState ? liveState.debt.recorded : interestInfo.recordedDebt;
-  const displayAccruedInterest = liveState ? liveState.debt.accruedInterest : interestInfo.accruedInterest;
-  const displayInterestRate = liveState ? liveState.rates.annualInterestRate : trove.metrics.interestRate;
-  const displayManagementFee = liveState
-    ? liveState.rates.accruedBatchManagementFee
-    : interestInfo.accruedManagementFees || 0;
-  const displayCollateral = liveState ? liveState.collateral.entire : trove.collateral.amount;
+  // Progressive enhancement: Use DB snapshot initially, then enhance with live blockchain data
+  // DB snapshot provides immediate display, blockchain data animates in when ready
+  const displayDebt = liveState?.debt.entire ?? trove.debt.current;
+  const displayRecordedDebt = liveState?.debt.recorded ?? trove.debt.current;
+  const displayAccruedInterest = liveState?.debt.accruedInterest; // undefined until blockchain loads
+  const displayInterestRate = liveState?.rates.annualInterestRate ?? trove.metrics.interestRate;
+  const displayManagementFee = liveState?.rates.accruedBatchManagementFee; // undefined until blockchain loads
+  const displayCollateral = liveState?.collateral.entire ?? trove.collateral.amount;
 
   // Recalculate interest costs from live data
-  const dailyInterestCost = (displayRecordedDebt * displayInterestRate) / 100 / 365;
   const annualInterestCost = (displayRecordedDebt * displayInterestRate) / 100;
-  const dailyManagementFee = (displayRecordedDebt * trove.batch.managementFee) / 100 / 365;
+  const dailyInterestCost = annualInterestCost / 365;
   const annualManagementFee = (displayRecordedDebt * trove.batch.managementFee) / 100;
+  const dailyManagementFee = annualManagementFee / 365;
 
   // Calculate live collateral metrics (only when both liveState and prices are available)
   const hasLiveData = liveState && prices;
@@ -94,34 +63,36 @@ function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatu
   const hoverContextItems = useMemo(() => {
     const items: React.ReactNode[] = [];
 
-    // Debt breakdown
-    items.push(
-      <span key="debt-breakdown" className="text-slate-500">
-        Current debt of{" "}
-        <HighlightableValue type="debt" state="after" value={displayDebt}>
-          {formatPrice(displayDebt)} BOLD
-        </HighlightableValue>{" "}
-        consists of{" "}
-        <HighlightableValue type="principal" state="after" value={displayRecordedDebt}>
-          {formatPrice(displayRecordedDebt)} BOLD
-        </HighlightableValue>{" "}
-        principal plus{" "}
-        <HighlightableValue type="interest" state="after" value={displayAccruedInterest}>
-          {formatPrice(displayAccruedInterest)} BOLD
-        </HighlightableValue>{" "}
-        accrued interest
-        {trove.batch.isMember && displayManagementFee !== undefined && displayManagementFee > 0 && (
-          <span>
-            {" "}
-            and{" "}
-            <HighlightableValue type="managementFee" state="after" value={displayManagementFee}>
-              {formatPrice(displayManagementFee)} BOLD
-            </HighlightableValue>{" "}
-            delegate fees
-          </span>
-        )}
-      </span>,
-    );
+    // Debt breakdown (only show when we have live blockchain data)
+    if (displayAccruedInterest !== undefined) {
+      items.push(
+        <span key="debt-breakdown" className="text-slate-500">
+          Current debt of{" "}
+          <HighlightableValue type="debt" state="after" value={displayDebt}>
+            {formatPrice(displayDebt)} BOLD
+          </HighlightableValue>{" "}
+          consists of{" "}
+          <HighlightableValue type="principal" state="after" value={displayRecordedDebt}>
+            {formatPrice(displayRecordedDebt)} BOLD
+          </HighlightableValue>{" "}
+          principal plus{" "}
+          <HighlightableValue type="interest" state="after" value={displayAccruedInterest}>
+            {formatPrice(displayAccruedInterest)} BOLD
+          </HighlightableValue>{" "}
+          accrued interest
+          {trove.batch.isMember && displayManagementFee !== undefined && displayManagementFee > 0 && (
+            <span>
+              {" "}
+              and{" "}
+              <HighlightableValue type="managementFee" state="after" value={displayManagementFee}>
+                {formatPrice(displayManagementFee)} BOLD
+              </HighlightableValue>{" "}
+              delegate fees
+            </span>
+          )}
+        </span>,
+      );
+    }
 
     // Collateral info
     if (hasLiveData && currentPrice && collateralUsd) {
@@ -376,7 +347,7 @@ function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatu
             <HighlightableValue type="debt" state="after" value={displayDebt} asBlock={true}>
               <div className="flex items-center">
                 <h3 className="text-3xl font-bold">
-                  <AnimatedNumber value={displayDebt} formatFn={formatPrice} />
+                  <FadeNumber value={displayDebt} formatFn={formatPrice} />
                 </h3>
                 <span className="ml-2 text-green-600 text-lg">
                   <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
@@ -393,19 +364,23 @@ function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatu
                     className="text-slate-500"
                     value={displayRecordedDebt}
                   >
-                    <AnimatedNumber value={displayRecordedDebt} formatFn={formatPrice} />
+                    <FadeNumber value={displayRecordedDebt} formatFn={formatPrice} />
                   </HighlightableValue>{" "}
                   +{" "}
-                  <HighlightableValue
-                    type="interest"
-                    state="after"
-                    className="text-slate-500"
-                    value={displayAccruedInterest}
-                  >
-                    <AnimatedNumber value={displayAccruedInterest} formatFn={formatPrice} />
-                  </HighlightableValue>{" "}
+                  {displayAccruedInterest !== undefined ? (
+                    <HighlightableValue
+                      type="interest"
+                      state="after"
+                      className="text-slate-500"
+                      value={displayAccruedInterest}
+                    >
+                      <FadeNumber value={displayAccruedInterest} formatFn={formatPrice} animateOnMount={true} />
+                    </HighlightableValue>
+                  ) : (
+                    <span className="inline-block h-4 w-16 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  )}{" "}
                   interest
-                  {trove.batch.isMember && displayManagementFee !== undefined && displayManagementFee > 0 && (
+                  {trove.batch.isMember && displayManagementFee !== undefined && (
                     <span className="text-pink-500">
                       {" "}
                       +&nbsp;
@@ -415,7 +390,7 @@ function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatu
                         className="text-pink-500"
                         value={displayManagementFee}
                       >
-                        <AnimatedNumber value={displayManagementFee} formatFn={formatPrice} />
+                        <FadeNumber value={displayManagementFee} formatFn={formatPrice} animateOnMount={true} />
                       </HighlightableValue>
                       &nbsp;delegate&nbsp;fee
                     </span>
@@ -433,7 +408,7 @@ function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatu
                 <span className="flex items-center">
                   <p className="text-xl font-bold mr-1">
                     <HighlightableValue type="collateral" state="after" value={displayCollateral}>
-                      <AnimatedNumber value={displayCollateral} />
+                      <FadeNumber value={displayCollateral} />
                     </HighlightableValue>
                   </p>
                   <span className="flex items-center">
@@ -449,7 +424,7 @@ function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatu
                         state="after"
                         value={collateralUsd}
                       >
-                        <AnimatedNumber value={collateralUsd} formatFn={formatUsdValue} animateOnMount={true} />
+                        <FadeNumber value={collateralUsd} formatFn={formatUsdValue} animateOnMount={true} />
                       </HighlightableValue>
                     </span>
                   ) : liveState && displayCollateral === 0 ? (
@@ -469,7 +444,7 @@ function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatu
               {hasLiveData && collateralRatio !== null && collateralRatio > 0 ? (
                 <p className="text-xl font-semibold">
                   <HighlightableValue type="collRatio" state="after" value={parseFloat(collateralRatio.toFixed(1))}>
-                    <AnimatedNumber value={collateralRatio} decimals={1} animateOnMount={true} />%
+                    <FadeNumber value={collateralRatio} decimals={1} animateOnMount={true} />%
                   </HighlightableValue>
                 </p>
               ) : liveState && (displayCollateral === 0 || displayDebt === 0) ? (
@@ -489,7 +464,7 @@ function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatu
               </div>
               <div className="text-xl font-medium">
                 <HighlightableValue type="interestRate" state="after" value={displayInterestRate}>
-                  <AnimatedNumber value={displayInterestRate} decimals={1} />%
+                  <FadeNumber value={displayInterestRate} decimals={1} />%
                 </HighlightableValue>
               </div>
               <div className="text-xs text-slate-500 mt-0.5 space-y-0.5">
@@ -501,7 +476,7 @@ function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatu
                     className="text-slate-500"
                     value={dailyInterestCost}
                   >
-                    <AnimatedNumber value={dailyInterestCost} formatFn={formatPrice} />
+                    <FadeNumber value={dailyInterestCost} formatFn={formatPrice} />
                   </HighlightableValue>{" "}
                   day /{" "}
                   <HighlightableValue
@@ -510,7 +485,7 @@ function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatu
                     className="text-slate-500"
                     value={annualInterestCost}
                   >
-                    <AnimatedNumber value={annualInterestCost} formatFn={formatPrice} />
+                    <FadeNumber value={annualInterestCost} formatFn={formatPrice} />
                   </HighlightableValue>{" "}
                   year
                 </span>
@@ -539,7 +514,7 @@ function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatu
                       className="text-pink-500"
                       value={dailyManagementFee}
                     >
-                      <AnimatedNumber value={dailyManagementFee} formatFn={formatPrice} />
+                      <FadeNumber value={dailyManagementFee} formatFn={formatPrice} />
                     </HighlightableValue>{" "}
                     day /{" "}
                     <HighlightableValue
@@ -548,7 +523,7 @@ function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatu
                       className="text-pink-500"
                       value={annualManagementFee}
                     >
-                      <AnimatedNumber value={annualManagementFee} formatFn={formatPrice} />
+                      <FadeNumber value={annualManagementFee} formatFn={formatPrice} />
                     </HighlightableValue>{" "}
                     year
                   </div>
@@ -600,16 +575,10 @@ function OpenTroveCardContent({ trove, timeline, liveState, prices, loadingStatu
   );
 }
 
-export function OpenSummaryCard({ trove, timeline, liveState, prices, loadingStatus }: OpenTroveCardProps) {
+export function OpenSummaryCard({ trove, liveState, prices, loadingStatus }: OpenTroveCardProps) {
   return (
     <HoverProvider>
-      <OpenTroveCardContent
-        trove={trove}
-        timeline={timeline}
-        liveState={liveState}
-        prices={prices}
-        loadingStatus={loadingStatus}
-      />
+      <OpenTroveCardContent trove={trove} liveState={liveState} prices={prices} loadingStatus={loadingStatus} />
     </HoverProvider>
   );
 }
