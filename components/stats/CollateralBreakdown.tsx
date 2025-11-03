@@ -64,7 +64,7 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
       {sortedData.map(([collateralType, stats]) => (
         <Link
           key={collateralType}
-          href={`/troves?collateral=${collateralType}`}
+          href={`/troves?collateralType=${collateralType}`}
           className="group bg-white dark:bg-slate-900 dark:hover:bg-slate-900/50 rounded-lg p-6 hover:bg-white-50/50 hover:shadow-lg transition-all cursor-pointer"
         >
           <div className="flex items-center gap-3 mb-4">

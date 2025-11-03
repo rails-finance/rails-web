@@ -1,16 +1,15 @@
-import { useMemo } from "react";
 import Link from "next/link";
-import { generateInterestInfo } from "@/lib/utils/interest-calculator";
 import { TroveSummary } from "@/types/api/trove";
 import { Icon } from "../icons/icon";
-import { formatPrice, formatUsdValue } from "@/lib/utils/format";
+import { formatApproximate, formatUsdValue } from "@/lib/utils/format";
 import { TokenIcon } from "../icons/tokenIcon";
 import { ChevronRight, Users } from "lucide-react";
 import { CardFooter } from "../trove/components/CardFooter";
 import { formatDuration } from "@/lib/date";
 import { formatBatchManagerDisplay } from "@/lib/services/batch-manager-service";
+import { OraclePricesData } from "@/types/api/oracle";
 
-export function OpenListingCard({ trove }: { trove: TroveSummary }) {
+export function OpenListingCard({ trove, prices }: { trove: TroveSummary; prices?: OraclePricesData | null }) {
   // Save scroll position when navigating to trove detail
   const handleClick = () => {
     if (typeof window !== "undefined") {
@@ -18,26 +17,13 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
     }
   };
 
-  // Calculate interest breakdown using real lastActivityAt timestamp
-  const interestInfo = useMemo(() => {
-    // Use actual lastActivityAt as the last debt update timestamp
-    const lastUpdate = trove.activity.lastActivityAt;
-    // Use pre-calculated debt value from backend (already converted from wei)
-    const recordedDebt = trove.debt.current;
-    const interestRate = trove.metrics.interestRate;
-
-    return generateInterestInfo(
-      recordedDebt,
-      interestRate,
-      lastUpdate,
-      trove.batch.isMember,
-      trove.batch.managementFee,
-      trove.batch.manager || undefined,
-    );
-  }, [trove]);
-
-  // Calculate display value with interest
-  const debtWithInterest = interestInfo.entireDebt;
+  // Calculate collateral ratio when prices are available
+  // Use live prices for ratio (price volatility >> debt staleness)
+  const collateralTokenKey = trove.collateralType.toLowerCase() as keyof OraclePricesData;
+  const currentPrice = prices ? prices[collateralTokenKey] : null;
+  const collateralUsd = currentPrice ? trove.collateral.amount * currentPrice : null;
+  const collateralRatio =
+    collateralUsd && trove.debt.current > 0 ? (collateralUsd / trove.debt.current) * 100 : null;
 
   return (
     <Link
@@ -69,13 +55,13 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
       {/* Content section - single responsive grid */}
       <div className="pt-2 p-4 space-y-4">
         {/* Main metrics grid - responsive columns */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 md:items-start">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 md:items-start">
           {/* Debt - spans 2 columns on mobile */}
           <div className="col-span-2 md:col-span-1">
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Debt</p>
             <div className="flex items-center">
               <h3 className="text-xl lg:text-3xl font-bold text-slate-600 dark:text-slate-200">
-                {formatPrice(debtWithInterest)}
+                {formatApproximate(trove.debt.current)}
               </h3>
               <span className="ml-2 font-bold text-green-500">
                 <TokenIcon assetSymbol="BOLD" className="w-6 md:w-7 h-6 md:h-7 relative top-0" />
@@ -87,11 +73,32 @@ export function OpenListingCard({ trove }: { trove: TroveSummary }) {
           <div className="col-span-2 md:col-span-1">
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Backed by</p>
             <div className="flex items-center">
-              <p className="text-lg md:text-xl font-bold mr-1 text-slate-600 dark:text-slate-200">
-                {trove.collateral.amount}
-              </p>
-              <TokenIcon assetSymbol={trove.collateralType} />
+              <span className="flex items-center">
+                <p className="text-lg md:text-xl font-bold mr-1 text-slate-600 dark:text-slate-200">
+                  {trove.collateral.amount}
+                </p>
+                <TokenIcon assetSymbol={trove.collateralType} />
+              </span>
+              {collateralUsd && (
+                <div className="ml-1 flex items-center">
+                  <span className="text-xs flex items-center font-bold text-green-500 border-l-2 border-r-2 border-green-500 rounded-sm px-1 py-0">
+                    {formatUsdValue(collateralUsd)}
+                  </span>
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* Collateral Ratio */}
+          <div className="col-span-2 md:col-span-1">
+            <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Collateral Ratio</p>
+            {collateralRatio !== null ? (
+              <div className="text-lg md:text-xl font-bold text-slate-600 dark:text-slate-200">
+                {collateralRatio.toFixed(1)}%
+              </div>
+            ) : (
+              <div className="h-7 w-16 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+            )}
           </div>
 
           {/* Interest Rate */}
