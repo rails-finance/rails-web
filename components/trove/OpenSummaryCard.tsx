@@ -16,7 +16,7 @@ import { useHover, HoverProvider } from "@/components/transaction-timeline/conte
 import { InfoButton } from "@/components/transaction-timeline/explanation/InfoButton";
 import { FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
-import { Link2, Users } from "lucide-react";
+import { Link2, Users, Loader2 } from "lucide-react";
 import type { Transaction } from "@/types/api/troveHistory";
 import { TroveStateData } from "@/types/api/troveState";
 import { OraclePricesData } from "@/types/api/oracle";
@@ -312,11 +312,15 @@ function OpenTroveCardContent({ trove, liveState, prices, loadingStatus }: OpenT
       <div className="relative rounded-lg text-slate-600 dark:text-slate-500 bg-slate-50 dark:bg-slate-900">
         {/* Header section */}
         <div className="grid grid-cols-[auto_1fr] gap-2 p-4 pb-0 items-start">
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
             {/* Status */}
             <span className="font-bold tracking-wider px-2 py-0.5 text-white bg-green-500 dark:bg-green-950 dark:text-green-500/70 rounded-xs text-xs">
               ACTIVE
             </span>
+            {/* Loading spinner */}
+            {(!hasLiveData || !currentPrice) && (
+              <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
+            )}
           </div>
           {/* Metrics moved to the right */}
           <div className="flex items-center gap-2 text-xs flex-wrap justify-end pt-0.5">
@@ -344,111 +348,145 @@ function OpenTroveCardContent({ trove, liveState, prices, loadingStatus }: OpenT
           {/* Main value */}
           <div>
             <p className="text-xs text-slate-400 mb-1">Debt</p>
-            <HighlightableValue type="debt" state="after" value={displayDebt} asBlock={true}>
-              <div className="flex items-center">
-                <h3 className="text-3xl font-bold">
-                  <FadeNumber value={displayDebt} formatFn={formatPrice} />
-                </h3>
-                <span className="ml-2 text-green-600 text-lg">
-                  <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
-                </span>
-              </div>
-            </HighlightableValue>
-            {/* Debt breakdown */}
-            <div className="mt-2 text-xs text-slate-500 space-y-0.5">
-              <div className="flex items-center gap-1 ">
-                <span>
-                  <HighlightableValue
-                    type="principal"
-                    state="after"
-                    className="text-slate-500"
-                    value={displayRecordedDebt}
-                  >
-                    <FadeNumber value={displayRecordedDebt} formatFn={formatPrice} />
-                  </HighlightableValue>{" "}
-                  +{" "}
-                  {displayAccruedInterest !== undefined ? (
-                    <HighlightableValue
-                      type="interest"
-                      state="after"
-                      className="text-slate-500"
-                      value={displayAccruedInterest}
-                    >
-                      <FadeNumber value={displayAccruedInterest} formatFn={formatPrice} animateOnMount={true} />
-                    </HighlightableValue>
-                  ) : (
-                    <span className="inline-block h-4 w-16 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
-                  )}{" "}
-                  interest
-                  {trove.batch.isMember && displayManagementFee !== undefined && (
-                    <span className="text-pink-500">
-                      {" "}
-                      +&nbsp;
-                      <HighlightableValue
-                        type="managementFee"
-                        state="after"
-                        className="text-pink-500"
-                        value={displayManagementFee}
-                      >
-                        <FadeNumber value={displayManagementFee} formatFn={formatPrice} animateOnMount={true} />
-                      </HighlightableValue>
-                      &nbsp;delegate&nbsp;fee
+            {hasLiveData && currentPrice ? (
+              <>
+                <HighlightableValue type="debt" state="after" value={displayDebt} asBlock={true}>
+                  <div className="flex items-center">
+                    <h3 className="text-3xl font-bold">
+                      <FadeNumber value={displayDebt} formatFn={formatPrice} animateOnMount={true} />
+                    </h3>
+                    <span className="ml-2 text-green-600 text-lg">
+                      <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
                     </span>
-                  )}
-                </span>
-              </div>
-            </div>
+                  </div>
+                </HighlightableValue>
+                {/* Debt breakdown */}
+                <div className="mt-2 text-xs text-slate-500 space-y-0.5">
+                  <div className="flex items-center gap-1 ">
+                    <span>
+                      <HighlightableValue
+                        type="principal"
+                        state="after"
+                        className="text-slate-500"
+                        value={displayRecordedDebt}
+                      >
+                        <FadeNumber value={displayRecordedDebt} formatFn={formatPrice} animateOnMount={true} />
+                      </HighlightableValue>{" "}
+                      +{" "}
+                      {displayAccruedInterest !== undefined ? (
+                        <HighlightableValue
+                          type="interest"
+                          state="after"
+                          className="text-slate-500"
+                          value={displayAccruedInterest}
+                        >
+                          <FadeNumber value={displayAccruedInterest} formatFn={formatPrice} animateOnMount={true} />
+                        </HighlightableValue>
+                      ) : (
+                        <span className="inline-block h-4 w-16 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                      )}{" "}
+                      interest
+                      {trove.batch.isMember && displayManagementFee !== undefined && (
+                        <span className="text-pink-500">
+                          {" "}
+                          +&nbsp;
+                          <HighlightableValue
+                            type="managementFee"
+                            state="after"
+                            className="text-pink-500"
+                            value={displayManagementFee}
+                          >
+                            <FadeNumber value={displayManagementFee} formatFn={formatPrice} animateOnMount={true} />
+                          </HighlightableValue>
+                          &nbsp;delegate&nbsp;fee
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center">
+                  <div className="h-9 w-32 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  <span className="ml-2 text-green-600 text-lg">
+                    <TokenIcon assetSymbol="BOLD" className="w-7 h-7 relative top-0" />
+                  </span>
+                </div>
+                <div className="mt-2 text-xs text-slate-500 space-y-0.5">
+                  <div className="flex items-center gap-1">
+                    <span className="inline-block h-4 w-48 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Metrics grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <p className="text-xs font-bold text-slate-400 dark:text-slate-600">Backed by</p>
-              <div className="flex items-center">
-                <span className="flex items-center">
-                  <p className="text-xl font-bold mr-1">
-                    <HighlightableValue type="collateral" state="after" value={displayCollateral}>
-                      <FadeNumber value={displayCollateral} />
-                    </HighlightableValue>
-                  </p>
+              {hasLiveData && currentPrice ? (
+                <div className="flex items-center">
+                  <span className="flex items-center">
+                    <p className="text-xl font-bold mr-1">
+                      <HighlightableValue type="collateral" state="after" value={displayCollateral}>
+                        <FadeNumber value={displayCollateral} animateOnMount={true} />
+                      </HighlightableValue>
+                    </p>
+                    <span className="flex items-center">
+                      <TokenIcon assetSymbol={trove.collateralType} />
+                    </span>
+                  </span>
+                  <div className="ml-1 flex items-center">
+                    {collateralUsd !== null && collateralUsd > 0 ? (
+                      <span className="text-xs flex items-center border-l-2 border-r-2 border-green-500 rounded-sm px-1 py-0">
+                        <HighlightableValue
+                          className="text-green-500"
+                          type="collateralUsd"
+                          state="after"
+                          value={collateralUsd}
+                        >
+                          <FadeNumber value={collateralUsd} formatFn={formatUsdValue} animateOnMount={true} />
+                        </HighlightableValue>
+                      </span>
+                    ) : displayCollateral === 0 ? (
+                      <span className="text-xs flex items-center border-l-2 border-r-2 border-slate-300 dark:border-slate-600 rounded-sm px-1 py-0 text-slate-400">
+                        N/A
+                      </span>
+                    ) : (
+                      <span className="text-xs flex items-center border-l-2 border-r-2 border-slate-300 dark:border-slate-600 rounded-sm px-1 py-0">
+                        <span className="h-3 w-12 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <div className="h-7 w-16 bg-slate-200 dark:bg-slate-700 rounded animate-pulse mr-1" />
                   <span className="flex items-center">
                     <TokenIcon assetSymbol={trove.collateralType} />
                   </span>
-                </span>
-                <div className="ml-1 flex items-center">
-                  {hasLiveData && collateralUsd !== null && collateralUsd > 0 ? (
-                    <span className="text-xs flex items-center border-l-2 border-r-2 border-green-500 rounded-sm px-1 py-0">
-                      <HighlightableValue
-                        className="text-green-500"
-                        type="collateralUsd"
-                        state="after"
-                        value={collateralUsd}
-                      >
-                        <FadeNumber value={collateralUsd} formatFn={formatUsdValue} animateOnMount={true} />
-                      </HighlightableValue>
-                    </span>
-                  ) : liveState && displayCollateral === 0 ? (
-                    <span className="text-xs flex items-center border-l-2 border-r-2 border-slate-300 dark:border-slate-600 rounded-sm px-1 py-0 text-slate-400">
-                      N/A
-                    </span>
-                  ) : (
+                  <div className="ml-1 flex items-center">
                     <span className="text-xs flex items-center border-l-2 border-r-2 border-slate-300 dark:border-slate-600 rounded-sm px-1 py-0">
                       <span className="h-3 w-12 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
                     </span>
-                  )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
             <div>
               <p className="text-xs font-bold text-slate-400 dark:text-slate-600">Collateral Ratio</p>
-              {hasLiveData && collateralRatio !== null && collateralRatio > 0 ? (
-                <p className="text-xl font-semibold">
-                  <HighlightableValue type="collRatio" state="after" value={parseFloat(collateralRatio.toFixed(1))}>
-                    <FadeNumber value={collateralRatio} decimals={1} animateOnMount={true} />%
-                  </HighlightableValue>
-                </p>
-              ) : liveState && (displayCollateral === 0 || displayDebt === 0) ? (
-                <p className="text-xl font-semibold text-slate-400">N/A</p>
+              {hasLiveData && currentPrice ? (
+                collateralRatio !== null && collateralRatio > 0 ? (
+                  <p className="text-xl font-semibold">
+                    <HighlightableValue type="collRatio" state="after" value={parseFloat(collateralRatio.toFixed(1))}>
+                      <FadeNumber value={collateralRatio} decimals={1} animateOnMount={true} />%
+                    </HighlightableValue>
+                  </p>
+                ) : (
+                  <p className="text-xl font-semibold text-slate-400">N/A</p>
+                )
               ) : (
                 <div className="h-7 w-16 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
               )}
@@ -462,71 +500,88 @@ function OpenTroveCardContent({ trove, liveState, prices, loadingStatus }: OpenT
                 )}
                 <p className="text-xs font-bold text-slate-400 dark:text-slate-600">Interest Rate</p>
               </div>
-              <div className="text-xl font-medium">
-                <HighlightableValue type="interestRate" state="after" value={displayInterestRate}>
-                  <FadeNumber value={displayInterestRate} decimals={1} />%
-                </HighlightableValue>
-              </div>
-              <div className="text-xs text-slate-500 mt-0.5 space-y-0.5">
-                <span>
-                  ~{" "}
-                  <HighlightableValue
-                    type="dailyInterest"
-                    state="after"
-                    className="text-slate-500"
-                    value={dailyInterestCost}
-                  >
-                    <FadeNumber value={dailyInterestCost} formatFn={formatPrice} />
-                  </HighlightableValue>{" "}
-                  day /{" "}
-                  <HighlightableValue
-                    type="annualInterest"
-                    state="after"
-                    className="text-slate-500"
-                    value={annualInterestCost}
-                  >
-                    <FadeNumber value={annualInterestCost} formatFn={formatPrice} />
-                  </HighlightableValue>{" "}
-                  year
-                </span>
-              </div>
-              {trove.batch.isMember && (
+              {hasLiveData && currentPrice ? (
                 <>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    +{" "}
-                    <HighlightableValue
-                      type="managementFeeRate"
-                      state="after"
-                      value={trove.batch.managementFee}
-                      className="text-pink-500"
-                    >
-                      {trove.batch.managementFee}%
-                    </HighlightableValue>{" "}
-                    <HighlightableValue type="delegateName" state="after" className="text-pink-500">
-                      {batchManagerInfo?.name || "Batch Manager"}
+                  <div className="text-xl font-medium">
+                    <HighlightableValue type="interestRate" state="after" value={displayInterestRate}>
+                      <FadeNumber value={displayInterestRate} decimals={2} animateOnMount={true} />%
                     </HighlightableValue>
-                  </p>
-                  <div className="text-xs text-pink-500 mt-0.5">
-                    ~{" "}
-                    <HighlightableValue
-                      type="dailyManagementFee"
-                      state="after"
-                      className="text-pink-500"
-                      value={dailyManagementFee}
-                    >
-                      <FadeNumber value={dailyManagementFee} formatFn={formatPrice} />
-                    </HighlightableValue>{" "}
-                    day /{" "}
-                    <HighlightableValue
-                      type="annualManagementFee"
-                      state="after"
-                      className="text-pink-500"
-                      value={annualManagementFee}
-                    >
-                      <FadeNumber value={annualManagementFee} formatFn={formatPrice} />
-                    </HighlightableValue>{" "}
-                    year
                   </div>
+                  <div className="text-xs text-slate-500 mt-0.5 space-y-0.5">
+                    <span>
+                      ~{" "}
+                      <HighlightableValue
+                        type="dailyInterest"
+                        state="after"
+                        className="text-slate-500"
+                        value={dailyInterestCost}
+                      >
+                        <FadeNumber value={dailyInterestCost} formatFn={formatPrice} animateOnMount={true} />
+                      </HighlightableValue>{" "}
+                      day /{" "}
+                      <HighlightableValue
+                        type="annualInterest"
+                        state="after"
+                        className="text-slate-500"
+                        value={annualInterestCost}
+                      >
+                        <FadeNumber value={annualInterestCost} formatFn={formatPrice} animateOnMount={true} />
+                      </HighlightableValue>{" "}
+                      year
+                    </span>
+                  </div>
+                  {trove.batch.isMember && (
+                    <>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        +{" "}
+                        <HighlightableValue
+                          type="managementFeeRate"
+                          state="after"
+                          value={trove.batch.managementFee}
+                          className="text-pink-500"
+                        >
+                          {trove.batch.managementFee}%
+                        </HighlightableValue>{" "}
+                        <HighlightableValue type="delegateName" state="after" className="text-pink-500">
+                          {batchManagerInfo?.name || "Batch Manager"}
+                        </HighlightableValue>
+                      </p>
+                      <div className="text-xs text-pink-500 mt-0.5">
+                        ~{" "}
+                        <HighlightableValue
+                          type="dailyManagementFee"
+                          state="after"
+                          className="text-pink-500"
+                          value={dailyManagementFee}
+                        >
+                          <FadeNumber value={dailyManagementFee} formatFn={formatPrice} animateOnMount={true} />
+                        </HighlightableValue>{" "}
+                        day /{" "}
+                        <HighlightableValue
+                          type="annualManagementFee"
+                          state="after"
+                          className="text-pink-500"
+                          value={annualManagementFee}
+                        >
+                          <FadeNumber value={annualManagementFee} formatFn={formatPrice} animateOnMount={true} />
+                        </HighlightableValue>{" "}
+                        year
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="h-7 w-16 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  <div className="text-xs text-slate-500 mt-0.5 space-y-0.5">
+                    <div className="h-4 w-32 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  </div>
+                  {trove.batch.isMember && (
+                    <>
+                      <div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded animate-pulse mt-0.5" />
+                      <div className="h-4 w-32 bg-slate-200 dark:bg-slate-700 rounded animate-pulse mt-0.5" />
+                    </>
+                  )}
                 </>
               )}
             </div>
