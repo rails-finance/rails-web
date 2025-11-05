@@ -1,36 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Rails
 
-## Getting Started
+A DeFi self-service support platform initially designed to make Liquity V2 protocol activity understandable and accessible for everyone.
 
-First, run the development server:
+## Overview
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Rails provides clear, intuitive explanations of DeFi transactions and protocol events. The platform displays DeFi activity on simple timelines with comprehensive explanations, helping users understand their positions, transactions, and activities within the Liquity V2 ecosystem.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Visit **[rails.finance](https://rails.finance)** to explore the platform.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Trove Explorer**
+Search and view Liquity V2 troves by ID, owner address, or ENS name. Track trove ownership history, collateral breakdown, and key statistics across ETH, wstETH, and rETH collateral types.
 
-## Learn More
+**Transaction Timeline**
+Detailed transaction history with visual timelines and explanations for each transaction type, including trove operations (open, adjust, close), batch delegations, and liquidations.
 
-To learn more about Next.js, take a look at the following resources:
+**Protocol Statistics**
+Real-time Liquity V2 protocol metrics including total value locked, collateral distribution, and network-wide statistics.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Batch Manager Integration**
+View and track batch manager information for delegated trove management, with integration support for services like Summerstone, Bolder, and Caramila Capital.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Additional Capabilities**
+- ENS name resolution for addresses
+- Dark and light theme support
+- Responsive design for mobile and desktop
+- Real-time data updates
 
-## Deploy on Vercel
+## Status
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Rails is currently in beta. The platform is actively being developed with additional features and improvements planned for future releases.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
