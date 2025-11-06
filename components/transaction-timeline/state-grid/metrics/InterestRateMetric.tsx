@@ -14,6 +14,7 @@ interface InterestRateMetricProps {
 export function InterestRateMetric({ before, after, isCloseTrove }: InterestRateMetricProps) {
   const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
   const hasBeforeValue = before > 0;
+  const hasAfterValue = after > 0;
   const hasChange = hasBeforeValue && before !== after;
 
   // Only highlight when hover is enabled
@@ -43,7 +44,7 @@ export function InterestRateMetric({ before, after, isCloseTrove }: InterestRate
         )}
         {isCloseTrove ? (
           <ClosedStateLabel />
-        ) : !hasBeforeValue ? (
+        ) : !hasAfterValue ? (
           <div className="text-sm font-bold text-slate-400 dark:text-slate-600">N/A</div>
         ) : (
           <span
