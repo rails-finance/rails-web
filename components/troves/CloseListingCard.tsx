@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { TroveSummary } from "@/types/api/trove";
 import { Icon } from "../icons/icon";
-import { formatPrice } from "@/lib/utils/format";
+import { formatPrice, formatApproximate } from "@/lib/utils/format";
 import { CardFooter } from "../trove/components/CardFooter";
 import { ChevronRight } from "lucide-react";
 import { formatDuration } from "@/lib/date";
@@ -51,7 +51,7 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Highest recorded debt</p>
             <div className="flex items-center">
               <h3 className="text-xl lg:text-3xl font-bold text-slate-600 dark:text-slate-200">
-                {formatPrice(trove.debt.peak)}
+                {formatApproximate(trove.debt.peak)}
               </h3>
               <span className="ml-2 text-green-600">
                 <TokenIcon assetSymbol="BOLD" className="w-6 md:w-7 h-6 md:h-7 relative top-0" />
@@ -64,7 +64,7 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
             <p className="text-xs text-slate-400 dark:text-slate-600 mb-1 font-bold">Highest recorded collateral</p>
             <div className="flex items-center">
               <p className="text-lg md:text-xl font-bold mr-1 text-slate-600 dark:text-slate-200">
-                {trove.collateral.peakAmount}
+                {formatApproximate(trove.collateral.peakAmount)}
               </p>
               <TokenIcon assetSymbol={trove.collateralType} />
             </div>

@@ -49,3 +49,4 @@ server.sh
 reference/*
 .zip.py
 rails*.zip
+app/(site)/blog/README.md

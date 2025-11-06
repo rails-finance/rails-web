@@ -114,4 +114,69 @@ body {
   .protocol-trove-header {
     background: linear-gradient(to bottom, var(--protocol-grad-1), var(--protocol-grad-2));
   }
+
+  /* Blog article content styling */
+  .article-content > p {
+    @apply text-slate-700 dark:text-slate-300 leading-relaxed mb-6 text-lg;
+  }
+
+  .article-content > h2 {
+    @apply text-3xl font-bold mt-12 mb-6 text-slate-900 dark:text-slate-100;
+  }
+
+  .article-content > h3 {
+    @apply text-2xl font-semibold mt-10 mb-4 text-slate-900 dark:text-slate-100;
+  }
+
+  .article-content a {
+    @apply text-blue-600 dark:text-blue-400 no-underline hover:underline;
+  }
+
+  .article-content strong {
+    @apply text-slate-900 dark:text-slate-100 font-semibold;
+  }
+
+  .article-content em {
+    @apply text-slate-700 dark:text-slate-300 italic;
+  }
+
+  .article-content > ul {
+    @apply my-8 pl-6 list-disc;
+  }
+
+  .article-content > ol {
+    @apply my-8 pl-6 list-decimal;
+  }
+
+  .article-content li {
+    @apply text-slate-700 dark:text-slate-300 mb-2 text-lg leading-relaxed ml-4;
+  }
+
+  .article-content > blockquote {
+    @apply border-l-4 border-slate-300 dark:border-slate-600 pl-6 italic my-8;
+  }
+
+  .article-content code {
+    @apply text-sm bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded;
+  }
+
+  .article-content > pre {
+    @apply bg-slate-900 dark:bg-slate-950 my-8;
+  }
+
+  .article-content > img {
+    @apply rounded-lg shadow-md my-8;
+  }
+
+  .article-content > figure {
+    @apply my-8;
+  }
+
+  .article-content figure > img {
+    @apply rounded-lg shadow-md;
+  }
+
+  .article-content figcaption {
+    @apply text-sm text-center text-slate-600 dark:text-slate-400 mt-3 italic;
+  }
 }

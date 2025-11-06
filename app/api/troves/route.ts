@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TrovesResponse } from "@/types/api/trove";
-import { mockTroveData } from "@/lib/mockData";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 
 const RAILS_API_URL = process.env.RAILS_API_URL;
@@ -104,30 +103,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Return mock data for specific fake trove ID
-  if (troveId === "mock-all-events") {
-    const mockCollateral = collateralType || "WETH";
-    const customizedMock = {
-      ...mockTroveData,
-      troveId: troveId,
-      collateralType: mockCollateral,
-      backedBy: {
-        ...mockTroveData.backedBy,
-        symbol: mockCollateral,
-      },
-    };
-
-    return NextResponse.json({
-      data: [customizedMock],
-      pagination: {
-        total: 1,
-        limit: 10,
-        page: 1,
-      },
-    });
-  }
-
-  // Original API logic
+  // API logic
   if (!RAILS_API_URL) {
     console.error("RAILS_API_URL environment variable is not set");
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });

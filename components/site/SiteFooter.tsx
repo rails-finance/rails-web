@@ -78,6 +78,14 @@ export function SiteFooter() {
               </li>
               <li>
                 <Link
+                  href="/blog"
+                  className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors duration-150"
+                >
+                  Blog
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/how-it-works"
                   className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-600 text-sm transition-colors duration-150"
                 >

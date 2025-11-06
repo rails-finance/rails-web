@@ -124,8 +124,8 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
         <span className="text-slate-600 dark:text-slate-400">•</span>
         <div className="text-slate-500">
           Annual interest rate set at{" "}
-          <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
-            {tx.stateAfter.annualInterestRate}%
+          <HighlightableValue type="interestRate" state="after" value={tx.troveOperation?.annualInterestRate ?? tx.stateAfter.annualInterestRate}>
+            {tx.troveOperation?.annualInterestRate ?? tx.stateAfter.annualInterestRate}%
           </HighlightableValue>
           , compounding continuously.
         </div>
