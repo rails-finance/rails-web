@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, BookOpen, Search } from "lucide-react";
+import { Home, Users, BookOpen, Search, FileText } from "lucide-react";
 import { ThemeToggle } from "../ThemeToggle";
 
 interface NavigationContentProps {
@@ -26,6 +26,14 @@ export function NavigationContent({ onLinkClick }: NavigationContentProps) {
       iconBg: "bg-blue-600",
       activeColor: "text-blue-600 dark:text-blue-600",
       hoverColor: "hover:text-blue-600 dark:hover:text-blue-600",
+    },
+    {
+      href: "/blog",
+      label: "Blog",
+      icon: <FileText size={16} />,
+      iconBg: "bg-orange-600",
+      activeColor: "text-orange-600 dark:text-orange-600",
+      hoverColor: "hover:text-orange-600 dark:hover:text-orange-600",
     },
     {
       href: "/how-it-works",
