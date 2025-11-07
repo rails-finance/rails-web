@@ -126,7 +126,7 @@ export default function RailsSolutionDefiTrustProblem() {
       </p>
 
       <p>
-        Currently in beta,{" "}
+        Currently in alpha,{" "}
         <a href="https://rails.finance/" target="_blank" rel="noopener noreferrer">
           Rails
         </a>{" "}
