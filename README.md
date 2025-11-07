@@ -30,7 +30,7 @@ View and track batch manager information for delegated trove management, with in
 
 ## Status
 
-Rails is currently in alpha. The platform is actively being developed with additional features and improvements planned for future releases.
+Rails is currently in beta. While core features are stable, the platform continues to be enhanced with additional features and improvements planned for future releases.
 
 ## License
 
