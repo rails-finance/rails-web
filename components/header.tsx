@@ -179,7 +179,7 @@ export function Header() {
       {/* Fixed Beta Label */}
       <button
         onClick={() => setIsBetaModalOpen(true)}
-        className="fixed bottom-0 left-0 bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-shadow text-white text-xs font-bold px-8 py-1 rotate-45 -translate-x-6 -translate-y-4 shadow-md z-50 cursor-pointer transition-colors duration-150"
+        className="fixed bottom-0 left-0 bg-orange-500 dark:bg-orange-600 hover:bg-orange-600 dark:hover:bg-orange-700 text-shadow text-white text-xs font-bold px-10 py-1 rotate-45 -translate-x-6 -translate-y-4 shadow-md z-50 cursor-pointer transition-colors duration-150"
         aria-label="View Beta version information"
       >
         Beta
@@ -198,7 +198,7 @@ export function Header() {
             {/* Modal Header */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-2">
-                <div className="bg-blue-500 dark:bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">
+                <div className="bg-orange-500 dark:bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded">
                   Beta
                 </div>
                 <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
