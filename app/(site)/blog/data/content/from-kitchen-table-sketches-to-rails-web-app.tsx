@@ -255,7 +255,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       <h2 id="what-comes-next-20252026">What comes next (2025–2026)</h2>
 
       <p>
-        Rails V2 is live with full Liquity coverage, built on infrastructure meant for the long haul. We’re self-funding
+        Rails is live (in Beta) with full Liquity V2 Trove coverage, built on infrastructure meant for the long haul. We’re self-funding
         beyond the Liquity grant while lining up new partners and grants to keep this public-good mission alive — and
         growing.
       </p>
