@@ -247,7 +247,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       <figure>
         <img
           src="/blog/from-kitchen-table-sketches-to-rails-web-app-rails-today.png"
-          alt="Rails homepage, Trove list, and Trove detail views"
+          alt="Rails today (Home, Trove list, and Trove detail views)"
         />
         <figcaption>Rails today (Home, Trove list, and Trove detail views)</figcaption>
       </figure>
@@ -277,6 +277,8 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
         <br />
         If you’d like to follow our journey or explore integrations,  <a href="https://twitter.com/rails_finance" target="_blank" rel="noopener noreferrer">reach out</a>.
       </p>
-    </>
+<p>
+        <em>Story by Miles Essex (<a href="https://x.com/milesessex" target="_blank">@milesessex</a>), designer of Rails.</em>
+      </p>    </>
   );
 }
