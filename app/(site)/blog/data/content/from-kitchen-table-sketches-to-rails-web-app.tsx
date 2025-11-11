@@ -1,13 +1,19 @@
 export default function FromKitchenTableSketchesToRailsWebApp() {
   return (
     <>
+      <h1 id="from-kitchen-table-sketches-to-rails-web-app">From kitchen table sketches to Rails web app</h1>
+
       <p>
         Rails began with my own struggle to untangle my on-chain activity. That confusion — and a desire to contribute
-        meaningfully to the blockchain space — led me to build <a href="https://rails.finance" target="_blank">Rails</a>, a web app designed to make DeFi protocols clear and
+        meaningfully to the blockchain space — led me to build{" "}
+        <a href="https://rails.finance" target="_blank" rel="noopener noreferrer">
+          Rails
+        </a>
+        , a web app designed to make DeFi protocols clear and
         accessible for everyone.
       </p>
 
-      <h2 id="discovering-digital-truth-20182021">Discovering Digital Truth (2018–2021)</h2>
+      <h2 id="discovering-digital-truth-20182021">Discovering digital truth (2018–2021)</h2>
 
       <p>
         In 2018, Ethereum’s promise of programmable property rights — <em>digital truth</em> — captured my
@@ -20,7 +26,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
         of the scams, hacks and the complexity that made using the technology feel risky.
       </p>
 
-      <h2 id="the-kitchen-table-blueprint-2021">The Kitchen Table Blueprint (2021)</h2>
+      <h2 id="the-kitchen-table-blueprint-2021">The kitchen table blueprint (2021)</h2>
 
       <p>
         By mid-2021, curiosity won out. I opened a position on{" "}
@@ -44,7 +50,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
 
       <figure>
         <img
-          src="/blog/from-kitchen-table-sketches-to-rails-web-app-kitchen-table.jpg"
+          src="/blog/from-kitchen-table-sketches-to-rails-web-app-kitchen-table2.jpg"
           alt="Liquity timeline sketched across a kitchen table"
         />
         <figcaption>Kitchen table sketches decoding Liquity V1 activity</figcaption>
@@ -79,7 +85,11 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       </p>
 
       <p>
-        I applied to attend the <a href="https://ethglobal.com">ETHGlobal</a> hackathon, ETHAmsterdam 2022 — that weekend strengthened my
+        I applied to attend the{" "}
+        <a href="https://ethglobal.com" target="_blank" rel="noopener noreferrer">
+          ETHGlobal
+        </a>{" "}
+        hackathon, ETHAmsterdam 2022 — that weekend strengthened my
         belief that I was on to something. I joined a team designing a cutting-edge{" "}
         <a href="https://ethglobal.com/showcase/soul-protocol-69p0s" target="_blank" rel="noopener noreferrer">
           soulbound NFT
@@ -113,7 +123,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
         connections but falling short of finding a collaborator.
       </p>
 
-      <h2 id="getting-real--20222023">Getting Real (2022–2023)</h2>
+      <h2 id="getting-real--20222023">Getting real (2022–2023)</h2>
 
       <p>
         I enlisted a developer friend and he played with building a prototype that could capture <em>every</em>{' '}
@@ -166,7 +176,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
         only way forward. Stepping into development from design proved to be an essential step in my own development.
       </p>
 
-      <h2 id="finding-market-fit-20242025">Finding Market Fit (2024–2025)</h2>
+      <h2 id="finding-market-fit-20242025">Finding market fit (2024–2025)</h2>
 
       <p>
         In early 2024, I began chatting with the <strong>Liquity</strong> team, sharing updates on Rails and exchanging
@@ -212,7 +222,16 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
 
       <p>
         Together, we’ve built a base that truly lives up to the original vision: a platform ready to grow with DeFi —
-        and, permit me to be <a href="http://github.com/liquity/bold" target="_blank" title="Liquity V2 BOLD Github Repo">BOLD</a>, to help <em>grow</em> DeFi itself.
+        and, permit me to be{" "}
+        <a
+          href="http://github.com/liquity/bold"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Liquity V2 BOLD Github Repo"
+        >
+          BOLD
+        </a>
+        , to help <em>grow</em> DeFi itself.
       </p>
 
       <p>
@@ -229,7 +248,15 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
         in November 2025.
       </p>
 
-      <h2 id="what-comes-next-20252026">What Comes Next (2025–2026)</h2>
+      <figure>
+        <img
+          src="/blog/from-kitchen-table-sketches-to-rails-web-app-rails-today.png"
+          alt="Rails homepage, Trove list, and Trove detail views"
+        />
+        <figcaption>Rails today (Home, Trove list, and Trove detail views)</figcaption>
+      </figure>
+
+      <h2 id="what-comes-next-20252026">What comes next (2025–2026)</h2>
 
       <p>
         Rails V2 is live with full Liquity coverage, built on infrastructure meant for the long haul. We’re self-funding
