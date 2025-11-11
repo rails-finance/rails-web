@@ -14,6 +14,18 @@ export interface Article {
 
 export const articles: Article[] = [
   {
+    slug: "from-kitchen-table-sketches-to-rails-web-app",
+    title: "From Kitchen Table Sketches to Rails Web App",
+    subtitle: "The path from DeFi curiosity to a production-ready transparency layer",
+    thumbnail: "/blog/from-kitchen-table-sketches-to-rails-web-app.png",
+    publishedAt: "2025-11-10",
+    author: {
+      name: "Rails Team",
+      twitter: "rails_finance",
+    },
+    content: require("./content/from-kitchen-table-sketches-to-rails-web-app").default,
+  },
+  {
     slug: "introducing-rails-finance",
     title: "Introducing Rails: DeFi Self-Service Support",
     subtitle: "Rails tracks interactions with DeFi protocols, helping you understand activity from real events",
