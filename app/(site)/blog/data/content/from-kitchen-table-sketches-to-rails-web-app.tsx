@@ -50,7 +50,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
 
       <figure>
         <img
-          src="/blog/from-kitchen-table-sketches-to-rails-web-app-kitchen-table2.jpg"
+          src="/blog/from-kitchen-table-sketches-to-rails-web-app-kitchen-table.jpg"
           alt="Liquity timeline sketched across a kitchen table"
         />
         <figcaption>Kitchen table sketches decoding Liquity V1 activity</figcaption>
