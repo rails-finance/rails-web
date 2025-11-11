@@ -1,8 +1,6 @@
 export default function FromKitchenTableSketchesToRailsWebApp() {
   return (
     <>
-      <h1 id="from-kitchen-table-sketches-to-rails-web-app">From kitchen table sketches to Rails web app</h1>
-
       <p>
         Rails began with my own struggle to untangle my on-chain activity. That confusion — and a desire to contribute
         meaningfully to the blockchain space — led me to build{" "}
