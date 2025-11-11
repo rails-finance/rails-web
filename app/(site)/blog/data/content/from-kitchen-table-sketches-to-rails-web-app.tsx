@@ -37,7 +37,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       </p>
 
       <p>
-        As someone who’s not naturally comfortable with numbers and dyslexic, understanding how it all worked was a challenge. Given that the blockchain is a public ledger, it seemed like it <em>should</em> be straightforward. I found myself sketching lines between the protocol and my wallet across a timeline — a
+        As someone who’s dyslexic and not naturally comfortable with numbers, understanding how it all worked was a challenge. Given that the blockchain is a public ledger, it seemed like it <em>should</em> be straightforward. I found myself sketching lines between the protocol and my wallet across a timeline — a
         map began to take shape. That map helped me decode my transactions and <em>see</em> clearly what was happening.
         It became the blueprint for{" "}
         <a href="https://rails.finance" target="_blank" rel="noopener noreferrer">
@@ -126,8 +126,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       <p>
         I enlisted a developer friend and he played with building a prototype that could capture <em>every</em>{' '}
         transaction on Ethereum mainnet  — building an explorer that turned wallet transactions into simple, map-like
-        visualisations. It was beautiful but proved a point that a lot happens on-chain and taking this approach was
-        going to have huge overheads.
+        visualisations. It was beautiful but proved that taking this approach was going to have huge overheads.
       </p>
 
       <p>
@@ -148,7 +147,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       </p>
 
       <p>
-        For Rails to become a true visual language, it had to adapt beyond Liquity.. I took this streamlined
+        For Rails to become a true visual language, it had to adapt beyond Liquity. I took this streamlined
         approach to{" "}
         <a href="https://ethglobal.com/showcase/rails-20fvz" target="_blank" rel="noopener noreferrer">
           ETHIstanbul 2023
@@ -169,9 +168,9 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       </figure>
 
       <p>
-        Protocols responded positively, but I knew I needed something more concrete — a working prototype of protocol
-        events. That was when I began, in earnest, to become a better developer. If Rails was going to work, it was the
-        only way forward. Stepping into development from design proved to be an essential step in my own development.
+        The response was positive, but I knew I needed something more concrete — a functioning prototype using real
+        events. That was when I began, in earnest, to take my role as a developer more seriously. If Rails was going to work, it was the
+        only way forward. Stepping into coding from design proved to be an essential step in my own development.
       </p>
 
       <h2 id="finding-market-fit-20242025">Finding market fit (2024–2025)</h2>
@@ -179,7 +178,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       <p>
         In early 2024, I began chatting with the <strong>Liquity</strong> team, sharing updates on Rails and exchanging
         ideas about how it might help their users. By the time we met in person at <strong>ETHCC 2024</strong>, they
-        were already familiar with my work. When I introduced myself to <strong>Michael</strong>, Liquity’s CEO, he was
+        were already familiar with my work. When I introduced myself to Michael, Liquity’s CEO, he was
         enthusiastic about the project and encouraged me to keep developing it — suggesting that if I could turn it into
         something genuinely useful, I should apply for a grant.
       </p>
@@ -192,19 +191,19 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       </p>
 
       <p>
-        Thanks to rapid progress in AI tools, that goal became more achievable. I began producing work I felt confident
-        enough to share publicly and, with Liquity’s encouragement, formally applied for a grant to help push the build
+        Thanks to progress in AI tools, that goal became more achievable. I began producing work I felt confident
+        enough to share publicly and, with Michael’s encouragement, formally applied for a grant to help push the build
         over the line.
       </p>
 
       <p>
         At <strong>ETHCC 2025</strong>, I showed Michael the latest version — a working Liquity explorer that reflected
-        everything I’d been building toward. The feedback was hugely positive, and for the first time, it felt like Rails
+        everything I’d been building toward. The feedback was positive, and for the first time, it felt like Rails
         had moved from an idea to a real, living product. It was a milestone moment after years of iteration.
       </p>
 
       <p>
-        At the same event, through <strong>Victor</strong> from Lens, I met <strong>Slava (@slvdev)</strong> — a
+        At the same event, through Victor from Lens, I met Slava (<a href="https://x.com/@slvdev">@slvdev</a>) — a
         developer who immediately understood the vision behind Rails. With Liquity’s grant contribution on the horizon, we began collaborating, turning years of solo work into a partnership while continuing to self-fund the
         remaining development.
       </p>
@@ -213,14 +212,14 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
 
       <p>
         By the time Slava joined, Rails had gone from sketches to a working application — but it needed an engineer’s
-        discipline to reach production quality. His technical depth and rigour have brought the stability and precision
+        discipline to reach production quality. Slava's technical depth and rigour have brought the stability and precision
         Rails needs to become real infrastructure. For the first time, we can focus on shaping the experience and
         expanding to new protocols — knowing the foundation beneath it is solid.
       </p>
 
       <p>
         Together, we’ve built a base that truly lives up to the original vision: a platform ready to grow with DeFi —
-        and, permit me to be{" "}
+        and let's be{" "}
         <a
           href="http://github.com/liquity/bold"
           target="_blank"
@@ -234,8 +233,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
 
       <p>
         Rails is the beginning of an ecosystem — a place where complex financial protocols can finally be made clear,
-        human, and usable. The mission hasn’t changed since those first kitchen table sketches — to make DeFi legible for
-        everyone.
+        human, and usable. The mission hasn’t changed since those first kitchen table sketches.
       </p>
 
       <p>
