@@ -23,6 +23,7 @@ export const articles: Article[] = [
       name: "Rails Team",
       twitter: "rails_finance",
     },
+    mediumUrl: "https://medium.com/@railsfinance/from-kitchen-table-sketches-to-rails-web-app-76b8aced9387",
     content: require("./content/from-kitchen-table-sketches-to-rails-web-app").default,
   },
   {
@@ -35,6 +36,7 @@ export const articles: Article[] = [
       name: "Rails Team",
       twitter: "rails_finance",
     },
+    mediumUrl: "https://medium.com/@railsfinance/introducing-rails-defi-self-service-support-ce47cd14ef1d",
     content: require("./content/introducing-rails-finance").default,
   },
   {
@@ -47,6 +49,7 @@ export const articles: Article[] = [
       name: "Rails Team",
       twitter: "rails_finance",
     },
+    mediumUrl: "https://medium.com/@railsfinance/rails-the-solution-to-defis-trust-problem-2cd1a7e65ed7",
     content: require("./content/rails-solution-defi-trust-problem").default,
   },
   {
