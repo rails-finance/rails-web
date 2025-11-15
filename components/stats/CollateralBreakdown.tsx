@@ -60,77 +60,58 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
   });
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {sortedData.map(([collateralType, stats]) => (
-        <Link
-          key={collateralType}
-          href={`/troves?collateralType=${collateralType}`}
-          className="group bg-white dark:bg-slate-900 dark:hover:bg-slate-900/50 rounded-lg p-6 hover:bg-white-50/50 hover:shadow-lg transition-all cursor-pointer"
-        >
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex items-center">
-              <TokenIcon assetSymbol={collateralType.toLowerCase()} className="lg:w-12 lg:h-12 w-10 h-10 z-1" />
-              <TokenIcon assetSymbol="bold" className="lg:w-12 lg:h-12 w-10 h-10 -ml-1.5" />
-            </div>
-            <div>
-              <div>
-                <span className="text-xl font-semibold text-slate-600 dark:text-slate-100">{collateralType}</span>
-              </div>
-              <div>
-                <span className="text-sm text-slate-500">
-                  {formatNumber(stats.totalCollateral)} {collateralType}
-                </span>
-              </div>
-            </div>
-          </div>
+    <div className="grid grid-cols-1 gap-4">
+      {sortedData.map(([collateralType, stats]) => {
+        const troveButton = (
+          <span
+            className="text-sm text-white group-hover:text-white font-medium dark:bg-slate-700 inline-flex items-center gap-1 rounded-full transition-all w-fit py-1 group-hover:bg-blue-500 bg-slate-300 pl-3 pr-2"
+            aria-label="View Troves"
+          >
+            <Icon name="view-troves" className="w-[19px] h-[18px]" />
+            <span>{stats.openTroveCount.toLocaleString()} Troves</span>
+            <ChevronRight className="w-4 h-4" />
+          </span>
+        );
 
-          <div className="space-y-3">
-            <div>
-              <div className="mb-1">
-                <span className="text-xs font-bold text-slate-400 dark:text-slate-600">TVL</span>
+        return (
+          <Link
+            key={collateralType}
+            href={`/troves?collateralType=${collateralType}`}
+            className="group bg-white dark:bg-slate-900 dark:hover:bg-slate-900/50 rounded-lg p-4 hover:bg-white-50/50 hover:shadow-lg transition-all cursor-pointer"
+          >
+            <div className="space-y-4 md:space-y-0">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-6 md:flex-1">
+                  <div className="flex items-center gap-3">
+                    <TokenIcon assetSymbol={collateralType.toLowerCase()} className="w-12 h-12 flex-shrink-0" />
+                    <div>
+                      <div className="mb-1">
+                        <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Total Collateral</span>
+                      </div>
+                      <div className="text-lg font-bold text-slate-600 dark:text-slate-300">
+                        {formatNumber(stats.totalCollateral)} {collateralType}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <TokenIcon assetSymbol="bold" className="w-12 h-12 flex-shrink-0" />
+                    <div>
+                      <div className="mb-1">
+                        <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Total Debt</span>
+                      </div>
+                      <div className="text-lg font-bold text-slate-600 dark:text-slate-300">
+                        ${formatNumber(stats.totalDebt)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="hidden md:flex">{troveButton}</div>
               </div>
-              <div>
-                <span className="text-2xl font-bold text-slate-600 dark:text-slate-300">
-                  ${formatNumber(stats.totalCollateralUsd)}
-                </span>
-              </div>
+              <div className="md:hidden">{troveButton}</div>
             </div>
-            <div className="flex justify-between items-center">
-              <div>
-                <div className="mb-1">
-                  <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Total Debt</span>
-                </div>
-                <div>
-                  <span className="text-lg font-bold text-slate-600 dark:text-slate-300">
-                    ${formatNumber(stats.totalDebt)}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <div className="mb-1">
-                  <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Active Troves</span>
-                </div>
-                <div>
-                  <span className="text-lg font-bold text-slate-600 dark:text-slate-300">
-                    {stats.openTroveCount.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex justify-end">
-            <span
-              className="text-sm text-white group-hover:text-white font-medium dark:bg-slate-700 inline-flex items-center gap-1 rounded-full transition-all w-fit py-1 group-hover:bg-blue-500 bg-slate-300 pl-3 pr-2"
-              aria-label="View Troves"
-            >
-              <Icon name="view-troves" className="w-[19px] h-[18px]" />
-              View
-              <ChevronRight className="w-4 h-4" />
-            </span>
-          </div>
-        </Link>
-      ))}
+          </Link>
+        );
+      })}
     </div>
   );
 }

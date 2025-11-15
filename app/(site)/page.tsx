@@ -2,12 +2,13 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, GraduationCap, Activity, Code2 } from "lucide-react";
 import Link from "next/link";
-import { CollateralBreakdown } from "@/components/stats/CollateralBreakdown";
 import { ProtocolStats } from "@/types/api/stats";
 import { LiquityLogo } from "@/components/LiquityLogo";
 import { NetworkGraphic } from "@/components/NetworkGraphic";
+import { CollateralBreakdown } from "@/components/stats/CollateralBreakdown";
+import { ExplanationPanel } from "@/components/transaction-timeline/explanation/ExplanationPanel";
 
 export default function Home() {
   const [searchValue, setSearchValue] = useState("");
@@ -73,9 +74,8 @@ export default function Home() {
             <div className="md:flex md:flex-col md:h-full">
               {/* Text Content - Same for both mobile and desktop */}
               <div className="md:flex-1 md:px-6 md:py-8 md:flex md:flex-col md:justify-center md:relative md:z-10">
-                <p className="text-slate-700 dark:text-slate-200 text-xl md:text-2xl lg:text-3xl/10  font-bold mb-4">
-                  <span className="text-green-600 font-bold dark:text-green-600">Rails</span> displays your DeFi
-                  activity on&nbsp;simple timelines with clear explanations and in&#8209;depth transaction analysis.
+                <p className="text-slate-700 dark:text-slate-200 text-xl md:text-3xl lg:text-4xl/12  font-bold mb-4">
+                  DeFi activity on&nbsp;simple timelines with in&#8209;depth analysis
                 </p>
               </div>
 
@@ -98,7 +98,7 @@ export default function Home() {
 
           {/* Desktop Right Side Background SVG */}
           <div
-            className="hidden md:block md:w-1/2 md:h-full md:-mt-24"
+            className="hidden md:block md:w-1/2 md:h-1/2 md:-mt-24"
             style={{
               backgroundImage: "url(/hero-r.svg)",
               backgroundRepeat: "no-repeat",
@@ -126,33 +126,33 @@ export default function Home() {
             {/* Content Column continued */}
             <div>
               {/* Liquity V2 Protocol Card */}
-              <div className="space-y-6">
+              <div className="">
                 <div className="bg-slate-100/50 dark:bg-slate-800 rounded-lg overflow-hidden">
                   <div className="p-4 space-y-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <svg className="w-12 h-12" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+
+                    {/* Mobile: Stacked, Desktop: Two columns */}
+                    
+                    <div className="flex flex-col md:flex-row md:gap-8 md:items-center">
+                      <div className="text-slate-600  dark:text-slate-400 font-medium text-md leading-relaxed md:flex-1 flex items-center mb-6 md:mb-0">
+                        <p>
+<div className="flex items-center gap-2 mb-4">
+                    <span className="text-2xl text-slate-600 dark:text-slate-300 font-extrabold">
+                      Explore
+                      </span> <svg className="w-12 h-12" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                         <use href="#icon-liquity" />
                       </svg>
                       <span className="text-2xl text-slate-600 dark:text-slate-300 font-extrabold">
-                        Explore Liquity V2
+                        Liquity V2
                       </span>
                     </div>
-
-                    {/* Mobile: Stacked, Desktop: Two columns */}
-                    <div className="flex flex-col md:flex-row md:gap-8 md:items-center">
-                      <div className="text-slate-600 dark:text-slate-400 font-medium text-sm leading-relaxed md:flex-1 flex items-center mb-6 md:mb-0">
-                        <NetworkGraphic className="w-10 h-25 mx-4 flex-shrink-0" />
-                        <p>
-                          <span className="font-extrabold text-slate-700 dark:text-slate-300">Liquity V2</span> is an
-                          immutable, governance-free lending protocol. Users can deposit ETH, wstETH, or rETH as
-                          collateral to mint BOLD stablecoins and set their own interest rates.
+                          Liquity V2 enables users to deposit ETH, wstETH, or rETH as collateral to mint BOLD stablecoins and set their own interest rates.
                         </p>
                       </div>
 
                       {/* Search Box - Mobile and Desktop */}
                       <div className="md:flex-1 bg-white dark:bg-slate-900 rounded-lg p-4 transition-shadow hover:shadow-sm">
                         <p className="text-slate-600 dark:text-slate-400 font-medium mb-3">
-                          View your Liquity V2 Trove on Rails. Enter borrower address, ENS, or Trove ID below.
+                          View a Liquity V2 Trove on Rails:
                         </p>
                         <form onSubmit={handleSearch}>
                           <div className="relative">
@@ -173,11 +173,12 @@ export default function Home() {
                             </svg>
                             <input
                               type="text"
-                              className="w-full pl-10 pr-4 py-2 text-sm bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors placeholder-slate-500 dark:placeholder-slate-400 rounded-full"
+                              className="w-full pl-10 pr-4 py-2 text-sm bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-blue-500 dark:border-blue-500 hover:border-slate-400 dark:hover:border-slate-500 focus:border-blue-500 dark:focus:border-white focus:outline-none transition-colors placeholder-slate-500 dark:placeholder-slate-400 rounded-full"
                               value={searchValue}
                               onChange={(e) => setSearchValue(e.target.value)}
                             />
                           </div>
+                          <p className="text-slate-500 text-xs mt-2">Enter borrower address, ENS, or Trove ID</p>
                         </form>
                       </div>
                     </div>
@@ -187,27 +188,108 @@ export default function Home() {
                       mode="overview"
                       loading={statsLoading}
                     />
+                    
                   </div>
+                  
                 </div>
+                <div>
+                      <ExplanationPanel
+                        defaultOpen={false}
+                        leftColumn={
+                          <>
+                          <div className="flex flex-col gap-3 text-sm">
+                            <a
+                              href="https://liquity.org"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-slate-800 dark:text-slate-200 hover:border-green-500 dark:hover:border-green-500 transition-colors"
+                            >
+                              https://liquity.org
+                              <ArrowRight className="ml-2 h-4 w-4 text-green-600 dark:text-green-500" />
+                            </a>
+                          </div>
+                          </>
+                        }
+                        rightColumn={
+                          <div className="flex flex-col gap-3 text-sm">
+                            <a
+                              href="https://github.com/liquity/bold"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-slate-800 dark:text-slate-200 hover:border-green-500 dark:hover:border-green-500 transition-colors"
+                            >
+                              https://github.com/liquity/bold
+                              <ArrowRight className="ml-2 h-4 w-4 text-green-600 dark:text-green-500" />
+                            </a>
+                          </div>
+                        }
+                      />
+                    </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
+      <section className="w-full pb-24">
+        <div className="max-w-7xl mx-auto px-4">
+          <h2 className="text-2xl font-extrabold text-slate-700 dark:text-slate-200 text-center mb-4">
+            Who is Rails for?
+          </h2>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="h-full bg-white dark:bg-slate-800/60 rounded-xl p-6 shadow-sm flex flex-col">
+              <p className="text-sm font-semibold flex items-center gap-2 tracking-wide text-green-600 dark:text-green-500 mb-2">
+                <GraduationCap className="h-5 w-5" aria-hidden="true" />
+                The DeFi Curious
+              </p>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-3">Learn by example</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                New users can browse real transactions to see how DeFi protocols operate in practice, explore trove
+                timelines, and build intuition before they risk capital.
+              </p>
+            </div>
+            <div className="h-full bg-white dark:bg-slate-800/60 rounded-xl p-6 shadow-sm flex flex-col">
+              <p className="text-sm font-semibold flex items-center gap-2 tracking-wide text-green-600 dark:text-green-500 mb-2">
+                <Activity className="h-5 w-5" aria-hidden="true" />
+                The Active DeFi User
+              </p>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-3">Stay on top of positions</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Monitor positions, understand nuanced onchain events, and view interpreted logs so nothing stays
+                buried in transaction traces.
+              </p>
+            </div>
+            <div className="h-full bg-white dark:bg-slate-800/60 rounded-xl p-6 shadow-sm flex flex-col">
+              <p className="text-sm font-semibold flex items-center gap-2 tracking-wide text-green-600 dark:text-green-500 mb-2">
+                <Code2 className="h-5 w-5" aria-hidden="true" />
+                DeFi Teams
+              </p>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-3">Support your community</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed flex-1">
+                Provide verifiable support with a Rails explorer tailored to your protocol. Give users clear timelines,
+                and human-readable insights.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Our Supporters Section */}
-			<div className="w-full pb-24">
-				<div className="sm:max-w-5xl mx-auto px-4">
-					<p className="sm:text-center text-xl md:text-2xl leading-8 text-slate-700 dark:text-slate-300 mb-4">
-						Rails is building essential DeFi support infrastructure, starting with Liquity V2. Our roadmap
-						includes integration with Liquity V2 forks and expansion across the broader DeFi ecosystem.
-													{" "}
-<a className="text-green-500  dark:text-green-600 hover:underline underline-offset-2 duration-150" href="about/">
-							Learn about Rails here<ArrowRight className="inline mr-1" />
-						</a>
-					</p>
-				</div>
-			</div>
+      <div className="w-full pb-24">
+        <div className="sm:max-w-5xl mx-auto px-4">
+          <p className="sm:text-center text-xl md:text-2xl leading-8 text-slate-700 dark:text-slate-300 mb-4">
+            Rails is building essential DeFi support infrastructure, starting with Liquity V2. Our roadmap includes
+            integration with Liquity V2 forks and expansion across the broader DeFi ecosystem.{" "}
+            <a
+              className="text-green-500  dark:text-green-600 hover:underline underline-offset-2 duration-150"
+              href="about/"
+            >
+              Learn about Rails here
+              <ArrowRight className="inline mr-1" />
+            </a>
+          </p>
+        </div>
+      </div>
       {/* Our Supporters Section */}
       <div className="w-full pb-24">
         <div className="max-w-7xl mx-auto px-4">
