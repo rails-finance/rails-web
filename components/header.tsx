@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { MapPlus } from "lucide-react";
 import { NavigationContent } from "./site/NavigationContent";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -179,10 +180,11 @@ export function Header() {
       {/* Fixed Beta Label */}
       <button
         onClick={() => setIsBetaModalOpen(true)}
-        className="fixed bottom-0 left-0 bg-orange-500 dark:bg-orange-600 hover:bg-orange-600 dark:hover:bg-orange-700 text-shadow text-white text-xs font-bold px-10 py-1 rotate-45 -translate-x-6 -translate-y-4 shadow-md z-50 cursor-pointer transition-colors duration-150"
-        aria-label="View Beta version information"
+        className="fixed bottom-4 left-0 bg-orange-500 dark:bg-orange-600 hover:bg-orange-600 dark:hover:bg-orange-700 text-shadow text-white text-xs font-bold pr-4 pl-3 py-2 rounded-r-lg shadow-md z-50 cursor-pointer transition-colors duration-150 flex items-center gap-2"
+        aria-label="View roadmap and support information"
       >
         Beta
+        <MapPlus className="w-4 h-4" aria-hidden="true" />
       </button>
 
       {/* Beta Modal */}
@@ -202,7 +204,7 @@ export function Header() {
                   Beta
                 </div>
                 <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
-                  Beta Version
+                  Our near-term plans...
                 </h2>
               </div>
               <button
@@ -225,20 +227,42 @@ export function Header() {
             </div>
 
             {/* Modal Content */}
-            <div className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
+            <div className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed space-y-4">
+              <p className="flex flex-row gap-2 items-center">
+                Liquity V2 Explorer to-do list:
+              </p>
+              <ul className="list-disc pl-5 space-y-2">
+                <li>Debt-In-Front indicator so borrowers can see redeemable debt ahead of them</li>
+                <li>Interest-rate cooldown highlighting</li>
+                <li>Telegram / Email Alerts</li>
+                <li>Rate delegate opportunity hints (for unmanaged troves)</li>
+                <li>Off-peg USD liability tracking</li>
+                <li>Atomic loop detection and visualisation</li>
+                <li>Share / screenshot actions for troves and events</li>
+                <li>Enhanced delegate event details</li>
+                <li>Advanced trove list filter</li>
+                <li className="text-green-500">Suggestions and feedback gratefully received @rails_finance on X</li>
+              </ul>
               <p>
-                Rails is currently in beta. While core features are stable, some calculated values and interpretations may still be refined. Please verify critical information independently.
+                If these features sound useful to you please consider supporting our work - <span className="text-fuchsia-500">donate.rails.eth</span>
               </p>
             </div>
 
             {/* Modal Footer */}
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button
                 onClick={() => setIsBetaModalOpen(false)}
-                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-medium transition-colors duration-150"
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-medium transition-colors duration-150 w-full sm:w-auto"
               >
-                Got it
+                Keep exploring
               </button>
+              <Link
+                href="https://etherscan.io/name-lookup-search?id=donate.rails.eth"
+                className="px-4 py-2 bg-fuchsia-600 hover:bg-fuchsia-500 text-white rounded-lg font-semibold text-center transition-colors duration-150 w-full sm:w-auto"
+                onClick={() => setIsBetaModalOpen(false)}
+              >
+                Support Rails
+              </Link>
             </div>
           </div>
         </div>
