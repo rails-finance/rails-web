@@ -23,6 +23,7 @@ export const articles: Article[] = [
       name: "Rails Team",
       twitter: "rails_finance",
     },
+    mediumUrl: "https://medium.com/@railsfinance/keeping-defi-open-and-accessible-ae9d66f25f5b",
     content: require("./content/keeping-defi-open-and-accessible").default,
   },
   {
