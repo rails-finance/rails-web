@@ -14,6 +14,18 @@ export interface Article {
 
 export const articles: Article[] = [
   {
+    slug: "keeping-defi-open-and-accessible",
+    title: "Keeping DeFi Open and Accessible",
+    subtitle: 'A response to Nomatic\'s "DeFi 101 – Back To Basics" on why independent dashboards matter.',
+    thumbnail: "/blog/keeping-defi-open-and-accessible.png",
+    publishedAt: "2025-11-12",
+    author: {
+      name: "Rails Team",
+      twitter: "rails_finance",
+    },
+    content: require("./content/keeping-defi-open-and-accessible").default,
+  },
+  {
     slug: "from-kitchen-table-sketches-to-rails-web-app",
     title: "From Kitchen Table Sketches to Rails Web App",
     subtitle: "The path from DeFi curiosity to a production-ready transparency layer",
