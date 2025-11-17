@@ -18,7 +18,7 @@ export const articles: Article[] = [
     title: "Keeping DeFi Open and Accessible",
     subtitle: 'A response to Nomatic\'s "DeFi 101 – Back To Basics" on why independent dashboards matter.',
     thumbnail: "/blog/keeping-defi-open-and-accessible.png",
-    publishedAt: "2025-11-12",
+    publishedAt: "2025-11-17",
     author: {
       name: "Rails Team",
       twitter: "rails_finance",
