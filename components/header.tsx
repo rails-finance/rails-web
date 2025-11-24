@@ -74,7 +74,6 @@ export function Header() {
                 <use href="#icon-liquity" />
               </svg>
               <h1 className="text-xs font-semibold text-slate-700 dark:text-white">Liquity V2 Trove Explorer</h1>
-              
             </div>
           </div>
 
