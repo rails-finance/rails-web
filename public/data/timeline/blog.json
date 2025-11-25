@@ -1,5 +1,15 @@
 [
   {
+    "id": "rails-2025-012",
+    "date": "2025-11-25T00:00:00Z",
+    "type": "post",
+    "platform": "blog",
+    "author": "rails.finance",
+    "postUrl": "https://rails.finance/blog/when-frontends-fail-what-happens-in-a-crisis",
+    "content": "When DeFi Frontends Fail",
+    "subtitle": "How a neutral support tool like Rails can help users during a crisis"
+  },
+  {
     "id": "rails-2025-003",
     "date": "2025-11-06T00:01:00Z",
     "type": "post",
