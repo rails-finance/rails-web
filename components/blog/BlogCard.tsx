@@ -13,8 +13,8 @@ export function BlogCard({ article }: BlogCardProps) {
   });
 
   return (
-    <Link href={`/blog/${article.slug}`} className="group block">
-      <article className="bg-slate-50 dark:bg-slate-800 rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300">
+    <Link href={`/blog/${article.slug}`} className="group block h-full">
+      <article className="bg-slate-50 dark:bg-slate-800 rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full flex flex-col">
         <div className="aspect-[16/9] bg-slate-200 dark:bg-slate-700 overflow-hidden">
           <img
             src={article.thumbnail}
@@ -22,7 +22,7 @@ export function BlogCard({ article }: BlogCardProps) {
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         </div>
-        <div className="p-6">
+        <div className="p-6 flex-1 flex flex-col">
           <time className="text-sm text-slate-500 dark:text-slate-400">{formattedDate}</time>
           <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-200 mt-2 mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
             {article.title}
