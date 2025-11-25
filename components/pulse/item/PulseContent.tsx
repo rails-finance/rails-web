@@ -42,11 +42,11 @@ export function PulseContent({
       <div className="flex">
         {/* Thumbnail */}
         {blogThumbnail && (
-          <div className="shrink-0 w-32 sm:w-40">
+          <div className="hidden sm:block shrink-0 sm:w-40">
             <img
               src={blogThumbnail}
               alt=""
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
           </div>
         )}
@@ -141,8 +141,8 @@ export function PulseContent({
 
       {/* Date and View button row */}
       {isGitHub ? (
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="inline-flex items-center gap-1">
               <GitBranch className="size-3 text-blue-400" />
               <span className="font-mono text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-md">main</span>
@@ -151,7 +151,7 @@ export function PulseContent({
               committed on {formatDisplayDate(event.date)}
             </span>
           </div>
-          <div className="flex items-center gap-2 text-slate-500">
+          <div className="flex items-center gap-2 text-slate-500 flex-wrap">
             <span>0 parents</span>
             <span>commit</span>
             {event.postUrl && (
