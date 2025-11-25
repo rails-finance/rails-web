@@ -119,7 +119,7 @@ export function TimelinePage({
     <section className="space-y-8 py-8">
       <div className="space-y-3">
         <h1 className="text-4xl font-semibold text-slate-900 dark:text-white flex items-center gap-3">
-          <Activity className="size-8 text-blue-500" />
+          <Activity className="size-8 text-emerald-600" />
           {title}
         </h1>
         <p className="text-lg text-slate-600 dark:text-slate-300 max-w-2xl">{description}</p>
