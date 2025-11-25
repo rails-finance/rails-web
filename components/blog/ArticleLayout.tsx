@@ -38,31 +38,35 @@ export function ArticleLayout({ article, nextArticle, prevArticle, children }: A
         </h2>
 
         {/* Article Hero Image */}
-        <div className="mb-8 -mx-4 md:mx-0">
+        <div className="-mx-4 md:mx-0">
           <img
             src={article.thumbnail}
             alt={article.title}
             className="w-full rounded-none md:rounded-lg shadow-sm"
           />
         </div>
+      </header>
 
-        <div className="flex items-center justify-between gap-4 border-t border-b border-slate-200 dark:border-slate-700 py-4">
-          <div className="flex items-center gap-4 text-slate-600 dark:text-slate-400">
-            <div>
-              <div className="font-medium text-slate-800 dark:text-slate-200">{article.author.name}</div>
-              {article.author.twitter && (
-                <a
-                  href={`https://x.com/${article.author.twitter}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  @{article.author.twitter}
-                </a>
-              )}
-            </div>
-            <span className="text-slate-400 dark:text-slate-500">•</span>
-            <time dateTime={article.publishedAt} className="text-sm">
+      {/* Article Content - Medium-compatible semantic HTML structure */}
+      <div className="article-content">
+        {children}
+      </div>
+
+      {/* Article Footer */}
+      <footer className="mt-12 pt-8 border-t border-slate-200 dark:border-slate-700">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600 dark:text-slate-400">
+            <p className="italic">
+              Originally published on{" "}
+              <a
+                href={`https://rails.finance/blog/${article.slug}`}
+                className="text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                rails.finance
+              </a>
+            </p>
+            <span>•</span>
+            <time dateTime={article.publishedAt}>
               {formattedDate}
             </time>
           </div>
@@ -80,24 +84,6 @@ export function ArticleLayout({ article, nextArticle, prevArticle, children }: A
             </a>
           )}
         </div>
-      </header>
-
-      {/* Article Content - Medium-compatible semantic HTML structure */}
-      <div className="article-content">
-        {children}
-      </div>
-
-      {/* Article Footer */}
-      <footer className="mt-12 pt-8 border-t border-slate-200 dark:border-slate-700">
-        <p className="text-sm text-slate-600 dark:text-slate-400 italic">
-          Originally published on{" "}
-          <a
-            href={`https://rails.finance/blog/${article.slug}`}
-            className="text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            rails.finance
-          </a>
-        </p>
       </footer>
 
       {/* Next/Previous Navigation */}
