@@ -14,6 +14,18 @@ export interface Article {
 
 export const articles: Article[] = [
   {
+    slug: "when-frontends-fail-what-happens-in-a-crisis",
+    title: "When DeFi Frontends Fail",
+    subtitle: "How a neutral support tool like Rails can help users during a crisis",
+    thumbnail: "/blog/when-frontends-fail-what-happens-in-a-crisis.png",
+    publishedAt: "2025-11-25",
+    author: {
+      name: "Rails Team",
+      twitter: "rails_finance",
+    },
+    content: require("./content/when-frontends-fail-what-happens-in-a-crisis").default,
+  },
+  {
     slug: "keeping-defi-open-and-accessible",
     title: "Keeping DeFi Open and Accessible",
     subtitle: 'A response to Nomatic\'s "DeFi 101 – Back To Basics" on why independent dashboards matter.',
