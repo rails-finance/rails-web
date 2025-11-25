@@ -1,0 +1,223 @@
+[
+  {
+    "id": "rails-2025-001",
+    "date": "2025-07-30T16:13:00Z",
+    "type": "post",
+    "platform": "x",
+    "author": "rails_finance",
+    "postUrl": "https://x.com/rails_finance/status/1950550624333963667",
+    "content": "Our first ever post on X: 🚀 Rails – DeFi Self-Service Support... Happy #Ethereum10 🙂",
+    "metrics": {
+      "likes": 10,
+      "reposts": 1,
+      "views": 2512
+    },
+    "engagements": [
+      {
+        "id": "rails-2025-001-eng-LiquityProtocol",
+        "date": "2025-08-04T18:09:00Z",
+        "type": "quote",
+        "actor": "LiquityProtocol",
+        "link": "https://x.com/LiquityProtocol/status/1952416500784001512",
+        "description": "A new trove explorer for Liquity V2 is now available for users to peruse!",
+        "metrics": {
+          "likes": 27,
+          "reposts": 6,
+          "views": 2533
+        }
+      }
+    ]
+  },
+  {
+    "id": "rails-2025-002",
+    "date": "2025-08-05T08:23:00Z",
+    "type": "post",
+    "platform": "x",
+    "author": "rails_finance",
+    "postUrl": "https://x.com/rails_finance/status/1952631425116561868",
+    "content": "Here's a basic intro showing @LiquityProtocol on Rails...",
+    "metrics": {
+      "likes": 6,
+      "reposts": 2,
+      "views": 3032
+    },
+    "engagements": [
+      {
+        "id": "rails-2025-002-eng-LiquityProtocol",
+        "date": "2025-08-05T22:06:00Z",
+        "type": "quote",
+        "actor": "LiquityProtocol",
+        "link": "https://x.com/LiquityProtocol/status/1952838694395887808",
+        "description": "Another Liquity V2 positions visualizer has entered the mix...",
+        "metrics": {
+          "likes": 28,
+          "reposts": 3,
+          "views": 2756
+        }
+      }
+    ]
+  },
+  {
+    "id": "rails-2025-004",
+    "date": "2025-11-07T17:36:00Z",
+    "type": "post",
+    "platform": "x",
+    "author": "rails_finance",
+    "postUrl": "https://x.com/rails_finance/status/1986850354513023108",
+    "content": "Stream Finance's xUSD crashed to $0.27 in hours... $BOLD didn't budge.",
+    "metrics": {
+      "likes": 17,
+      "reposts": 3,
+      "views": 1778
+    },
+    "engagements": [
+      {
+        "id": "rails-2025-004-eng-LiquityProtocol",
+        "date": "2025-11-07T17:36:00Z",
+        "type": "repost",
+        "actor": "LiquityProtocol",
+        "link": "https://x.com/rails_finance/status/1986850354513023108",
+        "description": "Repost to 59.8K Followers",
+        "metrics": {
+          "likes": 17,
+          "reposts": 3,
+          "views": 1778
+        }
+      }
+    ]
+  },
+  {
+    "id": "rails-2025-005",
+    "date": "2025-08-04T16:58:00Z",
+    "type": "post",
+    "platform": "x",
+    "author": "MilesEssex",
+    "postUrl": "https://x.com/milesessex/status/1952413807159975995",
+    "content": "This is the story of how rails.finance came to be...",
+    "metrics": {
+      "likes": 42,
+      "reposts": 2,
+      "views": 2025
+    }
+  },
+  {
+    "id": "rails-2025-007",
+    "date": "2025-11-13T13:59:00Z",
+    "type": "post",
+    "platform": "x",
+    "author": "TokenBrice",
+    "postUrl": "https://x.com/TokenBrice/status/1988970065505710578",
+    "content": "Skip to minute 57 for a quick spotlight on Rails. ”BROADCAST TokenBrice in the Arena 3”",
+    "metrics": {
+      "reposts": 4,
+      "views": 890
+    }
+  },
+  {
+    "id": "rails-2025-010",
+    "date": "2025-11-12T16:44:00Z",
+    "type": "post",
+    "platform": "x",
+    "author": "rails_finance",
+    "postUrl": "https://x.com/rails_finance/status/1988649188733727084",
+    "content": "The new Rails is live! Making DeFi transparent, visual, and accessible for everyone. Starting with Liquity V2",
+    "metrics": {
+      "likes": 26,
+      "reposts": 11,
+      "views": 5410
+    },
+    "engagements": [
+      {
+        "id": "rails-2025-010-eng-key-contributors",
+        "date": "2025-12-12T20:00:00Z",
+        "type": "like",
+        "actors": [
+          { "handle": "castle_labs", "link": "https://x.com/castle_labs" },
+          { "handle": "TokenBrice", "link": "https://x.com/TokenBrice" },
+          { "handle": "Ceazor7", "link": "https://x.com/Ceazor7" },
+          { "handle": "justinCbram", "link": "https://x.com/justinCbram" }
+        ],
+        "description": "Liked by key DeFi contributors (75k+ reach)"
+      },
+      {
+        "id": "rails-2025-010-eng-LiquityProtocol",
+        "date": "2025-11-12T18:17:00Z",
+        "type": "quote",
+        "actor": "LiquityProtocol",
+        "link": "https://x.com/LiquityProtocol/status/1988672618967572521",
+        "description": "Keen to see in-depth data on your Liquity V2 loan positions?",
+        "metrics": {
+          "likes": 25,
+          "reposts": 3,
+          "views": 2315
+        }
+      },
+      {
+        "id": "rails-2025-010-eng-Ceazor7",
+        "date": "2025-11-12T19:04:00Z",
+        "type": "quote",
+        "actor": "Ceazor7",
+        "link": "https://x.com/Ceazor7/status/1988684324024328195",
+        "description": "This might get me out of my reading chair.. Not right now, but soon",
+        "metrics": {
+          "likes": 7,
+          "reposts": 0,
+          "views": 763
+        }
+      },
+      {
+        "id": "rails-2025-010-eng-defiscan_info",
+        "date": "2025-11-12T18:56:00Z",
+        "type": "quote",
+        "actor": "defiscan_info",
+        "link": "https://x.com/defiscan_info/status/1988682322720534622",
+        "description": "It's free — explore, share, and support public-good DeFi infrastructure.",
+        "metrics": {
+          "likes": 7,
+          "reposts": 1,
+          "views": 406
+        }
+      },
+      {
+        "id": "rails-2025-010-eng-gutomartino",
+        "date": "2025-11-13T16:51:00Z",
+        "type": "quote",
+        "actor": "gutomartino",
+        "link": "https://x.com/gutomartino/status/1989013384151597526",
+        "description": "This is a great project. See your DeFi positions from a new perspective!",
+        "metrics": {
+          "likes": 4,
+          "reposts": 1,
+          "views": 306
+        }
+      },
+      {
+        "id": "rails-2025-010-eng-DuckDegen",
+        "date": "2025-11-13T17:22:00Z",
+        "type": "quote",
+        "actor": "DuckDegen",
+        "link": "https://x.com/DuckDegen/status/1989020973169844635",
+        "description": "Did you know Rails could come and add its UI to your protocol too?",
+        "metrics": {
+          "likes": 4,
+          "reposts": 1,
+          "views": 308
+        }
+      }
+    ]
+  },
+  {
+    "id": "rails-2025-012",
+    "date": "2025-11-18T17:42:00Z",
+    "type": "post",
+    "platform": "x",
+    "author": "Ceazor7",
+    "postUrl": "https://x.com/Ceazor7/status/1990838034213089361",
+    "content": "\"Whether it gets traction is to be seen, but they are aiming in the right direction, AFAIC. I hope it does.\" — Response to 'Keeping DeFi Open and Accessible'",
+    "metrics": {
+      "likes": 7,
+      "reposts": 2,
+      "views": 798
+    }
+  }
+]

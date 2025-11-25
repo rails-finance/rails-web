@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, GraduationCap, Activity, Code2 } from "lucide-react";
+import { ArrowRight, GraduationCap, Wallet, Code2 } from "lucide-react";
 import Link from "next/link";
 import { ProtocolStats } from "@/types/api/stats";
 import { LiquityLogo } from "@/components/LiquityLogo";
@@ -250,7 +250,7 @@ export default function Home() {
             </div>
             <div className="h-full bg-white dark:bg-slate-800/60 rounded-xl p-6 shadow-sm flex flex-col">
               <p className="text-sm font-semibold flex items-center gap-2 tracking-wide text-green-600 dark:text-green-500 mb-2">
-                <Activity className="h-5 w-5" aria-hidden="true" />
+                <Wallet className="h-5 w-5" aria-hidden="true" />
                 The Active DeFi User
               </p>
               <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-3">Stay on top of positions</h3>

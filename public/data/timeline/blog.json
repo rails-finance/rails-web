@@ -1,0 +1,52 @@
+[
+  {
+    "id": "rails-2025-003",
+    "date": "2025-11-06T00:01:00Z",
+    "type": "post",
+    "platform": "blog",
+    "author": "rails.finance",
+    "postUrl": "https://rails.finance/blog/bold-survived-stream-finance-chaos",
+    "content": "Why Liquity V2's BOLD Brushed Off the Chaos that Paralyzed Stream Finance",
+    "subtitle": "How the November 2025 crisis separated resilient stablecoin design from engineered fragility"
+  },
+  {
+    "id": "rails-2025-006",
+    "date": "2025-11-17T00:00:00Z",
+    "type": "post",
+    "platform": "blog",
+    "author": "rails.finance",
+    "postUrl": "https://rails.finance/blog/keeping-defi-open-and-accessible",
+    "content": "Keeping DeFi Open and Accessible",
+    "subtitle": "A response to Nomatic's 'DeFi 101 – Back To Basics' on why independent dashboards matter"
+  },
+  {
+    "id": "rails-2025-008",
+    "date": "2025-11-06T00:00:00Z",
+    "type": "post",
+    "platform": "blog",
+    "author": "rails.finance",
+    "postUrl": "https://rails.finance/blog/introducing-rails-finance",
+    "content": "Introducing Rails: DeFi Self-Service Support",
+    "subtitle": "Rails tracks interactions with DeFi protocols, helping you understand activity from real events"
+  },
+  {
+    "id": "rails-2025-009",
+    "date": "2025-11-10T00:00:00Z",
+    "type": "post",
+    "platform": "blog",
+    "author": "rails.finance",
+    "postUrl": "https://rails.finance/blog/from-kitchen-table-sketches-to-rails-web-app",
+    "content": "From Kitchen Table Sketches to Rails Web App",
+    "subtitle": "The path from DeFi curiosity to a production-ready transparency layer"
+  },
+  {
+    "id": "rails-2025-011",
+    "date": "2025-11-06T00:02:00Z",
+    "type": "post",
+    "platform": "blog",
+    "author": "rails.finance",
+    "postUrl": "https://rails.finance/blog/rails-solution-defi-trust-problem",
+    "content": "Rails: The Solution to DeFi's Trust Problem?",
+    "subtitle": "Complexity is increasing faster than our ability to evaluate it"
+  }
+]
