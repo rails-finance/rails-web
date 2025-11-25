@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, GraduationCap, Wallet, Code2 } from "lucide-react";
+import { ArrowRight, GraduationCap, Wallet, Code2, ShieldAlert, Lightbulb, Activity } from "lucide-react";
 import Link from "next/link";
 import { ProtocolStats } from "@/types/api/stats";
 import { LiquityLogo } from "@/components/LiquityLogo";
@@ -188,43 +188,10 @@ export default function Home() {
                       mode="overview"
                       loading={statsLoading}
                     />
-                    
+
                   </div>
-                  
+
                 </div>
-                <div>
-                      <ExplanationPanel
-                        defaultOpen={false}
-                        leftColumn={
-                          <>
-                          <div className="flex flex-col gap-3 text-sm">
-                            <a
-                              href="https://liquity.org"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-slate-800 dark:text-slate-200 hover:border-green-500 dark:hover:border-green-500 transition-colors"
-                            >
-                              https://liquity.org
-                              <ArrowRight className="ml-2 h-4 w-4 text-green-600 dark:text-green-500" />
-                            </a>
-                          </div>
-                          </>
-                        }
-                        rightColumn={
-                          <div className="flex flex-col gap-3 text-sm">
-                            <a
-                              href="https://github.com/liquity/bold"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-slate-800 dark:text-slate-200 hover:border-green-500 dark:hover:border-green-500 transition-colors"
-                            >
-                              https://github.com/liquity/bold
-                              <ArrowRight className="ml-2 h-4 w-4 text-green-600 dark:text-green-500" />
-                            </a>
-                          </div>
-                        }
-                      />
-                    </div>
               </div>
             </div>
           </div>
@@ -236,9 +203,9 @@ export default function Home() {
           <h2 className="text-2xl font-extrabold text-slate-700 dark:text-slate-200 text-center mb-4">
             Who is Rails for?
           </h2>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <div className="h-full bg-white dark:bg-slate-800/60 rounded-xl p-6 shadow-sm flex flex-col">
-              <p className="text-sm font-semibold flex items-center gap-2 tracking-wide text-green-600 dark:text-green-500 mb-2">
+              <p className="text-sm font-semibold flex items-center gap-2 tracking-wide text-blue-600 dark:text-blue-500 mb-2">
                 <GraduationCap className="h-5 w-5" aria-hidden="true" />
                 The DeFi Curious
               </p>
@@ -249,7 +216,7 @@ export default function Home() {
               </p>
             </div>
             <div className="h-full bg-white dark:bg-slate-800/60 rounded-xl p-6 shadow-sm flex flex-col">
-              <p className="text-sm font-semibold flex items-center gap-2 tracking-wide text-green-600 dark:text-green-500 mb-2">
+              <p className="text-sm font-semibold flex items-center gap-2 tracking-wide text-emerald-600 dark:text-emerald-500 mb-2">
                 <Wallet className="h-5 w-5" aria-hidden="true" />
                 The Active DeFi User
               </p>
@@ -260,7 +227,7 @@ export default function Home() {
               </p>
             </div>
             <div className="h-full bg-white dark:bg-slate-800/60 rounded-xl p-6 shadow-sm flex flex-col">
-              <p className="text-sm font-semibold flex items-center gap-2 tracking-wide text-green-600 dark:text-green-500 mb-2">
+              <p className="text-sm font-semibold flex items-center gap-2 tracking-wide text-purple-600 dark:text-purple-500 mb-2">
                 <Code2 className="h-5 w-5" aria-hidden="true" />
                 DeFi Teams
               </p>
@@ -270,6 +237,16 @@ export default function Home() {
                 and human-readable insights.
               </p>
             </div>
+            <div className="h-full bg-white dark:bg-slate-800/60 rounded-xl p-6 shadow-sm flex flex-col">
+              <p className="text-sm font-semibold flex items-center gap-2 tracking-wide text-amber-600 dark:text-amber-500 mb-2">
+                <ShieldAlert className="h-5 w-5" aria-hidden="true" />
+                Crisis Support
+              </p>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-3">When frontends fail</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed flex-1">
+                Check your positions safely during DNS hijacks or frontend failures. No wallet connection required—just read-only access when you need it most.
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -277,17 +254,26 @@ export default function Home() {
       {/* Our Supporters Section */}
       <div className="w-full pb-24">
         <div className="sm:max-w-5xl mx-auto px-4">
-          <p className="sm:text-center text-xl md:text-2xl leading-8 text-slate-700 dark:text-slate-300 mb-4">
+          <p className="sm:text-center text-xl md:text-2xl leading-8 text-slate-700 dark:text-slate-300 mb-6">
             Rails is building essential DeFi support infrastructure, starting with Liquity V2. Our roadmap includes
-            integration with Liquity V2 forks and expansion across the broader DeFi ecosystem.{" "}
-            <a
-              className="text-green-500  dark:text-green-600 hover:underline underline-offset-2 duration-150"
-              href="about/"
-            >
-              Learn about Rails here
-              <ArrowRight className="inline mr-1" />
-            </a>
+            integration with Liquity V2 forks and expansion across the broader DeFi ecosystem.
           </p>
+          <div className="flex flex-wrap justify-center gap-4">
+            <a
+              href="/about"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-150"
+            >
+              <Lightbulb className="h-5 w-5" />
+              Learn about Rails
+            </a>
+            <a
+              href="/pulse"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-colors duration-150"
+            >
+              <Activity className="h-5 w-5" />
+              Check our Pulse
+            </a>
+          </div>
         </div>
       </div>
       {/* Our Supporters Section */}
