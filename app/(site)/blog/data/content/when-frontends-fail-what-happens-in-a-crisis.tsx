@@ -1,7 +1,7 @@
 export default function WhenFrontendsFailWhatHappensInACrisis() {
   return (
     <>
-      <p>The recent Aerodrome DNS incident reminds us again of a familiar problem. Users have a patchwork of tools to turn to in a crisis, but nothing that lets them check their positions with confidence.</p>
+      <p>The recent Aerodrome Finance and Velodrome Finance DNS incident reminds us again of a familiar problem. Users have a patchwork of tools to turn to in a crisis, but nothing that lets them check their positions with confidence.</p>
 
       <p><a href="https://rails.finance" target="_blank" rel="noopener noreferrer">Rails</a> provides the solution: an independent, read-only platform for safely checking your positions when frontends fail.</p>
       <h2>The 3:24 AM Panic Scenario</h2>

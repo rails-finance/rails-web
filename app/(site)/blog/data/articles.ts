@@ -23,6 +23,7 @@ export const articles: Article[] = [
       name: "Rails Team",
       twitter: "rails_finance",
     },
+    mediumUrl: "https://medium.com/@railsfinance/when-defi-frontends-fail-8fdeb5e8fb24",
     content: require("./content/when-frontends-fail-what-happens-in-a-crisis").default,
   },
   {
