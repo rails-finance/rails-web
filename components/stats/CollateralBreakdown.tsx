@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Globe, BookOpen, Github } from "lucide-react";
 import { CollateralStats } from "@/types/api/stats";
 import { TokenIcon } from "@/components/icons/tokenIcon";
 import { Icon } from "@/components/icons/icon";
@@ -61,7 +61,7 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
 
   return (
     <div className="grid grid-cols-1 gap-4">
-      {sortedData.map(([collateralType, stats]) => {
+      {sortedData.map(([collateralType, stats], index) => {
         const troveButton = (
           <span
             className="text-sm text-white group-hover:text-white font-medium dark:bg-slate-700 inline-flex items-center gap-1 rounded-full transition-all w-fit py-1 group-hover:bg-blue-500 bg-slate-300 pl-3 pr-2"
@@ -73,43 +73,88 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
           </span>
         );
 
+        const isLastCollateral = index === sortedData.length - 1;
+
         return (
-          <Link
-            key={collateralType}
-            href={`/troves?collateralType=${collateralType}`}
-            className="group bg-white dark:bg-slate-900 dark:hover:bg-slate-900/50 rounded-lg p-4 hover:bg-white-50/50 hover:shadow-lg transition-all cursor-pointer"
-          >
-            <div className="space-y-4 md:space-y-0">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-6 md:flex-1">
-                  <div className="flex items-center gap-3">
-                    <TokenIcon assetSymbol={collateralType.toLowerCase()} className="w-12 h-12 flex-shrink-0" />
-                    <div>
-                      <div className="mb-1">
-                        <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Total Collateral</span>
+          <div key={collateralType}>
+            <Link
+              href={`/troves?collateralType=${collateralType}`}
+              className="group bg-white dark:bg-slate-900 dark:hover:bg-slate-900/50 rounded-lg p-4 hover:bg-white-50/50 hover:shadow-lg transition-all cursor-pointer block"
+            >
+              <div className="space-y-4 md:space-y-0">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-6 md:flex-1">
+                    <div className="flex items-center gap-3">
+                      <TokenIcon assetSymbol={collateralType.toLowerCase()} className="w-12 h-12 flex-shrink-0" />
+                      <div>
+                        <div className="mb-1">
+                          <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Total Collateral</span>
+                        </div>
+                        <div className="text-lg font-bold text-slate-600 dark:text-slate-300">
+                          {formatNumber(stats.totalCollateral)} {collateralType}
+                        </div>
                       </div>
-                      <div className="text-lg font-bold text-slate-600 dark:text-slate-300">
-                        {formatNumber(stats.totalCollateral)} {collateralType}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <TokenIcon assetSymbol="bold" className="w-12 h-12 flex-shrink-0" />
+                      <div>
+                        <div className="mb-1">
+                          <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Total Debt</span>
+                        </div>
+                        <div className="text-lg font-bold text-slate-600 dark:text-slate-300">
+                          ${formatNumber(stats.totalDebt)}
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <TokenIcon assetSymbol="bold" className="w-12 h-12 flex-shrink-0" />
-                    <div>
-                      <div className="mb-1">
-                        <span className="text-xs font-bold text-slate-400 dark:text-slate-600">Total Debt</span>
-                      </div>
-                      <div className="text-lg font-bold text-slate-600 dark:text-slate-300">
-                        ${formatNumber(stats.totalDebt)}
-                      </div>
-                    </div>
+                  <div className="hidden md:flex">{troveButton}</div>
+                </div>
+                <div className="md:hidden">{troveButton}</div>
+              </div>
+            </Link>
+
+            {isLastCollateral && (
+              <div className="mt-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center bg-white dark:bg-slate-900 rounded-md overflow-hidden divide-x divide-slate-200 dark:divide-slate-700">
+                    <a
+                      href="https://liquity.org"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Liquity Website"
+                      className="inline-flex items-center gap-1 px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-950 text-slate-700 dark:text-slate-300 hover:text-blue-500 dark:hover:text-blue-400 text-xs font-medium transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Globe className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Website</span>
+                    </a>
+                    <a
+                      href="https://docs.liquity.org/v2-faq"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Liquity Docs"
+                      className="inline-flex items-center gap-1 px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-950 text-slate-700 dark:text-slate-300 hover:text-blue-500 dark:hover:text-blue-400 text-xs font-medium transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Docs</span>
+                    </a>
+                    <a
+                      href="https://github.com/liquity/bold"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Liquity GitHub"
+                      className="inline-flex items-center gap-1 px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-950 text-slate-700 dark:text-slate-300 hover:text-blue-500 dark:hover:text-blue-400 text-xs font-medium transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Github className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">GitHub</span>
+                    </a>
                   </div>
                 </div>
-                <div className="hidden md:flex">{troveButton}</div>
               </div>
-              <div className="md:hidden">{troveButton}</div>
-            </div>
-          </Link>
+            )}
+          </div>
         );
       })}
     </div>
