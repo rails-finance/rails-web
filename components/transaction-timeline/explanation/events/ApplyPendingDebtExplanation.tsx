@@ -7,9 +7,10 @@ import { formatCurrency } from "../shared/eventHelpers";
 interface ApplyPendingDebtExplanationProps {
   transaction: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function ApplyPendingDebtExplanation({ transaction, onToggle }: ApplyPendingDebtExplanationProps) {
+export function ApplyPendingDebtExplanation({ transaction, onToggle, defaultOpen }: ApplyPendingDebtExplanationProps) {
   const tx = transaction as any;
   const applyBeforeDebt = tx.stateBefore?.debt || 0;
   const applyAfterDebt = tx.stateAfter.debt;
@@ -63,7 +64,7 @@ export function ApplyPendingDebtExplanation({ transaction, onToggle }: ApplyPend
     <ExplanationPanel
       items={pendingDebtItems}
       onToggle={onToggle}
-      defaultOpen={false}
+      defaultOpen={defaultOpen ?? false}
       transactionHash={transaction.transactionHash}
     />
   );

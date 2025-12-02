@@ -30,9 +30,18 @@ interface OpenTroveCardProps {
     message: string | null;
     snapshotDate?: number;
   };
+  summaryExplanationOpen?: boolean;
+  onToggleSummaryExplanation?: (isOpen: boolean) => void;
 }
 
-function OpenTroveCardContent({ trove, liveState, prices, loadingStatus }: OpenTroveCardProps) {
+function OpenTroveCardContent({
+  trove,
+  liveState,
+  prices,
+  loadingStatus,
+  summaryExplanationOpen,
+  onToggleSummaryExplanation,
+}: OpenTroveCardProps) {
   const { hoveredValue, setHoverEnabled } = useHover();
 
   const batchManagerInfo = getBatchManagerByAddress(trove.batch.manager);
@@ -622,18 +631,33 @@ function OpenTroveCardContent({ trove, liveState, prices, loadingStatus }: OpenT
           items={hoverContextItems}
           onToggle={(isOpen) => {
             setHoverEnabled(isOpen);
+            onToggleSummaryExplanation?.(isOpen);
           }}
-          defaultOpen={false}
+          defaultOpen={summaryExplanationOpen ?? false}
         />
       </div>
     </div>
   );
 }
 
-export function OpenSummaryCard({ trove, liveState, prices, loadingStatus }: OpenTroveCardProps) {
+export function OpenSummaryCard({
+  trove,
+  liveState,
+  prices,
+  loadingStatus,
+  summaryExplanationOpen,
+  onToggleSummaryExplanation,
+}: OpenTroveCardProps) {
   return (
     <HoverProvider>
-      <OpenTroveCardContent trove={trove} liveState={liveState} prices={prices} loadingStatus={loadingStatus} />
+      <OpenTroveCardContent
+        trove={trove}
+        liveState={liveState}
+        prices={prices}
+        loadingStatus={loadingStatus}
+        summaryExplanationOpen={summaryExplanationOpen}
+        onToggleSummaryExplanation={onToggleSummaryExplanation}
+      />
     </HoverProvider>
   );
 }

@@ -11,9 +11,10 @@ import { ExternalLink, SearchCheck } from "lucide-react";
 interface OpenTroveExplanationProps {
   transaction: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplanationProps) {
+export function OpenTroveExplanation({ transaction, onToggle, defaultOpen }: OpenTroveExplanationProps) {
   const tx = transaction as any;
   const openFee = getUpfrontFee(tx);
   const principalBorrowed = tx.stateAfter.debt - openFee;
@@ -291,7 +292,7 @@ export function OpenTroveExplanation({ transaction, onToggle }: OpenTroveExplana
       rightColumn={howBorrowingWorks}
       footer={railsPromotion}
       onToggle={onToggle}
-      defaultOpen={false}
+      defaultOpen={defaultOpen ?? false}
       transactionHash={transaction.transactionHash}
     />
   );

@@ -21,9 +21,10 @@ interface EventExplanationProps {
   transaction: Transaction;
   previousTransaction?: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function EventExplanation({ transaction, previousTransaction, onToggle }: EventExplanationProps) {
+export function EventExplanation({ transaction, previousTransaction, onToggle, defaultOpen }: EventExplanationProps) {
   const { setHoverEnabled } = useHover();
 
   const handleToggle = (isOpen: boolean) => {
@@ -36,46 +37,60 @@ export function EventExplanation({ transaction, previousTransaction, onToggle }:
 
     switch (tx.operation) {
       case "openTrove":
-        return <OpenTroveExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <OpenTroveExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
 
       case "openTroveAndJoinBatch":
-        return <OpenTroveAndJoinBatchExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <OpenTroveAndJoinBatchExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
 
       case "closeTrove":
-        return <CloseTroveExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <CloseTroveExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
 
       case "adjustTrove":
-        return <AdjustTroveExplanation transaction={transaction} previousTransaction={previousTransaction} onToggle={handleToggle} />;
+        return (
+          <AdjustTroveExplanation
+            transaction={transaction}
+            previousTransaction={previousTransaction}
+            onToggle={handleToggle}
+            defaultOpen={defaultOpen}
+          />
+        );
 
       case "adjustTroveInterestRate":
-        return <AdjustTroveInterestRateExplanation transaction={transaction} previousTransaction={previousTransaction} onToggle={handleToggle} />;
+        return (
+          <AdjustTroveInterestRateExplanation
+            transaction={transaction}
+            previousTransaction={previousTransaction}
+            onToggle={handleToggle}
+            defaultOpen={defaultOpen}
+          />
+        );
 
       case "liquidate":
-        return <LiquidateExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <LiquidateExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
 
       case "redeemCollateral":
-        return <RedeemCollateralExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <RedeemCollateralExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
 
       case "setInterestBatchManager":
-        return <SetInterestBatchManagerExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <SetInterestBatchManagerExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
 
       case "removeFromBatch":
-        return <RemoveFromBatchExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <RemoveFromBatchExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
 
       case "applyPendingDebt":
-        return <ApplyPendingDebtExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <ApplyPendingDebtExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
 
       case "transferTrove":
-        return <TransferTroveExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <TransferTroveExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
 
       case "setBatchManagerAnnualInterestRate":
-        return <BatchManagerInterestRateUpdateExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <BatchManagerInterestRateUpdateExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
 
       case "lowerBatchManagerAnnualFee":
-        return <BatchManagerInterestRateUpdateExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <BatchManagerInterestRateUpdateExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
 
       default:
-        return <DefaultExplanation transaction={transaction} onToggle={handleToggle} />;
+        return <DefaultExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
     }
   };
 

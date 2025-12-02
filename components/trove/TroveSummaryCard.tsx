@@ -14,16 +14,46 @@ interface TroveSummaryCardProps {
     message: string | null;
     snapshotDate?: number;
   };
+  summaryExplanationOpen?: boolean;
+  onToggleSummaryExplanation?: (isOpen: boolean) => void;
 }
 
-export function TroveSummaryCard({ trove, liveState, prices, loadingStatus }: TroveSummaryCardProps) {
+export function TroveSummaryCard({
+  trove,
+  liveState,
+  prices,
+  loadingStatus,
+  summaryExplanationOpen,
+  onToggleSummaryExplanation,
+}: TroveSummaryCardProps) {
   if (trove.status === "liquidated") {
-    return <LiquidatedSummaryCard trove={trove} />;
+    return (
+      <LiquidatedSummaryCard
+        trove={trove}
+        summaryExplanationOpen={summaryExplanationOpen}
+        onToggleSummaryExplanation={onToggleSummaryExplanation}
+      />
+    );
   }
 
   if (trove.status === "open") {
-    return <OpenSummaryCard trove={trove} liveState={liveState} prices={prices} loadingStatus={loadingStatus} />;
+    return (
+      <OpenSummaryCard
+        trove={trove}
+        liveState={liveState}
+        prices={prices}
+        loadingStatus={loadingStatus}
+        summaryExplanationOpen={summaryExplanationOpen}
+        onToggleSummaryExplanation={onToggleSummaryExplanation}
+      />
+    );
   }
 
-  return <ClosedSummaryCard trove={trove} />;
+  return (
+    <ClosedSummaryCard
+      trove={trove}
+      summaryExplanationOpen={summaryExplanationOpen}
+      onToggleSummaryExplanation={onToggleSummaryExplanation}
+    />
+  );
 }

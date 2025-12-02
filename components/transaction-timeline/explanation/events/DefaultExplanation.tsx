@@ -6,9 +6,10 @@ import { ExplanationPanel } from "../ExplanationPanel";
 interface DefaultExplanationProps {
   transaction: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function DefaultExplanation({ transaction, onToggle }: DefaultExplanationProps) {
+export function DefaultExplanation({ transaction, onToggle, defaultOpen }: DefaultExplanationProps) {
   const tx = transaction as any;
   const defaultBeforeDebt = tx.stateBefore?.debt;
   const defaultAfterDebt = tx.stateAfter.debt;
@@ -48,7 +49,7 @@ export function DefaultExplanation({ transaction, onToggle }: DefaultExplanation
     <ExplanationPanel
       items={items}
       onToggle={onToggle}
-      defaultOpen={false}
+      defaultOpen={defaultOpen ?? false}
       transactionHash={transaction.transactionHash}
     />
   );

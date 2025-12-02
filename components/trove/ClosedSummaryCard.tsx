@@ -15,9 +15,11 @@ import { Link2 } from "lucide-react";
 
 interface ClosedTroveCardProps {
   trove: TroveSummary;
+  summaryExplanationOpen?: boolean;
+  onToggleSummaryExplanation?: (isOpen: boolean) => void;
 }
 
-function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
+function ClosedTroveCardContent({ trove, summaryExplanationOpen, onToggleSummaryExplanation }: ClosedTroveCardProps) {
   const { hoveredValue, setHoverEnabled } = useHover();
 
   // Create hover context items for closed trove
@@ -193,18 +195,23 @@ function ClosedTroveCardContent({ trove }: ClosedTroveCardProps) {
           items={hoverContextItems}
           onToggle={(isOpen) => {
             setHoverEnabled(isOpen);
+            onToggleSummaryExplanation?.(isOpen);
           }}
-          defaultOpen={false}
+          defaultOpen={summaryExplanationOpen ?? false}
         />
       </div>
     </div>
   );
 }
 
-export function ClosedSummaryCard({ trove }: ClosedTroveCardProps) {
+export function ClosedSummaryCard({ trove, summaryExplanationOpen, onToggleSummaryExplanation }: ClosedTroveCardProps) {
   return (
     <HoverProvider>
-      <ClosedTroveCardContent trove={trove} />
+      <ClosedTroveCardContent
+        trove={trove}
+        summaryExplanationOpen={summaryExplanationOpen}
+        onToggleSummaryExplanation={onToggleSummaryExplanation}
+      />
     </HoverProvider>
   );
 }

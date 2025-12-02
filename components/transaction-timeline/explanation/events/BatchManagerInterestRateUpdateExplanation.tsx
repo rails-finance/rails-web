@@ -10,11 +10,13 @@ import { Icon } from "@/components/icons/icon";
 interface BatchManagerInterestRateUpdateExplanationProps {
   transaction: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
 export function BatchManagerInterestRateUpdateExplanation({
   transaction,
   onToggle,
+  defaultOpen,
 }: BatchManagerInterestRateUpdateExplanationProps) {
   const [copied, setCopied] = useState(false);
   const tx = transaction as any;
@@ -158,7 +160,7 @@ export function BatchManagerInterestRateUpdateExplanation({
     <ExplanationPanel
       items={items}
       onToggle={onToggle}
-      defaultOpen={false}
+      defaultOpen={defaultOpen ?? false}
       transactionHash={transaction.transactionHash}
     />
   );

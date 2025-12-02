@@ -133,18 +133,15 @@ export default function Home() {
                     {/* Mobile: Stacked, Desktop: Two columns */}
                     
                     <div className="flex flex-col md:flex-row md:gap-8 md:items-center">
-                      <div className="text-slate-600  dark:text-slate-400 font-medium text-md leading-relaxed md:flex-1 flex items-center mb-6 md:mb-0">
+                      <div className="text-slate-600  dark:text-slate-400 font-medium text-md leading-relaxed md:flex-1 flex flex-col mb-6 md:mb-0">
+                        <div className="flex items-center gap-2 mb-4">
+                          <span className="text-2xl text-slate-600 dark:text-slate-300 font-extrabold">Explore</span>
+                          <svg className="w-12 h-12" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                            <use href="#icon-liquity" />
+                          </svg>
+                          <span className="text-2xl text-slate-600 dark:text-slate-300 font-extrabold">Liquity V2</span>
+                        </div>
                         <p>
-<div className="flex items-center gap-2 mb-4">
-                    <span className="text-2xl text-slate-600 dark:text-slate-300 font-extrabold">
-                      Explore
-                      </span> <svg className="w-12 h-12" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                        <use href="#icon-liquity" />
-                      </svg>
-                      <span className="text-2xl text-slate-600 dark:text-slate-300 font-extrabold">
-                        Liquity V2
-                      </span>
-                    </div>
                           Liquity V2 enables users to deposit ETH, wstETH, or rETH as collateral to mint BOLD stablecoins and set their own interest rates.
                         </p>
                       </div>

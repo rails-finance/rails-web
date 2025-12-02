@@ -9,9 +9,10 @@ import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 interface RemoveFromBatchExplanationProps {
   transaction: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFromBatchExplanationProps) {
+export function RemoveFromBatchExplanation({ transaction, onToggle, defaultOpen }: RemoveFromBatchExplanationProps) {
   const tx = transaction as any;
   const exitRate = tx.stateAfter.annualInterestRate;
   const prevBatchRate = tx.stateBefore?.annualInterestRate || exitRate;
@@ -89,7 +90,7 @@ export function RemoveFromBatchExplanation({ transaction, onToggle }: RemoveFrom
     <ExplanationPanel
       items={batchExitItems}
       onToggle={onToggle}
-      defaultOpen={false}
+      defaultOpen={defaultOpen ?? false}
       transactionHash={transaction.transactionHash}
     />
   );

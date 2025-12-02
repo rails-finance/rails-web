@@ -13,9 +13,14 @@ import { ExternalLink, SearchCheck, Link2 } from "lucide-react";
 interface OpenTroveAndJoinBatchExplanationProps {
   transaction: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: OpenTroveAndJoinBatchExplanationProps) {
+export function OpenTroveAndJoinBatchExplanation({
+  transaction,
+  onToggle,
+  defaultOpen,
+}: OpenTroveAndJoinBatchExplanationProps) {
   const tx = transaction as any;
   const batchOpenFee = getUpfrontFee(tx);
   const batchPrincipalBorrowed = tx.stateAfter.debt - batchOpenFee;
@@ -315,7 +320,7 @@ export function OpenTroveAndJoinBatchExplanation({ transaction, onToggle }: Open
       rightColumn={howBatchManagementWorks}
       footer={railsPromotion}
       onToggle={onToggle}
-      defaultOpen={false}
+      defaultOpen={defaultOpen ?? false}
       transactionHash={transaction.transactionHash}
     />
   );

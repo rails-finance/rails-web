@@ -16,14 +16,12 @@ interface ExplanationPanelProps {
 }
 
 export function ExplanationPanel({ items, leftColumn, rightColumn, footer, onToggle, defaultOpen = true, transactionHash, noBullets = false }: ExplanationPanelProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen); // Use defaultOpen directly
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [copiedTxHash, setCopiedTxHash] = useState(false);
 
   useEffect(() => {
-    setIsHydrated(true);
-    onToggle?.(isOpen); // Enable hover context based on current state
-  }, [onToggle, isOpen]);
+    setIsOpen(defaultOpen);
+  }, [defaultOpen]);
 
   const handleToggle = () => {
     const newState = !isOpen;

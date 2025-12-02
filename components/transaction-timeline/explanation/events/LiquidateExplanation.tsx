@@ -17,9 +17,10 @@ import { ExternalLink } from "lucide-react";
 interface LiquidateExplanationProps {
   transaction: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplanationProps) {
+export function LiquidateExplanation({ transaction, onToggle, defaultOpen }: LiquidateExplanationProps) {
   const tx = transaction as TroveLiquidationTransaction;
 
   // Determine if this is a beneficial liquidation (trove gains from redistribution)
@@ -166,7 +167,7 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
         leftColumn={transactionBreakdown}
         rightColumn={howLiquidationsWork}
         onToggle={onToggle}
-        defaultOpen={false}
+        defaultOpen={defaultOpen ?? false}
         transactionHash={transaction.transactionHash}
       />
     );
@@ -401,7 +402,7 @@ export function LiquidateExplanation({ transaction, onToggle }: LiquidateExplana
         leftColumn={transactionBreakdown}
         rightColumn={howLiquidationsWork}
         onToggle={onToggle}
-        defaultOpen={false}
+        defaultOpen={defaultOpen ?? false}
         transactionHash={transaction.transactionHash}
       />
     );
