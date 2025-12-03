@@ -11,9 +11,10 @@ import { ExternalLink, Bell } from "lucide-react";
 interface RedeemCollateralExplanationProps {
   transaction: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCollateralExplanationProps) {
+export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen }: RedeemCollateralExplanationProps) {
   const tx = transaction as any;
 
   if (!isRedemptionTransaction(tx)) return null;
@@ -320,7 +321,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle }: RedeemCol
       rightColumn={howRedemptionsWork}
       footer={railsPromotion}
       onToggle={onToggle}
-      defaultOpen={false}
+      defaultOpen={defaultOpen ?? false}
       transactionHash={transaction.transactionHash}
     />
   );

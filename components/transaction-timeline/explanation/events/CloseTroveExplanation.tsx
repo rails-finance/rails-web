@@ -11,9 +11,10 @@ import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 interface CloseTroveExplanationProps {
   transaction: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function CloseTroveExplanation({ transaction, onToggle }: CloseTroveExplanationProps) {
+export function CloseTroveExplanation({ transaction, onToggle, defaultOpen }: CloseTroveExplanationProps) {
   const tx = transaction as any;
   const stateBefore = tx.stateBefore || tx.stateAfter;
 
@@ -101,7 +102,7 @@ export function CloseTroveExplanation({ transaction, onToggle }: CloseTroveExpla
     <ExplanationPanel
       items={closeTroveItems}
       onToggle={onToggle}
-      defaultOpen={false}
+      defaultOpen={defaultOpen ?? false}
       transactionHash={transaction.transactionHash}
     />
   );

@@ -10,9 +10,10 @@ import { Icon } from "@/components/icons/icon";
 interface SetInterestBatchManagerExplanationProps {
   transaction: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function SetInterestBatchManagerExplanation({ transaction, onToggle }: SetInterestBatchManagerExplanationProps) {
+export function SetInterestBatchManagerExplanation({ transaction, onToggle, defaultOpen }: SetInterestBatchManagerExplanationProps) {
   const [copied, setCopied] = useState(false);
   const tx = transaction as any;
   const joinRate = tx.stateAfter.annualInterestRate;
@@ -108,7 +109,7 @@ export function SetInterestBatchManagerExplanation({ transaction, onToggle }: Se
     <ExplanationPanel
       items={batchJoinItems}
       onToggle={onToggle}
-      defaultOpen={false}
+      defaultOpen={defaultOpen ?? false}
       transactionHash={transaction.transactionHash}
     />
   );

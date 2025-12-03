@@ -11,9 +11,10 @@ import { ExternalLinkIcon } from "@/components/ExternalLinkIcon";
 interface TransferTroveExplanationProps {
   transaction: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function TransferTroveExplanation({ transaction, onToggle }: TransferTroveExplanationProps) {
+export function TransferTroveExplanation({ transaction, onToggle, defaultOpen }: TransferTroveExplanationProps) {
   const tx = transaction as any;
   const fromAddress = tx.fromAddress;
   const toAddress = tx.toAddress;
@@ -141,7 +142,7 @@ export function TransferTroveExplanation({ transaction, onToggle }: TransferTrov
     <ExplanationPanel
       items={items}
       onToggle={onToggle}
-      defaultOpen={false}
+      defaultOpen={defaultOpen ?? false}
       transactionHash={transaction.transactionHash}
     />
   );

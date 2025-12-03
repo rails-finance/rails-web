@@ -11,9 +11,15 @@ interface AdjustTroveInterestRateExplanationProps {
   transaction: Transaction;
   previousTransaction?: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function AdjustTroveInterestRateExplanation({ transaction, previousTransaction, onToggle }: AdjustTroveInterestRateExplanationProps) {
+export function AdjustTroveInterestRateExplanation({
+  transaction,
+  previousTransaction,
+  onToggle,
+  defaultOpen,
+}: AdjustTroveInterestRateExplanationProps) {
   const tx = transaction as any;
   const prevRate = tx.stateBefore?.annualInterestRate || 0;
   const newRate = tx.stateAfter.annualInterestRate;
@@ -132,7 +138,7 @@ export function AdjustTroveInterestRateExplanation({ transaction, previousTransa
     <ExplanationPanel
       items={interestRateItems}
       onToggle={onToggle}
-      defaultOpen={false}
+      defaultOpen={defaultOpen ?? false}
       transactionHash={transaction.transactionHash}
     />
   );

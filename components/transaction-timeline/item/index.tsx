@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Transaction, isBatchManagerOperation } from "@/types/api/troveHistory";
+import { TransactionUiState } from "@/hooks/useTroveUiState";
 import { TransactionIcon } from "../icon";
 import { LeftValueDisplay } from "../value-display/components/LeftValueDisplay";
 import { RightValueDisplay } from "../value-display/components/RightValueDisplay";
@@ -20,19 +21,49 @@ interface TransactionItemProps {
   isFirst: boolean;
   isLast: boolean;
   txIndex: number;
+  transactionState: Record<string, TransactionUiState>;
+  getTransactionState: (transactionId: string) => TransactionUiState;
+  setTransactionExpanded: (transactionId: string, expanded: boolean) => void;
+  setExplanationOpen: (transactionId: string, explanationOpen: boolean) => void;
 }
 
-export function TransactionItem({ tx, previousTx, isFirst, isLast, txIndex }: TransactionItemProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [showExplanation, setShowExplanation] = useState(false);
+export function TransactionItem({
+  tx,
+  previousTx,
+  isFirst,
+  isLast,
+  txIndex,
+  transactionState,
+  getTransactionState,
+  setTransactionExpanded,
+  setExplanationOpen,
+}: TransactionItemProps) {
+  const persistedState = transactionState[tx.id] ?? getTransactionState(tx.id);
+  const [isExpanded, setIsExpanded] = useState(persistedState.expanded);
+  const [showExplanation, setShowExplanation] = useState(persistedState.explanationOpen);
   const isBatchManager = isBatchManagerOperation(tx);
+
+  useEffect(() => {
+    setIsExpanded(persistedState.expanded);
+    setShowExplanation(persistedState.explanationOpen);
+  }, [persistedState.expanded, persistedState.explanationOpen]);
 
   // Batch manager transactions don't expand - they only show rate changes
   const toggleExpanded = () => {
     if (!isBatchManager) {
-      setIsExpanded(!isExpanded);
+      const nextExpanded = !isExpanded;
+      setIsExpanded(nextExpanded);
+      setTransactionExpanded(tx.id, nextExpanded);
     }
   };
+
+  const handleExplanationToggle = useCallback(
+    (isOpen: boolean) => {
+      setShowExplanation(isOpen);
+      setExplanationOpen(tx.id, isOpen);
+    },
+    [setExplanationOpen, tx.id],
+  );
 
   return (
     <HoverProvider>
@@ -72,7 +103,8 @@ export function TransactionItem({ tx, previousTx, isFirst, isLast, txIndex }: Tr
                 <EventExplanation
                   transaction={tx}
                   previousTransaction={previousTx}
-                  onToggle={(isOpen) => setShowExplanation(isOpen)}
+                  onToggle={handleExplanationToggle}
+                  defaultOpen={showExplanation}
                 />
               </div>
             )}

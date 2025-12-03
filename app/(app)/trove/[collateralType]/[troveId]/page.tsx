@@ -15,19 +15,32 @@ import { TokenIcon } from "@/components/icons/tokenIcon";
 import { FeedbackButton } from "@/components/FeedbackButton";
 import { TroveStateData, TroveStateResponse } from "@/types/api/troveState";
 import { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
+import { useTroveUiState } from "@/hooks/useTroveUiState";
 
 export default function TrovePage() {
   const params = useParams();
   const router = useRouter();
   const troveId = params.troveId as string;
   const collateralType = params.collateralType as string;
+  const troveKey = `${collateralType}:${troveId}`;
 
   const [troveData, setTroveData] = useState<TroveSummary | null>(null);
   const [timelineData, setTimelineData] = useState<TimelineData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hideRedemptions, setHideRedemptions] = useState(false);
-  const [hideDelegateRates, setHideDelegateRates] = useState(false);
+
+  const {
+    hideDelegateRates,
+    hideRedemptions,
+    transactions: transactionUiState,
+    summaryExplanationOpen,
+    setHideDelegateRates,
+    setHideRedemptions,
+    getTransactionState,
+    setTransactionExpanded,
+    setExplanationOpen,
+    setSummaryExplanationOpen,
+  } = useTroveUiState(troveKey);
 
   // Live blockchain data and prices
   const [liveState, setLiveState] = useState<TroveStateData | undefined>(undefined);
@@ -206,6 +219,8 @@ export default function TrovePage() {
           trove={troveData}
           liveState={liveState}
           prices={prices}
+          summaryExplanationOpen={summaryExplanationOpen}
+          onToggleSummaryExplanation={setSummaryExplanationOpen}
           loadingStatus={{
             message: getEnhancementStatus(),
             snapshotDate: timelineData?.transactions?.[0]?.timestamp,
@@ -271,6 +286,10 @@ export default function TrovePage() {
                 return true;
               }),
             }}
+            transactionState={transactionUiState}
+            getTransactionState={getTransactionState}
+            setTransactionExpanded={setTransactionExpanded}
+            setExplanationOpen={setExplanationOpen}
           />
         ) : (
           <div className="text-center py-8 text-slate-400">No transaction history available</div>

@@ -12,9 +12,10 @@ interface AdjustTroveExplanationProps {
   transaction: Transaction;
   previousTransaction?: Transaction;
   onToggle: (isOpen: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-export function AdjustTroveExplanation({ transaction, previousTransaction, onToggle }: AdjustTroveExplanationProps) {
+export function AdjustTroveExplanation({ transaction, previousTransaction, onToggle, defaultOpen }: AdjustTroveExplanationProps) {
   const tx = transaction as any;
 
   if (!isTroveTransaction(tx)) return null;
@@ -196,7 +197,7 @@ export function AdjustTroveExplanation({ transaction, previousTransaction, onTog
     <ExplanationPanel
       items={adjustTroveItems}
       onToggle={onToggle}
-      defaultOpen={false}
+      defaultOpen={defaultOpen ?? false}
       transactionHash={transaction.transactionHash}
     />
   );

@@ -14,9 +14,15 @@ import { TroveSummary } from "@/types/api/trove";
 
 interface LiquidatedTroveCardProps {
   trove: TroveSummary;
+  summaryExplanationOpen?: boolean;
+  onToggleSummaryExplanation?: (isOpen: boolean) => void;
 }
 
-function LiquidatedTroveCardContent({ trove }: LiquidatedTroveCardProps) {
+function LiquidatedTroveCardContent({
+  trove,
+  summaryExplanationOpen,
+  onToggleSummaryExplanation,
+}: LiquidatedTroveCardProps) {
   const { hoveredValue, setHoverEnabled } = useHover();
 
   // Get the liquidation threshold for this collateral type
@@ -157,18 +163,27 @@ function LiquidatedTroveCardContent({ trove }: LiquidatedTroveCardProps) {
           items={hoverContextItems}
           onToggle={(isOpen) => {
             setHoverEnabled(isOpen);
+            onToggleSummaryExplanation?.(isOpen);
           }}
-          defaultOpen={false}
+          defaultOpen={summaryExplanationOpen ?? false}
         />
       </div>
     </div>
   );
 }
 
-export function LiquidatedSummaryCard({ trove }: LiquidatedTroveCardProps) {
+export function LiquidatedSummaryCard({
+  trove,
+  summaryExplanationOpen,
+  onToggleSummaryExplanation,
+}: LiquidatedTroveCardProps) {
   return (
     <HoverProvider>
-      <LiquidatedTroveCardContent trove={trove} />
+      <LiquidatedTroveCardContent
+        trove={trove}
+        summaryExplanationOpen={summaryExplanationOpen}
+        onToggleSummaryExplanation={onToggleSummaryExplanation}
+      />
     </HoverProvider>
   );
 }

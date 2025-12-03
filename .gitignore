@@ -50,3 +50,9 @@ reference/*
 .zip.py
 rails*.zip
 app/(site)/blog/README.md
+
+# Slideshow demo tool (lives in slideshow-tool branch only, never merge to main)
+slideshow/
+app/api/slideshow/
+app/slideshow-dev/
+SLIDESHOW-BRANCH-SETUP.md

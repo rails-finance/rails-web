@@ -1,11 +1,22 @@
 import { TransactionTimeline as TimelineData } from "@/types/api/troveHistory";
+import { TransactionUiState } from "@/hooks/useTroveUiState";
 import { TransactionItem } from "./item";
 
 interface TransactionTimelineProps {
   timeline: TimelineData;
+  transactionState: Record<string, TransactionUiState>;
+  getTransactionState: (transactionId: string) => TransactionUiState;
+  setTransactionExpanded: (transactionId: string, expanded: boolean) => void;
+  setExplanationOpen: (transactionId: string, explanationOpen: boolean) => void;
 }
 
-export function TransactionTimeline({ timeline }: TransactionTimelineProps) {
+export function TransactionTimeline({
+  timeline,
+  transactionState,
+  getTransactionState,
+  setTransactionExpanded,
+  setExplanationOpen,
+}: TransactionTimelineProps) {
   const txLength = timeline.transactions.length;
 
   if (txLength === 0) {
@@ -58,6 +69,10 @@ export function TransactionTimeline({ timeline }: TransactionTimelineProps) {
               isFirst={index === 0}
               isLast={index === txLength - 1}
               txIndex={txLength - index}
+              transactionState={transactionState}
+              getTransactionState={getTransactionState}
+              setTransactionExpanded={setTransactionExpanded}
+              setExplanationOpen={setExplanationOpen}
             />
           );
         })}
