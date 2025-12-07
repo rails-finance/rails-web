@@ -61,7 +61,7 @@ export function CloseTroveExplanation({ transaction, onToggle, defaultOpen }: Cl
   closeTroveItems.push(
     <span key="reserve" className="text-slate-500">
       The {LIQUIDATION_RESERVE_ETH} ETH liquidation reserve was returned
-      <InfoButton href={FAQ_URLS.LIQUIDATION_RESERVE} />
+      {' '}<InfoButton href={FAQ_URLS.LIQUIDATION_RESERVE} />
     </span>,
   );
 
@@ -87,7 +87,7 @@ export function CloseTroveExplanation({ transaction, onToggle, defaultOpen }: Cl
     closeTroveItems.push(
       <span key="nftBurn" className="text-slate-500">
         Trove NFT was sent to the burn address, ending token ownership
-        <InfoButton href={FAQ_URLS.NFT_TROVES} />
+        {' '}<InfoButton href={FAQ_URLS.NFT_TROVES} />
       </span>,
     );
   }

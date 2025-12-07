@@ -94,7 +94,7 @@ export function AdjustTroveExplanation({ transaction, previousTransaction, onTog
           {adjustFee.toFixed(2)} {tx.assetType}
         </HighlightableValue>{" "}
         borrowing fee (7 days of average interest on the respective borrow market)
-        <InfoButton href={FAQ_URLS.BORROWING_FEES} />
+        {' '}<InfoButton href={FAQ_URLS.BORROWING_FEES} />
       </span>,
     );
   }
@@ -154,7 +154,7 @@ export function AdjustTroveExplanation({ transaction, previousTransaction, onTog
         <HighlightableValue type="collRatio" state="after" value={afterCollRatio}>
           {afterCollRatio.toFixed(1)}%
         </HighlightableValue>
-        , reducing liquidation risk
+        , reducing liquidation risk{' '}
         <InfoButton href={FAQ_URLS.LTV_COLLATERAL_RATIO} />
       </span>,
     );
@@ -166,7 +166,7 @@ export function AdjustTroveExplanation({ transaction, previousTransaction, onTog
           {afterCollRatio.toFixed(1)}%
         </HighlightableValue>
         {afterCollRatio < beforeCollRatio ? ", increasing liquidation risk" : ""}
-        <InfoButton href={FAQ_URLS.LTV_COLLATERAL_RATIO} />
+        {' '}<InfoButton href={FAQ_URLS.LTV_COLLATERAL_RATIO} />
       </span>,
     );
   }

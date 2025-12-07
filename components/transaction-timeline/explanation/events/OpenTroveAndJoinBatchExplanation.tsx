@@ -4,7 +4,7 @@ import { Transaction } from "@/types/api/troveHistory";
 import { HighlightableValue } from "../HighlightableValue";
 import { ExplanationPanel } from "../ExplanationPanel";
 import { formatCurrency, formatUsdValue } from "@/lib/utils/format";
-import { getUpfrontFee } from "../shared/eventHelpers";
+import { getUpfrontFee, LIQUIDATION_RESERVE_ETH } from "../shared/eventHelpers";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 import { FAQ_URLS } from "../shared/faqUrls";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
@@ -35,7 +35,7 @@ export function OpenTroveAndJoinBatchExplanation({
   // 1. Transaction breakdown bullet points
   const transactionBreakdown = (
     <div className="space-y-3">
-      <div className="font-semibold text-slate-900 dark:text-slate-200 text-sm">Transaction Details</div>
+      <div className="font-semibold text-slate-900 dark:text-slate-200 text-sm">Transaction Explanation</div>
       <div className="text-slate-900 dark:text-white space-y-2 text-sm/5.5">
         <div className="flex items-start gap-2">
         <span className="text-slate-600 dark:text-slate-400">•</span>
@@ -43,11 +43,11 @@ export function OpenTroveAndJoinBatchExplanation({
           Wallet{" "}
           <Link
             href={`/troves?ownerAddress=${tx.relatedTransfer.toAddress}`}
-            className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline inline-flex items-center gap-1"
           >
             {`${tx.relatedTransfer.toAddress.substring(0, 6)}...${tx.relatedTransfer.toAddress.substring(38)}`}
           </Link>{" "}
-          opened a new Trove with batch management.
+          opened a Trove with delegated interest rate management
         </div>
       </div>
       <div className="flex items-start gap-2">
@@ -57,7 +57,7 @@ export function OpenTroveAndJoinBatchExplanation({
           <HighlightableValue type="collateral" state="change" value={tx.stateAfter.coll}>
             {tx.stateAfter.coll} {tx.collateralType}
           </HighlightableValue>{" "}
-          as collateral.
+          as collateral
         </div>
       </div>
       <div className="flex items-start gap-2">
@@ -67,7 +67,7 @@ export function OpenTroveAndJoinBatchExplanation({
           <HighlightableValue type="debt" state="change" value={batchPrincipalBorrowed}>
             {formatCurrency(batchPrincipalBorrowed, tx.assetType)}
           </HighlightableValue>{" "}
-          through the batch.
+          through the batch
         </div>
       </div>
       {batchOpenFee > 0 && (
@@ -78,7 +78,7 @@ export function OpenTroveAndJoinBatchExplanation({
             <HighlightableValue type="upfrontFee" state="fee" value={batchOpenFee}>
               {batchOpenFee.toFixed(2)} {tx.assetType}
             </HighlightableValue>{" "}
-            upfront borrowing fee.
+            upfront borrowing fee
           </div>
         </div>
       )}
@@ -89,9 +89,17 @@ export function OpenTroveAndJoinBatchExplanation({
           <HighlightableValue type="debt" state="after" value={tx.stateAfter.debt}>
             {formatCurrency(tx.stateAfter.debt, tx.assetType)}
           </HighlightableValue>
-          {batchOpenFee > 0 && " including fees"}.
+          {batchOpenFee > 0 && " including fees"}
         </div>
       </div>
+      {LIQUIDATION_RESERVE_ETH > 0 && (
+        <div className="flex items-start gap-2">
+          <span className="text-slate-600 dark:text-slate-400">•</span>
+          <div className="text-slate-500">
+            {LIQUIDATION_RESERVE_ETH} ETH liquidation reserve set aside (refundable on close)
+          </div>
+        </div>
+      )}
       {batchCollUsdValue && (
         <div className="flex items-start gap-2">
           <span className="text-slate-600 dark:text-slate-400">•</span>
@@ -106,7 +114,7 @@ export function OpenTroveAndJoinBatchExplanation({
                 {formatUsdValue(tx.collateralPrice)}
               </HighlightableValue>
             )}
-            {tx.collateralPrice && `)`}.
+            {tx.collateralPrice && `)`}
           </div>
         </div>
       )}
@@ -117,7 +125,6 @@ export function OpenTroveAndJoinBatchExplanation({
           <HighlightableValue type="collRatio" state="after" value={batchCollRatio}>
             {batchCollRatio ? batchCollRatio.toFixed(1) : "0"}%
           </HighlightableValue>
-          .
         </div>
       </div>
       <div className="flex items-start gap-2">
@@ -133,7 +140,7 @@ export function OpenTroveAndJoinBatchExplanation({
               href={batchManagerInfo.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-pink-500/75 hover:text-pink-600 dark:hover:text-pink-400 underline inline-flex items-center gap-1"
+              className="text-pink-500/75 hover:text-pink-600 dark:hover:text-pink-400 hover:underline inline-flex items-center gap-1"
               onClick={(e) => e.stopPropagation()}
             >
               {delegateDisplay}
@@ -142,24 +149,22 @@ export function OpenTroveAndJoinBatchExplanation({
           ) : (
             <span className="text-pink-500/75">{delegateDisplay}</span>
           )}
-          .
         </div>
       </div>
       {nftUrl && (
         <div className="flex items-start gap-2">
           <span className="text-slate-600 dark:text-slate-400">•</span>
           <div className="text-slate-500">
-            Trove is represented by an{" "}
+            Trove ownership is represented by an{" "}
             <a
               href={nftUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline inline-flex items-center gap-1"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
             >
-              ERC-721 NFT token
+              NFT token
               <ExternalLink className="w-3 h-3 flex-shrink-0" />
             </a>{" "}
-            representing ownership.
           </div>
         </div>
       )}
@@ -178,7 +183,7 @@ export function OpenTroveAndJoinBatchExplanation({
             href={batchManagerInfo.website}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline inline-flex items-center gap-1"
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
           >
             ({delegateDisplay})
             <ExternalLink className="w-3 h-3 flex-shrink-0" />
@@ -202,7 +207,7 @@ export function OpenTroveAndJoinBatchExplanation({
               href="https://www.youtube.com/watch?v=o1miCKLIPYs"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline inline-flex items-center gap-1"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
             >
               video guide
               <ExternalLink className="w-3 h-3 flex-shrink-0" />

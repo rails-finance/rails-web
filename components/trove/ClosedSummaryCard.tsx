@@ -82,7 +82,7 @@ function ClosedTroveCardContent({ trove, summaryExplanationOpen, onToggleSummary
     if (nftUrl) {
       items.push(
         <span key="nft-info" className="text-slate-600 dark:text-slate-500">
-          Trove is represented by an ERC-721 NFT token
+          Trove ownership is represented by an NFT token
           <a
             href={nftUrl}
             target="_blank"
@@ -92,7 +92,6 @@ function ClosedTroveCardContent({ trove, summaryExplanationOpen, onToggleSummary
           >
             <Link2 className="w-3 h-3" />
           </a>{" "}
-          for ownership verification
           <InfoButton href={FAQ_URLS.NFT_TROVES} />
         </span>,
       );
