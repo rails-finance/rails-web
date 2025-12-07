@@ -16,6 +16,7 @@ import { useHover, HoverProvider } from "@/components/transaction-timeline/conte
 import { InfoButton } from "@/components/transaction-timeline/explanation/InfoButton";
 import { FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
+import { LIQUIDATION_RESERVE_ETH } from "@/components/transaction-timeline/explanation/shared/eventHelpers";
 import { Link2, Users, Loader2 } from "lucide-react";
 import type { Transaction } from "@/types/api/troveHistory";
 import { TroveStateData } from "@/types/api/troveState";
@@ -264,6 +265,17 @@ function OpenTroveCardContent({
       );
     }
 
+    // Add liquidation reserve information
+    if (LIQUIDATION_RESERVE_ETH > 0) {
+      items.push(
+        <span key="liquidation-reserve" className="text-slate-500">
+          <span className="font-bold">{LIQUIDATION_RESERVE_ETH} ETH</span> liquidation reserve set aside and refunded
+          when the Trove is closed{' '}
+          <InfoButton href={FAQ_URLS.LIQUIDATION_RESERVE} />
+        </span>,
+      );
+    }
+
     // Add NFT information if NFT URL is available
     const nftUrl = getTroveNftUrl(trove.collateralType, trove.id);
     if (nftUrl && trove.owner) {
@@ -288,7 +300,7 @@ function OpenTroveCardContent({
             <HighlightableValue type="ownerAddress" state="after">
               {truncatedOwner}
             </HighlightableValue>
-          </Link>
+          </Link>{' '}
           <InfoButton href={FAQ_URLS.NFT_TROVES} />
         </span>,
       );

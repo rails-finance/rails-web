@@ -28,7 +28,7 @@ export function OpenTroveExplanation({ transaction, onToggle, defaultOpen }: Ope
   // 1. Transaction breakdown bullet points
   const transactionBreakdown = (
     <div className="space-y-3">
-      <div className="font-semibold text-slate-900 dark:text-slate-200 text-sm">Transaction Details</div>
+      <div className="font-semibold text-slate-900 dark:text-slate-200 text-sm">Transaction Explanation</div>
       <div className="text-slate-900 dark:text-white space-y-2 text-sm/5.5">
         <div className="flex items-start gap-2">
         <span className="text-slate-600 dark:text-slate-400">•</span>
@@ -36,11 +36,11 @@ export function OpenTroveExplanation({ transaction, onToggle, defaultOpen }: Ope
           Wallet{' '}
           <Link
             href={`/troves?ownerAddress=${tx.relatedTransfer.toAddress}`}
-            className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
           >
             {`${tx.relatedTransfer.toAddress.substring(0, 6)}...${tx.relatedTransfer.toAddress.substring(38)}`}
           </Link>{' '}
-          opened a new Trove.
+          opened a new Trove
         </div>
       </div>
       <div className="flex items-start gap-2">
@@ -50,7 +50,7 @@ export function OpenTroveExplanation({ transaction, onToggle, defaultOpen }: Ope
           <HighlightableValue type="collateral" state="change" value={tx.stateAfter.coll}>
             {tx.stateAfter.coll} {tx.collateralType}
           </HighlightableValue>{" "}
-          as collateral to secure the loan.
+          as collateral to secure the loan
         </div>
       </div>
       <div className="flex items-start gap-2">
@@ -60,7 +60,6 @@ export function OpenTroveExplanation({ transaction, onToggle, defaultOpen }: Ope
           <HighlightableValue type="debt" state="change" value={principalBorrowed}>
             {principalBorrowed.toLocaleString()} {tx.assetType}
           </HighlightableValue>
-          .
         </div>
       </div>
       {openFee > 0 && (
@@ -71,7 +70,7 @@ export function OpenTroveExplanation({ transaction, onToggle, defaultOpen }: Ope
             <HighlightableValue type="upfrontFee" state="fee" value={openFee}>
               {openFee.toFixed(2)} {tx.assetType}
             </HighlightableValue>{" "}
-            (equivalent to 7 days of average interest).
+            (equivalent to 7 days of average interest)
           </div>
         </div>
       )}
@@ -82,14 +81,14 @@ export function OpenTroveExplanation({ transaction, onToggle, defaultOpen }: Ope
           <HighlightableValue type="debt" state="after" value={tx.stateAfter.debt}>
             {tx.stateAfter.debt.toLocaleString()} {tx.assetType}
           </HighlightableValue>
-          {openFee > 0 && " including the borrowing fee"}.
+          {openFee > 0 && " including the borrowing fee"}
         </div>
       </div>
       {LIQUIDATION_RESERVE_ETH > 0 && (
         <div className="flex items-start gap-2">
           <span className="text-slate-600 dark:text-slate-400">•</span>
           <div className="text-slate-500">
-            A {LIQUIDATION_RESERVE_ETH} ETH liquidation reserve was set aside (refundable on close).
+            {LIQUIDATION_RESERVE_ETH} ETH liquidation reserve set aside (refundable on close)
           </div>
         </div>
       )}
@@ -107,7 +106,7 @@ export function OpenTroveExplanation({ transaction, onToggle, defaultOpen }: Ope
                 ${priceDisplay.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </HighlightableValue>
             )}
-            {priceDisplay && `)`}.
+            {priceDisplay && `)`}
           </div>
         </div>
       )}
@@ -118,7 +117,7 @@ export function OpenTroveExplanation({ transaction, onToggle, defaultOpen }: Ope
           <HighlightableValue type="collRatio" state="after" value={collRatio}>
             {collRatio.toFixed(1)}%
           </HighlightableValue>{" "}
-          collateralization ratio.
+          collateralization ratio
         </div>
       </div>
       <div className="flex items-start gap-2">
@@ -128,24 +127,23 @@ export function OpenTroveExplanation({ transaction, onToggle, defaultOpen }: Ope
           <HighlightableValue type="interestRate" state="after" value={tx.troveOperation?.annualInterestRate ?? tx.stateAfter.annualInterestRate}>
             {tx.troveOperation?.annualInterestRate ?? tx.stateAfter.annualInterestRate}%
           </HighlightableValue>
-          , compounding continuously.
+          , compounding continuously
         </div>
       </div>
       {nftUrl && (
         <div className="flex items-start gap-2">
           <span className="text-slate-600 dark:text-slate-400">•</span>
           <div className="text-slate-500">
-            Trove is represented by an{" "}
+            Trove ownership is represented by an{" "}
             <a
               href={nftUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline inline-flex items-center gap-1"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
             >
-              ERC-721 NFT token
+              NFT token
               <ExternalLink className="w-3 h-3 flex-shrink-0" />
-            </a>{" "}
-            representing ownership.
+            </a>
           </div>
         </div>
       )}

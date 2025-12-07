@@ -53,7 +53,7 @@ function LiquidatedTroveCardContent({
           {truncatedTroveId}
         </HighlightableValue>
         {" "}was liquidated when the collateral ratio fell below the minimum threshold ({liquidationThreshold}% for {trove.collateralType})
-        <InfoButton href={FAQ_URLS.LIQUIDATIONS} />
+        {' '}<InfoButton href={FAQ_URLS.LIQUIDATIONS} />
       </span>,
     );
 
@@ -106,8 +106,7 @@ function LiquidatedTroveCardContent({
     } else if (nftUrl) {
       items.push(
         <span key="nft-info" className="text-slate-500">
-          Trove is represented by an ERC-721 NFT token for ownership verification
-          <InfoButton href={FAQ_URLS.NFT_TROVES} />
+          Trove ownership is represented by an NFT token <InfoButton href={FAQ_URLS.NFT_TROVES} />
         </span>,
       );
     }

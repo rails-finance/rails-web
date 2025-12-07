@@ -72,7 +72,7 @@ export function TransferTroveExplanation({ transaction, onToggle, defaultOpen }:
   items.push(
     <span key="nft-ownership" className="text-slate-500">
       Liquity V2 troves are represented as ERC-721 NFT tokens, enabling transferable ownership
-      <InfoButton href={FAQ_URLS.NFT_TROVES} />
+      {' '}<InfoButton href={FAQ_URLS.NFT_TROVES} />
     </span>,
   );
 
