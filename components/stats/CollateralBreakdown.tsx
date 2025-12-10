@@ -63,13 +63,10 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
     <div className="grid grid-cols-1 gap-4">
       {sortedData.map(([collateralType, stats], index) => {
         const troveButton = (
-          <span
-            className="text-sm text-white group-hover:text-white font-medium dark:bg-slate-700 inline-flex items-center gap-1 rounded-full transition-all w-fit py-1 group-hover:bg-blue-500 bg-slate-300 pl-3 pr-2"
-            aria-label="View Troves"
-          >
-            <Icon name="view-troves" className="w-[19px] h-[18px]" />
+          <span className="text-sm text-white group-hover:text-white font-medium dark:bg-slate-700 inline-flex items-center gap-1 rounded-full transition-all w-fit py-1 group-hover:bg-blue-500 bg-slate-300 pl-3 pr-2">
+            <Icon name="view-troves" className="w-[19px] h-[18px]" aria-hidden="true" />
             <span>{stats.openTroveCount.toLocaleString()} Troves</span>
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-4 h-4" aria-hidden="true" />
           </span>
         );
 
@@ -80,6 +77,7 @@ export function CollateralBreakdown({ data, loading, mode = "overview" }: Collat
             <Link
               href={`/troves?collateralType=${collateralType}`}
               className="group bg-white dark:bg-slate-900 dark:hover:bg-slate-900/50 rounded-lg p-4 hover:bg-white-50/50 hover:shadow-lg transition-all cursor-pointer block"
+              aria-label={`View ${stats.openTroveCount.toLocaleString()} ${collateralType} troves with ${formatNumber(stats.totalDebt)} BOLD total debt`}
             >
               <div className="space-y-4 md:space-y-0">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

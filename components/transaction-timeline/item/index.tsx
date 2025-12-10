@@ -42,6 +42,7 @@ export function TransactionItem({
   const [isExpanded, setIsExpanded] = useState(persistedState.expanded);
   const [showExplanation, setShowExplanation] = useState(persistedState.explanationOpen);
   const isBatchManager = isBatchManagerOperation(tx);
+  const detailsId = `transaction-${tx.id}-details`;
 
   useEffect(() => {
     setIsExpanded(persistedState.expanded);
@@ -81,10 +82,14 @@ export function TransactionItem({
           {/* Transaction details wrapper */}
           <div className="grow self-start mb-2.5">
             <TransactionContent isInBatch={tx.isInBatch} isExpanded={isExpanded} isBatchManager={isBatchManager}>
-              <TransactionItemHeader tx={tx} isExpanded={isExpanded} onClick={toggleExpanded} />
+              <TransactionItemHeader tx={tx} isExpanded={isExpanded} onClick={toggleExpanded} detailsId={detailsId} />
 
               {/* Only show expanded content for non-batch-manager transactions */}
-              {isExpanded && !isBatchManager && <ExpandedContent tx={tx} previousTx={previousTx} />}
+              {isExpanded && !isBatchManager && (
+                <div id={detailsId}>
+                  <ExpandedContent tx={tx} previousTx={previousTx} />
+                </div>
+              )}
 
               {/* Footer - always show, but non-interactive for batch managers */}
               <TransactionFooter
@@ -94,10 +99,11 @@ export function TransactionItem({
                 isExpanded={isExpanded}
                 onClick={toggleExpanded}
                 isInteractive={!isBatchManager}
+                detailsId={detailsId}
               />
             </TransactionContent>
 
-            {/* Event explanation panel - only for non-batch-manager transactions */}
+            {/* Event explanation panel - positioned beneath the transaction details */}
             {isExpanded && !isBatchManager && (
               <div className="px-2.5">
                 <EventExplanation

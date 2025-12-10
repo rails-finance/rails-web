@@ -47,7 +47,7 @@ export function SiteNavigation() {
             {/* Logo with tagline */}
             <Link href="/" className="flex items-top space-x-3">
               <div className="bg-green-600 rounded-b-lg p-3 sm:p-5 w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
-                <svg className="w-8 h-8 sm:w-12 sm:h-12" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <svg className="w-8 h-8 sm:w-12 sm:h-12" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                   <use href="#icon-rails" />
                 </svg>
               </div>
@@ -66,7 +66,7 @@ export function SiteNavigation() {
                 <button
                   onClick={isMobile ? toggleMenu : undefined}
                   onMouseEnter={handleMouseEnter}
-                  className="p-3 cursor-pointer rounded-lg transition-colors duration-150"
+                  className="p-3 cursor-pointer rounded-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   aria-label="Toggle menu"
                 >
                   {/* Custom Hamburger Icon */}
@@ -123,7 +123,19 @@ export function SiteNavigation() {
 
       {/* Mobile Sidebar Modal */}
       {isMobile && isMenuOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" onClick={toggleMenu}>
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+          onClick={toggleMenu}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+              e.preventDefault();
+              toggleMenu();
+            }
+          }}
+          aria-label="Close menu"
+        >
           <div
             className="fixed top-0 right-0 h-full w-80 bg-white dark:bg-slate-800 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -132,7 +144,7 @@ export function SiteNavigation() {
             <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-green-600 rounded flex items-center justify-center">
-                  <svg className="w-5 h-5" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                  <svg className="w-5 h-5" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <use href="#icon-rails" />
                   </svg>
                 </div>
@@ -140,7 +152,7 @@ export function SiteNavigation() {
               </div>
               <button
                 onClick={toggleMenu}
-                className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-150 cursor-pointer touch-manipulation"
+                className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-150 cursor-pointer touch-manipulation focus:outline-none focus:ring-2 focus:ring-blue-500"
                 aria-label="Close menu"
               >
                 {/* X Icon */}
