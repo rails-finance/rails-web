@@ -15,6 +15,12 @@ import { HoverProvider } from "../context/HoverContext";
 import { EventExplanation } from "../explanation/EventExplanation";
 import { TimelineBackground } from "../icon/TimelineBackground";
 
+const truncateTxHash = (hash?: string) => {
+  if (!hash) return undefined;
+  if (hash.length <= 8) return hash;
+  return `${hash.substring(0, 8)}...`;
+};
+
 interface TransactionItemProps {
   tx: Transaction;
   previousTx?: Transaction;
@@ -43,6 +49,7 @@ export function TransactionItem({
   const [showExplanation, setShowExplanation] = useState(persistedState.explanationOpen);
   const isBatchManager = isBatchManagerOperation(tx);
   const detailsId = `transaction-${tx.id}-details`;
+  const truncatedTxHash = truncateTxHash(tx.transactionHash);
 
   useEffect(() => {
     setIsExpanded(persistedState.expanded);
@@ -82,7 +89,13 @@ export function TransactionItem({
           {/* Transaction details wrapper */}
           <div className="grow self-start mb-2.5">
             <TransactionContent isInBatch={tx.isInBatch} isExpanded={isExpanded} isBatchManager={isBatchManager}>
-              <TransactionItemHeader tx={tx} isExpanded={isExpanded} onClick={toggleExpanded} detailsId={detailsId} />
+              <TransactionItemHeader
+                tx={tx}
+                isExpanded={isExpanded}
+                onClick={toggleExpanded}
+                detailsId={detailsId}
+                truncatedTxHash={truncatedTxHash}
+              />
 
               {/* Only show expanded content for non-batch-manager transactions */}
               {isExpanded && !isBatchManager && (
@@ -96,6 +109,7 @@ export function TransactionItem({
                 timestamp={tx.timestamp}
                 txIndex={txIndex}
                 txHash={tx.transactionHash}
+                truncatedTxHash={truncatedTxHash}
                 isExpanded={isExpanded}
                 onClick={toggleExpanded}
                 isInteractive={!isBatchManager}
