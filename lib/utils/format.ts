@@ -64,3 +64,9 @@ export const formatApproximate = (value: number): string => {
   }
   return formatPrice(value);
 };
+
+export const truncateHash = (hash?: string): string | undefined => {
+  if (!hash) return undefined;
+  if (hash.length <= 8) return hash;
+  return `${hash.substring(0, 8)}...`;
+};

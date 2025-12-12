@@ -1,4 +1,5 @@
 import { formatTimestamp } from "@/lib/date";
+import { truncateHash } from "@/lib/utils/format";
 
 interface TransactionFooterProps {
   timestamp: number;
@@ -43,7 +44,7 @@ export function TransactionFooter({
       onClick={onClick}
       aria-expanded={isExpanded}
       aria-controls={detailsId}
-      aria-label={`${isExpanded ? "Collapse" : "Expand"} transaction details`}
+      aria-label={`${isExpanded ? "Collapse" : "Expand"} transaction ${truncateHash(txHash)} details`}
     >
       <div className="relative flex justify-between items-center font-bold">
         <div className="text-xs text-slate-300 dark:text-slate-600">{formatTimestamp(timestamp)}</div>

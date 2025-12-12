@@ -1,4 +1,5 @@
 import { Transaction, isBatchManagerOperation } from "@/types/api/troveHistory";
+import { truncateHash } from "@/lib/utils/format";
 import { HeaderContent } from "./operations";
 
 interface TransactionItemHeaderProps {
@@ -6,16 +7,9 @@ interface TransactionItemHeaderProps {
   isExpanded: boolean;
   onClick: () => void;
   detailsId: string;
-  truncatedTxHash?: string;
 }
 
-export function TransactionItemHeader({
-  tx,
-  isExpanded,
-  onClick,
-  detailsId,
-  truncatedTxHash,
-}: TransactionItemHeaderProps) {
+export function TransactionItemHeader({ tx, isExpanded, onClick, detailsId }: TransactionItemHeaderProps) {
   const isBatchManager = isBatchManagerOperation(tx);
   const focusStyles =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-slate-400 dark:focus-visible:ring-offset-slate-900";
@@ -48,7 +42,7 @@ export function TransactionItemHeader({
       onClick={onClick}
       aria-expanded={isExpanded}
       aria-controls={detailsId}
-      aria-label={`${isExpanded ? "Collapse" : "Expand"} transaction${truncatedTxHash ? ` ${truncatedTxHash}` : ""} details`}
+      aria-label={`${isExpanded ? "Collapse" : "Expand"} transaction ${truncateHash(tx.transactionHash)} details`}
     >
       <div className="relative flex items-start justify-between">
         <div className="grow mt-1 mb-2">
