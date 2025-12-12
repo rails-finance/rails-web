@@ -88,7 +88,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
                 0 {tx.assetType}
               </HighlightableValue>
               {isZombie && (
-                <span> debt, remaining open with collateral only (defined as a 'Zombie Trove').</span>
+                <span> debt, remaining open with collateral only (a 'zero-debt Zombie Trove').</span>
               )}
             </>
           ) : (
@@ -97,11 +97,11 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
                 {formatCurrency(redeemAfterDebt, tx.assetType)}
               </HighlightableValue>
               {isZombie ? (
-                <span> debt, creating a 'Zombie Trove' (below the 2000 {tx.assetType} minimum threshold), adjusting the collateral ratio proportionatly to <HighlightableValue type="collRatio" state="after" value={redeemAfterCollRatio}>
+                <span> debt, creating a 'low-debt Zombie Trove' (below the 2000 {tx.assetType} minimum threshold), adjusting the collateral ratio proportionally to <HighlightableValue type="collRatio" state="after" value={redeemAfterCollRatio}>
                   {redeemAfterCollRatio.toFixed(1)}%
                 </HighlightableValue>.</span>
               ) : (
-                <span>, adjusting the collateral ratio proportionatly to <HighlightableValue type="collRatio" state="after" value={redeemAfterCollRatio}>
+                <span>, adjusting the collateral ratio proportionally to <HighlightableValue type="collRatio" state="after" value={redeemAfterCollRatio}>
                   {redeemAfterCollRatio.toFixed(1)}%
                 </HighlightableValue>.</span>
               )}
@@ -132,7 +132,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
           <div className="flex items-start gap-2">
             <span className="text-slate-600 dark:text-slate-400">•</span>
             <div className="text-slate-500">
-              The Trove is removed from the normal sorted interest rate list and will be prioritized for the next redemption.
+              The Trove is removed from the normal redemption order. It may be targeted first in subsequent redemption(s) to clear the remaining below-minimum debt
             </div>
           </div>
           <div className="flex items-start gap-2">
@@ -140,7 +140,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
             <div className="text-slate-500">
               Interest continues to accrue at <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
                 {tx.stateAfter.annualInterestRate}%
-              </HighlightableValue>. If accrued interest naturally pushes the debt back above 2000 BOLD, the Trove automatically reactivates and returns to the normal list.
+              </HighlightableValue>. If the debt later rises back above 2,000 BOLD (for example from accrued interest), the Trove can return to normal behaviour.
             </div>
           </div>
           <div className="flex items-start gap-2">
@@ -179,7 +179,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
           {showOracleExplanation ? (
             <>
               <div className="text-slate-600 dark:text-slate-400">
-                Redemptions use Liquity's anti-manipulation price oracle{redemptionPrice > marketPrice
+                Redemptions use Liquity's anti-manipulation oracle price{redemptionPrice > marketPrice
                   ? ", which typically values collateral higher than the current market price"
                   : ", which valued collateral differently than the current market price at this time"}.
               </div>
@@ -207,7 +207,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
           ) : (
             <>
               <div className="text-slate-600 dark:text-slate-400">
-                Redemptions use Liquity's anti-manipulation price oracle to value collateral.
+                Redemptions use Liquity's anti-manipulation oracle price to value collateral.
               </div>
               <div className="space-y-1 text-slate-600 dark:text-slate-400">
                 <div>
