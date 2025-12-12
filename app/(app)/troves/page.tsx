@@ -55,6 +55,7 @@ function TrovesPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [prices, setPrices] = useState<OraclePricesData | null>(null);
+  const [dataKey, setDataKey] = useState(() => searchParams.toString());
 
   // Get page from URL
   const currentPage = Number(searchParams.get("page")) || 1;
@@ -211,6 +212,7 @@ function TrovesPageContent() {
       if (data.pagination) {
         setTotalCount(data.pagination.total || 0);
       }
+      setDataKey(searchParams.toString());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load troves");
       console.error("Error loading troves:", err);
@@ -261,8 +263,8 @@ function TrovesPageContent() {
         <AnimatePresence mode="wait">
           {troves.length > 0 ? (
             <motion.div
-              key={searchParams.toString()}
-              className="grid grid-cols-1 gap-6"
+              key={dataKey}
+              className={`grid grid-cols-1 gap-6 ${loading ? "pointer-events-none" : ""}`}
               variants={containerVariants}
               initial="hidden"
               animate="visible"
