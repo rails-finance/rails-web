@@ -58,7 +58,7 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true, isLiquida
                   </Link>
                   <div className="relative inline-block group">
                     <button
-                      className="mx-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
+                      className="mx-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded cursor-pointer flex items-center"
                       aria-label={copiedOwnerAddress ? "Copied to clipboard" : "Copy to clipboard"}
                       onClick={(e) => {
                         e.preventDefault();
@@ -70,7 +70,7 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true, isLiquida
                         }
                       }}
                     >
-                      <Icon name={copiedOwnerAddress ? "check" : "copy"} size={14} />
+                      <Icon name={copiedOwnerAddress ? "check" : "copy"} size={14} aria-hidden="true" />
                     </button>
                     <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 pointer-events-none">
                       <div
@@ -100,7 +100,7 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true, isLiquida
                   </HighlightableValue>
                   <div className="relative inline-block group">
                     <button
-                      className="mx-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 focus:outline-none cursor-pointer flex items-center"
+                      className="mx-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded cursor-pointer flex items-center"
                       aria-label={copiedTrove ? "Copied to clipboard" : "Copy to clipboard"}
                       onClick={(e) => {
                         e.preventDefault();
@@ -112,7 +112,7 @@ export function CardFooter({ trove, dateText, showDetailedInfo = true, isLiquida
                         }
                       }}
                     >
-                      <Icon name={copiedTrove ? "check" : "copy"} size={14} />
+                      <Icon name={copiedTrove ? "check" : "copy"} size={14} aria-hidden="true" />
                     </button>
                     <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 pointer-events-none">
                       <div

@@ -241,6 +241,7 @@ export default function TrovePage() {
             {timelineData && timelineData.transactions.some((tx) => isBatchManagerOperation(tx)) && (
               <button
                 onClick={() => setHideDelegateRates(!hideDelegateRates)}
+                aria-label={hideDelegateRates ? "Show delegate rate updates" : "Hide delegate rate updates"}
                 className={`cursor-pointer pl-0.5 pr-1.5 text-sm rounded-full transition-colors flex items-center bg-pink-100 dark:bg-pink-900/50 text-pink-600 dark:text-pink-400 hover:bg-pink-200 dark:hover:bg-pink-900/70`}
               >
                 <span className="w-5 h-5 flex items-center justify-center ">
@@ -259,6 +260,7 @@ export default function TrovePage() {
             {timelineData && timelineData.transactions.some((tx) => isRedemptionTransaction(tx)) && (
               <button
                 onClick={() => setHideRedemptions(!hideRedemptions)}
+                aria-label={hideRedemptions ? "Show redemption transactions" : "Hide redemption transactions"}
                 className={`cursor-pointer pl-0.5 pr-1.5 text-sm rounded-full transition-colors flex items-center bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/70`}
               >
                 <span className="w-5 h-5 flex items-center justify-center ">

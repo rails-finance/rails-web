@@ -641,6 +641,7 @@ function OpenTroveCardContent({
       <div className="px-2.5">
         <ExplanationPanel
           items={hoverContextItems}
+          troveId={trove.id}
           onToggle={(isOpen) => {
             setHoverEnabled(isOpen);
             onToggleSummaryExplanation?.(isOpen);

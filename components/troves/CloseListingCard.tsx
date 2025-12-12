@@ -20,6 +20,7 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
       href={`/trove/${trove.collateralType}/${trove.id}`}
       onClick={handleClick}
       className="block relative rounded-lg text-slate-600 dark:text-slate-500 bg-slate-200 dark:bg-slate-700 hover:dark:bg-slate-700/70 hover:bg-slate-200/70 transition-all cursor-pointer group"
+      aria-label={`View closed trove ${trove.id.substring(0, 8)}... with peak debt of ${formatApproximate(trove.debt.peak)} BOLD`}
     >
       {/* Header section */}
       <div className="flex items-center justify-between p-4 pb-0">
@@ -79,13 +80,10 @@ export function ClosedListingCard({ trove }: { trove: TroveSummary }) {
             showDetailedInfo={false}
           />
           <div className="flex items-center bg-slate-300 dark:bg-slate-800 group-hover:bg-blue-500 transition-colors rounded-full pl-3 pr-2 py-1">
-            <span
-              className="text-sm text-slate-50 dark:text-slate-500 group-hover:text-white font-bold flex items-center gap-1"
-              aria-label="View Trove"
-            >
-              <Icon name="timeline" size={20} />
+            <span className="text-sm text-slate-50 dark:text-slate-500 group-hover:text-white font-bold flex items-center gap-1">
+              <Icon name="timeline" size={20} aria-hidden="true" />
               View
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4" aria-hidden="true" />
             </span>
           </div>
         </div>
