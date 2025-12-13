@@ -87,33 +87,81 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
               <HighlightableValue type="debt" state="after" value={0}>
                 0 {tx.assetType}
               </HighlightableValue>
+              {isZombie && (
+                <span> debt, remaining open with collateral only (a 'zero-debt Zombie Trove').</span>
+              )}
             </>
           ) : (
-            <HighlightableValue type="debt" state="after" value={redeemAfterDebt}>
-              {formatCurrency(redeemAfterDebt, tx.assetType)}
-            </HighlightableValue>
-          )}{redeemAfterDebt === 0 ? (
-            <>{isZombie && (
-              <span> debt, remaining open with collateral only making it a 'Zombie Trove'. </span>
-            )}</>
-          ) : (
-            <>{", adjusting the collateral ratio proportionatly to "}<HighlightableValue type="collRatio" state="after" value={redeemAfterCollRatio}>
-              {redeemAfterCollRatio.toFixed(1)}%
-            </HighlightableValue>{isZombie && (
-              <span>. This creates a 'zombie' Trove since the debt of {redeemAfterDebt.toFixed(2)} {tx.assetType} is below the 2000 {tx.assetType} minimum threshold. It can be closed by repaying the remaining debt and withdrawing collateral, or by borrowing more to bring the debt above 2000 BOLD.</span>
-            )}</>
+            <>
+              <HighlightableValue type="debt" state="after" value={redeemAfterDebt}>
+                {formatCurrency(redeemAfterDebt, tx.assetType)}
+              </HighlightableValue>
+              {isZombie ? (
+                <span> debt, creating a 'low-debt Zombie Trove' (below the 2000 {tx.assetType} minimum threshold), adjusting the collateral ratio proportionally to <HighlightableValue type="collRatio" state="after" value={redeemAfterCollRatio}>
+                  {redeemAfterCollRatio.toFixed(1)}%
+                </HighlightableValue>.</span>
+              ) : (
+                <span>, adjusting the collateral ratio proportionally to <HighlightableValue type="collRatio" state="after" value={redeemAfterCollRatio}>
+                  {redeemAfterCollRatio.toFixed(1)}%
+                </HighlightableValue>.</span>
+              )}
+            </>
           )}</span>
         </div>
       </div>
-      <div className="flex items-start gap-2">
-        <span className="text-slate-600 dark:text-slate-400">•</span>
-        <div className="text-slate-500">
-          Interest rates are not affected by redemptions and this remains at{" "}
-          <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
-            {tx.stateAfter.annualInterestRate}%
-          </HighlightableValue>{"."}
+      {isZombie && redeemAfterDebt === 0 && (
+        <>
+          <div className="flex items-start gap-2">
+            <span className="text-slate-600 dark:text-slate-400">•</span>
+            <div className="text-slate-500">
+              With zero debt, no interest accrues and the <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
+                {tx.stateAfter.annualInterestRate}%
+              </HighlightableValue> interest rate is no longer relevant.
+            </div>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-slate-600 dark:text-slate-400">•</span>
+            <div className="text-slate-500">
+              It can be closed by withdrawing the remaining collateral, or re-activated by borrowing 2000 BOLD or more.
+            </div>
+          </div>
+        </>
+      )}
+      {isZombie && redeemAfterDebt > 0 && (
+        <>
+          <div className="flex items-start gap-2">
+            <span className="text-slate-600 dark:text-slate-400">•</span>
+            <div className="text-slate-500">
+              The Trove is removed from the normal redemption order. It may be targeted first in subsequent redemption(s) to clear the remaining below-minimum debt
+            </div>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-slate-600 dark:text-slate-400">•</span>
+            <div className="text-slate-500">
+              Interest continues to accrue at <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
+                {tx.stateAfter.annualInterestRate}%
+              </HighlightableValue>. If the debt later rises back above 2,000 BOLD (for example from accrued interest), the Trove can return to normal behaviour.
+            </div>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-slate-600 dark:text-slate-400">•</span>
+            <div className="text-slate-500">
+              It can be resolved by repaying the remaining debt and withdrawing collateral to close it, or borrowing more to bring the debt above 2000 BOLD and reactivate it.
+            </div>
+          </div>
+        </>
+      )}
+      {!isZombie && (
+        <div className="flex items-start gap-2">
+          <span className="text-slate-600 dark:text-slate-400">•</span>
+          <div className="text-slate-500">
+            Interest rates are not affected by redemptions and this remains at{" "}
+            <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
+              {tx.stateAfter.annualInterestRate}%
+            </HighlightableValue>{"."}
+          </div>
         </div>
-      </div>
+      )}
     </div>
     </div>
   );
@@ -131,7 +179,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
           {showOracleExplanation ? (
             <>
               <div className="text-slate-600 dark:text-slate-400">
-                Redemptions use Liquity's anti-manipulation price oracle{redemptionPrice > marketPrice
+                Redemptions use Liquity's anti-manipulation oracle price{redemptionPrice > marketPrice
                   ? ", which typically values collateral higher than the current market price"
                   : ", which valued collateral differently than the current market price at this time"}.
               </div>
@@ -159,7 +207,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
           ) : (
             <>
               <div className="text-slate-600 dark:text-slate-400">
-                Redemptions use Liquity's anti-manipulation price oracle to value collateral.
+                Redemptions use Liquity's anti-manipulation oracle price to value collateral.
               </div>
               <div className="space-y-1 text-slate-600 dark:text-slate-400">
                 <div>

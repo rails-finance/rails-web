@@ -43,14 +43,14 @@ export function CloseTroveExplanation({ transaction, onToggle, defaultOpen }: Cl
   } else {
     closeTroveItems.push(
       <span key="noDebt" className="text-slate-500">
-        Debt was already 0, so no repayment necessary
+        Debt was zero, so no repayment necessary
       </span>,
     );
   }
 
   closeTroveItems.push(
     <span key="retrieveCollateral" className="text-slate-500">
-      Retrieved all{" "}
+      Borrower retrieved all{" "}
       <HighlightableValue type="collateral" state="change" value={collateralWithdrawn}>
         {collateralWithdrawn} {tx.collateralType}
       </HighlightableValue>{" "}
@@ -65,20 +65,23 @@ export function CloseTroveExplanation({ transaction, onToggle, defaultOpen }: Cl
     </span>,
   );
 
-  if (beforeInterestRateClose) {
-    closeTroveItems.push(
-      <span key="interestRate" className="text-slate-400">
-        Position was paying {beforeInterestRateClose}% annual interest before closure
-      </span>,
-    );
-  }
+  // Only show interest rate and collateral ratio if there was debt
+  if (debtRepaid > 0) {
+    if (beforeInterestRateClose) {
+      closeTroveItems.push(
+        <span key="interestRate" className="text-slate-400">
+          Position was paying {beforeInterestRateClose}% annual interest before closure
+        </span>,
+      );
+    }
 
-  if (beforeCollRatioClose) {
-    closeTroveItems.push(
-      <span key="collRatio" className="text-slate-400">
-        Closed with a {beforeCollRatioClose}% collateral ratio
-      </span>,
-    );
+    if (beforeCollRatioClose) {
+      closeTroveItems.push(
+        <span key="collRatio" className="text-slate-400">
+          Closed with a {beforeCollRatioClose}% collateral ratio
+        </span>,
+      );
+    }
   }
 
   // Add NFT burn explanation if NFT URL is available
