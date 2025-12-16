@@ -98,7 +98,7 @@ export function OpenListingCard({ trove, prices }: { trove: TroveSummary; prices
                 {collateralRatio.toFixed(1)}%
               </div>
             ) : (
-              <div className="h-7 w-16 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+              <div className="text-lg md:text-xl font-bold text-slate-500">N/A</div>
             )}
           </div>
 
