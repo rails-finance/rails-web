@@ -312,20 +312,6 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
               </a>
             )}
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
-            <div className="font-semibold text-slate-900 dark:text-slate-100 text-xs mb-2">Technical Resources</div>
-            <div className="grid grid-cols-1 gap-1 text-xs">
-              <a
-                href="https://github.com/liquity/bold"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
-              >
-                <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                BOLD GitHub Repository
-              </a>
-            </div>
-          </div>
         </div>
       </div>
   );

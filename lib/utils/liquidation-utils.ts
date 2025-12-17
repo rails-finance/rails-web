@@ -74,6 +74,10 @@ export function getPerTroveLiquidationData(tx: TroveLiquidationTransaction) {
   // Calculate collateral ratio at liquidation
   const crAtLiquidation = (totalCollValueAtLiquidation / debtCleared) * 100;
 
+  // Calculate borrower equity and estimated loss
+  const borrowerEquityAtLiquidation = totalCollValueAtLiquidation - debtCleared;
+  const estimatedBorrowerLoss = borrowerEquityAtLiquidation - (collSurplus * liquidationPrice);
+
   // Determine liquidation mechanism
   const debtOffsetBySP = tx.systemLiquidation.debtOffsetBySP;
   const debtRedistributed = tx.systemLiquidation.debtRedistributed;
@@ -100,6 +104,8 @@ export function getPerTroveLiquidationData(tx: TroveLiquidationTransaction) {
     // Calculated metrics
     crAtLiquidation,
     liquidationPrice,
+    borrowerEquityAtLiquidation,
+    estimatedBorrowerLoss,
 
     // Metadata
     isBatchLiquidation,
