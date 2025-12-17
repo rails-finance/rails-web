@@ -36,7 +36,7 @@ export function RedeemCollateralHeader({ tx }: { tx: TroveRedemptionTransaction 
             alwaysShowAmount
             valueType="collateral"
           />
-          {tx.isZombieTrove && zombieClaimableCollateral > 0 && (
+          {tx.isZombieTrove && tx.stateAfter.debt === 0 && zombieClaimableCollateral > 0 && (
             <div className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-xs font-medium">
               <span
                 className={`${hoverEnabled ? "cursor-pointer" : ""} ${
@@ -59,7 +59,11 @@ export function RedeemCollateralHeader({ tx }: { tx: TroveRedemptionTransaction 
           )}
         </div>
         {tx.isZombieTrove && (
-          <span className="inline-flex items-center gap-1 px-1 md:px-1.5 py-0.5 text-xs font-bold rounded bg-yellow-400 dark:bg-yellow-500/20 text-white dark:text-yellow-400">
+          <span className={`inline-flex items-center gap-1 px-1 md:px-1.5 py-0.5 text-xs font-bold rounded ${
+            tx.stateAfter.debt === 0
+              ? 'bg-red-400 dark:bg-red-500/20 text-white dark:text-red-400'
+              : 'bg-yellow-400 dark:bg-yellow-500/20 text-white dark:text-yellow-400'
+          }`}>
             <TriangleAlert className="w-4 h-4 md:w-3 md:h-3" />
             <span className="hidden md:inline">Zombie</span>
           </span>
