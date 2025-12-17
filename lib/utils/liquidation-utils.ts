@@ -95,6 +95,7 @@ export function getPerTroveLiquidationData(tx: TroveLiquidationTransaction) {
     collSurplusValueUsd: collSurplus * liquidationPrice,
     collToSPValueUsd: collToSP * liquidationPrice,
     penaltyValueUsd,
+    penaltyInCollateral,
 
     // Calculated metrics
     crAtLiquidation,

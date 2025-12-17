@@ -7,7 +7,6 @@ import { ClosedStateLabel } from "../components/ClosedStateLabel";
 import { useHover, shouldHighlight } from "../../context/HoverContext";
 import { formatUsdValue } from "@/lib/utils/format";
 import { HighlightableValue } from "../../explanation/HighlightableValue";
-import { ExternalLink } from "lucide-react";
 
 interface CollateralMetricProps {
   collateralType: string;
@@ -114,19 +113,6 @@ export function CollateralMetric({ collateralType, before, after, beforeInUsd, a
           </div>
         )}
       </StateTransition>
-      {hasSurplus && (
-        <div className="">
-          <a
-            href="https://www.liquity.org/frontend-v2"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-green-600  font-bold text-xs transition-colors"
-          >
-            Claim surplus
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        </div>
-      )}
     </StateMetric>
   );
 }

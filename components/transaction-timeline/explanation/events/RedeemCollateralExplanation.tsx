@@ -70,13 +70,13 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
             {redeemAfterColl.toFixed(4)}&nbsp;{tx.collateralType}
           </HighlightableValue> (<HighlightableValue type="collateralUsd" state="after" value={redeemAfterCollUsd}>
             {formatUsdValue(redeemAfterCollUsd)}
-          </HighlightableValue>).
+          </HighlightableValue>)
         </div>
       </div>
       <div className="flex items-start gap-2">
         <span className="text-slate-600 dark:text-slate-400">•</span>
         <div className="text-slate-500">
-          A {feeRate.toFixed(3)}% redemption fee of {redemptionFee.toFixed(6)} {tx.collateralType} ({formatUsdValue(feeValueMarketPrice)}), paid by the redeemer, remains in the Trove as additional collateral.
+          A {feeRate.toFixed(3)}% redemption fee of {redemptionFee.toFixed(6)} {tx.collateralType} ({formatUsdValue(feeValueMarketPrice)}), paid by the redeemer, remains in the Trove as additional collateral
         </div>
       </div>
       <div className="flex items-start gap-2">
@@ -116,13 +116,13 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
             <div className="text-slate-500">
               With zero debt, no interest accrues and the <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
                 {tx.stateAfter.annualInterestRate}%
-              </HighlightableValue> interest rate is no longer relevant.
+              </HighlightableValue> interest rate is no longer relevant
             </div>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-slate-600 dark:text-slate-400">•</span>
             <div className="text-slate-500">
-              It can be closed by withdrawing the remaining collateral, or re-activated by borrowing 2000 BOLD or more.
+              It can be closed by withdrawing the remaining collateral, or re-activated by borrowing 2000 BOLD or more
             </div>
           </div>
         </>
@@ -132,7 +132,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
           <div className="flex items-start gap-2">
             <span className="text-slate-600 dark:text-slate-400">•</span>
             <div className="text-slate-500">
-              The Trove is removed from the normal redemption order. It may be targeted first in subsequent redemption(s) to clear the remaining below-minimum debt
+              The Trove is removed from the normal redemption order. It may be prioritised in subsequent redemption(s) to clear the remaining below-minimum debt
             </div>
           </div>
           <div className="flex items-start gap-2">
@@ -140,13 +140,13 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
             <div className="text-slate-500">
               Interest continues to accrue at <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
                 {tx.stateAfter.annualInterestRate}%
-              </HighlightableValue>. If the debt later rises back above 2,000 BOLD (for example from accrued interest), the Trove can return to normal behaviour.
+              </HighlightableValue>. If the debt later rises back above 2,000 BOLD (for example from accrued interest), the Trove can return to normal behaviour
             </div>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-slate-600 dark:text-slate-400">•</span>
             <div className="text-slate-500">
-              It can be resolved by repaying the remaining debt and withdrawing collateral to close it, or borrowing more to bring the debt above 2000 BOLD and reactivate it.
+              It can be resolved by repaying the remaining debt and withdrawing collateral to close it, or borrowing more to bring the debt above 2000 BOLD and reactivate it{' '}
             </div>
           </div>
         </>
@@ -181,7 +181,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
               <div className="text-slate-600 dark:text-slate-400">
                 Redemptions use Liquity's anti-manipulation oracle price{redemptionPrice > marketPrice
                   ? ", which typically values collateral higher than the current market price"
-                  : ", which valued collateral differently than the current market price at this time"}.
+                  : ", which valued collateral differently than the current market price at this time"}
               </div>
               <div className="space-y-1 text-slate-600 dark:text-slate-400">
                 <div>
@@ -207,7 +207,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
           ) : (
             <>
               <div className="text-slate-600 dark:text-slate-400">
-                Redemptions use Liquity's anti-manipulation oracle price to value collateral.
+                Redemptions use Liquity's anti-manipulation oracle price to value collateral
               </div>
               <div className="space-y-1 text-slate-600 dark:text-slate-400">
                 <div>
@@ -218,7 +218,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
                 </div>
               </div>
               <div className="text-slate-600 dark:text-slate-400">
-                The protocol and market prices were aligned at the time of this redemption.
+                The protocol and market prices were aligned at the time of this redemption
               </div>
             </>
           )}
