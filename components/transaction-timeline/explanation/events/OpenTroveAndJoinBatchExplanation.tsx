@@ -178,7 +178,7 @@ export function OpenTroveAndJoinBatchExplanation({
     <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 text-sm">
       <div className="font-semibold text-slate-900 dark:text-slate-100 mb-1">How Batch Management Works</div>
       <div className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
-        By joining a batch, you delegate interest rate management to a batch manager who optimizes rates on your behalf. This helps protect against redemptions while potentially saving on gas costs. A batch manager{" "}
+        By joining a batch, borrowers delegate interest rate management to a batch manager who optimizes rates on the borrower's behalf. This helps protect against redemptions while potentially saving on gas costs. A batch manager{" "}
         {batchManagerInfo?.website ? (
           <a
             href={batchManagerInfo.website}
@@ -192,7 +192,7 @@ export function OpenTroveAndJoinBatchExplanation({
         ) : (
           `(${delegateDisplay})`
         )}{" "}
-        handles rate adjustments, but you maintain full control over your collateral and debt through your NFT ownership.
+        handles rate adjustments, but the borrower maintains full control over their collateral and debt through their NFT ownership.
       </div>
       <div className="font-semibold text-slate-900 dark:text-slate-100 mb-1 mt-3">Learn More About Borrowing</div>
       <div className="flex items-start gap-3">
@@ -213,7 +213,7 @@ export function OpenTroveAndJoinBatchExplanation({
               video guide
               <ExternalLink className="w-3 h-3 flex-shrink-0" />
             </a>
-            {" "}to learn how to borrow on Liquity and manage your Trove effectively.
+            {" "}to learn how to borrow on Liquity and manage a Trove effectively.
           </div>
         </div>
       </div>
@@ -303,7 +303,7 @@ export function OpenTroveAndJoinBatchExplanation({
           <SearchCheck className="w-5 h-5 text-fuchsia-400" />
         </div>
         <div className="flex-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-          <span className="text-slate-500 dark:text-slate-300 font-bold">Track your Trove activity!</span> Rails provides detailed transaction history and analytics for your Liquity positions, including batch management details. Follow us on{" "}
+          <span className="text-slate-500 dark:text-slate-300 font-bold">Track Trove activity!</span> Rails provides detailed transaction history and analytics for Liquity positions, including batch management details. Follow us on{" "}
           <a
             href="https://x.com/rails_finance"
             target="_blank"

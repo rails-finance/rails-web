@@ -177,7 +177,7 @@ export function OpenTroveExplanation({ transaction, onToggle, defaultOpen }: Ope
               video guide
               <ExternalLink className="w-3 h-3 flex-shrink-0" />
             </a>
-            {" "}to learn how to borrow on Liquity and manage your Trove effectively.
+            {" "}to learn how to borrow on Liquity and manage a Trove effectively.
           </div>
         </div>
       </div>
@@ -267,7 +267,7 @@ export function OpenTroveExplanation({ transaction, onToggle, defaultOpen }: Ope
           <SearchCheck className="w-5 h-5 text-fuchsia-400" />
         </div>
         <div className="flex-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-          <span className="text-slate-500 dark:text-slate-300 font-bold">Track your Trove activity!</span> Rails provides detailed transaction history and analytics for your Liquity positions. Follow us on{" "}
+          <span className="text-slate-500 dark:text-slate-300 font-bold">Track Trove activity!</span> Rails provides detailed transaction history and analytics for Liquity positions. Follow us on{" "}
           <a
             href="https://x.com/rails_finance"
             target="_blank"
