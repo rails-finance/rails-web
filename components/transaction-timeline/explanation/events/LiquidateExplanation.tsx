@@ -295,11 +295,11 @@ export function LiquidateExplanation({ transaction, onToggle, defaultOpen }: Liq
               </div>
             )}
 
-            {/* Show liquidation penalty */}
+            {/* Show liquidator incentive */}
             <div className="flex items-start gap-2">
               <span className="text-slate-600 dark:text-slate-400">•</span>
               <div className="text-slate-500">
-                Liquidation penalty: {formatUsdValue(liquidationData.penaltyValueUsd)} (5% of debt)
+                Liquidator received {formatCurrency(liquidationData.penaltyInCollateral, tx.collateralType)} ({formatUsdValue(liquidationData.penaltyValueUsd)}) as an incentive for performing the liquidation (5% of debt)
               </div>
             </div>
 
