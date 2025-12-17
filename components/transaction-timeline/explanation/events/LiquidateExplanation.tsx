@@ -178,21 +178,6 @@ export function LiquidateExplanation({ transaction, onToggle, defaultOpen }: Liq
     // Left column: Transaction breakdown
     const transactionBreakdown = (
       <div className="space-y-4">
-        {/* Batch Liquidation Warning */}
-        {liquidationData.isBatchLiquidation && (
-          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-300 dark:border-blue-700 rounded-lg p-3">
-            <div className="font-semibold text-blue-900 dark:text-blue-200 text-sm mb-1">
-              ℹ️ Batch Liquidation Detected
-            </div>
-            <div className="text-blue-700 dark:text-blue-300 text-xs leading-relaxed">
-              This transaction liquidated multiple troves simultaneously. Values shown are calculated specifically for
-              this trove based on this position's state changes.
-            </div>
-          </div>
-        )}
-
-        
-
         {/* Event Breakdown */}
         <div className="space-y-3">
           <div className="font-semibold text-slate-900 dark:text-slate-200 text-sm">Event Explanation</div>
@@ -244,15 +229,22 @@ export function LiquidateExplanation({ transaction, onToggle, defaultOpen }: Liq
 						<div className="flex items-start gap-2">
 							<span className="text-slate-600 dark:text-slate-400">•</span>
 							<div className="text-slate-500">
-								<em>Borrower</em> can claim surplus of{' '}<HighlightableValue type="collSurplus" state="after" value={liquidationData.collSurplus}>
+								<em>Borrower</em> can claim surplus of {liquidationData.surplusIsAmbiguous ? '~' : ''}<HighlightableValue type="collSurplus" state="after" value={liquidationData.collSurplus}>
 									{formatCurrency(liquidationData.collSurplus, tx.collateralType)}
 								</HighlightableValue>
 								<span className="text-slate-400 dark:text-slate-500 ml-1">
-									({formatUsdValue(liquidationData.collSurplusValueUsd)})
+									({liquidationData.surplusIsAmbiguous ? '~' : ''}{formatUsdValue(liquidationData.collSurplusValueUsd)})
 								</span>
 								{liquidationData.surplusIsAmbiguous && (
-									<div className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-300 dark:border-yellow-700 rounded p-2 mt-2">
-										⚠️ This surplus value is estimated.
+									<div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-300 dark:border-blue-700 rounded p-3 mt-2">
+										<div className="font-semibold text-blue-900 dark:text-blue-200 text-sm mb-1">Rails Calculated Estimate</div>
+										<div className="text-blue-700 dark:text-blue-200 text-xs leading-relaxed">
+											Because multiple troves were liquidated together, blockchain events only report aggregate surplus (not per-trove).
+											Rails calculates this trove's surplus using the formula: collateral - (debt × 1.05 / price) - gas compensation.
+										</div>
+										<div className="text-blue-700 dark:text-blue-200 text-xs leading-relaxed mt-2">
+											The actual claimable amount on-chain may differ slightly from this estimate.
+										</div>
 									</div>
 								)}
 							</div>
