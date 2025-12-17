@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Transaction } from "@/types/api/troveHistory";
 import { HighlightableValue } from "../HighlightableValue";
 import { ExplanationPanel } from "../ExplanationPanel";
-import { formatCurrency, formatUsdValue } from "@/lib/utils/format";
+import { formatCurrency, formatUsdValue, truncateAddress, isEthereumAddress } from "@/lib/utils/format";
 import { getUpfrontFee, LIQUIDATION_RESERVE_ETH } from "../shared/eventHelpers";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 import { FAQ_URLS } from "../shared/faqUrls";
@@ -30,7 +30,8 @@ export function OpenTroveAndJoinBatchExplanation({
 
   // Get batch manager info
   const batchManagerInfo = getBatchManagerByAddress(tx.stateAfter.interestBatchManager || "");
-  const delegateDisplay = batchManagerInfo?.description || batchManagerInfo?.name || tx.stateAfter.interestBatchManager || "Unknown manager";
+  const rawDelegateDisplay = batchManagerInfo?.description || batchManagerInfo?.name || tx.stateAfter.interestBatchManager || "Unknown manager";
+  const delegateDisplay = isEthereumAddress(rawDelegateDisplay) ? truncateAddress(rawDelegateDisplay) : rawDelegateDisplay;
 
   // 1. Transaction breakdown bullet points
   const transactionBreakdown = (

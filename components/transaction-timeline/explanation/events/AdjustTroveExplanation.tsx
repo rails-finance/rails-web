@@ -174,21 +174,19 @@ export function AdjustTroveExplanation({ transaction, previousTransaction, onTog
   if (beforeInterestRate !== afterInterestRate) {
     adjustTroveItems.push(
       <span key="rateChange" className="text-slate-500">
-        Interest rate adjusted from {beforeInterestRate || 0}% to{" "}
+        Annual interest rate adjusted from {beforeInterestRate || 0}% to{" "}
         <HighlightableValue type="interestRate" state="after" value={afterInterestRate}>
           {afterInterestRate}%
-        </HighlightableValue>{" "}
-        annual
+        </HighlightableValue>
       </span>,
     );
   } else {
     adjustTroveItems.push(
       <span key="rateSame" className="text-slate-500">
-        Interest rate remains at{" "}
+        Annual interest rate remains at{" "}
         <HighlightableValue type="interestRate" state="after" value={afterInterestRate}>
           {afterInterestRate}%
-        </HighlightableValue>{" "}
-        annual
+        </HighlightableValue>
       </span>,
     );
   }
