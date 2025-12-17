@@ -83,7 +83,7 @@ export function LiquidateHeader({ tx }: { tx: TroveLiquidationTransaction }) {
               }
               onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
             >
-              {liquidationData.collSurplus.toFixed(4)}
+              {liquidationData.surplusIsAmbiguous ? '~' : ''}{liquidationData.collSurplus.toFixed(4)}
             </span>
             <TokenIcon assetSymbol={tx.collateralType} className="w-4 h-4" />
             claimable
