@@ -146,16 +146,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
           <div className="flex items-start gap-2">
             <span className="text-slate-600 dark:text-slate-400">•</span>
             <div className="text-slate-500">
-              It can be resolved by repaying the remaining debt and withdrawing collateral to close it, or borrowing more to bring the debt above 2000 BOLD and reactivate it -{' '}
-              <a
-                href="https://www.liquity.org/frontend-v2"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
-              >
-                claimable from a Liquity V2 frontend
-                <ExternalLink className="w-3 h-3" />
-              </a>
+              It can be resolved by repaying the remaining debt and withdrawing collateral to close it, or borrowing more to bring the debt above 2000 BOLD and reactivate it{' '}
             </div>
           </div>
         </>

@@ -3,6 +3,7 @@ import { OperationBadge } from "../components/OperationBadge";
 import { AssetAction } from "../components/AssetAction";
 import { getPerTroveLiquidationData } from "@/lib/utils/liquidation-utils";
 import { useHover, shouldHighlight } from "../../context/HoverContext";
+import { TokenIcon } from "@/components/icons/tokenIcon";
 
 export function LiquidateHeader({ tx }: { tx: TroveLiquidationTransaction }) {
   const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
@@ -83,8 +84,9 @@ export function LiquidateHeader({ tx }: { tx: TroveLiquidationTransaction }) {
               onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
             >
               {liquidationData.collSurplus.toFixed(4)}
-            </span>{" "}
-            {tx.collateralType} surplus available
+            </span>
+            <TokenIcon assetSymbol={tx.collateralType} className="w-4 h-4" />
+            claimable
           </div>
         )}
       </div>

@@ -3,6 +3,7 @@ import { OperationBadge } from "../components/OperationBadge";
 import { AssetAction } from "../components/AssetAction";
 import { TriangleAlert, ExternalLink } from "lucide-react";
 import { useHover, shouldHighlight } from "../../context/HoverContext";
+import { TokenIcon } from "@/components/icons/tokenIcon";
 
 export function RedeemCollateralHeader({ tx }: { tx: TroveRedemptionTransaction }) {
   const { hoveredValue, setHoveredValue, hoverEnabled } = useHover();
@@ -51,8 +52,9 @@ export function RedeemCollateralHeader({ tx }: { tx: TroveRedemptionTransaction 
                 onMouseLeave={hoverEnabled ? () => setHoveredValue(null) : undefined}
               >
                 {zombieClaimableCollateral.toFixed(4)}
-              </span>{" "}
-              {tx.collateralType} claimable
+              </span>
+              <TokenIcon assetSymbol={tx.collateralType} className="w-4 h-4" />
+              claimable
             </div>
           )}
         </div>
