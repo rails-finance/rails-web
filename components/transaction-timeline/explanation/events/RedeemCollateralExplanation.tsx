@@ -132,7 +132,7 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
           <div className="flex items-start gap-2">
             <span className="text-slate-600 dark:text-slate-400">•</span>
             <div className="text-slate-500">
-              The Trove is removed from the normal redemption order. It may be targeted first in subsequent redemption(s) to clear the remaining below-minimum debt
+              The Trove is removed from the normal redemption order. It may be prioritised in subsequent redemption(s) to clear the remaining below-minimum debt
             </div>
           </div>
           <div className="flex items-start gap-2">
