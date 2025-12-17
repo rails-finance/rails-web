@@ -70,3 +70,12 @@ export const truncateHash = (hash?: string): string | undefined => {
   if (hash.length <= 8) return hash;
   return `${hash.substring(0, 8)}...`;
 };
+
+export const truncateAddress = (address: string, startChars = 6, endChars = 4): string => {
+  if (!address || address.length <= startChars + endChars) return address;
+  return `${address.substring(0, startChars)}...${address.substring(address.length - endChars)}`;
+};
+
+export const isEthereumAddress = (str: string): boolean => {
+  return /^0x[a-fA-F0-9]{40}$/.test(str);
+};
