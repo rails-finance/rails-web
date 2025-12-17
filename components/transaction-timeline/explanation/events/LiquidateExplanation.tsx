@@ -201,7 +201,7 @@ export function LiquidateExplanation({ transaction, onToggle, defaultOpen }: Liq
 
         {/* Event Breakdown */}
         <div className="space-y-3">
-          <div className="font-semibold text-slate-900 dark:text-slate-200 text-sm">Event Breakdown</div>
+          <div className="font-semibold text-slate-900 dark:text-slate-200 text-sm">Event Explanation</div>
           {/* Collateral ratio at liquidation */}
           <div className="flex items-start gap-2">
             <span className="text-slate-600 dark:text-slate-400">•</span>
@@ -247,10 +247,10 @@ export function LiquidateExplanation({ transaction, onToggle, defaultOpen }: Liq
 						<div className="flex items-start gap-2">
 							<span className="text-slate-600 dark:text-slate-400">•</span>
 							<div className="text-slate-500">
-								Claimable Surplus{' '}<HighlightableValue type="collSurplus" state="after" value={liquidationData.collSurplus}>
+								Claimable surplus{' '}<HighlightableValue type="collSurplus" state="after" value={liquidationData.collSurplus}>
 									{formatCurrency(liquidationData.collSurplus, tx.collateralType)}
 								</HighlightableValue>{' '}(
-								{formatUsdValue(liquidationData.collSurplusValueUsd)} at liquidation price)
+								{formatUsdValue(liquidationData.collSurplusValueUsd)} at liquidation price){' '}
 								{liquidationData.surplusIsAmbiguous && (
 									<div className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-300 dark:border-yellow-700 rounded p-2 mt-2">
 										⚠️ This surplus value is estimated. Connect your wallet to the Liquity app to see your exact
@@ -278,6 +278,12 @@ export function LiquidateExplanation({ transaction, onToggle, defaultOpen }: Liq
                 </div>
               </div>
             )}
+            <div className="flex items-start gap-2">
+              <span className="text-slate-600 dark:text-slate-400">•</span>
+              <div className="text-slate-500">
+                0.0375 WETH gas compensation to liquidator
+              </div>
+            </div>
             {liquidationData.wasRedistributed && (
               <div className="flex items-start gap-2">
                 <span className="text-slate-600 dark:text-slate-400">•</span>
