@@ -91,19 +91,29 @@ function calculateEconomicsFromTransactions(
     }
   }
 
+  // Calculate liquidation metrics
+  let totalLiquidatedDebt = 0;
+  let totalCollSurplus = 0;
+
+  for (const liq of liquidations) {
+    totalLiquidatedDebt += Math.abs(liq.troveOperation.debtChangeFromOperation);
+    totalCollSurplus += liq.systemLiquidation.collSurplus;
+  }
+
   const liquidatedCollateral = liquidations.reduce(
     (sum, tx) => sum + Math.abs(tx.troveOperation.collChangeFromOperation),
     0
   );
+  const liquidatedCollSeized = Math.max(0, liquidatedCollateral - totalCollSurplus);
 
   const netCollateralChange =
     totalCollateralDeposited - totalCollateralWithdrawn - liquidatedCollateral - totalCollateralLost;
 
   // Calculate interest + management fees as the difference between debt repaid and debt created
-  // totalRepaid + redemptionDebtCleared = total debt that was cleared
+  // totalRepaid + redemptionDebtCleared + liquidationDebtCleared = total debt that was cleared
   // totalBorrowed + totalUpfrontFees = total debt that was created
   // The difference is interest + management fees that accrued
-  const totalDebtRepaidOrCleared = totalRepaid + totalDebtCleared;
+  const totalDebtRepaidOrCleared = totalRepaid + totalDebtCleared + totalLiquidatedDebt;
   const totalDebtCreated = totalBorrowed + totalUpfrontFees;
   const interestAndManagementFees = Math.max(0, totalDebtRepaidOrCleared - totalDebtCreated);
 
@@ -116,6 +126,14 @@ function calculateEconomicsFromTransactions(
             totalCollateralValueAtRedemption,
             totalFeesRetained,
             realizedPL,
+          }
+        : null,
+    liquidation:
+      liquidations.length > 0
+        ? {
+            totalDebtCleared: totalLiquidatedDebt,
+            totalCollateralSeized: liquidatedCollSeized,
+            totalCollateralSurplus: totalCollSurplus,
           }
         : null,
     gas: {
@@ -360,6 +378,7 @@ export function TroveEconomicsSummary({
   // Calculate values for summaries
   const collateralSymbol = trove.collateralType;
   const redemption = economics.redemption;
+  const liquidation = economics.liquidation ?? null;
   // P/L excludes fees (shown separately in collateral breakdown)
   const opportunityPL = redemption && currentPrice
     ? redemption.totalDebtCleared - redemption.totalCollateralLost * currentPrice
@@ -371,6 +390,7 @@ export function TroveEconomicsSummary({
     trove.debt.current
     + economics.position.totalRepaid
     + (redemption?.totalDebtCleared ?? 0)
+    + (liquidation?.totalDebtCleared ?? 0)
     - economics.position.totalBorrowed
     - economics.costs.totalUpfrontFees
   );
@@ -394,6 +414,7 @@ export function TroveEconomicsSummary({
 
   const debtSegments: TowerSegment[] = [
     { key: "current-debt", label: "Current Debt", value: trove.debt.current, colorClass: "bg-emerald-500" },
+    { key: "debt-liquidated", label: "Liquidated", value: liquidation?.totalDebtCleared ?? 0, colorClass: "", patternStyle: LIQUIDATION_PATTERN },
     { key: "debt-redeemed", label: "Redeemed", value: redemption?.totalDebtCleared ?? 0, colorClass: "", patternStyle: REDEMPTION_PATTERN },
     { key: "repaid", label: "Repaid", value: repaidPrincipal, colorClass: "", patternStyle: REPAID_PATTERN },
     { key: "costs", label: "Costs", value: costsSettled, colorClass: "", patternStyle: COSTS_PATTERN },
@@ -412,19 +433,26 @@ export function TroveEconomicsSummary({
   );
   const liquidatedColl = hasLiquidations && rawLiquidatedColl > 0.0001 ? rawLiquidatedColl : 0;
 
+  // Claimable surplus from liquidation (separate from seized collateral)
+  const claimableSurplus = liquidation?.totalCollateralSurplus ?? 0;
+  const liquidatedSeized = claimableSurplus > 0
+    ? Math.max(0, liquidatedColl - claimableSurplus)
+    : liquidatedColl;
+
   // Zombie trove: debt fully cleared but collateral remains claimable
   const isZombie = trove.debt.current === 0 && trove.collateral.amount > 0;
 
-  // Collateral tower: bottom-to-top: In Trove (or Claimable), Redeemed, Liquidated, Withdrawn
+  // Collateral tower: bottom-to-top: In Trove (or Claimable), Surplus, Fees, Redeemed, Liquidated, Withdrawn
   const feesReceivedColl = redemption?.totalFeesRetained ?? 0;
 
   const collSegments: TowerSegment[] = currentPrice ? [
     isZombie
       ? { key: "claimable", label: "Claimable", value: trove.collateral.amount * currentPrice, colorClass: "bg-blue-700 ring-1 ring-inset ring-green-700 dark:ring-green-400" }
       : { key: "in-trove", label: "In Trove", value: trove.collateral.amount * currentPrice, colorClass: "bg-blue-500" },
+    { key: "liq-surplus", label: "Claimable", value: claimableSurplus * currentPrice, colorClass: "bg-blue-700 ring-1 ring-inset ring-green-700 dark:ring-green-400" },
     { key: "fees-received", label: "Fees Received", value: feesReceivedColl * currentPrice, colorClass: "bg-cyan-800" },
     { key: "coll-redeemed", label: "Redeemed", value: (redemption?.totalCollateralLost ?? 0) * currentPrice, colorClass: "", patternStyle: REDEMPTION_PATTERN },
-    { key: "liquidated", label: "Liquidated", value: liquidatedColl * currentPrice, colorClass: "", patternStyle: LIQUIDATION_PATTERN },
+    { key: "liquidated", label: "Liquidated", value: liquidatedSeized * currentPrice, colorClass: "", patternStyle: LIQUIDATION_PATTERN },
     { key: "withdrawn", label: "Withdrawn", value: economics.position.totalCollateralWithdrawn * currentPrice, colorClass: "", patternStyle: WITHDRAWN_PATTERN },
   ] : [];
 
@@ -462,6 +490,7 @@ export function TroveEconomicsSummary({
     { sign: "", label: "Delegate Fees", amount: formatPrice(delegateFees), symbol: "BOLD", hidden: delegateFees === 0, indent: true },
     { sign: "\u2212", label: "Repaid", amount: formatPrice(economics.position.totalRepaid), symbol: "BOLD", hidden: economics.position.totalRepaid === 0, swatchStyle: REPAID_PATTERN },
     { sign: "\u2212", label: "Redeemed", amount: formatPrice(redemption?.totalDebtCleared ?? 0), symbol: "BOLD", hidden: !redemption || redemption.totalDebtCleared === 0, swatchStyle: REDEMPTION_PATTERN },
+    { sign: "\u2212", label: "Liquidated", amount: formatPrice(liquidation?.totalDebtCleared ?? 0), symbol: "BOLD", hidden: !liquidation || liquidation.totalDebtCleared === 0, swatchStyle: LIQUIDATION_PATTERN },
     { sign: "", label: "Current Debt", amount: formatPrice(trove.debt.current), symbol: "BOLD", isResult: true, swatchClass: "bg-emerald-500" },
   ];
 
@@ -484,10 +513,10 @@ export function TroveEconomicsSummary({
     },
     {
       sign: "\u2212", label: "Liquidated",
-      amount: liquidatedColl.toFixed(2),
+      amount: liquidatedSeized.toFixed(2),
       symbol: collateralSymbol,
-      usdHint: `[${formatCompactUsd(liquidatedColl * currentPrice)}]`,
-      hidden: liquidatedColl === 0,
+      usdHint: `[${formatCompactUsd(liquidatedSeized * currentPrice)}]`,
+      hidden: liquidatedSeized === 0,
       swatchStyle: LIQUIDATION_PATTERN,
     },
     {
@@ -505,6 +534,14 @@ export function TroveEconomicsSummary({
       usdHint: `[${formatCompactUsd(feesReceivedColl * currentPrice)}]`,
       hidden: feesReceivedColl === 0,
       swatchClass: "bg-cyan-800",
+    },
+    {
+      sign: "", label: "Claimable",
+      amount: claimableSurplus.toFixed(4),
+      symbol: collateralSymbol,
+      usdHint: `[${formatCompactUsd(claimableSurplus * currentPrice)}]`,
+      hidden: claimableSurplus === 0,
+      swatchClass: "bg-blue-700 ring-1 ring-inset ring-green-700 dark:ring-green-400",
     },
     {
       sign: "", label: isZombie ? "Claimable" : "In Trove",

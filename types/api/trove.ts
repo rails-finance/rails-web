@@ -11,6 +11,13 @@ export interface TroveEconomics {
     realizedPL: number;                     // debtCleared - collValueAtRedemption
   } | null;  // null if no redemptions
 
+  // Liquidation metrics
+  liquidation: {
+    totalDebtCleared: number;              // Sum of debt cleared by liquidations
+    totalCollateralSeized: number;         // Collateral taken by liquidation (excluding surplus)
+    totalCollateralSurplus: number;        // Claimable surplus collateral
+  } | null;  // null if no liquidations
+
   // Gas costs
   gas: {
     totalGasUsed: number;                   // Sum of gas across all txs
