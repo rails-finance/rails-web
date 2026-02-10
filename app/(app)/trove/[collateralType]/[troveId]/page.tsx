@@ -234,6 +234,7 @@ export default function TrovePage() {
           trove={troveData}
           transactions={timelineData?.transactions}
           currentPrice={prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData]}
+          entireDebt={liveState?.debt.entire}
           persistedOpen={economicsOpen}
           onToggle={setEconomicsOpen}
         />

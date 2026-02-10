@@ -12,11 +12,13 @@ import {
   isLiquidationTransaction,
 } from "@/types/api/troveHistory";
 import { formatPrice, formatUsdValue } from "@/lib/utils/format";
+import { calculateAccruedInterest } from "@/lib/utils/interest-calculator";
 
 interface TroveEconomicsSummaryProps {
   trove: TroveSummary;
   transactions?: Transaction[];
   currentPrice?: number;
+  entireDebt?: number;
   persistedOpen?: boolean;
   onToggle?: (isOpen: boolean) => void;
 }
@@ -351,6 +353,7 @@ export function TroveEconomicsSummary({
   trove,
   transactions,
   currentPrice,
+  entireDebt: entireDebtProp,
   persistedOpen,
   onToggle,
 }: TroveEconomicsSummaryProps) {
@@ -379,6 +382,19 @@ export function TroveEconomicsSummary({
   const collateralSymbol = trove.collateralType;
   const redemption = economics.redemption;
   const liquidation = economics.liquidation ?? null;
+
+  // Include pending interest so "Current Debt" matches the header.
+  // Prefer the blockchain-derived entireDebt prop (synced with the header);
+  // fall back to a local estimate from rate × elapsed time.
+  const entireDebt = entireDebtProp ?? (
+    trove.status === "open" && trove.debt.current > 0
+      ? trove.debt.current + calculateAccruedInterest(
+          trove.debt.current,
+          trove.metrics.interestRate + (trove.batch.isMember ? trove.batch.managementFee : 0),
+          trove.activity.lastActivityAt,
+        )
+      : trove.debt.current
+  );
   // P/L excludes fees (shown separately in collateral breakdown)
   const opportunityPL = redemption && currentPrice
     ? redemption.totalDebtCleared - redemption.totalCollateralLost * currentPrice
@@ -387,7 +403,7 @@ export function TroveEconomicsSummary({
   // Tower chart data
   // Total interest including what's still outstanding in current debt
   const totalInterestAndMgmtFees = Math.max(0,
-    trove.debt.current
+    entireDebt
     + economics.position.totalRepaid
     + (redemption?.totalDebtCleared ?? 0)
     + (liquidation?.totalDebtCleared ?? 0)
@@ -413,7 +429,7 @@ export function TroveEconomicsSummary({
   const repaidPrincipal = economics.position.totalRepaid - costsSettled;
 
   const debtSegments: TowerSegment[] = [
-    { key: "current-debt", label: "Current Debt", value: trove.debt.current, colorClass: "bg-emerald-500" },
+    { key: "current-debt", label: "Current Debt", value: entireDebt, colorClass: "bg-emerald-500" },
     { key: "debt-liquidated", label: "Liquidated", value: liquidation?.totalDebtCleared ?? 0, colorClass: "", patternStyle: LIQUIDATION_PATTERN },
     { key: "debt-redeemed", label: "Redeemed", value: redemption?.totalDebtCleared ?? 0, colorClass: "", patternStyle: REDEMPTION_PATTERN },
     { key: "repaid", label: "Repaid", value: repaidPrincipal, colorClass: "", patternStyle: REPAID_PATTERN },
@@ -491,7 +507,7 @@ export function TroveEconomicsSummary({
     { sign: "\u2212", label: "Repaid", amount: formatPrice(economics.position.totalRepaid), symbol: "BOLD", hidden: economics.position.totalRepaid === 0, swatchStyle: REPAID_PATTERN },
     { sign: "\u2212", label: "Redeemed", amount: formatPrice(redemption?.totalDebtCleared ?? 0), symbol: "BOLD", hidden: !redemption || redemption.totalDebtCleared === 0, swatchStyle: REDEMPTION_PATTERN },
     { sign: "\u2212", label: "Liquidated", amount: formatPrice(liquidation?.totalDebtCleared ?? 0), symbol: "BOLD", hidden: !liquidation || liquidation.totalDebtCleared === 0, swatchStyle: LIQUIDATION_PATTERN },
-    { sign: "", label: "Current Debt", amount: formatPrice(trove.debt.current), symbol: "BOLD", isResult: true, swatchClass: "bg-emerald-500" },
+    { sign: "", label: "Current Debt", amount: formatPrice(entireDebt), symbol: "BOLD", isResult: true, swatchClass: "bg-emerald-500" },
   ];
 
   // Collateral breakdown: math sum → In Trove
