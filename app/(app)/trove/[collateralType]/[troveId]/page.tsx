@@ -7,6 +7,7 @@ import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 import type { TransactionTimeline as TimelineData } from "@/types/api/troveHistory";
 import { isRedemptionTransaction, isBatchManagerOperation } from "@/types/api/troveHistory";
 import { TroveSummaryCard } from "@/components/trove/TroveSummaryCard";
+import { TroveEconomicsSummary } from "@/components/trove/TroveEconomicsSummary";
 import { Button } from "@/components/ui/button";
 import { TransactionTimeline } from "@/components/transaction-timeline";
 import { formatDuration } from "@/lib/date";
@@ -34,12 +35,14 @@ export default function TrovePage() {
     hideRedemptions,
     transactions: transactionUiState,
     summaryExplanationOpen,
+    economicsOpen,
     setHideDelegateRates,
     setHideRedemptions,
     getTransactionState,
     setTransactionExpanded,
     setExplanationOpen,
     setSummaryExplanationOpen,
+    setEconomicsOpen,
   } = useTroveUiState(troveKey);
 
   // Live blockchain data and prices
@@ -225,6 +228,14 @@ export default function TrovePage() {
             message: getEnhancementStatus(),
             snapshotDate: timelineData?.transactions?.[0]?.timestamp,
           }}
+        />
+
+        <TroveEconomicsSummary
+          trove={troveData}
+          transactions={timelineData?.transactions}
+          currentPrice={prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData]}
+          persistedOpen={economicsOpen}
+          onToggle={setEconomicsOpen}
         />
 
         <div className="flex items-center justify-between mb-4">

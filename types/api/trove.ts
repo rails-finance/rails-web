@@ -1,5 +1,40 @@
 // Type definitions for Trove API responses
 
+// Trove Economics - aggregate financial metrics
+export interface TroveEconomics {
+  // Redemption metrics
+  redemption: {
+    totalDebtCleared: number;               // Sum of all debt cleared by redemptions
+    totalCollateralLost: number;            // Sum of collateral sent to redeemers (in coll units)
+    totalCollateralValueAtRedemption: number; // Collateral × price at each redemption
+    totalFeesRetained: number;              // Redemption fees kept in trove
+    realizedPL: number;                     // debtCleared - collValueAtRedemption
+  } | null;  // null if no redemptions
+
+  // Gas costs
+  gas: {
+    totalGasUsed: number;                   // Sum of gas across all txs
+    totalGasCostEth: number;                // Total gas in ETH
+    totalGasCostUsd: number;                // Total gas in USD (at time of each tx)
+  };
+
+  // Interest & fees
+  costs: {
+    totalInterestPaid: number;              // Cumulative interest accrued
+    totalUpfrontFees: number;               // Sum of debtIncreaseFromUpfrontFee
+    totalManagementFees: number;            // Batch management fees (if applicable)
+  };
+
+  // Overall position summary
+  position: {
+    totalBorrowed: number;                  // Sum of all debt increases
+    totalRepaid: number;                    // Sum of all debt repayments
+    totalCollateralDeposited: number;       // Sum of all collateral deposits
+    totalCollateralWithdrawn: number;       // Sum of all collateral withdrawals
+    netCollateralChange: number;            // deposited - withdrawn - liquidated - redeemed
+  };
+}
+
 // Collateral information
 export interface TroveCollateral {
   amount: number; // Current collateral amount
@@ -64,6 +99,9 @@ export interface TroveSummary {
   metrics: TroveMetrics; // Performance metrics
   activity: TroveActivity; // Activity tracking
   batch: TroveBatch; // Batch membership
+
+  // Economics (optional - may be provided by backend or calculated client-side)
+  economics?: TroveEconomics;
 }
 
 // API response wrapper

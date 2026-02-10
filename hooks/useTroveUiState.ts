@@ -11,6 +11,7 @@ type TroveUiState = {
   hideDelegateRates: boolean;
   hideRedemptions: boolean;
   summaryExplanationOpen: boolean;
+  economicsOpen: boolean;
   transactions: Record<string, TransactionUiState>;
 };
 
@@ -23,6 +24,7 @@ const DEFAULT_TROVE_STATE: TroveUiState = {
   hideDelegateRates: false,
   hideRedemptions: false,
   summaryExplanationOpen: false,
+  economicsOpen: false,
   transactions: {},
 };
 
@@ -46,6 +48,7 @@ export function useTroveUiState(troveKey?: string) {
           hideDelegateRates: parsed.hideDelegateRates ?? false,
           hideRedemptions: parsed.hideRedemptions ?? false,
           summaryExplanationOpen: parsed.summaryExplanationOpen ?? false,
+          economicsOpen: parsed.economicsOpen ?? false,
           transactions: parsed.transactions ?? {},
         });
       } else {
@@ -78,6 +81,10 @@ export function useTroveUiState(troveKey?: string) {
 
   const setSummaryExplanationOpen = useCallback((isOpen: boolean) => {
     setState((prev) => ({ ...prev, summaryExplanationOpen: isOpen }));
+  }, []);
+
+  const setEconomicsOpen = useCallback((isOpen: boolean) => {
+    setState((prev) => ({ ...prev, economicsOpen: isOpen }));
   }, []);
 
   const setHideDelegateRates = useCallback((hide: boolean) => {
@@ -122,6 +129,7 @@ export function useTroveUiState(troveKey?: string) {
     hideDelegateRates: state.hideDelegateRates,
     hideRedemptions: state.hideRedemptions,
     summaryExplanationOpen: state.summaryExplanationOpen,
+    economicsOpen: state.economicsOpen,
     transactions,
     getTransactionState,
     setHideDelegateRates,
@@ -129,5 +137,6 @@ export function useTroveUiState(troveKey?: string) {
     setTransactionExpanded,
     setExplanationOpen,
     setSummaryExplanationOpen,
+    setEconomicsOpen,
   };
 }
