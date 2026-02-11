@@ -21,6 +21,7 @@ interface TransactionItemProps {
   isFirst: boolean;
   isLast: boolean;
   txIndex: number;
+  currentPrice?: number;
   transactionState: Record<string, TransactionUiState>;
   getTransactionState: (transactionId: string) => TransactionUiState;
   setTransactionExpanded: (transactionId: string, expanded: boolean) => void;
@@ -33,6 +34,7 @@ export function TransactionItem({
   isFirst,
   isLast,
   txIndex,
+  currentPrice,
   transactionState,
   getTransactionState,
   setTransactionExpanded,
@@ -87,7 +89,7 @@ export function TransactionItem({
               {/* Only show expanded content for non-batch-manager transactions */}
               {isExpanded && !isBatchManager && (
                 <div id={detailsId}>
-                  <ExpandedContent tx={tx} previousTx={previousTx} />
+                  <ExpandedContent tx={tx} previousTx={previousTx} currentPrice={currentPrice} />
                 </div>
               )}
 
@@ -109,6 +111,7 @@ export function TransactionItem({
                 <EventExplanation
                   transaction={tx}
                   previousTransaction={previousTx}
+                  currentPrice={currentPrice}
                   onToggle={handleExplanationToggle}
                   defaultOpen={showExplanation}
                 />

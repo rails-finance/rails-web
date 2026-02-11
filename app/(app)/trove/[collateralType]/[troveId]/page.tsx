@@ -300,6 +300,7 @@ export default function TrovePage() {
                 return true;
               }),
             }}
+            currentPrice={prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData]}
             transactionState={transactionUiState}
             getTransactionState={getTransactionState}
             setTransactionExpanded={setTransactionExpanded}

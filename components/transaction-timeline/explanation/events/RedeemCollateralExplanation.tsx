@@ -10,11 +10,12 @@ import { ExternalLink, Bell } from "lucide-react";
 
 interface RedeemCollateralExplanationProps {
   transaction: Transaction;
+  currentPrice?: number;
   onToggle: (isOpen: boolean) => void;
   defaultOpen?: boolean;
 }
 
-export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen }: RedeemCollateralExplanationProps) {
+export function RedeemCollateralExplanation({ transaction, currentPrice, onToggle, defaultOpen }: RedeemCollateralExplanationProps) {
   const tx = transaction as any;
 
   if (!isRedemptionTransaction(tx)) return null;
@@ -159,6 +160,51 @@ export function RedeemCollateralExplanation({ transaction, onToggle, defaultOpen
             <HighlightableValue type="interestRate" state="after" value={tx.stateAfter.annualInterestRate}>
               {tx.stateAfter.annualInterestRate}%
             </HighlightableValue>{"."}
+          </div>
+        </div>
+      )}
+      {marketPrice > 0 && (
+        <div className="flex items-start gap-2">
+          <span className="text-slate-600 dark:text-slate-400">•</span>
+          <div className="text-slate-500">
+            Net outcome:{" "}
+            <HighlightableValue type="debt" state="change" value={debtRedeemed}>
+              {formatUsdValue(debtRedeemed)}
+            </HighlightableValue>{" "}
+            debt cleared &minus;{" "}
+            <HighlightableValue type="collateral" state="change" value={collateralTransferredOut}>
+              {collateralTransferredOut.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+            </HighlightableValue>{" "}
+            &times;{" "}
+            <HighlightableValue type="collateralPrice" state="after" value={marketPrice}>
+              {formatUsdValue(marketPrice)}
+            </HighlightableValue>{" "}
+            ={" "}
+            <HighlightableValue
+              type="netOutcome"
+              state="change"
+              className={netProfitMarket >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}
+              value={netProfitMarket}
+            >
+              {netProfitMarket >= 0 ? "+" : "\u2212"}{formatUsdValue(Math.abs(netProfitMarket))}
+            </HighlightableValue>
+            {currentPrice != null && (() => {
+              const opportunityPL = debtRedeemed - collateralTransferredOut * currentPrice;
+              return (
+                <>
+                  {" "}or{" "}
+                  <HighlightableValue
+                    type="netOutcome"
+                    state="after"
+                    className={opportunityPL >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}
+                    value={opportunityPL}
+                  >
+                    {opportunityPL >= 0 ? "+" : "\u2212"}{formatUsdValue(Math.abs(opportunityPL))}
+                  </HighlightableValue>
+                  {" "}at today&apos;s price
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

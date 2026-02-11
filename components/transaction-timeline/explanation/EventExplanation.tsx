@@ -20,11 +20,12 @@ import { BatchManagerInterestRateUpdateExplanation } from "./events/BatchManager
 interface EventExplanationProps {
   transaction: Transaction;
   previousTransaction?: Transaction;
+  currentPrice?: number;
   onToggle: (isOpen: boolean) => void;
   defaultOpen?: boolean;
 }
 
-export function EventExplanation({ transaction, previousTransaction, onToggle, defaultOpen }: EventExplanationProps) {
+export function EventExplanation({ transaction, previousTransaction, currentPrice, onToggle, defaultOpen }: EventExplanationProps) {
   const { setHoverEnabled } = useHover();
 
   const handleToggle = (isOpen: boolean) => {
@@ -69,7 +70,7 @@ export function EventExplanation({ transaction, previousTransaction, onToggle, d
         return <LiquidateExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
 
       case "redeemCollateral":
-        return <RedeemCollateralExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
+        return <RedeemCollateralExplanation transaction={transaction} currentPrice={currentPrice} onToggle={handleToggle} defaultOpen={defaultOpen} />;
 
       case "setInterestBatchManager":
         return <SetInterestBatchManagerExplanation transaction={transaction} onToggle={handleToggle} defaultOpen={defaultOpen} />;
