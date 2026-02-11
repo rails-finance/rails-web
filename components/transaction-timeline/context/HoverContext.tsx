@@ -32,7 +32,8 @@ export type ValueType =
   | "collSurplus"
   | "debtOffsetBySP"
   | "collToSP"
-  | "collGasCompensation";
+  | "collGasCompensation"
+  | "netOutcome";
 export type ValueState = "before" | "after" | "change" | "fee";
 
 export interface HoveredValue {

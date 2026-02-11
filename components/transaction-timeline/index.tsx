@@ -4,6 +4,7 @@ import { TransactionItem } from "./item";
 
 interface TransactionTimelineProps {
   timeline: TimelineData;
+  currentPrice?: number;
   transactionState: Record<string, TransactionUiState>;
   getTransactionState: (transactionId: string) => TransactionUiState;
   setTransactionExpanded: (transactionId: string, expanded: boolean) => void;
@@ -12,6 +13,7 @@ interface TransactionTimelineProps {
 
 export function TransactionTimeline({
   timeline,
+  currentPrice,
   transactionState,
   getTransactionState,
   setTransactionExpanded,
@@ -69,6 +71,7 @@ export function TransactionTimeline({
               isFirst={index === 0}
               isLast={index === txLength - 1}
               txIndex={txLength - index}
+              currentPrice={currentPrice}
               transactionState={transactionState}
               getTransactionState={getTransactionState}
               setTransactionExpanded={setTransactionExpanded}
