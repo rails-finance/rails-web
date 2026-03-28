@@ -152,6 +152,20 @@ export function getBatchManagerLastUpdated(): string {
 }
 
 /**
+ * Get deprecation status for a batch manager
+ * Returns null if not deprecated, or an object with the deadline and whether it's past
+ */
+export function getBatchManagerDeprecation(
+  address: string | null | undefined,
+): { deprecatedDate: string; isPast: boolean } | null {
+  const manager = getBatchManagerByAddress(address);
+  if (!manager?.deprecated_date) return null;
+  const deadline = new Date(manager.deprecated_date + "T00:00:00Z");
+  const isPast = new Date() > deadline;
+  return { deprecatedDate: manager.deprecated_date, isPast };
+}
+
+/**
  * Format batch manager for display
  * Returns manager name or truncated address
  */

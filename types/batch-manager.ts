@@ -5,6 +5,7 @@ export interface BatchManager {
   website: string;
   asset_symbol: string;
   asset_contract: string;
+  deprecated_date?: string;
 }
 
 export interface BatchManagerData {

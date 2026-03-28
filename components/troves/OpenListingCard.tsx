@@ -3,10 +3,10 @@ import { TroveSummary } from "@/types/api/trove";
 import { Icon } from "../icons/icon";
 import { formatApproximate, formatUsdValue } from "@/lib/utils/format";
 import { TokenIcon } from "../icons/tokenIcon";
-import { ChevronRight, Users } from "lucide-react";
+import { AlertTriangle, ChevronRight, Users } from "lucide-react";
 import { CardFooter } from "../trove/components/CardFooter";
 import { formatDuration } from "@/lib/date";
-import { formatBatchManagerDisplay } from "@/lib/services/batch-manager-service";
+import { formatBatchManagerDisplay, getBatchManagerDeprecation } from "@/lib/services/batch-manager-service";
 import { OraclePricesData } from "@/types/api/oracle";
 
 export function OpenListingCard({ trove, prices }: { trove: TroveSummary; prices?: OraclePricesData | null }) {
@@ -24,6 +24,8 @@ export function OpenListingCard({ trove, prices }: { trove: TroveSummary; prices
   const collateralUsd = currentPrice ? trove.collateral.amount * currentPrice : null;
   const collateralRatio =
     collateralUsd && trove.debt.current > 0 ? (collateralUsd / trove.debt.current) * 100 : null;
+
+  const deprecation = getBatchManagerDeprecation(trove.batch.manager);
 
   return (
     <Link
@@ -118,6 +120,18 @@ export function OpenListingCard({ trove, prices }: { trove: TroveSummary; prices
             {trove.batch.isMember && trove.batch.manager && (
               <div className="text-xs font-medium text-pink-500 dark:text-pink-400 mt-1 truncate">
                 {formatBatchManagerDisplay(trove.batch.manager)}
+                {deprecation && (
+                  <span className={`inline-flex items-center gap-0.5 ml-1 ${
+                    deprecation.isPast
+                      ? "text-red-500 dark:text-red-400"
+                      : "text-amber-500 dark:text-amber-400"
+                  }`}>
+                    <AlertTriangle className="w-3 h-3" />
+                    <span className="text-[10px] font-bold uppercase">
+                      {deprecation.isPast ? "Deprecated" : "Ending"}
+                    </span>
+                  </span>
+                )}
               </div>
             )}
           </div>

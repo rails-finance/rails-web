@@ -120,7 +120,8 @@
       "description": "wstETH Autonomous Rate Manager",
       "website": "https://www.liquity.org/blog/autonomous-interest-manager",
       "asset_symbol": "wstETH",
-      "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045"
+      "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045",
+      "deprecated_date": "2026-04-26"
     },
     {
       "name": "ARM",
@@ -128,7 +129,8 @@
       "description": "ETH Autonomous Rate Manager",
       "website": "https://www.liquity.org/blog/autonomous-interest-manager",
       "asset_symbol": "ETH ",
-      "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
+      "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56",
+      "deprecated_date": "2026-04-26"
     },
     {
       "name": "ARM",
@@ -136,7 +138,8 @@
       "description": "rETH Autonomous Rate Manager",
       "website": "https://www.liquity.org/blog/autonomous-interest-manager",
       "asset_symbol": "rETH",
-      "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276"
+      "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276",
+      "deprecated_date": "2026-04-26"
     },
     {
       "name": "Mock Delegate Manager",
