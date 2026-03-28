@@ -18,6 +18,8 @@ import { FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/f
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 import { LIQUIDATION_RESERVE_ETH } from "@/components/transaction-timeline/explanation/shared/eventHelpers";
 import { Link2, Users, Loader2, AlertTriangle } from "lucide-react";
+
+const ARM_DEPRECATION_ANNOUNCEMENT = "https://discord.com/channels/700620821198143498/711975093940519012/1487025900208783530";
 import type { Transaction } from "@/types/api/troveHistory";
 import { TroveStateData } from "@/types/api/troveState";
 import { OraclePricesData } from "@/types/api/oracle";
@@ -340,9 +342,9 @@ function OpenTroveCardContent({
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
           <p>
             {deprecation.isPast ? (
-              <>The {batchManagerInfo?.name} delegate is no longer maintained and has been removed from the frontend. Please move your position to a new delegate. <a href="https://discord.com/channels/700620821198143498/711975093940519012/1487025900208783530" target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">Official announcement</a></>
+              <>The {batchManagerInfo?.name} delegate is no longer maintained and has been removed from the frontend. Please move your position to a new delegate. <a href={ARM_DEPRECATION_ANNOUNCEMENT} target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">Official announcement</a></>
             ) : (
-              <>The {batchManagerInfo?.name} delegate will no longer be maintained after {new Date(deprecation.deprecatedDate + "T00:00:00Z").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. Please move your position to a new delegate before this date. <a href="https://discord.com/channels/700620821198143498/711975093940519012/1487025900208783530" target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">Official announcement</a></>
+              <>The {batchManagerInfo?.name} delegate will no longer be maintained after {new Date(deprecation.deprecatedDate + "T00:00:00Z").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. Please move your position to a new delegate before this date. <a href={ARM_DEPRECATION_ANNOUNCEMENT} target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">Official announcement</a></>
             )}
           </p>
         </div>

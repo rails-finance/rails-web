@@ -128,7 +128,7 @@
       "address": "0xe507e4d0763851a6287238aadd243948d18ab60a",
       "description": "ETH Autonomous Rate Manager",
       "website": "https://www.liquity.org/blog/autonomous-interest-manager",
-      "asset_symbol": "ETH ",
+      "asset_symbol": "ETH",
       "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56",
       "deprecated_date": "2026-04-26"
     },
