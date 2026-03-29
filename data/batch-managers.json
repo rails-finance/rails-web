@@ -1,27 +1,51 @@
 {
   "version": "1.0.0",
-  "last_updated": "2024-01-15",
+  "last_updated": "2026-03-23",
   "batch_managers": [
     {
       "name": "Summerstone",
       "address": "0x0000000000704f94ce2fe636dab92677a9745dc3",
       "description": "Summerstone: Balanced rETH",
       "website": "https://summerstone.xyz",
-      "asset_symbol": "wstETH",
-      "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045"
+      "asset_symbol": "rETH",
+      "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276"
     },
     {
       "name": "Summerstone",
       "address": "0x000000000017d2a7b863e9ebbe6f9ab7255eb7c5",
       "description": "Summerstone: Balanced wstETH",
       "website": "https://summerstone.xyz",
-      "asset_symbol": "ETH",
-      "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
+      "asset_symbol": "wstETH",
+      "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045"
     },
     {
       "name": "Summerstone",
       "address": "0x00000000001991cee928c561e37725816cbf73ba",
       "description": "Summerstone: Balanced ETH",
+      "website": "https://summerstone.xyz",
+      "asset_symbol": "ETH",
+      "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
+    },
+    {
+      "name": "Summerstone",
+      "address": "0x00000000003b24f6895911d5e7ba18d6caa1da2b",
+      "description": "Summerstone: Aggressive ETH",
+      "website": "https://summerstone.xyz",
+      "asset_symbol": "ETH",
+      "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
+    },
+    {
+      "name": "Summerstone",
+      "address": "0x000000000036abd8fe2238a541ec72f91ceebefa",
+      "description": "Summerstone: Aggressive wstETH",
+      "website": "https://summerstone.xyz",
+      "asset_symbol": "wstETH",
+      "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045"
+    },
+    {
+      "name": "Summerstone",
+      "address": "0x0000000000cbed6433d0777552ee00f9c8e40f76",
+      "description": "Summerstone: Aggressive rETH",
       "website": "https://summerstone.xyz",
       "asset_symbol": "rETH",
       "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276"
@@ -96,15 +120,17 @@
       "description": "wstETH Autonomous Rate Manager",
       "website": "https://www.liquity.org/blog/autonomous-interest-manager",
       "asset_symbol": "wstETH",
-      "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045"
+      "asset_contract": "0x5F96c1eAa969b5a9CB42fC13956fb4Cc6d890045",
+      "deprecated_date": "2026-04-26"
     },
     {
       "name": "ARM",
       "address": "0xe507e4d0763851a6287238aadd243948d18ab60a",
       "description": "ETH Autonomous Rate Manager",
       "website": "https://www.liquity.org/blog/autonomous-interest-manager",
-      "asset_symbol": "ETH ",
-      "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56"
+      "asset_symbol": "ETH",
+      "asset_contract": "0x01b51ee16032C3Ef603A0E54E2844678FFaF2b56",
+      "deprecated_date": "2026-04-26"
     },
     {
       "name": "ARM",
@@ -112,7 +138,8 @@
       "description": "rETH Autonomous Rate Manager",
       "website": "https://www.liquity.org/blog/autonomous-interest-manager",
       "asset_symbol": "rETH",
-      "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276"
+      "asset_contract": "0x8fb0F30E6eddb8fcBCA1fECA01678a84a26AD276",
+      "deprecated_date": "2026-04-26"
     },
     {
       "name": "Mock Delegate Manager",

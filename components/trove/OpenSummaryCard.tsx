@@ -6,7 +6,7 @@ import { TokenIcon } from "@/components/icons/tokenIcon";
 import { Icon } from "@/components/icons/icon";
 import { CardFooter } from "./components/CardFooter";
 import { TroveSummary } from "@/types/api/trove";
-import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
+import { getBatchManagerByAddress, getBatchManagerDeprecation } from "@/lib/services/batch-manager-service";
 import { formatDate, formatDuration } from "@/lib/date";
 import { formatPrice, formatUsdValue } from "@/lib/utils/format";
 import { getLiquidationThreshold } from "@/lib/utils/liquidation-utils";
@@ -17,7 +17,9 @@ import { InfoButton } from "@/components/transaction-timeline/explanation/InfoBu
 import { FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 import { LIQUIDATION_RESERVE_ETH } from "@/components/transaction-timeline/explanation/shared/eventHelpers";
-import { Link2, Users, Loader2 } from "lucide-react";
+import { Link2, Users, Loader2, AlertTriangle } from "lucide-react";
+
+const ARM_DEPRECATION_ANNOUNCEMENT = "https://discord.com/channels/700620821198143498/711975093940519012/1487025900208783530";
 import type { Transaction } from "@/types/api/troveHistory";
 import { TroveStateData } from "@/types/api/troveState";
 import { OraclePricesData } from "@/types/api/oracle";
@@ -46,6 +48,7 @@ function OpenTroveCardContent({
   const { hoveredValue, setHoverEnabled } = useHover();
 
   const batchManagerInfo = getBatchManagerByAddress(trove.batch.manager);
+  const deprecation = getBatchManagerDeprecation(trove.batch.manager);
 
   // Progressive enhancement: Use DB snapshot initially, then enhance with live blockchain data
   // DB snapshot provides immediate display, blockchain data animates in when ready
@@ -329,6 +332,24 @@ function OpenTroveCardContent({
 
   return (
     <div>
+      {/* Deprecated delegate warning */}
+      {deprecation && (
+        <div className={`flex items-start gap-2 rounded-lg p-3 mb-2 text-sm ${
+          deprecation.isPast
+            ? "bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900"
+            : "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900"
+        }`}>
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <p>
+            {deprecation.isPast ? (
+              <>The {batchManagerInfo?.name} delegate is no longer maintained and has been removed from the frontend. Please move your position to a new delegate. <a href={ARM_DEPRECATION_ANNOUNCEMENT} target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">Official announcement</a></>
+            ) : (
+              <>The {batchManagerInfo?.name} delegate will no longer be maintained after {new Date(deprecation.deprecatedDate + "T00:00:00Z").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. Please move your position to a new delegate before this date. <a href={ARM_DEPRECATION_ANNOUNCEMENT} target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">Official announcement</a></>
+            )}
+          </p>
+        </div>
+      )}
+
       {/* Main trove card */}
       <div className="relative rounded-lg text-slate-600 dark:text-slate-500 bg-slate-50 dark:bg-slate-900">
         {/* Header section */}
