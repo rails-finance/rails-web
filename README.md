@@ -1,41 +1,44 @@
 # Rails
 
-A DeFi self-service support frontend that renders position state and transaction timelines for **Liquity V2** and **Aave V4**.
+The web app behind **[rails.finance](https://rails.finance)**: position explorers for DeFi lending
+protocols, with every figure re-derived from the chain and a transaction timeline that says what
+happened, event by event.
 
-Visit **[rails.finance](https://rails.finance)** to explore the platform.
+## What it covers
 
-## Overview
+Twenty-six explorers across Ethereum, Base and Sepolia. On Ethereum: Aave V3, Aave V4, Asymmetry,
+Compound V2, Compound V3, Dolomite, Ebisu, Fluid, Frankencoin, f(x), Liquity V1, Liquity V2,
+LlamaLend, MakerDAO, Maple, Moonwell, Morpho Blue, PWN and Spark. On Base: Aave V3, Basedollar,
+Compound V3, Moonwell, Morpho Blue and Seamless. On Sepolia: Polaris. The roster is
+`lib/shared/protocols.ts`; what each explorer can state, and what it cannot yet, is the coverage
+matrix at `/coverage`, driven by `lib/shared/coverage.ts`.
 
-Rails turns on-chain DeFi activity into clear, comprehensible timelines and position cards. Each protocol gets its own end-to-end view — a listing of all positions, a detail page for any one position, and a transaction timeline grounded in what actually happened on chain.
+Every explorer has a listing, a position page and a timeline. A position page shows chain-state
+balances and health beside the indexed history, prices each event at its own block where the
+protocol's oracle allows it, and exports the position as Markdown or CSV for pasting into an LLM.
+Where a figure cannot be stated from chain, the page says so rather than estimating.
 
-The frontend is mono-rails: each protocol owns its `/[protocol]/...` URL space. There is no cross-protocol composer in production; visit `/liquity-v2` for Liquity, `/aave-v4` for Aave, and use each protocol's own search bar to filter by wallet.
+## How it is built
 
-## Features
+Next.js App Router, TypeScript, Tailwind. Server-side route handlers talk to a bearer-authenticated
+indexing backend (`RAILS_API_URL`) and, for live chain state, to an Ethereum and a Base RPC. No key
+reaches the browser. `.env.example` documents every variable the app and its scripts read.
 
-### Liquity V2
+```
+pnpm install
+cp .env.example .env.local   # fill in the runtime keys
+pnpm dev
+pnpm check                   # routes, locale, OG cards, dead code, types
+```
 
-- Trove explorer: search and view troves by ID, owner address, or ENS name.
-- Per-trove timeline: open, adjust, close, redeem, liquidate, batch-delegate — with state-transition cards explaining each event.
-- Batch manager integration: track delegated trove management (Summerstone, Bolder, Caramila Capital, …).
-- Real-time stats: TVL, collateral distribution, and protocol-wide metrics across WETH, wstETH, and rETH collateral.
-
-### Aave V4
-
-- Spoke explorer: browse positions across Aave V4's spoke architecture (Main, Bluechip, EtherFi, Lido, …) — one shared health factor per spoke, independent between spokes.
-- Per-position detail: chain-state balances and HF, per-asset price-runway, liquidation-price headroom, and net APY.
-- Transaction timeline: Supply, Borrow, Withdraw, Repay, Liquidation, CollateralToggle, with USD pills priced at the event block (Chainlink-direct + LST exchange-rate derivation).
-
-### Cross-cutting
-
-- ENS name resolution.
-- Dark and light themes.
-- Per-protocol wallet history (recent + pinned), stored in local storage.
-- Server-side bearer-authenticated proxy to the `rails-server-onboarding` API.
+`scripts/verify-*-chain.mjs` re-derive an explorer's figures from the protocol's own contracts and
+check them against what the site serves; `scripts/verify/run-all.mjs` runs the page-level
+verifiers against a running dev server.
 
 ## Status
 
-Rails is in beta. Liquity V2 and Aave V4 are stable; both are continuously enhanced. Additional protocols may follow.
+Rails is in beta. Explorers whose coverage cells are still open say so on `/coverage`.
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
