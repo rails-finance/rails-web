@@ -67,7 +67,7 @@ export function SiteFooter() {
                 </svg>
               </a>
               <a
-                href="https://github.com/rails-finance"
+                href="https://github.com/rails-finance/rails-web"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-rb-500 hover:text-pink-500 dark:hover:text-pink-400 transition-colors duration-150"

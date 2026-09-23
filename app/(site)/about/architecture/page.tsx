@@ -130,7 +130,7 @@ export default function ArchitecturePage() {
       <p className="text-foreground leading-relaxed mt-12">
         Rails is open source.{" "}
         <a
-          href="https://github.com/rails-finance"
+          href="https://github.com/rails-finance/rails-web"
           target="_blank"
           rel="noopener noreferrer"
           className="underline hover:text-pink-500 transition-colors"
