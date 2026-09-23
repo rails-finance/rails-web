@@ -1,0 +1,21 @@
+[
+  {
+    "id": "rails-2026-rebrand",
+    "date": "2026-03-15T12:00:00Z",
+    "type": "milestone",
+    "platform": "app",
+    "author": "rails.finance",
+    "content": "Rails has a new look",
+    "subtitle": "We've retired the green 'R'-with-a-dot badge for a more abstract, linear R in neutral tones. The new mark is deliberately plain — Rails is a conveyor of information, not the subject of it. Keeping the branding quiet lets the protocol and asset icons that live on the platform, the things you actually came to see, take the foreground. It also gives Rails room to grow across many protocols without any one brand colour fighting the data."
+  },
+  {
+    "id": "rails-2026-aave-v4-soft-launch",
+    "date": "2026-06-22T12:00:00Z",
+    "type": "milestone",
+    "platform": "app",
+    "author": "rails.finance",
+    "iconUrl": "/icons/protocols/aave-v4.png",
+    "postUrl": "/aave-v4",
+    "content": "Soft launch: the Aave V4 explorer is live. Browse multi-spoke positions with chain-truth health factors, liquidation prices, net APY, and full event timelines."
+  }
+]

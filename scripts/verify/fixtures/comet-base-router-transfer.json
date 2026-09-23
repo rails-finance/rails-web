@@ -1,0 +1,88 @@
+{
+  "_note": "AggregationRouterV6 (0x1111\u20262a65) on Compound V3 Base, tx 0x2efa\u202646ee. `logs` are every Comet log sieve_base holds for that transaction (all five Comets, all eight event tables, read 2026-09-21), as Transfer(from, to, amount) on the usdbc Comet. `served` is rails-server's /api/compound-base/timeline answer for the wallet, recorded 2026-09-21 21:59 UTC after server b4ae29a.",
+  "wallet": "0x111111125421ca6dc452d289314280a0f8842a65",
+  "market": "usdbc",
+  "blockNumber": 16388753,
+  "transactionIndex": 26,
+  "transactionHash": "0x2efaa71738ca33cfe1609e6abbf34f9dccd2e6702795c3f463afd28037a146ee",
+  "logs": [
+    {
+      "logIndex": 105,
+      "from": "0xf9e8f4d2102b2ee5ae3481162fc25be9fc5a1655",
+      "to": "0x0000000000000000000000000000000000000000",
+      "amount": "3168"
+    },
+    {
+      "logIndex": 106,
+      "from": "0x0000000000000000000000000000000000000000",
+      "to": "0x111111125421ca6dc452d289314280a0f8842a65",
+      "amount": "3166"
+    },
+    {
+      "logIndex": 110,
+      "from": "0x111111125421ca6dc452d289314280a0f8842a65",
+      "to": "0x0000000000000000000000000000000000000000",
+      "amount": "3166"
+    },
+    {
+      "logIndex": 111,
+      "from": "0x0000000000000000000000000000000000000000",
+      "to": "0xd01507a6d6fc069471f2df6144da5a4ca4c3165d",
+      "amount": "3165"
+    }
+  ],
+  "served": {
+    "wallet": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "rows": [
+      {
+        "kind": "transfer",
+        "market": "usdbc",
+        "block_number": "16388753",
+        "tx_index": 26,
+        "log_index": 106,
+        "tx_hash": "0x2efaa71738ca33cfe1609e6abbf34f9dccd2e6702795c3f463afd28037a146ee",
+        "block_timestamp": "1719566853",
+        "tx_from": "0xd01507a6d6fc069471f2df6144da5a4ca4c3165d",
+        "asset": null,
+        "amount": "3166",
+        "counterparty": null,
+        "xfer_from": "0xf9e8f4d2102b2ee5ae3481162fc25be9fc5a1655",
+        "xfer_to": "0x111111125421ca6dc452d289314280a0f8842a65",
+        "usd_value": null
+      },
+      {
+        "kind": "transfer",
+        "market": "usdbc",
+        "block_number": "16388753",
+        "tx_index": 26,
+        "log_index": 110,
+        "tx_hash": "0x2efaa71738ca33cfe1609e6abbf34f9dccd2e6702795c3f463afd28037a146ee",
+        "block_timestamp": "1719566853",
+        "tx_from": "0xd01507a6d6fc069471f2df6144da5a4ca4c3165d",
+        "asset": null,
+        "amount": "3166",
+        "counterparty": null,
+        "xfer_from": "0x111111125421ca6dc452d289314280a0f8842a65",
+        "xfer_to": "0xd01507a6d6fc069471f2df6144da5a4ca4c3165d",
+        "usd_value": null
+      }
+    ],
+    "totalEvents": 2,
+    "truncated": false,
+    "coverage": {
+      "deployBlock": 2197607,
+      "historyComplete": true,
+      "backfillNextBlock": 50453933,
+      "backfillTo": 50453932,
+      "sourceCheckpoint": 51619298,
+      "accountsTotal": 262947,
+      "accountsRead": 262947,
+      "refreshedAt": "2026-09-21T21:59:05.465Z"
+    },
+    "fill": {
+      "lane": null,
+      "filler": false
+    },
+    "peakWithheldMarkets": ["aero", "usdbc", "usdc", "usds", "weth"]
+  }
+}

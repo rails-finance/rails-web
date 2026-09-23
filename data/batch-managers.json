@@ -1,0 +1,169 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-07-20",
+  "batch_managers": [
+    {
+      "name": "Summerstone",
+      "address": "0x0000000000704f94ce2fe636dab92677a9745dc3",
+      "description": "Summerstone: Balanced rETH",
+      "website": "https://summerstone.xyz",
+      "asset_symbol": "rETH",
+      "asset_contract": "0xae78736Cd615f374D3085123A210448E74Fc6393"
+    },
+    {
+      "name": "Summerstone",
+      "address": "0x000000000017d2a7b863e9ebbe6f9ab7255eb7c5",
+      "description": "Summerstone: Balanced wstETH",
+      "website": "https://summerstone.xyz",
+      "asset_symbol": "wstETH",
+      "asset_contract": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+    },
+    {
+      "name": "Summerstone",
+      "address": "0x00000000001991cee928c561e37725816cbf73ba",
+      "description": "Summerstone: Balanced ETH",
+      "website": "https://summerstone.xyz",
+      "asset_symbol": "ETH",
+      "asset_contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    },
+    {
+      "name": "Summerstone",
+      "address": "0x00000000003b24f6895911d5e7ba18d6caa1da2b",
+      "description": "Summerstone: Aggressive ETH",
+      "website": "https://summerstone.xyz",
+      "asset_symbol": "ETH",
+      "asset_contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    },
+    {
+      "name": "Summerstone",
+      "address": "0x000000000036abd8fe2238a541ec72f91ceebefa",
+      "description": "Summerstone: Aggressive wstETH",
+      "website": "https://summerstone.xyz",
+      "asset_symbol": "wstETH",
+      "asset_contract": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+    },
+    {
+      "name": "Summerstone",
+      "address": "0x0000000000cbed6433d0777552ee00f9c8e40f76",
+      "description": "Summerstone: Aggressive rETH",
+      "website": "https://summerstone.xyz",
+      "asset_symbol": "rETH",
+      "asset_contract": "0xae78736Cd615f374D3085123A210448E74Fc6393"
+    },
+    {
+      "name": "Summerstone",
+      "address": "0x0000000000b1b2ea2ecdaed0c7a3c402218e3cb0",
+      "description": "Summerstone: Conservative ETH",
+      "website": "https://summerstone.xyz",
+      "asset_symbol": "ETH",
+      "asset_contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    },
+    {
+      "name": "Summerstone",
+      "address": "0x00000000006c021d70549b7ee216f7ca8d7b6263",
+      "description": "Summerstone: Conservative wstETH",
+      "website": "https://summerstone.xyz",
+      "asset_symbol": "wstETH",
+      "asset_contract": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+    },
+    {
+      "name": "Summerstone",
+      "address": "0x0000000000c9b5c50439608f2b8df9fad5362a08",
+      "description": "Summerstone: Conservative rETH",
+      "website": "https://summerstone.xyz",
+      "asset_symbol": "rETH",
+      "asset_contract": "0xae78736Cd615f374D3085123A210448E74Fc6393"
+    },
+    {
+      "name": "Caramila",
+      "address": "0x1578ed833d986c1188d1a998aa5fecd418bef5da",
+      "description": "Caramila Capital",
+      "website": "https://etherscan.io/name-lookup-search?id=caramila.eth",
+      "asset_symbol": "ETH",
+      "asset_contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    },
+    {
+      "name": "Bolder",
+      "address": "0x25bc01fd5a01b1864a7dbaddb05bfed642340da2",
+      "description": "Bolder: I",
+      "website": "https://bolder.cash",
+      "asset_symbol": "ETH",
+      "asset_contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    },
+    {
+      "name": "Bolder",
+      "address": "0x50bc019abdb9951602bc4fe92947d3c15d5e45df",
+      "description": "Bolder: II",
+      "website": "https://bolder.cash",
+      "asset_symbol": "rETH",
+      "asset_contract": "0xae78736Cd615f374D3085123A210448E74Fc6393"
+    },
+    {
+      "name": "Bolder",
+      "address": "0x75bc01bf1e21ed33915777c131b62bb13b5f2552",
+      "description": "Bolder: III",
+      "website": "https://bolder.cash",
+      "asset_symbol": "wstETH",
+      "asset_contract": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+    },
+    {
+      "name": "trove0",
+      "address": "0xe707784292289be3aa0fb6f9d33d420291f98695",
+      "description": "trove0 batch manager",
+      "website": "https://trovezero.xyz",
+      "asset_symbol": "ETH",
+      "asset_contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    },
+    {
+      "name": "Bolder",
+      "address": "0x25bc0272217fb0fd7a2ff0d62cebe1aba15e4d91",
+      "description": "Bolder: Low",
+      "website": "https://bolder.cash",
+      "asset_symbol": "ETH",
+      "asset_contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    },
+    {
+      "name": "Bolder",
+      "address": "0x50bc02c6c7124e6e1b8333b80a0416e504e2d044",
+      "description": "Bolder: Mid",
+      "website": "https://bolder.cash",
+      "asset_symbol": "rETH",
+      "asset_contract": "0xae78736Cd615f374D3085123A210448E74Fc6393"
+    },
+    {
+      "name": "Bolder",
+      "address": "0x75bc02022344159b7ef50a3ff5291dd2bc6918c7",
+      "description": "Bolder: High",
+      "website": "https://bolder.cash",
+      "asset_symbol": "wstETH",
+      "asset_contract": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+    },
+    {
+      "name": "ARM",
+      "address": "0x8869a6fb59a8df330f90d9fbf46ebfaff6d4bc14",
+      "description": "wstETH Autonomous Rate Manager",
+      "website": "https://www.liquity.org/blog/autonomous-interest-manager",
+      "asset_symbol": "wstETH",
+      "asset_contract": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+      "deprecated_date": "2026-04-26"
+    },
+    {
+      "name": "ARM",
+      "address": "0xe507e4d0763851a6287238aadd243948d18ab60a",
+      "description": "ETH Autonomous Rate Manager",
+      "website": "https://www.liquity.org/blog/autonomous-interest-manager",
+      "asset_symbol": "ETH",
+      "asset_contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "deprecated_date": "2026-04-26"
+    },
+    {
+      "name": "ARM",
+      "address": "0x7700b2d305f47ae82e9598bab6d7ccb57299a82b",
+      "description": "rETH Autonomous Rate Manager",
+      "website": "https://www.liquity.org/blog/autonomous-interest-manager",
+      "asset_symbol": "rETH",
+      "asset_contract": "0xae78736Cd615f374D3085123A210448E74Fc6393",
+      "deprecated_date": "2026-04-26"
+    }
+  ]
+}

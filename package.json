@@ -1,0 +1,48 @@
+{
+  "name": "rails-web-onboarding",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build:svg": "node ../svg-build-tools/scripts/build-svg-templates.js",
+    "typecheck": "tsc --noEmit",
+    "check:prov": "node scripts/check-prov-scope.mjs",
+    "check:register": "node scripts/check-explainer-register.mjs",
+    "check:receipts": "node scripts/check-receipt-summaries.mjs",
+    "check:dead": "node scripts/check-dead-exports.mjs",
+    "check:parties": "node scripts/check-party-explanations.mjs",
+    "check:routes": "node scripts/check-explorer-routes.mjs",
+    "check:locale": "node scripts/check-locale.mjs",
+    "check:og": "node scripts/generate-og.mjs --check",
+    "verify:preflight": "node scripts/verify/preflight.mjs",
+    "og": "node scripts/generate-og.mjs",
+    "check": "npm run check:prov && npm run check:register && npm run check:receipts && npm run check:parties && npm run check:routes && npm run check:locale && npm run check:og && npm run check:dead && npm run typecheck"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "framer-motion": "^12.23.24",
+    "lucide-react": "^0.541.0",
+    "next": "15.5.7",
+    "next-themes": "^0.4.6",
+    "qrcode.react": "^4.2.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "viem": "~2.33.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "knip": "^6.29.0",
+    "playwright": "^1.55.0",
+    "prettier": "^3.6.2",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

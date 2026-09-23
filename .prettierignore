@@ -1,0 +1,51 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+# Generated lockfile — pnpm owns its format; prettier would rewrite every YAML
+# quote and pnpm would just undo it on the next install.
+pnpm-lock.yaml
+
+# Testing
+coverage
+
+# Next.js
+.next
+out
+build
+dist
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env files
+.env*.local
+
+# Vercel
+.vercel
+
+# Typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Cache
+.eslintcache
+.prettierignore
+
+# Generated files
+public/sw.js
+public/workbox-*.js
+
+# Markdown files (optional - remove if you want to format markdown)
+*.md
+
+# Vendored sync target — must stay byte-for-byte in sync with the canonical
+# declaration in rails-server-onboarding/api/src/types/event-shape.ts (see file
+# header). Local prettier rules would diverge it from upstream.
+lib/shared/types/event-shape.ts

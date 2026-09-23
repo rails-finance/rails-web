@@ -1,0 +1,1710 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Set default transition duration to 0 to prevent halo effect on theme switch */
+  --default-transition-duration: 0s;
+  --color-black: #000;
+  --color-white: #fff;
+  --color-slate-200: #e5e7eb;
+  --color-slate-300: #d2d5db;
+  --color-slate-400: #9da3ae;
+  --color-slate-500: #6c7280;
+  --color-slate-600: #4c5563;
+  --color-slate-700: #232a37;
+  --color-slate-800: #171b24;
+  --color-slate-900: #12151e;
+  --color-slate-950: #0d0f15;
+
+  --color-green-600: #008900;
+  --color-green-400: #4ade80;
+
+  /* Informational · positive (color-grammar.md §5) — the single functional
+     "positive / open / active" green. Drives the soft-tint Open/Enable header
+     pills (bg-positive/20 + text-positive). Its own token, deliberately kept
+     separate from the --marketing green even at a shared value so either can
+     retune without dragging the other. */
+  --color-positive: #22c55e; /* green-500 */
+
+  /* Informational · caution (color-grammar.md §5) — the single "adverse, needs
+     attention, NOT terminal" hue (orange). Defined here as a full scale so the
+     whole caution tier (redemption + zombie + deprecation glyphs, badges, spine
+     bars, and the left-border notice panels) is retunable from ONE place: edit
+     these eleven values and every `*-caution-*` utility + the `--caution` token
+     and `notice-caution` panel move together. Values are Tailwind's orange-*. */
+  --color-caution-50: #fff7ed;
+  --color-caution-100: #ffedd5;
+  --color-caution-200: #fed7aa;
+  --color-caution-300: #fdba74;
+  --color-caution-400: #fb923c;
+  --color-caution-500: #f97316;
+  --color-caution-600: #ea580c;
+  --color-caution-700: #c2410c;
+  --color-caution-800: #9a3412;
+  --color-caution-900: #7c2d12;
+  --color-caution-950: #431407;
+}
+
+/* ── Rails-explorer brand palette (additive, ported during phase-1 reskin) ──
+   Existing slate-* tokens stay for as long as legacy components reference
+   them; new ports use rb-* and the semantic tokens below.
+*/
+:root {
+  /* ── Paper tone knobs (LIGHT MODE ONLY) ────────────────────────────────────
+     The warm-paper palette is ONE hue family at varying lightness: measuring
+     the hand-tuned 2026-07 set (`96b6092`) in OKLCH put every token at H≈88,
+     with chroma rising as the tone darkens. So the whole warm cast collapses
+     to two numbers, and every light token below is stated as
+
+         oklch(<its L> calc(<its C> * var(--paper-chroma)) var(--paper-hue))
+
+     — retune the entire light theme from these two lines. Setting them back to
+     `88` / `1` reproduces the 2026-07 palette exactly (30 of the 32 tokens byte
+     for byte; 2/255 on --rb-500 / --muted-foreground, whose measured hue sat at
+     82.3° and gets snapped onto the shared hue), so the cream stays recoverable
+     — this is a retune, not a one-way rewrite.
+
+     SETTLED 2026-07-26: hue 0 at 0.6 chroma, a soft rosy grey — canvas #eee7e9,
+     ink #1b1718. The cream read too brown, so the cast moved off yellow and came
+     down to ~60% strength. Two things do NOT follow these knobs and need a hand
+     edit if the tone moves again: the `viewport.themeColor` light value plus its
+     <meta> twin in app/layout.tsx (both literal #eee7e9, measured from the canvas
+     — a stale value shows as a seam in mobile browser chrome), and the ~12
+     `bg-white` call sites, which are pure white at every hue.
+
+     `html.dark` pins its own cool blue-grey literals, so these knobs do not
+     reach dark mode. The LIGHTNESS ladder stays hand-authored per token — it
+     encodes the inverted elevation (see the rb-* block below), which is not
+     what these knobs are for. */
+  --paper-hue: 0; /* 0 = rosy · 88 = the old cream · 140 = sage · 250 = cool */
+  --paper-chroma: 0.6; /* 0 = pure neutral grey · 1 = the old strength · 2 = double */
+
+  /* Light mode colors (default) — warm ink, not the old cool near-black */
+  --foreground: oklch(0.2095 calc(0.01 * var(--paper-chroma)) var(--paper-hue));
+
+  /* Light mode specific colors (legacy slate tier, warmed to match the paper canvas) */
+  --card-background: oklch(0.991 calc(0.0041 * var(--paper-chroma)) var(--paper-hue));
+  --card-border: oklch(0.9159 calc(0.0154 * var(--paper-chroma)) var(--paper-hue));
+  --muted: oklch(0.9522 calc(0.0111 * var(--paper-chroma)) var(--paper-hue));
+  --muted-foreground: oklch(0.5492 calc(0.0296 * var(--paper-chroma)) var(--paper-hue));
+  --accent: oklch(0.9522 calc(0.0111 * var(--paper-chroma)) var(--paper-hue));
+  --accent-foreground: oklch(0.2528 calc(0.0204 * var(--paper-chroma)) var(--paper-hue));
+  --secondary: oklch(0.9487 calc(0.0137 * var(--paper-chroma)) var(--paper-hue));
+  --secondary-foreground: oklch(0.2528 calc(0.0204 * var(--paper-chroma)) var(--paper-hue));
+
+  /* Protocol-specific gradient colors for light mode — brand blue, off the
+     paper family, so they do NOT track the knobs. */
+  --liquity-grad-1: #4b5edb;
+  --liquity-grad-2: #3b4eab;
+
+  /* SVG inner background for timeline icons */
+  --svg-inner-bg: oklch(0.9882 calc(0.0069 * var(--paper-chroma)) var(--paper-hue));
+
+  /* ── rails-explorer brand: light mode ──────────────────────────────────── */
+  /* WARM PAPER light theme (2026-07: warmed from the cool blue-grey set,
+     inspired by dria's "daylight" — cream canvas, warm ink, warm-black alphas).
+     The rb 50–500 shades are LIGHT-MODE values here; dark mode pins the
+     original cool blue-grey set in `html.dark` below, and the @theme entries
+     route through these vars so BOTH utilities (`bg-rb-100`) and var()
+     consumers (`--surface-raised`) follow the active mode.
+
+     INVERTED elevation (dria-style): the CANVAS is the deepest everyday tone
+     and panels LIFT above it — rb-50/100 (cards, position card, listing rows)
+     sit lighter than the canvas, rb-200/300 (tracks, chips, hairlines) dip
+     back below it. That ladder lives in the L column below and is independent
+     of the paper-tone knobs. Dark mode keeps its own ladder untouched. */
+  --rb-50: oklch(0.9877 calc(0.0054 * var(--paper-chroma)) var(--paper-hue));
+  --rb-100: oklch(0.9733 calc(0.007 * var(--paper-chroma)) var(--paper-hue));
+  --rb-200: oklch(0.9192 calc(0.0141 * var(--paper-chroma)) var(--paper-hue));
+  --rb-300: oklch(0.8859 calc(0.0171 * var(--paper-chroma)) var(--paper-hue));
+  --rb-400: oklch(0.8218 calc(0.022 * var(--paper-chroma)) var(--paper-hue));
+  --rb-500: oklch(
+    0.5492 calc(0.0296 * var(--paper-chroma)) var(--paper-hue)
+  ); /* muted text — same weight as the old blue-grey */
+
+  /* The paper canvas — a real cream (deeper than the panel tier) so the
+     near-white panels read as elevated sheets on it. Surface overlays darken
+     on hover (warm-black alphas) because the panels they ride are near-white —
+     a white-alpha lift would be invisible on a white panel. */
+  --background: oklch(0.9347 calc(0.0128 * var(--paper-chroma)) var(--paper-hue));
+
+  /* Tinted with the paper hue (at low chroma) rather than pure black, so
+     hover/active fills on the panels read as deeper paper, not neutral grey —
+     while still adapting (alpha) to whatever surface they ride. One shared
+     ink, three alphas. */
+  --surface-hover: oklch(0.5075 calc(0.0416 * var(--paper-chroma)) var(--paper-hue) / 0.1);
+  --surface-active: oklch(0.5075 calc(0.0416 * var(--paper-chroma)) var(--paper-hue) / 0.16);
+  --surface-inset: oklch(0.5075 calc(0.0416 * var(--paper-chroma)) var(--paper-hue) / 0.07);
+  --surface-overlay: oklch(0.9967 calc(0.0054 * var(--paper-chroma)) var(--paper-hue));
+
+  /* ── Semantic surface roles ────────────────────────────────────────────────
+     Each role owns one (light, dark) pair, defined in terms of palette tokens
+     so it tracks any palette retune. Components use the role utility
+     (`bg-raised`, `bg-sunken`, …) instead of a raw `bg-rb-100 dark:bg-rb-800`
+     pair — see the `@utility` block below. Light values here; dark overrides in
+     `html.dark`. canvas = `--background`, overlay = `--surface-overlay`. */
+  --surface-raised: var(--color-rb-100); /* cards, panels, inputs, active in-place control */
+  --surface-sunken: var(--color-rb-200); /* segmented tracks, inset chips, recessed wells */
+  --surface-marker: var(--color-rb-200); /* small inline tags: badges, count pills, token chips */
+  --surface-skeleton: var(--color-rb-100); /* loading shimmer — matched to --surface-raised */
+  --surface-selected: var(--color-rb-300); /* pressed/active segment in a toggle group */
+  --surface-field: oklch(
+    0.9939 calc(0.0082 * var(--paper-chroma)) var(--paper-hue)
+  ); /* prominent text inputs — near-white "type here" affordance */
+  /* Full-width bands on the marketing page — the third step between the rb-50
+     sheet and the canvas, so three consecutive bands can each take a distinct
+     tone. A literal, like --surface-field: the palette has no token here (rb-100
+     sits 4 units off rb-50, too close to read as a separate band, and rb-200 is
+     DARKER than the canvas), so this is the measured midpoint of rb-50 and
+     --background and must be retuned by hand if either end moves. NOT an
+     elevation role: bands are flat page furniture, not lifted panels. Its
+     lightness is the hand-measured midpoint; the hue/chroma still track the
+     knobs so it stays inside the paper family. */
+  --surface-band: oklch(0.9618 calc(0.0086 * var(--paper-chroma)) var(--paper-hue));
+
+  /* The market-note row's own ground (components/shared/market-note-row.tsx) */
+  --color-note: #f0f0f0;
+
+  --text-muted: var(--color-rb-500);
+  --text-muted-hover: var(--rb-text-500);
+  /* Link/party accents — see color-grammar.md for the full rule.
+     blue = stays inside Rails (internal nav + links).
+     pink = leaves Rails (external links) OR is an external party (delegates). */
+  /* One link blue, both modes — blue-500. Links that REST blue (in-prose,
+     .link / PAGE_LINK / hub figures) signal hover with an underline, not a
+     shade shift; chrome links that rest neutral (NAV_LINK) turn blue-500 on
+     hover. No blue-300/400/600 in the link role. See color-grammar.md §4a. */
+  --text-link: var(--color-blue-500);
+  --text-external: var(--color-pink-500);
+  --text-external-hover: var(--color-pink-400);
+  /* Marketing accent — one global hue for decorative/brand emphasis on
+     marketing pages. Tuned to match the functional "positive" green (green-500,
+     #22c55e — the P&L-positive / Open / check hue), but deliberately kept as its
+     OWN token so the two greens share the "positive/active" intent yet stay
+     independently tunable (color-grammar.md §2, §5).
+     Off the link palette (blue/pink). Retune the whole marketing site here. */
+  --marketing: rgb(50, 120, 255);
+
+  /* Caution — the single "adverse, needs attention, NOT terminal" hue. Merges
+     the old amber(routine) + orange(redemption) tiers into one; the adverse
+     ladder is now caution → critical(red). Call sites use the `*-caution-*`
+     Tailwind utilities (driven by the --color-caution-* scale in @theme); this
+     token is the canonical mid value, used where a raw color is needed (e.g. an
+     SVG `color`). See color-grammar.md §5. */
+  --caution: var(--color-caution-500);
+
+  /* Notice panel (color-grammar.md §5) — the left-border + tinted-bg "this is a
+     note, set apart from the UI furniture" treatment. Light defaults here; dark
+     overrides in `.dark`. Consumed by the `notice-caution` utility. */
+  --notice-caution-bg: var(--color-caution-50);
+  --notice-caution-border: var(--color-caution-400);
+
+  --pill-active-bg: var(--surface-active);
+  --pill-active-text: var(--foreground);
+  --pill-idle-text: var(--color-rb-500);
+  --pill-idle-hover: var(--color-rb-300);
+
+  --focus-ring: rgba(59, 130, 246, 0.4);
+
+  /* Sidebar + its cards follow the inverted elevation: panel surfaces sit
+     LIGHTER than the canvas, hover lifts further toward white. */
+  --sidebar-bg: oklch(0.967 calc(0.0082 * var(--paper-chroma)) var(--paper-hue));
+  --card-bg: oklch(0.991 calc(0.0041 * var(--paper-chroma)) var(--paper-hue));
+  --card-hover: oklch(0.997 calc(0.0041 * var(--paper-chroma)) var(--paper-hue));
+  --card-border-rb: transparent;
+  --card-border-hover: oklch(0.997 calc(0.0041 * var(--paper-chroma)) var(--paper-hue));
+  --card-border-drag: oklch(0.8642 calc(0.0226 * var(--paper-chroma)) var(--paper-hue));
+  --sidebar-header-hover: oklch(0.9432 calc(0.0111 * var(--paper-chroma)) var(--paper-hue));
+  --backdrop-bg: oklch(0.982 calc(0.0082 * var(--paper-chroma)) var(--paper-hue) / 0.45);
+  --panel-shadow: -8px 0 30px oklch(0.2518 calc(0.0251 * var(--paper-chroma)) var(--paper-hue) / 0.15);
+  --facehash-ring: oklch(0.967 calc(0.0082 * var(--paper-chroma)) var(--paper-hue));
+
+  --rb-text-500: oklch(0.2528 calc(0.0204 * var(--paper-chroma)) var(--paper-hue));
+
+  --rb-chart-grid: oklch(0.8979 calc(0.0183 * var(--paper-chroma)) var(--paper-hue));
+  --rb-tooltip-bg: oklch(0.991 calc(0.0041 * var(--paper-chroma)) var(--paper-hue));
+  --rb-tooltip-border: oklch(0.9159 calc(0.0154 * var(--paper-chroma)) var(--paper-hue));
+}
+
+.dark {
+  /* Dark mode colors (current theme as dark) */
+  --foreground: #ffffff;
+
+  /* Dark mode specific colors */
+  --card-background: #12151e;
+  --card-border: #232a37;
+  --muted: #232a37;
+  --muted-foreground: #9da3ae;
+  --accent: #232a37;
+  --accent-foreground: #ffffff;
+  --secondary: #1e2530;
+  --secondary-foreground: #ffffff;
+
+  /* Protocol-specific gradient colors for dark mode */
+  --liquity-grad-1: #323e91;
+  --liquity-grad-2: #29336d;
+
+  /* SVG inner background for timeline icons */
+  --svg-inner-bg: #171b24;
+
+  /* ── rails-explorer brand: dark mode ───────────────────────────────────── */
+  --background: rgb(20 22 30); /* rb-800 */
+
+  --surface-hover: rgba(0, 0, 0, 0.15);
+  --surface-active: rgba(0, 0, 0, 0.25);
+  --surface-inset: rgba(0, 0, 0, 0.3);
+  --surface-overlay: #14161e;
+
+  --sidebar-bg: #12131a;
+  --card-bg: #0f1017;
+  --card-hover: #050507;
+  --card-border-rb: transparent;
+  --card-border-hover: #050507;
+  --card-border-drag: #050507;
+  --sidebar-header-hover: #0f1017;
+  --backdrop-bg: rgba(0, 0, 0, 0.5);
+  --panel-shadow: -8px 0 30px rgba(0, 0, 0, 0.5);
+  --facehash-ring: #12131a;
+
+  --rb-text-500: #dde1e8;
+
+  --rb-chart-grid: #14161e;
+  --rb-tooltip-bg: #050507;
+  --rb-tooltip-border: #14161e;
+
+  /* Notice panel — dark side: a deep translucent caution wash + a brighter left
+     rule so the panel reads against the dark canvas. */
+  --notice-caution-bg: color-mix(in srgb, var(--color-caution-900) 20%, transparent);
+  --notice-caution-border: var(--color-caution-500);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans-face);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  /* Rails brand palette (50 lightest, 950 darkest). The 50–500 tier is
+     MODE-SPLIT: routed through --rb-* runtime vars so light mode renders the
+     warm-paper set (`:root`) while dark keeps the original cool blue-grey
+     (`html.dark`). Because these are var() references inside `@theme inline`,
+     both the generated utilities (`bg-rb-100`, `dark:bg-rb-300`) and
+     `var(--color-rb-*)` consumers resolve per-mode. 600–950 stay
+     mode-agnostic literals. */
+  --color-rb-50: var(--rb-50);
+  --color-rb-100: var(--rb-100);
+  --color-rb-200: var(--rb-200);
+  --color-rb-300: var(--rb-300);
+  --color-rb-400: var(--rb-400);
+  --color-rb-500: var(--rb-500);
+  --color-rb-600: rgb(30 33 46);
+  --color-rb-700: rgb(25 28 38);
+  --color-rb-800: rgb(20 22 30);
+  --color-rb-850: rgb(18 19 26);
+  --color-rb-900: rgb(15 16 23);
+  --color-rb-950: rgb(5 5 7);
+
+  --color-rb-text-500: var(--rb-text-500);
+
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Dark-mode background darkening — a slightly deeper canvas + section tones
+   than the shared rb-* palette. Scoped to dark only (light revisited later).
+   `html.dark` out-specifies the @theme `:root` defaults above, so every
+   `dark:bg-rb-{800,850,900,950}` utility and the `bg-background` body canvas
+   pick these up together, across both the site and the app. rb-700 is left
+   alone so elevated surfaces/borders keep a touch more contrast. */
+html.dark {
+  /* Pin the 50–500 tier to the ORIGINAL cool blue-grey set — the `:root`
+     values above are the warm-paper light theme; dark mode is untouched by
+     the warming. (rb-100 keeps its pre-lightened dark value, used for the
+     Liquity logo fill via dark:fill-rb-100.) */
+  --rb-50: rgb(245 245 250);
+  --rb-100: rgb(228 233 240);
+  --rb-200: rgb(220 225 232);
+  --rb-300: rgb(213 218 224);
+  --rb-400: rgb(196 205 217);
+  --rb-500: rgb(104 119 144);
+  --color-rb-800: rgb(16 18 25);
+  --color-rb-850: rgb(13 14 20);
+  --color-rb-900: rgb(11 12 18);
+  --color-rb-950: rgb(3 3 4);
+  --background: rgb(23 27 36);
+
+  /* Semantic surface roles — dark side. NB: the palette lives in `@theme inline`,
+     so `dark:bg-rb-800` etc. inline the *@theme* value (e.g. rb-800 = 20 22 30)
+     and never see the `--color-rb-*` overrides above — those only reach
+     `var(--color-rb-*)` consumers. We therefore set these roles to the inlined
+     @theme shades (literals) so a `bg-raised` panel matches the `dark:bg-rb-800`
+     surfaces it sits beside (back button, pills, open dropdown) instead of
+     rendering a step darker via the override. */
+  --surface-raised: rgb(20 22 30); /* = rb-800 (inlined) */
+  --surface-sunken: rgb(15 16 23); /* = rb-900 (inlined) */
+  --surface-marker: rgb(20 22 30);
+  --surface-skeleton: rgb(20 22 30);
+  --surface-selected: rgb(25 28 38); /* = rb-700 */
+  --surface-field: rgb(15 16 23); /* rb-900 — recessed well vs the rgb(20 22 30) overlay panel */
+  /* Band — midpoint of the dark ladder's ends, rb-600 (30 33 46) and the
+     --background canvas (23 27 36), same construction as the light value. The
+     dark palette is compressed enough that this lands ~3 units off each
+     neighbour: subtle by nature, and the same order of contrast every
+     bg-raised panel already carries against the canvas. */
+  --surface-band: rgb(26 30 41);
+
+  /* The market-note row's own ground (components/shared/market-note-row.tsx) */
+  --color-note: #1d212b;
+}
+
+/* Role utilities — one class per surface role, theme-aware via the vars above.
+   `hover:`/`focus:` variants generate automatically; no `dark:` needed. */
+@utility bg-raised {
+  background-color: var(--surface-raised);
+}
+@utility border-raised {
+  border-color: var(--surface-raised);
+}
+@utility bg-sunken {
+  background-color: var(--surface-sunken);
+}
+@utility bg-marker {
+  background-color: var(--surface-marker);
+}
+@utility bg-skeleton {
+  background-color: var(--surface-skeleton);
+}
+@utility bg-selected {
+  background-color: var(--surface-selected);
+}
+@utility bg-field {
+  background-color: var(--surface-field);
+}
+@utility bg-band {
+  background-color: var(--surface-band);
+}
+@utility bg-note {
+  background-color: var(--color-note);
+}
+
+/* Notice panel — the left-border + tinted-bg "note" treatment (color-grammar.md
+   §5). Chrome only: bg + left rule. Markup adds its own padding / text colour
+   (text-caution-*) / layout so each site keeps its content shape. Theme-aware
+   via the --notice-caution-* vars. */
+@utility notice-caution {
+  border-left: 4px solid var(--notice-caution-border);
+  background-color: var(--notice-caution-bg);
+}
+
+body {
+  font-family: var(--font-sans-face), "DM Sans", sans-serif;
+}
+
+@layer components {
+  /* Canonical body copy — one treatment so body text stays in parity across
+     marketing + product. 16px / normal weight / rb-500 (#687790, set back in
+     both themes). Reserve text-foreground for emphasis, text-rb-500 utilities
+     for one-off labels. Add layout utilities (max-w-*, mb-*, flex-1) alongside. */
+  .body-text {
+    @apply text-base font-normal leading-relaxed text-rb-500;
+  }
+
+  /* Timeline column layout */
+  .transaction-timeline-column {
+    width: 80px;
+    flex-shrink: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 0;
+    overflow: hidden;
+  }
+
+  /* Timeline connector positioning */
+  .timeline-connector {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 0;
+  }
+
+  /* Transaction layouts - styles are inline in components, keeping minimal CSS here */
+  .transaction-multi-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  .transaction-step {
+    position: relative;
+    width: 80px;
+    height: 40px;
+    z-index: 1;
+  }
+
+  /* Protocol-specific classes */
+  .liquityv2 {
+    --protocol-grad-1: var(--liquity-grad-1);
+    --protocol-grad-2: var(--liquity-grad-2);
+  }
+
+  /* Protocol trove header gradient */
+  .protocol-trove-header {
+    background: linear-gradient(to bottom, var(--protocol-grad-1), var(--protocol-grad-2));
+  }
+
+  /* Blog article content styling */
+  .article-content > p {
+    @apply text-slate-700 dark:text-slate-300 leading-relaxed mb-6 text-lg;
+  }
+
+  .article-content > h2 {
+    @apply text-3xl font-bold mt-12 mb-6 text-slate-900 dark:text-slate-100;
+  }
+
+  .article-content > h3 {
+    @apply text-2xl font-semibold mt-10 mb-4 text-slate-900 dark:text-slate-100;
+  }
+
+  /* In-prose blog links stay inside Rails by default → internal link blue
+     (single shade both modes, color-grammar.md §4a). External links in body
+     copy should opt into `.link-external` at the call site. */
+  .article-content a {
+    @apply text-blue-500 no-underline hover:underline;
+  }
+
+  .article-content strong {
+    @apply text-slate-900 dark:text-slate-100 font-semibold;
+  }
+
+  .article-content em {
+    @apply text-slate-700 dark:text-slate-300 italic;
+  }
+
+  .article-content > ul {
+    @apply my-8 pl-6 list-disc;
+  }
+
+  .article-content > ol {
+    @apply my-8 pl-6 list-decimal;
+  }
+
+  .article-content li {
+    @apply text-slate-700 dark:text-slate-300 mb-2 text-lg leading-relaxed ml-4;
+  }
+
+  .article-content > blockquote {
+    @apply border-l-4 border-slate-300 dark:border-slate-600 pl-6 italic my-8;
+  }
+
+  .article-content code {
+    @apply text-sm bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded;
+  }
+
+  .article-content > pre {
+    @apply bg-slate-900 dark:bg-slate-950 my-8;
+  }
+
+  .article-content > img {
+    @apply rounded-lg shadow-md my-8;
+  }
+
+  .article-content > figure {
+    @apply my-8;
+  }
+
+  .article-content figure > img {
+    @apply rounded-lg shadow-md;
+  }
+
+  .article-content figcaption {
+    @apply text-sm text-center text-slate-600 dark:text-slate-400 mt-3 italic;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   rails-explorer ported system — phase-1 reskin foundation
+   Surfaces, buttons, pills, links, focus, dropdowns, animations, scrollbars.
+   These are used by ported components (event-card, spine-column, etc.) and
+   coexist with the legacy slate-based system above until that's retired.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Surfaces */
+.surface-hover {
+  background: var(--surface-hover);
+}
+.surface-active {
+  background: var(--surface-active);
+}
+.surface-inset {
+  background: var(--surface-inset);
+}
+.surface-on-hover {
+  transition: background 0.15s;
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+/* Buttons */
+.btn-secondary {
+  @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors;
+  border: 1px solid var(--color-rb-700);
+  color: var(--text-muted);
+  &:hover {
+    color: var(--text-muted-hover);
+    background: var(--surface-hover);
+  }
+}
+.btn-ghost {
+  @apply inline-flex items-center gap-1 transition-colors;
+  color: var(--text-muted);
+  &:hover {
+    color: var(--text-muted-hover);
+  }
+}
+
+/* Pills */
+.pill-active {
+  @apply px-3 py-1 rounded-full text-xs font-medium transition-colors;
+  background: var(--pill-active-bg);
+  color: var(--pill-active-text);
+}
+.pill-idle {
+  @apply px-3 py-1 rounded-full text-xs font-medium transition-colors;
+  color: var(--pill-idle-text);
+  &:hover {
+    color: var(--pill-idle-hover);
+    background: var(--surface-hover);
+  }
+}
+
+/* Links */
+.link {
+  color: var(--text-link);
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+.link-muted {
+  color: var(--text-muted);
+  transition: color 0.15s;
+  &:hover {
+    color: var(--text-muted-hover);
+  }
+}
+/* Links to external sites — see --text-external. Use for anchors that leave Rails. */
+.link-external {
+  color: var(--text-external);
+  transition: color 0.15s;
+  &:hover {
+    color: var(--text-external-hover);
+  }
+}
+/* Marketing accent text/icons — single global hue, see --marketing. */
+.marketing {
+  color: var(--marketing);
+}
+
+/* Expand chevron — no background pill; the icon itself is the affordance: its
+   stroke goes from muted rb-500 to foreground on group hover. Expanding a card
+   is a *disclosure* (it reveals more of this card), not an in-place utility
+   action, so it takes foreground rather than the utility teal. One rule for
+   both themes — --foreground is already redefined under .dark. */
+:is(.group\/evt, .group\/card, .group\/proto):hover .expand-chev svg {
+  stroke: var(--foreground) !important;
+}
+
+/* Event-card header meta on a phone. An event header is one wrapping flex row
+   whose last item — `.evt-meta`: date, time, event number — floats right with
+   ml-auto. Under sm that row wraps badly: the meta lands wherever the amounts
+   happen to end, and the card's chevron (a sibling of the header, not part of
+   it) sits beside the first line of text. So below 640px the meta takes the
+   header's FIRST row on its own, right-aligned, and the chevron goes absolute
+   in the header's top-right corner (event-card.tsx's `.evt-has-chev`) so the
+   two read as one line: [ 27 Aug '26 18:43 ▾ ] with the label and amounts
+   beneath (Miles, 2026-09-02). The padding keeps the meta clear of the
+   chevron's box (its 12px glyph + p-1 = 20px, plus 8px of air). Above sm
+   nothing here applies and the row is exactly what it was.
+
+   The share control does not reach this corner — it renders in the footer,
+   inside the Explanation pane, not the header — so only the chevron's own
+   width is accounted for here. */
+@media (max-width: 639.98px) {
+  .evt-meta {
+    order: -1;
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+  .evt-has-chev .evt-meta {
+    padding-right: 1.75rem;
+  }
+}
+
+/* Focus ring */
+.focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Input focus */
+.input-focus {
+  &:focus {
+    border-color: var(--focus-ring);
+    box-shadow: 0 0 0 1px var(--focus-ring);
+    outline: none;
+  }
+}
+
+/* Icon buttons */
+.btn-icon {
+  @apply inline-flex items-center justify-center shrink-0 rounded-lg transition-colors;
+  color: var(--text-muted);
+  &:hover {
+    color: var(--text-muted-hover);
+    background: var(--surface-hover);
+  }
+}
+
+/* Dropdown / popover containers */
+.overlay-panel {
+  background: var(--surface-overlay);
+  border: 1px solid var(--color-rb-200);
+  /* flex-col so inset rows (mx-1, no w-full) stretch to a uniform width minus
+     their margin, instead of a bare <button> shrinking to its content width. */
+  @apply flex flex-col rounded-xl shadow-xl;
+}
+/* Dark: match the wallet-search dropdown (rb-950, near-black) so every popover
+   reads as the same floating surface and lifts clearly off the rb-800 canvas,
+   rather than the old --surface-overlay that sat ~3 levels off the page. */
+:is(.dark) .overlay-panel {
+  background: var(--color-rb-900);
+  border-color: var(--color-rb-800);
+}
+
+.overlay-item {
+  /* Inset + rounded so each row reads as a button within the panel rather than
+     a full-bleed strip. No w-full: a block-level flex button already fills the
+     panel minus its margins, so mx-1 insets it without overflow. */
+  @apply flex items-center gap-3 mx-1 my-0.5 px-4 py-2 rounded-lg text-left text-sm transition-colors cursor-pointer;
+  color: var(--text-muted);
+  /* Gate hover behind a real hover-capable pointer. On touch (iOS Safari esp.)
+     an ungated :hover makes the first tap resolve to "apply hover" and swallow
+     the activation, so a row needs a second tap. Tailwind v4 already gates its
+     hover: utilities this way; this hand-written rule must match. */
+  @media (hover: hover) {
+    &:hover {
+      background: var(--surface-hover);
+      color: var(--text-muted-hover);
+    }
+  }
+}
+.overlay-item-active {
+  background: var(--surface-active);
+  color: var(--pill-active-text);
+}
+/* The surface-hover/active overlays are black alphas — invisible on the
+   near-black dark panel above — so items lift with an alpha instead. Tinted
+   with rb-400 (196 205 217, the light end of the brand blue-grey) rather than
+   pure white, so the lift reads as rb rather than neutral grey. */
+@media (hover: hover) {
+  :is(.dark) .overlay-item:hover {
+    background: rgba(196, 205, 217, 0.08);
+  }
+}
+:is(.dark) .overlay-item-active {
+  background: rgba(196, 205, 217, 0.12);
+}
+
+/* The type-to-filter row a long option list gains (filter-bar/option-search).
+   Sticky inside the panel's own scroll container so the options scroll UNDER
+   the input rather than past it — a 1,283-market roster is several screens of
+   rows, and an input that scrolled away would only be usable on the first one.
+   It carries the panel's background for the same reason .overlay-panel does:
+   rows must not show through it. */
+.overlay-search {
+  background: var(--surface-overlay);
+  @apply sticky top-0 z-10;
+}
+:is(.dark) .overlay-search {
+  background: var(--color-rb-900);
+}
+
+/* Form / interaction defaults.
+ *
+ * ⚠️ This MUST stay inside `@layer base`. Unlayered CSS beats every layered
+ * rule regardless of specificity, so while this sat unlayered it outranked
+ * `@layer utilities`' `.font-mono` — and since every wallet-address pill in the
+ * app is a <button> (the label doubles as a filter link), `font-mono` was a
+ * silent no-op on ALL of them: 467 of 467 on the Morpho listing rendered in the
+ * sans face. Addresses are the one thing that genuinely needs monospace, so
+ * they read as a column and hex can be compared character by character.
+ * In `base` the rule still lifts form controls off the UA default font, which
+ * is its whole job, while any explicit font utility now wins as intended. */
+@layer base {
+  input,
+  button,
+  textarea,
+  select {
+    font-family: inherit;
+  }
+}
+
+/* Tailwind v4 preflight no longer normalises button cursor to `pointer`
+   and Safari was treating layered `.cursor-pointer` utilities as losing
+   to UA defaults in our cascade — use unlayered + !important so this
+   rule wins everywhere it matches. `:not(:disabled)` keeps disabled
+   controls on the UA default cursor. Per-element opt-outs are now
+   essentially impossible without inline `style.setProperty(..., 'important')`
+   — accept that and don't over-customise cursors. */
+a,
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+input[type="submit"]:not(:disabled),
+input[type="button"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+select:not(:disabled),
+summary,
+label[for] {
+  cursor: pointer !important;
+}
+
+/* Animations */
+@keyframes sidebar-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes dropdown-bounce-down {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(2px) scale(1.005);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes dropdown-bounce-up {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.005);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-dropdown-down {
+  animation: dropdown-bounce-down 240ms cubic-bezier(0.22, 1.4, 0.5, 1) both;
+  transform-origin: top right;
+}
+.animate-dropdown-up {
+  animation: dropdown-bounce-up 240ms cubic-bezier(0.22, 1.4, 0.5, 1) both;
+  transform-origin: bottom right;
+}
+
+/* Pre-hydration control state. A control strip carries [data-ctrl-waking] from
+   the server response until React attaches its handlers (hooks/useHydrated +
+   ctrlWaking in lib/shared/ui-grammar). Clicks in that gap are lost, not
+   queued — measured at up to 1.8s on slow 4G — so the strip stops answering the
+   pointer and, if the wait is long enough to notice, says so.
+
+   The 250ms delay IS the design. A fast load hydrates at ~50ms, clears the
+   attribute, and the muted state is never painted; without the delay every page
+   on every connection would flash grey on load, which is a worse bug than the
+   one being fixed. Nothing was measured between 99ms and 286ms, so the
+   threshold sits in empty space rather than cutting through a distribution.
+
+   Not decorative motion: this is a state change on a delay, and it must survive
+   a reduced-motion sweep. Anything that blanket-disables animation here puts
+   the silent dead control back. The fade is 120ms only so the change does not
+   arrive as a jump; reduced-motion shortens it to nothing but still applies. */
+[data-ctrl-waking] {
+  animation: ctrl-waking 120ms linear 250ms both;
+  cursor: default;
+}
+/* The strip keeps its own box; everything inside stops taking the pointer, so a
+   hover never reacts on a control that cannot answer a click either. */
+[data-ctrl-waking] * {
+  pointer-events: none;
+}
+@keyframes ctrl-waking {
+  to {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-ctrl-waking] {
+    animation-duration: 1ms;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes hero-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-hero-fade-up {
+  opacity: 0;
+  animation: hero-fade-up 0.6s ease-out forwards;
+}
+
+@keyframes track-drift {
+  from {
+    transform: translateY(0px);
+  }
+  to {
+    transform: translateY(-10px);
+  }
+}
+.animate-track-drift {
+  animation: track-drift 8s ease-in-out infinite alternate;
+}
+
+@keyframes line-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.hero-track-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: line-draw 5s ease-out forwards;
+  animation-delay: var(--hero-line-delay, 0s);
+}
+[data-hero-seen="1"] .animate-hero-fade-up {
+  opacity: 1;
+  animation: none;
+}
+/* Track lines gate is its own flag — session-scoped (see TrackLines), so the
+   draw-on replays on the first load of each visit while the hero fade stays
+   once-per-browser. */
+[data-tracks-seen="1"] .hero-track-line {
+  stroke-dasharray: none;
+  stroke-dashoffset: 0;
+  animation: none;
+}
+
+@keyframes demo-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@keyframes demo-progress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes badge-ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Terminal-style scrollbar (used by Rails Index activity tables) */
+.terminal-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.terminal-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.terminal-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-rb-700);
+  border-radius: 3px;
+}
+.terminal-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-rb-600);
+}
+
+/* Terminal table styles */
+.terminal-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.terminal-row:hover {
+  background: rgba(128, 128, 128, 0.06) !important;
+}
+.proto-row {
+  transition: background 0.15s ease;
+}
+.proto-row:hover {
+  background: rgba(128, 128, 128, 0.06) !important;
+}
+.terminal-subrow {
+  background-color: rgba(128, 128, 128, 0.04);
+}
+.terminal-subrow:hover {
+  background: rgba(128, 128, 128, 0.06) !important;
+}
+.terminal-subrow td:first-child {
+  border-left: 2px solid var(--color-rb-600);
+}
+
+/* ── Provenance receipt ────────────────────────────────────────────────────
+   The expanded receipt body: the whole derivation in ONE pane — the displayed
+   value on the left, the equation on the right (formula → operand rows →
+   source coords). A derivation is an expression, not a sequence, so the layout
+   IS the equation. Receipt chrome carries `data-prov-chrome`, which the
+   provenance coverage tripwire skips (chrome is never a traced value).
+
+   Five DISPLAY classes (a distance refinement layered over the 4-kind gate):
+   emitted · state · oracle (all on-chain, third-party verifiable) → indexed ·
+   offchain (need Rails). Temperature: cool = on-chain, warm = trust required.
+   Dim set = light surfaces, bright set = dark surfaces (receipts render on the
+   normal card surface — the inverted page dock retired 2026-07-09). */
+:root {
+  --pc-emitted: #0f766e;
+  --pc-state: #0369a1;
+  --pc-oracle: #4338ca;
+  --pc-indexed: #b45309;
+  --pc-offchain: #c2410c;
+  --pc-rail: oklch(0.8859 calc(0.0171 * var(--paper-chroma)) var(--paper-hue)); /* = rb-300 */
+  --pc-focus: #4338ca;
+}
+.dark {
+  --pc-emitted: #2dd4bf;
+  --pc-state: #38bdf8;
+  --pc-oracle: #818cf8;
+  --pc-indexed: #fbbf24;
+  --pc-offchain: #fb923c;
+  --pc-rail: rgb(30 33 46); /* rb-600 */
+  --pc-focus: #818cf8;
+}
+.prov-cls-emitted {
+  --pc-d: var(--pc-emitted);
+}
+.prov-cls-state {
+  --pc-d: var(--pc-state);
+}
+.prov-cls-oracle {
+  --pc-d: var(--pc-oracle);
+}
+.prov-cls-indexed {
+  --pc-d: var(--pc-indexed);
+}
+.prov-cls-offchain {
+  --pc-d: var(--pc-offchain);
+}
+/* the receipt: two columns — the displayed value (headline) left, the equation
+   (formula → operand rows → source coordinates) right. Stacks on narrow
+   screens. */
+.prov-receipt {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 0.25rem 3.5rem;
+  align-items: start;
+  min-height: 6.5rem;
+  padding: 0.85rem 1.25rem 1.1rem;
+}
+@media (max-width: 860px) {
+  .prov-receipt {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem 0;
+    min-height: 0;
+  }
+}
+.prov-ins-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.prov-ins-label {
+  font-size: 12px;
+  color: var(--color-rb-500);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.prov-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-rb-500);
+  white-space: nowrap;
+}
+.prov-chip .prov-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pc-d, var(--pc-rail));
+}
+.prov-ins-value {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-weight: 660;
+  font-size: 26px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+  margin: 0.5rem 0 0.5rem;
+  word-break: break-word;
+}
+.prov-ins-value .prov-ins-token {
+  display: inline-flex;
+  align-items: center;
+}
+.prov-verify {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  text-decoration: none;
+}
+.prov-verify svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.prov-verify.prov-verify-link {
+  color: var(--pc-focus);
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+}
+.prov-verify.prov-verify-link:hover {
+  border-bottom-color: var(--pc-focus);
+}
+.prov-verify.prov-verify-muted {
+  color: var(--color-rb-500);
+}
+/* compact-notation "?" riding the headline (opens the notation modal), and the
+   exact from-the-block figure beneath it (only when the card shows a compact
+   form) */
+.prov-fmt-help {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 2px;
+  display: inline-flex;
+  color: var(--color-rb-500);
+  cursor: pointer;
+}
+.prov-fmt-help:hover {
+  color: var(--foreground);
+}
+.prov-fmt-help svg {
+  width: 14px;
+  height: 14px;
+}
+.prov-ins-exact {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-rb-500);
+  margin: -0.25rem 0 0.4rem;
+  word-break: break-word;
+}
+
+/* left column extras under the headline value */
+.prov-note {
+  margin: 0.4rem 0 0;
+  font-size: 12.5px;
+  color: var(--color-rb-500);
+  line-height: 1.55;
+  max-width: 64ch;
+}
+.prov-scaling {
+  overflow-wrap: anywhere;
+}
+.prov-via {
+  margin: 0.5rem 0 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--color-rb-500);
+  line-height: 1.5;
+}
+/* embedded receipts: the etherscan check rides the via line as a quiet inline
+   link (the log-naming segment), not a full-width row above the prose */
+.prov-via-verify {
+  color: var(--pc-focus);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.prov-via-verify:hover {
+  border-bottom-color: var(--pc-focus);
+}
+.prov-via-verify svg {
+  display: inline;
+  width: 11px;
+  height: 11px;
+  margin-left: 3px;
+  vertical-align: -1.5px;
+}
+
+/* right column: the equation — formula, operand rows, source coordinates.
+   Sections divide with a hairline, mirroring a printed receipt. */
+.prov-eq {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-top: 0.125rem;
+}
+.prov-eq > * + * {
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--color-rb-300);
+}
+.prov-eq a {
+  color: var(--pc-focus);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.prov-eq a:hover {
+  border-bottom-color: var(--pc-focus);
+}
+.prov-formula {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--foreground);
+  word-break: break-word;
+}
+/* untraced-input self-audit — a vocabulary gap made visible, never silent */
+.prov-audit {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--caution);
+}
+.prov-audit svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  margin-top: 2px;
+}
+.prov-audit b {
+  font-weight: 600;
+}
+.prov-operands {
+  display: grid;
+  grid-template-columns: 9px max-content minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: start;
+}
+.prov-row-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--pc-d, var(--pc-rail));
+  margin-top: 5px;
+}
+.prov-row-label {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-rb-500);
+}
+.prov-row-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.prov-row-cell .prov-row-value {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground);
+  word-break: break-all;
+}
+.prov-row-cell button {
+  align-self: center;
+}
+.prov-row-note {
+  color: var(--color-rb-500);
+}
+.prov-src {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  color: var(--color-rb-500);
+}
+.prov-src svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.prov-src .prov-src-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.prov-src .prov-src-block {
+  color: var(--foreground);
+}
+.prov-laddertoggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--color-rb-500);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 2px;
+}
+.prov-laddertoggle:hover {
+  color: var(--foreground);
+}
+.prov-laddertoggle svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* the bullet: one dot per provenance class involved in the value (the
+   inspector popover's head) */
+.prov-rrow-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 9px;
+}
+/* the locator pulse: pinning a receipt stamps data-prov-active on the
+   card's rendered instance(s) of that figure — the value becomes an INVERTED
+   PILL (dark ground, light text; mirrored in dark mode) and HOLDS it for as
+   long as the receipt is open (the effect's cleanup strips the attribute on
+   collapse, and everything reverts).
+   Zero layout shift: every scoped <Prov> span (.prov-locate-box) pre-reserves
+   the pill's box at rest — padding pulled back by equal negative margins, so
+   the resting layout is pixel-identical and the active pill paints OUTWARD
+   into the surrounding whitespace. */
+.prov-locate-box {
+  border-radius: 0.25rem; /* rounded-sm */
+  padding: 0.5px 4px;
+  margin: -0.5px -4px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone; /* a line-wrapped value pills per fragment */
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+/* a <Prov icon>-towed glyph rides inside the box, so the pill encloses
+   value + icon as one unit */
+.prov-locate-box.prov-has-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+[data-prov-active] {
+  --prov-locate: var(--color-rb-900);
+  background-color: var(--prov-locate);
+  color: oklch(0.9877 calc(0.0054 * var(--paper-chroma)) var(--paper-hue)); /* = rb-50 */
+}
+/* dev-only coverage tripwire: a value inside a receipts scope with no <Prov>
+   (prov-coverage-tripwire.tsx stamps it). The attribute never appears in prod,
+   so this rule is inert there. */
+[data-prov-uncovered] {
+  outline: 1px dashed rgb(244 63 94 / 0.75); /* rose-500 */
+  outline-offset: 2px;
+}
+.dark [data-prov-active] {
+  --prov-locate: var(--color-rb-100);
+  color: var(--color-rb-900);
+}
+/* children with their own colour utilities follow while active (unlayered,
+   so it beats Tailwind's layered utilities); revert when the attribute strips */
+[data-prov-active] * {
+  color: inherit;
+}
+/* ── Armed values (the inspector's targets) ───────────────────────────────
+   While the page-level inspector is armed, every scoped <Prov> value is a
+   click target (crosshair cursor, hover previews the locator pill — the
+   pre-reserved .prov-locate-box means zero layout shift). */
+/* armed targets: crosshair everywhere; the hover preview is exactly the
+   locator pill (hover-capable pointers only — touch arms by tap and picks by
+   tap, nothing hidden) */
+/* an armed target carries role="button", and the global unlayered
+   `[role="button"] { cursor: pointer !important }` rule (the Safari cursor
+   normaliser above) would swallow the pick cursor — matching its
+   specificity + importance later in the file lets crosshair win */
+[data-prov-pickable],
+[data-prov-pickable][role="button"] {
+  cursor: crosshair !important;
+}
+@media (hover: hover) {
+  [data-prov-pickable]:hover {
+    --prov-locate: var(--color-rb-900);
+    background-color: var(--prov-locate);
+    color: oklch(0.9877 calc(0.0054 * var(--paper-chroma)) var(--paper-hue)); /* = rb-50 */
+  }
+  .dark [data-prov-pickable]:hover {
+    --prov-locate: var(--color-rb-100);
+    color: var(--color-rb-900);
+  }
+  [data-prov-pickable]:hover * {
+    color: inherit;
+  }
+}
+[data-prov-pickable]:focus-visible {
+  outline: 2px solid rgb(13 148 136); /* teal-600 */
+  outline-offset: 1px;
+}
+.dark [data-prov-pickable]:focus-visible {
+  outline-color: rgb(45 212 191); /* teal-400 */
+}
+/* ── The page-level provenance inspector ──────────────────────────────────
+   The target tool (prov-inspector.tsx): one armed mode for the whole page.
+   Armed, every scoped <Prov> gets the pickable treatment above PLUS a resting
+   dotted underline — the visible map of which figures are traceable — and a
+   click pins the figure's receipt into a popover anchored at the value. */
+[data-prov-inspect] {
+  text-decoration: underline dotted rgb(13 148 136 / 0.55); /* teal-600 */
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.dark [data-prov-inspect] {
+  text-decoration-color: rgb(45 212 191 / 0.5); /* teal-400 */
+}
+/* the dock toggle — the picktoggle's grammar sized for the floating strip */
+.prov-inspect-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--color-rb-500);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 0.375rem;
+  flex: none;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+.prov-inspect-toggle:hover {
+  color: var(--foreground);
+}
+.prov-inspect-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+.prov-inspect-toggle[aria-pressed="true"] {
+  color: rgb(13 148 136); /* teal-600 */
+  background: rgb(13 148 136 / 0.1);
+}
+.dark .prov-inspect-toggle[aria-pressed="true"] {
+  color: rgb(45 212 191); /* teal-400 */
+  background: rgb(45 212 191 / 0.1);
+}
+.prov-inspect-hint {
+  font-size: 11px;
+  white-space: nowrap;
+}
+/* the armed halo — a fixed inset ring + inward glow on the whole viewport
+   while the tool is on (the browser-extension "operating" treatment), so the
+   mode reads at any scroll position. Pointer-transparent; under the popover. */
+.prov-inspect-halo {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 2px rgb(13 148 136 / 0.5),
+    inset 0 0 40px 6px rgb(13 148 136 / 0.16);
+  animation: prov-halo-in 0.3s ease;
+}
+.dark .prov-inspect-halo {
+  box-shadow:
+    inset 0 0 0 2px rgb(45 212 191 / 0.45),
+    inset 0 0 40px 6px rgb(45 212 191 / 0.14);
+}
+@keyframes prov-halo-in {
+  from {
+    opacity: 0;
+  }
+}
+/* the popover — the receipt pinned AT the value; a bottom sheet under 640px.
+   Teal-washed ground ties it to the tool's colorway (halo, dotted targets,
+   held pill); the var overrides re-ground the receipt internals (hairlines,
+   muted text) on the teal paper — the inverted receipt row's technique. */
+.prov-inspect-pop {
+  position: fixed;
+  z-index: 60;
+  width: 400px;
+  max-width: calc(100vw - 16px);
+  max-height: min(440px, calc(100vh - 16px));
+  overflow-y: auto;
+  padding: 10px 12px 12px;
+  border-radius: 0.75rem;
+  background: rgb(238 249 246); /* teal-washed paper */
+  border: 1px solid rgb(13 148 136 / 0.3);
+  --color-rb-300: rgb(185 216 208); /* teal-tinted hairlines */
+  --color-rb-500: rgb(90 122 115); /* teal-grey muted text */
+  box-shadow:
+    0 12px 32px rgb(13 148 136 / 0.16),
+    0 2px 8px rgb(0 0 0 / 0.1);
+}
+.dark .prov-inspect-pop {
+  background: rgb(15 40 37); /* deep teal ground */
+  border-color: rgb(45 212 191 / 0.3);
+  --color-rb-300: rgb(33 71 65);
+  --color-rb-500: rgb(129 168 160);
+  --color-rb-600: rgb(33 71 65); /* dark-mode hairline var follows the ground */
+  box-shadow:
+    0 12px 32px rgb(0 0 0 / 0.5),
+    0 2px 8px rgb(0 0 0 / 0.35);
+}
+.prov-inspect-sheet {
+  inset: auto 0 0 0;
+  width: auto;
+  max-width: none;
+  border-radius: 0.75rem 0.75rem 0 0;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+.prov-inspect-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+/* the head's dots are the button that opens the distance ladder */
+.prov-inspect-head .prov-rrow-dots {
+  align-self: center;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 3px;
+  margin: -3px;
+  border-radius: 0.25rem;
+  flex: none;
+}
+.prov-inspect-head .prov-rrow-dots:hover {
+  background: var(--color-rb-200);
+}
+.dark .prov-inspect-head .prov-rrow-dots:hover {
+  background: var(--color-rb-700);
+}
+.prov-inspect-label {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  min-width: 0;
+  flex: 1;
+}
+.prov-inspect-value {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--color-rb-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40%;
+  flex: none;
+}
+.prov-inspect-close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--color-rb-500);
+  cursor: pointer;
+  display: inline-flex;
+  align-self: center;
+  padding: 2px;
+  border-radius: 0.25rem;
+  flex: none;
+}
+.prov-inspect-close:hover {
+  color: var(--foreground);
+}
+.prov-inspect-close svg {
+  width: 14px;
+  height: 14px;
+}
+.prov-inspect-body {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-rb-300);
+}
+.dark .prov-inspect-body {
+  border-top-color: var(--color-rb-600);
+}
+/* the embedded receipt sheds the panel's dot-column indent in the popover */
+.prov-inspect-body .prov-receipt-embed {
+  padding-left: 0;
+  padding-bottom: 0.25rem;
+}
+
+/* the embedded receipt (the inspector popover's body): single-column (the
+   popover is card-width, not page-width). The popover head owns the
+   value/chip, so there is no headline — only the exact figure, the prose,
+   and the equation. */
+.prov-receipt-embed {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem 0;
+  min-height: 0;
+  padding: 0.15rem 0 1rem 19px;
+}
+.prov-receipt-embed .prov-ins-exact {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0.1rem 0 0.15rem;
+}
+.prov-receipt-embed .prov-note {
+  margin-top: 0.25rem;
+}
+.dark .prov-receipt-embed .prov-eq > * + * {
+  border-top-color: var(--color-rb-600);
+}
+
+/* distance-ladder modal content (the shell is the learn-more modal chrome,
+   portaled to <body>, so it rides the normal theme surface) */
+.prov-rung {
+  display: grid;
+  grid-template-columns: 118px 1fr;
+  gap: 14px;
+  align-items: baseline;
+  padding: 11px 0;
+  border-top: 1px solid var(--color-rb-300);
+}
+.dark .prov-rung {
+  border-top-color: var(--color-rb-600);
+}
+.prov-rung:first-of-type {
+  border-top: 0;
+}
+.prov-rung .prov-desc {
+  color: var(--color-rb-500);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.prov-rung b,
+.prov-prose b {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.prov-split {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 14px 0 2px;
+  font-size: 11px;
+  color: var(--color-rb-500);
+}
+.prov-split .prov-bar {
+  height: 1px;
+  flex: 1;
+  background: var(--color-rb-300);
+}
+.dark .prov-split .prov-bar {
+  background: var(--color-rb-600);
+}
+.prov-prose {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-rb-300);
+  font-size: 12.5px;
+  color: var(--color-rb-500);
+  line-height: 1.6;
+}
+.dark .prov-prose {
+  border-top-color: var(--color-rb-600);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prov-receipt * {
+    transition: none !important;
+  }
+}
+
+/* Chain-truth listing entrance cascade — CSS, not framer-motion.
+   A staggered fade+rise for the row column in <ChainTruthListing>. Deliberately
+   CSS: the memory tier renders the whole set (hundreds of rows), and driving that
+   many per-node JS animations choked the main thread for seconds on mount (rows
+   sat mid-fade, hover/clicks unresponsive). A compositor-driven CSS animation
+   costs the main thread nothing, so the rows are interactive immediately while
+   they settle. The stagger index is capped at the call site (--ct-i clamped), so
+   only the top rows step in and the tail arrives together — no multi-second tail.
+   The column is re-keyed by viewKey on a facet/sort/page change, remounting these
+   nodes so the cascade replays as feedback (search is excluded from the key, so
+   live typing filters in place without re-staggering). */
+@keyframes ct-row-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.ct-row {
+  animation: ct-row-enter 0.25s ease-out both;
+  animation-delay: calc(var(--ct-i, 0) * 0.045s);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ct-row {
+    animation: none;
+  }
+}

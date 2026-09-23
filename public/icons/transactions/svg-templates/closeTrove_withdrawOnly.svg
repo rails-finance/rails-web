@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+  <path d="M 31.74 19.936 L 16.157 19.95 L 16.157 16.25 L 7.504 24.266 L 16.157 32.266 L 16.157 28.566 L 31.975 28.552 L 31.975 20.936 L 31.74 19.936 Z" style="stroke-width: 1; fill: red; transform-origin: 19.739px 24.255px;"/>
+  <rect style="fill: red;" x="24" y="9" width="32" height="32" rx="16" ry="16"/>
+  <ellipse style="fill: var(--svg-inner-bg)" cx="40" cy="25" rx="14" ry="14"/>
+  <use href="#COLLATERAL_ICON" width="24" height="24" transform="matrix(1, 0, 0, 1, 28, 13)"/>
+</svg>

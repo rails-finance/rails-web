@@ -1,0 +1,19 @@
+export interface BatchManager {
+  name: string;
+  address: string;
+  description: string;
+  website: string;
+  asset_symbol: string;
+  asset_contract: string;
+  deprecated_date?: string;
+}
+
+export interface BatchManagerData {
+  version: string;
+  last_updated: string;
+  batch_managers: BatchManager[];
+}
+
+export interface BatchManagerSearchResult extends BatchManager {
+  relevance?: number;
+}
