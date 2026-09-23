@@ -33,8 +33,9 @@ export interface TimelineEvent {
   platform: TimelinePlatform;
   author?: string;
   authorUrl?: string;
-  /** Explicit spine-icon image, bypassing the /avatars/{platform}/{handle}
-   *  convention — e.g. a protocol logo for a product-milestone entry. */
+  /** Explicit spine-icon image, bypassing the avatar lookup
+   *  (components/pulse/shared/Avatar.tsx) — e.g. a protocol logo for a
+   *  product-milestone entry. */
   iconUrl?: string;
   postUrl?: string;
   content: string;

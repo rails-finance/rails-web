@@ -3,12 +3,35 @@
 import { useState } from "react";
 import type { TimelineEvent } from "@/types/pulse";
 
-function getAvatarBasePath(handle?: string, platform?: TimelineEvent["platform"]) {
-  if (!handle || !platform) return null;
-  const normalizedHandle = handle.replace(/^@/, "").trim().toLowerCase();
-  if (!normalizedHandle) return null;
-  const platformDir = platform.toLowerCase();
-  return `/avatars/${platformDir}/${normalizedHandle}`;
+/** The avatars held in public/avatars — the team's own, by platform and
+ *  lower-cased handle (ATTRIBUTION.md). Everyone else's X picture is read
+ *  through /api/avatar/x at request time and never stored in the repo. */
+const LOCAL_AVATARS: Partial<Record<TimelineEvent["platform"], Record<string, string>>> = {
+  x: {
+    milesessex: "/avatars/x/milesessex.png",
+    rails_finance: "/avatars/x/rails_finance.svg",
+  },
+  github: {
+    milodonid: "/avatars/github/milodonid.png",
+    slvdev: "/avatars/github/slvdev.jpg",
+  },
+};
+
+function normalizeHandle(handle?: string): string | null {
+  const normalized = handle?.replace(/^@/, "").trim().toLowerCase();
+  return normalized || null;
+}
+
+/** Where a handle's picture comes from: a local file for the team's own,
+ *  the request-time route for any other X handle, and nothing for the
+ *  rest (the initial shows instead). */
+function getAvatarSrc(handle?: string, platform?: TimelineEvent["platform"]): string | null {
+  const normalized = normalizeHandle(handle);
+  if (!normalized || !platform) return null;
+  const local = LOCAL_AVATARS[platform]?.[normalized];
+  if (local) return local;
+  if (platform === "x") return `/api/avatar/x/${normalized}`;
+  return null;
 }
 
 export function Avatar({
@@ -22,14 +45,13 @@ export function Avatar({
   platform?: TimelineEvent["platform"];
   size?: number;
   className?: string;
-  /** Explicit image path that bypasses the /avatars/{platform}/{handle} lookup. */
+  /** Explicit image path that bypasses the local-file / /api/avatar lookup. */
   overrideSrc?: string;
 }) {
-  const basePath = getAvatarBasePath(handle, platform);
-  const [extension, setExtension] = useState<"png" | "jpg" | "svg" | null>("png");
+  const [failed, setFailed] = useState(false);
   const initial = handle?.replace(/^@/, "").charAt(0)?.toUpperCase() ?? "?";
 
-  const src = overrideSrc ?? (basePath && extension ? `${basePath}.${extension}` : null);
+  const src = failed ? null : (overrideSrc ?? getAvatarSrc(handle, platform));
 
   return (
     <span
@@ -42,16 +64,7 @@ export function Avatar({
           alt={`Avatar for ${handle}`}
           className="h-full w-full object-cover"
           loading="lazy"
-          onError={(event) => {
-            if (extension === "png") {
-              setExtension("jpg");
-            } else if (extension === "jpg") {
-              setExtension("svg");
-            } else {
-              event.currentTarget.style.display = "none";
-              setExtension(null);
-            }
-          }}
+          onError={() => setFailed(true)}
         />
       )}
       <span
