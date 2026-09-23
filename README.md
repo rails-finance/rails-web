@@ -41,4 +41,5 @@ Rails is in beta. Explorers whose coverage cells are still open say so on `/cove
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Third-party images and one transcribed icon are listed in
+[ATTRIBUTION.md](ATTRIBUTION.md) and are not covered by it.
