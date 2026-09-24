@@ -39,7 +39,7 @@
 //   1247  weETH/WBTC, liquidated 67 times, small remainder.
 //   3763  eBTC/WBTC, one deposit_borrow and never touched again.
 //
-// Run:  node scripts/verify/verify-fluid-dust-borrow.mjs
+// Run:  node scripts/verify/verify-fluid-dust-borrow.mjs        (dev.rails.finance)
 //       BASE=http://localhost:3000 node scripts/verify/verify-fluid-dust-borrow.mjs
 // Needs ALCHEMY_URL in .env.local (read, never printed). About 8 eth_calls a fixture.
 
@@ -48,6 +48,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { createPublicClient, http, parseAbi, formatUnits } from "viem";
 import { mainnet } from "viem/chains";
+import { BASE, hostFetch } from "./lib/host.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const env = Object.fromEntries(
@@ -57,7 +58,6 @@ const env = Object.fromEntries(
     .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
 );
 if (!env.ALCHEMY_URL) throw new Error("ALCHEMY_URL missing from .env.local");
-const BASE = (process.env.BASE ?? "https://rails.finance").replace(/\/$/, "");
 const FIXTURES = (process.env.NFTS ?? "2333,1247,3763").split(",").map((s) => BigInt(s.trim()));
 
 const client = createPublicClient({ chain: mainnet, transport: http(env.ALCHEMY_URL) });
@@ -126,7 +126,7 @@ const check = (name, ok, detail = "") => {
 const info = (msg) => console.log(`      ${msg}`);
 
 async function getJson(path) {
-  const res = await fetch(`${BASE}${path}`);
+  const res = await hostFetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`${path} → HTTP ${res.status}`);
   return res.json();
 }
@@ -276,7 +276,7 @@ async function fixture(nft, B) {
 
   // D8 — the rendered page
   if (settled) {
-    const html = await (await fetch(`${BASE}/ethereum/fluid/${nft}`)).text();
+    const html = await (await hostFetch(`${BASE}/ethereum/fluid/${nft}`)).text();
     const text = pageText(html);
     const m = text.match(/owes ([0-9.e+-]+) ([A-Za-z0-9]+)/);
     // The page prints to a few significant figures: compare at its precision.

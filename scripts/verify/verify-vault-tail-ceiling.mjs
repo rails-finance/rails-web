@@ -18,9 +18,10 @@
 // A figure derived from a measurement goes stale the moment the thing measured
 // changes, and the row grammar (`VaultHolderEvent`, and each family's `extra`)
 // is a thing that changes. So this script re-measures: it reads the largest
-// tail each chain has actually STORED, back out of the production deployment's
-// own proxy, divides its byte length by its row count, and asserts that a full
-// ceiling's worth of those rows still fits.
+// tail each chain has actually STORED, back out of the deployment's own proxy
+// (dev.rails.finance by default, in front of the production store), divides
+// its byte length by its row count, and asserts that a full ceiling's worth of
+// those rows still fits.
 //
 // THE CEILINGS ARE RESTATED BELOW RATHER THAN IMPORTED. An expectation read out
 // of the thing under test cannot catch a change to it: importing `tailMaxRows`
@@ -34,10 +35,11 @@
 // so the GET body's length is the PUT body's length, and `JSON.stringify` of it
 // is measured too, to say so rather than to assume it.
 //
-// It reads production over the network and nothing else: no .env.local, no
-// chain lane, no dev server.
+// It reads the deployment over the network and nothing else: no chain lane, no
+// dev server; .env.local only for the Vercel bypass secret (scripts/verify/lib/host.mjs).
 //
 //   node scripts/verify/verify-vault-tail-ceiling.mjs
+//   BASE=https://rails.finance node scripts/verify/verify-vault-tail-ceiling.mjs
 //
 // ── PROVED IT CAN FAIL, 2026-09-09 ──────────────────────────────────────────
 //   A1  CEILING[1] raised to 20,000 in this script — the shape a chain-1 row
@@ -48,7 +50,9 @@
 //       × 548.9 B = 8,781,806 B". Chain 1 stayed green through it, which is the
 //       half of the proof that says the two chains are judged apart.
 
-const BASE = process.env.TAIL_BASE ?? "https://rails-web.vercel.app";
+import { BASE as HOST, hostFetch } from "./lib/host.mjs";
+
+const BASE = process.env.TAIL_BASE ?? HOST;
 
 /** The two figures under test, restated. `tailMaxRows(chainId)` in
  *  lib/shared/vault-holder-timeline.ts. */
@@ -109,7 +113,7 @@ async function measure(chainId, { vault, holder }) {
     `&holder=${holder}&loaderVersion=${LOADER_VERSION[chainId]}`;
   let res;
   try {
-    res = await fetch(url, { cache: "no-store" });
+    res = await hostFetch(url, { cache: "no-store" });
   } catch (error) {
     return { vault, holder, error: String(error?.message ?? error) };
   }

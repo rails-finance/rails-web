@@ -88,6 +88,7 @@
 
 import { createPublicClient, decodeEventLog, http, parseAbi, getAddress } from "viem";
 import { readFileSync } from "node:fs";
+import { hostFetch } from "../verify/lib/host.mjs";
 
 // ── env (.env.local) ─────────────────────────────────────────────────────────
 // metaUrl is the ENTRY script's import.meta.url (in scripts/), so .env.local is
@@ -730,7 +731,7 @@ export async function run(cfg) {
         const wallet = getAddress(w);
         let tl;
         try {
-          const res = await fetch(`${origin}/api/chain/${slug}/timeline?wallet=${wallet}`);
+          const res = await hostFetch(`${origin}/api/chain/${slug}/timeline?wallet=${wallet}`);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           tl = await res.json();
         } catch (e) {

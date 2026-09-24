@@ -40,7 +40,7 @@
 //   • Liquidation-bonus and accrued-interest exactness (as on every sibling).
 //
 // Run: node scripts/verify-seamless-chain.mjs
-//      BASE=https://preview.rails.finance node scripts/verify-seamless-chain.mjs
+//      BASE=https://dev.rails.finance node scripts/verify-seamless-chain.mjs
 // Env: .env.local — BASE_RPC_URL (chain); RAILS_API_URL + API_BEARER_TOKEN (the
 //      position sample; checks #6 and #7 skip gracefully without them).
 //      BASE (process env) — the web origin check #7 reads the timeline from.
