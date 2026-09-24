@@ -1,63 +1,48 @@
 "use client";
 
-// THE SEGMENT PICKER — the months of a position's life, above its timeline,
-// as a persistent in-view tool (rails-ops decision 0019, amendment
-// 2026-09-24, rule 1). The page holds one segment of time; this is how a
-// reader moves it.
+// THE SEGMENT PICKER — the months of a position's life, above its timeline
+// (rails-ops decision 0019, amendment 2026-09-24, rule 1). The page holds one
+// segment of time; this is how a reader moves it.
 //
-// Desktop: the year-row by month-column matrix the activity map draws, kept
-// short. The loaded segment is banded, a thin bar under a cell marks the rows
-// in view, a click on a month outside the band loads it on release, a click
-// inside scrolls to it. Nothing loads while a pointer moves.
+// One grid: year rows by month columns, every month the position lived
+// through drawn as a plain clickable label. A click shows that month's rows in
+// place of the month the page holds. Previous and Next step to the
+// neighbouring month that holds events, and Newest goes back to the rows the
+// page opened with. A month the position did not live through is drawn and
+// refuses the click.
 //
-// Phone: a sticky strip of month labels that scrolls sideways, three in view,
-// a year at each January, the loaded month underlined; heat is the
-// underline's opacity and nothing else. A tap, or a swipe that settles, loads.
-// No year-level jump, no vertical rail (both judged and set aside).
+// Phone: the same months as a strip that scrolls sideways, a year at each
+// January, the loaded month underlined. A tap loads it.
 //
-// Every count here is the whole life's, from `lifeDays` (lib/shared/
-// timeline-segments.ts). Marks are drawn for the loaded rows only: the other
-// months are counted, not marked. The row cap is never a number here.
+// ⚠️ CUT BACK TO A LOW-FI NAVIGATOR, 2026-09-24 evening. Miles: "for the date
+// navigator, while i think the dynamic highlights in the nav are a clever
+// feature i would prefer to keep the navigator more low-fi, we don't need the
+// infinite scroll type just a more rudimentary navigator that is clickable
+// between months." What went with that: the significance marks (liquidation
+// dot, owner underline, market-note ring), the band of loaded months and its
+// in-view bar, the heat ramp, the click that scrolled to a month already on
+// the page, and the phone strip's swipe-to-load. A click loads, and that is
+// the whole grammar.
+//
+// Every count here is the whole life's, from `lifeDays`
+// (lib/shared/timeline-segments.ts). The row cap is never a number here.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MONTH_NAMES, bucketClass, relLevel } from "@/components/shared/transaction-heatmap";
-import type { SignificanceMarks } from "@/lib/shared/timeline-navigator";
-import {
-  dayStartOf,
-  monthCounts,
-  monthEndTs,
-  monthIdxOf,
-  monthLabel,
-  monthStartTs,
-} from "@/lib/shared/timeline-segments";
+import { MONTH_NAMES } from "@/components/shared/transaction-heatmap";
+import { monthCounts, monthLabel } from "@/lib/shared/timeline-segments";
 
 export interface TimelineSegmentPickerProps {
   /** The whole life's events per UTC day. */
   lifeDays: ReadonlyMap<number, number>;
-  /** The loaded segment's extent in seconds: the band. */
-  loaded: { from: number; to: number };
-  /** The rows in view, newest and oldest, or null while nothing is. */
-  inView: { newest: number; oldest: number } | null;
-  /** Marks over the loaded rows. */
-  marks: SignificanceMarks | null;
+  /** The month the page holds as its segment, or null at rest — when the page
+   *  holds the rows it opened with, whose newest month is where a reader is. */
+  month: number | null;
   /** The month being loaded, while one is. */
   loadingMonth: number | null;
-  /** A month outside the band: load it. */
+  /** Show that month's rows in place of the current month's. */
   onPick: (monthIdx: number) => void;
-  /** A month inside the band: scroll the rows to it. */
-  onScrollTo: (monthIdx: number) => void;
-}
-
-/** A month is inside the band when the loaded rows reach its first day: the
- *  newest month is always open at its end, and the oldest loaded month, when
- *  the rows open part way through it, is a month to load whole. */
-function inBand(idx: number, loaded: { from: number; to: number }): boolean {
-  return monthStartTs(idx) >= dayStartOf(loaded.from) && monthStartTs(idx) <= loaded.to;
-}
-
-function fracOfMonth(ts: number): number {
-  const idx = monthIdxOf(ts);
-  return (ts - monthStartTs(idx)) / (monthEndTs(idx) - monthStartTs(idx) + 1);
+  /** Back to the rows the page opened with. Null at rest. */
+  onReset: (() => void) | null;
 }
 
 function reducedMotion(): boolean {
@@ -70,387 +55,252 @@ function reducedMotion(): boolean {
 
 const n = (v: number) => v.toLocaleString("en-US");
 
-export function TimelineSegmentPicker({
-  lifeDays,
-  loaded,
-  inView,
-  marks,
-  loadingMonth,
-  onPick,
-  onScrollTo,
-}: TimelineSegmentPickerProps) {
+export function TimelineSegmentPicker({ lifeDays, month, loadingMonth, onPick, onReset }: TimelineSegmentPickerProps) {
   const months = useMemo(() => monthCounts(lifeDays), [lifeDays]);
-  const { first, last, max } = useMemo(() => {
-    let first = Infinity;
-    let last = -Infinity;
-    let max = 0;
-    for (const [idx, count] of months) {
-      if (count <= 0) continue;
-      if (idx < first) first = idx;
-      if (idx > last) last = idx;
-      if (count > max) max = count;
-    }
-    return { first, last, max };
-  }, [months]);
-
-  const commit = useCallback(
-    (idx: number) => {
-      if (inBand(idx, loaded)) onScrollTo(idx);
-      else onPick(idx);
-    },
-    [loaded, onPick, onScrollTo],
+  /** The months that hold events, oldest first: what Previous and Next step
+   *  through, and the grid's own extent. */
+  const live = useMemo(
+    () =>
+      [...months.entries()]
+        .filter(([, count]) => count > 0)
+        .map(([idx]) => idx)
+        .sort((a, b) => a - b),
+    [months],
   );
+  const first = live[0];
+  const last = live[live.length - 1];
+  // At rest the page holds its newest rows, so the newest month is where a
+  // reader stands and Previous steps back from there.
+  const current = month ?? last;
+  const at = live.indexOf(current);
+  const previous = at > 0 ? live[at - 1] : null;
+  const next = at >= 0 && at < live.length - 1 ? live[at + 1] : null;
 
-  if (!Number.isFinite(first)) return null;
+  if (live.length === 0) return null;
 
   return (
     <div data-segment-picker="" className="sticky top-0 z-30 -mx-1 bg-background px-1 pb-2 pt-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pb-1.5 text-[11px] text-rb-500">
+        <div className="flex items-center gap-1">
+          <StepButton
+            data-segment-prev=""
+            label={previous == null ? "No earlier month" : `Previous month, ${monthLabel(previous)}`}
+            disabled={previous == null || loadingMonth != null}
+            onPress={() => previous != null && onPick(previous)}
+          >
+            ‹ Previous
+          </StepButton>
+          <StepButton
+            data-segment-next=""
+            label={next == null ? "No later month" : `Next month, ${monthLabel(next)}`}
+            disabled={next == null || loadingMonth != null}
+            onPress={() => next != null && onPick(next)}
+          >
+            Next ›
+          </StepButton>
+        </div>
+        <span data-segment-current-label="" className="text-foreground">
+          {monthLabel(loadingMonth ?? current)}
+        </span>
+        {onReset && (
+          <StepButton
+            data-segment-reset=""
+            label="Back to the newest events"
+            disabled={loadingMonth != null}
+            onPress={onReset}
+          >
+            Newest
+          </StepButton>
+        )}
+      </div>
       <MonthMatrix
         months={months}
         first={first}
         last={last}
-        max={max}
-        loaded={loaded}
-        inView={inView}
-        marks={marks}
+        current={current}
         loadingMonth={loadingMonth}
-        onCommit={commit}
+        onPick={onPick}
       />
-      <MonthStrip
-        months={months}
-        first={first}
-        last={last}
-        max={max}
-        loaded={loaded}
-        inView={inView}
-        loadingMonth={loadingMonth}
-        onCommit={commit}
-      />
+      <MonthStrip months={months} live={live} current={current} loadingMonth={loadingMonth} onPick={onPick} />
     </div>
   );
 }
 
-// ── Desktop: the matrix ─────────────────────────────────────────────────────
-
-interface GridProps {
-  months: ReadonlyMap<number, number>;
-  first: number;
-  last: number;
-  max: number;
-  loaded: { from: number; to: number };
-  inView: { newest: number; oldest: number } | null;
-  loadingMonth: number | null;
-  onCommit: (idx: number) => void;
+function StepButton({
+  children,
+  label,
+  disabled,
+  onPress,
+  ...rest
+}: {
+  children: React.ReactNode;
+  label: string;
+  disabled: boolean;
+  onPress: () => void;
+} & Record<`data-${string}`, string>) {
+  return (
+    <button
+      type="button"
+      {...rest}
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onPress}
+      className="rounded-sm border border-rb-200 px-1.5 py-0.5 text-[11px] leading-tight text-rb-600 hover:border-rb-400 hover:text-foreground disabled:cursor-default disabled:border-rb-200/60 disabled:text-rb-400 disabled:hover:text-rb-400 focus-visible:outline-2 focus-visible:outline-teal-400 dark:border-rb-800 dark:text-rb-400 dark:hover:border-rb-600 dark:disabled:border-rb-800/60"
+    >
+      {children}
+    </button>
+  );
 }
+
+// ── Desktop: the grid ───────────────────────────────────────────────────────
 
 function MonthMatrix({
   months,
   first,
   last,
-  max,
-  loaded,
-  inView,
-  marks,
+  current,
   loadingMonth,
-  onCommit,
-}: GridProps & { marks: SignificanceMarks | null }) {
-  const [armed, setArmed] = useState<number | null>(null);
-  const bandLo = monthIdxOf(loaded.from);
-  const bandHi = monthIdxOf(loaded.to);
-  const viewLo = inView ? monthIdxOf(inView.oldest) : null;
-  const viewHi = inView ? monthIdxOf(inView.newest) : null;
+  onPick,
+}: {
+  months: ReadonlyMap<number, number>;
+  first: number;
+  last: number;
+  /** The month the page stands on: the loaded segment, or the newest month
+   *  at rest. */
+  current: number;
+  loadingMonth: number | null;
+  onPick: (idx: number) => void;
+}) {
   const years: number[] = [];
   for (let y = Math.floor(first / 12); y <= Math.floor(last / 12); y++) years.push(y);
-  const anyOwner = marks ? [...marks.month.values()].some((m) => m.owner) : false;
-  const anyLiquidation = marks ? [...marks.month.values()].some((m) => m.liquidation) : false;
-
-  const release = (e: React.PointerEvent<HTMLElement>) => {
-    if (armed == null) return;
-    const under = document.elementFromPoint(e.clientX, e.clientY);
-    const cell = under?.closest?.("[data-segment-cell]") as HTMLElement | null;
-    const idx = cell ? Number(cell.dataset.segmentCell) : NaN;
-    setArmed(null);
-    if (idx === armed) onCommit(idx);
-  };
 
   return (
     <div className="hidden sm:block" data-segment-matrix="">
       <div
-        className="grid select-none items-center gap-x-1 gap-y-[3px] text-[10px] text-rb-500"
+        className="grid select-none items-center gap-1 text-[10px] text-rb-500"
         style={{ gridTemplateColumns: "auto repeat(12, minmax(0, 1fr))" }}
-        onPointerUp={release}
-        onPointerCancel={() => setArmed(null)}
       >
-        <div />
-        {MONTH_NAMES.map((m) => (
-          <div key={m} className="text-center">
-            {m}
-          </div>
-        ))}
         {years.map((y) => (
           <FragmentRow key={y}>
             <div className="pr-2 text-right tabular-nums">{y}</div>
-            {MONTH_NAMES.map((_, m) => {
+            {MONTH_NAMES.map((name, m) => {
               const idx = y * 12 + m;
               const live = idx >= first && idx <= last;
               const count = months.get(idx) ?? 0;
               const selectable = live && count > 0;
-              const banded = live && idx >= bandLo && idx <= bandHi;
-              const bandEdge =
-                banded && bandLo !== bandHi && Math.floor(bandLo / 12) === Math.floor(bandHi / 12)
-                  ? idx === bandLo
-                    ? "left"
-                    : idx === bandHi
-                      ? "right"
-                      : "middle"
-                  : "alone";
-              const mark = marks?.month.get(idx);
-              const barOn = viewLo != null && viewHi != null && idx >= viewLo && idx <= viewHi;
-              const barL = barOn && idx === viewLo && inView ? fracOfMonth(inView.oldest) : 0;
-              const barR = barOn && idx === viewHi && inView ? fracOfMonth(inView.newest) : 1;
-              const barW = Math.max(barR - barL, 0.06);
-              const label = live ? `${MONTH_NAMES[m]} ${y} · ${n(count)} ${count === 1 ? "event" : "events"}` : "";
+              const here = idx === current;
+              const label = live
+                ? `${name} ${y} · ${n(count)} ${count === 1 ? "event" : "events"}`
+                : `${name} ${y} · no events`;
               return (
                 <button
                   key={idx}
                   type="button"
                   data-segment-cell={idx}
                   data-cell-live={live ? "" : undefined}
-                  data-cell-band={banded ? "" : undefined}
-                  data-cell-in-view={barOn ? "" : undefined}
+                  data-cell-current={here ? "" : undefined}
                   tabIndex={selectable ? 0 : -1}
-                  aria-label={label || undefined}
+                  aria-label={label}
                   aria-disabled={!selectable || undefined}
                   title={label}
-                  onPointerDown={() => selectable && setArmed(idx)}
-                  onKeyDown={(e) => {
-                    if (!selectable || (e.key !== "Enter" && e.key !== " ")) return;
-                    e.preventDefault();
-                    onCommit(idx);
-                  }}
-                  className={`relative h-3.5 rounded-sm transition-colors ${live ? bucketClass(relLevel(count, max)) : "bg-transparent"} ${
-                    selectable ? "cursor-pointer hover:shadow-[inset_0_0_0_1px_var(--foreground)]" : "cursor-default"
-                  } ${armed === idx ? "shadow-[0_0_0_1px_var(--color-teal-400)]" : ""} ${
+                  onClick={() => selectable && onPick(idx)}
+                  className={`rounded-sm border py-[3px] text-center leading-tight ${
+                    here
+                      ? "border-teal-500 bg-teal-500/15 font-semibold text-foreground dark:border-teal-400 dark:bg-teal-400/15"
+                      : selectable
+                        ? "border-rb-200 text-rb-600 hover:border-rb-400 hover:text-foreground dark:border-rb-800 dark:text-rb-400 dark:hover:border-rb-600"
+                        : "border-rb-200/40 text-rb-400/60 dark:border-rb-800/40"
+                  } ${selectable ? "cursor-pointer" : "cursor-default"} ${
                     loadingMonth === idx ? "animate-pulse" : ""
                   } focus-visible:outline-2 focus-visible:outline-teal-400`}
                 >
-                  {banded && (
-                    <span
-                      aria-hidden
-                      className={`pointer-events-none absolute -inset-y-[3px] border-y border-teal-500/55 bg-teal-500/15 dark:border-teal-400/55 dark:bg-teal-400/15 ${
-                        bandEdge === "alone"
-                          ? "-inset-x-[3px] rounded-[5px] border-x"
-                          : bandEdge === "left"
-                            ? "-left-[3px] -right-1 rounded-l-[5px] border-l"
-                            : bandEdge === "right"
-                              ? "-left-1 -right-[3px] rounded-r-[5px] border-r"
-                              : "-inset-x-1"
-                      }`}
-                    />
-                  )}
-                  {mark?.liquidation && (
-                    <span
-                      aria-hidden
-                      data-cell-mark="liquidation"
-                      className="pointer-events-none absolute left-[1px] top-[1px] h-1 w-1 rounded-full bg-red-500"
-                    />
-                  )}
-                  {mark?.owner && (
-                    <span
-                      aria-hidden
-                      data-cell-mark="owner"
-                      className="pointer-events-none absolute inset-x-[1px] bottom-0 h-[2px] rounded-sm bg-foreground/60"
-                    />
-                  )}
-                  {barOn && (
-                    <span
-                      aria-hidden
-                      data-cell-bar=""
-                      className="pointer-events-none absolute -bottom-1.5 h-[2px] rounded-sm bg-foreground"
-                      style={{ left: `${(barL * 100).toFixed(1)}%`, width: `${(barW * 100).toFixed(1)}%` }}
-                    />
-                  )}
+                  {name}
                 </button>
               );
             })}
           </FragmentRow>
         ))}
       </div>
-      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[10px] text-rb-500">
-        <span className="max-w-[78ch] leading-snug">
-          Marks are drawn for the loaded segment; the other months are counted, not marked.
-        </span>
-        <span className="flex flex-wrap items-center gap-3">
-          <span className="flex items-center gap-1">
-            <span className="h-2.5 w-3 rounded-[3px] border border-teal-500/55 bg-teal-500/15 dark:border-teal-400/55 dark:bg-teal-400/15" />
-            loaded
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-[2px] w-3 rounded-sm bg-foreground" />
-            in view
-          </span>
-          {anyOwner && (
-            <span className="flex items-center gap-1">
-              <span className="h-[2px] w-3 rounded-sm bg-foreground/60" />
-              signed by the owner
-            </span>
-          )}
-          {anyLiquidation && (
-            <span className="flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-              liquidation
-            </span>
-          )}
-          <span className="flex items-center gap-1">
-            <span>Less</span>
-            {[0, 1, 2, 3, 4].map((level) => (
-              <span key={level} className={`inline-block h-2.5 w-2.5 rounded-sm ${bucketClass(level)}`} />
-            ))}
-            <span>More</span>
-          </span>
-        </span>
+      <div className="mt-2 text-[10px] leading-snug text-rb-500">
+        A month shows its own rows in place of the month on the page. Months the position did not live through are drawn
+        and take no click.
       </div>
     </div>
   );
 }
 
-/** A grid row is its cells: no wrapper, so the grid's own columns place them. */
+/** A grid row is its cells: no wrapper, so the grid's columns place them. */
 function FragmentRow({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
 // ── Phone: the strip ────────────────────────────────────────────────────────
 
-function MonthStrip({ months, first, last, max, loaded, inView, loadingMonth, onCommit }: GridProps) {
+function MonthStrip({
+  months,
+  live,
+  current,
+  loadingMonth,
+  onPick,
+}: {
+  months: ReadonlyMap<number, number>;
+  live: readonly number[];
+  current: number;
+  loadingMonth: number | null;
+  onPick: (idx: number) => void;
+}) {
   const stripRef = useRef<HTMLDivElement | null>(null);
-  const programmatic = useRef(false);
-  const settleTimer = useRef<number | null>(null);
-  // A settle loads only after a READER's gesture: the strip also scrolls
-  // itself, to follow the rows and to centre a tapped label, and a settle
-  // read off one of those scrolls mid-animation would load whichever month
-  // the label passed over.
-  const gesture = useRef(false);
-  const bandLo = monthIdxOf(loaded.from);
-  const bandHi = monthIdxOf(loaded.to);
-  // The month whose rows are at the top of the screen carries the full
-  // accent; the other months of the band a lighter one.
-  const here = inView ? monthIdxOf(inView.newest) : bandHi;
   const [centred, setCentred] = useState<number | null>(null);
 
   const centreOn = useCallback((idx: number, smooth: boolean) => {
     const strip = stripRef.current;
     const label = strip?.querySelector<HTMLElement>(`[data-strip-month="${idx}"]`);
     if (!strip || !label) return;
-    programmatic.current = true;
     strip.scrollTo({
       left: label.offsetLeft - (strip.clientWidth - label.offsetWidth) / 2,
       behavior: smooth && !reducedMotion() ? "smooth" : "auto",
     });
-    window.setTimeout(
-      () => {
-        programmatic.current = false;
-      },
-      smooth ? 450 : 50,
-    );
   }, []);
 
-  // Follow the rows: when the month at the top of the screen changes, the
-  // strip centres on it. Only while the strip is on screen (a desktop reader
-  // has the matrix instead, and this is `display: none` there).
+  // The strip follows the SELECTION, and nothing else: a reader's own sideways
+  // scroll loads nothing (Miles, 2026-09-24 evening — a tap is the pick).
   useEffect(() => {
-    if (here === centred) return;
+    if (current === centred) return;
     const strip = stripRef.current;
     if (!strip || strip.clientWidth === 0) return;
-    setCentred(here);
-    centreOn(here, centred != null);
-  }, [here, centred, centreOn]);
-
-  const centreMonth = (): number | null => {
-    const strip = stripRef.current;
-    if (!strip) return null;
-    const r = strip.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    let best: number | null = null;
-    let bestDistance = Infinity;
-    strip.querySelectorAll<HTMLElement>("[data-strip-month]").forEach((el) => {
-      const b = el.getBoundingClientRect();
-      const d = Math.abs(b.left + b.width / 2 - cx);
-      if (d < bestDistance) {
-        bestDistance = d;
-        best = Number(el.dataset.stripMonth);
-      }
-    });
-    return best;
-  };
-
-  const settleTo = (idx: number) => {
-    const count = months.get(idx) ?? 0;
-    if (count === 0) {
-      centreOn(here, true);
-      return;
-    }
-    setCentred(idx);
-    onCommit(idx);
-  };
-
-  // A swipe that settles: the label nearest the centre once scrolling stops.
-  const onScroll = () => {
-    if (programmatic.current || !gesture.current) return;
-    if (settleTimer.current != null) window.clearTimeout(settleTimer.current);
-    settleTimer.current = window.setTimeout(() => {
-      settleTimer.current = null;
-      gesture.current = false;
-      if (loadingMonth != null) return;
-      const idx = centreMonth();
-      if (idx != null && idx !== here) settleTo(idx);
-    }, 160);
-  };
-  const onGesture = () => {
-    gesture.current = true;
-  };
-  const onTap = (idx: number, empty: boolean) => {
-    // The tap is the pick; the scroll it causes is not a swipe.
-    gesture.current = false;
-    if (settleTimer.current != null) window.clearTimeout(settleTimer.current);
-    settleTimer.current = null;
-    if (!empty) settleTo(idx);
-  };
+    setCentred(current);
+    centreOn(current, centred != null);
+  }, [current, centred, centreOn]);
 
   const labels: number[] = [];
-  for (let i = first; i <= last; i++) labels.push(i);
+  for (let i = live[0]; i <= live[live.length - 1]; i++) labels.push(i);
 
   return (
     <div
       ref={stripRef}
       data-segment-strip=""
-      onScroll={onScroll}
-      onTouchStart={onGesture}
-      onPointerDown={onGesture}
-      onWheel={onGesture}
       className="flex select-none snap-x snap-mandatory overflow-x-auto border-b border-rb-200/60 pt-1 [scrollbar-width:none] sm:hidden dark:border-rb-800/60 [&::-webkit-scrollbar]:hidden"
     >
       <div className="shrink-0 basis-1/3" aria-hidden />
       {labels.map((idx) => {
         const count = months.get(idx) ?? 0;
         const empty = count === 0;
-        const banded = idx >= bandLo && idx <= bandHi;
-        const isHere = idx === here;
-        const showYear = idx === first || idx % 12 === 0;
-        const opacity = empty ? 0.15 : 0.25 + (0.75 * relLevel(count, max)) / 4;
+        const isHere = idx === current;
+        const showYear = idx === live[0] || idx % 12 === 0;
         return (
           <button
             key={idx}
             type="button"
             data-strip-month={idx}
-            data-strip-band={banded ? "" : undefined}
             data-strip-here={isHere ? "" : undefined}
             tabIndex={empty ? -1 : 0}
             aria-label={`${monthLabel(idx)}, ${n(count)} ${count === 1 ? "event" : "events"}`}
             aria-disabled={empty || undefined}
-            onClick={() => onTap(idx, empty)}
+            onClick={() => !empty && onPick(idx)}
             className={`relative grid shrink-0 basis-1/3 snap-center justify-items-center gap-px px-1.5 pb-2 pt-1 text-[13px] ${
               empty ? "cursor-default" : "cursor-pointer"
-            } ${banded || isHere ? "text-foreground" : "text-rb-500"} ${isHere ? "font-semibold" : ""} ${
+            } ${isHere ? "font-semibold text-foreground" : "text-rb-500"} ${
               loadingMonth === idx ? "animate-pulse" : ""
             } focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-400`}
           >
@@ -461,13 +311,8 @@ function MonthStrip({ months, first, last, max, loaded, inView, loadingMonth, on
             <span
               aria-hidden
               className={`absolute inset-x-3 bottom-0 rounded-sm ${
-                isHere
-                  ? "h-[3px] bg-teal-500 dark:bg-teal-400"
-                  : banded
-                    ? "h-[3px] bg-teal-500 dark:bg-teal-400"
-                    : "h-[2px] bg-rb-500"
+                isHere ? "h-[3px] bg-teal-500 dark:bg-teal-400" : "h-[2px] bg-rb-500/25"
               }`}
-              style={{ opacity: isHere ? 1 : banded ? 0.5 : opacity }}
             />
           </button>
         );

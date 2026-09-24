@@ -108,8 +108,6 @@ import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { decodeEventId } from "@/lib/shared/page-metadata";
 import { TimelineSegmentPicker } from "@/components/shared/timeline-segment-picker";
-import { buildSignificanceMarks } from "@/lib/shared/timeline-navigator";
-import { getEventActionKey } from "@/lib/shared/event-filter-helpers";
 import { eventsWithin, monthEndTs, monthLabel, monthStartTs } from "@/lib/shared/timeline-segments";
 
 // The small-print register a pinned/not-found notice draws in — the same
@@ -424,26 +422,24 @@ export interface ChainTruthTimelineProps {
   closed?: boolean;
   /** The month picker above the rows, on a page that holds one segment of
    *  time (decision 0019, amendment 2026-09-24). The page owns the segment
-   *  and its reads; this component draws the picker, keeps the rows in view
-   *  on it, scrolls to a month inside the band and asks the page for one
-   *  outside it. The Date panel then keeps its typed spread alone. */
+   *  and its reads; this component draws the picker and hands every pick
+   *  back. The Date panel then keeps its typed spread alone. */
   segments?: TimelineSegments;
 }
 
 export interface TimelineSegments {
   /** The whole life's events per UTC day (lib/shared/timeline-segments.ts). */
   lifeDays: ReadonlyMap<number, number>;
-  /** The loaded segment's extent in seconds. */
-  loaded: { from: number; to: number };
+  /** The month the page holds, or null at rest — when it holds the rows it
+   *  opened with. */
+  month: number | null;
   /** The month being loaded, while one is: the rows give way to a skeleton
    *  sized from that month's days, under its label. */
   loading: number | null;
-  /** A month outside the band was picked. */
+  /** A month was picked: show its rows in place of the current month's. */
   onPick: (monthIdx: number) => void;
-  /** A month to scroll to once the rows have changed (the page restored the
-   *  preload for a month inside it); `onLanded` clears it. */
-  landing?: number | null;
-  onLanded?: () => void;
+  /** Back to the rows the page opened with. Null at rest. */
+  onReset: (() => void) | null;
 }
 
 // Thin shell: mount the wallet + display providers, then delegate to the body.
@@ -1125,99 +1121,12 @@ function ChainTruthTimelineBody({
 
   const windowed = hasMore ? rows.slice(0, windowSize) : rows;
 
-  // ── The segment picker's two readings of the rows ──────────────────────
-  // Which rows are in view (the thin bar under the month cells), and how to
-  // scroll to a month inside the band. Both read the drawn rows' own
-  // `data-row-at` stamps rather than the list, because a folder's members
-  // and a run's members are rows a reader sees.
-  const listRef = useRef<HTMLDivElement | null>(null);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const pickerBottom = () =>
-    rootRef.current?.querySelector("[data-segment-picker]")?.getBoundingClientRect().bottom ?? 0;
-  const [inView, setInView] = useState<{ newest: number; oldest: number } | null>(null);
-  const [pendingScrollMonth, setPendingScrollMonth] = useState<number | null>(null);
+  // The picker draws the months and the page answers a click by loading one;
+  // it reads nothing off the rows (Miles, 2026-09-24 evening — the navigator
+  // is low-fi). Each drawn row still stamps its own moment as `data-row-at`,
+  // which is how `verify-timeline-navigator.mjs` asserts that every row of a
+  // loaded segment falls inside its month.
   const hasPicker = segments != null;
-  useEffect(() => {
-    if (!hasPicker) return;
-    let raf = 0;
-    const measure = () => {
-      raf = 0;
-      const list = listRef.current;
-      if (!list) return;
-      const top = pickerBottom();
-      const bottom = window.innerHeight;
-      let newest = -Infinity;
-      let oldest = Infinity;
-      list.querySelectorAll<HTMLElement>("[data-row-at]").forEach((el) => {
-        const r = el.getBoundingClientRect();
-        if (r.bottom < top || r.top > bottom) return;
-        const ts = Number(el.dataset.rowAt);
-        if (!Number.isFinite(ts)) return;
-        if (ts > newest) newest = ts;
-        if (ts < oldest) oldest = ts;
-      });
-      setInView((prev) => {
-        if (!Number.isFinite(newest)) return prev == null ? prev : null;
-        return prev && prev.newest === newest && prev.oldest === oldest ? prev : { newest, oldest };
-      });
-    };
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(measure);
-    };
-    measure();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [hasPicker, windowSize, rows]);
-  /** Scroll the rows to a month inside the band: the first row at or before
-   *  the month's end, drawn first if the local paging has not reached it. */
-  const scrollToMonth = (idx: number) => {
-    const end = monthEndTs(idx);
-    const i = rows.findIndex((r) => rowNewestAt(r) <= end);
-    if (i === -1) return;
-    if (i >= windowSize) setWindowSize(Math.min(rows.length, i + WINDOW_CHUNK));
-    setPendingScrollMonth(idx);
-  };
-  useEffect(() => {
-    if (pendingScrollMonth == null) return;
-    const end = monthEndTs(pendingScrollMonth);
-    const list = listRef.current;
-    if (!list) return;
-    const el = [...list.querySelectorAll<HTMLElement>("[data-row-at]")].find((e) => Number(e.dataset.rowAt) <= end);
-    if (!el) return;
-    let reduced = false;
-    try {
-      reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    } catch {
-      /* matchMedia unavailable — treat as no preference */
-    }
-    // The picker is sticky at the top once the page has scrolled, so the row
-    // lands just under its HEIGHT, wherever the picker sits now.
-    const inset = (rootRef.current?.querySelector("[data-segment-picker]")?.getBoundingClientRect().height ?? 0) + 8;
-    window.scrollTo({
-      top: el.getBoundingClientRect().top + window.scrollY - inset,
-      behavior: reduced ? "auto" : "smooth",
-    });
-    setPendingScrollMonth(null);
-  }, [pendingScrollMonth, windowSize, rows]);
-  // A landing the page asked for once it swapped the rows back to the preload.
-  const landing = segments?.landing ?? null;
-  const onLanded = segments?.onLanded;
-  useEffect(() => {
-    if (landing == null) return;
-    scrollToMonth(landing);
-    onLanded?.();
-    // `scrollToMonth` reads the rows of this render, which is the point.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [landing, rows]);
-  const pickerMarks = useMemo(
-    () => (hasPicker ? buildSignificanceMarks(tl.visibleEvents, navigatorNotes, getEventActionKey) : null),
-    [hasPicker, tl.visibleEvents, navigatorNotes],
-  );
 
   // Day-grouping over the FLAT displayed list (run members included), so the
   // date shows on the first card of each calendar day whether or not the
@@ -1379,7 +1288,6 @@ function ChainTruthTimelineBody({
     // read as a defect in the rule for a day). The toolbar pill states the
     // whole count throughout; these two say when the list agrees with it.
     <div
-      ref={rootRef}
       className="space-y-3"
       data-timeline-rows-drawn={Math.min(windowSize, rows.length)}
       data-timeline-rows-loaded={rows.length}
@@ -1408,12 +1316,10 @@ function ChainTruthTimelineBody({
       {segments && (
         <TimelineSegmentPicker
           lifeDays={segments.lifeDays}
-          loaded={segments.loaded}
-          inView={inView}
-          marks={pickerMarks}
+          month={segments.month}
           loadingMonth={segments.loading}
           onPick={segments.onPick}
-          onScrollTo={scrollToMonth}
+          onReset={segments.onReset}
         />
       )}
       {/* The month being loaded: a skeleton sized from its days, under its
@@ -1422,7 +1328,7 @@ function ChainTruthTimelineBody({
         <SegmentSkeleton monthIdx={segments.loading} lifeDays={segments.lifeDays} />
       ) : rows.length > 0 ? (
         <>
-          <div ref={listRef} className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2">
             {/* The top is the NEWEST end, so the only omission that can stand
                 here is the TIP's — drawn when the newest events the page holds
                 are filtered out, so the row below is not the newest and the

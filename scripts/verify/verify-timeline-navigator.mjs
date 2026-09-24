@@ -190,13 +190,20 @@
 // ⚠️ THE MONTHS LEFT THE DATE PANEL ON THE DEFAULT PAGE (2026-09-24, the
 // segment picker: decision 0019, amendment 2026-09-24). On a served page the
 // month matrix is the picker above the rows, one segment of time is loaded,
-// and a month click LOADS or SCROLLS rather than filtering; the Date panel
-// keeps the typed spread alone. G2–G4 (a month click filters; the same month
-// clears) are SUPERSEDED there and gave way to the S checks inside group G:
-// the picker, the band, the scroll inside it, a month below the cut loaded
-// and stated in time, and the phone strip at 390. G1 now asserts the count
-// line states TIME and names no row count. The `?folders=0` page keeps the
-// panel's grid, so groups 1–13 stand as written.
+// and a month click LOADS rather than filtering; the Date panel keeps the
+// typed spread alone. G2–G4 (a month click filters; the same month clears)
+// are SUPERSEDED there and gave way to the S checks inside group G: the
+// picker, its months, Previous and Next, a month below the cut loaded and
+// stated in time, and the phone strip at 390. G1 now asserts the count line
+// states TIME and names no row count. The `?folders=0` page keeps the panel's
+// grid, so groups 1–13 stand as written.
+//
+// ⚠️ AND THE PICKER WAS CUT BACK TO A LOW-FI NAVIGATOR the same evening
+// (Miles). The band of loaded months, its in-view bar, the heat ramp, the
+// significance marks and the click that scrolled to a month already on the
+// page are gone; a click on any month shows that month's rows, and Previous
+// and Next step between them. S1 and S2 were rewritten against that rather
+// than deleted — S1 now asserts the absence of everything the band drew.
 //
 // The hosted default is dev.rails.finance through the Vercel bypass header
 // (lib/host.mjs); `BASE=http://localhost:3000` points it at a dev server.
@@ -431,6 +438,29 @@
 //     line; the rows, the band and the tip stayed green, as they should;
 //   • the segment's `eventsBefore` dropped from `olderCount` → nothing red,
 //     recorded so the gap is known: no check reads a row number.
+//
+//   ⚠️ THE FIRST TWO BREAKS ARE KEPT THOUGH THEIR SUBJECT IS GONE. `inBand`
+//   and the band it drew were deleted the same evening (the low-fi cut), so
+//   neither break can be made again; they are the record that the S checks
+//   stood on the page's state rather than on its markup, and the second one
+//   still applies verbatim to the count line S2 and S3 read.
+//
+//   2026-09-24 (evening, the low-fi navigator), against a local dev server on
+//   the production api, restored after: `pickMonth` in position-view.tsx
+//   swallowing the pick — the month set, no read issued → 8/17 over
+//   `grouped-deep`. S2's Previous and Next red and S3's four red, each quoting
+//   the count line that never moved off "7,161 events · loaded 20 Jan 2025 to
+//   24 Sept 2026", with "2500 row(s), 2500 outside" December 2024 and "current
+//   2026-09" where the picked month was wanted. S1 stayed GREEN, which is
+//   right — it reads the page at rest, where no pick has happened — and so did
+//   "Newest gives back the rows the page opened with", which is the one
+//   control the break leaves working.
+//
+//   ⚠️ S4 AND G5 WENT RED IN THAT RUN FOR A DIFFERENT REASON and are not
+//   evidence for the break: the api's timeline reads began answering 500 at
+//   their 10 s budget part way through the run, so the phone page and the
+//   reload before G5 drew no rows at all ("0 events"). A verdict read off a
+//   backend that fell over mid-run is not a finding about the page.
 //
 //   A check that cannot be made to fail is not a check.
 
@@ -800,20 +830,30 @@ const COUNT_LINE = () =>
   (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim();
 
 /** The segment picker as the page draws it (components/shared/
- *  timeline-segment-picker.tsx): the banded months, the months the in-view
- *  bar reaches, the month being loaded, and the spine's boundary rows. */
+ *  timeline-segment-picker.tsx): the months the life holds, the one the page
+ *  stands on, the month being loaded, and the spine's boundary rows.
+ *  `dynamic` counts everything the low-fi cut removed — a band cell, an
+ *  in-view bar, a significance mark — so S1 can assert that none came back. */
 const READ_PICKER = () => {
   const picker = document.querySelector("[data-segment-picker]");
   const vis = (el) => (el ? getComputedStyle(el).display !== "none" : false);
   const cells = [...document.querySelectorAll("[data-segment-cell][data-cell-live]")];
   const idx = (c) => Number(c.getAttribute("data-segment-cell"));
+  const here = picker?.querySelector("[data-segment-cell][data-cell-current]");
   return {
     present: picker != null,
     sticky: picker ? getComputedStyle(picker).position : null,
     matrixVisible: vis(document.querySelector("[data-segment-matrix]")),
     stripVisible: vis(document.querySelector("[data-segment-strip]")),
-    band: cells.filter((c) => c.hasAttribute("data-cell-band")).map(idx),
-    inView: cells.filter((c) => c.hasAttribute("data-cell-in-view")).map(idx),
+    live: cells.map(idx).sort((a, b) => a - b),
+    current: here ? Number(here.getAttribute("data-segment-cell")) : null,
+    label: picker?.querySelector("[data-segment-current-label]")?.textContent?.trim() ?? null,
+    prevDisabled: picker?.querySelector("[data-segment-prev]")?.disabled ?? null,
+    nextDisabled: picker?.querySelector("[data-segment-next]")?.disabled ?? null,
+    reset: picker?.querySelector("[data-segment-reset]") != null,
+    dynamic: picker
+      ? picker.querySelectorAll("[data-cell-band], [data-cell-in-view], [data-cell-mark], [data-cell-bar]").length
+      : 0,
     loading: document.querySelector("[data-segment-skeleton]")?.getAttribute("data-segment-skeleton") ?? null,
     boundaryRows: [...document.querySelectorAll("[data-boundary-row]")].map((e) => e.getAttribute("data-boundary-row")),
     folders: document.querySelectorAll('[role="button"][aria-expanded][aria-label*=" consecutive "]').length,
@@ -821,7 +861,7 @@ const READ_PICKER = () => {
 };
 
 /** The phone strip: which labels sit wholly inside it, which carries the
- *  accent, which are banded, and whether the page scrolls sideways. */
+ *  accent, and whether the page scrolls sideways. */
 const READ_STRIP = () => {
   const strip = document.querySelector("[data-segment-strip]");
   const vis = (el) => (el ? getComputedStyle(el).display !== "none" : false);
@@ -847,9 +887,7 @@ const READ_STRIP = () => {
     // The accented label sits at the strip's centre: the strip pads both
     // ends, so the newest month is centred with one neighbour in view.
     hereCentred: r && hb ? Math.abs(hb.left + hb.width / 2 - (r.left + r.width / 2)) <= 4 : false,
-    band: labels
-      .filter((l) => l.hasAttribute("data-strip-band"))
-      .map((l) => Number(l.getAttribute("data-strip-month"))),
+    labels: labels.length,
     scrollWidth: document.documentElement.scrollWidth,
   };
 };
@@ -865,16 +903,12 @@ const NAMES_THE_CAP = (cap) => {
     : line.startsWith(`Showing ${cap.toLocaleString("en-US")}`);
 };
 
-/** A press on a month cell of the picker the way a pointer makes one: down,
- *  then up over the same cell, which is when the page commits. */
+/** A click on a month cell of the picker. Arming on pointerdown went with the
+ *  band, 2026-09-24 evening: a click is the whole grammar now. */
 async function pressCell(page, idx) {
   const cell = page.locator(`[data-segment-cell="${idx}"][data-cell-live]`);
   if ((await cell.count()) === 0) return false;
-  const box = await cell.boundingBox();
-  if (!box) return false;
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.mouse.up();
+  await cell.click({ timeout: 10_000 }).catch(() => {});
   return true;
 }
 
@@ -1589,18 +1623,32 @@ for (const g of GROUPED_FIXTURES) {
 
     // ── S — THE SEGMENT PICKER (decision 0019, amendment 2026-09-24) ──
     //
+    // ⚠️ CUT BACK TO A LOW-FI NAVIGATOR, 2026-09-24 evening, and the checks
+    // moved with it rather than being deleted. Miles: "i would prefer to keep
+    // the navigator more low-fi, we don't need the infinite scroll type just
+    // a more rudimentary navigator that is clickable between months." So the
+    // band of loaded months, the in-view bar that followed the rows and the
+    // significance marks are gone, and with them S1's band assertion and S2's
+    // scroll-inside-the-band. S1 now asserts the OPPOSITE of what the band
+    // asserted — that the picker draws none of it — which is the same claim
+    // read the other way round, and S2 asserts the control that replaced the
+    // scroll. A check that simply vanished would read later like one that
+    // quietly stopped running.
+    //
     //   S0  the picker stands above the rows, sticky, as the matrix at 1440;
     //       the Date panel opens with the spread alone, no grid;
-    //   S1  the band is the months the served rows reach;
-    //   S2  a click inside the band scrolls the rows to that month: the page
-    //       scrolls and the in-view bar reaches the cell;
-    //   S3  a click on a month outside the band (below the cut) loads it: the
-    //       count line states the month in time, every row drawn is inside
-    //       it, the spine's tip is withheld at the top, the band is that
-    //       month alone, and no lifetime figure is on the count line;
+    //   S1  the grid is every month the life holds and nothing dynamic: at
+    //       rest the newest month is where the page stands, no band cell, no
+    //       in-view bar and no significance mark anywhere in the picker;
+    //   S2  Previous steps to the previous month that holds events and shows
+    //       its rows; Next steps back to the month it came from;
+    //   S3  a click on a month below the cut loads it: the count line states
+    //       the month in time, every row drawn is inside it, the spine's tip
+    //       is withheld at the top, that month is the one the picker stands
+    //       on, and no lifetime figure is on the count line;
     //   S4  the phone strip at 390: at most three labels in view, the newest
     //       month centred and carrying the accent, no sideways page scroll,
-    //       and a tap on a month outside the band loads it.
+    //       and a tap on a month below the cut loads it.
     const picker = await page.evaluate(READ_PICKER);
     check(
       `S0 ${g.id}: the segment picker stands above the rows, sticky, as the matrix`,
@@ -1620,62 +1668,30 @@ for (const g of GROUPED_FIXTURES) {
     await page.keyboard.press("Escape");
     await panelGone(page);
 
-    const bandWant = [];
-    for (let i = monthIdxOf(oldestServed); i <= monthIdxOf(newestServed); i++) bandWant.push(i);
-    check(
-      `S1 ${g.id}: the band is the months the served rows reach`,
-      JSON.stringify(picker.band) === JSON.stringify(bandWant),
-      `band ${picker.band.map(monthName).join(", ")} (want ${bandWant.map(monthName).join(", ")})`,
-    );
-
-    // S2 — a click inside the band scrolls. The second-newest banded month
-    // that holds a served row, so the scroll has somewhere to go.
-    const inside = bandWant.filter((i) => i < monthIdxOf(newestServed) && i > monthIdxOf(oldestServed)).pop() ?? null;
-    if (inside == null) {
-      info(`S2 ${g.id}: a click inside the band`, "the band is too short to scroll within");
-    } else {
-      const yBefore = await page.evaluate(() => window.scrollY);
-      const pressed = await pressCell(page, inside);
-      await settled(
-        page,
-        (idx) => document.querySelector(`[data-segment-cell="${idx}"][data-cell-in-view]`) != null,
-        inside,
-        20_000,
-      );
-      const after = await page.evaluate(READ_PICKER);
-      const yAfter = await page.evaluate(() => window.scrollY);
-      check(
-        `S2 ${g.id}: a click on ${monthName(inside)} inside the band scrolls the rows to it`,
-        pressed && yAfter !== yBefore && after.inView.includes(inside) && after.loading == null,
-        `pressed ${pressed}, scrollY ${yBefore} → ${yAfter}, in view ${after.inView.map(monthName).join(", ")}, loading ${after.loading}`,
-      );
-    }
-
-    // S3 — a month below the cut. The newest month wholly below the oldest
-    // served row that holds events, from the whole-life summary.
-    const life = windowed
-      ? await getJson(`/api/aave-v3/timeline/summary?market=core&wallet=${g.wallet}&cutoffBlock=99999999`)
-      : null;
+    // The whole life by month, as the picker reduces it: the summary read at
+    // a block past the tip IS the life, which is what the picker's `lifeDays`
+    // sums to from the opening balance, the folders' `byDay` and the loose
+    // events.
+    const life = await getJson(`/api/aave-v3/timeline/summary?market=core&wallet=${g.wallet}&cutoffBlock=99999999`);
     const lifeMonths = new Map();
     for (const b of life?.byDay ?? []) {
       const i = monthIdxOf(Number(b.key));
       lifeMonths.set(i, (lifeMonths.get(i) ?? 0) + b.count);
     }
-    const below = [...lifeMonths.entries()]
-      .filter(([i, c]) => c > 0 && monthEndOf(monthStartTs(i)) < oldestServed)
-      .sort((a, b) => b[0] - a[0]);
-    const target = below[0] ?? null;
-    if (!windowed) {
-      info(`S3 ${g.id}: a month outside the band`, "the whole history is loaded; the picker only scrolls");
-    } else if (target == null) {
-      check(`S3 ${g.id}: a month below the cut to pick`, false, "none in the summary");
-    } else {
-      const [tIdx, tCount] = target;
-      const cap = route.boundBy === "rows" ? plan.length : null;
-      const head = `${monthLong(tIdx)} holds ${n(tCount)} ${tCount === 1 ? "event" : "events"}`;
-      const pressed = await pressCell(page, tIdx);
-      await settled(
-        page,
+    const liveWant = [...lifeMonths.entries()]
+      .filter(([, c]) => c > 0)
+      .map(([i]) => i)
+      .sort((a, b) => a - b);
+    const newestMonth = liveWant[liveWant.length - 1];
+    const holdsLine = (idx) => {
+      const c = lifeMonths.get(idx) ?? 0;
+      return `${monthLong(idx)} holds ${n(c)} ${c === 1 ? "event" : "events"}`;
+    };
+    /** A segment has landed when the count line states its month and the
+     *  skeleton is gone. */
+    const landed = (p, head) =>
+      settled(
+        p,
         (w) =>
           (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "")
             .trim()
@@ -1683,6 +1699,80 @@ for (const g of GROUPED_FIXTURES) {
         head,
         120_000,
       );
+
+    // S1 — the grid is the life's months, and nothing moves on it.
+    const liveHas = liveWant.every((i) => picker.live.includes(i));
+    check(
+      `S1 ${g.id}: every month the life holds is a cell, the newest is where the page stands, and nothing in the picker is banded, barred or marked`,
+      liveHas &&
+        picker.current === newestMonth &&
+        picker.label === monthLong(newestMonth) &&
+        picker.dynamic === 0 &&
+        picker.nextDisabled === true &&
+        picker.reset === false,
+      `${picker.live.length} live cell(s) of ${liveWant.length} month(s) the life holds; current ${picker.current == null ? "none" : monthName(picker.current)} (want ${monthName(newestMonth)}), label "${picker.label}"; ${picker.dynamic} band/bar/mark element(s); next disabled ${picker.nextDisabled}, reset offered ${picker.reset}`,
+    );
+
+    // S2 — Previous and Next, the whole of the navigation. The month before
+    // the newest one that holds events, and back.
+    const earlier = liveWant[liveWant.length - 2] ?? null;
+    if (earlier == null) {
+      info(`S2 ${g.id}: Previous and Next`, "the life holds one month");
+    } else {
+      await page.click("[data-segment-prev]", { timeout: 10_000 }).catch(() => {});
+      await landed(page, holdsLine(earlier));
+      await stillRows(page);
+      const back = await page.evaluate(READ_PICKER);
+      const backLine = await page.evaluate(COUNT_LINE);
+      check(
+        `S2 ${g.id}: Previous shows ${monthName(earlier)} in place of ${monthName(newestMonth)}`,
+        backLine.startsWith(holdsLine(earlier)) && back.current === earlier && back.reset === true,
+        `"${backLine}" (want "${holdsLine(earlier)}…"); current ${back.current == null ? "none" : monthName(back.current)}; reset offered ${back.reset}`,
+      );
+      await page.click("[data-segment-next]", { timeout: 10_000 }).catch(() => {});
+      await landed(page, holdsLine(newestMonth));
+      await stillRows(page);
+      const fwd = await page.evaluate(READ_PICKER);
+      const fwdLine = await page.evaluate(COUNT_LINE);
+      check(
+        `S2 ${g.id}: Next steps back to ${monthName(newestMonth)}`,
+        fwdLine.startsWith(holdsLine(newestMonth)) && fwd.current === newestMonth,
+        `"${fwdLine}" (want "${holdsLine(newestMonth)}…"); current ${fwd.current == null ? "none" : monthName(fwd.current)}`,
+      );
+      // And Newest gives the rows the page opened with back, count line and
+      // all — the one way out of a segment.
+      await page.click("[data-segment-reset]", { timeout: 10_000 }).catch(() => {});
+      await settled(
+        page,
+        (w) => (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim() === w,
+        wantRest,
+        60_000,
+      );
+      const restAgain = await page.evaluate(COUNT_LINE);
+      const rest2 = await page.evaluate(READ_PICKER);
+      check(
+        `S2 ${g.id}: Newest gives back the rows the page opened with`,
+        restAgain === wantRest && rest2.current === newestMonth && rest2.reset === false,
+        `"${restAgain}" (want "${wantRest}"); current ${rest2.current == null ? "none" : monthName(rest2.current)}; reset offered ${rest2.reset}`,
+      );
+    }
+
+    // S3 — a month below the cut. The newest month wholly below the oldest
+    // served row that holds events, from the whole-life summary.
+    const below = [...lifeMonths.entries()]
+      .filter(([i, c]) => c > 0 && monthEndOf(monthStartTs(i)) < oldestServed)
+      .sort((a, b) => b[0] - a[0]);
+    const target = below[0] ?? null;
+    if (!windowed) {
+      info(`S3 ${g.id}: a month below the cut`, "the page holds the whole history; no month sits below a cut");
+    } else if (target == null) {
+      check(`S3 ${g.id}: a month below the cut to pick`, false, "none in the summary");
+    } else {
+      const [tIdx, tCount] = target;
+      const cap = route.boundBy === "rows" ? plan.length : null;
+      const head = holdsLine(tIdx);
+      const pressed = await pressCell(page, tIdx);
+      await landed(page, head);
       await stillRows(page);
       const line = await page.evaluate(COUNT_LINE);
       const seg = await page.evaluate(READ_PICKER);
@@ -1706,9 +1796,9 @@ for (const g of GROUPED_FIXTURES) {
         `${rowsAt.length} row(s), ${rowsAt.filter((t) => t < from || t > to).length} outside`,
       );
       check(
-        `S3 ${g.id}: the tip is withheld at the top, and the band is that month alone`,
-        seg.boundaryRows.includes("tip") && JSON.stringify(seg.band) === JSON.stringify([tIdx]),
-        `boundary rows ${seg.boundaryRows.join(", ") || "none"}; band ${seg.band.map(monthName).join(", ")}`,
+        `S3 ${g.id}: the tip is withheld at the top, and the picker stands on that month`,
+        seg.boundaryRows.includes("tip") && seg.current === tIdx && seg.dynamic === 0,
+        `boundary rows ${seg.boundaryRows.join(", ") || "none"}; current ${seg.current == null ? "none" : monthName(seg.current)}; ${seg.dynamic} band/bar/mark element(s)`,
       );
       check(
         `S3 ${g.id}: no lifetime figure on the count line`,
@@ -1745,14 +1835,14 @@ for (const g of GROUPED_FIXTURES) {
           !strip.matrixVisible &&
           strip.inView >= 2 &&
           strip.inView <= 3 &&
-          strip.here === monthIdxOf(newestServed) &&
+          strip.here === newestMonth &&
           strip.hereCentred &&
           strip.scrollWidth === 390,
-        `strip ${strip.stripVisible}, matrix ${strip.matrixVisible}, ${strip.inView} in view, here ${strip.here == null ? "none" : monthName(strip.here)} (want ${monthName(monthIdxOf(newestServed))}) centred ${strip.hereCentred}, scrollWidth ${strip.scrollWidth}`,
+        `strip ${strip.stripVisible}, matrix ${strip.matrixVisible}, ${strip.inView} in view, here ${strip.here == null ? "none" : monthName(strip.here)} (want ${monthName(newestMonth)}) centred ${strip.hereCentred}, scrollWidth ${strip.scrollWidth}`,
       );
       if (windowed && target != null) {
-        const [tIdx, tCount] = target;
-        const head = `${monthLong(tIdx)} holds ${n(tCount)} ${tCount === 1 ? "event" : "events"}`;
+        const [tIdx] = target;
+        const head = holdsLine(tIdx);
         const tapped = await small.evaluate((idx) => {
           const el = document.querySelector(`[data-strip-month="${idx}"]`);
           if (!el) return false;
@@ -1760,21 +1850,13 @@ for (const g of GROUPED_FIXTURES) {
           el.click();
           return true;
         }, tIdx);
-        await settled(
-          small,
-          (w) =>
-            (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "")
-              .trim()
-              .startsWith(w) && document.querySelector("[data-segment-skeleton]") == null,
-          head,
-          120_000,
-        );
+        await landed(small, head);
         const line = await small.evaluate(COUNT_LINE);
         const after = await small.evaluate(READ_STRIP);
         check(
           `S4 ${g.id}: a tap on ${monthName(tIdx)} loads it, and the strip underlines it`,
-          tapped && line.startsWith(head) && after.band.length === 1 && after.band[0] === tIdx,
-          `tapped ${tapped}; "${line}"; band ${after.band.map(monthName).join(", ")}`,
+          tapped && line.startsWith(head) && after.here === tIdx,
+          `tapped ${tapped}; "${line}"; underlined ${after.here == null ? "none" : monthName(after.here)}`,
         );
       }
     } finally {

@@ -40,14 +40,7 @@ import {
   type TimelineOpeningBalance,
   type TimelineWindow,
 } from "@/lib/shared/timeline-opening-balance";
-import {
-  lifeDayCounts,
-  lifeExtent,
-  monthStartTs,
-  planSegmentAsk,
-  segmentSpan,
-  trimToNewest,
-} from "@/lib/shared/timeline-segments";
+import { lifeDayCounts, lifeExtent, planSegmentAsk, segmentSpan, trimToNewest } from "@/lib/shared/timeline-segments";
 import {
   fetchAaveV3Position,
   fetchAaveV3OraclePrices,
@@ -386,14 +379,6 @@ export default function AaveV3PositionDetail({
     [aaveEvents, servedFolders, opening],
   );
   const preloadCap = groupedTail?.boundBy === "rows" ? groupedTail.rowPlan.length : null;
-  const preloadLoaded = useMemo(() => {
-    const life = lifeExtent(lifeDays);
-    if (!life) return null;
-    let from = Infinity;
-    for (const e of aaveEvents) if (e.timestamp < from) from = e.timestamp;
-    for (const f of servedFolders ?? []) if (f.firstAt < from) from = f.firstAt;
-    return { from: Number.isFinite(from) ? from : life.firstAt, to: life.lastAt };
-  }, [lifeDays, aaveEvents, servedFolders]);
   const [segment, setSegment] = useState<{
     monthIdx: number;
     asked: { from: number; to: number };
@@ -404,7 +389,6 @@ export default function AaveV3PositionDetail({
     cutAt: number | null;
   } | null>(null);
   const [segmentLoading, setSegmentLoading] = useState<number | null>(null);
-  const [segmentLanding, setSegmentLanding] = useState<number | null>(null);
   const segmentRead = useRef<AbortController | null>(null);
   // Whether the api groups a segment. Learned from the first answer: one that
   // predates the grouped span answers the newest window with no `span` on it,
@@ -412,14 +396,9 @@ export default function AaveV3PositionDetail({
   const apiGroupsSpans = useRef<boolean | null>(null);
   const loadSegment = useCallback(
     async (monthIdx: number) => {
-      // A month the preload holds whole: back to the preload, and scroll.
-      if (preloadLoaded && monthStartTs(monthIdx) >= preloadLoaded.from && monthStartTs(monthIdx) <= preloadLoaded.to) {
-        segmentRead.current?.abort();
-        setSegmentLoading(null);
-        setSegment(null);
-        setSegmentLanding(monthIdx);
-        return;
-      }
+      // Every month is read the same way, whether or not the preload already
+      // holds its rows: a click shows that month in place of the one on the
+      // page (Miles, 2026-09-24 evening — no scroll-to branch).
       const ask = planSegmentAsk(monthIdx, lifeDays, preloadCap);
       segmentRead.current?.abort();
       const ac = new AbortController();
@@ -458,7 +437,7 @@ export default function AaveV3PositionDetail({
         }
       }
     },
-    [wallet, market, lifeDays, preloadCap, preloadLoaded],
+    [wallet, market, lifeDays, preloadCap],
   );
   const segmentEvents = useMemo(() => (segment ? segment.events.filter(isAaveV3Event) : null), [segment]);
   const segmentRows = useMemo(
@@ -505,19 +484,25 @@ export default function AaveV3PositionDetail({
     },
     [setDateRange, loadSegment],
   );
+  const resetSegment = useCallback(() => {
+    segmentRead.current?.abort();
+    setSegmentLoading(null);
+    setDateRange(null);
+    setSegment(null);
+  }, [setDateRange]);
+  const hasLife = useMemo(() => lifeExtent(lifeDays) != null, [lifeDays]);
   const segments = useMemo(
     () =>
-      groupedTail && preloadLoaded
+      groupedTail && hasLife
         ? {
             lifeDays,
-            loaded: segment ? segment.asked : preloadLoaded,
+            month: segment?.monthIdx ?? null,
             loading: segmentLoading,
             onPick: pickMonth,
-            landing: segmentLanding,
-            onLanded: () => setSegmentLanding(null),
+            onReset: segment ? resetSegment : null,
           }
         : undefined,
-    [groupedTail, preloadLoaded, lifeDays, segment, segmentLoading, pickMonth, segmentLanding],
+    [groupedTail, hasLife, lifeDays, segment, segmentLoading, pickMonth, resetSegment],
   );
   /** The preload's own total, for the export: `tl.totalCount` counts the
    *  segment once one is loaded. */
