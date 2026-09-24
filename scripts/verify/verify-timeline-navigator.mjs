@@ -523,13 +523,16 @@ async function settle(page) {
     { timeout: 240_000 },
   );
   await page.waitForFunction(() => document.querySelector("[data-ctrl-waking]") == null, { timeout: 120_000 });
-  // The total stops reading "listed" once the opening balance is in hand.
+  // The total stops reading "listed" (the flat page) or opening with
+  // "Loaded" (the served page, since 2026-09-24) once the opening balance is
+  // in hand; `data-timeline-total` says the same thing for a machine.
   await page
     .waitForFunction(
-      () =>
-        !/listed$/.test(
-          (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim(),
-        ),
+      () => {
+        const line = (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim();
+        const total = document.querySelector("[data-timeline-total]")?.getAttribute("data-timeline-total");
+        return !/listed$/.test(line) && !/^Loaded /.test(line) && total !== "pending";
+      },
       { timeout: 120_000 },
     )
     .catch(() => {});
