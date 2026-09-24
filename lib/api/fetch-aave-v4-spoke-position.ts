@@ -56,7 +56,8 @@ export interface FetchAaveV4SpokePositionParams {
   wallet: string;
   spoke: string; // key (lowercase), e.g. "main"
   baseUrl?: string;
-  /** The signed reader headers a server render's hop carries (lib/shared/listing-ssr.ts `ssrHop`). */
+  /** The headers a server render's hop carries, naming the reader to whatever
+   *  answers (lib/shared/listing-ssr.ts `ssrHop` / `boxHop`). */
   headers?: HeadersInit;
 }
 

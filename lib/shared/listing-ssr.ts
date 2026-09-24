@@ -19,6 +19,7 @@
 
 import { headers } from "next/headers";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
+import { createAuthHeaders } from "@/lib/api/fetch-with-auth";
 import type { NextRequest } from "next/server";
 import { readerHopHeaders, readerIpFromRequest } from "@/lib/api/reader-ip";
 import { decodeListFilters, listKey, type BaseListFilters, type SerializableDimension } from "@/lib/shared/list-filter";
@@ -70,6 +71,23 @@ export async function ssrHop(): Promise<SsrHop | null> {
   const baseUrl = await ssrOrigin();
   if (!baseUrl) return null;
   return { baseUrl, headers: readerHopHeaders(await readerIpFromHeaders()) };
+}
+
+/** The hop for a server read whose own `/api/<proto>` proxy only forwards —
+ *  same path, same query, the backend's JSON unchanged. Reading the box
+ *  directly then costs one function invocation less per read, and the box
+ *  budgets the reader the same way, because the bearer token plus
+ *  `X-Rails-Reader-IP` is what the proxy would have sent on its behalf.
+ *
+ *  Only for a proxy that forwards. A route that shapes the backend's rows into
+ *  what the page renders is not a hop to skip — read what it does first.
+ *
+ *  Falls back to `ssrHop()` when `RAILS_API_URL` is absent, so a deployment
+ *  without it degrades to the self-hop rather than to no read at all. */
+export async function boxHop(): Promise<SsrHop | null> {
+  const baseUrl = process.env.RAILS_API_URL?.replace(/\/$/, "");
+  if (!baseUrl) return ssrHop();
+  return { baseUrl, headers: createAuthHeaders(await readerIpFromHeaders()) };
 }
 
 /** The self-hop for a route handler: its own origin, and the reader of the

@@ -11,7 +11,7 @@ const API_BEARER_TOKEN = process.env.API_BEARER_TOKEN;
  * request can't claim an arbitrary reader. See lib/api/reader-ip.ts /
  * reader-ip-server.ts for how callers resolve the value.
  */
-export function createAuthHeaders(readerIp?: string): HeadersInit {
+export function createAuthHeaders(readerIp?: string): Record<string, string> {
   if (!API_BEARER_TOKEN) {
     console.warn("API_BEARER_TOKEN environment variable is not set");
     return {};

@@ -3,9 +3,12 @@
 // ============================================================================
 //
 // Thin typed clients over /api/aave-v4/timeline and /api/aave-v4/positions.
-// Both go via the Next route handlers (which attach the bearer token and
-// forward to the rails-server-onboarding Express endpoints). Server components can
-// pass `baseUrl` to call the same Next routes from SSR.
+// From the browser both go via the Next route handlers, which attach the bearer
+// token and forward to the rails-server-onboarding Express endpoints. A server
+// component passes `baseUrl` + `headers`: the box's own origin with bearer auth
+// (`boxHop`, the cheaper path where the proxy only forwards), or this
+// deployment's origin with the signed reader headers (`ssrHop`). The paths are
+// the same either way, which is what lets one client serve both.
 //
 // Wire-format contracts:
 //   /timeline → BaseActivityEvent[] with AaveV4Context attached. Match the
@@ -48,7 +51,8 @@ export interface FetchAaveV4Params {
   /** SSR override — server components calling the Next API route directly
    *  need an absolute origin since `fetch` in node has no implicit base. */
   baseUrl?: string;
-  /** The signed reader headers a server render's hop carries (lib/shared/listing-ssr.ts `ssrHop`). */
+  /** The headers a server render's hop carries, naming the reader to whatever
+   *  answers (lib/shared/listing-ssr.ts `ssrHop` / `boxHop`). */
   headers?: HeadersInit;
 }
 

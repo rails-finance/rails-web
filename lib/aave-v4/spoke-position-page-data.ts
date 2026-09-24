@@ -13,6 +13,13 @@
 // the history beside it.
 //
 // The timeline route is not windowed, so there is no opening balance to read.
+//
+// All four reads go to the BOX, not to this deployment's own /api proxies: the
+// four route handlers behind them (positions, spoke-position, timeline, prices)
+// forward the query and hand the backend's JSON back unchanged, so a self-hop
+// bought nothing and cost a function invocation each. The listing's server read
+// has taken the box directly since it was written; this is the detail catching
+// up with it.
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
@@ -22,7 +29,7 @@ import {
   type AaveV4SpokePositionChainResponse,
 } from "@/lib/api/fetch-aave-v4-spoke-position";
 import { SPOKE_NAME_TO_KEY } from "@/lib/aave-v4/spoke-meta";
-import { ssrHop } from "@/lib/shared/listing-ssr";
+import { boxHop } from "@/lib/shared/listing-ssr";
 import { fetchPrices } from "@/lib/api/fetch-prices";
 import { PRICEABLE_TOKEN_ADDRESSES } from "@/lib/aave/prices";
 
@@ -48,6 +55,7 @@ export const loadAaveV4SpokeTail = cache(async (wallet: string, spokeName: strin
       return { positions: posResult.positions, chain };
     },
     readTimeline: (baseUrl, headers) => fetchAaveV4Timeline({ wallet, baseUrl, headers }),
+    hop: boxHop,
   });
   return { ...tail, spokePositions: tail.positions?.positions ?? null, chain: tail.positions?.chain ?? null };
 });
@@ -69,7 +77,7 @@ const PRICES_FETCH_TIMEOUT_MS = 8000;
  * PricesProvider fetches on mount exactly as it did before.
  */
 export const loadAaveV4CardPrices = cache(async (): Promise<Record<string, number>> => {
-  const hop = await ssrHop();
+  const hop = await boxHop();
   if (!hop) return {};
   try {
     return await fetchPrices({
