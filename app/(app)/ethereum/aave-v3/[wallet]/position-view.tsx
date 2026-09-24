@@ -399,9 +399,9 @@ export default function AaveV3PositionDetail({
     asked: { from: number; to: number };
     events: BaseActivityEvent[];
     grouped: AaveV3GroupedTimelineResponse | null;
-    /** Events the index served for the ask and the page let go, when it
-     *  trimmed a flat span answer to the preload's size. */
-    dropped: number;
+    /** Where the served rows open when the ask was cut to the preload, by
+     *  the index (`boundBy: "rows"`) or by the page trimming a flat answer. */
+    cutAt: number | null;
   } | null>(null);
   const [segmentLoading, setSegmentLoading] = useState<number | null>(null);
   const [segmentLanding, setSegmentLanding] = useState<number | null>(null);
@@ -431,14 +431,23 @@ export default function AaveV3PositionDetail({
           const grouped = await fetchAaveV3GroupedTimeline({ wallet, market, span, signal: ac.signal });
           if (grouped.span && grouped.span.from === ask.from && grouped.span.to === ask.to) {
             apiGroupsSpans.current = true;
-            setSegment({ monthIdx, asked: ask, events: grouped.events, grouped, dropped: 0 });
+            let cutAt: number | null = null;
+            if (grouped.cutoffBlock != null) {
+              cutAt = Infinity;
+              for (const e of grouped.events) if (e.timestamp < cutAt) cutAt = e.timestamp;
+              for (const r of grouped.rowPlan)
+                if (r.kind === "folder" && r.folder.firstAt < cutAt) cutAt = r.folder.firstAt;
+              if (!Number.isFinite(cutAt)) cutAt = null;
+            }
+            setSegment({ monthIdx, asked: ask, events: grouped.events, grouped, cutAt });
             return;
           }
           apiGroupsSpans.current = false;
         }
         const flat = await fetchAaveV3Timeline({ wallet, market, span });
         const kept = trimToNewest(flat.events, preloadCap);
-        setSegment({ monthIdx, asked: ask, events: kept, grouped: null, dropped: flat.events.length - kept.length });
+        const cutAt = kept.length < flat.events.length && kept.length > 0 ? kept[0].timestamp : null;
+        setSegment({ monthIdx, asked: ask, events: kept, grouped: null, cutAt });
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
         // The rows the page holds stay; the month stays where it was.
@@ -458,14 +467,8 @@ export default function AaveV3PositionDetail({
   );
   const segmentWindow = useMemo<TimelineWindow | null>(() => {
     if (!segment) return null;
-    const span = segmentSpan(segment.monthIdx, segment.asked, lifeDays);
-    if (!span) return null;
-    return {
-      state: "span",
-      cutoffBlock: null,
-      opening: null,
-      span: { ...span, eventsBefore: span.eventsBefore + segment.dropped },
-    };
+    const span = segmentSpan(segment.monthIdx, segment.asked, segment.cutAt, lifeDays);
+    return span ? { state: "span", cutoffBlock: null, opening: null, span } : null;
   }, [segment, lifeDays]);
   const timelineWindow = segmentWindow ?? historyWindow;
   const segmentSpanParams = segment?.grouped

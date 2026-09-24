@@ -635,7 +635,8 @@ const panelGone = (page) => settled(page, () => document.querySelector("[data-ti
  *  the page (`!hasMore` in chain-truth-timeline.tsx), so a check that skips
  *  this reads a page with no boundary on it at all and compares two absences. */
 async function toEndOfList(page) {
-  for (let i = 0; i < 40; i++) {
+  // 2,500 rows at 50 a press (the preload since 2026-09-24), with room.
+  for (let i = 0; i < 60; i++) {
     // Click, and count the rows we had BEFORE it — the rows arriving is the
     // receipt that the chunk landed.
     const before = await page.evaluate(() => {
@@ -1690,8 +1691,11 @@ for (const g of GROUPED_FIXTURES) {
       const shrunk = cap != null && tCount > cap;
       check(
         `S3 ${g.id}: picking ${monthName(tIdx)} loads it and the count line states the month in time`,
-        pressed && (shrunk ? line.startsWith(`${head}; loaded `) : line === head),
-        `pressed ${pressed}; "${line}" (want ${shrunk ? `"${head}; loaded …"` : `"${head}"`})`,
+        // A month over the preload in events may still fit it in rows once
+        // grouped, so over the cap either form is right; under it, the month
+        // is on the page whole and the line says only that.
+        pressed && (shrunk ? line === head || line.startsWith(`${head}; loaded `) : line === head),
+        `pressed ${pressed}; "${line}" (want ${shrunk ? `"${head}" or "${head}; loaded …"` : `"${head}"`})`,
       );
       check(
         `S3 ${g.id}: every row drawn is inside ${monthName(tIdx)}, and there are rows`,

@@ -224,8 +224,12 @@ export interface TimelineSegmentSpan {
   /** What was asked of the index: the month, or the week or day it shrank to
    *  when the month holds more than the preload can carry. */
   asked: { from: number; to: number };
-  /** The events the life holds before `asked.from`: the number the segment's
-   *  oldest row counts up from. */
+  /** Where the served rows open when the index, or the page, trimmed the
+   *  ask to the preload: the oldest served moment. Null when the ask was
+   *  answered whole. */
+  cutAt: number | null;
+  /** The events the life holds before the oldest served row: the number it
+   *  counts up from. */
   eventsBefore: number;
   /** The life the segment sits inside, so the spine can say where it ends. */
   life: { firstAt: number; lastAt: number };

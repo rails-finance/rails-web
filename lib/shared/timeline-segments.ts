@@ -95,10 +95,11 @@ export function eventsWithin(lifeDays: ReadonlyMap<number, number>, from: number
   return n;
 }
 
-/** Events the life holds before `ts`. */
+/** Events the life holds on the days before the day of `ts`. */
 export function eventsBefore(lifeDays: ReadonlyMap<number, number>, ts: number): number {
+  const day0 = dayStartOf(ts);
   let n = 0;
-  for (const [day, count] of lifeDays) if (day < ts) n += count;
+  for (const [day, count] of lifeDays) if (day < day0) n += count;
   return n;
 }
 
@@ -131,6 +132,7 @@ export function planSegmentAsk(
 export function segmentSpan(
   monthIdx: number,
   asked: { from: number; to: number },
+  cutAt: number | null,
   lifeDays: ReadonlyMap<number, number>,
 ): TimelineSegmentSpan | null {
   const life = lifeExtent(lifeDays);
@@ -140,20 +142,18 @@ export function segmentSpan(
   return {
     month: { from, to, label: monthLabel(monthIdx), holds: eventsWithin(lifeDays, from, to) },
     asked,
-    eventsBefore: eventsBefore(lifeDays, asked.from),
+    cutAt,
+    eventsBefore: eventsBefore(lifeDays, cutAt ?? asked.from),
     life,
   };
 }
 
 /** "1 to 3 January", the loaded days inside the month, or "3 January" for
- *  one day. `served` is the extent of the rows the page holds, so a cut the
- *  index made inside the ask is stated too. */
-export function loadedDaysStatement(
-  span: TimelineSegmentSpan,
-  served: { firstAt: number; lastAt: number } | null,
-): string | null {
-  const from = Math.max(span.asked.from, served?.firstAt ?? span.asked.from);
-  const to = Math.min(span.asked.to, served?.lastAt ?? span.asked.to);
+ *  one day: the ask, or what of it the index served when it cut the ask to
+ *  the preload. Null when the month is on the page whole. */
+export function loadedDaysStatement(span: TimelineSegmentSpan): string | null {
+  const from = Math.max(span.asked.from, span.cutAt ?? span.asked.from);
+  const to = span.asked.to;
   if (dayStartOf(from) <= span.month.from && to >= dayStartOf(span.month.to)) return null;
   const a = dayOfMonth(from);
   const b = dayOfMonth(to);
@@ -163,13 +163,10 @@ export function loadedDaysStatement(
 
 /** The count line on a segment: "January 2026 holds 709 events", and when
  *  less than the month is on the page, "; loaded 1 to 3 January". */
-export function segmentStatement(
-  span: TimelineSegmentSpan,
-  served: { firstAt: number; lastAt: number } | null,
-): string {
+export function segmentStatement(span: TimelineSegmentSpan): string {
   const n = span.month.holds.toLocaleString("en-US");
   const head = `${span.month.label} holds ${n} ${span.month.holds === 1 ? "event" : "events"}`;
-  const loaded = loadedDaysStatement(span, served);
+  const loaded = loadedDaysStatement(span);
   return loaded ? `${head}; loaded ${loaded}` : head;
 }
 

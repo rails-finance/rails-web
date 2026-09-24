@@ -346,17 +346,6 @@ function loadedSpanText(tl: TimelineEventsState): string | null {
   return a === b ? a : `${a} to ${b}`;
 }
 
-/** The extent of the loaded rows in seconds, for the segment statement. */
-function loadedExtent(tl: TimelineEventsState): { firstAt: number; lastAt: number } | null {
-  let first = tl.sortedEvents.length ? tl.sortedEvents[0].timestamp : Infinity;
-  let last = tl.sortedEvents.length ? tl.sortedEvents[tl.sortedEvents.length - 1].timestamp : -Infinity;
-  if (tl.servedSpan) {
-    first = Math.min(first, tl.servedSpan.firstAt);
-    last = Math.max(last, tl.servedSpan.lastAt);
-  }
-  return Number.isFinite(first) ? { firstAt: first, lastAt: last } : null;
-}
-
 export function eventCountLine(tl: TimelineEventsState): string {
   const n = (v: number) => v.toLocaleString("en-US");
   const windowed = tl.historyWindow.state !== "whole";
@@ -365,10 +354,9 @@ export function eventCountLine(tl: TimelineEventsState): string {
   // life holds; what the page could carry is never a number here.
   if (tl.historyWindow.state === "span") {
     const span = tl.historyWindow.span;
-    const statement = segmentStatement(span, loadedExtent(tl));
-    if (!tl.isFiltered) return statement;
+    if (!tl.isFiltered) return segmentStatement(span);
     const shownNow = `${tl.filteredCountIsFloor ? "at least " : ""}${n(tl.filteredCount)}`;
-    const loaded = loadedDaysStatement(span, loadedExtent(tl));
+    const loaded = loadedDaysStatement(span);
     return `Showing ${shownNow} of ${span.month.label}${loaded ? `, ${loaded} loaded` : ""}`;
   }
   // Both halves of every ratio below count the loaded rows, so it is a true
