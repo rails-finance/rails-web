@@ -16,7 +16,7 @@
  */
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import type { AaveV4Context, BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV4Event } from "@/lib/shared/types/event-shape";
 import type { PositionBarData } from "@/components/shared/position-bar";
 import { resolvePrice, type PriceEntry } from "@/lib/aave/prices";
@@ -32,8 +32,22 @@ export interface AaveV4BarData extends PositionBarData {
 
 const AaveV4BarsContext = createContext<Map<string, AaveV4BarData> | null>(null);
 
+/** The event's primary price for its changed asset (`price`, or a
+ *  liquidation's `collateralPrice` / `debtPrice`): the same fallback the
+ *  detail panel's rows use when a row's own historic price is absent, so the
+ *  bar and the card above it price a leg the same way. */
+function primaryPrice(d: AaveV4Context, symbol: string): number | undefined {
+  if (d.eventType === "liquidation") {
+    if (symbol === d.collateralSymbol) return d.collateralPrice?.usd;
+    if (symbol === d.reserveSymbol) return d.debtPrice?.usd;
+    return undefined;
+  }
+  return symbol === d.reserveSymbol ? d.price?.usd : undefined;
+}
+
 function usdTotal(
   entries: { symbol: string; amount: string; price?: { usd: number } }[] | undefined,
+  d: AaveV4Context,
   prices: Record<string, PriceEntry | number> | undefined,
   mapAnswered: boolean,
 ): { usd: number; excluded: string[] } {
@@ -43,8 +57,9 @@ function usdTotal(
     const amt = parseFloat(e.amount);
     if (!isFinite(amt) || amt <= 0) continue;
     // Prefer the per-row historic price (block-anchored) when the server
-    // shipped one; the live map stands in for a legacy payload without one.
-    const price = e.price?.usd ?? resolvePrice(e.symbol, prices);
+    // shipped one, then the event's primary price for the changed asset; the
+    // live map stands in for a legacy payload without either.
+    const price = e.price?.usd ?? primaryPrice(d, e.symbol) ?? resolvePrice(e.symbol, prices);
     if (price != null) out.usd += amt * price;
     else if (mapAnswered && amt > UNPRICED_DUST_TOKENS) out.excluded.push(e.symbol);
   }
@@ -66,8 +81,8 @@ function buildBarMap(
   for (const e of events) {
     if (!isAaveV4Event(e)) continue;
     const spoke = e.context.data.spokeName ?? "Main";
-    const coll = usdTotal(e.context.data.allSupplies, prices, mapAnswered);
-    const debt = usdTotal(e.context.data.allDebts, prices, mapAnswered);
+    const coll = usdTotal(e.context.data.allSupplies, e.context.data, prices, mapAnswered);
+    const debt = usdTotal(e.context.data.allDebts, e.context.data, prices, mapAnswered);
     const row = Object.assign({}, e, {
       _coll: coll.usd,
       _debt: debt.usd,
