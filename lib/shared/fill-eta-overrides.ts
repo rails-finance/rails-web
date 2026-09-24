@@ -8,7 +8,7 @@
 //
 // HOW TO EDIT: key by the lane name the filler writes to price_fill_log
 // ("aave-v3-base", "moonwell-base", "seamless"), value an ISO date "YYYY-MM-DD"
-// read as that UTC day. Commit and push; pushing main deploys the preview.
+// read as that UTC day. Commit and push; pushing main deploys the site.
 // Once the date passes with the fill unfinished the well drops the date clause
 // and says only that Rails is processing the values, so an entry left behind
 // goes quiet on its own — remove it anyway when the walk finishes.

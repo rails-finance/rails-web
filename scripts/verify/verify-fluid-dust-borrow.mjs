@@ -57,7 +57,7 @@ const env = Object.fromEntries(
     .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
 );
 if (!env.ALCHEMY_URL) throw new Error("ALCHEMY_URL missing from .env.local");
-const BASE = (process.env.BASE ?? "https://preview.rails.finance").replace(/\/$/, "");
+const BASE = (process.env.BASE ?? "https://rails.finance").replace(/\/$/, "");
 const FIXTURES = (process.env.NFTS ?? "2333,1247,3763").split(",").map((s) => BigInt(s.trim()));
 
 const client = createPublicClient({ chain: mainnet, transport: http(env.ALCHEMY_URL) });

@@ -33,7 +33,7 @@
 //   timeline-export.test.ts.)
 //
 // Usage (the box URL and bearer token come from .env.local, never printed):
-//   BASE=https://preview.rails.finance node scripts/verify/verify-queued-export.mjs
+//   BASE=https://rails.finance node scripts/verify/verify-queued-export.mjs
 //   RESTART_CMD="<a command that redeploys the api>" BASE=… node …
 // BREAK=drop|cell|order|header|token|concurrent|daily|ttl|restart|format turns one
 // check's input wrong; the run must go red on that check.

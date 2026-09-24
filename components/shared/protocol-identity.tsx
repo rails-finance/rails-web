@@ -2,7 +2,7 @@
 
 // The protocol's identity line — mark + wordmark + chain mark, linking back to
 // the explorer's listing. This lived in the header chrome beside the Rails
-// wordmark until the chrome was reduced to "Rails · PREVIEW"; the pages own
+// wordmark until the chrome was reduced to "Rails · BETA"; the pages own
 // their identity now. Detail pages render it above the back row, and the
 // listing h1 carries the same mark inline. The link keeps the old header
 // affordance: from a deep view it is the fastest jump back to the BARE

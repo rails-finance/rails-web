@@ -26,7 +26,7 @@
 //
 // Usage:
 //   BASE=http://localhost:3000 node scripts/verify/verify-nav-progress.mjs
-//   BASE=https://preview.rails.finance node scripts/verify/verify-nav-progress.mjs
+//   BASE=https://rails.finance node scripts/verify/verify-nav-progress.mjs
 
 import { chromium } from "playwright";
 

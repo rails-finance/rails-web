@@ -51,14 +51,14 @@ function RailsLogo() {
   );
 }
 
-/** Deployment-tier pill right of the wordmark, on every page — this is the
- *  preview deployment, and the chrome says so once, site-wide, instead of a
- *  per-rail label. Caution-500 is the house "not settled yet" signal (the
- *  anatomy the old per-rail BETA pill used). */
-function PreviewPill() {
+/** Release-stage pill right of the wordmark, on every page — the site is in
+ *  beta, and the chrome says so once, site-wide, instead of a per-rail label.
+ *  Caution-500 is the house "not settled yet" signal (the anatomy the old
+ *  per-rail BETA pill used). */
+function BetaPill() {
   return (
     <span className="ml-2 rounded bg-caution-500 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
-      Preview
+      Beta
     </span>
   );
 }
@@ -112,7 +112,7 @@ export function HeaderBar() {
     <header className={isHome ? "absolute inset-x-0 top-0 z-40" : "relative z-40 mb-2"}>
       <div className="max-w-7xl mx-auto py-4 px-4 md:px-6 flex items-center">
         <RailsLogo />
-        <PreviewPill />
+        <BetaPill />
         {/* Right-hand control cluster. `ml-auto` pushes it hard right — it used
             to yield (`md:ml-0`) to the inline site-links nav that sat here, but
             that nav is retired, so the cluster owns the push outright. The

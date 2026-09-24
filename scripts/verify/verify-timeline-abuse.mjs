@@ -5,7 +5,7 @@
 // parameter with a backend query, and a request WITHOUT `?recent=N` asks for
 // the whole history — the expensive shape. The explorers themselves always
 // send `recent`, so a bare `/timeline` request is a scraper or a mistake, and
-// the Vercel Firewall on the project serving preview.rails.finance rate-limits
+// the Vercel Firewall on the project serving rails.finance rate-limits
 // it before it reaches a function:
 //
 //   IF   request path contains `/timeline`
@@ -35,7 +35,7 @@
 // vacuous green. Requests run five at a time; nothing secret is involved and
 // no URL or header value beyond the status is printed.
 //
-// Run:  BASE=https://preview.rails.finance BURST=1 node scripts/verify/verify-timeline-abuse.mjs
+// Run:  BASE=https://rails.finance BURST=1 node scripts/verify/verify-timeline-abuse.mjs
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const LIVE = !/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(BASE);
@@ -99,7 +99,7 @@ const tally = (statuses) => {
 const count403 = (statuses) => statuses.filter((s) => s === 403).length;
 
 if (!LIVE) {
-  skipped("T1–T3. live checks", `BASE is ${BASE}; run with BASE=https://preview.rails.finance BURST=1`);
+  skipped("T1–T3. live checks", `BASE is ${BASE}; run with BASE=https://rails.finance BURST=1`);
 } else if (!BURST) {
   skipped(
     "T1–T3. the burst and its scope",

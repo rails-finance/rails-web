@@ -26,7 +26,7 @@
 //
 // No chain call is made: the routes and the page are the only inputs.
 //
-// Run:  BASE=https://preview.rails.finance node scripts/verify/verify-aave-family-liquidation-price.mjs
+// Run:  BASE=https://rails.finance node scripts/verify/verify-aave-family-liquidation-price.mjs
 
 import { chromium } from "playwright";
 

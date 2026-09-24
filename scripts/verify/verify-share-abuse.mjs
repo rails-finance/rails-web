@@ -79,7 +79,7 @@
 //
 // claude-in-chrome cannot reach localhost — this script is the check.
 // Run:  BASE=http://localhost:3414 node scripts/verify/verify-share-abuse.mjs
-//       BASE=https://preview.rails.finance BURST=1 node scripts/verify/verify-share-abuse.mjs   (after deploy)
+//       BASE=https://rails.finance BURST=1 node scripts/verify/verify-share-abuse.mjs   (after deploy)
 //
 // ── PROVED IT CAN FAIL, 2026-09-10 ──────────────────────────────────────────
 //   1. `BOARD_TTL_MS = 0` in lib/sources/chain/polaris-position.ts → A2 red
@@ -1233,7 +1233,7 @@ if (v) {
 
 // ── D · live, after deploy ──────────────────────────────────────────────────
 if (!LIVE) {
-  skipped("D1–D3. live checks", `BASE is ${BASE}; run with BASE=https://preview.rails.finance after deploy`);
+  skipped("D1–D3. live checks", `BASE is ${BASE}; run with BASE=https://rails.finance after deploy`);
 } else {
   const get = async (p) => {
     const res = await fetch(`${BASE}${p}`, { headers: { "user-agent": "rails-verify" } });
