@@ -462,6 +462,15 @@
 //   reload before G5 drew no rows at all ("0 events"). A verdict read off a
 //   backend that fell over mid-run is not a finding about the page.
 //
+//   2026-09-24 (evening), same server: the picker's `current` pinned to the
+//   life's newest month whatever the page holds (`month ?? last` → `last`) →
+//   13/17 over `grouped-deep`. S2's Previous and Next red and S3's picker
+//   check red, all three quoting "current 2026-09" against the month asked
+//   for, and S4's tap red with "underlined 2026-09". S1 stayed GREEN, and so
+//   did S3's count line and its rows: the break moves the MARK and nothing
+//   else, so only the checks that read the mark after a pick can see it. A
+//   check that only ever reads a fresh load would have passed on all four.
+//
 //   A check that cannot be made to fail is not a check.
 
 import { chromium } from "playwright";
@@ -892,6 +901,14 @@ const READ_STRIP = () => {
   };
 };
 
+/** How a windowed page says its list is short of the month it is filtered to.
+ *  The word "listed" carried it until 2026-09-24, when decision 0019's last
+ *  amendment replaced "Showing N of M listed · T events" with the loaded span
+ *  in time — "Showing 1,000 of 11 Sept 2026 to 24 Sept 2026 · 4,353 events".
+ *  Both forms are accepted, because the flat arm reads pages on either side of
+ *  that change; neither is a count, which is the point of the amendment. */
+const STATES_SHORTFALL = /\bof \d{1,2} [A-Za-z]+ \d{4} to \d{1,2} [A-Za-z]+ \d{4}\b|\blisted\b/;
+
 /** Does the page state the row cap? The three phrases the amendment retired,
  *  and the cap itself as a bare figure in the count line. */
 const NAMES_THE_CAP = (cap) => {
@@ -1214,7 +1231,7 @@ for (const f of FIXTURES) {
         `2  ${f.id}: the rows it shows are the month's own figure, or the page says what it cannot show`,
         f.cut
           ? shownAfterOpen <= (monthCell?.count ?? -1) &&
-              (shownAfterOpen === monthCell?.count || /listed/.test(afterOpenLine))
+              (shownAfterOpen === monthCell?.count || STATES_SHORTFALL.test(afterOpenLine))
           : shownAfterOpen === monthCell?.count,
         `count line "${afterOpenLine}" → ${shownAfterOpen} row(s), against the map's own ${monthCell?.count} for ${month(targetMonth)}`,
       );
