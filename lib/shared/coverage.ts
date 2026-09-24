@@ -445,6 +445,19 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // with the first real liquidation (seizeTokens needs the mToken exchange
   // rate at block to value the seized leg).
   moonwell: explorerDepth({
+    // At-block prices (2026-09-24): the Base lane's Ethereum twin — the
+    // Comptroller's own oracle, exchange rates, incentive and close factor at
+    // every captured event block (rails-server-onboarding mig 325,
+    // scripts/fill-moonwell-prices.mjs on the shared roster runner), merged
+    // onto /api/moonwell/timeline rows as `oracle_at_block`, which
+    // lib/sources/api/moonwell-timeline.ts already read. A finite universe
+    // (~1,410 blocks on 2026-09-24) run to completion, so every row is priced
+    // at its own block; the newest blocks join within the 15-minute tick.
+    // Verifier: scripts/verify/verify-at-block-prices-moonwell-base.mjs with
+    // EXPLORER=moonwell. Two liquidations now exist on this deployment
+    // (2026-07-24 and 2026-08-30), so the `awaiting` below has its instances;
+    // that cell moves once the liquidation arm has run against the filled lane.
+    atBlockPrices: true,
     dashboard: true,
     oracleUsd: true,
     verification: true,

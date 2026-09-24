@@ -1,15 +1,21 @@
-// Live in-browser verification of the Moonwell Base oracle-at-block prices —
-// the mig-195 per-block roster capture (rails-server-onboarding
-// scripts/fill-moonwell-base-prices.mjs) as the timeline renders it: the
-// AtBlockPriceFootnote pill on an ordinary row, the valued two-leg
-// liquidation forensics (both legs + the premium against the incentive read
-// at the same block), the token-only render for a block the filler has not
-// priced, and the seized leg's receipt naming the two chain reads it derives
-// from. Every expected figure is re-derived from the SAME wallet's timeline
-// route payload (/api/chain/moonwell-base/timeline) and checked against the
-// DOM; nothing is pinned to an event number or to an absence
-// (verify-historic-usd-pills.mjs's rules): the specimens are discovered at
-// run time and a run that finds no unpriced row says NO EVIDENCE.
+// Live in-browser verification of the Moonwell oracle-at-block prices — the
+// per-block roster capture on Base (rails-server-onboarding mig 195,
+// scripts/fill-moonwell-base-prices.mjs) and on Ethereum (mig 325,
+// scripts/fill-moonwell-prices.mjs, 2026-09-24) as the shared timeline
+// renders it: the AtBlockPriceFootnote pill on an ordinary row, the valued
+// two-leg liquidation forensics (both legs + the premium against the
+// incentive read at the same block), the token-only render for a block the
+// filler has not priced, and the seized leg's receipt naming the two chain
+// reads it derives from. Every expected figure is re-derived from the SAME
+// wallet's timeline route payload (/api/chain/moonwell-base/timeline or
+// /api/moonwell/timeline) and checked against the DOM; nothing is pinned to
+// an event number or to an absence (verify-historic-usd-pills.mjs's rules):
+// the specimens are discovered at run time and a run that finds no unpriced
+// row says NO EVIDENCE — except on a lane whose universe is filled whole
+// (Ethereum: ~1,410 blocks, run to completion), where the token-only arm is
+// replaced by the stronger claim that EVERY ordinary row carries its price.
+//
+// EXPLORER=moonwell-base (default) | moonwell picks the arm; one per run.
 //
 // Fail-first (2026-09-04, dev server on :3021 against the onboarding box, wallet below):
 // run with the detail component's forensics/footnote stashed while the
@@ -22,16 +28,44 @@
 // card locator scopes to EventCard's `min-w-0 grow` content tier, not to the
 // header row the Aave verifier scopes to.
 //
+// The Ethereum arm (2026-09-24) is written ahead of its first run: the lane's
+// migration and fill land on the box first (rails-ops reference/pricing.md,
+// "The roster-at-block lanes"), and until the fill has run every row is
+// unpriced and the arm reports that.
+//
 // claude-in-chrome cannot reach localhost — this script is the check.
 // Run against a dev server:  BASE=http://localhost:3021 node scripts/verify/verify-at-block-prices-moonwell-base.mjs
+// The Ethereum arm:           EXPLORER=moonwell BASE=http://localhost:3021 node scripts/verify/verify-at-block-prices-moonwell-base.mjs
 
 import { chromium } from "playwright";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
-// The MAMO cascade's liquidated wallet (2026-08-27) — 596 liquidations and
-// ~1,800 ordinary rows, all on blocks the liquidation-first pass priced, so
-// both the priced arms have specimens; the unpriced arm is discovered.
-const WALLET = process.env.WALLET ?? "0x719eae70d4a83f35bf82a2740699f5db84be919d";
+const EXPLORERS = {
+  "moonwell-base": {
+    page: (w) => `/base/moonwell/${w}`,
+    timeline: (w) => `/api/chain/moonwell-base/timeline?wallet=${w}`,
+    // The MAMO cascade's liquidated wallet (2026-08-27) — 596 liquidations and
+    // ~1,800 ordinary rows, all on blocks the liquidation-first pass priced, so
+    // both the priced arms have specimens; the unpriced arm is discovered.
+    wallet: "0x719eae70d4a83f35bf82a2740699f5db84be919d",
+    // The historic walk is paced; older rows are token-only until it reaches them.
+    complete: false,
+  },
+  moonwell: {
+    page: (w) => `/ethereum/moonwell/${w}`,
+    timeline: (w) => `/api/moonwell/timeline?wallet=${w}`,
+    // The deployment's newest liquidation (block 25,871,437, 2026-08-30:
+    // 9.294028 USDC repaid, 657,205 mcbBTC seized), so the liquidation arm has
+    // its specimen alongside the wallet's ordinary rows.
+    wallet: "0xcc2f8a9725aa6682478ccb62d9f0dcbed34daad3",
+    // A finite lane run to completion: no ordinary row may be unpriced.
+    complete: true,
+  },
+};
+const EXPLORER = process.env.EXPLORER ?? "moonwell-base";
+const X = EXPLORERS[EXPLORER];
+if (!X) throw new Error(`EXPLORER must be one of ${Object.keys(EXPLORERS).join(", ")}`);
+const WALLET = process.env.WALLET ?? X.wallet;
 // The toolbar's count label: "2,021 events", "Showing 2,021 listed of 2,408",
 // "2,021 listed · 2,408 events" — en-US grouping, so no bare \d+ here.
 const COUNT_RE = /^(?:Showing )?[\d,]+(?: of [\d,]+)? (?:events?|listed)/;
@@ -152,10 +186,10 @@ async function openReceiptFor(page, card, valueText) {
 
 // ── Expectations from the API ───────────────────────────────────────────
 
-const tl = await api(`/api/chain/moonwell-base/timeline?wallet=${WALLET}`);
+const tl = await api(X.timeline(WALLET));
 const events = tl.events ?? [];
 check(
-  `API: timeline for ${WALLET.slice(0, 10)}… answers (${events.length} drawn events, source ${tl.coverage?.source})`,
+  `API: ${EXPLORER} timeline for ${WALLET.slice(0, 10)}… answers (${events.length} drawn events, source ${tl.coverage?.source ?? "index"})`,
   events.length > 0,
 );
 const data = (e) => e.context?.data ?? {};
@@ -203,7 +237,7 @@ page.on("pageerror", (e) => pageErrors.push(String(e)));
 // rails-ops decision 0021 a served page neither offers "Collapse like events"
 // nor opens its folders when the flag is off. The flat answer groups in the
 // browser, so the toggle below still expands its runs.
-await page.goto(`${BASE}/base/moonwell/${WALLET}?folders=0`, { waitUntil: "domcontentloaded", timeout: 240000 });
+await page.goto(`${BASE}${X.page(WALLET)}?folders=0`, { waitUntil: "domcontentloaded", timeout: 240000 });
 await page.getByText(COUNT_RE).first().waitFor({ state: "visible", timeout: 120000 });
 await setDisplayFlag(page, "Event Numbers", true);
 // A collapsed ×N run renders no individual badge — the MAMO cascade is
@@ -295,6 +329,16 @@ if (pricedLiq) {
   );
 }
 
+if (X.complete) {
+  // A lane filled whole has no token-only row to find; the claim the cell
+  // stands on is that none exists.
+  const unpricedOrdinary = numbered.filter(({ d }) => d.eventType !== "liquidation" && d.priceAtBlock == null);
+  check(
+    `complete lane: every ordinary row on this wallet carries its at-block price`,
+    unpricedOrdinary.length === 0,
+    `${unpricedOrdinary.length} unpriced of ${numbered.length}`,
+  );
+}
 if (unpriced) {
   const { n } = unpriced;
   await expandCard(page, domN(n));
@@ -303,7 +347,7 @@ if (unpriced) {
     `unpriced #${n}: renders token-only (no "oracle at block" pill)`,
     (await card.getByText(/oracle at block/).count()) === 0,
   );
-} else {
+} else if (!X.complete) {
   check(
     "token-only arm: NO EVIDENCE — no unpriced ordinary row on this wallet",
     false,
