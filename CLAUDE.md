@@ -1,4 +1,4 @@
-# CLAUDE.md — rails-web-onboarding
+# CLAUDE.md — rails-web
 
 Guidance for Claude Code working in **this repo's code**. All prose — the charter,
 architecture, design grammar, per-protocol/pipeline reference — lives in
@@ -111,8 +111,9 @@ browser bundle):
 - viem targets ES2017 (no BigInt literals — use `BigInt()`); multi-return calls
   decode to positional arrays, structs to objects.
 - Run `npx tsc --noEmit` and `pnpm format` before committing. `main` tracks `origin`
-  (`github.com/rails-finance/rails-web-onboarding`; the old `web-mig` URL still
-  redirects) — commit on `main` and `git push`.
+  (`github.com/rails-finance/rails-web`, public; the code moved here from the
+  archived `rails-web-onboarding` repo on 2026-09-23) — commit on `main` and
+  `git push`.
 
 ## Finishing a change
 
