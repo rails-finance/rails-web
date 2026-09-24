@@ -2,6 +2,15 @@
 
 import type { ReactNode } from "react";
 import type { AaveV4Context, AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
+import type { AaveV4SnapshotItem } from "@/lib/shared/types/event-shape";
+import {
+  NO_PRICE_HINT,
+  UNPRICED_DUST_TOKENS,
+  noPriceRatioProv,
+  partialLabel,
+  partialRatioProv,
+  pricesHaveLoaded,
+} from "@/lib/aave-v4/unpriced";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { formatRatio, ratioLabel, ratioColorClass } from "@/lib/shared/ratio-format";
@@ -218,18 +227,9 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber }: AaveV4EventDetai
   const supplyBefore = ctx.supplyBefore;
   const debtBefore = ctx.debtBefore;
 
-  // Without prices, totals come out 0 and the ratio panel hides. v1 ships
-  // without live pricing — `usePrices()` is a stub returning {}.
-  const getPrice = (sym: string) => resolvePrice(sym, prices) ?? 0;
-  const totalSupplyUsd = supplies.reduce((s, p) => s + parseFloat(p.amount) * getPrice(p.symbol), 0);
-  const totalDebtUsd = debts.reduce((s, p) => s + parseFloat(p.amount) * getPrice(p.symbol), 0);
-  const collRatio = totalDebtUsd > 0 ? totalSupplyUsd / totalDebtUsd : 0;
-  const showRatio = hasSupplies && hasDebts && totalDebtUsd > 0.01;
-
-  // Footer price pills — one per distinct asset in the snapshot (collateral +
-  // debt). Prefer each row's historic price; fall back to the event's primary
-  // price (`ctx.price`, or liquidation's `collateralPrice` / `debtPrice`) so
-  // the changed asset still shows when its per-row price is absent.
+  // The event's primary price (`ctx.price`, or liquidation's `collateralPrice`
+  // / `debtPrice`) for the changed asset — the fallback the rows and the
+  // footer pills use when a row's own historic price is absent.
   const rowPrice = (sym: string): { usd: number; source: AaveV4PriceSource; block?: number } | undefined => {
     if (isLiq) {
       if (sym === ctx.collateralSymbol) return ctx.collateralPrice;
@@ -238,6 +238,43 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber }: AaveV4EventDetai
     }
     return sym === ctx.reserveSymbol ? ctx.price : undefined;
   };
+
+  // RULE: Rails never invents a price (lib/aave-v4/unpriced.ts). The ratio
+  // values each leg at the price the row above it shows — the row's own
+  // historic price, else the event's primary price, else the live map — and a
+  // leg none of these covers is left out and named, never counted as zero.
+  // Until the live map has answered, a leg with no historic price is pending
+  // rather than unpriced, and the card waits.
+  const mapAnswered = pricesHaveLoaded(prices);
+  const sumLegs = (rows: AaveV4SnapshotItem[]) => {
+    let usd = 0;
+    const excluded: string[] = [];
+    let pending = false;
+    for (const r of rows) {
+      const amt = parseFloat(r.amount);
+      if (!(amt > 0)) continue;
+      const price = r.price?.usd ?? rowPrice(r.symbol)?.usd ?? resolvePrice(r.symbol, prices);
+      if (price != null) usd += amt * price;
+      else if (!mapAnswered) pending = true;
+      else if (amt > UNPRICED_DUST_TOKENS) excluded.push(r.symbol);
+    }
+    return { usd, excluded, pending };
+  };
+  const supplySum = sumLegs(supplies);
+  const debtSum = sumLegs(debts);
+  const ratioExcluded = [...supplySum.excluded, ...debtSum.excluded];
+  const collRatio = debtSum.usd > 0 ? supplySum.usd / debtSum.usd : 0;
+  // A side whose every priced holding is missing has no dollar figure, so the
+  // ratio is absent and the card says so rather than showing a zero.
+  const collateralAbsent = supplySum.usd <= 0 && supplySum.excluded.length > 0;
+  const debtAbsent = debtSum.usd <= 0.01 && debtSum.excluded.length > 0;
+  const ratioAbsent = collateralAbsent || debtAbsent;
+  const showRatio =
+    hasSupplies && hasDebts && !supplySum.pending && !debtSum.pending && (ratioAbsent || debtSum.usd > 0.01);
+
+  // Footer price pills — one per distinct asset in the snapshot (collateral +
+  // debt). Prefer each row's historic price; fall back to the event's primary
+  // price so the changed asset still shows when its per-row price is absent.
   const pricePills: { symbol: string; usd: number; source: AaveV4PriceSource; block?: number }[] = [];
   const seenPill = new Set<string>();
   for (const row of [...supplies, ...debts]) {
@@ -317,10 +354,24 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber }: AaveV4EventDetai
       ),
     });
   }
-  if (showRatio) {
+  if (showRatio && ratioAbsent) {
+    const label = ratioLabel(ratioMode);
+    const side = collateralAbsent ? "collateral" : "debt";
+    const names = collateralAbsent ? supplySum.excluded : debtSum.excluded;
     snapshotCards.push({
       key: "ratio",
-      label: ratioLabel(ratioMode),
+      label,
+      body: (
+        <div className="text-sm font-semibold text-rb-500" data-ratio="no-price">
+          <Prov info={noPriceRatioProv(label, side, names)}>{NO_PRICE_HINT}</Prov>
+        </div>
+      ),
+    });
+  } else if (showRatio) {
+    const label = ratioLabel(ratioMode);
+    snapshotCards.push({
+      key: "ratio",
+      label: partialLabel(label, ratioExcluded),
       body: (
         <div
           className={`text-sm font-semibold ${ratioColorClass(collRatio * 100, {
@@ -329,8 +380,11 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber }: AaveV4EventDetai
             warnClass: "text-foreground",
             safeClass: "",
           })}`}
+          data-ratio={ratioExcluded.length > 0 ? "partial" : "whole"}
         >
-          <Prov info={RATIO_PROV}>{formatRatio(collRatio * 100, ratioMode, 0)}</Prov>
+          <Prov info={partialRatioProv(RATIO_PROV, label, ratioExcluded)}>
+            {formatRatio(collRatio * 100, ratioMode, 0)}
+          </Prov>
         </div>
       ),
     });

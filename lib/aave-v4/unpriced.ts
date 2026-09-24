@@ -69,3 +69,33 @@ export function partialSumProv(base: Provenance, what: string, excluded: string[
 export function partialLabel(label: string, excluded: string[]): string {
   return excluded.length > 0 ? `${label}${PARTIAL_LABEL_SUFFIX}` : label;
 }
+
+/** A ratio of two USD sums that each add up only the priced holdings: the
+ *  figure's own receipt, re-summarised as partial and naming the assets it
+ *  could not reach. Returns `base` unchanged when nothing was left out. */
+export function partialRatioProv(base: Provenance, what: string, excluded: string[]): Provenance {
+  if (excluded.length === 0) return base;
+  const names = listSymbols(excluded);
+  return {
+    ...base,
+    summary: `${what} is partial — it divides the priced collateral by the priced debt. It leaves out ${names}, for which there is no price source.`,
+    inputs: [
+      ...(base.inputs ?? []),
+      { label: "left out", kind: "offchain", pclass: "offchain", note: `${names} — no price source` },
+    ],
+  };
+}
+
+/** Receipt for the `NO_PRICE_HINT` standing where a ratio would be, because
+ *  every holding on one side of it has no price: there is no dollar figure on
+ *  that side to divide by or from. */
+export function noPriceRatioProv(what: string, side: "collateral" | "debt", excluded: string[]): Provenance {
+  const names = listSymbols(excluded);
+  return {
+    kind: "offchain",
+    pclass: "offchain",
+    summary: `${what} has no figure at this event — ${names} has no price source, and it is all the ${side} side holds, so there is no ${side} dollar figure to take the ratio from.`,
+    via: "no price source",
+    inputs: [{ label: "left out", kind: "offchain", pclass: "offchain", note: `${names} — no price source` }],
+  };
+}
