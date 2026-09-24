@@ -438,12 +438,11 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     // in prose instead of rendering it.
     views: true,
   }),
-  // Forensics is `awaiting` (2026-07-14 forensics wave): the LiquidateBorrow
-  // lane is fully wired (repay + seize legs, liquidator link, explainer), but
-  // Moonwell Ethereum has had ZERO liquidations since its 2026-05-27 deploy —
-  // a valued treatment can't be verified against no instances. Flip to `true`
-  // with the first real liquidation (seizeTokens needs the mToken exchange
-  // rate at block to value the seized leg).
+  // Forensics flipped from `awaiting` to `true` on 2026-09-24, its note beside
+  // the cell below: the 2026-07-14 forensics wave wired the LiquidateBorrow
+  // lane (repay + seize legs, liquidator link, explainer) against ZERO
+  // liquidations since the 2026-05-27 deploy, and the deployment's first two
+  // have since landed.
   moonwell: explorerDepth({
     // At-block prices (2026-09-24): the Base lane's Ethereum twin, the
     // Comptroller's own oracle, exchange rates, incentive and close factor at
@@ -455,18 +454,24 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     // at its own block; the newest blocks join within the 15-minute tick.
     // Verifier: scripts/verify/verify-at-block-prices-moonwell-base.mjs with
     // EXPLORER=moonwell. Two liquidations now exist on this deployment
-    // (2026-07-24 and 2026-08-30), so the `awaiting` below has its instances;
-    // that cell moves once the liquidation arm has run against the filled lane.
+    // (2026-07-24 and 2026-08-30); the same verifier's liquidation arm is
+    // what flips forensics below.
     atBlockPrices: true,
     dashboard: true,
     oracleUsd: true,
     verification: true,
     llm: true,
     explainers: true,
-    forensics: {
-      awaiting:
-        "the liquidation lane is built, but Moonwell Ethereum has had zero liquidations since its 2026-05 deploy — there is nothing yet to show or verify against",
-    },
+    // Forensics (2026-09-24): flipped from `awaiting`, its instances now on
+    // record. Two liquidations exist on this deployment, 2026-07-24 (USDT debt, mUSDT
+    // seized) and 2026-08-30 (USDC debt, mcbBTC seized, wallet
+    // 0xcc2f8a9725aa6682478ccb62d9f0dcbed34daad3), and the chain sweep
+    // (scripts/verify-moonwell-chain.mjs) matches both, log for log, against
+    // mainnet. Verifier: scripts/verify/verify-at-block-prices-moonwell-base.mjs
+    // with EXPLORER=moonwell, whose liquidation arm confirms both legs valued
+    // at the Comptroller's own oracle read at the event's block, against the
+    // incentive read at the same block.
+    forensics: true,
     // Protocol view (2026-07-16): /moonwell/markets — the four markets against
     // their own caps, ported from the Compound V2 markets reader with the two
     // fork facts honored: rates annualize on each model's own
