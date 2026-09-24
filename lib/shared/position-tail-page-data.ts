@@ -20,11 +20,13 @@
 // for exited reserves — stays a client-side second wave, so no document waits on
 // a chain round trip.
 //
-// Reads through THIS deployment's own /api/* routes with an ssrHop() baseUrl,
-// not RAILS_API_URL directly: those routes shape the backend's raw rows into
-// what the page renders. Read what a proxy does before deciding it is only a hop.
-// Every read passes the hop's signed reader headers, so the proxy reads the
-// backend as the reader and the box's per-reader budget applies.
+// Reads through THIS deployment's own /api/* routes with an ssrHop() baseUrl by
+// default, because those routes can shape the backend's raw rows into what the
+// page renders. Read what a proxy does before deciding it is only a hop; where
+// all of them do forward unchanged, the caller passes `hop: boxHop` and the
+// reads go to RAILS_API_URL with bearer auth instead, one function invocation
+// cheaper each. Either way every read carries headers that name the reader, so
+// the box's per-reader budget applies to the reader and not to the deployment.
 //
 // THE WINDOWED HISTORY IS PART OF THE TAIL. The timeline fetch asks for a window
 // of the most recent events; a position large enough to need one gets back the
@@ -41,7 +43,7 @@
 // throwing, and the client half fetches for itself exactly as it did before the
 // route had a server half — an SSR miss costs the first-paint win, not the page.
 
-import { ssrHop } from "@/lib/shared/listing-ssr";
+import { ssrHop, type SsrHop } from "@/lib/shared/listing-ssr";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 
@@ -99,8 +101,13 @@ export async function loadPositionTail<Positions, Timeline extends TimelineRead 
     cutoffBlock: number,
     headers: Record<string, string>,
   ) => Promise<TimelineOpeningBalance>;
+  /** Where the reads go. The default is this deployment's own `/api/*` proxies
+   *  (`ssrHop`), which is right whenever a proxy shapes what it forwards. An
+   *  explorer whose three proxies only forward passes `boxHop` instead and
+   *  drops three function invocations from the cold path. */
+  hop?: () => Promise<SsrHop | null>;
 }): Promise<PositionTail<Positions, Timeline>> {
-  const hop = await ssrHop();
+  const hop = await (opts.hop ?? ssrHop)();
   if (!hop) return EMPTY;
   const { baseUrl: origin, headers } = hop;
 

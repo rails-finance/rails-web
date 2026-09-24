@@ -113,11 +113,16 @@ export interface AaveV4SpokeViewProps {
    *  reads it exactly as this page always did. An EMPTY array is a real answer
    *  — a wallet with no captured events — and seeds. */
   initialEvents: BaseActivityEvent[] | null;
+  /** Address→USD, read on the server beside the tail. Seeds PricesProvider so
+   *  the card's collateral / supplied figure renders into the HTML rather than
+   *  as a skeleton the client fills after hydration. Empty when the read
+   *  failed — the provider then fetches on mount as it always did. */
+  initialPrices?: Record<string, number>;
 }
 
 export default function AaveV4SpokeView(props: AaveV4SpokeViewProps) {
   return (
-    <PricesProvider>
+    <PricesProvider initialPrices={props.initialPrices}>
       <AaveV4SpokePageInner {...props} />
     </PricesProvider>
   );

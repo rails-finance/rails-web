@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { resolveSpokeSegment } from "@/lib/aave-v4/spoke-meta";
-import { loadAaveV4SpokeTail } from "@/lib/aave-v4/spoke-position-page-data";
+import { loadAaveV4CardPrices, loadAaveV4SpokeTail } from "@/lib/aave-v4/spoke-position-page-data";
 import AaveV4SpokeView from "./position-view";
 
 interface Props {
@@ -62,7 +62,9 @@ export default async function AaveV4SpokePage({ params }: Props) {
   if (slug && slug !== rawSpoke) permanentRedirect(canonicalPath);
   const spokeSlug = slug ?? rawSpoke;
 
-  const tail = await loadAaveV4SpokeTail(wallet, spokeName);
+  // Beside the tail, not behind it: the price map covers every address the
+  // card can resolve, so it needs nothing the tail returns.
+  const [tail, prices] = await Promise.all([loadAaveV4SpokeTail(wallet, spokeName), loadAaveV4CardPrices()]);
 
   return (
     <AaveV4SpokeView
@@ -75,6 +77,7 @@ export default async function AaveV4SpokePage({ params }: Props) {
       initialPositions={tail.spokePositions}
       initialChain={tail.chain}
       initialEvents={tail.events}
+      initialPrices={prices}
     />
   );
 }
