@@ -445,7 +445,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // with the first real liquidation (seizeTokens needs the mToken exchange
   // rate at block to value the seized leg).
   moonwell: explorerDepth({
-    // At-block prices (2026-09-24): the Base lane's Ethereum twin — the
+    // At-block prices (2026-09-24): the Base lane's Ethereum twin, the
     // Comptroller's own oracle, exchange rates, incentive and close factor at
     // every captured event block (rails-server-onboarding mig 325,
     // scripts/fill-moonwell-prices.mjs on the shared roster runner), merged

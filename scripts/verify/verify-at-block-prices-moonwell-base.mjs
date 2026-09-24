@@ -1,4 +1,4 @@
-// Live in-browser verification of the Moonwell oracle-at-block prices — the
+// Live in-browser verification of the Moonwell oracle-at-block prices, the
 // per-block roster capture on Base (rails-server-onboarding mig 195,
 // scripts/fill-moonwell-base-prices.mjs) and on Ethereum (mig 325,
 // scripts/fill-moonwell-prices.mjs, 2026-09-24) as the shared timeline
@@ -11,7 +11,7 @@
 // /api/moonwell/timeline) and checked against the DOM; nothing is pinned to
 // an event number or to an absence (verify-historic-usd-pills.mjs's rules):
 // the specimens are discovered at run time and a run that finds no unpriced
-// row says NO EVIDENCE — except on a lane whose universe is filled whole
+// row says NO EVIDENCE, except on a lane whose universe is filled whole
 // (Ethereum: ~1,410 blocks, run to completion), where the token-only arm is
 // replaced by the stronger claim that EVERY ordinary row carries its price.
 //
@@ -44,7 +44,7 @@ const EXPLORERS = {
   "moonwell-base": {
     page: (w) => `/base/moonwell/${w}`,
     timeline: (w) => `/api/chain/moonwell-base/timeline?wallet=${w}`,
-    // The MAMO cascade's liquidated wallet (2026-08-27) — 596 liquidations and
+    // The MAMO cascade's liquidated wallet (2026-08-27): 596 liquidations and
     // ~1,800 ordinary rows, all on blocks the liquidation-first pass priced, so
     // both the priced arms have specimens; the unpriced arm is discovered.
     wallet: "0x719eae70d4a83f35bf82a2740699f5db84be919d",
