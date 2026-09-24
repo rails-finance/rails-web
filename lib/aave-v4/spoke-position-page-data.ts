@@ -22,6 +22,9 @@ import {
   type AaveV4SpokePositionChainResponse,
 } from "@/lib/api/fetch-aave-v4-spoke-position";
 import { SPOKE_NAME_TO_KEY } from "@/lib/aave-v4/spoke-meta";
+import { ssrHop } from "@/lib/shared/listing-ssr";
+import { fetchPrices } from "@/lib/api/fetch-prices";
+import { PRICEABLE_TOKEN_ADDRESSES } from "@/lib/aave/prices";
 
 interface AaveV4SpokeReads {
   positions: AaveV4Position[];
@@ -47,4 +50,36 @@ export const loadAaveV4SpokeTail = cache(async (wallet: string, spokeName: strin
     readTimeline: (baseUrl, headers) => fetchAaveV4Timeline({ wallet, baseUrl, headers }),
   });
   return { ...tail, spokePositions: tail.positions?.positions ?? null, chain: tail.positions?.chain ?? null };
+});
+
+// Bound the price leg the way the tail beside it is bounded.
+const PRICES_FETCH_TIMEOUT_MS = 8000;
+
+/**
+ * The card's USD prices, read on the server so the collateral / supplied figure
+ * ships in the HTML instead of as a skeleton the client fills after hydration.
+ *
+ * The WHOLE priceable set, not the position's own reserves: `resolvePrice` can
+ * only reach an address in TOKEN_ADDR, and the position's reserves are known
+ * only after the tail has answered. Asking for the lot instead lets this run
+ * BESIDE the tail rather than chained behind it, and the box answers a price
+ * batch in single-digit milliseconds.
+ *
+ * Best-effort, like the tail: a failure returns an empty seed and the client's
+ * PricesProvider fetches on mount exactly as it did before.
+ */
+export const loadAaveV4CardPrices = cache(async (): Promise<Record<string, number>> => {
+  const hop = await ssrHop();
+  if (!hop) return {};
+  try {
+    return await fetchPrices({
+      tokens: PRICEABLE_TOKEN_ADDRESSES,
+      baseUrl: hop.baseUrl,
+      headers: hop.headers,
+      signal: AbortSignal.timeout(PRICES_FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    console.error("aave-v4-spoke-page-data: price read failed; client will fetch", err);
+    return {};
+  }
 });

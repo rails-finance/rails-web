@@ -46,6 +46,11 @@ export const TOKEN_ADDR: Record<string, string> = {
   "PT-USDG-24SEP2026": "0xc1906aecf868749a2dee203f59b904c0cf212140",
 };
 
+/** Every address `resolvePrice` can reach. A symbol outside TOKEN_ADDR resolves
+ *  to `null` whatever the price map holds, so this list is the whole set a
+ *  server render has to ask for to price a card's figures in the document. */
+export const PRICEABLE_TOKEN_ADDRESSES: string[] = [...new Set(Object.values(TOKEN_ADDR))];
+
 /** The asset's live USD price, or `null` when no source covers it. A `null` is
  *  a fact the surface has to state, never a number to substitute for. */
 export function resolvePrice(symbol: string, prices?: Record<string, PriceEntry | number>): number | null {
