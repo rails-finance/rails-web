@@ -325,6 +325,11 @@ function MonthStrip({ months, first, last, max, loaded, inView, loadingMonth, on
   const stripRef = useRef<HTMLDivElement | null>(null);
   const programmatic = useRef(false);
   const settleTimer = useRef<number | null>(null);
+  // A settle loads only after a READER's gesture: the strip also scrolls
+  // itself, to follow the rows and to centre a tapped label, and a settle
+  // read off one of those scrolls mid-animation would load whichever month
+  // the label passed over.
+  const gesture = useRef(false);
   const bandLo = monthIdxOf(loaded.from);
   const bandHi = monthIdxOf(loaded.to);
   // The month whose rows are at the top of the screen carries the full
@@ -390,13 +395,25 @@ function MonthStrip({ months, first, last, max, loaded, inView, loadingMonth, on
 
   // A swipe that settles: the label nearest the centre once scrolling stops.
   const onScroll = () => {
-    if (programmatic.current) return;
+    if (programmatic.current || !gesture.current) return;
     if (settleTimer.current != null) window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => {
       settleTimer.current = null;
+      gesture.current = false;
+      if (loadingMonth != null) return;
       const idx = centreMonth();
       if (idx != null && idx !== here) settleTo(idx);
     }, 160);
+  };
+  const onGesture = () => {
+    gesture.current = true;
+  };
+  const onTap = (idx: number, empty: boolean) => {
+    // The tap is the pick; the scroll it causes is not a swipe.
+    gesture.current = false;
+    if (settleTimer.current != null) window.clearTimeout(settleTimer.current);
+    settleTimer.current = null;
+    if (!empty) settleTo(idx);
   };
 
   const labels: number[] = [];
@@ -407,6 +424,9 @@ function MonthStrip({ months, first, last, max, loaded, inView, loadingMonth, on
       ref={stripRef}
       data-segment-strip=""
       onScroll={onScroll}
+      onTouchStart={onGesture}
+      onPointerDown={onGesture}
+      onWheel={onGesture}
       className="flex select-none snap-x snap-mandatory overflow-x-auto border-b border-rb-200/60 pt-1 [scrollbar-width:none] sm:hidden dark:border-rb-800/60 [&::-webkit-scrollbar]:hidden"
     >
       <div className="shrink-0 basis-1/3" aria-hidden />
@@ -427,7 +447,7 @@ function MonthStrip({ months, first, last, max, loaded, inView, loadingMonth, on
             tabIndex={empty ? -1 : 0}
             aria-label={`${monthLabel(idx)}, ${n(count)} ${count === 1 ? "event" : "events"}`}
             aria-disabled={empty || undefined}
-            onClick={() => !empty && settleTo(idx)}
+            onClick={() => onTap(idx, empty)}
             className={`relative grid shrink-0 basis-1/3 snap-center justify-items-center gap-px px-1.5 pb-2 pt-1 text-[13px] ${
               empty ? "cursor-default" : "cursor-pointer"
             } ${banded || isHere ? "text-foreground" : "text-rb-500"} ${isHere ? "font-semibold" : ""} ${
