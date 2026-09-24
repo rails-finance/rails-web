@@ -88,6 +88,10 @@ const SKIPS = {
     "live only: requests queued exports from a deployed preview and the onboarding box " +
     "(BASE=https://preview.rails.finance), spends test readers' daily quota, and with " +
     "RESTART_CMD redeploys the api. Run it by hand.",
+  "verify-timeline-abuse.mjs":
+    "live only: bursts 70 bare /timeline requests at the deployed preview to meet the " +
+    "Vercel Firewall rate limit (BASE=https://preview.rails.finance BURST=1), which " +
+    "denies the runner's IP on every /timeline path for the rest of the window. Run it by hand.",
 };
 
 // A verifier "reached a verdict" if it printed one of its own summary lines.
