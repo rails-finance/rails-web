@@ -78,7 +78,8 @@ export async function GET(request: NextRequest) {
   // reader who pointed at one month or one day in the middle of the history
   // rather than at its newest end. Passed straight through for the same reason
   // `recent` is: rails-server owns the shape of both, refuses them together,
-  // and answers a bad one with its own 400. It is never composed with `group`.
+  // and answers a bad one with its own 400. Under `group` it names the
+  // segment (below).
   const from = request.nextUrl.searchParams.get("from");
   const to = request.nextUrl.searchParams.get("to");
   const grouped = request.nextUrl.searchParams.get("group") === "1";
@@ -90,9 +91,15 @@ export async function GET(request: NextRequest) {
       // whichever binds first), because a caller cannot know how many events
       // fill a thousand rows on this particular position.
       const marketParam = market ? `&market=${encodeURIComponent(market)}` : "";
+      // A SPAN is composed with `group`: the month picker's read (decision
+      // 0019, amendment 2026-09-24) is the segment grouped the same way the
+      // newest window is. Each end forwarded independently, as below. An api
+      // that predates the grouped span answers the newest window with no
+      // `span` on it, and the page reads the segment flat instead.
+      const spanParam = (from ? `&from=${encodeURIComponent(from)}` : "") + (to ? `&to=${encodeURIComponent(to)}` : "");
       // `swaps=1`: both legs of a paired position swap arrive marked, and the
       // transform draws them as one card (rails-ops TO-DO-ui-jobs §15).
-      const url = `${RAILS_API_URL}/api/aave-v3/timeline?wallet=${encodeURIComponent(wallet)}${marketParam}&group=1&swaps=1`;
+      const url = `${RAILS_API_URL}/api/aave-v3/timeline?wallet=${encodeURIComponent(wallet)}${marketParam}${spanParam}&group=1&swaps=1`;
       const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));
       if (!response.ok) {
         console.error(`Backend API error: ${response.status} ${response.statusText}`);
@@ -139,6 +146,7 @@ export async function GET(request: NextRequest) {
         rowPlan,
         eventsServed: upstream.eventsServed,
         boundBy: upstream.boundBy,
+        span: upstream.span ?? null,
       };
       return NextResponse.json(toTimelineWire(body, MAINNET_CHAIN_ID), {
         headers: proxyCacheControl(response, LISTING_CACHE_CONTROL),

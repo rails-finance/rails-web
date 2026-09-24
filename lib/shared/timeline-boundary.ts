@@ -109,7 +109,9 @@ export function boundaryFromWindow(
   listed: number,
   state: BoundaryStateLine[] | null,
 ): TimelineBoundary | null {
-  if (win.state === "whole") return null;
+  // A segment has no card: the months outside it are in the picker above the
+  // rows, and the spine's bare glyphs mark its two ends.
+  if (win.state === "whole" || win.state === "span") return null;
   if (win.state !== "ready") {
     return {
       arm: "window",

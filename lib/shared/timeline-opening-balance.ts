@@ -203,11 +203,33 @@ export interface TimelineOpeningBalance {
  * rather than comments a reader has to trust: a window that is not "whole"
  * always names the block it opened at, and only "ready" carries an opening
  * balance. Anything that reads `opening` outside "ready" is reading a null it
- * cannot silently treat as an empty history. */
+ * cannot silently treat as an empty history.
+ *
+ *  - `span` — the page holds ONE SEGMENT OF TIME that is not the newest slice
+ *    (decision 0019, amendment 2026-09-24: the month picker). A span brings no
+ *    opening balance forward, so every lifetime figure is absent here too; the
+ *    segment states its own month and what of it was loaded. */
 export type TimelineWindow =
   | { state: "whole"; cutoffBlock: null; opening: null }
   | { state: "pending" | "failed"; cutoffBlock: number; opening: null }
-  | { state: "ready"; cutoffBlock: number; opening: TimelineOpeningBalance };
+  | { state: "ready"; cutoffBlock: number; opening: TimelineOpeningBalance }
+  | { state: "span"; cutoffBlock: null; opening: null; span: TimelineSegmentSpan };
+
+/** A segment the page holds in place of the newest window. */
+export interface TimelineSegmentSpan {
+  /** The month the picker named, whole: its bounds, its label ("January
+   *  2026") and how many events the life holds in it, read from the whole
+   *  life's per-day counts. */
+  month: { from: number; to: number; label: string; holds: number };
+  /** What was asked of the index: the month, or the week or day it shrank to
+   *  when the month holds more than the preload can carry. */
+  asked: { from: number; to: number };
+  /** The events the life holds before `asked.from`: the number the segment's
+   *  oldest row counts up from. */
+  eventsBefore: number;
+  /** The life the segment sits inside, so the spine can say where it ends. */
+  life: { firstAt: number; lastAt: number };
+}
 
 export const WHOLE_HISTORY: TimelineWindow = { state: "whole", cutoffBlock: null, opening: null };
 

@@ -37,9 +37,10 @@ function fmtFullDate(ts: number): string {
 }
 
 // Five intensity levels (0 = empty … 4 = busiest) → Tailwind classes.
-// Exported with `relLevel` below for the navigator's overview strip: the two
-// tiers draw the same months, so they must draw them the same colour.
-function bucketClass(level: number): string {
+// Exported with `relLevel` below for the segment picker above the rows
+// (timeline-segment-picker.tsx): it draws the same months, so it must draw
+// them the same colour.
+export function bucketClass(level: number): string {
   switch (level) {
     case 0:
       return "bg-rb-200/50 dark:bg-rb-900/60";
@@ -72,7 +73,7 @@ const bucketColor = (count: number): string => bucketClass(absLevel(count));
 // on a log curve so a heavy-tailed distribution still spreads across the four
 // shades. Quiet histories (busiest month ≤ 4 events) fall back to the absolute
 // scale so a low-activity position isn't forced dark.
-function relLevel(count: number, max: number): number {
+export function relLevel(count: number, max: number): number {
   if (count <= 0) return 0;
   if (max <= 4) return absLevel(count);
   const r = Math.log(count + 1) / Math.log(max + 1); // (0, 1]

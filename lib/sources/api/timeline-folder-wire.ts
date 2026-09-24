@@ -103,6 +103,9 @@ export interface UpstreamGroupedTimeline<R> {
   cutoffBlock: number | null;
   eventsServed: number;
   boundBy: "rows" | "scan" | null;
+  /** The span asked for, echoed back, on an api that groups a segment
+   *  (decision 0019, amendment 2026-09-24). Absent on one that predates it. */
+  span?: { from: number; to: number } | null;
 }
 
 /** What `/timeline/folder` answers with: the folder's own header and its

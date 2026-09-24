@@ -150,9 +150,13 @@ export interface TimelineNavigatorPanelProps {
   /** Inside the phone sheet, whose pinned header already carries the count and
    *  Reset. The spread stays — it is the picker, not chrome. */
   inSheet?: boolean;
+  /** False where the months have left this panel for the segment picker above
+   *  the rows (decision 0019, amendment 2026-09-24, rule 1): the spread alone
+   *  stands here, a filter typed within the loaded segment. */
+  grid?: boolean;
 }
 
-export function TimelineNavigatorPanel({ tl, notes, inSheet }: TimelineNavigatorPanelProps) {
+export function TimelineNavigatorPanel({ tl, notes, inSheet, grid = true }: TimelineNavigatorPanelProps) {
   const events = tl.visibleEvents;
   const priorDays = tl.historyWindow.opening?.byDay;
   // The served folders' own days. They are part of the WINDOW, not of the
@@ -190,7 +194,7 @@ export function TimelineNavigatorPanel({ tl, notes, inSheet }: TimelineNavigator
     <div data-timeline-navigator="">
       {/* The header: the spread on the left, Reset on the right. No count —
           the control strip's own is still on screen just above the panel. */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div className={`${grid ? "mb-3 " : ""}flex flex-wrap items-center justify-between gap-x-4 gap-y-2`}>
         <div data-date-span-picker="" className="flex items-center gap-2">
           <input
             type="date"
@@ -219,22 +223,26 @@ export function TimelineNavigatorPanel({ tl, notes, inSheet }: TimelineNavigator
         )}
       </div>
 
-      <TransactionHeatmap
-        events={events}
-        priorDays={priorDays}
-        windowDays={folderDays}
-        value={value}
-        onChange={tl.setDateRange}
-        layout="months"
-        chrome="plain"
-        marks={marks}
-        select="single"
-      />
+      {grid && (
+        <>
+          <TransactionHeatmap
+            events={events}
+            priorDays={priorDays}
+            windowDays={folderDays}
+            value={value}
+            onChange={tl.setDateRange}
+            layout="months"
+            chrome="plain"
+            marks={marks}
+            select="single"
+          />
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <MarkLegend marks={marks} />
-        <DensityRamp />
-      </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <MarkLegend marks={marks} />
+            <DensityRamp />
+          </div>
+        </>
+      )}
     </div>
   );
 }

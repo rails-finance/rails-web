@@ -42,6 +42,10 @@ export async function GET(request: NextRequest) {
   const market = request.nextUrl.searchParams.get("market");
   const event = request.nextUrl.searchParams.get("event");
   const folderId = request.nextUrl.searchParams.get("folder");
+  // A folder on a segment (`/timeline?group=1&from=&to=`) is cut from that
+  // segment's grouping, so the span rides the open too.
+  const from = request.nextUrl.searchParams.get("from");
+  const to = request.nextUrl.searchParams.get("to");
 
   try {
     // `swaps=1` as on /timeline, so the folder is cut from the same grouping.
@@ -49,6 +53,8 @@ export async function GET(request: NextRequest) {
     if (market) qs.set("market", market);
     if (event) qs.set("event", event);
     if (folderId) qs.set("folder", folderId);
+    if (from) qs.set("from", from);
+    if (to) qs.set("to", to);
     const url = `${RAILS_API_URL}/api/aave-v3/timeline/folder?${qs.toString()}`;
     const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));
     if (!response.ok) {

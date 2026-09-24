@@ -95,7 +95,10 @@ export type AaveV3GroupedTimelineResponse = AaveV3TimelineResponse & GroupedTime
  * no longer the served history, so a caller that reduces `events` and calls
  * the result a lifetime figure would be wrong in a way a boolean flag would
  * have hidden. `?recent` is not composed with it — under grouping the bounds
- * are the route's own.
+ * are the route's own. A `span` is: the month picker's read is the segment
+ * grouped the same way (decision 0019, amendment 2026-09-24), and the answer
+ * echoes it as `span`. An api that predates the grouped span answers the
+ * newest window with no `span` on it; the caller reads the segment flat then.
  */
 export async function fetchAaveV3GroupedTimeline(p: {
   wallet: string;
@@ -103,9 +106,14 @@ export async function fetchAaveV3GroupedTimeline(p: {
   baseUrl?: string;
   signal?: AbortSignal;
   headers?: HeadersInit;
+  span?: [number, number];
 }): Promise<AaveV3GroupedTimelineResponse> {
   const qs = new URLSearchParams({ wallet: p.wallet, group: "1" });
   if (p.market) qs.set("market", p.market);
+  if (p.span) {
+    qs.set("from", String(p.span[0]));
+    qs.set("to", String(p.span[1]));
+  }
   const url = `${p.baseUrl ?? ""}/api/aave-v3/timeline?${qs.toString()}`;
   const done = settleFetchMark("aave-v3-timeline-grouped");
   const res = await fetch(url, { cache: "no-store", signal: p.signal, headers: p.headers });

@@ -38,6 +38,7 @@ import { formatDate, formatDuration } from "@/lib/date";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { ratioLabel } from "@/lib/shared/ratio-format";
 import { lifetimeFiguresKnown } from "@/lib/shared/timeline-opening-balance";
+import { loadedDaysStatement, segmentStatement } from "@/lib/shared/timeline-segments";
 import { TimelineNavigatorPanel } from "@/components/shared/timeline-navigator";
 import type { MarketNote } from "@/lib/shared/market-note";
 import { useHydrated } from "@/hooks/useHydrated";
@@ -208,6 +209,10 @@ export function TimelineDisplayMenu({ items }: { items: TimelineDisplayItem[] })
 }
 
 export interface TimelineToolbarProps {
+  /** False on a page whose months are the segment picker above the rows:
+   *  the Date panel then keeps the typed spread alone (decision 0019,
+   *  amendment 2026-09-24, rule 1). */
+  navigatorGrid?: boolean;
   tl: TimelineEventsState;
   /** Display flags to expose in the eye-menu (only ones with a render path). */
   displayItems: TimelineDisplayItem[];
@@ -318,9 +323,54 @@ export function eventCountState(tl: TimelineEventsState): EventCountState {
   };
 }
 
+/** The span the loaded rows cover, from the loose events and the served
+ *  folders, in the line's own date register: "14 Nov 2025 to 24 Sep 2026".
+ *  Null when nothing is loaded. */
+function loadedSpanText(tl: TimelineEventsState): string | null {
+  let first = tl.sortedEvents.length ? tl.sortedEvents[0].timestamp : Infinity;
+  let last = tl.sortedEvents.length ? tl.sortedEvents[tl.sortedEvents.length - 1].timestamp : -Infinity;
+  if (tl.servedSpan) {
+    first = Math.min(first, tl.servedSpan.firstAt);
+    last = Math.max(last, tl.servedSpan.lastAt);
+  }
+  if (!Number.isFinite(first)) return null;
+  const day = (ts: number) =>
+    new Date(ts * 1000).toLocaleDateString("en-GB", {
+      timeZone: "UTC",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  const a = day(first);
+  const b = day(last);
+  return a === b ? a : `${a} to ${b}`;
+}
+
+/** The extent of the loaded rows in seconds, for the segment statement. */
+function loadedExtent(tl: TimelineEventsState): { firstAt: number; lastAt: number } | null {
+  let first = tl.sortedEvents.length ? tl.sortedEvents[0].timestamp : Infinity;
+  let last = tl.sortedEvents.length ? tl.sortedEvents[tl.sortedEvents.length - 1].timestamp : -Infinity;
+  if (tl.servedSpan) {
+    first = Math.min(first, tl.servedSpan.firstAt);
+    last = Math.max(last, tl.servedSpan.lastAt);
+  }
+  return Number.isFinite(first) ? { firstAt: first, lastAt: last } : null;
+}
+
 export function eventCountLine(tl: TimelineEventsState): string {
   const n = (v: number) => v.toLocaleString("en-US");
   const windowed = tl.historyWindow.state !== "whole";
+  // A SEGMENT states its month and what of it is on the page, in time
+  // (decision 0019, amendment 2026-09-24). The month's count is a fact the
+  // life holds; what the page could carry is never a number here.
+  if (tl.historyWindow.state === "span") {
+    const span = tl.historyWindow.span;
+    const statement = segmentStatement(span, loadedExtent(tl));
+    if (!tl.isFiltered) return statement;
+    const shownNow = `${tl.filteredCountIsFloor ? "at least " : ""}${n(tl.filteredCount)}`;
+    const loaded = loadedDaysStatement(span, loadedExtent(tl));
+    return `Showing ${shownNow} of ${span.month.label}${loaded ? `, ${loaded} loaded` : ""}`;
+  }
   // Both halves of every ratio below count the loaded rows, so it is a true
   // one. `servedEventCount` and not `sortedEvents.length`, because on a
   // grouped page the folder members are drawn too and the list covers them.
@@ -351,13 +401,18 @@ export function eventCountLine(tl: TimelineEventsState): string {
   const state = eventCountState(tl);
   const totalKnown = state.total !== "pending";
   const atLeast = state.total === "floor" ? "at least " : "";
-  const grouped = state.unit === "rows";
+  // A WINDOWED page states the time its rows cover, never how many the
+  // preload carries: the cut is a server guard on one answer, not a figure
+  // for the reader (decision 0019, amendment 2026-09-24). "Showing 1,000 of
+  // 3,342 events" and "Showing 942 rows of 106,518 events" both named it and
+  // both went with that amendment.
+  const loaded = loadedSpanText(tl);
   if (!tl.isFiltered) {
-    if (!totalKnown) return `Showing ${n(listed)} listed`;
-    if (grouped) return `Showing ${n(tl.servedRowCount as number)} rows of ${atLeast}${n(tl.totalCount)} events`;
-    return `Showing ${n(listed)} of ${atLeast}${n(tl.totalCount)} events`;
+    if (!totalKnown) return loaded ? `Loaded ${loaded}` : `Showing ${n(listed)} listed`;
+    const total = `${atLeast}${n(tl.totalCount)} events`;
+    return loaded ? `${total} · loaded ${loaded}` : total;
   }
-  const head = `Showing ${shown} of ${n(listed)} listed`;
+  const head = loaded ? `Showing ${shown} of ${loaded}` : `Showing ${shown} of ${n(listed)} listed`;
   return totalKnown ? `${head} · ${atLeast}${n(tl.totalCount)} events` : head;
 }
 
@@ -369,6 +424,7 @@ export function TimelineToolbar({
   marketNotesOn,
   onToggleMarketNotes,
   navigatorNotes,
+  navigatorGrid = true,
 }: TimelineToolbarProps) {
   // One option is not an axis — a single-reserve wallet on a multi-asset roster
   // would get a control whose every state shows the same list.
@@ -596,12 +652,12 @@ export function TimelineToolbar({
             }
           >
             <div className="px-4 pb-3">
-              <TimelineNavigatorPanel tl={tl} notes={navigatorNotes} inSheet />
+              <TimelineNavigatorPanel tl={tl} notes={navigatorNotes} grid={navigatorGrid} inSheet />
             </div>
           </MobileSheet>
         ) : (
           <div data-nav-dropdown="" className="overlay-panel absolute inset-x-0 top-full z-40 mt-2 p-3">
-            <TimelineNavigatorPanel tl={tl} notes={navigatorNotes} />
+            <TimelineNavigatorPanel tl={tl} notes={navigatorNotes} grid={navigatorGrid} />
           </div>
         ))}
     </div>

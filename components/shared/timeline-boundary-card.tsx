@@ -135,8 +135,6 @@ export interface TimelineBoundaryCardProps {
   /** The page's protocol key — labels the type histogram with the same table
    *  the filter menu uses (`actionLabel`). */
   protocolKey: string;
-  /** How many rows the list holds — the other half of the arithmetic. */
-  listed: number;
   /** True when the page mounts the export menu with a whole-history fetch AND
    *  the position's total is within what that fetch can serve in one answer
    *  (`wholeHistoryExportable`, lib/shared/timeline-row-ceiling.ts) — the
@@ -150,7 +148,6 @@ export interface TimelineBoundaryCardProps {
 export function TimelineBoundaryCard({
   boundary: b,
   protocolKey,
-  listed,
   csvExport,
   isFirst,
   isLast,
@@ -301,8 +298,8 @@ export function TimelineBoundaryCard({
         </p>
       ) : (
         <p>
-          This activity timeline displays the most recent {n(listed)} events in the timeline. The remaining {atLeast}
-          {n(b.omitted as number)} events are accounted for here.
+          The list holds every event from block {blockLink} onward. The {atLeast}
+          {n(b.omitted as number)} events before it are accounted for here.
         </p>
       )}
       <p>

@@ -41,6 +41,14 @@ import {
   type TimelineWindow,
 } from "@/lib/shared/timeline-opening-balance";
 import {
+  lifeDayCounts,
+  lifeExtent,
+  monthStartTs,
+  planSegmentAsk,
+  segmentSpan,
+  trimToNewest,
+} from "@/lib/shared/timeline-segments";
+import {
   fetchAaveV3Position,
   fetchAaveV3OraclePrices,
   type AaveV3PositionChainResponse,
@@ -364,19 +372,155 @@ export default function AaveV3PositionDetail({
     };
   }, [view, aaveEvents, wallet, market, precomputedLifetime]);
 
+  // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
+  //
+  // Decision 0019, amendment 2026-09-24. The preload above (the newest rows,
+  // their folders and the opening balance) stays the page's whole-history
+  // record: the tower, the export and the life the picker draws all read it.
+  // The TIMELINE alone swaps to a segment when a month outside the preload
+  // is picked; a segment brings no opening balance, so its lifetime figures
+  // are absent and the count line states its month in time. What the preload
+  // could carry is learned from the answer (`boundBy`) and never assumed.
+  const lifeDays = useMemo(
+    () => lifeDayCounts(aaveEvents, servedFolders, opening),
+    [aaveEvents, servedFolders, opening],
+  );
+  const preloadCap = groupedTail?.boundBy === "rows" ? groupedTail.rowPlan.length : null;
+  const preloadLoaded = useMemo(() => {
+    const life = lifeExtent(lifeDays);
+    if (!life) return null;
+    let from = Infinity;
+    for (const e of aaveEvents) if (e.timestamp < from) from = e.timestamp;
+    for (const f of servedFolders ?? []) if (f.firstAt < from) from = f.firstAt;
+    return { from: Number.isFinite(from) ? from : life.firstAt, to: life.lastAt };
+  }, [lifeDays, aaveEvents, servedFolders]);
+  const [segment, setSegment] = useState<{
+    monthIdx: number;
+    asked: { from: number; to: number };
+    events: BaseActivityEvent[];
+    grouped: AaveV3GroupedTimelineResponse | null;
+    /** Events the index served for the ask and the page let go, when it
+     *  trimmed a flat span answer to the preload's size. */
+    dropped: number;
+  } | null>(null);
+  const [segmentLoading, setSegmentLoading] = useState<number | null>(null);
+  const [segmentLanding, setSegmentLanding] = useState<number | null>(null);
+  const segmentRead = useRef<AbortController | null>(null);
+  // Whether the api groups a segment. Learned from the first answer: one that
+  // predates the grouped span answers the newest window with no `span` on it,
+  // and from then on the page reads segments flat.
+  const apiGroupsSpans = useRef<boolean | null>(null);
+  const loadSegment = useCallback(
+    async (monthIdx: number) => {
+      // A month the preload holds whole: back to the preload, and scroll.
+      if (preloadLoaded && monthStartTs(monthIdx) >= preloadLoaded.from && monthStartTs(monthIdx) <= preloadLoaded.to) {
+        segmentRead.current?.abort();
+        setSegmentLoading(null);
+        setSegment(null);
+        setSegmentLanding(monthIdx);
+        return;
+      }
+      const ask = planSegmentAsk(monthIdx, lifeDays, preloadCap);
+      segmentRead.current?.abort();
+      const ac = new AbortController();
+      segmentRead.current = ac;
+      setSegmentLoading(monthIdx);
+      try {
+        const span: [number, number] = [ask.from, ask.to];
+        if (apiGroupsSpans.current !== false) {
+          const grouped = await fetchAaveV3GroupedTimeline({ wallet, market, span, signal: ac.signal });
+          if (grouped.span && grouped.span.from === ask.from && grouped.span.to === ask.to) {
+            apiGroupsSpans.current = true;
+            setSegment({ monthIdx, asked: ask, events: grouped.events, grouped, dropped: 0 });
+            return;
+          }
+          apiGroupsSpans.current = false;
+        }
+        const flat = await fetchAaveV3Timeline({ wallet, market, span });
+        const kept = trimToNewest(flat.events, preloadCap);
+        setSegment({ monthIdx, asked: ask, events: kept, grouped: null, dropped: flat.events.length - kept.length });
+      } catch (err) {
+        if ((err as { name?: string })?.name === "AbortError") return;
+        // The rows the page holds stay; the month stays where it was.
+      } finally {
+        if (segmentRead.current === ac) {
+          segmentRead.current = null;
+          setSegmentLoading(null);
+        }
+      }
+    },
+    [wallet, market, lifeDays, preloadCap, preloadLoaded],
+  );
+  const segmentEvents = useMemo(() => (segment ? segment.events.filter(isAaveV3Event) : null), [segment]);
+  const segmentRows = useMemo(
+    () => (segment?.grouped && segmentEvents ? interleaveRowPlan(segment.grouped.rowPlan, segmentEvents) : undefined),
+    [segment, segmentEvents],
+  );
+  const segmentWindow = useMemo<TimelineWindow | null>(() => {
+    if (!segment) return null;
+    const span = segmentSpan(segment.monthIdx, segment.asked, lifeDays);
+    if (!span) return null;
+    return {
+      state: "span",
+      cutoffBlock: null,
+      opening: null,
+      span: { ...span, eventsBefore: span.eventsBefore + segment.dropped },
+    };
+  }, [segment, lifeDays]);
+  const timelineWindow = segmentWindow ?? historyWindow;
+  const segmentSpanParams = segment?.grouped
+    ? { from: String(segment.asked.from), to: String(segment.asked.to) }
+    : undefined;
+
   const readFolderMembers = useCallback(
     (ask: { event?: string; folder?: string }) =>
-      fetchTimelineFolderMembers({ path: "/api/aave-v3/timeline/folder", params: { wallet, market }, ...ask }),
-    [wallet, market],
+      fetchTimelineFolderMembers({
+        path: "/api/aave-v3/timeline/folder",
+        params: { wallet, market, ...(segmentSpanParams ?? {}) },
+        ...ask,
+      }),
+    // The two strings are the whole of the span's identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [wallet, market, segmentSpanParams?.from, segmentSpanParams?.to],
   );
 
-  const tl = useTimelineEvents(aaveEvents, {
+  const tl = useTimelineEvents(segmentEvents ?? aaveEvents, {
     storageKey: `aave-v3-${market}-${wallet}`,
     protocolKey: "aave-v3",
-    window: historyWindow,
-    servedRows,
-    eventsServed: groupedTail?.eventsServed,
+    window: timelineWindow,
+    servedRows: segment ? segmentRows : servedRows,
+    eventsServed: segment ? (segment.grouped?.eventsServed ?? segment.events.length) : groupedTail?.eventsServed,
+    olderCount: segmentWindow?.state === "span" ? segmentWindow.span.eventsBefore : 0,
   });
+  const { setDateRange } = tl;
+  const pickMonth = useCallback(
+    (monthIdx: number) => {
+      // Picking a month replaces the segment; a date typed within the old
+      // one does not carry over.
+      setDateRange(null);
+      void loadSegment(monthIdx);
+    },
+    [setDateRange, loadSegment],
+  );
+  const segments = useMemo(
+    () =>
+      groupedTail && preloadLoaded
+        ? {
+            lifeDays,
+            loaded: segment ? segment.asked : preloadLoaded,
+            loading: segmentLoading,
+            onPick: pickMonth,
+            landing: segmentLanding,
+            onLanded: () => setSegmentLanding(null),
+          }
+        : undefined,
+    [groupedTail, preloadLoaded, lifeDays, segment, segmentLoading, pickMonth, segmentLanding],
+  );
+  /** The preload's own total, for the export: `tl.totalCount` counts the
+   *  segment once one is loaded. */
+  const preloadTotal = lifetimeFiguresKnown(historyWindow)
+    ? (opening?.totalEvents ?? 0) + (groupedTail?.eventsServed ?? aaveEvents.length)
+    : null;
 
   // ── Market notes: the reserve's own rate across this position's own
   //    stretches ───────────────────────────────────────────────────────────
@@ -590,7 +734,7 @@ export default function AaveV3PositionDetail({
               queued={{
                 protocol: "aave-v3",
                 params: { wallet, market },
-                totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
+                totalEvents: preloadTotal,
               }}
               history={markdownHistoryScope(historyWindow, aaveEvents, servedFolders)}
               scopeNote={exportScopeNote(historyWindow, aaveEvents, "this wallet's whole history", servedFolders)}
@@ -667,6 +811,8 @@ export default function AaveV3PositionDetail({
               runs={AAVE_V3_TIMELINE_RUNS}
               folderRegister={AAVE_V3_FOLDER_REGISTER}
               readFolderMembers={readFolderMembers}
+              // The month picker above the rows, on a served page.
+              segments={segments}
               // The USD-values toggle joins the chain-state items: the detail
               // grid renders after-balance USD chips off the captured
               // oracle-at-block prices (mig 092).

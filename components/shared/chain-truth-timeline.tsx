@@ -107,6 +107,10 @@ import { setCardOpen } from "@/lib/shared/card-open-store";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { decodeEventId } from "@/lib/shared/page-metadata";
+import { TimelineSegmentPicker } from "@/components/shared/timeline-segment-picker";
+import { buildSignificanceMarks } from "@/lib/shared/timeline-navigator";
+import { getEventActionKey } from "@/lib/shared/event-filter-helpers";
+import { eventsWithin, monthEndTs, monthLabel, monthStartTs } from "@/lib/shared/timeline-segments";
 
 // The small-print register a pinned/not-found notice draws in — the same
 // `text-[11px]` scale `TimelineCoverageFooter`'s NOTE uses, so a reader who has
@@ -218,6 +222,26 @@ const LIVE_NOTE_SKELETON_HEIGHT = 64;
  *  no more than it did before notes existed. */
 const NO_ANCHORS: ReadonlyMap<string, MarketNote[]> = new Map();
 const NO_NOTES: MarketNote[] = [];
+
+/** One closed event card's height, the unit the segment skeleton stacks. */
+const SEGMENT_SKELETON_ROW = 72;
+/** The most rows a month's skeleton draws: a landing, not a reading list. */
+const SEGMENT_SKELETON_ROWS = 8;
+
+/** The month being loaded: its label, then a skeleton sized from the days
+ *  the life holds in it, capped (0019, amendment 2026-09-24, rule 3). */
+function SegmentSkeleton({ monthIdx, lifeDays }: { monthIdx: number; lifeDays: ReadonlyMap<number, number> }) {
+  const holds = eventsWithin(lifeDays, monthStartTs(monthIdx), monthEndTs(monthIdx));
+  const count = Math.max(1, Math.min(SEGMENT_SKELETON_ROWS, holds));
+  return (
+    <div data-segment-skeleton={monthIdx} aria-busy="true" className="flex flex-col gap-2">
+      <div className="px-1 text-xs text-rb-500">{monthLabel(monthIdx)}</div>
+      {Array.from({ length: count }, (_, i) => (
+        <SkeletonBlock key={i} height={SEGMENT_SKELETON_ROW} />
+      ))}
+    </div>
+  );
+}
 
 /** One collapsible run kind — only passive/automated events should collapse;
  *  owner actions always stand as their own rows (the V2 rule). */
@@ -398,6 +422,28 @@ export interface ChainTruthTimelineProps {
    *  boundary logic) — only whether that row's dot renders. Omit for a page
    *  with no open/closed concept (a vault share-transfer timeline). */
   closed?: boolean;
+  /** The month picker above the rows, on a page that holds one segment of
+   *  time (decision 0019, amendment 2026-09-24). The page owns the segment
+   *  and its reads; this component draws the picker, keeps the rows in view
+   *  on it, scrolls to a month inside the band and asks the page for one
+   *  outside it. The Date panel then keeps its typed spread alone. */
+  segments?: TimelineSegments;
+}
+
+export interface TimelineSegments {
+  /** The whole life's events per UTC day (lib/shared/timeline-segments.ts). */
+  lifeDays: ReadonlyMap<number, number>;
+  /** The loaded segment's extent in seconds. */
+  loaded: { from: number; to: number };
+  /** The month being loaded, while one is: the rows give way to a skeleton
+   *  sized from that month's days, under its label. */
+  loading: number | null;
+  /** A month outside the band was picked. */
+  onPick: (monthIdx: number) => void;
+  /** A month to scroll to once the rows have changed (the page restored the
+   *  preload for a month inside it); `onLanded` clears it. */
+  landing?: number | null;
+  onLanded?: () => void;
 }
 
 // Thin shell: mount the wallet + display providers, then delegate to the body.
@@ -551,6 +597,7 @@ function ChainTruthTimelineBody({
   csvExportCeiling,
   persistKeyPrefix,
   closed,
+  segments,
 }: ChainTruthTimelineProps) {
   // Run-collapse is a display preference: flag off ⇒ no run specs reach the
   // rows memo, so it maps events straight to lone cards (the plain
@@ -985,10 +1032,16 @@ function ChainTruthTimelineBody({
         ? row.events[row.events.length - 1].timestamp
         : clampToRange(row.folder.firstAt);
   const newestLooseAt = tl.sortedEvents.length === 0 ? null : tl.sortedEvents[tl.sortedEvents.length - 1].timestamp;
-  const newestLoadedAt =
+  // A SEGMENT sits inside a longer life: the life's own ends are what the two
+  // glyphs answer to, so a January segment shows the tip withheld at its top
+  // and the older end cut at its bottom, with the other months in the picker.
+  const segmentLife = tl.historyWindow.state === "span" ? tl.historyWindow.span.life : null;
+  const newestHeldAt =
     tl.servedSpan && (newestLooseAt == null || tl.servedSpan.lastAt > newestLooseAt)
       ? tl.servedSpan.lastAt
       : newestLooseAt;
+  const newestLoadedAt =
+    segmentLife && (newestHeldAt == null || segmentLife.lastAt > newestHeldAt) ? segmentLife.lastAt : newestHeldAt;
   const newestShownAt = rows.length === 0 ? null : rowNewestAt(rows[0]);
   const tipIsStale = newestLoadedAt != null && newestShownAt != null && newestShownAt < newestLoadedAt;
   // Where the dot is withheld the bare boundary row stands in its place — at
@@ -1009,12 +1062,18 @@ function ChainTruthTimelineBody({
   // this is withheld (`!boundaryAt…` below). One end, one glyph: two would
   // read as two different omissions.
   const oldestLooseAt = tl.sortedEvents.length === 0 ? null : tl.sortedEvents[0].timestamp;
-  const oldestLoadedAt =
+  const oldestHeldAt =
     tl.servedSpan && (oldestLooseAt == null || tl.servedSpan.firstAt < oldestLooseAt)
       ? tl.servedSpan.firstAt
       : oldestLooseAt;
+  const oldestLoadedAt =
+    segmentLife && (oldestHeldAt == null || segmentLife.firstAt < oldestHeldAt) ? segmentLife.firstAt : oldestHeldAt;
   const oldestShownAt = rows.length === 0 ? null : rowOldestAt(rows[rows.length - 1]);
   const tailIsCut = oldestLoadedAt != null && oldestShownAt != null && oldestShownAt > oldestLoadedAt;
+  // On a segment the older end is a cut of the page's own making, not a
+  // filter's: the glyph says so.
+  const tailKind: "cut" | "view" =
+    segmentLife && oldestHeldAt != null && oldestShownAt === oldestHeldAt ? "cut" : "view";
   // On a SERVED list the newest row can be a FOLDER, and then no event on the
   // page is the tip — the folder's own node carries the dot instead, the same
   // way a client-grouped run's does when the newest event is among its
@@ -1065,6 +1124,100 @@ function ChainTruthTimelineBody({
   }, [hasMore, events]);
 
   const windowed = hasMore ? rows.slice(0, windowSize) : rows;
+
+  // ── The segment picker's two readings of the rows ──────────────────────
+  // Which rows are in view (the thin bar under the month cells), and how to
+  // scroll to a month inside the band. Both read the drawn rows' own
+  // `data-row-at` stamps rather than the list, because a folder's members
+  // and a run's members are rows a reader sees.
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const pickerBottom = () =>
+    rootRef.current?.querySelector("[data-segment-picker]")?.getBoundingClientRect().bottom ?? 0;
+  const [inView, setInView] = useState<{ newest: number; oldest: number } | null>(null);
+  const [pendingScrollMonth, setPendingScrollMonth] = useState<number | null>(null);
+  const hasPicker = segments != null;
+  useEffect(() => {
+    if (!hasPicker) return;
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
+      const list = listRef.current;
+      if (!list) return;
+      const top = pickerBottom();
+      const bottom = window.innerHeight;
+      let newest = -Infinity;
+      let oldest = Infinity;
+      list.querySelectorAll<HTMLElement>("[data-row-at]").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.bottom < top || r.top > bottom) return;
+        const ts = Number(el.dataset.rowAt);
+        if (!Number.isFinite(ts)) return;
+        if (ts > newest) newest = ts;
+        if (ts < oldest) oldest = ts;
+      });
+      setInView((prev) => {
+        if (!Number.isFinite(newest)) return prev == null ? prev : null;
+        return prev && prev.newest === newest && prev.oldest === oldest ? prev : { newest, oldest };
+      });
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(measure);
+    };
+    measure();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [hasPicker, windowSize, rows]);
+  /** Scroll the rows to a month inside the band: the first row at or before
+   *  the month's end, drawn first if the local paging has not reached it. */
+  const scrollToMonth = (idx: number) => {
+    const end = monthEndTs(idx);
+    const i = rows.findIndex((r) => rowNewestAt(r) <= end);
+    if (i === -1) return;
+    if (i >= windowSize) setWindowSize(Math.min(rows.length, i + WINDOW_CHUNK));
+    setPendingScrollMonth(idx);
+  };
+  useEffect(() => {
+    if (pendingScrollMonth == null) return;
+    const end = monthEndTs(pendingScrollMonth);
+    const list = listRef.current;
+    if (!list) return;
+    const el = [...list.querySelectorAll<HTMLElement>("[data-row-at]")].find((e) => Number(e.dataset.rowAt) <= end);
+    if (!el) return;
+    let reduced = false;
+    try {
+      reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch {
+      /* matchMedia unavailable — treat as no preference */
+    }
+    // The picker is sticky at the top once the page has scrolled, so the row
+    // lands just under its HEIGHT, wherever the picker sits now.
+    const inset = (rootRef.current?.querySelector("[data-segment-picker]")?.getBoundingClientRect().height ?? 0) + 8;
+    window.scrollTo({
+      top: el.getBoundingClientRect().top + window.scrollY - inset,
+      behavior: reduced ? "auto" : "smooth",
+    });
+    setPendingScrollMonth(null);
+  }, [pendingScrollMonth, windowSize, rows]);
+  // A landing the page asked for once it swapped the rows back to the preload.
+  const landing = segments?.landing ?? null;
+  const onLanded = segments?.onLanded;
+  useEffect(() => {
+    if (landing == null) return;
+    scrollToMonth(landing);
+    onLanded?.();
+    // `scrollToMonth` reads the rows of this render, which is the point.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [landing, rows]);
+  const pickerMarks = useMemo(
+    () => (hasPicker ? buildSignificanceMarks(tl.visibleEvents, navigatorNotes, getEventActionKey) : null),
+    [hasPicker, tl.visibleEvents, navigatorNotes],
+  );
 
   // Day-grouping over the FLAT displayed list (run members included), so the
   // date shows on the first card of each calendar day whether or not the
@@ -1122,6 +1275,7 @@ function ChainTruthTimelineBody({
           <div
             id={`event-${event.id}`}
             data-event-id={event.id}
+            data-row-at={event.timestamp}
             className={`rounded-xl transition-shadow duration-[2000ms] ${
               highlightId === event.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
             }`}
@@ -1225,6 +1379,7 @@ function ChainTruthTimelineBody({
     // read as a defect in the rule for a day). The toolbar pill states the
     // whole count throughout; these two say when the list agrees with it.
     <div
+      ref={rootRef}
       className="space-y-3"
       data-timeline-rows-drawn={Math.min(windowSize, rows.length)}
       data-timeline-rows-loaded={rows.length}
@@ -1243,18 +1398,31 @@ function ChainTruthTimelineBody({
           // which owns the Date button the panel now hangs from. The panel
           // used to stand as a sibling of the rows; it floats over them now.
           navigatorNotes={navigatorNotes}
+          navigatorGrid={!hasPicker}
         />
       </div>
       {notice}
       {/* A `?at=` landing whose id never turned up in `tl.sortedEvents` — the
           list otherwise renders exactly as it would have without `at`. */}
       {landingNotFoundId && <EventNotFoundNotice id={landingNotFoundId} chainId={chainId} />}
-      {/* ROWS, not `events`: a folder is something to draw, and a served
-          answer made only of folders has no loose event at all. The empty
-          label below is for a list with nothing to draw. */}
-      {rows.length > 0 ? (
+      {segments && (
+        <TimelineSegmentPicker
+          lifeDays={segments.lifeDays}
+          loaded={segments.loaded}
+          inView={inView}
+          marks={pickerMarks}
+          loadingMonth={segments.loading}
+          onPick={segments.onPick}
+          onScrollTo={scrollToMonth}
+        />
+      )}
+      {/* The month being loaded: a skeleton sized from its days, under its
+          label, in place of the rows (0019, amendment 2026-09-24, rule 3). */}
+      {segments?.loading != null ? (
+        <SegmentSkeleton monthIdx={segments.loading} lifeDays={segments.lifeDays} />
+      ) : rows.length > 0 ? (
         <>
-          <div className="flex flex-col gap-2">
+          <div ref={listRef} className="flex flex-col gap-2">
             {/* The top is the NEWEST end, so the only omission that can stand
                 here is the TIP's — drawn when the newest events the page holds
                 are filtered out, so the row below is not the newest and the
@@ -1295,36 +1463,42 @@ function ChainTruthTimelineBody({
                     // newest row; its members re-provide null, so one dot.
                     value={!liveHoldsTip && rowIdx === tipRowIdx ? tipSide : null}
                   >
-                    <ServedFolderRow
-                      folder={row.folder}
-                      register={folderRegister as ServedFolderRegister}
-                      forceOpen={openFilteredFolders || splitByFilter(row) || row.folder.responseId === landedFolderId}
-                      memberPasses={tl.isFiltered ? tl.memberPasses : null}
-                      onlyDates={
-                        tl.dateRange !== null &&
-                        tl.visibleActionKeys.size === tl.eventOptions.length &&
-                        tl.visibleAssetKeys.size === tl.assetOptions.length &&
-                        tl.visibleCounterpartyKeys.size === tl.counterpartyOptions.length
-                      }
-                      // A served folder has no run around it to scope its
-                      // spine termini to, so its place in the displayed list
-                      // is the whole answer — suppressed at either end where
-                      // a live note or the boundary card now sits there.
-                      isFirst={folderTerminus(rowIdx, rows.length).isFirst && !topTerminusTaken}
-                      isLast={folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken}
-                      renderMember={(event, eventNumber, isLastMember) =>
-                        renderEventRow(event, row.flatIdx, {
-                          inRun: true,
-                          eventNumber,
-                          // A member's own day, read off the member itself:
-                          // `datePrefixAt` indexes the flat displayed list,
-                          // and a folder's members are not in it.
-                          datePrefix: `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`,
-                          isLastMember:
-                            isLastMember && folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken,
-                        })
-                      }
-                    />
+                    {/* The folder's newest moment, for the segment picker's
+                        in-view bar and scroll-to (see `data-row-at`). */}
+                    <div data-row-at={row.folder.lastAt}>
+                      <ServedFolderRow
+                        folder={row.folder}
+                        register={folderRegister as ServedFolderRegister}
+                        forceOpen={
+                          openFilteredFolders || splitByFilter(row) || row.folder.responseId === landedFolderId
+                        }
+                        memberPasses={tl.isFiltered ? tl.memberPasses : null}
+                        onlyDates={
+                          tl.dateRange !== null &&
+                          tl.visibleActionKeys.size === tl.eventOptions.length &&
+                          tl.visibleAssetKeys.size === tl.assetOptions.length &&
+                          tl.visibleCounterpartyKeys.size === tl.counterpartyOptions.length
+                        }
+                        // A served folder has no run around it to scope its
+                        // spine termini to, so its place in the displayed list
+                        // is the whole answer — suppressed at either end where
+                        // a live note or the boundary card now sits there.
+                        isFirst={folderTerminus(rowIdx, rows.length).isFirst && !topTerminusTaken}
+                        isLast={folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken}
+                        renderMember={(event, eventNumber, isLastMember) =>
+                          renderEventRow(event, row.flatIdx, {
+                            inRun: true,
+                            eventNumber,
+                            // A member's own day, read off the member itself:
+                            // `datePrefixAt` indexes the flat displayed list,
+                            // and a folder's members are not in it.
+                            datePrefix: `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`,
+                            isLastMember:
+                              isLastMember && folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken,
+                          })
+                        }
+                      />
+                    </div>
                   </SpineTipContext.Provider>
                 ) : (
                   <SpineTipContext.Provider
@@ -1375,9 +1549,12 @@ function ChainTruthTimelineBody({
                 was the only statement of, so nobody rediscovers the loss by
                 accident. */}
             {(boundaryAtBottom || viewBoundaryAtBottom) && (
-              <TimelineBoundaryRow kind={boundaryAtBottom ? "cut" : "view"} isFirst={false} isLast />
+              <TimelineBoundaryRow kind={boundaryAtBottom ? "cut" : tailKind} isFirst={false} isLast />
             )}
           </div>
+          {/* The button alone: how many rows the page holds is not a figure
+              for the reader (0019, amendment 2026-09-24); the two data
+              attributes on the root carry it for a machine. */}
           {hasMore && (
             <div ref={sentinelRef} className="flex flex-col items-center gap-1.5 pt-1">
               <button
@@ -1387,9 +1564,6 @@ function ChainTruthTimelineBody({
               >
                 Show {Math.min(WINDOW_CHUNK, rows.length - windowSize)} more
               </button>
-              <span className="text-[11px] tabular-nums text-rb-400">
-                Showing {windowSize.toLocaleString("en-US")} of {rows.length.toLocaleString("en-US")} rows
-              </span>
             </div>
           )}
           {footer && !hasMore && footer}
@@ -1413,7 +1587,6 @@ function ChainTruthTimelineBody({
               <TimelineBoundaryCard
                 boundary={effectiveBoundary}
                 protocolKey={tl.protocolKey}
-                listed={0}
                 csvExport={csvExport}
                 isFirst
                 isLast

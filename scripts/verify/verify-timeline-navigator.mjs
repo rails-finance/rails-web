@@ -187,6 +187,20 @@
 // over a list that is part rows and part folders, measured against the grouped
 // route. The MARKS on a grouped page are out of its scope — see its note.
 //
+// ⚠️ THE MONTHS LEFT THE DATE PANEL ON THE DEFAULT PAGE (2026-09-24, the
+// segment picker: decision 0019, amendment 2026-09-24). On a served page the
+// month matrix is the picker above the rows, one segment of time is loaded,
+// and a month click LOADS or SCROLLS rather than filtering; the Date panel
+// keeps the typed spread alone. G2–G4 (a month click filters; the same month
+// clears) are SUPERSEDED there and gave way to the S checks inside group G:
+// the picker, the band, the scroll inside it, a month below the cut loaded
+// and stated in time, and the phone strip at 390. G1 now asserts the count
+// line states TIME and names no row count. The `?folders=0` page keeps the
+// panel's grid, so groups 1–13 stand as written.
+//
+// The hosted default is dev.rails.finance through the Vercel bypass header
+// (lib/host.mjs); `BASE=http://localhost:3000` points it at a dev server.
+//
 //   ONLY=grouped-deep,grouped-whole …   the grouped arm alone
 //
 // ── PROVED IT CAN FAIL ──────────────────────────────────────────────────────
@@ -402,12 +416,28 @@
 //     "Showing 1,000 rows of 7,150 events"). The count checks stayed green
 //     under the first, which is right: a folder outside the month adds 0.
 //
+//   2026-09-24 (the S checks, the segment picker), each break against a local
+//   dev server on the production api (which predates the grouped span, so a
+//   segment answered flat), restored after:
+//   • `inBand` in timeline-segment-picker.tsx inverted → 10/15 over
+//     `grouped-deep`: S3's four red (the click on 2025-10 scrolled instead:
+//     the count line stayed "7,161 events · loaded 14 Nov 2025 to 24 Sept
+//     2026", 1,000 rows outside the month, the band eleven months) and S4's
+//     tap red the same way. S2 stayed green, which is right: a month the
+//     preload holds is scrolled to whichever branch the click takes;
+//   • `segmentStatement` labelling the life's newest month in place of the
+//     picked one → 13/15, S3's first red ("September 2026 holds 293 events"
+//     want "October 2025 holds 293 events") and S4's tap red for the same
+//     line; the rows, the band and the tip stayed green, as they should;
+//   • the segment's `eventsBefore` dropped from `olderCount` → nothing red,
+//     recorded so the gap is known: no check reads a row number.
+//
 //   A check that cannot be made to fail is not a check.
 
 import { chromium } from "playwright";
 import { RECENT_QS } from "./_timeline-window.mjs";
+import { BASE, bypassHeaders, hostFetch } from "./lib/host.mjs";
 
-const BASE = process.env.BASE ?? "http://localhost:3000";
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(",")) : null;
 const SECONDS_PER_DAY = 86_400;
 
@@ -477,7 +507,7 @@ const INIT = `
 `;
 
 async function getJson(path) {
-  const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
+  const res = await hostFetch(`${BASE}${path}`, { cache: "no-store" });
   if (!res.ok) return { error: `HTTP ${res.status}` };
   return res.json();
 }
@@ -765,13 +795,128 @@ const TYPE_DATE = ([which, iso]) => {
 const COUNT_LINE = () =>
   (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim();
 
+/** The segment picker as the page draws it (components/shared/
+ *  timeline-segment-picker.tsx): the banded months, the months the in-view
+ *  bar reaches, the month being loaded, and the spine's boundary rows. */
+const READ_PICKER = () => {
+  const picker = document.querySelector("[data-segment-picker]");
+  const vis = (el) => (el ? getComputedStyle(el).display !== "none" : false);
+  const cells = [...document.querySelectorAll("[data-segment-cell][data-cell-live]")];
+  const idx = (c) => Number(c.getAttribute("data-segment-cell"));
+  return {
+    present: picker != null,
+    sticky: picker ? getComputedStyle(picker).position : null,
+    matrixVisible: vis(document.querySelector("[data-segment-matrix]")),
+    stripVisible: vis(document.querySelector("[data-segment-strip]")),
+    band: cells.filter((c) => c.hasAttribute("data-cell-band")).map(idx),
+    inView: cells.filter((c) => c.hasAttribute("data-cell-in-view")).map(idx),
+    loading: document.querySelector("[data-segment-skeleton]")?.getAttribute("data-segment-skeleton") ?? null,
+    boundaryRows: [...document.querySelectorAll("[data-boundary-row]")].map((e) => e.getAttribute("data-boundary-row")),
+    folders: document.querySelectorAll('[role="button"][aria-expanded][aria-label*=" consecutive "]').length,
+  };
+};
+
+/** The phone strip: which labels sit wholly inside it, which carries the
+ *  accent, which are banded, and whether the page scrolls sideways. */
+const READ_STRIP = () => {
+  const strip = document.querySelector("[data-segment-strip]");
+  const vis = (el) => (el ? getComputedStyle(el).display !== "none" : false);
+  const r = strip?.getBoundingClientRect();
+  const labels = [...document.querySelectorAll("[data-strip-month]")];
+  // A label is in view when at least nine tenths of it is inside the strip:
+  // the strip snaps to a label's centre and a fractional scroll leaves an
+  // edge label a pixel over the line.
+  const inView = r
+    ? labels.filter((l) => {
+        const b = l.getBoundingClientRect();
+        const visible = Math.min(b.right, r.right) - Math.max(b.left, r.left);
+        return b.width > 0 && visible / b.width >= 0.9;
+      }).length
+    : 0;
+  const here = document.querySelector("[data-strip-here]");
+  const hb = here?.getBoundingClientRect();
+  return {
+    stripVisible: vis(strip),
+    matrixVisible: vis(document.querySelector("[data-segment-matrix]")),
+    inView,
+    here: here ? Number(here.getAttribute("data-strip-month")) : null,
+    // The accented label sits at the strip's centre: the strip pads both
+    // ends, so the newest month is centred with one neighbour in view.
+    hereCentred: r && hb ? Math.abs(hb.left + hb.width / 2 - (r.left + r.width / 2)) <= 4 : false,
+    band: labels
+      .filter((l) => l.hasAttribute("data-strip-band"))
+      .map((l) => Number(l.getAttribute("data-strip-month"))),
+    scrollWidth: document.documentElement.scrollWidth,
+  };
+};
+
+/** Does the page state the row cap? The three phrases the amendment retired,
+ *  and the cap itself as a bare figure in the count line. */
+const NAMES_THE_CAP = (cap) => {
+  const text = document.body.innerText;
+  if (/Showing [\d,]+ rows|most recent [\d,]+ events|above what Rails|showing the newest/i.test(text)) return true;
+  const line = (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim();
+  return line.includes(`${cap.toLocaleString("en-US")} `) && !/events$/.test(line)
+    ? true
+    : line.startsWith(`Showing ${cap.toLocaleString("en-US")}`);
+};
+
+/** A press on a month cell of the picker the way a pointer makes one: down,
+ *  then up over the same cell, which is when the page commits. */
+async function pressCell(page, idx) {
+  const cell = page.locator(`[data-segment-cell="${idx}"][data-cell-live]`);
+  if ((await cell.count()) === 0) return false;
+  const box = await cell.boundingBox();
+  if (!box) return false;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.up();
+  return true;
+}
+
+/** Open the Date panel on a page whose months are the picker: the spread is
+ *  what stands there, so the wait is for the from field, not a grid. */
+async function openSpread(page) {
+  if ((await page.$("[data-timeline-navigator] [data-date-from]")) != null) return true;
+  await page.click("[data-date-control]", { timeout: 10_000 }).catch(() => {});
+  await page.waitForSelector("[data-timeline-navigator] [data-date-from]", { timeout: 30_000 }).catch(() => {});
+  return (await page.$("[data-timeline-navigator] [data-date-from]")) != null;
+}
+
+const MONTH_LONG = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+const monthLong = (idx) => `${MONTH_LONG[idx % 12]} ${Math.floor(idx / 12)}`;
+const monthName = (idx) => `${String(Math.floor(idx / 12))}-${String((idx % 12) + 1).padStart(2, "0")}`;
+const monthStartTs = (idx) => Math.floor(Date.UTC(Math.floor(idx / 12), idx % 12, 1) / 1000);
+/** The count line's own date register: "14 Nov 2025". */
+const dateText = (ts) =>
+  new Date(ts * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
+
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const search = (page) => page.url().replace(/^[^?]*/, "");
 const firstNumber = (line) => Number(((line.match(/[\d,]+/) ?? [])[0] ?? "").replace(/,/g, ""));
 
 console.log(`Timeline navigator checks — against ${BASE}\n`);
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "light" });
+// The hosted default is dev.rails.finance behind Vercel Authentication; the
+// bypass header rides every request the browser makes (lib/host.mjs).
+const ctx = await browser.newContext({
+  viewport: { width: 1440, height: 900 },
+  colorScheme: "light",
+  extraHTTPHeaders: bypassHeaders(),
+});
 await ctx.addInitScript(INIT);
 
 for (const f of FIXTURES) {
@@ -1406,11 +1551,6 @@ for (const g of GROUPED_FIXTURES) {
         (a, f) => a + f.byDay.reduce((b, d) => (Number(d.key) >= from && Number(d.key) <= to ? b + d.count : b), 0),
         0,
       );
-    const foldersMeeting = (from, to) => folders.filter((f) => f.lastAt >= from && f.firstAt <= to).length;
-    const filteredLine = (x) =>
-      windowed
-        ? `Showing ${n(x)} of ${n(eventsServed)} listed · ${n(route.totalEvents)} events`
-        : `${n(x)} of ${n(route.totalEvents)} events`;
 
     await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
     await settle(page);
@@ -1423,124 +1563,239 @@ for (const g of GROUPED_FIXTURES) {
       `${drawn.folders} folder row(s) (${drawn.open} open) against the route's ${folders.length}; ${drawn.events} event row(s) against ${loose.length} loose events`,
     );
 
-    // G1 — the count line at rest.
+    // G1 — the count line at rest states TIME, never the preload's size
+    // (decision 0019, amendment 2026-09-24): "7,161 events · loaded 14 Nov
+    // 2025 to 24 Sept 2026" on a windowed page, "389 events" on a whole one.
+    const oldestServed = Math.min(...loose.map((e) => e.timestamp), ...folders.map((f) => f.firstAt));
+    const newestServed = Math.max(...loose.map((e) => e.timestamp), ...folders.map((f) => f.lastAt));
+    const loadedText = `${dateText(oldestServed)} to ${dateText(newestServed)}`;
     const wantRest = windowed
-      ? `Showing ${n(plan.length)} rows of ${n(route.totalEvents)} events`
+      ? `${n(route.totalEvents)} events · loaded ${loadedText}`
       : `${n(route.totalEvents)} events`;
     check(
-      `G1 ${g.id}: the count line at rest ${windowed ? "names its noun, rows of events" : "is the whole history's count"}`,
+      `G1 ${g.id}: the count line at rest ${windowed ? "states the loaded span in time" : "is the whole history's count"}`,
       restLine === wantRest && (!windowed || drawn.unit === "rows"),
       `"${restLine}" (want "${wantRest}"), unit ${drawn.unit}`,
     );
+    check(
+      `G1 ${g.id}: nothing on the page names the row cap`,
+      !(await page.evaluate(NAMES_THE_CAP, plan.length)),
+      `a "Showing N rows", "most recent N" or "above what Rails" phrase, or the cap ${n(plan.length)} as a bare count, is on the page`,
+    );
 
-    // G2 — the month click. The month is the newest one holding BOTH a loose
-    // event and a folder member, so the filtered list is itself part rows and
-    // part folders; on a windowed page it must also lie wholly above the cut,
-    // so every event the map counts in it is one the page holds.
-    const oldestListed = Math.min(...loose.map((e) => e.timestamp), ...folders.map((f) => f.firstAt));
-    const months = [
-      ...new Set([
-        ...loose.map((e) => monthStartOf(e.timestamp)),
-        ...folders.flatMap((f) => f.byDay.map((d) => monthStartOf(Number(d.key)))),
-      ]),
-    ]
-      .filter((m) => !windowed || m >= oldestListed)
-      .filter(
-        (m) =>
-          loose.some((e) => monthStartOf(e.timestamp) === m) &&
-          folders.some((f) => f.byDay.some((d) => monthStartOf(Number(d.key)) === m)),
-      )
-      .sort((a, b) => b - a);
-    const targetMonth = months[0] ?? null;
-    const opened = await openPanel(page);
-    const rest = opened ? await page.evaluate(READ_NAV) : null;
-    const beforeClick = search(page);
-    const clicked = targetMonth == null || !opened ? false : await page.evaluate(CLICK_CELL, targetMonth);
-    if (!clicked) {
-      check(
-        `G2 ${g.id}: a month holding both rows and folder members to click`,
-        false,
-        targetMonth == null ? "none in the route's answer" : `no selectable cell for ${month(targetMonth)}`,
-      );
+    // ── S — THE SEGMENT PICKER (decision 0019, amendment 2026-09-24) ──
+    //
+    //   S0  the picker stands above the rows, sticky, as the matrix at 1440;
+    //       the Date panel opens with the spread alone, no grid;
+    //   S1  the band is the months the served rows reach;
+    //   S2  a click inside the band scrolls the rows to that month: the page
+    //       scrolls and the in-view bar reaches the cell;
+    //   S3  a click on a month outside the band (below the cut) loads it: the
+    //       count line states the month in time, every row drawn is inside
+    //       it, the spine's tip is withheld at the top, the band is that
+    //       month alone, and no lifetime figure is on the count line;
+    //   S4  the phone strip at 390: at most three labels in view, the newest
+    //       month centred and carrying the accent, no sideways page scroll,
+    //       and a tap on a month outside the band loads it.
+    const picker = await page.evaluate(READ_PICKER);
+    check(
+      `S0 ${g.id}: the segment picker stands above the rows, sticky, as the matrix`,
+      picker.present && picker.sticky === "sticky" && picker.matrixVisible && !picker.stripVisible,
+      `present ${picker.present}, position ${picker.sticky}, matrix ${picker.matrixVisible}, strip ${picker.stripVisible}`,
+    );
+    const spreadOpened = await openSpread(page);
+    const panel = await page.evaluate(() => ({
+      spread: document.querySelector("[data-timeline-navigator] [data-date-from]") != null,
+      grid: document.querySelector("[data-timeline-navigator] [data-heatmap-grain]") != null,
+    }));
+    check(
+      `S0 ${g.id}: the Date panel opens with the spread alone, the months having left it for the picker`,
+      spreadOpened && panel.spread && !panel.grid,
+      `opened ${spreadOpened}, spread ${panel.spread}, grid ${panel.grid}`,
+    );
+    await page.keyboard.press("Escape");
+    await panelGone(page);
+
+    const bandWant = [];
+    for (let i = monthIdxOf(oldestServed); i <= monthIdxOf(newestServed); i++) bandWant.push(i);
+    check(
+      `S1 ${g.id}: the band is the months the served rows reach`,
+      JSON.stringify(picker.band) === JSON.stringify(bandWant),
+      `band ${picker.band.map(monthName).join(", ")} (want ${bandWant.map(monthName).join(", ")})`,
+    );
+
+    // S2 — a click inside the band scrolls. The second-newest banded month
+    // that holds a served row, so the scroll has somewhere to go.
+    const inside = bandWant.filter((i) => i < monthIdxOf(newestServed) && i > monthIdxOf(oldestServed)).pop() ?? null;
+    if (inside == null) {
+      info(`S2 ${g.id}: a click inside the band`, "the band is too short to scroll within");
     } else {
-      await searchMoved(page, beforeClick);
-      await stillRows(page);
-      const monthEnd = monthEndOf(targetMonth);
-      const want = expectedIn(targetMonth, monthEnd);
-      // The folders a date filter leaves standing open and fetch their
-      // members; the line is exact from the headers' `byDay` before any lands.
+      const yBefore = await page.evaluate(() => window.scrollY);
+      const pressed = await pressCell(page, inside);
       await settled(
         page,
-        (w) => (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim() === w,
-        filteredLine(want),
-        30_000,
+        (idx) => document.querySelector(`[data-segment-cell="${idx}"][data-cell-in-view]`) != null,
+        inside,
+        20_000,
       );
-      const line = await page.evaluate(COUNT_LINE);
-      const nav = await page.evaluate(READ_NAV);
-      const sp = new URLSearchParams(search(page));
-      const cell = (rest?.cells ?? []).find((c) => c.at === targetMonth);
+      const after = await page.evaluate(READ_PICKER);
+      const yAfter = await page.evaluate(() => window.scrollY);
       check(
-        `G2 ${g.id}: clicking ${month(targetMonth)} filters to the month and the spread reads it back`,
-        sp.get("from") === day(targetMonth) &&
-          sp.get("to") === day(monthEnd) &&
-          nav?.from === day(targetMonth) &&
-          nav?.to === day(monthEnd),
-        `url "${search(page)}" (want from=${day(targetMonth)} to=${day(monthEnd)}); spread ${nav?.from}…${nav?.to}`,
-      );
-      const shown = await page.evaluate(READ_GROUPED_LIST, FOLDER_HEADER);
-      check(
-        `G2 ${g.id}: the count line states the month's loose events plus its folder members, exactly`,
-        line === filteredLine(want) && shown.shown === "exact",
-        `"${line}" (want "${filteredLine(want)}"), shown ${shown.shown}`,
-      );
-      check(
-        // Equal on both kinds of page: on a windowed one the month was chosen
-        // wholly above the cut, so the map counts nothing the page lacks.
-        `G2 ${g.id}: which is the map's own figure for the month`,
-        cell != null && want === cell.count,
-        `line ${n(want)}, map ${cell == null ? "no cell" : n(cell.count)} for ${month(targetMonth)}`,
-      );
-
-      // G3 — which folders stand, and that each is open.
-      await toEndOfList(page);
-      const standing = await page.evaluate(READ_GROUPED_LIST, FOLDER_HEADER);
-      const meeting = foldersMeeting(targetMonth, monthEnd);
-      check(
-        `G3 ${g.id}: the folders left standing are the ones whose span meets the month, all open`,
-        standing.folders === meeting && standing.open === meeting,
-        `${standing.folders} folder row(s) standing, ${standing.open} open; ${meeting} meet ${month(targetMonth)}`,
-      );
-
-      // G4 — the same month again clears it.
-      await openPanel(page);
-      const beforeClear = search(page);
-      await page.evaluate(CLICK_CELL, targetMonth);
-      await searchMoved(page, beforeClear);
-      await settled(
-        page,
-        (w) => (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim() === w,
-        restLine,
-      );
-      const cleared = await page.evaluate(COUNT_LINE);
-      check(
-        `G4 ${g.id}: the same month again clears the selection and the count line returns`,
-        !/[?&](from|to)=/.test(search(page)) && cleared === restLine,
-        `url "${search(page)}", count line "${cleared}" (want "${restLine}")`,
+        `S2 ${g.id}: a click on ${monthName(inside)} inside the band scrolls the rows to it`,
+        pressed && yAfter !== yBefore && after.inView.includes(inside) && after.loading == null,
+        `pressed ${pressed}, scrollY ${yBefore} → ${yAfter}, in view ${after.inView.map(monthName).join(", ")}, loading ${after.loading}`,
       );
     }
+
+    // S3 — a month below the cut. The newest month wholly below the oldest
+    // served row that holds events, from the whole-life summary.
+    const life = windowed
+      ? await getJson(`/api/aave-v3/timeline/summary?market=core&wallet=${g.wallet}&cutoffBlock=99999999`)
+      : null;
+    const lifeMonths = new Map();
+    for (const b of life?.byDay ?? []) {
+      const i = monthIdxOf(Number(b.key));
+      lifeMonths.set(i, (lifeMonths.get(i) ?? 0) + b.count);
+    }
+    const below = [...lifeMonths.entries()]
+      .filter(([i, c]) => c > 0 && monthEndOf(monthStartTs(i)) < oldestServed)
+      .sort((a, b) => b[0] - a[0]);
+    const target = below[0] ?? null;
+    if (!windowed) {
+      info(`S3 ${g.id}: a month outside the band`, "the whole history is loaded; the picker only scrolls");
+    } else if (target == null) {
+      check(`S3 ${g.id}: a month below the cut to pick`, false, "none in the summary");
+    } else {
+      const [tIdx, tCount] = target;
+      const cap = route.boundBy === "rows" ? plan.length : null;
+      const head = `${monthLong(tIdx)} holds ${n(tCount)} ${tCount === 1 ? "event" : "events"}`;
+      const pressed = await pressCell(page, tIdx);
+      await settled(
+        page,
+        (w) =>
+          (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "")
+            .trim()
+            .startsWith(w) && document.querySelector("[data-segment-skeleton]") == null,
+        head,
+        120_000,
+      );
+      await stillRows(page);
+      const line = await page.evaluate(COUNT_LINE);
+      const seg = await page.evaluate(READ_PICKER);
+      const rowsAt = await page.evaluate(() =>
+        [...document.querySelectorAll("[data-row-at]")].map((e) => Number(e.dataset.rowAt)),
+      );
+      const from = monthStartTs(tIdx);
+      const to = monthEndOf(from);
+      const shrunk = cap != null && tCount > cap;
+      check(
+        `S3 ${g.id}: picking ${monthName(tIdx)} loads it and the count line states the month in time`,
+        pressed && (shrunk ? line.startsWith(`${head}; loaded `) : line === head),
+        `pressed ${pressed}; "${line}" (want ${shrunk ? `"${head}; loaded …"` : `"${head}"`})`,
+      );
+      check(
+        `S3 ${g.id}: every row drawn is inside ${monthName(tIdx)}, and there are rows`,
+        rowsAt.length > 0 && rowsAt.every((t) => t >= from && t <= to),
+        `${rowsAt.length} row(s), ${rowsAt.filter((t) => t < from || t > to).length} outside`,
+      );
+      check(
+        `S3 ${g.id}: the tip is withheld at the top, and the band is that month alone`,
+        seg.boundaryRows.includes("tip") && JSON.stringify(seg.band) === JSON.stringify([tIdx]),
+        `boundary rows ${seg.boundaryRows.join(", ") || "none"}; band ${seg.band.map(monthName).join(", ")}`,
+      );
+      check(
+        `S3 ${g.id}: no lifetime figure on the count line`,
+        !line.includes(n(route.totalEvents)),
+        `"${line}" carries the position's total ${n(route.totalEvents)}`,
+      );
+      info(
+        `S3 ${g.id}: the segment answered`,
+        seg.folders > 0
+          ? `in folders (${seg.folders} folder row(s))`
+          : "flat (an api that predates the grouped span, or a month with nothing to group)",
+      );
+    }
+
+    // S4 — the phone strip at 390.
+    const phone = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      colorScheme: "light",
+      extraHTTPHeaders: bypassHeaders(),
+    });
+    await phone.addInitScript(INIT);
+    const small = await phone.newPage();
+    small.setDefaultTimeout(300_000);
+    try {
+      await small.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
+      await settle(small);
+      await small.waitForSelector("[data-segment-strip]", { timeout: 30_000 }).catch(() => {});
+      await small.evaluate(() => document.querySelector("[data-segment-picker]")?.scrollIntoView());
+      await settled(small, () => document.querySelectorAll("[data-strip-here]").length === 1, null, 10_000);
+      const strip = await small.evaluate(READ_STRIP);
+      check(
+        `S4 ${g.id}: at 390 the strip stands in place of the matrix, at most three months in view, the newest accented and centred, no sideways scroll`,
+        strip.stripVisible &&
+          !strip.matrixVisible &&
+          strip.inView >= 2 &&
+          strip.inView <= 3 &&
+          strip.here === monthIdxOf(newestServed) &&
+          strip.hereCentred &&
+          strip.scrollWidth === 390,
+        `strip ${strip.stripVisible}, matrix ${strip.matrixVisible}, ${strip.inView} in view, here ${strip.here == null ? "none" : monthName(strip.here)} (want ${monthName(monthIdxOf(newestServed))}) centred ${strip.hereCentred}, scrollWidth ${strip.scrollWidth}`,
+      );
+      if (windowed && target != null) {
+        const [tIdx, tCount] = target;
+        const head = `${monthLong(tIdx)} holds ${n(tCount)} ${tCount === 1 ? "event" : "events"}`;
+        const tapped = await small.evaluate((idx) => {
+          const el = document.querySelector(`[data-strip-month="${idx}"]`);
+          if (!el) return false;
+          el.scrollIntoView({ inline: "center", block: "nearest" });
+          el.click();
+          return true;
+        }, tIdx);
+        await settled(
+          small,
+          (w) =>
+            (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "")
+              .trim()
+              .startsWith(w) && document.querySelector("[data-segment-skeleton]") == null,
+          head,
+          120_000,
+        );
+        const line = await small.evaluate(COUNT_LINE);
+        const after = await small.evaluate(READ_STRIP);
+        check(
+          `S4 ${g.id}: a tap on ${monthName(tIdx)} loads it, and the strip underlines it`,
+          tapped && line.startsWith(head) && after.band.length === 1 && after.band[0] === tIdx,
+          `tapped ${tapped}; "${line}"; band ${after.band.map(monthName).join(", ")}`,
+        );
+      }
+    } finally {
+      await small.close();
+      await phone.close();
+    }
+
+    // Back to the newest rows for G5: reload rather than pick, so the spread
+    // reads the preload's own life.
+    await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
+    await settle(page);
+    const filteredLine = (x) =>
+      windowed
+        ? `Showing ${n(x)} of ${loadedText} · ${n(route.totalEvents)} events`
+        : `${n(x)} of ${n(route.totalEvents)} events`;
 
     // G5 — a day typed into the spread, on the busiest day a folder covers.
     const folderDays = new Map();
     for (const f of folders)
       for (const d of f.byDay) {
         const at = Number(d.key);
-        if (!windowed || at >= oldestListed) folderDays.set(at, (folderDays.get(at) ?? 0) + d.count);
+        if (!windowed || at >= oldestServed) folderDays.set(at, (folderDays.get(at) ?? 0) + d.count);
       }
     const pickDay = [...folderDays.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
     if (pickDay == null) {
       check(`G5 ${g.id}: a day a folder covers`, false, "no folder day in the listed range");
     } else {
-      await openPanel(page);
+      await openSpread(page);
       const beforeFrom = search(page);
       await page.evaluate(TYPE_DATE, ["from", day(pickDay)]);
       await searchMoved(page, beforeFrom);
