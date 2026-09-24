@@ -32,7 +32,7 @@
  * per-position shape go through one fetch client).
  *
  *   node scripts/verify/verify-timeline-wire.mjs
- *   node scripts/verify/verify-timeline-wire.mjs --ref=https://rails-web-onboarding.vercel.app
+ *   node scripts/verify/verify-timeline-wire.mjs --ref=https://rails-web.vercel.app
  *   node scripts/verify/verify-timeline-wire.mjs --only=spark,asymmetry
  *
  * Needs a dev server. BASE defaults to http://localhost:3000.

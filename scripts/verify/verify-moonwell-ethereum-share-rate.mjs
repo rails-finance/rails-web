@@ -30,7 +30,7 @@
 //
 // claude-in-chrome cannot reach localhost — this script is the check.
 // Run:  BASE=http://localhost:3000 node scripts/verify/verify-moonwell-ethereum-share-rate.mjs
-//       BASE=https://rails-web-onboarding.vercel.app node scripts/verify/verify-moonwell-ethereum-share-rate.mjs
+//       BASE=https://rails-web.vercel.app node scripts/verify/verify-moonwell-ethereum-share-rate.mjs
 
 import { chromium } from "playwright";
 

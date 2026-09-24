@@ -74,7 +74,7 @@
 //
 // claude-in-chrome cannot reach localhost — this script is the check.
 // Run:  BASE=http://localhost:3611 node scripts/verify/verify-makerdao-rate-step.mjs
-//       BASE=https://rails-web-onboarding.vercel.app node scripts/verify/verify-makerdao-rate-step.mjs
+//       BASE=https://rails-web.vercel.app node scripts/verify/verify-makerdao-rate-step.mjs
 // Needs ALCHEMY_URL in .env.local (read, never printed).
 
 import fs from "node:fs";

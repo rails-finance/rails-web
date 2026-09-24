@@ -80,7 +80,7 @@
 //
 // Run:
 //   BASE=http://localhost:3022 node scripts/verify/verify-market-note-row.mjs
-//   BASE=https://rails-web-onboarding.vercel.app node scripts/verify/verify-market-note-row.mjs
+//   BASE=https://rails-web.vercel.app node scripts/verify/verify-market-note-row.mjs
 
 import { chromium } from "playwright";
 

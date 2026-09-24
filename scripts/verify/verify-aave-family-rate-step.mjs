@@ -40,7 +40,7 @@
 //
 // claude-in-chrome cannot reach localhost — this script is the check.
 // Run:  BASE=http://localhost:3411 node scripts/verify/verify-aave-family-rate-step.mjs
-//       BASE=https://rails-web-onboarding.vercel.app node scripts/verify/verify-aave-family-rate-step.mjs
+//       BASE=https://rails-web.vercel.app node scripts/verify/verify-aave-family-rate-step.mjs
 //
 // FLOOR_STUBBED=1 flips check 6's expectation: run it after setting
 // AAVE_RATE_STEP_LIVE_FLOOR to 0 in lib/aave-v3/market-notes.ts, and the whale

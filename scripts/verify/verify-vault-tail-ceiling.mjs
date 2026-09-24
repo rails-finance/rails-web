@@ -48,7 +48,7 @@
 //       × 548.9 B = 8,781,806 B". Chain 1 stayed green through it, which is the
 //       half of the proof that says the two chains are judged apart.
 
-const BASE = process.env.TAIL_BASE ?? "https://rails-web-onboarding.vercel.app";
+const BASE = process.env.TAIL_BASE ?? "https://rails-web.vercel.app";
 
 /** The two figures under test, restated. `tailMaxRows(chainId)` in
  *  lib/shared/vault-holder-timeline.ts. */

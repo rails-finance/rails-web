@@ -24,7 +24,7 @@
 // change, P1's `block` field is absent (red) and P5 reads 21,344.52 against
 // 25,122.55 (red). After the change every line is green or a stated SKIP.
 //
-//   BASE=https://rails-web-onboarding.vercel.app node scripts/verify/verify-aave-v4-price-stamp.mjs
+//   BASE=https://rails-web.vercel.app node scripts/verify/verify-aave-v4-price-stamp.mjs
 //
 // Needs ALCHEMY_URL in .env.local (archive reads at blocks days old). Prints
 // lane NAMES only, never a URL.

@@ -64,7 +64,7 @@
 //
 // claude-in-chrome cannot reach localhost — this script is the check.
 // Run:  BASE=http://localhost:3023 node scripts/verify/verify-market-note-row-liquity-v2.mjs
-//       BASE=https://rails-web-onboarding.vercel.app node scripts/verify/verify-market-note-row-liquity-v2.mjs
+//       BASE=https://rails-web.vercel.app node scripts/verify/verify-market-note-row-liquity-v2.mjs
 
 import { chromium } from "playwright";
 

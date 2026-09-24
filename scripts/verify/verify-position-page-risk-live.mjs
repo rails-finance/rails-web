@@ -28,7 +28,7 @@
 //   compound-base                     : −base.amount · account
 //   morpho-base                       : borrowed.amount · owner / marketId
 //
-//   BASE=https://rails-web-onboarding.vercel.app node scripts/verify/verify-position-page-risk-live.mjs
+//   BASE=https://rails-web.vercel.app node scripts/verify/verify-position-page-risk-live.mjs
 //
 // ── PROVED IT CAN FAIL, 2026-09-10 ──────────────────────────────────────────
 //   RUNWAY set to "from liquidationx" → FAIL 2 on all seven lanes. Picking the
