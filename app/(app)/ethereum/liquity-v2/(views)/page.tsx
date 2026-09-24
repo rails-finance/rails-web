@@ -18,6 +18,7 @@ import {
   LIQUITY_V2_LIST_DEFAULTS,
 } from "@/lib/liquity-v2/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
+import { readListQuery } from "@/lib/shared/list-filter";
 import { holderListingMetadata, listingMetadata } from "@/lib/shared/page-metadata";
 import { parseTroveSearch } from "@/lib/liquity-v2/search";
 import { resolveEnsAddress } from "@/lib/ens/resolve-ens";
@@ -47,7 +48,7 @@ export async function generateMetadata({
     description:
       "Explore all Liquity V2 Troves across ETH, wstETH, and rETH collateral types. Filter by owner, status, collateral ratio, and more. View detailed transaction timelines for any trove.",
   });
-  const { ownerAddress, ownerEns } = parseTroveSearch(toURLSearchParams(await searchParams).get("q") ?? "");
+  const { ownerAddress, ownerEns } = parseTroveSearch(readListQuery(toURLSearchParams(await searchParams)));
   // An address is lowercased (one wallet, one URL, whatever case it was typed
   // in); an ENS name stays as typed, which is how it resolves.
   const holder = ownerAddress ? ownerAddress.toLowerCase() : ownerEns;

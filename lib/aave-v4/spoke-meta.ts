@@ -34,10 +34,10 @@ import type { HubTier } from "@/components/protocol/aave-v4/aave-v4-spoke-consta
 //
 // When a new spoke ships:
 //   1. Add the row here (slug → display name).
-//   2. Add a 308 redirect in next.config.ts from the encoded display name
-//      shape, in case the spoke's name contains a space.
-//   3. Mirror in SPOKE_META below (keyed by the same slug) if it needs
+//   2. Mirror in SPOKE_META below (keyed by the same slug) if it needs
 //      editorial copy.
+// The encoded display-name shape needs no rule of its own: the spoke page 308s
+// any segment `resolveSpokeSegment` recognises to its slug.
 const SPOKE_SLUG_TO_NAME: Record<string, string> = {
   main: "Main",
   bluechip: "Bluechip",
@@ -79,6 +79,25 @@ export function slugifySpoke(displayName: string): string | null {
  *  catch them. */
 export function spokeFromSlug(slug: string): string | null {
   return SPOKE_SLUG_TO_NAME[slug] ?? null;
+}
+
+/** Resolve a `[spoke]` URL segment in any shape the site has linked — the slug,
+ *  a legacy slug (`global-dollar`), or a display name, raw or percent-encoded
+ *  (`Ethena%20Ecosystem`) — to its canonical slug and display name. `slug` is
+ *  null for a spoke this build has not heard of; `name` is then the decoded
+ *  segment. The page 308s to `slug` when it differs from the segment it was given. */
+export function resolveSpokeSegment(segment: string): { slug: string | null; name: string } {
+  const given = spokeFromSlug(segment) ?? decodeSegment(segment);
+  const slug = slugifySpoke(given);
+  return { slug, name: (slug && spokeFromSlug(slug)) ?? given };
+}
+
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
 }
 
 export type SpokeArchetype =

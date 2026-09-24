@@ -29,6 +29,26 @@ export interface BaseListFilters {
 export interface SerializableDimension<F> extends FilterDimension<F> {
   /** URL param name this dimension serializes to. */
   param: string;
+  /** Older param names for the same selection (the pre-0016 site's
+   *  `collateralType`). Read when `param` is absent; never written. */
+  aliases?: readonly string[];
+}
+
+/** Older names for the free-text query. The pre-0016 site linked its wallet
+ *  filter as `?ownerAddress=` / `?ownerEns=` (Liquity V2) and `?wallet=` (Aave
+ *  V4); next.config.ts forwards those to `?q=`, and this reads them for any link
+ *  that reaches the page without the hop. */
+const LEGACY_QUERY_PARAMS = ["ownerAddress", "ownerEns", "wallet"] as const;
+
+/** The listing's free-text query: `q`, or the first legacy name present. */
+export function readListQuery(sp: URLSearchParams): string {
+  const q = sp.get("q");
+  if (q != null) return q;
+  for (const key of LEGACY_QUERY_PARAMS) {
+    const v = sp.get(key);
+    if (v != null) return v;
+  }
+  return "";
 }
 
 /** A serializable dimension plus the predicate needed to apply it in memory. */
@@ -152,12 +172,12 @@ export function decodeListFilters<F extends BaseListFilters>(
 ): F {
   let f: F = {
     ...defaults,
-    q: sp.get("q") ?? "",
+    q: readListQuery(sp),
     sortBy: sp.get("sortBy") ?? defaults.sortBy,
     sortOrder: sp.get("sortOrder") === "asc" ? "asc" : sp.get("sortOrder") === "desc" ? "desc" : defaults.sortOrder,
   };
   for (const dim of dims) {
-    const raw = sp.get(dim.param);
+    const raw = sp.get(dim.param) ?? dim.aliases?.map((a) => sp.get(a)).find((v) => v != null) ?? null;
     if (raw != null) {
       const values = raw
         .split(",")

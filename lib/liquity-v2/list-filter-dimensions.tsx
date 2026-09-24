@@ -129,6 +129,8 @@ export function liquityV2ListDimensions(
     group: "Collateral",
     cardinality: "multi",
     param: "collateralTypes",
+    // The pre-0016 stats page linked each collateral as `?collateralType=rETH`.
+    aliases: ["collateralType"],
     options: collateralOptions,
     get: (f) => f.collateralTypes ?? [],
     set: (f, values) => ({ ...f, collateralTypes: values.length > 0 ? values : undefined }),
