@@ -17,7 +17,7 @@ import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 export const NO_PRICE_HINT = "no price source";
 
 /** The dust floor for a holding no USD floor can judge, because the asset has
- *  no price. Matches the token epsilon the position simulator uses. */
+ *  no price. Matches the token epsilon the position calculation uses. */
 export const UNPRICED_DUST_TOKENS = 0.0001;
 
 /** What a total's label gains when an unpriced holding is missing from it. */

@@ -26,9 +26,9 @@ import type { AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
 export type AaveV4SpokePositionStatus = "open" | "closed" | "liquidated";
 
 /** Per-reserve breakdown shipped with every listing row. Mirrors the detail
- *  page's chain-state shape so the listing card can build the same sim inputs
+ *  page's chain-state shape so the listing card can build the same calculation inputs
  *  (HF / liq price / borrowing power) the detail card uses — no per-row chain
- *  fetch from the client, no duplicate sim logic, no number drift between the
+ *  fetch from the client, no duplicate calculation, no number drift between the
  *  two surfaces.
  *
  *  Balances ship as token-wei strings (numeric(78,0) precision). Scale by
@@ -36,7 +36,7 @@ export type AaveV4SpokePositionStatus = "open" | "closed" | "liquidated";
  *  compute the row's totals — now the on-chain Aave oracle price (DefiLlama only
  *  for reserves the registry omits) — and `priceSource` names its lineage so the
  *  card can label the figure's provenance. Using them client-side means the
- *  listing's sim arrives at the same totals the server reports. */
+ *  listing's calculation arrives at the same totals the server reports. */
 export interface AaveV4SpokeReserveSummary {
   symbol: string;
   address: string;
@@ -119,7 +119,7 @@ export interface AaveV4SpokePositionRow {
   ensName: string | null;
   /** Per-reserve breakdown — chain-state when overlay succeeded, MV-indexed
    *  fallback (with `chainHfStale=true`) otherwise. Feeds the listing card's
-   *  asset cluster + the same `simulateAaveV4Position` the detail uses. */
+   *  asset cluster + the same `calculateAaveV4Position` the detail uses. */
   reserves: AaveV4SpokeReserveSummary[];
 }
 

@@ -12,10 +12,10 @@
 // single-card breadcrumb and the auto-select effect is gone.
 //
 // Health factor, liq price, and borrowing power are computed client-side via
-// lib/aave-v4/spoke-cards.ts → simulateAaveV4Position over a hard-coded LT
-// table. Net interest carry comes from chain-state balances vs. indexed
+// lib/aave-v4/spoke-cards.ts → calculateAaveV4Position over the thresholds the
+// spoke reports. Net interest carry comes from chain-state balances vs. indexed
 // deposits (computeAaveV4InterestPnl). Every current-state USD figure — the
-// sim inputs, interest carry, runway, tower "today" totals and price strip —
+// calculation's inputs, interest carry, runway, tower "today" totals and price strip —
 // is valued at Aave's own on-chain oracle price (chainTruthPrices, oracle-first
 // with a DefiLlama fallback only for assets the oracle registry omits), so the
 // live position reads chain-true throughout, not just the headline totals.
@@ -65,8 +65,8 @@ import {
   computeAaveV4InterestPnl,
   resolveFallbackCollateral,
 } from "@/lib/aave-v4/spoke-cards";
-import { AAVE_V4_FALLBACK_LT, isStable } from "@/lib/aave-v4/liquidation-thresholds";
-import { simulateAaveV4Position, type SimPositionInputs } from "@/lib/aave-v4/utils/simulate";
+import { AAVE_V4_FALLBACK_LT, isDollarRail } from "@/lib/aave-v4/liquidation-thresholds";
+import { calculateAaveV4Position, type CalcPositionInputs } from "@/lib/aave-v4/utils/position-calculation";
 import { resolvePrice, type PriceEntry } from "@/lib/aave/prices";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
@@ -769,12 +769,12 @@ function AaveV4SpokeTowerBlock({
   // this registry, which the page-level inspector reads.
   const registry = useReceiptRegistry();
 
-  // A simulated leg is priced by construction — every figure it feeds (the
+  // A calculated leg is priced by construction — every figure it feeds (the
   // surplus split here, borrowing power, liquidation price) is a USD weighing.
-  // An asset with no price source can't be weighed, so it stays out of the sim
-  // rather than entering it at a dollar a unit (RULE: Rails never invents a
+  // An asset with no price source can't be weighed, so it stays out of the
+  // calculation rather than entering it at a dollar a unit (RULE: Rails never invents a
   // price — lib/aave-v4/unpriced.ts). The tower's breakdown names it instead.
-  const simBase: SimPositionInputs = useMemo(
+  const calcBase: CalcPositionInputs = useMemo(
     () => ({
       supplies: reserves
         .map((r) => {
@@ -788,7 +788,7 @@ function AaveV4SpokeTowerBlock({
           const collateralEnabled = r.collateralEnabled ?? true;
           return { symbol: r.symbol, amount: netSupply, price, lt, collateralEnabled };
         })
-        .filter(Boolean) as SimPositionInputs["supplies"],
+        .filter(Boolean) as CalcPositionInputs["supplies"],
       debts: reserves
         .map((r) => {
           const netDebt = r.currentBorrowed ?? Math.max(0, r.borrowed - r.repaid - r.liquidatedDebt);
@@ -797,12 +797,12 @@ function AaveV4SpokeTowerBlock({
           if (price == null) return null;
           return { symbol: r.symbol, amount: netDebt, price };
         })
-        .filter(Boolean) as SimPositionInputs["debts"],
+        .filter(Boolean) as CalcPositionInputs["debts"],
     }),
     [reserves, prices],
   );
 
-  const [surplusSymbols, hideSurplus, setHideSurplus] = useSurplusState(simBase);
+  const [surplusSymbols, hideSurplus, setHideSurplus] = useSurplusState(calcBase);
 
   // Lifetime totals that mirror the tower legend, narrated in the footnote.
   const totals = useMemo(() => computeAaveLifetimeTotals(reserves, prices), [reserves, prices]);
@@ -899,20 +899,24 @@ function AaveV4SpokeTowerBlock({
 }
 
 function useSurplusState(
-  simBase: SimPositionInputs,
+  calcBase: CalcPositionInputs,
 ): [Set<string>, boolean, React.Dispatch<React.SetStateAction<boolean>>] {
   const [hideSurplus, setHideSurplus] = useState(false);
   const surplusSymbols = useMemo(() => {
     const out = new Set<string>();
-    if (simBase.supplies.length > 0 && simBase.debts.length > 0) {
-      const axis = simulateAaveV4Position({ supplies: simBase.supplies, debts: simBase.debts });
-      for (let i = 0; i < simBase.supplies.length; i++) {
-        if (axis.assetLiqPrices[i]?.liqPrice === 0 && !isStable(simBase.supplies[i].symbol)) {
-          out.add(simBase.supplies[i].symbol);
+    if (calcBase.supplies.length > 0 && calcBase.debts.length > 0) {
+      const axis = calculateAaveV4Position({ supplies: calcBase.supplies, debts: calcBase.debts });
+      for (let i = 0; i < calcBase.supplies.length; i++) {
+        // A collateral the rest of the basket already over-covers (liq price 0)
+        // is surplus, unless it is a $1 rail — decided from its own oracle price
+        // (isDollarRail), so sUSDe and EURC are weighed like any other asset.
+        const supply = calcBase.supplies[i];
+        if (axis.assetLiqPrices[i]?.liqPrice === 0 && !isDollarRail(supply.price)) {
+          out.add(supply.symbol);
         }
       }
     }
     return out;
-  }, [simBase]);
+  }, [calcBase]);
   return [surplusSymbols, hideSurplus, setHideSurplus];
 }

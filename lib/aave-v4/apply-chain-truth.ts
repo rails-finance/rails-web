@@ -18,7 +18,7 @@
 import type { AaveSpokeCardInfo, ReserveStats } from "./spoke-cards";
 import type { AaveV4SpokePositionChainResponse } from "@/lib/api/fetch-aave-v4-spoke-position";
 import { scaleChainBalance } from "@/lib/api/fetch-aave-v4-spoke-position";
-import { simulateAaveV4Position, computeSupplyBreakdown, type SimPositionInputs } from "./utils/simulate";
+import { calculateAaveV4Position, computeSupplyBreakdown, type CalcPositionInputs } from "./utils/position-calculation";
 import { resolvePrice, type PriceEntry } from "@/lib/aave/prices";
 import { pricesHaveLoaded } from "@/lib/aave-v4/unpriced";
 
@@ -114,12 +114,12 @@ export function patchSpokeCardWithChain(
   chain: AaveV4SpokePositionChainResponse,
   prices: Record<string, PriceEntry | number>,
 ): AaveSpokeCardInfo {
-  // Build simulator inputs from chain reserves so per-asset liq prices use
+  // Build the calculation's inputs from chain reserves so per-asset liq prices use
   // the same balances Aave would. A reserve no source prices enters at zero:
-  // that is the only weight a USD simulation can give a leg it cannot value.
+  // that is the only weight a USD calculation can give a leg it cannot value.
   // Its name rides on `unpricedSymbols` below, so the totals can say they are
   // short of it.
-  const simInputs: SimPositionInputs = {
+  const calcInputs: CalcPositionInputs = {
     supplies: chain.reserves
       .filter((r) => scaleChainBalance(r.supplyBalanceRaw, r.decimals) > 0)
       .map((r) => ({
@@ -137,21 +137,21 @@ export function patchSpokeCardWithChain(
         price: resolvePrice(r.symbol, prices) ?? 0,
       })),
   };
-  const sim = simulateAaveV4Position(simInputs);
+  const calc = calculateAaveV4Position(calcInputs);
 
   // Symbol lists from chain. supplyingSymbols = currently-active supplies
   // (positive balance), borrowingSymbols = currently-active debts.
-  const supplyingSymbols = simInputs.supplies.map((s) => s.symbol);
-  const borrowingSymbols = simInputs.debts.map((d) => d.symbol);
+  const supplyingSymbols = calcInputs.supplies.map((s) => s.symbol);
+  const borrowingSymbols = calcInputs.debts.map((d) => d.symbol);
 
   // Dominant-collateral liq price = the largest USD supply with a valid
-  // simulated liq price. Matches what the listing/detail headline expects.
+  // calculated liq price. Matches what the listing/detail headline expects.
   let liqPrice: AaveSpokeCardInfo["liqPrice"] = null;
-  if (sim.totalDebtUsd > 0) {
-    const withShare = simInputs.supplies
+  if (calc.totalDebtUsd > 0) {
+    const withShare = calcInputs.supplies
       .map((s, i) => {
         const usd = s.amount * s.price;
-        const lp = sim.assetLiqPrices[i];
+        const lp = calc.assetLiqPrices[i];
         return { s, usd, lp };
       })
       .filter((x) => x.lp?.liqPrice != null && x.lp.liqPrice > 0)
@@ -171,24 +171,24 @@ export function patchSpokeCardWithChain(
   // resolved from the chain reserve list.
   const addrLookup = new Map<string, string>();
   for (const r of chain.reserves) addrLookup.set(r.symbol, r.address);
-  const assetLiqPrices = simInputs.supplies
+  const assetLiqPrices = calcInputs.supplies
     .map((s, i) => {
       const usd = s.amount * s.price;
-      const totalSupplyUsd = sim.totalCollateralUsd || 1;
+      const totalSupplyUsd = calc.totalCollateralUsd || 1;
       return {
         symbol: s.symbol,
         address: addrLookup.get(s.symbol),
         currentPrice: s.price,
-        liqPrice: sim.assetLiqPrices[i]?.liqPrice ?? null,
-        headroomPct: sim.assetLiqPrices[i]?.headroomPct ?? null,
+        liqPrice: calc.assetLiqPrices[i]?.liqPrice ?? null,
+        headroomPct: calc.assetLiqPrices[i]?.headroomPct ?? null,
         usdShare: (usd / totalSupplyUsd) * 100,
       };
     })
     .sort((a, b) => b.usdShare - a.usdShare);
 
-  // Use the chain's HF directly (not sim.healthFactor) — they should match
+  // Use the chain's HF directly (not calc.healthFactor) — they should match
   // when inputs align, but chain HF includes V4-specific accounting (risk
-  // premium, premium-shares, etc.) our simulator doesn't model.
+  // premium, premium-shares, etc.) the calculation leaves out.
   const healthFactor = chain.healthFactor;
 
   // Recompute the collateral-only blended LT from the SAME chain LTs the liq
@@ -200,7 +200,7 @@ export function patchSpokeCardWithChain(
   // event card's value only when there's no priced collateral to blend.
   let collValueUsd = 0;
   let collWeightedLtUsd = 0;
-  for (const s of simInputs.supplies) {
+  for (const s of calcInputs.supplies) {
     if (!s.collateralEnabled || s.lt <= 0) continue;
     const usd = s.amount * s.price;
     collValueUsd += usd;
@@ -209,7 +209,7 @@ export function patchSpokeCardWithChain(
   const blendedLt = collValueUsd > 0 ? collWeightedLtUsd / collValueUsd : card.blendedLt;
 
   // RULE: Rails never invents a price (lib/aave-v4/unpriced.ts). A reserve with
-  // no price source enters the sim at zero — it keeps its place in the symbol
+  // no price source enters the calculation at zero — it keeps its place in the symbol
   // rows, because holding it is a fact of the chain read, and adds no dollars
   // to any total. Recomputed here on the chain basis (the event-derived list on
   // `card` was drawn from a different reserve set) so a surface printing one of
@@ -230,19 +230,19 @@ export function patchSpokeCardWithChain(
   return {
     ...card,
     unpricedSymbols,
-    totalSupplyUsd: sim.totalCollateralUsd,
-    weightedCollateralUsd: sim.weightedCollateralUsd,
+    totalSupplyUsd: calc.totalCollateralUsd,
+    weightedCollateralUsd: calc.weightedCollateralUsd,
     blendedLt,
-    totalDebtUsd: sim.totalDebtUsd,
-    collRatio: sim.totalDebtUsd > 0 ? sim.totalCollateralUsd / sim.totalDebtUsd : null,
+    totalDebtUsd: calc.totalDebtUsd,
+    collRatio: calc.totalDebtUsd > 0 ? calc.totalCollateralUsd / calc.totalDebtUsd : null,
     supplyingSymbols,
     borrowingSymbols,
     healthFactor,
     liqPrice,
     assetLiqPrices,
-    borrowingPowerUsd: sim.borrowCapacityUsd,
-    supplyBreakdown: computeSupplyBreakdown(simInputs.supplies),
+    borrowingPowerUsd: calc.borrowCapacityUsd,
+    supplyBreakdown: computeSupplyBreakdown(calcInputs.supplies),
     // Closed-position heuristic: chain says no supply AND no debt.
-    isClosed: simInputs.supplies.length === 0 && simInputs.debts.length === 0,
+    isClosed: calcInputs.supplies.length === 0 && calcInputs.debts.length === 0,
   };
 }

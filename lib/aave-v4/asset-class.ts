@@ -2,8 +2,6 @@
 // descriptive buckets only — no risk valence (see memory feedback-no-opinionated-color).
 // "correlated" describes price behaviour (these move with ETH / BTC), not a judgement.
 
-import { isStable } from "./liquidation-thresholds";
-
 export type AssetClass = "eth" | "btc" | "stablecoin" | "gold" | "other";
 
 const ETH_CORRELATED = new Set<string>([
@@ -23,12 +21,31 @@ const ETH_CORRELATED = new Set<string>([
 const BTC_CORRELATED = new Set<string>(["WBTC", "cbBTC", "LBTC", "tBTC", "BTCB", "eBTC", "swBTC"]);
 const GOLD = new Set<string>(["XAUt", "PAXG"]);
 
-// Stable-DENOMINATED assets beyond the simulator's STABLE_SYMBOLS ($1 rails):
-// yield-bearing stables and fiat stables the V3-family rosters list. These
-// price like dollars (the classification is price behaviour) but are NOT $1
-// rails — sDAI/sUSDS/syrup shares appreciate — so they must not join
-// STABLE_SYMBOLS, which would give them a fixed-$1 treatment in the simulator.
+// Stable-DENOMINATED assets: fiat stables (USD and EUR), Ethena dollars, the
+// Pendle principal tokens of those, and the yield-bearing shares (sDAI, sUSDS,
+// sUSDe, syrup) that appreciate against a dollar. This bucket describes price
+// behaviour for the hub and exposure prose, so a name list is the right tool
+// here. It is NOT the $1-rail rule the liquidation figures use: that is
+// `isDollarRail` in lib/aave-v4/liquidation-thresholds.ts, decided per asset
+// from its own oracle price, because sDAI, sUSDS and sUSDe are stable-denominated
+// and not worth a dollar.
 const STABLE_DENOMINATED = new Set<string>([
+  "USDC",
+  "USDT",
+  "DAI",
+  "GHO",
+  "EURC",
+  "USDG",
+  "frxUSD",
+  "RLUSD",
+  "USDe",
+  "sUSDe",
+  "PT-sUSDE",
+  "PT-sUSDE-7MAY2026",
+  "PT-USDe-7MAY2026",
+  "PT-USDG-24SEP2026",
+  "LUSD",
+  "BOLD",
   "USDS",
   "sUSDS",
   "sDAI",
@@ -40,14 +57,12 @@ const STABLE_DENOMINATED = new Set<string>([
   "syrupUSDT",
 ]);
 
-/** Bucket a token symbol. Stablecoins are resolved via the simulator's
- *  STABLE_SYMBOLS set (USD + EUR fiat stables, Ethena dollars) plus the
- *  stable-denominated set above. */
+/** Bucket a token symbol. */
 export function assetClass(symbol: string): AssetClass {
   if (ETH_CORRELATED.has(symbol)) return "eth";
   if (BTC_CORRELATED.has(symbol)) return "btc";
   if (GOLD.has(symbol)) return "gold";
-  if (isStable(symbol) || STABLE_DENOMINATED.has(symbol)) return "stablecoin";
+  if (STABLE_DENOMINATED.has(symbol)) return "stablecoin";
   return "other";
 }
 

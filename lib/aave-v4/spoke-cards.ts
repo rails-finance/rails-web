@@ -5,7 +5,7 @@
 //
 // Crucially, the risk datapoints here (HF, liq price, borrowing power,
 // dominant-asset headroom %) derive from the events the API already returns
-// plus the static LT lookup table — no on-chain reads are needed. Interest
+// plus the chain-read liquidation thresholds (lib/aave-v4/liquidation-thresholds.ts). Interest
 // carry (computeAaveV4InterestPnl) additionally consumes chain-state balances.
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -14,7 +14,11 @@ import { type PriceEntry, resolvePrice } from "@/lib/aave/prices";
 import { pricesHaveLoaded, UNPRICED_DUST_TOKENS } from "@/lib/aave-v4/unpriced";
 import { SPOKE_HUB, type HubTier } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { AAVE_V4_FALLBACK_LT } from "@/lib/aave-v4/liquidation-thresholds";
-import { simulateAaveV4Position, computeSupplyBreakdown, type SupplyBreakdown } from "@/lib/aave-v4/utils/simulate";
+import {
+  calculateAaveV4Position,
+  computeSupplyBreakdown,
+  type SupplyBreakdown,
+} from "@/lib/aave-v4/utils/position-calculation";
 import { effectiveBorrowAPR } from "@/lib/aave-v4/borrow-rate";
 
 // ---- Types ----
@@ -69,7 +73,7 @@ export interface ReserveStats {
   currentBorrowed?: number;
   /** Chain-state liquidation threshold for this (spoke, reserve), when an
    *  on-chain read has been applied (see `patchReservesWithChain`). Undefined
-   *  on purely event-derived reserves — the simulator then falls back to
+   *  on purely event-derived reserves — the calculation then falls back to
    *  `AAVE_V4_FALLBACK_LT`. */
   lt?: number;
 }
@@ -165,7 +169,7 @@ export interface AaveSpokeCardInfo {
   /** Liq price for the dominant collateral asset (largest USD share). null when
    *  no debt, single-asset can't reach liq, or there's no priced collateral. */
   liqPrice: { symbol: string; currentPrice: number; liqPrice: number; headroomPct: number } | null;
-  /** Per-collateral-asset liq prices (full output of the simulator). Drives the
+  /** Per-collateral-asset liq prices (full output of the calculation). Drives the
    *  stacked price-runway view below the active spoke card. Sorted by USD share
    *  desc so the runway stack reads dominant → minor. */
   assetLiqPrices: {
@@ -769,11 +773,11 @@ export function buildSpokeCards(
       }
     }
 
-    // Every simulated figure (borrowing power, health factor, liquidation
+    // Every calculated figure (borrowing power, health factor, liquidation
     // price) weighs legs against each other in USD, so a leg with no price
-    // source can't be simulated and stays out (RULE: Rails never invents a
+    // source can't be calculated and stays out (RULE: Rails never invents a
     // price — lib/aave-v4/unpriced.ts).
-    const simSupplies = g.result.reserves
+    const calcSupplies = g.result.reserves
       .map((r) => {
         const netSupply = Math.max(0, r.supplied - r.withdrawn);
         if (netSupply <= 0.0001) return null;
@@ -786,7 +790,7 @@ export function buildSpokeCards(
         return { symbol: r.symbol, amount: netSupply, price, lt, collateralEnabled };
       })
       .filter(Boolean) as { symbol: string; amount: number; price: number; lt: number; collateralEnabled: boolean }[];
-    const simDebts = g.result.reserves
+    const calcDebts = g.result.reserves
       .map((r) => {
         const netDebt = Math.max(0, r.borrowed - r.repaid);
         if (netDebt <= 0.0001) return null;
@@ -796,12 +800,12 @@ export function buildSpokeCards(
       })
       .filter(Boolean) as { symbol: string; amount: number; price: number }[];
 
-    const simResult = simulateAaveV4Position({ supplies: simSupplies, debts: simDebts });
+    const calcResult = calculateAaveV4Position({ supplies: calcSupplies, debts: calcDebts });
 
     let liqPrice: AaveSpokeCardInfo["liqPrice"] = null;
-    if (simResult.totalDebtUsd > 0 && simSupplies.length > 0) {
-      const dominant = [...simSupplies].sort((a, b) => b.amount * b.price - a.amount * a.price)[0];
-      const liq = simResult.assetLiqPrices.find((a) => a.symbol === dominant.symbol);
+    if (calcResult.totalDebtUsd > 0 && calcSupplies.length > 0) {
+      const dominant = [...calcSupplies].sort((a, b) => b.amount * b.price - a.amount * a.price)[0];
+      const liq = calcResult.assetLiqPrices.find((a) => a.symbol === dominant.symbol);
       if (liq && liq.liqPrice != null && liq.liqPrice > 0 && liq.headroomPct != null) {
         liqPrice = {
           symbol: liq.symbol,
@@ -813,8 +817,8 @@ export function buildSpokeCards(
     }
 
     const usdBySym = new Map<string, number>();
-    for (const s of simSupplies) usdBySym.set(s.symbol, s.amount * s.price);
-    const assetLiqPrices = simResult.assetLiqPrices
+    for (const s of calcSupplies) usdBySym.set(s.symbol, s.amount * s.price);
+    const assetLiqPrices = calcResult.assetLiqPrices
       .map((a) => ({
         symbol: a.symbol,
         currentPrice: a.currentPrice,
@@ -853,7 +857,7 @@ export function buildSpokeCards(
       hub: g.hub,
       totalSupplyUsd: g.totalSupplyUsd,
       unpricedSymbols: g.unpricedSymbols,
-      weightedCollateralUsd: simResult.weightedCollateralUsd,
+      weightedCollateralUsd: calcResult.weightedCollateralUsd,
       blendedLt,
       totalDebtUsd: g.totalDebtUsd,
       peakSupplyUsd,
@@ -865,14 +869,14 @@ export function buildSpokeCards(
       supplyingSymbols,
       borrowingSymbols,
       latestBorrowRate: spokeBorrowRate,
-      healthFactor: simResult.healthFactor,
+      healthFactor: calcResult.healthFactor,
       liqPrice,
       assetLiqPrices,
-      borrowingPowerUsd: simResult.borrowCapacityUsd,
+      borrowingPowerUsd: calcResult.borrowCapacityUsd,
       wasLiquidated,
       endedByLiquidation: g.result.lastAction === "liquidation",
       liquidationCount,
-      supplyBreakdown: computeSupplyBreakdown(simSupplies),
+      supplyBreakdown: computeSupplyBreakdown(calcSupplies),
     };
   });
 }
@@ -918,7 +922,7 @@ export interface LiquidationBuffer {
  *     systematically OVERSTATES safety for a correlated basket.
  *
  * Collateral-enabled is read off `assetLiqPrices`: a non-collateral supply has a
- * null `liqPrice` (the simulator returns null for assets that don't back debt).
+ * null `liqPrice` (the calculation returns null for assets that don't back debt).
  */
 export function liquidationBuffer(spoke: AaveSpokeCardInfo): LiquidationBuffer {
   return liquidationBufferFrom(spoke.healthFactor, spoke.totalDebtUsd, spoke.assetLiqPrices);
@@ -926,7 +930,7 @@ export function liquidationBuffer(spoke: AaveSpokeCardInfo): LiquidationBuffer {
 
 /**
  * Primitive form of {@link liquidationBuffer} over the minimal inputs, so the
- * listing card (which holds a raw simulator result, not an AaveSpokeCardInfo)
+ * listing card (which holds a raw calculation result, not an AaveSpokeCardInfo)
  * gets identical behaviour. `assetLiqPrices` entries with a non-null `liqPrice`
  * are the collateral-enabled assets.
  */

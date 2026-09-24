@@ -1,5 +1,6 @@
 /**
- * Pure multi-asset simulator for an Aave V4 spoke position.
+ * The Aave V4 position calculation: health factor, borrowing power and the
+ * per-asset liquidation price of one spoke position, pure over its inputs.
  *
  * Aave's health factor is:
  *   HF = Σ(coll_i × price_i × LT_i) / Σ(debt_j × price_j)
@@ -14,7 +15,7 @@
  * debt — the asset in question can go to zero without liquidating.
  */
 
-export interface SimSupply {
+export interface CalcSupply {
   symbol: string;
   amount: number;
   price: number;
@@ -24,18 +25,18 @@ export interface SimSupply {
   collateralEnabled: boolean;
 }
 
-export interface SimDebt {
+export interface CalcDebt {
   symbol: string;
   amount: number;
   price: number;
 }
 
-export interface SimPositionInputs {
-  supplies: SimSupply[];
-  debts: SimDebt[];
+export interface CalcPositionInputs {
+  supplies: CalcSupply[];
+  debts: CalcDebt[];
 }
 
-export interface SimAssetLiqPrice {
+export interface CalcAssetLiqPrice {
   symbol: string;
   currentPrice: number;
   /** Price at which HF hits 1, with all other assets held at current state.
@@ -46,7 +47,7 @@ export interface SimAssetLiqPrice {
   headroomPct: number | null;
 }
 
-export interface SimResult {
+export interface CalcResult {
   totalCollateralUsd: number;
   totalDebtUsd: number;
   /** Σ(coll_i × price_i × LT_i) — the numerator of HF before dividing. */
@@ -58,7 +59,7 @@ export interface SimResult {
   /** Max new borrow in USD before HF = 1, given current weighted collateral. */
   borrowCapacityUsd: number;
   /** Per-collateral-asset liquidation price (shock only that asset). */
-  assetLiqPrices: SimAssetLiqPrice[];
+  assetLiqPrices: CalcAssetLiqPrice[];
   /** True when HF < 1 — on-chain the position would already be liquidatable. */
   underwater: boolean;
 }
@@ -83,7 +84,7 @@ export interface SupplyBreakdown {
  * loan, doesn't move the health factor, and can't be seized — so it must not be
  * counted in the headline "Collateral".
  */
-export function computeSupplyBreakdown(supplies: SimSupply[]): SupplyBreakdown {
+export function computeSupplyBreakdown(supplies: CalcSupply[]): SupplyBreakdown {
   const out: SupplyBreakdown = {
     collateralUsd: 0,
     collateralSymbols: [],
@@ -104,7 +105,7 @@ export function computeSupplyBreakdown(supplies: SimSupply[]): SupplyBreakdown {
   return out;
 }
 
-export function simulateAaveV4Position({ supplies, debts }: SimPositionInputs): SimResult {
+export function calculateAaveV4Position({ supplies, debts }: CalcPositionInputs): CalcResult {
   let totalCollateralUsd = 0;
   let weightedCollateralUsd = 0;
   for (const s of supplies) {
@@ -123,7 +124,7 @@ export function simulateAaveV4Position({ supplies, debts }: SimPositionInputs): 
   const borrowCapacityUsd = Math.max(0, weightedCollateralUsd - totalDebtUsd);
   const underwater = totalDebtUsd > 0 && weightedCollateralUsd < totalDebtUsd;
 
-  const assetLiqPrices: SimAssetLiqPrice[] = supplies.map((s) => {
+  const assetLiqPrices: CalcAssetLiqPrice[] = supplies.map((s) => {
     if (!s.collateralEnabled || s.lt <= 0 || s.amount <= 0 || totalDebtUsd <= 0) {
       return { symbol: s.symbol, currentPrice: s.price, liqPrice: null, headroomPct: null };
     }

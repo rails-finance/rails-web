@@ -15,7 +15,7 @@
 //   • REPLAYED — the running per-reserve balances, reconstructed as the signed
 //     sum of the amounts the position's logs moved, in on-chain order.
 //   • DERIVED — accumulations over the spoke's event stream (lifetime flows,
-//     peaks, tx count, interest carry) and simulations over the per-asset
+//     peaks, tx count, interest carry) and the position calculation over the per-asset
 //     thresholds the spoke reports (borrowing power, liquidation price).
 //     Computed in the browser.
 //
@@ -300,31 +300,31 @@ export function accumProv(what: string, opts?: { formula?: string; inputs?: Prov
 
 /** Health factor — the spoke's calculation for this position, read live from
  *  getUserAccountData (the figure Aave's interface shows); falls back to a
- *  client-side simulation over the per-asset thresholds when the live read is
+ *  client-side calculation over the per-asset thresholds when the live read is
  *  unavailable. */
 export function healthFactorProv(): Provenance {
   return {
     kind: "chain",
     pclass: "state",
     summary:
-      "Health factor — the spoke's calculation for this position, read at the latest block, so it is the figure the spoke would liquidate on. When that read is unavailable the page simulates it from the balances and each asset's liquidation threshold.",
+      "Health factor — the spoke's calculation for this position, read at the latest block, so it is the figure the spoke would liquidate on. When that read is unavailable the page calculates it from the balances and each asset's liquidation threshold.",
     contract: { name: "Aave V4 spoke" },
     via: `${SPOKE_POSITION_VIA} · spoke getUserAccountData · healthFactor · ÷10^18`,
   };
 }
 
-/** A figure simulated from chain-state balances and the per-asset thresholds
+/** A figure calculated from chain-state balances and the per-asset thresholds
  *  the spoke reports — liquidation price, borrowing power, blended-threshold
  *  debt ceiling. The USD leg is Aave's oracle price, the figure the spoke
  *  values the position at, so the number tracks what Aave would liquidate on.
  *  An off-chain market price backstops an asset the oracle registry leaves
  *  out. (The hand-maintained LT table is gone — see
  *  lib/aave-v4/liquidation-thresholds.ts.) */
-export function simProv(what: string, opts?: { formula?: string; inputs?: ProvInput[] }): Provenance {
+export function calcProv(what: string, opts?: { formula?: string; inputs?: ProvInput[] }): Provenance {
   return {
     kind: "derived",
     summary: `${what} — worked out in the browser from the position's collateral and debt, each asset weighted by the liquidation threshold the spoke reports for it, and valued at the price Aave's oracle answers.`,
-    via: "simulateAaveV4Position · the spoke's thresholds · Aave's oracle price",
+    via: "calculateAaveV4Position · the spoke's thresholds · Aave's oracle price",
     formula: opts?.formula,
     inputs: [
       { label: "asset price", kind: "chain", pclass: "oracle", note: "Aave's oracle (getReservePrice)" },
@@ -333,14 +333,14 @@ export function simProv(what: string, opts?: { formula?: string; inputs?: ProvIn
   };
 }
 
-// The position pane's three simulated-risk receipts, hosted HERE rather than
+// The position pane's three calculated-risk receipts, hosted HERE rather than
 // inline in the pane component: receipts keep their value-epistemics — exact
 // formulas and method names — and this vocabulary file is where that register
 // lives (the Explanation surfaces are charter-swept and register-gated; a
 // receipt embedded there would have to water its basis down).
 /** The blended liquidation threshold — the risk strip's pivot figure. A
- *  bespoke summary rather than the simProv template: the receipt must say
- *  what the WEIGHTING means, which the generic simulation boilerplate
+ *  bespoke summary rather than the calcProv template: the receipt must say
+ *  what the WEIGHTING means, which the generic calculation boilerplate
  *  doesn't. */
 export const BLENDED_LT_PROV: Provenance = {
   kind: "derived",
@@ -365,7 +365,7 @@ export const BLENDED_LT_PROV: Provenance = {
   ],
 };
 
-export const DEBT_CEILING_PROV = simProv("The LT-weighted debt ceiling", {
+export const DEBT_CEILING_PROV = calcProv("The LT-weighted debt ceiling", {
   formula: "Σ(collateral × liquidation threshold)",
   inputs: [
     { label: "collateral", kind: "chain", pclass: "state", note: "per-asset supply balances (spoke read)" },
@@ -377,17 +377,17 @@ export const DEBT_CEILING_PROV = simProv("The LT-weighted debt ceiling", {
     },
   ],
 });
-export const LIQ_PRICE_PROV = simProv("The liquidation price", {
+export const LIQ_PRICE_PROV = calcProv("The liquidation price", {
   formula: "price ÷ health factor",
   inputs: [{ label: "health factor", kind: "chain", pclass: "state", note: "spoke getUserAccountData" }],
 });
-export const LIQ_DROP_PROV = simProv("The drop to liquidation", {
+export const LIQ_DROP_PROV = calcProv("The drop to liquidation", {
   formula: "price → liquidation price · 1 − 1 ÷ health factor",
   inputs: [
     {
       label: "liquidation price",
       kind: "derived",
-      note: "simulated — price gap for a single collateral asset; the health-factor form covers a basket",
+      note: "calculated — price gap for a single collateral asset; the health-factor form covers a basket",
     },
     { label: "health factor", kind: "chain", pclass: "state", note: "spoke getUserAccountData" },
   ],

@@ -30,7 +30,7 @@ import {
   LIQ_DROP_PROV,
 } from "@/lib/aave-v4/position-provenance";
 
-// The simulated-risk receipts (DEBT_CEILING_PROV / LIQ_PRICE_PROV /
+// The calculated-risk receipts (DEBT_CEILING_PROV / LIQ_PRICE_PROV /
 // LIQ_DROP_PROV) live in lib/aave-v4/position-provenance.ts: receipts keep
 // their exact formulas and method names, and this file is a register-gated
 // Explanation surface where that vocabulary can't be written inline.

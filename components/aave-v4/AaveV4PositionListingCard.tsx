@@ -10,7 +10,7 @@
 //   - Numbers: the server ships per-reserve chain-state (`reserves[]`:
 //     chain balances, LTs, isCollateral, on-chain oracle prices) on every listing
 //     row, mirroring the detail page's chain-state endpoint. The card runs
-//     the same `simulateAaveV4Position` the detail's `patchSpokeCardWithChain`
+//     the same `calculateAaveV4Position` the detail's `patchSpokeCardWithChain`
 //     runs, so totals, liq prices, and borrowing power are derived from
 //     identical inputs.
 //   - Formatting: shared `fmtUsd` / `hfLabel` / `fmtLiqPrice` (`lib/aave-v4/format.ts`).
@@ -43,18 +43,22 @@ import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { fmtUsd, hfLabel } from "@/lib/aave-v4/format";
-import { simulateAaveV4Position, computeSupplyBreakdown, type SimPositionInputs } from "@/lib/aave-v4/utils/simulate";
+import {
+  calculateAaveV4Position,
+  computeSupplyBreakdown,
+  type CalcPositionInputs,
+} from "@/lib/aave-v4/utils/position-calculation";
 import { liquidationBufferFrom } from "@/lib/aave-v4/spoke-cards";
 import { AaveV4LiquidationFootnote } from "@/components/protocol/aave-v4/aave-v4-liquidation-footnote";
 import { Prov } from "@/components/shared/provenance";
 import { usdProvOnchain, usdProv, isOnChainPriceSource } from "@/lib/aave-v4/position-provenance";
 
 export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow }) {
-  // Build sim inputs from the server's chain-state reserves[]. Same inputs the
-  // detail page passes to simulateAaveV4Position inside patchSpokeCardWithChain.
-  const sim = useMemo(() => {
-    const supplies: SimPositionInputs["supplies"] = [];
-    const debts: SimPositionInputs["debts"] = [];
+  // Build the calculation's inputs from the server's chain-state reserves[]. Same inputs the
+  // detail page passes to calculateAaveV4Position inside patchSpokeCardWithChain.
+  const calc = useMemo(() => {
+    const supplies: CalcPositionInputs["supplies"] = [];
+    const debts: CalcPositionInputs["debts"] = [];
     const supplyingSymbols: string[] = [];
     const borrowingSymbols: string[] = [];
 
@@ -78,7 +82,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
       }
     }
 
-    const result = simulateAaveV4Position({ supplies, debts });
+    const result = calculateAaveV4Position({ supplies, debts });
 
     return {
       ...result,
@@ -90,11 +94,11 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
 
   // Liquidation read — identical helper to the detail card. Single collateral
   // asset → its price; two or more → the 1 − 1/HF buffer. Uses the chain HF the
-  // server shipped (row.healthFactor), not the sim's derived HF.
-  const buf = liquidationBufferFrom(row.healthFactor, sim.totalDebtUsd, sim.assetLiqPrices);
+  // server shipped (row.healthFactor), not the calculation's derived HF.
+  const buf = liquidationBufferFrom(row.healthFactor, calc.totalDebtUsd, calc.assetLiqPrices);
 
   // Prefer the chain HF the server already shipped (matches Aave UI by
-  // construction) over the sim's derived HF. They agree when LTs are fresh;
+  // construction) over the calculation's derived HF. They agree when LTs are fresh;
   // chain wins when they don't (premium-shares, recently-changed LT).
   const healthFactor = row.healthFactor;
   const hasDebt = healthFactor != null;
@@ -107,7 +111,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   // agrees with the "Borrowing" pill (both key off debt > 0). Past borrows or
   // liquidations on an otherwise debt-free position stay carried by the
   // LiquidatedBadge + timeline, since debt is genuinely 0 there.
-  const supplyOnly = sim.totalDebtUsd <= 0;
+  const supplyOnly = calc.totalDebtUsd <= 0;
   // Chain overlay failed for this row → balances are MV-indexed (potentially
   // drifted from on-chain). The card still renders; the indicator warns.
   const hfStale = hasDebt && row.chainHfStale;
@@ -157,7 +161,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
     // the full deposited value; once there's debt, non-collateral supplies are
     // excluded (shown as a footnote). The LT weighting lives in HF + borrowing
     // power, not in this number.
-    const usd = supplyOnly ? sim.totalCollateralUsd : sim.breakdown.collateralUsd;
+    const usd = supplyOnly ? calc.totalCollateralUsd : calc.breakdown.collateralUsd;
     const v = fmtUsd(usd);
     const label = supplyOnly ? "Supplied" : "Collateral";
     const info = collateralOnChain
@@ -179,7 +183,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   // card and the closed-Liquity precedent: an absent dimension shows nothing,
   // not a placeholder dash).
   const debtValue = (() => {
-    const v = fmtUsd(sim.totalDebtUsd);
+    const v = fmtUsd(calc.totalDebtUsd);
     const info = debtOnChain
       ? usdProvOnchain("Debt")
       : usdProv("Debt", { amountLabel: "debt balance", amountKind: "chain" });
@@ -276,14 +280,14 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
           {
             label: supplyOnly ? "Supplied" : "Collateral",
             assetIcons: (() => {
-              const symbols = supplyOnly ? sim.supplyingSymbols : sim.breakdown.collateralSymbols;
+              const symbols = supplyOnly ? calc.supplyingSymbols : calc.breakdown.collateralSymbols;
               return symbols.length > 0 ? <InlineAssetCluster symbols={symbols} /> : undefined;
             })(),
             value: collateralValue,
             footnote:
-              !supplyOnly && sim.breakdown.nonCollateralUsd > 0 ? (
+              !supplyOnly && calc.breakdown.nonCollateralUsd > 0 ? (
                 <div className="text-xs mt-0.5 text-rb-500">
-                  + {fmtUsd(sim.breakdown.nonCollateralUsd).display} supplied · not collateral
+                  + {fmtUsd(calc.breakdown.nonCollateralUsd).display} supplied · not collateral
                 </div>
               ) : undefined,
           },
@@ -295,7 +299,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
             : {
                 label: "Debt",
                 assetIcons:
-                  sim.borrowingSymbols.length > 0 ? <InlineAssetCluster symbols={sim.borrowingSymbols} /> : undefined,
+                  calc.borrowingSymbols.length > 0 ? <InlineAssetCluster symbols={calc.borrowingSymbols} /> : undefined,
                 value: debtValue,
               },
           supplyOnly
