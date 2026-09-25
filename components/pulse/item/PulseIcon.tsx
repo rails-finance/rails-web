@@ -63,7 +63,7 @@ export function PulseIcon({
   return (
     <div className="relative flex h-full mr-2 sm:mr-4 md:mr-6 shrink-0 flex-col items-center">
       <div
-        className="absolute left-1/2 top-0 -z-10 flex h-full w-1 -translate-x-1/2 justify-center text-rb-300 dark:text-rb-500"
+        className="absolute left-1/2 top-0 -z-10 flex h-full w-px -translate-x-1/2 justify-center text-rb-400 dark:text-rb-500/70"
         style={connectorStyle}
       >
         <TimelineConnector event={event} isFirst={isFirst} isLast={isLast} />
