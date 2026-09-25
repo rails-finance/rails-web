@@ -55,8 +55,10 @@ import { FrankencoinChallengeCard } from "@/components/protocol/frankencoin/fran
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { computeFrankencoinEconomics, frankencoinLifetimeWithOpening } from "@/lib/frankencoin/economics";
 import { frankencoinEconomicsExplanation, frankencoinEconomicsContent } from "@/lib/frankencoin/economics-explanation";
-import { normalizePositionAddress } from "@/lib/frankencoin/asset-catalog";
+import { FRANKENCOIN_ADDRESSES, normalizePositionAddress } from "@/lib/frankencoin/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { RiskFooterStrip, RiskFigure } from "@/components/shared/risk-footer-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -248,9 +250,29 @@ export default function FrankencoinPositionView({
 
   const loading = !chainSettled && view == null;
 
+  // The top row's price dropdown: the two tokens a position stands on, and no
+  // figure beside either. Frankencoin runs no oracle, so nothing in the
+  // protocol states what a collateral is worth. The one number that looks like
+  // a price is `liqPrice`, and it is not one: the owner DECLARES it at mint and
+  // the challenge auctions enforce or refute it. Putting a declaration in a
+  // list headed "Prices" would read as a market reading, which is the whole
+  // reason this explorer renders no USD. It stays on the card, where the card
+  // says whose number it is.
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
+    if (!view) return [];
+    return [
+      {
+        symbol: view.collateralSymbol,
+        address: chain?.collateralToken ?? undefined,
+        label: `${view.collateralSymbol}, the position's collateral`,
+      },
+      { symbol: "ZCHF", address: FRANKENCOIN_ADDRESSES.ZCHF, label: "ZCHF, the token this position mints" },
+    ];
+  }, [view, chain]);
+
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="frankencoin">
+      <DetailTopRow session="frankencoin" assets={stripAssets} priceReason={ORACLE_USD_REASON.frankencoin}>
         {view && (
           <FrankencoinExportMenu
             position={position}
