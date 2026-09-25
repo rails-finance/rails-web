@@ -851,11 +851,11 @@ function MonthsHeatmap({
               // whether the cell can be filtered to, which the cursor and the
               // tooltip carry.
               const cls = !cell.inLifetime ? "bg-transparent" : bucketClass(relLevel(cell.count, grid.maxCount));
-              // One ring, and it means one thing: the rows below are filtered
-              // to this cell. (There was a second, neutral one for a month the
-              // reader had OPENED without choosing — it went with the drill on
-              // 2026-09-11.) A typed span rings every month it covers, which
-              // is the same statement about more cells.
+              // One ring, and it says one thing: THE ROWS BELOW ARE THIS
+              // CELL'S. That is the filter's selection where the page filtered
+              // and the segment's month where it read, and the reader is
+              // looking at the same list either way. A typed span rings every
+              // month it covers, which is the same statement about more cells.
               const reachable = cell.summarised && reachMonth != null;
               const selectable = cell.inLifetime && !isEmpty(cell.count) && (!cell.summarised || reachable);
               const isCurrent = currentMonth != null && cell.idx === currentMonth;
