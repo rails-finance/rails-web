@@ -44,7 +44,8 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { RailHeader } from "@/components/shared/rail-header";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
-import { LatestPrices } from "@/components/shared/latest-prices";
+import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
+import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { VaultFlowsTower } from "@/components/vaults/vault-flows-tower";
@@ -186,6 +187,26 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
   const vaultName = data.vault.name ?? data.vault.censusName;
   const subject = lookup.address ? shortAddress(lookup.address) : typed;
 
+  // The top row's price dropdown. A holder holds SHARES, and the one price
+  // the vault states about them is its own `convertToAssets` — one whole
+  // share in the vault's asset, read at the block this page names. No USD:
+  // the roster's 72 assets have no common feed to value them against.
+  // Where the chain read failed the row still names the share and shows no
+  // figure, because what is held is true whether or not the read landed.
+  const sharePrice =
+    !data.chainStale && data.vault.sharePrice != null && data.vault.sharePrice.value > 0
+      ? data.vault.sharePrice.value
+      : undefined;
+  const shareAssets: LatestPriceAsset[] = [
+    {
+      symbol: data.vault.symbol ?? shortAddress(data.vault.address),
+      address: data.vault.address,
+      price: sharePrice,
+      unit: sharePrice ? data.vault.asset.symbol : undefined,
+      label: `One share in ${data.vault.asset.symbol}, the vault's own convertToAssets`,
+    },
+  ];
+
   return (
     <div className="min-h-screen">
       <div className="py-8">
@@ -198,13 +219,13 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
               factsheet, which is where a holding is opened from. */}
           {/* The one thin row of "latest" (rails-ops TO-DO-ui-jobs 48): back,
               the chain head and its age, and the holding's assets at their
-              current prices — empty here until this section prices them —
+              current prices — the share, quoted in the vault's own asset —
               with the page's instruments in Tools at the right end. */}
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2" data-back-row>
             <div className="flex min-w-0 items-center gap-2">
               <DetailBackButton fallbackHref={yearnVaultHref(address)} compact />
               <RecencyStamp />
-              <LatestPrices assets={[]} />
+              <LatestPrices assets={shareAssets} reason={ORACLE_USD_REASON["yearn"]} />
             </div>
             <ToolsMenu />
           </div>

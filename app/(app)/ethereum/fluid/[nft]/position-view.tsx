@@ -50,6 +50,8 @@ import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { computeFluidEconomics, fluidLifetimeWithOpening } from "@/lib/fluid/economics";
 import { fluidEconomicsExplanation, fluidEconomicsContent } from "@/lib/fluid/economics-explanation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
@@ -278,9 +280,41 @@ export default function FluidPositionView({
 
   const liveRisk = chain != null && view?.status === "open";
 
+  // The top row's price dropdown. Fluid runs no USD feed: a vault's own oracle
+  // quotes the collateral in the vault's DEBT token, which is the two-token
+  // space its liquidation engine judges the ratio in, so that is the figure the
+  // collateral row carries. The debt leg is that unit and has no price of its
+  // own. A smart leg is DEX shares rather than an ERC-20, and valuing those
+  // needs the DexResolver this depth deliberately does not assert, so a smart
+  // vault's rows name the legs and state no figure.
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
+    if (!view) return [];
+    const supply = fluidLegName(view, "supply", chain);
+    const borrow = fluidLegName(view, "borrow", chain);
+    const debtPerCol =
+      chain &&
+      chain.found &&
+      !chain.chainStale &&
+      !chain.isSmartCol &&
+      !chain.isSmartDebt &&
+      chain.oraclePriceDebtPerCol != null &&
+      chain.oraclePriceDebtPerCol > 0
+        ? chain.oraclePriceDebtPerCol
+        : undefined;
+    return [
+      {
+        symbol: supply,
+        price: debtPerCol,
+        unit: debtPerCol ? borrow : undefined,
+        label: `${supply} in ${borrow} (the vault's own oracle)`,
+      },
+      { symbol: borrow, label: `${borrow}, the vault's debt token` },
+    ];
+  }, [view, chain]);
+
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="fluid">
+      <DetailTopRow session="fluid" assets={stripAssets} priceReason={ORACLE_USD_REASON.fluid}>
         {view && (
           <FluidExportMenu
             view={view}

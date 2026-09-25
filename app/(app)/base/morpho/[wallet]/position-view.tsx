@@ -28,6 +28,8 @@ import { LenderClosedCard, MorphoLenderOpenCard } from "@/components/protocol/mo
 import { VaultHoldingsNote } from "@/components/protocol/morpho-base/vault-holdings-note";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { MorphoSweptPosition } from "@/lib/api/fetch-morpho-base-timeline";
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
@@ -118,12 +120,42 @@ export default function MorphoBaseWalletView({
       });
   }, [timeline, chainByMarket, wallet, vaultNote]);
 
+  // The top row's price dropdown. This page is the WALLET, not a market, and
+  // on Blue a price belongs to a market: the oracle quotes the collateral in
+  // that market's own loan token, and a wallet open in several markets has no
+  // single unit to state a figure in. So the dropdown names the tokens the
+  // wallet's open markets hold and leaves the figures to the market pages one
+  // click down, each of which carries its own oracle's price.
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
+    const seen = new Set<string>();
+    const out: LatestPriceAsset[] = [];
+    for (const { pos, view } of rows) {
+      if (view.status !== "open") continue;
+      for (const t of [
+        { symbol: pos.collateralSymbol, address: pos.collateralToken },
+        { symbol: pos.loanSymbol, address: pos.loanToken },
+      ]) {
+        if (!t.symbol) continue;
+        const key = (t.address ?? t.symbol).toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ symbol: t.symbol, address: t.address });
+      }
+    }
+    return out;
+  }, [rows]);
+
   return (
     // Every event card's custody line names whichever source answered — the
     // index once it vouches for the whole life, the live sweep until then.
     <CaptureSourceProvider value={captureSource}>
       <div className="py-8 space-y-6">
-        <DetailTopRow session="morpho-base" wallet={wallet} />
+        <DetailTopRow
+          session="morpho-base"
+          wallet={wallet}
+          assets={stripAssets}
+          priceReason={ORACLE_USD_REASON["morpho-base"]}
+        />
 
         {vaultNote ? (
           <p className="text-[12px] text-rb-500">

@@ -16,6 +16,8 @@ import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isPwnEvent } from "@/lib/shared/types/event-shape";
 import { fetchPwnPositions } from "@/lib/api/fetch-pwn-positions";
@@ -246,11 +248,47 @@ export default function PwnLoanView({
     window: historyWindow,
   });
 
+  // The top row's price dropdown: the selected loan's two sides, named, with
+  // no figure beside either. PWN has no oracle at all — the borrower and the
+  // lender agree the terms between themselves, and nothing on chain says what
+  // the collateral is worth — so the dropdown lists what the loan stands on
+  // and says why there is no price. A bundled collateral is one ERC-1155
+  // wrapping several tokens; its contents are listed under it once the bundle
+  // read lands, since what is held is what is inside the wrapper.
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
+    if (!view) return [];
+    const out: LatestPriceAsset[] = [];
+    if (view.collateral) {
+      out.push({
+        symbol: view.collateral.symbol,
+        address: view.collateral.address,
+        label: `${view.collateral.symbol}, the loan's collateral`,
+      });
+      for (const b of view.bundleContents ?? []) {
+        out.push({ symbol: b.symbol, address: b.address, label: `${b.symbol}, inside the bundled collateral` });
+      }
+    }
+    if (view.credit) {
+      out.push({
+        symbol: view.credit.symbol,
+        address: view.credit.address,
+        label: `${view.credit.symbol}, the loan's credit asset`,
+      });
+    }
+    return out;
+  }, [view]);
+
   return (
     <div className="py-8 space-y-6">
       {/* showStamp={false}: PWN has no chain overlay — a recency stamp would
           assert a freshness the page doesn't have. */}
-      <DetailTopRow session="pwn" wallet={wallet} showStamp={false}>
+      <DetailTopRow
+        session="pwn"
+        wallet={wallet}
+        showStamp={false}
+        assets={stripAssets}
+        priceReason={ORACLE_USD_REASON.pwn}
+      >
         {/* A window survives here only on a single-loan wallet: with more loans
             the page refetches the whole history, because PWN's timeline route
             takes no per-loan cutoff and a wallet-grained opening balance cannot

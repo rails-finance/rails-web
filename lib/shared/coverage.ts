@@ -22,6 +22,11 @@
 
 import { LAUNCHED_PROTOCOLS, PROTOCOLS, isLaunchedChain, type ProtocolEntry } from "@/lib/shared/protocols";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+// The `oracleUsd: { why }` text below is shared with the position views' price
+// dropdown, which states the same reason where the reader is, so it lives in
+// its own small module rather than in this one (which no position route should
+// have to pull in for one sentence).
+import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 
 export type DepthKey =
   | "dashboard"
@@ -424,9 +429,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     explainers: true,
     verification: true,
     llm: true,
-    oracleUsd: {
-      why: "Maple runs an oracle, and for USDC that oracle IS a $1 pin: getLatestPrice returns a governance-set manualOverridePrice of exactly 1e8, overriding the registered feed (for USDT it reverts — no price at all). Rendering it would launder a pin as a market reading, which is what a $1 pin is charter-forbidden for; the pool assets ARE the unit, so values render in the asset itself",
-    },
+    oracleUsd: { why: ORACLE_USD_REASON.maple },
     forensics: {
       why: "a Maple lender has no liquidation surface — borrower defaults resolve at off-chain custodians, and the on-chain trace is the delegate's impairment bookkeeping (unrealizedLosses), which socializes through the exit rate rather than seizing from any lender. Chain-proven: the exit price takes a share count and no address, so under an impairment every holder's claim drops by exactly its pro-rata slice — there is no per-lender term for a loss to be aimed at",
     },
@@ -605,9 +608,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   fluid: explorerDepth({
     atBlockPrices: true,
     dashboard: true,
-    oracleUsd: {
-      why: "debt-token units by design — each vault's oracle prices the collateral in the vault's debt token (the exact space its liquidation engine judges in); Fluid runs no USD feed",
-    },
+    oracleUsd: { why: ORACLE_USD_REASON.fluid },
     verification: true,
     llm: true,
     explainers: true,
@@ -676,13 +677,11 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // tokens with no oracle mean no sum exists without importing a feed the
   // protocol runs without.
   frankencoin: explorerDepth({
-    atBlockPrices: {
-      why: "oracle-free by design — the liquidation price is owner-declared and enforced by challenge auctions; no USD feed exists anywhere in the protocol",
-    },
+    // Both price cells are ruled out by the same fact, so both read the one
+    // sentence: a price at a block is a USD price too.
+    atBlockPrices: { why: ORACLE_USD_REASON.frankencoin },
     dashboard: true,
-    oracleUsd: {
-      why: "oracle-free by design — the liquidation price is owner-declared and enforced by challenge auctions; no USD feed exists anywhere in the protocol",
-    },
+    oracleUsd: { why: ORACLE_USD_REASON.frankencoin },
     verification: true,
     llm: true,
     explainers: true,
@@ -704,7 +703,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   morpho: explorerDepth({
     atBlockPrices: true,
     dashboard: true,
-    oracleUsd: { why: "loan-token units by design — Morpho Blue has no USD oracle" },
+    oracleUsd: { why: ORACLE_USD_REASON.morpho },
     verification: true,
     llm: true,
     explainers: true,
@@ -748,7 +747,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   "morpho-base": explorerDepth({
     atBlockPrices: true,
     dashboard: true,
-    oracleUsd: { why: "loan-token units by design — Morpho Blue has no USD oracle" },
+    oracleUsd: { why: ORACLE_USD_REASON["morpho-base"] },
     llm: true,
     explainers: true,
     forensics: true,
@@ -767,9 +766,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     dashboard: true,
     verification: true,
     views: true,
-    oracleUsd: {
-      why: "a vault share has no protocol oracle to value it — the one priced figure is the census's, the balance through the vault's own convertToAssets and the chain's Aave V3 oracle on the ASSET at that block",
-    },
+    oracleUsd: { why: ORACLE_USD_REASON["aave-vaults"] },
     forensics: {
       why: "nobody in a vault holds a loan — there is no threshold to breach and nothing to seize, so there is no liquidation to trace",
     },
@@ -796,9 +793,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     views: true,
     verification: true,
     dashboard: true,
-    oracleUsd: {
-      why: "72 distinct assets across the roster and no per-asset feed to value them against, so every figure stays in the vault's own asset and no two assets are ever added together",
-    },
+    oracleUsd: { why: ORACLE_USD_REASON.yearn },
     forensics: {
       why: "nobody in a vault holds a loan — there is no threshold to breach and nothing to seize, so there is no liquidation to trace",
     },
@@ -1031,9 +1026,9 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     views: true,
   }),
   pwn: explorerDepth({
-    atBlockPrices: { why: "no protocol oracle — the two parties set the price" },
+    atBlockPrices: { why: ORACLE_USD_REASON.pwn },
     dashboard: { why: "terms are fixed at origination — no health factor or floating rate to read" },
-    oracleUsd: { why: "no protocol oracle — the two parties set the price" },
+    oracleUsd: { why: ORACLE_USD_REASON.pwn },
     verification: true,
     llm: true,
     explainers: true,

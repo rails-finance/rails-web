@@ -40,6 +40,9 @@ import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { computeMapleEconomics, computeMapleCardCaptions, mapleLifetimeWithOpening } from "@/lib/maple/economics";
 import { mapleEconomicsExplanation, mapleEconomicsContent } from "@/lib/maple/economics-explanation";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
+import { maplePoolOf } from "@/lib/maple/asset-catalog";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
@@ -253,6 +256,34 @@ export default function MaplePositionView({
     return Object.fromEntries(Object.entries(poolState).filter(([k]) => touched.size === 0 || touched.has(k)));
   }, [view, poolState]);
 
+  // The top row's price dropdown. A Maple lender holds POOL SHARES, and the
+  // one price the protocol states about a share is the pool's own exit rate:
+  // what one share converts to in the pool's funds asset, quantized by the pool
+  // rather than re-multiplied here. The funds asset is that unit — and it is
+  // where the USD stops, since Maple's oracle answers a governance-set $1 pin
+  // for USDC and reverts for USDT, so its row names the asset and no figure.
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
+    if (!view) return [];
+    const out: LatestPriceAsset[] = [];
+    const assets = new Map<string, string>();
+    for (const p of view.pools) {
+      const state = walletPoolState[p.pool];
+      const rate = state && !Number.isNaN(state.exitRate) && state.exitRate > 0 ? state.exitRate : undefined;
+      out.push({
+        symbol: p.symbol,
+        address: maplePoolOf(p.pool).pool,
+        price: rate,
+        unit: rate ? p.assetSymbol : undefined,
+        label: `One ${p.symbol} at the pool's exit rate, in ${p.assetSymbol}`,
+      });
+      assets.set(p.assetAddress, p.assetSymbol);
+    }
+    for (const [address, symbol] of assets) {
+      out.push({ symbol, address, label: `${symbol}, the pool's funds asset` });
+    }
+    return out;
+  }, [view, walletPoolState]);
+
   // The custody view — the factual page for a bridge escrow address. The
   // identity card states what the contract is and links the verified source;
   // the custody card beneath it carries what the escrow holds in the pool,
@@ -288,7 +319,7 @@ export default function MaplePositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="maple" wallet={wallet}>
+      <DetailTopRow session="maple" wallet={wallet} assets={stripAssets} priceReason={ORACLE_USD_REASON.maple}>
         {view && (
           <MapleExportMenu
             view={view}

@@ -38,6 +38,8 @@ import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { MORPHO_LIQUIDATION_RUNS } from "@/lib/morpho/timeline-runs";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { MorphoEventCard } from "@/components/protocol/morpho/morpho-event-card";
 import {
   MorphoPositionCard,
@@ -251,9 +253,32 @@ export default function MorphoPositionView({
     };
   }, [view, chain]);
 
+  // The top row's price dropdown. Morpho Blue runs no USD oracle: a market's
+  // oracle prices the collateral in that market's own loan token, which is the
+  // space the liquidation engine judges in, so that is what the collateral row
+  // carries. The loan token is the unit it is quoted in and has no price of its
+  // own, so its row names the asset and stops there.
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
+    const v = liveView;
+    if (!v) return [];
+    const out: LatestPriceAsset[] = [];
+    if (v.collateralSymbol) {
+      const oracle = chain && !chain.chainStale && chain.oraclePrice > 0 ? chain.oraclePrice : undefined;
+      out.push({
+        symbol: v.collateralSymbol,
+        address: v.collateralToken,
+        price: oracle,
+        unit: oracle ? v.loanSymbol : undefined,
+        label: `${v.collateralSymbol} in ${v.loanSymbol} (the market's own oracle)`,
+      });
+    }
+    out.push({ symbol: v.loanSymbol, address: v.loanToken, label: `${v.loanSymbol}, the market's loan token` });
+    return out;
+  }, [liveView, chain]);
+
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="morpho">
+      <DetailTopRow session="morpho" assets={stripAssets} priceReason={ORACLE_USD_REASON.morpho}>
         {liveView && (
           <MorphoExportMenu
             view={liveView}

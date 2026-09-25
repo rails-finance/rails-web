@@ -10,7 +10,16 @@
 // server migs 243, 245, 247 and 248 and the merge is lib/sources/api/aave-v3-timeline.ts.
 //
 // Fixtures are pinned by the chain facts that make them swaps, not by counts of
-// other events (every wallet is live):
+// other events (every wallet is live). Each names its TRANSACTION, and the list
+// is paged until that transaction's row is drawn before anything is read: the
+// page lands on `TIMELINE_PAGE_ROWS` rows (lib/shared/timeline-opening-balance.ts)
+// and the rest is one press, so a wallet that keeps acting sinks its old swap
+// below the landing. Read without pressing, 0x56b8a8's debt swap (row 206 on
+// 2026-09-25) and 0xf0838f's repay with collateral (row 161) were both off the
+// page, and the run reported a card the served history had and the page was
+// never asked to draw.
+//
+// The fixtures:
 //   0x81dbec…ad5a tx 0x8a01f2c1…7614 (block 25,971,859): aUSDC → aWETH, permit route
 //   0xfe28…5820  tx 0xc2596fc8…078d (block 25,963,602) and a second CoW swap ten
 //     blocks from it: both legs of each against GPv2Settlement, permit route
@@ -38,6 +47,7 @@
 //   BASE=http://localhost:3000 node scripts/verify/verify-swap-cards.mjs
 
 import { chromium } from "playwright";
+import { PRESS_SHOW_MORE } from "../lib/timeline-draw.mjs";
 
 const BASE = process.env.BASE || "http://localhost:3000";
 const COW_ICON = "/icons/protocols/cow.png";
@@ -51,18 +61,21 @@ const FIXTURES = [
   {
     label: "aave-v3 core 0x81dbec (permit route)",
     path: "/ethereum/aave-v3/0x81dbec9d661cdbe17650a6cbb9098ccf3eabad5a?market=core",
+    tx: "0x8a01f2c1",
     minCards: 1,
     kind: "Collateral swap",
   },
   {
     label: "aave-v3 core 0xfe28 (two permit swaps)",
     path: "/ethereum/aave-v3/0xfe28854b855ab09a47adbd893a5f580cdffc5820?market=core",
+    tx: "0xc2596fc8",
     minCards: 2,
     kind: "Collateral swap",
   },
   {
     label: "aave-v3 core 0x682ef9 (adapter route)",
     path: "/ethereum/aave-v3/0x682ef980b9732fc7606d2632339fe2d8fedf1a88?market=core",
+    tx: "0x9be7bbcd",
     minCards: 1,
     kind: "Collateral swap",
     // The per-order proxy that owned the Trade: never named on the page.
@@ -71,6 +84,7 @@ const FIXTURES = [
   {
     label: "aave-v3 core 0x56b8a8 (debt swap)",
     path: "/ethereum/aave-v3/0x56b8a8dfae36edd33df91606fe4ece49e4d76ac1?market=core",
+    tx: "0xaf0a493a",
     minCards: 1,
     kind: "Debt swap",
     axis: "debt",
@@ -79,6 +93,7 @@ const FIXTURES = [
   {
     label: "aave-v3 core 0xfa356e (repay with collateral)",
     path: "/ethereum/aave-v3/0xfa356e93d17a5d80dc1d64e3d181009e594295fc?market=core",
+    tx: "0xa3ac83ba",
     minCards: 1,
     kind: "Repay with collateral",
     axis: "mixed",
@@ -87,6 +102,7 @@ const FIXTURES = [
   {
     label: "aave-v3 core 0xbc8c (withdraw and swap)",
     path: "/ethereum/aave-v3/0xbc8c609e7df8658dc9c494434058e6389fef3dc4?market=core",
+    tx: "0x061ae6a7",
     minCards: 1,
     kind: "Withdraw and swap",
     mark: "flow",
@@ -94,6 +110,7 @@ const FIXTURES = [
   {
     label: "aave-v3 core 0x650e (supply from a swap)",
     path: "/ethereum/aave-v3/0x650e0262d165bcfcbd6fb78cedf083089bcbee14?market=core",
+    tx: "0xff98b829",
     minCards: 1,
     kind: "Supply from a swap",
     mark: "flow",
@@ -101,6 +118,7 @@ const FIXTURES = [
   {
     label: "aave-v3 core 0xb466 (ParaSwap debt swap, leftover repaid back)",
     path: "/ethereum/aave-v3/0xb466d8e3e4873b43730950911fc1a7a19603ff3e?market=core",
+    tx: "0x087968de",
     minCards: 1,
     kind: "Debt swap",
     axis: "debt",
@@ -115,6 +133,7 @@ const FIXTURES = [
   {
     label: "aave-v3 core 0xf0838f (ParaSwap repay with collateral, leftover supplied back)",
     path: "/ethereum/aave-v3/0xf0838f0fb5daaf808cf1ebad6c09460e1701d1d7?market=core",
+    tx: "0x6e28d6e4",
     minCards: 1,
     kind: "Repay with collateral",
     axis: "mixed",
@@ -123,6 +142,7 @@ const FIXTURES = [
   {
     label: "aave-v3 core 0xe72b71 (ParaSwap collateral swap)",
     path: "/ethereum/aave-v3/0xe72b71f97a4ceb0077e468054b788163e72abcc8?market=core",
+    tx: "0xa1eee65b",
     minCards: 1,
     kind: "Collateral swap",
     venue: PARASWAP_VENUE,
@@ -130,16 +150,51 @@ const FIXTURES = [
   {
     label: "aave-v3 core 0xf6b75b (ParaSwap withdraw and swap)",
     path: "/ethereum/aave-v3/0xf6b75b0475d09e4a92e4316185c383d74a9d9589?market=core",
+    tx: "0x803c61bc",
     minCards: 1,
     kind: "Withdraw and swap",
     venue: PARASWAP_VENUE,
     mark: "flow",
     // The bought WETH has no position row: it reads from the adapter's Swapped log,
     // so it keeps its grid cell. The WBTC it sold is stated by the position block's
-    // Supplied row (§47), exact, interest to the block included.
-    readsWhenOpen: [/Supplied 0\.00913 0\b/, "Bought 0.339", "Total collateral"],
+    // Supplied row (§47), exact, interest to the block included: 0.00913 down to 0.
+    // The pattern stopped requiring the amounts to follow "Supplied" directly on
+    // 2026-09-25 — 30d7665 groups that panel under "Collateral on" / "Collateral
+    // off" headings, which now sit between the two. The panel and the figures are
+    // what the check is about, and both still read.
+    readsWhenOpen: [/Supplied\b.{0,200}?\b0\.00913 0\b/, "Bought 0.339", "Total collateral"],
   },
 ];
+
+/** Presses allowed before a transaction is called undrawable. The served window
+ *  is TIMELINE_WINDOW_ROWS (1,000) and a press paints TIMELINE_PAGE_ROWS (50),
+ *  so twenty reaches the bottom of it; the rest is slack. */
+const PRESSES_MAX = 30;
+
+/** Is the fixture's transaction drawn? The row's `data-event-id` is Aave V3's
+ *  own event key, `action:contract:txHash:logIndex`, so the hash is in it. */
+const rowDrawn = (page, tx) =>
+  page.evaluate(
+    (t) =>
+      [...document.querySelectorAll("[data-event-id]")].some((e) =>
+        (e.getAttribute("data-event-id") ?? "").includes(t),
+      ),
+    tx,
+  );
+
+/** Page the list until the fixture's transaction is on it. Returns the presses
+ *  it took, or −1 when the transaction never arrived. */
+async function drawUntilTx(page, tx) {
+  for (let presses = 0; presses <= PRESSES_MAX; presses++) {
+    if (await rowDrawn(page, tx)) return presses;
+    if (!(await page.evaluate(PRESS_SHOW_MORE))) {
+      await page.waitForTimeout(600);
+      if (!(await page.evaluate(PRESS_SHOW_MORE))) break;
+    }
+    await page.waitForTimeout(400);
+  }
+  return (await rowDrawn(page, tx)) ? PRESSES_MAX : -1;
+}
 
 const only = process.env.FIXTURES ? new RegExp(process.env.FIXTURES) : null;
 let pass = 0;
@@ -159,12 +214,17 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
 for (const fx of FIXTURES) {
   if (only && !only.test(fx.label)) continue;
   let read;
+  let presses = 0;
   try {
     await page.goto(`${BASE}${fx.path}`, { waitUntil: "load", timeout: 120000 });
     // Wait on the swap node itself: a page on a build without the merge draws
     // the two legs instead and never shows one, which is the failure to catch.
     await page.waitForSelector(SWAP_NODE, { timeout: 90000 }).catch(() => null);
     await page.waitForTimeout(1500);
+    presses = await drawUntilTx(page, fx.tx);
+    if (presses < 0) bad(`${fx.label}: ${fx.tx}… is drawn by no row in the served window`);
+    else ok(`${fx.label}: ${fx.tx}… is drawn (${presses} press${presses === 1 ? "" : "es"})`);
+    await page.waitForTimeout(500);
     read = await page.evaluate(
       ({ swapNode, kindLabel, neverNamed }) => {
         const chipsIn = (root) =>
@@ -276,8 +336,10 @@ for (const fx of FIXTURES) {
   if (fx.readsWhenOpen) {
     const reads = (t, want) => (want instanceof RegExp ? want.test(t) : t.includes(want));
     const wanted = fx.readsWhenOpen.map(String).join(" and ");
+    // The fixture's own transaction, not whichever card of that kind the page
+    // drew first: a press can put a second one above it.
     const candidates = page
-      .locator("[data-event-id]")
+      .locator(`[data-event-id*="${fx.tx}"]`)
       .filter({ hasText: fx.kind })
       .filter({ hasText: wantVenue.text.replace(/^via /, "") });
     const n = Math.min(await candidates.count(), 5);

@@ -12,6 +12,15 @@
 // A view whose assets are not wired yet still renders the trigger and says so
 // when it opens — the row is the same shape on every position, and an absent
 // price list is a fact about that protocol, not a missing control.
+//
+// EVERY POSITION LISTS WHAT IT HOLDS, PRICED OR NOT (ui-jobs 56). Several
+// protocols run no USD feed of their own — Morpho and Fluid quote in the
+// market's loan token, Frankencoin and PWN state no price at all, Maple's
+// USDC "oracle" is a governance $1 pin — and Rails renders no number the
+// protocol does not state. So an asset may arrive with no `price`: the row
+// still names it, and `reason` carries that protocol's own recorded sentence
+// (lib/shared/oracle-usd-reasons.ts, the same string the coverage matrix's
+// `oracleUsd: { why }` cell shows) in place of the generic "not yet".
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Coins } from "lucide-react";
@@ -20,7 +29,13 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 
-export function LatestPrices({ assets }: { assets: PriceStripAsset[] }) {
+/** A dropdown row. `price` absent means the protocol states none for this
+ *  asset: the row names what is held and `reason` says why no figure follows
+ *  it. A `PriceStripAsset` (the bottom dock's shape, always priced) is
+ *  assignable here, so the priced views pass through unchanged. */
+export type LatestPriceAsset = Omit<PriceStripAsset, "price"> & { price?: number };
+
+export function LatestPrices({ assets, reason }: { assets: LatestPriceAsset[]; reason?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -44,6 +59,12 @@ export function LatestPrices({ assets }: { assets: PriceStripAsset[] }) {
 
   const first = assets[0];
   const more = assets.length - 1;
+  const priced = (a: LatestPriceAsset) => typeof a.price === "number" && a.price > 0;
+  // The reason answers "why is there no dollar figure here", so it belongs
+  // under any list that is not wholly USD — a row with no price at all, and a
+  // row quoted in the protocol's own unit alike — and in place of the generic
+  // sentence when there is no list.
+  const showReason = reason != null && !assets.every((a) => priced(a) && !a.unit);
 
   return (
     <div ref={ref} className="relative" data-latest-prices>
@@ -55,7 +76,7 @@ export function LatestPrices({ assets }: { assets: PriceStripAsset[] }) {
         aria-label={
           assets.length === 0
             ? "Prices for this position"
-            : `Prices for this position: ${assets.length} ${assets.length === 1 ? "asset" : "assets"}`
+            : `${assets.some(priced) ? "Prices for" : "Assets in"} this position: ${assets.length} ${assets.length === 1 ? "asset" : "assets"}`
         }
         className={`${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} h-7 gap-1.5 rounded-md px-2 text-xs`}
       >
@@ -65,8 +86,16 @@ export function LatestPrices({ assets }: { assets: PriceStripAsset[] }) {
             {/* Below sm the row carries back, block, prices and Tools across
                 390px, so the summary keeps the icon and the count and leaves
                 the figure to the open list. */}
-            <span className="hidden font-bold tabular-nums text-green-400 sm:inline">
-              {first.unit ? fmtNative(first.price, first.unit) : fmtPrice(first.price)}
+            {/* An unpriced first asset puts its symbol where the figure would
+                be, so the trigger still names what the position holds. */}
+            <span
+              className={`hidden tabular-nums sm:inline ${priced(first) ? "font-bold text-green-400" : "font-medium text-rb-500"}`}
+            >
+              {priced(first)
+                ? first.unit
+                  ? fmtNative(first.price as number, first.unit)
+                  : fmtPrice(first.price as number)
+                : first.symbol}
             </span>
             {more > 0 && <span className="tabular-nums text-rb-500">+{more}</span>}
           </>
@@ -82,33 +111,67 @@ export function LatestPrices({ assets }: { assets: PriceStripAsset[] }) {
         />
       </button>
 
+      {/* A list alone sizes to its longest price. A reason is prose and needs a
+          measure to read at, so the panel widens for one and caps at the
+          viewport on a phone; a long one scrolls rather than running off the
+          bottom of a short window. */}
       {open && (
-        <div className="overlay-panel absolute left-0 top-full z-50 mt-2 min-w-[200px] py-1" role="menu">
+        <div
+          className={`overlay-panel absolute left-0 top-full z-50 mt-2 max-h-[min(70vh,26rem)] max-w-[calc(100vw-2rem)] overflow-y-auto py-1 ${
+            showReason ? "w-[20rem]" : "min-w-[200px]"
+          }`}
+          role="menu"
+        >
           <div className="px-4 py-2">
-            <span className={`${OVERLAY_HEADING} text-rb-500`}>Prices</span>
+            <span className={`${OVERLAY_HEADING} text-rb-500`}>
+              {assets.length > 0 && !assets.some(priced) ? "Assets held" : "Prices"}
+            </span>
           </div>
           <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />
-          {assets.length === 0 ? (
-            <p className="px-4 pb-2 pt-1 text-xs leading-relaxed text-rb-500">
-              This explorer does not price the position&rsquo;s assets yet.
-            </p>
-          ) : (
-            <ul className="pb-1">
-              {assets.map((a) => (
-                <li key={a.unit ? `${a.symbol}-${a.unit}` : a.symbol} className="px-2">
-                  <PricePill
-                    symbol={a.symbol}
-                    address={a.address}
-                    price={a.price}
-                    unit={a.unit}
-                    filterable={false}
-                    title={a.label ?? a.symbol}
-                    showSymbol
-                    bare
-                  />
-                </li>
-              ))}
+          {assets.length > 0 && (
+            <ul className={showReason ? "" : "pb-1"}>
+              {assets.map((a) =>
+                priced(a) ? (
+                  <li key={a.unit ? `${a.symbol}-${a.unit}` : a.symbol} className="px-2">
+                    <PricePill
+                      symbol={a.symbol}
+                      address={a.address}
+                      price={a.price as number}
+                      unit={a.unit}
+                      filterable={false}
+                      title={a.label ?? a.symbol}
+                      showSymbol
+                      bare
+                    />
+                  </li>
+                ) : (
+                  // Held, and the protocol states no figure for it. The row
+                  // names the asset and leaves the price column empty rather
+                  // than filling it with a number from somewhere else.
+                  <li key={a.unit ? `${a.symbol}-${a.unit}` : a.symbol} className="px-2">
+                    <span
+                      title={a.label ?? a.symbol}
+                      className="inline-flex cursor-default items-center gap-1.5 rounded-md px-2 py-1 text-xs tabular-nums"
+                    >
+                      <TokenChipIcon symbol={a.symbol} address={a.address} size={14} filterable={false} />
+                      <span className="font-medium text-rb-500">{a.symbol}</span>
+                      <span className="text-rb-500" aria-label="no price stated">
+                        &ndash;
+                      </span>
+                    </span>
+                  </li>
+                ),
+              )}
             </ul>
+          )}
+          {showReason ? (
+            <p className="px-4 pb-2 pt-1 text-xs leading-relaxed text-rb-500">{reason}</p>
+          ) : (
+            assets.length === 0 && (
+              <p className="px-4 pb-2 pt-1 text-xs leading-relaxed text-rb-500">
+                This explorer does not price the position&rsquo;s assets yet.
+              </p>
+            )
           )}
         </div>
       )}

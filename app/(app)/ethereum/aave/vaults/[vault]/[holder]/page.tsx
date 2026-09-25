@@ -40,7 +40,8 @@ import { VaultPositionCard } from "@/components/vaults/vault-position-card";
 import { VaultContextStrip, VaultContextStripStandalone } from "@/components/vaults/vault-context-strip";
 import { RiskFooterStrip } from "@/components/shared/risk-footer-strip";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
-import { LatestPrices } from "@/components/shared/latest-prices";
+import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
+import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { AAVE_FAMILY_SINGULAR } from "@/components/vaults/aave-vault-format";
@@ -402,6 +403,24 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
   const vaultName = data.vault.name || shortAddr(address);
   const subject = lookup.address ? shortAddr(lookup.address) : typed;
 
+  // The top row's price dropdown. A holder holds SHARES, and the one price
+  // the vault states about them is its own `convertToAssets` — one whole
+  // share in the vault's asset, read at the block this page names. No USD:
+  // the vault's own stake token has no oracle Rails reads here.
+  // Where the chain read failed the row still names the share and shows no
+  // figure, because what is held is true whether or not the read landed.
+  const sharePrice =
+    !data.chainStale && data.sharePrice != null && data.sharePrice.value > 0 ? data.sharePrice.value : undefined;
+  const shareAssets: LatestPriceAsset[] = [
+    {
+      symbol: data.vault.symbol ?? shortAddr(data.vault.address),
+      address: data.vault.address,
+      price: sharePrice,
+      unit: sharePrice ? data.vault.asset.symbol : undefined,
+      label: `One share in ${data.vault.asset.symbol}, the vault's own convertToAssets`,
+    },
+  ];
+
   return (
     <div className="min-h-screen">
       <div className="py-8">
@@ -416,13 +435,13 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
               (rails-ops decision 0017). */}
           {/* The one thin row of "latest" (rails-ops TO-DO-ui-jobs 48): back,
               the chain head and its age, and the holding's assets at their
-              current prices — empty here until this section prices them —
+              current prices — the share, quoted in the vault's own asset —
               with the page's instruments in Tools at the right end. */}
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2" data-back-row>
             <div className="flex min-w-0 items-center gap-2">
               <DetailBackButton fallbackHref={ethereumVaultsListingHref()} compact />
               <RecencyStamp />
-              <LatestPrices assets={[]} />
+              <LatestPrices assets={shareAssets} reason={ORACLE_USD_REASON["aave-vaults"]} />
             </div>
             <ToolsMenu />
           </div>
