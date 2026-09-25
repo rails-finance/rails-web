@@ -671,6 +671,17 @@ body {
   }
 }
 
+/* The Lifetime-flows tower, put away (ui-jobs 61).
+   The body is HIDDEN, not unmounted: the panel's figures stay in the DOM
+   whatever the chevron says, and the pre-paint script inside the section
+   (lib/shared/flows-collapse-store.ts) sets this attribute before the first
+   paint, so a tower the reader collapsed on a previous page never flashes open
+   on the way to hydration. React takes the attribute over once its effect has
+   read the store. */
+[data-flows-collapsed="1"] [data-flows-body] {
+  display: none;
+}
+
 /* Icon buttons */
 .btn-icon {
   @apply inline-flex items-center justify-center shrink-0 rounded-lg transition-colors;

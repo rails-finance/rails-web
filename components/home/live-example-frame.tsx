@@ -94,6 +94,13 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
                 title="Lifetime flows"
                 explanation={liquityEconomicsExplanation(result.economics, result.economics._meta)}
                 learnMore={liquityEconomicsContent({ isBatched: result.economics._meta.isInBatch })}
+                // Stated, not left to default (ui-jobs 61): the hero belongs to
+                // no protocol, so it has no setting of its own to read and must
+                // not borrow one — a reader who put the tower away on an Aave
+                // V4 position would otherwise find the home page's picture of
+                // the app missing its middle. The frame is inert anyway, so a
+                // chevron here would be a control nobody could press.
+                collapseKey={null}
               />
               {result.redeemer && <RedeemerSummary stats={result.redeemer} currentPrice={currentPrice} />}
             </>

@@ -38,7 +38,8 @@
 // side holding several tokens draws one bar per token (`bars`). All three are
 // opt-in; a feeder that sets none renders as before.
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
+import { ChartColumnBig, ChevronDown } from "lucide-react";
 import {
   DualTowerChart,
   formatCompactUsd,
@@ -56,7 +57,14 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import {
+  COLLAPSE_KEY_ATTR,
+  COLLAPSED_ATTR,
+  collapseScript,
+  isFlowsCollapsed,
+  setFlowsCollapsed,
+} from "@/lib/shared/flows-collapse-store";
 import { formatCompact, formatNumber } from "@/lib/utils/format";
 import {
   type ChainTruthTowerData,
@@ -953,6 +961,17 @@ export interface ChainTruthTowerProps {
    *  right-aligned redemption net-outcome strip). Same slot the position
    *  card's context line uses. */
   rowExtra?: ReactNode;
+  /** PUT THIS TOWER AWAY, AND REMEMBER IT PER PROTOCOL (ui-jobs 61). Given a
+   *  protocol's roster id, the heading becomes the button that collapses the
+   *  panel to its own header row, a chevron rides the top right, and the state
+   *  is stored under that id — so every position page in the protocol opens
+   *  the way the reader left the last one (lib/shared/flows-collapse-store.ts).
+   *
+   *  OPT-IN, and null is the default: the other ~28 surfaces that draw this
+   *  tower keep the plain eyebrow and no chevron, and a surface that belongs to
+   *  no protocol — the home page's live example frame, which is inert — passes
+   *  null explicitly rather than borrowing an id that is not its own. */
+  collapseKey?: string | null;
 }
 
 export function ChainTruthTower({
@@ -961,6 +980,7 @@ export function ChainTruthTower({
   explanation,
   learnMore,
   rowExtra,
+  collapseKey = null,
 }: ChainTruthTowerProps) {
   // Lifetime-first, matching the reference towers: the all-time flows render by
   // default, and the Display menu's "Hide inactive / repaid" collapses to the
@@ -969,6 +989,20 @@ export function ChainTruthTower({
   // null = follow the auto-default (group whenever anything can merge); a
   // "Group assets" toggle pins the reader's choice (the Aave V4 default).
   const [groupOverride, setGroupOverride] = useState<boolean | null>(null);
+  // Collapsed, per protocol (ui-jobs 61). `settled` is false until the effect
+  // below has read the store, and while it is false React writes NO collapsed
+  // attribute: the server cannot know the answer, so the pre-paint script owns
+  // the attribute for those first frames and React takes it over afterwards.
+  // Rendering "0" from the server and letting the script overwrite it would put
+  // the two in a fight that hydration could win.
+  const [collapsed, setCollapsed] = useState(false);
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!collapseKey) return;
+    setCollapsed(isFlowsCollapsed(collapseKey));
+    setSettled(true);
+  }, [collapseKey]);
+  const bodyId = useId();
   const registry = useReceiptRegistry();
   const holds = (s: TowerSideData) =>
     s.current.some((l) => l.amount > 0) || (s.eventlessGains ?? []).some((l) => l.amount > 0);
@@ -1004,70 +1038,176 @@ export function ChainTruthTower({
         // compaction), so the stacked panels read as one family.
         // data-skel-section feeds the skeleton memory layer (skeleton-size-recorder).
         data-skel-section="detail-economics"
+        {...(collapseKey ? { [COLLAPSE_KEY_ATTR]: collapseKey } : {})}
+        {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
+        suppressHydrationWarning
         className="rounded-2xl bg-raised px-5 py-4"
       >
+        {/* Pre-paint: the stored state applied before the browser paints, so a
+            tower the reader put away does not flash open on the way to
+            hydration. Reads its key off this section — see
+            lib/shared/flows-collapse-store.ts. */}
+        {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}
         {/* Toolbar row: title left, legend + Lifetime-flows control right. The
           chart below pulls up underneath it (-mt-7 matching the row's min-h),
           so the towers' empty top band shares this line — title left, controls
           right, towers centered. The row stays hit-testable above the chart
           (z-10) but only on its actual children, so tower-top tooltips still
-          hover through the middle. */}
+          hover through the middle.
+
+          COLLAPSIBLE (ui-jobs 61): the title becomes the button that puts the
+          panel away and the chevron takes the top right, which is where the
+          Display control stood — so the Display control moves down onto the
+          first row of the body, still right-aligned and still inside the
+          towers' empty top band once the chart pulls up under it. */}
         <div className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-between gap-2">
-          <span className={`${OVERLAY_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
+          {collapseKey ? (
+            <button
+              type="button"
+              onClick={() => {
+                const next = !collapsed;
+                setCollapsed(next);
+                setSettled(true);
+                setFlowsCollapsed(collapseKey, next);
+              }}
+              aria-expanded={!collapsed}
+              aria-controls={bodyId}
+              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -ml-2 h-7 min-w-0 gap-1.5 rounded-md px-2`}
+            >
+              <ChartColumnBig size={14} aria-hidden />
+              <span className={`${OVERLAY_HEADING} truncate`}>{title}</span>
+            </button>
+          ) : (
+            <span className={`${OVERLAY_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
+          )}
           {/* No corner color key — the flank-table swatches are the one legend
               (design-grammar rule; neither reference tower carries one). */}
           <div className="pointer-events-auto flex items-center gap-3">
-            {(lifetimeAvailable || canGroup) && (
-              <FilterDropdown
-                label="Display"
-                options={[
-                  ...(canGroup ? [{ key: "group-assets", label: "Group assets" } satisfies FilterOption] : []),
-                  ...(lifetimeAvailable
-                    ? [{ key: "hide-historical", label: "Hide inactive / repaid" } satisfies FilterOption]
-                    : []),
-                ]}
-                selected={
-                  new Set([...(grouped ? ["group-assets"] : []), ...(hideHistorical ? ["hide-historical"] : [])])
-                }
-                onSelect={() => {}}
-                multi
-                minimal
-                align="right"
-                variant="ghost"
-                triggerIcon={<DisplaySettingsIcon size={14} />}
-                onToggle={(key) => {
-                  if (key === "group-assets") setGroupOverride((v) => !(v ?? true));
-                  if (key === "hide-historical") setHideHistorical((v) => !v);
+            {collapseKey ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !collapsed;
+                  setCollapsed(next);
+                  setSettled(true);
+                  setFlowsCollapsed(collapseKey, next);
                 }}
-              />
-            )}
-            {showBars && !lifetimeAvailable && (
-              // Where the reference towers would show lifetime flows, this
-              // position can't — say so in the toggle's place rather than
-              // leaving the missing control unexplained.
-              <span
-                className="text-[10px] text-rb-400"
-                title={
-                  data.flowsNote ??
-                  "Lifetime flows aren't shown: the events on record for this position don't add up to its current balance, so an all-time total would be incomplete."
-                }
+                aria-expanded={!collapsed}
+                aria-controls={bodyId}
+                aria-label={collapsed ? `Show ${title}` : `Hide ${title}`}
+                className={`${CTRL_GHOST} ${CTRL_OFF} h-7 w-7 rounded-md`}
               >
-                No lifetime flows
-              </span>
+                <ChevronDown size={16} className={collapsed ? "" : "rotate-180"} aria-hidden />
+              </button>
+            ) : (
+              <TowerDisplayControls
+                lifetimeAvailable={lifetimeAvailable}
+                canGroup={canGroup}
+                grouped={grouped}
+                hideHistorical={hideHistorical}
+                showBars={showBars}
+                flowsNote={data.flowsNote}
+                onGroup={() => setGroupOverride((v) => !(v ?? true))}
+                onHideHistorical={() => setHideHistorical((v) => !v)}
+              />
             )}
           </div>
         </div>
-        {/* Bars pull up under the toolbar row; the gated reserve LIST keeps its
-          own row (text would collide with the title). */}
-        <div className={showBars ? "-mt-7" : "mt-3"}>
-          {showBars ? (
-            <ChainTruthTowerChart data={chartData} hideHistorical={hideHistorical} />
-          ) : (
-            <GatedEconomics data={data} />
+        <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
+          {collapseKey && (
+            <div className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-end gap-3">
+              <div className="pointer-events-auto flex items-center gap-3">
+                <TowerDisplayControls
+                  lifetimeAvailable={lifetimeAvailable}
+                  canGroup={canGroup}
+                  grouped={grouped}
+                  hideHistorical={hideHistorical}
+                  showBars={showBars}
+                  flowsNote={data.flowsNote}
+                  onGroup={() => setGroupOverride((v) => !(v ?? true))}
+                  onHideHistorical={() => setHideHistorical((v) => !v)}
+                />
+              </div>
+            </div>
           )}
+          {/* Bars pull up under the toolbar row; the gated reserve LIST keeps its
+            own row (text would collide with the title). */}
+          <div className={showBars ? "-mt-7" : "mt-3"}>
+            {showBars ? (
+              <ChainTruthTowerChart data={chartData} hideHistorical={hideHistorical} />
+            ) : (
+              <GatedEconomics data={data} />
+            )}
+          </div>
+          <ProvenanceInfoTabs className="mt-3" explanation={explanation} learnMore={learnMore} rowExtra={rowExtra} />
         </div>
-        <ProvenanceInfoTabs className="mt-3" explanation={explanation} learnMore={learnMore} rowExtra={rowExtra} />
       </section>
     </ProvReceiptsScope>
+  );
+}
+
+/** The tower's Display menu — "Group assets" / "Hide inactive / repaid" — and
+ *  the sentence that stands in its place where this position cannot draw
+ *  lifetime flows. Lifted out of the toolbar row because the collapsible
+ *  variant renders it a row lower (ui-jobs 61), and one copy is what keeps the
+ *  two rows saying the same thing. */
+function TowerDisplayControls({
+  lifetimeAvailable,
+  canGroup,
+  grouped,
+  hideHistorical,
+  showBars,
+  flowsNote,
+  onGroup,
+  onHideHistorical,
+}: {
+  lifetimeAvailable: boolean;
+  canGroup: boolean;
+  grouped: boolean;
+  hideHistorical: boolean;
+  showBars: boolean;
+  flowsNote?: string;
+  onGroup: () => void;
+  onHideHistorical: () => void;
+}) {
+  return (
+    <>
+      {(lifetimeAvailable || canGroup) && (
+        <FilterDropdown
+          label="Display"
+          options={[
+            ...(canGroup ? [{ key: "group-assets", label: "Group assets" } satisfies FilterOption] : []),
+            ...(lifetimeAvailable
+              ? [{ key: "hide-historical", label: "Hide inactive / repaid" } satisfies FilterOption]
+              : []),
+          ]}
+          selected={new Set([...(grouped ? ["group-assets"] : []), ...(hideHistorical ? ["hide-historical"] : [])])}
+          onSelect={() => {}}
+          multi
+          minimal
+          align="right"
+          variant="ghost"
+          triggerIcon={<DisplaySettingsIcon size={14} />}
+          onToggle={(key) => {
+            if (key === "group-assets") onGroup();
+            if (key === "hide-historical") onHideHistorical();
+          }}
+        />
+      )}
+      {showBars && !lifetimeAvailable && (
+        // Where the reference towers would show lifetime flows, this
+        // position can't — say so in the toggle's place rather than
+        // leaving the missing control unexplained.
+        <span
+          className="text-[10px] text-rb-400"
+          title={
+            flowsNote ??
+            "Lifetime flows aren't shown: the events on record for this position don't add up to its current balance, so an all-time total would be incomplete."
+          }
+        >
+          No lifetime flows
+        </span>
+      )}
+    </>
   );
 }
