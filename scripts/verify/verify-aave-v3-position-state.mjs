@@ -25,6 +25,9 @@
 //     other supplied reserves under a cent — the dust count line (§52)
 //   0x9ff6…0de5 core  tx 0xa8590e9c…693cf81 (25,983,408): a collateral swap, UNI → WETH, whose sold
 //     UNI ends the tx under a cent — touched and dust, so its row still draws (§52)
+//   0x37bc…769b core  tx 0xc4405cd1…9b (25,902,231): a repay burns the USDT aTokens straight to
+//     zero, the flag auto-flipping off — the "Collateral off" group and its "was on" flip note
+//     (§54), while five untouched, unflipped reserves exercise the merged balance+flag receipt
 // plus one Base card, which must never ask.
 //
 // Until rails-server serves the route this fails at the first check of every
@@ -59,6 +62,9 @@ const FIXTURES = [
       { reserve: USDC, side: "supply", sign: -1 },
       { reserve: WETH, side: "supply", sign: 1 },
     ],
+    // §54: USDC ends the swap under a cent, touched — the position's sole
+    // dust reserve, so the dust line must not draw at all (the bug it fixed).
+    checkFlagProv: true,
   },
   {
     label: "core 0x56b8 debt swap",
@@ -145,6 +151,23 @@ const FIXTURES = [
       { reserve: WETH, side: "supply", sign: 1 },
     ],
     dust: true,
+  },
+  {
+    // rails-ops TO-DO-ui-jobs §54: repayWithATokens burns the USDT aTokens
+    // straight to zero; Aave auto-flips the collateral switch off once the
+    // balance is gone. USDT is untouched (a plain repay's own axis is the
+    // debt side) and the position's sole dust reserve, so it sits under
+    // "Collateral off" with a "was on" flip note; WBTC, AAVE, sUSDe, WETH and
+    // cbBTC stay put, unflipped, under "Collateral on".
+    label: "core 0x37bc repay burns USDT collateral to zero, flag flips off",
+    wallet: "0x37bcd52b5319cbb7e62b9947a34774cee513db4b",
+    market: "core",
+    block: 25902231,
+    tx: "0xc4405cd15a649755199d0754d72f566d01cb3557c1d192acc6ab64da62a1769b",
+    idPrefix: "repay:",
+    moved: [{ reserve: USDT, side: "debt", sign: -1 }],
+    dust: true,
+    checkFlagProv: true,
   },
 ];
 
@@ -419,10 +442,13 @@ for (const fx of FIXTURES) {
         check(`${fx.label}: the grid's ${r.symbol} ${m.side} stat is the exact after-balance ${grouped}`, titled > 0);
     }
 
-    // Supplied and borrowed lists: one line per held reserve, amount, USD and
-    // the collateral switch. A reserve under a cent is dust and sits behind a
-    // count line by default, unless it is one of the reserves this event
-    // touched (§52) — that row always draws, whatever its side reads.
+    // Supplied and borrowed lists: one line per held reserve, amount and USD.
+    // A reserve under a cent is dust and sits behind a count line by default,
+    // unless it is one of the reserves this event touched (§52) — that row
+    // always draws, whatever its side reads. The Supplied panel groups its
+    // rows under "Collateral on" / "Collateral off" by each reserve's AFTER
+    // flag, an empty group drawing no heading, and a row whose flag flipped
+    // carries "was on"/"was off" (§54).
     for (const [side, rows] of [
       ["supply", supplied],
       ["debt", borrowed],
@@ -431,8 +457,11 @@ for (const fx of FIXTURES) {
       const dustRows = rows.filter((r) => !touched.has(r.reserve) && isDustRow(r, side));
       const shownRows = rows.filter((r) => touched.has(r.reserve) || !isDustRow(r, side));
       const scope = block.locator(`[data-position-reserves="${side}"]`);
+      // Supply rows sit one level deeper, under a collateral-group heading;
+      // debt rows are still a flat list (§54: "Debt rows unchanged").
+      const rowSel = side === "supply" ? "[data-collateral-group] > span" : "> span";
 
-      const lines = scope.locator("> span");
+      const lines = scope.locator(rowSel);
       const n = await lines.count();
       check(
         `${fx.label}: ${side} list shows ${shownRows.length} line(s) before any dust toggle`,
@@ -441,6 +470,18 @@ for (const fx of FIXTURES) {
       );
       const texts = [];
       for (let i = 0; i < n; i++) texts.push(await text(lines.nth(i)));
+
+      if (side === "supply") {
+        // A group with no rows in it draws no heading at all.
+        for (const group of ["on", "off"]) {
+          const wantsGroup = rows.some((r) => r.collateral && (r.collateral.after ? "on" : "off") === group);
+          check(
+            `${fx.label}: "Collateral ${group}" heading draws only when it has rows`,
+            (await scope.locator(`[data-collateral-group="${group}"]`).count()) === (wantsGroup ? 1 : 0),
+          );
+        }
+      }
+
       for (const r of shownRows) {
         const leg = r[side];
         const amount = fmtAmount(humanOf(leg.after, r.decimals));
@@ -452,22 +493,32 @@ for (const fx of FIXTURES) {
           lineIdx !== -1,
           texts.join(" | "),
         );
-        // The collateral flag is a switch icon, not the word (§53): the icon
-        // carries its own data-collateral and aria-label ("Collateral on" /
-        // "Collateral off"), the row's after state (its last icon when the
-        // flag flipped across the event and both before and after draw).
+        // A supplied reserve sits under its AFTER flag's heading (§54), no
+        // per-row icon or words.
         if (side === "supply" && r.collateral && lineIdx !== -1) {
-          const want = r.collateral.after ? "on" : "off";
-          const icons = lines.nth(lineIdx).locator("[data-collateral]");
-          const count = await icons.count();
-          const afterIcon = icons.nth(Math.max(0, count - 1));
-          const dataVal = count > 0 ? await afterIcon.getAttribute("data-collateral") : null;
-          const ariaVal = count > 0 ? await afterIcon.getAttribute("aria-label") : null;
+          const wantGroup = r.collateral.after ? "on" : "off";
+          const line = lines.nth(lineIdx);
+          const gotGroup = await line.locator("xpath=..").getAttribute("data-collateral-group");
           check(
-            `${fx.label}: ${r.symbol} collateral icon reads ${want}`,
-            dataVal === want && ariaVal === `Collateral ${want}`,
-            `data-collateral=${dataVal} aria-label=${ariaVal}`,
+            `${fx.label}: ${r.symbol} sits under the "Collateral ${wantGroup}" heading`,
+            gotGroup === wantGroup,
+            `got ${gotGroup}`,
           );
+          const flipped = r.collateral.before !== r.collateral.after;
+          const flipEl = line.locator("[data-collateral-flip]");
+          const flipCount = await flipEl.count();
+          if (flipped) {
+            const was = r.collateral.before ? "on" : "off";
+            check(
+              `${fx.label}: ${r.symbol} carries "was ${was}" — its flag flipped this transaction`,
+              flipCount === 1 && (await flipEl.getAttribute("data-collateral-flip")) === wantGroup,
+              `count=${flipCount}`,
+            );
+            const flipText = await text(flipEl);
+            check(`${fx.label}: ${r.symbol}'s flip text reads "was ${was}"`, flipText === `was ${was}`, flipText);
+          } else {
+            check(`${fx.label}: ${r.symbol} carries no flip text — its flag did not change`, flipCount === 0);
+          }
         }
       }
 
@@ -498,7 +549,7 @@ for (const fx of FIXTURES) {
         const after = await text(dustButton);
         check(`${fx.label}: ${side} count line now reads "Hide dust"`, after === "Hide dust", after);
         const shownTexts = [];
-        const allLines = scope.locator("> span");
+        const allLines = scope.locator(rowSel);
         const total = await allLines.count();
         for (let i = 0; i < total; i++) shownTexts.push(await text(allLines.nth(i)));
         for (const r of dustRows) {
@@ -511,6 +562,34 @@ for (const fx of FIXTURES) {
         }
       } else {
         check(`${fx.label}: ${side} carries no dust count line`, (await dustButton.count()) === 0);
+      }
+
+      // §54: no receipt is lost when the icon retires. A flipped row's "was
+      // on"/"was off" still opens collateralFlagProv; a row that did not flip
+      // has that same receipt's summary riding on its own balance receipt.
+      // By now any dust row is revealed, so a flipped reserve hidden behind
+      // the count line is still on the page to click.
+      if (side === "supply" && fx.checkFlagProv) {
+        const flippedR = rows.find((r) => r.collateral && r.collateral.before !== r.collateral.after);
+        if (flippedR) {
+          const was = flippedR.collateral.before ? "on" : "off";
+          const receipt = await receiptText(page, scope, `was ${was}`);
+          check(
+            `${fx.label}: ${flippedR.symbol}'s flip note opens the collateral-flag receipt`,
+            !!receipt && receipt.includes("collateral switch"),
+            receipt,
+          );
+        }
+        const steadyR = rows.find((r) => r.collateral && r.collateral.before === r.collateral.after);
+        if (steadyR) {
+          const amount = fmtAmount(humanOf(steadyR.supply.after, steadyR.decimals));
+          const receipt = await receiptText(page, scope, amount);
+          check(
+            `${fx.label}: ${steadyR.symbol}'s balance receipt also states its collateral flag`,
+            !!receipt && receipt.includes("collateral switch"),
+            receipt,
+          );
+        }
       }
     }
 
