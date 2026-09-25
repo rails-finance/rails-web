@@ -69,8 +69,8 @@ import {
 import { sparkEconomicsExplanation, sparkEconomicsContent } from "@/lib/spark/economics-explanation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader, CHAIN_TRUTH_USD_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
@@ -526,7 +526,7 @@ export default function SparkPositionDetail({
     [view, lifetimeEvents, precomputedLifetime],
   );
 
-  // Ambient price pill (bottom-right, the V4 treatment): the on-chain oracle
+  // The top row's price dropdown: the on-chain oracle
   // price of each reserve the account currently holds.
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
     if (!view || view.status !== "open") return [];
@@ -544,7 +544,7 @@ export default function SparkPositionDetail({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="spark" wallet={wallet}>
+      <DetailTopRow session="spark" wallet={wallet} assets={stripAssets}>
         {view && (
           <SparkExportMenu
             wallet={wallet}
@@ -669,7 +669,6 @@ export default function SparkPositionDetail({
             }
           />
           {/* Ambient oracle-price pill, fixed bottom-right (the V4 treatment). */}
-          <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       )}

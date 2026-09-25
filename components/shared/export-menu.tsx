@@ -1,8 +1,10 @@
 "use client";
 
-// Generic "Copy for LLM" export control. A single button + chevron
-// (open/closed indicator, matching the listing page's sort control) opens a
-// dropdown of export actions, modelled on the affordance Aave use on their docs:
+// The position's export shapes, carried as rows of the shared Tools menu
+// (components/shared/tools-menu.tsx) under the provenance inspector's toggle.
+// Until 2026-09-25 this was its own "Copy for LLM" trigger beside the back
+// button; the shapes are the same, modelled on the affordance Aave use on
+// their docs:
 //
 //   • Copy Position    → Markdown to clipboard, ready to paste into an LLM
 //   • View as Markdown → opens the snapshot as plain text in a new tab
@@ -22,11 +24,11 @@
 // CSV" opens <QueuedExportWindow>, which asks rails-server to build the file
 // and hands the reader a link to collect it within 24 hours.
 
-import { useState, useRef, useEffect } from "react";
-import { Copy, Check, FileText, Download, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { Copy, FileText, Download } from "lucide-react";
 import { eventsToCsv, TokenMetaUnresolvedError } from "@/lib/shared/events-to-csv";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { CTRL_GHOST, CTRL_OFF, CTRL_ON } from "@/lib/shared/ui-grammar";
+import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
 import { shouldQueueExport, type QueuedExportRequest } from "@/lib/shared/queued-export";
 import dynamic from "next/dynamic";
 
@@ -74,36 +76,6 @@ type Props = {
   queued?: QueuedExportRequest;
 };
 
-function MenuItem({
-  icon,
-  title,
-  subtitle,
-  onClick,
-  disabled,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      role="menuitem"
-      className="flex w-full items-start gap-3 px-3 py-2 text-left transition-colors hover:bg-rb-200/60 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-rb-900/60"
-    >
-      <span className="mt-0.5 shrink-0 text-rb-500">{icon}</span>
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold text-foreground">{title}</span>
-        <span className="block text-xs text-rb-500">{subtitle}</span>
-      </span>
-    </button>
-  );
-}
-
 export function ExportMenu({
   buildMarkdown,
   events,
@@ -113,32 +85,13 @@ export function ExportMenu({
   scopeNote,
   queued,
 }: Props) {
-  const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [csvError, setCsvError] = useState<string | null>(null);
   const [queuedOpen, setQueuedOpen] = useState(false);
   const queue = shouldQueueExport(queued, fetchAllEvents != null);
-  const ref = useRef<HTMLDivElement>(null);
 
-  // Close on outside click / Escape — mirrors the listing sort dropdown.
-  useEffect(() => {
-    if (!open) return;
-    function handlePointer(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    function handleEscape(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("pointerdown", handlePointer);
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointer);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [open]);
-
-  const copyMarkdown = async () => {
+  const copyMarkdown = async (close: () => void) => {
     try {
       await navigator.clipboard.writeText(buildMarkdown());
       // The menu closes on action, so surface the confirmation on the trigger.
@@ -147,21 +100,21 @@ export function ExportMenu({
     } catch (err) {
       console.error("Failed to copy position markdown:", err);
     }
-    setOpen(false);
+    close();
   };
 
-  const viewMarkdown = () => {
+  const viewMarkdown = (close: () => void) => {
     const blob = new Blob([buildMarkdown()], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     window.open(url, "_blank", "noopener,noreferrer");
     // Revoke once the new tab has had time to load the blob.
     setTimeout(() => URL.revokeObjectURL(url), 10000);
-    setOpen(false);
+    close();
   };
 
-  const downloadCsv = async () => {
+  const downloadCsv = async (close: () => void) => {
     if (queue) {
-      setOpen(false);
+      close();
       setQueuedOpen(true);
       return;
     }
@@ -211,80 +164,60 @@ export function ExportMenu({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    setOpen(false);
+    close();
   };
 
   const hasEvents = events.length > 0;
 
   return (
-    <div ref={ref} className="relative" data-export-menu>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label={ariaLabel}
-        className={`${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} h-8 gap-2 rounded-md px-3 text-xs font-medium`}
-      >
-        <span>{copied ? "Copied" : "Copy for LLM"}</span>
-        {copied ? (
-          <Check className="h-3.5 w-3.5" aria-hidden="true" />
-        ) : (
-          <ChevronDown
-            className={`h-3.5 w-3.5 text-rb-500 transition-transform ${open ? "rotate-180" : ""}`}
-            aria-hidden="true"
-          />
+    <>
+      <ToolsMenu ariaLabel={ariaLabel} copied={copied}>
+        {(close) => (
+          <>
+            <ToolsMenuItem
+              icon={<Copy size={16} />}
+              title="Copy Position"
+              subtitle="Copy as Markdown for LLMs"
+              onClick={() => void copyMarkdown(close)}
+            />
+            <ToolsMenuItem
+              icon={<FileText size={16} />}
+              title="View as Markdown"
+              subtitle="View this position as plain text"
+              onClick={() => viewMarkdown(close)}
+            />
+            <ToolsMenuItem
+              icon={<Download size={16} />}
+              title="Download CSV"
+              subtitle={
+                preparing
+                  ? "Loading the whole history…"
+                  : queue
+                    ? "Every event, prepared as a file to collect"
+                    : fetchAllEvents
+                      ? "Every event as a spreadsheet"
+                      : "Activity timeline as a spreadsheet"
+              }
+              onClick={() => void downloadCsv(close)}
+              disabled={!hasEvents || preparing}
+            />
+            {csvError && (
+              <p className="px-3 pb-1 pt-1 text-[11px] leading-relaxed text-rb-500" role="status">
+                {csvError}
+              </p>
+            )}
+            {scopeNote && (
+              <p
+                data-export-scope-note
+                className="border-t border-rb-200 px-3 pb-1 pt-2 text-[11px] leading-relaxed text-rb-500 dark:border-rb-800"
+              >
+                {scopeNote}
+              </p>
+            )}
+          </>
         )}
-      </button>
-
-      {open && (
-        <div
-          className="overlay-panel absolute right-0 top-full z-50 mt-2 min-w-[260px] overflow-hidden py-1"
-          role="menu"
-        >
-          <MenuItem
-            icon={<Copy size={16} />}
-            title="Copy Position"
-            subtitle="Copy as Markdown for LLMs"
-            onClick={copyMarkdown}
-          />
-          <MenuItem
-            icon={<FileText size={16} />}
-            title="View as Markdown"
-            subtitle="View this position as plain text"
-            onClick={viewMarkdown}
-          />
-          <MenuItem
-            icon={<Download size={16} />}
-            title="Download CSV"
-            subtitle={
-              preparing
-                ? "Loading the whole history…"
-                : queue
-                  ? "Every event, prepared as a file to collect"
-                  : fetchAllEvents
-                    ? "Every event as a spreadsheet"
-                    : "Activity timeline as a spreadsheet"
-            }
-            onClick={() => void downloadCsv()}
-            disabled={!hasEvents || preparing}
-          />
-          {csvError && (
-            <p className="px-3 pb-1 pt-1 text-[11px] leading-relaxed text-rb-500" role="status">
-              {csvError}
-            </p>
-          )}
-          {scopeNote && (
-            <p
-              data-export-scope-note
-              className="border-t border-rb-200 px-3 pb-1 pt-2 text-[11px] leading-relaxed text-rb-500 dark:border-rb-800"
-            >
-              {scopeNote}
-            </p>
-          )}
-        </div>
-      )}
+      </ToolsMenu>
       {queuedOpen && queued && <QueuedExportWindow request={queued} onClose={() => setQueuedOpen(false)} />}
-    </div>
+    </>
   );
 }

@@ -62,8 +62,8 @@ import {
 import { moonwellEconomicsExplanation, moonwellEconomicsContent } from "@/lib/moonwell/economics-explanation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 
@@ -394,7 +394,7 @@ export default function MoonwellPositionView({
   // interest splits; the rates ride the listing row's per-market chain read.
   const captions = liveView ? computeMoonwellCardCaptions(liveView, lifetimeEvents, precomputedLifetime) : null;
 
-  // Ambient price pill (bottom-right): the on-chain oracle price of each
+  // The top row's price dropdown: the on-chain oracle price of each
   // market the account currently touches.
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
     if (!view || view.status !== "open") return [];
@@ -412,7 +412,7 @@ export default function MoonwellPositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="moonwell" wallet={wallet}>
+      <DetailTopRow session="moonwell" wallet={wallet} assets={stripAssets}>
         {liveView && (
           <MoonwellExportMenu
             wallet={wallet}
@@ -532,7 +532,6 @@ export default function MoonwellPositionView({
             }
           />
           {/* Ambient oracle-price pill, fixed bottom-right. */}
-          <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       )}

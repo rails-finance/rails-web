@@ -51,8 +51,7 @@ import { computeFluidEconomics, fluidLifetimeWithOpening } from "@/lib/fluid/eco
 import { fluidEconomicsExplanation, fluidEconomicsContent } from "@/lib/fluid/economics-explanation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
@@ -372,7 +371,6 @@ export default function FluidPositionView({
               ) : null
             }
           />
-          <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       )}

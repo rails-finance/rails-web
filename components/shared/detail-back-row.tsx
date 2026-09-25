@@ -15,6 +15,10 @@ import { NAV_BUTTON } from "@/lib/shared/ui-grammar";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { listingHrefForWallet, protocolForSession } from "@/lib/shared/protocols";
 import { RailHeader } from "@/components/shared/rail-header";
+import { RecencyStamp } from "@/components/shared/recency-stamp";
+import { LatestPrices } from "@/components/shared/latest-prices";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { ToolsMenu } from "@/components/shared/tools-menu";
 
 /** The one back affordance on every detail page. NAV_BUTTON pill + ArrowLeft(14)
  *  + "Back". Smart-back: returns to the listing the viewer actually came from
@@ -35,10 +39,15 @@ export function DetailBackButton({
   session,
   wallet,
   fallbackHref: given,
+  compact = false,
 }: {
   session?: SessionProtocol;
   wallet?: string | null;
   fallbackHref?: string;
+  /** Drop the word "Back" below sm, leaving the arrow. For the detail pages'
+   *  latest row, which carries four controls across 390px and would otherwise
+   *  wrap; the accessible name is unchanged. */
+  compact?: boolean;
 }) {
   const router = useRouter();
   const entryHref = (session ? protocolForSession(session)?.href : undefined) ?? "/";
@@ -53,38 +62,62 @@ export function DetailBackButton({
     }
   };
   return (
-    <button type="button" onClick={onBack} className={NAV_BUTTON}>
+    <button type="button" onClick={onBack} aria-label="Back" className={NAV_BUTTON}>
       <ArrowLeft size={14} />
-      <span>Back</span>
+      <span className={compact ? "hidden sm:inline" : undefined}>Back</span>
     </button>
   );
 }
 
-/** The rail header (identity + recency stamp + sub-nav — nothing lit, this
- *  is a position view), then the row: back button on the left, the export
- *  menu ("Copy for LLM") as `children` on the right. The header's tabs stay
- *  live links here — from a position, either rail surface is one click.
- *  `showStamp={false}` is for routes with no chain overlay (PWN) — rendering
- *  a stamp there would assert a freshness the page doesn't have. */
+/** The protocol's title, then one thin row of everything a position view says
+ *  about "latest": back, the chain head and its age, and the position's assets
+ *  at their current prices behind a dropdown — with the Tools menu (`children`)
+ *  at the right end.
+ *
+ *  The row is what replaced the fixed bottom price dock on these views
+ *  (rails-ops TO-DO-ui-jobs 48): the prices had nowhere to go on a phone but
+ *  sideways, and the page's instruments were split between a floating dock and
+ *  a menu up here. The title keeps its link to the protocol's listing; the
+ *  rail's sub-nav does not follow a reader into a position, which is why
+ *  RailHeader draws no tabs at the `position` venue.
+ *
+ *  `showStamp={false}` is for routes with no chain overlay (PWN) — rendering a
+ *  stamp there would assert a freshness the page doesn't have.
+ *
+ *  `assets` is what the dock used to be handed. A view that does not price its
+ *  assets yet passes none and the dropdown says so, which is a fact about that
+ *  explorer rather than a missing control. */
 export function DetailTopRow({
   session,
   wallet,
   showStamp = true,
+  assets = [],
   children,
 }: {
   session: SessionProtocol;
   wallet?: string | null;
   showStamp?: boolean;
+  assets?: PriceStripAsset[];
   children?: ReactNode;
 }) {
   return (
     <div>
       <div className="mb-2.5">
-        <RailHeader session={session} venue="position" stamp={showStamp} />
+        <RailHeader session={session} venue="position" />
       </div>
-      <div className="flex items-center justify-between gap-2">
-        <DetailBackButton session={session} wallet={wallet} />
-        {children}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <DetailBackButton session={session} wallet={wallet} compact />
+          {showStamp && <RecencyStamp />}
+          <LatestPrices assets={assets} />
+        </div>
+        {/* Tools is part of the row, not of the export menu that usually fills
+            it: a caller renders its shapes only once the view has loaded
+            (`{view && <ExportMenu …/>}`), and the provenance inspector has to
+            be reachable before then and on a view that never resolves — which
+            is what the dock used to guarantee. A bare menu carries the
+            inspector alone until the shapes arrive. */}
+        {children || <ToolsMenu />}
       </div>
     </div>
   );

@@ -17,6 +17,7 @@
 //   BASE=http://localhost:3000 node scripts/verify/verify-trove-face-scaling.mjs
 
 import { chromium } from "playwright";
+import { armInspector, openInspectorHome } from "./lib/prov-inspector.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 
@@ -64,15 +65,14 @@ await page.goto(BASE + path, { waitUntil: "domcontentloaded", timeout: 180000 })
 // The live read has landed when a receipt's via line names the call
 // (`TroveManager.getLatestTroveData(): …`); before it, the card shows the logged
 // snapshot, whose receipts carry no raw here and owe no sentence.
-const toggle = page.locator("button.prov-inspect-toggle").first();
-await toggle.waitFor({ state: "visible", timeout: 90000 });
+await openInspectorHome(page);
 
 /** Arm, then pick pickables until one's popover head names `label`. Returns the
  *  popover's text and its scaling sentence, or null. */
 async function receiptFor(label) {
   const deadline = Date.now() + 90000;
   while (Date.now() < deadline) {
-    if ((await toggle.getAttribute("aria-pressed")) !== "true") await toggle.click().catch(() => {});
+    await armInspector(page).catch(() => {});
     const picks = page.locator("[data-prov-pickable]");
     const n = await picks.count();
     for (let i = 0; i < n; i++) {

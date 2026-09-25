@@ -42,8 +42,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { MorphoBaseVaultExposureView } from "@/components/protocol/morpho-base/vault-exposure-view";
 import { MorphoBaseVaultTimeline } from "@/components/protocol/morpho-base/vault-timeline";
@@ -53,6 +52,9 @@ import { VaultPositionCard } from "@/components/vaults/vault-position-card";
 import { VaultContextStrip, VaultContextStripStandalone } from "@/components/vaults/vault-context-strip";
 import { RiskFooterStrip } from "@/components/shared/risk-footer-strip";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
+import { LatestPrices } from "@/components/shared/latest-prices";
+import { RecencyStamp } from "@/components/shared/recency-stamp";
+import { ToolsMenu } from "@/components/shared/tools-menu";
 import { assetText } from "@/lib/shared/vault-amount-text";
 import { vaultHolderMaxWithdrawProv, type MorphoVaultCoords } from "@/lib/morpho-base/vault-provenance";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
@@ -392,13 +394,22 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
       <div className="py-8">
         <header className="mb-5" data-skel-section="page-header">
           <div className="mb-4">
-            <RailHeader session="morpho-base" venue="position" stamp />
+            <RailHeader session="morpho-base" venue="position" />
           </div>
           {/* Smart-back returns the reader wherever they came from; the
               fallback — a fresh tab, a pasted link — is the position listing
               under the vault roster. */}
-          <div className="mb-3 flex items-center justify-between gap-2" data-back-row>
-            <DetailBackButton fallbackHref={baseVaultsListingHref()} />
+          {/* The one thin row of "latest" (rails-ops TO-DO-ui-jobs 48): back,
+              the chain head and its age, and the holding's assets at their
+              current prices — empty here until this section prices them —
+              with the page's instruments in Tools at the right end. */}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2" data-back-row>
+            <div className="flex min-w-0 items-center gap-2">
+              <DetailBackButton fallbackHref={baseVaultsListingHref()} compact />
+              <RecencyStamp />
+              <LatestPrices assets={[]} />
+            </div>
+            <ToolsMenu />
           </div>
           <h1 className="text-2xl font-semibold text-foreground" data-vault-page={address}>
             <span className="font-mono">{subject}</span>
@@ -551,7 +562,6 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
           />
         )}
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     </div>

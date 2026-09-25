@@ -50,8 +50,8 @@ import { computeFxEconomics, fxDebtFlowsWithOpening } from "@/lib/fx/economics";
 import { fxEconomicsExplanation, fxEconomicsContent } from "@/lib/fx/economics-explanation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle.
@@ -243,7 +243,7 @@ export default function FxPositionView({
     [fxEvents, opening],
   );
 
-  // Ambient price pill (bottom-right): the pool's own oracle price per
+  // The top row's price dropdown: the pool's own oracle price per
   // NORMALIZED unit (the settled amounts' basis), while the position is open.
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
     if (!view || view.status !== "open") return [];
@@ -253,7 +253,7 @@ export default function FxPositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="fx">
+      <DetailTopRow session="fx" assets={stripAssets}>
         {view && (
           <FxExportMenu
             view={view}
@@ -364,7 +364,6 @@ export default function FxPositionView({
             }
           />
           {/* Ambient oracle-price pill, fixed bottom-right. */}
-          <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       )}

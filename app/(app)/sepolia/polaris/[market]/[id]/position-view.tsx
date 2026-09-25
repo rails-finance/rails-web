@@ -49,9 +49,9 @@ import {
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader, POLARIS_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { RiskFooterStrip, RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { Prov } from "@/components/shared/provenance";
 import { formatNumber } from "@/lib/utils/format";
 import {
@@ -247,7 +247,7 @@ export default function PolarisPositionView({
     return out;
   }, [chain, tl.sortedEvents, market, stable]);
 
-  // The fixed bottom price strip — what the protocol's own feed says about
+  // The top row's price dropdown — what the protocol's own feed says about
   // the two assets THIS page is denominated in, at the block the overlay was
   // read at: pETH in ETH (bondingCurve.currentPrice(), the native rate — the
   // curve mints and burns pETH against ETH directly, no USD leg involved),
@@ -355,7 +355,7 @@ export default function PolarisPositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="polaris" wallet={view?.owner ?? null}>
+      <DetailTopRow session="polaris" wallet={view?.owner ?? null} assets={stripAssets}>
         {view && (
           <PolarisExportMenu
             view={view}
@@ -465,7 +465,6 @@ export default function PolarisPositionView({
               />
             </PolarisCdpBarsProvider>
           )}
-          <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       )}

@@ -11,6 +11,7 @@
 //   BASE=http://localhost:3000 node scripts/verify/verify-ladder-dots.mjs
 
 import { chromium } from "playwright";
+import { armInspector, HALO } from "./lib/prov-inspector.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const PATH = "/ethereum/liquity-v2/branches";
@@ -25,12 +26,12 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 await page.goto(BASE + PATH, { waitUntil: "domcontentloaded", timeout: 180000 });
 
-const toggle = page.locator("button.prov-inspect-toggle").first();
-await toggle.waitFor({ state: "visible", timeout: 90000 });
-await toggle.click();
+await armInspector(page);
 const pop = page.locator(".prov-inspect-pop");
 const ladder = page.locator('[role="dialog"][aria-label="Distance ladder"]');
-const armed = async () => (await toggle.getAttribute("aria-pressed")) === "true";
+// The armed halo is the mode's state, and it outlives the menu the toggle
+// now sits in — so it, not the toggle's aria-pressed, is what to read.
+const armed = async () => (await page.locator(HALO).count()) > 0;
 
 // Pick the first value that opens a popover.
 const picks = page.locator("[data-prov-pickable]");

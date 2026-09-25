@@ -31,8 +31,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { AaveEthereumVaultPositionView } from "@/components/vaults/aave-ethereum-vault-view";
 import { AaveVaultTimeline } from "@/components/vaults/aave-vault-timeline";
@@ -41,6 +40,9 @@ import { VaultPositionCard } from "@/components/vaults/vault-position-card";
 import { VaultContextStrip, VaultContextStripStandalone } from "@/components/vaults/vault-context-strip";
 import { RiskFooterStrip } from "@/components/shared/risk-footer-strip";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
+import { LatestPrices } from "@/components/shared/latest-prices";
+import { RecencyStamp } from "@/components/shared/recency-stamp";
+import { ToolsMenu } from "@/components/shared/tools-menu";
 import { AAVE_FAMILY_SINGULAR } from "@/components/vaults/aave-vault-format";
 import { shareText } from "@/lib/shared/vault-amount-text";
 import { cooldownSentence } from "@/lib/aave-vaults/cooldown-words";
@@ -405,15 +407,24 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
       <div className="py-8">
         <header className="mb-5" data-skel-section="page-header">
           <div className="mb-4">
-            <RailHeader session="aave-vaults" venue="position" stamp />
+            <RailHeader session="aave-vaults" venue="position" />
           </div>
           {/* Smart-back returns the reader wherever they came from; the
               fallback — a fresh tab, a pasted link — is the section's own
               listing on this chain, which is where a position was opened from.
               No session: the Vaults section has no roster entry to derive one
               (rails-ops decision 0017). */}
-          <div className="mb-3 flex items-center justify-between gap-2" data-back-row>
-            <DetailBackButton fallbackHref={ethereumVaultsListingHref()} />
+          {/* The one thin row of "latest" (rails-ops TO-DO-ui-jobs 48): back,
+              the chain head and its age, and the holding's assets at their
+              current prices — empty here until this section prices them —
+              with the page's instruments in Tools at the right end. */}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2" data-back-row>
+            <div className="flex min-w-0 items-center gap-2">
+              <DetailBackButton fallbackHref={ethereumVaultsListingHref()} compact />
+              <RecencyStamp />
+              <LatestPrices assets={[]} />
+            </div>
+            <ToolsMenu />
           </div>
           <h1
             className="text-2xl font-semibold text-foreground"
@@ -529,7 +540,6 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
           />
         )}
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     </div>

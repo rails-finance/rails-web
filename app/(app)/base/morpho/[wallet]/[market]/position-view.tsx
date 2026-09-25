@@ -20,8 +20,7 @@ import { MorphoPositionCard } from "@/components/protocol/morpho/morpho-position
 import { MorphoRiskSlot } from "@/components/protocol/morpho/morpho-risk-slot";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
-import { PriceStrip } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { isMorphoBaseMarketSegment } from "@/lib/morpho-base/routes";
 import { useMorphoBaseWalletReads } from "@/lib/morpho-base/use-wallet-reads";
@@ -220,7 +219,6 @@ export default function MorphoBasePositionView({
           </>
         )}
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     </CaptureSourceProvider>

@@ -4,9 +4,12 @@
 // ----------------------------------------------------------------------------
 // Two pieces, both talking to the `provInspector` store (provenance.tsx):
 //
-// - <ProvInspectorToggle> — the crosshair button a page mounts in its floating
-//   dock (the PriceStrip's leading slot). Arming turns every scoped <Prov> on
-//   the page into a click target (dotted underline = the coverage map).
+// - <ProvInspectorToggle> — the crosshair control that arms the tool. Arming
+//   turns every scoped <Prov> on the page into a click target (dotted
+//   underline = the coverage map). Two dresses: `dock`, the icon button in the
+//   PriceStrip's leading slot, which is what the Market-type pages still
+//   mount; and `menu`, a row of the Tools dropdown, which is where a position
+//   or detail view now carries it.
 // - <ProvInspectorLayer> — the armed halo + the popover. A pick anchors the
 //   figure's WHOLE receipt at the clicked value: name + figure + class dots
 //   (a button that opens the distance ladder) in the head, then the summary, via, formula, operand rows, and source
@@ -37,17 +40,56 @@ import {
   resolveClass,
   type ProvInspectorPin,
 } from "./provenance";
+import { usePriceStripActive } from "@/components/shared/price-strip";
 
-export function ProvInspectorToggle() {
+export function ProvInspectorToggle({
+  variant = "dock",
+  onPick,
+}: {
+  /** `dock` — the icon button in the PriceStrip's leading slot. `menu` — a row
+   *  of the Tools dropdown, wearing that panel's title/subtitle shape. Same
+   *  button, same class, so anything that reaches for the toggle finds one
+   *  control on either surface. */
+  variant?: "dock" | "menu";
+  /** Called after the click, so the menu that holds the row can close. */
+  onPick?: () => void;
+}) {
   const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
+  const label = armed ? "Exit the provenance inspector" : "Provenance inspector — click any value to trace it";
+  const onClick = () => {
+    provInspector.setArmed(!armed);
+    onPick?.();
+  };
+  if (variant === "menu") {
+    return (
+      <button
+        type="button"
+        className="prov-inspect-toggle prov-inspect-toggle-menu"
+        role="menuitem"
+        aria-pressed={armed}
+        aria-label={label}
+        onClick={onClick}
+      >
+        <Crosshair aria-hidden />
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-foreground">
+            {armed ? "Stop inspecting" : "Inspect provenance"}
+          </span>
+          <span className="block text-xs text-rb-500">
+            {armed ? "Click any value to trace it · esc exits" : "Click any value to trace where it came from"}
+          </span>
+        </span>
+      </button>
+    );
+  }
   return (
     <button
       type="button"
       className="prov-inspect-toggle"
       aria-pressed={armed}
-      aria-label={armed ? "Exit the provenance inspector" : "Provenance inspector — click any value to trace it"}
+      aria-label={label}
       title={armed ? "Exit the provenance inspector (Esc)" : "Provenance inspector — click any value to trace it"}
-      onClick={() => provInspector.setArmed(!armed)}
+      onClick={onClick}
     >
       <Crosshair aria-hidden />
       {armed && <span className="prov-inspect-hint">click any value · esc exits</span>}
@@ -56,11 +98,16 @@ export function ProvInspectorToggle() {
 }
 
 /** Mount once per page (beside the timeline, outside any card). Renders
- *  nothing at rest; owns the armed halo, the Escape ladder, and the pinned
- *  popover. */
+ *  nothing at rest; owns the armed halo, its close control, the Escape ladder,
+ *  and the pinned popover. */
 export function ProvInspectorLayer() {
   const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
   const pin = useSyncExternalStore(provInspector.subscribe, provInspector.getPin, () => null);
+  // Where the way out lives. A page with the dock still has the toggle in
+  // sight, so the halo adds nothing; a page whose toggle is a row of a menu
+  // that has since closed has no visible control at all, so the halo carries
+  // its own.
+  const dock = usePriceStripActive();
   // Escape, in rungs: an open popover closes first; a second press disarms.
   useEffect(() => {
     if (!armed) return;
@@ -82,6 +129,20 @@ export function ProvInspectorLayer() {
           the mode state is unmistakable at any scroll position. Pointer-
           transparent chrome; sits under the popover. */}
       {createPortal(<div className="prov-inspect-halo" aria-hidden data-prov-chrome="" />, document.body)}
+      {/* The halo's own way out, where nothing else on the page offers one. */}
+      {!dock &&
+        createPortal(
+          <button
+            type="button"
+            className="prov-inspect-exit"
+            data-prov-chrome=""
+            onClick={() => provInspector.setArmed(false)}
+          >
+            <X aria-hidden />
+            <span>Exit inspector</span>
+          </button>,
+          document.body,
+        )}
       {/* Keyed per pick: a fresh mount per figure resets expansion + position. */}
       {pin && <InspectorPopover key={`${pin.key}:${pin.tick}`} pin={pin} />}
     </>

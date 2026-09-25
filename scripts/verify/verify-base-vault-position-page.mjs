@@ -710,6 +710,8 @@ async function pageRead(browser, url, { expandRuns = false, growWindow = false }
         tabs: [...nav.querySelectorAll("a")].map((a) => a.getAttribute("href")),
         lit: [...nav.querySelectorAll('a[aria-current="page"]')].map((a) => a.getAttribute("href")),
       })),
+      railIdentity: [...document.querySelectorAll("[data-rail-identity]")].map((a) => a.getAttribute("href")),
+      backRow: document.querySelectorAll("[data-back-row]").length,
       sectionMark: document.querySelectorAll("[data-vaults-identity]").length,
       horizonText: document.querySelector("[data-figure='timeline-horizon']")?.innerText ?? "",
       windowText: document.querySelector("[data-figure='timeline-window']")?.innerText ?? "",
@@ -1645,18 +1647,19 @@ check(
 );
 
 // ═══ T14 — the rail the position page wears ═══════════════════════════════
-// One Morpho Blue Base rail, carrying the VAULTS tab that leads back to the
-// roster this position was reached through, and no mark from the retired
-// chain-scoped section. NO tab is lit: a position has no place in the sub-nav.
+// One Morpho Blue Base title, linking to that explorer, and no mark from the
+// retired chain-scoped section. Since rails-ops TO-DO-ui-jobs 48 a position
+// draws NO sub-nav: the tabs belong to the protocol, not to one holding, and
+// none of them was ever lit here. The roster this position was reached
+// through is the back control's fallback, which is the row below the title.
 check(
-  "T14 the position page carries exactly one Morpho Blue Base rail, with the roster on it and no lit tab, and no Vaults-section mark",
-  f1Page.identity.length === 1 &&
-    f1Page.identity[0].tabs.includes("/base/morpho/vaults") &&
-    f1Page.identity[0].lit.length === 0 &&
+  "T14 the position page carries exactly one Morpho Blue Base title linking to the explorer, no sub-nav, a back row, and no Vaults-section mark",
+  f1Page.railIdentity.length === 1 &&
+    f1Page.railIdentity[0] === "/base/morpho" &&
+    f1Page.identity.length === 0 &&
+    f1Page.backRow === 1 &&
     f1Page.sectionMark === 0,
-  f1Page.identity.length
-    ? `${JSON.stringify(f1Page.identity[0])}, ${f1Page.sectionMark} section mark(s)`
-    : "no rail on the position page",
+  `${JSON.stringify(f1Page.railIdentity)}, ${f1Page.identity.length} sub-nav(s), ${f1Page.backRow} back row(s), ${f1Page.sectionMark} section mark(s)`,
 );
 
 // ═══ T12 — the floor is chosen by the REFUSAL ═════════════════════════════

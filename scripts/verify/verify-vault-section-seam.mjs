@@ -686,48 +686,40 @@ for (const f of fixtures) {
 
 // ═══ S5 · the rail on a position page ════════════════════════════════════
 // A vault sits inside the explorer whose factory deployed it (rails-ops
-// decision 0028), so every vault surface draws THAT explorer's `RailHeader` —
-// a position page included, which is what makes the back row a convenience
-// rather than the only way out. The chain-scoped section's own row is gone and
-// must not be drawn anywhere. Each href is read off the DOM and then FETCHED:
-// a tab pointing at a 404 is the failure this is for, and a check that only
-// compared strings could not see it.
+// decision 0028), so every vault surface draws THAT explorer's `RailHeader`, a
+// position page included. Since rails-ops TO-DO-ui-jobs 48 the header on a
+// position is the TITLE ALONE: the sub-nav belongs to the protocol, not to one
+// holding, and it never had a lit tab here. So the title is the rail's whole
+// claim, and the roster this position was reached through is the back row's
+// fallback — which is why the back row must be on the page. The chain-scoped
+// section's own row is gone and must not be drawn anywhere. The title's href
+// is read off the DOM and then FETCHED: a rail pointing at a 404 is the
+// failure this is for, and a check that only compared strings could not see it.
 for (const f of fixtures) {
   if (!f) continue;
   const { context, page, url } = await openFixture(f);
-  const rails = await page.locator('nav[aria-label="Explorer sections"]').evaluateAll((navs) =>
-    navs.map((nav) =>
-      Array.from(nav.querySelectorAll("a")).map((a) => ({
-        href: a.getAttribute("href"),
-        label: a.getAttribute("aria-label"),
-        link: a.getAttribute("data-link"),
-        current: a.getAttribute("aria-current"),
-      })),
-    ),
-  );
+  const titles = await page
+    .locator("[data-rail-identity]")
+    .evaluateAll((els) => els.map((a) => a.getAttribute("href")));
+  const subNavs = await page.locator('nav[aria-label="Explorer sections"]').count();
   const sectionRails = await page.locator('nav[aria-label="Section surfaces"]').count();
-  const tabs = rails[0] ?? [];
+  const backRows = await page.locator("[data-back-row]").count();
   const statuses = [];
-  for (const t of tabs) {
-    const r = await fetch(`${BASE_URL}${t.href}`, { redirect: "follow" });
-    statuses.push(`${t.href} ${r.status}`);
+  for (const href of titles) {
+    const r = await fetch(`${BASE_URL}${href}`, { redirect: "follow" });
+    statuses.push(`${href} ${r.status}`);
   }
   check(
-    `S5a·${f.label} the position page draws ONE explorer rail carrying this vault's roster, every tab answering 200, and no section rail`,
-    rails.length === 1 &&
-      sectionRails === 0 &&
-      tabs.some((t) => t.href === vaultRoot(f.chain)) &&
-      statuses.every((st) => st.endsWith(" 200")),
-    `${rails.length} rail(s), ${sectionRails} section rail(s), ${tabs.length} tabs on ${url} · ${statuses.join(", ") || "none"}`,
+    `S5a·${f.label} the position page draws ONE explorer title that answers 200, no sub-nav and no section rail`,
+    titles.length === 1 && subNavs === 0 && sectionRails === 0 && statuses.every((st) => st.endsWith(" 200")),
+    `${titles.length} title(s), ${subNavs} sub-nav(s), ${sectionRails} section rail(s) on ${url} · ${statuses.join(", ") || "none"}`,
   );
-  // A position has no stable place in the sub-nav — it is reached through a
-  // listing — so no tab is where the reader is standing. `aria-current="page"`
-  // on any tab here would be the rail claiming otherwise.
-  const lit = tabs.filter((t) => t.current != null);
+  // With the sub-nav gone the back row IS the way out, so its absence is the
+  // failure this leg now catches.
   check(
-    `S5b·${f.label} no tab is lit on a position page`,
-    lit.length === 0,
-    lit.length ? lit.map((t) => `${t.href} aria-current=${t.current}`).join(", ") : "no aria-current on any tab",
+    `S5b·${f.label} the position page carries the back row that leads out of it`,
+    backRows === 1,
+    `${backRows} back row(s)`,
   );
   await context.close();
 }

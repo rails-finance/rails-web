@@ -36,8 +36,7 @@ import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LIQUITY_V1_REDEMPTION_RUNS } from "@/lib/liquity-v1/timeline-runs";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { LiquityV1EventCard } from "@/components/protocol/liquity-v1/liquity-v1-event-card";
 import { LiquityV1PositionCard, viewFromSummary } from "@/components/protocol/liquity-v1/liquity-v1-position-card";
@@ -287,7 +286,11 @@ export default function LiquityV1TroveView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="liquity-v1" wallet={wallet}>
+      <DetailTopRow
+        session="liquity-v1"
+        wallet={wallet}
+        assets={chain && view?.status === "open" && chain.price > 0 ? [{ symbol: "ETH", price: chain.price }] : []}
+      >
         {view && (
           <LiquityV1ExportMenu
             wallet={wallet}
@@ -408,12 +411,6 @@ export default function LiquityV1TroveView({
                 />
               ) : null
             }
-          />
-          {/* Ambient price pill (the V4 treatment): the protocol's own
-              PriceFeed ETH:USD, live while the shown life is the open one. */}
-          <PriceStrip
-            assets={chain && view?.status === "open" && chain.price > 0 ? [{ symbol: "ETH", price: chain.price }] : []}
-            leading={<ProvInspectorToggle />}
           />
           <ProvInspectorLayer />
         </>
