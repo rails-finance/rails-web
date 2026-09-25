@@ -427,7 +427,7 @@ export interface ChainTruthTimelineProps {
    *
    *  ⚠️ IT WAS A PICKER ABOVE THE ROWS for a day (2026-09-24), sticky, with
    *  Previous / Next / Newest of its own. Miles put the grid back in the Date
-   *  panel on 2026-09-25 — live's form, dev's reach — and
+   *  panel on 2026-09-25 (live's form with dev's reach) and
    *  `timeline-segment-picker.tsx` went with the ruling. */
   segments?: TimelineSegments;
 }

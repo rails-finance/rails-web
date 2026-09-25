@@ -20,8 +20,8 @@
 //      holding the summary's own `firstTimestamp` to the month holding its
 //      `lastTimestamp` with no month between them missing. Read from
 //      `/api/aave-v3/timeline/summary` on the run — never a pasted number;
-//   2  A MONTH CLICK SHOWS THAT MONTH'S ROWS. Where the loaded rows hold it —
-//      which is every month of a `?folders=0` page the grid lets you click —
+//   2  A MONTH CLICK SHOWS THAT MONTH'S ROWS. Where the loaded rows hold it,
+//      which is every month of a `?folders=0` page the grid lets you click,
 //      it FILTERS: it writes `?from=`/`?to=` as the whole month, moves the
 //      count line, and the editable spread reads the same two dates back. One
 //      control, one grammar. ⚠️ THE PANEL CLOSES ON THE PICK (Miles,
@@ -57,9 +57,9 @@
 //      than extending it, and a drag across the month matrix — which under the
 //      old range grammar was a span — still selects one month;
 //   5  NOTHING ON THE PAGE IS MARKED. ⚠️ THIS CHECK WAS INVERTED ON
-//      2026-09-25, not deleted. It asserted the LIQUIDATION REGISTER — that
+//      2026-09-25, not deleted. It asserted the LIQUIDATION REGISTER, that
 //      the summary's `byAction` bucket, the listed rows and the marked month
-//      cells all agreed — and Miles dropped the marks everywhere, the
+//      cells all agreed, and Miles dropped the marks everywhere, the
 //      `?folders=0` grid and the legend included: "the heatmap is enough and
 //      if users need to find a liquidation they can use the event filter". So
 //      it now asserts the absence: no cell anywhere carries a mark, no legend
@@ -71,7 +71,7 @@
 //      said why. There are no marks and there is no clause, so both halves
 //      have no subject; the number is left unused rather than closed up, the
 //      way group 10's was, so nobody later reads the gap as a check that
-//      quietly stopped running. What stood WITH it — the reach, 13 below —
+//      quietly stopped running. What stood WITH it, the reach at 13 below,
 //      is untouched and still runs on the same fixtures;
 //   7  NO COUNT MOVED: the toolbar's count line and every row-number pill read
 //      byte-identically before the panel is opened and while it is open. The
@@ -202,7 +202,7 @@
 // ⚠️ THE MONTHS LEFT THE DATE PANEL ON THE DEFAULT PAGE (2026-09-24) AND CAME
 // BACK TO IT ON 2026-09-25. For one day the matrix was a sticky picker above
 // the rows with Previous / Next / Newest of its own, and every month click
-// was a read. Miles then ruled the middle ground — live's form, dev's reach
+// was a read. Miles then ruled the middle ground, live's form with dev's reach
 // (decision 0019, amendment 2026-09-25): the grid is in the Date panel again,
 // with the heat ramp and the typed spread, and a month click takes ONE OF TWO
 // PATHS. Where the loaded rows hold the month it filters them, instantly, as
@@ -213,7 +213,7 @@
 // S0 to S4 inside group G were rewritten against that rather than deleted, and
 // they are where the two paths are told apart: S2 is the FILTER path and S3 is
 // the READ path, each asserting the thing the other cannot do. G2–G4 stay
-// superseded — the S checks cover the same ground on the default page — and G1
+// superseded, the S checks covering the same ground on the default page, and G1
 // still asserts the count line states TIME and names no row cap. Groups 1–13
 // pin `?folders=0`, which offers no read, so their month click is the filter
 // path alone.
@@ -486,7 +486,7 @@
 //
 //   2026-09-25 (the two paths), against a local dev server on the production
 //   api, restored after each:
-//   • the HELD BOUNDARY collapsed — `heldMinIdx` forced to `lifeMinIdx` in
+//   • the HELD BOUNDARY collapsed: `heldMinIdx` forced to `lifeMinIdx` in
 //     the months grid, so every month of the life reads as one the page holds
 //     and every click is a filter → 11/17 over `grouped-deep`. S3's five red,
 //     quoting the damage exactly: "the grid called it a filter", then
@@ -494,16 +494,16 @@
 //     row(s)" and no month ringed, and S4's tap red for the same line. THAT
 //     EMPTY LIST IS THE WHOLE REASON FOR THE TWO PATHS: a month below the cut
 //     filtered rather than read gives the reader a grid full of density over
-//     no rows at all. ⚠️ S2 STAYED GREEN, which is the discriminating shape —
+//     no rows at all. ⚠️ S2 STAYED GREEN, which is the discriminating shape:
 //     the break makes everything a filter, and a month the page does hold
 //     still filters correctly, so a check that only ever clicked a held month
 //     would have passed on all of it;
-//   • the PANEL LEFT STANDING — `onPicked` dropped from the grid's `onChange`
-//     → 26/27 over `control`, exactly one red: "the panel closes on the pick
-//     — the panel was still on the page after a month was clicked". Every
+//   • the PANEL LEFT STANDING: `onPicked` dropped from the grid's `onChange`
+//     → 26/27 over `control`, exactly one red, "the panel closes on the pick,
+//     the panel was still on the page after a month was clicked". Every
 //     other check in the group passed, including the filter it performed,
 //     which is right: the pick worked, the map just stayed over the rows;
-//   • the MARKS BACK — a `data-cell-mark` span put back on every selectable
+//   • the MARKS BACK: a `data-cell-mark` span put back on every selectable
 //     month cell → 26/27 over `control`, check 5 alone red with "9 marked
 //     cell(s), 0 legend(s), 0 picker element(s), 1 density key(s)". An
 //     ABSENCE CHECK THAT CANNOT BE MADE TO FAIL IS NOT A CHECK, and check 5
@@ -786,7 +786,7 @@ const READ_NAV = () => {
   };
 };
 
-/** The marks, as an ABSENCE — anywhere on the page, not merely in the panel,
+/** The marks, as an ABSENCE, anywhere on the page and not merely in the panel,
  *  because the legend used to sit beside the grid and the cells inside it. */
 const READ_MARKS = () => ({
   cells: document.querySelectorAll("[data-cell-mark]").length,
@@ -890,7 +890,7 @@ const TYPE_DATE = ([which, iso]) => {
 const COUNT_LINE = () =>
   (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim();
 
-// ⚠️ THREE READERS WENT WITH THE PICKER, 2026-09-25 — `READ_PICKER`,
+// ⚠️ THREE READERS WENT WITH THE PICKER, 2026-09-25: `READ_PICKER`,
 // `READ_STRIP` and `pressCell`. They read a control that no longer exists
 // (`components/shared/timeline-segment-picker.tsx`, its Previous / Next /
 // Newest and its phone strip); what replaced them is `READ_NAV` and
@@ -1092,7 +1092,7 @@ for (const f of FIXTURES) {
     // check this replaced (the summary's liquidation bucket against the
     // listed rows against the marked cells) lost its subject when Miles
     // dropped all three marks; what it can still assert is that none came
-    // back, and that the DENSITY KEY — the key to the wash, not to a mark —
+    // back, and that the DENSITY KEY, the key to the wash and not to a mark,
     // is still under the grid.
     const marksNow = await page.evaluate(READ_MARKS);
     check(
@@ -1177,7 +1177,7 @@ for (const f of FIXTURES) {
       const monthCell = (rest?.cells ?? []).find((c) => c.at === targetMonth);
       const shownAfterOpen = firstNumber(afterOpenLine);
       check(
-        `2  ${f.id}: the panel closes on the pick — the reader asked for rows`,
+        `2  ${f.id}: the panel closes on the pick, the reader having asked for rows`,
         closedOnPick,
         "the panel was still on the page after a month was clicked",
       );
@@ -1610,8 +1610,8 @@ for (const g of GROUPED_FIXTURES) {
     // same evening when it went low-fi, and rewritten again on 2026-09-25 when
     // Miles put the grid back in the Date panel and ruled that a month click
     // takes one of two paths: filter where the loaded rows hold the month,
-    // read where they do not. The subject is the same both times — what a
-    // month click does — so the checks moved with it. A check that simply
+    // read where they do not. The subject is the same both times, what a
+    // month click does, so the checks moved with it. A check that simply
     // vanished would read later like one that quietly stopped running.
     //
     //   S0  the grid is BACK IN THE PANEL and the picker above the rows is
@@ -1619,11 +1619,11 @@ for (const g of GROUPED_FIXTURES) {
     //       panel holding the spread and exactly one month grid;
     //   S1  that grid is every month the life holds, with the density key
     //       under it and no mark on any cell;
-    //   S2  THE FILTER PATH — a month the loaded rows hold writes
+    //   S2  THE FILTER PATH. A month the loaded rows hold writes
     //       `?from=`/`?to=` for that month, moves the count line to its
     //       filtered form, closes the panel and reads NOTHING: no skeleton
     //       stands and the line never states a segment;
-    //   S3  THE READ PATH — a month below the cut becomes the page's segment:
+    //   S3  THE READ PATH. A month below the cut becomes the page's segment:
     //       the count line states the month in time, every row drawn is inside
     //       it, the tip is withheld at the top, no lifetime figure stands, and
     //       the grid reopened rings that month as the one the page is on. Then
@@ -1809,7 +1809,7 @@ for (const g of GROUPED_FIXTURES) {
       );
 
       // And Reset gives the rows the page opened with back, count line and
-      // all — the one way out of a segment now the Newest button is gone.
+      // all: the one way out of a segment now the Newest button is gone.
       await page.click("[data-timeline-navigator] button:has-text('Reset')", { timeout: 10_000 }).catch(() => {});
       await settled(
         page,
@@ -1856,8 +1856,8 @@ for (const g of GROUPED_FIXTURES) {
           tapped && line.startsWith(head),
           `tapped ${tapped}; "${line}" (want "${head}…")`,
         );
-        // ⚠️ THE SHEET'S RESET IS THE ONLY ONE ON A PHONE — the panel's own is
-        // withheld inside the sheet — so it has to clear the SEGMENT, not the
+        // ⚠️ THE SHEET'S RESET IS THE ONLY ONE ON A PHONE, the panel's own
+        // being withheld inside the sheet, so it has to clear the SEGMENT, not the
         // date range alone. Without this a month read on a phone has no way
         // back, which is how the first build of this shipped.
         await openPanel(small);

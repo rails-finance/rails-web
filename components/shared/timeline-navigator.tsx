@@ -26,21 +26,21 @@
 // ── THE TWO PATHS A MONTH CLICK TAKES (decision 0019, amendment 2026-09-25)
 //
 // Where the LOADED ROWS already hold the month, the click filters them, which
-// is instant. Where they do not — a month below the preload's oldest row, or
-// any other month while the page is standing on one it read — the page READS
+// is instant. Where they do not, which is a month below the preload's oldest
+// row or any other month while the page stands on one it read, the page READS
 // that month from the index as its own segment, brought-forward opening
 // balance and all, which costs a request. So every month of the life that
 // holds an event is one click away; an empty month and a month outside the
 // life are drawn and refuse the click as they always have.
 //
 // ⚠️ THE SECOND PATH IS THE CALLER'S TO OFFER. A page that passes no `reach`
-// keeps the first alone and its below-cut months keep refusing — which is
-// what a `?folders=0` page and every family without the segment read do.
+// keeps the first alone and its below-cut months keep refusing, which is what
+// a `?folders=0` page and every family without the segment read do.
 //
 // The panel CLOSES on a pick, either path (Miles, 2026-09-25): the reader
 // asked for rows, and a map left standing over them is in the way.
 //
-// ⚠️ THE SIGNIFICANCE MARKS ARE GONE, 2026-09-25, everywhere — the
+// ⚠️ THE SIGNIFICANCE MARKS ARE GONE, 2026-09-25, everywhere: the
 // liquidation dot, the owner-signed underline, the market-note ring, their
 // legend and the builder behind them (`lib/shared/timeline-navigator.ts`,
 // deleted). Miles: "the heatmap is enough and if users need to find a
@@ -88,8 +88,8 @@
 // An EMPTY month is drawn and refuses the click: filtering to it would empty
 // the list for the plainest reason there is, that nothing is there. So does a
 // month outside the life. Without a `reach`, so does a month entirely below a
-// windowed page's cut — the loaded rows are all at or after the cut and an
-// opening balance is brought forward, not re-filtered
+// windowed page's cut, the loaded rows all being at or after the cut and an
+// opening balance being brought forward, not re-filtered
 // (lib/shared/timeline-opening-balance.ts).
 //
 // Every FILTER, typed or clicked, goes through `useTimelineEvents`'s own
@@ -166,7 +166,7 @@ function lifeSpan(
  *  as the page's own segment. The page owns the read and its state; this panel
  *  draws the months and hands a pick back. */
 export interface TimelineMonthReach {
-  /** The whole life's events per UTC day (lib/shared/timeline-segments.ts) —
+  /** The whole life's events per UTC day (lib/shared/timeline-segments.ts):
    *  the grid's counts and its extent, so the ramp does not move when the page
    *  swaps the rows under it for one month's. */
   lifeDays: ReadonlyMap<number, number>;
@@ -207,7 +207,7 @@ export function TimelineNavigatorPanel({ tl, inSheet, reach, onPicked }: Timelin
     }
     return lifeSpan(events, folderDays, priorDays);
   }, [reachLife, events, folderDays, priorDays]);
-  /** The span the rows ON THE PAGE cover — where the first path reaches.
+  /** The span the rows ON THE PAGE cover, which is where the first path reaches.
    *  `sortedEvents` is every loaded row whatever the filters, and `servedSpan`
    *  extends it over the folders, so this is the same span the count line
    *  states in time. */

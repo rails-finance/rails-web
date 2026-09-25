@@ -98,14 +98,14 @@ const CELL_GAP_PX = 2;
 //   • NOT IN THE LIFETIME — grid padding. The week grid pads out to whole
 //     Monday-to-Sunday columns, the calendar to whole rows, the month matrix
 //     to whole year rows. Nothing is drawn at all.
-//   • OUTSIDE WHAT THE PAGE HOLDS — its count is REAL and comes from the
+//   • OUTSIDE WHAT THE PAGE HOLDS. Its count is REAL and comes from the
 //     opening balance or from a month the preload never reached; no loaded row
 //     falls in it, so filtering to it would empty a list the page cannot
 //     refill. ⚠️ A CALLER THAT PASSES `reachMonth` TAKES THIS REFUSAL AWAY:
 //     the month is then read from the index as the page's own segment, which
 //     is the second of the two paths decision 0019's 2026-09-25 amendment
 //     rules. Without it the cell still refuses and the caption says so.
-//   • EMPTY — in the lifetime, inside what the page holds, and nothing
+//   • EMPTY. In the lifetime, inside what the page holds, and nothing
 //     happened. This one.
 // A `pending` day (drawn, after the life's last event) is already covered by
 // the first: it is outside the lifetime by construction.
@@ -197,7 +197,7 @@ export interface TransactionHeatmapProps {
   /** The WHOLE LIFE's events per UTC day, keyed by day start in seconds. Given,
    *  it replaces `events`/`priorDays`/`windowDays` as the months grid's counts
    *  and its extent, so the ramp is the life's whatever the page currently
-   *  holds — a reader who has read one month from the index still sees the
+   *  holds: a reader who has read one month from the index still sees the
    *  four years around it at the shades they had. `months` layout only. */
   lifeDays?: ReadonlyMap<number, number> | null;
   /** The span the rows ON THE PAGE cover, as unix seconds. A month that meets
@@ -216,14 +216,14 @@ export interface TransactionHeatmapProps {
 
 // ── ⚠️ THE SIGNIFICANCE MARKS ARE GONE (2026-09-25, decision 0019) ─────────
 //
-// `CellMarks` drew three registers over a cell — a liquidation dot, a neutral
-// underline where the owner had signed, a hollow ring for a market note — and
+// `CellMarks` drew three registers over a cell (a liquidation dot, a neutral
+// underline where the owner had signed, a hollow ring for a market note) and
 // `MarkLegend` named the ones a grid wore. Miles dropped all three everywhere,
 // the `?folders=0` grid and the legend included: "the heatmap is enough and if
 // users need to find a liquidation they can use the event filter". The
 // builder behind them (`lib/shared/timeline-navigator.ts`) went with them, and
 // so did the caption clause that said why a below-cut cell carried none. The
-// DENSITY KEY stays — it is the key to the wash, not to a mark.
+// DENSITY KEY stays: it is the key to the wash, not to a mark.
 
 /** The density ramp, Less → More. A key to the wash, and the one piece of
  *  chrome a grid drawn as a TIER of something larger must not carry its own
@@ -595,7 +595,7 @@ function WeeksHeatmap({
   );
 }
 
-// Month index helpers (UTC). A month is keyed by year*12 + month (0-based) —
+// Month index helpers (UTC). A month is keyed by year*12 + month (0-based),
 // the same key `lib/shared/timeline-segments.ts` reduces a life to, which is
 // what makes a month the picker names and a cell in this grid the same cell.
 export const monthStartTs = (idx: number): number => Math.floor(Date.UTC(Math.floor(idx / 12), idx % 12, 1) / 1000);
