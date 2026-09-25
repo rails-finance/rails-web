@@ -13,7 +13,8 @@
 //     RULE (§47): one statement of a balance. Once the read lands and the block
 //     draws the reserve's row, the grid's cell for it gives way — the row carries
 //     the same before/after/change receipts plus the collateral switch, and the
-//     event's own change keeps its receipt on the header.
+//     event's own change keeps its receipt on the header. The block hides dust
+//     rows behind a count line (§52), but never the row the grid gave way for.
 //   • Base and Seamless keep the principal replayed from the per-reserve deltas,
 //     before → after.
 // USD rides the oracle price at the event's block — the at-block read on the
@@ -59,7 +60,7 @@ import {
   type AtBlockPricePill,
 } from "@/components/shared/liquidation-forensics";
 import { signedAmount } from "./aave-v3-ct-event-header";
-import { AaveV3PositionStateBlock, exactLeg, exactUsd, reserveSymbol } from "./aave-v3-position-state";
+import { AaveV3PositionStateBlock, exactLeg, exactUsd, reserveSymbol, type TouchedLeg } from "./aave-v3-position-state";
 import { formatCompact, formatNumber } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
@@ -133,6 +134,10 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
   // The position-state receipts also name the owner.
   const stateCoords: V3Coords = wallet ? { ...coords, wallet: wallet.toLowerCase() } : coords;
 
+  // Reserves the block below always draws a row for, dust or not, because the
+  // grid gives way to that row for the same balance (§47, §52).
+  const touched: TouchedLeg[] = [];
+
   /** The axis' stat, or null where the position block below states the balance. */
   const statFor = (a: Axis): ChainTruthStat | null => {
     if (!state) {
@@ -173,8 +178,12 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
     const leg = a.side === "supply" ? r.supply : r.debt;
     // The block below draws a row for every reserve it holds on this side
     // (ReserveList's filter). Where it draws this one, that row is the balance's
-    // one statement and the grid says nothing about it.
-    if (legHeld(leg)) return null;
+    // one statement and the grid says nothing about it — and the block's dust
+    // rule never hides that row (§52).
+    if (legHeld(leg)) {
+      touched.push({ reserve: r.reserve, side: a.side });
+      return null;
+    }
     const before = humanOf(leg.before, r.decimals);
     const after = humanOf(leg.after, r.decimals);
     const moved = legChange(leg, r.decimals);
@@ -452,7 +461,7 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
           Position state isn&rsquo;t available for this event.
         </div>
       )}
-      {ready && <AaveV3PositionStateBlock state={ready} coords={stateCoords} />}
+      {ready && <AaveV3PositionStateBlock state={ready} coords={stateCoords} touched={touched} />}
       {forensics && <LiquidationForensics {...forensics} />}
       {pricePills.length > 0 && (
         <div className="px-5 pb-2">

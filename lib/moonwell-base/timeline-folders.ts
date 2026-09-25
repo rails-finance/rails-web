@@ -74,13 +74,6 @@ export const MOONWELL_ROW_ACCESS: GroupingAccess<BaseActivityEvent> = {
  *  third-party mint or redeem, which Moonwell's markets make rare) is `other`. */
 const COUNT_KINDS = ["liquidation", "repay", "transfer_out", "transfer_in"] as const;
 
-const NOUN: Record<string, string> = {
-  liquidation: "liquidation",
-  repay: "repayment",
-  transfer_in: "transfer",
-  transfer_out: "transfer",
-};
-
 interface Sum {
   amount: bigint;
   count: number;
@@ -236,7 +229,6 @@ export function moonwellFolderSpecs(
         const amount = baseUnitMagnitude(raw);
         return amount == null ? null : { key: `${d.eventType}:${d.market}`, amount };
       },
-      nounOf: (kind) => NOUN[kind] ?? kind.replace(/_/g, " "),
       // The members are the page's own events, so the cross-tab is keyed by
       // the filters' own functions and cannot disagree with them.
       cellOf: (e) => ({
