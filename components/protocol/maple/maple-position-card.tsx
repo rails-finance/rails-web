@@ -37,6 +37,11 @@ import type { MapleCardCaptions } from "@/lib/maple/economics";
 import { mapleExitAssets } from "@/lib/maple/exit-value";
 import { maplePositionContent } from "@/lib/maple/position-content";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
+import {
+  useReserveDisclosure,
+  ReserveDisclosureToggle,
+  ReserveDisclosureList,
+} from "@/components/shared/reserve-disclosure";
 import type { MaplePositionSummary, MaplePoolAmount, MaplePeakAmount } from "@/lib/sources/api/maple-positions";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 
@@ -220,6 +225,13 @@ export function MaplePositionCard({
    *  omit them. */
   captions?: MapleCardCaptions;
 }) {
+  // The "Pool claim" side's own list of live pools — collapsed by default
+  // once it would list two or more (ui-jobs 57). Computed here (not just
+  // below) because the hook must run on every render, before the closed
+  // early return.
+  const liveCount = v.pools.filter((p) => p.shares + p.escrowedShares > 0).length;
+  const claimDisclosure = useReserveDisclosure(liveCount);
+
   // Closed: the wallet holds no shares and no queue position — the headline
   // is what it held at its height (the peak share balance per pool, with the
   // peak deposited principal beneath where one was ever recorded). No debt
@@ -276,15 +288,25 @@ export function MaplePositionCard({
           {
             label: "Pool claim",
             assetIcons:
-              v.pools.filter((p) => p.shares + p.escrowedShares > 0).length > 0 ? (
-                <InlineAssetCluster
-                  symbols={v.pools.filter((p) => p.shares + p.escrowedShares > 0).map((p) => p.assetSymbol)}
-                />
+              liveCount > 0 ? (
+                <span className="inline-flex items-center gap-1">
+                  <InlineAssetCluster
+                    symbols={v.pools.filter((p) => p.shares + p.escrowedShares > 0).map((p) => p.assetSymbol)}
+                  />
+                  <ReserveDisclosureToggle disclosure={claimDisclosure} count={liveCount} />
+                </span>
               ) : undefined,
-            value: <ClaimStack v={v} />,
+            value: claimDisclosure.collapsible ? null : <ClaimStack v={v} />,
             footnote: (
               <>
-                <ClaimFootnoteLines v={v} />
+                {claimDisclosure.collapsible ? (
+                  <ReserveDisclosureList disclosure={claimDisclosure}>
+                    <ClaimStack v={v} />
+                    <ClaimFootnoteLines v={v} />
+                  </ReserveDisclosureList>
+                ) : (
+                  <ClaimFootnoteLines v={v} />
+                )}
                 <InterestCaption captions={captions} />
               </>
             ),

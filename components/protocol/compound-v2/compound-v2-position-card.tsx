@@ -56,6 +56,11 @@ import { compoundV2PositionContent } from "@/lib/compound-v2/position-content";
 import { formatUsd } from "@/lib/shared/format-event";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
+import {
+  useReserveDisclosure,
+  ReserveDisclosureToggle,
+  ReserveDisclosureList,
+} from "@/components/shared/reserve-disclosure";
 import type {
   CompoundV2PositionSummary,
   CompoundV2SupplyAmount,
@@ -310,6 +315,17 @@ export function CompoundV2PositionCard({
     v,
     v.borrows.map((r) => ({ market: r.market, amount: r.amount })),
   );
+  // `receipts` is the render-site switch (listing defaults false; only the
+  // detail page passes it) — computed here (not just below) because the
+  // reserve-list disclosure hooks must run on every render, before the
+  // closed/liquidated early return. A priced side's list only exists on the
+  // detail page (the footnote lines); an unpriced side's list is the
+  // headline itself and collapses on every surface.
+  const isDetail = receipts;
+  const supplyListCount = collUsd == null ? v.supplies.length : isDetail ? v.supplies.length : 0;
+  const debtListCount = debtUsd == null ? v.borrows.length : isDetail ? v.borrows.length : 0;
+  const supplyDisclosure = useReserveDisclosure(supplyListCount);
+  const debtDisclosure = useReserveDisclosure(debtListCount);
 
   // Closed / liquidated: the wallet holds no open markets, so the headline is
   // what each asset held at its height — highest recorded per-market supply +
@@ -348,11 +364,9 @@ export function CompoundV2PositionCard({
   // doing NOW), plus the wallet pill. The LISTING render keeps the lifecycle
   // pill; the wallet pill (facehash + copy + bookmark) renders on both surfaces.
   const modeWord = v.borrows.length > 0 ? "Borrowing" : "Supply only";
-  // `receipts` is the render-site switch (listing defaults false; only the
-  // detail page passes it), so it doubles as the surface discriminator: the
+  // `isDetail` (== `receipts`) doubles as the surface discriminator: the
   // listing omits the per-leg lines (V4 spoke-card parity — USD headline +
   // capped cluster only), the detail page keeps the full traced list.
-  const isDetail = receipts;
 
   return (
     <PositionCardShell
@@ -390,16 +404,30 @@ export function CompoundV2PositionCard({
           {
             label: CARD_VOCAB.collateral,
             assetIcons:
-              v.supplies.length > 0 ? <InlineAssetCluster symbols={v.supplies.map((r) => r.symbol)} /> : undefined,
+              v.supplies.length > 0 ? (
+                <span className="inline-flex items-center gap-1">
+                  <InlineAssetCluster symbols={v.supplies.map((r) => r.symbol)} />
+                  <ReserveDisclosureToggle disclosure={supplyDisclosure} count={v.supplies.length} />
+                </span>
+              ) : undefined,
             value:
               collUsd != null ? (
                 <UsdHeadline usd={collUsd.usd} info={compoundV2UsdProvOnchain("Collateral", collUsd.fixed)} />
-              ) : (
+              ) : supplyDisclosure.collapsible ? null : (
                 <SupplyStack v={v} />
               ),
             footnote: (
               <>
-                {isDetail && collUsd != null && <SupplyFootnoteLines v={v} />}
+                {collUsd == null && supplyDisclosure.collapsible && (
+                  <ReserveDisclosureList disclosure={supplyDisclosure}>
+                    <SupplyStack v={v} />
+                  </ReserveDisclosureList>
+                )}
+                {isDetail && collUsd != null && (
+                  <ReserveDisclosureList disclosure={supplyDisclosure}>
+                    <SupplyFootnoteLines v={v} />
+                  </ReserveDisclosureList>
+                )}
                 <InterestCaption side="supply" usd={captions?.supplyInterestUsd} />
               </>
             ),
@@ -407,16 +435,30 @@ export function CompoundV2PositionCard({
           {
             label: CARD_VOCAB.debt,
             assetIcons:
-              v.borrows.length > 0 ? <InlineAssetCluster symbols={v.borrows.map((r) => r.symbol)} /> : undefined,
+              v.borrows.length > 0 ? (
+                <span className="inline-flex items-center gap-1">
+                  <InlineAssetCluster symbols={v.borrows.map((r) => r.symbol)} />
+                  <ReserveDisclosureToggle disclosure={debtDisclosure} count={v.borrows.length} />
+                </span>
+              ) : undefined,
             value:
               debtUsd != null ? (
                 <UsdHeadline usd={debtUsd.usd} info={compoundV2UsdProvOnchain("Borrowed", debtUsd.fixed)} />
-              ) : (
+              ) : debtDisclosure.collapsible ? null : (
                 <BorrowStack v={v} />
               ),
             footnote: (
               <>
-                {isDetail && debtUsd != null && <BorrowFootnoteLines v={v} />}
+                {debtUsd == null && debtDisclosure.collapsible && (
+                  <ReserveDisclosureList disclosure={debtDisclosure}>
+                    <BorrowStack v={v} />
+                  </ReserveDisclosureList>
+                )}
+                {isDetail && debtUsd != null && (
+                  <ReserveDisclosureList disclosure={debtDisclosure}>
+                    <BorrowFootnoteLines v={v} />
+                  </ReserveDisclosureList>
+                )}
                 <BorrowRateCaption rate={captions?.borrowRate} />
                 <InterestCaption
                   side="debt"

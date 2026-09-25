@@ -40,6 +40,11 @@ import { formatUsd } from "@/lib/shared/format-event";
 import { fmtLiqPrice } from "@/lib/aave-v4/format";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
+import {
+  useReserveDisclosure,
+  ReserveDisclosureToggle,
+  ReserveDisclosureList,
+} from "@/components/shared/reserve-disclosure";
 import type { SparkPositionSummary, SparkReserveAmount } from "@/lib/sources/api/spark-positions";
 
 export interface SparkPositionView {
@@ -272,6 +277,17 @@ export function SparkPositionCard({
 }) {
   const collUsd = totalUsd(v, v.supplies);
   const debtUsd = totalUsd(v, v.borrows);
+  // `receipts` is the render-site switch (listing defaults false; only the
+  // detail page passes it) — computed here (not just below) because the
+  // reserve-list disclosure hooks must run on every render, before the
+  // closed/liquidated early return. A priced side's list only exists on the
+  // detail page (the footnote lines); an unpriced side's list is the
+  // headline itself and collapses on every surface.
+  const isDetail = receipts;
+  const supplyListCount = collUsd == null ? v.supplies.length : isDetail ? v.supplies.length : 0;
+  const debtListCount = debtUsd == null ? v.borrows.length : isDetail ? v.borrows.length : 0;
+  const supplyDisclosure = useReserveDisclosure(supplyListCount);
+  const debtDisclosure = useReserveDisclosure(debtListCount);
 
   // Closed / liquidated: the wallet holds no open reserves, so the headline is
   // what each asset held at its height — highest recorded per-reserve supply +
@@ -317,11 +333,9 @@ export function SparkPositionCard({
         : "Borrowing"
       : "Supply only";
 
-  // `receipts` is the render-site switch (listing defaults false; only the
-  // detail page passes it), so it doubles as the surface discriminator: the
+  // `isDetail` (== `receipts`) doubles as the surface discriminator: the
   // listing omits the per-leg lines (V4 spoke-card parity — USD headline +
   // capped cluster only), the detail page keeps the full traced list.
-  const isDetail = receipts;
   // Value order for the cluster and the leg lines — the three visible icons
   // are the three largest by oracle USD, and the detail legs match.
   const suppliesRanked = rankByValue(v, v.supplies);
@@ -369,17 +383,29 @@ export function SparkPositionCard({
           {
             label: CARD_VOCAB.collateral,
             assetIcons:
-              v.supplies.length > 0 ? <InlineAssetCluster symbols={suppliesRanked.map((r) => r.symbol)} /> : undefined,
+              v.supplies.length > 0 ? (
+                <span className="inline-flex items-center gap-1">
+                  <InlineAssetCluster symbols={suppliesRanked.map((r) => r.symbol)} />
+                  <ReserveDisclosureToggle disclosure={supplyDisclosure} count={v.supplies.length} />
+                </span>
+              ) : undefined,
             value:
               collUsd != null ? (
                 <UsdHeadline usd={collUsd} info={sparkUsdProvOnchain("Collateral")} />
-              ) : (
+              ) : supplyDisclosure.collapsible ? null : (
                 <ReserveStack reserves={v.supplies} side="supply" atBlock={v.atBlock} />
               ),
             footnote: (
               <>
+                {collUsd == null && supplyDisclosure.collapsible && (
+                  <ReserveDisclosureList disclosure={supplyDisclosure}>
+                    <ReserveStack reserves={v.supplies} side="supply" atBlock={v.atBlock} />
+                  </ReserveDisclosureList>
+                )}
                 {isDetail && collUsd != null && (
-                  <ReserveFootnoteLines reserves={suppliesRanked} side="supply" atBlock={v.atBlock} />
+                  <ReserveDisclosureList disclosure={supplyDisclosure}>
+                    <ReserveFootnoteLines reserves={suppliesRanked} side="supply" atBlock={v.atBlock} />
+                  </ReserveDisclosureList>
                 )}
                 <InterestCaption side="supply" usd={captions?.supplyInterestUsd} />
               </>
@@ -388,17 +414,29 @@ export function SparkPositionCard({
           {
             label: CARD_VOCAB.debt,
             assetIcons:
-              v.borrows.length > 0 ? <InlineAssetCluster symbols={borrowsRanked.map((r) => r.symbol)} /> : undefined,
+              v.borrows.length > 0 ? (
+                <span className="inline-flex items-center gap-1">
+                  <InlineAssetCluster symbols={borrowsRanked.map((r) => r.symbol)} />
+                  <ReserveDisclosureToggle disclosure={debtDisclosure} count={v.borrows.length} />
+                </span>
+              ) : undefined,
             value:
               debtUsd != null ? (
                 <UsdHeadline usd={debtUsd} info={sparkUsdProvOnchain("Borrowed")} />
-              ) : (
+              ) : debtDisclosure.collapsible ? null : (
                 <ReserveStack reserves={v.borrows} side="debt" atBlock={v.atBlock} />
               ),
             footnote: (
               <>
+                {debtUsd == null && debtDisclosure.collapsible && (
+                  <ReserveDisclosureList disclosure={debtDisclosure}>
+                    <ReserveStack reserves={v.borrows} side="debt" atBlock={v.atBlock} />
+                  </ReserveDisclosureList>
+                )}
                 {isDetail && debtUsd != null && (
-                  <ReserveFootnoteLines reserves={borrowsRanked} side="debt" atBlock={v.atBlock} />
+                  <ReserveDisclosureList disclosure={debtDisclosure}>
+                    <ReserveFootnoteLines reserves={borrowsRanked} side="debt" atBlock={v.atBlock} />
+                  </ReserveDisclosureList>
                 )}
                 <BorrowRateCaption rate={captions?.borrowRate} />
                 <InterestCaption side="debt" usd={captions?.debtInterestUsd} />
