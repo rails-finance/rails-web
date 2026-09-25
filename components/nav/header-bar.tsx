@@ -20,7 +20,9 @@ function isSiteRoute(pathname: string | null) {
   return SITE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
-/** Always-on Rails wordmark on the left. Rails is the platform; the active
+/** The Rails wordmark on the left of the bar — on every marketing width, and
+ *  on the app surfaces only below `md`, where BrandRail does not render.
+ *  Rails is the platform; the active
  *  rail's identity lives on the page itself (`ProtocolIdentity` above the
  *  detail back row, the mark in the listing h1), not in the chrome. No
  *  "Explorer" sublabel — there isn't a single explorer, there are mono-rails. */
@@ -51,8 +53,9 @@ function RailsLogo() {
   );
 }
 
-/** Release-stage pill right of the wordmark, on every page — the site is in
- *  beta, and the chrome says so once, site-wide, instead of a per-rail label.
+/** Release-stage pill right of the wordmark — the site is in beta, and the
+ *  chrome says so once, site-wide, instead of a per-rail label. It travels
+ *  with the mark, so on the app surfaces from `md` up BrandRail draws it.
  *  Caution-500 is the house "not settled yet" signal (the anatomy the old
  *  per-rail BETA pill used). */
 function BetaPill() {
@@ -109,10 +112,23 @@ export function HeaderBar() {
   const isMarketing = isHome || isSiteRoute(pathname);
 
   return (
-    <header className={isHome ? "absolute inset-x-0 top-0 z-40" : "relative z-40 mb-2"}>
+    <header
+      className={`${isHome ? "absolute inset-x-0 top-0 z-40" : "relative z-40 mb-2"}${
+        // The app surfaces carry BrandRail down the left edge from `md` up, so
+        // the bar reserves the rail's 56px the way the page column does and
+        // its controls stay flush with the content's right edge.
+        isMarketing ? "" : " md:pl-14"
+      }`}
+    >
       <div className="max-w-7xl mx-auto py-4 px-4 md:px-6 flex items-center">
-        <RailsLogo />
-        <BetaPill />
+        {/* The mark and the beta pill. From `md` up on an app route the rail
+            holds the mark, so drawing it here too would say Rails twice;
+            below `md` there is no rail and the bar keeps its present shape,
+            wordmark included (Miles, 2026-09-25). Marketing is untouched. */}
+        <div className={`flex items-center${isMarketing ? "" : " md:hidden"}`}>
+          <RailsLogo />
+          <BetaPill />
+        </div>
         {/* Right-hand control cluster. `ml-auto` pushes it hard right — it used
             to yield (`md:ml-0`) to the inline site-links nav that sat here, but
             that nav is retired, so the cluster owns the push outright. The
@@ -126,7 +142,16 @@ export function HeaderBar() {
             (SiteFooter on marketing routes, AppFooter's quiet Coverage link
             on app routes). */}
         <div className="ml-auto flex items-center gap-1">
-          {!isMarketing && <BookmarksButton onClick={() => setShowBookmarks(true)} />}
+          {/* App-only, and from `md` up the rail's foot carries it instead —
+              same control, one place per width. The theme toggle below stays
+              in the bar at every width and on both sides: it renders on the
+              marketing surfaces too, and a rail instance would be a second
+              copy of one control (Miles, 2026-09-25). */}
+          {!isMarketing && (
+            <span className="md:hidden">
+              <BookmarksButton onClick={() => setShowBookmarks(true)} />
+            </span>
+          )}
           <HeaderThemeToggle />
           <ChainSwitcher variant={isMarketing ? "cta" : "chain"} />
         </div>

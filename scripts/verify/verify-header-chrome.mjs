@@ -36,7 +36,10 @@ async function chromeState(page, path, expect) {
   const header = page.locator("header").first();
   const cta = await header.locator('button[aria-label="Open an explorer"]').count();
   const burger = await header.locator('button[aria-label="Toggle menu"]').count();
-  const bookmarks = await header.locator('button[aria-label="Bookmarks"]').count();
+  // `:visible`, not a bare count: the bar's bookmark is hidden by a breakpoint
+  // class from `md` up rather than dropped from the tree, so a DOM count would
+  // read 1 at every width and assert nothing.
+  const bookmarks = await header.locator('button[aria-label="Bookmarks"]:visible').count();
   const headerText = (await header.innerText()).replace(/\s+/g, " ");
   const pos = await header.evaluate((el) => getComputedStyle(el).position);
 
@@ -69,7 +72,15 @@ for (const p of [
 ]) {
   await chromeState(page, p, { cta: 1, bookmarks: 0, pos: "relative" });
 }
-await chromeState(page, "/ethereum/liquity-v2", { cta: 0, bookmarks: 1, pos: "relative" });
+// The bookmark left the bar for BrandRail's foot at `md` and up (rails-ops
+// TO-DO-ui-jobs 67), so at 1280 an app route's header carries none and the
+// rail carries one. Below `md` there is no rail and the bar keeps it — the
+// mobile block further down holds that end.
+await chromeState(page, "/ethereum/liquity-v2", { cta: 0, bookmarks: 0, pos: "relative" });
+const railBookmarks = await page.locator('aside[aria-label="Rails"] button[aria-label="Bookmarks"]:visible').count();
+check(railBookmarks === 1, `/ethereum/liquity-v2: the brand rail carries the bookmark (${railBookmarks})`);
+const railMark = await page.locator('aside[aria-label="Rails"] a[href="/"]').count();
+check(railMark === 1, `/ethereum/liquity-v2: the brand rail carries the Rails mark (${railMark})`);
 
 // ── ml-auto regression: control cluster stays hard right on a wide app page ──
 console.log("[ml-auto cluster @1280 on /liquity-v2]");
@@ -152,6 +163,14 @@ const mBurger = await mob.locator('header button[aria-label="Toggle menu"]').cou
 const mSwitcher = await mob.locator('header button[aria-label="Switch blockchain"]').count();
 check(mBurger === 0, `mobile header has no hamburger (${mBurger})`);
 check(mSwitcher === 1, `mobile header keeps the chain switcher trigger (${mSwitcher})`);
+// Below `md` the brand rail does not render and the bar is unchanged: mark,
+// wordmark, bookmark, theme (rails-ops TO-DO-ui-jobs 67).
+const mRail = await mob.locator('aside[aria-label="Rails"]').isVisible();
+check(mRail === false, `mobile draws no brand rail (${mRail})`);
+const mBookmarks = await mob.locator('header button[aria-label="Bookmarks"]:visible').count();
+check(mBookmarks === 1, `mobile header keeps the bookmark (${mBookmarks})`);
+const mWordmark = await mob.locator("header").first().innerText();
+check(/Rails/.test(mWordmark), `mobile header keeps the Rails wordmark (${mWordmark.replace(/\s+/g, " ")})`);
 const mCov = await switcherCoverage(mob, "ethereum");
 check(mCov >= 1, `mobile chain switcher reaches /coverage/ethereum (${mCov})`);
 await shoot(mob, "hdr-mobile");

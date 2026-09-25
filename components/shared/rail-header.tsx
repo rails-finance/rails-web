@@ -16,7 +16,9 @@
 // 48). The tabs and the (i) belong to the protocol, not to one account's
 // position, and nothing in them was ever lit here; the identity keeps its
 // link, which is the one door back to the rail. The recency stamp left with
-// them — a position states its chain head in the row under this one.
+// them — a position states its chain head in the row under this one. It keeps
+// the small-caps register too, where the other venues take the title scale:
+// the subject of a position view is the account named in its h1.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -77,7 +79,10 @@ export function RailHeader({
     // any width, so the split is unconditional now: the identity owns the
     // first row by itself, the stamp and the sub-nav share the second.
     <div className="flex flex-col gap-2">
-      <ProtocolIdentity session={session} />
+      {/* The page's largest type (rails-ops TO-DO-ui-jobs 67). The first thing
+          the eye lands on is now what the page is about; the scale lives in
+          ProtocolIdentity, so every explorer wears the same one. */}
+      <ProtocolIdentity session={session} scale="title" />
       {/* Right-aligned even with the stamp off (the info page): a lone nav
           flush right still reads as one deliberate row, not a stamp-shaped
           gap. With the stamp on, the two ends split it as before. */}
