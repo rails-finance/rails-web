@@ -228,6 +228,24 @@
 //      rows served, drawn null".
 //  T5a, T5b, T5c2, T5d and T5f stayed green through all four.
 //
+// ── T5c3 REWRITTEN 2026-09-25: it was asserting a retired line ──────────────
+// T5c3 and `verify-ethereum-vault-timeline.mjs`'s 1f2 read the count line with
+// a regex for "Showing 1,000 of 9,097 events". Decision 0019's amendment of
+// 2026-09-24 retired that form — "the page states time, not the cap" — and the
+// build that landed it (web `b5bd31c` · `54e04aa`) left both checks asserting
+// a shape the page no longer owes. They read the line as ABSENT from that day
+// on, on a page that was right, and rails.finance has served the amended line
+// since. An earlier session read the four reds as another session's half-made
+// change to `timeline-toolbar.tsx`; they were neither, and the inline date
+// picker that landed the same day (`dbd55fc` … `c47bd1b`) never touched the
+// count line — at `6369ba4`, production before the picker, the page rendered
+// "9,154 events · loaded 1 Jul 2026 to 25 Sept 2026" and the old regex matched
+// nothing there either.
+//   The lesson is in the extractor, not the assertion: a capture that selects
+// the shape it is about to assert cannot tell a CHANGED line from a MISSING
+// one, and reports both as ABSENT. Both files now read the line's own element
+// whole and pin the whole of it.
+//
 // ── A NOTE ON T4's SKIPs ────────────────────────────────────────────────────
 // T4b–T4e need to write a poisoned tail at a cut BELOW the correct one the
 // loader is about to write, because the store replaces a value only when the
@@ -712,14 +730,24 @@ async function pageText(browser, url) {
       buildingText: document.querySelector("[data-figure='timeline-building']")?.innerText ?? "",
       timelineOf: document.querySelector("[data-vault-timeline-rows]")?.getAttribute("data-vault-timeline-of") ?? null,
       // The window the wrapper was handed, and the toolbar's count line beside
-      // it ("Showing 1,000 of 9,097 events" — decision 0019 §3).
+      // it ("9,154 events · loaded 1 Jul 2026 to 25 Sept 2026" — decision 0019
+      // §3 as its 2026-09-24 amendment left it).
+      //
+      // ⚠️ READ WHOLE, NOT MATCHED. Until 2026-09-25 this pulled the line out
+      // of the header with a regex for the retired "Showing 1,000 of 9,097
+      // events" form, so when that form went the line read ABSENT and T5c3
+      // failed on a page that was right. A regex that selects the shape it is
+      // about to assert cannot tell a changed line from a missing one; the
+      // line has its own element, so take that element's text and let the
+      // check hold the whole of it.
       rowCountAttr:
         document.querySelector("[data-vault-timeline-rows]")?.getAttribute("data-vault-timeline-rows") ?? null,
       countLine:
-        /Showing [\d,]+ of (?:at least )?[\d,]+ events/.exec(
-          document.querySelector("[data-vault-timeline-rows] [data-skel-section='detail-timeline-header']")
-            ?.innerText ?? "",
-        )?.[0] ?? null,
+        document
+          .querySelector(
+            "[data-vault-timeline-rows] [data-skel-section='detail-timeline-header'] [data-prov-exempt] span.text-xs.tabular-nums",
+          )
+          ?.textContent?.trim() ?? null,
       unreconciledText: document.querySelector("[data-figure='timeline-unreconciled']")?.innerText ?? "",
     };
   });
@@ -1249,18 +1277,37 @@ for (const [name, f] of T5_FIXTURES) {
           `six sums over ${own.rows.length} rows`
       : "no tower on the page",
   );
-  // The window sentence is gone (decision 0019): the two figures are the
-  // toolbar's count line and the wrapper's two attributes, and both halves are
-  // this script's own arithmetic at the PAGE's block.
+  // THE COUNT LINE STATES TIME. Decision 0019 §3, amended 2026-09-24: "the
+  // 'Showing 1,000 of…' form of the count line goes; the page states time, not
+  // the cap", and rule 2, "the row cap is a server guard on one answer and is
+  // never stated to the reader as a number". So the two figures part company.
+  // The life's total stays the line's, literally (§3's "counts are literal",
+  // which the amendment left standing), beside the span the loaded rows cover;
+  // the window drawn stays on the wrapper, which is plumbing and not the
+  // reader's. The span's own dates are held to the route's timestamps by
+  // `verify-timeline-navigator.mjs` G1 — here the line is pinned to its shape,
+  // which leaves no room for a cap to be named in it.
   const pageWant = Math.min(DRAW_ROWS, own.rows.length);
-  const wantLine = `Showing ${pageWant.toLocaleString("en-US")} of ${own.rows.length.toLocaleString("en-US")} events`;
+  const wantHead = `${own.rows.length.toLocaleString("en-US")} events`;
+  const gotLine = page.countLine ?? "";
+  const spanTail = gotLine.startsWith(wantHead) ? gotLine.slice(wantHead.length) : null;
+  // One date where the loaded rows sit inside a day, two where they span days.
+  const SPAN_SHAPE = /^ · loaded \d{1,2} [A-Za-z]+ \d{4}(?: to \d{1,2} [A-Za-z]+ \d{4})?$/;
+  // The three phrases the amendment retired, anywhere on the face.
+  const capPhrase =
+    /Showing [\d,]+ (?:rows|of [\d,]+ events)|most recent [\d,]+ events|above what Rails|showing the newest/i;
+  const namesCap = capPhrase.test(page.text);
   check(
-    `T5c3 ${name}: the page states both figures — the count line and the wrapper, the window drawn and the life it was cut from`,
-    page.countLine === wantLine &&
+    `T5c3 ${name}: the count line states the whole life and the span its rows cover, naming no cap, and the wrapper carries the window drawn`,
+    spanTail !== null &&
+      SPAN_SHAPE.test(spanTail) &&
+      !namesCap &&
       Number(page.rowCountAttr) === pageWant &&
       Number(page.timelineOf) === own.rows.length &&
       page.rows > 0,
-    `${page.rows} row cards painted; count line "${page.countLine ?? "ABSENT"}", wanted "${wantLine}"; wrapper ${page.rowCountAttr}/${page.timelineOf}`,
+    `${page.rows} row cards painted; count line "${page.countLine ?? "ABSENT"}", wanted "${wantHead} · loaded <span>"; ` +
+      `wrapper ${page.rowCountAttr}/${page.timelineOf} (want ${pageWant}/${own.rows.length})` +
+      (namesCap ? `; the page names the cap: "${capPhrase.exec(page.text)?.[0]}"` : ""),
   );
 }
 

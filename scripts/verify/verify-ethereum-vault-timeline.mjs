@@ -372,6 +372,18 @@ const CEILING = 14000;
  *  Tier 0 / Tier 1 boundary and no longer the number of rows served. */
 const DRAW_ROWS = 1000;
 
+/** What the count line says after its total, once decision 0019's 2026-09-24
+ *  amendment made the line state time: " · loaded 1 Jul 2026 to 25 Sept 2026",
+ *  or one date where the loaded rows sit inside a day. en-GB, UTC, as
+ *  `timeline-toolbar.tsx`'s `loadedSpanText` renders it. */
+const LOADED_SPAN = /^ · loaded \d{1,2} [A-Za-z]+ \d{4}(?: to \d{1,2} [A-Za-z]+ \d{4})?$/;
+
+/** The phrases that name the preload cap to the reader, which the same
+ *  amendment retired ("never stated to the reader as a number", rule 2). The
+ *  same set `verify-timeline-navigator.mjs` rejects. */
+const NAMES_THE_CAP =
+  /Showing [\d,]+ (?:rows|of [\d,]+ events)|most recent [\d,]+ events|above what Rails|showing the newest/i;
+
 const client = createPublicClient({
   chain: mainnet,
   // Five retries 1 s doubling (31 s in all): this Mac shares preview's Alchemy app, and
@@ -701,9 +713,17 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
   const blockNumber = Number(await attr("[data-vault-block]", "data-vault-block"));
   const rowCountAttr = await attr("[data-vault-timeline-rows]", "data-vault-timeline-rows");
   // On a life cut to the draw window: the life it was cut from, and the
-  // toolbar's count line ("Showing 1,000 of 7,882 events", decision 0019 §3).
+  // toolbar's count line ("7,958 events · loaded 1 Jul 2026 to 25 Sept 2026",
+  // decision 0019 §3 as its 2026-09-24 amendment left it).
   const rowCountOf = await attr("[data-vault-timeline-rows]", "data-vault-timeline-of");
-  const toolbarText = await text("[data-vault-timeline-rows] [data-skel-section='detail-timeline-header']");
+  // ⚠️ READ WHOLE, NOT MATCHED. Until 2026-09-25 the line was pulled out of
+  // the toolbar with a regex for the retired "Showing 1,000 of 7,882 events"
+  // form, so when that form went it read ABSENT and 1f2 failed on a page that
+  // was right. A regex that selects the shape it is about to assert cannot
+  // tell a changed line from a missing one. The line has its own element.
+  const countLineText = await text(
+    "[data-vault-timeline-rows] [data-skel-section='detail-timeline-header'] [data-prov-exempt] span.text-xs.tabular-nums",
+  );
   // ⚠️ EVENT HEADERS ONLY. Since 2026-09-20 the vault's own notes sit AMONG
   // these rows (ChainTruthTimeline's `notes` prop), and a note's header panel
   // carries `role="button"` exactly as a card's does. Counting one as a row
@@ -770,7 +790,7 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
     blockNumber,
     rowCountAttr: rowCountAttr == null ? null : Number(rowCountAttr),
     rowCountOf: rowCountOf == null ? null : Number(rowCountOf),
-    countLine: /Showing [\d,]+ of (?:at least )?[\d,]+ events/.exec(toolbarText ?? "")?.[0] ?? null,
+    countLine: countLineText,
     domRows,
     headerTexts,
     noteRows,
@@ -1096,19 +1116,28 @@ if (!hOwn) {
         omittedStated === routeRows.length - wantRows,
       `page ${t.events.length} rows, drawn ${JSON.stringify({ ...drawn, summary: undefined })}, summary counts ${omittedStated}; own life ${routeRows.length} rows, own newest ${newest.id}, page head ${t.events[0]?.id}, own cut block ${oldestDrawn.blockNumber}`,
     );
-    // The window sentence is gone (decision 0019): the page states the two
-    // figures in the toolbar's count line and on the wrapper, both held to this
-    // script's own count at the PAGE's block.
+    // The window sentence is gone (decision 0019), and since the 2026-09-24
+    // amendment so is the "Showing 1,000 of…" count line: the page states the
+    // life's total, literally, beside the span its loaded rows cover, and the
+    // cap is "never stated to the reader as a number" (rule 2). The window
+    // drawn is still on the wrapper, where it is plumbing and not the reader's.
     const pageRows = ownRowsAt(hOwn, hPage.blockNumber);
     const pageWant = Math.min(DRAW_ROWS, pageRows.length);
-    const wantLine = `Showing ${pageWant.toLocaleString("en-US")} of ${pageRows.length.toLocaleString("en-US")} events`;
+    const wantHead = `${pageRows.length.toLocaleString("en-US")} events`;
+    const gotLine = hPage.countLine ?? "";
+    const spanTail = gotLine.startsWith(wantHead) ? gotLine.slice(wantHead.length) : null;
+    const namesCap = NAMES_THE_CAP.test(hPage.bodyText ?? "");
     check(
-      "1f2 …and the page states both figures on its face — the count line and the wrapper",
-      hPage.countLine === wantLine &&
+      "1f2 …and the page states the whole life and its loaded span on its face, naming no cap, with the window on the wrapper",
+      spanTail !== null &&
+        LOADED_SPAN.test(spanTail) &&
+        !namesCap &&
         hPage.rowCountAttr === pageWant &&
         hPage.rowCountOf === pageRows.length &&
         hPage.domRows > 0,
-      `count line "${hPage.countLine ?? "ABSENT"}", wanted "${wantLine}"; wrapper ${hPage.rowCountAttr}/${hPage.rowCountOf}; ${hPage.domRows} rows painted`,
+      `count line "${hPage.countLine ?? "ABSENT"}", wanted "${wantHead} · loaded <span>"; ` +
+        `wrapper ${hPage.rowCountAttr}/${hPage.rowCountOf} (want ${pageWant}/${pageRows.length}); ${hPage.domRows} rows painted` +
+        (namesCap ? `; the page names the cap: "${NAMES_THE_CAP.exec(hPage.bodyText)?.[0]}"` : ""),
     );
   }
 }
@@ -1521,8 +1550,12 @@ const bad7e = sghoKeys.filter((k) => {
   // reason that has nothing to do with notes — and it can no longer count one
   // in any case, since `heads` is scoped to `[data-event-id]`.
   if (p.rowCountAttr !== own.rows.length) return true;
-  const stated = /Showing ([\d,]+) of (?:at least )?([\d,]+) events/.exec(p.countLine ?? "");
-  if (stated && Number(stated[2].replace(/,/g, "")) !== own.rows.length) return true;
+  // The toolbar's own total. It led with "Showing 1,000 of" until the
+  // 2026-09-24 amendment and now opens the line; reading it by the retired
+  // form left this clause matching nothing, so it judged nought from that day
+  // until 2026-09-25.
+  const stated = /^(?:at least )?([\d,]+) events\b/.exec(p.countLine ?? "");
+  if (stated && Number(stated[1].replace(/,/g, "")) !== own.rows.length) return true;
   // The type filter's options, as the toolbar renders them — no note kind, and
   // no note's own words, may be among them.
   return /vault-terms|target rate/i.test(p.filterOptionText ?? "");
