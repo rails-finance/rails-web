@@ -13,6 +13,9 @@
 //   S0  the default page draws folders (the fixture is still served — a guard;
 //       every other check on the family waits on it)
 //   S1  the default page's eye menu has no "Collapse like events"
+//   S5  no folder header names a lone standout member (decision 0019, rule 6,
+//       amended 2026-09-25: the header states the sums only, never
+//       "including one …")
 //   S2  with `timeline-display-v3` = {"collapseRuns":false} stored before load:
 //       zero `/timeline/folder` reads through load and settle, and no folder
 //       drawn open
@@ -246,6 +249,14 @@ async function runServed(f) {
       return;
     }
     await offersToggle(page, id, "S1 the eye menu does not offer the toggle", false);
+
+    // S5 — rule 6's retired naming: no header reads "including one …".
+    const bodyText = await page.evaluate(() => document.body.innerText);
+    check(
+      id("S5 no folder header names a lone standout member"),
+      !bodyText.includes("including one"),
+      bodyText.includes("including one") ? 'a header still reads "including one …"' : "clean",
+    );
 
     // S3 — one click, one read, its members drawn.
     await page.waitForTimeout(SETTLE_MS);

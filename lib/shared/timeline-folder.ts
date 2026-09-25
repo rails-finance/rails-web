@@ -96,8 +96,10 @@ export interface ServedFolderCount {
   count: number;
 }
 
-/** Rule 6's answer: the one member the header names because the aggregate
- *  would otherwise hide it. `eventKey` is the durable coordinate. */
+/** Rule 6's retired naming: the one member the header used to call out because
+ *  the aggregate would otherwise hide it (decision 0019, before the 2026-09-25
+ *  amendment). `eventKey` is the durable coordinate. The type stays only
+ *  because `ServedFolder.outlier` still has to type what a Base door can send. */
 export interface ServedFolderOutlier {
   eventKey: string;
   reason: "kind" | "magnitude";
@@ -133,7 +135,11 @@ export interface ServedFolder {
    *  written yet, and inventing one here would be a second boundary card. */
   stateBefore: Record<string, string> | null;
   stateAfter: Record<string, string> | null;
-  outlier: ServedFolderOutlier | null;
+  /** Retired 2026-09-25: the header no longer names a lone standout member
+   *  (decision 0019, rule 6). Optional and tolerated as input only — a Base
+   *  door still sends it (`routes/baseLending.ts`, `routes/baseMorpho.ts` in
+   *  rails-server-onboarding); the web reads no field of this name. */
+  outlier?: ServedFolderOutlier | null;
 
   /** The lifetime-tower reduction over the members, in the OPENING BALANCE's
    *  own shape — same leg names, same base units — so a folder merges through
