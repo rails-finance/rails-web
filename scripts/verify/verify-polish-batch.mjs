@@ -110,10 +110,12 @@ for (const [proto, path] of [
   check(`1 ${proto} rail header shows currentColor glyph`, headerSvg === "svg", headerSvg);
 }
 
-// ── 2. Listing page: recency stamp reads on from the rail identity ───────
+// ── 2. Listing page: two rows — identity alone, then stamp + sub-nav ─────
 // The (i) drawer is retired: the intro lives at /info (linked from the rail
-// header's sub-nav) and the recency stamp sits in the rail header's LEFT
-// cluster, directly after the protocol identity.
+// header's sub-nav). Since rails-ops ui-jobs 66 the rail is two rows at every
+// width — the protocol identity alone on the first, the recency stamp and the
+// sub-nav sharing the second (stamp on the left, sub-nav on the right) — so
+// the stamp no longer shares a row with the identity.
 await page.goto(`${BASE}/ethereum/dolomite`, { waitUntil: "networkidle" });
 const stampPlacement = await page.evaluate(() => {
   if (document.querySelector("button[aria-label*='introduction']")) return "drawer trigger still present";
@@ -122,19 +124,20 @@ const stampPlacement = await page.evaluate(() => {
   const infoLink = nav.querySelector("a[aria-label='About this explorer']");
   if (!infoLink) return "no (i) link in sub-nav";
   if (!/\/info$/.test(infoLink.getAttribute("href") || "")) return "(i) href is not /info";
-  const row = nav.parentElement;
-  const identity = row?.querySelector("a[href='/ethereum/dolomite']");
+  const identity = document.querySelector("[data-rail-identity]");
   // The stamp is a button since ui-jobs 59 — it shows the age and swaps to the
   // block number on a press — so it is found by its accessible name rather
   // than by the "block · age" text it used to read.
-  const stamp = row?.querySelector("button[aria-label^='Chain head']");
-  if (!identity) return "no identity link in rail row";
-  if (!stamp) return "no recency stamp in rail row";
-  // Same left cluster: the stamp's flex parent also contains the identity.
-  return stamp.closest("div")?.contains(identity) ? "ok" : "stamp not beside identity";
+  const stamp = document.querySelector("button[aria-label^='Chain head']");
+  if (!identity) return "no identity link in rail header";
+  if (!stamp) return "no recency stamp in rail header";
+  const stampRow = stamp.parentElement;
+  if (!stampRow || !stampRow.contains(nav)) return "stamp is not sharing a row with the sub-nav";
+  if (stampRow.contains(identity)) return "stamp still shares a row with the identity";
+  return "ok";
 });
 check(
-  "2 recency stamp reads on from the rail identity; (i) links to /info",
+  "2 two rows: identity alone, stamp shares the sub-nav's row; (i) links to /info",
   stampPlacement === "ok",
   stampPlacement === "ok" ? "" : String(stampPlacement),
 );
