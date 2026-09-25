@@ -38,7 +38,7 @@
 // Run with the dev server up:  BASE=http://localhost:3001 node scripts/verify/verify-flank-echoes.mjs
 
 import { chromium } from "playwright";
-import { armInspector, openInspectorHome } from "./lib/prov-inspector.mjs";
+import { armInspector, HALO, openInspectorHome } from "./lib/prov-inspector.mjs";
 
 const BASE = process.env.BASE || "http://localhost:3000";
 const VIEWPORT = { width: 1440, height: 1100 };
@@ -96,6 +96,9 @@ async function sleep(ms) {
  *  on alternate rounds, which yields phantom "nothing was stamped" results that
  *  look exactly like a drifted key. Always read `aria-pressed` first. */
 async function ensureArmed(page) {
+  // Already armed is the common case between picks, and it costs nothing: the
+  // settling wait below is only for an arming that actually happened.
+  if (await page.$(HALO)) return true;
   if (!(await armInspector(page))) return false;
   await sleep(250);
   return true;

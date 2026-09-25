@@ -1485,11 +1485,14 @@ label[for] {
   }
 }
 /* the armed halo's own way out, on a page whose toggle is behind a menu that
-   has closed. Sits over the halo (z 55) and under the popover (z 60). */
+   has closed. Sits over the halo (z 55) and under the popover (z 60), and at
+   the LEFT end of the bottom edge: the right end is where the dock sits on the
+   pages that still have one, and where a card's end flank lands — a pick that
+   hit this chip instead would put the tool down rather than trace a value. */
 .prov-inspect-exit {
   position: fixed;
   z-index: 56;
-  right: 12px;
+  left: 12px;
   bottom: max(12px, env(safe-area-inset-bottom));
   display: inline-flex;
   align-items: center;
