@@ -964,10 +964,11 @@ export interface ChainTruthTowerProps {
    *  card's context line uses. */
   rowExtra?: ReactNode;
   /** PUT THIS TOWER AWAY, AND REMEMBER IT PER PROTOCOL (ui-jobs 61, widened by
-   *  63). Given a protocol's roster id, the heading becomes the button that
-   *  collapses the panel to its own header row, a chevron rides the top right,
-   *  and the state is stored under that id, so every position page in the
-   *  protocol opens the way the reader left the last one
+   *  63, made one control by 65). Given a protocol's roster id, the whole
+   *  header row becomes one button: icon and heading at its left, a chevron
+   *  at its right, no second interactive element. It collapses the panel to
+   *  its own header row, and the state is stored under that id, so every
+   *  position page in the protocol opens the way the reader left the last one
    *  (lib/shared/flows-collapse-store.ts).
    *
    *  LEAVE IT OFF AND THE ROUTE ANSWERS. Every position and trove page sits
@@ -1067,11 +1068,13 @@ export function ChainTruthTower({
           (z-10) but only on its actual children, so tower-top tooltips still
           hover through the middle.
 
-          COLLAPSIBLE (ui-jobs 61): the title becomes the button that puts the
-          panel away and the chevron takes the top right, which is where the
-          Display control stood — so the Display control moves down onto the
-          first row of the body, still right-aligned and still inside the
-          towers' empty top band once the chart pulls up under it. */}
+          COLLAPSIBLE (ui-jobs 61, made one control by 65): the whole row is
+          the button that puts the panel away, icon and title at its left,
+          the chevron riding at its right inside the same element, with no
+          second interactive child. The Display control moved down onto the
+          first row of the body under 63 and stays there, still right-aligned
+          and still inside the towers' empty top band once the chart pulls up
+          under it. */}
         <div className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-between gap-2">
           {collapseKey ? (
             <button
@@ -1084,46 +1087,36 @@ export function ChainTruthTower({
               }}
               aria-expanded={!collapsed}
               aria-controls={bodyId}
-              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -ml-2 h-7 min-w-0 gap-1.5 rounded-md px-2`}
+              aria-label={collapsed ? `Show ${title}` : `Hide ${title}`}
+              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -mx-2 h-7 w-full min-w-0 rounded-md px-2`}
             >
-              <ChartColumnBig size={14} aria-hidden />
-              <span className={`${OVERLAY_HEADING} truncate`}>{title}</span>
+              <span className="flex w-full min-w-0 items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <ChartColumnBig size={14} aria-hidden />
+                  <span className={`${OVERLAY_HEADING} truncate`}>{title}</span>
+                </span>
+                <ChevronDown size={16} className={collapsed ? "" : "rotate-180"} aria-hidden />
+              </span>
             </button>
           ) : (
-            <span className={`${OVERLAY_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
+            <>
+              <span className={`${OVERLAY_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
+              {/* No corner color key — the flank-table swatches are the one legend
+                  (design-grammar rule; neither reference tower carries one). */}
+              <div className="pointer-events-auto flex items-center gap-3">
+                <TowerDisplayControls
+                  lifetimeAvailable={lifetimeAvailable}
+                  canGroup={canGroup}
+                  grouped={grouped}
+                  hideHistorical={hideHistorical}
+                  showBars={showBars}
+                  flowsNote={data.flowsNote}
+                  onGroup={() => setGroupOverride((v) => !(v ?? true))}
+                  onHideHistorical={() => setHideHistorical((v) => !v)}
+                />
+              </div>
+            </>
           )}
-          {/* No corner color key — the flank-table swatches are the one legend
-              (design-grammar rule; neither reference tower carries one). */}
-          <div className="pointer-events-auto flex items-center gap-3">
-            {collapseKey ? (
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !collapsed;
-                  setCollapsed(next);
-                  setSettled(true);
-                  setFlowsCollapsed(collapseKey, next);
-                }}
-                aria-expanded={!collapsed}
-                aria-controls={bodyId}
-                aria-label={collapsed ? `Show ${title}` : `Hide ${title}`}
-                className={`${CTRL_GHOST} ${CTRL_OFF} h-7 w-7 rounded-md`}
-              >
-                <ChevronDown size={16} className={collapsed ? "" : "rotate-180"} aria-hidden />
-              </button>
-            ) : (
-              <TowerDisplayControls
-                lifetimeAvailable={lifetimeAvailable}
-                canGroup={canGroup}
-                grouped={grouped}
-                hideHistorical={hideHistorical}
-                showBars={showBars}
-                flowsNote={data.flowsNote}
-                onGroup={() => setGroupOverride((v) => !(v ?? true))}
-                onHideHistorical={() => setHideHistorical((v) => !v)}
-              />
-            )}
-          </div>
         </div>
         <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
           {collapseKey && (
