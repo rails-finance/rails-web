@@ -660,8 +660,16 @@ export function TimelineToolbar({
           // `data-nav-dropdown` hook, same open/close state
           // (`tl.heatmapOpen`); only the positioning classes differ from the
           // dropdown it replaces for this review. Not a decision.
+          //
+          // No `onPicked` here (Miles, 2026-09-25): on this inline variant a
+          // pick filters or reads the segment and the grid stays open, so
+          // clicking through several months in a row costs one press each
+          // rather than a reopen between them. It closes only on a second
+          // press of the Date button (`tl.toggleHeatmap`, wired below) or
+          // when Reset already closed it, which it did not before this
+          // change either. The phone sheet keeps closing on pick.
           <div data-nav-dropdown="" className="overlay-panel mt-2 p-3">
-            <TimelineNavigatorPanel tl={tl} reach={monthReach} onPicked={tl.toggleHeatmap} />
+            <TimelineNavigatorPanel tl={tl} reach={monthReach} />
           </div>
         ))}
     </div>

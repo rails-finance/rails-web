@@ -891,9 +891,13 @@ function MonthsHeatmap({
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-rb-500">
         {grid.summarising ? (
           reachMonth ? (
-            // The two paths, said once: a month the list already holds answers
-            // at once, and one it does not is a read.
-            <span>A month the list does not hold is read from the index when you pick it, which takes a moment.</span>
+            // The picker-inline review branch drops the sentence that stood
+            // here (Miles, 2026-09-25): "A month the list does not hold is
+            // read from the index when you pick it, which takes a moment."
+            // The two paths still exist (`onCellDown` above) and the cell's
+            // own title still says "read from the index"; only this line of
+            // prose is gone.
+            <span />
           ) : (
             <span>
               Months before {MONTH_NAMES[grid.windowMinIdx % 12]} {Math.floor(grid.windowMinIdx / 12)} are the opening

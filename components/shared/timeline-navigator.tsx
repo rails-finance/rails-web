@@ -40,6 +40,17 @@
 // The panel CLOSES on a pick, either path (Miles, 2026-09-25): the reader
 // asked for rows, and a map left standing over them is in the way.
 //
+// ⚠️ ON THE picker-inline REVIEW BRANCH (Miles, 2026-09-25) this panel
+// differs from the paragraphs above in three ways, for comparison only, not
+// a decision: the typed spread (the two date inputs) is gone on both the
+// desktop panel and the phone sheet, the grid is the only filter; the
+// density key is gone and Reset sits where it stood, same on both; and on
+// the DESKTOP panel only, a pick no longer closes it, so a reader can click
+// through several months in a row — it closes on a second press of the Date
+// button, or stays as it is on Reset (which did not close it before this
+// branch either). The phone sheet still closes on a pick. See
+// `timeline-toolbar.tsx`'s desktop branch for the close-on-pick wiring.
+//
 // ⚠️ THE SIGNIFICANCE MARKS ARE GONE, 2026-09-25, everywhere: the
 // liquidation dot, the owner-signed underline, the market-note ring, their
 // legend and the builder behind them (`lib/shared/timeline-navigator.ts`,
@@ -98,7 +109,6 @@
 // the page's own state and writes no query of its own.
 
 import { useMemo } from "react";
-import { DensityRamp } from "@/components/shared/transaction-heatmap";
 // The grid itself through the LAZY boundary: this panel only ever renders
 // after a press on the Date button, so no detail route should carry the
 // heatmap in its initial bundle. The legend and the ramp are a few lines of
@@ -108,25 +118,6 @@ import { TransactionHeatmap } from "@/components/shared/transaction-heatmap-lazy
 import { RESET_LINK } from "@/lib/shared/ui-grammar";
 import { lifeExtent } from "@/lib/shared/timeline-segments";
 import type { TimelineEventsState } from "@/hooks/useTimelineEvents";
-
-const SECONDS_PER_DAY = 86_400;
-
-/** A UTC calendar day as the wire value a native `date` input takes. The
- *  input renders it in the viewer's own locale, which is the one date on the
- *  page not formatted by us — it is a field, not a statement. */
-const isoUtcDay = (unix: number): string => new Date(unix * 1000).toISOString().slice(0, 10);
-
-/** The other direction: `YYYY-MM-DD` → the first second of that UTC day.
- *  Null on anything else, including the empty string a cleared field gives. */
-const utcDayStart = (iso: string): number | null => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) return null;
-  const ts = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 1000;
-  return Number.isFinite(ts) ? ts : null;
-};
-
-const DATE_FIELD =
-  "rounded-md bg-raised px-2 py-1 text-xs tabular-nums text-foreground focus-ring [color-scheme:light] dark:[color-scheme:dark]";
 
 /** The position's whole life in seconds, over ALL THREE contributors to the
  *  history — the loaded rows, the served folders' own day histogram and the
@@ -227,8 +218,6 @@ export function TimelineNavigatorPanel({ tl, inSheet, reach, onPicked }: Timelin
   if (!life) return null;
 
   const value = tl.dateRange;
-  const from = isoUtcDay(value ? value[0] : life.first);
-  const to = isoUtcDay(value ? value[1] : life.last);
   /** Anything to go back FROM: a typed or clicked filter, or a segment the
    *  page read. Reset returns the rows the page opened with, both at once. */
   const resettable = value != null || reach?.onReset != null;
@@ -237,56 +226,8 @@ export function TimelineNavigatorPanel({ tl, inSheet, reach, onPicked }: Timelin
     reach?.onReset?.();
   };
 
-  /** Both ends at once, because a range is one fact. One end alone is a single
-   *  day — the reader has said WHEN, not yet how long — and the two ends in
-   *  the wrong order are the same span typed backwards, so they are ordered
-   *  rather than refused. The later end runs to the close of its own day,
-   *  which is the form every other date selection on the page takes. */
-  const commit = (nextFrom: string, nextTo: string) => {
-    const a = utcDayStart(nextFrom);
-    const b = utcDayStart(nextTo);
-    if (a == null && b == null) {
-      tl.setDateRange(null);
-      return;
-    }
-    const one = (a ?? b) as number;
-    const other = (b ?? a) as number;
-    tl.setDateRange([Math.min(one, other), Math.max(one, other) + (SECONDS_PER_DAY - 1)]);
-  };
-
   return (
     <div data-timeline-navigator="">
-      {/* The header: the spread on the left, Reset on the right. No count —
-          the control strip's own is still on screen just above the panel. */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div data-date-span-picker="" className="flex items-center gap-2">
-          <input
-            type="date"
-            data-date-from=""
-            aria-label="From date"
-            value={from}
-            onChange={(e) => commit(e.target.value, to)}
-            className={DATE_FIELD}
-          />
-          <span aria-hidden className="text-xs text-rb-500">
-            –
-          </span>
-          <input
-            type="date"
-            data-date-to=""
-            aria-label="To date"
-            value={to}
-            onChange={(e) => commit(from, e.target.value)}
-            className={DATE_FIELD}
-          />
-        </div>
-        {!inSheet && resettable && (
-          <button type="button" onClick={resetAll} className={RESET_LINK}>
-            Reset
-          </button>
-        )}
-      </div>
-
       <TransactionHeatmap
         events={events}
         priorDays={priorDays}
@@ -312,9 +253,17 @@ export function TimelineNavigatorPanel({ tl, inSheet, reach, onPicked }: Timelin
         select="single"
       />
 
-      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-        <DensityRamp />
-      </div>
+      {/* The heat legend stood here; Reset takes its place (Miles,
+          2026-09-25). The grid is the only date filter now, so the one thing
+          left to offer beside it is a way back. Withheld in the sheet, whose
+          own header carries Reset already. */}
+      {!inSheet && resettable && (
+        <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+          <button type="button" onClick={resetAll} className={RESET_LINK}>
+            Reset
+          </button>
+        </div>
+      )}
     </div>
   );
 }
