@@ -652,7 +652,15 @@ export function TimelineToolbar({
             </div>
           </MobileSheet>
         ) : (
-          <div data-nav-dropdown="" className="overlay-panel absolute inset-x-0 top-full z-40 mt-2 p-3">
+          // Local review variant (picker-inline branch, Miles, 2026-09-25),
+          // for comparison against the floating dropdown decision 0019
+          // describes. In flow rather than `absolute`/`top-full`/`z-40`, so
+          // the panel takes real height here and pushes the rows below it
+          // down instead of floating over them. Same panel, same
+          // `data-nav-dropdown` hook, same open/close state
+          // (`tl.heatmapOpen`); only the positioning classes differ from the
+          // dropdown it replaces for this review. Not a decision.
+          <div data-nav-dropdown="" className="overlay-panel mt-2 p-3">
             <TimelineNavigatorPanel tl={tl} reach={monthReach} onPicked={tl.toggleHeatmap} />
           </div>
         ))}
