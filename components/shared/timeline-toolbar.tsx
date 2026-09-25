@@ -668,7 +668,13 @@ export function TimelineToolbar({
           // press of the Date button (`tl.toggleHeatmap`, wired below) or
           // when Reset already closed it, which it did not before this
           // change either. The phone sheet keeps closing on pick.
-          <div data-nav-dropdown="" className="overlay-panel mt-2 p-3">
+          //
+          // `shadow-none` (Miles, 2026-09-25): `overlay-panel` carries
+          // `shadow-xl` for the floating dropdown it usually is; sitting in
+          // flow here, a shadow reads as a card standing off the page rather
+          // than a section of it, so this variant drops just the shadow and
+          // keeps the class's background, border and rounded corners.
+          <div data-nav-dropdown="" className="overlay-panel shadow-none mt-2 p-3">
             <TimelineNavigatorPanel tl={tl} reach={monthReach} />
           </div>
         ))}

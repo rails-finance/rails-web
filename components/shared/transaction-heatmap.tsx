@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { Check } from "lucide-react";
 import { RESET_LINK } from "@/lib/shared/ui-grammar";
 // The life reduced to months, on the same `year * 12 + month` key this grid
 // has always used for a cell.
@@ -859,6 +860,14 @@ function MonthsHeatmap({
               const reachable = cell.summarised && reachMonth != null;
               const selectable = cell.inLifetime && !isEmpty(cell.count) && (!cell.summarised || reachable);
               const isCurrent = currentMonth != null && cell.idx === currentMonth;
+              // The picked cell, either path — the one thing that needs to
+              // read as PICKED rather than merely busy, since the wash
+              // already carries a colour of its own. A plain ring in the
+              // wash's own hue disappeared into a dark cell (Miles,
+              // 2026-09-25); the ink ring and the tick are both in
+              // `text-rb-500`, the grid's own label colour, which the wash
+              // never uses.
+              const picked = selectable && (inSelection(cell) || isCurrent);
               const label = `${MONTH_NAMES[cell.idx % 12]} ${Math.floor(cell.idx / 12)} · ${cell.count} event${cell.count === 1 ? "" : "s"}`;
               const title = !cell.inLifetime
                 ? ""
@@ -881,8 +890,17 @@ function MonthsHeatmap({
                   title={title}
                   onMouseDown={() => onCellDown(cell)}
                   onMouseEnter={() => onCellEnter(cell)}
-                  className={`relative h-5 rounded-sm transition-colors ${cls} ${selectable && (inSelection(cell) || isCurrent) ? "ring-1 ring-teal-400" : ""} ${selectable ? "cursor-pointer" : ""}`}
-                />
+                  className={`relative h-5 rounded-sm transition-colors ${cls} ${picked ? "ring-2 ring-rb-500" : ""} ${selectable ? "cursor-pointer" : ""}`}
+                >
+                  {picked && (
+                    <Check
+                      aria-hidden
+                      size={10}
+                      strokeWidth={3}
+                      className="pointer-events-none absolute right-0.5 top-1/2 -translate-y-1/2 text-rb-500"
+                    />
+                  )}
+                </div>
               );
             })}
           </Fragment>
