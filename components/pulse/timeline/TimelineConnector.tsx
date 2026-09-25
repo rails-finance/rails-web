@@ -15,11 +15,11 @@ export function isDashedConnector(event: TimelineEvent): boolean {
   return isThirdParty(event.author);
 }
 
-// Matches the position timeline spine (spine-column.tsx's SPINE_COLORS.default,
-// rb-500): rb-300 light / rb-500 dark. (Was a one-off dark hex, off-grammar;
-// then rb-700, which read too close to the rb-800 dark canvas to be visible,
-// TO-DO-ui-jobs #44.)
-const CONNECTOR_COLOR_CLASS = "text-rb-300 dark:text-rb-500";
+// A hairline at the width of the position timeline spine (spine-column.tsx,
+// w-px): rb-400 light / rb-500 at 70% dark. (Was a one-off dark hex,
+// off-grammar; then rb-700, which read too close to the rb-800 dark canvas to
+// be visible, TO-DO-ui-jobs #44.)
+const CONNECTOR_COLOR_CLASS = "text-rb-400 dark:text-rb-500/70";
 
 export function TimelineConnector({
   event,
@@ -37,39 +37,38 @@ export function TimelineConnector({
   if (!showTopConnection && !showBottomConnection) {
     return (
       <div className={`relative h-full ${CONNECTOR_COLOR_CLASS}`}>
-        <svg width="4" height="32" className="timeline-line">
-          <line x1="2" y1="0" x2="2" y2="32" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+        <svg width="1" height="32" className="timeline-line">
+          <line x1="0.5" y1="0" x2="0.5" y2="32" stroke="currentColor" strokeWidth="1" />
         </svg>
       </div>
     );
   }
 
   if (dashed) {
-    const dotSpacing = 8.2;
-    const dotRadius = 2;
+    const dotSpacing = 6;
+    const dotRadius = 0.5;
 
     return (
-      <svg width="4" height="100%" className={`timeline-line ${CONNECTOR_COLOR_CLASS}`} style={{ overflow: "visible" }}>
+      <svg width="1" height="100%" className={`timeline-line ${CONNECTOR_COLOR_CLASS}`} style={{ overflow: "visible" }}>
         <defs>
           <pattern
             id={`dots-${event.id}`}
             x="0"
             y={dotRadius}
-            width="4"
+            width="1"
             height={dotSpacing}
             patternUnits="userSpaceOnUse"
           >
-            <circle cx="2" cy={dotSpacing / 2} r={dotRadius} fill="currentColor" />
+            <circle cx="0.5" cy={dotSpacing / 2} r={dotRadius} fill="currentColor" />
           </pattern>
         </defs>
         <line
-          x1="2"
+          x1="0.5"
           y1={showTopConnection ? "0%" : "0"}
-          x2="2"
+          x2="0.5"
           y2={showBottomConnection ? "100%" : "20"}
           stroke={`url(#dots-${event.id})`}
-          strokeWidth="4"
-          strokeLinecap="round"
+          strokeWidth="1"
         />
       </svg>
     );
@@ -77,15 +76,14 @@ export function TimelineConnector({
 
   return (
     <div className={`relative h-full ${CONNECTOR_COLOR_CLASS}`}>
-      <svg width="4" height="100%" viewBox="0 0 4 100" preserveAspectRatio="none" className="timeline-line">
+      <svg width="1" height="100%" viewBox="0 0 1 100" preserveAspectRatio="none" className="timeline-line">
         <line
-          x1="2"
+          x1="0.5"
           y1={showTopConnection ? "0%" : "0"}
-          x2="2"
+          x2="0.5"
           y2={showBottomConnection ? "100%" : "20"}
           stroke="currentColor"
-          strokeWidth="4"
-          strokeLinecap="round"
+          strokeWidth="1"
         />
       </svg>
     </div>
