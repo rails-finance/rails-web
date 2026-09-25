@@ -20,6 +20,7 @@
 // for, §47) always draws, dust or not, and is never counted in that line.
 
 import { useState, type ReactNode } from "react";
+import { ToggleLeft, ToggleRight } from "lucide-react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { StatCard, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
 import { PositionRow, fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
@@ -149,6 +150,29 @@ function NotAvailable() {
   return <span className="text-sm text-rb-500">Not available at this block</span>;
 }
 
+/** One state of the collateral switch — an icon, not the word (rails-ops
+ *  TO-DO-ui-jobs §53): accent blue when on, the block's muted secondary grey
+ *  when off, never red (off is a setting, not a fault). The word rides behind
+ *  it as the hover title and the accessible label, and the receipt that
+ *  opened from the word opens from the icon now. */
+function CollateralIcon({ sym, when, on, coords }: { sym: string; when: When; on: boolean; coords: V3Coords }) {
+  const label = on ? "Collateral on" : "Collateral off";
+  const Icon = on ? ToggleRight : ToggleLeft;
+  return (
+    <Prov info={collateralFlagProv(sym, when, on, coords)} value={on ? "on" : "off"}>
+      <span title={label} className="inline-flex items-center">
+        <Icon
+          size={16}
+          className={on ? "text-blue-500" : "text-rb-500"}
+          aria-label={label}
+          role="img"
+          data-collateral={on ? "on" : "off"}
+        />
+      </span>
+    </Prov>
+  );
+}
+
 /** The collateral switch beside a supplied reserve, before → after where it
  *  flipped. */
 function CollateralSwitch({
@@ -160,21 +184,15 @@ function CollateralSwitch({
   flag: { before: boolean; after: boolean };
   coords: V3Coords;
 }) {
-  const word = (when: When) => (
-    <Prov info={collateralFlagProv(sym, when, flag[when], coords)} value={flag[when] ? "on" : "off"}>
-      {flag[when] ? "on" : "off"}
-    </Prov>
-  );
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-rb-500" data-collateral={flag.after ? "on" : "off"}>
-      Collateral
+    <span className="inline-flex items-center gap-1">
       {flag.before !== flag.after && (
         <>
-          {word("before")}
+          <CollateralIcon sym={sym} when="before" on={flag.before} coords={coords} />
           <TransitionArrow size="sm" />
         </>
       )}
-      {word("after")}
+      <CollateralIcon sym={sym} when="after" on={flag.after} coords={coords} />
     </span>
   );
 }

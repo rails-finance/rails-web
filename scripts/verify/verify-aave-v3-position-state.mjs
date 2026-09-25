@@ -446,18 +446,29 @@ for (const fx of FIXTURES) {
         const amount = fmtAmount(humanOf(leg.after, r.decimals));
         const usd =
           r.priceBase && big(leg.after) > BigInt(0) ? fmtUsd(rawToUsd(leg.after, r.priceBase, r.decimals)) : null;
-        const line = texts.find((t) => t.includes(amount) && (!usd || t.includes(usd)));
+        const lineIdx = texts.findIndex((t) => t.includes(amount) && (!usd || t.includes(usd)));
         check(
           `${fx.label}: ${side} line for ${r.symbol} reads ${amount}${usd ? ` and ${usd}` : ""}`,
-          !!line,
+          lineIdx !== -1,
           texts.join(" | "),
         );
-        if (side === "supply" && r.collateral && line)
+        // The collateral flag is a switch icon, not the word (§53): the icon
+        // carries its own data-collateral and aria-label ("Collateral on" /
+        // "Collateral off"), the row's after state (its last icon when the
+        // flag flipped across the event and both before and after draw).
+        if (side === "supply" && r.collateral && lineIdx !== -1) {
+          const want = r.collateral.after ? "on" : "off";
+          const icons = lines.nth(lineIdx).locator("[data-collateral]");
+          const count = await icons.count();
+          const afterIcon = icons.nth(Math.max(0, count - 1));
+          const dataVal = count > 0 ? await afterIcon.getAttribute("data-collateral") : null;
+          const ariaVal = count > 0 ? await afterIcon.getAttribute("aria-label") : null;
           check(
-            `${fx.label}: ${r.symbol} collateral reads ${r.collateral.after ? "on" : "off"}`,
-            new RegExp(`Collateral.*${r.collateral.after ? "on" : "off"}$`).test(line),
-            line,
+            `${fx.label}: ${r.symbol} collateral icon reads ${want}`,
+            dataVal === want && ariaVal === `Collateral ${want}`,
+            `data-collateral=${dataVal} aria-label=${ariaVal}`,
           );
+        }
       }
 
       const dustButton = scope.locator("[data-dust-hidden]");
