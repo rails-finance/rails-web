@@ -16,11 +16,20 @@
 // RULE (§52): a reserve row whose priced after-balance is under a cent is dust,
 // whatever its collateral flag — a row with no price is held, not dust. Dust
 // rows sit behind a "N dust reserve(s) hidden" line per side, local state, not
-// persisted. The reserve an event touched (the one the grid above gives way
-// for, §47) always draws, dust or not, and is never counted in that line.
+// persisted, counting hidden rows across both collateral groups (§54). The
+// reserve an event touched (the one the grid above gives way for, §47) always
+// draws, dust or not, and is never counted in that line.
+//
+// RULE (§54): the Supplied panel lists its reserves under two sub-headings,
+// "Collateral on" then "Collateral off", by each reserve's AFTER-state flag; an
+// empty group draws no heading. A row whose flag flipped on the event carries a
+// short muted "was on" / "was off" holding the receipt the icon used to carry
+// (collateralFlagProv). A row that did not flip has no per-row flag icon or
+// words; its flag receipt rides on the row's own after-balance receipt instead
+// (see `withFlagNote` below) rather than a new per-heading receipt, since
+// `collateralFlagProv` names one reserve and a heading can list several.
 
 import { useState, type ReactNode } from "react";
-import { ToggleLeft, ToggleRight } from "lucide-react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { StatCard, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
 import { PositionRow, fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
@@ -150,32 +159,18 @@ function NotAvailable() {
   return <span className="text-sm text-rb-500">Not available at this block</span>;
 }
 
-/** One state of the collateral switch — an icon, not the word (rails-ops
- *  TO-DO-ui-jobs §53): accent blue when on, the block's muted secondary grey
- *  when off, never red (off is a setting, not a fault). The word rides behind
- *  it as the hover title and the accessible label, and the receipt that
- *  opened from the word opens from the icon now. */
-function CollateralIcon({ sym, when, on, coords }: { sym: string; when: When; on: boolean; coords: V3Coords }) {
-  const label = on ? "Collateral on" : "Collateral off";
-  const Icon = on ? ToggleRight : ToggleLeft;
-  return (
-    <Prov info={collateralFlagProv(sym, when, on, coords)} value={on ? "on" : "off"}>
-      <span title={label} className="inline-flex items-center">
-        <Icon
-          size={16}
-          className={on ? "text-blue-500" : "text-rb-500"}
-          aria-label={label}
-          role="img"
-          data-collateral={on ? "on" : "off"}
-        />
-      </span>
-    </Prov>
-  );
-}
+/** A supplied reserve is placed under its after-state group heading (rails-ops
+ *  TO-DO-ui-jobs §54), so the group itself states the after flag; no per-row
+ *  icon or words repeat it. */
+type CollateralGroup = "on" | "off";
+const collateralGroup = (on: boolean): CollateralGroup => (on ? "on" : "off");
+const COLLATERAL_GROUP_LABEL: Record<CollateralGroup, string> = { on: "Collateral on", off: "Collateral off" };
 
-/** The collateral switch beside a supplied reserve, before → after where it
- *  flipped. */
-function CollateralSwitch({
+/** The muted "was on" / "was off" a row carries only where its flag flipped on
+ *  the event — the receipt the icon used to carry (§53), now on this text
+ *  (§54). `data-collateral-flip` is the AFTER state, matching the group the
+ *  row now sits under. */
+function CollateralFlipNote({
   sym,
   flag,
   coords,
@@ -184,17 +179,25 @@ function CollateralSwitch({
   flag: { before: boolean; after: boolean };
   coords: V3Coords;
 }) {
+  const was = flag.before ? "on" : "off";
   return (
-    <span className="inline-flex items-center gap-1">
-      {flag.before !== flag.after && (
-        <>
-          <CollateralIcon sym={sym} when="before" on={flag.before} coords={coords} />
-          <TransitionArrow size="sm" />
-        </>
-      )}
-      <CollateralIcon sym={sym} when="after" on={flag.after} coords={coords} />
-    </span>
+    <Prov info={collateralFlagProv(sym, "before", flag.before, coords)} value={was}>
+      <span className="text-xs text-rb-500" data-collateral-flip={flag.after ? "on" : "off"}>
+        was {was}
+      </span>
+    </Prov>
   );
+}
+
+/** A row whose flag did not flip carries no separate flag receipt (§54): the
+ *  group heading it sits under already states the after flag, and a
+ *  per-heading receipt would misname `collateralFlagProv`'s one reserve when a
+ *  group lists several. Instead the flag's receipt rides on this same row's
+ *  after-balance receipt, so opening it still proves the flag along with the
+ *  balance — no new receipt shape, no new row UI. */
+function withFlagNote(prov: Provenance, sym: string, on: boolean, coords: V3Coords): Provenance {
+  const flag = collateralFlagProv(sym, "after", on, coords);
+  return { ...prov, summary: `${prov.summary} ${flag.summary}` };
 }
 
 /** The reserve's after-balance in USD at this side, or null where it isn't
@@ -231,6 +234,10 @@ function ReserveLine({
   const after = humanOf(leg.after, decimals);
   const moved = legChange(leg, decimals);
   const sign = moved.sign < 0 ? "−" : "+";
+  const flag = side === "supply" ? r.collateral : null;
+  const flipped = !!flag && flag.before !== flag.after;
+  let afterProv = exactBalanceProv(sym, side, "after", coords, exactLeg(leg, "after", decimals, state.blockTimestamp));
+  if (flag && !flipped) afterProv = withFlagNote(afterProv, sym, flag.after, coords);
   return (
     <PositionRow
       symbol={sym}
@@ -239,7 +246,7 @@ function ReserveLine({
       amount={after}
       before={before}
       isChanged={moved.sign !== 0}
-      afterProv={exactBalanceProv(sym, side, "after", coords, exactLeg(leg, "after", decimals, state.blockTimestamp))}
+      afterProv={afterProv}
       beforeProv={exactBalanceProv(
         sym,
         side,
@@ -251,11 +258,40 @@ function ReserveLine({
       deltaText={`${sign}${fmtPositionAmount(moved.magnitude)}`}
       exact={{ after: groupExact(after), before: groupExact(before), delta: `${sign}${groupExact(moved.magnitude)}` }}
       usd={exactUsd(state, r, side, "after", coords)}
-      trailing={
-        side === "supply" && r.collateral ? <CollateralSwitch sym={sym} flag={r.collateral} coords={coords} /> : null
-      }
+      trailing={flipped && flag ? <CollateralFlipNote sym={sym} flag={flag} coords={coords} /> : null}
       dust={dust}
     />
+  );
+}
+
+/** One "Collateral on" / "Collateral off" group inside the Supplied panel
+ *  (§54): an empty group draws no heading. Dust rows are the caller's
+ *  concern — this just places whichever rows it is given. */
+function CollateralGroupBlock({
+  group,
+  rows,
+  state,
+  coords,
+  showDust,
+  touched,
+}: {
+  group: CollateralGroup;
+  rows: AaveV3PositionStateReserve[];
+  state: AaveV3PositionState;
+  coords: V3Coords;
+  showDust: boolean;
+  touched: Set<string>;
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1" data-collateral-group={group}>
+      <div className="text-[11px] font-semibold text-rb-500">{COLLATERAL_GROUP_LABEL[group]}</div>
+      {rows.map((r) => {
+        const dust = !touched.has(r.reserve) && isDustRow(r, "supply");
+        if (dust && !showDust) return null;
+        return <ReserveLine key={r.reserve} state={state} r={r} side="supply" coords={coords} dust={dust} />;
+      })}
+    </div>
   );
 }
 
@@ -275,28 +311,54 @@ function ReserveList({
   if (rows.length === 0) return <span className="text-sm text-rb-500">None</span>;
 
   // The touched reserve always draws, dust or not, and never joins the count
-  // behind the toggle (§52).
-  const dustRows = rows.filter((r) => !touched.has(r.reserve) && isDustRow(r, side));
-  const shownRows = rows.filter((r) => touched.has(r.reserve) || !isDustRow(r, side));
+  // behind the toggle (§52), which counts across both groups (§54).
+  const dustCount = rows.filter((r) => !touched.has(r.reserve) && isDustRow(r, side)).length;
+
+  // A reserve is placed by its AFTER-state flag (§54); grouping needs every
+  // held reserve's flag known, which tracks whether the block's own settings
+  // read landed (sources.settings). Where it did not, the flat list stands, as
+  // it always has, alongside the "Collateral on/off isn't available" note.
+  const canGroup = side === "supply" && rows.every((r) => r.collateral != null);
+
+  const body = canGroup ? (
+    <div className="flex flex-col gap-2">
+      <CollateralGroupBlock
+        group="on"
+        rows={rows.filter((r) => collateralGroup(r.collateral!.after) === "on")}
+        state={state}
+        coords={coords}
+        showDust={showDust}
+        touched={touched}
+      />
+      <CollateralGroupBlock
+        group="off"
+        rows={rows.filter((r) => collateralGroup(r.collateral!.after) === "off")}
+        state={state}
+        coords={coords}
+        showDust={showDust}
+        touched={touched}
+      />
+    </div>
+  ) : (
+    rows.map((r) => {
+      const dust = !touched.has(r.reserve) && isDustRow(r, side);
+      if (dust && !showDust) return null;
+      return <ReserveLine key={r.reserve} state={state} r={r} side={side} coords={coords} dust={dust} />;
+    })
+  );
 
   return (
     <div className="flex flex-col gap-1" data-position-reserves={side}>
-      {shownRows.map((r) => (
-        <ReserveLine key={r.reserve} state={state} r={r} side={side} coords={coords} />
-      ))}
-      {dustRows.length > 0 && (
-        <>
-          {showDust &&
-            dustRows.map((r) => <ReserveLine key={r.reserve} state={state} r={r} side={side} coords={coords} dust />)}
-          <button
-            type="button"
-            className="self-start text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700"
-            data-dust-hidden={dustRows.length}
-            onClick={() => setShowDust((v) => !v)}
-          >
-            {showDust ? "Hide dust" : `${dustRows.length} dust reserve${dustRows.length === 1 ? "" : "s"} hidden`}
-          </button>
-        </>
+      {body}
+      {dustCount > 0 && (
+        <button
+          type="button"
+          className="self-start text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700"
+          data-dust-hidden={dustCount}
+          onClick={() => setShowDust((v) => !v)}
+        >
+          {showDust ? "Hide dust" : `${dustCount} dust reserve${dustCount === 1 ? "" : "s"} hidden`}
+        </button>
       )}
     </div>
   );
