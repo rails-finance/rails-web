@@ -58,19 +58,29 @@
 // is not there yet — Moonwell Base 0x4bb3…0544 lands at 11.2 s. It now waits
 // for the card, and for the not-found notice, and prints the elapsed time when
 // the wait runs long. The third was `spark-folders`, whose count line read
-// "Showing 1,004 listed" under load where a settled page reads "Showing 1,000
-// rows of 29,513 events": that is the page saying its lifetime figures have
-// not landed, not a page that failed to group. The served-folders arm waits
-// for the page's own settled marker now (`scripts/lib/timeline-draw.mjs`), and
-// where it never settles the two checks that read the line are reported UNRUN
-// instead of red.
+// "Showing 1,004 listed" under load where a settled page then read "Showing
+// 1,000 rows of 29,513 events": that is the page saying its lifetime figures
+// have not landed, not a page that failed to group. The served-folders arm
+// waits for the page's own settled marker now (`scripts/lib/timeline-draw.mjs`),
+// and where it never settles the two checks that read the line are reported
+// UNRUN instead of red.
+//   (The settled form quoted there is the 2026-09-20 one. Decision 0019's
+// amendment of 2026-09-24 retired it: a settled line reads "29,513 events ·
+// loaded 20 Aug 2026 to 25 Sept 2026" and names no cap. The mid-settle form,
+// which is the subject of the note, is unchanged.)
 //
 // Run:
 //   BASE=http://localhost:3101 node scripts/verify/verify-event-share.mjs
 //   BASE=http://localhost:3101 FAMILIES=spark,fluid node scripts/verify/verify-event-share.mjs
 
 import { chromium } from "playwright";
-import { exhaustPaging, waitForCountSettled } from "../lib/timeline-draw.mjs";
+import {
+  exhaustPaging,
+  waitForCountSettled,
+  countLineText,
+  parseCountLine,
+  NAMES_THE_CAP,
+} from "../lib/timeline-draw.mjs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
@@ -837,7 +847,16 @@ async function verifyServedFolders(name, { listingPath, rowHrefRe, apiPath, para
   // prose it was left with (§38; it was read as a defect for a day).
   const settled = await waitForCountSettled(page, { timeout: 45000 });
   const bodyText = await page.locator("body").innerText();
-  const countLine = bodyText.split("\n").find((l) => l.startsWith("Showing")) ?? "";
+  // ⚠️ READ THE LINE OFF ITS OWN ELEMENT, not by scanning the body for a line
+  // that starts with "Showing". Decision 0019's amendment of 2026-09-24 took
+  // the cap off the reader's face and the settled line now OPENS with the
+  // life's total ("7,161 events · loaded 20 Jan 2025 to 24 Sept 2026"), so
+  // from that day the scan found nothing, check 1 fell to the "no count line"
+  // branch and printed a note instead of judging, and check 2's total quietly
+  // reverted to the answer fetched moments earlier — the drift this file was
+  // corrected for on 2026-09-11 (TO-DO-ui-jobs §58).
+  const countLine = (await countLineText(page)) ?? "";
+  const counts = parseCountLine(countLine);
   if (settled === "pending") {
     console.log(
       `SKIP  ${name} — the count line never left "pending" inside 45 s: the position's lifetime\n` +
@@ -847,22 +866,26 @@ async function verifyServedFolders(name, { listingPath, rowHrefRe, apiPath, para
         "      Checks 3, 5 and 8 below do not read the line and run as normal.",
     );
   }
-  // The line states ROWS only where rows and events differ. A position served
-  // whole with a folder or two still has fewer rows than events, but one
-  // served whole with NO cut may carry no count line at all — so the assertion
-  // is conditional on there being a line, and on the answer having been cut.
+  // WHAT THE LINE STATES NOW (decision 0019 §3, amended 2026-09-24): the
+  // life's total, literally, and the span the loaded rows cover — never the
+  // grain of the cut, which "Showing N rows of M events" used to name and
+  // which rule 2 forbids ("never stated to the reader as a number"). So the
+  // rows/events distinction has left the line, and what is left to hold is
+  // that the total on the page IS the position's. A page served whole with
+  // nothing cut states the total alone and no span, which is the same check
+  // with one fewer clause.
   if (settled === "pending") {
-    // handled above — the line is the mid-settle one and states no ratio
+    // handled above — the line is the mid-settle one and states no total
   } else if (countLine) {
     check(
-      `${name}: the count line states ROWS against the position's events (1)`,
-      answer.eventsServed === answer.rowPlan.length
-        ? /Showing [\d,]+ of [\d,]+ events/.test(countLine)
-        : /Showing [\d,]+ rows of [\d,]+ events/.test(countLine),
-      countLine,
+      `${name}: the count line states a lifetime total and names no cap (1)`,
+      counts != null && counts.total != null && !NAMES_THE_CAP.test(bodyText),
+      `"${countLine}"${counts == null ? " — matched no form the toolbar writes" : ""}` +
+        `${counts?.span ? `, span ${counts.span}` : ""}` +
+        `${NAMES_THE_CAP.test(bodyText) ? `; the page names the cap: "${NAMES_THE_CAP.exec(bodyText)?.[0]}"` : ""}`,
     );
   } else {
-    console.log(`      (${name}: no count line — the position is served whole with nothing cut)`);
+    check(`${name}: the count line is on the page at all (1)`, false, "no count line element");
   }
 
   // 2 — numbering runs over the WHOLE history and closes at the top: the
@@ -874,7 +897,7 @@ async function verifyServedFolders(name, { listingPath, rowHrefRe, apiPath, para
   // rather than on anything about numbering. The page's own count line is the
   // total that the page's own numbering must close against.
   if (settled !== "pending") {
-    const totalOnPage = Number((countLine.match(/of ([\d,]+) events/)?.[1] ?? "").replace(/,/g, ""));
+    const totalOnPage = counts?.total ?? NaN;
     const total = Number.isFinite(totalOnPage) && totalOnPage > 0 ? totalOnPage : answer.totalEvents;
     check(
       `${name}: the newest row is numbered the position's total (2)`,

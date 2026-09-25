@@ -154,9 +154,19 @@ async function runFixture(browser, fx) {
   // against the very figures it is supposed to carry, and the snapshot would
   // then be checked in its window-only state and look like a code defect.
   //
-  // ⚠️ OR FOR THE COUNT LINE'S "Showing L of T events" FORM, whichever comes
-  // first. When the server rendered the opening balance the browser never asks
-  // for it, and waiting on the response alone spent its full 180 s per page.
+  // ⚠️ OR FOR THE COUNT LINE HAVING SETTLED, whichever comes first. When the
+  // server rendered the opening balance the browser never asks for it, and
+  // waiting on the response alone spent its full 180 s per page.
+  //
+  // ⚠️⚠️ THAT SECOND LEG WAITED ON A RETIRED SHAPE. It looked for the count
+  // line's "Showing L of T events" form, which decision 0019's amendment of
+  // 2026-09-24 retired ("the page states time, not the cap") — so from that
+  // day it matched nothing, never resolved, and the race fell back to the
+  // response leg's full 180 s on exactly the server-rendered pages it was
+  // added to spare. A gate that has stopped gating looks like a slow page
+  // (TO-DO-ui-jobs §58). The page states the same fact as a marker, and a
+  // marker is not a shape: `data-timeline-total` leaves "pending" when the
+  // lifetime figures are in hand, whatever words the line is built from.
   const summarySeen = page
     .waitForResponse((r) => r.url().includes(`/api/${PROTO}/timeline/summary`), { timeout: 180000 })
     .catch(() => null);
@@ -167,10 +177,10 @@ async function runFixture(browser, fx) {
     .waitFor({ timeout: 180000 });
   const balanceLine = page
     .waitForFunction(
-      () =>
-        [...document.querySelectorAll("span.tabular-nums")].some((el) =>
-          /^Showing [\d,]+ of [\d,]+ events?$/.test((el.textContent || "").trim()),
-        ),
+      () => {
+        const el = document.querySelector("[data-timeline-total]");
+        return el != null && el.getAttribute("data-timeline-total") !== "pending";
+      },
       null,
       { timeout: 180000 },
     )

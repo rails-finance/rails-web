@@ -215,12 +215,25 @@
 //    B13 `RUN_KINDS` back to the two vault kinds. 48/49. FAIL 2c only.
 //    B14 the two custody directions reversed. 48/49. FAIL 4e only.
 //
+//  ── 2026-09-25 · 1f2 REWRITTEN: it was asserting a retired line ────────────
+//  Decision 0019's amendment of 2026-09-24 retired the "Showing 1,000 of 8,422
+//  events" form — "the page states time, not the cap", and the cap is "never
+//  stated to the reader as a number" (rule 2). From the build that landed it
+//  (web `b5bd31c` · `54e04aa`) this page has read "8,422 events · loaded 17 Oct
+//  2025 to 7 Nov 2025" and 1f2 has been asserting a shape the page no longer
+//  owes. The Ethereum twins were corrected first (`6a41491`); this is the same
+//  fix, and the lesson is the same one: a capture that selects the shape it is
+//  about to assert cannot tell a CHANGED line from a MISSING one and reports
+//  both as ABSENT, so the line is read WHOLE off its own element and the check
+//  holds the whole of it (TO-DO-ui-jobs §58).
+//
 import { chromium } from "playwright";
 import { createPublicClient, http, parseAbi, parseAbiItem, toEventSelector, getAddress } from "viem";
 import { base } from "viem/chains";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { LOADED_SPAN, NAMES_THE_CAP } from "../lib/timeline-draw.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE_URL = process.env.BASE ?? "http://localhost:3761";
@@ -714,9 +727,18 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
   const blockNumber = Number(await attr("[data-vault-block]", "data-vault-block"));
   const rowCountAttr = await attr("[data-vault-timeline-rows]", "data-vault-timeline-rows");
   // On a life cut to the draw window: the life it was cut from, and the
-  // toolbar's count line ("Showing 1,000 of 8,422 events", decision 0019 §3).
+  // toolbar's count line ("8,422 events · loaded 17 Oct 2025 to 7 Nov 2025",
+  // decision 0019 §3 as its 2026-09-24 amendment left it).
   const rowCountOf = await attr("[data-vault-timeline-rows]", "data-vault-timeline-of");
-  const toolbarText = await text("[data-vault-timeline-rows] [data-skel-section='detail-timeline-header']");
+  // ⚠️ READ WHOLE, NOT MATCHED. Until 2026-09-25 the line was pulled out of
+  // the toolbar with a regex for the retired "Showing 1,000 of 8,422 events"
+  // form, so when that form went it read ABSENT and 1f2 failed on a page that
+  // was right. A regex that selects the shape it is about to assert cannot
+  // tell a changed line from a missing one. The line has its own element.
+  // Corrected on the Ethereum twin first (`6a41491`); this is the same fix.
+  const countLineText = await text(
+    "[data-vault-timeline-rows] [data-skel-section='detail-timeline-header'] [data-prov-exempt] span.text-xs.tabular-nums",
+  );
 
   // ── 2026-09-08 · THE ROWS RIDE `ChainTruthTimeline` AND COLLAPSE ─────────
   // A stretch of consecutive same-kind rows is drawn as ONE run row, so the
@@ -808,7 +830,7 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
     blockNumber,
     rowCountAttr: rowCountAttr == null ? null : Number(rowCountAttr),
     rowCountOf: rowCountOf == null ? null : Number(rowCountOf),
-    countLine: /Showing [\d,]+ of (?:at least )?[\d,]+ events/.exec(toolbarText ?? "")?.[0] ?? null,
+    countLine: countLineText,
     collapsed,
     runsPainted,
     domRows,
@@ -1089,19 +1111,29 @@ if (!hOwn) {
         t.events[0].id === newest.id,
       `page ${t.events.length} rows, drawn ${JSON.stringify({ ...drawn, summary: undefined })}; own life ${hOwn.rows.length} rows, own newest ${newest.id}, page head ${t.events[0]?.id}`,
     );
-    // The window SENTENCE is gone (decision 0019): the page states the two
-    // figures in the toolbar's count line and on the rows wrapper. This read
-    // `[data-figure='timeline-window']`, which the Base page stopped drawing
-    // with the rest of them, so it failed on an absence rather than on a
-    // disagreement.
-    const wantLine = `Showing ${wantRows.toLocaleString("en-US")} of ${hOwn.rows.length.toLocaleString("en-US")} events`;
+    // The window SENTENCE is gone (decision 0019), and since the 2026-09-24
+    // amendment so is the "Showing 1,000 of…" count line: the page states the
+    // life's total, literally (§3's counts, which the amendment left standing),
+    // beside the span its loaded rows cover, and the cap is "never stated to
+    // the reader as a number" (rule 2). So the two figures part company — the
+    // window drawn stays on the wrapper, where it is plumbing and not the
+    // reader's, and the line is pinned to a shape with no room for a cap.
+    const wantHead = `${hOwn.rows.length.toLocaleString("en-US")} events`;
+    const gotLine = hPage.countLine ?? "";
+    const spanTail = gotLine.startsWith(wantHead) ? gotLine.slice(wantHead.length) : null;
+    const SPAN_SHAPE = new RegExp(`^ · loaded ${LOADED_SPAN.source}$`);
+    const namesCap = NAMES_THE_CAP.test(hPage.bodyText ?? "");
     check(
-      "1f2 …and the page states both figures on its face — the count line and the wrapper",
-      hPage.countLine === wantLine &&
+      "1f2 …and the page states the whole life and its loaded span on its face, naming no cap, with the window on the wrapper",
+      spanTail !== null &&
+        SPAN_SHAPE.test(spanTail) &&
+        !namesCap &&
         hPage.rowCountAttr === wantRows &&
         hPage.rowCountOf === hOwn.rows.length &&
         hPage.domRows > 0,
-      `count line "${hPage.countLine ?? "ABSENT"}", wanted "${wantLine}"; wrapper ${hPage.rowCountAttr}/${hPage.rowCountOf}; ${hPage.domRows} rows painted`,
+      `count line "${hPage.countLine ?? "ABSENT"}", wanted "${wantHead} · loaded <span>"; ` +
+        `wrapper ${hPage.rowCountAttr}/${hPage.rowCountOf} (want ${wantRows}/${hOwn.rows.length}); ${hPage.domRows} rows painted` +
+        (namesCap ? `; the page names the cap: "${NAMES_THE_CAP.exec(hPage.bodyText)?.[0]}"` : ""),
     );
   }
 }

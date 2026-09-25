@@ -232,16 +232,24 @@ const EVENT = "[data-vault-timeline-rows] [data-event-id]";
 
 const f3Dom = await f3Page.evaluate(
   ({ folderSel, eventSel }) => {
-    const showing = /Showing ([\d,]+) of ([\d,]+) rows/.exec(document.body.innerText);
-    // The "Showing X of Y rows" line is drawn only while the window has more to
-    // reveal. Where it does not, the painted rows ARE all the rows — and the
-    // fallback matters: a grouping that collapsed the whole list into ten
-    // folders has no such line, and a check that read `null` there would fail
-    // with the word "undefined" instead of with the count it found.
+    // ⚠️ THE ROW COUNT COMES OFF THE PAGE'S OWN MARKER, NOT OUT OF ITS PROSE.
+    // Until 2026-09-25 this read "Showing X of Y rows" out of the body text.
+    // No component has written that sentence since decision 0019's amendment
+    // of 2026-09-24 took the cap off the reader's face — and because the read
+    // fell back to the PAINTED rows when it matched nothing, R1a stopped
+    // comparing the page's grouping and started comparing its render window
+    // (50 rows, chunked by `chain-truth-timeline.tsx`), which is 446 short on
+    // this fixture. A capture shaped like the sentence it expects cannot tell
+    // a changed page from a silent one (TO-DO-ui-jobs §58).
+    //   `data-timeline-rows-loaded` is the page stating how many rows it holds,
+    // `-drawn` how many of them are painted; the two differ by the render
+    // window alone. Null where the page carries no timeline at all, which the
+    // checks below report rather than paper over.
+    const marker = document.querySelector("[data-timeline-rows-loaded]");
     const painted = document.querySelectorAll(`${folderSel}, ${eventSel}`).length;
     return {
-      windowed: showing ? Number(showing[1].replace(/,/g, "")) : painted,
-      rows: showing ? Number(showing[2].replace(/,/g, "")) : painted,
+      windowed: marker ? Number(marker.getAttribute("data-timeline-rows-drawn")) : null,
+      rows: marker ? Number(marker.getAttribute("data-timeline-rows-loaded")) : null,
       folders: document.querySelectorAll(folderSel).length,
       painted: document.querySelectorAll(eventSel).length,
       // Document order: a lone event card carries the event's id, a folder
@@ -261,7 +269,8 @@ const f3Dom = await f3Page.evaluate(
 check(
   "R1a the page's own grouped row count is this script's grouping of the route's rows",
   f3Dom.rows === f3Own.length,
-  `page says ${f3Dom.rows?.toLocaleString("en-US")} rows, own grouping gives ${f3Own.length.toLocaleString("en-US")}`,
+  `page holds ${f3Dom.rows?.toLocaleString("en-US") ?? "NO TIMELINE MARKER"} rows (${f3Dom.windowed ?? "?"} painted), ` +
+    `own grouping gives ${f3Own.length.toLocaleString("en-US")}`,
 );
 check(
   "R1b folders are drawn, and the page states fewer rows than the life has events",
