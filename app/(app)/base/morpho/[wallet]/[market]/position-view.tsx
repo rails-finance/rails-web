@@ -20,6 +20,8 @@ import { MorphoPositionCard } from "@/components/protocol/morpho/morpho-position
 import { MorphoRiskSlot } from "@/components/protocol/morpho/morpho-risk-slot";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { isMorphoBaseMarketSegment } from "@/lib/morpho-base/routes";
@@ -121,12 +123,45 @@ export default function MorphoBasePositionView({
   );
   const exportEvents = useMemo(() => (pos ? pos.events.filter(isMorphoEvent) : []), [pos]);
 
+  // The top row's price dropdown — the Ethereum page's treatment on the Base
+  // singleton: the market's own oracle prices the collateral in the market's
+  // loan token, which is the only price Blue states, and the loan token is
+  // that unit rather than a priced asset. The swept position names both tokens
+  // before the live read lands, so the rows stand and only the price waits.
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
+    const collateralSymbol = pos?.collateralSymbol ?? live?.collateralSymbol ?? null;
+    const loanSymbol = pos?.loanSymbol ?? live?.loanSymbol ?? null;
+    if (!loanSymbol) return [];
+    const out: LatestPriceAsset[] = [];
+    if (collateralSymbol) {
+      const oracle = liveClean && liveClean.oraclePrice > 0 ? liveClean.oraclePrice : undefined;
+      out.push({
+        symbol: collateralSymbol,
+        address: pos?.collateralToken ?? live?.collateralToken,
+        price: oracle,
+        unit: oracle ? loanSymbol : undefined,
+        label: `${collateralSymbol} in ${loanSymbol} (the market's own oracle)`,
+      });
+    }
+    out.push({
+      symbol: loanSymbol,
+      address: pos?.loanToken ?? live?.loanToken,
+      label: `${loanSymbol}, the market's loan token`,
+    });
+    return out;
+  }, [pos, live, liveClean]);
+
   return (
     // Every event card's custody line names whichever source answered — the
     // index once it vouches for the whole life, the live sweep until then.
     <CaptureSourceProvider value={captureSource}>
       <div className="py-8 space-y-6">
-        <DetailTopRow session="morpho-base" wallet={wallet}>
+        <DetailTopRow
+          session="morpho-base"
+          wallet={wallet}
+          assets={stripAssets}
+          priceReason={ORACLE_USD_REASON["morpho-base"]}
+        >
           {exportView && (
             <MorphoExportMenu
               view={exportView}
