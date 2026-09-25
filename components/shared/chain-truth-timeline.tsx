@@ -530,11 +530,11 @@ function ServedFolderRow({
           </p>,
         ]
       : shown?.map((m, i) => renderMember(m.event, m.eventNumber, i === shown.length - 1));
-  // Rule 6: "a folder header must be complete about its members". The index
-  // names at most one member that the Σ would otherwise hide; the header says
-  // so, in the index's own noun phrase, rather than leaving the reader to open
-  // a folder they have no reason to open. `other` is the second half of the
-  // same promise — with it the header's parts sum to `count`.
+  // Rule 6 (decision 0019, amended 2026-09-25): "a folder header is complete
+  // about its members" — one sum per kind of event the folder holds, with its
+  // count, and nothing else. `other` is what keeps that promise: with it the
+  // header's parts sum to `count`. The header no longer names a lone standout
+  // member; a reader who wants it opens the folder.
   const extras: ReactNode[] = [];
   if (folder.other > 0) {
     extras.push(
@@ -544,13 +544,6 @@ function ServedFolderRow({
         className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10"
       >
         {folder.other.toLocaleString("en-US")} other
-      </span>,
-    );
-  }
-  if (folder.outlier) {
-    extras.push(
-      <span key="outlier" className="text-xs text-rb-500">
-        including {folder.outlier.label}
       </span>,
     );
   }
