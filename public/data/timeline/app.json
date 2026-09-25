@@ -20,12 +20,12 @@
   },
   {
     "id": "rails-2026-26-explorers-beta",
-    "date": "2026-09-25T13:00:00Z",
+    "date": "2026-09-24T12:00:00Z",
     "type": "milestone",
     "platform": "app",
     "author": "rails.finance",
     "postUrl": "/coverage/ethereum",
-    "content": "Shhh. Quietly launching a major update.",
-    "subtitle": "Our breadth goes from 2 protocols to 26, and the in-house indexer now covers Base and Sepolia alongside Ethereum mainnet. We've slapped a Beta label on while we iron out some kinks."
+    "content": "We have quietly launched a major update.",
+    "subtitle": "Today Rails extended coverage from 2 protocols to 26, now on Base as well as Ethereum."
   }
 ]
