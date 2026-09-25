@@ -30,6 +30,7 @@
 // Σ to state), SHOT=path. Unset, it runs the Aave V3 pilot exactly as before.
 
 import { chromium } from "@playwright/test";
+import { countLineText, parseCountLine, NAMES_THE_CAP } from "../lib/timeline-draw.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const WALLET = (process.env.WALLET ?? "0xee7ca610d896c53ffe716b801c05748efd902954").toLowerCase();
@@ -165,50 +166,83 @@ async function main() {
     // withheld at the cut — the spine's Layers glyph stands there alone
     // (components/shared/timeline-boundary-card.tsx, `TimelineBoundaryRow`).
     // The COUNT survives in exactly one place: the toolbar's count line
-    // (`eventCountLine`), which reads "Showing L listed" while the opening
-    // balance is in flight and "Showing L of T events" once it is in hand —
-    // the lifetime total is never stated from the window alone. So the ready
-    // state is that line's FORM, and the opening balance is T − L.
+    // (`eventCountLine`).
     //
-    // The wait is on the form, not on the figures: a wait on the expected
-    // numbers would time out on wrong ones and report a crash instead of the
-    // checks below. Read from the count SPAN, never the body — the page names
-    // the same figures in prose elsewhere.
-    const READY = /^Showing ([\d,]+) of ([\d,]+) events?$/;
-    const line = await page
+    // ⚠️ AND ITS FORM CHANGED ON 2026-09-24. Decision 0019's amendment retired
+    // "Showing L of T events" — "the page states time, not the cap", and the
+    // preload is "never stated to the reader as a number" (rule 2). The line
+    // now reads "7,161 events · loaded 7 Apr 2026 to 24 Sept 2026": the life's
+    // total, literally, beside the SPAN its loaded rows cover. The window's own
+    // size has left the reader's face altogether, so the two assertions below
+    // are re-pointed rather than dropped — the total is held to the opening
+    // balance plus the window (which is what "T − L === older" was saying), and
+    // the span is held to the timestamps of the very rows the window returned,
+    // which is what "L === loaded" was for. Both expectations are still the
+    // API's own, never the page's.
+    //
+    // ⚠️ AND IT IS READ WHOLE. This waited on a regex for the shape it was
+    // about to assert, so from the day the form changed the wait ran its full
+    // 90 s, the ready check failed on a page that was right, and the two
+    // assertions inside `if (line != null)` judged nought and said nothing
+    // (TO-DO-ui-jobs §58). The line has its own element; the ready state is the
+    // page's own `data-timeline-total` marker, not a shape.
+    const ready = await page
       .waitForFunction(
-        (src) => {
-          const re = new RegExp(src);
-          for (const el of document.querySelectorAll("span.tabular-nums")) {
-            const s = (el.textContent || "").trim();
-            if (re.test(s)) return s;
-          }
-          return false;
+        () => {
+          const el = document.querySelector("[data-timeline-total]");
+          return el != null && el.getAttribute("data-timeline-total") !== "pending";
         },
-        READY.source,
+        null,
         { timeout: 90_000 },
       )
-      .then((h) => h.jsonValue())
-      .catch(() => null);
-    assert(line != null, "the page reaches the opening-balance state", 'no "Showing L of T events" line within 90 s');
+      .then(() => true)
+      .catch(() => false);
+    const line = await countLineText(page);
+    assert(
+      ready,
+      "the page reaches the opening-balance state",
+      `data-timeline-total never left "pending" within 90 s; the line reads ${JSON.stringify(line)}`,
+    );
 
     const text = await page.innerText("body");
 
-    if (line != null) {
-      const [, l, t] = line.match(READY);
-      const listed = Number(l.replace(/,/g, ""));
-      const total = Number(t.replace(/,/g, ""));
+    const parsed = parseCountLine(line);
+    assert(
+      parsed != null,
+      "the count line is one of the forms the toolbar writes",
+      `${JSON.stringify(line ?? "ABSENT")} matched none of them`,
+    );
+    if (ready && parsed != null) {
+      // The whole life, literally, and nothing standing in for the cap.
       assert(
-        listed === loaded,
-        "the count line lists the window the page loaded",
-        `${JSON.stringify(line)} lists ${fmt(listed)}, the window holds ${fmt(loaded)}`,
+        parsed.total === whole,
+        "the count line states the whole position — the opening balance and the window together",
+        `${JSON.stringify(line)} states ${parsed.total == null ? "no total" : fmt(parsed.total)}, ` +
+          `${fmt(older)} + ${fmt(loaded)} = ${fmt(whole)}`,
       );
-      // The line must account for the events the opening balance summarised,
-      // in the page's own digits: what it counts beyond the listed rows.
+      // The span the window covers, in the line's own register, from the
+      // timestamps of the rows the API returned for it. `loaded` rows, oldest
+      // and newest: one date where they sit inside a day.
+      const day = (ts) =>
+        new Date(ts * 1000).toLocaleDateString("en-GB", {
+          timeZone: "UTC",
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+      const stamps = rows.events.map((e) => Number(e.timestamp)).filter(Number.isFinite);
+      const a = day(Math.min(...stamps));
+      const b = day(Math.max(...stamps));
+      const wantSpan = a === b ? a : `${a} to ${b}`;
       assert(
-        total - listed === older,
-        "the count line accounts for exactly the events the opening balance holds",
-        `${JSON.stringify(line)} → ${fmt(total - listed)} beyond the listed rows, opening balance holds ${fmt(older)}`,
+        parsed.span === wantSpan,
+        "the count line states the time the window it loaded covers",
+        `${JSON.stringify(line)} → span ${JSON.stringify(parsed.span)}, the window's own rows run ${JSON.stringify(wantSpan)}`,
+      );
+      assert(
+        !NAMES_THE_CAP.test(text),
+        "and the page names the preload cap nowhere",
+        NAMES_THE_CAP.exec(text)?.[0] ?? "",
       );
     }
 

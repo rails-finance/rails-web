@@ -75,8 +75,13 @@
 //      or not; a seeded heavy wallet draws the tail after its seed's cut,
 //      which can be shorter — `tail` fixtures assert the tail is under the
 //      cut where nothing was anchored, and take the same bound where the tail
-//      reached the cut), the count line reads "Showing N of M events", and
-//      the newest pill is `M`. Beside it, `omitted.anchoredComplete` states
+//      reached the cut), the count line states the life's total and the span
+//      its loaded rows cover and names no cap — decision 0019 §3 as its
+//      2026-09-24 amendment left it, "the page states time, not the cap" —
+//      and the newest pill is `M`. The grouped arm takes no bound here: its
+//      preload is the API's own constant, 2,500 since that amendment, and
+//      check 3 holds the page to the route that served it.
+//      Beside it, `omitted.anchoredComplete` states
 //      the guarantee ("everything the wallet signed is drawn") exactly where
 //      no seed stands in: true on an unseeded read, false on a `tail` (seeded)
 //      one, whose seed's rows were never there to anchor. The cut is read from
@@ -215,6 +220,7 @@
 
 import { chromium } from "playwright";
 import { RECENT_QS, TIMELINE_WINDOW_ROWS } from "./_timeline-window.mjs";
+import { parseCountLine, LOADED_SPAN, NAMES_THE_CAP } from "../lib/timeline-draw.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(",")) : null;
@@ -258,9 +264,11 @@ const FIXTURES = [
     // position on its DEFAULT page, answered in folders, still exceeds the cut
     // after grouping — 1,000 rows (86 folders beside 914 events) of 7,150
     // events on 2026-09-21 — so the list still ends in the boundary. The cut
-    // counts ROWS here, so the count line takes its grouped form, "Showing
-    // <rows> rows of <total> events", and the route asserted is the grouped
-    // one: `boundBy: "rows"` and as many rows as the line names.
+    // counts ROWS here, and the route asserted is the grouped one:
+    // `boundBy: "rows"` and as many rows as the PAGE holds. The count line
+    // used to name that grain ("Showing <rows> rows of <total> events");
+    // decision 0019's amendment of 2026-09-24 retired the form, so the rows
+    // are read off the page's own `data-timeline-rows-loaded` marker instead.
     id: "aave-v3-grouped",
     arm: "grouped",
     path: "/ethereum/aave-v3/0xee7ca610d896c53ffe716b801c05748efd902954",
@@ -480,15 +488,16 @@ async function settle(page) {
     { timeout: 180_000 },
   );
   // A windowed page's opening balance is a second request (about 6 s on the
-  // deepest Aave V3 wallet, past the server tail's budget): until it lands
-  // the count line reads "Showing 1,000 listed" with no total and the card is
-  // in its "being counted" form. Wait for the total, within reason.
+  // deepest Aave V3 wallet, past the server tail's budget): until it lands the
+  // count line states no total and the card is in its "being counted" form.
+  // Wait for the total, within reason — on the page's own marker, not on the
+  // line's wording. This tested for a line ending in "listed", which was one
+  // of the two mid-settle forms; the amendment of 2026-09-24 gave the other
+  // one ("Loaded 20 Jan 2025 to 24 Sept 2026") no such tell, so the wait
+  // returned at once on a page whose figures had not landed.
   await page
     .waitForFunction(
-      () =>
-        !/listed$/.test(
-          (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim(),
-        ),
+      () => document.querySelector("[data-timeline-total]")?.getAttribute("data-timeline-total") !== "pending",
       { timeout: 90_000 },
     )
     .catch(() => {});
@@ -526,26 +535,51 @@ async function settle(page) {
   return presses;
 }
 
-/** listed/total off the toolbar line. `whole` when the line names no cut;
- *  `cutForm` when it is the amended "Showing N of M events" form. */
-function parseCountLine(text) {
-  const t = text.replace(/\s+/g, " ").trim();
-  // Cut, unfiltered — the amended form.
-  let m = t.match(/^Showing ([\d,]+) of (at least )?([\d,]+) events$/);
-  if (m) return { listed: num(m[1]), total: num(m[3]), floor: !!m[2], cutForm: true };
-  // Cut, unfiltered, answered in folders — `listed` counts ROWS, a folder one.
-  m = t.match(/^Showing ([\d,]+) rows of (at least )?([\d,]+) events$/);
-  if (m) return { listed: num(m[1]), total: num(m[3]), floor: !!m[2], cutForm: true, rows: true };
-  // Cut, filtered — the ratio over the listed rows, the total beside it.
-  m = t.match(/^Showing [\d,]+ of ([\d,]+) listed · (at least )?([\d,]+) events$/);
-  if (m) return { listed: num(m[1]), total: num(m[3]), floor: !!m[2], cutForm: true };
-  // Cut, total pending (window arm before the opening balance lands).
-  m = t.match(/^Showing (?:[\d,]+ of )?([\d,]+) listed$/);
-  if (m) return { listed: num(m[1]), total: null, floor: false, cutForm: true };
-  // Whole.
-  m = t.match(/^(?:[\d,]+ of )?([\d,]+) events?$/);
-  if (m) return { listed: num(m[1]), total: num(m[1]), floor: false, whole: true };
-  return null;
+/** listed/total, from the toolbar's line and the page's own row markers beside
+ *  it. `whole` where the page holds the position entire; `cutForm` where it
+ *  holds part of it and says so in time.
+ *
+ *  ⚠️ THE LINE STOPPED NAMING THE CUT, 2026-09-24. Decision 0019's amendment:
+ *  "the 'Showing 1,000 of…' form of the count line goes; the page states time,
+ *  not the cap", and the preload is "never stated to the reader as a number"
+ *  (rule 2). So a windowed page reads "7,161 events · loaded 20 Jan 2025 to 24
+ *  Sept 2026" — the life's total, literally, beside the span its rows cover —
+ *  and a grouped one says no more about its rows than a flat one does. This
+ *  reader matched only the retired forms and returned null on every windowed
+ *  fixture from that day, which check 6 reported as "the count line parsed:
+ *  false" and which left the two row-numbering clauses of check 2 guarded on a
+ *  total they never got (TO-DO-ui-jobs §58).
+ *
+ *  `listed` now comes from `data-timeline-rows-loaded` — the page stating how
+ *  many rows it holds, as plumbing rather than as prose — and `rows` from
+ *  `data-timeline-unit`, which says whether those rows are a count of events or
+ *  of rows the index grouped. The grammar of the line itself is
+ *  `parseCountLine` in `scripts/lib/timeline-draw.mjs`, one copy for every
+ *  verifier that reads it. */
+function readCounts(line, marker) {
+  const parsed = parseCountLine(line ?? "");
+  if (!parsed) return null;
+  // A whole history states its total and stops; a page holding part of one
+  // names the span the part covers. The mid-settle form states neither a total
+  // nor a span — `settle()` waits it out, and where it does not this reports
+  // `total: null` and the checks say so.
+  const whole = parsed.span == null && parsed.listed == null && parsed.total != null;
+  // The rows the page HOLDS, from the page's own marker where there is one.
+  // It is 0 on the four seeded heavy wallets whose whole life sits before
+  // their seed's cut — they draw nothing, so their line carries a total and no
+  // span, which reads like a whole history and is the opposite of one. Falling
+  // back to the total there made check 2 read a shortfall of nought and check
+  // 6 read the cut as overshot by the length of the life.
+  const listed = marker?.loaded ?? parsed.listed ?? (whole ? parsed.total : null);
+  return {
+    listed,
+    total: parsed.total,
+    floor: parsed.totalIsFloor,
+    span: parsed.span,
+    rows: marker?.unit === "rows",
+    whole,
+    cutForm: !whole,
+  };
 }
 
 /** The small print sits in the card's (i) pane, which the event-card shell
@@ -609,7 +643,34 @@ async function readPage(page) {
     // is a check quietly changing its subject.
     const anchor = card ?? cutRows[0] ?? null;
     const root = anchor?.parentElement?.parentElement ?? document;
+    // ⚠️ THE LINE IS TAKEN WHOLE and judged afterwards — never captured with a
+    // regex for the form the check is about to assert. That is how eight
+    // verifiers read a CHANGED line as a MISSING one when decision 0019's
+    // amendment landed (TO-DO-ui-jobs §58). This reader was already whole; the
+    // two row grains beside it were not on the page at all until the amendment
+    // moved them off the count line and onto the timeline root.
     const line = root.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "";
+    // ⚠️ SCOPED BY CLIMBING, NOT BY FALLING BACK. The marker div wraps the
+    // toolbar AND the rows (`chain-truth-timeline.tsx`), so it is an ANCESTOR
+    // of the boundary, never a descendant — a `root.querySelector` finds
+    // nothing and a fallback to `document` then answers with the FIRST
+    // timeline on the page. On a wallet with two Comet markets that is the
+    // other market's: the card's own list had drawn nothing and the marker
+    // reported 1,998 rows, so three checks read one timeline's card against
+    // another timeline's rows. A scoping fallback is a check quietly changing
+    // its subject — this file says so about the anchor itself, above.
+    const rowsEl = anchor
+      ? anchor.closest("[data-timeline-rows-loaded]")
+      : document.querySelector("[data-timeline-rows-loaded]");
+    const stateEl = rowsEl?.querySelector("[data-timeline-total]") ?? null;
+    const marker = rowsEl
+      ? {
+          loaded: Number(rowsEl.getAttribute("data-timeline-rows-loaded")),
+          drawn: Number(rowsEl.getAttribute("data-timeline-rows-drawn")),
+          unit: stateEl?.getAttribute("data-timeline-unit") ?? null,
+          total: stateEl?.getAttribute("data-timeline-total") ?? null,
+        }
+      : null;
     let label = null,
       state = [],
       offerInCard = 0,
@@ -691,6 +752,7 @@ async function readPage(page) {
     const tenure = eyebrow == null ? null : /^Opened/.test(eyebrow) ? "closed" : "open";
     return {
       line,
+      marker,
       cards: root === document ? cards.length : root.querySelectorAll('[data-figure="timeline-boundary"]').length,
       cardsOnPage: cards.length,
       cutRows: root === document ? cutRows.length : root.querySelectorAll('[data-boundary-row="cut"]').length,
@@ -723,6 +785,8 @@ async function readPage(page) {
         "earlier events are not listed",
         "This list is capped",
       ].filter((s) => body.includes(s)),
+      /** The whole face, for the phrases that name the cap (check 6). */
+      pageText: body,
       vault: wrap
         ? {
             rows: Number(wrap.getAttribute("data-vault-timeline-rows")),
@@ -883,7 +947,7 @@ for (const f of FIXTURES) {
     await page.goto(`${BASE}${f.path}`, { waitUntil: "domcontentloaded" });
     const presses = await settle(page);
     const r = await readPage(page);
-    const counts = parseCountLine(r.line);
+    const counts = readCounts(r.line, r.marker);
     // A VAULT HOLDER PAGE HAS NO OPEN/CLOSED CONCEPT, so the tip rule that
     // withholds the dot from a closed position does not reach it — `f1027e1f`
     // left those two call sites unthreaded deliberately, because whether a
@@ -1052,11 +1116,28 @@ for (const f of FIXTURES) {
         // share of the cut. Whether the 1,000-row amendment should bind such
         // a wallet is Miles's call, not this check's; it asserts the rule as
         // it stands.
-        check(
-          `6  ${f.id}: listed is the cut${anchoredRows > 0 ? " plus the anchored rows" : ""}, give or take a shared boundary block`,
-          counts.listed >= CUT && counts.listed < CUT + anchoredRows + 50,
-          `listed ${n(counts.listed)} (cut ${n(CUT)}, anchored ${n(anchoredRows)}, overshoot ${n(counts.listed - CUT - anchoredRows)})`,
-        );
+        //
+        // ⚠️ NOT ON THE GROUPED ARM, AND THE REASON IS THE AMENDMENT. `CUT` is
+        // the WEB's `TIMELINE_WINDOW_ROWS`, 1,000, which binds the arms the web
+        // itself windows. A served family's preload is the SERVER's constant of
+        // the same name and has been 2,500 since 2026-09-24 (decision 0019,
+        // amendment rule 2, server `4a0d28b`) — this repo cannot read it, and
+        // the page may not state it, so a bound written here would be a third
+        // copy of a number two repos already disagree about. What the grouped
+        // page owes is that it lists exactly the rows its own route served,
+        // and check 3 below holds it to that, on the same run.
+        if (f.arm === "grouped") {
+          info(
+            `6  ${f.id}: the served preload is the api's own cut, held to the route by check 3`,
+            `${n(counts.listed)} rows loaded`,
+          );
+        } else {
+          check(
+            `6  ${f.id}: listed is the cut${anchoredRows > 0 ? " plus the anchored rows" : ""}, give or take a shared boundary block`,
+            counts.listed >= CUT && counts.listed < CUT + anchoredRows + 50,
+            `listed ${n(counts.listed)} (cut ${n(CUT)}, anchored ${n(anchoredRows)}, overshoot ${n(counts.listed - CUT - anchoredRows)})`,
+          );
+        }
       }
       // The guarantee itself. A `tail` fixture is a seeded read by
       // construction, so its flag must be false whatever the tail's length;
@@ -1074,16 +1155,30 @@ for (const f of FIXTURES) {
           }), anchored ${n(anchoredRows)}`,
         );
       }
+      // ⚠️ REWRITTEN 2026-09-25. This asserted "Showing N of M events", and
+      // "Showing N rows of M events" on the grouped arm — both retired by
+      // decision 0019's amendment of 2026-09-24, which put the cap out of the
+      // reader's reach ("the page states time, not the cap"; rule 2, "never
+      // stated to the reader as a number"). What the line owes now is the
+      // life's total, literally — §3's counts, which the amendment left
+      // standing — beside the span its loaded rows cover, and a shape with no
+      // room for a cap in it. The rows drawn are on the timeline root, where
+      // they are plumbing and not the reader's, and check 3 holds them to the
+      // route on the grouped arm.
+      //
+      // A page that drew NO rows — the seeded heavy wallets whose whole life
+      // sits before their seed's cut — has no span to state, so it states the
+      // total and stops. That is the same rule with its second clause vacuous,
+      // and the branch is on what the page HOLDS, not on a fixture flag: a
+      // wallet that gains its first drawn row flips it by itself.
+      const wantHead = `${counts.floor ? "at least " : ""}${n(counts.total ?? 0)} events`;
+      const spanTail = r.line.trim().startsWith(wantHead) ? r.line.trim().slice(wantHead.length) : null;
+      const SPAN_SHAPE = counts.listed === 0 ? /^$/ : new RegExp(`^ · loaded ${LOADED_SPAN.source}$`);
       check(
-        f.arm === "grouped"
-          ? `6  ${f.id}: the count line reads "Showing N rows of M events"`
-          : `6  ${f.id}: the count line reads "Showing N of M events"`,
-        counts.cutForm === true &&
-          (f.arm === "grouped"
-            ? /^Showing [\d,]+ rows of (at least )?[\d,]+ events$/
-            : /^Showing [\d,]+ of (at least )?[\d,]+ events$/
-          ).test(r.line.trim()),
-        `"${r.line}"`,
+        `6  ${f.id}: the count line states the whole life${counts.listed === 0 ? ", which is all it can state with no row drawn" : " and the span its rows cover"}, and names no cap`,
+        spanTail !== null && SPAN_SHAPE.test(spanTail) && !NAMES_THE_CAP.test(r.pageText),
+        `"${r.line}", wanted "${wantHead}${counts.listed === 0 ? "" : " · loaded <span>"}"` +
+          (NAMES_THE_CAP.test(r.pageText) ? `; the page names the cap: "${NAMES_THE_CAP.exec(r.pageText)?.[0]}"` : ""),
       );
       // ⚠️ THREE CHECKS STOOD HERE AND ARE DELETED, 2026-09-11: "card count =
       // M − 1,000", the small print's "displays the most recent N …" sentence,

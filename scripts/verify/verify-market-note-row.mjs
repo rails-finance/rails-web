@@ -125,7 +125,23 @@ const PAGE = (w) => `${BASE}/base/moonwell/${w}`;
 // overlapping ones: an optional "Showing", a count, an optional "of M", and
 // then either "listed" (with the event total after it, where the two counts
 // differ) or "events". It still refuses a bare "Showing 268".
-const COUNT_RE = /^(?:Showing )?[\d,]+(?: of [\d,]+)?(?:(?: listed)(?: · [\d,]+ events?)?| events?)$/;
+//
+// ⚠️ AND IT OUTGREW IT AGAIN, 2026-09-25. Decision 0019's amendment of
+// 2026-09-24 took the cap off the reader's face: a windowed page now reads
+// "2,407 events · loaded 20 Aug 2026 to 25 Sept 2026", and filtered, "Showing
+// 268 of 20 Aug 2026 to 25 Sept 2026 · 2,407 events". THIS FIXTURE does not
+// meet either — 0x719e… holds 2,407 events, under the served preload, so its
+// page is a whole history and reads "2,407 events", which is why the arm was
+// correct and is left alone. The pattern is widened all the same, because the
+// day the fixture's life crosses the preload is the day `waitForList` would
+// wait out its 180 s on a page that was rendering perfectly — which is how it
+// failed the last time the line moved (TO-DO-ui-jobs §58).
+//   The tail after the total is optional and deliberately loose: this is a
+// LOCATOR, and a locator's job is to find the line. What the line may say is
+// asserted by check 6 below, and by `parseCountLine` in
+// `scripts/lib/timeline-draw.mjs`, which is the whole grammar in one place.
+const COUNT_RE =
+  /^(?:Showing )?(?:at least )?[\d,]+(?: of (?:[\d,]+|\d{1,2} [A-Za-z]+ \d{4}(?: to \d{1,2} [A-Za-z]+ \d{4})?))?(?:(?: listed)| events?)(?: · (?:at least )?[\d,]+ events?)?(?: · loaded \d{1,2} [A-Za-z]+ \d{4}(?: to \d{1,2} [A-Za-z]+ \d{4})?)?$/;
 
 let failures = 0;
 const check = (name, cond, detail = "") => {
@@ -358,11 +374,19 @@ async function readCounts(page) {
   return {
     countLine: await page.getByText(COUNT_RE).first().innerText(),
     eventRows: await page.locator("[data-event-id]").count(),
+    // The rows the page holds, and how many of them it has painted. This read
+    // "Showing X of Y rows" out of the page until 2026-09-25 — a sentence no
+    // component has ever written in that word order, so it caught nothing,
+    // fell to its own "(no window line)" string, and was read by nobody. The
+    // page states both figures as markers (`scripts/lib/timeline-draw.mjs`).
     windowLine: await page
-      .getByText(/^Showing [\d,]+ of [\d,]+ rows$/)
+      .locator("[data-timeline-rows-loaded]")
       .first()
-      .innerText()
-      .catch(() => "(no window line)"),
+      .evaluate(
+        (el) =>
+          `${el.getAttribute("data-timeline-rows-drawn")} of ${el.getAttribute("data-timeline-rows-loaded")} rows drawn`,
+      )
+      .catch(() => "(no timeline marker)"),
     typeFilter: await readFilterPanel(page, "Types of event"),
   };
 }

@@ -54,6 +54,7 @@
 //   BASE=http://localhost:3111 node scripts/verify/verify-timeline-asset-axis.mjs
 
 import { chromium } from "playwright";
+import { COUNT_LINE_SEL, countLineText, parseCountLine, NAMES_THE_CAP } from "../lib/timeline-draw.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const NAV = { waitUntil: "networkidle", timeout: 300000 };
@@ -63,13 +64,17 @@ const NAV = { waitUntil: "networkidle", timeout: 300000 };
 // members of a standing folder never joined it. The line now counts them and
 // says when it has (`data-timeline-shown`), which is what every read below
 // waits on.
-const SPARK = "/ethereum/spark/0x1601843c5e9bc251a3272907010afa41fa18347e";
+const SPARK_WALLET = "0x1601843c5e9bc251a3272907010afa41fa18347e";
+const SPARK = `/ethereum/spark/${SPARK_WALLET}`;
 const ALL_FOLDERS = "/ethereum/spark/0xb137e7d16564c81ae2b0c8ee6b55de81dd46ece5";
 const TROVE = "/ethereum/liquity-v1/0x56356afabaa06b555029a1f1fee3fcecf21d3692?epoch=2";
 
 // The reserves this wallet has used, commonest first — the order the menu
-// sorts them into. New reserves would be a real change worth seeing.
-const EXPECTED = ["USDT", "USDS", "USDC", "DAI", "PYUSD", "WETH"];
+// sorts them into. New reserves would be a real change worth seeing, and the
+// check has now seen one: RLUSD, a single event, arrived by 2026-09-25 and is
+// added here rather than left as a standing red. It is the wallet moving, not
+// the page.
+const EXPECTED = ["USDT", "USDS", "USDC", "DAI", "PYUSD", "WETH", "RLUSD"];
 /** Its event count on 2026-08-28. The index only grows, so this is a floor. */
 const FLOOR = 28065;
 
@@ -108,74 +113,69 @@ async function dismiss() {
   await page.mouse.click(4, 4);
 }
 
-/** The toolbar's own count line, in each of its forms (`eventCountLine`,
- *  components/shared/timeline-toolbar.tsx — read it before changing this). A
- *  ratio on this line is only ever between two counts of the SAME set, so which
- *  set the numerator belongs to has to be read, not assumed:
+/** The toolbar's own count line, and beside it the two row grains the line no
+ *  longer carries. Every form `eventCountLine` writes is parsed by
+ *  `parseCountLine` in `scripts/lib/timeline-draw.mjs` — one grammar, in one
+ *  place; read it, and `components/shared/timeline-toolbar.tsx`, before
+ *  changing anything here.
  *
- *                       unfiltered                          filtered
- *    whole history      "28,153 events"                     "563 of 28,153 events"
- *    window, ready      "Showing 1,000 of 28,179 events"    "Showing 563 of 1,000 listed · 28,179 events"
- *    window, pending    "Showing 1,000 listed"              "Showing 563 of 1,000 listed"
+ *  ⚠️⚠️ THE LINE STOPPED STATING WHAT THE PAGE LOADED, 2026-09-24. Decision
+ *  0019's amendment made the count line state TIME: "29,839 events · loaded 20
+ *  Aug 2026 to 25 Sept 2026" at rest, "Showing 563 of 20 Aug 2026 to 25 Sept
+ *  2026 · 29,839 events" filtered. The preload is "never stated to the reader
+ *  as a number" (rule 2), so "Showing 1,000 of 28,179 events" and "Showing
+ *  1,000 rows of 29,590 events" are both gone and with them the `listed` and
+ *  `rows` grains this reader used to take off the line. It matched none of the
+ *  new forms and returned null from that day, which read as `undefined` in
+ *  four details and let one check compare two undefineds and pass
+ *  (TO-DO-ui-jobs §58).
  *
- *    grouped, ready     "Showing 1,000 rows of 29,590 events"
+ *  So the grains come from where the page still states them, as plumbing
+ *  rather than prose: `data-timeline-rows-loaded` is the rows the page holds,
+ *  `data-timeline-unit` says whether those rows are a count of events or of
+ *  rows the index grouped. A ratio is only ever between two counts of the SAME
+ *  set, which is why they are returned apart.
  *
- *  The windowed total may read "at least N" where it is a floor. The grouped
- *  form states ROWS, which are not a count of listed events, so it returns
- *  `rows` and `listed: null` — the listed count is read off the first filtered
- *  line. A filtered numerator may read "at least N" while a split folder's
- *  members are still being read; `settled()` waits that out, so the reads here
- *  never see it and it is refused.
+ *  ⚠️ Read from the count line's own ELEMENT, never the whole body: the
+ *  coverage footer prose under the timeline names the same figures in
+ *  sentences. A filtered numerator may read "at least N" while a split
+ *  folder's members are still being read; `settled()` waits that out.
  *
- *  ⚠️ The windowed forms gained "Showing" on 2026-09-10 (`5b1065a9`) and the
- *  unfiltered ready form lost "listed ·". This reader kept the older grammar
- *  and read every line as null for two days — a reader that matches nothing
- *  reports `undefined`, not the defect, so the forms are listed here in full.
- *
- *  ⚠️⚠️ Until 2026-08-31 the windowed forms did not exist and the line read
- *  "563 of 28,179 events" — a page-grain numerator over a position-grain
- *  denominator. That is what the assertions below now pin, so returning
- *  `listed` separately from `total` is the point of this helper, not a detail.
- *  Read from the count SPAN, never the whole body: the coverage footer prose
- *  under the timeline names the same figures in sentences.
- *
- *  @returns {{shown:number,listed:number,total:number|null,windowed:boolean,text:string}|null}
- *    `shown` — rows on screen. `listed` — rows the page loaded (=== shown when
- *    nothing is filtered). `total` — the POSITION's lifetime count, or null
- *    where the opening balance has not arrived and no such figure may be
- *    stated. */
+ *  @returns {{shown:number|null,listed:number|null,rows:number|null,total:number|null,
+ *    span:string|null,windowed:boolean,text:string}|null}
+ *    `shown` — the filtered numerator, null when nothing is filtered. `listed`
+ *    — the rows the page loaded, in events where the index grouped nothing.
+ *    `rows` — the same figure where it counts ROWS, null otherwise. `total` —
+ *    the POSITION's lifetime count, or null where the opening balance has not
+ *    arrived and no such figure may be stated. `windowed` — the page holds
+ *    less than the whole life, read from the line's span rather than guessed
+ *    at from its shape. */
 async function counts() {
-  const text = await page.evaluate(() => {
-    for (const el of document.querySelectorAll("span.tabular-nums")) {
-      const s = (el.textContent || "").trim();
-      if (/^(Showing )?[\d,]+( rows)?( of (at least )?[\d,]+)? (events?|listed|rows)/.test(s)) return s;
-    }
-    return null;
-  });
-  if (!text) return null;
-  const num = (v) => +v.replace(/,/g, "");
-  if (text.startsWith("Showing ")) {
-    const body = text.slice("Showing ".length);
-    const grouped = body.match(/^([\d,]+) rows of (?:at least )?([\d,]+) events?$/);
-    if (grouped)
-      return { shown: null, listed: null, rows: num(grouped[1]), total: num(grouped[2]), windowed: true, text };
-    // Filtered: "M of L listed[ · T events]". Pending, unfiltered: "L listed".
-    const listedForm = body.match(/^([\d,]+)(?: of ([\d,]+))? listed(?: · (?:at least )?([\d,]+) events?)?$/);
-    if (listedForm) {
-      const [, a, b, tot] = listedForm;
-      const listed = b ? num(b) : num(a);
-      return { shown: num(a), listed, total: tot ? num(tot) : null, windowed: true, text };
-    }
-    // Ready, unfiltered: "L of T events" — nothing hidden, so shown === listed.
-    const ready = body.match(/^([\d,]+) of (?:at least )?([\d,]+) events?$/);
-    if (!ready) return null;
-    return { shown: num(ready[1]), listed: num(ready[1]), total: num(ready[2]), windowed: true, text };
-  }
-  const whole = text.match(/^([\d,]+)(?: of ([\d,]+))? events?$/);
-  if (!whole) return null;
-  const [, a, b] = whole;
-  const total = b ? num(b) : num(a);
-  return { shown: b ? num(a) : total, listed: total, total, windowed: false, text };
+  const read = await page.evaluate((sel) => {
+    const marker = document.querySelector("[data-timeline-rows-loaded]");
+    const state = document.querySelector("[data-timeline-total]");
+    return {
+      text: document.querySelector(sel)?.textContent?.trim() ?? null,
+      loaded: marker ? Number(marker.getAttribute("data-timeline-rows-loaded")) : null,
+      unit: state?.getAttribute("data-timeline-unit") ?? null,
+    };
+  }, COUNT_LINE_SEL);
+  const parsed = parseCountLine(read.text);
+  if (!parsed) return null;
+  // The line names the span only where the page holds less than the life; a
+  // whole history states its total and stops. The mid-settle form states a
+  // listed count and no total, and `settled()` is what keeps it out of here.
+  const windowed = parsed.span != null || parsed.listed != null;
+  const listed = read.loaded ?? parsed.listed;
+  return {
+    shown: parsed.shown,
+    listed,
+    rows: read.unit === "rows" ? listed : null,
+    total: parsed.total,
+    span: parsed.span,
+    windowed,
+    text: parsed.text,
+  };
 }
 
 /** The count line once the page has declared it settled: the lifetime figures
@@ -229,15 +229,38 @@ check(
 );
 const TOTAL = atRest?.total ?? 0;
 
-// This wallet is past the window, so the two grains must BOTH be on the line
-// and they must differ. If they ever stop differing the fixture has fallen
-// under the cut and the windowed assertions below go vacuous — which is a
-// reason to change the fixture, not to drop the check. Grouped, the line
-// states ROWS; the listed EVENTS come in with the first filter, below.
+// The grouped answer this page drew, read on the same run and independently of
+// it: `eventsServed` is the EVENTS the page holds, folder members included,
+// against `events.length` rows. Those two grains used to be on the count line;
+// decision 0019's amendment of 2026-09-24 took the cap off the reader's face,
+// so the page states the life's total and the time its rows cover and nothing
+// about their number. The ratio checks below need the grain all the same, and
+// an expectation read from the route rather than from the page is the stronger
+// source in any case.
+const sparkRoute = await fetch(`${BASE}/api/spark/timeline?wallet=${SPARK_WALLET}&group=1`)
+  .then((r) => (r.ok ? r.json() : null))
+  .catch(() => null);
+const SERVED_EVENTS = sparkRoute?.eventsServed ?? null;
+const SERVED_ROWS = sparkRoute?.events?.length ?? null;
 check(
-  "spark: the grouped line separates the rows drawn from what the position holds",
-  atRest?.windowed === true && (atRest?.rows ?? 0) > 0 && atRest.rows < TOTAL,
-  `${atRest?.rows} rows of a position holding ${TOTAL} — "${atRest?.text}"`,
+  "spark: the grouped route answers, cut by rows, with more events served than rows",
+  sparkRoute?.grouped === true && sparkRoute?.boundBy === "rows" && SERVED_EVENTS > SERVED_ROWS && SERVED_ROWS > 0,
+  `grouped ${sparkRoute?.grouped}, boundBy ${sparkRoute?.boundBy}, ${SERVED_ROWS} rows carrying ${SERVED_EVENTS} events`,
+);
+
+// This wallet is past the preload, so the page holds part of its life and says
+// so IN TIME. If it ever stops holding part of it the fixture has fallen under
+// the cut and the windowed assertions below go vacuous — which is a reason to
+// change the fixture, not to drop the check. The grain the page still states,
+// and no longer in prose, is the rows it loaded.
+check(
+  "spark: the page holds part of the life, states the span in time, and names no cap",
+  atRest?.windowed === true &&
+    atRest?.span != null &&
+    (atRest?.rows ?? 0) > 0 &&
+    atRest.rows < TOTAL &&
+    !NAMES_THE_CAP.test(await page.innerText("body")),
+  `${atRest?.rows} rows loaded of a position holding ${TOTAL}, span ${JSON.stringify(atRest?.span)} — "${atRest?.text}"`,
 );
 
 const assets = await openMenu("Assets");
@@ -266,18 +289,31 @@ if (assets) {
   // Hide the biggest reserve. ⚠️⚠️ THE DENOMINATOR IS THE ASSERTION. The menu's
   // bucket is a fact about the POSITION (it is seeded from the opening balance),
   // while the filter can only ever act on the rows the page loaded — so the
-  // count line must divide by what is LISTED, and the position's own total must
-  // sit beside it, unchanged. The bug this pins read "563 of 28,153": the drop
-  // it implied, 27,590 events, was twice the bucket the menu had just named.
-  // Grouped, what is listed is EVENTS, folder members included, so it is at
-  // least the rows the unfiltered line stated.
+  // numerator must be counted over what the page LOADED, and the position's own
+  // total must sit beside it, unchanged. The bug this pins read "563 of 28,153":
+  // the drop it implied, 27,590 events, was twice the bucket the menu had just
+  // named.
+  //
+  // ⚠️ THE DENOMINATOR IS NOW THE LOADED SPAN, not a number. Decision 0019's
+  // amendment of 2026-09-24: the filtered line reads "Showing 563 of 20 Aug
+  // 2026 to 25 Sept 2026 · 29,839 events", so what the numerator is over is
+  // stated in TIME and the cap is not stated at all. The set is the same set,
+  // and the served answer above is where its size is read. The span is the
+  // second half of the assertion now: a filter narrows the view and must move
+  // neither the span the page holds nor the position's total.
   const biggest = parsed[0];
   const hidden = await toggle("Assets", biggest.sym);
-  const LISTED = hidden?.listed ?? 0;
+  const LISTED = SERVED_EVENTS ?? 0;
   check(
-    `spark: hiding ${biggest.sym} divides by what is listed, not by the position`,
-    hidden?.windowed === true && LISTED >= (atRest?.rows ?? Infinity) && LISTED < TOTAL && hidden?.total === TOTAL,
-    `"${hidden?.text}" — listed ${LISTED} (at least the ${atRest?.rows} rows), position ${hidden?.total} (expected ${TOTAL})`,
+    `spark: hiding ${biggest.sym} counts over what the page loaded, and moves neither the span nor the position`,
+    hidden?.windowed === true &&
+      (hidden?.shown ?? 0) > 0 &&
+      hidden.shown <= LISTED &&
+      hidden?.span === atRest?.span &&
+      hidden?.total === TOTAL,
+    `"${hidden?.text}" — shown ${hidden?.shown} of the ${LISTED} events served, span ${JSON.stringify(
+      hidden?.span,
+    )} (was ${JSON.stringify(atRest?.span)}), position ${hidden?.total} (expected ${TOTAL})`,
   );
   // Direction, and the one exact relation that survives the two grains: a drop
   // measured over the loaded rows can never exceed the bucket measured over the
@@ -290,11 +326,14 @@ if (assets) {
   );
 
   // And it is reversible — the axis narrows the view, never the data.
+  // ⚠️ AND BOTH SIDES HAVE TO EXIST. While the reader above matched none of
+  // the amended forms this compared `undefined` with `undefined` and passed on
+  // a page it had not read (TO-DO-ui-jobs §58).
   const restored = await toggle("Assets", biggest.sym);
   check(
     `spark: showing ${biggest.sym} again restores the unfiltered line`,
-    restored?.text === atRest?.text,
-    `"${restored?.text}" — before the filter "${atRest?.text}"`,
+    restored?.text != null && restored.text === atRest?.text,
+    `"${restored?.text ?? "UNREAD"}" — before the filter "${atRest?.text ?? "UNREAD"}"`,
   );
 }
 
@@ -351,8 +390,8 @@ async function exactArm(heading, id) {
   const back = await toggle(heading, biggest.key);
   check(
     `all-folders ${id} [${heading}]: showing ${biggest.key} again restores the line`,
-    back?.text === whole?.text,
-    `"${back?.text}"`,
+    back?.text != null && back.text === whole?.text,
+    `"${back?.text ?? "UNREAD"}" — before the filter "${whole?.text ?? "UNREAD"}"`,
   );
 }
 await exactArm("Assets", "X1");
@@ -416,23 +455,35 @@ await exactArm("Types of event", "X2");
     waitUntil: "domcontentloaded",
     timeout: 300000,
   });
-  const line = await p2
-    .waitForFunction(
-      () => {
-        const el = document.querySelector("[data-timeline-total]");
-        if (!el || el.getAttribute("data-timeline-total") === "pending") return null;
-        if (el.getAttribute("data-timeline-shown") === "floor") return null;
-        const text = (el.textContent || "").trim();
-        return /^Showing [\d,]+ of [\d,]+ listed/.test(text) ? text : null;
-      },
-      null,
-      { timeout: 240000, polling: 100 },
-    )
-    .then((h) => h.jsonValue())
-    .catch(() => null);
+  // ⚠️ WAIT ON THE PAGE'S MARKERS AND ON THE LINE HAVING A NUMERATOR — never
+  // on the shape of the line. This waited for "Showing N of M listed", which
+  // decision 0019's amendment of 2026-09-24 retired with the rest of the cap's
+  // appearances on the reader's face; from that day it waited out its full
+  // 240 s and both checks below went red on a page that was right
+  // (TO-DO-ui-jobs §58). Three facts have to be true before the reads below
+  // mean anything, and each is taken from where the page states it: the
+  // lifetime figures are in hand and the numerator is whole (the two markers),
+  // and the filter has landed, which is the line stating a numerator at all.
+  // Parsed, not matched: the assertion is on the VALUE, and the form is the
+  // toolbar's business.
+  const deadline = Date.now() + 240000;
+  let line = null;
+  let shown = null;
+  for (;;) {
+    const state = await p2.evaluate(() => {
+      const el = document.querySelector("[data-timeline-total]");
+      return el
+        ? { total: el.getAttribute("data-timeline-total"), shown: el.getAttribute("data-timeline-shown") }
+        : null;
+    });
+    line = await countLineText(p2);
+    shown = parseCountLine(line)?.shown ?? null;
+    if (state && state.total !== "pending" && state.shown !== "floor" && shown != null) break;
+    if (Date.now() > deadline) break;
+    await p2.waitForTimeout(100);
+  }
   const settledMs = Date.now() - t0;
   const readsAtSettle = reads;
-  const shown = line ? +line.match(/^Showing ([\d,]+) of/)[1].replace(/,/g, "") : null;
   check(
     `counted C1: hiding ${HIDE} counts what the members give`,
     shown === expected,
