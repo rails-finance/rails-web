@@ -30,10 +30,13 @@
 // Until rails-server serves the route this fails at the first check of every
 // fixture, and says so. Run with the dev server up:
 //   BASE=http://localhost:3000 node scripts/verify/verify-aave-v3-position-state.mjs
+// Against a Vercel-protected deployment (dev.rails.finance), the bypass header
+// rides every request through hostFetch and the browser context (lib/host.mjs):
+//   BASE=https://dev.rails.finance node scripts/verify/verify-aave-v3-position-state.mjs
 
 import { chromium } from "playwright";
+import { BASE, bypassHeaders, hostFetch } from "./lib/host.mjs";
 
-const BASE = process.env.BASE || "http://localhost:3000";
 const ROUTE = "/api/aave-v3/timeline/position-state";
 
 const WETH = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
@@ -201,7 +204,7 @@ const check = (name, cond, detail = "") => {
 async function readState(fx) {
   const qs = new URLSearchParams({ wallet: fx.wallet, market: fx.market, block: String(fx.block), tx: fx.tx });
   for (let i = 0; i < 4; i++) {
-    const res = await fetch(`${BASE}${ROUTE}?${qs}`).catch((e) => ({ ok: false, status: 0, e }));
+    const res = await hostFetch(`${BASE}${ROUTE}?${qs}`).catch((e) => ({ ok: false, status: 0, e }));
     if (res.status === 429 || res.status === 0) {
       await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
       continue;
@@ -379,7 +382,7 @@ for (const fx of FIXTURES) {
     );
 
   // ── 2. The card ─────────────────────────────────────────────────────────
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, extraHTTPHeaders: bypassHeaders() });
   const asks = [];
   page.on("request", (r) => {
     if (r.url().includes(ROUTE)) asks.push(r.url());
@@ -593,7 +596,7 @@ for (const fx of FIXTURES) {
 // ── 3. A Base card never asks ───────────────────────────────────────────────
 if (!only || only.test("base")) {
   console.log(`\n=== Base ===`);
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, extraHTTPHeaders: bypassHeaders() });
   const asks = [];
   page.on("request", (r) => {
     if (r.url().includes(ROUTE)) asks.push(r.url());
