@@ -111,9 +111,15 @@ export function LatestPrices({ assets, reason }: { assets: LatestPriceAsset[]; r
         />
       </button>
 
+      {/* A list alone sizes to its longest price. A reason is prose and needs a
+          measure to read at, so the panel widens for one and caps at the
+          viewport on a phone; a long one scrolls rather than running off the
+          bottom of a short window. */}
       {open && (
         <div
-          className="overlay-panel absolute left-0 top-full z-50 mt-2 min-w-[200px] max-w-[min(22rem,calc(100vw-2rem))] py-1"
+          className={`overlay-panel absolute left-0 top-full z-50 mt-2 max-h-[min(70vh,26rem)] max-w-[calc(100vw-2rem)] overflow-y-auto py-1 ${
+            showReason ? "w-[20rem]" : "min-w-[200px]"
+          }`}
           role="menu"
         >
           <div className="px-4 py-2">
