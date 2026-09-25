@@ -2,7 +2,9 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { RESET_LINK } from "@/lib/shared/ui-grammar";
-import type { MarkSet, SignificanceMarks } from "@/lib/shared/timeline-navigator";
+// The life reduced to months, on the same `year * 12 + month` key this grid
+// has always used for a cell.
+import { monthCounts } from "@/lib/shared/timeline-segments";
 
 // GitHub-style activity heatmap. Doubles as a date-range selector for the
 // timeline below: click a cell for a single-day filter, or drag across cells
@@ -37,9 +39,6 @@ function fmtFullDate(ts: number): string {
 }
 
 // Five intensity levels (0 = empty … 4 = busiest) → Tailwind classes.
-// Exported with `relLevel` below for the segment picker above the rows
-// (timeline-segment-picker.tsx): it draws the same months, so it must draw
-// them the same colour.
 export function bucketClass(level: number): string {
   switch (level) {
     case 0:
@@ -99,11 +98,15 @@ const CELL_GAP_PX = 2;
 //   • NOT IN THE LIFETIME — grid padding. The week grid pads out to whole
 //     Monday-to-Sunday columns, the calendar to whole rows, the month matrix
 //     to whole year rows. Nothing is drawn at all.
-//   • SUMMARISED — below a windowed page's cut. Its count is REAL, and comes
-//     from the opening balance; no loaded row falls in it, so filtering to it
-//     would empty a list the page cannot refill. The caption says so.
-//   • EMPTY — in the lifetime, at or after the cut, and nothing happened. This
-//     one.
+//   • OUTSIDE WHAT THE PAGE HOLDS — its count is REAL and comes from the
+//     opening balance or from a month the preload never reached; no loaded row
+//     falls in it, so filtering to it would empty a list the page cannot
+//     refill. ⚠️ A CALLER THAT PASSES `reachMonth` TAKES THIS REFUSAL AWAY:
+//     the month is then read from the index as the page's own segment, which
+//     is the second of the two paths decision 0019's 2026-09-25 amendment
+//     rules. Without it the cell still refuses and the caption says so.
+//   • EMPTY — in the lifetime, inside what the page holds, and nothing
+//     happened. This one.
 // A `pending` day (drawn, after the life's last event) is already covered by
 // the first: it is outside the lifetime by construction.
 const isEmpty = (count: number): boolean => count <= 0;
@@ -191,89 +194,36 @@ export interface TransactionHeatmapProps {
    *  map whose only job is to get the reader to a day should not grow a second
    *  way to express it (Miles, 2026-09-11). */
   select?: "range" | "single";
-  /** What each cell carries beyond its density — liquidations, events the
-   *  owner signed, market notes (lib/shared/timeline-navigator.ts). Drawn over
-   *  the wash, never instead of it.
-   *
-   *  ⚠️ The marks speak only for cells at or after `marks.from`. Everything
-   *  before it draws the wash and NOTHING else, and the caption states why: a
-   *  page whose opening balance counts days and actions separately cannot say
-   *  which of those days held a liquidation, and an unmarked cell that read as
-   *  "nothing happened here" would be a claim the page has no basis for. */
-  marks?: SignificanceMarks | null;
+  /** The WHOLE LIFE's events per UTC day, keyed by day start in seconds. Given,
+   *  it replaces `events`/`priorDays`/`windowDays` as the months grid's counts
+   *  and its extent, so the ramp is the life's whatever the page currently
+   *  holds — a reader who has read one month from the index still sees the
+   *  four years around it at the shades they had. `months` layout only. */
+  lifeDays?: ReadonlyMap<number, number> | null;
+  /** The span the rows ON THE PAGE cover, as unix seconds. A month that meets
+   *  it is filtered locally, which is instant; a month outside it is a read.
+   *  Defaults to "from the oldest loaded row onward", which is what a windowed
+   *  page without a segment holds. */
+  held?: [number, number] | null;
+  /** Read that month from the index as the page's own segment. Given, a month
+   *  outside `held` is selectable and its click comes here instead of through
+   *  `onChange` (decision 0019, amendment 2026-09-25). */
+  reachMonth?: ((monthIdx: number) => void) | null;
+  /** The month the page holds as its segment, ringed like a selection so the
+   *  grid says where the rows below came from. */
+  currentMonth?: number | null;
 }
 
-/** The three registers, over one cell.
- *
- *  Shape carries the distinction, not hue alone, because these sit on a
- *  coloured wash at twelve pixels. A LIQUIDATION is a filled dot in the
- *  critical red the spine and the folder badges already use for one. An
- *  OWNER-SIGNED cell is underlined in neutral ink — an event, so filled; no
- *  valence, so no hue (`color-grammar.md` §1). A MARKET NOTE is a HOLLOW ring,
- *  in neutral ink, which is the register the spine already gives a note: a
- *  hollow diamond, never a party colour, because a note is not an event. */
-function CellMarks({ marks, on }: { marks: MarkSet | undefined; on: boolean }) {
-  if (!on || !marks) return null;
-  return (
-    <>
-      {marks.liquidation && (
-        <span
-          aria-hidden
-          data-cell-mark="liquidation"
-          className="pointer-events-none absolute left-[1px] top-[1px] h-1 w-1 rounded-full bg-red-500"
-        />
-      )}
-      {marks.note && (
-        <span
-          aria-hidden
-          data-cell-mark="note"
-          className="pointer-events-none absolute right-[1px] top-[1px] h-[5px] w-[5px] rounded-full border border-rb-600 dark:border-rb-300"
-        />
-      )}
-      {marks.owner && (
-        <span
-          aria-hidden
-          data-cell-mark="owner"
-          className="pointer-events-none absolute inset-x-[1px] bottom-0 h-[2px] rounded-sm bg-foreground/60"
-        />
-      )}
-    </>
-  );
-}
-
-/** The mark legend, beside the density ramp. Only the registers actually drawn
- *  are named — a legend entry for a mark nothing on this grid wears would be a
- *  key to a thing that is not there. */
-export function MarkLegend({ marks }: { marks: SignificanceMarks | null | undefined }) {
-  if (!marks) return null;
-  const any = (k: keyof MarkSet) => [...marks.day.values()].some((m) => m[k]);
-  const items = (
-    [
-      { key: "liquidation", label: "liquidation", glyph: <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> },
-      {
-        key: "owner",
-        label: "signed by the owner",
-        glyph: <span className="h-[2px] w-3 rounded-sm bg-foreground/60" />,
-      },
-      {
-        key: "note",
-        label: "market note",
-        glyph: <span className="h-[6px] w-[6px] rounded-full border border-rb-600 dark:border-rb-300" />,
-      },
-    ] as const
-  ).filter((i) => any(i.key));
-  if (items.length === 0) return null;
-  return (
-    <span data-mark-legend="" className="flex flex-wrap items-center gap-3 text-[10px] text-rb-500">
-      {items.map((i) => (
-        <span key={i.key} className="flex items-center gap-1">
-          {i.glyph}
-          {i.label}
-        </span>
-      ))}
-    </span>
-  );
-}
+// ── ⚠️ THE SIGNIFICANCE MARKS ARE GONE (2026-09-25, decision 0019) ─────────
+//
+// `CellMarks` drew three registers over a cell — a liquidation dot, a neutral
+// underline where the owner had signed, a hollow ring for a market note — and
+// `MarkLegend` named the ones a grid wore. Miles dropped all three everywhere,
+// the `?folders=0` grid and the legend included: "the heatmap is enough and if
+// users need to find a liquidation they can use the event filter". The
+// builder behind them (`lib/shared/timeline-navigator.ts`) went with them, and
+// so did the caption clause that said why a below-cut cell carried none. The
+// DENSITY KEY stays — it is the key to the wash, not to a mark.
 
 /** The density ramp, Less → More. A key to the wash, and the one piece of
  *  chrome a grid drawn as a TIER of something larger must not carry its own
@@ -281,7 +231,7 @@ export function MarkLegend({ marks }: { marks: SignificanceMarks | null | undefi
  *  (`chrome="plain"`), because two ramps under two grids read as two scales. */
 export function DensityRamp() {
   return (
-    <span className="flex items-center gap-1 text-[10px] text-rb-500">
+    <span data-density-key="" className="flex items-center gap-1 text-[10px] text-rb-500">
       <span>Less</span>
       {[0, 1, 2, 3, 4].map((level) => (
         <div key={level} className={`h-3 w-3 rounded-sm ${bucketClass(level)}`} />
@@ -290,12 +240,6 @@ export function DensityRamp() {
     </span>
   );
 }
-
-/** The sentence that keeps an unmarked below-cut region from reading as an
- *  empty one. Extends the caption the grid already carries rather than
- *  standing beside it. */
-const MARKS_STOP_AT_THE_CUT =
-  "They carry no marks either: the index counts the summarised days and the summarised actions separately, so which of those days held a liquidation is not something this page holds.";
 
 /** The title row: title + range + Reset in a card, the range alone when bare,
  *  nothing at all when plain (the navigator's own heading speaks for both of
@@ -360,7 +304,6 @@ function WeeksHeatmap({
   title = "Transaction Heatmap",
   chrome = "card",
   extent,
-  marks,
   select = "range",
 }: TransactionHeatmapProps) {
   const single = select === "single";
@@ -576,9 +519,7 @@ function WeeksHeatmap({
         onMouseEnter={() => onCellMouseEnter(d)}
         className={`relative rounded-sm transition-colors ${cls} ${selected ? "ring-1 ring-teal-400 ring-offset-0" : ""} ${selectable ? "cursor-pointer" : ""}`}
         style={{ width: `${CELL_PX}px`, height: `${CELL_PX}px` }}
-      >
-        <CellMarks marks={marks?.day.get(d.ts)} on={d.inLifetime && marks != null && d.ts >= marks.from} />
-      </div>
+      />
     );
   };
 
@@ -629,12 +570,10 @@ function WeeksHeatmap({
             <div className="mt-2 text-[10px] text-rb-500">
               Days before {fmtFullDate(grid.windowMinDay)} are the opening balance — counted in the index, summarised
               rather than listed, and not filterable.
-              {marks != null && ` ${MARKS_STOP_AT_THE_CUT}`}
             </div>
           )}
           {chrome !== "plain" && (
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-              <MarkLegend marks={marks} />
+            <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
               {/* Legend: Less → More */}
               <div className="flex items-center gap-1 text-[10px] text-rb-500">
                 {[0, 1, 2, 3, 5].map((c) => (
@@ -656,10 +595,9 @@ function WeeksHeatmap({
   );
 }
 
-// Month index helpers (UTC). A month is keyed by year*12 + month (0-based).
-// Exported for the navigator's overview strip, which is the same month grain
-// one row deep: sharing the keys is what makes a cell in the strip and a cell
-// in this grid the same cell.
+// Month index helpers (UTC). A month is keyed by year*12 + month (0-based) —
+// the same key `lib/shared/timeline-segments.ts` reduces a life to, which is
+// what makes a month the picker names and a cell in this grid the same cell.
 export const monthStartTs = (idx: number): number => Math.floor(Date.UTC(Math.floor(idx / 12), idx % 12, 1) / 1000);
 export const monthEndTs = (idx: number): number =>
   Math.floor(Date.UTC(Math.floor(idx / 12), (idx % 12) + 1, 1) / 1000) - 1;
@@ -672,8 +610,10 @@ interface MonthCell {
   idx: number;
   count: number;
   inLifetime: boolean;
-  /** Entirely below a windowed page's cut: its count comes from the opening
-   *  balance, and no loaded row falls in it, so it cannot be filtered to. */
+  /** Outside the span the loaded rows cover: its count is real and comes from
+   *  the opening balance or from a month the preload never reached, and no
+   *  loaded row falls in it. Either the page can READ it (`reachMonth`) or the
+   *  cell refuses the click; filtering to it would empty the list. */
   summarised: boolean;
 }
 
@@ -695,12 +635,15 @@ function MonthsHeatmap({
   events,
   priorDays,
   windowDays,
+  lifeDays,
+  held,
+  reachMonth,
+  currentMonth,
   value,
   onChange,
   title = "Transaction Heatmap",
   chrome = "card",
   extent,
-  marks,
   select = "range",
 }: TransactionHeatmapProps) {
   const single = select === "single";
@@ -708,6 +651,45 @@ function MonthsHeatmap({
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   const grid = useMemo(() => {
+    // ── WHERE THE COUNTS COME FROM
+    //
+    // `lifeDays` given, they are the whole life and nothing the page currently
+    // holds moves them: a reader who has read December 2024 from the index
+    // still sees the years around it at the shades they had. Without it they
+    // are reduced here from what the page holds, which is what every caller
+    // did before the segment read and is what a `?folders=0` page still wants.
+    if (lifeDays) {
+      const counts = monthCounts(lifeDays);
+      const live = [...counts.entries()].filter(([, c]) => c > 0).map(([idx]) => idx);
+      if (live.length === 0) return null;
+      const lifeMinIdx = Math.min(...live);
+      const lifeMaxIdx = Math.max(...live);
+      // What the page HOLDS, in months. Everything outside it is a read.
+      const heldMinIdx = held ? monthIdxOf(held[0]) : lifeMinIdx;
+      const heldMaxIdx = held ? monthIdxOf(held[1]) : lifeMaxIdx;
+      const rows: { year: number; cells: MonthCell[] }[] = [];
+      for (let y = Math.floor(lifeMinIdx / 12); y <= Math.floor(lifeMaxIdx / 12); y++) {
+        const cells: MonthCell[] = [];
+        for (let m = 0; m < 12; m++) {
+          const idx = y * 12 + m;
+          cells.push({
+            idx,
+            count: counts.get(idx) ?? 0,
+            inLifetime: idx >= lifeMinIdx && idx <= lifeMaxIdx,
+            summarised: idx < heldMinIdx || idx > heldMaxIdx,
+          });
+        }
+        rows.push({ year: y, cells });
+      }
+      return {
+        rows,
+        minIdx: lifeMinIdx,
+        maxIdx: lifeMaxIdx,
+        maxCount: counts.size === 0 ? 0 : Math.max(...counts.values()),
+        windowMinIdx: heldMinIdx,
+        summarising: lifeMinIdx < heldMinIdx || lifeMaxIdx > heldMaxIdx,
+      };
+    }
     if (events.length === 0 && (windowDays?.length ?? 0) === 0) return null;
     let minTs = Infinity;
     let maxTs = 0;
@@ -777,7 +759,7 @@ function MonthsHeatmap({
       windowMinIdx,
       summarising: (priorDays?.length ?? 0) > 0 && minIdx < windowMinIdx,
     };
-  }, [events, priorDays, windowDays, extent]);
+  }, [events, priorDays, windowDays, lifeDays, held, extent]);
 
   useEffect(() => {
     if (dragStart === null) return;
@@ -800,7 +782,18 @@ function MonthsHeatmap({
   };
 
   const onCellDown = (cell: MonthCell) => {
-    if (!cell.inLifetime || cell.summarised || isEmpty(cell.count)) return;
+    if (!cell.inLifetime || isEmpty(cell.count)) return;
+    // ── THE TWO PATHS (decision 0019, amendment 2026-09-25) ──
+    //
+    // Where the loaded rows hold the month, a click FILTERS them, which is
+    // instant and is what rails.finance has always done. Where they do not,
+    // the page READS that month from the index as its own segment, which is a
+    // request and costs one. A caller that offers no read leaves the cell
+    // refusing, as it did before either path existed.
+    if (cell.summarised) {
+      if (reachMonth) reachMonth(cell.idx);
+      return;
+    }
     if (single) {
       // THIS month, not "a month the selection touches". Equality rather than
       // `inSelection`, so a click inside a typed span (Jan – Mar, click Feb)
@@ -863,36 +856,50 @@ function MonthsHeatmap({
               // reader had OPENED without choosing — it went with the drill on
               // 2026-09-11.) A typed span rings every month it covers, which
               // is the same statement about more cells.
-              const selectable = cell.inLifetime && !cell.summarised && !isEmpty(cell.count);
+              const reachable = cell.summarised && reachMonth != null;
+              const selectable = cell.inLifetime && !isEmpty(cell.count) && (!cell.summarised || reachable);
+              const isCurrent = currentMonth != null && cell.idx === currentMonth;
               const label = `${MONTH_NAMES[cell.idx % 12]} ${Math.floor(cell.idx / 12)} · ${cell.count} event${cell.count === 1 ? "" : "s"}`;
+              const title = !cell.inLifetime
+                ? ""
+                : reachable
+                  ? `${label} · read from the index`
+                  : cell.summarised
+                    ? `${label} · in the opening balance`
+                    : label;
               return (
                 <div
                   key={cell.idx}
                   data-cell-at={monthStartTs(cell.idx)}
                   data-cell-live={cell.inLifetime ? "" : undefined}
-                  title={!cell.inLifetime ? "" : cell.summarised ? `${label} · in the opening balance` : label}
+                  // A cell whose click is a READ rather than a filter, and the
+                  // month the page is standing on: what anything reading the
+                  // page rather than looking at it needs to tell the two paths
+                  // apart without parsing a tooltip.
+                  data-cell-reach={reachable ? "" : undefined}
+                  data-cell-current={isCurrent ? "" : undefined}
+                  title={title}
                   onMouseDown={() => onCellDown(cell)}
                   onMouseEnter={() => onCellEnter(cell)}
-                  className={`relative h-5 rounded-sm transition-colors ${cls} ${selectable && inSelection(cell) ? "ring-1 ring-teal-400" : ""} ${selectable ? "cursor-pointer" : ""}`}
-                >
-                  <CellMarks
-                    marks={marks?.month.get(cell.idx)}
-                    on={cell.inLifetime && marks != null && monthEndTs(cell.idx) >= marks.from}
-                  />
-                </div>
+                  className={`relative h-5 rounded-sm transition-colors ${cls} ${selectable && (inSelection(cell) || isCurrent) ? "ring-1 ring-teal-400" : ""} ${selectable ? "cursor-pointer" : ""}`}
+                />
               );
             })}
           </Fragment>
         ))}
       </div>
-      {chrome !== "plain" && <MarkLegend marks={marks} />}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-rb-500">
         {grid.summarising ? (
-          <span>
-            Months before {MONTH_NAMES[grid.windowMinIdx % 12]} {Math.floor(grid.windowMinIdx / 12)} are the opening
-            balance — counted in the index, summarised rather than listed, and not filterable.
-            {marks != null && ` ${MARKS_STOP_AT_THE_CUT}`}
-          </span>
+          reachMonth ? (
+            // The two paths, said once: a month the list already holds answers
+            // at once, and one it does not is a read.
+            <span>A month the list does not hold is read from the index when you pick it, which takes a moment.</span>
+          ) : (
+            <span>
+              Months before {MONTH_NAMES[grid.windowMinIdx % 12]} {Math.floor(grid.windowMinIdx / 12)} are the opening
+              balance — counted in the index, summarised rather than listed, and not filterable.
+            </span>
+          )
         ) : (
           <span />
         )}

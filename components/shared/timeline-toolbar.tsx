@@ -39,8 +39,7 @@ import { usePreferences } from "@/lib/shared/preferences-context";
 import { ratioLabel } from "@/lib/shared/ratio-format";
 import { lifetimeFiguresKnown } from "@/lib/shared/timeline-opening-balance";
 import { loadedDaysStatement, segmentStatement } from "@/lib/shared/timeline-segments";
-import { TimelineNavigatorPanel } from "@/components/shared/timeline-navigator";
-import type { MarketNote } from "@/lib/shared/market-note";
+import { TimelineNavigatorPanel, type TimelineMonthReach } from "@/components/shared/timeline-navigator";
 import { useHydrated } from "@/hooks/useHydrated";
 import type { TimelineEventsState } from "@/hooks/useTimelineEvents";
 
@@ -209,10 +208,10 @@ export function TimelineDisplayMenu({ items }: { items: TimelineDisplayItem[] })
 }
 
 export interface TimelineToolbarProps {
-  /** False on a page whose months are the segment picker above the rows:
-   *  the Date panel then keeps the typed spread alone (decision 0019,
-   *  amendment 2026-09-24, rule 1). */
-  navigatorGrid?: boolean;
+  /** The second path a month click can take, on a page that can read a month
+   *  from the index as its own segment (decision 0019, amendment 2026-09-25).
+   *  Omitted, the grid filters the loaded rows and nothing else. */
+  monthReach?: TimelineMonthReach;
   tl: TimelineEventsState;
   /** Display flags to expose in the eye-menu (only ones with a render path). */
   displayItems: TimelineDisplayItem[];
@@ -234,7 +233,6 @@ export interface TimelineToolbarProps {
   /** The notes the page is showing, for the navigator panel's marks. Reduced
    *  in ChainTruthTimeline, where they are anchored, and passed here because
    *  the panel hangs off this strip's Date button. */
-  navigatorNotes?: MarketNote[];
 }
 
 /**
@@ -411,8 +409,7 @@ export function TimelineToolbar({
   marketNoteCount,
   marketNotesOn,
   onToggleMarketNotes,
-  navigatorNotes,
-  navigatorGrid = true,
+  monthReach,
 }: TimelineToolbarProps) {
   // One option is not an axis — a single-reserve wallet on a multi-asset roster
   // would get a control whose every state shows the same list.
@@ -450,9 +447,9 @@ export function TimelineToolbar({
   // beside it do, opened by a press and closed by one.
   //
   // The panel used to STAND above the rows permanently, mounted as a sibling
-  // of them in ChainTruthTimeline. It floats now, and the notes its marks read
-  // travel here as a prop instead (`navigatorNotes`), because the strip owns
-  // the button.
+  // of them in ChainTruthTimeline. It floats now, and the second path a month
+  // click can take travels here as a prop (`monthReach`), because the strip
+  // owns the button.
   //
   // Opened only by a press: it covers the rows, and a panel that sprang open
   // at every selection would take the page away from a reader who had just
@@ -640,12 +637,12 @@ export function TimelineToolbar({
             }
           >
             <div className="px-4 pb-3">
-              <TimelineNavigatorPanel tl={tl} notes={navigatorNotes} grid={navigatorGrid} inSheet />
+              <TimelineNavigatorPanel tl={tl} reach={monthReach} onPicked={tl.toggleHeatmap} inSheet />
             </div>
           </MobileSheet>
         ) : (
           <div data-nav-dropdown="" className="overlay-panel absolute inset-x-0 top-full z-40 mt-2 p-3">
-            <TimelineNavigatorPanel tl={tl} notes={navigatorNotes} grid={navigatorGrid} />
+            <TimelineNavigatorPanel tl={tl} reach={monthReach} onPicked={tl.toggleHeatmap} />
           </div>
         ))}
     </div>

@@ -107,7 +107,6 @@ import { setCardOpen } from "@/lib/shared/card-open-store";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { decodeEventId } from "@/lib/shared/page-metadata";
-import { TimelineSegmentPicker } from "@/components/shared/timeline-segment-picker";
 import { eventsWithin, monthEndTs, monthLabel, monthStartTs } from "@/lib/shared/timeline-segments";
 
 // The small-print register a pinned/not-found notice draws in — the same
@@ -420,10 +419,16 @@ export interface ChainTruthTimelineProps {
    *  boundary logic) — only whether that row's dot renders. Omit for a page
    *  with no open/closed concept (a vault share-transfer timeline). */
   closed?: boolean;
-  /** The month picker above the rows, on a page that holds one segment of
-   *  time (decision 0019, amendment 2026-09-24). The page owns the segment
-   *  and its reads; this component draws the picker and hands every pick
-   *  back. The Date panel then keeps its typed spread alone. */
+  /** The SECOND PATH a month click in the Date panel can take, on a page that
+   *  can read a month from the index as its own segment (decision 0019,
+   *  amendment 2026-09-25). The page owns the segment and its reads; this
+   *  component forwards the months to the panel and draws the skeleton while
+   *  one is in flight.
+   *
+   *  ⚠️ IT WAS A PICKER ABOVE THE ROWS for a day (2026-09-24), sticky, with
+   *  Previous / Next / Newest of its own. Miles put the grid back in the Date
+   *  panel on 2026-09-25 — live's form, dev's reach — and
+   *  `timeline-segment-picker.tsx` went with the ruling. */
   segments?: TimelineSegments;
 }
 
@@ -436,7 +441,7 @@ export interface TimelineSegments {
   /** The month being loaded, while one is: the rows give way to a skeleton
    *  sized from that month's days, under its label. */
   loading: number | null;
-  /** A month was picked: show its rows in place of the current month's. */
+  /** A month was picked that the loaded rows do not hold: read it. */
   onPick: (monthIdx: number) => void;
   /** Back to the rows the page opened with. Null at rest. */
   onReset: (() => void) | null;
@@ -888,16 +893,6 @@ function ChainTruthTimelineBody({
   // takes the spine's lead-in dot and the `isFirst` flag, and every other
   // claim on them is suppressed below, so no two rows draw either.
   const liveRowsShown = showMarketNotes ? (liveNotes ?? []) : [];
-  /** What the navigator marks: the notes this page is SHOWING. A reader who
-   *  has put notes away does not get them back on the map, and the marks move
-   *  no count either way — the toolbar's pill states every note the page has,
-   *  whatever the toggle. */
-  const navigatorNotes = useMemo(() => {
-    if (!showMarketNotes) return NO_NOTES;
-    const out: MarketNote[] = [...(liveNotes ?? [])];
-    for (const list of anchored.values()) out.push(...list);
-    return out;
-  }, [showMarketNotes, anchored, liveNotes]);
   const liveSlotAtTop = liveRowsShown.length > 0;
   /** The live WINDOW's own occupancy of the head slot — read off the prop, not
    *  off `showMarketNotes`: it is not a market note, so putting the notes away
@@ -1121,12 +1116,9 @@ function ChainTruthTimelineBody({
 
   const windowed = hasMore ? rows.slice(0, windowSize) : rows;
 
-  // The picker draws the months and the page answers a click by loading one;
-  // it reads nothing off the rows (Miles, 2026-09-24 evening — the navigator
-  // is low-fi). Each drawn row still stamps its own moment as `data-row-at`,
-  // which is how `verify-timeline-navigator.mjs` asserts that every row of a
-  // loaded segment falls inside its month.
-  const hasPicker = segments != null;
+  // Each drawn row stamps its own moment as `data-row-at`, which is how
+  // `verify-timeline-navigator.mjs` asserts that every row of a loaded
+  // segment falls inside its month.
 
   // Day-grouping over the FLAT displayed list (run members included), so the
   // date shows on the first card of each calendar day whether or not the
@@ -1305,23 +1297,22 @@ function ChainTruthTimelineBody({
           // where the notes it marks are anchored — and handed to the toolbar,
           // which owns the Date button the panel now hangs from. The panel
           // used to stand as a sibling of the rows; it floats over them now.
-          navigatorNotes={navigatorNotes}
-          navigatorGrid={!hasPicker}
+          monthReach={
+            segments
+              ? {
+                  lifeDays: segments.lifeDays,
+                  month: segments.month,
+                  onReach: segments.onPick,
+                  onReset: segments.onReset,
+                }
+              : undefined
+          }
         />
       </div>
       {notice}
       {/* A `?at=` landing whose id never turned up in `tl.sortedEvents` — the
           list otherwise renders exactly as it would have without `at`. */}
       {landingNotFoundId && <EventNotFoundNotice id={landingNotFoundId} chainId={chainId} />}
-      {segments && (
-        <TimelineSegmentPicker
-          lifeDays={segments.lifeDays}
-          month={segments.month}
-          loadingMonth={segments.loading}
-          onPick={segments.onPick}
-          onReset={segments.onReset}
-        />
-      )}
       {/* The month being loaded: a skeleton sized from its days, under its
           label, in place of the rows (0019, amendment 2026-09-24, rule 3). */}
       {segments?.loading != null ? (
@@ -1369,8 +1360,7 @@ function ChainTruthTimelineBody({
                     // newest row; its members re-provide null, so one dot.
                     value={!liveHoldsTip && rowIdx === tipRowIdx ? tipSide : null}
                   >
-                    {/* The folder's newest moment, for the segment picker's
-                        in-view bar and scroll-to (see `data-row-at`). */}
+                    {/* The folder's newest moment (see `data-row-at`). */}
                     <div data-row-at={row.folder.lastAt}>
                       <ServedFolderRow
                         folder={row.folder}
