@@ -16,7 +16,6 @@
 //
 //   • the SPREAD — the selected dates, editable, and the way to pick a day or
 //     a span by hand. It is the date picker; there is no second one;
-//   • RESET, when there is something to reset;
 //   • the MONTH MATRIX — the year-row × month-column grid the position page
 //     has always drawn, every month the position lived through on screen at
 //     once. A click shows that month's rows beneath; the same month again
@@ -41,21 +40,32 @@
 // asked for rows, and a map left standing over them is in the way.
 //
 // ⚠️ ON THE picker-inline REVIEW BRANCH (Miles, 2026-09-25) this panel
-// differs from the paragraphs above in three ways, for comparison only, not
+// differs from the paragraphs above in two ways, for comparison only, not
 // a decision: the typed spread (the two date inputs) is gone on both the
-// desktop panel and the phone sheet, the grid is the only filter; the
-// density key is gone and Reset sits where it stood, same on both; and on
+// desktop panel and the phone sheet, the grid is the only filter; and on
 // the DESKTOP panel only, a pick no longer closes it, so a reader can click
 // through several months in a row — it closes on a second press of the Date
-// button, or stays as it is on Reset (which did not close it before this
-// branch either). The phone sheet still closes on a pick. See
+// button. The phone sheet still closes on a pick. See
 // `timeline-toolbar.tsx`'s desktop branch for the close-on-pick wiring.
+//
+// ── THE TICK IS THE WAY BACK (ui-jobs 60)
+//
+// The panel has NO Reset. The density key stood at its foot, then Reset took
+// that place, and now neither does: pressing the month that already carries
+// the tick clears the filter, which is the idiom the rest of the toolbar
+// already uses and leaves the grid as the whole panel. The grid presses back
+// through `clearPicked`, which clears a typed or clicked FILTER and a month
+// read as a SEGMENT together, because a reader pressing the ticked cell means
+// "give me back what I opened with" whichever path took it away. Every cell is
+// a real button, so the keyboard reaches the tick and clears through it too.
+// The phone sheet keeps the Reset in its pinned header — that header is every
+// filter sheet's own grammar (`MobileSheetFilterHeader`), not this panel's.
 //
 // ⚠️ THE SIGNIFICANCE MARKS ARE GONE, 2026-09-25, everywhere: the
 // liquidation dot, the owner-signed underline, the market-note ring, their
 // legend and the builder behind them (`lib/shared/timeline-navigator.ts`,
 // deleted). Miles: "the heatmap is enough and if users need to find a
-// liquidation they can use the event filter". The density key stays.
+// liquidation they can use the event filter".
 //
 // No title. The button that opened the panel already carries the range, so a
 // panel that re-announced itself would be saying the same thing twice.
@@ -115,7 +125,6 @@ import { useMemo } from "react";
 // markup each and come from the real module directly — routing them through a
 // dynamic import would split a chunk to save nothing.
 import { TransactionHeatmap } from "@/components/shared/transaction-heatmap-lazy";
-import { RESET_LINK } from "@/lib/shared/ui-grammar";
 import { lifeExtent } from "@/lib/shared/timeline-segments";
 import type { TimelineEventsState } from "@/hooks/useTimelineEvents";
 
@@ -172,16 +181,13 @@ export interface TimelineMonthReach {
 
 export interface TimelineNavigatorPanelProps {
   tl: TimelineEventsState;
-  /** Inside the phone sheet, whose pinned header already carries the count and
-   *  Reset. The spread stays — it is the picker, not chrome. */
-  inSheet?: boolean;
   /** The second path, where the page offers one. See `TimelineMonthReach`. */
   reach?: TimelineMonthReach;
   /** A month was picked, either path: the panel closes on it. */
   onPicked?: () => void;
 }
 
-export function TimelineNavigatorPanel({ tl, inSheet, reach, onPicked }: TimelineNavigatorPanelProps) {
+export function TimelineNavigatorPanel({ tl, reach, onPicked }: TimelineNavigatorPanelProps) {
   const events = tl.visibleEvents;
   const priorDays = tl.historyWindow.opening?.byDay;
   // The served folders' own days. They are part of the WINDOW, not of the
@@ -218,10 +224,10 @@ export function TimelineNavigatorPanel({ tl, inSheet, reach, onPicked }: Timelin
   if (!life) return null;
 
   const value = tl.dateRange;
-  /** Anything to go back FROM: a typed or clicked filter, or a segment the
-   *  page read. Reset returns the rows the page opened with, both at once. */
-  const resettable = value != null || reach?.onReset != null;
-  const resetAll = () => {
+  /** Back to the rows the page opened with, whichever path took it away — a
+   *  typed or clicked filter, or a segment the page read — since a reader who
+   *  presses the ticked month means both at once. */
+  const clearAll = () => {
     tl.setDateRange(null);
     reach?.onReset?.();
   };
@@ -243,6 +249,12 @@ export function TimelineNavigatorPanel({ tl, inSheet, reach, onPicked }: Timelin
             : null
         }
         currentMonth={reach?.month ?? null}
+        // The month the page is STANDING ON clears on a second press (ui-jobs
+        // 60). The filter path already did this for itself — the grid's own
+        // `isTheSelection` — but a month read as a SEGMENT carries the tick
+        // with no `dateRange` behind it, so the grid hands the press back here
+        // and this is what "clear" means for both paths at once.
+        clearPicked={clearAll}
         value={value}
         onChange={(next) => {
           tl.setDateRange(next);
@@ -252,18 +264,6 @@ export function TimelineNavigatorPanel({ tl, inSheet, reach, onPicked }: Timelin
         chrome="plain"
         select="single"
       />
-
-      {/* The heat legend stood here; Reset takes its place (Miles,
-          2026-09-25). The grid is the only date filter now, so the one thing
-          left to offer beside it is a way back. Withheld in the sheet, whose
-          own header carries Reset already. */}
-      {!inSheet && resettable && (
-        <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-          <button type="button" onClick={resetAll} className={RESET_LINK}>
-            Reset
-          </button>
-        </div>
-      )}
     </div>
   );
 }

@@ -213,6 +213,13 @@ export interface TransactionHeatmapProps {
   /** The month the page holds as its segment, ringed like a selection so the
    *  grid says where the rows below came from. */
   currentMonth?: number | null;
+  /** Press the ticked `currentMonth` again and this runs instead of a second
+   *  read of it (ui-jobs 60). The grid cannot know what "clear" means for a
+   *  month it did not filter to — the page read it as a segment and no
+   *  `value` stands behind the tick — so the caller says. A SELECTED month
+   *  (`value`) clears through `onChange(null)` as it always has; this is the
+   *  other path's half of the same gesture. */
+  clearPicked?: (() => void) | null;
 }
 
 // ── ⚠️ THE SIGNIFICANCE MARKS ARE GONE (2026-09-25, decision 0019) ─────────
@@ -640,6 +647,7 @@ function MonthsHeatmap({
   held,
   reachMonth,
   currentMonth,
+  clearPicked,
   value,
   onChange,
   title = "Transaction Heatmap",
@@ -784,6 +792,16 @@ function MonthsHeatmap({
 
   const onCellDown = (cell: MonthCell) => {
     if (!cell.inLifetime || isEmpty(cell.count)) return;
+    // THE TICKED MONTH CLEARS (ui-jobs 60). First, before either path below:
+    // the month the page is STANDING ON wears the tick with no `value` behind
+    // it, so neither the reach branch (which would re-read it) nor the single
+    // branch (which would filter to it) reads a second press as "put it back".
+    // A month the FILTER ticked falls through to `isTheSelection`, which has
+    // cleared on a second press since the grid was built.
+    if (clearPicked && currentMonth != null && cell.idx === currentMonth) {
+      clearPicked();
+      return;
+    }
     // ── THE TWO PATHS (decision 0019, amendment 2026-09-25) ──
     //
     // Where the loaded rows hold the month, a click FILTERS them, which is
@@ -869,16 +887,32 @@ function MonthsHeatmap({
               // never uses.
               const picked = selectable && (inSelection(cell) || isCurrent);
               const label = `${MONTH_NAMES[cell.idx % 12]} ${Math.floor(cell.idx / 12)} · ${cell.count} event${cell.count === 1 ? "" : "s"}`;
+              // The ticked cell says what a press on it DOES, since the Reset
+              // that used to say it is gone (ui-jobs 60).
               const title = !cell.inLifetime
                 ? ""
-                : reachable
-                  ? `${label} · read from the index`
-                  : cell.summarised
-                    ? `${label} · in the opening balance`
-                    : label;
+                : picked
+                  ? `${label} · showing — press to clear`
+                  : reachable
+                    ? `${label} · read from the index`
+                    : cell.summarised
+                      ? `${label} · in the opening balance`
+                      : label;
               return (
-                <div
+                // A REAL BUTTON, not a div with a mousedown (ui-jobs 60). The
+                // panel's Reset is gone and the tick is the way back, so the
+                // grid is now the only way to clear a month — and a control
+                // the keyboard cannot reach would have left a reader who
+                // filtered by tab and Enter with no way out of the filter.
+                // `disabled` on the cells that already refused a click: they
+                // never had a behaviour to lose, and this keeps them out of
+                // the tab order rather than handing back thirty dead stops.
+                <button
                   key={cell.idx}
+                  type="button"
+                  disabled={!selectable}
+                  aria-label={label}
+                  aria-pressed={selectable ? picked : undefined}
                   data-cell-at={monthStartTs(cell.idx)}
                   data-cell-live={cell.inLifetime ? "" : undefined}
                   // A cell whose click is a READ rather than a filter, and the
@@ -888,9 +922,21 @@ function MonthsHeatmap({
                   data-cell-reach={reachable ? "" : undefined}
                   data-cell-current={isCurrent ? "" : undefined}
                   title={title}
+                  // Mousedown is the pointer path (the range arm starts a drag
+                  // on it); Enter and Space are the keyboard's. No onClick, so
+                  // the two never both fire for one press.
                   onMouseDown={() => onCellDown(cell)}
                   onMouseEnter={() => onCellEnter(cell)}
-                  className={`relative h-5 rounded-sm transition-colors ${cls} ${picked ? "ring-2 ring-rb-500" : ""} ${selectable ? "cursor-pointer" : ""}`}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" && e.key !== " ") return;
+                    e.preventDefault();
+                    onCellDown(cell);
+                  }}
+                  // A selectable cell that is not the tick answers a hover with
+                  // a light ring in the same ink, so the cells read as
+                  // pressable; the tick keeps its own heavier one, and says in
+                  // its tooltip that a press clears it.
+                  className={`focus-ring relative h-5 w-full rounded-sm transition-colors ${cls} ${picked ? "ring-2 ring-rb-500" : selectable ? "hover:ring-1 hover:ring-rb-500" : ""} ${selectable ? "cursor-pointer" : ""}`}
                 >
                   {picked && (
                     <Check
@@ -900,7 +946,7 @@ function MonthsHeatmap({
                       className="pointer-events-none absolute right-0.5 top-1/2 -translate-y-1/2 text-rb-500"
                     />
                   )}
-                </div>
+                </button>
               );
             })}
           </Fragment>

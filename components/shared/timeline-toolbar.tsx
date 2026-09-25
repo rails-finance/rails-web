@@ -659,9 +659,7 @@ export function TimelineToolbar({
           so it is the width of the TIMELINE rather than of the button it
           hangs from: the month matrix is a twelve-column grid and a
           button-width popover would make each month four pixels wide.
-          `overlay-panel` is the app's own floating surface — opaque in both
-          themes, bordered and shadowed — because a translucent panel over
-          moving rows is unreadable. z-40 clears the spine's own z-20. */}
+          z-40 clears the spine's own z-20. */}
       {tl.heatmapOpen &&
         (isPhone ? (
           <MobileSheet
@@ -672,10 +670,11 @@ export function TimelineToolbar({
               <MobileSheetFilterHeader
                 label="Date range"
                 status={countLine}
-                // The sheet's own Reset is the only one on a phone, the
-                // panel's being withheld in the sheet, so it has to clear a
-                // SEGMENT as well as a filter, or a month read on a phone
-                // would have no way back.
+                // The sheet's own Reset, in the pinned header every filter
+                // sheet carries, is the only Reset anywhere now (ui-jobs 60
+                // took the panel's), so it has to clear a SEGMENT as well as a
+                // filter. The tick clears on a phone too; this is the second
+                // way back, not the only one.
                 onReset={
                   dateActive || monthReach?.onReset
                     ? () => {
@@ -688,7 +687,7 @@ export function TimelineToolbar({
             }
           >
             <div className="px-4 pb-3">
-              <TimelineNavigatorPanel tl={tl} reach={monthReach} onPicked={tl.toggleHeatmap} inSheet />
+              <TimelineNavigatorPanel tl={tl} reach={monthReach} onPicked={tl.toggleHeatmap} />
             </div>
           </MobileSheet>
         ) : (
@@ -709,16 +708,17 @@ export function TimelineToolbar({
           // when Reset already closed it, which it did not before this
           // change either. The phone sheet keeps closing on pick.
           //
-          // `shadow-none!` (Miles, 2026-09-25): `overlay-panel` carries
-          // `shadow-xl` for the floating dropdown it usually is; sitting in
-          // flow here, a shadow reads as a card standing off the page rather
-          // than a section of it, so this variant drops just the shadow and
-          // keeps the class's background, border and rounded corners. The `!`
-          // is load-bearing: `overlay-panel`'s own `shadow-xl` sets the same
-          // `--tw-shadow` custom property, and a bare `shadow-none` lost that
-          // fight (both are real Tailwind utilities, but `overlay-panel` is
-          // one hand-written CSS rule already carrying its own weight).
-          <div data-nav-dropdown="" className="overlay-panel shadow-none! mt-2 p-3">
+          // `bg-raised`, NOT `overlay-panel` (ui-jobs 60). `overlay-panel` is
+          // the app's FLOATING surface and `app/globals.css` says so in the
+          // rule's own comment: in dark it takes rb-900, near-black, chosen so
+          // a popover lifts clearly off the rb-800 canvas. This picker does not
+          // float — it opens in flow and pushes the rows below it down — so it
+          // sits on the same raised surface the rest of the inline panels use
+          // (the position card, the flows tower). That also retires the
+          // `shadow-none!` this branch needed to cancel `overlay-panel`'s own
+          // `shadow-xl`, and the border that went with the floating surface:
+          // `bg-raised` carries neither.
+          <div data-nav-dropdown="" className="mt-2 rounded-xl bg-raised p-3">
             <TimelineNavigatorPanel tl={tl} reach={monthReach} />
           </div>
         ))}

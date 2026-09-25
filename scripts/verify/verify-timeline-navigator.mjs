@@ -55,9 +55,11 @@
 //      map's figure, and a stated shortfall whenever it is less;
 //   3  ⚠️ THE SPREAD IS GONE, 2026-09-25 (picker-inline): the two date inputs
 //      above the grid were removed, the month grid being the only filter now.
-//      With nothing picked the Date button reads "Date" and offers no Reset —
-//      the "nothing selected" state a spread with two blank fields used to
-//      show, translated to a control with no field to leave blank. What this
+//      With nothing picked the Date button reads "Date", and no Reset stands
+//      anywhere in the panel — ui-jobs 60 took the panel's last one, the tick
+//      being the way back — which is the "nothing selected" state a spread
+//      with two blank fields used to show, translated to a control with no
+//      field to leave blank. What this
 //      check asserted beyond that — `setDateRange` and the `?from=`/`?to=`
 //      querystring round-tripping on reload for a range the grid cannot
 //      itself produce, one UTC day or a span crossing months — still works
@@ -79,8 +81,9 @@
 //      day a mark comes back. The old form's fail-first proof is kept below.
 //
 //      ⚠️ THE DENSITY KEY LEFT TOO, SAME DAY (picker-inline): it stood under
-//      the grid until Reset took its place, so this check's second half is
-//      now the key's absence rather than its presence;
+//      the grid until Reset took its place, and Reset then left as well
+//      (ui-jobs 60), so this check's second half is now the key's absence
+//      rather than its presence and nothing stands under the grid at all;
 //   6  ⚠️ GONE WITH THE MARKS, 2026-09-25, BY DECISION. It asserted that no
 //      month cell below the cut carried a mark and that the grid's caption
 //      said why. There are no marks and there is no clause, so both halves
@@ -808,9 +811,10 @@ const READ_NAV = () => {
     grain: grid?.getAttribute("data-heatmap-grain") ?? null,
     cells,
     dateInputs: nav.querySelectorAll("[data-date-from], [data-date-to]").length,
-    // The density key is gone, 2026-09-25 (picker-inline); Reset sits where
-    // it stood. `keys` stays as an explicit reader so the check asserting its
-    // absence has something to point at, same reasoning as `dateInputs`.
+    // The density key is gone, 2026-09-25 (picker-inline); Reset took its
+    // place and then left too (ui-jobs 60). Both stay as explicit readers so
+    // the checks asserting their absence have something to point at, same
+    // reasoning as `dateInputs`.
     keys: nav.querySelectorAll("[data-density-key]").length,
     reset: [...nav.querySelectorAll("button")].some((b) => (b.textContent ?? "").trim() === "Reset"),
   };
@@ -1079,13 +1083,13 @@ for (const f of FIXTURES) {
         openControls.countLineBottom <= openControls.dropdownTop,
       `panel count ${openControls.navCount === null ? "absent" : `"${openControls.navCount}"`}; strip's "${restLine}" ends at ${openControls.countLineBottom}, panel starts at ${openControls.dropdownTop}`,
     );
-    // The inline panel sits flat, 2026-09-25 (picker-inline): `overlay-panel`
-    // carries `shadow-xl` for the floating dropdown it usually is, and this
-    // one drops it (`shadow-none!`) so it reads as a section of the page
-    // rather than a card standing off it. `boxShadow` is the browser's
-    // resolved value, not the class list — a bare `shadow-none` lost its own
-    // fight against `overlay-panel`'s `shadow-xl` on the same `--tw-shadow`
-    // custom property, so the class list alone would say nothing true here.
+    // The inline panel sits flat. It dropped `overlay-panel`'s `shadow-xl`
+    // with a `shadow-none!` on 2026-09-25 (picker-inline), and ui-jobs 60 then
+    // took `overlay-panel` itself: the panel opens in flow and pushes the rows
+    // down, so it sits on `bg-raised` like every other inline panel and there
+    // is no floating surface left to cancel. `boxShadow` is the browser's
+    // resolved value rather than the class list, which is what this check
+    // wanted when the two disagreed and is still the thing worth reading.
     // A real shadow always carries a fractional alpha ("0.1)", "0.25)" — a
     // browser's various zero-shadow spellings ("none", or Tailwind's own
     // composed zero layers) never do, so that is the one thing worth testing
@@ -1169,9 +1173,10 @@ for (const f of FIXTURES) {
     //
     // ⚠️ THE DENSITY KEY LEFT TOO, 2026-09-25 (picker-inline): it stood under
     // the grid until Miles asked for Reset in its place instead (the panel no
-    // longer restates it near the spread, the spread itself being gone), so
-    // this check's second half is now an absence rather than a presence —
-    // read the other way round again, the same subject a second time.
+    // longer restates it near the spread, the spread itself being gone), and
+    // Reset then left as well (ui-jobs 60). So this check's second half is now
+    // an absence rather than a presence — read the other way round again, the
+    // same subject a second time.
     const marksNow = await page.evaluate(READ_MARKS);
     check(
       `5  ${f.id}: no cell carries a mark, no legend names one, and the density key is gone`,
@@ -1746,8 +1751,9 @@ for (const g of GROUPED_FIXTURES) {
     //       it, the tip is withheld at the top, no lifetime figure stands, and
     //       the grid — still open, having never closed — rings that month as
     //       the one the page is on, its cell carrying `data-cell-current` and
-    //       its check glyph. Then Reset gives back the rows the page opened
-    //       with;
+    //       its check glyph. Then PRESSING THAT TICKED CELL gives back the
+    //       rows the page opened with (a Reset button's click until ui-jobs
+    //       60, which took the button and made the tick the way back);
     //   S4  the phone at 390 keeps its `MobileSheet` form: the Date control
     //       opens a sheet holding the grid, and a tap on a below-cut month
     //       reads it there too, closing the sheet as it always has.
@@ -1963,9 +1969,14 @@ for (const g of GROUPED_FIXTURES) {
         `${tookRead} ms from click to the rows, against the filter path's figure above`,
       );
 
-      // And Reset gives the rows the page opened with back, count line and
-      // all: the one way out of a segment now the Newest button is gone.
-      await page.click("[data-timeline-navigator] button:has-text('Reset')", { timeout: 10_000 }).catch(() => {});
+      // And PRESSING THE TICKED CELL gives the rows the page opened with
+      // back, count line and all: the one way out of a segment now the Newest
+      // button is gone and the panel's Reset with it (ui-jobs 60). The tick is
+      // the affordance, so this is also the check that the affordance works —
+      // it was a Reset button's click until 2026-09-25.
+      await page
+        .click(`[data-timeline-navigator] button[data-cell-at="${monthStartTs(tIdx)}"]`, { timeout: 10_000 })
+        .catch(() => {});
       await settled(
         page,
         (w) => (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim() === w,
@@ -1974,13 +1985,13 @@ for (const g of GROUPED_FIXTURES) {
       );
       const restAgain = await page.evaluate(COUNT_LINE);
       check(
-        `S3 ${g.id}: Reset gives back the rows the page opened with`,
+        `S3 ${g.id}: pressing the ticked month gives back the rows the page opened with`,
         restAgain === wantRest,
         `"${restAgain}" (want "${wantRest}")`,
       );
       const afterResetControls = await page.evaluate(READ_CONTROLS);
       check(
-        `S3 ${g.id}: Reset also gives the Date button back "Date"`,
+        `S3 ${g.id}: ...and gives the Date button back "Date"`,
         afterResetControls.dateLabel === "Date" && !afterResetControls.dateAccent,
         `button "${afterResetControls.dateLabel}", accent ${afterResetControls.dateAccent}`,
       );
