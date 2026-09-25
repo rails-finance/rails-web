@@ -195,22 +195,22 @@ export function TimelinePage({ title, description, dataSources = DEFAULT_DATA_SO
                     </span>
                     {/* Vertical line connecting to first event */}
                     <div
-                      className="absolute left-1/2 -translate-x-1/2 w-1 bg-rb-300 dark:bg-rb-700"
+                      className="absolute left-1/2 -translate-x-1/2 w-1 bg-rb-300 dark:bg-rb-500"
                       style={{ top: "50%", bottom: "-1rem" }}
                     />
                   </>
                 ) : (
                   <div
-                    className="absolute left-1/2 -translate-x-1/2 w-1 bg-rb-300 dark:bg-rb-700"
+                    className="absolute left-1/2 -translate-x-1/2 w-1 bg-rb-300 dark:bg-rb-500"
                     style={{ top: "-1rem", bottom: "-1rem" }}
                   />
                 )}
               </div>
               {/* Month label */}
               <div className="flex-1 flex items-center gap-4 py-2">
-                <div className="flex-1 border-t border-dashed border-rb-300 dark:border-rb-700" />
+                <div className="flex-1 border-t border-dashed border-rb-300 dark:border-rb-500" />
                 <span className="text-xs font-medium text-rb-500">{group.label}</span>
-                <div className="flex-1 border-t border-dashed border-rb-300 dark:border-rb-700" />
+                <div className="flex-1 border-t border-dashed border-rb-300 dark:border-rb-500" />
               </div>
             </li>,
           );
@@ -225,7 +225,7 @@ export function TimelinePage({ title, description, dataSources = DEFAULT_DATA_SO
                   style={{ width: "40px" }}
                 >
                   <div
-                    className="absolute left-1/2 -translate-x-1/2 w-1 bg-rb-300 dark:bg-rb-700"
+                    className="absolute left-1/2 -translate-x-1/2 w-1 bg-rb-300 dark:bg-rb-500"
                     style={{ top: "-1rem", bottom: "-1rem" }}
                   />
                 </div>

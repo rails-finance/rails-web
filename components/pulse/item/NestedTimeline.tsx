@@ -7,8 +7,10 @@ import { Avatar } from "../shared/Avatar";
 import { formatFullDateTime, isInternalPlatform } from "../types";
 import { Handle } from "./Handle";
 
-// Matches the base position timeline spine connector: rb-300 light / rb-700 dark.
-const CONNECTOR_COLOR_CLASS = "bg-rb-300 dark:bg-rb-700";
+// Matches the position timeline spine (spine-column.tsx's SPINE_COLORS.default,
+// rb-500): rb-300 light / rb-500 dark. rb-700 read too close to the rb-800 dark
+// canvas to be visible (TO-DO-ui-jobs #44).
+const CONNECTOR_COLOR_CLASS = "bg-rb-300 dark:bg-rb-500";
 
 export function NestedTimeline({
   entries,
