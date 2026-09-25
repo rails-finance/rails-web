@@ -23,11 +23,16 @@
 //   2  A MONTH CLICK SHOWS THAT MONTH'S ROWS. Where the loaded rows hold it,
 //      which is every month of a `?folders=0` page the grid lets you click,
 //      it FILTERS: it writes `?from=`/`?to=` as the whole month, moves the
-//      count line, and the editable spread reads the same two dates back. One
-//      control, one grammar. ⚠️ THE PANEL CLOSES ON THE PICK (Miles,
-//      2026-09-25), so every check below that reads the grid after a click
-//      opens it again first; one that forgot would read an absent panel and
-//      report a wrong one.
+//      count line, and the Date button names the month. One control, one
+//      grammar.
+//
+//      ⚠️ THE PANEL NO LONGER CLOSES ON THE PICK, 2026-09-25 (picker-inline):
+//      it stays open so a reader can click through several months in a row,
+//      closing only on a second press of the Date button — checked here too.
+//      What used to prove the click landed (the panel closing) is now the
+//      Date button's own label, since a picked month reads on it whichever
+//      path picked it. The picked cell also carries a small check glyph now,
+//      the ring alone having blended into a busy cell's own fill.
 //
 //      ⚠️ THIS ASSERTION WAS REVERSED ON 2026-09-11, deliberately, and is
 //      kept rather than deleted so nobody later reads the change as a
@@ -48,11 +53,18 @@
 //      relates the 106 to the 57.
 //      So the check asserts the weaker true thing there: never more than the
 //      map's figure, and a stated shortfall whenever it is less;
-//   3  THE SPREAD IS THE PICKER, AND IT ROUND-TRIPS: typing ONE day into both
-//      ends writes it as one UTC day, moves the count line, and comes back on
-//      reload with the panel reading the same two dates; typing a SPAN writes
-//      both ends. The map cannot say a span and does not have to — the spread
-//      is a date control, which is where Miles has always said a span belongs;
+//   3  ⚠️ THE SPREAD IS GONE, 2026-09-25 (picker-inline): the two date inputs
+//      above the grid were removed, the month grid being the only filter now.
+//      With nothing picked the Date button reads "Date" and offers no Reset —
+//      the "nothing selected" state a spread with two blank fields used to
+//      show, translated to a control with no field to leave blank. What this
+//      check asserted beyond that — `setDateRange` and the `?from=`/`?to=`
+//      querystring round-tripping on reload for a range the grid cannot
+//      itself produce, one UTC day or a span crossing months — still works
+//      and is still asserted, reached now by navigating straight to the URL
+//      rather than by typing into a field that is not there. The Date
+//      button's short date-to-date form, the one thing on screen that can
+//      still say a span, is checked alongside it;
 //   4  ONE MONTH AT A TIME: the same month again clears the selection rather
 //      than extending it, and a drag across the month matrix — which under the
 //      old range grammar was a span — still selects one month;
@@ -63,9 +75,12 @@
 //      `?folders=0` grid and the legend included: "the heatmap is enough and
 //      if users need to find a liquidation they can use the event filter". So
 //      it now asserts the absence: no cell anywhere carries a mark, no legend
-//      names one, and the DENSITY KEY is still under the grid. Same subject,
-//      read the other way round, and it goes red the day a mark comes back.
-//      The old form's fail-first proof is kept below;
+//      names one. Same subject, read the other way round, and it goes red the
+//      day a mark comes back. The old form's fail-first proof is kept below.
+//
+//      ⚠️ THE DENSITY KEY LEFT TOO, SAME DAY (picker-inline): it stood under
+//      the grid until Reset took its place, so this check's second half is
+//      now the key's absence rather than its presence;
 //   6  ⚠️ GONE WITH THE MARKS, 2026-09-25, BY DECISION. It asserted that no
 //      month cell below the cut carried a mark and that the grid's caption
 //      said why. There are no marks and there is no clause, so both halves
@@ -750,7 +765,16 @@ async function toEndOfList(page) {
   await stillRows(page);
 }
 
-/** What the navigator is drawing, read as facts and never as prose. */
+/** What the navigator is drawing, read as facts and never as prose.
+ *
+ *  ⚠️ `from`/`to` READ OFF THE SPREAD ARE GONE, 2026-09-25 (picker-inline):
+ *  the two date inputs above the grid were removed, the month grid being the
+ *  only filter now. What a check needs about the CURRENT selection reads off
+ *  the URL (`search(page)`, already every check's own source of truth for a
+ *  write) or off the Date button (`READ_CONTROLS` below), never off a field
+ *  that no longer exists. `dateInputs` stays as an explicit zero rather than
+ *  a silently deleted key, so a check asserting its absence has something to
+ *  point at. */
 const READ_NAV = () => {
   const nav = document.querySelector("[data-timeline-navigator]");
   if (!nav) return null;
@@ -773,14 +797,20 @@ const READ_NAV = () => {
             // do not hold the month, a filter where they do.
             reach: c.hasAttribute("data-cell-reach"),
             current: c.hasAttribute("data-cell-current"),
+            // The picked cell's own tick (picker-inline, 2026-09-25): a small
+            // Check glyph drawn inside it, in the same ink as a 2px ring —
+            // read here as a plain child-SVG test so a check can assert it
+            // without a second DOM round trip.
+            tick: c.querySelector("svg") != null,
           }));
   return {
     grains: [...nav.querySelectorAll("[data-heatmap-grain]")].map((g) => g.getAttribute("data-heatmap-grain")),
     grain: grid?.getAttribute("data-heatmap-grain") ?? null,
     cells,
-    from: nav.querySelector("[data-date-from]")?.value ?? null,
-    to: nav.querySelector("[data-date-to]")?.value ?? null,
-    // The density key, which survived the marks; the legend did not.
+    dateInputs: nav.querySelectorAll("[data-date-from], [data-date-to]").length,
+    // The density key is gone, 2026-09-25 (picker-inline); Reset sits where
+    // it stood. `keys` stays as an explicit reader so the check asserting its
+    // absence has something to point at, same reasoning as `dateInputs`.
     keys: nav.querySelectorAll("[data-density-key]").length,
     reset: [...nav.querySelectorAll("button")].some((b) => (b.textContent ?? "").trim() === "Reset"),
   };
@@ -826,6 +856,22 @@ const READ_CONTROLS = () => ({
   chevronTurned: (
     document.querySelector("[data-date-control] [data-date-chevron]")?.getAttribute("class") ?? ""
   ).includes("rotate-180"),
+  // The Date button's own state (picker-inline, 2026-09-25): it names the
+  // picked month or span while a filter or a segment is active, "Date"
+  // otherwise, and takes the toolbar's own accent treatment for an active
+  // filter chip (`CTRL_ON_ACCENT`, `bg-teal-500/15`) while it does.
+  dateLabel: document.querySelector("[data-date-control]")?.textContent?.trim() ?? null,
+  dateAccent: (document.querySelector("[data-date-control]")?.className ?? "").includes("bg-teal-500/15"),
+  // The inline panel drops overlay-panel's own shadow (picker-inline,
+  // 2026-09-25): it sits flat in the page rather than floating over it.
+  // `boxShadow` is read as the browser resolves it, not off the class list,
+  // since a bare `shadow-none` lost its own fight against `overlay-panel`'s
+  // `shadow-xl` on the same `--tw-shadow` custom property (`shadow-none!`
+  // is what actually won it) — the computed style is the only honest check.
+  dropdownShadow: (() => {
+    const e = document.querySelector("[data-nav-dropdown]");
+    return e ? getComputedStyle(e).boxShadow : null;
+  })(),
 });
 
 /** The figures check 7 compares across the flag — the count line and the
@@ -873,19 +919,14 @@ const CLICK_CELL = (at) => {
   return true;
 };
 
-/** Type into one end of the spread the way a person does — React's own value
- *  setter, then the events it listens for. */
-const TYPE_DATE = ([which, iso]) => {
-  const el = document.querySelector(`[data-date-${which}]`);
-  // No field is a red check, never a throw that takes the fixture's other
-  // checks down with it.
-  if (el == null) return false;
-  const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-  set.call(el, iso);
-  el.dispatchEvent(new Event("input", { bubbles: true }));
-  el.dispatchEvent(new Event("change", { bubbles: true }));
-  return true;
-};
+// ⚠️ `TYPE_DATE` WENT WITH THE SPREAD, 2026-09-25 (picker-inline): the two
+// date inputs it drove (`[data-date-from]`/`[data-date-to]`) are gone from
+// the panel, the month grid being the only filter now. What it exercised —
+// that `setDateRange` and the `?from=`/`?to=` querystring round-trip on
+// reload — still works, and is still checked, just reached the way a bookmark
+// or an old link would reach it: by navigating straight to a URL carrying
+// those params, below, rather than by typing into a field that no longer
+// exists.
 
 const COUNT_LINE = () =>
   (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim();
@@ -932,12 +973,24 @@ const MONTH_LONG = [
 ];
 const monthLong = (idx) => `${MONTH_LONG[idx % 12]} ${Math.floor(idx / 12)}`;
 const monthName = (idx) => `${String(Math.floor(idx / 12))}-${String((idx % 12) + 1).padStart(2, "0")}`;
+// The Date button's own register (picker-inline, 2026-09-25): "Jul 2023",
+// matching `MONTH_SHORT` in transaction-heatmap.tsx exactly.
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const monthShort = (idx) => `${MONTH_SHORT[idx % 12]} ${Math.floor(idx / 12)}`;
 const monthStartTs = (idx) => Math.floor(Date.UTC(Math.floor(idx / 12), idx % 12, 1) / 1000);
 /** The count line's own date register: "14 Nov 2025". */
 const dateText = (ts) =>
   new Date(ts * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
+/** The Date button's OTHER register (picker-inline, 2026-09-25): a range that
+ *  is not exactly one calendar month reads as short date – short date, "24
+ *  Sep – 24 Sep" for a single day. Mirrors `timeline-toolbar.tsx`'s own
+ *  `toLocaleDateString` call exactly, en dash included, so a check comparing
+ *  strings is comparing the same format on both sides. */
+const shortRangeLabel = (fromTs, toTs) => {
+  const short = (ts) => new Date(ts * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric" });
+  return `${short(fromTs)} – ${short(toTs)}`;
+};
 
-const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const search = (page) => page.url().replace(/^[^?]*/, "");
 const firstNumber = (line) => Number(((line.match(/[\d,]+/) ?? [])[0] ?? "").replace(/,/g, ""));
 
@@ -1025,6 +1078,22 @@ for (const f of FIXTURES) {
         openControls.countLineBottom <= openControls.dropdownTop,
       `panel count ${openControls.navCount === null ? "absent" : `"${openControls.navCount}"`}; strip's "${restLine}" ends at ${openControls.countLineBottom}, panel starts at ${openControls.dropdownTop}`,
     );
+    // The inline panel sits flat, 2026-09-25 (picker-inline): `overlay-panel`
+    // carries `shadow-xl` for the floating dropdown it usually is, and this
+    // one drops it (`shadow-none!`) so it reads as a section of the page
+    // rather than a card standing off it. `boxShadow` is the browser's
+    // resolved value, not the class list — a bare `shadow-none` lost its own
+    // fight against `overlay-panel`'s `shadow-xl` on the same `--tw-shadow`
+    // custom property, so the class list alone would say nothing true here.
+    // A real shadow always carries a fractional alpha ("0.1)", "0.25)" — a
+    // browser's various zero-shadow spellings ("none", or Tailwind's own
+    // composed zero layers) never do, so that is the one thing worth testing
+    // across engines rather than matching one browser's exact string.
+    check(
+      `8  ${f.id}: the inline panel has no drop shadow`,
+      openControls.dropdownShadow != null && !/\.\d+\)/.test(openControls.dropdownShadow),
+      `computed box-shadow "${openControls.dropdownShadow}"`,
+    );
     check(
       `8  ${f.id}: the Date button wears a chevron, turned over while the panel is open`,
       openControls.chevrons === 1 &&
@@ -1054,18 +1123,21 @@ for (const f of FIXTURES) {
       `1  ${f.id}: whole life`,
       `${n(summary.totalEvents)} events, ${month(summary.firstTimestamp)} → ${month(summary.lastTimestamp)}`,
     );
+    // 3 — REWRITTEN, 2026-09-25 (picker-inline): the spread this asserted is
+    // gone, the month grid being the only filter now. What "nothing selected"
+    // means for a control with no field to sit blank or full is that the Date
+    // button reads "Date" rather than a picked month, wears none of the
+    // active-filter accent, and offers no Reset — the three things a filter
+    // being ON would turn on.
     check(
-      `3  ${f.id}: with nothing selected the spread shows the whole life, editable`,
-      // Two real dates, not two empty fields: the reader is looking at all of
-      // it, and the control says so rather than sitting blank. The near end is
-      // the summary's own first timestamp; the far end is only required to be
-      // a later ISO day, because on a live position it moves between the route
-      // read and the page load.
-      ISO_DAY.test(rest?.from ?? "") &&
-        ISO_DAY.test(rest?.to ?? "") &&
-        rest.from === day(summary.firstTimestamp) &&
-        rest.from <= rest.to,
-      `spread ${rest?.from}…${rest?.to} (want it to open at ${day(summary.firstTimestamp)})`,
+      `3  ${f.id}: with nothing selected the Date button reads "Date" and offers no Reset`,
+      openControls.dateLabel === "Date" && !openControls.dateAccent && rest?.reset === false,
+      `button "${openControls.dateLabel}" (accent ${openControls.dateAccent}); Reset offered ${rest?.reset}`,
+    );
+    check(
+      `3  ${f.id}: the panel carries no date-input spread`,
+      (rest?.dateInputs ?? -1) === 0,
+      `${rest?.dateInputs} date input(s) in the panel`,
     );
 
     // 11 — an empty month is drawn and refuses the click; one that holds
@@ -1092,12 +1164,17 @@ for (const f of FIXTURES) {
     // check this replaced (the summary's liquidation bucket against the
     // listed rows against the marked cells) lost its subject when Miles
     // dropped all three marks; what it can still assert is that none came
-    // back, and that the DENSITY KEY, the key to the wash and not to a mark,
-    // is still under the grid.
+    // back.
+    //
+    // ⚠️ THE DENSITY KEY LEFT TOO, 2026-09-25 (picker-inline): it stood under
+    // the grid until Miles asked for Reset in its place instead (the panel no
+    // longer restates it near the spread, the spread itself being gone), so
+    // this check's second half is now an absence rather than a presence —
+    // read the other way round again, the same subject a second time.
     const marksNow = await page.evaluate(READ_MARKS);
     check(
-      `5  ${f.id}: no cell carries a mark, no legend names one, and the density key stands`,
-      marksNow.cells === 0 && marksNow.legends === 0 && marksNow.pickers === 0 && (rest?.keys ?? 0) === 1,
+      `5  ${f.id}: no cell carries a mark, no legend names one, and the density key is gone`,
+      marksNow.cells === 0 && marksNow.legends === 0 && marksNow.pickers === 0 && (rest?.keys ?? -1) === 0,
       `${marksNow.cells} marked cell(s), ${marksNow.legends} legend(s), ${marksNow.pickers} picker element(s), ${rest?.keys} density key(s) in the panel`,
     );
 
@@ -1153,10 +1230,12 @@ for (const f of FIXTURES) {
 
     // 2 — a month click filters to that month.
     //
-    // ⚠️ THE PANEL CLOSES ON THE PICK (Miles, 2026-09-25), so every read of
-    // the grid after a click opens it again first. A check that forgot would
-    // read `rest?.from` off a panel that is not there and report the spread as
-    // absent rather than as wrong.
+    // ⚠️ THE PANEL NO LONGER CLOSES ON THE PICK (Miles, 2026-09-25,
+    // picker-inline): it stays open, so a reader can click through several
+    // months in a row without a reopen between them. It closes only on a
+    // second press of the Date button, on Escape, or on a press outside the
+    // strip — group 8 covers the last two, unchanged. Every read below
+    // happens with the panel already open.
     //
     // The month chosen is the one holding the NEWEST listed row: on a windowed
     // page every earlier month may be below the cut, and a month that cannot be
@@ -1170,25 +1249,31 @@ for (const f of FIXTURES) {
       check(`2  ${f.id}: a month to click`, false, "no live, selectable month cell on the grid");
     } else {
       const afterOpenLine = await page.evaluate(COUNT_LINE);
-      const closedOnPick = (await page.$("[data-timeline-navigator]")) == null;
-      await openPanel(page);
       const afterOpen = await page.evaluate(READ_NAV);
+      const afterPickControls = await page.evaluate(READ_CONTROLS);
       const openedSp = new URLSearchParams(search(page));
       const monthCell = (rest?.cells ?? []).find((c) => c.at === targetMonth);
       const shownAfterOpen = firstNumber(afterOpenLine);
+      const pickedCell = (afterOpen?.cells ?? []).find((c) => c.at === targetMonth);
+      const wantLabel = monthShort(monthIdxOf(targetMonth));
       check(
-        `2  ${f.id}: the panel closes on the pick, the reader having asked for rows`,
-        closedOnPick,
-        "the panel was still on the page after a month was clicked",
+        `2  ${f.id}: the panel stays open on the pick, so the reader can click through`,
+        afterPickControls.navigators === 1 && afterPickControls.dropdowns === 1,
+        `${afterPickControls.navigators} panel(s), ${afterPickControls.dropdowns} dropdown(s) after the click`,
       );
       check(
-        `2  ${f.id}: clicking a month filters the rows to it and the spread reads it back`,
+        `2  ${f.id}: clicking a month filters the rows to it and the Date button names it`,
         openedSp.get("from") === day(targetMonth) &&
           openedSp.get("to") === day(monthEndOf(targetMonth)) &&
           afterOpenLine !== restLine &&
-          afterOpen?.from === day(targetMonth) &&
-          afterOpen?.to === day(monthEndOf(targetMonth)),
-        `clicking wrote "${search(page)}" (want from=${day(targetMonth)} to=${day(monthEndOf(targetMonth))}); count line "${restLine}" → "${afterOpenLine}"; spread ${afterOpen?.from}…${afterOpen?.to}`,
+          afterPickControls.dateLabel === wantLabel &&
+          afterPickControls.dateAccent,
+        `clicking wrote "${search(page)}" (want from=${day(targetMonth)} to=${day(monthEndOf(targetMonth))}); count line "${restLine}" → "${afterOpenLine}"; button "${afterPickControls.dateLabel}" (want "${wantLabel}"), accent ${afterPickControls.dateAccent}`,
+      );
+      check(
+        `2  ${f.id}: the picked cell carries its check glyph`,
+        pickedCell?.tick === true,
+        `cell ${targetMonth} tick ${pickedCell?.tick} (found ${pickedCell != null})`,
       );
       check(
         `2  ${f.id}: the rows it shows are the month's own figure, or the page says what it cannot show`,
@@ -1198,23 +1283,44 @@ for (const f of FIXTURES) {
           : shownAfterOpen === monthCell?.count,
         `count line "${afterOpenLine}" → ${shownAfterOpen} row(s), against the map's own ${monthCell?.count} for ${month(targetMonth)}`,
       );
-      // 4 — one month at a time. The panel was reopened above, so the second
-      // click lands on the same cell of the same grid.
+      // The Date button closes the panel that a pick no longer does (Miles,
+      // 2026-09-25): press it and the panel goes, the button's own label
+      // staying exactly what it was — the filter is still on, only the map is
+      // put away.
+      await page.click("[data-date-control]", { timeout: 10_000 }).catch(() => {});
+      await panelGone(page);
+      const closedControls = await page.evaluate(READ_CONTROLS);
+      check(
+        `2  ${f.id}: a second press of the Date button closes the panel, the label unchanged`,
+        closedControls.navigators === 0 &&
+          closedControls.dropdowns === 0 &&
+          closedControls.dateLabel === wantLabel &&
+          closedControls.dateAccent,
+        `${closedControls.navigators} panel(s) after the press; button "${closedControls.dateLabel}" (want "${wantLabel}"), accent ${closedControls.dateAccent}`,
+      );
+      await openPanel(page);
+      // 4 — one month at a time. The panel is reopened above (the pick above
+      // left it closed, deliberately, to prove the Date button's own close);
+      // the second click lands on the same cell of the same grid.
       const beforeSecondClick = search(page);
       await page.evaluate(CLICK_CELL, targetMonth);
       await searchMoved(page, beforeSecondClick);
       await stillRows(page);
+      const afterClearControls = await page.evaluate(READ_CONTROLS);
       check(
         `4  ${f.id}: the same month again clears the selection rather than extending it`,
-        !/[?&](from|to)=/.test(search(page)) && (await page.evaluate(COUNT_LINE)) === restLine,
-        `url "${search(page)}", count line "${await page.evaluate(COUNT_LINE)}" (want "${restLine}")`,
+        !/[?&](from|to)=/.test(search(page)) &&
+          (await page.evaluate(COUNT_LINE)) === restLine &&
+          afterClearControls.dateLabel === "Date" &&
+          !afterClearControls.dateAccent &&
+          afterClearControls.navigators === 1,
+        `url "${search(page)}", count line "${await page.evaluate(COUNT_LINE)}" (want "${restLine}"); button "${afterClearControls.dateLabel}"; panel still open (${afterClearControls.navigators})`,
       );
       // And no drag produces a span: press on one month, release on another,
       // which under the range grammar the grid used to carry would be a
       // multi-month selection. Any OTHER live, selectable month — not
       // necessarily a later one, since the newest month usually has nothing
       // after it and a forward-only drag test would quietly never run.
-      await openPanel(page);
       const spanTo = refusals.filter((m) => m.pointer && m.at !== targetMonth).map((m) => m.at)[0];
       if (spanTo == null) {
         // A real answer, not a failed check: a position whose whole life bar
@@ -1249,56 +1355,64 @@ for (const f of FIXTURES) {
       }
     }
 
-    // 3 — the spread IS the picker, and it round-trips.
+    // 3 — REWRITTEN, 2026-09-25 (picker-inline): the two fields `TYPE_DATE`
+    // used to type into are gone, the month grid being the only filter now.
+    // What they tested underneath — `setDateRange` and the `?from=`/`?to=`
+    // querystring round-tripping on reload — is unchanged, so the check
+    // reaches it the way a bookmark or an old link would: navigating straight
+    // to the URL, never typing into a field that is not there. The Date
+    // button's OTHER register — the short date-to-date form, for a range that
+    // is not exactly one calendar month — gets its only coverage here, since
+    // check 2 above only ever produces a whole month.
     const pickDay = listed.length > 0 ? startOfUtcDay(Math.max(...listed.map((e) => e.timestamp))) : null;
     const spanFrom = startOfUtcDay(oldestListed ?? summary.firstTimestamp);
     if (pickDay == null) {
-      check(`3  ${f.id}: a listed day to type`, false, "no listed rows");
+      check(`3  ${f.id}: a listed day to carry in the URL`, false, "no listed rows");
     } else {
-      await page.goto(`${BASE}${path}?folders=0`, { waitUntil: "domcontentloaded" });
+      const dayFrom = day(pickDay);
+      await page.goto(`${BASE}${path}?folders=0&from=${dayFrom}&to=${dayFrom}`, { waitUntil: "domcontentloaded" });
       await settle(page);
       await openPanel(page);
-      const beforeFrom = search(page);
-      await page.evaluate(TYPE_DATE, ["from", day(pickDay)]);
-      await searchMoved(page, beforeFrom);
-      const beforeTo = search(page);
-      await page.evaluate(TYPE_DATE, ["to", day(pickDay)]);
-      await searchMoved(page, beforeTo);
-      await stillRows(page);
-      const typedLine = await page.evaluate(COUNT_LINE);
-      const typedSp = new URLSearchParams(search(page));
+      const dayLine = await page.evaluate(COUNT_LINE);
+      const dayControls = await page.evaluate(READ_CONTROLS);
+      const wantDayLabel = shortRangeLabel(pickDay, pickDay + SECONDS_PER_DAY - 1);
       check(
-        `3  ${f.id}: one day typed into both ends is one UTC day, and the count moves`,
-        typedSp.get("from") === day(pickDay) && typedSp.get("to") === day(pickDay) && typedLine !== restLine,
-        `from=${typedSp.get("from")} to=${typedSp.get("to")} (want ${day(pickDay)}); count line "${restLine}" → "${typedLine}"`,
+        `3  ${f.id}: a one-day URL still filters, and the Date button reads it`,
+        dayLine !== restLine && dayControls.dateLabel === wantDayLabel && dayControls.dateAccent,
+        `count line "${restLine}" → "${dayLine}"; button "${dayControls.dateLabel}" (want "${wantDayLabel}"), accent ${dayControls.dateAccent}`,
       );
-      const typedUrl = search(page);
-      await page.goto(`${BASE}${path}${typedUrl}`, { waitUntil: "domcontentloaded" });
+      const dayUrl = search(page);
+      await page.goto(`${BASE}${path}${dayUrl}`, { waitUntil: "domcontentloaded" });
+      await settle(page);
+      const reloadedControls = await page.evaluate(READ_CONTROLS);
+      check(
+        `3  ${f.id}: the reloaded URL is the same view, the Date button says so`,
+        search(page) === dayUrl && reloadedControls.dateLabel === wantDayLabel && reloadedControls.dateAccent,
+        `url "${dayUrl}" → "${search(page)}"; button "${reloadedControls.dateLabel}" (want "${wantDayLabel}")`,
+      );
+
+      // A SPAN — the one thing the grid cannot say, being month-grained, and
+      // the reason the URL mechanism still carries an arbitrary range even
+      // with no field left to type one into.
+      const spanA = day(spanFrom);
+      const spanB = dayFrom;
+      const wantFrom = spanFrom <= pickDay ? spanFrom : pickDay;
+      const wantTo = (spanFrom <= pickDay ? pickDay : spanFrom) + SECONDS_PER_DAY - 1;
+      await page.goto(`${BASE}${path}?folders=0&from=${spanA}&to=${spanB}`, { waitUntil: "domcontentloaded" });
       await settle(page);
       await openPanel(page);
-      const reloaded = await page.evaluate(READ_NAV);
-      check(
-        `3  ${f.id}: the reloaded view is the same view, and the spread says so`,
-        search(page) === typedUrl && reloaded?.from === day(pickDay) && reloaded?.to === day(pickDay),
-        `url "${typedUrl}" → "${search(page)}"; spread ${reloaded?.from}…${reloaded?.to} (want ${day(pickDay)} both ends)`,
-      );
-      // A SPAN — the one thing the map cannot say, and the reason the spread
-      // is a control and not a caption.
-      const beforeSpan = search(page);
-      await page.evaluate(TYPE_DATE, ["from", day(spanFrom)]);
-      await searchMoved(page, beforeSpan);
-      await stillRows(page);
-      const spanned = await page.evaluate(READ_NAV);
+      const spanLine = await page.evaluate(COUNT_LINE);
+      const spanControls = await page.evaluate(READ_CONTROLS);
+      const wantSpanLabel = shortRangeLabel(wantFrom, wantTo);
       const sp3 = new URLSearchParams(search(page));
-      const wantFrom = spanFrom <= pickDay ? day(spanFrom) : day(pickDay);
-      const wantTo = spanFrom <= pickDay ? day(pickDay) : day(spanFrom);
       check(
-        `3  ${f.id}: a span typed into the spread is written whole and read back whole`,
-        sp3.get("from") === wantFrom &&
-          sp3.get("to") === wantTo &&
-          spanned?.from === wantFrom &&
-          spanned?.to === wantTo,
-        `url ${sp3.get("from")}…${sp3.get("to")} (want ${wantFrom}…${wantTo}); spread ${spanned?.from}…${spanned?.to}`,
+        `3  ${f.id}: a span carried in the URL is read back whole, and the Date button names it`,
+        sp3.get("from") === day(wantFrom) &&
+          sp3.get("to") === day(spanFrom <= pickDay ? pickDay : spanFrom) &&
+          spanLine !== restLine &&
+          spanControls.dateLabel === wantSpanLabel &&
+          spanControls.dateAccent,
+        `url ${sp3.get("from")}…${sp3.get("to")} (want ${day(wantFrom)}…${day(spanFrom <= pickDay ? pickDay : spanFrom)}); button "${spanControls.dateLabel}" (want "${wantSpanLabel}")`,
       );
     }
 
@@ -1500,9 +1614,13 @@ for (const f of FIXTURES) {
 //       month, and every one of them is open (a date filter opens what covers
 //       the dates);
 //   G4  the same month again clears the selection and the count line returns;
-//   G5  one day typed into both ends, on the busiest day a folder covers:
-//       the line counts that day's loose events plus the members the folders'
-//       `byDay` puts on it.
+//   G5  a day carried in the URL, on the busiest day a folder covers: the
+//       line counts that day's loose events plus the members the folders'
+//       `byDay` puts on it. ⚠️ REWRITTEN, 2026-09-25 (picker-inline): it used
+//       to type the day into the removed spread; a single day is never a
+//       whole month, so the grid cannot reach it either, and this now
+//       navigates straight to the URL instead, the same substitution check 3
+//       makes above.
 //
 // ⚠️ THE MARKS ARE NOT CHECKED HERE, AND CANNOT BE YET. A folder carries
 // `counts` (per action) and `byDay` (per day) as two separate histograms, so
@@ -1616,21 +1734,28 @@ for (const g of GROUPED_FIXTURES) {
     //
     //   S0  the grid is BACK IN THE PANEL and the picker above the rows is
     //       gone: nothing on the page draws one, and the Date button opens a
-    //       panel holding the spread and exactly one month grid;
-    //   S1  that grid is every month the life holds, with the density key
-    //       under it and no mark on any cell;
+    //       panel holding exactly one month grid;
+    //   S1  that grid is every month the life holds, with no mark on any cell;
     //   S2  THE FILTER PATH. A month the loaded rows hold writes
     //       `?from=`/`?to=` for that month, moves the count line to its
-    //       filtered form, closes the panel and reads NOTHING: no skeleton
-    //       stands and the line never states a segment;
+    //       filtered form and reads NOTHING: no skeleton stands and the line
+    //       never states a segment. The panel stays open;
     //   S3  THE READ PATH. A month below the cut becomes the page's segment:
     //       the count line states the month in time, every row drawn is inside
     //       it, the tip is withheld at the top, no lifetime figure stands, and
-    //       the grid reopened rings that month as the one the page is on. Then
-    //       Reset gives back the rows the page opened with;
+    //       the grid — still open, having never closed — rings that month as
+    //       the one the page is on, its cell carrying `data-cell-current` and
+    //       its check glyph. Then Reset gives back the rows the page opened
+    //       with;
     //   S4  the phone at 390 keeps its `MobileSheet` form: the Date control
     //       opens a sheet holding the grid, and a tap on a below-cut month
-    //       reads it there too.
+    //       reads it there too, closing the sheet as it always has.
+    //
+    // ⚠️ REWRITTEN AGAIN, 2026-09-25 (picker-inline): S0 and S1 no longer
+    // check for a spread or a density key, both removed from the panel; S2
+    // and S3 no longer expect the panel to close on the pick, since it
+    // doesn't; and S3 gains the check-glyph assertion decision 0019's amendment
+    // did not need, because the ring alone did not yet need strengthening.
     //
     // The two paths differ in what they COST, which is the reason for having
     // both, so each is timed and the figure printed beside its check.
@@ -1645,14 +1770,14 @@ for (const g of GROUPED_FIXTURES) {
     const navG = await page.evaluate(READ_NAV);
     const openG = await page.evaluate(READ_CONTROLS);
     check(
-      `S0 ${g.id}: the Date button opens one panel holding the spread and one month grid`,
-      openedG &&
-        openG.navigators === 1 &&
-        openG.grains.length === 1 &&
-        navG?.grain === "months" &&
-        ISO_DAY.test(navG?.from ?? "") &&
-        ISO_DAY.test(navG?.to ?? ""),
-      `opened ${openedG}, ${openG.navigators} panel(s), grids [${openG.grains.join(", ")}], spread ${navG?.from}…${navG?.to}`,
+      `S0 ${g.id}: the Date button opens one panel holding one month grid`,
+      openedG && openG.navigators === 1 && openG.grains.length === 1 && navG?.grain === "months",
+      `opened ${openedG}, ${openG.navigators} panel(s), grids [${openG.grains.join(", ")}]`,
+    );
+    check(
+      `S0 ${g.id}: the panel carries no date-input spread`,
+      (navG?.dateInputs ?? -1) === 0,
+      `${navG?.dateInputs} date input(s) in the panel`,
     );
 
     // The whole life by month: the summary read past the tip IS the life, and
@@ -1690,12 +1815,13 @@ for (const g of GROUPED_FIXTURES) {
         ? `Showing ${n(x)} of ${loadedText} · ${n(route.totalEvents)} events`
         : `${n(x)} of ${n(route.totalEvents)} events`;
 
-    // S1 — the grid is the life, and it carries a key and no marks.
+    // S1 — the grid is the life, no density key under it any more, and no
+    // marks.
     const gridMonths = (navG?.cells ?? []).map((c) => monthIdxOf(c.at)).sort((a, b) => a - b);
     check(
-      `S1 ${g.id}: the grid is every month the life holds, with the density key and no mark`,
+      `S1 ${g.id}: the grid is every month the life holds, with no density key and no mark`,
       liveWant.every((i) => gridMonths.includes(i)) &&
-        (navG?.keys ?? 0) === 1 &&
+        (navG?.keys ?? -1) === 0 &&
         marksG.cells === 0 &&
         marksG.legends === 0,
       `${gridMonths.length} live cell(s) covering ${liveWant.filter((i) => gridMonths.includes(i)).length} of ${liveWant.length} month(s) the life holds; ${navG?.keys} density key(s), ${marksG.cells} mark(s), ${marksG.legends} legend(s)`,
@@ -1726,8 +1852,15 @@ for (const g of GROUPED_FIXTURES) {
       const tookFilter = Date.now() - t0;
       const line = await page.evaluate(COUNT_LINE);
       const sp = new URLSearchParams(search(page));
-      const closed = (await page.$("[data-timeline-navigator]")) == null;
+      // ⚠️ NO LONGER `closed` — the panel stays open on the pick, 2026-09-25
+      // (picker-inline). What used to prove the reader got their rows back
+      // (the map closing) is now the Date button naming the month instead.
+      const stillOpen = (await page.$("[data-timeline-navigator]")) != null;
       const skeleton = (await page.$("[data-segment-skeleton]")) != null;
+      const filterControls = await page.evaluate(READ_CONTROLS);
+      const filterNav = await page.evaluate(READ_NAV);
+      const filteredCell = (filterNav?.cells ?? []).find((c) => c.at === heldFrom);
+      const wantFilterLabel = monthShort(heldMonth);
       check(
         `S2 ${g.id}: ${monthName(heldMonth)} is held, so the click filters the rows and reads nothing`,
         clicked &&
@@ -1735,8 +1868,13 @@ for (const g of GROUPED_FIXTURES) {
           sp.get("to") === day(heldTo) &&
           line === wantFiltered &&
           !skeleton &&
-          closed,
-        `clicked ${clicked}; from=${sp.get("from")} to=${sp.get("to")} (want ${day(heldFrom)}…${day(heldTo)}); "${line}" (want "${wantFiltered}"); skeleton ${skeleton}; panel closed ${closed}`,
+          stillOpen,
+        `clicked ${clicked}; from=${sp.get("from")} to=${sp.get("to")} (want ${day(heldFrom)}…${day(heldTo)}); "${line}" (want "${wantFiltered}"); skeleton ${skeleton}; panel open ${stillOpen}`,
+      );
+      check(
+        `S2 ${g.id}: the Date button names ${monthName(heldMonth)}, and the picked cell carries its check glyph`,
+        filterControls.dateLabel === wantFilterLabel && filterControls.dateAccent && filteredCell?.tick === true,
+        `button "${filterControls.dateLabel}" (want "${wantFilterLabel}"), accent ${filterControls.dateAccent}; cell tick ${filteredCell?.tick}`,
       );
       info(`S2 ${g.id}: the filter path`, `${tookFilter} ms from click to the count line`);
     }
@@ -1767,15 +1905,17 @@ for (const g of GROUPED_FIXTURES) {
       const tookRead = Date.now() - t0;
       const line = await page.evaluate(COUNT_LINE);
       const spine = await page.evaluate(READ_SPINE);
-      const closed = (await page.$("[data-timeline-navigator]")) == null;
+      // ⚠️ NO LONGER `closed` — the panel stays open on the pick, 2026-09-25
+      // (picker-inline); see S2's own note above.
+      const stillOpen = (await page.$("[data-timeline-navigator]")) != null;
       const rowsAt = await page.evaluate(() =>
         [...document.querySelectorAll("[data-row-at]")].map((e) => Number(e.dataset.rowAt)),
       );
       const shrunk = cap != null && tCount > cap;
       check(
         `S3 ${g.id}: ${monthName(tIdx)} is below the cut, so the grid offers it as a read and the click takes it`,
-        pressed && reachCell?.reach === true && closed,
-        `pressed ${pressed}; the grid called it ${reachCell == null ? "no cell at all" : reachCell.reach ? "a read" : "a filter"}; panel closed ${closed}`,
+        pressed && reachCell?.reach === true && stillOpen,
+        `pressed ${pressed}; the grid called it ${reachCell == null ? "no cell at all" : reachCell.reach ? "a read" : "a filter"}; panel open ${stillOpen}`,
       );
       check(
         `S3 ${g.id}: the count line states the month in time`,
@@ -1795,13 +1935,27 @@ for (const g of GROUPED_FIXTURES) {
         spine.tip >= 1 && !line.includes(n(route.totalEvents)),
         `${spine.tip} bare tip row(s); "${line}"`,
       );
-      await openPanel(page);
-      const onSegment = await page.evaluate(READ_NAV);
-      const current = (onSegment?.cells ?? []).filter((c) => c.current).map((c) => monthIdxOf(c.at));
+      const readControls = await page.evaluate(READ_CONTROLS);
+      const wantReadLabel = monthShort(tIdx);
       check(
-        `S3 ${g.id}: the grid reopened rings ${monthName(tIdx)} as the month the page is on`,
+        `S3 ${g.id}: the Date button names ${monthName(tIdx)} while the segment is on the page`,
+        readControls.dateLabel === wantReadLabel && readControls.dateAccent,
+        `button "${readControls.dateLabel}" (want "${wantReadLabel}"), accent ${readControls.dateAccent}`,
+      );
+      // The panel never closed on this pick, so this reads the grid as it
+      // stands rather than reopening it.
+      const onSegment = await page.evaluate(READ_NAV);
+      const currentCells = (onSegment?.cells ?? []).filter((c) => c.current);
+      const current = currentCells.map((c) => monthIdxOf(c.at));
+      check(
+        `S3 ${g.id}: the grid, still open, rings ${monthName(tIdx)} as the month the page is on`,
         current.length === 1 && current[0] === tIdx,
         `${current.length} month(s) ringed as current${current.length ? ` (${current.map(monthName).join(", ")})` : ""}`,
+      );
+      check(
+        `S3 ${g.id}: that cell carries data-cell-current and its check glyph`,
+        currentCells.length === 1 && currentCells[0].current === true && currentCells[0].tick === true,
+        `${currentCells.length} current cell(s), tick ${currentCells[0]?.tick}`,
       );
       info(
         `S3 ${g.id}: the read path`,
@@ -1822,6 +1976,12 @@ for (const g of GROUPED_FIXTURES) {
         `S3 ${g.id}: Reset gives back the rows the page opened with`,
         restAgain === wantRest,
         `"${restAgain}" (want "${wantRest}")`,
+      );
+      const afterResetControls = await page.evaluate(READ_CONTROLS);
+      check(
+        `S3 ${g.id}: Reset also gives the Date button back "Date"`,
+        afterResetControls.dateLabel === "Date" && !afterResetControls.dateAccent,
+        `button "${afterResetControls.dateLabel}", accent ${afterResetControls.dateAccent}`,
       );
     }
 
@@ -1881,11 +2041,12 @@ for (const g of GROUPED_FIXTURES) {
       await phone.close();
     }
 
-    // Back to the newest rows for G5: reload rather than pick, so the spread
-    // reads the preload's own life.
-    await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
-    await settle(page);
-    // G5 — a day typed into the spread, on the busiest day a folder covers.
+    // G5 — REWRITTEN, 2026-09-25 (picker-inline): `TYPE_DATE` drove this one
+    // too. The busiest folder day is a single UTC day, never a whole month,
+    // so the grid (month-grained) cannot reach it at all any more; what
+    // still can is the same URL mechanism check 3 above now uses — a direct
+    // navigation to `?from=`/`?to=` for that day, which is exactly what a
+    // typed day used to write and exactly what the page still reads.
     const folderDays = new Map();
     for (const f of folders)
       for (const d of f.byDay) {
@@ -1896,14 +2057,9 @@ for (const g of GROUPED_FIXTURES) {
     if (pickDay == null) {
       check(`G5 ${g.id}: a day a folder covers`, false, "no folder day in the listed range");
     } else {
-      await openPanel(page);
-      const beforeFrom = search(page);
-      await page.evaluate(TYPE_DATE, ["from", day(pickDay)]);
-      await searchMoved(page, beforeFrom);
-      const beforeTo = search(page);
-      await page.evaluate(TYPE_DATE, ["to", day(pickDay)]);
-      await searchMoved(page, beforeTo);
-      await stillRows(page);
+      const dayFrom = day(pickDay);
+      await page.goto(`${BASE}${path}?from=${dayFrom}&to=${dayFrom}`, { waitUntil: "domcontentloaded" });
+      await settle(page);
       const want = expectedIn(pickDay, pickDay + SECONDS_PER_DAY - 1);
       await settled(
         page,
@@ -1914,8 +2070,8 @@ for (const g of GROUPED_FIXTURES) {
       const line = await page.evaluate(COUNT_LINE);
       const sp = new URLSearchParams(search(page));
       check(
-        `G5 ${g.id}: ${day(pickDay)} typed into both ends counts its loose events plus the folder members on it`,
-        sp.get("from") === day(pickDay) && sp.get("to") === day(pickDay) && line === filteredLine(want),
+        `G5 ${g.id}: ${dayFrom} carried in the URL counts its loose events plus the folder members on it`,
+        sp.get("from") === dayFrom && sp.get("to") === dayFrom && line === filteredLine(want),
         `from=${sp.get("from")} to=${sp.get("to")}; "${line}" (want "${filteredLine(want)}": ${folderDays.get(pickDay)} folder member(s) that day)`,
       );
     }
