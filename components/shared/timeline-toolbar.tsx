@@ -669,12 +669,16 @@ export function TimelineToolbar({
           // when Reset already closed it, which it did not before this
           // change either. The phone sheet keeps closing on pick.
           //
-          // `shadow-none` (Miles, 2026-09-25): `overlay-panel` carries
+          // `shadow-none!` (Miles, 2026-09-25): `overlay-panel` carries
           // `shadow-xl` for the floating dropdown it usually is; sitting in
           // flow here, a shadow reads as a card standing off the page rather
           // than a section of it, so this variant drops just the shadow and
-          // keeps the class's background, border and rounded corners.
-          <div data-nav-dropdown="" className="overlay-panel shadow-none mt-2 p-3">
+          // keeps the class's background, border and rounded corners. The `!`
+          // is load-bearing: `overlay-panel`'s own `shadow-xl` sets the same
+          // `--tw-shadow` custom property, and a bare `shadow-none` lost that
+          // fight (both are real Tailwind utilities, but `overlay-panel` is
+          // one hand-written CSS rule already carrying its own weight).
+          <div data-nav-dropdown="" className="overlay-panel shadow-none! mt-2 p-3">
             <TimelineNavigatorPanel tl={tl} reach={monthReach} />
           </div>
         ))}
