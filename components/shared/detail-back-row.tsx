@@ -16,8 +16,7 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 import { listingHrefForWallet, protocolForSession } from "@/lib/shared/protocols";
 import { RailHeader } from "@/components/shared/rail-header";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
-import { LatestPrices } from "@/components/shared/latest-prices";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 
 /** The one back affordance on every detail page. NAV_BUTTON pill + ArrowLeft(14)
@@ -84,20 +83,26 @@ export function DetailBackButton({
  *  `showStamp={false}` is for routes with no chain overlay (PWN) — rendering a
  *  stamp there would assert a freshness the page doesn't have.
  *
- *  `assets` is what the dock used to be handed. A view that does not price its
- *  assets yet passes none and the dropdown says so, which is a fact about that
- *  explorer rather than a missing control. */
+ *  `assets` is what the dock used to be handed, and every position view passes
+ *  what it holds (ui-jobs 56) — priced, or named with no figure where the
+ *  protocol states none. `priceReason` is that protocol's own recorded
+ *  sentence, which the dropdown shows in place of the generic "not yet";
+ *  `ORACLE_USD_REASON` in lib/shared/oracle-usd-reasons.ts holds them, and the
+ *  coverage matrix's `oracleUsd: { why }` cell reads the same string. A view
+ *  that has simply not been wired passes neither and keeps the generic line. */
 export function DetailTopRow({
   session,
   wallet,
   showStamp = true,
   assets = [],
+  priceReason,
   children,
 }: {
   session: SessionProtocol;
   wallet?: string | null;
   showStamp?: boolean;
-  assets?: PriceStripAsset[];
+  assets?: LatestPriceAsset[];
+  priceReason?: string;
   children?: ReactNode;
 }) {
   return (
@@ -109,7 +114,7 @@ export function DetailTopRow({
         <div className="flex min-w-0 items-center gap-2">
           <DetailBackButton session={session} wallet={wallet} compact />
           {showStamp && <RecencyStamp />}
-          <LatestPrices assets={assets} />
+          <LatestPrices assets={assets} reason={priceReason} />
         </div>
         {/* Tools is part of the row, not of the export menu that usually fills
             it: a caller renders its shapes only once the view has loaded
