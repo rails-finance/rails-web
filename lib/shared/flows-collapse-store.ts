@@ -22,7 +22,26 @@
 // and is what React renders from afterwards; the script only covers the frames
 // before it.
 
+import { protocolForPathname } from "@/lib/shared/protocols";
+
 const STORAGE_KEY = "rails-flows-collapsed-v1";
+
+/** The key a ROUTE collapses under (ui-jobs 63): the roster id of the explorer
+ *  the route sits inside. Every position and trove page reaches the tower this
+ *  way, so the chevron and the stored setting arrive without a prop threaded
+ *  through the two dozen call sites that draw it.
+ *
+ *  Null off the rails, and null on an explorer's own LISTING route. A listing
+ *  draws no tower today, so the second guard buys nothing now; it is what keeps
+ *  a future roster or coverage surface that did draw one from picking up the
+ *  protocol's key and collapsing with the position pages. The case the key is
+ *  for is a route BELOW the listing: a position, a trove, a vault holder under
+ *  a sub-page. */
+export function flowsCollapseKeyForPathname(pathname: string | null): string | null {
+  const entry = protocolForPathname(pathname);
+  if (!entry || pathname === entry.href) return null;
+  return entry.id;
+}
 
 /** The attribute the pre-paint script writes and `app/globals.css` reads.
  *  "1" collapsed, "0" expanded. */

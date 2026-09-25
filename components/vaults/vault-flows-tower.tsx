@@ -31,10 +31,8 @@
 // block.
 
 import type { ReactNode } from "react";
-import { usePathname } from "next/navigation";
 
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { protocolForPathname } from "@/lib/shared/protocols";
 import { aaveVaultFlowsContent } from "@/lib/shared/learn-more-content";
 import type { VaultPositionEconomics, VaultPositionFlows } from "@/lib/aave-vaults/position-economics";
 import type { ChainTruthTowerData } from "@/lib/shared/chain-truth-economics";
@@ -65,14 +63,13 @@ export interface VaultFlowsTowerProps {
 }
 
 export function VaultFlowsTower(props: VaultFlowsTowerProps) {
-  // THE TOWER COLLAPSES, AND THE STATE IS THE PROTOCOL'S (ui-jobs 61). The
-  // roster id the route resolves to — `aave-vaults`, `yearn`, `morpho-base` —
-  // is the key: it is already chain-qualified and unique, so Base Morpho and
+  // THE TOWER COLLAPSES, AND THE STATE IS THE PROTOCOL'S (ui-jobs 61). The key
+  // is the roster id the route resolves to (`aave-vaults`, `yearn`,
+  // `morpho-base`), which is chain-qualified and unique, so Base Morpho and
   // Ethereum Morpho are two settings rather than one, and every holder page in
-  // a vault explorer opens the way the reader left the last one. A route that
-  // resolves to no roster entry gets null and a tower that does not collapse,
-  // rather than a shared key that would put several explorers on one switch.
-  const collapseKey = protocolForPathname(usePathname())?.id ?? null;
+  // a vault explorer opens the way the reader left the last one. The tower
+  // reads that off the pathname now (ui-jobs 63), for the position pages as
+  // well as these, so this file states nothing.
   if (!props.computed) return null;
   const { data, flows } = props.computed;
   const total = flows.counts.mints + flows.counts.burns + flows.counts.transfersIn + flows.counts.transfersOut;
@@ -112,7 +109,6 @@ export function VaultFlowsTower(props: VaultFlowsTowerProps) {
         title="Lifetime flows"
         explanation={vaultPositionEconomicsExplanation(data, flows, props, total)}
         learnMore={aaveVaultFlowsContent(props.assetSymbol, props.shareSymbol)}
-        collapseKey={collapseKey}
       />
     </div>
   );

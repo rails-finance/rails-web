@@ -39,6 +39,7 @@
 // opt-in; a feeder that sets none renders as before.
 
 import { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { ChartColumnBig, ChevronDown } from "lucide-react";
 import {
   DualTowerChart,
@@ -62,6 +63,7 @@ import {
   COLLAPSE_KEY_ATTR,
   COLLAPSED_ATTR,
   collapseScript,
+  flowsCollapseKeyForPathname,
   isFlowsCollapsed,
   setFlowsCollapsed,
 } from "@/lib/shared/flows-collapse-store";
@@ -961,16 +963,23 @@ export interface ChainTruthTowerProps {
    *  right-aligned redemption net-outcome strip). Same slot the position
    *  card's context line uses. */
   rowExtra?: ReactNode;
-  /** PUT THIS TOWER AWAY, AND REMEMBER IT PER PROTOCOL (ui-jobs 61). Given a
-   *  protocol's roster id, the heading becomes the button that collapses the
-   *  panel to its own header row, a chevron rides the top right, and the state
-   *  is stored under that id — so every position page in the protocol opens
-   *  the way the reader left the last one (lib/shared/flows-collapse-store.ts).
+  /** PUT THIS TOWER AWAY, AND REMEMBER IT PER PROTOCOL (ui-jobs 61, widened by
+   *  63). Given a protocol's roster id, the heading becomes the button that
+   *  collapses the panel to its own header row, a chevron rides the top right,
+   *  and the state is stored under that id, so every position page in the
+   *  protocol opens the way the reader left the last one
+   *  (lib/shared/flows-collapse-store.ts).
    *
-   *  OPT-IN, and null is the default: the other ~28 surfaces that draw this
-   *  tower keep the plain eyebrow and no chevron, and a surface that belongs to
-   *  no protocol — the home page's live example frame, which is inert — passes
-   *  null explicitly rather than borrowing an id that is not its own. */
+   *  LEAVE IT OFF AND THE ROUTE ANSWERS. Every position and trove page sits
+   *  inside an explorer, so `flowsCollapseKeyForPathname` reads the id off the
+   *  pathname and the two dozen call sites need say nothing. 61 shipped this as
+   *  an opt-in prop that only the vault timelines passed, which put the chevron
+   *  on the vault timelines and on no borrow position at all.
+   *
+   *  PASS NULL TO OPT OUT: a surface that belongs to no protocol but draws on a
+   *  protocol's route, or one whose tower is inert. The home page's live
+   *  example frame does. Its route resolves to no explorer anyway, and saying
+   *  so keeps the frame from picking a key up if it ever moves. */
   collapseKey?: string | null;
 }
 
@@ -980,8 +989,11 @@ export function ChainTruthTower({
   explanation,
   learnMore,
   rowExtra,
-  collapseKey = null,
+  collapseKey: collapseKeyProp,
 }: ChainTruthTowerProps) {
+  // The route's key unless the caller states one (including a stated null).
+  const pathname = usePathname();
+  const collapseKey = collapseKeyProp !== undefined ? collapseKeyProp : flowsCollapseKeyForPathname(pathname);
   // Lifetime-first, matching the reference towers: the all-time flows render by
   // default, and the Display menu's "Hide inactive / repaid" collapses to the
   // current-state principal/interest split.
