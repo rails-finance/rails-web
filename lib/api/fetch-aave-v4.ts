@@ -13,6 +13,10 @@
 // Wire-format contracts:
 //   /timeline → BaseActivityEvent[] with AaveV4Context attached. Match the
 //     rails-server-onboarding api/src/routes/aaveV4.ts TimelineResponse type.
+//     `recent` asks for a WINDOW of the newest N events; without it the box
+//     answers the whole history, which its rate limiter counts in the
+//     60-a-minute whole-history bucket (rails-ops decisions/0019). A position
+//     page passes the window; the CSV export is what asks whole, once.
 //   /positions → flat list of (spoke, reserve) rows; one entry per non-zero
 //     supply/debt pair from mv_aave_v4_positions.
 
@@ -21,8 +25,19 @@ import { settleFetchMark } from "@/lib/perf/settle-marks";
 
 export interface FetchAaveV4TimelineResult {
   wallet: string;
+  /** What this answer CARRIES: the whole history, or the newest window of it. */
   events: BaseActivityEvent[];
+  /** What the wallet HAS across every spoke, counted before the window. */
   totalEvents: number;
+  /** What each spoke has, keyed by the display name the events carry ("Main",
+   *  "Kelp"). Absent on a whole-history answer, where the drawn events are
+   *  already the count. A spoke page reads its own entry to number its rows
+   *  over the whole history and to say what sits below the cut. */
+  eventsBySpoke?: Record<string, number>;
+  /** Where `recent` drew the line: `events` holds every event from this block
+   *  onward. Null when no window was asked for, and when the wallet holds
+   *  fewer events than the window — then the events ARE the history. */
+  cutoffBlock?: number | null;
 }
 
 export interface AaveV4Position {
@@ -56,12 +71,23 @@ export interface FetchAaveV4Params {
   headers?: HeadersInit;
 }
 
+export interface FetchAaveV4TimelineParams extends FetchAaveV4Params {
+  /** Ask for a WINDOW of the most recent N events instead of the whole
+   *  history. The response says where the window opened and what the wallet
+   *  holds, per spoke, so the page can number its rows over the whole life.
+   *  Omitted keeps the whole-history fetch — which is what the CSV export
+   *  wants and what the box's whole-history budget is counting. */
+  recent?: number;
+}
+
 export async function fetchAaveV4Timeline({
   wallet,
   baseUrl = "",
   headers,
-}: FetchAaveV4Params): Promise<FetchAaveV4TimelineResult> {
-  const url = `${baseUrl}/api/aave-v4/timeline?wallet=${encodeURIComponent(wallet)}`;
+  recent,
+}: FetchAaveV4TimelineParams): Promise<FetchAaveV4TimelineResult> {
+  const recentQs = recent ? `&recent=${encodeURIComponent(String(recent))}` : "";
+  const url = `${baseUrl}/api/aave-v4/timeline?wallet=${encodeURIComponent(wallet)}${recentQs}`;
   const done = settleFetchMark("aave-v4-timeline");
   const res = await fetch(url, { cache: "no-store", headers });
   if (!res.ok) {

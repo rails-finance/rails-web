@@ -20,7 +20,7 @@
 // with a DefiLlama fallback only for assets the oracle registry omits), so the
 // live position reads chain-true throughout, not just the headline totals.
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -75,6 +75,7 @@ import { summariseExternalActors } from "@/lib/shared/external-actor";
 import type { ReserveStats } from "@/lib/aave-v4/spoke-cards";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { AAVE_V4_DISPLAY_ITEMS } from "@/lib/aave-v4/timeline-display-items";
 import { AAVE_V4_TIMELINE_RUNS } from "@/lib/aave-v4/timeline-runs";
@@ -113,6 +114,10 @@ export interface AaveV4SpokeViewProps {
    *  reads it exactly as this page always did. An EMPTY array is a real answer
    *  — a wallet with no captured events — and seeds. */
   initialEvents: BaseActivityEvent[] | null;
+  /** How many events this spoke holds over its WHOLE life, from the same
+   *  windowed read that seeded `initialEvents`. Null when the read answered
+   *  the whole history (the events are the count) or did not answer at all. */
+  initialSpokeTotalEvents?: number | null;
   /** Address→USD, read on the server beside the tail. Seeds PricesProvider so
    *  the card's collateral / supplied figure renders into the HTML rather than
    *  as a skeleton the client fills after hydration. Empty when the read
@@ -135,6 +140,7 @@ function AaveV4SpokePageInner({
   initialPositions,
   initialChain,
   initialEvents,
+  initialSpokeTotalEvents = null,
 }: AaveV4SpokeViewProps) {
   const isValidWallet = /^0x[a-f0-9]{40}$/.test(wallet);
   // The listing filtered to this wallet — formed in one place (the wallet param
@@ -149,7 +155,21 @@ function AaveV4SpokePageInner({
   const [positions, setPositions] = useState<AaveV4Position[]>(initialPositions ?? []);
   const [chainPosition, setChainPosition] = useState<AaveV4SpokePositionChainResponse | null>(initialChain);
   const [loading, setLoading] = useState(!seeded);
+  // The POSITION read's failure, and only that one. A rejected roster or chain
+  // read leaves nothing to draw, so it still replaces the body.
   const [error, setError] = useState<string | null>(null);
+  // The HISTORY read's own state, held apart from `error` the way the Base
+  // position pages hold theirs: a refused timeline takes the activity list and
+  // the economics panel with it and leaves everything else standing, and the
+  // page says so in a sentence rather than in a status code. A 429 out of the
+  // box's whole-history bucket used to arrive here as `fetchAaveV4Timeline
+  // failed: 429` and take the whole page down.
+  const [timelineState, setTimelineState] = useState<"loading" | "ready" | "failed">(seeded ? "ready" : "loading");
+  // What this spoke holds over its whole life. The page draws the newest
+  // TIMELINE_WINDOW_ROWS of the WALLET's events, so a deep wallet's spoke page
+  // holds fewer of its own rows than the spoke has; this is what it counts
+  // them up from. Null means the answer was the whole history.
+  const [spokeTotalEvents, setSpokeTotalEvents] = useState<number | null>(initialSpokeTotalEvents);
 
   // hasHydrated only — the timeline's own filter/sort/date/heatmap state now
   // lives in useTimelineEvents (below), keyed per spoke. This hook's flag
@@ -189,11 +209,20 @@ function AaveV4SpokePageInner({
       try {
         setLoading(true);
         setError(null);
+        setTimelineState("loading");
         const spokeKey = SPOKE_NAME_TO_KEY[spokeName];
         const [timeline, posResult, chainResult] = await Promise.all([
           // The index serves every spoke's history; the page filters to this
-          // one. { events } shape.
-          fetchAaveV4Timeline({ wallet }),
+          // one. A WINDOW of it: without `recent` the box reads this as the
+          // whole-history request and counts it in the 60-a-minute bucket, so
+          // ordinary browsing — Next's link prefetching included — answered
+          // 429 (rails-ops decisions/0019). Settled separately from the two
+          // reads beside it: a refused history must not take the position with
+          // it.
+          fetchAaveV4Timeline({ wallet, recent: TIMELINE_WINDOW_ROWS }).catch((err) => {
+            console.error("aave-v4 spoke page: timeline read failed", err);
+            return null;
+          }),
           // Positions seed price requests.
           fetchAaveV4Positions({ wallet }),
           // Headline chain-state overlay — already a live spoke-contract read in
@@ -208,7 +237,9 @@ function AaveV4SpokePageInner({
             : Promise.resolve(null),
         ]);
         if (cancelled) return;
-        setEvents(timeline.events);
+        setEvents(timeline?.events ?? []);
+        setSpokeTotalEvents(timeline?.eventsBySpoke?.[spokeName] ?? null);
+        setTimelineState(timeline ? "ready" : "failed");
         setPositions(posResult.positions);
         setChainPosition(chainResult);
         setLoading(false);
@@ -391,6 +422,37 @@ function AaveV4SpokePageInner({
     return { txGroups, txSiblings: byTx };
   }, [spokeScopedEvents]);
 
+  // Events this spoke holds BELOW the oldest drawn row. The page draws a window
+  // of the wallet's newest events and then filters to one spoke, so its own
+  // count is not `totalEvents − events.length`; the route answers per spoke
+  // for that reason. Zero whenever the read was the whole history, which is
+  // every position under the cut. This is decision 0019's trim arm — the row
+  // numbers run over the spoke's whole life and the count line states it —
+  // not the checkpoint arm, there being no opening balance to bring forward.
+  const olderCount = useMemo(
+    () => (spokeTotalEvents == null ? 0 : Math.max(spokeTotalEvents - spokeScopedEvents.length, 0)),
+    [spokeTotalEvents, spokeScopedEvents.length],
+  );
+
+  // The CSV is the export whose purpose IS the rows, so on a windowed page it
+  // goes and reads the whole history at click time rather than handing over the
+  // window under a whole-history filename. This is the one Aave V4 read that
+  // still asks for the whole history, it happens once per press, and the box's
+  // 60-a-minute bucket is sized for exactly that. The same spoke narrowing the
+  // page applies to its own events applies here, so the spreadsheet and the
+  // timeline agree.
+  const fetchAllHistory = useCallback(async () => {
+    const res = await fetchAaveV4Timeline({ wallet });
+    const served = res.events ?? [];
+    return {
+      events: served.filter((e) => isAaveV4Event(e) && (e.context.data.spokeName ?? "Main") === spokeName),
+      // The route states no row ceiling of its own — its 5,000-row fetcher cap
+      // is unreported, and reporting a short file as whole is what `missing` is
+      // there to prevent. Nothing to pass through until the route says.
+      missing: 0,
+    };
+  }, [wallet, spokeName]);
+
   // The shared timeline pipeline: type/date filtering, sort direction, render
   // windowing and the months heatmap all live here + in ChainTruthTimeline.
   // Keyed per spoke (not just per wallet) since each spoke is its own
@@ -398,6 +460,7 @@ function AaveV4SpokePageInner({
   const tl = useTimelineEvents(spokeScopedEvents, {
     storageKey: `aave-v4-${rawSpoke}-${wallet}`,
     protocolKey: "aave-v4",
+    olderCount,
   });
 
   // ── Market notes ─────────────────────────────────────────────────────────
@@ -588,6 +651,34 @@ function AaveV4SpokePageInner({
 
   const positionClosed = activeCard?.isClosed ?? false;
 
+  // A REFUSED HISTORY, stated. Everything this page draws — the card, the
+  // health factor, the flows — is replayed from the wallet's events, so a
+  // history it could not read leaves nothing to draw them from. What it must
+  // not do is fall through to "has no activity on this spoke" below, which is
+  // a claim about the chain rather than about the read, or to the raw status
+  // line this used to render in place of the whole page. It says which read
+  // failed, and the wallet's other spokes stay one click away. (The Base
+  // position pages hold their sweep's failure apart from their position read
+  // the same way.)
+  if (timelineState === "failed" && !activeCard && !loading) {
+    return (
+      <div className="py-8 space-y-6">
+        <DetailBackButton session="aave-v4" wallet={wallet} />
+        <div className="text-center py-12">
+          <p className="text-foreground text-lg mb-3">
+            This wallet&rsquo;s history could not be read, so the {spokeName} position and its activity are unavailable.
+          </p>
+          <p className="text-sm text-rb-500 mb-3">Reload to try again.</p>
+          <p className="text-sm text-rb-500">
+            <Link href={walletFilterHref} className={`underline ${NAV_LINK}`}>
+              See this wallet&rsquo;s other spokes →
+            </Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // If the URL points at a spoke that doesn't exist for this wallet (typo,
   // stale link), bail with a path back to the wallet's other spokes.
   if (!activeCard && !loading) {
@@ -625,6 +716,7 @@ function AaveV4SpokePageInner({
               notes={notes}
               liveNotes={liveNotes}
               csvFilename={`aave-v4-${rawSpoke}-${wallet.slice(0, 10)}-activity.csv`}
+              fetchAllEvents={olderCount > 0 ? fetchAllHistory : undefined}
             />
           )}
         </DetailTopRow>

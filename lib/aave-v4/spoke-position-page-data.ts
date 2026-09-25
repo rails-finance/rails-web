@@ -12,7 +12,17 @@
 // the indexed figures and says so — so it is caught here rather than forfeiting
 // the history beside it.
 //
-// The timeline route is not windowed, so there is no opening balance to read.
+// The timeline read is WINDOWED (2026-09-25): it asks for the newest
+// TIMELINE_WINDOW_ROWS events, the same cut every other position page takes.
+// Without it the box classified each page view as a whole-history read and
+// spent one of the reader's sixty a minute, so ordinary browsing — link
+// prefetching included — answered 429 (rails-ops decisions/0019, and the
+// limiter's own rule in api/src/middleware/rate-limiter.ts).
+//
+// There is still no opening balance to read: Aave V4 has no `/timeline/summary`
+// twin. The route answers what the wallet holds per spoke instead, and the page
+// numbers its rows from that — the trim arm of decision 0019, not the
+// checkpoint arm.
 //
 // All four reads go to the BOX, not to this deployment's own /api proxies: the
 // four route handlers behind them (positions, spoke-position, timeline, prices)
@@ -23,12 +33,18 @@
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { fetchAaveV4Positions, fetchAaveV4Timeline, type AaveV4Position } from "@/lib/api/fetch-aave-v4";
+import {
+  fetchAaveV4Positions,
+  fetchAaveV4Timeline,
+  type AaveV4Position,
+  type FetchAaveV4TimelineResult,
+} from "@/lib/api/fetch-aave-v4";
 import {
   fetchAaveV4SpokePosition,
   type AaveV4SpokePositionChainResponse,
 } from "@/lib/api/fetch-aave-v4-spoke-position";
 import { SPOKE_NAME_TO_KEY } from "@/lib/aave-v4/spoke-meta";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { boxHop } from "@/lib/shared/listing-ssr";
 import { fetchPrices } from "@/lib/api/fetch-prices";
 import { PRICEABLE_TOKEN_ADDRESSES } from "@/lib/aave/prices";
@@ -40,7 +56,7 @@ interface AaveV4SpokeReads {
 
 export const loadAaveV4SpokeTail = cache(async (wallet: string, spokeName: string) => {
   const spokeKey = SPOKE_NAME_TO_KEY[spokeName];
-  const tail = await loadPositionTail<AaveV4SpokeReads>({
+  const tail = await loadPositionTail<AaveV4SpokeReads, FetchAaveV4TimelineResult>({
     label: "aave-v4",
     readPositions: async (baseUrl, headers) => {
       const [posResult, chain] = await Promise.all([
@@ -54,10 +70,18 @@ export const loadAaveV4SpokeTail = cache(async (wallet: string, spokeName: strin
       ]);
       return { positions: posResult.positions, chain };
     },
-    readTimeline: (baseUrl, headers) => fetchAaveV4Timeline({ wallet, baseUrl, headers }),
+    readTimeline: (baseUrl, headers) => fetchAaveV4Timeline({ wallet, baseUrl, headers, recent: TIMELINE_WINDOW_ROWS }),
     hop: boxHop,
   });
-  return { ...tail, spokePositions: tail.positions?.positions ?? null, chain: tail.positions?.chain ?? null };
+  return {
+    ...tail,
+    spokePositions: tail.positions?.positions ?? null,
+    chain: tail.positions?.chain ?? null,
+    // What this spoke holds over the whole life, so the client half can number
+    // its rows and state its cut without a second read. Null on a whole-history
+    // answer and on a failed one alike: there is no cut to state either way.
+    spokeTotalEvents: tail.timeline?.eventsBySpoke?.[spokeName] ?? null,
+  };
 });
 
 // Bound the price leg the way the tail beside it is bounded.

@@ -77,6 +77,7 @@ export default async function AaveV4SpokePage({ params }: Props) {
       initialPositions={tail.spokePositions}
       initialChain={tail.chain}
       initialEvents={tail.events}
+      initialSpokeTotalEvents={tail.spokeTotalEvents}
       initialPrices={prices}
     />
   );
