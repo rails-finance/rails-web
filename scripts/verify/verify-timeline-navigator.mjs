@@ -20,9 +20,14 @@
 //      holding the summary's own `firstTimestamp` to the month holding its
 //      `lastTimestamp` with no month between them missing. Read from
 //      `/api/aave-v3/timeline/summary` on the run — never a pasted number;
-//   2  A MONTH CLICK FILTERS TO THAT MONTH: it writes `?from=`/`?to=` as the
-//      whole month, moves the count line, and the editable spread reads the
-//      same two dates back. One control, one grammar.
+//   2  A MONTH CLICK SHOWS THAT MONTH'S ROWS. Where the loaded rows hold it —
+//      which is every month of a `?folders=0` page the grid lets you click —
+//      it FILTERS: it writes `?from=`/`?to=` as the whole month, moves the
+//      count line, and the editable spread reads the same two dates back. One
+//      control, one grammar. ⚠️ THE PANEL CLOSES ON THE PICK (Miles,
+//      2026-09-25), so every check below that reads the grid after a click
+//      opens it again first; one that forgot would read an absent panel and
+//      report a wrong one.
 //
 //      ⚠️ THIS ASSERTION WAS REVERSED ON 2026-09-11, deliberately, and is
 //      kept rather than deleted so nobody later reads the change as a
@@ -51,16 +56,23 @@
 //   4  ONE MONTH AT A TIME: the same month again clears the selection rather
 //      than extending it, and a drag across the month matrix — which under the
 //      old range grammar was a span — still selects one month;
-//   5  THE LIQUIDATION REGISTER IS EXACT where the page holds the whole
-//      history: on `liquidated` the summary's `byAction` liquidation bucket
-//      and the timeline route's listed rows agree, and the month cells marked
-//      are exactly the months those liquidations fall in;
-//   6  BELOW THE CUT, NOTHING IS MARKED, AND THE PAGE SAYS WHY: on `deep`,
-//      `dense-short` and `broad` no month cell before the oldest LISTED row
-//      (read off the timeline route on the same run) carries any mark, and the
-//      grid's caption carries the stated reason. An unmarked below-cut cell
-//      with no reason beside it silently claims a churned position never
-//      liquidated, which is the way this does real damage;
+//   5  NOTHING ON THE PAGE IS MARKED. ⚠️ THIS CHECK WAS INVERTED ON
+//      2026-09-25, not deleted. It asserted the LIQUIDATION REGISTER — that
+//      the summary's `byAction` bucket, the listed rows and the marked month
+//      cells all agreed — and Miles dropped the marks everywhere, the
+//      `?folders=0` grid and the legend included: "the heatmap is enough and
+//      if users need to find a liquidation they can use the event filter". So
+//      it now asserts the absence: no cell anywhere carries a mark, no legend
+//      names one, and the DENSITY KEY is still under the grid. Same subject,
+//      read the other way round, and it goes red the day a mark comes back.
+//      The old form's fail-first proof is kept below;
+//   6  ⚠️ GONE WITH THE MARKS, 2026-09-25, BY DECISION. It asserted that no
+//      month cell below the cut carried a mark and that the grid's caption
+//      said why. There are no marks and there is no clause, so both halves
+//      have no subject; the number is left unused rather than closed up, the
+//      way group 10's was, so nobody later reads the gap as a check that
+//      quietly stopped running. What stood WITH it — the reach, 13 below —
+//      is untouched and still runs on the same fixtures;
 //   7  NO COUNT MOVED: the toolbar's count line and every row-number pill read
 //      byte-identically before the panel is opened and while it is open. The
 //      navigator is a map, and a map does not change the territory.
@@ -187,23 +199,24 @@
 // over a list that is part rows and part folders, measured against the grouped
 // route. The MARKS on a grouped page are out of its scope — see its note.
 //
-// ⚠️ THE MONTHS LEFT THE DATE PANEL ON THE DEFAULT PAGE (2026-09-24, the
-// segment picker: decision 0019, amendment 2026-09-24). On a served page the
-// month matrix is the picker above the rows, one segment of time is loaded,
-// and a month click LOADS rather than filtering; the Date panel keeps the
-// typed spread alone. G2–G4 (a month click filters; the same month clears)
-// are SUPERSEDED there and gave way to the S checks inside group G: the
-// picker, its months, Previous and Next, a month below the cut loaded and
-// stated in time, and the phone strip at 390. G1 now asserts the count line
-// states TIME and names no row count. The `?folders=0` page keeps the panel's
-// grid, so groups 1–13 stand as written.
+// ⚠️ THE MONTHS LEFT THE DATE PANEL ON THE DEFAULT PAGE (2026-09-24) AND CAME
+// BACK TO IT ON 2026-09-25. For one day the matrix was a sticky picker above
+// the rows with Previous / Next / Newest of its own, and every month click
+// was a read. Miles then ruled the middle ground — live's form, dev's reach
+// (decision 0019, amendment 2026-09-25): the grid is in the Date panel again,
+// with the heat ramp and the typed spread, and a month click takes ONE OF TWO
+// PATHS. Where the loaded rows hold the month it filters them, instantly, as
+// rails.finance does; where they do not, the page reads that month from the
+// index as its own segment, which is what dev did for every month. The picker
+// component and its Previous / Next / Newest are deleted.
 //
-// ⚠️ AND THE PICKER WAS CUT BACK TO A LOW-FI NAVIGATOR the same evening
-// (Miles). The band of loaded months, its in-view bar, the heat ramp, the
-// significance marks and the click that scrolled to a month already on the
-// page are gone; a click on any month shows that month's rows, and Previous
-// and Next step between them. S1 and S2 were rewritten against that rather
-// than deleted — S1 now asserts the absence of everything the band drew.
+// S0 to S4 inside group G were rewritten against that rather than deleted, and
+// they are where the two paths are told apart: S2 is the FILTER path and S3 is
+// the READ path, each asserting the thing the other cannot do. G2–G4 stay
+// superseded — the S checks cover the same ground on the default page — and G1
+// still asserts the count line states TIME and names no row cap. Groups 1–13
+// pin `?folders=0`, which offers no read, so their month click is the filter
+// path alone.
 //
 // The hosted default is dev.rails.finance through the Vercel bypass header
 // (lib/host.mjs); `BASE=http://localhost:3000` points it at a dev server.
@@ -471,6 +484,31 @@
 //   else, so only the checks that read the mark after a pick can see it. A
 //   check that only ever reads a fresh load would have passed on all four.
 //
+//   2026-09-25 (the two paths), against a local dev server on the production
+//   api, restored after each:
+//   • the HELD BOUNDARY collapsed — `heldMinIdx` forced to `lifeMinIdx` in
+//     the months grid, so every month of the life reads as one the page holds
+//     and every click is a filter → 11/17 over `grouped-deep`. S3's five red,
+//     quoting the damage exactly: "the grid called it a filter", then
+//     "Showing 0 of 20 Jan 2025 to 24 Sept 2026 · 7,161 events" with "0
+//     row(s)" and no month ringed, and S4's tap red for the same line. THAT
+//     EMPTY LIST IS THE WHOLE REASON FOR THE TWO PATHS: a month below the cut
+//     filtered rather than read gives the reader a grid full of density over
+//     no rows at all. ⚠️ S2 STAYED GREEN, which is the discriminating shape —
+//     the break makes everything a filter, and a month the page does hold
+//     still filters correctly, so a check that only ever clicked a held month
+//     would have passed on all of it;
+//   • the PANEL LEFT STANDING — `onPicked` dropped from the grid's `onChange`
+//     → 26/27 over `control`, exactly one red: "the panel closes on the pick
+//     — the panel was still on the page after a month was clicked". Every
+//     other check in the group passed, including the filter it performed,
+//     which is right: the pick worked, the map just stayed over the rows;
+//   • the MARKS BACK — a `data-cell-mark` span put back on every selectable
+//     month cell → 26/27 over `control`, check 5 alone red with "9 marked
+//     cell(s), 0 legend(s), 0 picker element(s), 1 density key(s)". An
+//     ABSENCE CHECK THAT CANNOT BE MADE TO FAIL IS NOT A CHECK, and check 5
+//     is an absence now, so this is the break that earns it.
+//
 //   A check that cannot be made to fail is not a check.
 
 import { chromium } from "playwright";
@@ -731,7 +769,10 @@ const READ_NAV = () => {
             count: Number(
               (((c.getAttribute("title") ?? "").match(/· ([\d,]+) event/) ?? [])[1] ?? "").replace(/,/g, ""),
             ),
-            marks: [...c.querySelectorAll("[data-cell-mark]")].map((m) => m.getAttribute("data-cell-mark")),
+            // WHICH PATH this cell's click takes: a read where the loaded rows
+            // do not hold the month, a filter where they do.
+            reach: c.hasAttribute("data-cell-reach"),
+            current: c.hasAttribute("data-cell-current"),
           }));
   return {
     grains: [...nav.querySelectorAll("[data-heatmap-grain]")].map((g) => g.getAttribute("data-heatmap-grain")),
@@ -739,11 +780,21 @@ const READ_NAV = () => {
     cells,
     from: nav.querySelector("[data-date-from]")?.value ?? null,
     to: nav.querySelector("[data-date-to]")?.value ?? null,
-    caption: [...nav.querySelectorAll("div,span")]
-      .map((e) => e.textContent ?? "")
-      .find((t) => t.includes("are the opening balance")),
+    // The density key, which survived the marks; the legend did not.
+    keys: nav.querySelectorAll("[data-density-key]").length,
+    reset: [...nav.querySelectorAll("button")].some((b) => (b.textContent ?? "").trim() === "Reset"),
   };
 };
+
+/** The marks, as an ABSENCE — anywhere on the page, not merely in the panel,
+ *  because the legend used to sit beside the grid and the cells inside it. */
+const READ_MARKS = () => ({
+  cells: document.querySelectorAll("[data-cell-mark]").length,
+  legends: document.querySelectorAll("[data-mark-legend]").length,
+  // The picker that stood above the rows for one day (2026-09-24) and went
+  // with the 2026-09-25 ruling: nothing on the page may draw it again.
+  pickers: document.querySelectorAll("[data-segment-picker], [data-segment-strip], [data-segment-matrix]").length,
+});
 
 /** The panel as a THING ON THE PAGE rather than as a grid: is it there, is it
  *  floating, and is it the only heatmap anywhere. */
@@ -806,6 +857,7 @@ const READ_REFUSALS = () =>
   [...document.querySelectorAll("[data-timeline-navigator] [data-cell-at][data-cell-live]")].map((c) => ({
     empty: /· 0 events/.test(c.getAttribute("title") ?? ""),
     summarised: /in the opening balance/.test(c.getAttribute("title") ?? ""),
+    reach: c.hasAttribute("data-cell-reach"),
     pointer: c.className.includes("cursor-pointer"),
     at: Number(c.getAttribute("data-cell-at")),
   }));
@@ -838,68 +890,12 @@ const TYPE_DATE = ([which, iso]) => {
 const COUNT_LINE = () =>
   (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim();
 
-/** The segment picker as the page draws it (components/shared/
- *  timeline-segment-picker.tsx): the months the life holds, the one the page
- *  stands on, the month being loaded, and the spine's boundary rows.
- *  `dynamic` counts everything the low-fi cut removed — a band cell, an
- *  in-view bar, a significance mark — so S1 can assert that none came back. */
-const READ_PICKER = () => {
-  const picker = document.querySelector("[data-segment-picker]");
-  const vis = (el) => (el ? getComputedStyle(el).display !== "none" : false);
-  const cells = [...document.querySelectorAll("[data-segment-cell][data-cell-live]")];
-  const idx = (c) => Number(c.getAttribute("data-segment-cell"));
-  const here = picker?.querySelector("[data-segment-cell][data-cell-current]");
-  return {
-    present: picker != null,
-    sticky: picker ? getComputedStyle(picker).position : null,
-    matrixVisible: vis(document.querySelector("[data-segment-matrix]")),
-    stripVisible: vis(document.querySelector("[data-segment-strip]")),
-    live: cells.map(idx).sort((a, b) => a - b),
-    current: here ? Number(here.getAttribute("data-segment-cell")) : null,
-    label: picker?.querySelector("[data-segment-current-label]")?.textContent?.trim() ?? null,
-    prevDisabled: picker?.querySelector("[data-segment-prev]")?.disabled ?? null,
-    nextDisabled: picker?.querySelector("[data-segment-next]")?.disabled ?? null,
-    reset: picker?.querySelector("[data-segment-reset]") != null,
-    dynamic: picker
-      ? picker.querySelectorAll("[data-cell-band], [data-cell-in-view], [data-cell-mark], [data-cell-bar]").length
-      : 0,
-    loading: document.querySelector("[data-segment-skeleton]")?.getAttribute("data-segment-skeleton") ?? null,
-    boundaryRows: [...document.querySelectorAll("[data-boundary-row]")].map((e) => e.getAttribute("data-boundary-row")),
-    folders: document.querySelectorAll('[role="button"][aria-expanded][aria-label*=" consecutive "]').length,
-  };
-};
-
-/** The phone strip: which labels sit wholly inside it, which carries the
- *  accent, and whether the page scrolls sideways. */
-const READ_STRIP = () => {
-  const strip = document.querySelector("[data-segment-strip]");
-  const vis = (el) => (el ? getComputedStyle(el).display !== "none" : false);
-  const r = strip?.getBoundingClientRect();
-  const labels = [...document.querySelectorAll("[data-strip-month]")];
-  // A label is in view when at least nine tenths of it is inside the strip:
-  // the strip snaps to a label's centre and a fractional scroll leaves an
-  // edge label a pixel over the line.
-  const inView = r
-    ? labels.filter((l) => {
-        const b = l.getBoundingClientRect();
-        const visible = Math.min(b.right, r.right) - Math.max(b.left, r.left);
-        return b.width > 0 && visible / b.width >= 0.9;
-      }).length
-    : 0;
-  const here = document.querySelector("[data-strip-here]");
-  const hb = here?.getBoundingClientRect();
-  return {
-    stripVisible: vis(strip),
-    matrixVisible: vis(document.querySelector("[data-segment-matrix]")),
-    inView,
-    here: here ? Number(here.getAttribute("data-strip-month")) : null,
-    // The accented label sits at the strip's centre: the strip pads both
-    // ends, so the newest month is centred with one neighbour in view.
-    hereCentred: r && hb ? Math.abs(hb.left + hb.width / 2 - (r.left + r.width / 2)) <= 4 : false,
-    labels: labels.length,
-    scrollWidth: document.documentElement.scrollWidth,
-  };
-};
+// ⚠️ THREE READERS WENT WITH THE PICKER, 2026-09-25 — `READ_PICKER`,
+// `READ_STRIP` and `pressCell`. They read a control that no longer exists
+// (`components/shared/timeline-segment-picker.tsx`, its Previous / Next /
+// Newest and its phone strip); what replaced them is `READ_NAV` and
+// `CLICK_CELL` above, which read the grid where it now is, in the Date panel.
+// `READ_MARKS` asserts that none of it came back.
 
 /** How a windowed page says its list is short of the month it is filtered to.
  *  The word "listed" carried it until 2026-09-24, when decision 0019's last
@@ -919,24 +915,6 @@ const NAMES_THE_CAP = (cap) => {
     ? true
     : line.startsWith(`Showing ${cap.toLocaleString("en-US")}`);
 };
-
-/** A click on a month cell of the picker. Arming on pointerdown went with the
- *  band, 2026-09-24 evening: a click is the whole grammar now. */
-async function pressCell(page, idx) {
-  const cell = page.locator(`[data-segment-cell="${idx}"][data-cell-live]`);
-  if ((await cell.count()) === 0) return false;
-  await cell.click({ timeout: 10_000 }).catch(() => {});
-  return true;
-}
-
-/** Open the Date panel on a page whose months are the picker: the spread is
- *  what stands there, so the wait is for the from field, not a grid. */
-async function openSpread(page) {
-  if ((await page.$("[data-timeline-navigator] [data-date-from]")) != null) return true;
-  await page.click("[data-date-control]", { timeout: 10_000 }).catch(() => {});
-  await page.waitForSelector("[data-timeline-navigator] [data-date-from]", { timeout: 30_000 }).catch(() => {});
-  return (await page.$("[data-timeline-navigator] [data-date-from]")) != null;
-}
 
 const MONTH_LONG = [
   "January",
@@ -1110,49 +1088,22 @@ for (const f of FIXTURES) {
       `${liveMonthCells.filter((m) => m.pointer).length} of ${liveMonthCells.length} month(s) that hold listed events are interactive`,
     );
 
-    // 5 — the liquidation register, where the page holds the whole history.
-    if (!f.cut) {
-      const bucket = (summary.byAction ?? []).find((b) => b.key === "liquidation")?.count ?? 0;
-      const liqRows = listed.filter((e) => e.context?.data?.eventType === "liquidation");
-      const same = (a, b) => a.size === b.size && [...a].every((x) => b.has(x));
-      const markedMonths = new Set((rest?.cells ?? []).filter((c) => c.marks.includes("liquidation")).map((c) => c.at));
-      const liqMonths = new Set(liqRows.map((e) => monthStartOf(e.timestamp)));
-      if (f.liquidations) {
-        check(
-          `5  ${f.id}: the listed rows carry the summary's liquidation count`,
-          bucket > 0 && liqRows.length === bucket,
-          `summary byAction ${bucket}, listed rows ${liqRows.length}`,
-        );
-      } else {
-        // Stated, never asserted: an equality at zero passes with the marks
-        // deleted, so it proves nothing about them.
-        info(`5  ${f.id}: liquidations on this fixture`, `summary byAction ${bucket}, listed rows ${liqRows.length}`);
-      }
-      check(
-        `5  ${f.id}: the grid marks exactly the months they fall in`,
-        same(markedMonths, liqMonths),
-        `${markedMonths.size} marked, ${liqMonths.size} months hold one (${liqRows.length} liquidations)`,
-      );
-    }
+    // 5 — INVERTED 2026-09-25: there are no marks, anywhere. The register
+    // check this replaced (the summary's liquidation bucket against the
+    // listed rows against the marked cells) lost its subject when Miles
+    // dropped all three marks; what it can still assert is that none came
+    // back, and that the DENSITY KEY — the key to the wash, not to a mark —
+    // is still under the grid.
+    const marksNow = await page.evaluate(READ_MARKS);
+    check(
+      `5  ${f.id}: no cell carries a mark, no legend names one, and the density key stands`,
+      marksNow.cells === 0 && marksNow.legends === 0 && marksNow.pickers === 0 && (rest?.keys ?? 0) === 1,
+      `${marksNow.cells} marked cell(s), ${marksNow.legends} legend(s), ${marksNow.pickers} picker element(s), ${rest?.keys} density key(s) in the panel`,
+    );
 
-    // 6 — below the cut: no mark, and a stated reason.
+    // 6 is GONE with the marks (see the head of this file). The reach it stood
+    // beside is not, and runs here on the same windowed fixtures.
     if (f.cut) {
-      const floor = monthStartOf(oldestListed);
-      // A month cell is below the cut only when the WHOLE of it is. The month
-      // that straddles the cut holds listed rows and is marked from them, which
-      // is true of that month.
-      const below = (rest?.cells ?? []).filter((c) => c.at < floor && c.marks.length > 0);
-      check(
-        `6  ${f.id}: no mark before the oldest listed month`,
-        rest?.grain === "months" && below.length === 0,
-        `${below.length} mark(s) before the oldest listed month ${month(floor)} — earliest marked ${below.length ? month(Math.min(...below.map((c) => c.at))) : "—"}`,
-      );
-      check(
-        `6  ${f.id}: the caption states why they carry none`,
-        (rest?.caption ?? "").includes("They carry no marks either"),
-        `caption "${(rest?.caption ?? "").slice(-140)}"`,
-      );
-
       // 13 — the index can be REACHED for a below-cut day, through the web's
       // own proxy. This is the half of the fix that exists today: the page
       // still HOLDS only its window, but the rows under a dead month are now
@@ -1202,6 +1153,11 @@ for (const f of FIXTURES) {
 
     // 2 — a month click filters to that month.
     //
+    // ⚠️ THE PANEL CLOSES ON THE PICK (Miles, 2026-09-25), so every read of
+    // the grid after a click opens it again first. A check that forgot would
+    // read `rest?.from` off a panel that is not there and report the spread as
+    // absent rather than as wrong.
+    //
     // The month chosen is the one holding the NEWEST listed row: on a windowed
     // page every earlier month may be below the cut, and a month that cannot be
     // clicked would make this check vacuous rather than red.
@@ -1214,10 +1170,17 @@ for (const f of FIXTURES) {
       check(`2  ${f.id}: a month to click`, false, "no live, selectable month cell on the grid");
     } else {
       const afterOpenLine = await page.evaluate(COUNT_LINE);
+      const closedOnPick = (await page.$("[data-timeline-navigator]")) == null;
+      await openPanel(page);
       const afterOpen = await page.evaluate(READ_NAV);
       const openedSp = new URLSearchParams(search(page));
       const monthCell = (rest?.cells ?? []).find((c) => c.at === targetMonth);
       const shownAfterOpen = firstNumber(afterOpenLine);
+      check(
+        `2  ${f.id}: the panel closes on the pick — the reader asked for rows`,
+        closedOnPick,
+        "the panel was still on the page after a month was clicked",
+      );
       check(
         `2  ${f.id}: clicking a month filters the rows to it and the spread reads it back`,
         openedSp.get("from") === day(targetMonth) &&
@@ -1235,7 +1198,8 @@ for (const f of FIXTURES) {
           : shownAfterOpen === monthCell?.count,
         `count line "${afterOpenLine}" → ${shownAfterOpen} row(s), against the map's own ${monthCell?.count} for ${month(targetMonth)}`,
       );
-      // 4 — one month at a time.
+      // 4 — one month at a time. The panel was reopened above, so the second
+      // click lands on the same cell of the same grid.
       const beforeSecondClick = search(page);
       await page.evaluate(CLICK_CELL, targetMonth);
       await searchMoved(page, beforeSecondClick);
@@ -1250,6 +1214,7 @@ for (const f of FIXTURES) {
       // multi-month selection. Any OTHER live, selectable month — not
       // necessarily a later one, since the newest month usually has nothing
       // after it and a forward-only drag test would quietly never run.
+      await openPanel(page);
       const spanTo = refusals.filter((m) => m.pointer && m.at !== targetMonth).map((m) => m.at)[0];
       if (spanTo == null) {
         // A real answer, not a failed check: a position whose whole life bar
@@ -1638,57 +1603,61 @@ for (const g of GROUPED_FIXTURES) {
       `a "Showing N rows", "most recent N" or "above what Rails" phrase, or the cap ${n(plan.length)} as a bare count, is on the page`,
     );
 
-    // ── S — THE SEGMENT PICKER (decision 0019, amendment 2026-09-24) ──
+    // ── S — THE TWO PATHS (decision 0019, amendment 2026-09-25) ──
     //
-    // ⚠️ CUT BACK TO A LOW-FI NAVIGATOR, 2026-09-24 evening, and the checks
-    // moved with it rather than being deleted. Miles: "i would prefer to keep
-    // the navigator more low-fi, we don't need the infinite scroll type just
-    // a more rudimentary navigator that is clickable between months." So the
-    // band of loaded months, the in-view bar that followed the rows and the
-    // significance marks are gone, and with them S1's band assertion and S2's
-    // scroll-inside-the-band. S1 now asserts the OPPOSITE of what the band
-    // asserted — that the picker draws none of it — which is the same claim
-    // read the other way round, and S2 asserts the control that replaced the
-    // scroll. A check that simply vanished would read later like one that
-    // quietly stopped running.
+    // ⚠️ REWRITTEN, NOT DELETED, FOR THE THIRD TIME. S0 to S4 were written
+    // against the sticky picker above the rows (2026-09-24), rewritten the
+    // same evening when it went low-fi, and rewritten again on 2026-09-25 when
+    // Miles put the grid back in the Date panel and ruled that a month click
+    // takes one of two paths: filter where the loaded rows hold the month,
+    // read where they do not. The subject is the same both times — what a
+    // month click does — so the checks moved with it. A check that simply
+    // vanished would read later like one that quietly stopped running.
     //
-    //   S0  the picker stands above the rows, sticky, as the matrix at 1440;
-    //       the Date panel opens with the spread alone, no grid;
-    //   S1  the grid is every month the life holds and nothing dynamic: at
-    //       rest the newest month is where the page stands, no band cell, no
-    //       in-view bar and no significance mark anywhere in the picker;
-    //   S2  Previous steps to the previous month that holds events and shows
-    //       its rows; Next steps back to the month it came from;
-    //   S3  a click on a month below the cut loads it: the count line states
-    //       the month in time, every row drawn is inside it, the spine's tip
-    //       is withheld at the top, that month is the one the picker stands
-    //       on, and no lifetime figure is on the count line;
-    //   S4  the phone strip at 390: at most three labels in view, the newest
-    //       month centred and carrying the accent, no sideways page scroll,
-    //       and a tap on a month below the cut loads it.
-    const picker = await page.evaluate(READ_PICKER);
+    //   S0  the grid is BACK IN THE PANEL and the picker above the rows is
+    //       gone: nothing on the page draws one, and the Date button opens a
+    //       panel holding the spread and exactly one month grid;
+    //   S1  that grid is every month the life holds, with the density key
+    //       under it and no mark on any cell;
+    //   S2  THE FILTER PATH — a month the loaded rows hold writes
+    //       `?from=`/`?to=` for that month, moves the count line to its
+    //       filtered form, closes the panel and reads NOTHING: no skeleton
+    //       stands and the line never states a segment;
+    //   S3  THE READ PATH — a month below the cut becomes the page's segment:
+    //       the count line states the month in time, every row drawn is inside
+    //       it, the tip is withheld at the top, no lifetime figure stands, and
+    //       the grid reopened rings that month as the one the page is on. Then
+    //       Reset gives back the rows the page opened with;
+    //   S4  the phone at 390 keeps its `MobileSheet` form: the Date control
+    //       opens a sheet holding the grid, and a tap on a below-cut month
+    //       reads it there too.
+    //
+    // The two paths differ in what they COST, which is the reason for having
+    // both, so each is timed and the figure printed beside its check.
+    const marksG = await page.evaluate(READ_MARKS);
+    const atRestG = await page.evaluate(READ_CONTROLS);
     check(
-      `S0 ${g.id}: the segment picker stands above the rows, sticky, as the matrix`,
-      picker.present && picker.sticky === "sticky" && picker.matrixVisible && !picker.stripVisible,
-      `present ${picker.present}, position ${picker.sticky}, matrix ${picker.matrixVisible}, strip ${picker.stripVisible}`,
+      `S0 ${g.id}: nothing above the rows is a picker, and the page at rest carries no grid`,
+      marksG.pickers === 0 && atRestG.navigators === 0 && atRestG.grains.length === 0,
+      `${marksG.pickers} picker element(s); ${atRestG.navigators} panel(s), grids [${atRestG.grains.join(", ")}]`,
     );
-    const spreadOpened = await openSpread(page);
-    const panel = await page.evaluate(() => ({
-      spread: document.querySelector("[data-timeline-navigator] [data-date-from]") != null,
-      grid: document.querySelector("[data-timeline-navigator] [data-heatmap-grain]") != null,
-    }));
+    const openedG = await openPanel(page);
+    const navG = await page.evaluate(READ_NAV);
+    const openG = await page.evaluate(READ_CONTROLS);
     check(
-      `S0 ${g.id}: the Date panel opens with the spread alone, the months having left it for the picker`,
-      spreadOpened && panel.spread && !panel.grid,
-      `opened ${spreadOpened}, spread ${panel.spread}, grid ${panel.grid}`,
+      `S0 ${g.id}: the Date button opens one panel holding the spread and one month grid`,
+      openedG &&
+        openG.navigators === 1 &&
+        openG.grains.length === 1 &&
+        navG?.grain === "months" &&
+        ISO_DAY.test(navG?.from ?? "") &&
+        ISO_DAY.test(navG?.to ?? ""),
+      `opened ${openedG}, ${openG.navigators} panel(s), grids [${openG.grains.join(", ")}], spread ${navG?.from}…${navG?.to}`,
     );
-    await page.keyboard.press("Escape");
-    await panelGone(page);
 
-    // The whole life by month, as the picker reduces it: the summary read at
-    // a block past the tip IS the life, which is what the picker's `lifeDays`
-    // sums to from the opening balance, the folders' `byDay` and the loose
-    // events.
+    // The whole life by month: the summary read past the tip IS the life, and
+    // is what the page's own `lifeDays` sums to from the opening balance, the
+    // folders' `byDay` and the loose events.
     const life = await getJson(`/api/aave-v3/timeline/summary?market=core&wallet=${g.wallet}&cutoffBlock=99999999`);
     const lifeMonths = new Map();
     for (const b of life?.byDay ?? []) {
@@ -1716,66 +1685,64 @@ for (const g of GROUPED_FIXTURES) {
         head,
         120_000,
       );
+    const filteredLine = (x) =>
+      windowed
+        ? `Showing ${n(x)} of ${loadedText} · ${n(route.totalEvents)} events`
+        : `${n(x)} of ${n(route.totalEvents)} events`;
 
-    // S1 — the grid is the life's months, and nothing moves on it.
-    const liveHas = liveWant.every((i) => picker.live.includes(i));
+    // S1 — the grid is the life, and it carries a key and no marks.
+    const gridMonths = (navG?.cells ?? []).map((c) => monthIdxOf(c.at)).sort((a, b) => a - b);
     check(
-      `S1 ${g.id}: every month the life holds is a cell, the newest is where the page stands, and nothing in the picker is banded, barred or marked`,
-      liveHas &&
-        picker.current === newestMonth &&
-        picker.label === monthLong(newestMonth) &&
-        picker.dynamic === 0 &&
-        picker.nextDisabled === true &&
-        picker.reset === false,
-      `${picker.live.length} live cell(s) of ${liveWant.length} month(s) the life holds; current ${picker.current == null ? "none" : monthName(picker.current)} (want ${monthName(newestMonth)}), label "${picker.label}"; ${picker.dynamic} band/bar/mark element(s); next disabled ${picker.nextDisabled}, reset offered ${picker.reset}`,
+      `S1 ${g.id}: the grid is every month the life holds, with the density key and no mark`,
+      liveWant.every((i) => gridMonths.includes(i)) &&
+        (navG?.keys ?? 0) === 1 &&
+        marksG.cells === 0 &&
+        marksG.legends === 0,
+      `${gridMonths.length} live cell(s) covering ${liveWant.filter((i) => gridMonths.includes(i)).length} of ${liveWant.length} month(s) the life holds; ${navG?.keys} density key(s), ${marksG.cells} mark(s), ${marksG.legends} legend(s)`,
     );
 
-    // S2 — Previous and Next, the whole of the navigation. The month before
-    // the newest one that holds events, and back.
-    const earlier = liveWant[liveWant.length - 2] ?? null;
-    if (earlier == null) {
-      info(`S2 ${g.id}: Previous and Next`, "the life holds one month");
+    // S2 — THE FILTER PATH. The month holding the newest served row: the page
+    // holds those rows, so the click must never issue a read.
+    const heldMonth = monthIdxOf(newestServed);
+    const heldFrom = monthStartTs(heldMonth);
+    const heldTo = monthEndOf(heldFrom);
+    const wantFiltered = filteredLine(expectedIn(heldFrom, heldTo));
+    const filterCell = (navG?.cells ?? []).find((c) => c.at === heldFrom);
+    if (filterCell == null || filterCell.reach) {
+      check(
+        `S2 ${g.id}: ${monthName(heldMonth)} is a month the loaded rows hold`,
+        false,
+        filterCell == null ? "no cell for it on the grid" : "the grid calls it a read, not a filter",
+      );
     } else {
-      await page.click("[data-segment-prev]", { timeout: 10_000 }).catch(() => {});
-      await landed(page, holdsLine(earlier));
-      await stillRows(page);
-      const back = await page.evaluate(READ_PICKER);
-      const backLine = await page.evaluate(COUNT_LINE);
-      check(
-        `S2 ${g.id}: Previous shows ${monthName(earlier)} in place of ${monthName(newestMonth)}`,
-        backLine.startsWith(holdsLine(earlier)) && back.current === earlier && back.reset === true,
-        `"${backLine}" (want "${holdsLine(earlier)}…"); current ${back.current == null ? "none" : monthName(back.current)}; reset offered ${back.reset}`,
-      );
-      await page.click("[data-segment-next]", { timeout: 10_000 }).catch(() => {});
-      await landed(page, holdsLine(newestMonth));
-      await stillRows(page);
-      const fwd = await page.evaluate(READ_PICKER);
-      const fwdLine = await page.evaluate(COUNT_LINE);
-      check(
-        `S2 ${g.id}: Next steps back to ${monthName(newestMonth)}`,
-        fwdLine.startsWith(holdsLine(newestMonth)) && fwd.current === newestMonth,
-        `"${fwdLine}" (want "${holdsLine(newestMonth)}…"); current ${fwd.current == null ? "none" : monthName(fwd.current)}`,
-      );
-      // And Newest gives the rows the page opened with back, count line and
-      // all — the one way out of a segment.
-      await page.click("[data-segment-reset]", { timeout: 10_000 }).catch(() => {});
+      const t0 = Date.now();
+      const clicked = await page.evaluate(CLICK_CELL, heldFrom);
       await settled(
         page,
         (w) => (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim() === w,
-        wantRest,
-        60_000,
+        wantFiltered,
+        30_000,
       );
-      const restAgain = await page.evaluate(COUNT_LINE);
-      const rest2 = await page.evaluate(READ_PICKER);
+      const tookFilter = Date.now() - t0;
+      const line = await page.evaluate(COUNT_LINE);
+      const sp = new URLSearchParams(search(page));
+      const closed = (await page.$("[data-timeline-navigator]")) == null;
+      const skeleton = (await page.$("[data-segment-skeleton]")) != null;
       check(
-        `S2 ${g.id}: Newest gives back the rows the page opened with`,
-        restAgain === wantRest && rest2.current === newestMonth && rest2.reset === false,
-        `"${restAgain}" (want "${wantRest}"); current ${rest2.current == null ? "none" : monthName(rest2.current)}; reset offered ${rest2.reset}`,
+        `S2 ${g.id}: ${monthName(heldMonth)} is held, so the click filters the rows and reads nothing`,
+        clicked &&
+          sp.get("from") === day(heldFrom) &&
+          sp.get("to") === day(heldTo) &&
+          line === wantFiltered &&
+          !skeleton &&
+          closed,
+        `clicked ${clicked}; from=${sp.get("from")} to=${sp.get("to")} (want ${day(heldFrom)}…${day(heldTo)}); "${line}" (want "${wantFiltered}"); skeleton ${skeleton}; panel closed ${closed}`,
       );
+      info(`S2 ${g.id}: the filter path`, `${tookFilter} ms from click to the count line`);
     }
 
-    // S3 — a month below the cut. The newest month wholly below the oldest
-    // served row that holds events, from the whole-life summary.
+    // S3 — THE READ PATH. The newest month wholly below the oldest served row
+    // that holds events, from the whole-life summary.
     const below = [...lifeMonths.entries()]
       .filter(([i, c]) => c > 0 && monthEndOf(monthStartTs(i)) < oldestServed)
       .sort((a, b) => b[0] - a[0]);
@@ -1788,24 +1755,35 @@ for (const g of GROUPED_FIXTURES) {
       const [tIdx, tCount] = target;
       const cap = route.boundBy === "rows" ? plan.length : null;
       const head = holdsLine(tIdx);
-      const pressed = await pressCell(page, tIdx);
+      const from = monthStartTs(tIdx);
+      const to = monthEndOf(from);
+      await openPanel(page);
+      const beforePick = await page.evaluate(READ_NAV);
+      const reachCell = (beforePick?.cells ?? []).find((c) => c.at === from);
+      const t0 = Date.now();
+      const pressed = await page.evaluate(CLICK_CELL, from);
       await landed(page, head);
       await stillRows(page);
+      const tookRead = Date.now() - t0;
       const line = await page.evaluate(COUNT_LINE);
-      const seg = await page.evaluate(READ_PICKER);
+      const spine = await page.evaluate(READ_SPINE);
+      const closed = (await page.$("[data-timeline-navigator]")) == null;
       const rowsAt = await page.evaluate(() =>
         [...document.querySelectorAll("[data-row-at]")].map((e) => Number(e.dataset.rowAt)),
       );
-      const from = monthStartTs(tIdx);
-      const to = monthEndOf(from);
       const shrunk = cap != null && tCount > cap;
       check(
-        `S3 ${g.id}: picking ${monthName(tIdx)} loads it and the count line states the month in time`,
+        `S3 ${g.id}: ${monthName(tIdx)} is below the cut, so the grid offers it as a read and the click takes it`,
+        pressed && reachCell?.reach === true && closed,
+        `pressed ${pressed}; the grid called it ${reachCell == null ? "no cell at all" : reachCell.reach ? "a read" : "a filter"}; panel closed ${closed}`,
+      );
+      check(
+        `S3 ${g.id}: the count line states the month in time`,
         // A month over the preload in events may still fit it in rows once
         // grouped, so over the cap either form is right; under it, the month
         // is on the page whole and the line says only that.
-        pressed && (shrunk ? line === head || line.startsWith(`${head}; loaded `) : line === head),
-        `pressed ${pressed}; "${line}" (want ${shrunk ? `"${head}" or "${head}; loaded …"` : `"${head}"`})`,
+        shrunk ? line === head || line.startsWith(`${head}; loaded `) : line === head,
+        `"${line}" (want ${shrunk ? `"${head}" or "${head}; loaded …"` : `"${head}"`})`,
       );
       check(
         `S3 ${g.id}: every row drawn is inside ${monthName(tIdx)}, and there are rows`,
@@ -1813,24 +1791,41 @@ for (const g of GROUPED_FIXTURES) {
         `${rowsAt.length} row(s), ${rowsAt.filter((t) => t < from || t > to).length} outside`,
       );
       check(
-        `S3 ${g.id}: the tip is withheld at the top, and the picker stands on that month`,
-        seg.boundaryRows.includes("tip") && seg.current === tIdx && seg.dynamic === 0,
-        `boundary rows ${seg.boundaryRows.join(", ") || "none"}; current ${seg.current == null ? "none" : monthName(seg.current)}; ${seg.dynamic} band/bar/mark element(s)`,
+        `S3 ${g.id}: the tip is withheld at the top, and no lifetime figure is on the line`,
+        spine.tip >= 1 && !line.includes(n(route.totalEvents)),
+        `${spine.tip} bare tip row(s); "${line}"`,
       );
+      await openPanel(page);
+      const onSegment = await page.evaluate(READ_NAV);
+      const current = (onSegment?.cells ?? []).filter((c) => c.current).map((c) => monthIdxOf(c.at));
       check(
-        `S3 ${g.id}: no lifetime figure on the count line`,
-        !line.includes(n(route.totalEvents)),
-        `"${line}" carries the position's total ${n(route.totalEvents)}`,
+        `S3 ${g.id}: the grid reopened rings ${monthName(tIdx)} as the month the page is on`,
+        current.length === 1 && current[0] === tIdx,
+        `${current.length} month(s) ringed as current${current.length ? ` (${current.map(monthName).join(", ")})` : ""}`,
       );
       info(
-        `S3 ${g.id}: the segment answered`,
-        seg.folders > 0
-          ? `in folders (${seg.folders} folder row(s))`
-          : "flat (an api that predates the grouped span, or a month with nothing to group)",
+        `S3 ${g.id}: the read path`,
+        `${tookRead} ms from click to the rows, against the filter path's figure above`,
+      );
+
+      // And Reset gives the rows the page opened with back, count line and
+      // all — the one way out of a segment now the Newest button is gone.
+      await page.click("[data-timeline-navigator] button:has-text('Reset')", { timeout: 10_000 }).catch(() => {});
+      await settled(
+        page,
+        (w) => (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim() === w,
+        wantRest,
+        60_000,
+      );
+      const restAgain = await page.evaluate(COUNT_LINE);
+      check(
+        `S3 ${g.id}: Reset gives back the rows the page opened with`,
+        restAgain === wantRest,
+        `"${restAgain}" (want "${wantRest}")`,
       );
     }
 
-    // S4 — the phone strip at 390.
+    // S4 — the phone at 390, where the panel is a MobileSheet.
     const phone = await browser.newContext({
       viewport: { width: 390, height: 844 },
       colorScheme: "light",
@@ -1842,38 +1837,24 @@ for (const g of GROUPED_FIXTURES) {
     try {
       await small.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
       await settle(small);
-      await small.waitForSelector("[data-segment-strip]", { timeout: 30_000 }).catch(() => {});
-      await small.evaluate(() => document.querySelector("[data-segment-picker]")?.scrollIntoView());
-      await settled(small, () => document.querySelectorAll("[data-strip-here]").length === 1, null, 10_000);
-      const strip = await small.evaluate(READ_STRIP);
+      const openedPhone = await openPanel(small);
+      const phoneNav = await small.evaluate(READ_NAV);
+      const phoneMarks = await small.evaluate(READ_MARKS);
       check(
-        `S4 ${g.id}: at 390 the strip stands in place of the matrix, at most three months in view, the newest accented and centred, no sideways scroll`,
-        strip.stripVisible &&
-          !strip.matrixVisible &&
-          strip.inView >= 2 &&
-          strip.inView <= 3 &&
-          strip.here === newestMonth &&
-          strip.hereCentred &&
-          strip.scrollWidth === 390,
-        `strip ${strip.stripVisible}, matrix ${strip.matrixVisible}, ${strip.inView} in view, here ${strip.here == null ? "none" : monthName(strip.here)} (want ${monthName(newestMonth)}) centred ${strip.hereCentred}, scrollWidth ${strip.scrollWidth}`,
+        `S4 ${g.id}: at 390 the Date control opens the sheet, and the grid is in it`,
+        openedPhone && phoneNav?.grain === "months" && (phoneNav?.cells.length ?? 0) > 0 && phoneMarks.pickers === 0,
+        `opened ${openedPhone}, grain ${phoneNav?.grain}, ${phoneNav?.cells.length ?? 0} live cell(s), ${phoneMarks.pickers} picker element(s)`,
       );
       if (windowed && target != null) {
         const [tIdx] = target;
         const head = holdsLine(tIdx);
-        const tapped = await small.evaluate((idx) => {
-          const el = document.querySelector(`[data-strip-month="${idx}"]`);
-          if (!el) return false;
-          el.scrollIntoView({ inline: "center", block: "nearest" });
-          el.click();
-          return true;
-        }, tIdx);
+        const tapped = await small.evaluate(CLICK_CELL, monthStartTs(tIdx));
         await landed(small, head);
         const line = await small.evaluate(COUNT_LINE);
-        const after = await small.evaluate(READ_STRIP);
         check(
-          `S4 ${g.id}: a tap on ${monthName(tIdx)} loads it, and the strip underlines it`,
-          tapped && line.startsWith(head) && after.here === tIdx,
-          `tapped ${tapped}; "${line}"; underlined ${after.here == null ? "none" : monthName(after.here)}`,
+          `S4 ${g.id}: a tap on ${monthName(tIdx)} reads it there too`,
+          tapped && line.startsWith(head),
+          `tapped ${tapped}; "${line}" (want "${head}…")`,
         );
       }
     } finally {
@@ -1885,11 +1866,6 @@ for (const g of GROUPED_FIXTURES) {
     // reads the preload's own life.
     await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
     await settle(page);
-    const filteredLine = (x) =>
-      windowed
-        ? `Showing ${n(x)} of ${loadedText} · ${n(route.totalEvents)} events`
-        : `${n(x)} of ${n(route.totalEvents)} events`;
-
     // G5 — a day typed into the spread, on the busiest day a folder covers.
     const folderDays = new Map();
     for (const f of folders)
@@ -1901,7 +1877,7 @@ for (const g of GROUPED_FIXTURES) {
     if (pickDay == null) {
       check(`G5 ${g.id}: a day a folder covers`, false, "no folder day in the listed range");
     } else {
-      await openSpread(page);
+      await openPanel(page);
       const beforeFrom = search(page);
       await page.evaluate(TYPE_DATE, ["from", day(pickDay)]);
       await searchMoved(page, beforeFrom);
