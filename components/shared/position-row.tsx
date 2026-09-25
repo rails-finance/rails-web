@@ -49,6 +49,7 @@ export function PositionRow({
   exact,
   usd,
   trailing,
+  dust,
 }: {
   symbol: string;
   /** The token's address, where the caller has it: the chip resolves its mark
@@ -70,6 +71,10 @@ export function PositionRow({
   usd?: { value: number; prov: Provenance; exact?: string };
   /** Beside the line, after the USD chip. */
   trailing?: ReactNode;
+  /** This row is dust, hidden by default behind a count line (rails-ops
+   *  TO-DO-ui-jobs §52). Marked on the row itself so the verifier can assert
+   *  it renders only once shown. */
+  dust?: boolean;
 }) {
   const { showTickerLabels, showUsdValues } = useTimelineDisplay();
   const afterN = parseFloat(amount) || 0;
@@ -79,7 +84,7 @@ export function PositionRow({
   const delta = afterN - beforeN;
   const deltaStr = deltaText ?? `${delta >= 0 ? "+" : "−"}${fmtPositionAmount(Math.abs(delta))}`;
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm">
+    <span className="inline-flex items-center gap-1.5 text-sm" data-dust-row={dust ? "" : undefined}>
       {isChanged && before != null ? (
         <>
           <DeltaToggle

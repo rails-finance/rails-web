@@ -42,7 +42,6 @@ import type {
   ServedFolderCell,
   ServedFolderCount,
   ServedFolderLeg,
-  ServedFolderOutlier,
   ServedTimelineRow,
 } from "@/lib/shared/timeline-folder";
 import { CHUNK_TARGET, chunkByTransaction } from "@/lib/shared/timeline-chunks";
@@ -90,7 +89,6 @@ export interface GroupingSpec<R> {
   actorOf?: (row: R) => string | null;
   stateOf?: (members: R[]) => { before: Record<string, string> | null; after: Record<string, string> | null };
   magnitudeOf?: (row: R) => { key: string; amount: bigint } | null;
-  nounOf?: (kind: string) => string;
   mixedKind?: string;
   /** One member's place in the folder's cross-tab (`ServedFolder.cells`), in
    *  the page filters' own keys — on a family grouped here the members ARE
@@ -202,8 +200,13 @@ function countByDay<R>(members: R[], timestampOf: (row: R) => number): OpeningBu
 }
 
 // ──────────────────────────── rule 6 ────────────────────────────────────────
-// "A folder header must be complete about its members." The constants are the
-// server's; the argument for each is at its twin in timeline-folders.ts.
+// "A folder header is complete about its members: a member materially unlike
+// the rest splits the folder." (Decision 0019, amended 2026-09-25 — the header
+// no longer names a lone standout member; it states the sums only.) A member
+// that stands out by kind (rare against the folder) or by magnitude (far from
+// its partition's median) marks the folder `mixed`, so its kind label does not
+// claim a uniformity the members do not have. The constants are the server's;
+// the argument for each is at its twin in timeline-folders.ts.
 
 const OUTLIER_KIND_SHARE = 0.05;
 const OUTLIER_KIND_TIMES = 3;
@@ -216,13 +219,9 @@ function medianOf(sorted: bigint[]): bigint {
   return n % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / BigInt(2);
 }
 
-function outlierOf<R>(
-  members: R[],
-  spec: GroupingSpec<R>,
-  access: GroupingAccess<R>,
-): { outlier: ServedFolderOutlier | null; mixed: boolean } {
+function isMixed<R>(members: R[], spec: GroupingSpec<R>, access: GroupingAccess<R>): boolean {
   const n = members.length;
-  const qualified = new Map<string, { row: R; reason: "kind" | "magnitude" }>();
+  const qualified = new Set<string>();
 
   const kindCount = new Map<string, number>();
   for (const row of members) {
@@ -232,7 +231,7 @@ function outlierOf<R>(
   for (const row of members) {
     const c = kindCount.get(spec.kindOf(row)) as number;
     if (c < OUTLIER_KIND_TIMES && c / n < OUTLIER_KIND_SHARE) {
-      qualified.set(access.eventKey(row), { row, reason: "kind" });
+      qualified.add(access.eventKey(row));
     }
   }
 
@@ -259,17 +258,12 @@ function outlierOf<R>(
       const median = medians.get(m.key);
       if (median === undefined) continue;
       if (m.amount >= OUTLIER_MAGNITUDE_RATIO * median || m.amount * OUTLIER_MAGNITUDE_RATIO <= median) {
-        qualified.set(key, { row, reason: "magnitude" });
+        qualified.add(key);
       }
     }
   }
 
-  if (qualified.size === 0) return { outlier: null, mixed: false };
-  if (qualified.size > 1) return { outlier: null, mixed: true };
-  const [[eventKey, only]] = [...qualified];
-  const kind = spec.kindOf(only.row);
-  const noun = spec.nounOf ? spec.nounOf(kind) : kind.replace(/_/g, " ");
-  return { outlier: { eventKey, reason: only.reason, label: `one ${noun}` }, mixed: false };
+  return qualified.size > 1;
 }
 
 // ──────────────────────────── the pass ──────────────────────────────────────
@@ -300,7 +294,7 @@ function folderOf<R>(
   const legs = spec.legsFor
     ? spec.legsFor(members)
     : sumLegEntries(spec.legsOf ? members.flatMap((row) => spec.legsOf!(row)) : []);
-  const { outlier, mixed } = outlierOf(members, spec, access);
+  const mixed = isMixed(members, spec, access);
   const state = spec.stateOf ? spec.stateOf(members) : { before: null, after: null };
   const first = members[0];
   const last = members[members.length - 1];
@@ -320,7 +314,6 @@ function folderOf<R>(
     other: members.length - namedTotal,
     stateBefore: state.before,
     stateAfter: state.after,
-    outlier,
     flows: null,
     actors: spec.actorOf ? countActors(members, spec.actorOf) : null,
     byDay: countByDay(members, access.timestamp),

@@ -12,8 +12,15 @@
 // arithmetic over them, as rails-server computed it. Where the collateral
 // switches, eMode or the at-block read are not known, a card says so rather than
 // guess.
+//
+// RULE (§52): a reserve row whose priced after-balance is under a cent is dust,
+// whatever its collateral flag — a row with no price is held, not dust. Dust
+// rows sit behind a "N dust reserve(s) hidden" line per side, local state, not
+// persisted. The reserve an event touched (the one the grid above gives way
+// for, §47) always draws, dust or not, and is never counted in that line.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { ToggleLeft, ToggleRight } from "lucide-react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { StatCard, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
 import { PositionRow, fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
@@ -50,6 +57,12 @@ import {
 
 type Side = "supply" | "debt";
 type When = "before" | "after";
+
+/** A reserve+side the event touched: the block always draws its row (§52). */
+export interface TouchedLeg {
+  reserve: string;
+  side: Side;
+}
 
 const ZERO = BigInt(0);
 
@@ -137,6 +150,29 @@ function NotAvailable() {
   return <span className="text-sm text-rb-500">Not available at this block</span>;
 }
 
+/** One state of the collateral switch — an icon, not the word (rails-ops
+ *  TO-DO-ui-jobs §53): accent blue when on, the block's muted secondary grey
+ *  when off, never red (off is a setting, not a fault). The word rides behind
+ *  it as the hover title and the accessible label, and the receipt that
+ *  opened from the word opens from the icon now. */
+function CollateralIcon({ sym, when, on, coords }: { sym: string; when: When; on: boolean; coords: V3Coords }) {
+  const label = on ? "Collateral on" : "Collateral off";
+  const Icon = on ? ToggleRight : ToggleLeft;
+  return (
+    <Prov info={collateralFlagProv(sym, when, on, coords)} value={on ? "on" : "off"}>
+      <span title={label} className="inline-flex items-center">
+        <Icon
+          size={16}
+          className={on ? "text-blue-500" : "text-rb-500"}
+          aria-label={label}
+          role="img"
+          data-collateral={on ? "on" : "off"}
+        />
+      </span>
+    </Prov>
+  );
+}
+
 /** The collateral switch beside a supplied reserve, before → after where it
  *  flipped. */
 function CollateralSwitch({
@@ -148,35 +184,45 @@ function CollateralSwitch({
   flag: { before: boolean; after: boolean };
   coords: V3Coords;
 }) {
-  const word = (when: When) => (
-    <Prov info={collateralFlagProv(sym, when, flag[when], coords)} value={flag[when] ? "on" : "off"}>
-      {flag[when] ? "on" : "off"}
-    </Prov>
-  );
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-rb-500" data-collateral={flag.after ? "on" : "off"}>
-      Collateral
+    <span className="inline-flex items-center gap-1">
       {flag.before !== flag.after && (
         <>
-          {word("before")}
+          <CollateralIcon sym={sym} when="before" on={flag.before} coords={coords} />
           <TransitionArrow size="sm" />
         </>
       )}
-      {word("after")}
+      <CollateralIcon sym={sym} when="after" on={flag.after} coords={coords} />
     </span>
   );
 }
+
+/** The reserve's after-balance in USD at this side, or null where it isn't
+ *  priced at this block. A row with no price is held, not dust (§52). */
+function reserveUsdAfter(r: AaveV3PositionStateReserve, side: Side): number | null {
+  if (r.priceBase == null || r.decimals == null) return null;
+  const leg = side === "supply" ? r.supply : r.debt;
+  return rawToUsd(leg.after, r.priceBase, r.decimals);
+}
+
+/** Under a cent, priced, whatever the collateral flag (§52). */
+const isDustRow = (r: AaveV3PositionStateReserve, side: Side): boolean => {
+  const usd = reserveUsdAfter(r, side);
+  return usd != null && usd < 0.01;
+};
 
 function ReserveLine({
   state,
   r,
   side,
   coords,
+  dust,
 }: {
   state: AaveV3PositionState;
   r: AaveV3PositionStateReserve;
   side: Side;
   coords: V3Coords;
+  dust?: boolean;
 }) {
   const decimals = r.decimals ?? 0;
   const sym = reserveSymbol(r);
@@ -208,24 +254,67 @@ function ReserveLine({
       trailing={
         side === "supply" && r.collateral ? <CollateralSwitch sym={sym} flag={r.collateral} coords={coords} /> : null
       }
+      dust={dust}
     />
   );
 }
 
-function ReserveList({ state, side, coords }: { state: AaveV3PositionState; side: Side; coords: V3Coords }) {
+function ReserveList({
+  state,
+  side,
+  coords,
+  touched,
+}: {
+  state: AaveV3PositionState;
+  side: Side;
+  coords: V3Coords;
+  touched: Set<string>;
+}) {
+  const [showDust, setShowDust] = useState(false);
   const rows = state.reserves.filter((r) => r.decimals != null && legHeld(side === "supply" ? r.supply : r.debt));
   if (rows.length === 0) return <span className="text-sm text-rb-500">None</span>;
+
+  // The touched reserve always draws, dust or not, and never joins the count
+  // behind the toggle (§52).
+  const dustRows = rows.filter((r) => !touched.has(r.reserve) && isDustRow(r, side));
+  const shownRows = rows.filter((r) => touched.has(r.reserve) || !isDustRow(r, side));
+
   return (
     <div className="flex flex-col gap-1" data-position-reserves={side}>
-      {rows.map((r) => (
+      {shownRows.map((r) => (
         <ReserveLine key={r.reserve} state={state} r={r} side={side} coords={coords} />
       ))}
+      {dustRows.length > 0 && (
+        <>
+          {showDust &&
+            dustRows.map((r) => <ReserveLine key={r.reserve} state={state} r={r} side={side} coords={coords} dust />)}
+          <button
+            type="button"
+            className="self-start text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700"
+            data-dust-hidden={dustRows.length}
+            onClick={() => setShowDust((v) => !v)}
+          >
+            {showDust ? "Hide dust" : `${dustRows.length} dust reserve${dustRows.length === 1 ? "" : "s"} hidden`}
+          </button>
+        </>
+      )}
     </div>
   );
 }
 
-export function AaveV3PositionStateBlock({ state, coords }: { state: AaveV3PositionState; coords: V3Coords }) {
+export function AaveV3PositionStateBlock({
+  state,
+  coords,
+  touched = [],
+}: {
+  state: AaveV3PositionState;
+  coords: V3Coords;
+  /** Reserves the event touched: the grid above gives way to their row for
+   *  the same balance (§47), so the dust rule here never hides it (§52). */
+  touched?: TouchedLeg[];
+}) {
   const { account, emode, sources } = state;
+  const touchedOn = (side: Side): Set<string> => new Set(touched.filter((t) => t.side === side).map((t) => t.reserve));
 
   const accountCard = (figure: (side: AaveV3AccountSide, when: When) => Figure) =>
     account ? (
@@ -262,14 +351,18 @@ export function AaveV3PositionStateBlock({ state, coords }: { state: AaveV3Posit
       label: "Supplied",
       body: (
         <>
-          <ReserveList state={state} side="supply" coords={coords} />
+          <ReserveList state={state} side="supply" coords={coords} touched={touchedOn("supply")} />
           {sources.settings == null && (
             <div className="mt-1 text-xs text-rb-500">Collateral on/off isn&rsquo;t available at this block.</div>
           )}
         </>
       ),
     },
-    { key: "borrowed", label: "Borrowed", body: <ReserveList state={state} side="debt" coords={coords} /> },
+    {
+      key: "borrowed",
+      label: "Borrowed",
+      body: <ReserveList state={state} side="debt" coords={coords} touched={touchedOn("debt")} />,
+    },
     { key: "total-collateral", label: "Total collateral", body: total("collateral") },
     { key: "total-debt", label: "Total debt", body: total("debt") },
     {
