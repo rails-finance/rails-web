@@ -3,7 +3,9 @@
 // with its exact before → after (USD, collateral on/off), total collateral, total
 // debt, health factor, LTV, liquidation threshold and eMode. A balance the block
 // lists is stated there and nowhere else — the grid's cell for that reserve is
-// the statement only until the read lands (§47).
+// the statement only until the read lands (§47). A reserve row under a cent is
+// dust and sits behind a "N dust reserve(s) hidden" line per side, unless it is
+// the reserve the event touched — that row always draws (§52).
 //
 // The rendered card is checked against the SAME answer the page reads —
 // /api/aave-v3/timeline/position-state through this server — so no balance is
@@ -19,6 +21,10 @@
 //   0x52af…4c1f prime tx 0x361e9da2…3348 (24,354,939): a USDC borrow with wstETH and WETH supplied
 //   0x64b8…e12b core  tx 0x89d97f9c…22ec (25,301,360): UserEModeSet category 1 and a WETH borrow, one tx
 //   0x74c2…2a10 core  tx 0xe62f083a…b74b (25,302,570): liquidation, USDe debt, WBTC collateral
+//   0x9ff6…0de5 core  tx 0x01c8f13b…be71c1 (26,052,226): a WETH supply against 115.998 WETH, five
+//     other supplied reserves under a cent — the dust count line (§52)
+//   0x9ff6…0de5 core  tx 0xa8590e9c…693cf81 (25,983,408): a collateral swap, UNI → WETH, whose sold
+//     UNI ends the tx under a cent — touched and dust, so its row still draws (§52)
 // plus one Base card, which must never ask.
 //
 // Until rails-server serves the route this fails at the first check of every
@@ -35,6 +41,7 @@ const USDC = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
 const USDT = "0xdac17f958d2ee523a2206206994597c13d831ec7";
 const WBTC = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599";
 const USDE = "0x4c9edd5852cd905f086c759e8383e09bff1e68b3";
+const UNI = "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984";
 
 const FIXTURES = [
   {
@@ -109,6 +116,33 @@ const FIXTURES = [
       { reserve: USDE, side: "debt", sign: -1 },
     ],
   },
+  {
+    // rails-ops TO-DO-ui-jobs §52: 115.998 WETH plus five sub-cent reserves
+    // (UNI, LINK, XAUt, AAVE, BTC.b), the Miles screenshot's fixture.
+    label: "core 0x9ff6 large WETH supply, five dust reserves",
+    wallet: "0x9ff679ef5e663a223c5ef07fd191e9e7eda90de5",
+    market: "core",
+    block: 26052226,
+    tx: "0x01c8f13bf4c6ab034b4bf01c9508545f3d34163ca6d2e9d3aeec6497a3be71c1",
+    idPrefix: "supply:",
+    moved: [{ reserve: WETH, side: "supply", sign: 1 }],
+    dust: true,
+  },
+  {
+    // Same wallet, a collateral swap that sells its UNI down to under a cent
+    // in the same transaction: the touched reserve draws its row dust or not.
+    label: "core 0x9ff6 collateral swap, sold UNI ends dust and touched",
+    wallet: "0x9ff679ef5e663a223c5ef07fd191e9e7eda90de5",
+    market: "core",
+    block: 25983408,
+    tx: "0xa8590e9c7325641a59840a897d3d57f5681b46ce353efa373136edf3a693cf81",
+    cardText: "Collateral swap",
+    moved: [
+      { reserve: UNI, side: "supply", sign: -1 },
+      { reserve: WETH, side: "supply", sign: 1 },
+    ],
+    dust: true,
+  },
 ];
 
 // A Base card: the same component, with no market, so no read. A wallet whose
@@ -148,6 +182,13 @@ const hfLabel = (wad) => {
 const bpsPct = (bps) => `${(bps / 100).toFixed(2)}%`;
 const emodeName = (state, id) => (id === 0 ? "None" : state.emode?.categories?.[String(id)]?.label || `Category ${id}`);
 const held = (leg) => big(leg?.before) > BigInt(0) || big(leg?.after) > BigInt(0);
+// §52: under a cent, priced, whatever the collateral flag. A row with no price
+// (priceBase null) is held, not dust.
+const isDustRow = (r, side) => {
+  if (r.priceBase == null || r.decimals == null) return false;
+  const leg = side === "supply" ? r.supply : r.debt;
+  return rawToUsd(leg.after, r.priceBase, r.decimals) < 0.01;
+};
 
 let pass = 0;
 let fail = 0;
@@ -376,17 +417,28 @@ for (const fx of FIXTURES) {
     }
 
     // Supplied and borrowed lists: one line per held reserve, amount, USD and
-    // the collateral switch.
+    // the collateral switch. A reserve under a cent is dust and sits behind a
+    // count line by default, unless it is one of the reserves this event
+    // touched (§52) — that row always draws, whatever its side reads.
     for (const [side, rows] of [
       ["supply", supplied],
       ["debt", borrowed],
     ]) {
-      const lines = block.locator(`[data-position-reserves="${side}"] > span`);
+      const touched = new Set(fx.moved.filter((m) => m.side === side).map((m) => m.reserve));
+      const dustRows = rows.filter((r) => !touched.has(r.reserve) && isDustRow(r, side));
+      const shownRows = rows.filter((r) => touched.has(r.reserve) || !isDustRow(r, side));
+      const scope = block.locator(`[data-position-reserves="${side}"]`);
+
+      const lines = scope.locator("> span");
       const n = await lines.count();
-      check(`${fx.label}: ${side} list has ${rows.length} line(s)`, n === rows.length, `${n} drawn`);
+      check(
+        `${fx.label}: ${side} list shows ${shownRows.length} line(s) before any dust toggle`,
+        n === shownRows.length,
+        `${n} drawn`,
+      );
       const texts = [];
       for (let i = 0; i < n; i++) texts.push(await text(lines.nth(i)));
-      for (const r of rows) {
+      for (const r of shownRows) {
         const leg = r[side];
         const amount = fmtAmount(humanOf(leg.after, r.decimals));
         const usd =
@@ -403,6 +455,48 @@ for (const fx of FIXTURES) {
             new RegExp(`Collateral.*${r.collateral.after ? "on" : "off"}$`).test(line),
             line,
           );
+      }
+
+      const dustButton = scope.locator("[data-dust-hidden]");
+      if (dustRows.length > 0) {
+        check(`${fx.label}: ${side} carries a dust count line`, (await dustButton.count()) === 1);
+        check(
+          `${fx.label}: ${side} data-dust-hidden reads ${dustRows.length}`,
+          (await dustButton.getAttribute("data-dust-hidden")) === String(dustRows.length),
+        );
+        const label = `${dustRows.length} dust reserve${dustRows.length === 1 ? "" : "s"} hidden`;
+        const before = await text(dustButton);
+        check(`${fx.label}: ${side} count line reads "${label}"`, before === label, before);
+        check(
+          `${fx.label}: ${side} dust rows are absent before the toggle`,
+          (await scope.locator("[data-dust-row]").count()) === 0,
+        );
+        await dustButton.click();
+        await scope
+          .locator("[data-dust-row]")
+          .first()
+          .waitFor({ timeout: 5000 })
+          .catch(() => {});
+        check(
+          `${fx.label}: ${side} dust rows draw once the count line is clicked`,
+          (await scope.locator("[data-dust-row]").count()) === dustRows.length,
+        );
+        const after = await text(dustButton);
+        check(`${fx.label}: ${side} count line now reads "Hide dust"`, after === "Hide dust", after);
+        const shownTexts = [];
+        const allLines = scope.locator("> span");
+        const total = await allLines.count();
+        for (let i = 0; i < total; i++) shownTexts.push(await text(allLines.nth(i)));
+        for (const r of dustRows) {
+          const amount = fmtAmount(humanOf(r[side].after, r.decimals));
+          check(
+            `${fx.label}: dust row for ${r.symbol} reads ${amount} once shown`,
+            shownTexts.some((t) => t.includes(amount)),
+            shownTexts.join(" | "),
+          );
+        }
+      } else {
+        check(`${fx.label}: ${side} carries no dust count line`, (await dustButton.count()) === 0);
       }
     }
 
