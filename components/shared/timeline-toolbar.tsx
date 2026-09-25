@@ -402,6 +402,22 @@ export function eventCountLine(tl: TimelineEventsState): string {
   return totalKnown ? `${head} · ${atLeast}${n(tl.totalCount)} events` : head;
 }
 
+// Tiny month-index arithmetic, deliberately NOT imported from
+// transaction-heatmap.tsx: that module is the LAZY boundary (loaded only
+// after a Date press, see timeline-navigator.tsx's own note), and this
+// toolbar renders eagerly on every detail page. Importing even one named
+// export risks the bundler keeping the whole heatmap component in the
+// eager chunk. The three lines below mirror monthStartTs/monthEndTs/
+// monthIdxOf there exactly; if those change, change these too.
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const monthStartOfIdx = (idx: number): number => Math.floor(Date.UTC(Math.floor(idx / 12), idx % 12, 1) / 1000);
+const monthEndOfIdx = (idx: number): number =>
+  Math.floor(Date.UTC(Math.floor(idx / 12), (idx % 12) + 1, 1) / 1000) - 1;
+const monthIdxOfTs = (ts: number): number => {
+  const d = new Date(ts * 1000);
+  return d.getUTCFullYear() * 12 + d.getUTCMonth();
+};
+
 export function TimelineToolbar({
   tl,
   displayItems,
@@ -418,14 +434,39 @@ export function TimelineToolbar({
   // control whose every state shows the same address.
   const counterpartyOptions = tl.counterpartyOptions.length > 1 ? tl.counterpartyOptions : [];
   const dateActive = tl.dateRange !== null;
+  // The second path (decision 0019, amendment 2026-09-25) sets no
+  // `dateRange` at all — the page reads the month as its own segment
+  // instead — so a picked month read that way leaves `dateActive` false.
+  // The button needs the reach's own month too, or the Date button read
+  // "Date" while the grid it opens stood on a month underneath it (Miles,
+  // 2026-09-25).
+  const segmentMonth = monthReach?.month ?? null;
+  const filterActive = dateActive || segmentMonth != null;
+  const monthLabel = (idx: number) => `${MONTH_SHORT[idx % 12]} ${Math.floor(idx / 12)}`;
+  // A direct filter that IS exactly one calendar month reads as that month
+  // — "Jul 2023" — the same as a segment read does, since the reader picked
+  // the same kind of thing either path. Anything else (a typed or
+  // URL-carried span wider than one month) keeps the short date-to-date
+  // form this button has always shown.
+  const pickedMonthIdx =
+    dateActive &&
+    tl.dateRange![0] === monthStartOfIdx(monthIdxOfTs(tl.dateRange![0])) &&
+    tl.dateRange![1] === monthEndOfIdx(monthIdxOfTs(tl.dateRange![0]))
+      ? monthIdxOfTs(tl.dateRange![0])
+      : null;
   // On a phone the panel is a live sheet rather than a dropdown — the same
   // register as the filter menus beside it.
   const isPhone = useMediaQuery(PHONE_QUERY);
-  const dateLabel = dateActive
-    ? `${new Date(tl.dateRange![0] * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric" })} – ${new Date(
-        tl.dateRange![1] * 1000,
-      ).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric" })}`
-    : "Date";
+  const dateLabel =
+    pickedMonthIdx != null
+      ? monthLabel(pickedMonthIdx)
+      : segmentMonth != null
+        ? monthLabel(segmentMonth)
+        : dateActive
+          ? `${new Date(tl.dateRange![0] * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric" })} – ${new Date(
+              tl.dateRange![1] * 1000,
+            ).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric" })}`
+          : "Date";
   const countLine = eventCountLine(tl);
   const countState = eventCountState(tl);
   // Inert until this strip's handlers are attached. A detail page is the widest
@@ -574,7 +615,7 @@ export function TimelineToolbar({
             // panel the same way they do, so it is one of them, not a
             // one-off.
             className={`${CTRL_GHOST} h-7 gap-2 px-2.5 rounded-md text-xs ${
-              dateActive ? CTRL_ON_ACCENT : datePanelOpen ? `${CTRL_ON} ${CTRL_ON_HOVER}` : CTRL_OFF
+              filterActive ? CTRL_ON_ACCENT : datePanelOpen ? `${CTRL_ON} ${CTRL_ON_HOVER}` : CTRL_OFF
             }`}
             title={datePanelOpen ? "Hide the date span" : "Filter by a span of dates"}
           >
