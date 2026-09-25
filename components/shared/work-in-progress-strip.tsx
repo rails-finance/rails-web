@@ -34,22 +34,31 @@ function coverageChain(pathname: string | null): ChainId | undefined {
   return slug ? (Object.values(CHAINS).find((c) => c.slug === slug)?.id ?? undefined) : undefined;
 }
 
-/** What this route's strip is about, or undefined when the route is launched
- *  and there is no strip to draw. */
-function unlaunchedSubject(pathname: string | null): string | undefined {
+/** What this route's strip is about, and whether that route is an explorer —
+ *  or undefined when the route is launched and there is no strip to draw.
+ *  `explorer` is what decides the rail offset below: an explorer route is
+ *  under app/(app) and carries BrandRail from `md` up, a coverage page is
+ *  marketing and carries none. */
+function unlaunchedSubject(pathname: string | null): { subject: string; explorer: boolean } | undefined {
   const entry = protocolForPathname(pathname);
-  if (entry) return entry.unlaunched ? explorerName(entry) : undefined;
+  if (entry) return entry.unlaunched ? { subject: explorerName(entry), explorer: true } : undefined;
   const chainId = coverageChain(pathname);
-  if (chainId !== undefined && !isLaunchedChain(chainId)) return `${CHAINS[chainId].name} coverage`;
+  if (chainId !== undefined && !isLaunchedChain(chainId))
+    return { subject: `${CHAINS[chainId].name} coverage`, explorer: false };
   return undefined;
 }
 
 export function WorkInProgressStrip() {
-  const subject = unlaunchedSubject(usePathname());
-  if (!subject) return null;
+  const found = unlaunchedSubject(usePathname());
+  if (!found) return null;
+  const { subject, explorer } = found;
 
   return (
-    <div data-work-in-progress className="notice-caution">
+    // The strip spans the viewport, so on an explorer it reserves the rail's
+    // 56px the way app/(app)/layout.tsx does — the rail is fixed and opaque
+    // (ui-jobs 68), and without this the first words of the sentence sit
+    // behind it.
+    <div data-work-in-progress className={`notice-caution${explorer ? " md:pl-14" : ""}`}>
       <p className="mx-auto max-w-7xl px-4 py-2.5 text-sm text-foreground md:px-6">
         <span className="font-semibold">{subject} is a work in progress.</span>{" "}
         <span className="text-rb-500">

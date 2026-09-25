@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
-/** Icon-only theme toggle that sits to the left of the hamburger in the
- *  HeaderBar. No pill/background — only the line art recolours to teal on
- *  hover, matching the footer affordance. At rest the icon shares the
- *  hamburger's ink (rb-700 / dark:rb-300) so the two read as one control
- *  cluster. Uses next-themes (the app's canonical theme mechanism); the
+/** Icon-only theme toggle. It is drawn once per width: in HeaderBar on the
+ *  marketing surfaces and on an app route below `md`, and at the foot of
+ *  BrandRail from `md` up, where the app bar is gone (rails-ops TO-DO-ui-jobs
+ *  68). No pill/background — only the line art recolours to teal on hover,
+ *  matching the footer affordance. At rest the icon shares the bookmark's ink
+ *  (rb-700 / dark:rb-300) so the two read as one control cluster wherever they
+ *  sit. Uses next-themes (the app's canonical theme mechanism); the
  *  mounted flag avoids the SSR/CSR mismatch on resolvedTheme, and a fixed-size
  *  placeholder keeps the header from shifting before hydration. */
 export function HeaderThemeToggle() {

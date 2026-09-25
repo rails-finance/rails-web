@@ -442,7 +442,8 @@ if ((await page.locator("[data-prov-tripwire]").count()) > 0) {
 }
 
 // ── 9: the chain switcher ───────────────────────────────────────────────────
-await page.getByRole("button", { name: "Switch blockchain" }).click();
+// The drawn one: the bar keeps a hidden copy below `md` (ui-jobs 68).
+await page.locator('button[aria-label="Switch blockchain"]:visible').click();
 await page.waitForSelector("[role='menu']");
 const baseSelected = await page.locator("[role='menu'] button[aria-pressed='true']").textContent();
 const vaultsRowBase = await page

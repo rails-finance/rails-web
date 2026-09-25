@@ -740,7 +740,8 @@ if ((await page.locator("[data-prov-tripwire]").count()) > 0) {
 }
 
 // ── 11: the chain switcher ──────────────────────────────────────────────────
-await page.getByRole("button", { name: "Switch blockchain" }).click();
+// The drawn one: the bar keeps a hidden copy below `md` (ui-jobs 68).
+await page.locator('button[aria-label="Switch blockchain"]:visible').click();
 await page.waitForSelector("[role='menu']");
 // The chains the panel OFFERS, read off the panel rather than listed here: it
 // shows the launched chains (`launchedChains()`), so a hardcoded list here

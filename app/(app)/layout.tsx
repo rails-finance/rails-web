@@ -12,11 +12,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           padding: `md:pl-14` reserves the rail's 56px on the outer block and
           the inner `mx-auto` then centres the content in what is left, rather
           than the rail pushing a viewport-centred column off centre.
-          HeaderBar reserves the same 56px on the app routes, so the bar's
-          controls stay flush with the content's right edge. */}
+          `md:pt-4` replaces the air the header band used to give these pages:
+          from `md` up the bar is gone (ui-jobs 68) and the page would
+          otherwise open hard against the top of the viewport. It is a quarter
+          of what the bar cost, since the pages carry their own `py-8` under
+          it. Below `md` the bar is still there, so no padding is owed. */}
       <BrandRail />
       <div className="md:pl-14">
-        <main className="max-w-7xl mx-auto px-4 md:px-6">{children}</main>
+        <main className="max-w-7xl mx-auto px-4 md:px-6 md:pt-4">{children}</main>
         <AppFooter />
       </div>
       {/* Invisible: measures the tagged real sections and feeds the skeleton

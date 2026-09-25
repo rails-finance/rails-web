@@ -1,26 +1,31 @@
 "use client";
 
 // BrandRail — the narrow vertical strip down the left edge of every app/(app)
-// surface (rails-ops TO-DO-ui-jobs 67). The Rails mark sits at the top and the
-// bookmarks control at the foot; the top bar keeps the theme toggle and the
-// chain switcher for both route groups, so no control is drawn twice.
+// surface (rails-ops TO-DO-ui-jobs 67, 68). The Rails mark sits at the top; the
+// theme toggle, the bookmarks control and the beta pill share the foot.
+//
+// IT IS A SURFACE, NOT A MARGIN (68): `bg-raised` is the same tone the cards
+// and panels take, so the strip reads as chrome the page sits beside rather
+// than as empty gutter that happens to have a glyph in it.
 //
 // WIDTH: 56px (w-14), icon width. The rail is a brand strip today and is
 // expected to grow into a utility bar nested in some form of nav, so it starts
 // at the width its contents need. Widening it later changes the rail;
 // narrowing it later reflows every page.
 //
-// MARKETING KEEPS ITS PRESENT HEADER. The rail is mounted from
-// app/(app)/layout.tsx and reaches nothing under app/(site).
+// MARKETING KEEPS ITS PRESENT HEADER, its own theme toggle included, at every
+// width. The rail is mounted from app/(app)/layout.tsx and reaches nothing
+// under app/(site).
 //
 // BELOW `md` THERE IS NO RAIL: at phone widths 56px of permanent gutter is a
-// sixth of the page. HeaderBar draws the mark, the bookmark and the theme
-// icons there, as it did before this rail existed.
+// sixth of the page. HeaderBar draws the mark, the bookmark, the theme toggle
+// and the chain trigger there, as it did before this rail existed.
 
 import { useState } from "react";
 import Link from "next/link";
 
 import { BookmarksModal } from "@/components/nav/bookmarks-modal";
+import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 
 /** The Rails glyph, linking home — the same mark and the same link the top bar
  *  carried, without the wordmark, which will not fit at icon width. */
@@ -47,12 +52,16 @@ function RailsGlyph() {
   );
 }
 
-/** The release-stage pill, under the glyph rather than beside it: it belongs to
- *  the mark, and at icon width the only room left is below. Same caution-500
- *  anatomy the top bar uses, a size down to sit inside 56px. */
+/** The release-stage pill at the very foot of the rail, below the bookmark
+ *  (Miles, 2026-09-25). Drawn as a label coming out of the browser's left
+ *  edge: square on the left, rounded on the right, flush to x=0 rather than
+ *  centred in the rail. Under the glyph it read as part of the mark and pulled
+ *  the eye to the top of the page; down here it is a standing note about the
+ *  product. Same caution-500 anatomy the top bar uses, a size down to sit
+ *  inside 56px. */
 function BetaPill() {
   return (
-    <span className="mt-1.5 rounded bg-caution-500 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-white">
+    <span className="self-start rounded-r bg-caution-500 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-white">
       Beta
     </span>
   );
@@ -92,21 +101,25 @@ export function BrandRail() {
   const [showBookmarks, setShowBookmarks] = useState(false);
   return (
     <>
-      {/* Fixed, so the mark holds the top of the viewport and the bookmark the
-          bottom however far the page scrolls. `py-4` matches the top bar's
-          band, which lands the glyph on the same centre line as the controls
-          still in the bar. z-40 ties with the header; the rail is later in the
+      {/* Fixed, so the mark holds the top of the viewport and the foot cluster
+          the bottom however far the page scrolls. `py-4` is the same air the
+          top bar used to give the glyph, kept now that the bar is gone from
+          these widths. z-40 ties with the header; the rail is later in the
           document, so its glyph stays clickable under the header's full-width
           box. */}
       <aside
         aria-label="Rails"
-        className="fixed inset-y-0 left-0 z-40 hidden w-14 flex-col items-center justify-between py-4 md:flex"
+        className="fixed inset-y-0 left-0 z-40 hidden w-14 flex-col items-center justify-between bg-raised py-4 md:flex"
       >
-        <div className="flex flex-col items-center">
-          <RailsGlyph />
+        <RailsGlyph />
+        {/* Toggle, bookmark, then the pill flush to the left edge. `w-full`
+            is what lets the pill sit at x=0 while the two icons stay centred
+            in the 56px. */}
+        <div className="flex w-full flex-col items-center gap-1">
+          <HeaderThemeToggle />
+          <BookmarksButton onClick={() => setShowBookmarks(true)} />
           <BetaPill />
         </div>
-        <BookmarksButton onClick={() => setShowBookmarks(true)} />
       </aside>
       {showBookmarks && <BookmarksModal onClose={() => setShowBookmarks(false)} />}
     </>

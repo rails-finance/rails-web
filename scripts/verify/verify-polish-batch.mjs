@@ -179,7 +179,10 @@ check("L Escape closes the modal", (await page.locator(LIQUITY_DIALOG).count()) 
 // panel actually renders for that chain.
 await page.goto(`${BASE}/ethereum/dolomite`, { waitUntil: "networkidle" });
 const SWITCHER_PANEL = 'div[role="menu"][aria-label="Blockchain switcher"]';
-const switcherTrigger = page.locator('button[aria-label="Switch blockchain"]');
+// `:visible` — on an app route from `md` up the chooser sits on the protocol
+// title row and the bar's own copy is in the tree but hidden by a breakpoint
+// class (rails-ops TO-DO-ui-jobs 68), so a bare locator matches two.
+const switcherTrigger = page.locator('button[aria-label="Switch blockchain"]:visible');
 check("S trigger names the active chain", /Ethereum/.test((await switcherTrigger.textContent()) ?? ""));
 // Pre-hydration clicks are lost, not replayed — poll the panel and re-click.
 let switcherOpen = false;

@@ -1,7 +1,10 @@
 "use client";
 
 // RailHeader — the two-row header on every explorer surface. The protocol's
-// identity (ProtocolIdentity) takes the first row alone. The second row
+// identity (ProtocolIdentity) takes the left of the first row and the chain
+// chooser the right end of it (rails-ops TO-DO-ui-jobs 68): the two together
+// say what you are looking at and which chain it runs on, so they belong on
+// one line rather than one on the page and one in the chrome. The second row
 // carries the recency stamp on the left (the chain head is rail-level
 // context — the block the page reads against — not row furniture) and the
 // rail's sub-nav on the right. The sub-nav is live tab links — the position
@@ -12,13 +15,19 @@
 // whose route holds the pathname, so a sub-page's nested routes (Morpho's
 // markets/[loanToken]) light their parent.
 //
-// A POSITION VIEW DRAWS NEITHER ROW, ONLY THE IDENTITY (rails-ops TO-DO-ui-jobs
-// 48). The tabs and the (i) belong to the protocol, not to one account's
-// position, and nothing in them was ever lit here; the identity keeps its
-// link, which is the one door back to the rail. The recency stamp left with
-// them — a position states its chain head in the row under this one. It keeps
-// the small-caps register too, where the other venues take the title scale:
-// the subject of a position view is the account named in its h1.
+// A POSITION VIEW DRAWS NO SECOND ROW, ONLY THE IDENTITY AND THE CHOOSER
+// (rails-ops TO-DO-ui-jobs 48, 68). The tabs and the (i) belong to the
+// protocol, not to one account's position, and nothing in them was ever lit
+// here; the identity keeps its link, which is the one door back to the rail.
+// The recency stamp left with them — a position states its chain head in the
+// row under this one. The identity keeps the small-caps register too, where
+// the other venues take the title scale: the subject of a position view is the
+// account named in its h1. The chooser stays, because it is the only one an
+// app page has above `md`.
+//
+// THE CHOOSER IS `md` AND UP ONLY. Below `md` there is no brand rail and
+// HeaderBar keeps the chain trigger and the theme toggle, so drawing it here
+// too would be a second copy of one control.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -27,6 +36,19 @@ import { positionNounPlural, protocolForSession, subPageForPathname } from "@/li
 import { ProtocolIdentity } from "@/components/shared/protocol-identity";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { INFO_PATH } from "@/components/shared/info-disclosure";
+import { ChainSwitcher } from "@/components/nav/chain-switcher";
+
+/** The chain chooser as it sits on the title row: hidden below `md`, where
+ *  HeaderBar still carries it. `-mr-2.5` pulls the trigger's own padding back
+ *  so its glyph lines up with the content's right edge rather than the
+ *  padding box. */
+function TitleRowChooser() {
+  return (
+    <div className="-mr-2.5 hidden shrink-0 md:block">
+      <ChainSwitcher variant="chain" />
+    </div>
+  );
+}
 
 /** Which surface of the rail is being looked at — decides the lit slot. */
 export type RailVenue = "listing" | "subPage" | "position" | "info";
@@ -66,7 +88,12 @@ export function RailHeader({
   if (!entry) return null;
   const litSubPage = venue === "subPage" ? subPageForPathname(entry, pathname) : undefined;
   if (venue === "position") {
-    return <ProtocolIdentity session={session} />;
+    return (
+      <div className="flex min-h-9 items-center justify-between gap-3">
+        <ProtocolIdentity session={session} />
+        <TitleRowChooser />
+      </div>
+    );
   }
   return (
     // Two rows at every width (rails-ops TO-DO-ui-jobs 66). Pinning the
@@ -81,8 +108,15 @@ export function RailHeader({
     <div className="flex flex-col gap-2">
       {/* The page's largest type (rails-ops TO-DO-ui-jobs 67). The first thing
           the eye lands on is now what the page is about; the scale lives in
-          ProtocolIdentity, so every explorer wears the same one. */}
-      <ProtocolIdentity session={session} scale="title" />
+          ProtocolIdentity, so every explorer wears the same one. The chooser
+          takes the far end of the row, and `min-w-0` lets a long name shrink
+          rather than push it off. */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <ProtocolIdentity session={session} scale="title" />
+        </div>
+        <TitleRowChooser />
+      </div>
       {/* Right-aligned even with the stamp off (the info page): a lone nav
           flush right still reads as one deliberate row, not a stamp-shaped
           gap. With the stamp on, the two ends split it as before. */}

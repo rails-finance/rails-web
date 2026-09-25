@@ -114,44 +114,41 @@ export function HeaderBar() {
   return (
     <header
       className={`${isHome ? "absolute inset-x-0 top-0 z-40" : "relative z-40 mb-2"}${
-        // The app surfaces carry BrandRail down the left edge from `md` up, so
-        // the bar reserves the rail's 56px the way the page column does and
-        // its controls stay flush with the content's right edge.
-        isMarketing ? "" : " md:pl-14"
+        // From `md` up an app route has nothing left for this bar to carry:
+        // the mark, the bookmark and the theme toggle are in BrandRail and the
+        // chain chooser is on the protocol title row (rails-ops TO-DO-ui-jobs
+        // 68). So the bar goes rather than standing as an empty band, and
+        // app/(app)/layout.tsx takes over the top spacing. Below `md` there is
+        // no rail and the bar is the only chrome, so it keeps every control.
+        isMarketing ? "" : " md:hidden"
       }`}
     >
       <div className="max-w-7xl mx-auto py-4 px-4 md:px-6 flex items-center">
-        {/* The mark and the beta pill. From `md` up on an app route the rail
-            holds the mark, so drawing it here too would say Rails twice;
-            below `md` there is no rail and the bar keeps its present shape,
-            wordmark included (Miles, 2026-09-25). Marketing is untouched. */}
-        <div className={`flex items-center${isMarketing ? "" : " md:hidden"}`}>
+        {/* The mark and the beta pill. On an app route this bar exists only
+            below `md`, where there is no rail to hold them. Marketing is
+            untouched at every width. */}
+        <div className="flex items-center">
           <RailsLogo />
           <BetaPill />
         </div>
         {/* Right-hand control cluster. `ml-auto` pushes it hard right — it used
             to yield (`md:ml-0`) to the inline site-links nav that sat here, but
             that nav is retired, so the cluster owns the push outright. The
-            switcher trails it, rightmost: on app routes a chain trigger
-            ("Ethereum ▾" — the chain, never the protocol; identity lives on
-            the page), on marketing routes the "Open an explorer" pill. Both
-            open the same roster panel. Bookmarks and the theme toggle lead —
+            switcher trails it, rightmost: on app routes below `md` a chain
+            trigger ("Ethereum ▾" — the chain, never the protocol; identity
+            lives on the page), on marketing routes the "Open an explorer"
+            pill. Both open the same roster panel. Bookmarks and the toggle lead —
             the switcher opens a panel, so it anchors the cluster's outer edge
             rather than sitting in the middle of it. The hamburger is retired
             with it — the site's own pages and socials live in the footers
             (SiteFooter on marketing routes, AppFooter's quiet Coverage link
             on app routes). */}
         <div className="ml-auto flex items-center gap-1">
-          {/* App-only, and from `md` up the rail's foot carries it instead —
-              same control, one place per width. The theme toggle below stays
-              in the bar at every width and on both sides: it renders on the
-              marketing surfaces too, and a rail instance would be a second
-              copy of one control (Miles, 2026-09-25). */}
-          {!isMarketing && (
-            <span className="md:hidden">
-              <BookmarksButton onClick={() => setShowBookmarks(true)} />
-            </span>
-          )}
+          {/* Bookmarks are an app-side affordance and marketing pages have
+              nothing to bookmark. From `md` up the rail's foot carries it,
+              along with the theme toggle — but this whole bar is gone by then
+              on an app route, so each control is drawn once per width. */}
+          {!isMarketing && <BookmarksButton onClick={() => setShowBookmarks(true)} />}
           <HeaderThemeToggle />
           <ChainSwitcher variant={isMarketing ? "cta" : "chain"} />
         </div>

@@ -1,15 +1,20 @@
 "use client";
 
-// The blockchain switcher — the top-right chrome affordance that owns the
-// roster. Chains on the left with their explorer counts, the selected chain's
-// explorers on the right, click-through to a listing. It replaces the roster
-// sections that lived inside the hamburger menu (the hamburger keeps the site
-// links); the marketing pages' "Open an explorer" pill opens this same panel.
+// The blockchain switcher — the affordance that owns the roster. Chains on the
+// left with their explorer counts, the selected chain's explorers on the
+// right, click-through to a listing. It replaces the roster sections that
+// lived inside the hamburger menu; the marketing pages' "Open an explorer"
+// pill opens this same panel.
 //
-// The trigger states the CHAIN, never the protocol: the pages own their rail's
-// identity (the rail header directly below says MOONWELL), and the chrome says
-// only the ambient context — which chain this explorer runs on. On marketing
-// routes there is no active chain, so the trigger is the neutral CTA pill.
+// WHERE IT SITS: from `md` up on an app route, at the right end of the
+// protocol title row in RailHeader (rails-ops TO-DO-ui-jobs 68) — the name and
+// the chain read as one statement. Below `md`, and on every marketing width,
+// it is the right-hand end of HeaderBar's control cluster.
+//
+// The trigger states the CHAIN, never the protocol: the identity at the other
+// end of the row says Moonwell, and this says only the ambient context — which
+// chain that explorer runs on. On marketing routes there is no active chain,
+// so the trigger is the neutral CTA pill.
 //
 // Counts and rows are roster-derived (`protocolsForChain`), never hardcoded —
 // a new explorer lands in this panel by being added to `lib/shared/protocols`.
