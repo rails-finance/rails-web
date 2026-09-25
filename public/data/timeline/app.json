@@ -17,5 +17,15 @@
     "iconUrl": "/icons/protocols/aave-v4.png",
     "postUrl": "/aave-v4",
     "content": "Soft launch: the Aave V4 explorer is live. Browse multi-spoke positions with chain-truth health factors, liquidation prices, net APY, and full event timelines."
+  },
+  {
+    "id": "rails-2026-26-explorers-beta",
+    "date": "2026-09-24T12:00:00Z",
+    "type": "milestone",
+    "platform": "app",
+    "author": "rails.finance",
+    "postUrl": "/coverage/ethereum",
+    "content": "We have quietly launched a major update.",
+    "subtitle": "Today Rails extended coverage from 2 to 26 protocol explorers across Ethereum and now Base."
   }
 ]
