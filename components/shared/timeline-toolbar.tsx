@@ -411,8 +411,7 @@ export function eventCountLine(tl: TimelineEventsState): string {
 // monthIdxOf there exactly; if those change, change these too.
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const monthStartOfIdx = (idx: number): number => Math.floor(Date.UTC(Math.floor(idx / 12), idx % 12, 1) / 1000);
-const monthEndOfIdx = (idx: number): number =>
-  Math.floor(Date.UTC(Math.floor(idx / 12), (idx % 12) + 1, 1) / 1000) - 1;
+const monthEndOfIdx = (idx: number): number => Math.floor(Date.UTC(Math.floor(idx / 12), (idx % 12) + 1, 1) / 1000) - 1;
 const monthIdxOfTs = (ts: number): number => {
   const d = new Date(ts * 1000);
   return d.getUTCFullYear() * 12 + d.getUTCMonth();

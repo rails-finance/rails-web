@@ -987,7 +987,8 @@ const dateText = (ts) =>
  *  `toLocaleDateString` call exactly, en dash included, so a check comparing
  *  strings is comparing the same format on both sides. */
 const shortRangeLabel = (fromTs, toTs) => {
-  const short = (ts) => new Date(ts * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric" });
+  const short = (ts) =>
+    new Date(ts * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric" });
   return `${short(fromTs)} – ${short(toTs)}`;
 };
 
