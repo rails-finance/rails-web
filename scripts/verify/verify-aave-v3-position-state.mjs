@@ -1,8 +1,9 @@
 // The open Aave V3 Ethereum card reads the position state around its event's
-// transaction (rails-ops TO-DO-ui-jobs §19): the touched balance's exact before →
-// after in the grid, and beneath it every supplied and borrowed reserve (USD,
-// collateral on/off), total collateral, total debt, health factor, LTV,
-// liquidation threshold and eMode.
+// transaction (rails-ops TO-DO-ui-jobs §19): every supplied and borrowed reserve
+// with its exact before → after (USD, collateral on/off), total collateral, total
+// debt, health factor, LTV, liquidation threshold and eMode. A balance the block
+// lists is stated there and nowhere else — the grid's cell for that reserve is
+// the statement only until the read lands (§47).
 //
 // The rendered card is checked against the SAME answer the page reads —
 // /api/aave-v3/timeline/position-state through this server — so no balance is
@@ -353,14 +354,25 @@ for (const fx of FIXTURES) {
     const block = card.locator('[data-position-state="ready"]');
     const text = (s) => s.innerText().then((t) => t.replace(/\s+/g, " ").trim());
 
-    // The touched stats: exact after-balance as the grid's full-figure title.
+    // One statement of a balance (rails-ops TO-DO-ui-jobs §47). A reserve the
+    // block lists is stated by its row alone: the grid draws no cell for it, and
+    // a full-figure title (the grid's own, `[title="<exact> <symbol>"]`) is the
+    // sign that it did. A reserve the block leaves out keeps its grid cell,
+    // carrying the exact after-balance.
     for (const m of fx.moved) {
       const r = state.reserves.find((x) => x.reserve === m.reserve);
       if (!r?.decimals && r?.decimals !== 0) continue;
       const exact = humanOf(r[m.side].after, r.decimals);
       const grouped = `${BigInt(exact.split(".")[0]).toLocaleString("en-US")}${exact.includes(".") ? `.${exact.split(".")[1]}` : ""}`;
       const titled = await card.locator(`[title^="${grouped} "]`).count();
-      check(`${fx.label}: the grid's ${r.symbol} ${m.side} stat is the exact after-balance ${grouped}`, titled > 0);
+      if (held(r[m.side]))
+        check(
+          `${fx.label}: ${r.symbol} ${m.side} is stated once — the row, not the grid`,
+          titled === 0,
+          `${titled} grid cell(s) reading ${grouped}`,
+        );
+      else
+        check(`${fx.label}: the grid's ${r.symbol} ${m.side} stat is the exact after-balance ${grouped}`, titled > 0);
     }
 
     // Supplied and borrowed lists: one line per held reserve, amount, USD and

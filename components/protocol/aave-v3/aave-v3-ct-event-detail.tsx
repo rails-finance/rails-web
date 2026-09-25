@@ -10,6 +10,10 @@
 //     touched balance's exact before → after, interest included, and the whole
 //     account beneath the grid (AaveV3PositionStateBlock). While that is read,
 //     and where it cannot be, a stat shows the event's own change and no balance.
+//     RULE (§47): one statement of a balance. Once the read lands and the block
+//     draws the reserve's row, the grid's cell for it gives way — the row carries
+//     the same before/after/change receipts plus the collateral switch, and the
+//     event's own change keeps its receipt on the header.
 //   • Base and Seamless keep the principal replayed from the per-reserve deltas,
 //     before → after.
 // USD rides the oracle price at the event's block — the at-block read on the
@@ -61,7 +65,7 @@ import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
-import { findReserve, groupExact, humanOf, legChange } from "@/lib/aave-v3/position-state";
+import { findReserve, groupExact, humanOf, legChange, legHeld } from "@/lib/aave-v3/position-state";
 
 export interface AaveV3CtEventDetailProps {
   ctx: AaveV3Context;
@@ -129,7 +133,8 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
   // The position-state receipts also name the owner.
   const stateCoords: V3Coords = wallet ? { ...coords, wallet: wallet.toLowerCase() } : coords;
 
-  const statFor = (a: Axis): ChainTruthStat => {
+  /** The axis' stat, or null where the position block below states the balance. */
+  const statFor = (a: Axis): ChainTruthStat | null => {
     if (!state) {
       return {
         label: a.label,
@@ -166,6 +171,10 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
     }
     const sym = reserveSymbol(r);
     const leg = a.side === "supply" ? r.supply : r.debt;
+    // The block below draws a row for every reserve it holds on this side
+    // (ReserveList's filter). Where it draws this one, that row is the balance's
+    // one statement and the grid says nothing about it.
+    if (legHeld(leg)) return null;
     const before = humanOf(leg.before, r.decimals);
     const after = humanOf(leg.after, r.decimals);
     const moved = legChange(leg, r.decimals);
@@ -207,12 +216,15 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
   };
 
   const stats: ChainTruthStat[] = [];
+  const push = (s: ChainTruthStat | null) => {
+    if (s) stats.push(s);
+  };
   const sym = ctx.reserveSymbol ?? "—";
 
   if (ctx.eventType === "liquidation") {
     const collSym = ctx.collateralSymbol ?? "—";
     // Seized collateral reduces the supply balance (change negative).
-    stats.push(
+    push(
       statFor({
         label: "Collateral",
         symbol: collSym,
@@ -231,7 +243,7 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
       }),
     );
     // Debt covered reduces the borrowed balance (change negative).
-    stats.push(
+    push(
       statFor({
         label: "Borrowed",
         symbol: sym,
@@ -257,7 +269,7 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
       amount: string | undefined,
       price: { usd: number } | undefined,
       changeProv: Provenance,
-    ): ChainTruthStat => {
+    ): ChainTruthStat | null => {
       const debt = action === "repay" || action === "borrow";
       return statFor({
         label: debt ? "Borrowed" : "Supplied",
@@ -272,21 +284,19 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
       });
     };
     const givenDebt = s.givenAction === "repay";
-    stats.push(
-      legStat(
-        sym,
-        ctx.reserve,
-        s.givenAction,
-        givenDebt ? ctx.debtAfter : ctx.supplyAfter,
-        givenDebt ? ctx.raw?.debtAfter : ctx.raw?.supplyAfter,
-        ctx.amount,
-        ctx.price,
-        swapLegProv(sym, s.givenAction, coords, ctx.raw?.amount, ctx.origin?.amount, s.kind, swapLegNet(s, "given"), s),
-      ),
+    const given = legStat(
+      sym,
+      ctx.reserve,
+      s.givenAction,
+      givenDebt ? ctx.debtAfter : ctx.supplyAfter,
+      givenDebt ? ctx.raw?.debtAfter : ctx.raw?.supplyAfter,
+      ctx.amount,
+      ctx.price,
+      swapLegProv(sym, s.givenAction, coords, ctx.raw?.amount, ctx.origin?.amount, s.kind, swapLegNet(s, "given"), s),
     );
     const rSym = s.receivedSymbol ?? "—";
     const receivedDebt = s.receivedAction === "repay" || s.receivedAction === "borrow";
-    stats.push(
+    const received: ChainTruthStat | null =
       // A withdraw and swap's bought token left the position: its figure is the
       // Trade's (or a ParaSwap adapter's Swapped log), with no balance to move.
       s.receivedAction === "trade"
@@ -314,10 +324,9 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
               undefined,
               swapLegNet(s, "received"),
             ),
-          ),
-    );
+          );
     // A supply from a swap lists what it sold before the balance it supplied (D2).
-    if (s.kind === "supply_from_swap") stats.push(...stats.splice(stats.length - 2, 1));
+    for (const leg of s.kind === "supply_from_swap" ? [received, given] : [given, received]) push(leg);
     // Where a leftover nets into a leg (§15 D4), every row behind the figures
     // above is listed with its own amount.
     for (const e of s.events ?? []) {
@@ -343,7 +352,7 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
     // index), not a Pool log's own amount param — same reconstruction, its
     // own vocabulary entry.
     const isTransfer = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";
-    stats.push(
+    push(
       statFor({
         label: "Supplied",
         symbol: sym,
@@ -363,7 +372,7 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
     // change traces to the DeficitCreated log rather than a Pool `amount`
     // param; the reconstruction is the same.
     const writtenOff = ctx.eventType === "bad_debt_written_off";
-    stats.push(
+    push(
       statFor({
         label: "Borrowed",
         symbol: sym,
@@ -428,7 +437,7 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
 
   return (
     <>
-      <ChainTruthDetail stats={stats} />
+      {stats.length > 0 && <ChainTruthDetail stats={stats} />}
       {state?.status === "loading" && (
         <div className="px-5 pb-2 text-xs text-rb-500" data-position-state="loading">
           Reading the position at this block…

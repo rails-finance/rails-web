@@ -105,11 +105,12 @@ const FIXTURES = [
     kind: "Debt swap",
     axis: "debt",
     venue: PARASWAP_VENUE,
-    // D4: the open card reads the Borrowed balance ending at the net 18.76K (the
+    // D4: the open card reads the Borrowed balance ending at the net 18,76x (the
     // gross borrow alone would end at 18.8K), the Borrow row at its gross, and the
     // leftover as its own "Repaid back" row. The balance is the exact one read when
-    // the card opens (rails-ops TO-DO-ui-jobs §19), so the account beneath it shows too.
-    readsWhenOpen: [/Borrowed 0 18\.7\dK/, "Borrow 18.8K", "Repaid back 37.528", "Health factor"],
+    // the card opens (rails-ops TO-DO-ui-jobs §19) and is stated by the position
+    // block's Borrowed row alone (§47), so the account beneath it shows too.
+    readsWhenOpen: [/Borrowed .*\b0 18,76\d\b/, "Borrow 18.8K", "Repaid back 37.528", "Health factor"],
   },
   {
     label: "aave-v3 core 0xf0838f (ParaSwap repay with collateral, leftover supplied back)",
@@ -133,9 +134,10 @@ const FIXTURES = [
     kind: "Withdraw and swap",
     venue: PARASWAP_VENUE,
     mark: "flow",
-    // The bought WETH has no position row: it reads from the adapter's Swapped log.
-    // The Supplied balance is exact, interest to the block included.
-    readsWhenOpen: [/Supplied 0\.009 0/, "Bought 0.339", "Total collateral"],
+    // The bought WETH has no position row: it reads from the adapter's Swapped log,
+    // so it keeps its grid cell. The WBTC it sold is stated by the position block's
+    // Supplied row (§47), exact, interest to the block included.
+    readsWhenOpen: [/Supplied 0\.00913 0\b/, "Bought 0.339", "Total collateral"],
   },
 ];
 
