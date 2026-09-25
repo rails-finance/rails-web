@@ -58,9 +58,8 @@ import { frankencoinEconomicsExplanation, frankencoinEconomicsContent } from "@/
 import { normalizePositionAddress } from "@/lib/frankencoin/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { PriceStrip } from "@/components/shared/price-strip";
 import { RiskFooterStrip, RiskFigure } from "@/components/shared/risk-footer-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle.
@@ -377,7 +376,6 @@ export default function FrankencoinPositionView({
               }
             />
           )}
-          <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       )}

@@ -24,6 +24,7 @@
 import { chromium } from "playwright";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { armInspector } from "./lib/prov-inspector.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 try {
@@ -236,12 +237,7 @@ for (const spec of SPECIMENS) {
         // inspector (the per-card receipts panel is retired — the inspector
         // popover is THE receipt surface now), pick the chip, and read the
         // batch-manager receipt back off the popover.
-        const toggle = page.locator("button.prov-inspect-toggle").first();
-        assert((await toggle.count()) > 0, `[${scheme}] page mounts the provenance inspector`);
-        if ((await toggle.getAttribute("aria-pressed")) !== "true") {
-          await toggle.click();
-          await page.waitForTimeout(300);
-        }
+        assert(await armInspector(page), `[${scheme}] page mounts the provenance inspector`);
         const chip = page.locator("span.prov-locate-box").filter({ hasText: "delegate" }).first();
         await chip.scrollIntoViewIfNeeded();
         await chip.click();

@@ -62,8 +62,8 @@ import { compoundV2EconomicsExplanation, compoundV2EconomicsContent } from "@/li
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
@@ -284,7 +284,7 @@ export default function CompoundV2PositionView({
   const captions = liveView ? computeCompoundV2CardCaptions(liveView, lifetimeEvents, precomputedLifetime) : null;
   const towerData = liveView ? computeCompoundV2Economics(liveView, lifetimeEvents, precomputedLifetime) : null;
 
-  // Ambient price pill (bottom-right): the on-chain oracle price of each
+  // The top row's price dropdown: the on-chain oracle price of each
   // market the account currently touches. Deduped by the underlying token
   // (the two WBTC markets share one asset; cETH keys on its own market).
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
@@ -304,7 +304,7 @@ export default function CompoundV2PositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="compound-v2" wallet={wallet}>
+      <DetailTopRow session="compound-v2" wallet={wallet} assets={stripAssets}>
         {liveView && (
           <CompoundV2ExportMenu
             wallet={wallet}
@@ -415,7 +415,6 @@ export default function CompoundV2PositionView({
             }
           />
           {/* Ambient oracle-price pill, fixed bottom-right. */}
-          <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       )}

@@ -51,8 +51,8 @@ const TroveExportMenu = dynamic(() => import("@/components/trove/TroveExportMenu
 });
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import { LiquityTroveBarsProvider } from "@/lib/liquity/use-trove-bars";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 export interface TroveViewProps {
   collateralType: string;
@@ -402,7 +402,7 @@ export default function TroveView({
     );
   }
 
-  // Assets relevant to the position in view for the fixed bottom price strip:
+  // Assets relevant to the position in view, for the top row's price dropdown:
   // the trove's collateral (priced from the Liquity oracle) plus BOLD, the
   // debt asset — hard-pegged to $1 by the protocol's redemption mechanism, so
   // there's no separate price source for it.
@@ -415,7 +415,7 @@ export default function TroveView({
   return (
     <>
       <div className="py-8 space-y-6">
-        <DetailTopRow session="liquity-v2" wallet={effectiveOwner}>
+        <DetailTopRow session="liquity-v2" wallet={effectiveOwner} assets={stripAssets}>
           <TroveExportMenu
             trove={troveData}
             liveState={liveState}
@@ -515,7 +515,6 @@ export default function TroveView({
           />
         </LiquityTroveBarsProvider>
       </div>
-      <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
       <ProvInspectorLayer />
     </>
   );

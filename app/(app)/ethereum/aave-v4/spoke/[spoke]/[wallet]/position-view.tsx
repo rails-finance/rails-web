@@ -15,7 +15,7 @@
 // lib/aave-v4/spoke-cards.ts → calculateAaveV4Position over the thresholds the
 // spoke reports. Net interest carry comes from chain-state balances vs. indexed
 // deposits (computeAaveV4InterestPnl). Every current-state USD figure — the
-// calculation's inputs, interest carry, runway, tower "today" totals and price strip —
+// calculation's inputs, interest carry, runway, tower "today" totals and prices —
 // is valued at Aave's own on-chain oracle price (chainTruthPrices, oracle-first
 // with a DefiLlama fallback only for assets the oracle registry omits), so the
 // live position reads chain-true throughout, not just the headline totals.
@@ -69,8 +69,8 @@ import { AAVE_V4_FALLBACK_LT, isDollarRail } from "@/lib/aave-v4/liquidation-thr
 import { calculateAaveV4Position, type CalcPositionInputs } from "@/lib/aave-v4/utils/position-calculation";
 import { resolvePrice, type PriceEntry } from "@/lib/aave/prices";
 import { fmtUsd } from "@/lib/aave-v4/format";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
 import type { ReserveStats } from "@/lib/aave-v4/spoke-cards";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
@@ -235,7 +235,7 @@ function AaveV4SpokePageInner({
   // per reserve, keyed by address; DefiLlama stays the fallback for any asset
   // the oracle registry doesn't cover. Threaded into every CURRENT-STATE
   // valuation (liq price, borrowing power, interest carry, runway, tower "today"
-  // figures, price strip) so the whole live position reads chain-true, not just
+  // figures, prices) so the whole live position reads chain-true, not just
   // the headline totals. Until the oracle map loads it IS `prices`, so first
   // paint is unchanged and the figures refine to oracle when it arrives. The
   // event-derived history/peak seed (groupBySpoke / buildAaveV4SpokeCards) keeps
@@ -315,7 +315,7 @@ function AaveV4SpokePageInner({
   }, [eventActiveGroup, chainPosition]);
 
   // Assets relevant to the position in view — the union of what this spoke is
-  // currently supplying and borrowing — for the fixed bottom price strip. Only
+  // currently supplying and borrowing — for the top row's price dropdown. Only
   // priced symbols make the cut (resolvePrice → null for unknowns).
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
     if (!activeCard) return [];
@@ -613,7 +613,7 @@ function AaveV4SpokePageInner({
   return (
     <>
       <div className="py-8 space-y-6">
-        <DetailTopRow session="aave-v4" wallet={wallet}>
+        <DetailTopRow session="aave-v4" wallet={wallet} assets={stripAssets}>
           {activeCard && (
             <AaveV4ExportMenu
               spokeName={spokeName}
@@ -720,7 +720,6 @@ function AaveV4SpokePageInner({
           />
         </AaveV4BarsProvider>
       </div>
-      <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
       <ProvInspectorLayer />
     </>
   );

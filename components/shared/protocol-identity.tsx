@@ -22,7 +22,7 @@ export function ProtocolIdentity({ session }: { session: SessionProtocol }) {
   const entry = protocolForSession(session);
   if (!entry) return null;
   return (
-    <Link href={entry.href} className="group inline-flex items-center gap-1.5">
+    <Link href={entry.href} data-rail-identity={entry.id} className="group inline-flex items-center gap-1.5">
       <ProtocolIcon
         id={entry.id}
         className="h-4 w-4 shrink-0 text-foreground transition-colors group-hover:text-blue-500"

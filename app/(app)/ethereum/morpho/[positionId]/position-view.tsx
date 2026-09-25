@@ -52,8 +52,7 @@ import {
   MorphoPositionExplanation,
   MorphoClosedPositionExplanation,
 } from "@/components/protocol/morpho/morpho-position-explanation";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle, mirroring the V4 spoke page.
@@ -350,7 +349,6 @@ export default function MorphoPositionView({
               ) : null
             }
           />
-          <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       )}

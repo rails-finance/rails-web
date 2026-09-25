@@ -50,8 +50,8 @@ import { COMPOUND_LIQUIDATION_RUNS } from "@/lib/compound/timeline-runs";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -515,7 +515,7 @@ export default function CompoundBaseWalletView({
     <CaptureSourceProvider value={captureSource}>
       <CometDeploymentProvider deployment={COMPOUND_BASE_DEPLOYMENT}>
         <div className="py-8 space-y-6">
-          <DetailTopRow session="compound-base" wallet={wallet}>
+          <DetailTopRow session="compound-base" wallet={wallet} assets={stripAssets}>
             {views.length > 0 && (
               <CompoundExportMenu
                 wallet={wallet}
@@ -583,7 +583,6 @@ export default function CompoundBaseWalletView({
             </div>
           )}
 
-          <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </div>
       </CometDeploymentProvider>

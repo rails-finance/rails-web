@@ -26,6 +26,7 @@
 // One explorer only:         EXPLORER=seamless … ; a different wallet: WALLET=0x… (applies to that explorer)
 
 import { chromium } from "playwright";
+import { armInspector } from "./lib/prov-inspector.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const ONLY = process.env.EXPLORER;
@@ -142,12 +143,10 @@ async function expandCard(page, n) {
 }
 
 async function openReceiptFor(page, card, valueText) {
-  const toggle = page.locator("button.prov-inspect-toggle").first();
-  if ((await toggle.count()) === 0) return null;
-  if ((await toggle.getAttribute("aria-pressed")) !== "true") {
-    await toggle.click();
-    await page.waitForTimeout(300);
-  }
+  // The toggle rides in the Tools menu on a position view and in the dock on
+  // a Market-type page; armInspector reads either, and is a no-op once armed
+  // (the tool is STICKY — a blind second click would put it down).
+  if (!(await armInspector(page))) return null;
   const target = card.locator("span.prov-locate-box").filter({ hasText: valueText }).first();
   if ((await target.count()) === 0) return null;
   await target.scrollIntoViewIfNeeded();

@@ -41,8 +41,7 @@ import { PwnPositionExplanation } from "@/components/protocol/pwn/pwn-position-e
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { computePwnEconomics } from "@/lib/pwn/economics";
 import { pwnEconomicsExplanation, pwnEconomicsContent } from "@/lib/pwn/economics-explanation";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
@@ -326,7 +325,6 @@ export default function PwnLoanView({
               ) : null
             }
           />
-          <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       )}

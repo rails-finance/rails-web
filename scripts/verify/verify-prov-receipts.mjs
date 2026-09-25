@@ -41,6 +41,7 @@
 // plan).
 
 import { chromium } from "playwright";
+import { armInspector, openInspectorHome } from "./lib/prov-inspector.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 
@@ -110,21 +111,23 @@ async function runPage(page, p) {
   page.on("pageerror", (e) => pageErrors.push(`${p.name}: ${e}`));
   await page.goto(`${BASE}${p.path}`, { waitUntil: "domcontentloaded", timeout: 240000 });
 
-  // 1. The inspector toggle — part of the page shell, so a short wait.
-  const toggle = page.locator("button.prov-inspect-toggle").first();
-  const mounted = await toggle
-    .waitFor({ state: "visible", timeout: 60000 })
-    .then(() => true)
-    .catch(() => false);
+  // 1. The inspector — part of the page shell, reached through the Tools menu
+  //    on a position view and straight from the dock on a Market-type page.
+  //    The shell takes a moment to paint, so try until it does.
+  let mounted = false;
+  const mountDeadline = Date.now() + 60000;
+  while (Date.now() < mountDeadline) {
+    mounted = await openInspectorHome(page);
+    if (mounted) break;
+    await sleep(500);
+  }
   check(`${p.name}: provenance inspector mounts`, mounted);
   if (!mounted) return;
 
-  // 2. Arm and wait for the coverage map. The tool is STICKY — read
-  //    aria-pressed before clicking, a blind toggle click turns it OFF.
-  if ((await toggle.getAttribute("aria-pressed")) !== "true") {
-    await toggle.click();
-    await sleep(250);
-  }
+  // 2. Arm and wait for the coverage map. The tool is STICKY — armInspector
+  //    reads the halo first, so a second call never puts it back down.
+  await armInspector(page);
+  await sleep(250);
   const deadline = Date.now() + 90000;
   let pickable = 0;
   while (Date.now() < deadline) {
@@ -134,11 +137,9 @@ async function runPage(page, p) {
     // paints, and a pre-hydration click lands before React attaches the
     // handler — it vanishes silently (measured live: the three slowest
     // pages stayed at 0 pickable for the full 90s while 400+ scoped values
-    // sat on the page). Re-assert the armed state every round, reading
-    // aria-pressed first — the tool is sticky, and a blind click disarms.
-    if ((await toggle.getAttribute("aria-pressed")) !== "true") {
-      await toggle.click().catch(() => {});
-    }
+    // sat on the page). Re-assert the armed state every round — armInspector
+    // reads the halo first, and the tool is sticky, so a blind click disarms.
+    await armInspector(page).catch(() => {});
     await sleep(2000);
   }
   check(

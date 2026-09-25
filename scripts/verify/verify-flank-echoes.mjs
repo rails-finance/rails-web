@@ -38,6 +38,7 @@
 // Run with the dev server up:  BASE=http://localhost:3001 node scripts/verify/verify-flank-echoes.mjs
 
 import { chromium } from "playwright";
+import { armInspector, openInspectorHome } from "./lib/prov-inspector.mjs";
 
 const BASE = process.env.BASE || "http://localhost:3000";
 const VIEWPORT = { width: 1440, height: 1100 };
@@ -55,11 +56,11 @@ const FLANK_SELECTOR =
 // A bare (non-echoed) flank value still lives in the same outer span, just
 // with no .prov-locate-box child — used to prove the PWN "claimed" inertness.
 const FLANK_OUTER_SELECTOR = "span.justify-self-end.pr-5, span.justify-self-start.pl-5";
-// The page-level inspector toggle (ProvInspectorToggle), mounted once per page
-// in the floating dock's leading slot. No card expansion is needed to reach it,
-// and the spine flank is visible on a collapsed card — which is precisely why
-// the inspector is the right surface for this check.
-const INSPECTOR = "button.prov-inspect-toggle";
+// The page-level inspector toggle (ProvInspectorToggle): a row of the Tools
+// menu on a position view, the dock's leading slot on a Market-type page.
+// Either way no card expansion is needed to reach it, and the spine flank is
+// visible on a collapsed card — which is precisely why the inspector is the
+// right surface for this check.
 const POPOVER = ".prov-inspect-pop";
 
 let pass = 0;
@@ -95,12 +96,8 @@ async function sleep(ms) {
  *  on alternate rounds, which yields phantom "nothing was stamped" results that
  *  look exactly like a drifted key. Always read `aria-pressed` first. */
 async function ensureArmed(page) {
-  const toggle = page.locator(INSPECTOR).first();
-  if ((await toggle.count()) === 0) return false;
-  if ((await toggle.getAttribute("aria-pressed")) !== "true") {
-    await toggle.click();
-    await sleep(250);
-  }
+  if (!(await armInspector(page))) return false;
+  await sleep(250);
   return true;
 }
 
@@ -169,7 +166,7 @@ async function testPage(page, { label, url, maxCards = 6, maxFlanksPerCard = 4, 
   const staticFlankCount = await page.locator(FLANK_SELECTOR).count();
   logInfo(`event cards mounted: ${cardCount}; echoed flank spans: ${staticFlankCount}`);
 
-  if ((await page.locator(INSPECTOR).count()) === 0) {
+  if (!(await openInspectorHome(page))) {
     logFail(`${label}: no provenance inspector on this page — the trace surface is missing entirely`);
     return { found: 0, resolved: 0 };
   }
@@ -251,7 +248,7 @@ async function testPwn(page, { label, url }) {
   const cardCount = await page.locator(CARD_ROOT).count();
   logInfo(`event cards mounted: ${cardCount}`);
 
-  if ((await page.locator(INSPECTOR).count()) === 0) {
+  if (!(await openInspectorHome(page))) {
     logFail("pwn: no provenance inspector on this page");
     return;
   }

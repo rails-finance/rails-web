@@ -75,8 +75,8 @@ import {
 import { aaveV3EconomicsExplanation, aaveV3EconomicsContent } from "@/lib/aave-v3/economics-explanation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader, CHAIN_TRUTH_USD_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
@@ -676,7 +676,7 @@ export default function AaveV3PositionDetail({
     [view, lifetimeEvents, precomputedLifetime],
   );
 
-  // Ambient price pill (bottom-right, the V4 treatment): the on-chain oracle
+  // The top row's price dropdown: the on-chain oracle
   // price of each reserve the account currently holds.
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
     if (!view || view.status !== "open") return [];
@@ -706,7 +706,7 @@ export default function AaveV3PositionDetail({
   return (
     <V3PoolProvider pool={poolIdentity}>
       <div className="py-8 space-y-6">
-        <DetailTopRow session="aave-v3" wallet={wallet}>
+        <DetailTopRow session="aave-v3" wallet={wallet} assets={stripAssets}>
           {view && (
             <AaveV3ExportMenu
               wallet={wallet}
@@ -834,11 +834,9 @@ export default function AaveV3PositionDetail({
                 ) : null
               }
             />
-            {/* The floating instruments dock: the provenance inspector's target
-              toggle + the ambient oracle-price pills (the V4 treatment). Armed,
-              every traced value on the page becomes a click target and its
-              receipt pins into a popover at the value (prototype: this page). */}
-            <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
+            {/* The inspector's layer: armed from Tools in the top row, every
+              traced value on the page becomes a click target and its receipt
+              pins into a popover at the value (prototype: this page). */}
             <ProvInspectorLayer />
           </>
         )}

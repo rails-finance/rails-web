@@ -1459,6 +1459,67 @@ label[for] {
   font-size: 11px;
   white-space: nowrap;
 }
+/* the toggle as a row of the Tools dropdown: the panel's full-width
+   title/subtitle shape instead of the dock's icon button. These rules follow
+   the dock ones so the armed teal wash gives way to the panel's own hover
+   treatment, leaving the crosshair to carry the armed colour it inherits. */
+.prov-inspect-toggle-menu {
+  width: 100%;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 0;
+  text-align: left;
+  background: transparent;
+}
+.prov-inspect-toggle-menu svg {
+  margin-top: 2px;
+  flex: none;
+}
+@media (hover: hover) {
+  .prov-inspect-toggle-menu:hover {
+    background: var(--surface-hover);
+  }
+  :is(.dark) .prov-inspect-toggle-menu:hover {
+    background: rgba(196, 205, 217, 0.08);
+  }
+}
+/* the armed halo's own way out, on a page whose toggle is behind a menu that
+   has closed. Sits over the halo (z 55) and under the popover (z 60). */
+.prov-inspect-exit {
+  position: fixed;
+  z-index: 56;
+  right: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: rgb(13 148 136); /* teal-600 */
+  background: rgb(238 249 246);
+  border: 1px solid rgb(13 148 136 / 0.35);
+  box-shadow: 0 6px 20px rgb(13 148 136 / 0.18);
+}
+.prov-inspect-exit svg {
+  width: 14px;
+  height: 14px;
+}
+.prov-inspect-exit:hover {
+  background: rgb(13 148 136 / 0.14);
+}
+.dark .prov-inspect-exit {
+  color: rgb(45 212 191); /* teal-400 */
+  background: rgb(15 40 37);
+  border-color: rgb(45 212 191 / 0.35);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
+}
+.dark .prov-inspect-exit:hover {
+  background: rgb(45 212 191 / 0.16);
+}
 /* the armed halo — a fixed inset ring + inward glow on the whole viewport
    while the tool is on (the browser-extension "operating" treatment), so the
    mode reads at any scroll position. Pointer-transparent; under the popover. */

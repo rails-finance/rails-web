@@ -48,8 +48,8 @@ import { COMPOUND_LIQUIDATION_RUNS } from "@/lib/compound/timeline-runs";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { NAV_LINK } from "@/lib/shared/ui-grammar";
@@ -355,7 +355,7 @@ export default function CompoundPositionView({
     window: historyWindow,
   });
 
-  // Ambient price pill (bottom-right, the V4 treatment): the open market's base +
+  // The top row's price dropdown: the open market's base +
   // held collateral at Comet's own oracle price.
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
     if (!view || view.status !== "open") return [];
@@ -378,7 +378,7 @@ export default function CompoundPositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="compound" wallet={wallet}>
+      <DetailTopRow session="compound" wallet={wallet} assets={stripAssets}>
         {view && (
           <CompoundExportMenu
             wallet={wallet}
@@ -446,7 +446,6 @@ export default function CompoundPositionView({
             }
           />
           {/* Ambient oracle-price pill, fixed bottom-right (the V4 treatment). */}
-          <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       ) : (

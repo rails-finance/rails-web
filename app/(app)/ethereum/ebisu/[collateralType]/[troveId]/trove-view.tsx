@@ -68,8 +68,8 @@ import {
 } from "@/lib/shared/liquity-fork-economics-explanation";
 import { DEBT_SYMBOL } from "@/lib/ebisu/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle.
@@ -231,7 +231,7 @@ export default function EbisuTroveDetail({
 
   const liveRisk = chain != null && view?.status === "open";
 
-  // Ambient price strip (the V2 trove treatment): the branch's own oracle
+  // The top row's price dropdown: the branch's own oracle
   // price for the collateral — the live chain read when it landed, else the
   // listing route's PriceFeed resolution carried on the view — plus the
   // fork's stable at its $1 redemption face (no separate price source, as
@@ -272,7 +272,7 @@ export default function EbisuTroveDetail({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="ebisu" wallet={view?.owner ?? view?.lastOwner ?? null}>
+      <DetailTopRow session="ebisu" wallet={view?.owner ?? view?.lastOwner ?? null} assets={stripAssets}>
         {view && (
           <LiquityForkExportMenu
             protocolLabel="Ebisu"
@@ -371,7 +371,6 @@ export default function EbisuTroveDetail({
               ) : null
             }
           />
-          <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       )}

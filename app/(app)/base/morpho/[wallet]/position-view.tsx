@@ -28,8 +28,7 @@ import { LenderClosedCard, MorphoLenderOpenCard } from "@/components/protocol/mo
 import { VaultHoldingsNote } from "@/components/protocol/morpho-base/vault-holdings-note";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
-import { PriceStrip } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { MorphoSweptPosition } from "@/lib/api/fetch-morpho-base-timeline";
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
 import type { MorphoWalletChainResponse } from "@/lib/api/fetch-morpho-wallet";
@@ -256,7 +255,6 @@ export default function MorphoBaseWalletView({
           </>
         )}
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     </CaptureSourceProvider>

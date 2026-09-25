@@ -57,8 +57,8 @@ import { llamalendEconomicsExplanation, llamalendEconomicsContent } from "@/lib/
 import { normalizeAddressParam } from "@/lib/llamalend/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle.
@@ -255,7 +255,7 @@ export default function LlamalendPositionView({
     };
   }, [controller, user]);
 
-  // Ambient price pill (bottom-right): the AMM's own oracle price of the
+  // The top row's price dropdown: the AMM's own oracle price of the
   // collateral — only where the borrowed token is crvUSD (~$1); a WETH-
   // denominated price is not a dollar and never renders as one.
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
@@ -277,7 +277,7 @@ export default function LlamalendPositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="llamalend" wallet={user}>
+      <DetailTopRow session="llamalend" wallet={user} assets={stripAssets}>
         {liveView && (
           <LlamalendExportMenu
             controller={controller}
@@ -371,7 +371,6 @@ export default function LlamalendPositionView({
             }
           />
           {/* Ambient oracle-price pill, fixed bottom-right. */}
-          <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       )}

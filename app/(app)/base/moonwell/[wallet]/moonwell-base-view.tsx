@@ -55,8 +55,8 @@ import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { TimelineFillWell } from "@/components/shared/timeline-fill-well";
 import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
@@ -511,7 +511,7 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
         };
   }, [view, timeline, sweptClean]);
 
-  // Ambient price pill: the Comptroller's own oracle price of each market the
+  // The top row's price dropdown: the Comptroller's own oracle price of each market the
   // account currently touches.
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
     if (!view) return [];
@@ -531,7 +531,7 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
     <CaptureSourceProvider value={captureSource}>
       <MoonwellDeploymentProvider value={DEPLOYMENT}>
         <div className="py-8 space-y-6">
-          <DetailTopRow session="moonwell-base" wallet={wallet}>
+          <DetailTopRow session="moonwell-base" wallet={wallet} assets={stripAssets}>
             {view && (
               <MoonwellExportMenu
                 wallet={wallet}
@@ -685,7 +685,6 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
             </>
           )}
 
-          <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </div>
       </MoonwellDeploymentProvider>

@@ -63,8 +63,8 @@ import { dolomiteEconomicsExplanation, dolomiteEconomicsContent } from "@/lib/do
 import { normalizeAccountNumber } from "@/lib/dolomite/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
@@ -282,7 +282,7 @@ export default function DolomitePositionView({
 
   const captions = liveView ? computeDolomiteCardCaptions(liveView) : null;
 
-  // Ambient price pill (bottom-right): the core's own oracle price of each
+  // The top row's price dropdown: the core's own oracle price of each
   // market the account currently touches, deduped by token.
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
     if (!chain || chain.chainStale) return [];
@@ -307,7 +307,7 @@ export default function DolomitePositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="dolomite" wallet={owner}>
+      <DetailTopRow session="dolomite" wallet={owner} assets={stripAssets}>
         {liveView && (
           <DolomiteExportMenu
             owner={owner}
@@ -409,7 +409,6 @@ export default function DolomitePositionView({
             }
           />
           {/* Ambient oracle-price pill, fixed bottom-right. */}
-          <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       )}

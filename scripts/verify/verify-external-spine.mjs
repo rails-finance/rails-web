@@ -14,6 +14,7 @@
 
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { armInspector } from "./lib/prov-inspector.mjs";
 
 // Section A needs SpineColumn rendered in states no live position reaches, so it
 // writes a throwaway route, drives it, and removes it again — the repo keeps no
@@ -179,12 +180,10 @@ async function probeEcho(page) {
   await page.waitForSelector(CARD_ROOT, { timeout: 90_000 });
   await page.waitForTimeout(2000);
 
-  const toggle = await page.$("button.prov-inspect-toggle");
-  if (!toggle) {
+  if (!(await armInspector(page))) {
     bad("no provenance-inspector toggle on the page — cannot test the echo");
     return;
   }
-  await toggle.click();
   await page.waitForTimeout(400);
 
   const FLANK =
@@ -202,11 +201,9 @@ async function probeEcho(page) {
     // Sticky mode: a pick moves the popover and leaves the tool ARMED. Re-arming
     // between picks would toggle it OFF on alternate rounds (which is what
     // produced phantom empty results the first time this ran) — so just check
-    // the armed state and only click the toggle when it has actually dropped.
-    if ((await toggle.getAttribute("aria-pressed")) !== "true") {
-      await toggle.click();
-      await page.waitForTimeout(250);
-    }
+    // the armed state and only re-arm when it has actually dropped, which is
+    // what armInspector does: it reads the halo before it clicks anything.
+    await armInspector(page);
     await flank.click();
     await page.waitForTimeout(400);
     const stamped = await page.evaluate(() =>

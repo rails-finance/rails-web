@@ -40,11 +40,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { RailHeader } from "@/components/shared/rail-header";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
+import { LatestPrices } from "@/components/shared/latest-prices";
+import { RecencyStamp } from "@/components/shared/recency-stamp";
+import { ToolsMenu } from "@/components/shared/tools-menu";
 import { VaultFlowsTower } from "@/components/vaults/vault-flows-tower";
 import { YearnVaultTimeline } from "@/components/vaults/yearn-vault-timeline";
 import { computeVaultPositionEconomics } from "@/lib/aave-vaults/position-economics";
@@ -189,13 +191,22 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
       <div className="py-8">
         <header className="mb-5" data-skel-section="page-header">
           <div className="mb-4">
-            <RailHeader session="yearn" venue="subPage" />
+            <RailHeader session="yearn" venue="position" />
           </div>
           {/* Smart-back returns the reader wherever they came from; the
               fallback — a fresh tab, a pasted link — is the vault's own
               factsheet, which is where a holding is opened from. */}
-          <div className="mb-3 flex items-center justify-between gap-2" data-back-row>
-            <DetailBackButton fallbackHref={yearnVaultHref(address)} />
+          {/* The one thin row of "latest" (rails-ops TO-DO-ui-jobs 48): back,
+              the chain head and its age, and the holding's assets at their
+              current prices — empty here until this section prices them —
+              with the page's instruments in Tools at the right end. */}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2" data-back-row>
+            <div className="flex min-w-0 items-center gap-2">
+              <DetailBackButton fallbackHref={yearnVaultHref(address)} compact />
+              <RecencyStamp />
+              <LatestPrices assets={[]} />
+            </div>
+            <ToolsMenu />
           </div>
           <h1 className="text-2xl font-semibold text-foreground" data-vault-page={address}>
             <span className="font-mono">{subject}</span>
@@ -289,7 +300,6 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
           </Suspense>
         )}
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     </div>

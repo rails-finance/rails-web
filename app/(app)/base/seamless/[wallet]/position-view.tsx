@@ -43,8 +43,8 @@ import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
-import { PriceStrip, type PriceStripAsset } from "@/components/shared/price-strip";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { TimelineFillWell } from "@/components/shared/timeline-fill-well";
 import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
@@ -351,7 +351,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     <CaptureSourceProvider value={captureSource}>
       <V3PoolProvider pool={POOL_IDENTITY}>
         <div className="py-8 space-y-6">
-          <DetailTopRow session="seamless" wallet={wallet}>
+          <DetailTopRow session="seamless" wallet={wallet} assets={stripAssets}>
             {view && (
               <AaveV3ExportMenu
                 wallet={wallet}
@@ -497,7 +497,6 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
             </>
           )}
 
-          <PriceStrip assets={stripAssets} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </div>
       </V3PoolProvider>

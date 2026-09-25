@@ -36,8 +36,7 @@ import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { MAKERDAO_LIQUIDATION_RUNS } from "@/lib/makerdao/timeline-runs";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { MakerDAOEventCard } from "@/components/protocol/makerdao/makerdao-event-card";
 import {
   MakerVaultCard,
@@ -337,7 +336,14 @@ export default function MakerVaultDetailView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="makerdao">
+      <DetailTopRow
+        session="makerdao"
+        assets={
+          view && view.status === "open" && view.priceUsd != null && view.priceUsd > 0
+            ? [{ symbol: view.collateralSymbol, price: view.priceUsd }]
+            : []
+        }
+      >
         {view && (
           <MakerdaoExportMenu
             view={view}
@@ -426,16 +432,6 @@ export default function MakerVaultDetailView({
                 />
               ) : null
             }
-          />
-          {/* Ambient price pill (the V4 treatment): the vault collateral's own
-              OSM price, while the vault is open. */}
-          <PriceStrip
-            assets={
-              view && view.status === "open" && view.priceUsd != null && view.priceUsd > 0
-                ? [{ symbol: view.collateralSymbol, price: view.priceUsd }]
-                : []
-            }
-            leading={<ProvInspectorToggle />}
           />
           <ProvInspectorLayer />
         </>

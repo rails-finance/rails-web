@@ -40,10 +40,10 @@ import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { computeMapleEconomics, computeMapleCardCaptions, mapleLifetimeWithOpening } from "@/lib/maple/economics";
 import { mapleEconomicsExplanation, mapleEconomicsContent } from "@/lib/maple/economics-explanation";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
+import { ToolsMenu } from "@/components/shared/tools-menu";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { getCcipEscrow, getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { MapleCustodyCard } from "@/components/protocol/maple/maple-custody-card";
@@ -261,7 +261,10 @@ export default function MaplePositionView({
   if (infra) {
     return (
       <div className="py-8 space-y-6">
-        <DetailBackButton session="maple" wallet={wallet} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <DetailBackButton session="maple" wallet={wallet} />
+          <ToolsMenu />
+        </div>
         <ContractIdentityCard
           kicker="Bridge infrastructure"
           name={infra.name}
@@ -278,7 +281,6 @@ export default function MaplePositionView({
         {custody != null && custody.length > 0 && (
           <MapleCustodyCard infra={infra} holdings={custody} viewHref={tl.viewHref} />
         )}
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     );
@@ -385,7 +387,6 @@ export default function MaplePositionView({
               ) : null
             }
           />
-          <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
           <ProvInspectorLayer />
         </>
       )}

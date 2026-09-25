@@ -8,11 +8,15 @@
 // own noun: TROVES, VAULTS, ACCOUNTS; absent on an explorer that has none),
 // then each of the roster's sub-pages in order (MARKETS, BRANCHES, SYSTEM, …)
 // — then, slightly apart, the (i) link to
-// the explorer's info page. On a position view no tab is lit: a position has
-// no stable place in the sub-nav (it is reached through the listing), and the
-// page below the row already says what is being looked at. On a sub-page the
-// lit tab is the one whose route holds the pathname, so a sub-page's nested
-// routes (Morpho's markets/[loanToken]) light their parent.
+// the explorer's info page. On a sub-page the lit tab is the one whose route
+// holds the pathname, so a sub-page's nested routes (Morpho's
+// markets/[loanToken]) light their parent.
+//
+// A POSITION VIEW DRAWS NO SUB-NAV AT ALL (rails-ops TO-DO-ui-jobs 48). The
+// tabs and the (i) belong to the protocol, not to one account's position, and
+// nothing in them was ever lit here; the identity keeps its link, which is the
+// one door back to the rail. The recency stamp left with them — a position
+// states its chain head in the row under this one.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -44,15 +48,19 @@ export function RailHeader({
   session: SessionProtocol;
   venue: RailVenue;
   /** Render the shared RecencyStamp after the identity (decision 0006's
-   *  freshness signal). On for listings and chain-overlay position views; off
-   *  where the page reads no chain head (the info page, PWN's detail) —
-   *  rendering it there would assert a freshness the page doesn't have. */
+   *  freshness signal). On for listings; off where the page reads no chain
+   *  head (the info page) — rendering it there would assert a freshness the
+   *  page doesn't have. Ignored at the `position` venue, where the stamp sits
+   *  in the row below (DetailTopRow). */
   stamp?: boolean;
 }) {
   const pathname = usePathname();
   const entry = protocolForSession(session);
   if (!entry) return null;
   const litSubPage = venue === "subPage" ? subPageForPathname(entry, pathname) : undefined;
+  if (venue === "position") {
+    return <ProtocolIdentity session={session} />;
+  }
   return (
     // Below sm the sub-nav ALWAYS takes the row under the identity. Left to
     // wrap on its own it landed in two places — beside the name on the markets
