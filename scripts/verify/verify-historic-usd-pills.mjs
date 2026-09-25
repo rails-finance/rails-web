@@ -4,18 +4,13 @@
 // build anything new; it re-derives the expected numbers from the SAME
 // wallet's timeline API payload and checks the rendered DOM agrees, on both
 // protocols: the after-balance USD chip, the AtBlockPriceFootnote pill, the
-// toggle-off behavior, liquidation forensics (both legs + premium), the
-// token-only render for an unpriced block, and the USD chip's receipt
-// formula (no "Untraced input" caution anywhere on the card).
+// toggle-off behavior, liquidation forensics (both legs + premium), and the
+// USD chip's receipt formula (no "Untraced input" caution anywhere on the card).
 //
-// NOTHING HERE IS PINNED TO A ROW NUMBER OR TO AN ABSENCE any more; both pin
-// kinds rotted, and for opposite reasons. Event numbers renumber whenever a
-// backfill inserts past rows, so each case names the immutable coordinate (the
-// block, plus the type and symbol that pick one row out of it) and the number is
-// counted off the API. The unpriced case was worse: it pinned an event that had
-// no price, which is a bet against the oracle backfill, and the backfill won.
-// That specimen is discovered at run time, and a run that finds none says NO
-// EVIDENCE rather than reporting that nothing violated a rule it never applied.
+// NO ROW NUMBER IS PINNED HERE. Event numbers renumber whenever a backfill
+// inserts past rows, so each case names the immutable coordinate (the block,
+// plus the type and symbol that pick one row out of it) and the number is
+// counted off the API.
 //
 // claude-in-chrome cannot reach localhost — this script is the check.
 // Run against a dev server:  BASE=http://localhost:3021 node scripts/verify/verify-historic-usd-pills.mjs
@@ -49,31 +44,34 @@ const check = (name, cond, detail = "") => {
 const AAVE_V3_WALLET = "0xc593352eefa7c45863525a3194870929fd6f5948";
 const SPARK_WALLET = "0xf2b07a31316ee4eca5c14c5f237a9903b4806236";
 
-// The unpriced specimen is NOT pinned either — for a stronger reason than
-// renumbering. It was pinned to a wallet's absence: an event whose block sat
-// below mig 092's price floor and so carried no price. The oracle backfill has
-// since filled that block, the case went red, and re-pinning to another absence
-// only queues the same failure behind the next backfill. A pinned absence is a
-// standing bet against the data improving, and the data keeps improving.
+// THE TOKEN-ONLY ARM IS GONE (2026-09-25, rails-ops TO-DO-ui-jobs §50). It
+// drove one claim — an event carrying no oracle-at-block price renders no
+// AtBlockPriceFootnote pill — against a specimen swept out of the positions
+// listing at run time, and it had started answering NO EVIDENCE because the
+// sweep found nothing to drive. The sweep was not looking in the wrong place:
+// there is nothing left to find. What was searched on rails.finance that day,
+// counting only ORDINARY rows (a liquidation carries `collateralPrice` and
+// `debtPrice` and never a `price`, so every one of them reads as unpriced and
+// the sweep always excluded them):
 //
-// It is discovered at run time instead: page the positions listing, read
-// timelines, and take an event that genuinely carries no `context.data.price`.
-// A run that finds none prints NO EVIDENCE and exits non-zero — "no USD chip
-// where no chip was expected" is trivially true of an event that was never
-// found, and this file must not be able to say it.
-const UNPRICED_SWEEP = {
-  // Bounded because the backend rate-limits: enough pages to reach the
-  // custody-scale wallets that carry unpriced aToken transfers, far short of
-  // the 240k-row listing.
-  pages: [0, 5000, 25000, 60000],
-  pageSize: 25,
-  // The card has to be reachable: `showAll` clicks "Show more" five times, so a
-  // 50,000-event timeline would never paint the row even though the API has it.
-  maxTimelineEvents: 120,
-  // Stop as soon as there are enough to survive a few being unreachable (a
-  // transfer inside a collapsed ×N run renders no individual badge).
-  want: 4,
-};
+//   aave-v3 core      172 wallets / ~6,000 events, twelve offsets spread over
+//                     the whole 249,560-row listing        → 0 unpriced
+//   aave-v3 prime      94 wallets / 32,923 events          → 0 unpriced
+//   aave-v3 etherfi    97 wallets /    418 events          → 0 unpriced
+//   spark              92 wallets / 44,524 events          → 0 unpriced
+//
+// The oracle-price filler has caught up with the whole history: mig 092's
+// floor is behind it and no listed reserve is missing from its roster. The one
+// place an unpriced row still appears is the last few minutes of CHAIN HEAD,
+// where the filler trails the indexer — three such rows were read at 26,054,696
+// –26,054,700 and all three were priced again twenty minutes later. A check
+// resting on that is red whenever the filler is level, which is most of the
+// time, so it is not a repoint; it is the same bet against the data improving
+// that the pinned absence before it was.
+//
+// To bring the claim back, give it a specimen that cannot be filled in — a
+// fixture the price lane is defined not to cover — rather than an absence
+// discovered in live data.
 
 // ── The API side: where every event number comes from ───────────────────
 
@@ -126,9 +124,6 @@ const timelinePath = (proto, wallet) =>
     ? `/api/aave-v3/timeline?wallet=${wallet}&market=core`
     : `/api/${proto}/timeline?wallet=${wallet}`;
 
-/** An event's oracle-at-block price, or null where it carries none. */
-const priceOf = (event) => event.context?.data?.price?.usd ?? null;
-
 /** The 1-based chronological number the timeline will render for the event at
  *  `block` of type `eventType` (and, where a block holds more than one, the one
  *  on `symbol`). The API returns the wallet's whole history in block order, so
@@ -152,49 +147,6 @@ function resolveEventNumber(events, { block, eventType, symbol }, label) {
     `${hits.length} matched`,
   );
   return hits.length === 1 ? hits[0].n : null;
-}
-
-/** Walk the positions listing for events that genuinely carry no price, newest
- *  API state each run. Returns candidates smallest-timeline-first, so the one
- *  the DOM arm drives is one `showAll` can actually reach. */
-async function discoverUnpriced(proto) {
-  const found = [];
-  for (const offset of UNPRICED_SWEEP.pages) {
-    if (found.length >= UNPRICED_SWEEP.want) break;
-    let listing;
-    try {
-      listing = await api(`/api/${proto}/positions?limit=${UNPRICED_SWEEP.pageSize}&offset=${offset}`);
-    } catch (e) {
-      console.log(`  (positions page @${offset} unavailable: ${e.message})`);
-      continue;
-    }
-    for (const row of listing.rows ?? listing.data ?? []) {
-      if (found.length >= UNPRICED_SWEEP.want) break;
-      let tl;
-      try {
-        tl = await api(timelinePath(proto, row.wallet));
-      } catch {
-        continue;
-      }
-      const events = tl.events ?? [];
-      if (events.length === 0 || events.length > UNPRICED_SWEEP.maxTimelineEvents) continue;
-      events.forEach((e, i) => {
-        // Liquidations are the two-legged case with its own arm below; the
-        // token-only claim is about an ordinary row.
-        if (e.context?.data?.eventType === "liquidation") return;
-        if (priceOf(e) !== null) return;
-        found.push({
-          wallet: row.wallet,
-          num: i + 1,
-          block: e.blockNumber,
-          eventType: e.context.data.eventType,
-          symbol: e.context.data.reserveSymbol,
-          total: events.length,
-        });
-      });
-    }
-  }
-  return found.sort((a, b) => a.total - b.total);
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -446,54 +398,6 @@ async function runProtocol(proto, wallet, cases) {
   await page.close();
 }
 
-/** Drive the token-only claim against a specimen the sweep found: an event that
- *  carries no oracle-at-block price must render no USD chip and no price pill.
- *
- *  Candidates are tried in turn because not every unpriced row has a card of its
- *  own — consecutive custody transfers collapse into one ×N run and the member
- *  badges are not in the DOM. A candidate with no badge is skipped, not failed.
- *  Running out of candidates IS a failure: it means the claim went unexercised,
- *  and an unexercised absence check is the vacuous pass this file exists to
- *  avoid. */
-async function runUnpriced(proto, candidates) {
-  if (candidates.length === 0) {
-    check(
-      `${proto}: NO EVIDENCE — the sweep found no unpriced event to drive the token-only render against`,
-      false,
-      `swept offsets ${UNPRICED_SWEEP.pages.join(",")} × ${UNPRICED_SWEEP.pageSize}`,
-    );
-    return;
-  }
-  for (const c of candidates) {
-    const page = await openTimeline(proto, c.wallet);
-    const badge = page.locator(`[aria-label="Event ${c.num}"]`);
-    if ((await badge.count()) === 0) {
-      console.log(`  (skip ${c.wallet} #${c.num}: no individual badge — the row rides a collapsed run)`);
-      await page.close();
-      continue;
-    }
-    const where = `${c.wallet} #${c.num} ${c.eventType} ${c.symbol} @${c.block}`;
-    await expandCard(page, c.num);
-    const card = cardFor(page, c.num);
-    // An Aave V3 Ethereum card prices its balances from the read at the block
-    // when it opens (rails-ops TO-DO-ui-jobs §19), captured price or not, so there
-    // only the footnote pill, which is the captured price's own, stays absent.
-    if (proto !== "aave-v3")
-      check(`${proto}: unpriced ${where} has NO USD chip`, (await card.locator(usdChipSel).count()) === 0);
-    check(
-      `${proto}: unpriced ${where} has NO AtBlockPriceFootnote pill`,
-      (await card.getByText(/oracle at block/).count()) === 0,
-    );
-    await page.close();
-    return;
-  }
-  check(
-    `${proto}: NO EVIDENCE — every unpriced candidate the sweep found rides a collapsed run, so none could be driven`,
-    false,
-    `${candidates.length} candidate(s)`,
-  );
-}
-
 // Numbers are counted off the API, never pinned. Fetching the two fixtures'
 // timelines up front also proves the routes answer at all before the browser
 // arm reads their DOM.
@@ -532,14 +436,6 @@ await runProtocol("aave-v3", AAVE_V3_WALLET, {
     debtPrice: "1.00",
   },
 });
-
-console.log(`\n=== Aave V3, unpriced — discovered at run time ===`);
-const unpriced = await discoverUnpriced("aave-v3");
-console.log(
-  `  sweep found ${unpriced.length} unpriced candidate(s)` +
-    (unpriced.length ? `; smallest timeline ${unpriced[0].total} events` : ""),
-);
-await runUnpriced("aave-v3", unpriced);
 
 console.log(`\n=== Spark — ${SPARK_WALLET} ===`);
 await runProtocol("spark", SPARK_WALLET, {
