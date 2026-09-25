@@ -15,9 +15,11 @@ export function isDashedConnector(event: TimelineEvent): boolean {
   return isThirdParty(event.author);
 }
 
-// Matches the base position timeline spine connector (timeline-spine.tsx):
-// rb-300 light / rb-700 dark. (Was a one-off dark hex, off-grammar.)
-const CONNECTOR_COLOR_CLASS = "text-rb-300 dark:text-rb-700";
+// Matches the position timeline spine (spine-column.tsx's SPINE_COLORS.default,
+// rb-500): rb-300 light / rb-500 dark. (Was a one-off dark hex, off-grammar;
+// then rb-700, which read too close to the rb-800 dark canvas to be visible,
+// TO-DO-ui-jobs #44.)
+const CONNECTOR_COLOR_CLASS = "text-rb-300 dark:text-rb-500";
 
 export function TimelineConnector({
   event,
