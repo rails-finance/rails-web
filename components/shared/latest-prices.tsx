@@ -83,14 +83,15 @@ export function LatestPrices({ assets, reason }: { assets: LatestPriceAsset[]; r
         {first ? (
           <>
             <TokenChipIcon symbol={first.symbol} address={first.address} size={14} filterable={false} />
-            {/* Below sm the row carries back, block, prices and Tools across
-                390px, so the summary keeps the icon and the count and leaves
-                the figure to the open list. */}
+            {/* The figure shows at every width (ui-jobs 59). It used to be
+                withheld below sm because the row carried back, the block
+                number, prices and Tools across 390px; the recency stamp beside
+                this one now shows the age alone, and the nine characters the
+                block number gave up are what this figure fits in. An asset on
+                show with no price next to it was the odd half of the row. */}
             {/* An unpriced first asset puts its symbol where the figure would
                 be, so the trigger still names what the position holds. */}
-            <span
-              className={`hidden tabular-nums sm:inline ${priced(first) ? "font-bold text-green-400" : "font-medium text-rb-500"}`}
-            >
+            <span className={`tabular-nums ${priced(first) ? "font-bold text-green-400" : "font-medium text-rb-500"}`}>
               {priced(first)
                 ? first.unit
                   ? fmtNative(first.price as number, first.unit)

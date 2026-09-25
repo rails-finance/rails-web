@@ -124,7 +124,10 @@ const stampPlacement = await page.evaluate(() => {
   if (!/\/info$/.test(infoLink.getAttribute("href") || "")) return "(i) href is not /info";
   const row = nav.parentElement;
   const identity = row?.querySelector("a[href='/ethereum/dolomite']");
-  const stamp = [...(row?.querySelectorAll("span") ?? [])].find((el) => /· .+ ago/.test(el.textContent || ""));
+  // The stamp is a button since ui-jobs 59 — it shows the age and swaps to the
+  // block number on a press — so it is found by its accessible name rather
+  // than by the "block · age" text it used to read.
+  const stamp = row?.querySelector("button[aria-label^='Chain head']");
   if (!identity) return "no identity link in rail row";
   if (!stamp) return "no recency stamp in rail row";
   // Same left cluster: the stamp's flex parent also contains the identity.
