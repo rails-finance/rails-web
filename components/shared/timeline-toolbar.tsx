@@ -632,7 +632,18 @@ export function TimelineToolbar({
               <MobileSheetFilterHeader
                 label="Date range"
                 status={countLine}
-                onReset={dateActive ? () => tl.setDateRange(null) : undefined}
+                // The sheet's own Reset is the only one on a phone — the
+                // panel's is withheld in the sheet — so it has to clear a
+                // SEGMENT as well as a filter, or a month read on a phone
+                // would have no way back.
+                onReset={
+                  dateActive || monthReach?.onReset
+                    ? () => {
+                        tl.setDateRange(null);
+                        monthReach?.onReset?.();
+                      }
+                    : undefined
+                }
               />
             }
           >

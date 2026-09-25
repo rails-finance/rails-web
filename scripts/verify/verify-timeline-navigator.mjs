@@ -1856,6 +1856,25 @@ for (const g of GROUPED_FIXTURES) {
           tapped && line.startsWith(head),
           `tapped ${tapped}; "${line}" (want "${head}…")`,
         );
+        // ⚠️ THE SHEET'S RESET IS THE ONLY ONE ON A PHONE — the panel's own is
+        // withheld inside the sheet — so it has to clear the SEGMENT, not the
+        // date range alone. Without this a month read on a phone has no way
+        // back, which is how the first build of this shipped.
+        await openPanel(small);
+        await small.click("[role='dialog'] button:has-text('Reset')", { timeout: 10_000 }).catch(() => {});
+        await settled(
+          small,
+          (w) =>
+            (document.querySelector("[data-prov-exempt] span.text-xs.tabular-nums")?.textContent ?? "").trim() === w,
+          wantRest,
+          60_000,
+        );
+        const backOnPhone = await small.evaluate(COUNT_LINE);
+        check(
+          `S4 ${g.id}: the sheet's Reset gives the rows the page opened with back`,
+          backOnPhone === wantRest,
+          `"${backOnPhone}" (want "${wantRest}")`,
+        );
       }
     } finally {
       await small.close();
