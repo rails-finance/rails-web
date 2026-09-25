@@ -72,6 +72,7 @@
 //   ONLY=spark,client …   run a subset (fixture ids)
 
 import { chromium } from "playwright";
+import { bypassHeaders } from "./lib/host.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(",").map((s) => s.trim())) : null;
@@ -139,7 +140,7 @@ const browser = await chromium.launch();
 
 /** A page with its folder reads counted from the first request. */
 async function openPage(path, { stored } = {}) {
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1400 } });
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1400 }, extraHTTPHeaders: bypassHeaders() });
   if (stored) {
     await ctx.addInitScript((value) => {
       try {
