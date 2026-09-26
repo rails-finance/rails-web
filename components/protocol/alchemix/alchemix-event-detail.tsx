@@ -117,7 +117,7 @@ function legStats(
       stat("Requested", "amount", sym);
       break;
     case "self_liquidated":
-      stat("Vault shares liquidated", "amount_liquidated", mytSymbol);
+      stat("Vault shares used to repay the debt", "amount_liquidated", mytSymbol);
       break;
     case "liquidated":
       stat("Vault shares taken", "amount", mytSymbol);

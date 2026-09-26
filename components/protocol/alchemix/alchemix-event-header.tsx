@@ -74,6 +74,10 @@ const scaled = (raw: string | null | undefined): number => {
 /** The per-axis verb a combined row gives a leg that has none of its own. The
  *  contract's word for the move, not Liquity's: an Alchemist deposits and
  *  mints where a Trove supplies and borrows. */
+/** What a self-liquidation is called on the card: the holder closed the
+ *  position and its collateral paid the debt. */
+export const SELF_LIQUIDATION_LABEL = "Closed with collateral";
+
 const AXIS_VERB: Record<string, string> = {
   deposit: "Deposit",
   withdraw: "Withdraw",
@@ -81,14 +85,10 @@ const AXIS_VERB: Record<string, string> = {
   burn: "Burn",
 };
 
-/** Adverse but chosen-for-you; the spine draws the caution triangle. */
-export const ALCHEMIX_CAUTION = new Set([
-  "force_repay",
-  "self_liquidated",
-  "redemption",
-  "batch_liquidated",
-  "fee_shortfall",
-]);
+/** Adverse but chosen-for-you; the spine draws the caution triangle. A
+ *  self-liquidation is not here: the holder chose it, and it draws the close
+ *  mark (alchemix-event-card). */
+export const ALCHEMIX_CAUTION = new Set(["force_repay", "redemption", "batch_liquidated", "fee_shortfall"]);
 
 export interface AlchemixEventHeaderProps {
   /** The legs of ONE transaction that this card DRAWS, in log order. It holds
@@ -182,8 +182,9 @@ function legSpec(
       break;
     }
     case "self_liquidated":
-      deltas.push(shares("amount_liquidated", scaled(raw.amount_liquidated), "Liquidated"));
-      spec = { ...spec, labelOnSpine: true };
+      // The holder's own close: a plain holder-action label, no caution pill.
+      deltas.push(shares("amount_liquidated", scaled(raw.amount_liquidated), "Paid the debt"));
+      spec = { ...spec, label: SELF_LIQUIDATION_LABEL };
       break;
     case "liquidated":
       // The chip names the LIQUIDATOR, which is a role, not a verdict about
@@ -376,6 +377,9 @@ export function combineLegSpecs(
   const party = custodyParty ?? specs.find((s, i) => s.party && legs[i].context.data.eventType !== "transfer")?.party;
 
   if (critical) return { ...critical, deltas, party: critical.party ?? party };
+  // A self-liquidation takes the row over the force repay that fires inside it.
+  const closeIdx = legs.findIndex((l) => l.context.data.eventType === "self_liquidated");
+  if (closeIdx >= 0) return { ...specs[closeIdx], deltas, party: specs[closeIdx].party ?? party };
   if (onSpine) return { ...onSpine, deltas, party: onSpine.party ?? party };
   // The pill is only the card's to give where the card DRAWS the mint: a filter
   // that left the deposit standing alone has not left an opening behind.

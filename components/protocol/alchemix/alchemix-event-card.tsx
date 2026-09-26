@@ -16,11 +16,13 @@
 // to the whole line, so it joins nobody's transaction and arrives here alone.
 //
 // SPINE GRAMMAR. The holder's own moves draw token rows on a solid spine, one
-// per leg that moved something. The adverse ones draw the caution triangle: a
-// force repay and a self-liquidation are consequences rather than choices, and
-// a liquidation by another party is the critical tone with that party badged on
-// the flow. An adverse leg takes the whole card's spine, because the
-// transaction it was part of is one of those. A transaction of custody moves
+// per leg that moved something. A self-liquidation is the holder's own close,
+// collateral paying the debt in one step, so it draws the neutral close mark on
+// a solid spine and takes the card, including the force repay that fires inside
+// it. The adverse ones draw the caution triangle: a force repay outside a
+// close, and the line-scope rows; a liquidation by another party is the
+// critical tone with that party badged on the flow. An adverse leg takes the
+// whole card's spine, because the transaction it was part of is one of those. A transaction of custody moves
 // alone draws the send mark and no direction: the position changed hands and
 // neither axis moved.
 //
@@ -115,7 +117,6 @@ function legTokens(leg: AlchemistEvent, mytSymbol: string): SpineTokenRow[] {
 
 const WARNING_LABEL: Record<string, string> = {
   liquidated: "Liquidation",
-  self_liquidated: "Self-liquidation",
   force_repay: "Forced repayment",
   redemption: "Redemption",
   batch_liquidated: "Batch liquidation",
@@ -154,10 +155,11 @@ export function AlchemixEventCard({
   };
 
   const adverse = legs.find((l) => l.context.data.eventType === "liquidated");
-  const cautioned = legs.find((l) => ALCHEMIX_CAUTION.has(l.context.data.eventType));
+  const closed = !adverse && legs.some((l) => l.context.data.eventType === "self_liquidated");
+  const cautioned = closed ? undefined : legs.find((l) => ALCHEMIX_CAUTION.has(l.context.data.eventType));
   const custodyOnly = legs.every((l) => l.context.data.eventType === "transfer");
 
-  const tokens = adverse || cautioned ? [] : legs.flatMap((leg) => legTokens(leg, mytSymbol));
+  const tokens = adverse || cautioned || closed ? [] : legs.flatMap((leg) => legTokens(leg, mytSymbol));
 
   const iconSlot = custodyOnly ? (
     <SpineColumn
@@ -166,6 +168,8 @@ export function AlchemixEventCard({
       isFirst={isFirst}
       isLast={!!isLast}
     />
+  ) : closed ? (
+    <SpineColumn icon="close" isFirst={isFirst} isLast={!!isLast} />
   ) : adverse || cautioned ? (
     <SpineColumn
       icon="warning"

@@ -111,6 +111,21 @@ const LIQUIDATION: LearnMoreContent = {
   ],
 };
 
+const CLOSED_WITH_COLLATERAL: LearnMoreContent = {
+  title: "Closing a position with its collateral",
+  intro:
+    "The holder can close a position in one step without bringing the synthetic back: the Alchemist puts enough of the position's vault shares against its debt to repay all of it, and returns the rest of the collateral. Alchemix calls this a self-liquidation. The holder chose it, and no liquidator takes a fee.",
+  detailsHeading: "What the event states",
+  details: [
+    { bold: "Shares used", text: "are in the log: the vault shares that went against the debt." },
+    {
+      bold: "Debt set aside for repayment",
+      text: "is repaid first, as a force repay in the same transaction, with the protocol's fee on that part.",
+    },
+    { bold: "Debt and collateral after", text: "are both zero: the position is closed." },
+  ],
+};
+
 const LINE_WIDE: LearnMoreContent = {
   title: "Events that belong to the whole line",
   intro:
@@ -140,8 +155,9 @@ const CUSTODY: LearnMoreContent = {
 
 export function alchemixLearnMoreContent(ctx: AlchemixV3Context): LearnMoreContent {
   switch (ctx.eventType) {
-    case "liquidated":
     case "self_liquidated":
+      return CLOSED_WITH_COLLATERAL;
+    case "liquidated":
     case "force_repay":
     case "repayment_fee":
       return LIQUIDATION;
@@ -162,7 +178,10 @@ export function alchemixLearnMoreContent(ctx: AlchemixV3Context): LearnMoreConte
  *  what the reader needs explained there is the axis, so the leg that moved one
  *  chooses the modal and a transaction of transfers alone keeps custody. */
 export function alchemixLearnMoreFor(legs: AlchemistEvent[]): LearnMoreContent {
-  const lead = legs.find((l) => l.context.data.eventType !== "transfer") ?? legs[0];
+  const lead =
+    legs.find((l) => l.context.data.eventType === "self_liquidated") ??
+    legs.find((l) => l.context.data.eventType !== "transfer") ??
+    legs[0];
   return alchemixLearnMoreContent(lead.context.data);
 }
 

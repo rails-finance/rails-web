@@ -539,7 +539,7 @@ const ALCHEMIX_OP_LABELS: Record<string, string> = {
   burn: "Burn debt",
   repay: "Repay",
   force_repay: "Force repay",
-  self_liquidated: "Self-liquidate",
+  self_liquidated: "Closed with collateral",
   liquidated: "Liquidated",
   repayment_fee: "Repayment fee",
   transfer: "Position transferred",
