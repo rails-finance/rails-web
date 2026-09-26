@@ -658,7 +658,7 @@ export function FxSystemView({ data }: { data: FxSystemChainResponse }) {
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read f(x)&apos;s pool state from chain.</p>
         <p className="text-sm">
-          This view is a live contract read with no cached fallback — it shows nothing. Try again shortly.
+          This view is a live contract read with no cached fallback, so when the read fails it shows nothing. Try again shortly.
         </p>
       </div>
     );

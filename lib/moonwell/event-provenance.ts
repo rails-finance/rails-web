@@ -177,7 +177,7 @@ export const accountBorrowsProv = (sym: string, coords: MoonwellCoords, raw?: st
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `Total ${sym} debt the position owed AFTER this event — the \`accountBorrows\` field the mToken emitted verbatim${atBlock(coords)}. Interest accrued up to this moment is INCLUDED (Moonwell accrues per timestamp and settles interest before every borrow/repay), so this is the contract's own reckoning of the debt.`,
+  summary: `Total ${sym} debt the position owed AFTER this event — the \`accountBorrows\` field the mToken emitted verbatim${atBlock(coords)}. Interest accrued up to this moment is INCLUDED (Moonwell accrues per timestamp and settles interest before every borrow/repay), so this is the contract's own reckoning of the debt, not a replayed sum.`,
   contract: mtokenContract(coords),
   via: `${captureVia(coords)} · Borrow/RepayBorrow log · ${fieldSeg("accountBorrows", raw)}`,
   inputs: eventInputs(coords),

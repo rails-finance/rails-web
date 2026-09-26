@@ -345,7 +345,7 @@ function PositionCardExplanation({ row, maxRedeemRead }: { row: VaultPositionRow
       ? `"Redeemable now" on the row above is the vault's own maxRedeem() for this address at that same block, in share units — what the contract says can be redeemed then, not what the shares are worth. On a stake token it answers zero outside the holder's unstake window, and that zero is a state rather than an absence.`
       : `"Redeemable now" is stated as not read: the vault's own maxRedeem() did not answer for this address at block ${n(row.live?.blockNumber ?? 0)}, and an unread call is said rather than shown as a zero.`,
     `Transfers, first seen and last activity are counted by the census: one whole-Transfer sweep of this vault, proven complete by Σ balanceOf equalling totalSupply() wei-exact, swept to block ${n(row.census.block)}.`,
-    `The claim is the vault's own convertToAssets of this exact balance, in ${row.asset?.symbol ?? "the vault's asset"}.`,
+    `The claim is the vault's own convertToAssets of this exact balance, in ${row.asset?.symbol ?? "the vault's asset"} — never shares multiplied by a price.`,
     row.value.usdE8 != null
       ? `Value · USD is the census's figure at block ${n(row.value.pricedBlock ?? row.census.block)}: the balance at that block through the vault's own convertToAssets and the chain's Aave V3 oracle (IAaveOracle.getAssetPrice) at the same block, the oracle named on its receipt — computed once by the daily census and never read for this page, so it says what the position was worth then and nothing about now.`
       : row.value.pricedBlock == null

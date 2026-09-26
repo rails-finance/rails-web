@@ -180,7 +180,7 @@ export const vaultTimelineAssetsProv = (c: VaultTimelineCoords, kind: "deposit" 
     kind: "recompute",
     text: `Read the ERC-4626 ${kind === "deposit" ? "Deposit" : "Withdraw"} log in ${c.txHash ?? "this transaction"} and decode its first non-indexed word`,
   },
-  summary: `${kind === "deposit" ? "Deposited" : "Withdrawn"} — the \`assets\` word of the ERC-4626 \`${kind === "deposit" ? "Deposit" : "Withdraw"}\` event the vault emitted for this address in this same transaction${atBlock(c)}, in ${asset(c)}. It is the contract's own figure for what moved, matched to this row by transaction AND by share count. Where a row states no asset leg, none was emitted — a plain transfer between two holders emits none — and this page states the shares alone.`,
+  summary: `${kind === "deposit" ? "Deposited" : "Withdrawn"} — the \`assets\` word of the ERC-4626 \`${kind === "deposit" ? "Deposit" : "Withdraw"}\` event the vault emitted for this address in this same transaction${atBlock(c)}, in ${asset(c)}. It is the contract's own figure for what moved, matched to this row by transaction AND by share count, not this page's shares multiplied by a share price. Where a row states no asset leg, none was emitted — a plain transfer between two holders emits none — and this page states the shares alone.`,
   contract: vaultContract(c),
   via: `${LANE} · the ERC-4626 ${kind === "deposit" ? "Deposit" : "Withdraw"} log in this transaction`,
 });
@@ -299,7 +299,7 @@ const FLOW_CLAUSE: Record<VaultFlowKind, (unit: string) => string> = {
   "transferred-out": (u) =>
     `every \`Transfer\` with this address as \`from\` and a real address as \`to\`, summed — shares handed to another holder rather than redeemed. In ${u}`,
   deposited: (u) =>
-    `the \`assets\` word of every ERC-4626 \`Deposit\` this address's own mints were emitted with, summed. It is the contract's own figure for what went in, in ${u}`,
+    `the \`assets\` word of every ERC-4626 \`Deposit\` this address's own mints were emitted with, summed. It is the contract's own figure for what went in, in ${u} — never shares multiplied by a share price`,
   withdrawn: (u) =>
     `the \`assets\` word of every ERC-4626 \`Withdraw\` this address's own burns were emitted with, summed, in ${u}. The contract's own figure for what came out`,
 };
