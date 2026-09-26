@@ -204,7 +204,7 @@ function VaultRow({ v, block }: { v: FluidVaultRow; block: number }) {
                 {v.aggregateRatio != null && (
                   <span
                     data-prov-exempt=""
-                    title="The vault's aggregate is total borrow ÷ (total collateral × the vault's liquidate price) — all three inputs already traced in this row. A ratio of receipted figures, not a distinct chain read; and not any one position's ratio."
+                    title="The vault's aggregate is total borrow ÷ (total collateral × the vault's liquidate price) — all three inputs already traced in this row. A ratio of receipted figures, not any one position's ratio."
                   >
                     · {pctText(v.aggregateRatio, 1)} used
                   </span>

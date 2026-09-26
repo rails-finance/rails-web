@@ -91,7 +91,7 @@ export function AaveVaultIntroDrawer({
             <p>
               The reserve&rsquo;s liquidity index in the Pool is the same fact as the share price read from the other
               end. The Pool named beside it is the one the wrapper itself answers in <code>POOL()</code>, and the aToken
-              is asked of the wrapper directly.
+              is asked of the wrapper rather than searched for across Aave&rsquo;s three Ethereum Pools.
             </p>
             <p>
               The wrapper&rsquo;s <code>rewardTokens()</code> is a registry rather than the Pool&rsquo;s truth: a reward

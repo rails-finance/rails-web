@@ -256,8 +256,7 @@ export function StageRail() {
             accent
             className="col-span-2 row-start-5 lg:col-span-1 lg:col-start-5 lg:row-start-1 lg:row-span-2 lg:self-center"
           >
-            Lifetime totals are checked against live state. Anything that doesn&rsquo;t reconcile is left out rather
-            than guessed.
+            Lifetime totals are checked against live state. Anything that doesn&rsquo;t reconcile is left out.
           </Station>
 
           <Station

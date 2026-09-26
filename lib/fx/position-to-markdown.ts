@@ -135,7 +135,7 @@ export function fxPositionToMarkdown(args: FxPositionMarkdownArgs): string {
     lines.push(
       `- The settled sweep has not landed for this position, so its CURRENT collateral and debt are not stated here. ` +
         `The event-implied running debt is ${amt(view.impliedDebt.amount)} fxUSD — history only, and known to be wrong ` +
-        `by whatever rebalances, write-offs and socialized bad debt have applied since.`,
+        `by whatever rebalances, write-offs and socialized bad debt have applied since. It is deliberately not presented as the current figure.`,
     );
     lines.push("");
   } else {

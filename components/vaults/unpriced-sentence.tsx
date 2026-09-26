@@ -18,7 +18,8 @@ export function UnpricedSentence({ census }: { census: readonly VaultCensusRow[]
   if (priced.length === 0) {
     return (
       <span data-intro-unpriced data-unpriced-vaults="0" data-unpriced-assets="">
-        The census has not yet priced any vault on this chain, so every card states its value as not priced.
+        The census has not yet priced any vault on this chain, so every card states its value as not priced rather than
+        as a figure.
       </span>
     );
   }

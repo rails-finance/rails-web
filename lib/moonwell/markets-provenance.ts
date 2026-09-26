@@ -234,7 +234,7 @@ export const mwSummaryValueProv = (side: "supplied" | "borrowed", coords: Moonwe
   kind: "chain-derived",
   pclass: "oracle",
   source: { block: coords.blockNumber },
-  summary: `Roster ${side} in USD${atBlock(coords)} — Σ over every priced market of its own ${side} value (underlying amount × the Comptroller's oracle price). Each leg a live read; a market the oracle answers 0 for is left out rather than counted as zero.`,
+  summary: `Roster ${side} in USD${atBlock(coords)} — Σ over every priced market of its own ${side} value (underlying amount × the Comptroller's oracle price). Each leg a live read; a market the oracle answers 0 for is left out.`,
   via: `${LANE} · Σ per-market ${side} USD over the priced roster @ head`,
   formula: `Σ per-market ${side} value`,
 });

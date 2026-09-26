@@ -144,11 +144,11 @@ export function PolarisPositionExplanation({
             {signedNum(equity)} {stableSymbol}
           </H>
         </Prov>{" "}
-        — a Sepolia testnet figure. That is a valuation at this block, not a profit. It moves with the feed, with the
-        interest and PSM share still pending, and with every mint and redemption the PSM settles onto the CDP. A profit
-        or loss is only fixed when the CDP closes and the holder&rsquo;s flows are complete. Valuing what the holder put
-        in before then means choosing a price for each deposit, which is a decision about basis rather than a fact of
-        the chain.
+        — a Sepolia testnet figure, not money. That is a valuation at this block, not a profit. It moves with the feed,
+        with the interest and PSM share still pending, and with every mint and redemption the PSM settles onto the CDP.
+        A profit or loss is only fixed when the CDP closes and the holder&rsquo;s flows are complete. Valuing what the
+        holder put in before then means choosing a price for each deposit, which is a decision about basis rather than a
+        fact of the chain.
       </span>,
     );
   }

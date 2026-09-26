@@ -285,7 +285,7 @@ export function TimelineBoundaryCard({
         <p>
           The list holds every event from block {n(b.cutBlock)} onward, and each card on it is exact. The events before
           that block are {b.pending === "reading" ? "being counted" : "not counted on this request"}, so the lifetime
-          figures above are not stated.
+          figures above are not stated rather than reduced from this page alone.
         </p>
       ) : horizon ? (
         <p>

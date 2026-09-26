@@ -520,7 +520,7 @@ function shareRateBody(note: ShareRateStepNote, links: NoteLinks): NoteBody {
       <>
         This is a LIVE note: the earlier reading is this account&rsquo;s own last Mint or Redeem in the{" "}
         {note.marketSymbol} market — the underlying amount it emitted divided by the mTokens it was exchanged for — and
-        the later one is m{note.marketSymbol}&rsquo;s own exchange rate read now, at the chain head.{" "}
+        the later one is m{note.marketSymbol}&rsquo;s own exchange rate read now, at the chain head, not a second log.{" "}
         {observation(note.from, "before")}; {observation(note.to, "after")}. Shown whenever this account still holds the
         market&rsquo;s mTokens, whatever the move — nothing having changed is itself the fact this note states.
         {note.slice && (
@@ -583,7 +583,8 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
       const liveNoun = isPolaris ? "the market's own price feed, read live" : "the backend's live oracle read";
       return (
         <>
-          the later price: {liveNoun}, at the chain head block {point.block.toLocaleString("en-US")}
+          the later price: {liveNoun}, at the chain head block {point.block.toLocaleString("en-US")} — not a{" "}
+          {positionNoun} event
         </>
       );
     }
@@ -647,8 +648,8 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
             <Prov info={positionProv(note, "state")} value={String(p.atBlock)}>
               <span className="tabular-nums">{f.atBlock}</span>
             </Prov>{" "}
-            fixed and move only the price, so the later one is what that state is worth NOW; interest has kept accruing
-            since.
+            fixed and move only the price, so the later one is what that state is worth NOW rather than a second
+            reading; interest has kept accruing since.
             {!isPolaris && <> The position card&rsquo;s live ratio also carries the interest accrued since then.</>}
             {isPolaris && (
               <>
@@ -673,8 +674,8 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
             <Prov info={positionProv(note, "state")} value={String(p.atBlock)}>
               <span className="tabular-nums">{f.atBlock}</span>
             </Prov>{" "}
-            and move only the price, so the later one is what that state came to be worth; interest kept accruing across
-            the stretch.
+            and move only the price, so the later one is what that state came to be worth rather than a second reading;
+            interest kept accruing across the stretch.
             {isPolaris && (
               <>
                 {" "}
@@ -710,7 +711,7 @@ function aaveV4PriceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
       return (
         <>
           the later price: a live read of Aave&rsquo;s oracle (/api/oracle/aave-v4), at the chain head block{" "}
-          {point.block.toLocaleString("en-US")}
+          {point.block.toLocaleString("en-US")} — not a row of this position&rsquo;s
         </>
       );
     }
@@ -793,9 +794,10 @@ function aaveV4PriceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
             <Prov info={aaveV4PriceGapHealthProv(note, "state")} value={String(h.atBlock)}>
               <span className="tabular-nums">{f.atBlock}</span>
             </Prov>{" "}
-            and move only the {note.marketSymbol} price, so the later one is what that basket is worth NOW; interest has
-            kept accruing since. The threshold each collateral is weighted by is the one the spoke reports now — Aave V4
-            states no static per-reserve threshold, and the one in force at that block is not indexed.
+            and move only the {note.marketSymbol} price, so the later one is what that basket is worth NOW rather than a
+            second reading; interest has kept accruing since. The threshold each collateral is weighted by is the one
+            the spoke reports now — Aave V4 states no static per-reserve threshold, and the one in force at that block
+            is not indexed.
           </>
         )}
       </>
@@ -921,7 +923,12 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
   const observation = (which: "from" | "to") => {
     const p = which === "from" ? note.from : note.to;
     if (which === "to" && note.live) {
-      return <>now: the cdpManager&rsquo;s own primary rate, read live at block {p.block.toLocaleString("en-US")}</>;
+      return (
+        <>
+          now: the cdpManager&rsquo;s own primary rate, read live at block {p.block.toLocaleString("en-US")} — not a
+          touch of this CDP&rsquo;s
+        </>
+      );
     }
     const o = which === "from" ? note.observed.from : note.observed.to;
     if (!o) {
@@ -1303,7 +1310,7 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
       return (
         <>
           now: the Pool&rsquo;s own getReserveData for the {note.marketSymbol} reserve, read live at block{" "}
-          {p.block.toLocaleString("en-US")} — a slot read at the head
+          {p.block.toLocaleString("en-US")} — a slot read at the head, not a log
         </>
       );
     }
@@ -1399,13 +1406,13 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
     learnMore: marketNoteRateStepContent(),
     derivation: note.live ? (
       <>
-        This is a LIVE note: the {note.marketSymbol} {rateNoun} on {marketName} is the reserve&rsquo;s own — utilisation
-        across every account in the reserve makes it, and nobody chooses it. The earlier value is the rate this
-        position&rsquo;s own last touch left in force; the later is the Pool&rsquo;s getReserveData read now, at the
-        chain head — {observation("from")}, {observation("to")}. Shown whenever this position still holds this reserve
-        on this side, whatever the move — nothing having moved is itself the fact this note states. A side whose rate is
-        nothing at both ends is not drawn at all: a reserve nobody borrows pays no supply rate, and &ldquo;0.00% →
-        0.00%&rdquo; is an absence rather than a reading.
+        This is a LIVE note: the {note.marketSymbol} {rateNoun} on {marketName} is the reserve&rsquo;s own, not this
+        position&rsquo;s — utilisation across every account in the reserve makes it, and nobody chooses it. The earlier
+        value is the rate this position&rsquo;s own last touch left in force; the later is the Pool&rsquo;s
+        getReserveData read now, at the chain head — {observation("from")}, {observation("to")}. Shown whenever this
+        position still holds this reserve on this side, whatever the move — nothing having moved is itself the fact this
+        note states. A side whose rate is nothing at both ends is not drawn at all: a reserve nobody borrows pays no
+        supply rate, and &ldquo;0.00% → 0.00%&rdquo; is an absence rather than a reading.
         {note.interest && (
           <>
             {" "}

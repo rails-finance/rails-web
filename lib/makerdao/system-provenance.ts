@@ -329,7 +329,7 @@ export const systemDustProv = (ilk: string): Provenance => ({
 export const systemChopProv = (ilk: string): Provenance => ({
   kind: "chain",
   pclass: "state",
-  summary: `The liquidation penalty on ${ilk} — the Dog's \`chop\`, applied to the debt when a vault is barked. It is carried into the auction as a cushion; the surplus settles at the Vow, not with the liquidator.`,
+  summary: `The liquidation penalty on ${ilk} — the Dog's \`chop\`, applied to the debt when a vault is barked. It is carried into the auction as a cushion; the surplus settles at the Vow.`,
   contract: DOG,
   via: `${SYSTEM_VIA} · Dog.ilks(ilk).chop @ head · wad ÷10^18`,
   verify: STATE_VERIFY,

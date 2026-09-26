@@ -109,7 +109,7 @@ function UtilMini({ m }: { m: DolomiteMarketRow }) {
     <span
       className="inline-flex items-center gap-1.5"
       data-prov-exempt=""
-      title="Utilisation is borrowed ÷ supplied — both already traced in this row (the supplied and borrowed USD receipts). A ratio of two receipted figures, not a distinct chain read."
+      title="Utilisation is borrowed ÷ supplied — both already traced in this row (the supplied and borrowed USD receipts). A ratio of two receipted figures."
     >
       <span className="h-1 w-10 overflow-hidden rounded-full bg-foreground/10">
         <span
@@ -385,7 +385,7 @@ export function DolomiteMarketsView({ data }: { data: DolomiteMarketsResponse })
             label: "Utilisation",
             value: <span data-prov-exempt="">{pctText(s.utilisation)}</span>,
             title:
-              "Σ borrowed value ÷ Σ supplied value, both in USD at DolomiteMargin's own price — the two figures beside it in this band. A ratio of two receipted figures, not a distinct chain read.",
+              "Σ borrowed value ÷ Σ supplied value, both in USD at DolomiteMargin's own price — the two figures beside it in this band. A ratio of two receipted figures.",
           },
         ]}
         notes={

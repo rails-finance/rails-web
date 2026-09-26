@@ -158,7 +158,7 @@ export const cvMarketBaseProv = (side: "supplied" | "borrowed", coords: Compound
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("cToken.totalBorrows", coords),
-      summary: `${sym(coords)} borrowed — the market's own \`totalBorrows\`${atBlock(coords)}, scaled by the underlying's decimals. Interest is already in it: Compound V2 accrues borrows into this slot, so it is the debt the market records, not a sum over events.`,
+      summary: `${sym(coords)} borrowed — the market's own \`totalBorrows\`${atBlock(coords)}, scaled by the underlying's decimals. Interest is already in it: Compound V2 accrues borrows into this slot, so it is the debt the market records.`,
       contract: cTokenContract(coords),
       via: `${LANE} · cToken.totalBorrows @ head`,
     };
