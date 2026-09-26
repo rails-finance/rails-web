@@ -18,7 +18,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { Info } from "lucide-react";
 
 import { Facehash } from "@/components/shared/facehash";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
@@ -190,10 +190,17 @@ export function BookmarksModal({ onClose }: { onClose: () => void }) {
               only, with no server copy, so a reader deciding whether to rely
               on one deserves to be told before they fill a list, not after a
               cleared browser loses it. Shown in both branches below (empty
-              and populated) since the empty state is exactly when this is
-              most worth knowing. */}
+              and populated) since the empty state is when this is most worth
+              knowing.
+
+              THE GLYPH IS `Info`, NOT A TRIANGLE. standards/color-grammar.md
+              reserves the caution triangle for adverse events (redemption,
+              liquidation, zombie, deprecation), so that a triangle beside a
+              figure always means the position is at risk. Where the bookmarks
+              live is a fact about storage, so it takes the neutral mark and
+              the muted tone (Miles, 2026-09-26). */}
           <div className="mb-5 flex items-start gap-1.5 text-[11px] text-rb-500">
-            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+            <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
             <p>
               Bookmarks are stored in your browser&apos;s local storage. Nothing is saved to our servers or anywhere
               else. To keep a copy safe, use Export to file below.
