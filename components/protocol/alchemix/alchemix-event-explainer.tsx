@@ -74,6 +74,11 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
     "When a staker claims, the Transmuter redeems: every open position's set-aside debt is cleared by the same ratio, and a matching slice of its collateral moves to the Transmuter: vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared.",
     "The Transmuter pays the staker in those vault shares (mixUSDC on the alUSD line) for the part of the deposit that has matured, and hands back the rest as alUSD.",
   ],
+  // The staker's side, which a borrower reading a redemption also needs: a
+  // claim can come before maturity, and what that costs.
+  extraParagraphs: [
+    "A stake converts a little every block, in equal parts from the block it is made to its maturity block. The staker can claim at any time. A claim before maturity converts only the part whose blocks have passed, hands the rest back as alUSD and keeps an early exit fee on that rest (1% on every early claim so far). So claiming early gives up converting the rest and pays the fee; to convert it, the staker stakes it again and waits a new full term.",
+  ],
   detailsHeading: "What it means for a borrower",
   details: [
     {

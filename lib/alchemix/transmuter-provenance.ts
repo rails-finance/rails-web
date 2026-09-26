@@ -8,6 +8,7 @@
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { explorerUrl } from "@/lib/shared/chains";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
+import type { TransmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
 
 const TRANSMUTER_VIA = "captured Transmuter logs (alchemix_v3_transmuter_*)";
 
@@ -102,6 +103,53 @@ export function transmuterConvertedProv(
     inputs: inputs(coords, [
       { label: "amount_staked", value: stakedRaw, kind: "chain", note: "PositionCreated" },
       { label: "amount_unclaimed", value: unclaimedRaw, kind: "chain", note: "PositionClaimed" },
+    ]),
+  };
+}
+
+/** One part of a claim that landed before maturity (lib/alchemix/transmuter-early-claim):
+ *  the part converted, the part that had not, or the early exit fee. Each is
+ *  arithmetic over the stake, the two blocks that bound its term, the claim
+ *  block and the part handed back, all from the Transmuter's logs. */
+export function transmuterEarlyClaimProv(
+  part: "converted" | "unconverted" | "exit-fee",
+  symbol: string,
+  e: TransmuterEarlyClaim,
+  coords: AlchemixCoords,
+): Provenance {
+  const term = e.maturationBlock - e.startBlock;
+  const unconvertedFormula = `${e.stakedRaw} × (${e.maturationBlock} − ${e.claimBlock}) ÷ (${e.maturationBlock} − ${e.startBlock}) = ${e.stakedRaw} × ${e.blocksEarly} ÷ ${term} = ${e.unconvertedRaw}`;
+  const spec = {
+    converted: {
+      summary: `${symbol} converted — the stake less the part whose blocks had not yet passed at the claim`,
+      via: "amount_staked − unconverted",
+      formula: `${unconvertedFormula}; ${e.stakedRaw} − ${e.unconvertedRaw} = ${e.convertedRaw}`,
+    },
+    unconverted: {
+      summary: `${symbol} not yet converted — the stake converts in equal parts every block from its start to maturity, so this is the share of its term still to run at the claim`,
+      via: "amount_staked × blocks left ÷ term",
+      formula: unconvertedFormula,
+    },
+    "exit-fee": {
+      summary: `${symbol} kept as the early exit fee — the unconverted part less what the claim handed back`,
+      via: "unconverted − amount_unclaimed",
+      formula: `${unconvertedFormula}; ${e.unconvertedRaw} − ${e.returnedRaw} = ${e.exitFeeRaw} (${(e.exitFeeShare * 100).toFixed(4)}% of the unconverted part)`,
+    },
+  }[part];
+  return {
+    kind: "chain-derived",
+    pclass: "indexed",
+    summary: spec.summary,
+    contract: transmuterContract(coords),
+    via: `${TRANSMUTER_VIA} · ${spec.via}`,
+    formula: spec.formula,
+    verify: { kind: "rollup", text: "It rolls up the stake, its maturity and the claim on this page" },
+    inputs: inputs(coords, [
+      { label: "amount_staked", value: e.stakedRaw, kind: "chain", note: "PositionCreated" },
+      { label: "start block", value: String(e.startBlock), kind: "chain", note: "PositionCreated" },
+      { label: "maturity block", value: String(e.maturationBlock), kind: "chain", note: "start + timeToTransmute" },
+      { label: "claim block", value: String(e.claimBlock), kind: "chain", note: "PositionClaimed" },
+      { label: "amount_unclaimed", value: e.returnedRaw, kind: "chain", note: "PositionClaimed" },
     ]),
   };
 }

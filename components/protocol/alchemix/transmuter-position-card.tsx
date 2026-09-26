@@ -30,6 +30,7 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 import { formatHeadlineAmount, formatUnitsExact } from "@/lib/utils/format";
 import { alchemixPositionName } from "@/lib/alchemix/naming";
 import type { AlchemixAmount, AlchemixTransmuterPositionSummary } from "@/types/api/alchemix";
+import { transmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -152,6 +153,7 @@ export function claimColumn(
     };
   }
   const mytSymbol = c.claimed?.symbol ?? p.mytSymbol ?? "vault shares";
+  const early = transmuterEarlyClaim(p);
   const returned =
     c.unclaimed && c.unclaimed.raw !== "0" ? (
       <div className="mt-0.5 leading-snug">
@@ -183,7 +185,10 @@ export function claimColumn(
     ),
     footnote: (
       <StatFootnote>
-        <span className="tabular-nums">at block {block(c.blockNumber)}</span>
+        <span className="tabular-nums">
+          at block {block(c.blockNumber)}
+          {early ? `, ${block(early.blocksEarly)} blocks before maturity` : ""}
+        </span>
         {returned}
       </StatFootnote>
     ),

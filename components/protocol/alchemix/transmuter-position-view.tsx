@@ -37,6 +37,7 @@ import type { AlchemixDeployment } from "@/lib/alchemix/lines";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
 import { transmuterEmittedProv, transmuterMaturityProv } from "@/lib/alchemix/transmuter-provenance";
 import { computeTransmuterEconomics } from "@/lib/alchemix/transmuter-economics";
+import { transmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
 import { logIndexOf, splitRidingTransfers, withRiders } from "@/lib/alchemix/riding-transfers";
 import {
   claimColumn,
@@ -47,6 +48,7 @@ import {
 import {
   TransmuterEventCard,
   coordsForTransmuterLeg,
+  earlyClaimSentence,
   type TransmuterEvent,
 } from "@/components/protocol/alchemix/transmuter-event-card";
 import type { AlchemixTransmuterPositionData } from "@/types/api/alchemix";
@@ -93,6 +95,8 @@ export function TransmuterPositionView({
     olderCount,
   });
 
+  const early = useMemo(() => transmuterEarlyClaim(p), [p]);
+
   // One transaction, one card: a stake's mint and PositionCreated, a claim's
   // hop, burn and PositionClaimed.
   const runs: TimelineRunSpec[] = useMemo(
@@ -114,12 +118,13 @@ export function TransmuterPositionView({
               mytSymbol={mytSymbol}
               isFirst={meta.isFirst}
               isLast={meta.isLast}
+              early={early}
             />
           );
         },
       },
     ],
-    [mytSymbol, ridersByTx],
+    [mytSymbol, ridersByTx, early],
   );
 
   const economics = useMemo(
@@ -186,10 +191,19 @@ export function TransmuterPositionView({
           />
           <div className="mt-3 space-y-1.5">
             <p className="text-xs leading-relaxed text-rb-500">
-              A Transmuter position locks {p.syntheticSymbol} until a maturity counted in blocks, and a claim pays out
-              the converted part in {mytSymbol}. Every figure here is one of the Transmuter&rsquo;s own events,
-              replayed; none is read from the contract at a block.
+              A Transmuter position locks {p.syntheticSymbol} until a maturity counted in blocks, converting a little
+              every block, and a claim pays out the converted part in {mytSymbol}. The holder can claim before maturity:
+              the claim then hands back the part not yet converted as {p.syntheticSymbol}, less an early exit fee, so
+              claiming early gives up converting that part and pays the fee on it. Every figure here is one of the
+              Transmuter&rsquo;s own events, replayed, or arithmetic over them; none is read from the contract at a
+              block.
             </p>
+            {early && p.claim?.claimed ? (
+              <p className="text-xs leading-relaxed text-foreground/80">
+                {earlyClaimSentence(early, p.syntheticSymbol, mytSymbol, p.claim.claimed.raw, false)} The claim&rsquo;s
+                card below carries the arithmetic.
+              </p>
+            ) : null}
             {p.owner ? (
               <p className="text-[11px] leading-relaxed text-rb-500">
                 The position is a token that can be sold until it is claimed, so the address above is who holds it now
@@ -234,6 +248,7 @@ export function TransmuterPositionView({
                 isFirst={meta.isFirst}
                 isLast={meta.isLast}
                 eventNumber={meta.eventNumber}
+                early={early}
               />
             );
           }}
