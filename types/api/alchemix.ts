@@ -204,7 +204,16 @@ export interface AlchemixTimelineResponse<TEvent> {
   success: true;
   data: AlchemixTimelineData<TEvent>;
   pagination: AlchemixPagination;
-  notes: { lineScopedEvents: string };
+  notes: {
+    lineScopedEvents: string;
+    /** The route's own statement of what a redemption row's
+     *  `debtClearedFromReadings` is: a difference of two readings, with the
+     *  unavailable marker a surface must honour by drawing nothing. The shape
+     *  travels on the event context (`AlchemixDebtClearedFromReadings` in
+     *  lib/shared/types/event-shape.ts), which is where the timeline's events
+     *  are typed. */
+    redemptionDebtCleared: string;
+  };
 }
 
 /** The collateral leg of a live read. One `asOfBlock` covers the whole reading

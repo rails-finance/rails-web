@@ -1,7 +1,7 @@
 "use client";
 
-// Alchemist event detail — the figures the log itself carries, and the two it
-// does not.
+// Alchemist event detail — the figures the log carries, and the ones it does
+// not.
 //
 // NO BEFORE→AFTER TRANSITIONS HERE, and the absence is the point. An Alchemix
 // log states what moved, never the position's balance after it, and on a line
@@ -16,12 +16,15 @@ import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, type ChainTruthStat } from "@/components/shared/chain-truth-event";
 import { formatExact } from "@/lib/utils/format";
 import {
+  debtClearedFromReadingsProv,
   emittedAmountProv,
   resolvedAtCaptureProv,
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
 
 const WAD = 1e18;
+
+const block = (n: number) => n.toLocaleString("en-US");
 
 const scaled = (raw: string | null | undefined): number | null => {
   if (raw == null) return null;
@@ -99,9 +102,30 @@ export function AlchemixEventDetail({ ctx, mytSymbol, coords }: AlchemixEventDet
       stat("Fee in shares", "fee_in_yield", mytSymbol);
       stat("Fee in the asset underneath", "fee_in_underlying", mytSymbol);
       break;
-    case "redemption":
+    case "redemption": {
       stat("Redeemed across the line", "amount", sym);
+      // The per-position figure is not in the log and is not worked out from
+      // it: it is this position's debt read either side of the redemption,
+      // subtracted. The label says so, and a zero stands as an answer — the
+      // unavailable case drops the row instead, which is the only way the two
+      // can be told apart.
+      const cleared = ctx.debtClearedFromReadings;
+      if (cleared?.status === "stated" && cleared.amountRaw != null) {
+        stats.push({
+          label: "Cleared for this position, from two readings",
+          value: formatExact(scaled(cleared.amountRaw) ?? 0),
+          symbol: sym,
+          prov: debtClearedFromReadingsProv(
+            sym,
+            cleared.amountRaw,
+            cleared.fromBlock ?? 0,
+            cleared.atBlock ?? 0,
+            coords,
+          ),
+        });
+      }
       break;
+    }
     case "batch_liquidated":
       stat("Taken across the batch", "amount", mytSymbol);
       stat("Liquidator fee, in shares", "fee_in_yield", mytSymbol);
@@ -114,6 +138,12 @@ export function AlchemixEventDetail({ ctx, mytSymbol, coords }: AlchemixEventDet
       break;
   }
 
+  const span = ctx.debtClearedFromReadings;
+  const clearedSpan =
+    span?.status === "stated" && span.fromBlock != null && span.atBlock != null
+      ? { fromBlock: span.fromBlock, atBlock: span.atBlock }
+      : null;
+
   return (
     <>
       <ChainTruthDetail stats={stats} />
@@ -121,6 +151,13 @@ export function AlchemixEventDetail({ ctx, mytSymbol, coords }: AlchemixEventDet
         <p className="px-5 pb-3 text-[11px] leading-relaxed text-rb-500">
           This event names no position. It is on this timeline because it fell inside this position&rsquo;s life and
           moved its figures, not because the holder did anything.
+          {clearedSpan ? (
+            <>
+              {" "}
+              The second figure is this position&rsquo;s debt read at block {block(clearedSpan.fromBlock)} less its debt
+              read at block {block(clearedSpan.atBlock)} &mdash; the two blocks this redemption sits between.
+            </>
+          ) : null}
           {ctx.eventType === "batch_liquidated" && ctx.accountsTopic ? (
             <>
               {" "}

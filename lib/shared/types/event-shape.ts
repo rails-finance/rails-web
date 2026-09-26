@@ -2493,6 +2493,42 @@ export interface AlchemixV3Context {
   /** Set on `batch_liquidated`: the indexed uint256[] arrives as the array's
    *  hash, so the ids are not recoverable from the log. */
   accountsTopic?: string;
+  /** Set on line-scope `redemption` rows only. How much of THIS position's
+   *  debt that redemption cleared — measured, never derived. See
+   *  `AlchemixDebtClearedFromReadings`. */
+  debtClearedFromReadings?: AlchemixDebtClearedFromReadings;
+}
+
+/** The part of one position's debt that a `Redemption` cleared.
+ *
+ *  THIS IS A DIFFERENCE OF TWO getCDP READINGS, NOT A FIGURE DERIVED FROM THE
+ *  EVENT. The field is named `...FromReadings` so it cannot be read as the
+ *  latter: `Redemption` carries one uint256 and no per-account attribution, so
+ *  no attribution is recoverable from the log and none is attempted
+ *  (rails-ops decisions/0032). It leaves the position's grade where it was.
+ *
+ *  `status: "unavailable"` is the marker a surface must honour by rendering
+ *  NOTHING — a cleared amount of zero is a real answer (a position with no
+ *  earmarked debt at that redemption) and arrives as `status: "stated"` with
+ *  `amountRaw: "0"`. The two must never render alike. */
+export interface AlchemixDebtClearedFromReadings {
+  status: "stated" | "unavailable";
+  /** Debt tokens in wei, `debt(fromBlock) - debt(atBlock)`. Null when
+   *  unavailable. Never negative: a redemption only reduces debt. */
+  amountRaw: string | null;
+  /** The earlier reading's block, and the redemption's own block. Both are on
+   *  the wire because the figure is the span between them, so a surface
+   *  showing the figure shows both. Null when unavailable. */
+  fromBlock: number | null;
+  atBlock: number | null;
+  /** Why it cannot be stated; null when it can.
+   *   `no-reading-at-block`   — no reading at the redemption's block, so this
+   *                             position was not open at it.
+   *   `no-prior-reading`      — the redemption is the position's first band
+   *                             edge, so there is nothing to subtract from.
+   *   `step-between-readings` — another step falls between the two readings,
+   *                             so the difference is those combined. */
+  reason: "no-reading-at-block" | "no-prior-reading" | "step-between-readings" | null;
 }
 
 // ProtocolContext is designed to grow as new protocol transformers come

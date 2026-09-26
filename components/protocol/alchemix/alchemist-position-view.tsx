@@ -66,6 +66,7 @@ import { isAlchemistEvent } from "@/lib/shared/types/event-shape";
 import { AlchemixEventCard } from "@/components/protocol/alchemix/alchemix-event-card";
 import { AlchemixStatusPill, amountColumn } from "@/components/protocol/alchemix/alchemix-position-card";
 import { computeAlchemixEconomics } from "@/lib/alchemix/economics";
+import { useAlchemixTimelineRuns } from "@/lib/alchemix/timeline-runs";
 import {
   liveFigureProv,
   servedFigureProv,
@@ -151,6 +152,9 @@ export function AlchemistPositionView({
   }, [position.owner, setWallets]);
 
   const coords: AlchemixCoords = useMemo(() => ({ chainId, lineKey, tokenId }), [chainId, lineKey, tokenId]);
+  // A redemption belongs to the line, so most of this timeline is them; a
+  // streak of three or more collapses into one dated row (lib/alchemix/timeline-runs).
+  const timelineRuns = useAlchemixTimelineRuns(coords);
 
   const alchemistEvents = useMemo(() => events.filter(isAlchemistEvent), [events]);
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - alchemistEvents.length) : 0;
@@ -457,6 +461,7 @@ export function AlchemistPositionView({
           persistKeyPrefix="alchemix-v3"
           closed={position.status === "closed"}
           tl={tl}
+          runs={timelineRuns}
           boundary={boundary}
           displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
           emptyLabel="No events recorded for this position"

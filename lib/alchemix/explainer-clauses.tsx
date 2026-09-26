@@ -188,7 +188,8 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
       break;
     }
 
-    case "redemption":
+    case "redemption": {
+      const cleared = ctx.debtClearedFromReadings;
       out.push(
         clause(
           <>
@@ -206,6 +207,27 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
           </>,
         ),
       );
+      // The figure the event cannot give, measured instead: this position's
+      // debt either side of the redemption. A stated ZERO is an answer and says
+      // so in its own words; an unavailable one adds no bullet at all, which is
+      // the only thing that keeps the two apart.
+      if (cleared?.status === "stated" && cleared.amountRaw != null) {
+        out.push(
+          cleared.amountRaw === "0"
+            ? clause(
+                <>
+                  This position&rsquo;s debt was read from the contract on both sides of it and came out the same, so
+                  this redemption cleared none of this one&rsquo;s.
+                </>,
+              )
+            : clause(
+                <>
+                  This position&rsquo;s debt was read from the contract on both sides of it. The two readings are{" "}
+                  {amount(cleared.amountRaw)} {sym} apart, and that is what this redemption cleared here.
+                </>,
+              ),
+        );
+      }
       out.push(
         raw.swept === "true" ? (
           clause(<>The figures for this position have since been taken from the contract past this point.</>)
@@ -219,6 +241,7 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
         ),
       );
       break;
+    }
 
     case "batch_liquidated":
       out.push(

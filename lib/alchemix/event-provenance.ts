@@ -142,6 +142,86 @@ export function resolvedAtCaptureProv(
   };
 }
 
+// ── What a redemption cleared for one position ──────────────────────────────
+//
+// A `Redemption` log carries one line-wide uint256 and attributes nothing, so
+// the per-position figure is A DIFFERENCE OF TWO READINGS: this position's debt
+// at the redemption's block, subtracted from its debt at the reading before it.
+// Both blocks ride in the receipt because the figure is the span between them.
+// The receipt's kind is `chain-derived` for the subtraction and its class is
+// `state`, because both operands are contract slots read at a block — the
+// nearest a figure can stand to chain state while still being arithmetic.
+
+/** The debt one redemption cleared for this position, from the two readings it
+ *  sits between. */
+export function debtClearedFromReadingsProv(
+  symbol: string,
+  raw: string,
+  fromBlock: number,
+  atBlock: number,
+  coords: AlchemixCoords,
+): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `${symbol} this redemption cleared here — this position's debt read at two blocks, one either side of it`,
+    contract: alchemistContract(coords),
+    via: `getCDP(${coords.tokenId}) at blocks ${fromBlock} and ${atBlock}`,
+    formula: `debt at block ${fromBlock} − debt at block ${atBlock}`,
+    verify: {
+      kind: "recompute",
+      text: `Call getCDP(${coords.tokenId}) at blocks ${fromBlock} and ${atBlock} and take the difference`,
+    },
+    source: { block: atBlock },
+    inputs: coordInputs(coords, [
+      { label: "debt read before", value: `block ${fromBlock}`, kind: "chain" },
+      { label: "debt read at the redemption", value: `block ${atBlock}`, kind: "chain" },
+      {
+        label: "what the log gives",
+        value: "one line-wide amount, no position named",
+        kind: "chain",
+        note: "which is why the figure comes from the readings",
+      },
+    ]),
+    scaling: { raw, from: "call", places: 18, why: `${symbol} carries 18 decimals` },
+  };
+}
+
+/** The total a RUN of redemptions cleared for this position — the sum of each
+ *  member's own difference. Summing is sound because a cleared amount is a flow
+ *  between two blocks; nothing else on this protocol's timeline may be summed
+ *  across a run, and an earmarked figure never may. `stated` counts the members
+ *  whose figure could be read, and is short of `count` on a run the total does
+ *  not cover whole. */
+export function clearedRunProv(
+  symbol: string,
+  raw: string,
+  count: number,
+  stated: number,
+  range: string,
+  coords: AlchemixCoords,
+): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `${symbol} this run cleared here — the sum of what each redemption in it cleared for this position`,
+    contract: alchemistContract(coords),
+    via: `getCDP(${coords.tokenId}) either side of each redemption in the run`,
+    formula: `Σ (debt before − debt at) over ${stated} redemption${stated === 1 ? "" : "s"}`,
+    verify: { kind: "rollup", text: "It rolls up the redemptions in this run, each with its own receipt" },
+    inputs: coordInputs(coords, [
+      { label: "redemptions in the run", value: `${count}, ${range}`, kind: "chain" },
+      {
+        label: "of those, read",
+        value: String(stated),
+        kind: "chain",
+        note: stated === count ? "every one" : "the total covers these and stops there",
+      },
+    ]),
+    scaling: { raw, from: "call", places: 18, why: `${symbol} carries 18 decimals` },
+  };
+}
+
 // ── The headline figures ────────────────────────────────────────────────────
 
 const GRADE_BASIS: Record<AlchemixGrade, string> = {
