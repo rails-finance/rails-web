@@ -43,8 +43,8 @@ export function AaveFirstPartySources() {
       </h2>
       <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-rb-500">
         The venue publishes these vaults itself, so what stands here is Aave&rsquo;s own documentation for the three
-        families — cited, not summarised, and each page fetched on {fetchedOn}. It is a citation and not an attribution:
-        a holder in this section is the holder&rsquo;s own wallet address, and the section names no app on any row.
+        families — cited, and each page fetched on {fetchedOn}. It is a citation and not an attribution: a holder in
+        this section is the holder&rsquo;s own wallet address, and the section names no app on any row.
       </p>
       <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
         Rails states a reading for any address, and the address rides in the URL. Aave&rsquo;s own surfaces can only be

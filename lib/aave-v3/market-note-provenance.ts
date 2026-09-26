@@ -87,7 +87,7 @@ const rateLeafNote = (note: RateStepNote, which: "earlier" | "later"): string =>
   if (which === "later" && note.live) {
     return (
       `the Pool's getReserveData for this reserve, read at block ${note.to.block} through ` +
-      `${overlayRoute(note)} — \`reserves[].${liveField(note)}\`, a slot the Pool holds at the head, not a log`
+      `${overlayRoute(note)} — \`reserves[].${liveField(note)}\`, a slot the Pool holds at the head`
     );
   }
   const observed = which === "earlier" ? note.observed.from : note.observed.to;
