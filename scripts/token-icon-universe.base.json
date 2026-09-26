@@ -206,6 +206,11 @@
   },
   {
     "chainId": 8453,
+    "address": "0x877014e21c32fea108b6a1f45f367efc9a2d9b9f",
+    "seenIn": ["alchemix"]
+  },
+  {
+    "chainId": 8453,
     "address": "0x92a7aee8afaa71ba0a9cc04a3dbe1f34237c33e0",
     "seenIn": ["basedollar"]
   },
