@@ -84,8 +84,11 @@ export function InfoDisclosureTrigger({
         className ? ` ${className}` : ""
       }`}
     >
+      {/* duration-200 matches the chevron below, which needs that long for its
+          rotate. Without it this glyph takes Tailwind's default 150ms and the
+          two halves of one control reach the hover colour 50ms apart. */}
       <svg
-        className={`h-5 w-5 transition-colors ${
+        className={`h-5 w-5 transition-colors duration-200 ${
           warning ? "text-red-500 dark:text-red-400" : "text-rb-500 group-hover/info:text-foreground"
         }`}
         viewBox="0 0 20 20"
@@ -287,7 +290,7 @@ export function InfoTabsDisclosure({
               }`}
             >
               <svg
-                className="h-5 w-5 text-rb-500 transition-colors group-hover/info:text-foreground"
+                className="h-5 w-5 text-rb-500 transition-colors duration-200 group-hover/info:text-foreground"
                 viewBox="0 0 20 20"
                 fill="currentColor"
                 aria-hidden="true"
