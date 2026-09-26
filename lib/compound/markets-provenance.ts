@@ -70,7 +70,7 @@ export const cvMarketBaseProv = (side: "supplied" | "borrowed", coords: Compound
     pclass: "state",
     source: { block: coords.blockNumber },
     verify: recompute(`Comet.${method}`, coords),
-    summary: `${coords.baseSymbol ?? "Base"} ${side} — the market's own \`${method}\`${atBlock(coords)}, scaled by the base asset's decimals. Interest is already in the figure: Comet carries a live index on its totals, so this is what the market records as ${side}, not a sum over events.`,
+    summary: `${coords.baseSymbol ?? "Base"} ${side} — the market's own \`${method}\`${atBlock(coords)}, scaled by the base asset's decimals. Interest is already in the figure: Comet carries a live index on its totals, so this is what the market records as ${side}.`,
     contract: cometContract(coords),
     via: `${LANE} · Comet.${method} @ head`,
   };

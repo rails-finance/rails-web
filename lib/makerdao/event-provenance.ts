@@ -97,7 +97,7 @@ export const inkAfterProv = (collSym: string, coords: MakerCoords): Provenance =
   kind: "chain",
   pclass: "indexed",
   verify: stateVerify(coords),
-  summary: `Collateral (${collSym}) the vault held AFTER this event — the vault's running collateral, replayed by summing the signed dink of its own frob/grab/fork operations in log order up to this block${atBlock(coords)}. A replay of the urn.ink slot, not a slot read — it matches when the captured history is complete.`,
+  summary: `Collateral (${collSym}) the vault held AFTER this event — the vault's running collateral, replayed by summing the signed dink of its own frob/grab/fork operations in log order up to this block${atBlock(coords)}. A replay of the urn.ink slot — it matches when the captured history is complete.`,
   contract: VAT,
   via: `${MAKER_VIA} · Σ ±dink → urn.ink · in on-chain order`,
   inputs: eventInputs(coords),
@@ -108,7 +108,7 @@ export const artAfterProv = (coords: MakerCoords): Provenance => ({
   kind: "chain",
   pclass: "indexed",
   verify: stateVerify(coords),
-  summary: `Normalized debt (art) the vault held AFTER this event — the vault's running normalized debt, replayed by summing the signed dart of its own frob/grab/fork operations in log order up to this block${atBlock(coords)}. A replay of the urn.art slot, not a slot read — it matches when the captured history is complete.`,
+  summary: `Normalized debt (art) the vault held AFTER this event — the vault's running normalized debt, replayed by summing the signed dart of its own frob/grab/fork operations in log order up to this block${atBlock(coords)}. A replay of the urn.art slot — it matches when the captured history is complete.`,
   contract: VAT,
   via: `${MAKER_VIA} · Σ ±dart → urn.art · in on-chain order`,
   inputs: eventInputs(coords),
@@ -122,7 +122,7 @@ export const artAfterProv = (coords: MakerCoords): Provenance => ({
 export const inkBeforeProv = (collSym: string, coords: MakerCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Collateral (${collSym}) the vault held BEFORE this event — the urn.ink after minus the signed dink this frob/grab/fork applied (after − change), reconstructed in the browser from the replayed ink and the LogNote dink, not a distinct chain read. Exact (collateral doesn't accrue).`,
+  summary: `Collateral (${collSym}) the vault held BEFORE this event — the urn.ink after minus the signed dink this frob/grab/fork applied (after − change), reconstructed in the browser from the replayed ink and the LogNote dink. Exact (collateral doesn't accrue).`,
   contract: VAT,
   via: "urn.ink after − dink",
   formula: "after − change",
@@ -141,7 +141,7 @@ export const inkBeforeProv = (collSym: string, coords: MakerCoords): Provenance 
 export const artBeforeProv = (coords: MakerCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Normalized debt (art) the vault held BEFORE this event — the urn.art after minus the signed dart this frob/grab/fork applied (after − change), reconstructed in the browser from the replayed art and the LogNote dart, not a distinct chain read. Exact at the art level (interest lives in the ilk rate accumulator, not in art); multiply by rate for the DAI figure.`,
+  summary: `Normalized debt (art) the vault held BEFORE this event — the urn.art after minus the signed dart this frob/grab/fork applied (after − change), reconstructed in the browser from the replayed art and the LogNote dart. Exact at the art level (interest lives in the ilk rate accumulator, not in art); multiply by rate for the DAI figure.`,
   contract: VAT,
   via: "urn.art after − dart",
   formula: "after − change",
@@ -158,7 +158,7 @@ export const artBeforeProv = (coords: MakerCoords): Provenance => ({
 export const daiDebtProv = (artHuman: string, rateRay: string, symbol: string = "DAI"): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `Current ${symbol} debt of the vault — the normalized art multiplied by the ilk's rate accumulator. Both operands are chain reads (the §2 index resolution) and the product is Maker's own debt figure, so it's chain-derived, not a model.`,
+  summary: `Current ${symbol} debt of the vault — the normalized art multiplied by the ilk's rate accumulator. Both operands are chain reads (the §2 index resolution) and the product is Maker's own debt figure, so it's chain-derived.`,
   contract: VAT,
   via: "urn.art (Σ dart replay) × Vat.ilks(ilk).rate (live)",
   formula: "art × rate ÷ 10^27",
@@ -175,7 +175,7 @@ export const stabilityFeeProv = (artHuman: string, rateRay: string): Provenance 
   kind: "chain-derived",
   pclass: "state",
   summary:
-    "Accrued stability fee on this vault — the difference between the current DAI debt (art × rate) and the normalized art, i.e. the DAI the ilk's rate accumulator has charged since each draw. Both operands are Vat reads, so this carry is read from the chain, not a forward projection.",
+    "Accrued stability fee on this vault — the difference between the current DAI debt (art × rate) and the normalized art, i.e. the DAI the ilk's rate accumulator has charged since each draw. Both operands are Vat reads, so this carry is read from the chain.",
   contract: VAT,
   via: "urn.art (Σ dart replay) × (Vat.ilks(ilk).rate − 1)",
   formula: "art × rate ÷ 10^27 − art",
@@ -290,7 +290,7 @@ export const grabClearedDaiProv = (coords: MakerCoords, vals: { amount: string; 
   pclass: "indexed",
   formula: "dart × rate@block ÷ 10^45",
   verify: txVerify(coords),
-  summary: `The debt this grab cleared from the vault, in DAI — the grab LogNote's dart valued at the ilk's rate accumulator as of this block (replayed from the Vat's own fold deltas). DAI is the Vat's own unit of account, so no price is applied: this is the protocol's exact reckoning of the debt seized into the liquidation system. The liquidation penalty (chop) is added on top at auction, not here.`,
+  summary: `The debt this grab cleared from the vault, in DAI — the grab LogNote's dart valued at the ilk's rate accumulator as of this block (replayed from the Vat's own fold deltas). DAI is the Vat's own unit of account, so no price is applied: this is the protocol's exact reckoning of the debt seized into the liquidation system. The liquidation penalty (chop) is added on top at auction.`,
   contract: VAT,
   via: `${MAKER_VIA} · |dart| × rate@block ÷ 10^45`,
   inputs: [
@@ -349,8 +349,8 @@ export const vaultInkProv = (
   verify: stateVerify({ blockNumber: atBlock }),
   summary:
     source === "chain"
-      ? `Collateral (${collSym}) the vault holds — the Vat's own \`urns(ilk, urn).ink\` slot, read by eth_call${atBlock ? ` at block ${atBlock}` : ""}. A slot read, not a replay: the same block pins every other figure on this card.${residue ? RESIDUE_SENTENCE : ""}`
-      : `Collateral (${collSym}) the vault holds — ${vaultSlotPhrase()}${atBlock ? ` at block ${atBlock}` : ""}. A replay of the urn.ink slot, not a slot read.${residue ? RESIDUE_SENTENCE : ""}`,
+      ? `Collateral (${collSym}) the vault holds — the Vat's own \`urns(ilk, urn).ink\` slot, read by eth_call${atBlock ? ` at block ${atBlock}` : ""}. A slot read: the same block pins every other figure on this card.${residue ? RESIDUE_SENTENCE : ""}`
+      : `Collateral (${collSym}) the vault holds — ${vaultSlotPhrase()}${atBlock ? ` at block ${atBlock}` : ""}. A replay of the urn.ink slot.${residue ? RESIDUE_SENTENCE : ""}`,
   contract: VAT,
   via: source === "chain" ? "Vat.urns(ilk, urn) · ink, eth_call at the block" : `${MAKER_VIA} · Σ ±dink → urn.ink`,
 });
@@ -362,10 +362,10 @@ export const vaultArtProv = (atBlock?: number, residue?: boolean, source: MakerS
   verify: stateVerify({ blockNumber: atBlock }),
   summary:
     source === "chain"
-      ? `Normalized debt (art) the vault holds — the Vat's own \`urns(ilk, urn).art\` slot, read by eth_call${atBlock ? ` at block ${atBlock}` : ""}. A slot read, not a replay. Multiply by the ilk rate for the DAI figure.${residue ? RESIDUE_SENTENCE : ""}`
+      ? `Normalized debt (art) the vault holds — the Vat's own \`urns(ilk, urn).art\` slot, read by eth_call${atBlock ? ` at block ${atBlock}` : ""}. A slot read. Multiply by the ilk rate for the DAI figure.${residue ? RESIDUE_SENTENCE : ""}`
       : `Normalized debt (art) the vault holds — ${vaultSlotPhrase().replace("Σ dink", "Σ dart")}${
           atBlock ? ` at block ${atBlock}` : ""
-        }. A replay of the urn.art slot, not a slot read. Multiply by the ilk rate for the DAI figure.${residue ? RESIDUE_SENTENCE : ""}`,
+        }. A replay of the urn.art slot. Multiply by the ilk rate for the DAI figure.${residue ? RESIDUE_SENTENCE : ""}`,
   contract: VAT,
   via: source === "chain" ? "Vat.urns(ilk, urn) · art, eth_call at the block" : `${MAKER_VIA} · Σ ±dart → urn.art`,
 });
@@ -483,7 +483,7 @@ export const osmPriceProv = (collSym: string, ilk: string): Provenance => ({
 export const liquidationPriceProv = (debtDaiHuman: string, matPct: string, inkHuman: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `The collateral price at which this vault crosses the liquidation line — the vault is safe exactly while ink × spot ≥ art × rate (the Vat's own predicate), which rearranges to price ≥ DAI debt × mat ÷ ink. Every input is a live chain read; the equivalence to the Vat's predicate is machine-verified, so this is the contract's line, not a model.`,
+  summary: `The collateral price at which this vault crosses the liquidation line — the vault is safe exactly while ink × spot ≥ art × rate (the Vat's own predicate), which rearranges to price ≥ DAI debt × mat ÷ ink. Every input is a live chain read; the equivalence to the Vat's predicate is machine-verified, so this is the contract's line.`,
   contract: VAT,
   via: "Vat safety line (ink·spot ≥ art·rate), rearranged for price",
   formula: "DAI debt × mat ÷ ink",

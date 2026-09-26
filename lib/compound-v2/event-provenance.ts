@@ -164,7 +164,7 @@ export const accountBorrowsProv = (
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `Total ${sym} debt the position owed AFTER this event — the \`accountBorrows\` field the cToken emitted verbatim${atBlock(coords)}. Interest accrued up to this moment is INCLUDED (Compound V2 accrues per block and settles interest before every borrow/repay), so this is the contract's own reckoning of the debt, not a replayed sum.${
+  summary: `Total ${sym} debt the position owed AFTER this event — the \`accountBorrows\` field the cToken emitted verbatim${atBlock(coords)}. Interest accrued up to this moment is INCLUDED (Compound V2 accrues per block and settles interest before every borrow/repay), so this is the contract's own reckoning of the debt.${
     fromLiquidation
       ? " On a liquidation the figure comes from the RepayBorrow log the liquidation itself emitted in the same transaction (liquidateBorrowFresh calls repayBorrowFresh internally) — one event, one row."
       : ""
