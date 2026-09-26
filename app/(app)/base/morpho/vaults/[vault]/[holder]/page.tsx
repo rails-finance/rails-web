@@ -336,7 +336,7 @@ function PositionCardExplanation({ row, maxWithdrawRead }: { row: VaultPositionR
       ? `"Redeemable now" on the row above is the vault's own maxWithdraw() for this address at that same block, in ${row.asset?.symbol ?? "the vault's asset"} — what the vault says could be taken out then, bounded by the liquidity of the markets in its withdraw queue at that block. It is not the claim beside it and it is not a promise about the next block.`
       : `"Redeemable now" is stated as not read: the vault's own maxWithdraw() did not answer for this address at block ${n(row.live?.blockNumber ?? 0)}, and an unread call is said rather than shown as a zero.`,
     `Transfers, first seen and last activity are counted by the census: one whole-Transfer sweep of this vault from its own creation block, proven complete by Σ balanceOf equalling totalSupply() wei-exact, swept to block ${n(row.census.block)}.`,
-    `The claim is the vault's own convertToAssets of this exact balance, in ${row.asset?.symbol ?? "the vault's asset"} — never shares multiplied by a price.`,
+    `The claim is the vault's own convertToAssets of this exact balance, in ${row.asset?.symbol ?? "the vault's asset"}.`,
     row.value.usdE8 != null
       ? `Value · USD is the census's figure at block ${n(row.value.pricedBlock ?? row.census.block)}: the balance at that block through the vault's own convertToAssets and the chain's Aave V3 oracle (IAaveOracle.getAssetPrice) at the same block, the oracle named on its receipt — computed once by the daily census and never read for this page, so it says what the position was worth then and nothing about now.`
       : row.value.pricedBlock == null

@@ -40,7 +40,7 @@ export function contractVerdictProv(what: string, method: string, coords?: Compo
     kind: "chain",
     pclass: "state",
     verify: stateVerify(method),
-    summary: `${what} — the Comet contract's own verdict (${method}), computed by its liquidation engine over its configured price feeds and collateral factors at the latest block. The protocol judging its own account, not a client-side reconstruction.`,
+    summary: `${what} — the Comet contract's own verdict (${method}), computed by its liquidation engine over its configured price feeds and collateral factors at the latest block.`,
     contract: cometContract(coords),
     via: `${LANE_VIA} · Comet.${method} @ head`,
   };

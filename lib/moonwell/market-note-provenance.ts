@@ -136,7 +136,7 @@ export const shareRateSliceProv = (note: ShareRateStepNote, part: "units" | "bef
   const liveRate = part === "after" && note.live;
   const summary = note.live
     ? part === "units"
-      ? `${mSym} this position holds NOW — the account's own live mToken balance (\`mtokenBalanceRaw\` on the position overlay), read at the chain head rather than replayed at any particular block. Held fixed here: the two valuations beside it move only the rate.`
+      ? `${mSym} this position holds NOW — the account's own live mToken balance (\`mtokenBalanceRaw\` on the position overlay), read at the chain head. Held fixed here: the two valuations beside it move only the rate.`
       : `What this position's ${mSym} counts in ${note.marketSymbol} ${part === "after" ? "now" : "at the last observation before now"} — the live balance multiplied by the market's rate ${part === "after" ? "read live at the chain head" : `at this account's own last Mint or Redeem (block ${rate.block})`}. A count of underlying at that rate, not a valuation: no price of any kind enters it, and the account neither gained nor lost anything by the multiplication.`
     : part === "units"
       ? `${mSym} this position held across the step — the account's own mToken balance after its last supply-side event in the ${note.marketSymbol} market at or before block ${note.from.block}, replayed from every mToken Transfer touching this wallet. It is the same figure the account's own event cards state, carried across a stretch in which the account did nothing.`
@@ -202,7 +202,7 @@ export const shareRateSliceProv = (note: ShareRateStepNote, part: "units" | "bef
 const elapsedProv = (note: ShareRateStepNote, logs: string): Provenance => ({
   kind: "chain-derived",
   pclass: "emitted",
-  summary: `The time between the two observations — the later block's timestamp less the earlier's, both read from the block headers ${logs} sit in. Exact, not an estimate from a block count. It bounds when the change happened and says nothing about where inside the stretch it fell.`,
+  summary: `The time between the two observations — the later block's timestamp less the earlier's, both read from the block headers ${logs} sit in. Exact. It bounds when the change happened and says nothing about where inside the stretch it fell.`,
   contract: { name: `m${note.marketSymbol}`, address: note.marketAddress },
   via: "block headers · timestamp at each end",
   formula: "timestamp after − timestamp before",

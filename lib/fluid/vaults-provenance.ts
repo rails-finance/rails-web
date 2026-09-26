@@ -87,7 +87,7 @@ export const fluidRosterProv = (coords: FluidVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("VaultResolver.getVaultsEntireData", coords),
-  summary: `Vaults minted — the length of the VaultResolver's own \`getVaultsEntireData()\` array${atBlock(coords)}. Fluid keeps no market catalog: the factory mints one vault per pair and the resolver returns every one in a single call, so the roster is what the protocol says it is, not what this view decides.`,
+  summary: `Vaults minted — the length of the VaultResolver's own \`getVaultsEntireData()\` array${atBlock(coords)}. Fluid keeps no market catalog: the factory mints one vault per pair and the resolver returns every one in a single call, so the roster is what the protocol says it is.`,
   contract: VAULT_RESOLVER_CONTRACT,
   via: ROSTER_VIA,
 });

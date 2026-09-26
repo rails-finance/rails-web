@@ -187,7 +187,7 @@ export const transferCounterpartyProv = (dir: "in" | "out", coords: SparkCoords,
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The ${dir === "in" ? "sending" : "receiving"} account on the other side of this position transfer — the ${dir === "in" ? "from" : "to"} address the spToken's BalanceTransfer log carries${atBlock(coords)}. The counterparty of the move itself, not who signed the transaction.${named ? ` Rails names the address ${named.name}: its verified contract source is \`${named.contractName}\`, ${named.role}.` : ""}`,
+    summary: `The ${dir === "in" ? "sending" : "receiving"} account on the other side of this position transfer — the ${dir === "in" ? "from" : "to"} address the spToken's BalanceTransfer log carries${atBlock(coords)}. The counterparty of the move, not who signed the transaction.${named ? ` Rails names the address ${named.name}: its verified contract source is \`${named.contractName}\`, ${named.role}.` : ""}`,
     contract: SPARK,
     via: `${SPARK_VIA} · BalanceTransfer log · ${dir === "in" ? "from" : "to"}`,
     inputs: eventInputs(
@@ -227,7 +227,7 @@ export const debtAfterProv = (sym: string, coords: SparkCoords, raw?: string | n
 export const supplyBeforeProv = (sym: string, coords: SparkCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Supplied ${sym} the position held BEFORE this event — the after-balance minus this event's own \`amount\` (after − change; for a liquidation, minus the seized collateral), reconstructed in the browser from the replayed after and the logged delta, not a distinct chain read. Nominal supplied principal, same basis as the after (aToken interest is a separate layer).`,
+  summary: `Supplied ${sym} the position held BEFORE this event — the after-balance minus this event's own \`amount\` (after − change; for a liquidation, minus the seized collateral), reconstructed in the browser from the replayed after and the logged delta. Nominal supplied principal, same basis as the after (aToken interest is a separate layer).`,
   contract: SPARK,
   via: "supply after − amount",
   formula: "after − change",
@@ -245,7 +245,7 @@ export const supplyBeforeProv = (sym: string, coords: SparkCoords): Provenance =
 export const debtBeforeProv = (sym: string, coords: SparkCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Borrowed ${sym} (PRINCIPAL) the position owed BEFORE this event — the after-balance minus this event's own \`amount\` (after − change; for a liquidation, minus the \`debtToCover\`), reconstructed in the browser from the replayed after and the logged delta, not a distinct chain read. Principal only, same basis as the after (interest since each draw needs the reserve index — a derived layer).`,
+  summary: `Borrowed ${sym} (PRINCIPAL) the position owed BEFORE this event — the after-balance minus this event's own \`amount\` (after − change; for a liquidation, minus the \`debtToCover\`), reconstructed in the browser from the replayed after and the logged delta. Principal only, same basis as the after (interest since each draw needs the reserve index — a derived layer).`,
   contract: SPARK,
   via: "debt after − amount",
   formula: "after − change",
@@ -318,7 +318,7 @@ export const sparkUsdProvOnchain = (what: string): Provenance => ({
   kind: "chain-derived",
   // Both legs on-chain; the oracle price is the furthest class, so it leads.
   pclass: "oracle",
-  summary: `${what} valued in USD from SparkLend's own on-chain oracle — the chain-state token balance multiplied by the same IAaveOracle price the Pool reads to price collateral (\`getAssetPrice\`, 8-dec USD), not an off-chain market feed.`,
+  summary: `${what} valued in USD from SparkLend's own on-chain oracle — the chain-state token balance multiplied by the same IAaveOracle price the Pool reads to price collateral (\`getAssetPrice\`, 8-dec USD).`,
   contract: SPARK_ORACLE,
   via: "chain balance × on-chain oracle price",
   formula: "balance × oracle price",
@@ -439,7 +439,7 @@ export const sparkDebtInterestProv = (sym: string): Provenance => ({
 export const atBlockPriceProv = (sym: string, coords: SparkCoords, priceUsd: number): Provenance => ({
   kind: "chain",
   pclass: "oracle",
-  summary: `${sym} priced in USD by SparkLend's own oracle at this event's block${atBlock(coords)} — the same IAaveOracle the Pool reads to validate liquidations (getAssetPrice, 8-dec USD), called at the block and captured into the index. The price the protocol itself was using at fire time, not an off-chain feed and not today's price.`,
+  summary: `${sym} priced in USD by SparkLend's own oracle at this event's block${atBlock(coords)} — the same IAaveOracle the Pool reads to validate liquidations (getAssetPrice, 8-dec USD), called at the block and captured into the index. The price the protocol was using at fire time, not today's price.`,
   contract: SPARK_ORACLE,
   via: `${SPARK_VIA} · IAaveOracle getAssetPrice at the event's block = $${priceUsd}`,
   inputs: eventInputs(coords),

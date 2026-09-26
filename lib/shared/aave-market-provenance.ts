@@ -225,7 +225,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getConfiguration", coords),
-      summary: `${symbol} reserve factor — the protocol's cut of borrow interest, decoded from the reserve's live configuration word${atBlock(coords)} (Pool.getConfiguration, bits 64-79). The share of each unit of borrow interest that accrues to the protocol treasury rather than to suppliers. A governance-set slot, read straight.`,
+      summary: `${symbol} reserve factor — the protocol's cut of borrow interest, decoded from the reserve's live configuration word${atBlock(coords)} (Pool.getConfiguration, bits 64-79). The share of each unit of borrow interest that accrues to the protocol treasury. A governance-set slot, read straight.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · reserveFactor @ head`,
     }),

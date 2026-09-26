@@ -106,7 +106,7 @@ export const cvUtilizationProv = (coords: CompoundMarketCoords): Provenance => (
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("Comet.getUtilization", coords),
-  summary: `Utilisation — the market's own \`getUtilization\`${atBlock(coords)}: totalBorrow ÷ totalSupply of the base, the contract's OWN arithmetic (1e18-scaled), not re-derived here. Every point on the rate curve is priced from this one number.`,
+  summary: `Utilisation — the market's own \`getUtilization\`${atBlock(coords)}: totalBorrow ÷ totalSupply of the base, the contract's OWN arithmetic (1e18-scaled). Every point on the rate curve is priced from this one number.`,
   contract: cometContract(coords),
   via: `${LANE} · Comet.getUtilization @ head`,
 });
@@ -118,7 +118,7 @@ export const cvKinkProv = (which: "supply" | "borrow", coords: CompoundMarketCoo
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute(`Comet.${which}Kink`, coords),
-  summary: `${which === "supply" ? "Supply" : "Borrow"}-rate kink — the market's \`${which}Kink\`${atBlock(coords)}: the utilisation the ${which} curve turns steep at, governance-set (1e18-scaled). It sits on the utilisation axis, so it is drawn against the fill rather than stated apart.`,
+  summary: `${which === "supply" ? "Supply" : "Borrow"}-rate kink — the market's \`${which}Kink\`${atBlock(coords)}: the utilisation the ${which} curve turns steep at, governance-set (1e18-scaled). It sits on the utilisation axis, so it is drawn against the fill.`,
   contract: cometContract(coords),
   via: `${LANE} · Comet.${which}Kink @ head`,
 });
@@ -210,7 +210,7 @@ export const cvCollateralValueProv = (coords: CompoundMarketCoords): Provenance 
   kind: "chain-derived",
   pclass: "oracle",
   source: { block: coords.blockNumber },
-  summary: `${coords.collateralSymbol ?? "Collateral"} value — its pooled total valued in ${coords.quoteUnit ?? "the quote unit"}${atBlock(coords)}: totalsCollateral × the market's OWN getPrice on this asset's configured feed. The price its liquidation engine uses, not a market API.`,
+  summary: `${coords.collateralSymbol ?? "Collateral"} value — its pooled total valued in ${coords.quoteUnit ?? "the quote unit"}${atBlock(coords)}: totalsCollateral × the market's OWN getPrice on this asset's configured feed. The price its liquidation engine uses.`,
   contract: cometContract(coords),
   via: `${LANE} · Comet.totalsCollateral × Comet.getPrice(asset feed) @ head`,
   formula: "collateral total × oracle price",

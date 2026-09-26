@@ -198,7 +198,7 @@ export function MorphoBaseVaultExposureView({
         <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-rb-500">
           Every market in the vault&rsquo;s withdraw queue — its own list of where the pool is allocated, in its own
           order. {funded} of {legs.length} carry a balance at this block. An idle market has no collateral token, no
-          oracle and no interest-rate model; it is where a vault holds cash inside Blue rather than outside it.
+          oracle and no interest-rate model; it is where a vault holds cash inside Blue.
         </p>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[42rem] text-[12px]">

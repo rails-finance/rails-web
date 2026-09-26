@@ -164,7 +164,7 @@ function MarketCard({
             figures rather than a distinct chain read. */}
         <span
           data-prov-exempt=""
-          title="Utilisation is borrowed ÷ supplied — both already traced on this card (USD supplied and USD borrowed). A ratio of two receipted figures, not a distinct chain read."
+          title="Utilisation is borrowed ÷ supplied — both traced on this card (USD supplied and USD borrowed). A ratio of two receipted figures."
         >
           <span className="text-foreground">{pctText(m.utilisation)}</span> utilised
         </span>
@@ -409,7 +409,7 @@ export function MoonwellMarketsView({
             label: "Utilisation",
             value: <span data-prov-exempt="">{pctText(s.utilisation)}</span>,
             title:
-              "Σ borrowed ÷ Σ supplied, both in USD at the Chainlink wrapper the Comptroller reads — the two figures beside it in this band. How much of the money is working. A ratio of two receipted figures, not a distinct chain read.",
+              "Σ borrowed ÷ Σ supplied, both in USD at the Chainlink wrapper the Comptroller reads — the two figures beside it in this band. How much of the money is working. A ratio of two receipted figures.",
           },
         ]}
         notes={

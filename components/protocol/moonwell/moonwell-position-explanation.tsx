@@ -196,8 +196,7 @@ export function MoonwellPositionExplanation({
       <span key="mechanics">
         A liquidation here repays at most {Math.round(chain.closeFactor * 100)}% of one borrowed market per seizure (the
         close factor) and the liquidator takes collateral worth that repayment plus{" "}
-        {Math.round(Math.max(0, chain.liquidationIncentive - 1) * 100)}% — a partial nudge back over the line, not a
-        full absorb.
+        {Math.round(Math.max(0, chain.liquidationIncentive - 1) * 100)}% — a partial nudge back over the line.
       </span>,
     );
   } else if (entered.length > 0) {

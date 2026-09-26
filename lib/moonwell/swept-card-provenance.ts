@@ -88,7 +88,7 @@ export function makeSweptMoonwellIdentity(id: SweptMoonwellIdentityArgs): Moonwe
       usd: (what): Provenance => ({
         kind: "chain-derived",
         pclass: "oracle",
-        summary: `${what} valued in USD from the Comptroller's own on-chain oracle — the balance read at the card's block multiplied by the same price the Comptroller reads for its liquidity and liquidation math (\`getUnderlyingPrice\`), not an off-chain market feed.`,
+        summary: `${what} valued in USD from the Comptroller's own on-chain oracle — the balance read at the card's block multiplied by the same price the Comptroller reads for its liquidity and liquidation math (\`getUnderlyingPrice\`).`,
         contract: id.comptroller,
         via: `GET ${id.positionRoute} · chain balance × Comptroller oracle getUnderlyingPrice`,
         formula: "balance × oracle price",

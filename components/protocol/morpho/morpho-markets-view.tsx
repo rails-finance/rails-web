@@ -145,7 +145,7 @@ function LltvSpread({
       </div>
       <p className="mt-2.5 max-w-3xl text-[11px] leading-relaxed text-rb-500">
         The bottom row is lltv 0: markets where nobody can ever borrow, because zero collateral value supports zero
-        debt. Most exist so a vault can hold uninvested cash inside Blue rather than outside it.
+        debt. Most exist so a vault can hold uninvested cash inside Blue.
       </p>
     </div>
   );

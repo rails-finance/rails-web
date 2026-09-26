@@ -118,7 +118,7 @@ function FluidClosedPositionExplanation({
         ) : (
           <>; only the owner can withdraw, so what remained left by the owner&rsquo;s own hand.</>
         )}{" "}
-        Closing with sweeps in its record is what marks the outcome Liquidated rather than Closed.
+        Closing with sweeps in its record is what marks the outcome Liquidated.
       </>,
     );
   }
@@ -441,11 +441,11 @@ export function FluidPositionExplanation({
             speaks in transactions, a different quantity) — always the full
             self-contained form, never "Of those". */}
         {operatorLead(ext, null, "recorded on this position")}
-        {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed by a third-party address
-        rather than the owner&rsquo;s. Fluid has no delegation to grant: only the address holding the position&rsquo;s
-        NFT may withdraw collateral or draw debt, and an ERC-721 approval does not stand in for it. Adding collateral or
-        repaying debt, by contrast, is open to anyone — so another address can pay into this position without asking,
-        while the right to take anything out moves only with the NFT itself.
+        {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed by a third-party address.
+        Fluid has no delegation to grant: only the address holding the position&rsquo;s NFT may withdraw collateral or
+        draw debt, and an ERC-721 approval does not stand in for it. Adding collateral or repaying debt, by contrast, is
+        open to anyone — so another address can pay into this position without asking, while the right to take anything
+        out moves only with the NFT itself.
         {ext.actors.length === 1
           ? leadName
             ? ` All of it ran through ${leadName}.`

@@ -99,7 +99,7 @@ export const mintedAfterProv = (coords: FrankencoinCoords, raw?: string | null):
         ? `Re-run the position's minted() eth_call at block ${coords.blockNumber} against an archive node — the emitted figure IS the stored slot, so the read reproduces it exactly.`
         : "Re-run the position's minted() eth_call — the emitted figure IS the stored slot, so the read reproduces it exactly.",
   },
-  summary: `ZCHF this position had minted AFTER this event — the MintingUpdate's own \`minted\` absolute, emitted by the Position contract itself${atBlock(coords)} and equal to its stored minted() slot (verified wei-exact against archive reads). The replay is last-write-wins over absolutes, not a running sum — there is nothing to drift. This is the position's debt to the system in ZCHF, the native unit (Frankencoin runs no oracle and no USD renders here).`,
+  summary: `ZCHF this position had minted AFTER this event — the MintingUpdate's own \`minted\` absolute, emitted by the Position contract itself${atBlock(coords)} and equal to its stored minted() slot (verified wei-exact against archive reads). The replay is last-write-wins over absolutes — there is nothing to drift. This is the position's debt to the system in ZCHF, the native unit (Frankencoin runs no oracle and no USD renders here).`,
   contract: positionContract(coords),
   via: `${FRANKENCOIN_VIA} · MintingUpdate · ${fieldSeg("minted", raw)} (the emitted absolute = the minted() slot)`,
   inputs: eventInputs(coords),
@@ -245,7 +245,7 @@ export const forcedSaleProv = (sym: string, coords: FrankencoinCoords, raw?: str
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `${sym} sold in a forced sale — the V2 hub's own ForcedSale log${atBlock(coords)}: after a position's expiration passes, anyone can buy its collateral through the hub at a declining price and the proceeds repay the debt. The expiry is a hard lifecycle edge, not a display nicety.`,
+  summary: `${sym} sold in a forced sale — the V2 hub's own ForcedSale log${atBlock(coords)}: after a position's expiration passes, anyone can buy its collateral through the hub at a declining price and the proceeds repay the debt. The expiry is a hard lifecycle edge.`,
   contract: hubContract(coords),
   via: `${FRANKENCOIN_VIA} · ForcedSale · ${fieldSeg("amount", raw)}`,
   inputs: eventInputs(coords),

@@ -252,11 +252,10 @@ export function DolomitePositionExplanation({
     bullets.push(
       <span key="operators">
         {operatorLead(ext, null, "recorded on this account")}
-        {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed by a third-party address
-        rather than the owner&rsquo;s. Dolomite has one permission for that and it is all-or-nothing: an operator the
-        owner registered — or one the protocol&rsquo;s admin approved across every account — may deposit, withdraw,
-        transfer and trade the account alike, so nothing here separates an address trusted to top the account up from
-        one trusted to empty it.
+        {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed by a third-party address.
+        Dolomite has one permission for that and it is all-or-nothing: an operator the owner registered — or one the
+        protocol&rsquo;s admin approved across every account — may deposit, withdraw, transfer and trade the account
+        alike, so nothing here separates an address trusted to top the account up from one trusted to empty it.
         {ext.actors.length === 1
           ? leadName
             ? ` All of it ran through ${leadName}.`

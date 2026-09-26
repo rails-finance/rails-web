@@ -69,7 +69,7 @@ const rateLeafNote = (note: RateStepNote, which: "earlier" | "later"): string =>
   if (which === "later" && note.live) {
     return (
       `the Jug's own base + duty for this ilk, compounded over a year, read live at block ${note.to.block} ` +
-      `(GET /api/chain/makerdao/vault/<id> · stabilityFeeApr) — the head, not a drip`
+      `(GET /api/chain/makerdao/vault/<id> · stabilityFeeApr) — the head`
     );
   }
   const observed = observedOf(note, which);
@@ -280,7 +280,7 @@ const setsProv = (note: RateStepNote): Provenance => {
       `How many times governance reset the ${ilk} stability fee between this vault's two touches — the difference ` +
       `of each end's rate set's own ordinal in the ilk's log. Only sets the Jug CONFIRMED as a change are counted: ` +
       `the Vat's fold series has a gap on the busy ilks, and a derived set the Jug says never moved the duty is ` +
-      `listed as an artefact by the route rather than counted here. Nothing about any of those resets is drawn on ` +
+      `listed as an artefact by the route. Nothing about any of those resets is drawn on ` +
       `this page; only their number is stated.`,
     ...jugContract(note),
     via: "ordinal(rate set at the later touch) − ordinal(rate set at the earlier touch)",
@@ -322,9 +322,9 @@ const elapsedProv = (note: RateStepNote): Provenance => ({
   pclass: "emitted",
   summary: note.live
     ? `The time since the earlier touch — the block the live Jug read answered at, less the block header of this ` +
-      `vault's last touch. Exact, not an estimate from a block count. It grows on every reload.`
+      `vault's last touch. Exact. It grows on every reload.`
     : `The time between the two touches — the later block's timestamp less the earlier's, both read from the ` +
-      `headers of the blocks this vault's two touches sit in. Exact, not an estimate from a block count. It bounds ` +
+      `headers of the blocks this vault's two touches sit in. Exact. It bounds ` +
       `when the fee moved and says nothing about where inside the stretch it did.`,
   ...jugContract(note),
   via: note.live

@@ -272,7 +272,7 @@ function marketNotesSection(notes: MarketNote[]): string[] {
       "already carries the market's primary rate in force at its block, and every priced touch carries the feed's " +
       "price at its block; a live note's later end is read from the market's own contracts at the head. The " +
       "derived figures hold the earlier touch's own debt and collateral fixed and move only the rate or the " +
-      "price, so the later one is what that state came to be worth, not a second reading of the CDP. A rate note " +
+      "price, so the later one is what that state came to be worth. A rate note " +
       "leads with the rate at its later end — what the market charged by then — and consecutive stretches that " +
       "moved the rate the same way are stated as one note, from the first touch to the last, with each step it " +
       "took in named on its receipt.",

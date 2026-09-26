@@ -188,7 +188,7 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}): LearnMor
     details: [
       {
         bold: "Lifetime flows",
-        text: "the bars show every supply, withdrawal, borrow and repayment over the position's life, not just the current balance.",
+        text: "the bars show every supply, withdrawal, borrow and repayment over the position's life.",
       },
       {
         bold: "Accrued interest",

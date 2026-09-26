@@ -335,7 +335,7 @@ export function queueOrderProv(): Provenance {
     pclass: "state",
     verify: STATE_VERIFY,
     summary:
-      "The redemption order — the protocol's OWN SortedTroves list, swept through MultiTroveGetter at the latest block. The contract keeps it in descending collateral ratio and redemptions take the LOWEST first, so the queue is shown reversed: front (redeemed first) at the top. The order is the protocol's, not a re-sort of ours. Unlike Liquity V2 and its forks, nothing about this position is chosen — a Trove's place is its collateral ratio, which the ETH price moves.",
+      "The redemption order — the protocol's OWN SortedTroves list, swept through MultiTroveGetter at the latest block. The contract keeps it in descending collateral ratio and redemptions take the LOWEST first, so the queue is shown reversed: front (redeemed first) at the top. The order is the protocol's. Unlike Liquity V2 and its forks, nothing about this position is chosen — a Trove's place is its collateral ratio, which the ETH price moves.",
     contract: MULTI_TROVE_GETTER,
     via: `${SYSTEM_VIA} · MultiTroveGetter sweep of SortedTroves @ head (reversed to redemption order)`,
   };
@@ -376,7 +376,7 @@ export function queueBelowMinimumProv(): Provenance {
     pclass: "state",
     verify: STATE_VERIFY,
     summary:
-      "Troves below the 110% minimum — how many in the protocol's own sorted list sit under its minimum collateral ratio at its own price. The contract's own comparison, counted over EVERY listed Trove rather than inferred from where the queue's order breaks: each ICR is TroveManager.getCurrentICR at the same block and price as the rest of this page. Below the minimum means liquidatable now, by anyone — a fact about the contract's threshold, not a judgement about a borrower.",
+      "Troves below the 110% minimum — how many in the protocol's own sorted list sit under its minimum collateral ratio at its own price. The contract's own comparison, counted over EVERY listed Trove rather than inferred from where the queue's order breaks: each ICR is TroveManager.getCurrentICR at the same block and price as the rest of this page. Below the minimum means liquidatable now, by anyone — a fact about the contract's threshold.",
     contract: TROVE_MANAGER,
     via: `${SYSTEM_VIA} · count of TroveManager.getCurrentICR(borrower, price) < MCR @ head`,
     formula: "count(ICR < 110%) across the sorted list",

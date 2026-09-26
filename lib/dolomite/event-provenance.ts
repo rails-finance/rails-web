@@ -155,7 +155,7 @@ export const parDeltaProv = (sym: string, coords: DolomiteCoords): Provenance =>
   kind: "chain-derived",
   pclass: "state",
   verify: txVerify(coords),
-  summary: `The ${sym} PAR change this event made — this event's emitted \`newPar\` minus the previous event's, a difference of two emitted absolutes (each equal to the getAccountPar slot at its block). This is the PAR axis: it differs from the leg's emitted \`deltaWei\` (the token amount) by the market's interest index factor, which is why the two figures are traced separately rather than reconciled into one lane.`,
+  summary: `The ${sym} PAR change this event made — this event's emitted \`newPar\` minus the previous event's, a difference of two emitted absolutes (each equal to the getAccountPar slot at its block). This is the PAR axis: it differs from the leg's emitted \`deltaWei\` (the token amount) by the market's interest index factor, which is why the two figures are traced separately.`,
   contract: MARGIN,
   via: "newPar − previous newPar (two emitted absolutes)",
   formula: "after − before",
@@ -434,7 +434,7 @@ export const positionParProv = (sym: string, side: "supply" | "debt"): Provenanc
 export const dolomiteUsdProv = (what: string): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `${what} valued in USD from Dolomite's own on-chain oracle — the balance multiplied by the same \`getMarketPrice\` the core's risk engine values accounts with (scale 1e(36 − decimals)), not an off-chain market feed. All 21 feeds are live (anti-pin proven: USDC's price is not exactly 1e30); one nuance — wsrUSD reuses srUSD's price to the wei, a shared-oracle alias, live but not independent.`,
+  summary: `${what} valued in USD from Dolomite's own on-chain oracle — the balance multiplied by the same \`getMarketPrice\` the core's risk engine values accounts with (scale 1e(36 − decimals)). All 21 feeds are live (anti-pin proven: USDC's price is not exactly 1e30); one nuance — wsrUSD reuses srUSD's price to the wei, a shared-oracle alias, live but not independent.`,
   contract: MARGIN,
   via: "chain balance × getMarketPrice (eth_call at head)",
   formula: "balance × oracle price",

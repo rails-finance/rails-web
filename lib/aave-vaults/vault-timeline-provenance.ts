@@ -153,7 +153,7 @@ export const vaultTimelineBalanceAfterProv = (c: VaultTimelineCoords): Provenanc
   kind: "chain-derived",
   pclass: "emitted",
   source: { block: c.blockNumber, txHash: c.txHash },
-  summary: `Balance after — every one of this address's own \`Transfer\` values up to and including this log, added with its sign, in share units. Not a call: it is the replay, which is the same sum the history check above compares against the vault's \`balanceOf\`. It is a position INSIDE the block, so where an address has two logs in one block only the later one equals what \`balanceOf\` would answer at the end of that block. The check compares only the final position, which is always an end-of-block figure.`,
+  summary: `Balance after — every one of this address's own \`Transfer\` values up to and including this log, added with its sign, in share units. It is the replay, which is the same sum the history check above compares against the vault's \`balanceOf\`. It is a position INSIDE the block, so where an address has two logs in one block only the later one equals what \`balanceOf\` would answer at the end of that block. The check compares only the final position, which is always an end-of-block figure.`,
   contract: vaultContract(c),
   via: `${LANE} · replay of this address's own Transfer logs`,
   formula: "Σ (value where to == holder) − Σ (value where from == holder), up to this log",
@@ -165,7 +165,7 @@ export const vaultTimelineBalanceBeforeProv = (c: VaultTimelineCoords): Provenan
   kind: "chain-derived",
   pclass: "emitted",
   source: { block: c.blockNumber, txHash: c.txHash },
-  summary: `Balance before — the replayed position one log earlier, which is the balance after this log less this log's own signed \`value\`. Integer arithmetic on two figures this row already carries, so it is exact: no call was made at the block before this one and none is implied. A row whose \`value\` is zero — a transfer whose two ends are this same address, or a cooldown that moved no shares — states the same figure on both sides, and that equality is the reading rather than a placeholder.`,
+  summary: `Balance before — the replayed position one log earlier, which is the balance after this log less this log's own signed \`value\`. Integer arithmetic on two figures this row already carries, so it is exact. A row whose \`value\` is zero — a transfer whose two ends are this same address, or a cooldown that moved no shares — states the same figure on both sides, and that equality is the reading rather than a placeholder.`,
   contract: vaultContract(c),
   via: `${LANE} · replay of this address's own Transfer logs`,
   formula: "balance after this log − this log's own signed value",
@@ -180,7 +180,7 @@ export const vaultTimelineAssetsProv = (c: VaultTimelineCoords, kind: "deposit" 
     kind: "recompute",
     text: `Read the ERC-4626 ${kind === "deposit" ? "Deposit" : "Withdraw"} log in ${c.txHash ?? "this transaction"} and decode its first non-indexed word`,
   },
-  summary: `${kind === "deposit" ? "Deposited" : "Withdrawn"} — the \`assets\` word of the ERC-4626 \`${kind === "deposit" ? "Deposit" : "Withdraw"}\` event the vault emitted for this address in this same transaction${atBlock(c)}, in ${asset(c)}. It is the contract's own figure for what moved, matched to this row by transaction AND by share count, not this page's shares multiplied by a share price. Where a row states no asset leg, none was emitted — a plain transfer between two holders emits none — and this page states the shares alone rather than a stand-in dressed as the contract's word.`,
+  summary: `${kind === "deposit" ? "Deposited" : "Withdrawn"} — the \`assets\` word of the ERC-4626 \`${kind === "deposit" ? "Deposit" : "Withdraw"}\` event the vault emitted for this address in this same transaction${atBlock(c)}, in ${asset(c)}. It is the contract's own figure for what moved, matched to this row by transaction AND by share count, not this page's shares multiplied by a share price. Where a row states no asset leg, none was emitted — a plain transfer between two holders emits none — and this page states the shares alone.`,
   contract: vaultContract(c),
   via: `${LANE} · the ERC-4626 ${kind === "deposit" ? "Deposit" : "Withdraw"} log in this transaction`,
 });
@@ -194,7 +194,7 @@ export const vaultTimelineSharePriceProv = (c: VaultTimelineCoords, shareDecimal
     kind: "recompute",
     text: `Re-run the convertToAssets(10^${shareDecimals}) eth_call at block ${c.blockNumber ?? "this row's block"} against any Ethereum archive node`,
   },
-  summary: `Share price at this event — \`convertToAssets(10^${shareDecimals})\` answered${atBlock(c)}, which is the block this address's own transaction landed in rather than a block Rails picked. What ONE whole share converted to in ${asset(c)} at that moment, answered by the vault itself. The exponent is this vault's OWN \`decimals()\`: Aave's share tokens are 6-, 8- and 18-decimal and \`convertToAssets\` is linear, so a fixed 10^18 would answer a different question on most of them. This figure says nothing about any block between this row and the next — nothing was read there, and this page draws no line through it.`,
+  summary: `Share price at this event — \`convertToAssets(10^${shareDecimals})\` answered${atBlock(c)}. What ONE whole share converted to in ${asset(c)} at that moment, answered by the vault itself. The exponent is this vault's OWN \`decimals()\`: Aave's share tokens are 6-, 8- and 18-decimal and \`convertToAssets\` is linear, so a fixed 10^18 would answer a different question on most of them. This figure says nothing about any block between this row and the next — nothing was read there, and this page draws no line through it.`,
   contract: vaultContract(c),
   via: `${LANE} · convertToAssets(one whole share) @ this row's own block`,
 });
@@ -252,7 +252,7 @@ export const vaultTimelineAccrualProv = (
       ? `Why accrual is not a row — sGHO emits \`ExchangeRateUpdated\` on very nearly every state-changing call: 4,600 of them against 5,478 \`Transfer\` logs over the vault's whole life. It is the mechanic behind each row's share price, named in that figure's receipt, and a row for each would not be a holder's life. This page reads none of them.`
       : family === "stata"
         ? `Why accrual is not a row — a static aToken emits no accrual event at all. Its share price IS the wrapped reserve's Aave V3 liquidity index, so the price on a row is a state read at that row's block rather than an event, and there is nothing here to draw a row from.`
-        : `Why accrual is not a row — an Umbrella stake token's \`totalAssets()\` is a stored counter rather than a balance read, and the token emits no accrual event for this page to draw a row from. Each row's share price is therefore a state read at that row's own block, the same call the section above makes at the page's block.`,
+        : `Why accrual is not a row — an Umbrella stake token's \`totalAssets()\` is a stored counter, and the token emits no accrual event for this page to draw a row from. Each row's share price is therefore a state read at that row's own block, the same call the section above makes at the page's block.`,
   contract: vaultContract(c),
   via: `${LANE} · the family's own accrual mechanic`,
 });
@@ -291,7 +291,7 @@ export const vaultStoredRowsProv = (
 /** What each flow figure on the tower is, in the words the contract used. */
 const FLOW_CLAUSE: Record<VaultFlowKind, (unit: string) => string> = {
   minted: (u) =>
-    `every \`Transfer\` of this vault whose \`from\` is the zero address and whose \`to\` is this address, summed. Those are mints: shares that came into existence for it. The figure is in ${u} and is a sum of log words, not a state read`,
+    `every \`Transfer\` of this vault whose \`from\` is the zero address and whose \`to\` is this address, summed. Those are mints: shares that came into existence for it. The figure is in ${u}`,
   burned: (u) =>
     `every \`Transfer\` whose \`to\` is the zero address and whose \`from\` is this address, summed. Those are burns: shares destroyed when it redeemed. The figure is in ${u}`,
   "transferred-in": (u) =>

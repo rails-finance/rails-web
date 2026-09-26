@@ -101,7 +101,7 @@ export function CompoundClosedPositionExplanation({ v }: { v: CompoundPositionVi
         The protocol absorbed the position <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} —
         taking its collateral and clearing the whole debt against it, crediting back the value minus each asset&rsquo;s
         liquidation penalty.
-        {liquidated && <> Closing with that in its record is what marks the outcome Liquidated rather than Closed.</>}
+        {liquidated && <> Closing with that in its record is what marks the outcome Liquidated.</>}
       </>,
     );
   }

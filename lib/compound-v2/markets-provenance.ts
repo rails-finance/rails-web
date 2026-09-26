@@ -93,7 +93,7 @@ export const cvRosterProv = (coords: CompoundV2MarketCoords): Provenance => ({
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("Comptroller.getAllMarkets", coords),
-  summary: `Markets listed — the length of the Comptroller's own \`getAllMarkets()\`${atBlock(coords)}: the cToken markets it lists, read from the enumerator itself rather than a catalog. The roster is what the protocol says it is, not what this view decides.`,
+  summary: `Markets listed — the length of the Comptroller's own \`getAllMarkets()\`${atBlock(coords)}: the cToken markets it lists, read from the enumerator rather than a catalog. The roster is what the protocol says it is.`,
   contract: comptrollerContract(),
   via: `${LANE} · Comptroller.getAllMarkets() @ head`,
 });

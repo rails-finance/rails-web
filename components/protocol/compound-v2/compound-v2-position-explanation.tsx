@@ -238,8 +238,8 @@ export function CompoundV2PositionExplanation({
       <>
         A liquidation here repays at most {Math.round(chain.closeFactor * 100)}% of one borrowed market per seizure (the
         close factor) and the liquidator takes collateral worth that repayment plus{" "}
-        {Math.round(Math.max(0, chain.liquidationIncentive - 1) * 100)}% — a partial nudge back over the line, not a
-        full absorb. The protocol keeps its own burned share of every seizure.
+        {Math.round(Math.max(0, chain.liquidationIncentive - 1) * 100)}% — a partial nudge back over the line. The
+        protocol keeps its own burned share of every seizure.
       </>,
     );
   } else if (entered.length > 0) {
@@ -380,7 +380,7 @@ export function CompoundV2ClosedPositionExplanation({ v }: { v: CompoundV2Positi
       <>
         The account was liquidated <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} — a liquidator
         repaid part of what it owed and took collateral in exchange.
-        {liquidated && <> Closing with that in its record is what marks the outcome Liquidated rather than Closed.</>}
+        {liquidated && <> Closing with that in its record is what marks the outcome Liquidated.</>}
       </>,
     );
   }

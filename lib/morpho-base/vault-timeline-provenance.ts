@@ -119,7 +119,7 @@ export const morphoVaultTimelineBuildingProv = (
     kind: "recompute",
     text: `Read GET /api/vaults/positions/tail for this position on chain 8453 and check that its cutBlock is ${building.keptCut} and that its rows sum to its cutBalance`,
   },
-  summary: `A history being read into Rails's store — ${building.keptRows.toLocaleString("en-US")} of this address's ${building.totalRows.toLocaleString("en-US")} rows are kept at or below block ${building.keptCut}, and the rest are still to be read. Every row costs one \`eth_getBlockByNumber\` and one archive \`convertToAssets\` at its OWN block, so a life this long is read a chunk of blocks at a time across visits rather than making one reader wait for all of it. What is kept is a WHOLE up to its own cut: the rows are read oldest first, so the stored set is an unbroken prefix of the life, and the store re-sums its deltas on the way in and refuses a body that does not add up. No rows are drawn until the whole life is stored — a prefix is not a life, and the history check sums every row of one. The allocation band is not part of what is kept: it is read fresh over the newest rows on the visit that draws.`,
+  summary: `A history being read into Rails's store — ${building.keptRows.toLocaleString("en-US")} of this address's ${building.totalRows.toLocaleString("en-US")} rows are kept at or below block ${building.keptCut}, and the rest are still to be read. Every row costs one \`eth_getBlockByNumber\` and one archive \`convertToAssets\` at its OWN block, so a life this long is read a chunk of blocks at a time across visits. What is kept is a WHOLE up to its own cut: the rows are read oldest first, so the stored set is an unbroken prefix of the life, and the store re-sums its deltas on the way in and refuses a body that does not add up. No rows are drawn until the whole life is stored — a prefix is not a life, and the history check sums every row of one. The allocation band is not part of what is kept: it is read fresh over the newest rows on the visit that draws.`,
   contract: vaultContract(c),
   via: `${LANE} · eth_getBlockByNumber + convertToAssets at each row's own block, stored at a finalized cut`,
 });
@@ -160,7 +160,7 @@ export const morphoVaultTimelineAssetsProv = (c: VaultTimelineCoords, kind: "dep
     kind: "recompute",
     text: `Read the ERC-4626 ${kind === "deposit" ? "Deposit" : "Withdraw"} log in ${c.txHash ?? "this transaction"} and decode its first non-indexed word`,
   },
-  summary: `${kind === "deposit" ? "Deposited" : "Withdrawn"} — the \`assets\` word of the ERC-4626 \`${kind === "deposit" ? "Deposit" : "Withdraw"}\` event the vault emitted for this address in this same transaction${atBlock(c)}, in ${asset(c)}. It is the contract's own figure for what moved, matched to this row by transaction AND by share count, not this page's shares multiplied by a share price. Where a row states no asset leg, none was emitted — a plain transfer between two holders emits none — and this page states the shares alone rather than a stand-in dressed as the contract's word.`,
+  summary: `${kind === "deposit" ? "Deposited" : "Withdrawn"} — the \`assets\` word of the ERC-4626 \`${kind === "deposit" ? "Deposit" : "Withdraw"}\` event the vault emitted for this address in this same transaction${atBlock(c)}, in ${asset(c)}. It is the contract's own figure for what moved, matched to this row by transaction AND by share count. Where a row states no asset leg, none was emitted — a plain transfer between two holders emits none — and this page states the shares alone rather than a stand-in dressed as the contract's word.`,
   contract: vaultContract(c),
   via: `${LANE} · the ERC-4626 ${kind === "deposit" ? "Deposit" : "Withdraw"} log in this transaction`,
 });
@@ -238,7 +238,7 @@ export const morphoVaultTimelineNoteProv = (c: VaultTimelineCoords, note: Morpho
     kind: "recompute",
     text: `Re-run eth_getLogs on the vault for this event's topic from its creation block and read the log at block ${note.blockNumber}`,
   },
-  summary: `A change to the vault's own terms — ${NOTE_CLAUSE[note.kind]}, read at block ${note.blockNumber}. It is not this address's event: it moved every holder's terms at once, which is why it sits beside the rows rather than among them and is counted in no total here. The values are the log's own words, raw. What the vault's terms are NOW is the reading in the sections above, at the page's own block.`,
+  summary: `A change to the vault's own terms — ${NOTE_CLAUSE[note.kind]}, read at block ${note.blockNumber}. It is not this address's event: it moved every holder's terms at once, which is why it sits beside the rows and is counted in no total here. The values are the log's own words, raw. What the vault's terms are NOW is the reading in the sections above, at the page's own block.`,
   contract: vaultContract(c),
   via: `${LANE} · eth_getLogs on the vault for this configuration event`,
 });

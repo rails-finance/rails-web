@@ -275,8 +275,7 @@ export function PolarisMarketsView({ chain, book }: { chain: PolarisMarketsChain
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read Polaris&apos;s markets from Sepolia, and the index did not answer.</p>
         <p className="text-sm">
-          This view is a live contract read with no cached fallback — rather than show stale figures, it shows nothing.
-          Try again shortly.
+          This view is a live contract read with no cached fallback — it shows nothing. Try again shortly.
         </p>
       </div>
     );

@@ -94,7 +94,7 @@ export const mwSuppliedUnderlyingProv = (coords: MoonwellMarketCoords): Provenan
   kind: "chain-derived",
   pclass: "state",
   source: { block: coords.blockNumber },
-  summary: `${sym(coords)} supplied — the market's own \`totalSupply\` (its 8-dp mTokens) × \`exchangeRateStored\`${atBlock(coords)}, both read from the mToken. The exchange rate carries accrued interest, so the product is what the market records as supplied this block, not a sum over Mint/Redeem events.`,
+  summary: `${sym(coords)} supplied — the market's own \`totalSupply\` (its 8-dp mTokens) × \`exchangeRateStored\`${atBlock(coords)}, both read from the mToken. The exchange rate carries accrued interest, so the product is what the market records as supplied this block.`,
   contract: mTokenContract(coords),
   via: `${LANE} · mToken.totalSupply × mToken.exchangeRateStored @ head`,
   formula: "mToken supply × exchange rate",
@@ -140,7 +140,7 @@ export const mwKinkProv = (coords: MoonwellMarketCoords): Provenance => ({
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("interestRateModel.kink", coords),
-  summary: `${sym(coords)} rate-model kink${atBlock(coords)} — the \`kink\` on this market's OWN interest rate model (1e18-scaled): the utilisation its curve turns steep at, governance-set. Read from the model the mToken names, not assumed — the four roster markets do not share a kink.`,
+  summary: `${sym(coords)} rate-model kink${atBlock(coords)} — the \`kink\` on this market's OWN interest rate model (1e18-scaled): the utilisation its curve turns steep at, governance-set. Read from the model the mToken names — the four roster markets do not share a kink.`,
   contract: irmContract(coords),
   via: `${LANE} · mToken.interestRateModel → model.kink @ head`,
 });
@@ -223,7 +223,7 @@ export const mwRosterCountProv = (coords: MoonwellMarketCoords): Provenance => (
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("Comptroller.getAllMarkets", coords),
-  summary: `Markets listed${atBlock(coords)} — the length of the Comptroller's OWN \`getAllMarkets()\`. Moonwell enumerates its markets on-chain (governance-gated listing, not a factory), so this count is read from the registry, never stated from a file. A fifth market would appear here the block it is listed.`,
+  summary: `Markets listed${atBlock(coords)} — the length of the Comptroller's OWN \`getAllMarkets()\`. Moonwell enumerates its markets on-chain (governance-gated listing), so this count is read from the registry, never stated from a file. A fifth market would appear here the block it is listed.`,
   contract: comptrollerContract(coords),
   via: `${LANE} · Comptroller.getAllMarkets().length @ head`,
 });

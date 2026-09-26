@@ -67,7 +67,7 @@ export function comptrollerVerdictProv(what: string): Provenance {
     kind: "chain",
     pclass: "state",
     verify: recompute("Comptroller", "getAccountLiquidity"),
-    summary: `${what} — the Comptroller's own account verdict (getAccountLiquidity), computed by the risk engine itself over its oracle prices and collateral factors at the latest block. The contract exposes a tuple, not a boolean: the USD value still borrowable (liquidity), or — the moment shortfall > 0 — the amount past the liquidation line. The protocol judging its own account, not a client-side reconstruction. Only markets the account has ENTERED count: supplying alone does not enter a market, so an un-entered supply backs nothing.`,
+    summary: `${what} — the Comptroller's own account verdict (getAccountLiquidity), computed by the risk engine itself over its oracle prices and collateral factors at the latest block. The contract exposes a tuple, not a boolean: the USD value still borrowable (liquidity), or — the moment shortfall > 0 — the amount past the liquidation line. Only markets the account has ENTERED count: supplying alone does not enter a market, so an un-entered supply backs nothing.`,
     contract: COMPTROLLER,
     via: `${LANE_VIA} · Comptroller.getAccountLiquidity @ head`,
   };

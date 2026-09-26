@@ -135,7 +135,7 @@ export const afterImageProv = (
         ? `Re-run the Controller's user_state eth_call at block ${coords.blockNumber} against an archive node — the UserState event emits the position's absolute after-state, so the read reproduces this figure exactly. The replay is a LAG over these absolutes, never a running sum: there is nothing to drift.`
         : "Re-run the Controller's user_state eth_call — the UserState event emits the position's absolute after-state, so the read reproduces this figure exactly.",
   },
-  summary: `${sym} ${which} this position held AFTER this event — the same-tx UserState after-image, the Controller's own emitted ABSOLUTE${atBlock(coords)}. The position replay is last-write-wins over these absolutes (a lag, not a running sum). ⚠️ What this event does NOT carry: the converted/soft-liquidation amount — that is a state-only figure (user_state.stablecoin), read live on the position page.`,
+  summary: `${sym} ${which} this position held AFTER this event — the same-tx UserState after-image, the Controller's own emitted ABSOLUTE${atBlock(coords)}. The position replay is last-write-wins over these absolutes (a lag). ⚠️ What this event does NOT carry: the converted/soft-liquidation amount — that is a state-only figure (user_state.stablecoin), read live on the position page.`,
   contract: controllerOf(coords),
   via: `${LLAMALEND_VIA} · UserState after-image · ${fieldSeg(which, raw)} (= the user_state read at this block)`,
   inputs: eventInputs(coords),
@@ -192,7 +192,7 @@ export const positionStateProv = (sym: string, which: "collateral" | "debt", con
     kind: "recompute",
     text: "Re-run the Controller's user_state eth_call against any node — the leg reproduces this figure exactly.",
   },
-  summary: `${sym} ${which} NOW — the ${which === "collateral" ? "collateral" : "debt"} leg of the Controller's own user_state(user) at the latest block. Debt accrues per second through the market's rate, so no stored figure is current — this is the live read, not a replayed sum.`,
+  summary: `${sym} ${which} NOW — the ${which === "collateral" ? "collateral" : "debt"} leg of the Controller's own user_state(user) at the latest block. Debt accrues per second through the market's rate, so no stored figure is current — this is the live read.`,
   contract: { name: "LlamaLend Controller", address: controller ?? "" },
   via: "GET /api/chain/llamalend/position · user_state @ head",
 });
@@ -215,7 +215,7 @@ export const positionIndexProv = (sym: string, which: "collateral" | "debt", con
 export const llamalendUsdProv = (what: string, borrowedSymbol: string, amm?: string): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `${what} in USD — valued through the market's own AMM oracle (price_oracle: collateral priced in the market's borrowed token, 1e18). The borrowed token here IS crvUSD, a $-pegged stable, so the crvUSD figure is presented as USD — unit: crvUSD (~$1), the protocol's own denomination, not an off-chain feed. ⚠️ Markets that borrow anything other than crvUSD never get this treatment: they present in their own borrowed token.`,
+  summary: `${what} in USD — valued through the market's own AMM oracle (price_oracle: collateral priced in the market's borrowed token, 1e18). The borrowed token here IS crvUSD, a $-pegged stable, so the crvUSD figure is presented as USD — unit: crvUSD (~$1), the protocol's own denomination. ⚠️ Markets that borrow anything other than crvUSD never get this treatment: they present in their own borrowed token.`,
   contract: { name: "LLAMMA AMM", address: amm ?? "" },
   via: "amount × AMM.price_oracle (eth_call at head) · unit: crvUSD (~$1)",
   formula: "amount × oracle price",

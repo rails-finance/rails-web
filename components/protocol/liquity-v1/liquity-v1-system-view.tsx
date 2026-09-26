@@ -351,8 +351,7 @@ export function LiquityV1SystemView({ data }: { data: LiquityV1SystemChainRespon
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read Liquity V1&apos;s system state from chain.</p>
         <p className="text-sm">
-          This view is a live contract read with no cached fallback — rather than show stale figures, it shows nothing.
-          Try again shortly.
+          This view is a live contract read with no cached fallback, so when the read fails it shows nothing. Try again shortly.
         </p>
       </div>
     );
@@ -382,10 +381,10 @@ export function LiquityV1SystemView({ data }: { data: LiquityV1SystemChainRespon
           {COLLATERAL_SYMBOL} and sheds the same value of debt, and its ratio rises as a result.
         </p>
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-          That queue is the Trove listing sorted by ratio, so it is shown there rather than twice: the link below opens
-          every open Trove, lowest ratio first, front of the queue at the top. Two things it leaves out, both because
-          they need the {COLLATERAL_SYMBOL} price the listing doesn&rsquo;t read — a Trove&rsquo;s own collateral ratio,
-          and how much {DEBT_SYMBOL} is redeemed before it. Both are on that Trove&rsquo;s own page.
+          That queue is the Trove listing sorted by ratio, so it is shown there: the link below opens every open Trove,
+          lowest ratio first, front of the queue at the top. Two things it leaves out, both because they need the{" "}
+          {COLLATERAL_SYMBOL} price the listing doesn&rsquo;t read — a Trove&rsquo;s own collateral ratio, and how much{" "}
+          {DEBT_SYMBOL} is redeemed before it. Both are on that Trove&rsquo;s own page.
         </p>
 
         <div className="mt-3 lg:max-w-md">

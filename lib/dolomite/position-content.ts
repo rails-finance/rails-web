@@ -29,7 +29,7 @@ export function dolomitePositionContent(opts: {
         },
         {
           bold: "Vaporization",
-          text: "if collateral ran out before the debt was cleared, the shortfall is written off, covered by the core's own excess token balances rather than by the account.",
+          text: "if collateral ran out before the debt was cleared, the shortfall is written off, covered by the core's excess token balances.",
         },
       ],
       links: LINKS,

@@ -400,7 +400,7 @@ export function AaveV3ClosedPositionExplanation({
         {endedBySeizure
           ? "Here the final seizure emptied it entirely."
           : "What remained after the seizures left by the account's own transactions."}{" "}
-        Seizures in the record are what mark the outcome Liquidated rather than Closed.
+        Seizures in the record are what mark the outcome Liquidated.
       </span>,
     );
   }

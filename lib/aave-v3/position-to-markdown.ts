@@ -348,7 +348,7 @@ function marketNotesSection(notes: MarketNote[]): string[] {
       "before the position's next touch and NOT inside that touch's own transaction, so a move the position " +
       "itself caused there is never stated as the market's. A live note's later end is the Pool's getReserveData " +
       "read at the head. The interest figures hold the earlier touch's own balance fixed and move only the rate, " +
-      "so they are what that balance came to be worth at each rate, not a second reading of the position.",
+      "so they are what that balance came to be worth at each rate.",
   );
   out.push("");
   for (const n of notes) {

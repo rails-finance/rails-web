@@ -378,8 +378,8 @@ export function PwnBookView({ book }: { book: PwnLoanBook }) {
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read the loan book from the indexed backend.</p>
         <p className="text-sm">
-          This view reduces the explorer&rsquo;s own loan index and has no cached fallback — rather than show a partial
-          book, it shows nothing. Try again shortly.
+          This view reduces the explorer&rsquo;s own loan index and has no cached fallback — it shows nothing. Try again
+          shortly.
         </p>
       </div>
     );

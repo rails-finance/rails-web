@@ -116,7 +116,7 @@ export const rateStepProv = (
           `as-of figure already on this CDP's own two touches. It is the move in the rate alone: nothing about ` +
           `this CDP's own debt or collateral enters it.`
         : `The two blocks the stretch runs between — this CDP's own ${polarisEndLabel(note.from)} and ` +
-          `${polarisEndLabel(note.to)}. The stretch is bounded by the CDP's own activity, not by a window: the ` +
+          `${polarisEndLabel(note.to)}. The stretch is bounded by the CDP's own activity: the ` +
           `rate is known at these two blocks because the CDP was touched at each, and Rails states nothing about ` +
           `the rate's path in between.`;
   // A merged note's every face says so: the two ends are two touches with more
@@ -282,9 +282,9 @@ const elapsedProv = (note: RateStepNote): Provenance => ({
   pclass: "emitted",
   summary: note.live
     ? `The time since the earlier touch — the chain head's own timestamp at read time less the block header of ` +
-      `this CDP's last touch. Exact, not an estimate from a block count. It grows on every reload.`
+      `this CDP's last touch. It grows on every reload.`
     : `The time between the two touches — the later block's timestamp less the earlier's, both read from the ` +
-      `headers of the blocks this CDP's two touches sit in. Exact, not an estimate from a block count. It bounds ` +
+      `headers of the blocks this CDP's two touches sit in. It bounds ` +
       `when the rate moved and says nothing about where inside the stretch it did.`,
   ...contractOf(note),
   via: note.live
@@ -473,7 +473,7 @@ const polarisPriceGapElapsedProv = (note: PriceGapNote, market: PolarisMarket): 
   pclass: "emitted",
   summary:
     `The time between the two touches — the later block's timestamp less the earlier's, both read from the ` +
-    `headers of the blocks this CDP's two touches sit in. Exact, not an estimate from a block count. It bounds ` +
+    `headers of the blocks this CDP's two touches sit in. It bounds ` +
     `when the price moved and says nothing about where inside the stretch it did.`,
   contract: feedContract(note, market),
   via: "block headers · timestamp at each touch",

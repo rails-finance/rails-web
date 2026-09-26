@@ -194,7 +194,7 @@ export const suppliedAfterProv = (sym: string, coords: MorphoCoords): Provenance
 export const suppliedBeforeProv = (sym: string, coords: MorphoCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Net supplied PRINCIPAL (${sym}) before this event — the after-balance minus the amount this event itself moved (after − change), reconstructed in the browser from the replayed after and the logged delta, not a distinct chain read. Principal only, same basis as the after.`,
+  summary: `Net supplied PRINCIPAL (${sym}) before this event — the after-balance minus the amount this event moved (after − change), reconstructed in the browser from the replayed after and the logged delta. Principal only, same basis as the after.`,
   contract: MORPHO,
   via: "supplied after − this event's amount",
   formula: "after − change",
@@ -211,7 +211,7 @@ export const suppliedBeforeProv = (sym: string, coords: MorphoCoords): Provenanc
 export const collateralBeforeProv = (sym: string, coords: MorphoCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `Collateral (${sym}) the position held BEFORE this event — the after-balance minus the amount this event itself moved (after − change), reconstructed in the browser from the replayed after and the logged delta, not a distinct chain read. Collateral doesn't accrue, so this is exact.`,
+  summary: `Collateral (${sym}) the position held BEFORE this event — the after-balance minus the amount this event moved (after − change), reconstructed in the browser from the replayed after and the logged delta. Collateral doesn't accrue, so this is exact.`,
   contract: MORPHO,
   via: "collateral after − this event's amount",
   formula: "after − change",
@@ -232,7 +232,7 @@ export const collateralBeforeProv = (sym: string, coords: MorphoCoords): Provena
 export const borrowedBeforeProv = (sym: string, coords: MorphoCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Net borrowed PRINCIPAL (${sym}) before this event — the after-balance minus the amount this event itself moved (after − change), reconstructed in the browser from the replayed after and the logged delta, not a distinct chain read. Principal only, same basis as the after (interest since each draw is a derived layer).`,
+  summary: `Net borrowed PRINCIPAL (${sym}) before this event — the after-balance minus the amount this event moved (after − change), reconstructed in the browser from the replayed after and the logged delta. Principal only, same basis as the after (interest since each draw is a derived layer).`,
   contract: MORPHO,
   via: "borrowed after − this event's amount",
   formula: "after − change",

@@ -94,7 +94,7 @@ export const llamaDebtProv = (c: LlamalendMarketCoords): Provenance => ({
   source: { block: c.blockNumber },
   verify: recompute("Controller.total_debt", c),
   summary: c.borrowedIsCrvusd
-    ? `${pair(c)} debt — the market's own \`total_debt\`${atBlock(c)}, in crvUSD. crvUSD is $-pegged, so this reads as dollars taken AT PAR (~$1, the market's own denomination) — not an oracle conversion. Interest is already in the slot; this is what the Controller records as borrowed, not a sum over events.`
+    ? `${pair(c)} debt — the market's own \`total_debt\`${atBlock(c)}, in crvUSD. crvUSD is $-pegged, so this reads as dollars taken AT PAR (~$1, the market's own denomination) — not an oracle conversion. Interest is already in the slot; this is what the Controller records as borrowed.`
     : `${pair(c)} debt — the market's own \`total_debt\`${atBlock(c)}, in ${c.borrowedSymbol ?? "the borrowed token"}, its own borrowed token. No dollar is asserted: this market does not borrow crvUSD, so the figure stays in its own unit. Interest is already in the slot, read straight from the Controller.`,
   contract: controllerContract(c),
   via: `${LANE} · Controller.total_debt @ head`,
