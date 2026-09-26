@@ -14,6 +14,11 @@ export const TOKEN_ADDRESSES: Record<string, string> = {
   "1INCH": "0x111111111117dc0aa78b770fa6a738034120c302",
   AAVE: "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9",
   ALCX: "0xdbdb4d16eda451d0503b854cf79d55697f90c8df",
+  // alUSD's own address: already read from the chain twice over, as the
+  // yieldToken() of two Pendle PTs that mature on it (pt-underlying.ts). Not
+  // a local PNG (no source hosts one yet), but present here so the chip's CDN
+  // tiers get a real address to ask about instead of none.
+  alUSD: "0xdcd0f5ab30856f28385f641580bbd85f88349124",
   ankrETH: "0xe95a203b1a91a908f9b9ce46459d101078c2c3cb",
   AURA: "0xc0c293ce456ff0ed870add98a0828dd4d2903dbf",
   BAL: "0xba100000625a3754423978a60c9317c58a424e3d",
