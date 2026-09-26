@@ -208,7 +208,7 @@ function forensicsSection(events: BaseActivityEvent[], colSym: string, debtSym: 
         `two are an independent check. The penalty is a FLOOR the engine guarantees, not a target: across Fluid's ` +
         `whole history a real-sized sweep meets or exceeds its vault's constant essentially always, and reproduces ` +
         `it exactly in the large majority — so a figure above the constant means that sweep cleared the tick on ` +
-        `better terms than the minimum, and is stated rather than smoothed. On a seizure small enough that the ` +
+        `better terms than the minimum. On a seizure small enough that the ` +
         `tick-settled legs quantize, the ratio is dominated by that rounding and can land either side._`,
     );
   }

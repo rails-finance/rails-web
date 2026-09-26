@@ -27,7 +27,7 @@ export function accountDataProv(what: string, field: string): Provenance {
     kind: "chain",
     pclass: "state",
     verify: STATE_VERIFY,
-    summary: `${what} — read from SparkLend's Pool.getUserAccountData for this wallet, at the latest block. The protocol's own oracle-priced account state, not an event-replay approximation.`,
+    summary: `${what} — read from SparkLend's Pool.getUserAccountData for this wallet, at the latest block. The protocol's own oracle-priced account state.`,
     contract: POOL_CONTRACT,
     via: `${ACCOUNT_VIA} · ${field}`,
   };
@@ -62,7 +62,7 @@ export function reserveDataProv(what: string, field: string, asset?: string): Pr
     kind: "chain",
     pclass: "state",
     verify: STATE_VERIFY,
-    summary: `${what}${asset ? ` for ${asset}` : ""} — read from SparkLend's Pool.getReserveData at the latest block. The reserve's own pool-wide rate/state, not an event-replay approximation.`,
+    summary: `${what}${asset ? ` for ${asset}` : ""} — read from SparkLend's Pool.getReserveData at the latest block. The reserve's own pool-wide rate/state.`,
     contract: POOL_CONTRACT,
     via: `GET /api/chain/spark/position · getReserveData @ head · ${field}`,
     inputs: asset ? [{ label: "reserve", value: asset, kind: "chain" }] : undefined,

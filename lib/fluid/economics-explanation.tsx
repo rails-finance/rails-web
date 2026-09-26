@@ -143,7 +143,7 @@ export function fluidEconomicsContent(): LearnMoreContent {
     stepsHeading: "How it's built:",
     steps: [
       "Flows are replayed from every deposit, withdraw, borrow and repay the position's own LogOperate events recorded — a single composite operation can move both legs at once.",
-      "Liquidation impact is read from the vault's own settlement views at the blocks before and after the sweep, not from the liquidation event itself (which names no position).",
+      "Liquidation impact is read from the vault's own settlement views at the blocks before and after the sweep.",
       "Current balances come from the vault's own resolver at the block the page reads, with interest already included; Fluid has no on-chain USD price at this depth, so every figure stays in its own token.",
     ],
     detailsHeading: "Key concepts:",

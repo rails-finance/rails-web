@@ -109,7 +109,7 @@ export function liveIcrProv(market: PolarisMarket): Provenance {
     kind: "chain",
     pclass: "state",
     verify: recompute("getICR(id)"),
-    summary: `Collateral ratio — the cdpManager's own getICR(id) at the latest block: entire collateral × the market's price feed ÷ entire debt, computed by the contract. The protocol judging its own CDP against MCR (or the defensive-mode MCR when that mode is on), not a client-side reconstruction; the verifier asserts the identity entireColl × price ÷ entireDebt.`,
+    summary: `Collateral ratio — the cdpManager's own getICR(id) at the latest block: entire collateral × the market's price feed ÷ entire debt, computed by the contract. The protocol judging its own CDP against MCR (or the defensive-mode MCR when that mode is on); the verifier asserts the identity entireColl × price ÷ entireDebt.`,
     contract: manager(market),
     via: `${LANE_VIA} · getICR(id) @ head (÷ 1e18)`,
     formula: "entireColl × price ÷ entireDebt",
@@ -275,7 +275,7 @@ export function liveTotalProv(what: "coll" | "debt", market: PolarisMarket): Pro
     verify: recompute(what === "coll" ? "getTotalColl()" : "getTotalDebt()"),
     summary:
       what === "coll"
-        ? "All pETH in the market's CDPs — the cdpManager's own getTotalColl() at the latest block: the active collateral the manager accounts for, the chain's own figure rather than a sum over the index."
+        ? "All pETH in the market's CDPs — the cdpManager's own getTotalColl() at the latest block: the active collateral the manager accounts for, the chain's own figure."
         : `All ${stableOf(market)} owed across the market's CDPs — the cdpManager's own getTotalDebt() at the latest block: the recorded debt the manager accounts for, before interest pending on each CDP since its last touch.`,
     contract: manager(market),
     via: `${BOARD_VIA} · ${what === "coll" ? "getTotalColl" : "getTotalDebt"}() @ head`,
@@ -361,8 +361,8 @@ export function liveMedianiserProv(which: "eth" | "xau", board = false): Provena
     verify: recompute("medianiser.previewExternalPrice()"),
     summary:
       which === "eth"
-        ? `ETH in USD — the ETH/USD medianiser's own previewExternalPrice() at the latest block (the view twin of getExternalPrice()), the median over its configured Sepolia oracles (Chainlink's Sepolia ETH/USD feed among them). A testnet price: a test figure, not the market.`
-        : `Gold in USD — the XAU/USD medianiser's own previewExternalPrice() at the latest block, the median over its configured Sepolia oracles. A testnet price: a test figure, not the market.`,
+        ? `ETH in USD — the ETH/USD medianiser's own previewExternalPrice() at the latest block (the view twin of getExternalPrice()), the median over its configured Sepolia oracles (Chainlink's Sepolia ETH/USD feed among them). A testnet price: a test figure.`
+        : `Gold in USD — the XAU/USD medianiser's own previewExternalPrice() at the latest block, the median over its configured Sepolia oracles. A testnet price: a test figure.`,
     contract:
       which === "eth"
         ? { name: "Polaris ETH/USD Medianiser", address: POLARIS_CORE.ethUsdMedianiser }
@@ -380,7 +380,7 @@ export function liveUsdValueProv(what: string, board = false): Provenance {
       kind: "recompute",
       text: "Re-run bondingCurve.currentPrice() and the ETH/USD medianiser's previewExternalPrice() at the stamped block; multiply the pETH amount by both.",
     },
-    summary: `${what} in USD — the pETH amount × the bonding curve's pETH-in-ETH price × the ETH/USD medianiser, both read at the latest block. These are the protocol's own two legs (the USDp feed is exactly their product); no price API is involved. Sepolia testnet figures throughout: a test dollar, not a real one.`,
+    summary: `${what} in USD — the pETH amount × the bonding curve's pETH-in-ETH price × the ETH/USD medianiser, both read at the latest block. These are the protocol's own two legs (the USDp feed is exactly their product); no price API is involved. Sepolia testnet figures throughout: a test dollar.`,
     contract: { name: "Polaris BondingCurve", address: POLARIS_CORE.bondingCurve },
     via: `${board ? BOARD_VIA : LANE_VIA} · amount × currentPrice() × ETH/USD @ head`,
     formula: "amount × curve × ETH/USD",
@@ -467,7 +467,7 @@ export function holderCollProv(): Provenance {
       text: "Add the last emitted collateral of each open CDP the wallet holds — every one of them is on the page under this strip.",
     },
     summary:
-      "All the pETH the wallet's open CDPs hold — the sum of each CDP's last emitted collateral, from the index. Exact rather than approximate: pETH is the collateral in both markets, so the legs are one token and the sum is a quantity of it. Reward pETH accrued since each CDP's last touch is not in it; it lands on the CDP at its next touch.",
+      "All the pETH the wallet's open CDPs hold — the sum of each CDP's last emitted collateral, from the index. pETH is the collateral in both markets, so the legs are one token and the sum is a quantity of it. Reward pETH accrued since each CDP's last touch is not in it; it lands on the CDP at its next touch.",
     via: "GET /api/polaris/positions?wallet=… · Σ last emitted coll over the open rows",
     formula: "Σ coll over the wallet's open CDPs",
     inputs: [
@@ -513,7 +513,7 @@ export function holderDebtValueProv(): Provenance {
       text: "Add the last emitted debt of each open CDP the wallet holds, market by market; take USDp at one dollar and GOLDp at the XAU/USD medianiser's price at the stamped block.",
     },
     summary:
-      "What the wallet's open CDPs owe, in dollars — each CDP's last emitted debt in its own market's unit, USDp at one dollar and GOLDp at the gold price the protocol's own feed stated at the latest read. An estimate for two reasons: the two markets' debts are different tokens and a sum of them exists only at a price, and interest since each CDP's last touch and any pending PSM share settle at the next touch rather than here. A Sepolia testnet figure — a test dollar, not a real one.",
+      "What the wallet's open CDPs owe, in dollars — each CDP's last emitted debt in its own market's unit, USDp at one dollar and GOLDp at the gold price the protocol's own feed stated at the latest read. An estimate for two reasons: the two markets' debts are different tokens and a sum of them exists only at a price, and interest since each CDP's last touch and any pending PSM share settle at the next touch rather than here. A Sepolia testnet figure — a test dollar.",
     contract: { name: "Polaris XAU/USD Medianiser", address: POLARIS_CORE.xauUsdMedianiser },
     via: `${BOARD_VIA} · Σ last emitted debt × the market's own unit price @ head`,
     formula: "Σ debt × the market's unit in USD",

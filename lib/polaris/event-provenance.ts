@@ -120,7 +120,7 @@ function ledgerSummary(field: PolarisLedgerField, stable: string): string {
     case "mintRedeemDebtGain":
       return `${stable} of debt added or removed by the market's PSM activity — the CDPUpdated log's own \`_mintRedeemDebtGain\` field: the CDP's pro-rata share of the debt the PSM's mints and redemptions moved, settled at this touch.`;
     case "accruedInterest":
-      return `Interest charged into the debt at this touch — the CDPUpdated log's own \`_accruedInterest\` field: simple accrual at the market's rate since the previous touch, written into the debt here. Realised, not pending.`;
+      return `Interest charged into the debt at this touch — the CDPUpdated log's own \`_accruedInterest\` field: simple accrual at the market's rate since the previous touch, written into the debt here. Realised.`;
     case "stableGain":
       return `${stable} credited against the debt at this touch — the CDPUpdated log's own \`_stableGain\` field: the CDP's share of the market revenue the stability pool distributes, applied as a debt reduction.`;
     case "stablesMintedToEnsureZeroDebt":
@@ -508,7 +508,7 @@ export const rateInForceProv = (coords: PolarisCoords, raw?: string | null): Pro
     kind: "recompute",
     text: "Find the cdpManager's last PrimaryRateSet log at or before this block — its newPrimaryRate (1e18 = 100%/yr) is this figure.",
   },
-  summary: `The market's primary rate in force at this touch — the cdpManager's last PrimaryRateSet log at or before this row, newPrimaryRate ÷ 1e18 per year. Algorithmic: the market sets it (the event fires on the PSM's mints and redemptions, never inside a CDP touch), so it is a fact of the market at that moment, not a rate the holder chose. The secondary, utilisation-driven rate is added on top and is not on this log.`,
+  summary: `The market's primary rate in force at this touch — the cdpManager's last PrimaryRateSet log at or before this row, newPrimaryRate ÷ 1e18 per year. Algorithmic: the market sets it (the event fires on the PSM's mints and redemptions, never inside a CDP touch), so it is a fact of the market at that moment. The secondary, utilisation-driven rate is added on top and is not on this log.`,
   contract: managerContract(coords),
   via: `${POLARIS_VIA} · last PrimaryRateSet ≤ block · ${fieldSeg("newPrimaryRate", raw)} ÷ 1e18`,
   inputs: eventInputs(coords),

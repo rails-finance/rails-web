@@ -74,7 +74,7 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
       `SEPOLIA TESTNET: every figure here is a test figure — the tokens are test tokens and the prices come from ` +
       `the protocol's own testnet oracles. The position is a CDP NFT in the ${stable} market; the holder is whoever ` +
       `holds the NFT. ALL UNITS ARE NATIVE: collateral in pETH (the protocol's bonding-curve wrapper of ETH), debt in ` +
-      `${stable}. Rates are algorithmic — set by the market, not chosen by the holder. Interest accrues continuously ` +
+      `${stable}. Rates are algorithmic — set by the market. Interest accrues continuously ` +
       `and is written into the debt at each touch; stability gains, reward pETH and the PSM's pro-rata shares are ` +
       `applied the same way. Not financial advice.`,
   );
@@ -272,7 +272,7 @@ function marketNotesSection(notes: MarketNote[]): string[] {
       "already carries the market's primary rate in force at its block, and every priced touch carries the feed's " +
       "price at its block; a live note's later end is read from the market's own contracts at the head. The " +
       "derived figures hold the earlier touch's own debt and collateral fixed and move only the rate or the " +
-      "price, so the later one is what that state came to be worth, not a second reading of the CDP. A rate note " +
+      "price, so the later one is what that state came to be worth. A rate note " +
       "leads with the rate at its later end — what the market charged by then — and consecutive stretches that " +
       "moved the rate the same way are stated as one note, from the first touch to the last, with each step it " +
       "took in named on its receipt.",

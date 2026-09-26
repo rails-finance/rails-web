@@ -77,7 +77,7 @@ export function llamalendBandEdgeProv(
     kind: "chain-derived",
     pclass: "state",
     verify: recompute(
-      `Re-run the AMM's own ${edge === "pUp" ? "p_oracle_up(n1)" : "p_oracle_down(n2)"} eth_call — it reproduces this figure to the wei. The rendered number comes from the deployed integer math itself (the Vault's ln_int for LOG_A_RATIO and the AMM's solmate-expWad power), ported bit-for-bit and verified BigInt-exact against those reads across A ∈ {10…500} and negative ticks — never a float approximation.`,
+      `Re-run the AMM's own ${edge === "pUp" ? "p_oracle_up(n1)" : "p_oracle_down(n2)"} eth_call — it reproduces this figure to the wei. The rendered number comes from the deployed integer math itself (the Vault's ln_int for LOG_A_RATIO and the AMM's solmate-expWad power), ported bit-for-bit and verified BigInt-exact against those reads across A ∈ {10…500} and negative ticks.`,
     ),
     summary:
       edge === "pUp"

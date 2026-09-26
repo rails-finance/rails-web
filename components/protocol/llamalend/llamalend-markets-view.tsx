@@ -254,8 +254,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
             // Roster cardinality — a count over the three factories' own
             // rosters (with unreadable markets dropped), not a single chain read.
             value: <span data-prov-exempt="">{s.total}</span>,
-            title:
-              "A cardinality over the three factories' own rosters (unreadable markets dropped), not a single chain read.",
+            title: "A cardinality over the three factories' own rosters (unreadable markets dropped).",
           },
           {
             slot: "sizeOut",
@@ -279,7 +278,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
           <>
             <span
               data-prov-exempt=""
-              title="A cardinality over the three factories' own rosters (unreadable markets dropped), not a single chain read."
+              title="A cardinality over the three factories' own rosters (unreadable markets dropped)."
             >
               <span className="text-foreground">{s.v1Lend}</span> V1 lend ·{" "}
               <span className="text-foreground">{s.v1Mint}</span> V1 mint ·{" "}
@@ -290,7 +289,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
               <span
                 className="text-foreground"
                 data-prov-exempt=""
-                title="A count of the markets carrying at least one open loan — a cardinality, not a single chain read."
+                title="A count of the markets carrying at least one open loan — a cardinality."
               >
                 {s.live}
               </span>{" "}
@@ -299,7 +298,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
             {s.nonCrvusdBorrow > 0 && (
               <span
                 data-prov-exempt=""
-                title="A count of the markets whose borrowed token is not crvUSD — a cardinality, not a single chain read."
+                title="A count of the markets whose borrowed token is not crvUSD — a cardinality."
               >
                 <span className="text-foreground">{s.nonCrvusdBorrow}</span> markets borrow something other than crvUSD
               </span>
@@ -361,7 +360,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
             On every other market the borrowed token is crvUSD — a $-pegged stable — so the AMM&rsquo;s own oracle reads
             as dollars there (unit: crvUSD, ~$1). On these it does not: their prices, debts and band edges are in the
             borrowed token itself, and this explorer presents them that way rather than inventing a conversion. All are
-            empty or dust today, but the roster is read from the factories at head, not assumed.
+            empty or dust today, but the roster is read from the factories at head.
           </p>
         </section>
       )}

@@ -186,9 +186,9 @@ export const liqSettledProv = (
       kind: "recompute",
       text: `Re-run the vault's fetchLatestPosition eth_call at ${blockPhrase} against an archive node — the contract's own settlement math reproduces this figure`,
     },
-    summary: `${sym} ${side} the position held ${boundary === "before" ? "BEFORE" : "AFTER"} this liquidation — the vault's own fetchLatestPosition(tick, tickId, debtRaw, tickData) read at ${blockPhrase}: the contract's settlement math as a view, applied to this position's tick coordinates. Fluid liquidates price-band ticks and LogLiquidate names no position, so this figure is a settled READ, not an emitted field — and it is exact, partial-liquidation math included.`,
+    summary: `${sym} ${side} the position held ${boundary === "before" ? "BEFORE" : "AFTER"} this liquidation — the vault's own fetchLatestPosition(tick, tickId, debtRaw, tickData) read at ${blockPhrase}: the contract's settlement math as a view, applied to this position's tick coordinates. Fluid liquidates price-band ticks and LogLiquidate names no position, so this figure is a settled read — exact, partial-liquidation math included.`,
     contract: vaultContract(coords),
-    via: `vault fetchLatestPosition (eth_call at ${blockPhrase}) — LogLiquidate carries no position id, so the impact is a settled read, not an emitted field`,
+    via: `vault fetchLatestPosition (eth_call at ${blockPhrase}) — LogLiquidate carries no position id, so the impact is a settled read`,
     inputs: eventInputs(coords),
   };
 };
@@ -220,7 +220,7 @@ export const fullyLiquidatedProv = (coords: FluidCoords): Provenance => ({
     kind: "recompute",
     text: "Re-run the vault's fetchLatestPosition eth_call at the liquidation block against an archive node — a zeroed position reads zero on both legs",
   },
-  summary: `Whether this liquidation emptied the position — the vault's own settled read at the liquidation block landing at zero on both legs. Fluid liquidates only enough of a swept tick to restore its health, so a partial outcome is the norm; the flag is the settled math's verdict, not an emitted field.`,
+  summary: `Whether this liquidation emptied the position — the vault's own settled read at the liquidation block landing at zero on both legs. Fluid liquidates only enough of a swept tick to restore its health, so a partial outcome is the norm; the flag is the settled math's verdict.`,
   contract: vaultContract(coords),
   via: "vault fetchLatestPosition at the liquidation block → both legs zero",
   inputs: eventInputs(coords),
@@ -352,7 +352,7 @@ export const liqPremiumProv = (
   },
   summary: `The premium realized on this liquidation — the seized collateral's value (at the vault oracle's price this block, in ${debtSym}) over the debt cleared, minus one. This is what the liquidator actually took, not what the vault promises.${
     vals.penaltyPct != null
-      ? ` It is derived from the two settled legs alone and never from the vault's liquidationPenalty shown beside it, so the two are an independent check rather than a restatement. The penalty is a FLOOR the engine guarantees, not a target: across Fluid's whole liquidation history a real-sized sweep meets or exceeds its vault's constant essentially always, and reproduces it exactly in the large majority. A figure sitting ABOVE the constant is therefore ordinary — the sweep cleared the tick on terms better than the minimum — and is stated rather than smoothed. On a seizure small enough that the tick-settled legs quantize, the ratio is dominated by that rounding and can land either side.`
+      ? ` It is derived from the two settled legs alone and never from the vault's liquidationPenalty shown beside it, so the two are an independent check. The penalty is a FLOOR the engine guarantees, not a target: across Fluid's whole liquidation history a real-sized sweep meets or exceeds its vault's constant essentially always, and reproduces it exactly in the large majority. A figure sitting ABOVE the constant is therefore ordinary — the sweep cleared the tick on terms better than the minimum. On a seizure small enough that the tick-settled legs quantize, the ratio is dominated by that rounding and can land either side.`
       : ""
   }`,
   contract: vaultContract(coords),

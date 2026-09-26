@@ -28,7 +28,7 @@ export function fluidPositionContent(opts: {
           text: "every Fluid position is an ERC-721 minted by the vault factory — ownership can move wallets, and the timeline keys by the NFT id.",
         },
         {
-          bold: "Liquidation sweeps a band, not a position",
+          bold: "Liquidation sweeps a band",
           text: "Fluid liquidates price-band 'ticks' — one sweep can touch many positions at once, and it usually takes only enough to restore the band's health, so 'liquidated' rarely means emptied outright.",
         },
         {
