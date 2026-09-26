@@ -34,23 +34,37 @@
 // 5. THE POSITION IS A FREELY TRANSFERABLE ERC721. Ownership can change
 //    without the position closing, so the holder shown is the holder now and
 //    the page says so wherever it names one.
+//
+// THE CHROME IS THE HOUSE'S. The page is the roster's detail anatomy — the top
+// row, the position card, Lifetime flows, the timeline — drawn with the shared
+// components (`PositionCardShell`, `OpenPositionStats`, `StatValue`,
+// `WalletPill`, the status pill), not with a frame, a type scale or a palette
+// of its own. The one departure is the second panel below the card, which
+// states the stored figures: rule 1 above is why they cannot be merged into the
+// card's, so they are a second statement in the same chrome rather than a
+// second column in the first.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { OpenPositionStats } from "@/components/shared/open-position-stats";
+import { PositionCardShell } from "@/components/shared/position-card-shell";
+import { WalletPill } from "@/components/shared/wallet-pill";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { ProvReceiptsScope, useReceiptRegistry, Prov } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { useWalletContext } from "@/components/nav/wallet-context";
-import { formatCompact, shortAddr } from "@/lib/shared/format-event";
+import { formatCompact } from "@/lib/shared/format-event";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAlchemistEvent } from "@/lib/shared/types/event-shape";
 import { AlchemixEventCard } from "@/components/protocol/alchemix/alchemix-event-card";
+import { AlchemixStatusPill, amountColumn } from "@/components/protocol/alchemix/alchemix-position-card";
 import { computeAlchemixEconomics } from "@/lib/alchemix/economics";
 import {
   liveFigureProv,
@@ -60,12 +74,7 @@ import {
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
 import type { AlchemixDeployment } from "@/lib/alchemix/lines";
-import type {
-  AlchemixAmountAtBlock,
-  AlchemixLineCoverage,
-  AlchemixLiveState,
-  AlchemixPositionSummary,
-} from "@/types/api/alchemix";
+import type { AlchemixLineCoverage, AlchemixLiveState, AlchemixPositionSummary } from "@/types/api/alchemix";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -84,52 +93,6 @@ export interface AlchemistPositionViewProps {
   /** The current figures, read at render. Null when that read did not land —
    *  and then the slot says so, because no stored figure is current. */
   initialLiveState: AlchemixLiveState | null;
-}
-
-/** An amount is stated only with the block it was settled at. Without one the
- *  page says the figure did not settle rather than printing a bare number. */
-function AmountAtBlock({
-  label,
-  value,
-  unit,
-  prov,
-  note,
-}: {
-  label: string;
-  value: AlchemixAmountAtBlock | null;
-  unit: string;
-  prov?: Parameters<typeof Prov>[0]["info"];
-  note?: string;
-}) {
-  if (!value || value.asOfBlock == null) {
-    return (
-      <div className="flex flex-col gap-0.5">
-        <span className="text-xs text-rb-500">{label}</span>
-        <span className="text-sm text-rb-500">Not settled</span>
-        {note ? <span className="text-[11px] leading-snug text-rb-400">{note}</span> : null}
-      </div>
-    );
-  }
-  const { display, title } = formatCompact(value.formatted);
-  const figure = (
-    <span className="text-lg tabular-nums" title={title}>
-      {display} {unit}
-    </span>
-  );
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-xs text-rb-500">{label}</span>
-      {prov ? (
-        <Prov info={prov} value={String(value.formatted)} symbol={unit}>
-          {figure}
-        </Prov>
-      ) : (
-        figure
-      )}
-      <span className="text-[11px] tabular-nums text-rb-500">at block {block(value.asOfBlock)}</span>
-      {note ? <span className="text-[11px] leading-snug text-rb-400">{note}</span> : null}
-    </div>
-  );
 }
 
 export function AlchemistPositionView({
@@ -187,10 +150,7 @@ export function AlchemistPositionView({
     setWallets([position.owner.toLowerCase()], {});
   }, [position.owner, setWallets]);
 
-  const coords: AlchemixCoords = useMemo(
-    () => ({ chainId, lineKey, tokenId }),
-    [chainId, lineKey, tokenId],
-  );
+  const coords: AlchemixCoords = useMemo(() => ({ chainId, lineKey, tokenId }), [chainId, lineKey, tokenId]);
 
   const alchemistEvents = useMemo(() => events.filter(isAlchemistEvent), [events]);
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - alchemistEvents.length) : 0;
@@ -238,224 +198,255 @@ export function AlchemistPositionView({
       <div className="space-y-6 py-8">
         <DetailTopRow session={deployment.session} wallet={position.owner} />
 
-        {/* ── Who and what ──────────────────────────────────────────────── */}
-        <header className="space-y-2">
-          <h1 className="text-xl font-medium">
-            {position.lineDisplayName} position {tokenId}
-          </h1>
-          <p className="text-sm text-rb-500">
-            {position.chainName ?? `chain ${chainId}`} · {position.status === "unknown" ? "no current reading" : position.status}
-            {position.owner ? (
+        {/* ── The position card: the current figures, one reading, one block ── */}
+        <PositionCardShell receipts>
+          <OpenPositionStats
+            statusPill={<AlchemixStatusPill status={position.status} />}
+            leadingIdentity={
               <>
-                {" · held now by "}
-                <Link href={`/address/${position.owner}`} className="underline underline-offset-4">
-                  {shortAddr(position.owner)}
-                </Link>
+                <span className="text-xs font-bold uppercase tracking-wide text-foreground/80">
+                  {position.lineDisplayName}
+                </span>
+                <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-rb-500">
+                  <span className="tabular-nums">position {tokenId}</span>
+                  <span>{position.chainName ?? `chain ${chainId}`}</span>
+                  {position.owner ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      held now by
+                      <WalletPill
+                        wallet={position.owner}
+                        ensName={null}
+                        filterProtocol={deployment.session}
+                        bookmarkProtocol={deployment.session}
+                      />
+                    </span>
+                  ) : null}
+                </span>
               </>
-            ) : null}
-          </p>
-          {/* Rule 5, said outright rather than left to be inferred. */}
-          <p className="text-[11px] leading-relaxed text-rb-500">
-            This position is a token that can be sold. It can change hands without closing, so the address above is who
-            holds it now and need not be who did any of what is below.
-          </p>
-        </header>
-
-        {/* ── The current figures: one reading, one block ───────────────── */}
-        <section className="space-y-3 rounded-lg border border-rb-200 p-4 dark:border-rb-800">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-sm font-medium">Now</h2>
-            {live ? (
-              <span className="text-[11px] tabular-nums text-rb-500">
-                one reading at block{" "}
-                <a
-                  href={explorerUrl(chainId as ChainId, "block", live.asOfBlock)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline underline-offset-4"
-                >
-                  {block(live.asOfBlock)}
-                </a>
+            }
+            identity={
+              <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span className={`${OVERLAY_HEADING} text-rb-500`}>Now</span>
+                {live ? (
+                  <span className="text-[11px] tabular-nums text-rb-500">
+                    one reading at block{" "}
+                    <a
+                      href={explorerUrl(chainId as ChainId, "block", live.asOfBlock)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="link-muted"
+                    >
+                      {block(live.asOfBlock)}
+                    </a>
+                  </span>
+                ) : null}
               </span>
-            ) : null}
-          </div>
-          {live ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <AmountAtBlock
-                label="Debt"
-                value={live.debt ? { ...live.debt, asOfBlock: live.asOfBlock } : null}
-                unit={sym}
-                prov={liveFigureProv("Debt", sym, live.debt?.raw ?? null, live.asOfBlock, coords)}
-              />
-              <AmountAtBlock
-                label="Collateral"
-                value={{ ...live.collateral, asOfBlock: live.asOfBlock }}
-                unit={live.collateral.mytSymbol ?? mytSymbol}
-                prov={liveFigureProv("Collateral", mytSymbol, live.collateral.raw, live.asOfBlock, coords)}
-                note={
-                  live.collateral.underlying
-                    ? `${formatCompact(live.collateral.underlying.formatted).display} ${live.collateral.underlying.symbol ?? "underlying"}${
-                        live.collateral.usd ? ` · $${formatCompact(live.collateral.usd.usd).display}` : ""
-                      }`
-                    : "No share price in hand, so no figure for the asset underneath."
-                }
-              />
-              {/* Rule 1. Its own slot, its own block, added to nothing. */}
-              <AmountAtBlock
-                label="Set aside for repayment"
-                value={live.earmarked ? { ...live.earmarked, asOfBlock: live.asOfBlock } : null}
-                unit={sym}
-                prov={liveFigureProv("Set aside for repayment", sym, live.earmarked?.raw ?? null, live.asOfBlock, coords)}
-                note="It grows every block, so this is true at that block and at no other."
-              />
-            </div>
-          ) : (
+            }
+            columns={
+              live
+                ? [
+                    amountColumn("Debt", live.debt ? { ...live.debt, asOfBlock: live.asOfBlock } : null, sym, {
+                      prov: liveFigureProv("Debt", sym, live.debt?.raw ?? null, live.asOfBlock, coords),
+                    }),
+                    amountColumn(
+                      "Collateral",
+                      { ...live.collateral, asOfBlock: live.asOfBlock },
+                      live.collateral.mytSymbol ?? mytSymbol,
+                      {
+                        prov: liveFigureProv("Collateral", mytSymbol, live.collateral.raw, live.asOfBlock, coords),
+                        note: live.collateral.underlying
+                          ? `${formatCompact(live.collateral.underlying.formatted).display} ${live.collateral.underlying.symbol ?? "underlying"}${
+                              live.collateral.usd ? ` · $${formatCompact(live.collateral.usd.usd).display}` : ""
+                            }`
+                          : "No share price in hand, so no figure for the asset underneath.",
+                      },
+                    ),
+                    // Rule 1. Its own slot, its own block, added to nothing.
+                    amountColumn(
+                      "Set aside for repayment",
+                      live.earmarked ? { ...live.earmarked, asOfBlock: live.asOfBlock } : null,
+                      sym,
+                      {
+                        prov: liveFigureProv(
+                          "Set aside for repayment",
+                          sym,
+                          live.earmarked?.raw ?? null,
+                          live.asOfBlock,
+                          coords,
+                        ),
+                        note: "It grows every block, so this is true at that block and at no other.",
+                      },
+                    ),
+                  ]
+                : []
+            }
+          />
+          {live ? null : (
             <p className="text-sm text-rb-500">
               {livePending
                 ? "Reading the position now…"
                 : "The current figures did not come back. Nothing stored is put in their place: the amount set aside for repayment grows every block, so no figure taken earlier is the figure now."}
             </p>
           )}
-        </section>
+          {/* Rule 5, said outright rather than left to be inferred. */}
+          <p className="mt-3 text-[11px] leading-relaxed text-rb-500">
+            This position is a token that can be sold. It can change hands without closing, so the address above is who
+            holds it now and need not be who did any of what is below.
+          </p>
+        </PositionCardShell>
 
         {/* ── What the index holds, and under which grade ────────────────── */}
-        <section className="space-y-3 rounded-lg border border-rb-200 p-4 dark:border-rb-800">
-          <h2 className="text-sm font-medium">As this explorer last settled it</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <AmountAtBlock
-              label="Debt"
-              value={position.figures.debt}
-              unit={sym}
-              prov={servedFigureProv(
-                "Debt",
-                sym,
-                position.figures.debt?.raw ?? null,
-                position.figures.debt?.asOfBlock ?? null,
-                position.figures.grade,
-                coords,
-              )}
-            />
-            <AmountAtBlock
-              label="Collateral"
-              value={collateral}
-              unit={mytSymbol}
-              prov={servedFigureProv(
-                "Collateral",
-                mytSymbol,
-                collateral?.raw ?? null,
-                collateral?.asOfBlock ?? null,
-                position.figures.grade,
-                coords,
-              )}
-            />
-            <AmountAtBlock
-              label="Set aside for repayment"
-              value={position.figures.earmarked}
-              unit={sym}
-              prov={servedFigureProv(
-                "Set aside for repayment",
-                sym,
-                position.figures.earmarked?.raw ?? null,
-                position.figures.earmarked?.asOfBlock ?? null,
-                position.figures.grade,
-                coords,
-              )}
-              note="The last reading taken. It is not this position's figure now."
-            />
-          </div>
-
-          {/* The asset underneath the shares, with BOTH blocks — the share
-              count and the share price need not have been read together. */}
-          {underlying ? (
-            <p className="text-[11px] leading-relaxed text-rb-500">
-              Those shares are{" "}
-              <Prov
-                info={underlyingProv(
-                  underlying.symbol ?? "the asset underneath",
-                  underlying.raw,
-                  underlying.decimals,
-                  collateral?.asOfBlock ?? null,
-                  underlying.sharePriceRaw,
-                  underlying.sharePriceAsOfBlock,
+        {/* The same shell the card above draws in, so the two sets of figures
+            line up column for column: they are the same three figures on two
+            bases, and a reader compares them across the gap. */}
+        <PositionCardShell receipts>
+          <OpenPositionStats
+            // The card above states the status once. This panel leads with the
+            // basis instead — what a pill would say here is already said.
+            statusPill={null}
+            leadingIdentity={<h2 className={`${OVERLAY_HEADING} text-rb-500`}>As this explorer last settled it</h2>}
+            columns={[
+              amountColumn("Debt", position.figures.debt, sym, {
+                prov: servedFigureProv(
+                  "Debt",
+                  sym,
+                  position.figures.debt?.raw ?? null,
+                  position.figures.debt?.asOfBlock ?? null,
+                  position.figures.grade,
                   coords,
+                ),
+              }),
+              amountColumn("Collateral", collateral, mytSymbol, {
+                prov: servedFigureProv(
+                  "Collateral",
+                  mytSymbol,
+                  collateral?.raw ?? null,
+                  collateral?.asOfBlock ?? null,
+                  position.figures.grade,
+                  coords,
+                ),
+              }),
+              amountColumn("Set aside for repayment", position.figures.earmarked, sym, {
+                prov: servedFigureProv(
+                  "Set aside for repayment",
+                  sym,
+                  position.figures.earmarked?.raw ?? null,
+                  position.figures.earmarked?.asOfBlock ?? null,
+                  position.figures.grade,
+                  coords,
+                ),
+                note: "The last reading taken. It is not this position's figure now.",
+              }),
+            ]}
+          />
+
+          <div className="mt-3 space-y-1.5">
+            {/* The asset underneath the shares, with BOTH blocks — the share
+              count and the share price need not have been read together. */}
+            {underlying ? (
+              <p className="text-[11px] leading-relaxed text-rb-500">
+                Those shares are{" "}
+                <Prov
+                  info={underlyingProv(
+                    underlying.symbol ?? "the asset underneath",
+                    underlying.raw,
+                    underlying.decimals,
+                    collateral?.asOfBlock ?? null,
+                    underlying.sharePriceRaw,
+                    underlying.sharePriceAsOfBlock,
+                    coords,
+                  )}
+                  value={String(underlying.formatted)}
+                  symbol={underlying.symbol ?? undefined}
+                >
+                  <span className="tabular-nums">
+                    {formatCompact(underlying.formatted).display} {underlying.symbol ?? ""}
+                  </span>
+                </Prov>
+                {underlying.sharePriceAsOfBlock != null ? (
+                  <> at the share price read at block {block(underlying.sharePriceAsOfBlock)}</>
+                ) : (
+                  <> at a share price with no block stated</>
                 )}
-                value={String(underlying.formatted)}
-                symbol={underlying.symbol ?? undefined}
-              >
+                {usd ? (
+                  <>
+                    {", worth "}
+                    <Prov
+                      info={usdProv(
+                        underlying.symbol ?? "the asset underneath",
+                        usd.pricePerUnit,
+                        usd.priceSource,
+                        usd.pricedAt,
+                      )}
+                      value={String(usd.usd)}
+                    >
+                      <span className="tabular-nums">${formatCompact(usd.usd).display}</span>
+                    </Prov>
+                  </>
+                ) : null}
+                .
+              </p>
+            ) : (
+              // Rule 6 of the protocol's own shape: the share price lives only on
+              // a reading of the position. With no reading there is no price, so
+              // there is no figure for the asset underneath — and none is shown,
+              // rather than a zero.
+              <p className="text-[11px] leading-relaxed text-rb-500">
+                No share price has been read for this position, so what those shares are worth in the asset underneath
+                is not stated here.
+              </p>
+            )}
+
+            {/* Rule 3. The route's own words for this line's grade. */}
+            <p className="text-xs leading-relaxed text-rb-500">{position.figures.gradeReason}</p>
+
+            {/* Rule 4. The figure, its block, and no direction. */}
+            {dlb ? (
+              <p className="text-xs leading-relaxed text-rb-500">
+                Worked out from this position&rsquo;s own events alone, the debt is{" "}
                 <span className="tabular-nums">
-                  {formatCompact(underlying.formatted).display} {underlying.symbol ?? ""}
+                  {formatCompact(Number(dlb.debtRaw) / 1e18).display} {sym}
                 </span>
-              </Prov>
-              {underlying.sharePriceAsOfBlock != null ? (
-                <> at the share price read at block {block(underlying.sharePriceAsOfBlock)}</>
-              ) : (
-                <> at a share price with no block stated</>
-              )}
-              {usd ? (
-                <>
-                  {", worth "}
-                  <Prov
-                    info={usdProv(underlying.symbol ?? "the asset underneath", usd.pricePerUnit, usd.priceSource, usd.pricedAt)}
-                    value={String(usd.usd)}
-                  >
-                    <span className="tabular-nums">${formatCompact(usd.usd).display}</span>
-                  </Prov>
-                </>
-              ) : null}
-              .
-            </p>
-          ) : (
-            // Rule 6 of the protocol's own shape: the share price lives only on
-            // a reading of the position. With no reading there is no price, so
-            // there is no figure for the asset underneath — and none is shown,
-            // rather than a zero.
-            <p className="text-[11px] leading-relaxed text-rb-500">
-              No share price has been read for this position, so what those shares are worth in the asset underneath is
-              not stated here.
-            </p>
-          )}
+                , exact to block {block(dlb.validToBlock)}. Redemptions after that block moved the debt with nothing in
+                these events to see, so that figure and the one above it differ, and by how much is not something either
+                of them states.
+              </p>
+            ) : null}
 
-          {/* Rule 3. The route's own words for this line's grade. */}
-          <p className="text-xs leading-relaxed text-rb-600 dark:text-rb-400">{position.figures.gradeReason}</p>
+            {position.refusedReason ? (
+              <p className="text-xs leading-relaxed text-rb-500">{position.refusedReason}</p>
+            ) : null}
 
-          {/* Rule 4. The figure, its block, and no direction. */}
-          {dlb ? (
-            <p className="text-xs leading-relaxed text-rb-500">
-              Worked out from this position&rsquo;s own events alone, the debt is{" "}
-              <span className="tabular-nums">
-                {formatCompact(Number(dlb.debtRaw) / 1e18).display} {sym}
-              </span>
-              , exact to block {block(dlb.validToBlock)}. Redemptions after that block moved the debt with nothing in
-              these events to see, so that figure and the one above it differ, and by how much is not something either
-              of them states.
-            </p>
-          ) : null}
+            {coverage ? (
+              <p className="text-[11px] leading-relaxed text-rb-500">
+                This line has{" "}
+                {coverage.redemptionCount === 0 ? "had no redemption" : `had ${coverage.redemptionCount} redemptions`}
+                {coverage.firstRedemptionBlock != null
+                  ? `, the first at block ${block(coverage.firstRedemptionBlock)}`
+                  : ""}
+                {coverage.indexedToBlock != null
+                  ? `, and is covered here to block ${block(coverage.indexedToBlock)}`
+                  : ""}
+                .
+                {coverage.unsweptRedemptions > 0
+                  ? ` ${coverage.unsweptRedemptions} of them have no reading taken past them yet, so the figures above do not cover every point the debt could have stepped.`
+                  : ""}
+              </p>
+            ) : null}
 
-          {position.refusedReason ? (
-            <p className="text-xs leading-relaxed text-rb-500">{position.refusedReason}</p>
-          ) : null}
-
-          {coverage ? (
-            <p className="text-[11px] leading-relaxed text-rb-400">
-              This line has {coverage.redemptionCount === 0 ? "had no redemption" : `had ${coverage.redemptionCount} redemptions`}
-              {coverage.firstRedemptionBlock != null ? `, the first at block ${block(coverage.firstRedemptionBlock)}` : ""}
-              {coverage.indexedToBlock != null ? `, and is covered here to block ${block(coverage.indexedToBlock)}` : ""}.
-              {coverage.unsweptRedemptions > 0
-                ? ` ${coverage.unsweptRedemptions} of them have no reading taken past them yet, so the figures above do not cover every point the debt could have stepped.`
-                : ""}
-            </p>
-          ) : null}
-
-          <Link href={`${deployment.basePath}/lines`} className="inline-block text-xs underline underline-offset-4">
-            How each line answers
-          </Link>
-        </section>
+            <Link href={`${deployment.basePath}/lines`} className="link inline-block text-xs">
+              How each line answers
+            </Link>
+          </div>
+        </PositionCardShell>
 
         {/* ── Lifetime flows ─────────────────────────────────────────────── */}
         {economics ? (
           <ChainTruthTower data={economics.data} title="Lifetime flows" />
         ) : olderCount > 0 ? (
-          <p className="rounded-lg border border-dashed border-rb-300/50 p-4 text-[11px] leading-relaxed text-rb-500 dark:border-rb-700/50">
+          // The tower's own "nothing to draw" placeholder, in the slot the
+          // tower would have filled.
+          <p className="rounded-md border border-dashed border-rb-300/50 px-4 py-6 text-center text-[11px] leading-relaxed text-rb-400 dark:border-rb-700/50">
             This position has more events than the page draws, so no lifetime totals are given: a total over part of a
             life would carry a label it has not earned.
           </p>

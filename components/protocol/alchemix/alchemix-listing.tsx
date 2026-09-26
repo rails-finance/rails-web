@@ -52,7 +52,7 @@ export function AlchemixListing({
       defaults={ALCHEMIX_LIST_DEFAULTS}
       sortOptions={alchemixSortOptions}
       searchPlaceholder="Address or position id"
-      renderCard={(p) => <AlchemixPositionCard p={p} />}
+      renderCard={(p) => <AlchemixPositionCard p={p} session={deployment.session} />}
       // Both halves of the key, always: a token id is unique only inside its
       // line, and the line is unique only on its chain. The position route
       // takes the pair in its path and checks the line against the chain

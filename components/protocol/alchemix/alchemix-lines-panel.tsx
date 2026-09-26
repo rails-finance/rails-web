@@ -46,27 +46,30 @@ function gradeSentence(line: AlchemixLineCoverage): string {
 
 export function AlchemixLinesPanel({ lines }: { lines: AlchemixLineCoverage[] }) {
   if (lines.length === 0) {
-    return <p className="text-sm text-neutral-500">No line on this chain answered.</p>;
+    return <p className="text-sm text-rb-500">No line on this chain answered.</p>;
   }
   return (
-    <div className="flex flex-col gap-4">
+    // The shared sub-page panel: the raised rounded-xl card every protocol-level
+    // view draws its sections in, with the title/meta row and the muted prose
+    // rhythm that go with it. Nothing about a line needs a frame of its own.
+    <div className="flex flex-col gap-3">
       {lines.map((line) => (
-        <section key={line.lineKey} className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+        <section key={line.lineKey} className="rounded-xl bg-raised px-4 py-3.5">
           <header className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-sm font-medium">{line.displayName}</h2>
-            <span className="text-xs text-neutral-500 tabular-nums">
+            <h2 className="text-xs font-bold uppercase tracking-wide text-foreground/80">{line.displayName}</h2>
+            <span className="text-[11px] tabular-nums text-rb-500">
               {line.lineKey} · indexed to block {block(line.indexedToBlock)}
             </span>
           </header>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">{gradeSentence(line)}</p>
+          <p className="mt-2.5 text-xs leading-relaxed text-rb-500">{gradeSentence(line)}</p>
           {line.unsweptRedemptions > 0 ? (
-            <p className="mt-2 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
+            <p className="mt-2 text-xs leading-relaxed text-rb-500">
               {line.unsweptRedemptions.toLocaleString("en-US")} of those redemptions have not been swept yet, so the
               readings on this line do not cover every block at which a debt could have stepped.
             </p>
           ) : null}
           {line.staleHeadReadings > 0 ? (
-            <p className="mt-2 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
+            <p className="mt-2 text-xs leading-relaxed text-rb-500">
               {line.staleHeadReadings.toLocaleString("en-US")} positions on this line have no current reading. Their
               replayed figures are a floor, not their debt.
             </p>
