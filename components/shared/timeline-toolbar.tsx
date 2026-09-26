@@ -34,7 +34,7 @@ import {
   PILL_META,
   ctrlWaking,
 } from "@/lib/shared/ui-grammar";
-import { formatDate, formatDuration } from "@/lib/date";
+import { formatDate, formatDayMonth, formatDuration } from "@/lib/date";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { ratioLabel } from "@/lib/shared/ratio-format";
 import { lifetimeFiguresKnown } from "@/lib/shared/timeline-opening-balance";
@@ -332,13 +332,7 @@ function loadedSpanText(tl: TimelineEventsState): string | null {
     last = Math.max(last, tl.servedSpan.lastAt);
   }
   if (!Number.isFinite(first)) return null;
-  const day = (ts: number) =>
-    new Date(ts * 1000).toLocaleDateString("en-GB", {
-      timeZone: "UTC",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+  const day = (ts: number) => formatDate(ts);
   const a = day(first);
   const b = day(last);
   return a === b ? a : `${a} to ${b}`;
@@ -462,9 +456,7 @@ export function TimelineToolbar({
       : segmentMonth != null
         ? monthLabel(segmentMonth)
         : dateActive
-          ? `${new Date(tl.dateRange![0] * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric" })} – ${new Date(
-              tl.dateRange![1] * 1000,
-            ).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric" })}`
+          ? `${formatDayMonth(tl.dateRange![0])} – ${formatDayMonth(tl.dateRange![1])}`
           : "Date";
   const countLine = eventCountLine(tl);
   const countState = eventCountState(tl);

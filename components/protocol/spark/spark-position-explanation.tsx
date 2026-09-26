@@ -264,14 +264,10 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isSparkEvent } from "@/lib/shared/types/event-shape";
 import type { SparkReserveAmount } from "@/lib/sources/api/spark-positions";
 import { formatNumber } from "@/lib/utils/format";
+import { formatDate } from "@/lib/date";
 
 function closureDate(unix: number): string {
-  return new Date(unix * 1000).toLocaleDateString("en-GB", {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDate(unix);
 }
 
 /** Up to three peak reserve figures, bolded, then a count for the rest — the

@@ -47,14 +47,9 @@ import { formatCompact, formatExact, formatNumber } from "@/lib/utils/format";
 import type { FrankencoinSystemChainResponse } from "@/lib/sources/chain/frankencoin-system";
 import type { FrankencoinBook } from "@/lib/sources/api/frankencoin-system-book";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { formatDate } from "@/lib/date";
 
-const dateOf = (unix: number): string =>
-  new Date(unix * 1000).toLocaleDateString("en-GB", {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+const dateOf = (unix: number): string => formatDate(unix);
 
 /** The franc itself — supply and the FPS equity market. */
 function FrancCard({ data }: { data: FrankencoinSystemChainResponse }) {

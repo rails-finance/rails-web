@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SITE_URL } from "@/lib/shared/page-metadata";
+import { formatMonthDayYear } from "@/lib/date";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -26,7 +27,7 @@ export default function TermsPage() {
         </h1>
         <p className="text-sm text-rb-500 mb-8">
           Last updated:{" "}
-          {new Date().toLocaleDateString("en-US", { timeZone: "UTC", month: "long", day: "numeric", year: "numeric" })}
+          {formatMonthDayYear(new Date())}
         </p>
 
         <div className="notice-caution p-4 mb-8">

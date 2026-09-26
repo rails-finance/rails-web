@@ -62,6 +62,7 @@ import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { RiskFooterStrip, RiskFigure } from "@/components/shared/risk-footer-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { formatDayMonth } from "@/lib/date";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle.
@@ -312,12 +313,7 @@ export default function FrankencoinPositionView({
                   )}
                   {chain.cooldownActive && chain.cooldownUntil != null && (
                     <RiskFigure>
-                      minting cooldown until{" "}
-                      {new Date(chain.cooldownUntil * 1000).toLocaleDateString("en-GB", {
-                        timeZone: "UTC",
-                        day: "numeric",
-                        month: "short",
-                      })}
+                      minting cooldown until {formatDayMonth(chain.cooldownUntil)}
                     </RiskFigure>
                   )}
                 </RiskFooterStrip>

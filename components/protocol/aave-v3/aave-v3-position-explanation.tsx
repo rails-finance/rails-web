@@ -262,14 +262,10 @@ import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import type { AaveV3ReserveAmount } from "@/components/protocol/aave-v3/aave-v3-position-card";
 import { MARKET_NAME } from "@/lib/aave-v3/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
+import { formatDate } from "@/lib/date";
 
 function closureDate(unix: number): string {
-  return new Date(unix * 1000).toLocaleDateString("en-GB", {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDate(unix);
 }
 
 /** Up to three peak reserve figures, bolded, then a count for the rest — the

@@ -23,6 +23,7 @@ import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import type { CompoundPositionView } from "@/components/protocol/compound/compound-position-card";
 import { capacityShare } from "@/lib/shared/capacity-share";
+import { formatDate } from "@/lib/date";
 
 /** Oxford-join asset symbols ("wstETH, WBTC and cbBTC"). */
 function joinSymbols(syms: string[]): string {
@@ -49,15 +50,7 @@ export function CompoundClosedPositionExplanation({ v }: { v: CompoundPositionVi
         </H>
       </span>
     ));
-  const closedDate =
-    v.lastActivityAt != null
-      ? new Date(v.lastActivityAt * 1000).toLocaleDateString("en-GB", {
-          timeZone: "UTC",
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        })
-      : null;
+  const closedDate = v.lastActivityAt != null ? formatDate(v.lastActivityAt) : null;
 
   const lead = liquidated ? (
     <>

@@ -2,6 +2,7 @@ import type { CoveredPositions } from "@/lib/home/covered-positions";
 import type { HomeStats } from "@/lib/home/home-stats";
 import { CoveredStatsNote } from "@/components/home/covered-stats-note";
 import { launchedChainScope } from "@/lib/shared/protocols";
+import { formatMonthDay } from "@/lib/date";
 
 /** The production chains the count is drawn from — the same set the loader
  *  sums over, named with their layer. */
@@ -127,10 +128,6 @@ export function CoveredStats({ covered, stats }: { covered: CoveredPositions | n
  * "en-US" fix on the number formatting above, applied to a date this time.
  */
 function formatEarliestDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(iso));
+  const date = new Date(iso);
+  return `${formatMonthDay(date)}, ${date.getUTCFullYear()}`;
 }

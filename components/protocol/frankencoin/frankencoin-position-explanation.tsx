@@ -17,14 +17,9 @@ import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-posit
 import { formatNumber } from "@/lib/utils/format";
 import { ppmToPct } from "@/lib/frankencoin/asset-catalog";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
+import { formatDate } from "@/lib/date";
 
-const dateOf = (unix: number): string =>
-  new Date(unix * 1000).toLocaleDateString("en-GB", {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+const dateOf = (unix: number): string => formatDate(unix);
 
 export function FrankencoinPositionExplanation({
   chain,

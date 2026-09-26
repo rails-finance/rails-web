@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Article } from "@/app/(site)/blog/data/articles";
+import { formatMonthDayYear } from "@/lib/date";
 
 interface ArticleLayoutProps {
   article: Article;
@@ -9,12 +10,7 @@ interface ArticleLayoutProps {
 }
 
 export function ArticleLayout({ article, nextArticle, prevArticle, children }: ArticleLayoutProps) {
-  const formattedDate = new Date(article.publishedAt).toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const formattedDate = formatMonthDayYear(article.publishedAt);
 
   return (
     <article className="container mx-auto px-4 md:px-6 pt-32 pb-12 max-w-3xl">

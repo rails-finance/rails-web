@@ -18,6 +18,7 @@ import { ImageResponse } from "next/og";
 import { protocolForSession, POSITION_NOUN } from "@/lib/shared/protocols";
 import { CHAINS, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { SessionProtocol } from "@/lib/shared/sessions";
+import { monthShort } from "@/lib/date";
 import { CANVAS, MUTED, loadFonts, protocolMark } from "@/lib/share/position-card";
 
 /** What `lib/share/event-model.ts`'s family-agnostic mapper hands the
@@ -50,7 +51,7 @@ export interface EventCardModel {
  *  Intl's day/month/year order varies by locale and this card has none. */
 function formatEventStamp(d: Date): string {
   const day = d.getUTCDate();
-  const month = d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  const month = monthShort(d.getUTCMonth());
   const year = d.getUTCFullYear();
   const hh = String(d.getUTCHours()).padStart(2, "0");
   const mm = String(d.getUTCMinutes()).padStart(2, "0");

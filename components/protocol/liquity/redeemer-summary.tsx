@@ -11,11 +11,12 @@
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { formatPrice, formatUsdValue } from "@/components/shared/economics-chart-primitives";
 import type { RedeemerStats } from "@/lib/liquity/economics";
+import { formatDate } from "@/lib/date";
 
 export type { RedeemerStats };
 
 export function RedeemerSummary({ stats, currentPrice }: { stats: RedeemerStats; currentPrice?: number }) {
-  const dateRange = `${new Date(stats.firstTimestamp * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })} – ${new Date(stats.lastTimestamp * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}`;
+  const dateRange = `${formatDate(stats.firstTimestamp)} – ${formatDate(stats.lastTimestamp)}`;
   const collValue = currentPrice ? stats.totalCollateralReceived * currentPrice : null;
   const netPL = collValue !== null ? collValue - stats.totalDebtRedeemed : null;
   // Effective rate: BOLD per unit of collateral received

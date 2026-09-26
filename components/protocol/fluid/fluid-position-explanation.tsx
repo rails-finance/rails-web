@@ -31,6 +31,7 @@ import {
 } from "@/lib/shared/explainer-prose";
 
 import { FLUID_EPS as EPS, fluidLegHolds } from "@/lib/fluid/explainer-clauses";
+import { formatDate } from "@/lib/date";
 
 /** Terminal pane — a closed position narrates its RECORD from the index alone
  *  (its live read answers zeros): the card's peak figures, the liquidation
@@ -50,15 +51,7 @@ function FluidClosedPositionExplanation({
   const peakDebt = Number(v.peakDebt);
   const hasPeakCol = Number.isFinite(peakCol) && peakCol > 0;
   const hasPeakDebt = Number.isFinite(peakDebt) && peakDebt > 0;
-  const closedDate =
-    v.lastActivityAt != null
-      ? new Date(v.lastActivityAt * 1000).toLocaleDateString("en-GB", {
-          timeZone: "UTC",
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        })
-      : null;
+  const closedDate = v.lastActivityAt != null ? formatDate(v.lastActivityAt) : null;
 
   // The lead is keyed on HOW it ended: `fullyLiquidated` means the engine
   // itself emptied the position; a position with sweeps in its record that

@@ -44,6 +44,7 @@ import { Prov } from "@/components/shared/provenance";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { getBatchManagerByAddress } from "@/lib/liquity/batch-managers";
 import { formatGasCost } from "@/lib/shared/format-event";
+import { formatMonthDay } from "@/lib/date";
 import { calculateInterestBetweenTransactions } from "@/lib/liquity/utils/interest-calculator";
 import { isNoChangeAdjust, LIQUITY_MIN_DEBT, TROVE_DELTA_EPSILON } from "@/lib/liquity/trove-ops";
 import {
@@ -89,12 +90,8 @@ function fmtCurrency(n: number, asset: string): string {
 function fmtDay(tsSeconds: number): string {
   const d = new Date(tsSeconds * 1000);
   const sameYear = d.getUTCFullYear() === new Date().getUTCFullYear();
-  return d.toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    month: "short",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "2-digit" }),
-  });
+  const base = formatMonthDay(d);
+  return sameYear ? base : `${base}, ${String(d.getUTCFullYear()).slice(-2)}`;
 }
 
 function shortenAddress(addr: string): string {

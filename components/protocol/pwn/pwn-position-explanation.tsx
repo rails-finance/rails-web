@@ -24,14 +24,9 @@ import { loanDueAt } from "@/lib/pwn/economics";
 import { shortAddress, shortTokenId } from "@/lib/pwn/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
+import { formatDate } from "@/lib/date";
 
-const dateOf = (unix: number): string =>
-  new Date(unix * 1000).toLocaleDateString("en-GB", {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+const dateOf = (unix: number): string => formatDate(unix);
 
 /** The collateral as prose: "PWN Bundle #29" for an NFT, "2.5 WETH" fungible. */
 function assetText(a: PwnAsset | null): string {

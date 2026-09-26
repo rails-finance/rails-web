@@ -38,6 +38,7 @@ import { FadeNumber } from "@/components/ui/FadeNumber";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { useEnsName } from "@/lib/ens/use-ens-names";
+import { formatMonthDayYear } from "@/lib/date";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { formatApproximate, formatPrice, formatUsdValue } from "@/lib/utils/format";
 import { getLiquidationThreshold, formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
@@ -473,12 +474,7 @@ export function LiquityPositionCard({
         ) : (
           <>
             The {v.batch.managerName} delegate will no longer be maintained after{" "}
-            {new Date(v.batch.deprecation.deprecatedDate + "T00:00:00Z").toLocaleDateString("en-US", {
-              timeZone: "UTC",
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}
+            {formatMonthDayYear(v.batch.deprecation.deprecatedDate + "T00:00:00Z")}
             . This position should be moved to a new delegate before this date.{" "}
             <AnnouncementLink url={cfg.delegateDeprecationAnnouncement} />
           </>

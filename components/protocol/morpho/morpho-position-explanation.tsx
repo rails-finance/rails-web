@@ -231,14 +231,10 @@ export function MorphoPositionExplanation({
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
 import type { MorphoPositionView } from "./morpho-position-card";
+import { formatDate } from "@/lib/date";
 
 function closureDate(unix: number): string {
-  return new Date(unix * 1000).toLocaleDateString("en-GB", {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDate(unix);
 }
 
 export function MorphoClosedPositionExplanation({

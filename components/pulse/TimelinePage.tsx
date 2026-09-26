@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertCircle, Loader2, Pin } from "lucide-react";
 import type { TimelineEvent, TimelinePlatform } from "@/types/pulse";
 import { PulseTimelineItem } from "./item";
+import { formatMonthYear } from "@/lib/date";
 
 const XIcon = ({ className = "size-4" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
@@ -120,7 +121,7 @@ export function TimelinePage({ title, description, dataSources = DEFAULT_DATA_SO
     filteredEvents.forEach((event) => {
       const date = new Date(event.date);
       const key = `${date.getUTCFullYear()}-${date.getUTCMonth()}`;
-      const label = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "long", year: "numeric" }).format(date);
+      const label = formatMonthYear(date);
 
       if (key !== currentKey) {
         groups.push({ key, label, events: [event] });

@@ -23,6 +23,7 @@ import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { capacityShare } from "@/lib/shared/capacity-share";
+import { formatDate } from "@/lib/date";
 
 /** Oxford-join asset symbols ("WETH, USDC and cbBTC"). */
 function joinSymbols(syms: string[]): string {
@@ -326,12 +327,7 @@ export function MoonwellClosedPositionExplanation({ v }: { v: MoonwellPositionVi
         </H>
       </span>
     ));
-  const closedDate = new Date(v.lastActivityAt * 1000).toLocaleDateString("en-GB", {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const closedDate = formatDate(v.lastActivityAt);
 
   const lead = <>This account ran its course and closed — nothing remains supplied or borrowed:</>;
 

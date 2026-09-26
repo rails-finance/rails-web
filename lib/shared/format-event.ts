@@ -2,6 +2,7 @@
 
 import type { GasCost } from "@/lib/shared/types/activity";
 import type { AssetFlow } from "@/lib/shared/types/event-shape";
+import { formatDayMonth } from "@/lib/date";
 
 /** The contract address for `symbol` among an event's own flows — but only
  *  when EXACTLY ONE flow carries that symbol.
@@ -73,7 +74,7 @@ export function dayKey(unix: number): string {
  *  wrote "Feb 7" for as long as it existed, which put two orders of the same
  *  three fields on one page. */
 export function shortDate(unix: number): string {
-  return new Date(unix * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric" });
+  return formatDayMonth(unix);
 }
 
 /** Two-digit-year suffix, e.g. "'26" — pair with shortDate for full prefix. */

@@ -22,6 +22,7 @@ import { protocolForSession, POSITION_NOUN, protocolIconSrc } from "@/lib/shared
 import { protocolGlyph, type Glyph } from "@/components/icons/protocol-glyphs";
 import { CHAINS, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { SessionProtocol } from "@/lib/shared/sessions";
+import { monthShort } from "@/lib/date";
 
 /** What a family's `share-card.ts` mapper hands the renderer — already the
  *  page's own numbers, in the page's own formatted strings. This file draws
@@ -172,7 +173,7 @@ export async function protocolMark(id: string, size: number) {
  *  card has no locale of its own to key off. */
 function formatAsOf(d: Date): string {
   const day = d.getUTCDate();
-  const month = d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  const month = monthShort(d.getUTCMonth());
   const year = d.getUTCFullYear();
   const hh = String(d.getUTCHours()).padStart(2, "0");
   const mm = String(d.getUTCMinutes()).padStart(2, "0");

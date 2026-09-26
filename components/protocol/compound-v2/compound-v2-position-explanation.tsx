@@ -23,6 +23,7 @@ import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { capacityShare } from "@/lib/shared/capacity-share";
+import { formatDate } from "@/lib/date";
 
 /** Oxford-join asset symbols ("ETH, USDC and WBTC"). */
 function joinSymbols(syms: string[]): string {
@@ -354,12 +355,7 @@ export function CompoundV2ClosedPositionExplanation({ v }: { v: CompoundV2Positi
         </H>
       </span>
     ));
-  const closedDate = new Date(v.lastActivityAt * 1000).toLocaleDateString("en-GB", {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const closedDate = formatDate(v.lastActivityAt);
 
   const lead = liquidated ? (
     <>This account closed with liquidation in its record — nothing remains supplied or borrowed:</>

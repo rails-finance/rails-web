@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
+import { formatDate } from "@/lib/date";
 
 export type PositionOutcome = "closed" | "liquidated" | "expired" | "repaid" | "defaulted" | "denied";
 
@@ -55,8 +56,7 @@ export interface ClosedPositionStatsProps {
 }
 
 function formatClosureDate(unix: number): string {
-  const d = new Date(unix * 1000);
-  return d.toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
+  return formatDate(unix);
 }
 
 export function ClosedPositionStats({

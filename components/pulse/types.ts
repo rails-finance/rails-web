@@ -1,4 +1,5 @@
 import type { TimelinePlatform } from "@/types/pulse";
+import { formatMonthDay } from "@/lib/date";
 
 /** Platforms whose links stay inside Rails (rails.finance) — these read as
  *  internal links (blue, color-grammar.md §4a). Blog posts count as internal
@@ -10,16 +11,11 @@ export function isInternalPlatform(platform?: TimelinePlatform): boolean {
 }
 
 export function formatDisplayDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(value));
+  return formatMonthDay(new Date(value));
 }
 
 export function formatFullDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
+  const date = new Date(value);
+  const time = date.toLocaleTimeString("en-US", { timeZone: "UTC", hour: "numeric", minute: "2-digit" });
+  return `${formatMonthDay(date)}, ${date.getUTCFullYear()}, ${time}`;
 }

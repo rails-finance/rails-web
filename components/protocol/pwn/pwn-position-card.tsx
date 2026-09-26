@@ -30,6 +30,7 @@ import {
   bookPastDueProv,
 } from "@/lib/pwn/event-provenance";
 import { loanDueAt } from "@/lib/pwn/economics";
+import { formatDate } from "@/lib/date";
 import { shortAddress, shortTokenId } from "@/lib/pwn/asset-catalog";
 import { pwnPositionContent } from "@/lib/pwn/position-content";
 import type { PwnPositionSummary, PwnAsset } from "@/lib/sources/api/pwn-positions";
@@ -152,13 +153,7 @@ function collateralFootnote(v: PwnPositionView) {
 }
 
 /** "1 Jan 2024" — the deadline as a date; the title carries the exact moment. */
-const dueDateText = (unix: number): string =>
-  new Date(unix * 1000).toLocaleDateString("en-GB", {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+const dueDateText = (unix: number): string => formatDate(unix);
 
 const dueDateTitle = (unix: number): string => {
   const d = new Date(unix * 1000);

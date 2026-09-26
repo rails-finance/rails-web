@@ -1,17 +1,13 @@
 import Link from "next/link";
 import type { Article } from "@/app/(site)/blog/data/articles";
+import { formatMonthDayYear } from "@/lib/date";
 
 interface BlogCardProps {
   article: Article;
 }
 
 export function BlogCard({ article }: BlogCardProps) {
-  const formattedDate = new Date(article.publishedAt).toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const formattedDate = formatMonthDayYear(article.publishedAt);
 
   return (
     <Link href={`/blog/${article.slug}`} className="group block h-full">

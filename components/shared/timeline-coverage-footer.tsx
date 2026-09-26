@@ -60,18 +60,14 @@
 import type { ChainTimelineCoverage } from "@/lib/api/fetch-chain-timeline";
 import { explorerUrl } from "@/lib/shared/chains";
 import { useChainId } from "@/lib/shared/chain-context";
+import { formatDateLong } from "@/lib/date";
 
 /** The small-print register every footer/notice here shares. No rule above
  *  or below: the list's last card and the toolbar are the edges. */
 const NOTE = "text-[11px] leading-relaxed text-rb-500";
 
 function longDate(unix: number): string {
-  return new Date(unix * 1000).toLocaleDateString("en-GB", {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return formatDateLong(unix);
 }
 
 export interface TimelineCoverageFooterProps {

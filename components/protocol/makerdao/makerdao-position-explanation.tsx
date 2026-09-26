@@ -203,14 +203,10 @@ export function MakerdaoPositionExplanation({
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
+import { formatDate } from "@/lib/date";
 
 function closureDate(unix: number): string {
-  return new Date(unix * 1000).toLocaleDateString("en-GB", {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDate(unix);
 }
 
 export function MakerdaoClosedPositionExplanation({

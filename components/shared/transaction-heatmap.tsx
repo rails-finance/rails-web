@@ -30,13 +30,12 @@ function dayOfWeekMon0(ts: number): number {
 }
 
 function fmtFullDate(ts: number): string {
-  return new Date(ts * 1000).toLocaleDateString("en-GB", {
-    timeZone: "UTC",
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const d = new Date(ts * 1000);
+  // Weekday alone, via Intl: only the month name disagrees between Node and
+  // the browser (see lib/date.ts), so the day/month/year below come from
+  // MONTH_NAMES instead and only the weekday still asks the runtime.
+  const weekday = d.toLocaleDateString("en-GB", { timeZone: "UTC", weekday: "short" });
+  return `${weekday}, ${d.getUTCDate()} ${MONTH_NAMES[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
 // Five intensity levels (0 = empty … 4 = busiest) → Tailwind classes.

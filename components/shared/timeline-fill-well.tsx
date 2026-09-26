@@ -19,6 +19,7 @@
 
 import type { TimelineFillState } from "@/lib/api/fetch-chain-timeline";
 import { FILL_ETA_OVERRIDES } from "@/lib/shared/fill-eta-overrides";
+import { formatDateLong } from "@/lib/date";
 
 const DAY_MS = 86_400_000;
 
@@ -57,7 +58,7 @@ export function fillWellState(
 }
 
 function longDate(d: Date): string {
-  return d.toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "long", year: "numeric" });
+  return formatDateLong(d);
 }
 
 export function TimelineFillWell({ fill }: { fill: TimelineFillState | undefined }) {

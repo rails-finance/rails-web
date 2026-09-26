@@ -15,6 +15,7 @@ import {
   type ExportJobState,
   type ExportReceipt,
 } from "@/lib/shared/queued-export";
+import { monthShort } from "@/lib/date";
 
 const POLL_MS = 2_000;
 const n = (v: number) => v.toLocaleString("en-US");
@@ -25,13 +26,20 @@ function bytesLabel(b: number): string {
 }
 
 function whenLabel(iso: string): string {
-  return new Date(iso).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
+  // This one is client-only and reads the viewer's own local zone, not UTC
+  // (a queued export's "when" is a wall-clock time to the person who queued
+  // it) — scripts/check-locale.mjs bars the local getters (getDate/getMonth)
+  // that would normally read that zone, so day and month are read the same
+  // local-zone way lib/date.ts avoids for UTC: a bare, locale-pinned
+  // `toLocaleString` asked for one numeric field at a time. Numerals don't
+  // carry the CLDR month-name disagreement (see lib/date.ts) — only the
+  // month's SPELLING does, and that comes from the table below instead of a
+  // spelled-out Intl month.
+  const d = new Date(iso);
+  const day = d.toLocaleString("en-GB", { day: "numeric" });
+  const monthIndex = Number(d.toLocaleString("en-GB", { month: "numeric" })) - 1;
+  const time = d.toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
+  return `${day} ${monthShort(monthIndex)}, ${time}`;
 }
 
 export const PRIMARY_BUTTON =

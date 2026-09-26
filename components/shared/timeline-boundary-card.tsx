@@ -36,6 +36,7 @@ import { useTimelineDisplay } from "@/components/shared/timeline-display-context
 import { FeedbackModal } from "@/components/shared/feedback-modal";
 import { actionLabel } from "@/lib/shared/event-filter-helpers";
 import { formatCompact, shortDate, shortDateYear } from "@/lib/shared/format-event";
+import { formatDate } from "@/lib/date";
 import { explorerUrl } from "@/lib/shared/chains";
 import { useChainId } from "@/lib/shared/chain-context";
 import type { TimelineBoundary } from "@/lib/shared/timeline-boundary";
@@ -50,12 +51,7 @@ const rowDate = (unix: number) => `${shortDate(unix)} ${shortDateYear(unix)}`;
 const PILL = "inline-flex items-center rounded-full bg-sunken px-1.5 py-0.5 text-[9px] text-rb-500";
 
 function longDate(unix: number): string {
-  return new Date(unix * 1000).toLocaleDateString("en-GB", {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDate(unix);
 }
 
 /** THE BOUNDARY WITHOUT THE CARD — the spine's `Layers` node, and nothing

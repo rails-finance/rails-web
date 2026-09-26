@@ -13,6 +13,7 @@
 // different markup in each.
 
 import { formatUnitsExact } from "@/lib/utils/format";
+import { monthShort } from "@/lib/date";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import type { AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
 
@@ -59,16 +60,12 @@ export function durationText(seconds: number): string {
 /** A block or contract timestamp, as one UTC instant. Both the locale and the
  *  zone are pinned: these are chain timestamps, and two readers of one of them
  *  must be given one time. */
-export const utcInstant = (unixSeconds: number): string =>
-  `${new Date(unixSeconds * 1000).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  })} UTC`;
+export const utcInstant = (unixSeconds: number): string => {
+  const d = new Date(unixSeconds * 1000);
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${d.getUTCDate()} ${monthShort(d.getUTCMonth())} ${d.getUTCFullYear()}, ${hh}:${mm} UTC`;
+};
 
 /** A signed amount, with the sign printed rather than implied. A gap between
  *  two reads can fall either way and the page asserts no order, so a positive
