@@ -60,7 +60,7 @@ export const globalFillProv = (debtDai: string, lineDai: string): Provenance => 
   kind: "chain-derived",
   pclass: "state",
   summary:
-    "How much of the system's global ceiling is drawn. Both operands are single Vat slots and the global Line is a governance constant rather than an autoline artifact, so this ratio states a real limit — which is precisely why the per-ilk table opposite shows no such figure.",
+    "How much of the system's global ceiling is drawn. Both operands are single Vat slots and the global Line is a governance constant, so this ratio states a real limit — which is precisely why the per-ilk table opposite shows no such figure.",
   contract: VAT,
   via: `${SYSTEM_VIA} · derived ratio`,
   formula: "Vat.debt ÷ Vat.Line",
@@ -96,7 +96,7 @@ export const vowSinProv = (): Provenance => ({
   kind: "chain",
   pclass: "state",
   summary:
-    "The `sin` charged to the Vow — the matching entry for every DAI of `vice`. The Vow is the system's only sin holder, so this equals `vice`: reading both is the check, not a repetition.",
+    "The `sin` charged to the Vow — the matching entry for every DAI of `vice`. The Vow is the system's only sin holder, so this equals `vice`: reading both is the check.",
   contract: VAT,
   via: `${SYSTEM_VIA} · Vat.sin(Vow) @ head · rad ÷10^45`,
   verify: STATE_VERIFY,
@@ -124,7 +124,7 @@ export const reconcileProv = (reconciles: boolean, ilkCount: number): Provenance
   kind: "chain-derived",
   pclass: "state",
   summary: reconciles
-    ? `The Vat's own identity, checked at this block: sum every ilk's debt, add the DAI that has no collateral behind it, and you have every DAI in existence — exactly, to the last rad (10^-45 DAI). Nothing is rounded to make it close. That the ${ilkCount} rows below account for all of it is what makes the decomposition trustworthy rather than merely plausible.`
+    ? `The Vat's own identity, checked at this block: sum every ilk's debt, add the DAI that has no collateral behind it, and you have every DAI in existence — exactly, to the last rad (10^-45 DAI). Nothing is rounded to make it close. That the ${ilkCount} rows below account for all of it is what makes the decomposition trustworthy.`
     : `The Vat's own identity does NOT close at this block: summing every ilk's debt and adding the uncollateralized DAI leaves a gap against Vat.debt. That means this read is not accounting for every DAI in existence — most likely an ilk carrying debt that IlkRegistry.list() no longer returns. The decomposition below is incomplete by the residual shown, and should be read as such.`,
   contract: VAT,
   via: `${SYSTEM_VIA} · exact BigInt check in rad, before any rounding`,
@@ -156,7 +156,7 @@ export const reconcileProv = (reconciles: boolean, ilkCount: number): Provenance
 export const ilkDebtTotalProv = (ilkCount: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `Every ilk's DAI debt, summed across all ${ilkCount} of them. Each term is that ilk's own \`Art × rate\` out of the Vat; the sum is taken in rad (10^-45 DAI) so the reconcile against Vat.debt is exact rather than approximate.`,
+  summary: `Every ilk's DAI debt, summed across all ${ilkCount} of them. Each term is that ilk's own \`Art × rate\` out of the Vat; the sum is taken in rad (10^-45 DAI) so the reconcile against Vat.debt is exact.`,
   contract: VAT,
   via: `${SYSTEM_VIA} · Σ over the roster · rad ÷10^45`,
   formula: "Σ (Vat.ilks(ilk).Art × Vat.ilks(ilk).rate)",
@@ -264,7 +264,7 @@ export const userVaultShareProv = (vaultIlkCount: number): Provenance => ({
  */
 export const ceilingProv = (ilk: string, state: "auto" | "fixed" | "closed" | "dormant"): Provenance => {
   const summary = {
-    auto: `What still can be drawn against ${ilk}. Governance doesn't set this ceiling directly — the DssAutoLine does, lifting \`line\` to stay a fixed \`gap\` above current debt, no more than once every \`ttl\` seconds, up to a hard \`maxLine\`. So \`line\` chases debt, and debt ÷ line would mostly restate the gap rather than tell you anything: the real limit is maxLine, which is why that is the figure shown.`,
+    auto: `What still can be drawn against ${ilk}. Governance doesn't set this ceiling directly — the DssAutoLine does, lifting \`line\` to stay a fixed \`gap\` above current debt, no more than once every \`ttl\` seconds, up to a hard \`maxLine\`. So \`line\` chases debt, and debt ÷ line would mostly restate the gap: the real limit is maxLine, which is why that is the figure shown.`,
     fixed: `What still can be drawn against ${ilk} — its \`line\`, a constant only a governance spell moves. Debt against it is a genuine measure here, unlike the autoline-managed ilks.`,
     closed: `${ilk} is closed. Its \`line\` is 0 while debt is still outstanding, which is governance winding the ilk down: nothing new can be drawn, and the vaults that exist carry on and keep accruing the fee. This is not "fully utilised" — there is no ceiling left to be under.`,
     dormant: `${ilk} is dormant — no ceiling and no debt. The Vat keeps the slot; the ilk does nothing.`,
@@ -285,7 +285,7 @@ export const ceilingProv = (ilk: string, state: "auto" | "fixed" | "closed" | "d
 export const availableProv = (ilk: string, lineDai: string, debtDai: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `What can be drawn against ${ilk} right now — its current \`line\` less its current debt, floored at zero (a ceiling cut below outstanding debt leaves nothing to draw, not a negative allowance).`,
+  summary: `What can be drawn against ${ilk} right now — its current \`line\` less its current debt, floored at zero (a ceiling cut below outstanding debt leaves nothing to draw).`,
   contract: VAT,
   via: `${SYSTEM_VIA} · derived`,
   // Names only what the inputs carry (the receipt self-audits this): the debt
@@ -310,7 +310,7 @@ export const systemMatProv = (ilk: string): Provenance => ({
 export const systemFeeProv = (ilk: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `The stability fee ${ilk} debt accrues — Maker's own per-second rate (Jug.base + the ilk's \`duty\`, ray) compounded over a year's seconds. Governance sets the duty; nothing about it responds to how much is drawn, so it is not a curve and there is no utilisation behind it. It is the current rate, not a promise: a spell can change it at any block.`,
+  summary: `The stability fee ${ilk} debt accrues — Maker's own per-second rate (Jug.base + the ilk's \`duty\`, ray) compounded over a year's seconds. Governance sets the duty; nothing about it responds to how much is drawn, so it is not a curve and there is no utilisation behind it. It is the current rate: a spell can change it at any block.`,
   contract: JUG,
   via: `${SYSTEM_VIA} · Jug.base() + Jug.ilks(ilk).duty @ head · compounded`,
   formula: "((base + duty) ÷ RAY) ^ 31,536,000 − 1",

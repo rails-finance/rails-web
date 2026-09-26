@@ -480,8 +480,7 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read MakerDAO&apos;s system state from chain.</p>
         <p className="text-sm">
-          This view is a live contract read with no cached fallback — rather than show stale figures, it shows nothing.
-          Try again shortly.
+          This view is a live contract read with no cached fallback, so when the read fails it shows nothing. Try again shortly.
         </p>
       </div>
     );
@@ -585,7 +584,7 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
           Every ilk on the terms governance set for it. There is no utilisation column: Maker mints DAI rather than
           lending it out, so nothing here responds to how much is drawn — and where the DssAutoLine manages the ceiling
           it holds <code>line</code> just above current debt, which would make <code>debt ÷ line</code> a restatement of
-          the gap rather than a fact about the ilk.
+          the gap.
         </p>
 
         <div className="mt-3 space-y-3">

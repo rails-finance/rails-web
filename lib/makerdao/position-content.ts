@@ -56,7 +56,7 @@ export function makerdaoPositionContent(opts: {
       details: [
         {
           bold: "Closing a vault",
-          text: "repaying the normalized debt (art) to zero and withdrawing the collateral (ink) empties the vault; it stays reusable rather than being destroyed.",
+          text: "repaying the normalized debt (art) to zero and withdrawing the collateral (ink) empties the vault; it stays reusable.",
         },
         {
           bold: "Normalized debt",

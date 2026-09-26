@@ -90,7 +90,7 @@ export function makeSweptMoonwellVocabulary(id: SweptMoonwellIdentity): Moonwell
     debtInterest: (symbol): Provenance => ({
       kind: "chain-derived",
       pclass: "state",
-      summary: `Accrued interest inside the ${symbol} debt — the live debt (the mToken's \`borrowBalanceStored\` at the pinned block, interest to the market's last accrual included) minus the net principal replayed from the wallet's own Borrow and RepayBorrow logs since the Comptroller's first block. Exact arithmetic — "owed now minus drawn", not an annualized-rate estimate. Shown only when the sweep read the position's whole history and the subtraction lands inside its own plausibility bounds.`,
+      summary: `Accrued interest inside the ${symbol} debt — the live debt (the mToken's \`borrowBalanceStored\` at the pinned block, interest to the market's last accrual included) minus the net principal replayed from the wallet's own Borrow and RepayBorrow logs since the Comptroller's first block. Exact arithmetic — "owed now minus drawn". Shown only when the sweep read the position's whole history and the subtraction lands inside its own plausibility bounds.`,
       contract: { name: "mToken", address: "" },
       via: `borrowBalanceStored @ the pinned block − (${sweepVia} · Σ borrow − repay − liquidation cover)`,
       formula: "current − net principal",

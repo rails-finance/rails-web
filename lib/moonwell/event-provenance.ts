@@ -177,7 +177,7 @@ export const accountBorrowsProv = (sym: string, coords: MoonwellCoords, raw?: st
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `Total ${sym} debt the position owed AFTER this event — the \`accountBorrows\` field the mToken emitted verbatim${atBlock(coords)}. Interest accrued up to this moment is INCLUDED (Moonwell accrues per timestamp and settles interest before every borrow/repay), so this is the contract's own reckoning of the debt, not a replayed sum.`,
+  summary: `Total ${sym} debt the position owed AFTER this event — the \`accountBorrows\` field the mToken emitted verbatim${atBlock(coords)}. Interest accrued up to this moment is INCLUDED (Moonwell accrues per timestamp and settles interest before every borrow/repay), so this is the contract's own reckoning of the debt.`,
   contract: mtokenContract(coords),
   via: `${captureVia(coords)} · Borrow/RepayBorrow log · ${fieldSeg("accountBorrows", raw)}`,
   inputs: eventInputs(coords),
@@ -259,7 +259,7 @@ export const mTokensBeforeProv = (mSym: string, coords: MoonwellCoords): Provena
 export const supplyAfterProv = (sym: string, coords: MoonwellCoords, raw?: string | null): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `${sym} supply PRINCIPAL after this event — replayed by summing the underlying amounts of the position's own mints and redeems, in log order up to this block${atBlock(coords)}. No on-chain slot holds this figure (the chain stores mTokens, not deposited principal): it is ${coords.source === "sweep" ? "this request's replay over the swept logs" : "the index's replay"}, clamped at zero — a full exit nets negative by exactly the interest earned. The mToken lane beside it is the slot-exact reading.`,
+  summary: `${sym} supply PRINCIPAL after this event — replayed by summing the underlying amounts of the position's own mints and redeems, in log order up to this block${atBlock(coords)}. No on-chain slot holds this figure (the chain stores mTokens): it is ${coords.source === "sweep" ? "this request's replay over the swept logs" : "the index's replay"}, clamped at zero — a full exit nets negative by exactly the interest earned. The mToken lane beside it is the slot-exact reading.`,
   contract: mtokenContract(coords),
   via: `${captureVia(coords)} · Σ ±amount across Mint/Redeem logs${raw ? ` = ${raw}` : ""}`,
   inputs: eventInputs(coords),
@@ -380,7 +380,7 @@ export const positionDebtProv = (sym: string, atBlockNum?: number): Provenance =
 export const peakSupplyProv = (sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `The highest ${sym} supply PRINCIPAL this wallet ever recorded — the maximum of the replayed principal lane (each captured event's own supplied-balance-after) across its whole history. The index's arithmetic over the emitted amounts, not an on-chain slot. Interest lives in the exchange rate outside this lane, so the claim's value at its height sat above this figure; mTokens that arrived by transfer never entered it.`,
+  summary: `The highest ${sym} supply PRINCIPAL this wallet ever recorded — the maximum of the replayed principal lane (each captured event's own supplied-balance-after) across its whole history. The index's arithmetic over the emitted amounts. Interest lives in the exchange rate outside this lane, so the claim's value at its height sat above this figure; mTokens that arrived by transfer never entered it.`,
   contract: { name: "mToken", address: "" },
   via: `${MOONWELL_INDEX_VIA} · max(supply-after) across Mint/Redeem logs`,
 });
@@ -405,7 +405,7 @@ export const moonwellUsdProvOnchain = (what: string): Provenance => ({
   kind: "chain-derived",
   // Both legs on-chain; the oracle price is the furthest class, so it leads.
   pclass: "oracle",
-  summary: `${what} valued in USD from Moonwell's own on-chain oracle — the replayed token balance multiplied by the same Chainlink-wrapper price the Comptroller reads for liquidity and liquidation math (\`getUnderlyingPrice\`), not an off-chain market feed.`,
+  summary: `${what} valued in USD from Moonwell's own on-chain oracle — the replayed token balance multiplied by the same Chainlink-wrapper price the Comptroller reads for liquidity and liquidation math (\`getUnderlyingPrice\`).`,
   contract: MOONWELL_ORACLE,
   via: "chain balance × on-chain oracle price",
   formula: "balance × oracle price",
@@ -447,8 +447,8 @@ export const moonwellDebtInterestProv = (sym: string, live?: boolean): Provenanc
   kind: "chain-derived",
   pclass: live ? "state" : "indexed",
   summary: live
-    ? `Accrued interest on the ${sym} debt — the live debt (the mToken's \`borrowBalanceStored\` read at head, interest to the market's last accrual included) minus the net principal replayed from the position's own Borrow/RepayBorrow amounts. Exact arithmetic — "owed now minus drawn", not an annualized-rate estimate.`
-    : `Accrued interest on the ${sym} debt — the debt at the last borrow/repay event (its emitted \`accountBorrows\`, interest to that moment included) minus the net principal replayed from the position's own Borrow/RepayBorrow amounts. Exact arithmetic over the position's own logs — "owed then minus drawn", not an annualized-rate estimate. Interest accrued since the last event is not yet in either figure.`,
+    ? `Accrued interest on the ${sym} debt — the live debt (the mToken's \`borrowBalanceStored\` read at head, interest to the market's last accrual included) minus the net principal replayed from the position's own Borrow/RepayBorrow amounts. Exact arithmetic — "owed now minus drawn".`
+    : `Accrued interest on the ${sym} debt — the debt at the last borrow/repay event (its emitted \`accountBorrows\`, interest to that moment included) minus the net principal replayed from the position's own Borrow/RepayBorrow amounts. Exact arithmetic over the position's own logs — "owed then minus drawn". Interest accrued since the last event is not yet in either figure.`,
   contract: { name: "mToken", address: "" },
   via: live ? "borrowBalanceStored @ head − Σ (borrow − repay)" : "last emitted accountBorrows − Σ (borrow − repay)",
   formula: "current − net principal",
@@ -650,7 +650,7 @@ export const liqIncentiveRefProv = (coords: MoonwellCoords, comptroller?: string
         ? `Re-run Comptroller.liquidationIncentiveMantissa() at block ${coords.blockNumber} against an archive node`
         : "Re-run Comptroller.liquidationIncentiveMantissa() against any node",
   },
-  summary: `The liquidation incentive the Comptroller enforced at this block — \`liquidationIncentiveMantissa\` read at the event block, not assumed (governance can change it, so it is read where the seizure happened). The realized premium above reproduces this figure for a seizure priced off the block's closing oracle state.`,
+  summary: `The liquidation incentive the Comptroller enforced at this block — \`liquidationIncentiveMantissa\` read at the event block (governance can change it, so it is read where the seizure happened). The realized premium above reproduces this figure for a seizure priced off the block's closing oracle state.`,
   contract: { name: "Comptroller (Unitroller)", address: comptroller ?? MOONWELL_ADDRESSES.COMPTROLLER },
   via: `Comptroller.liquidationIncentiveMantissa()${atBlock(coords)}${raw ? ` = ${raw}` : ""}`,
   inputs: eventInputs(coords),

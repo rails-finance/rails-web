@@ -297,7 +297,7 @@ export function MakerdaoClosedPositionExplanation({
         {endedBySeizure
           ? "Here the final seizure emptied it entirely."
           : "What remained after the seizures left by the vault's own transactions."}{" "}
-        Seizures in the record are what mark the outcome Liquidated rather than Closed.
+        Seizures in the record are what mark the outcome Liquidated.
       </span>,
     );
   }
@@ -335,7 +335,7 @@ export function MakerdaoClosedPositionExplanation({
         {inkResidue && !artResidue ? <> of collateral</> : artResidue && !inkResidue ? <> of debt</> : null} — the
         wei-scale remainder left in the slot{inkResidue && artResidue ? "s" : ""} when the record emptied. It sits below
         the 0.000001 line the lifecycle status reads balances against, so the record reads as {v.status}; the
-        lifetime-flows section shows it at its true magnitude rather than rounding it to a zero.
+        lifetime-flows section shows it at its true magnitude.
       </span>,
     );
   }

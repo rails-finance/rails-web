@@ -274,7 +274,7 @@ export const grabSeizedUsdProv = (
   pclass: "oracle",
   formula: "seized collateral × price at block",
   verify: txVerify(coords),
-  summary: `What the seized collateral was worth at the moment of the grab — the collateral this seizure moved (the grab LogNote's dink) times the ilk's own OSM price recovered at the event's block. Both factors are chain values pinned to this block. The collateral went to a Dutch auction, not to a liquidator directly.`,
+  summary: `What the seized collateral was worth at the moment of the grab — the collateral this seizure moved (the grab LogNote's dink) times the ilk's own OSM price recovered at the event's block. Both factors are chain values pinned to this block. The collateral went to a Dutch auction.`,
   contract: VAT,
   via: `${MAKER_VIA} · |dink| × (spot × mat) at block`,
   inputs: [
@@ -323,7 +323,7 @@ export const vaultSlotPhrase = (): string => "replayed from the vault's own Vat 
 /** Stated on a terminal vault's sub-dust balance: why a "closed" record still
  *  shows a figure, and why it isn't rounded away. */
 const RESIDUE_SENTENCE =
-  " This is a wei-scale residue on a terminal record — the remainder left in the slot when the record emptied, below the 0.000001 dust line the lifecycle status reads balances against; it renders at its true magnitude rather than as a zero.";
+  " This is a wei-scale residue on a terminal record — the remainder left in the slot when the record emptied, below the 0.000001 dust line the lifecycle status reads balances against; it renders at its true magnitude.";
 
 /** Where a position-card slot figure came from. The card renders from whichever
  *  of the two landed (`MakerVaultView.source`), and the two are NOT the same
@@ -445,7 +445,7 @@ export const giveDstProv = (coords: MakerCoords): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `The vault's new holder — the dst argument of CdpManager.give(cdp, dst), decoded from the CdpManager's LogNote (topic 3)${atBlock(coords)}. The CdpManager's owner record for this vault points here from this event on. Often a DSProxy (a user's proxy contract) rather than the end user — the resolved owner beside it traces the hop.`,
+  summary: `The vault's new holder — the dst argument of CdpManager.give(cdp, dst), decoded from the CdpManager's LogNote (topic 3)${atBlock(coords)}. The CdpManager's owner record for this vault points here from this event on. Often a DSProxy (a user's proxy contract) — the resolved owner beside it traces the hop.`,
   contract: CDP_MANAGER,
   via: "captured CdpManager give LogNotes (maker_give) · topic3 dst",
   inputs: eventInputs(coords),
@@ -510,7 +510,7 @@ export const matProv = (ilk: string): Provenance => ({
 export const stabilityFeeAprProv = (ilk: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `The stability fee ${ilk} debt accrues — Maker's own per-second rate (Jug.base + Jug.ilks(ilk).duty, ray) compounded over a year's seconds. The per-second rate is a live chain read; the APR restates it at the familiar grain. Governance can change the duty at any time, so this is the CURRENT rate, not a promise.`,
+  summary: `The stability fee ${ilk} debt accrues — Maker's own per-second rate (Jug.base + Jug.ilks(ilk).duty, ray) compounded over a year's seconds. The per-second rate is a live chain read; the APR restates it at the familiar grain. Governance can change the duty at any time, so this is the CURRENT rate.`,
   contract: { name: "Jug", address: MAKER_ADDRESSES.JUG },
   via: "Jug.base + Jug.ilks(ilk).duty · compounded",
   formula: "((base + duty) ÷ RAY) ^ 31,536,000 − 1",
@@ -553,7 +553,7 @@ export const borrowHeadroomProv = (matPct: string): Provenance => ({
  *  is an off-chain leaf (a DefiLlama price), never the step count. */
 export const collateralRatioProv = (collUsdHuman: string, daiDebtHuman: string): Provenance => ({
   kind: "chain-derived",
-  summary: `Collateralization ratio — the vault's collateral USD (ink × OSM price) divided by its DAI debt (art × rate), as a percentage. Every input is on-chain: the Vat slots and Maker's own OSM (Spotter) price. No off-chain feed, so it is chain-derived, not interpretation.`,
+  summary: `Collateralization ratio — the vault's collateral USD (ink × OSM price) divided by its DAI debt (art × rate), as a percentage. Every input is on-chain: the Vat slots and Maker's own OSM (Spotter) price. No off-chain feed, so it is chain-derived.`,
   contract: VAT,
   via: "collateral USD ÷ DAI debt",
   // Formula at the grain the inputs are traced at (the two composites); the

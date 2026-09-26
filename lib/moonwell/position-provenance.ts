@@ -79,7 +79,7 @@ export function comptrollerVerdictProv(what: string, lane?: MoonwellLane): Prove
     kind: "chain",
     pclass: "state",
     verify: recompute("Comptroller", "getAccountLiquidity"),
-    summary: `${what} — the Comptroller's own account verdict (getAccountLiquidity), computed by the risk engine itself over its oracle prices and collateral factors at the latest block: the USD value still borrowable, or — the moment shortfall > 0 — the amount past the liquidation line. The protocol judging its own account, not a client-side reconstruction. Only markets the account has ENTERED count: minting alone does not enter a market, so an un-entered supply backs nothing.`,
+    summary: `${what} — the Comptroller's own account verdict (getAccountLiquidity), computed by the risk engine itself over its oracle prices and collateral factors at the latest block: the USD value still borrowable, or — the moment shortfall > 0 — the amount past the liquidation line. The protocol judging its own account. Only markets the account has ENTERED count: minting alone does not enter a market, so an un-entered supply backs nothing.`,
     contract: comptrollerOf(lane),
     via: `${laneVia(lane)} · Comptroller.getAccountLiquidity @ head`,
   };
