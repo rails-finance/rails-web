@@ -36,6 +36,10 @@ export interface AlchemixEventExplainerProps {
   siblings: AlchemistEvent[];
   /** The card shows the lead bullet as its teaser; render only the rest. */
   skipLead?: boolean;
+  /** The decimals of the asset under this line's MYT, from the position's own
+   *  row. Carried for the two fees paid in that asset, which are 6-decimal
+   *  figures on the USDC lines and 18-decimal ones on the WETH line. */
+  underlyingDecimals?: number | null;
 }
 
 const BORROWING: LearnMoreContent = {
@@ -136,7 +140,11 @@ function proseOrder(legs: AlchemistEvent[]): AlchemistEvent[] {
 }
 
 /** Every bullet the card can show, teaser included. */
-function alchemixCardClauses(legs: AlchemistEvent[], siblings: AlchemistEvent[]): ClauseInput[] {
+function alchemixCardClauses(
+  legs: AlchemistEvent[],
+  siblings: AlchemistEvent[],
+  underlyingDecimals: number | null,
+): ClauseInput[] {
   const combined = legs.length > 1;
   // The reading's own bullets state the share unit, so the deposit's
   // continuation saying it a second time is dropped.
@@ -156,6 +164,7 @@ function alchemixCardClauses(legs: AlchemistEvent[], siblings: AlchemistEvent[])
         combined,
         skipShareUnit: readingClauses.length > 0,
         skipCustody: roundTrip != null,
+        underlyingDecimals,
       }),
     ),
     ...(roundTrip ? [alchemixCustodyRoundTripClause(roundTrip)] : []),
@@ -164,12 +173,21 @@ function alchemixCardClauses(legs: AlchemistEvent[], siblings: AlchemistEvent[])
 }
 
 /** The teaser: the first bullet, rendered on the card face. */
-export function alchemixExplainerTeaser(legs: AlchemistEvent[], siblings: AlchemistEvent[]) {
-  return splitLead(alchemixCardClauses(legs, siblings)).lead;
+export function alchemixExplainerTeaser(
+  legs: AlchemistEvent[],
+  siblings: AlchemistEvent[],
+  underlyingDecimals: number | null = null,
+) {
+  return splitLead(alchemixCardClauses(legs, siblings, underlyingDecimals)).lead;
 }
 
-export function AlchemixEventExplainer({ legs, siblings, skipLead }: AlchemixEventExplainerProps) {
-  const clauses = alchemixCardClauses(legs, siblings);
+export function AlchemixEventExplainer({
+  legs,
+  siblings,
+  skipLead,
+  underlyingDecimals = null,
+}: AlchemixEventExplainerProps) {
+  const clauses = alchemixCardClauses(legs, siblings, underlyingDecimals);
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
   return <ProseExplainer items={items} />;
 }

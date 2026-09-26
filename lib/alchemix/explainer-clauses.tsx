@@ -49,6 +49,11 @@ import { clause, cont, type ClauseInput } from "@/lib/shared/explainer-prose";
 import { shortAddr } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
 
+// The synthetic and every MYT carry 18 decimals on every line, so every figure
+// an Alchemist log emits in one of those two is scaled here (see the note on
+// `AlchemixV3Context`). The asset UNDERNEATH the MYT is the exception: 6 on the
+// two USDC lines, 18 on the WETH one, and it is read from the line rather than
+// assumed — `underlying` below.
 const WAD = 1e18;
 
 const amount = (raw: string | null | undefined): string | null => {
@@ -56,6 +61,17 @@ const amount = (raw: string | null | undefined): string | null => {
   const n = Number(raw.split(".")[0]);
   if (!Number.isFinite(n)) return null;
   return formatNumber(n / WAD);
+};
+
+/** A figure denominated in the asset under the MYT, at that asset's own
+ *  decimals. Null when the line's decimals are not in hand, and the caller then
+ *  states no figure: reading 6-decimal wei at 18 renders a real fee as nothing,
+ *  which is a wrong number rather than a missing one. */
+const underlying = (raw: string | null | undefined, decimals: number | null | undefined): string | null => {
+  if (raw == null || decimals == null) return null;
+  const n = Number(raw.split(".")[0]);
+  if (!Number.isFinite(n)) return null;
+  return formatNumber(n / 10 ** decimals);
 };
 
 const who = (addr: string | null | undefined): string => (addr ? shortAddr(addr) : "an address the log does not name");
@@ -189,6 +205,11 @@ export interface AlchemixClauseOptions {
   /** This leg is a hop of a custody ROUND TRIP, which the card narrates once
    *  (`alchemixCustodyRoundTripClause`) rather than once per hop. */
   skipCustody?: boolean;
+  /** The decimals of the asset under this line's MYT, from the position's own
+   *  row — 6 on the USDC lines, 18 on the WETH one. The events do not carry it
+   *  and it is not guessed from the line key. Null leaves the two fees that are
+   *  paid in that asset unstated rather than scaled at the wrong power. */
+  underlyingDecimals?: number | null;
 }
 
 /** The bullets for one event, in reading order. The first survives as the
@@ -203,7 +224,7 @@ export function alchemixEventClauses(
   self?: AlchemistEvent,
   opts: AlchemixClauseOptions = {},
 ): ClauseInput[] {
-  const { combined = false, skipShareUnit = false, skipCustody = false } = opts;
+  const { combined = false, skipShareUnit = false, skipCustody = false, underlyingDecimals = null } = opts;
   const raw = ctx.raw;
   const sym = ctx.syntheticSymbol;
   const out: ClauseInput[] = [];
@@ -329,27 +350,49 @@ export function alchemixEventClauses(
           </>,
         ),
       );
-      out.push(
-        cont(
-          <>
-            {" "}
-            The liquidator was paid {amount(raw.fee_in_yield)} shares and {amount(raw.fee_in_underlying)} of the asset
-            underneath for doing it.
-          </>,
-        ),
-      );
+      {
+        const fee = underlying(raw.fee_in_underlying, underlyingDecimals);
+        out.push(
+          cont(
+            fee != null ? (
+              <>
+                {" "}
+                The liquidator was paid {amount(raw.fee_in_yield)} shares and {fee} of the asset underneath for doing
+                it.
+              </>
+            ) : (
+              <>
+                {" "}
+                The liquidator was paid {amount(raw.fee_in_yield)} shares for doing it, and a further amount of the
+                asset underneath which is not stated here: what that asset is, and the decimals its figure is in, come
+                from a reading of this position, and none has been taken.
+              </>
+            ),
+          ),
+        );
+      }
       break;
 
-    case "repayment_fee":
+    case "repayment_fee": {
+      const fee = underlying(raw.fee_in_underlying, underlyingDecimals);
       out.push(
         clause(
-          <>
-            A repayment fee went to {who(raw.fee_receiver)}: {amount(raw.fee_in_yield)} vault shares and{" "}
-            {amount(raw.fee_in_underlying)} of the asset underneath.
-          </>,
+          fee != null ? (
+            <>
+              A repayment fee went to {who(raw.fee_receiver)}: {amount(raw.fee_in_yield)} vault shares and {fee} of the
+              asset underneath.
+            </>
+          ) : (
+            <>
+              A repayment fee went to {who(raw.fee_receiver)}: {amount(raw.fee_in_yield)} vault shares, and an amount of
+              the asset underneath which is not stated here — its decimals come from a reading of this position, and
+              none has been taken.
+            </>
+          ),
         ),
       );
       break;
+    }
 
     case "transfer": {
       const kind = ctx.transfer?.transferType;

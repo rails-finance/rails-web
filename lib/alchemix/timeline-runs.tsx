@@ -105,6 +105,7 @@ const logIndexOf = (e: BaseActivityEvent): number => {
 export function useAlchemixTimelineRuns(
   coords: AlchemixCoords,
   mytSymbol: string,
+  underlyingDecimals: number | null,
   siblingsByTx: Map<string, AlchemistEvent[]>,
 ): TimelineRunSpec[] {
   return useMemo(
@@ -123,6 +124,7 @@ export function useAlchemixTimelineRuns(
               key={legs[0].id}
               legs={legs}
               mytSymbol={mytSymbol}
+              underlyingDecimals={underlyingDecimals}
               siblings={siblingsByTx.get(legs[0].txHash) ?? legs}
               isFirst={meta.isFirst}
               isLast={meta.isLast}
@@ -172,6 +174,6 @@ export function useAlchemixTimelineRuns(
           }),
       },
     ],
-    [coords, mytSymbol, siblingsByTx],
+    [coords, mytSymbol, underlyingDecimals, siblingsByTx],
   );
 }

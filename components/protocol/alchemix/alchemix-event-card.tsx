@@ -54,6 +54,11 @@ export interface AlchemixEventCardProps {
   /** The vault share ticker for this line, from the position's own row — the
    *  events do not carry it, and it is not guessed from the line key. */
   mytSymbol: string;
+  /** The decimals of the asset under that MYT, from the same row and for the
+   *  same reason: 6 on the USDC lines, 18 on the WETH one. Only the two fees
+   *  paid in that asset need it; every other figure a log emits is in the
+   *  synthetic or in shares, and both are 18 on every line. */
+  underlyingDecimals?: number | null;
   /** Every row sharing the transaction, filtered or not. A reader's type filter
    *  can leave one leg of an opening standing alone, and that leg must still be
    *  able to tell a forwarding hop from a change of owner. */
@@ -110,7 +115,15 @@ const WARNING_LABEL: Record<string, string> = {
   fee_shortfall: "Fee shortfall",
 };
 
-export function AlchemixEventCard({ legs, mytSymbol, siblings, isFirst, isLast, eventNumber }: AlchemixEventCardProps) {
+export function AlchemixEventCard({
+  legs,
+  mytSymbol,
+  underlyingDecimals = null,
+  siblings,
+  isFirst,
+  isLast,
+  eventNumber,
+}: AlchemixEventCardProps) {
   const lead = legs[0];
   const sibs = siblings ?? legs;
 
@@ -168,9 +181,11 @@ export function AlchemixEventCard({ legs, mytSymbol, siblings, isFirst, isLast, 
       }
       detail={<AlchemixEventDetail legs={legs} mytSymbol={mytSymbol} coordsFor={coordsFor} />}
       detailLabel="What the logs state"
-      explainer={<AlchemixEventExplainer legs={legs} siblings={sibs} skipLead />}
+      explainer={
+        <AlchemixEventExplainer legs={legs} siblings={sibs} skipLead underlyingDecimals={underlyingDecimals} />
+      }
       explainerLabel="Plain English"
-      explainerTeaser={alchemixExplainerTeaser(legs, sibs)}
+      explainerTeaser={alchemixExplainerTeaser(legs, sibs, underlyingDecimals)}
       txHash={lead.txHash}
       learnMore={<LearnMore inline content={alchemixLearnMoreFor(legs)} />}
       persistKey={`alchemix-v3:${lead.id}`}

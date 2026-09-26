@@ -65,7 +65,11 @@ import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAlchemistEvent } from "@/lib/shared/types/event-shape";
 import { AlchemixEventCard } from "@/components/protocol/alchemix/alchemix-event-card";
-import { AlchemixStatusPill, amountColumn, collateralColumn } from "@/components/protocol/alchemix/alchemix-position-card";
+import {
+  AlchemixStatusPill,
+  amountColumn,
+  collateralColumn,
+} from "@/components/protocol/alchemix/alchemix-position-card";
 import { computeAlchemixEconomics } from "@/lib/alchemix/economics";
 import { useAlchemixTimelineRuns } from "@/lib/alchemix/timeline-runs";
 import {
@@ -167,6 +171,16 @@ export function AlchemistPositionView({
 
   const coords: AlchemixCoords = useMemo(() => ({ chainId, lineKey, tokenId }), [chainId, lineKey, tokenId]);
 
+  // The decimals of the asset under the MYT — 6 on the two USDC lines, 18 on
+  // the WETH one. It reaches the event cards for the two fees an Alchemist pays
+  // in that asset; everything else a log emits is in the synthetic or in
+  // shares, and both are 18 on every line. Either reading answers it, because
+  // it is a property of the line and not of the reading, and a Base position
+  // with no head reading has neither, which leaves those two fees unstated
+  // rather than scaled at a power the line does not use.
+  const underlyingDecimals =
+    position.figures.collateral?.underlying?.decimals ?? live?.collateral.underlying?.decimals ?? null;
+
   const alchemistEvents = useMemo(() => events.filter(isAlchemistEvent), [events]);
   // An opening emits three logs in one transaction — the NFT's mint, the
   // deposit, and often a transfer passing the NFT on to the address that asked
@@ -177,7 +191,7 @@ export function AlchemistPositionView({
   // One transaction is one card; and a redemption belongs to the line, so most
   // of this timeline is them, and a streak of three or more collapses into one
   // dated row.
-  const timelineRuns = useAlchemixTimelineRuns(coords, mytSymbol, siblingsByTx);
+  const timelineRuns = useAlchemixTimelineRuns(coords, mytSymbol, underlyingDecimals, siblingsByTx);
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - alchemistEvents.length) : 0;
   const tl = useTimelineEvents(alchemistEvents, {
     storageKey: `alchemix-${lineKey}-${tokenId}`,
@@ -410,7 +424,12 @@ export function AlchemistPositionView({
                     )
                   : undefined,
                 usd: usd
-                  ? usdProv(underlying?.symbol ?? "the asset underneath", usd.pricePerUnit, usd.priceSource, usd.pricedAt)
+                  ? usdProv(
+                      underlying?.symbol ?? "the asset underneath",
+                      usd.pricePerUnit,
+                      usd.priceSource,
+                      usd.pricedAt,
+                    )
                   : undefined,
               }),
               amountColumn("Set aside for repayment", position.figures.earmarked, sym, {
@@ -587,6 +606,7 @@ export function AlchemistPositionView({
               <AlchemixEventCard
                 legs={[event]}
                 mytSymbol={mytSymbol}
+                underlyingDecimals={underlyingDecimals}
                 siblings={siblingsByTx.get(event.txHash) ?? [event]}
                 isFirst={meta.isFirst}
                 isLast={meta.isLast}
