@@ -94,7 +94,9 @@ export function RailHeader({
   if (venue === "position") {
     return (
       <div className="flex min-h-9 items-center justify-between gap-3">
-        <ProtocolIdentity session={session} scale="title" />
+        <div className="min-w-0">
+          <ProtocolIdentity session={session} scale="title" />
+        </div>
         <TitleRowChooser />
       </div>
     );

@@ -14,19 +14,21 @@ import { protocolForSession } from "@/lib/shared/protocols";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 
 /** Two scales, set here so every protocol gets the same treatment (rails-ops
- *  TO-DO-ui-jobs 67, retuned by 68).
+ *  TO-DO-ui-jobs 67, retuned by 68, 69).
  *
  *  `title` is the page's largest type, at 20px with a 32px mark beside it
- *  (Miles, 2026-09-25) — one size at every width, since the chain chooser now
+ *  (Miles, 2026-09-25): one size at every width, since the chain chooser now
  *  shares the row and a name that grew at `md` would push it about. It carries
  *  NO tracking and NO uppercasing: the roster already spells each name the way
  *  it is written ("Liquity V2", "f(x) Protocol"), and at this size the capitals
  *  and the letter-spacing that give 11px small caps their register read as
- *  shouting.
+ *  shouting. RailHeader renders every venue at this scale, the position venue
+ *  included as of TO-DO-ui-jobs 69: a position view has no h1 at all, so this
+ *  identity is the page's only large text.
  *
- *  `label` is the original 11px small-caps register, still what a position
- *  view wears: there the subject is one account's position and its own h1
- *  names it, so the protocol above it is a way back, not the headline. */
+ *  `label` is the original 11px small-caps register. No call site wears it
+ *  today; it stays as the type's default for a caller that wants the mark set
+ *  inline with body text rather than standing as a page's heading. */
 const SCALE = {
   title: {
     icon: "h-8 w-8",
