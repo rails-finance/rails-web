@@ -611,11 +611,7 @@ export function alchemixReadingClauses(
   const inBlock = state.positionEventsInBlock;
   const out: ClauseInput[] = [];
 
-  out.push(
-    clause(
-      <>The figures above are one reading of the Alchemist at block {at}, not the events on this page added up.</>,
-    ),
-  );
+  out.push(clause(<>The figures above are one reading of the Alchemist at block {at}.</>));
   // Instance-bound on purpose (the explanation-copy charter's register gate):
   // the sentence is about what THIS line's redemptions did to THIS position's
   // figures, not a rule about redemptions.
@@ -624,7 +620,7 @@ export function alchemixReadingClauses(
       <>
         {" "}
         A redemption on this line moves every open position&rsquo;s debt at once and names none of them, so this
-        position&rsquo;s own events cannot reach these figures.
+        position&rsquo;s events cannot reach these figures.
       </>,
     ),
   );
