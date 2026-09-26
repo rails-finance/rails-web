@@ -129,6 +129,10 @@ export function boundaryStateFromOldestRow(e: BaseActivityEvent | undefined): Bo
     // the event card itself (`alchemix-state-at-block.tsx`); this group says
     // only that nothing may be inferred here, never that no state is in hand.
     case "alchemix-v3":
+    // Alchemix V2: the debt fell every block between events as harvested
+    // credit unlocked, with no log at those blocks, so no balance at a cut can
+    // be reached from the rows either.
+    case "alchemix-v2":
     // After-only rows, or no running balance at all: the line is absent.
     case "compound":
     case "morpho":

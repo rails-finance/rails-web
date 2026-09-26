@@ -1406,7 +1406,8 @@ function ChainTruthTimelineBody({
                           tl.dateRange !== null &&
                           tl.visibleActionKeys.size === tl.eventOptions.length &&
                           tl.visibleAssetKeys.size === tl.assetOptions.length &&
-                          tl.visibleCounterpartyKeys.size === tl.counterpartyOptions.length
+                          tl.visibleCounterpartyKeys.size === tl.counterpartyOptions.length &&
+                          tl.visibleVersionKeys.size === tl.versionOptions.length
                         }
                         // A served folder has no run around it to scope its
                         // spine termini to, so its place in the displayed list

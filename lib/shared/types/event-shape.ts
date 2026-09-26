@@ -2589,6 +2589,46 @@ export interface AlchemixStateAtBlockFromReading {
   reason: "no-reading-at-block" | "reading-stale" | null;
 }
 
+// ───────────────────────── Alchemix V2 detail types ─────────────────────────
+//
+// V2 closed on 2026-04-02 and is served as a frozen record (rails-ops
+// reference/alchemix-v2-frozen-record.md). Its rows ride an arm of their own
+// because they share no field a surface could read across both versions: the
+// position is an ACCOUNT (no token id), collateral is one of 22 yield tokens at
+// its own decimals, `Withdraw` and `Liquidate` state SHARES, and `Repay` is in
+// the underlying. Keeping the arms apart is also what holds the rule that a V2
+// figure never sums with a V3 one: every V3 guard and reduction narrows on
+// `alchemix-v3` and cannot admit a V2 row.
+
+export type AlchemixV2EventType = "deposit" | "withdraw" | "mint" | "burn" | "repay" | "liquidate";
+
+export interface AlchemixV2Token {
+  address: string;
+  /** A label. Five yield-token symbols repeat across two addresses each. */
+  symbol: string | null;
+  /** decimals() of the token; null where the line's token table has no row. */
+  decimals: number | null;
+}
+
+export interface AlchemixV2Context {
+  version: "v2";
+  eventType: AlchemixV2EventType;
+  /** `eth-alusd-v2` or `eth-aleth-v2`. */
+  lineKey: string;
+  chainId: number;
+  syntheticSymbol: string;
+  /** The account whose balance the log moved. */
+  account: string;
+  emitter: string;
+  /** Which Alchemist ABI decoded a Repay or Liquidate; a "pre" row carries no
+   *  credit. Null on the four events whose signature never changed. */
+  abiEra: "pre" | "post" | null;
+  yieldToken: AlchemixV2Token | null;
+  underlyingToken: AlchemixV2Token | null;
+  /** The log's own integers as the table stores them, unscaled. */
+  raw: Record<string, string | null>;
+}
+
 // ProtocolContext is designed to grow as new protocol transformers come
 // online. When a new protocol gets a transformer, add a discriminant arm
 // below; the frontend duplicate must mirror the addition. The set of ids is
@@ -2619,6 +2659,7 @@ export type ProtocolContext =
   | { protocol: "fluid"; data: FluidContext }
   | { protocol: "polaris"; data: PolarisContext }
   | { protocol: "alchemix-v3"; data: AlchemixV3Context }
+  | { protocol: "alchemix-v2"; data: AlchemixV2Context }
   | { protocol: "other"; data: OtherContext };
 
 // ───────────────────────── The unified event ─────────────────────────
@@ -2873,4 +2914,14 @@ export function isAlchemistEvent(
   context: { protocol: "alchemix-v3"; data: AlchemixV3Context };
 } {
   return isAlchemixV3Event(e) && e.context.data.positionKind === "alchemist";
+}
+
+/** An Alchemix V2 row: one closed account's event, on its own arm. No V3 guard
+ *  admits it, which is what keeps a V2 amount out of every V3 reduction. */
+export function isAlchemixV2Event(
+  e: BaseActivityEvent,
+): e is BaseActivityEvent & {
+  context: { protocol: "alchemix-v2"; data: AlchemixV2Context };
+} {
+  return e.context?.protocol === "alchemix-v2";
 }

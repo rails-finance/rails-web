@@ -79,6 +79,43 @@ export function transmuterPositionPath(deployment: AlchemixDeployment, lineKey: 
   return `${transmuterListingPath(deployment)}/${encodeURIComponent(lineKey)}/${nftId}`;
 }
 
+// ── Alchemix V2: the closed lines ────────────────────────────────────────────
+//
+// V2 ran on Ethereum only (eth_getCode is empty at every V2 address on Base)
+// and was wound down on 2026-04-02. Its two lines are listed as a third type
+// tab on the Ethereum explorer, and a V2 position lives at
+// `<explorer>/v2/<line>/<account>`: the position is a wallet account, so the
+// account is the second half of the key where a V3 position has a token id.
+
+const V2_LINES: AlchemixLine[] = [
+  { key: "eth-alusd-v2", chainId: 1, displayName: "alUSD" },
+  { key: "eth-aleth-v2", chainId: 1, displayName: "alETH" },
+];
+
+/** The V2 lines on one chain: both on Ethereum, none anywhere else. */
+export function v2LinesForChain(chainId: ChainId): AlchemixLine[] {
+  return V2_LINES.filter((l) => l.chainId === chainId);
+}
+
+/** The V2 gate for a line key arriving in a URL, on the pair, as
+ *  `isLineOnChain` is for V3. */
+export function isV2LineOnChain(chainId: ChainId, key: string): boolean {
+  return V2_LINES.some((l) => l.chainId === chainId && l.key === key);
+}
+
+export function v2ListingPath(deployment: AlchemixDeployment): string {
+  return `${deployment.basePath}/v2`;
+}
+
+export function v2PositionPath(deployment: AlchemixDeployment, lineKey: string, account: string): string {
+  return `${v2ListingPath(deployment)}/${encodeURIComponent(lineKey)}/${account.toLowerCase()}`;
+}
+
+/** Where a V3 position lives, for a link from its V2 predecessor. */
+export function v3PositionPath(deployment: AlchemixDeployment, lineKey: string, tokenId: string): string {
+  return `${deployment.basePath}/${encodeURIComponent(lineKey)}/${tokenId}`;
+}
+
 /** The lines deployed on one chain. The only way to get a line out of the
  *  catalog, so nothing can hold a line without having named its chain. */
 export function linesForChain(chainId: ChainId): AlchemixLine[] {

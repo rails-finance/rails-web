@@ -23,11 +23,13 @@
 //    be carried forward, interpolated, or added to a debt figure read at another
 //    block. History comes from the stored rows, each stating its own block.
 //
-// 3. NO V2 FIGURE BELONGS IN THIS SHAPE. Alchemix V2 closed on 2026-04-02 and
+// 3. NO V2 FIGURE BELONGS IN A V3 SHAPE. Alchemix V2 closed on 2026-04-02 and
 //    its frozen record is a separate read (rails-ops
-//    `reference/alchemix-v2-frozen-record.md`). A V3 position is what a linked
-//    V2 one BECAME, so adding the two debts double counts one obligation. There
-//    is deliberately no field here for a V2 leg.
+//    `reference/alchemix-v2-frozen-record.md`, the V2 shapes at the foot of
+//    this file). A V3 position is what a linked V2 one BECAME, so adding the
+//    two debts double counts one obligation. The two versions point at each
+//    other by LINK only (`v2Predecessors`, `v3Successors`), and a link carries
+//    no amount.
 
 /** A wei-scale integer with the decimal reading of it beside it. `raw` is the
  *  integer the contract holds; `formatted` is it scaled by the token's decimals
@@ -175,6 +177,16 @@ export interface AlchemixPositionSummary {
   figures: AlchemixFigures;
   activity: AlchemixActivity;
   chainReading: AlchemixChainReading | null;
+  /** The V2 account this position's holder closed on 2026-04-02, where there
+   *  is one. Served by the single-position route only. A link: it carries no
+   *  V2 figure. */
+  v2Predecessors?: AlchemixV2Link[];
+}
+
+/** One V2 account, by its key. */
+export interface AlchemixV2Link {
+  lineKey: string;
+  account: string;
 }
 
 /** What a line answers about its own completeness. The route states coverage
@@ -390,4 +402,82 @@ export interface AlchemixTransmuterPositionData<TEvent> extends AlchemixTransmut
 export interface AlchemixTransmuterPositionResponse<TEvent> {
   success: true;
   data: AlchemixTransmuterPositionData<TEvent>;
+}
+
+// ── Alchemix V2: the closed record ───────────────────────────────────────────
+//
+// `/api/alchemix/v2/positions` and `/v2/position/:lineKey/:account`
+// (rails-server-onboarding `routes/alchemix-v2.ts`). V2 was wound down on
+// 2026-04-02 and every figure is the contract's own read at the frozen block,
+// 24,794,239, re-read at head 176 days later with the same bytes. So every
+// position is `closed`, and every figure carries that block.
+//
+// THE POSITION IS AN ACCOUNT. V2 is wallet-keyed: (lineKey, account) is the
+// whole key, and there is no token id.
+//
+// THE DEBT IS SIGNED. `sign: "credit"` is a negative debt, credit the account
+// never drew, and is never an asset or netted against a debt.
+//
+// COLLATERAL IS SHARES OF A YIELD TOKEN, one row per token the account held,
+// each at that token's own decimals, with the underlying it was worth at the
+// frozen block at the UNDERLYING's decimals (6 for USDC and USDT). It left the
+// Alchemist in the sweep that day, so it is what the account HAD; no USD is
+// put on it.
+
+export interface AlchemixV2TokenRef {
+  address: string;
+  symbol: string;
+  decimals: number;
+}
+
+export interface AlchemixV2Collateral {
+  yieldToken: AlchemixV2TokenRef;
+  shares: AlchemixAmount & { asOfBlock: number };
+  underlying: (AlchemixV2TokenRef & AlchemixAmount & { perShareRaw: string }) | null;
+  readStale: boolean;
+}
+
+export interface AlchemixV2PositionSummary {
+  version: "v2";
+  lineKey: string;
+  chainId: number;
+  chainName: string | null;
+  account: string;
+  syntheticSymbol: string;
+  status: "closed";
+  closedAt: string;
+  frozenAtBlock: number;
+  readStale: boolean;
+  frozenDebt: (AlchemixAmount & { sign: "debt" | "credit" | "none"; asOfBlock: number }) | null;
+  collateral: AlchemixV2Collateral[];
+  activity: { firstEventBlock: number; lastEventBlock: number; eventCount: number };
+  /** Links to the V3 positions this wallet holds now. No figure rides them. */
+  v3Successors: { lineKey: string; tokenId: string }[];
+  closure: {
+    closedAt: string;
+    frozenAtBlock: number;
+    sweptTo: string;
+    sweepTxHash: string | null;
+    sweepBlock: number | null;
+  };
+  accountUrl: string | null;
+}
+
+export interface AlchemixV2PositionsResponse {
+  success: true;
+  data: AlchemixV2PositionSummary[];
+  pagination: AlchemixPagination;
+  notes: { closure: string };
+}
+
+export interface AlchemixV2PositionData<TEvent> extends AlchemixV2PositionSummary {
+  events: TEvent[];
+  eventCount: number;
+  eventsTruncated: boolean;
+}
+
+export interface AlchemixV2PositionResponse<TEvent> {
+  success: true;
+  data: AlchemixV2PositionData<TEvent>;
+  notes: { closure: string };
 }

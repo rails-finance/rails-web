@@ -14,7 +14,7 @@
 // in `provenance-info-tabs.tsx`.
 
 import { useEffect, useRef } from "react";
-import { Clock, Coins, Wallet } from "lucide-react";
+import { Clock, Coins, Layers, Wallet } from "lucide-react";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
@@ -426,6 +426,9 @@ export function TimelineToolbar({
   // Same rule for counterparties — a wallet with one recipient never grows a
   // control whose every state shows the same address.
   const counterpartyOptions = tl.counterpartyOptions.length > 1 ? tl.counterpartyOptions : [];
+  // And for versions: a timeline of one version, which is every protocol but
+  // an Alchemix position carrying its V2 history, grows no control.
+  const versionOptions = tl.versionOptions.length > 1 ? tl.versionOptions : [];
   const dateActive = tl.dateRange !== null;
   // The second path (decision 0019, amendment 2026-09-25) sets no
   // `dateRange` at all — the page reads the month as its own segment
@@ -577,6 +580,22 @@ export function TimelineToolbar({
               triggerIcon={<Coins size={12} />}
               sheetStatus={countLine}
               onToggle={(sym) => tl.toggleHiddenAsset(sym)}
+            />
+          )}
+          {versionOptions.length > 0 && (
+            <FilterDropdown
+              label="Versions"
+              options={versionOptions}
+              selected={tl.visibleVersionKeys}
+              onSelect={() => tl.resetHiddenVersions()}
+              multi
+              variant="button"
+              align="right"
+              // "V2" is a name, not prose.
+              verbatimLabels
+              triggerIcon={<Layers size={12} />}
+              sheetStatus={countLine}
+              onToggle={(v) => tl.toggleHiddenVersion(v)}
             />
           )}
           {counterpartyOptions.length > 0 && (
