@@ -40,10 +40,17 @@ export function alchemixShareCardModel(
   if (debt && debt.asOfBlock != null) {
     stats.push({ label: CARD_VOCAB.debt, value: `${formatNumber(debt.formatted)} ${p.syntheticSymbol}` });
   }
+  // The asset underneath leads here too, so the card and the page state the
+  // collateral in the same order. The share price lives only on a reading of
+  // the position, so a position with no reading has no underlying — and then
+  // the card states the share count, never a zero.
   if (collateral && collateral.asOfBlock != null) {
+    const underlying = collateral.underlying;
     stats.push({
       label: CARD_VOCAB.collateral,
-      value: `${formatNumber(collateral.formatted)} ${collateral.mytSymbol ?? "shares"}`,
+      value: underlying
+        ? `${formatNumber(underlying.formatted)} ${underlying.symbol ?? "underlying"}`
+        : `${formatNumber(collateral.formatted)} ${collateral.mytSymbol ?? "shares"}`,
     });
   }
   // The block both figures are true at. An Alchemix figure without its block is

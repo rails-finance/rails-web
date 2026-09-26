@@ -65,7 +65,7 @@ import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAlchemistEvent } from "@/lib/shared/types/event-shape";
 import { AlchemixEventCard } from "@/components/protocol/alchemix/alchemix-event-card";
-import { AlchemixStatusPill, amountColumn } from "@/components/protocol/alchemix/alchemix-position-card";
+import { AlchemixStatusPill, amountColumn, collateralColumn } from "@/components/protocol/alchemix/alchemix-position-card";
 import { computeAlchemixEconomics } from "@/lib/alchemix/economics";
 import { useAlchemixTimelineRuns } from "@/lib/alchemix/timeline-runs";
 import {
@@ -285,19 +285,30 @@ export function AlchemistPositionView({
                     amountColumn("Debt", live.debt ? { ...live.debt, asOfBlock: live.asOfBlock } : null, sym, {
                       prov: liveFigureProv("Debt", sym, live.debt?.raw ?? null, live.asOfBlock, coords),
                     }),
-                    amountColumn(
-                      "Collateral",
-                      { ...live.collateral, asOfBlock: live.asOfBlock },
-                      live.collateral.mytSymbol ?? mytSymbol,
-                      {
-                        prov: liveFigureProv("Collateral", mytSymbol, live.collateral.raw, live.asOfBlock, coords),
-                        note: live.collateral.underlying
-                          ? `${formatCompact(live.collateral.underlying.formatted).display} ${live.collateral.underlying.symbol ?? "underlying"}${
-                              live.collateral.usd ? ` · $${formatCompact(live.collateral.usd.usd).display}` : ""
-                            }`
-                          : "No share price in hand, so no figure for the asset underneath.",
-                      },
-                    ),
+                    // The asset underneath leads; the share count is what the
+                    // position holds and stays beside it.
+                    collateralColumn({ ...live.collateral, asOfBlock: live.asOfBlock }, mytSymbol, {
+                      shares: liveFigureProv("Collateral", mytSymbol, live.collateral.raw, live.asOfBlock, coords),
+                      underlying: live.collateral.underlying
+                        ? underlyingProv(
+                            live.collateral.underlying.symbol ?? "the asset underneath",
+                            live.collateral.underlying.raw,
+                            live.collateral.underlying.decimals,
+                            live.asOfBlock,
+                            live.collateral.underlying.sharePriceRaw,
+                            live.collateral.underlying.sharePriceAsOfBlock,
+                            coords,
+                          )
+                        : undefined,
+                      usd: live.collateral.usd
+                        ? usdProv(
+                            live.collateral.underlying?.symbol ?? "the asset underneath",
+                            live.collateral.usd.pricePerUnit,
+                            live.collateral.usd.priceSource,
+                            live.collateral.usd.pricedAt,
+                          )
+                        : undefined,
+                    }),
                     // Rule 1. Its own slot, its own block, added to nothing.
                     amountColumn(
                       "Set aside for repayment",
@@ -353,8 +364,8 @@ export function AlchemistPositionView({
                   coords,
                 ),
               }),
-              amountColumn("Collateral", collateral, mytSymbol, {
-                prov: servedFigureProv(
+              collateralColumn(collateral, mytSymbol, {
+                shares: servedFigureProv(
                   "Collateral",
                   mytSymbol,
                   collateral?.raw ?? null,
@@ -362,6 +373,20 @@ export function AlchemistPositionView({
                   position.figures.grade,
                   coords,
                 ),
+                underlying: underlying
+                  ? underlyingProv(
+                      underlying.symbol ?? "the asset underneath",
+                      underlying.raw,
+                      underlying.decimals,
+                      collateral?.asOfBlock ?? null,
+                      underlying.sharePriceRaw,
+                      underlying.sharePriceAsOfBlock,
+                      coords,
+                    )
+                  : undefined,
+                usd: usd
+                  ? usdProv(underlying?.symbol ?? "the asset underneath", usd.pricePerUnit, usd.priceSource, usd.pricedAt)
+                  : undefined,
               }),
               amountColumn("Set aside for repayment", position.figures.earmarked, sym, {
                 prov: servedFigureProv(
@@ -378,49 +403,19 @@ export function AlchemistPositionView({
           />
 
           <div className="mt-3 space-y-1.5">
-            {/* The asset underneath the shares, with BOTH blocks — the share
-              count and the share price need not have been read together. */}
+            {/* What the column above is a conversion OF, and at which block —
+              the share count and the share price need not have been read
+              together, so the second block is named here. Neither figure is
+              repeated; both are in the column, each with its own receipt. */}
             {underlying ? (
               <p className="text-[11px] leading-relaxed text-rb-500">
-                Those shares are{" "}
-                <Prov
-                  info={underlyingProv(
-                    underlying.symbol ?? "the asset underneath",
-                    underlying.raw,
-                    underlying.decimals,
-                    collateral?.asOfBlock ?? null,
-                    underlying.sharePriceRaw,
-                    underlying.sharePriceAsOfBlock,
-                    coords,
-                  )}
-                  value={String(underlying.formatted)}
-                  symbol={underlying.symbol ?? undefined}
-                >
-                  <span className="tabular-nums">
-                    {formatCompact(underlying.formatted).display} {underlying.symbol ?? ""}
-                  </span>
-                </Prov>
+                Collateral is held as shares in the vault, not as the asset underneath it. The figure above is that
+                share count
                 {underlying.sharePriceAsOfBlock != null ? (
                   <> at the share price read at block {block(underlying.sharePriceAsOfBlock)}</>
                 ) : (
                   <> at a share price with no block stated</>
                 )}
-                {usd ? (
-                  <>
-                    {", worth "}
-                    <Prov
-                      info={usdProv(
-                        underlying.symbol ?? "the asset underneath",
-                        usd.pricePerUnit,
-                        usd.priceSource,
-                        usd.pricedAt,
-                      )}
-                      value={String(usd.usd)}
-                    >
-                      <span className="tabular-nums">${formatCompact(usd.usd).display}</span>
-                    </Prov>
-                  </>
-                ) : null}
                 .
               </p>
             ) : (

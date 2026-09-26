@@ -40,8 +40,26 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { StatValue, StatFootnote } from "@/components/shared/stat-value";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import type { SessionProtocol } from "@/lib/shared/sessions";
-import type { AlchemixAmountAtBlock, AlchemixPositionStatus, AlchemixPositionSummary } from "@/types/api/alchemix";
+import type {
+  AlchemixAmountAtBlock,
+  AlchemixPositionStatus,
+  AlchemixPositionSummary,
+  AlchemixUnderlyingValue,
+  AlchemixUsdValue,
+} from "@/types/api/alchemix";
 import { formatCompact } from "@/lib/shared/format-event";
+
+/** The collateral, as either surface holds it. The listing serves it with the
+ *  block it was settled at; the live read pins one block to the whole reading,
+ *  and the caller lifts it onto this shape. */
+export interface AlchemixCollateralView {
+  raw: string;
+  formatted: number;
+  asOfBlock: number | null;
+  mytSymbol: string | null;
+  underlying: AlchemixUnderlyingValue | null;
+  usd: AlchemixUsdValue | null;
+}
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -126,8 +144,71 @@ export function amountColumn(
   };
 }
 
+/** The collateral as a stat, on either surface. What a holder recognises is the
+ *  asset underneath, not the vault share, so THE UNDERLYING LEADS and the share
+ *  count stays beside it — the count is what the position holds and the two
+ *  surfaces state them in the same order.
+ *
+ *  `myt_share_price` lives only on a reading of the position, so a position with
+ *  no reading has no share price, and therefore no underlying and no USD. That
+ *  case leads with the share count and says the conversion is not in hand. It
+ *  never renders a zero. */
+export function collateralColumn(
+  c: AlchemixCollateralView | null,
+  fallbackMytSymbol: string,
+  prov?: { shares?: Provenance; underlying?: Provenance; usd?: Provenance },
+): OpenPositionStatsColumn {
+  const myt = c?.mytSymbol ?? fallbackMytSymbol;
+  const underlying = c?.underlying ?? null;
+
+  if (!c || !underlying) {
+    return amountColumn("Collateral", c ? { raw: c.raw, formatted: c.formatted, asOfBlock: c.asOfBlock } : null, myt, {
+      prov: prov?.shares,
+      note: c ? "No share price in hand, so no figure for the asset underneath." : undefined,
+    });
+  }
+
+  const shares = (
+    <span className="tabular-nums">
+      {formatCompact(c.formatted).display} {myt}
+    </span>
+  );
+  const usd = c.usd ? <span className="tabular-nums">${formatCompact(c.usd.usd).display}</span> : null;
+  return amountColumn(
+    "Collateral",
+    { raw: underlying.raw, formatted: underlying.formatted, asOfBlock: c.asOfBlock },
+    underlying.symbol ?? "underlying",
+    {
+      prov: prov?.underlying,
+      note: (
+        <>
+          held as{" "}
+          {prov?.shares ? (
+            <Prov info={prov.shares} value={String(c.formatted)} symbol={myt}>
+              {shares}
+            </Prov>
+          ) : (
+            shares
+          )}
+          {usd ? (
+            <>
+              {" · "}
+              {prov?.usd && c.usd ? (
+                <Prov info={prov.usd} value={String(c.usd.usd)}>
+                  {usd}
+                </Prov>
+              ) : (
+                usd
+              )}
+            </>
+          ) : null}
+        </>
+      ),
+    },
+  );
+}
+
 export function AlchemixPositionCard({ p, session }: { p: AlchemixPositionSummary; session: SessionProtocol }) {
-  const collateralUnit = p.figures.collateral?.mytSymbol ?? "shares";
   return (
     <PositionCardShell>
       <OpenPositionStats
@@ -146,7 +227,7 @@ export function AlchemixPositionCard({ p, session }: { p: AlchemixPositionSummar
         }
         columns={[
           amountColumn("Debt", p.figures.debt, p.syntheticSymbol),
-          amountColumn("Collateral", p.figures.collateral, collateralUnit),
+          collateralColumn(p.figures.collateral, "shares"),
           // Its own slot, never added to the debt beside it.
           amountColumn("Earmarked", p.figures.earmarked, p.syntheticSymbol),
         ]}
