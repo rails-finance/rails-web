@@ -2413,6 +2413,88 @@ export interface MapleContext {
   isOpen?: boolean;
 }
 
+// ───────────────────────── Alchemix V3 detail types ─────────────────────────
+//
+// Alchemix V3 is a self-repaying CDP: collateral sits in a Meta Yield Token
+// (the MYT) whose yield is harvested to burn the synthetic the position minted.
+// The position grain is (lineKey, tokenId) — a line is one synthetic on one
+// chain (`eth-alusd`, `eth-aleth`, `base-alusdb`) and the position is an NFT,
+// so a token id is unique only inside its line and both halves are always
+// carried. The synthetic and every MYT are 18 decimals on both chains.
+//
+// TWO THINGS THIS ARM SAYS THAT THE OTHERS HAVE NO NEED TO.
+//
+// SCOPE. `Redemption`, `BatchLiquidated` and `FeeShortfall` name no position.
+// A redemption applies one survival ratio to every open position's earmarked
+// debt at once; the other two carry the hash of an indexed uint256[], so the
+// ids are not recoverable from the log. They ride a position's timeline because
+// they are what moved its debt, windowed to the position's life, and each is
+// marked `scope: "line"` so a surface can say "this was line-wide" rather than
+// render it as the holder's action (rails-ops decisions/0032).
+//
+// RESOLVED-AT-CAPTURE. `Repay` and `ForceRepay` do not emit their own debt
+// delta, and `Repay` does not emit the collateral fee either. Both are resolved
+// when the log is captured and stored beside it. They are carried under
+// `resolvedAtCapture`, apart from `raw`, so nothing reads a resolved figure as
+// an emitted one.
+//
+// The thirteen Alchemist arms are ten that name a token id (deposit, withdraw,
+// mint, burn, repay, force_repay, self_liquidated, liquidated, repayment_fee,
+// transfer) and three line-wide ones (redemption, batch_liquidated,
+// fee_shortfall). The Transmuter is a position type of its own with its own
+// route, and its three arms are the `transmuter_*` ones.
+
+export type AlchemixV3EventType =
+  | "deposit"
+  | "withdraw"
+  | "mint"
+  | "burn"
+  | "repay"
+  | "force_repay"
+  | "self_liquidated"
+  | "liquidated"
+  | "repayment_fee"
+  | "transfer"
+  | "redemption"
+  | "batch_liquidated"
+  | "fee_shortfall"
+  | "transmuter_position_created"
+  | "transmuter_position_claimed"
+  | "transmuter_position_poked";
+
+export interface AlchemixV3Context {
+  eventType: AlchemixV3EventType;
+  /** "position" — the log names this token id. "line" — the log names no
+   *  position and belongs to the whole line; it sits on the timeline because
+   *  it is what moved the figure, never as the holder's action. */
+  scope: "position" | "line";
+  positionKind: "alchemist" | "transmuter";
+  /** One synthetic on one chain (`base-alusdb`, `eth-alusd`, `eth-aleth`). */
+  lineKey: string;
+  chainId: number;
+  syntheticSymbol: string;
+  /** The Alchemist position's token id, or the Transmuter position's nft id.
+   *  Null on a line-scope row, which names none. */
+  tokenId: string | null;
+  emitter: string;
+  /** The log's own integers as the table stores them, unscaled. */
+  raw: Record<string, string | null>;
+  /** The two quantities `Repay` and `ForceRepay` do not emit, resolved when
+   *  the log was captured. `debtCredit` is the debt delta; `collateralFee` is
+   *  the protocol fee on the earmarked part, taken from the same transaction's
+   *  MYT Transfer. Null means the resolution failed and the reducer refuses the
+   *  position rather than guessing. */
+  resolvedAtCapture?: {
+    debtCredit: string | null;
+    collateralFee: string | null;
+  };
+  /** Set on ERC-721 Transfer rows — custody, moving no axis. */
+  transfer?: TransferDetail;
+  /** Set on `batch_liquidated`: the indexed uint256[] arrives as the array's
+   *  hash, so the ids are not recoverable from the log. */
+  accountsTopic?: string;
+}
+
 // ProtocolContext is designed to grow as new protocol transformers come
 // online. When a new protocol gets a transformer, add a discriminant arm
 // below; the frontend duplicate must mirror the addition. The set of ids is
@@ -2442,6 +2524,7 @@ export type ProtocolContext =
   | { protocol: "fx"; data: FxContext }
   | { protocol: "fluid"; data: FluidContext }
   | { protocol: "polaris"; data: PolarisContext }
+  | { protocol: "alchemix-v3"; data: AlchemixV3Context }
   | { protocol: "other"; data: OtherContext };
 
 // ───────────────────────── The unified event ─────────────────────────

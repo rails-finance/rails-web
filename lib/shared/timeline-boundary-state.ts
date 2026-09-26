@@ -119,6 +119,13 @@ export function boundaryStateFromOldestRow(e: BaseActivityEvent | undefined): Bo
         line("Principal", d.principalBefore, d.assetSymbol),
       );
     }
+    // Alchemix V3 rows carry deltas, never the figure before them, and the
+    // boundary could not be restated from one even if they did: a redemption
+    // moves every open position's debt at once and appears on the timeline as a
+    // line-scope row with no per-position figure on it (rails-ops
+    // decisions/0032). A before-figure inferred from the position's own rows
+    // would be a number the chain does not agree with.
+    case "alchemix-v3":
     // After-only rows, or no running balance at all: the line is absent.
     case "compound":
     case "morpho":

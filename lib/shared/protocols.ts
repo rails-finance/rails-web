@@ -202,6 +202,40 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults", holderListing: true }],
   },
   {
+    // Alchemix V3's ETHEREUM lines — alUSD and alETH. Two entries rather than a
+    // chain switch, for the reason aave-v3 / aave-v3-base are two: a position's
+    // identity is the (chain, line) pair, and a token id on one chain says
+    // nothing about the same number on the other.
+    //
+    // Off the nav while the surface is being built — see `unlaunched`.
+    id: "alchemix",
+    session: "alchemix",
+    label: "Alchemix",
+    chainId: 1,
+    slug: "alchemix",
+    unlaunched: true,
+    tags: ["CDP", "Yield"],
+    desc: "Self-repaying loans against a yield-bearing vault token — each position's debt and collateral stated with the grade and the block they were settled at, and the line-wide redemptions that moved them",
+    subPages: [{ segment: "lines", label: "Lines overview", tab: "Lines" }],
+  },
+  {
+    // Alchemix V3's BASE line — alUSDb. Its own Alchemist, its own Transmuter,
+    // its own positions. It also answers a different GRADE from the two
+    // Ethereum lines: Base has had no redemption, so its figures replay
+    // wei-exact from the position's own events, while Ethereum's are read from
+    // getCDP at a block (rails-ops decisions/0032). That difference is a thing
+    // each explorer says in words, not a property of the roster.
+    id: "alchemix-base",
+    session: "alchemix-base",
+    label: "Alchemix",
+    chainId: 8453,
+    slug: "alchemix",
+    unlaunched: true,
+    tags: ["CDP", "Yield"],
+    desc: "Alchemix V3's Base deployment — the alUSDb line, every position's debt and collateral replayed from its own events, with the block each figure was settled at stated beside it",
+    subPages: [{ segment: "lines", label: "Lines overview", tab: "Lines" }],
+  },
+  {
     id: "asymmetry",
     session: "asymmetry",
     label: "Asymmetry",
@@ -580,6 +614,9 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   // because that explorer draws no position tab; the entry exists because this
   // map is keyed on the closed session union.
   "aave-vaults": "Holding",
+  // Alchemix calls the NFT a position, and so do its getters and its events.
+  alchemix: "Position",
+  "alchemix-base": "Position",
   // Yearn's is the same word for the same reason, and goes unprinted the same
   // way: the explorer draws no position tab and lists no positions.
   yearn: "Holding",

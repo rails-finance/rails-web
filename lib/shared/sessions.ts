@@ -29,6 +29,15 @@ export type SessionProtocol =
   // contract that has none is false (rails-ops decision 0028 point 5). The
   // pool explorers above are version-scoped and truthfully stamped.
   | "aave-vaults"
+  // Alchemix V3's Ethereum lines (alUSD, alETH), at `/ethereum/alchemix`. The
+  // position is an NFT inside a line, so a bookmark on this rail is a wallet's
+  // standing across both lines rather than one id.
+  | "alchemix"
+  // Alchemix V3's Base line (alUSDb), at `/base/alchemix`. A separate scope
+  // from the Ethereum one for the reason `aave-v3-base` is: separate contracts,
+  // separate lines, and a position's identity is the (chain, line) pair — so a
+  // token id on one chain says nothing about the same number on the other.
+  | "alchemix-base"
   | "seamless"
   | "makerdao"
   | "maple"
