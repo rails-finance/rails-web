@@ -70,7 +70,48 @@ const FILLER = /\b(?:itself|own|exactly|straight|actually)\b/gi;
 // A_ALLOW: `phrase` is a run of the summary's words around the hit, `why` is
 // what a reader would get wrong without it. An entry that no longer matches
 // anything fails the check, so a rewritten sentence takes its entry with it.
-const C_KEEP = [];
+const C_KEEP = [
+  {
+    file: "lib/polaris/live-provenance.ts",
+    phrase: "A testnet price: a test figure, not the market.",
+    why: "Polaris runs on Sepolia; without this, a reader could take a testnet price for a real one and act on it. Covers both the ETH and the Gold/XAU branches, which share this exact sentence.",
+  },
+  {
+    file: "lib/polaris/live-provenance.ts",
+    phrase: "Sepolia testnet figures throughout: a test dollar, not a real one.",
+    why: "A USD-shaped figure on a testnet page reads as real money unless said otherwise.",
+  },
+  {
+    file: "lib/polaris/live-provenance.ts",
+    phrase: "A Sepolia testnet figure — a test dollar, not a real one.",
+    why: "Same testnet-vs-real-money warning, the wallet-level debt total.",
+  },
+  {
+    file: "lib/liquity-v1/event-provenance.ts",
+    phrase: "Emitted whole, not a reconstructed sum.",
+    why: "Distinguishes the TroveManager's own emitted absolute from a client-side replay; a reader who assumed the latter could doubt a figure that is in fact exact.",
+  },
+  {
+    file: "lib/spark/event-provenance.ts",
+    phrase: "Interest grew the collateral, so it is part of the headline figure, not a separate holding.",
+    why: "Without this, a reader could double-count accrued interest as an amount on top of the balance shown.",
+  },
+  {
+    file: "lib/spark/event-provenance.ts",
+    phrase: "Interest grew the debt, so it is part of the headline figure, not an amount repaid.",
+    why: "Same double-counting risk on the debt side: the interest is already in the figure, not something separately paid down.",
+  },
+  {
+    file: "lib/spark/position-provenance.ts",
+    phrase: "The protocol's own oracle-priced account state, not an event-replay approximation.",
+    why: "Health-factor-adjacent account state; a reader who thought this was a replayed approximation could distrust an exact, protocol-computed figure near the liquidation line.",
+  },
+  {
+    file: "lib/spark/position-provenance.ts",
+    phrase: "The reserve's own pool-wide rate/state, not an event-replay approximation.",
+    why: "Same exactness guarantee for reserve-level rate/state.",
+  },
+];
 
 /** The literal texts of the expression starting at `from`: one entry per run of
  *  string/template literals joined by `+`. Stops at the `,` `;` or closer that

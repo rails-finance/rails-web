@@ -62,5 +62,4 @@ export const PLAIN_WORDS_PENDING = [
   "lib/sources/chain/compound-markets.ts",
   "lib/sources/chain/moonwell-market-state.ts",
   "lib/spark/event-provenance.ts",
-  "lib/spark/position-provenance.ts",
 ];
