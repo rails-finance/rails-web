@@ -2497,6 +2497,11 @@ export interface AlchemixV3Context {
    *  debt that redemption cleared — measured, never derived. See
    *  `AlchemixDebtClearedFromReadings`. */
   debtClearedFromReadings?: AlchemixDebtClearedFromReadings;
+  /** What the position read as at THIS EVENT'S BLOCK. A getCDP reading, not a
+   *  balance accumulated from the events. Absent on Transmuter rows, which have
+   *  neither axis. See `AlchemixStateAtBlockFromReading` — in particular that it
+   *  belongs to the block and not to the event. */
+  stateAtBlockFromReading?: AlchemixStateAtBlockFromReading;
 }
 
 /** The part of one position's debt that a `Redemption` cleared.
@@ -2529,6 +2534,59 @@ export interface AlchemixDebtClearedFromReadings {
    *   `step-between-readings` — another step falls between the two readings,
    *                             so the difference is those combined. */
   reason: "no-reading-at-block" | "no-prior-reading" | "step-between-readings" | null;
+}
+
+/** What one Alchemist position read as at the block an event landed in.
+ *
+ *  THIS IS A READING, NOT A RUNNING BALANCE. The server stores a getCDP result
+ *  at every block where the position's own events could move it and at every
+ *  line `Redemption` (rails-ops decisions/0032 point 5), so the three figures
+ *  below are what the chain answered at `blockNumber`. Nothing accumulates the
+ *  position's deltas to reach them, which is what `timeline-boundary-state.ts`
+ *  rules out for Alchemix: a redemption moves debt line-wide with no
+ *  per-position figure, so an INFERRED balance would disagree with the chain.
+ *  A read one cannot.
+ *
+ *  IT BELONGS TO THE BLOCK, NOT TO THE EVENT. Several of a position's events
+ *  share a block often — 3,941 of production's 11,972 rows are not the last
+ *  event in their block. One reading at that block is the state after ALL of
+ *  them. Every row in such a block carries the same reading and
+ *  `positionEventsInBlock` says how many events it covers; at 1 it is this
+ *  event's alone, above 1 it is not, and no surface may present it as this
+ *  event's own state-after.
+ *
+ *  EARMARKED IS TRUE AT `blockNumber` AND NOWHERE ELSE (decisions/0032 point
+ *  6). It accrues every block. Nothing may carry it forward or put it beside a
+ *  figure read at another block.
+ *
+ *  `status: "unavailable"` is the marker a surface must honour by rendering
+ *  NOTHING. A debt of zero is a real answer and arrives as `"stated"` with
+ *  `debtRaw: "0"`. The two must never render alike. */
+export interface AlchemixStateAtBlockFromReading {
+  status: "stated" | "unavailable";
+  /** The block the reading was taken at — this event's own block. Null when
+   *  unavailable, because the figures mean nothing without it. */
+  blockNumber: number | null;
+  /** Debt in the synthetic's wei, as read. */
+  debtRaw: string | null;
+  /** Collateral in MYT SHARES (WAD), as read — never the underlying. */
+  collateralRaw: string | null;
+  /** Earmarked debt in the synthetic's wei, as read at `blockNumber`. */
+  earmarkedRaw: string | null;
+  /** How many of this position's OWN events sit in `blockNumber`, counted over
+   *  its whole event stream and not over the page. Stated whether or not the
+   *  reading is: it is a count of rows, not a reading. Zero on a line-scope
+   *  row, whose block holds none of this position's events. */
+  positionEventsInBlock: number;
+  /** Why it cannot be stated; null when it can.
+   *   `no-reading-at-block` — the sweep takes no reading here. A custody
+   *                           Transfer moves no axis, so it is not a band edge
+   *                           and has no reading of its own unless one of the
+   *                           position's axis-moving events shares its block:
+   *                           1,867 of production's 4,988 position Transfers.
+   *   `reading-stale`       — a stale row is the stub a failed sweep wrote, so
+   *                           it is treated as missing rather than served. */
+  reason: "no-reading-at-block" | "reading-stale" | null;
 }
 
 // ProtocolContext is designed to grow as new protocol transformers come

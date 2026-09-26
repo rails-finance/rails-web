@@ -241,6 +241,27 @@ export interface AlchemixTimelineData<TEvent> {
   owner: string | null;
   positionKind: "alchemist";
   events: TEvent[];
+  /** The span of the line this timeline draws line-scope rows from. It stops at
+   *  the position's end where it has one, because a position that has ended
+   *  cannot be moved by a later redemption; otherwise it runs to the line's
+   *  indexed frontier. Optional: a backend that predates the field sends none,
+   *  and the page then says nothing about the window rather than guessing at
+   *  it. */
+  lineEventWindow?: AlchemixLineEventWindow;
+}
+
+/** Where a position's line-scope rows begin and end, and how far the line
+ *  itself is indexed. The two together are what let a closed position's
+ *  timeline say why it carries no redemption past its last event. */
+export interface AlchemixLineEventWindow {
+  fromBlock: number | null;
+  toBlock: number | null;
+  positionEnded: boolean;
+  /** The block the position ended at; null while it is open. */
+  endedAtBlock: number | null;
+  /** How far the LINE is indexed, which is past `toBlock` on an ended
+   *  position and equal to it on an open one. */
+  lineFrontierBlock: number | null;
 }
 
 export interface AlchemixTimelineResponse<TEvent> {

@@ -77,7 +77,12 @@ import {
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
 import type { AlchemixDeployment } from "@/lib/alchemix/lines";
-import type { AlchemixLineCoverage, AlchemixLiveState, AlchemixPositionSummary } from "@/types/api/alchemix";
+import type {
+  AlchemixLineCoverage,
+  AlchemixLineEventWindow,
+  AlchemixLiveState,
+  AlchemixPositionSummary,
+} from "@/types/api/alchemix";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -93,6 +98,12 @@ export interface AlchemistPositionViewProps {
   totalEvents: number | null;
   /** The route's own statement about rows that name no position. */
   lineScopedNote: string | null;
+  /** Where this timeline's line-scope rows stop, and how far the line runs
+   *  past that. It earns a line only on a position that has ENDED: there the
+   *  timeline stops carrying redemptions while the line keeps having them, and
+   *  nothing else on the page says why. On an open position the window's end
+   *  IS the line's frontier, so it would state what the timeline shows. */
+  lineEventWindow: AlchemixLineEventWindow | null;
   /** The current figures, read at render. Null when that read did not land —
    *  and then the slot says so, because no stored figure is current. */
   initialLiveState: AlchemixLiveState | null;
@@ -107,6 +118,7 @@ export function AlchemistPositionView({
   events,
   totalEvents,
   lineScopedNote,
+  lineEventWindow,
   initialLiveState,
 }: AlchemistPositionViewProps) {
   const registry = useReceiptRegistry();
@@ -198,6 +210,17 @@ export function AlchemistPositionView({
       }),
     [tl.sortedEvents, sym, mytSymbol, live, position.figures, olderCount, coords],
   );
+
+  // The window, narrowed to the one case it says something the timeline does
+  // not: an ENDED position whose line has run on past it. Both blocks must be
+  // in hand and the frontier must be the later of the two, or there is nothing
+  // to state.
+  const endedWindow = useMemo(() => {
+    const w = lineEventWindow;
+    if (!w?.positionEnded || w.endedAtBlock == null || w.lineFrontierBlock == null) return null;
+    if (w.lineFrontierBlock <= w.endedAtBlock) return null;
+    return { endedAtBlock: w.endedAtBlock, lineFrontierBlock: w.lineFrontierBlock };
+  }, [lineEventWindow]);
 
   const collateral = position.figures.collateral;
   const underlying = collateral?.underlying ?? null;
@@ -537,8 +560,23 @@ export function AlchemistPositionView({
             />
           }
           notice={
-            lineScopedNote ? (
-              <p className="px-1 text-[11px] leading-relaxed text-rb-500">{lineScopedNote}</p>
+            lineScopedNote || endedWindow ? (
+              <div className="space-y-1">
+                {lineScopedNote ? (
+                  <p className="px-1 text-[11px] leading-relaxed text-rb-500">{lineScopedNote}</p>
+                ) : null}
+                {/* Why a closed position's timeline stops carrying the line's
+                    events while the line goes on having them. Open positions
+                    get nothing: their window ends at the frontier, so the
+                    sentence would restate the timeline. */}
+                {endedWindow ? (
+                  <p className="px-1 text-[11px] leading-relaxed text-rb-500">
+                    This position ended at block {block(endedWindow.endedAtBlock)}, and the line has been indexed to
+                    block {block(endedWindow.lineFrontierBlock)} since. A position that has ended cannot be moved by a
+                    later redemption, so none of the line&rsquo;s events past that block are on this timeline.
+                  </p>
+                ) : null}
+              </div>
             ) : undefined
           }
           renderCard={(event, meta) => {

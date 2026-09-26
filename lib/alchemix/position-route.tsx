@@ -73,6 +73,7 @@ export async function AlchemixPositionPage({
       events={tail.events}
       totalEvents={tail.hasMore ? tail.totalEvents : null}
       lineScopedNote={tail.lineScopedNote}
+      lineEventWindow={tail.lineEventWindow}
       initialLiveState={live}
     />
   );

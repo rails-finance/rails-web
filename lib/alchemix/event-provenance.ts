@@ -222,6 +222,62 @@ export function clearedRunProv(
   };
 }
 
+// ── What the position read as at one event's block ──────────────────────────
+//
+// A READING, NOT AN ACCUMULATION. The sweep stores a `getCDP` result at every
+// block a position's own events could move it and at every line `Redemption`,
+// so the figure served beside an event is what the chain answered at that
+// block. Adding the position's own deltas would not reach it: a redemption
+// moves debt line-wide and names no position, so the events are short by
+// whatever the redemptions took.
+//
+// THE RECEIPT NAMES THE BLOCK AND WHAT ELSE SHARES IT. One reading covers every
+// event in its block, so `eventsInBlock` rides in the trace: at 1 the figure is
+// this event's alone, above 1 it is the state after all of them, and the
+// receipt says which rather than leaving a reader to assume the first.
+
+/** One axis of the reading taken at an event's block. `eventsInBlock` is how
+ *  many of this position's events that one reading covers. */
+export function stateAtBlockFromReadingProv(
+  label: string,
+  symbol: string,
+  raw: string | null,
+  atBlock: number,
+  eventsInBlock: number,
+  coords: AlchemixCoords,
+  decimals = 18,
+): Provenance {
+  const shared = eventsInBlock > 1;
+  return {
+    kind: "chain",
+    pclass: "state",
+    summary: `${label} — this position read from the Alchemist at block ${atBlock}`,
+    contract: alchemistContract(coords),
+    via: `getCDP(${coords.tokenId}) at block ${atBlock}`,
+    verify: { kind: "recompute", text: `Call getCDP(${coords.tokenId}) at block ${atBlock}` },
+    source: { block: atBlock },
+    inputs: coordInputs({ ...coords, blockNumber: atBlock }, [
+      {
+        label: "what the figure is",
+        value: "a reading, not the events added up",
+        kind: "chain",
+        note: "a redemption moves debt across the whole line, so the position's own events cannot reach this figure",
+      },
+      {
+        label: "this position's events in the block",
+        value: String(eventsInBlock),
+        kind: "chain",
+        note: shared
+          ? "the reading covers all of them, so it is not this event's state-after alone"
+          : eventsInBlock === 1
+            ? "this event alone, so the reading is its state-after"
+            : "none — the block belongs to a line-scope event, and the reading is the state after it",
+      },
+    ]),
+    scaling: raw ? { raw, from: "call", places: decimals, why: `${symbol} carries ${decimals} decimals` } : undefined,
+  };
+}
+
 // ── What the vault did for the collateral ───────────────────────────────────
 //
 // The same class of figure as the redemption subtraction above: a SUM OF

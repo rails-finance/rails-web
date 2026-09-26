@@ -124,7 +124,10 @@ export function boundaryStateFromOldestRow(e: BaseActivityEvent | undefined): Bo
     // moves every open position's debt at once and appears on the timeline as a
     // line-scope row with no per-position figure on it (rails-ops
     // decisions/0032). A before-figure inferred from the position's own rows
-    // would be a number the chain does not agree with.
+    // would be a number the chain does not agree with. What IS available is a
+    // `getCDP` reading at each event's block, served on the wire and drawn on
+    // the event card itself (`alchemix-state-at-block.tsx`); this group says
+    // only that nothing may be inferred here, never that no state is in hand.
     case "alchemix-v3":
     // After-only rows, or no running balance at all: the line is absent.
     case "compound":

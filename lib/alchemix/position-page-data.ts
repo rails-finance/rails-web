@@ -45,6 +45,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import type {
   AlchemixLineCoverage,
+  AlchemixLineEventWindow,
   AlchemixLiveState,
   AlchemixPositionSummary,
 } from "@/types/api/alchemix";
@@ -76,6 +77,9 @@ export interface AlchemistPositionTail {
   /** What the route says a line-scope row is. Rendered as given — it is the
    *  backend's own statement about rows that name no position. */
   lineScopedNote: string | null;
+  /** The span of the line this timeline draws line-scope rows from, and how far
+   *  the line itself is indexed. Null when the backend sends none. */
+  lineEventWindow: AlchemixLineEventWindow | null;
   /** The backend answered and has no such position — a 404, not a retry. */
   missing: boolean;
 }
@@ -87,6 +91,7 @@ const EMPTY_TAIL: AlchemistPositionTail = {
   totalEvents: null,
   hasMore: false,
   lineScopedNote: null,
+  lineEventWindow: null,
   missing: false,
 };
 
@@ -139,6 +144,7 @@ export const loadAlchemistPositionTail = cache(
         totalEvents: timelineRead.result.pagination?.total ?? null,
         hasMore: timelineRead.result.pagination?.hasMore === true,
         lineScopedNote: timelineRead.result.notes?.lineScopedEvents ?? null,
+        lineEventWindow: timelineRead.result.data.lineEventWindow ?? null,
         missing: false,
       };
     } catch (err) {

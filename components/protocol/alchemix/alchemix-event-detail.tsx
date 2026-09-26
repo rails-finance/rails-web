@@ -1,20 +1,29 @@
 "use client";
 
-// Alchemist event detail — the figures the log carries, and the ones it does
-// not.
+// Alchemist event detail — the figures the log carries, the ones it does not,
+// and where the position stood once it had landed.
 //
-// NO BEFORE→AFTER TRANSITIONS HERE, and the absence is the point. An Alchemix
-// log states what moved, never the position's balance after it, and on a line
-// that has had a redemption the balance also steps at events this position has
-// none of. A reconstructed after-figure would therefore be wrong on exactly the
-// lines where a reader would most want it. The page's own figures, above the
-// timeline, carry the block they were taken at instead.
+// TWO GRIDS, AND THE SEAM BETWEEN THEM IS THE POINT. The first is what the log
+// states: amounts the event emitted, plus the two a `Repay` does not emit and
+// the index resolved when it captured the log. The second is a `getCDP`
+// READING at the event's block, served on the wire — not a balance replayed
+// from the rows above it. A replayed one would be wrong on the lines a reader
+// most wants it on: a redemption moves debt across the whole line and names no
+// position, so the position's own events cannot account for every step
+// (rails-ops decisions/0032). NO BEFORE→AFTER TRANSITION joins the two, for the
+// same reason: with no trustworthy before there is nothing to subtract.
+//
+// The reading's own rules — that it belongs to the block rather than the event,
+// and that an absent one is not a zero — live with the component that draws it,
+// `alchemix-state-at-block.tsx`.
 //
 // A row that names no position states the line's figure and says so.
 
 import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, type ChainTruthStat } from "@/components/shared/chain-truth-event";
 import { formatExact } from "@/lib/utils/format";
+import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import { AlchemixStateAtBlock } from "./alchemix-state-at-block";
 import {
   debtClearedFromReadingsProv,
   emittedAmountProv,
@@ -146,6 +155,11 @@ export function AlchemixEventDetail({ ctx, mytSymbol, coords }: AlchemixEventDet
 
   return (
     <>
+      {/* Both grids are headed, and the first one is why. The shell declares a
+          `detailLabel` and renders it nowhere, so a lone heading over the
+          second grid would read as covering the pane. Naming this one says
+          which figures the event emitted and which were read. */}
+      {stats.length > 0 ? <h4 className={`${OVERLAY_HEADING} px-5 pt-2 text-rb-500`}>What the log states</h4> : null}
       <ChainTruthDetail stats={stats} />
       {ctx.scope === "line" ? (
         <p className="px-5 pb-3 text-[11px] leading-relaxed text-rb-500">
@@ -167,6 +181,13 @@ export function AlchemixEventDetail({ ctx, mytSymbol, coords }: AlchemixEventDet
           ) : null}
         </p>
       ) : null}
+      <AlchemixStateAtBlock
+        state={ctx.stateAtBlockFromReading}
+        syntheticSymbol={sym}
+        mytSymbol={mytSymbol}
+        eventBlock={coords.blockNumber}
+        coords={coords}
+      />
     </>
   );
 }
