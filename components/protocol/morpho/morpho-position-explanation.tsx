@@ -327,7 +327,7 @@ export function MorphoClosedPositionExplanation({
         {endedBySeizure
           ? "Here the final seizure emptied it entirely."
           : "What remained after the seizures left by the position's own transactions."}{" "}
-        Seizures in the record are what mark the outcome Liquidated rather than Closed.
+        Seizures in the record are what mark the outcome Liquidated.
       </span>,
     );
     // The split the timeline cannot show: the Liquidate log's cleared figure

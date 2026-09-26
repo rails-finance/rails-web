@@ -120,7 +120,7 @@ export function MorphoMarketView({ data, chainId }: { data: MorphoMarketViewData
         {m.isIdle ? (
           <>
             An idle market: it names no collateral, oracle or interest-rate model, so nothing can be borrowed from it.
-            It exists so a vault can hold {m.loanSymbol} inside Blue rather than outside it.
+            It exists so a vault can hold {m.loanSymbol} inside Blue.
           </>
         ) : (
           <>

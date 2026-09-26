@@ -95,7 +95,7 @@ export const vaultTotalAssetsProv = (c: MorphoVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("MetaMorpho.totalAssets()", c),
-  summary: `Total assets — the vault's own \`totalAssets()\`${atBlock(c)}, in ${asset(c)}. MetaMorpho computes it by walking its supply queue and EXTRAPOLATING each market's interest to this block's timestamp, so it stands ahead of the stored market totals the allocation table sums. Both figures are on the page, and the difference between them is stated as its own number rather than reconciled away.`,
+  summary: `Total assets — the vault's own \`totalAssets()\`${atBlock(c)}, in ${asset(c)}. MetaMorpho computes it by walking its supply queue and EXTRAPOLATING each market's interest to this block's timestamp, so it stands ahead of the stored market totals the allocation table sums. Both figures are on the page, and the difference between them is stated as its own number.`,
   contract: vaultContract(c),
   via: `${LANE} · MetaMorpho.totalAssets() @ the pinned block`,
 });
@@ -123,7 +123,7 @@ export const vaultSharePriceProv = (c: MorphoVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("MetaMorpho.convertToAssets(1 share)", c),
-  summary: `Share price — \`convertToAssets(10^decimals)\`${atBlock(c)}: what ONE whole vault share converts to in ${asset(c)}, answered by the vault rather than divided out by this page. It carries the same extrapolation \`totalAssets()\` does.`,
+  summary: `Share price — \`convertToAssets(10^decimals)\`${atBlock(c)}: what ONE whole vault share converts to in ${asset(c)}, answered by the vault. It carries the same extrapolation \`totalAssets()\` does.`,
   contract: vaultContract(c),
   via: `${LANE} · MetaMorpho.convertToAssets(one share) @ the pinned block`,
 });
@@ -236,7 +236,7 @@ export const vaultGapProv = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
-  summary: `Unaccrued interest — the vault's own \`totalAssets()\` minus the Σ of its stored Blue legs${atBlock(c)}. Two readings of the same holdings at the same block: MetaMorpho extrapolates each market's interest to this block's timestamp, Blue's \`market(id)\` holds what each market last SETTLED. The difference is stated rather than reconciled away, and it also carries any asset the vault holds outside its Blue positions.`,
+  summary: `Unaccrued interest — the vault's own \`totalAssets()\` minus the Σ of its stored Blue legs${atBlock(c)}. Two readings of the same holdings at the same block: MetaMorpho extrapolates each market's interest to this block's timestamp, Blue's \`market(id)\` holds what each market last SETTLED. The difference is stated, and it also carries any asset the vault holds outside its Blue positions.`,
   contract: vaultContract(c),
   via: `${LANE} · MetaMorpho.totalAssets() − Σ legs @ the pinned block`,
   formula: "totalAssets − Σ leg assets",
@@ -341,7 +341,7 @@ export const vaultHolderClaimProv = (c: MorphoVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("MetaMorpho.convertToAssets(shares)", c),
-  summary: `Claim on the vault — \`convertToAssets(shares)\`${atBlock(c)}, in ${asset(c)}: the VAULT's own conversion of this balance, asked of the contract rather than computed here. It is deliberately NOT the arithmetic of the attributed rows: MetaMorpho converts against its extrapolated \`totalAssets()\` and against the share count it would have after its next accrual — including the performance-fee shares that accrual would mint. Both adjustments are small and they pull opposite ways, so this figure can land either side of the attributed sum.`,
+  summary: `Claim on the vault — \`convertToAssets(shares)\`${atBlock(c)}, in ${asset(c)}: the VAULT's own conversion of this balance, asked of the contract. It is deliberately NOT the arithmetic of the attributed rows: MetaMorpho converts against its extrapolated \`totalAssets()\` and against the share count it would have after its next accrual — including the performance-fee shares that accrual would mint. Both adjustments are small and they pull opposite ways, so this figure can land either side of the attributed sum.`,
   contract: vaultContract(c),
   via: `${LANE} · MetaMorpho.convertToAssets(balanceOf(holder)) @ the pinned block`,
 });
@@ -353,7 +353,7 @@ export const vaultHolderMaxWithdrawProv = (c: MorphoVaultCoords): Provenance => 
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("MetaMorpho.maxWithdraw(the holder)", c),
-  summary: `Redeemable now — \`maxWithdraw()\` for this address${atBlock(c)}, in ${asset(c)}: the vault's own answer for how much of the asset this address could take out at that block, asked of the contract rather than derived here. It is NOT the claim beside it. ERC-4626 clamps this to what the vault can actually pay: the withdraw queue is walked in order and each market can only give up what it holds unborrowed at that block, so a vault whose legs are fully utilised answers less than the claim, and a paused or capped vault can answer zero. A zero here is a reading of the queue's liquidity, not an absence. It is one block's answer and the next block's can differ — nothing about it is a promise.`,
+  summary: `Redeemable now — \`maxWithdraw()\` for this address${atBlock(c)}, in ${asset(c)}: the vault's own answer for how much of the asset this address could take out at that block, asked of the contract. It is NOT the claim beside it. ERC-4626 clamps this to what the vault can actually pay: the withdraw queue is walked in order and each market can only give up what it holds unborrowed at that block, so a vault whose legs are fully utilised answers less than the claim, and a paused or capped vault can answer zero. A zero here is a reading of the queue's liquidity, not an absence. It is one block's answer and the next block's can differ — nothing about it is a promise.`,
   contract: vaultContract(c),
   via: `${LANE} · MetaMorpho.maxWithdraw(holder) @ the pinned block`,
 });
@@ -460,7 +460,7 @@ export const vaultDirectorySharePriceProv = (c: MorphoVaultCoords): Provenance =
   pclass: "state",
   source: { block: c.blockNumber },
   verify: recompute("MetaMorpho.convertToAssets(1 share)", c),
-  summary: `Share price — \`convertToAssets(10^18)\`${atBlock(c)}: what ONE whole vault share converts to in ${asset(c)}, answered by the vault rather than divided out by this page. It carries the same extrapolation \`totalAssets()\` does, and is a quantity of ${asset(c)} only — never compared or summed across a group boundary, and never converted to USD.`,
+  summary: `Share price — \`convertToAssets(10^18)\`${atBlock(c)}: what ONE whole vault share converts to in ${asset(c)}, answered by the vault. It carries the same extrapolation \`totalAssets()\` does, and is a quantity of ${asset(c)} only — never compared or summed across a group boundary, and never converted to USD.`,
   contract: vaultContract(c),
   via: `${LANE} · MetaMorpho.convertToAssets(one share) @ the pinned block`,
 });
@@ -478,7 +478,7 @@ export const vaultDirectoryStewardProv = (c: MorphoVaultCoords, role: "curator" 
       ? `Curator — the vault's \`curator()\`${atBlock(c)}: the address the vault's owner has set to manage its market caps and queue. Stated as an address and only as an address; no name is attached, because nothing on chain says who holds it.`
       : role === "owner"
         ? `Owner — the vault's \`owner()\`${atBlock(c)}. Shown because this vault's \`curator()\` is the zero address: it names no curator, and putting the owner under a "Curator" label would attribute a role nobody holds. Stated as an address; no name is attached.`
-        : `No curator and no owner — both \`curator()\` and \`owner()\` answered the zero address${atBlock(c)}: the vault names nobody in either role (ownership renounced). A reading about the vault, stated rather than left blank.`,
+        : `No curator and no owner — both \`curator()\` and \`owner()\` answered the zero address${atBlock(c)}: the vault names nobody in either role (ownership renounced). A reading about the vault, stated plainly.`,
   contract: vaultContract(c),
   via: `${LANE} · MetaMorpho.${role === "none" ? "curator() and MetaMorpho.owner" : role}() @ the pinned block`,
 });

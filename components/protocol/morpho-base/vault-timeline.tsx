@@ -442,7 +442,7 @@ function GateFailure({
         (r.refetchDiffered
           ? " Both sweeps were run a second time and returned a different number of logs from the first, which is direct evidence of the lane answering one question two ways."
           : " Both sweeps were run a second time and returned the same number of logs.")}{" "}
-      The figures above this are unaffected — they are calls at block {n(timeline.blockNumber)}, not a replay.
+      The figures above this are unaffected — they are calls at block {n(timeline.blockNumber)}.
     </p>
   );
 }
