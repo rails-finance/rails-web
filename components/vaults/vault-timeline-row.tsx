@@ -325,8 +325,8 @@ function RowDetail({
                 {assetText(rawAmount(event.assets, ad), ad)} {assetSymbol}
               </Prov>{" "}
               in the ERC-4626 <code>{event.kind === "deposit" ? "Deposit" : "Withdraw"}</code> event of this same
-              transaction. It is the contract&rsquo;s own figure, not these shares multiplied by a share price. This
-              address&rsquo;s own leg is what is stated here; the transaction may have moved other shares too.
+              transaction. It is the contract&rsquo;s own figure. This address&rsquo;s own leg is what is stated here;
+              the transaction may have moved other shares too.
             </>
           ) : (
             <>

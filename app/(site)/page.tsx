@@ -114,8 +114,7 @@ export default async function Home() {
               <p className="body-text flex-1 mb-6">
                 <span className="font-semibold text-foreground">Stay on top of positions.</span> Monitor collateral
                 ratios, redemption exposure, yield earned, and liquidation risk — translated into plain language,
-                computed straight from the chain rather than taken on faith from a dashboard. Know exactly where you
-                stand.
+                computed from the chain. Know exactly where you stand.
               </p>
             </div>
             <div className="flex flex-col">
@@ -126,8 +125,7 @@ export default async function Home() {
               <p className="body-text flex-1 mb-6">
                 <span className="font-semibold text-foreground">Support your users.</span> Give your users a dedicated,
                 verifiable window into their positions — one that holds up even where your own frontend can&apos;t
-                reach. A Rails integration means full coverage for your protocol, and real answers for your users, not
-                confusion.
+                reach. A Rails integration means full coverage for your protocol, and real answers for your users.
               </p>
             </div>
             <div className="flex flex-col">

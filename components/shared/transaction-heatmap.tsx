@@ -575,8 +575,7 @@ function WeeksHeatmap({
           </div>
           {grid.summarising && (
             <div className="mt-2 text-[10px] text-rb-500">
-              Days before {fmtFullDate(grid.windowMinDay)} are the opening balance — counted in the index, summarised
-              rather than listed, and not filterable.
+              Days before {fmtFullDate(grid.windowMinDay)} are the opening balance — counted in the index.
             </div>
           )}
           {chrome !== "plain" && (
@@ -964,7 +963,7 @@ function MonthsHeatmap({
           ) : (
             <span>
               Months before {MONTH_NAMES[grid.windowMinIdx % 12]} {Math.floor(grid.windowMinIdx / 12)} are the opening
-              balance — counted in the index, summarised rather than listed, and not filterable.
+              balance — counted in the index.
             </span>
           )
         ) : (

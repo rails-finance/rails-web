@@ -383,7 +383,7 @@ export function liquityInterestRateContent(opts?: { delegated?: boolean; delegat
       },
       {
         bold: "Continuous accrual",
-        text: "interest compounds onto the principal over time rather than being charged upfront.",
+        text: "interest compounds onto the principal over time.",
       },
       {
         bold: "Premium on change",
@@ -651,7 +651,7 @@ export function aaveV4EconomicsContent(): LearnMoreContent {
     details: [
       {
         bold: "Lifetime flows",
-        text: "the towers show every supply, withdrawal, borrow, and repayment over the position's life — not just the current balance.",
+        text: "the towers show every supply, withdrawal, borrow, and repayment over the position's life.",
       },
       {
         bold: "Price runway",
@@ -785,7 +785,7 @@ export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "
   return {
     title: "How the market overview works",
     intro: seamless
-      ? "Seamless is a single Aave-V3-architecture market on Base: one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. It is a fork rather than an Aave deployment, with its own contracts, its own risk parameters and its own oracle. Every one of its reserves has been frozen since April 2025, which closes the market to new supplies and new borrows while leaving interest, repayment, withdrawal and liquidation working exactly as before. This page reads each reserve's size, rates and risk parameters from that Pool and prices them with the oracle it liquidates with."
+      ? "Seamless is a single Aave-V3-architecture market on Base: one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. It is a fork, with its own contracts, its own risk parameters and its own oracle. Every one of its reserves has been frozen since April 2025, which closes the market to new supplies and new borrows while leaving interest, repayment, withdrawal and liquidation working exactly as before. This page reads each reserve's size, rates and risk parameters from that Pool and prices them with the oracle it liquidates with."
       : spark
         ? "SparkLend is a single Aave-V3-architecture market: one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. This page reads each reserve's size, rates and risk parameters live from that Pool and prices them with SparkLend's own oracle."
         : onBase
@@ -800,7 +800,7 @@ export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "
       {
         bold: "Utilisation & rates",
         text: spark
-          ? "utilisation is borrowed ÷ supplied per reserve. Most SparkLend rates follow a utilisation curve; DAI is the exception — its borrow rate is set by Sky governance (the D3M policy rate), not by utilisation."
+          ? "utilisation is borrowed ÷ supplied per reserve. Most SparkLend rates follow a utilisation curve; DAI is the exception — its borrow rate is set by Sky governance (the D3M policy rate)."
           : "utilisation is borrowed ÷ supplied per reserve; the interest-rate curve prices borrowing from it, and suppliers earn the borrow interest net of the reserve factor.",
       },
       {
@@ -831,13 +831,13 @@ export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "
       },
       {
         bold: "Oracle price",
-        text: `USD comes from ${name}'s own IAaveOracle — the same prices the Pool liquidates with, not an off-chain feed.`,
+        text: `USD comes from ${name}'s own IAaveOracle — the same prices the Pool liquidates with.`,
       },
       ...(seamless
         ? [
             {
               bold: "Frozen",
-              text: "a bit in the reserve's own configuration word. A frozen reserve accepts no new supply and no new borrow, but keeps accruing interest and stays liquidatable — so a frozen market's rates and thresholds are live and enforced rather than historical. All eighteen here were frozen in one block.",
+              text: "a bit in the reserve's own configuration word. A frozen reserve accepts no new supply and no new borrow, but keeps accruing interest and stays liquidatable — so a frozen market's rates and thresholds are live and enforced. All eighteen here were frozen in one block.",
             },
           ]
         : []),
@@ -962,8 +962,8 @@ export function aaveV3LiquidationContent(protocol: V3Protocol = "Aave V3"): Lear
     title: "How Liquidations Work",
     intro: `${account} becomes eligible for liquidation when its health factor falls below 1.0 — the point where its borrowed value, measured against each collateral asset's liquidation threshold, is no longer sufficiently covered. Once eligible, anyone (in practice, automated liquidator bots) can step in.`,
     extraParagraphs: [
-      "A liquidator repays part of the account's outstanding debt and, in return, receives an equivalent value of its collateral plus a liquidation bonus — so the collateral seized is worth more than the debt cleared. That bonus is the liquidator's incentive and the borrower's effective penalty. Because V3 pools everything into one cross-collateralised account, the liquidator can take any of the account's collateral assets, not just one in isolation.",
-      `${v3Brand(protocol)} liquidates only partially — enough to nudge the health factor back above 1.0 — rather than closing the whole position at once. Health factor = (collateral value × each asset's liquidation threshold) ÷ total debt; keep it comfortably above 1.0 by holding more collateral or carrying less debt.`,
+      "A liquidator repays part of the account's outstanding debt and, in return, receives an equivalent value of its collateral plus a liquidation bonus — so the collateral seized is worth more than the debt cleared. That bonus is the liquidator's incentive and the borrower's effective penalty. Because V3 pools everything into one cross-collateralised account, the liquidator can take any of the account's collateral assets.",
+      `${v3Brand(protocol)} liquidates only partially — enough to nudge the health factor back above 1.0. Health factor = (collateral value × each asset's liquidation threshold) ÷ total debt; keep it comfortably above 1.0 by holding more collateral or carrying less debt.`,
     ],
     links: v3ModalLinks(protocol, [
       { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
@@ -987,8 +987,8 @@ export function aaveV3BadDebtContent(protocol: V3Protocol = "Aave V3"): LearnMor
       {
         bold: "Who absorbs it",
         text: isAave
-          ? "the reserve's deficit is covered by Aave's Umbrella safety module and the DAO treasury, not by charging other borrowers."
-          : `the reserve's deficit is covered from ${brand}'s own reserves, not by charging other borrowers.`,
+          ? "the reserve's deficit is covered by Aave's Umbrella safety module and the DAO treasury."
+          : `the reserve's deficit is covered from ${brand}'s own reserves.`,
       },
       {
         bold: "Why it happens",
@@ -1014,7 +1014,7 @@ export function aaveV3TransferContent(protocol: V3Protocol = "Aave V3"): LearnMo
     details: [
       {
         bold: "Not a deposit or withdrawal",
-        text: "a transfer is a change of custody, not new capital arriving or leaving — so this explorer counts it on its own line rather than merging it into supplied/withdrawn, which stay true to real Pool flows.",
+        text: "a transfer is a change of custody — so this explorer counts it on its own line rather than merging it into supplied/withdrawn, which stay true to real Pool flows.",
       },
       {
         bold: "Two accounts, one move",
@@ -1131,7 +1131,7 @@ export function sparkBorrowRepayContent(eventType: "borrow" | "repay"): LearnMor
       },
       {
         bold: "Variable borrow interest",
-        text: "debt accrues interest continuously at the reserve's variable borrow rate. Most reserves price off pool utilisation; DAI is the exception — its rate is a flat policy rate set by Sky governance through the D3M credit line, so it moves with governance votes, not utilisation.",
+        text: "debt accrues interest continuously at the reserve's variable borrow rate. Most reserves price off pool utilisation; DAI is the exception — its rate is a flat policy rate set by Sky governance through the D3M credit line, so it moves with governance votes.",
       },
     ],
     links: [
@@ -1148,8 +1148,8 @@ export function sparkLiquidationContent(): LearnMoreContent {
     intro:
       "A SparkLend account becomes eligible for liquidation when its health factor falls below 1.0 — the point where its borrowed value, measured against each collateral asset's liquidation threshold, is no longer sufficiently covered. Once eligible, anyone (in practice, automated liquidator bots) can step in.",
     extraParagraphs: [
-      "A liquidator repays part of the account's outstanding debt and, in return, receives an equivalent value of its collateral plus a liquidation bonus — so the collateral seized is worth more than the debt cleared. That bonus is the liquidator's incentive and the borrower's effective penalty. Because SparkLend pools everything into one cross-collateralised account, the liquidator can take any of the account's collateral assets, not just one in isolation.",
-      "SparkLend liquidates only partially — enough to nudge the health factor back above 1.0 — rather than closing the whole position at once. Health factor = (collateral value × each asset's liquidation threshold) ÷ total debt; keep it comfortably above 1.0 by holding more collateral or carrying less debt.",
+      "A liquidator repays part of the account's outstanding debt and, in return, receives an equivalent value of its collateral plus a liquidation bonus — so the collateral seized is worth more than the debt cleared. That bonus is the liquidator's incentive and the borrower's effective penalty. Because SparkLend pools everything into one cross-collateralised account, the liquidator can take any of the account's collateral assets.",
+      "SparkLend liquidates only partially — enough to nudge the health factor back above 1.0. Health factor = (collateral value × each asset's liquidation threshold) ÷ total debt; keep it comfortably above 1.0 by holding more collateral or carrying less debt.",
     ],
     links: [
       { label: "Liquidations", url: SPARK_DOC_URLS.LIQUIDATIONS },
@@ -1167,7 +1167,7 @@ export function sparkTransferContent(): LearnMoreContent {
     details: [
       {
         bold: "Not a deposit or withdrawal",
-        text: "a transfer is a change of custody, not new capital arriving or leaving — so this explorer counts it on its own line rather than merging it into supplied/withdrawn, which stay true to real Pool flows.",
+        text: "a transfer is a change of custody — so this explorer counts it on its own line rather than merging it into supplied/withdrawn, which stay true to real Pool flows.",
       },
       {
         bold: "Two accounts, one move",
@@ -1266,7 +1266,7 @@ export function moonwellBorrowRepayContent(
   return {
     title: borrowing ? "How Borrowing Works" : "How Repaying Works",
     intro: borrowing
-      ? "Borrowing draws an asset against the account's supplied collateral, accruing interest continuously — Moonwell accrues per second (per-timestamp), not per block like the original Compound v2."
+      ? "Borrowing draws an asset against the account's supplied collateral, accruing interest continuously — Moonwell accrues per second (per-timestamp)."
       : "Repaying returns borrowed assets to the market, clearing debt and restoring the account's borrowing headroom.",
     detailsHeading: "Key concepts:",
     details: [
@@ -1310,7 +1310,7 @@ export function moonwellTransferContent(direction: "transfer_in" | "transfer_out
         bold: incoming ? "Positions can start here" : "Positions can end here",
         text: incoming
           ? "a wallet that never supplied can still hold a position — received mTokens are a deposit like any other."
-          : "a wallet can exit by sending its mTokens rather than redeeming — the position continues under the new owner.",
+          : "a wallet can exit by sending its mTokens — the position continues under the new owner.",
       },
     ],
     links: [{ label: "Moonwell docs", url: MOONWELL_DOC_URL }],
@@ -1324,7 +1324,7 @@ export function moonwellLiquidationContent(): LearnMoreContent {
       "A Moonwell account becomes eligible for liquidation when the Comptroller's account liquidity turns to shortfall — its borrowed value is no longer covered by the collateral-factor-weighted supplied value. Once eligible, anyone (in practice, automated liquidator bots) can step in.",
     extraParagraphs: [
       "A liquidator repays part of the account's debt (up to the close factor, 50% per liquidation) and, in return, seizes the borrower's mTokens in a collateral market of the liquidator's choosing — worth the repaid debt plus a 10% liquidation incentive. The seize is an mToken transfer from borrower to liquidator, so it shows on the collateral market's balance lane too.",
-      "Liquidation is partial and repeatable: each one clears at most half the debt, nudging the account back toward solvency rather than closing it outright.",
+      "Liquidation is partial and repeatable: each one clears at most half the debt, nudging the account back toward solvency.",
     ],
     links: [{ label: "Moonwell docs", url: MOONWELL_DOC_URL }],
   };
@@ -1444,7 +1444,7 @@ export function compoundV2TransferContent(direction: "transfer_in" | "transfer_o
         bold: incoming ? "Positions can start here" : "Positions can end here",
         text: incoming
           ? "a wallet that never supplied can still hold a position — received cTokens are a deposit like any other."
-          : "a wallet can exit by sending its cTokens rather than redeeming — the position continues under the new owner. Nothing stops a send to the cToken contract itself or to the zero address either; such tokens are simply gone from the sender.",
+          : "a wallet can exit by sending its cTokens — the position continues under the new owner. Nothing stops a send to the cToken contract or to the zero address either; such tokens are gone from the sender.",
       },
     ],
     links: [{ label: "Compound V2 docs", url: COMPOUND_V2_DOC_URL }],
@@ -1458,7 +1458,7 @@ export function compoundV2LiquidationContent(): LearnMoreContent {
       "A Compound V2 account becomes eligible for liquidation when the Comptroller's account liquidity turns to shortfall — its borrowed value is no longer covered by the collateral-factor-weighted supplied value. Once eligible, anyone (in practice, automated liquidator bots) can step in.",
     extraParagraphs: [
       "A liquidator repays part of the account's debt — at most the close factor, 50% of one borrowed market per liquidation — and in return seizes the borrower's cTokens in a collateral market of the liquidator's choosing, worth the repaid debt plus the liquidation incentive. The seizure splits in two: most goes to the liquidator, and the protocol keeps its own share (protocolSeizeShare, 2.8%), burned out of the borrower's balance.",
-      "Liquidation is partial and repeatable, and borrowers commonly survive it: Compound V2's 26,639 liquidations land on 5,864 distinct borrowers — about 4.5 each. An account liquidated years ago can still be open today; the timeline shows each liquidation as one event in the account's life, not its end.",
+      "Liquidation is partial and repeatable, and borrowers commonly survive it: Compound V2's 26,639 liquidations land on 5,864 distinct borrowers — about 4.5 each. An account liquidated years ago can still be open today; the timeline shows each liquidation as one event in the account's life.",
     ],
     links: [{ label: "Compound V2 docs", url: COMPOUND_V2_DOC_URL }],
   };
@@ -1490,7 +1490,7 @@ export function compoundV2SeizeContent(kind: "seize_out" | "seize_in" | "seize_b
       },
       {
         bold: "Partial by design",
-        text: "the close factor caps each liquidation at half of one borrowed market, so an account often survives — seizures appear alongside continued activity, not as an ending.",
+        text: "the close factor caps each liquidation at half of one borrowed market, so an account often survives — seizures appear alongside continued activity.",
       },
     ],
     links: [{ label: "Compound V2 docs", url: COMPOUND_V2_DOC_URL }],
@@ -1618,13 +1618,13 @@ export function dolomiteLiquidationContent(): LearnMoreContent {
       "An account becomes liquidatable when its adjusted collateral value falls below the margin requirement times its adjusted debt — the requirement being the global 117.65% minimum scaled up by each market's margin premium (multiplicatively), or the account's own risk override (111.11% on the LST/ETH category) where one applies.",
     extraParagraphs: [
       "A liquidator repays part of the account's debt from their own Dolomite balances and takes collateral worth that repayment plus the liquidation spread (5% globally, scaled by per-market spread premiums; 4% under the risk override). One liquidation event moves FOUR balances: the borrower's debt and collateral, and the liquidator's payout and receipt — each account's timeline shows its own two legs.",
-      "Liquidation is partial and repeatable: it clears what the liquidator chooses to repay, and the account continues with whatever remains. The timeline shows each liquidation as an event in the account's life, not its end.",
+      "Liquidation is partial and repeatable: it clears what the liquidator chooses to repay, and the account continues with whatever remains. The timeline shows each liquidation as an event in the account's life.",
     ],
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "Vaporization",
-        text: "an account can run out of collateral before its debt is cleared, leaving a shortfall no liquidation can seize against. Vaporization writes that remaining debt off, covered by the core's own excess token balances rather than by the account.",
+        text: "an account can run out of collateral before its debt is cleared, leaving a shortfall no liquidation can seize against. Vaporization writes that remaining debt off, covered by the core's excess token balances.",
       },
     ],
     links: [{ label: "Dolomite docs", url: DOLOMITE_DOC_URL }],
@@ -1797,7 +1797,7 @@ export function fxLiquidationContent(): LearnMoreContent {
     intro:
       "f(x) defends fxUSD with two mechanisms. Rebalances trim whole ticks of positions back to a safer debt ratio when the price moves against them — socialized across every position in the tick, with no per-position event. Liquidations close individual positions whose debt ratio breaches the liquidation threshold.",
     extraParagraphs: [
-      "A liquidation event records the collateral seized and the debt actually repaid by the liquidator. When a position's collateral runs out before its debt, the difference is written off against the protocol's reserve — that write-off appears in no event, which is why the explorer reconciles every position against the pool's own settled reading rather than trusting event arithmetic.",
+      "A liquidation event records the collateral seized and the debt actually repaid by the liquidator. When a position's collateral runs out before its debt, the difference is written off against the protocol's reserve — that write-off appears in no event, which is why the explorer reconciles every position against the pool's settled reading.",
       "Because rebalances and redemptions socialize across ticks, a position's collateral and debt can shrink between its own transactions. The dashboard's reconciliation line quantifies exactly how much of the position's history arrived this way.",
     ],
     links: [{ label: "f(x) docs", url: FX_DOC_URL }],
@@ -2039,7 +2039,7 @@ export function compoundLiquidationContent(): LearnMoreContent {
     intro:
       "A Compound V3 account becomes absorbable when its debt exceeds the sum of each collateral asset's value weighted by its liquidate collateral factor. Liquidation is then an ABSORB: the protocol itself takes over the account, rather than a third party repaying part of the debt.",
     extraParagraphs: [
-      "On absorb, the protocol seizes the account's collateral and clears its entire base debt in one step. The account is credited the collateral's oracle value minus each asset's liquidation penalty (1 − liquidationFactor), paid in the base asset — so an absorbed account can come out of liquidation holding a small positive base balance rather than owing anything.",
+      "On absorb, the protocol seizes the account's collateral and clears its entire base debt in one step. The account is credited the collateral's oracle value minus each asset's liquidation penalty (1 − liquidationFactor), paid in the base asset — so an absorbed account can come out of liquidation holding a small positive base balance.",
       "The seized collateral then belongs to the protocol, which sells it to liquidators at a discount (buyCollateral) to recapitalize its reserves. Keep the account healthy by holding the debt under the liquidate-factor-weighted collateral value — the health factor shown here is exactly that ratio, and 1.0 is the contract's own isLiquidatable line.",
     ],
     links: [
@@ -2059,7 +2059,7 @@ export function compoundTransferContent(collateral: boolean): LearnMoreContent {
     details: [
       {
         bold: "Not a deposit or withdrawal",
-        text: "a transfer is a change of custody, not new capital arriving or leaving — so this explorer counts it on its own line rather than merging it into deposited/withdrawn, which stay true to real supplies.",
+        text: "a transfer is a change of custody — so this explorer counts it on its own line rather than merging it into deposited/withdrawn, which stay true to real supplies.",
       },
       {
         bold: "Two accounts, one move",
@@ -2145,7 +2145,7 @@ export function morphoVaultExposureContent(): LearnMoreContent {
       },
       {
         bold: "What the address is",
-        text: "the page reads the address's own code at the same block and states what it found: no code at all (an externally owned account), a Safe, an ERC-4626 vault, or a proxy to another contract, whose address is printed rather than named. A contract holding shares holds them for its own holders, and the figures are attributed to the address either way.",
+        text: "the page reads the address's own code at the same block and states what it found: no code at all (an externally owned account), a Safe, an ERC-4626 vault, or a proxy to another contract, whose address is printed. A contract holding shares holds them for its own holders, and the figures are attributed to the address either way.",
       },
       {
         bold: "An address is not a person",
@@ -2322,7 +2322,7 @@ export function fluidOperateContent(kind: "deposit" | "borrow" | "composite"): L
       ? "Deposits and withdrawals move the position's collateral leg. Fluid routes every token through its central Liquidity layer, but the vault's LogOperate event carries the exact signed amount for this position."
       : kind === "borrow"
         ? "Borrows and repays move the position's debt leg. The emitted amount is the resolved actual token amount — a max-repay sentinel is resolved to the true figure before the event fires."
-        : "One Fluid operation can move BOTH legs — deposit-and-borrow in a single transaction is the protocol's native shape, not a batched pair of actions. The event carries one signed amount per leg.";
+        : "One Fluid operation can move BOTH legs — deposit-and-borrow in a single transaction is the protocol's native shape. The event carries one signed amount per leg.";
   return {
     title:
       kind === "deposit"
@@ -2403,8 +2403,8 @@ export function fluidEventFallbackContent(): LearnMoreContent {
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "Chain-read, not modeled",
-        text: "amounts come from the event log itself; running balances are the replayed sum of the position's own events plus attributed liquidation impacts.",
+        bold: "Chain-read",
+        text: "amounts come from the event log; running balances are the replayed sum of the position's own events plus attributed liquidation impacts.",
       },
     ],
     links: [{ label: "Fluid docs", url: FLUID_DOC_URL }],
@@ -2480,7 +2480,7 @@ export function mapleTransferContent(eventType: "transfer_in" | "transfer_out"):
     details: [
       {
         bold: "The claim moves with the token",
-        text: "whoever holds the shares holds the deposit and its accrued interest — positions routinely arrive via DEX buys, Pendle, or exchange distributions rather than a direct deposit.",
+        text: "whoever holds the shares holds the deposit and its accrued interest — positions routinely arrive via DEX buys, Pendle, or exchange distributions.",
       },
       {
         bold: "Deposit principal stays behind",
@@ -2574,7 +2574,7 @@ export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams): Lea
     intro: `Any ${p.stablecoin} holder can redeem it against the system at $1 face value — the peg mechanism. Redemptions are routed across branches by their unbacked portions and, within a branch, sweep the LOWEST user-set interest rates first (not the lowest collateral ratio — the V1 difference).`,
     stepsHeading: "What happens to a redeemed Trove:",
     steps: [
-      "It gives up collateral at the branch oracle price and sheds exactly the same value of debt — net value is preserved; a forced deleveraging, not a penalty.",
+      "It gives up collateral at the branch oracle price and sheds exactly the same value of debt — net value is preserved.",
       "Its collateral ratio RISES as a result.",
       `A partial redemption that leaves the Trove below the minimum debt makes it a "zombie": outside the rate-ordered queue, redeemed first the next time redemptions route through the branch.`,
     ],
@@ -2603,7 +2603,7 @@ export function liquityForkBatchContent(p: LiquityForkLearnMoreParams): LearnMor
     stepsHeading: "What batching changes:",
     steps: [
       "The batch manager (within owner-approved bounds) controls the rate — and with it the batch's redemption-queue position.",
-      `A batched Trove's debt is tracked as a share of the batch total, so the exact ${p.stablecoin} figure is derived from batch shares rather than emitted per-Trove.`,
+      `A batched Trove's debt is tracked as a share of the batch total, so the exact ${p.stablecoin} figure is derived from batch shares.`,
       "Leaving the batch returns the rate to self-management.",
     ],
     links: forkLinks(p),
@@ -2729,7 +2729,7 @@ export function pwnDefaultContent(): LearnMoreContent {
       },
       {
         bold: "The risk was priced at origination",
-        text: "the lender accepted this collateral against this credit knowing default hands them the collateral; whether that trade was good is decided by the parties, not the protocol.",
+        text: "the lender accepted this collateral against this credit knowing default hands them the collateral; whether that trade was good is decided by the parties.",
       },
       {
         bold: "Defaults are visible in advance",
@@ -2792,7 +2792,7 @@ export function frankencoinMintingContent(): LearnMoreContent {
   return {
     title: "How Frankencoin Minting Positions Work",
     intro:
-      "Frankencoin (ZCHF) is an oracle-free Swiss-franc stablecoin. Every borrower owns a Position contract of their own: they post collateral, DECLARE the liquidation price themselves, and mint ZCHF against it. No price feed exists anywhere in the system — the declared price is kept honest by challenge auctions, not an oracle.",
+      "Frankencoin (ZCHF) is an oracle-free Swiss-franc stablecoin. Every borrower owns a Position contract of their own: they post collateral, DECLARE the liquidation price themselves, and mint ZCHF against it. No price feed exists anywhere in the system — the declared price is kept honest by challenge auctions.",
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -2866,7 +2866,7 @@ export function frankencoinEventFallbackContent(): LearnMoreContent {
   return {
     title: "How Frankencoin Works",
     intro:
-      "Frankencoin (ZCHF) is a decentralized, oracle-free Swiss-franc stablecoin. Borrowers mint ZCHF against collateral they price themselves; challenge auctions — not a price feed — keep the declared prices honest, and a system reserve absorbs shortfalls.",
+      "Frankencoin (ZCHF) is a decentralized, oracle-free Swiss-franc stablecoin. Borrowers mint ZCHF against collateral they price themselves; challenge auctions keep the declared prices honest, and a system reserve absorbs shortfalls.",
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -2913,7 +2913,7 @@ export function marketNoteShareRateContent(): LearnMoreContent {
       },
       {
         bold: "A live note",
-        text: "the same idea, but the later end runs to the chain head instead of a second market observation: this account's own last Mint or Redeem in the market against its own exchange rate read right now, holding the account's CURRENT mToken holding fixed and moving only the rate. Shown for any entered market the account still holds, whatever the move — nothing having changed since is itself the fact it states.",
+        text: "the same idea, but the later end runs to the chain head: this account's own last Mint or Redeem in the market against its own exchange rate read right now, holding the account's CURRENT mToken holding fixed and moving only the rate. Shown for any entered market the account still holds, whatever the move — nothing having changed since is the fact it states.",
       },
     ],
     links: [{ label: "Moonwell docs", url: MOONWELL_DOC_URL }],
@@ -2941,7 +2941,7 @@ export function marketNotePriceGapContent(): LearnMoreContent {
       },
       {
         bold: "The two ratios",
-        text: "the earlier event's debt and collateral, valued at each end's price. The later figure is what that state came to be worth, not a second reading of the position — interest kept accruing across the stretch.",
+        text: "the earlier event's debt and collateral, valued at each end's price. The later figure is what that state came to be worth — interest kept accruing across the stretch.",
       },
       {
         bold: "On a Polaris CDP",
@@ -2957,7 +2957,7 @@ export function marketNotePriceGapContent(): LearnMoreContent {
       },
       {
         bold: "A live note",
-        text: "the same idea, but the later end is the chain head instead of a second event: this position's own newest priced event or touch against the market's oracle price read right now. Shown on any OPEN position, whatever the move — never gated on the runway threshold, because nothing having moved since is itself the fact it states.",
+        text: "the same idea, but the later end is the chain head: this position's own newest priced event or touch against the market's oracle price read right now. Shown on any OPEN position, whatever the move.",
       },
     ],
     links: [
@@ -2992,7 +2992,7 @@ export function marketNoteVaultTermsContent(): LearnMoreContent {
       },
       {
         bold: "What the terms are now",
-        text: "a note says what was set THEN. What the vault's terms are at the block this page read at is stated in the sections above it, which are calls answered at that block rather than logs.",
+        text: "a note says what was set THEN. What the vault's terms are at the block this page read at is stated in the sections above it, which are calls answered at that block.",
       },
     ],
   };
@@ -3007,7 +3007,7 @@ export function marketNoteRateStepContent(): LearnMoreContent {
     details: [
       {
         bold: "Primary rate",
-        text: "the market's Peg Stability Rate, set algorithmically on the market's own PSM mints and redemptions — never chosen by a holder. It is already on every touch as the rate in force at that block.",
+        text: "the market's Peg Stability Rate, set algorithmically on the market's own PSM mints and redemptions. It is already on every touch as the rate in force at that block.",
       },
       {
         bold: "Rate in force at a touch",
@@ -3027,7 +3027,7 @@ export function marketNoteRateStepContent(): LearnMoreContent {
       },
       {
         bold: "A live note",
-        text: "the same idea, but the later end is the chain head instead of a second touch: this CDP's own last touch against the cdpManager's own primary rate read right now. Shown on any OPEN CDP, whatever the move — there is no percentage-point threshold for a live note, because nothing having moved since is itself the fact it states.",
+        text: "the same idea, but the later end is the chain head: this CDP's own last touch against the cdpManager's own primary rate read right now. Shown on any OPEN CDP, whatever the move — there is no percentage-point threshold for a live note, because nothing having moved since is the fact it states.",
       },
       {
         bold: "The same note on a MakerDAO vault",
@@ -3126,7 +3126,7 @@ export function polarisTransferContent(): LearnMoreContent {
       },
       {
         bold: "The mint and the burn",
-        text: "the NFT is minted when the CDP opens and burned when it closes or is liquidated — those two transfers are the open and the close themselves, not custody events.",
+        text: "the NFT is minted when the CDP opens and burned when it closes or is liquidated — those two transfers are the open and the close.",
       },
     ],
     links: [POLARIS_DOC_LINKS.passetMarkets, POLARIS_DOC_LINKS.polaris101, POLARIS_APP_LINK],
@@ -3225,7 +3225,7 @@ export function aaveVaultFlowsContent(assetSymbol: string, shareSymbol: string):
     ],
     extraParagraphs: [
       "No rate, no yield and no profit or loss is drawn. A cost basis over a pooled fungible share is not something any chain read supplies, and the difference between two share prices read at two blocks the holder happened to transact in is not a return.",
-      "The tower is drawn under exactly the condition the rows are: a history that could not be reconciled against the vault's own balanceOf, and one too large to draw whole, both leave it off the page rather than summing part of a life.",
+      "The tower is drawn under exactly the condition the rows are: a history that could not be reconciled against the vault's own balanceOf, and one too large to draw whole, both leave it off the page.",
     ],
   };
 }

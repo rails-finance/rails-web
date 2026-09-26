@@ -2173,7 +2173,7 @@ export function marketNoteSentence(note: MarketNote): string {
       ? `Over ${f.steps} of this CDP's own touches the ${note.marketSymbol} market's primary rate moved ` +
         `${f.fromRate} → ${f.toRate} per year, ${f.delta}, from its ${polarisEndLabel(note.from)} at block ` +
         `${f.fromBlock} to its ${polarisEndLabel(note.to)} at block ${f.toBlock} — each step in between moved it ` +
-        `the same way, so they are stated as one stretch rather than ${f.steps} in a row`
+        `the same way, so they are stated as one stretch`
       : `The ${note.marketSymbol} market's primary rate moved ${f.fromRate} → ${f.toRate} per year, ${f.delta}, ` +
         `between this CDP's ${polarisEndLabel(note.from)} at block ${f.fromBlock} and its ` +
         `${polarisEndLabel(note.to)} at block ${f.toBlock}`;
