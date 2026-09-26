@@ -233,7 +233,7 @@ export function AlchemixPositionCard({ p, session }: { p: AlchemixPositionSummar
           amountColumn("Debt", p.figures.debt, p.syntheticSymbol),
           collateralColumn(p.figures.collateral, "shares"),
           // Its own slot, never added to the debt beside it.
-          amountColumn("Earmarked", p.figures.earmarked, p.syntheticSymbol),
+          amountColumn("Set aside for repayment", p.figures.earmarked, p.syntheticSymbol),
         ]}
       />
 

@@ -534,8 +534,8 @@ export function alchemixEventClauses(
       out.push(
         clause(
           <>
-            The line&rsquo;s Transmuter redeemed {amount(raw.amount)} {sym} across every open position at once, as its
-            stakers&rsquo; deposits matured; nobody holding this position acted.
+            The line&rsquo;s Transmuter redeemed {amount(raw.amount)} {sym} across every open position at once, when a
+            staker claimed a matured deposit; nobody holding this position acted.
           </>,
         ),
       );

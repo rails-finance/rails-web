@@ -19,6 +19,7 @@ import type { AlchemixLiveState } from "@/types/api/alchemix";
 
 const compact = (n: number) => formatCompact(n).display;
 const block = (n: number) => n.toLocaleString("en-US");
+const two = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** What the timeline's redemptions did to this position, summed over the
  *  ones with stated figures. */
@@ -113,11 +114,11 @@ export function AlchemixPositionExplanation({
     redemptions.stated > 0 ? (
       <>
         Across the {redemptions.count} line redemptions on the timeline below, the Transmuter cleared{" "}
-        {compact(redemptions.cleared)} {sym} of this position&rsquo;s debt
+        {two(redemptions.cleared)} {sym} of this position&rsquo;s debt
         {redemptions.taken != null ? (
           <>
             {" "}
-            and took {compact(redemptions.taken)} {mytSymbol} of its collateral
+            and took {two(redemptions.taken)} {mytSymbol} of its collateral
           </>
         ) : null}
         .

@@ -51,7 +51,6 @@ import {
   type ChainTruthTransition,
 } from "@/components/shared/chain-truth-event";
 import { formatUnitsExact } from "@/lib/utils/format";
-import { formatCompact } from "@/lib/shared/format-event";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { readingChangeProv, stateAtBlockFromReadingProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
 import type { AlchemixReading } from "@/lib/alchemix/readings-before";
@@ -61,6 +60,17 @@ const block = (n: number) => n.toLocaleString("en-US");
 /** Both alAssets and the MYT share count carry 18 decimals, the same scale the
  *  rest of this card reads its emitted amounts at. */
 const DECIMALS = 18;
+
+/** The grid's figure: whole units from a thousand up, so a small move on a
+ *  large balance still shows between before and after (Liquity V2's
+ *  `36,887 → 35,899`); two places below that. */
+const gridFigure = (raw: string): string => {
+  const n = Number(raw) / 10 ** DECIMALS;
+  if (n === 0) return "0";
+  if (Math.abs(n) >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  if (Math.abs(n) < 0.01) return "<0.01";
+  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+};
 
 export interface AlchemixStateAtBlockProps {
   state: AlchemixStateAtBlockFromReading | undefined;
@@ -104,7 +114,7 @@ export function AlchemixStateAtBlock({
     const why =
       state.reason === "reading-stale"
         ? `The reading${at} did not complete, so what this position held here is not stated.`
-        : `No reading was taken${at}. ${subject} moved neither of this position's axes, so it is not a block the reading stops at, and what this position held here is not stated.`;
+        : `No reading was taken${at}: ${subject.toLowerCase()} moved neither debt nor collateral, so the explorer stores no figures for this block.`;
     return (
       <p className="mt-1 border-t border-rb-200 px-5 pb-3 pt-2 text-[11px] leading-relaxed text-rb-500 dark:border-rb-800">
         {why}
@@ -127,10 +137,10 @@ export function AlchemixStateAtBlock({
     const sign = delta > BigInt(0) ? "+" : "−";
     const abs = (delta < BigInt(0) ? -delta : delta).toString();
     const t: ChainTruthTransition = {
-      before: formatCompact(Number(beforeRaw) / 10 ** DECIMALS).display,
+      before: gridFigure(beforeRaw),
       beforeExact: formatUnitsExact(beforeRaw, DECIMALS),
       beforeProv: stateAtBlockFromReadingProv(label, symbol, beforeRaw, before.blockNumber, 0, coords, DECIMALS),
-      change: `${sign}${formatCompact(Number(abs) / 10 ** DECIMALS).display}`,
+      change: `${sign}${gridFigure(abs)}`,
       changeExact: `${sign}${formatUnitsExact(abs, DECIMALS)}`,
       changeProv: readingChangeProv(label, symbol, before.blockNumber, atBlock, coords),
     };
@@ -148,6 +158,7 @@ export function AlchemixStateAtBlock({
       label,
       value: formatUnitsExact(raw, DECIMALS),
       symbol,
+      display: gridFigure(raw),
       prov: stateAtBlockFromReadingProv(label, symbol, raw, atBlock, state.positionEventsInBlock, coords, DECIMALS),
       transition: transition(label, symbol, raw, beforeRaw),
     };

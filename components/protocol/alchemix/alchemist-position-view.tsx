@@ -598,7 +598,7 @@ export function AlchemistPositionView({
               repeated; both are in the column, each with its own receipt. */}
             {underlying ? (
               <p className="text-[11px] leading-relaxed text-rb-500">
-                The {underlying.symbol ?? "underlying"} figure above is the {mytSymbol} share count
+                The {underlying.symbol ?? "underlying"} figure above is the {mytSymbol} share count valued
                 {underlying.sharePriceAsOfBlock != null ? (
                   <> at the share price read at block {block(underlying.sharePriceAsOfBlock)}</>
                 ) : (
@@ -711,8 +711,7 @@ export function AlchemistPositionView({
           // The tower's own "nothing to draw" placeholder, in the slot the
           // tower would have filled.
           <p className="rounded-md border border-dashed border-rb-300/50 px-4 py-6 text-center text-[11px] leading-relaxed text-rb-400 dark:border-rb-700/50">
-            This position has more events than the page draws, so no lifetime totals are given: a total over part of a
-            life would carry a label it has not earned.
+            This position has more events than the page draws, so no lifetime totals are given.
           </p>
         ) : null}
 
@@ -734,10 +733,15 @@ export function AlchemistPositionView({
               />
             }
             notice={
-              lineScopedNote || endedWindow ? (
+              (lineScopedNote && redemptionTotals.count > 0) || endedWindow ? (
                 <div className="space-y-1">
-                  {lineScopedNote ? (
-                    <p className="px-1 text-[11px] leading-relaxed text-rb-500">{lineScopedNote}</p>
+                  {lineScopedNote && redemptionTotals.count > 0 ? (
+                    // The route sends its own statement about line rows in
+                    // the index's vocabulary; the reader gets it in plain words.
+                    <p className="px-1 text-[11px] leading-relaxed text-rb-500">
+                      Redemption rows are the whole line&rsquo;s events, and the holder did none of them. Each states
+                      what it cleared from this position&rsquo;s debt and took from its collateral.
+                    </p>
                   ) : null}
                   {/* Why a closed position's timeline stops carrying the line's
                     events while the line goes on having them. Open positions

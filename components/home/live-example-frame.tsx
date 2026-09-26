@@ -143,8 +143,16 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
                 const previousEvent = tempIdx > 0 ? chronoEvents[tempIdx - 1] : undefined;
                 // Day-grouping in display (newest-first) order — same rule as
                 // the trove page's renderCard.
+                // The newest AND the oldest card of each day carry the date,
+                // so an older card never reads as a bare time above a card
+                // dated the day before.
                 const prevDisplayed = idx > 0 ? visibleEvents[idx - 1] : undefined;
-                const showDate = !prevDisplayed || dayKey(event.timestamp) !== dayKey(prevDisplayed.timestamp);
+                const nextDisplayed = idx + 1 < visibleEvents.length ? visibleEvents[idx + 1] : undefined;
+                const showDate =
+                  !prevDisplayed ||
+                  !nextDisplayed ||
+                  dayKey(event.timestamp) !== dayKey(prevDisplayed.timestamp) ||
+                  dayKey(event.timestamp) !== dayKey(nextDisplayed.timestamp);
                 const datePrefix = showDate ? `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}` : null;
                 return (
                   <EventDateContext.Provider key={event.id} value={datePrefix}>

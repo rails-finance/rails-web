@@ -71,7 +71,7 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
   steps: [
     "Someone holding alUSD deposits it in the line's Transmuter, where it matures over a period measured in blocks.",
     "As those deposits mature, the Alchemist sets aside a matching amount of debt across every open position on the line. That is each position's Set aside for repayment figure, and it grows block by block.",
-    "When a staker claims, the Transmuter redeems: every open position's set-aside debt is cleared by the same ratio, and a matching slice of its collateral moves to the Transmuter, one alUSD of debt for one USDC's worth of vault shares.",
+    "When a staker claims, the Transmuter redeems: every open position's set-aside debt is cleared by the same ratio, and a matching slice of its collateral moves to the Transmuter: vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared.",
     "The Transmuter pays the staker in those vault shares (mixUSDC on the alUSD line) for the part of the deposit that has matured, and hands back the rest as alUSD.",
   ],
   detailsHeading: "What it means for a borrower",
