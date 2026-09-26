@@ -290,7 +290,7 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
             <Fig info={rateInForceProv(coords, ctx.raw?.primaryRate)} value={pct(ctx.primaryRate)}>
               {pct(ctx.primaryRate)}
             </Fig>{" "}
-            per year — set by the market.
+            per year — set by the market, not chosen by the holder.
           </>,
         )
       : null;

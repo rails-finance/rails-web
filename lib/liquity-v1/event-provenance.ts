@@ -139,7 +139,7 @@ export const collAfterProv = (coords: LiquityV1Coords): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `ETH collateral the Trove held AFTER this event — the absolute balance the TroveManager emitted at this event${atBlock(coords)}, scaled by 18 decimals. Emitted whole.`,
+  summary: `ETH collateral the Trove held AFTER this event — the absolute balance the TroveManager emitted at this event${atBlock(coords)}, scaled by 18 decimals. Emitted whole, not a reconstructed sum.`,
   contract: TROVE_MANAGER,
   via: `${LIQUITY_V1_VIA} · TroveUpdated log · _coll · ÷10^18`,
   inputs: eventInputs(coords),

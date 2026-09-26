@@ -51,7 +51,7 @@ export function frankencoinPositionContent(opts: {
       details: [
         {
           bold: "Owner-set expiration",
-          text: "expiration is a term the owner sets — the panel above shows what it held at its height, since the current figures may still be settling.",
+          text: "expiration is a term the owner sets, not a challenge outcome — the panel above shows what it held at its height, since the current figures may still be settling.",
         },
         {
           bold: "Owner-declared price",

@@ -45,7 +45,7 @@ export function llamalendPositionContent(opts: {
         },
         {
           bold: "Collateral lives in an AMM",
-          text: "the collateral was liquidity in the market's LLAMMA AMM, placed across price bands.",
+          text: "the collateral was liquidity in the market's LLAMMA AMM, placed across price bands rather than parked in a vault.",
         },
       ],
       links: LINKS,

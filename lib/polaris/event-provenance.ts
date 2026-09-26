@@ -120,7 +120,7 @@ function ledgerSummary(field: PolarisLedgerField, stable: string): string {
     case "mintRedeemDebtGain":
       return `${stable} of debt added or removed by the market's PSM activity — the CDPUpdated log's own \`_mintRedeemDebtGain\` field: the CDP's pro-rata share of the debt the PSM's mints and redemptions moved, settled at this touch.`;
     case "accruedInterest":
-      return `Interest charged into the debt at this touch — the CDPUpdated log's own \`_accruedInterest\` field: simple accrual at the market's rate since the previous touch, written into the debt here. Realised.`;
+      return `Interest charged into the debt at this touch — the CDPUpdated log's own \`_accruedInterest\` field: simple accrual at the market's rate since the previous touch, written into the debt here. Realised, not pending.`;
     case "stableGain":
       return `${stable} credited against the debt at this touch — the CDPUpdated log's own \`_stableGain\` field: the CDP's share of the market revenue the stability pool distributes, applied as a debt reduction.`;
     case "stablesMintedToEnsureZeroDebt":

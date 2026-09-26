@@ -372,8 +372,8 @@ export const sparkInterestCaptionProv = (side: "supply" | "debt"): Provenance =>
   pclass: "indexed",
   summary:
     side === "supply"
-      ? "Accrued supply interest included in the collateral balance above — per reserve, the current rebased balance (equal to the spToken's balanceOf at the indexed head) minus the net principal replayed from the position's own Supply/Withdraw/LiquidationCall events, valued at SparkLend's own on-chain oracle price. Interest grew the collateral, so it is part of the headline figure."
-      : "Accrued borrow interest included in the debt balance above — per reserve, the current rebased debt (equal to the variableDebtToken's balanceOf at the indexed head) minus the net principal replayed from the position's own Borrow/Repay/LiquidationCall events, valued at SparkLend's own on-chain oracle price. Interest grew the debt, so it is part of the headline figure.",
+      ? "Accrued supply interest included in the collateral balance above — per reserve, the current rebased balance (equal to the spToken's balanceOf at the indexed head) minus the net principal replayed from the position's own Supply/Withdraw/LiquidationCall events, valued at SparkLend's own on-chain oracle price. Interest grew the collateral, so it is part of the headline figure, not a separate holding."
+      : "Accrued borrow interest included in the debt balance above — per reserve, the current rebased debt (equal to the variableDebtToken's balanceOf at the indexed head) minus the net principal replayed from the position's own Borrow/Repay/LiquidationCall events, valued at SparkLend's own on-chain oracle price. Interest grew the debt, so it is part of the headline figure, not an amount repaid.",
   contract: SPARK,
   via: "(current rebased balance − Σ net event principal) × IAaveOracle getAssetPrice, per reserve",
   formula: "(current − net principal) × oracle price",
