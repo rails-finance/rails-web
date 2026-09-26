@@ -69,6 +69,7 @@ import { AlchemixStatusPill, amountColumn } from "@/components/protocol/alchemix
 import { computeAlchemixEconomics } from "@/lib/alchemix/economics";
 import { useAlchemixTimelineRuns } from "@/lib/alchemix/timeline-runs";
 import {
+  collateralAppreciationProv,
   liveFigureProv,
   servedFigureProv,
   underlyingProv,
@@ -202,6 +203,32 @@ export function AlchemistPositionView({
   const underlying = collateral?.underlying ?? null;
   const usd = collateral?.usd ?? null;
   const dlb = position.figures.derivedLowerBound;
+
+  // Rule 6. What the vault did for the collateral, and only where every part of
+  // it is in hand. An `unavailable` figure draws nothing at all — a stated ZERO
+  // is an answer and is the reason the guard is on the status and not on the
+  // amount.
+  const app = position.figures.collateralAppreciationFromReadings;
+  const appStated =
+    app?.status === "stated" &&
+    app.formatted != null &&
+    app.amountRaw != null &&
+    app.decimals != null &&
+    app.fromBlock != null &&
+    app.toBlock != null &&
+    app.intervals != null &&
+    app.readings != null
+      ? {
+          formatted: app.formatted,
+          amountRaw: app.amountRaw,
+          decimals: app.decimals,
+          symbol: app.symbol ?? "the asset underneath",
+          fromBlock: app.fromBlock,
+          toBlock: app.toBlock,
+          intervals: app.intervals,
+          readings: app.readings,
+        }
+      : null;
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -406,6 +433,42 @@ export function AlchemistPositionView({
                 is not stated here.
               </p>
             )}
+
+            {/* What the vault did for the collateral. The verb carries the
+                sign — a share price that fell has to read as a loss, which is
+                why this is never labelled yield (rails-ops decisions/0032). */}
+            {appStated ? (
+              <p className="text-[11px] leading-relaxed text-rb-500">
+                The vault&rsquo;s share price{" "}
+                {appStated.formatted > 0
+                  ? "took this position’s collateral up by "
+                  : appStated.formatted < 0
+                    ? "took this position’s collateral down by "
+                    : "moved this position’s collateral by "}
+                <Prov
+                  info={collateralAppreciationProv(
+                    appStated.symbol,
+                    appStated.amountRaw,
+                    appStated.decimals,
+                    appStated.fromBlock,
+                    appStated.toBlock,
+                    appStated.intervals,
+                    appStated.readings,
+                    coords,
+                  )}
+                  value={String(appStated.formatted)}
+                  symbol={appStated.symbol}
+                >
+                  <span className="tabular-nums">
+                    {formatCompact(Math.abs(appStated.formatted)).display} {appStated.symbol}
+                  </span>
+                </Prov>{" "}
+                over the readings from block {block(appStated.fromBlock)} to block {block(appStated.toBlock)}. That is
+                the share count against each step the price took, summed over {appStated.intervals}{" "}
+                {appStated.intervals === 1 ? "step" : "steps"}, with deposits and withdrawals left out — a vault share
+                can lose value as well as gain it.
+              </p>
+            ) : null}
 
             {/* Rule 3. The route's own words for this line's grade. */}
             <p className="text-xs leading-relaxed text-rb-500">{position.figures.gradeReason}</p>

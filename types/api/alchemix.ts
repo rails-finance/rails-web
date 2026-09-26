@@ -86,6 +86,46 @@ export interface AlchemixDerivedLowerBound {
   reducedToBlock: number;
 }
 
+/** What the collateral gained, or lost, from the vault's share price moving.
+ *
+ *  THE PROTOCOL'S PREMISE IS THAT THE COLLATERAL'S YIELD PAYS THE DEBT DOWN,
+ *  and this is the figure for it: the position's share count times the move in
+ *  the MYT's share price, summed over each pair of consecutive readings. A share
+ *  count is constant between two consecutive readings, because every block that
+ *  can move it is itself a reading boundary — so this is A SUM OF DIFFERENCES OF
+ *  MEASUREMENTS, the same class of figure as the redemption subtraction, and it
+ *  leaves the grade untouched. Nothing may call it derived.
+ *
+ *  IT IS SIGNED, AND THAT IS THE POINT. A MYT is a Morpho vault over several
+ *  strategies and a strategy can lose: the alETH line's share price fell on 154
+ *  of 1,903 steps and six positions carry a negative total. Alchemix's own app
+ *  labels this "Yield Earned"; on that line the label is a lie, so no surface
+ *  built on this field may promise yield (rails-ops decisions/0032).
+ *
+ *  A STATED ZERO IS AN ANSWER. `unavailable` is the only thing that draws
+ *  nothing, and its `reason` says which measurement was missing. */
+export interface AlchemixCollateralAppreciationFromReadings {
+  status: "stated" | "unavailable";
+  /** Signed, in the UNDERLYING token at `decimals` below — never the MYT's 18.
+   *  Negative when the share price ended lower than it started. */
+  amountRaw: string | null;
+  formatted: number | null;
+  decimals: number | null;
+  symbol: string | null;
+  address: string | null;
+  /** The span the sum covers. The figure is true for it and for no other, so
+   *  both blocks travel with it and are stated wherever it is. */
+  fromBlock: number | null;
+  toBlock: number | null;
+  /** How many consecutive reading pairs the sum ran over, and how many readings
+   *  that was. */
+  intervals: number | null;
+  readings: number | null;
+  /** Why it cannot be stated; null when it can. A stale row is what a failed
+   *  sweep wrote, so it counts as missing rather than being skipped past. */
+  reason: "position-refused" | "single-reading" | "no-readings" | "unusable-reading" | null;
+}
+
 export interface AlchemixFigures {
   grade: AlchemixGrade;
   /** The route's own sentence for this grade, in plain words. Rendered as
@@ -97,6 +137,9 @@ export interface AlchemixFigures {
   collateral: AlchemixCollateral | null;
   /** Earmarked debt at the block the reading was taken at, and at no other. */
   earmarked: AlchemixAmountAtBlock | null;
+  /** Served by the single-position route only, and absent where the route has
+   *  nothing to say — optional here, never a zero standing in for a figure. */
+  collateralAppreciationFromReadings?: AlchemixCollateralAppreciationFromReadings;
   derivedLowerBound: AlchemixDerivedLowerBound | null;
 }
 

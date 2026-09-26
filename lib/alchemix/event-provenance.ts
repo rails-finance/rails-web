@@ -222,6 +222,60 @@ export function clearedRunProv(
   };
 }
 
+// ── What the vault did for the collateral ───────────────────────────────────
+//
+// The same class of figure as the redemption subtraction above: a SUM OF
+// DIFFERENCES OF READINGS, not a rate and not a projection. The share count is
+// constant between two consecutive readings — every block that can move it is
+// itself a reading boundary — so each interval contributes shares × the move in
+// the share price, and the receipt names the span because the figure is true
+// for that span and no other. It is signed, and the receipt says so: a vault
+// share can lose value.
+
+/** The underlying the collateral gained or lost from the MYT's share price
+ *  moving, summed over the readings in a block range. */
+export function collateralAppreciationProv(
+  symbol: string,
+  raw: string,
+  decimals: number,
+  fromBlock: number,
+  toBlock: number,
+  intervals: number,
+  readings: number,
+  coords: AlchemixCoords,
+): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `${symbol} the collateral gained or lost from the vault's share price moving — this position's shares against each step the share price took`,
+    contract: { name: "Metavault (MYT)" },
+    formula: "Σ shares × (share price at the later reading − share price at the earlier one)",
+    via: `${readings} readings of getCDP(${coords.tokenId}) and the MYT's share price, blocks ${fromBlock} to ${toBlock}`,
+    verify: {
+      kind: "recompute",
+      text: `Take each pair of consecutive readings between blocks ${fromBlock} and ${toBlock} and sum the moves`,
+    },
+    source: { block: toBlock },
+    inputs: coordInputs(coords, [
+      { label: "first reading", value: `block ${fromBlock}`, kind: "chain" },
+      { label: "last reading", value: `block ${toBlock}`, kind: "chain" },
+      {
+        label: "steps summed",
+        value: `${intervals} of ${readings} readings`,
+        kind: "chain",
+        note: "the share count holds still across each one, so each step is a share-price move alone",
+      },
+      {
+        label: "sign",
+        value: "the figure can be negative",
+        kind: "offchain",
+        note: "a vault share can lose value, so this is what the price did and never a promised yield",
+      },
+    ]),
+    scaling: { raw, from: "call", places: decimals, why: `${symbol} carries ${decimals} decimals` },
+  };
+}
+
 // ── The headline figures ────────────────────────────────────────────────────
 
 const GRADE_BASIS: Record<AlchemixGrade, string> = {
