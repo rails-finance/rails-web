@@ -2746,3 +2746,26 @@ export function isFluidEvent(
   return e.context?.protocol === "fluid";
 }
 
+
+/** An Alchemix V3 row of EITHER position kind. The kind is inside the context
+ *  (`positionKind`), because one transformer emits both and the Alchemist and
+ *  the Transmuter share every coordinate field. A surface that serves one kind
+ *  narrows on `positionKind` after this guard — see `isAlchemistEvent`. */
+export function isAlchemixV3Event(
+  e: BaseActivityEvent,
+): e is BaseActivityEvent & {
+  context: { protocol: "alchemix-v3"; data: AlchemixV3Context };
+} {
+  return e.context?.protocol === "alchemix-v3";
+}
+
+/** An Alchemix V3 row belonging to an ALCHEMIST position — the borrow side.
+ *  The Transmuter is its own position type with its own page, and a row of its
+ *  kind on this timeline would be a different position's event. */
+export function isAlchemistEvent(
+  e: BaseActivityEvent,
+): e is BaseActivityEvent & {
+  context: { protocol: "alchemix-v3"; data: AlchemixV3Context };
+} {
+  return isAlchemixV3Event(e) && e.context.data.positionKind === "alchemist";
+}

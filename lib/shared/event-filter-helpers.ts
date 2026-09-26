@@ -504,6 +504,30 @@ const AAVE_VAULT_OP_LABELS: Record<string, string> = {
   cooldown: "Cooldown started",
 };
 
+/** Alchemix V3's Alchemist timeline. Registered rather than left to the global
+ *  fall-through, because four of these keys mean something else on another
+ *  roster: "mint" is a Fluid position NFT and a Moonwell supply, "burn",
+ *  "repay" and "deposit" all resolve to a different table's verb. Three keys
+ *  name events that belong to the LINE and not to the holder — a redemption
+ *  moves every open position's debt at once, and the two batch rows carry the
+ *  hash of an account list nothing can decode — so each says so in its own
+ *  label; the card states it in full. */
+const ALCHEMIX_OP_LABELS: Record<string, string> = {
+  deposit: "Deposit collateral",
+  withdraw: "Withdraw collateral",
+  mint: "Mint debt",
+  burn: "Burn debt",
+  repay: "Repay",
+  force_repay: "Force repay",
+  self_liquidated: "Self-liquidate",
+  liquidated: "Liquidated",
+  repayment_fee: "Repayment fee",
+  transfer: "Position transferred",
+  redemption: "Redemption (line-wide)",
+  batch_liquidated: "Batch liquidation (line-wide)",
+  fee_shortfall: "Fee shortfall (line-wide)",
+};
+
 /**
  * Per-protocol label registry, keyed by the `protocolKey` strings the
  * timeline hooks/pages already pass around (useTimelineEvents,
@@ -535,6 +559,7 @@ const PROTOCOL_OP_LABELS: Record<string, Record<string, string>> = {
   frankencoin: FRANKENCOIN_OP_LABELS,
   polaris: POLARIS_OP_LABELS,
   "aave-vaults": AAVE_VAULT_OP_LABELS,
+  "alchemix-v3": ALCHEMIX_OP_LABELS,
 };
 
 /**
@@ -572,6 +597,11 @@ export function actionLabel(actionKey: string, protocolKey?: string): string {
 
 /** Actions that are demoted (shown last in the filter list, often noisy). */
 export const DEMOTED_ACTIONS: Record<string, string[]> = {
+  // Custody moves and the fee row are real, and secondary to the borrow
+  // lifecycle. The three LINE-wide kinds are NOT demoted: on a read-grade line
+  // a redemption is the reason the position's own events no longer add up, so
+  // burying it would hide the one row that explains the rest.
+  "alchemix-v3": ["transfer", "repayment_fee"],
   "liquity-v2-troves": ["setBatchManagerAnnualInterestRate", "applyPendingDebt", "adjustTrove_noChange"],
   // Standalone collateral toggles (not merged into a supply) are rare and
   // mostly noise — surface but demoted. The merged "supply + collateral"
@@ -629,6 +659,7 @@ export const DEMOTED_ACTIONS: Record<string, string[]> = {
  * reads owner-first; non-batched troves emit none, so nothing changes for them.
  */
 export const DEFAULT_HIDDEN_ACTIONS: Record<string, string[]> = {
+  "alchemix-v3": [],
   "liquity-v2-troves": [],
   "aave-v4": [],
   "aave-v3": [],

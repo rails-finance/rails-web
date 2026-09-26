@@ -170,3 +170,71 @@ export interface AlchemixPositionsResponse {
   coverage: { lines: AlchemixLineCoverage[] };
   notes: { earmarked: string };
 }
+
+// ── One Alchemist position: the three reads its page makes ───────────────────
+//
+// `/api/alchemix/position/:lineKey/:tokenId` carries the same
+// `AlchemixPositionSummary` the listing serves, so the page and the row state
+// one thing. `/timeline` carries the position's events in the shared
+// `BaseActivityEvent` shape. `/state` is the live `getCDP` read, and it is the
+// only place a CURRENT earmarked figure may come from: earmarked accrues on
+// every block, so a stored figure is true at its own block and nowhere else.
+
+/** One position, with the coverage its line answers for. */
+export interface AlchemixPositionResponse {
+  success: true;
+  data: AlchemixPositionSummary;
+  coverage: { lines: AlchemixLineCoverage[] };
+  notes: { earmarked: string };
+}
+
+/** The position's events, newest first, windowed on `limit`/`offset`. The
+ *  events are typed at the call site against `BaseActivityEvent` so this
+ *  module stays free of the event-shape import graph. */
+export interface AlchemixTimelineData<TEvent> {
+  lineKey: string;
+  tokenId: string;
+  chainId: number;
+  owner: string | null;
+  positionKind: "alchemist";
+  events: TEvent[];
+}
+
+export interface AlchemixTimelineResponse<TEvent> {
+  success: true;
+  data: AlchemixTimelineData<TEvent>;
+  pagination: AlchemixPagination;
+  notes: { lineScopedEvents: string };
+}
+
+/** The collateral leg of a live read. One `asOfBlock` covers the whole reading
+ *  and sits on the payload, not on each figure: all three come from one call at
+ *  one block, which is what makes earmarked safe to show beside debt HERE and
+ *  nowhere else. The share price carries its own block all the same, because
+ *  the conversion to the underlying need not have been read at that block. */
+export interface AlchemixLiveCollateral extends AlchemixAmount {
+  unit: "myt-shares";
+  mytSymbol: string | null;
+  underlying: AlchemixUnderlyingValue | null;
+  usd: AlchemixUsdValue | null;
+}
+
+export interface AlchemixLiveState {
+  lineKey: string;
+  tokenId: string;
+  chainId: number;
+  /** The block all three figures below were read at. */
+  asOfBlock: number;
+  source: "getCDP";
+  cache: "fresh" | "stale" | "miss";
+  readAt: string;
+  debt: AlchemixAmount | null;
+  collateral: AlchemixLiveCollateral;
+  earmarked: AlchemixAmount | null;
+}
+
+export interface AlchemixStateResponse {
+  success: true;
+  data: AlchemixLiveState;
+  notes: { earmarked: string };
+}

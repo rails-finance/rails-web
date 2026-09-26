@@ -54,13 +54,10 @@ export function AlchemixListing({
       searchPlaceholder="Address or position id"
       renderCard={(p) => <AlchemixPositionCard p={p} />}
       // Both halves of the key, always: a token id is unique only inside its
-      // line, and the line is unique only on its chain.
-      //
-      // The position's own page is stage two, so a row opens the listing
-      // narrowed to that one position rather than a route that does not serve
-      // yet. Replace this with the position route when it lands; the pair it
-      // sends is already the pair that route takes.
-      hrefFor={(p) => `${deployment.basePath}?line=${encodeURIComponent(p.lineKey)}&q=${p.tokenId}`}
+      // line, and the line is unique only on its chain. The position route
+      // takes the pair in its path and checks the line against the chain
+      // before it reads anything.
+      hrefFor={(p) => `${deployment.basePath}/${encodeURIComponent(p.lineKey)}/${p.tokenId}`}
       keyFor={(p) => `${p.lineKey}:${p.tokenId}`}
       strategy={serverStrategy<AlchemixPositionSummary, AlchemixListFilters>({
         dimensions: alchemixListDimensions(deployment.chainId),
