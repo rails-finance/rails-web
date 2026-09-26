@@ -3,12 +3,26 @@
 // Composer: the Alchemist header / detail / plain-words pane in the universal
 // EventCard shell.
 //
-// SPINE GRAMMAR. The holder's own moves draw token rows on a solid spine. The
-// adverse ones draw the caution triangle: a force repay and a self-liquidation
-// are consequences rather than choices, and a liquidation by another party is
-// the critical tone with that party badged on the flow. A custody move draws
-// the send mark and no direction — the position changed hands and neither axis
-// moved.
+// ONE TRANSACTION IS ONE CARD. An opening emits the position NFT's mint, the
+// deposit that funded it and often a forwarding hop, all in one transaction;
+// they used to draw two and three cards, each repeating the same reading of the
+// same block and the same note about it. They arrive here together now, the way
+// Liquity V2's `Open` is one card for a deposit and a borrow, and the header
+// states every leg with its magnitude so the transaction reads without being
+// expanded. The grouping is the timeline's (`lib/alchemix/timeline-runs`); this
+// file takes the legs.
+//
+// A LINE-SCOPE ROW IS NEVER A LEG. A redemption names no position and belongs
+// to the whole line, so it joins nobody's transaction and arrives here alone.
+//
+// SPINE GRAMMAR. The holder's own moves draw token rows on a solid spine, one
+// per leg that moved something. The adverse ones draw the caution triangle: a
+// force repay and a self-liquidation are consequences rather than choices, and
+// a liquidation by another party is the critical tone with that party badged on
+// the flow. An adverse leg takes the whole card's spine, because the
+// transaction it was part of is one of those. A transaction of custody moves
+// alone draws the send mark and no direction: the position changed hands and
+// neither axis moved.
 //
 // THE THREE LINE-SCOPE ROWS DRAW NO TOKEN FLOW AT ALL. A redemption applies one
 // ratio to every open position on the line and names none of them; the batch
@@ -21,13 +35,9 @@ import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-colum
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
-import { AlchemixEventHeader } from "./alchemix-event-header";
+import { AlchemixEventHeader, ALCHEMIX_CAUTION } from "./alchemix-event-header";
 import { AlchemixEventDetail } from "./alchemix-event-detail";
-import {
-  AlchemixEventExplainer,
-  alchemixExplainerTeaser,
-  alchemixLearnMoreContent,
-} from "./alchemix-event-explainer";
+import { AlchemixEventExplainer, alchemixExplainerTeaser, alchemixLearnMoreFor } from "./alchemix-event-explainer";
 
 const WAD = 1e18;
 
@@ -38,109 +48,102 @@ const scaled = (raw: string | null | undefined): number => {
 };
 
 export interface AlchemixEventCardProps {
-  event: AlchemistEvent;
+  /** The legs of ONE transaction, in log order. One leg is the ordinary case;
+   *  an opening brings two or three. */
+  legs: AlchemistEvent[];
   /** The vault share ticker for this line, from the position's own row — the
    *  events do not carry it, and it is not guessed from the line key. */
   mytSymbol: string;
-  /** Every row sharing this event's transaction. An opening emits three logs
-   *  from two contracts, so the mint card needs its siblings to state what the
-   *  transaction did; each card still carries its own receipt and tx link. */
+  /** Every row sharing the transaction, filtered or not. A reader's type filter
+   *  can leave one leg of an opening standing alone, and that leg must still be
+   *  able to tell a forwarding hop from a change of owner. */
   siblings?: AlchemistEvent[];
   isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
 }
 
-/** Adverse but chosen-for-you; the position's own consequence. */
-const CAUTION = new Set(["force_repay", "self_liquidated", "redemption", "batch_liquidated", "fee_shortfall"]);
-
-export function AlchemixEventCard({
-  event,
-  mytSymbol,
-  siblings,
-  isFirst,
-  isLast,
-  eventNumber,
-}: AlchemixEventCardProps) {
-  const ctx = event.context.data;
-  const sibs = siblings ?? [event];
+/** The shares or synthetic one leg moved for THIS position, and which way.
+ *  Left is toward the wallet, right is toward the protocol. */
+function legTokens(leg: AlchemistEvent, mytSymbol: string): SpineTokenRow[] {
+  const ctx = leg.context.data;
   const raw = ctx.raw;
-  const coords: AlchemixCoords = {
-    chainId: ctx.chainId as AlchemixCoords["chainId"],
-    lineKey: ctx.lineKey,
-    tokenId: ctx.tokenId ?? "",
-    emitter: ctx.emitter,
-    txHash: event.txHash,
-    blockNumber: event.blockNumber,
+  if (ctx.scope === "line") return [];
+  switch (ctx.eventType) {
+    case "deposit":
+      return [{ symbol: mytSymbol, direction: "right", value: scaled(raw.amount) }];
+    case "withdraw":
+      return [{ symbol: mytSymbol, direction: "left", value: scaled(raw.amount) }];
+    case "mint":
+      return [
+        {
+          symbol: ctx.syntheticSymbol,
+          address: soleFlowAddress(leg.flows, ctx.syntheticSymbol),
+          direction: "left",
+          value: scaled(raw.amount),
+        },
+      ];
+    case "burn":
+      return [
+        {
+          symbol: ctx.syntheticSymbol,
+          address: soleFlowAddress(leg.flows, ctx.syntheticSymbol),
+          direction: "right",
+          value: scaled(raw.amount),
+        },
+      ];
+    case "repay":
+      // The shares only. The debt this bought is a credit against the
+      // position, not a token this wallet moved, so it has no flank.
+      return [{ symbol: mytSymbol, direction: "right", value: scaled(raw.amount) }];
+    default:
+      return [];
+  }
+}
+
+const WARNING_LABEL: Record<string, string> = {
+  liquidated: "Liquidation",
+  self_liquidated: "Self-liquidation",
+  force_repay: "Forced repayment",
+  redemption: "Redemption",
+  batch_liquidated: "Batch liquidation",
+  fee_shortfall: "Fee shortfall",
+};
+
+export function AlchemixEventCard({ legs, mytSymbol, siblings, isFirst, isLast, eventNumber }: AlchemixEventCardProps) {
+  const lead = legs[0];
+  const sibs = siblings ?? legs;
+
+  const coordsFor = (leg: AlchemistEvent): AlchemixCoords => {
+    const ctx = leg.context.data;
+    return {
+      chainId: ctx.chainId as AlchemixCoords["chainId"],
+      lineKey: ctx.lineKey,
+      tokenId: ctx.tokenId ?? "",
+      emitter: ctx.emitter,
+      txHash: leg.txHash,
+      blockNumber: leg.blockNumber,
+    };
   };
 
-  const critical = ctx.eventType === "liquidated";
-  const caution = CAUTION.has(ctx.eventType);
-  const custody = ctx.eventType === "transfer";
+  const adverse = legs.find((l) => l.context.data.eventType === "liquidated");
+  const cautioned = legs.find((l) => ALCHEMIX_CAUTION.has(l.context.data.eventType));
+  const custodyOnly = legs.every((l) => l.context.data.eventType === "transfer");
 
-  /** The shares or synthetic this event moved for THIS position, and which way.
-   *  Left is toward the wallet, right is toward the protocol. */
-  const tokens: SpineTokenRow[] = (() => {
-    if (ctx.scope === "line" || critical || caution || custody) return [];
-    switch (ctx.eventType) {
-      case "deposit":
-        return [{ symbol: mytSymbol, direction: "right", value: scaled(raw.amount) }];
-      case "withdraw":
-        return [{ symbol: mytSymbol, direction: "left", value: scaled(raw.amount) }];
-      case "mint":
-        return [
-          {
-            symbol: ctx.syntheticSymbol,
-            address: soleFlowAddress(event.flows, ctx.syntheticSymbol),
-            direction: "left",
-            value: scaled(raw.amount),
-          },
-        ];
-      case "burn":
-        return [
-          {
-            symbol: ctx.syntheticSymbol,
-            address: soleFlowAddress(event.flows, ctx.syntheticSymbol),
-            direction: "right",
-            value: scaled(raw.amount),
-          },
-        ];
-      case "repay":
-        // The shares only. The debt this bought is a credit against the
-        // position, not a token this wallet moved, so it has no flank.
-        return [{ symbol: mytSymbol, direction: "right", value: scaled(raw.amount) }];
-      default:
-        return [];
-    }
-  })();
+  const tokens = adverse || cautioned ? [] : legs.flatMap((leg) => legTokens(leg, mytSymbol));
 
-  const warningLabel =
-    ctx.eventType === "liquidated"
-      ? "Liquidation"
-      : ctx.eventType === "self_liquidated"
-        ? "Self-liquidation"
-        : ctx.eventType === "force_repay"
-          ? "Forced repayment"
-          : ctx.eventType === "redemption"
-            ? "Redemption"
-            : ctx.eventType === "batch_liquidated"
-              ? "Batch liquidation"
-              : ctx.eventType === "fee_shortfall"
-                ? "Fee shortfall"
-                : undefined;
-
-  const iconSlot = custody ? (
+  const iconSlot = custodyOnly ? (
     <SpineColumn
-      tokens={[{ symbol: ctx.syntheticSymbol, badge: "send" }]}
+      tokens={[{ symbol: lead.context.data.syntheticSymbol, badge: "send" }]}
       spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
-  ) : critical || caution ? (
+  ) : adverse || cautioned ? (
     <SpineColumn
       icon="warning"
-      warningTone={critical ? "critical" : "caution"}
-      warningLabel={warningLabel}
+      warningTone={adverse ? "critical" : "caution"}
+      warningLabel={WARNING_LABEL[(adverse ?? cautioned)!.context.data.eventType]}
       spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
@@ -155,24 +158,22 @@ export function AlchemixEventCard({
       iconColumn={iconSlot}
       header={
         <AlchemixEventHeader
-          ctx={ctx}
-          actionLabel={event.actionLabel}
-          mytSymbol={mytSymbol}
-          timestamp={event.timestamp}
-          eventNumber={eventNumber}
-          coords={coords}
+          legs={legs}
           siblings={sibs}
-          self={event}
+          mytSymbol={mytSymbol}
+          timestamp={lead.timestamp}
+          eventNumber={eventNumber}
+          coordsFor={coordsFor}
         />
       }
-      detail={<AlchemixEventDetail ctx={ctx} mytSymbol={mytSymbol} coords={coords} />}
-      detailLabel="What the log states"
-      explainer={<AlchemixEventExplainer ctx={ctx} siblings={sibs} self={event} skipLead />}
+      detail={<AlchemixEventDetail legs={legs} mytSymbol={mytSymbol} coordsFor={coordsFor} />}
+      detailLabel="What the logs state"
+      explainer={<AlchemixEventExplainer legs={legs} siblings={sibs} skipLead />}
       explainerLabel="Plain English"
-      explainerTeaser={alchemixExplainerTeaser(ctx, sibs, event)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={alchemixLearnMoreContent(ctx)} />}
-      persistKey={`alchemix-v3:${event.id}`}
+      explainerTeaser={alchemixExplainerTeaser(legs, sibs)}
+      txHash={lead.txHash}
+      learnMore={<LearnMore inline content={alchemixLearnMoreFor(legs)} />}
+      persistKey={`alchemix-v3:${lead.id}`}
     />
   );
 }

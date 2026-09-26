@@ -1,8 +1,8 @@
 "use client";
 
-// Where the position stood at one event's block — the served `getCDP` reading,
-// drawn in the same StatCard grid Morpho's chain-state cards draw their
-// after-balances in.
+// Where the position stood at one transaction's block: the served `getCDP`
+// reading, drawn in the same StatCard grid Morpho's chain-state cards draw
+// their after-balances in.
 //
 // THREE RULES, each one a way this figure can be read as saying something it
 // does not.
@@ -11,17 +11,15 @@
 //    position's own deltas to reach it, and nothing may: a redemption moves debt
 //    across the whole line and names no position (rails-ops decisions/0032), so
 //    an accumulated figure would be short by whatever the redemptions took and
-//    the chain would not agree with it. The note under the grid says so, and the
-//    receipt on every figure traces to the call and its block.
+//    the chain would not agree with it.
 //
 // 2. IT BELONGS TO THE BLOCK, NOT TO THE EVENT. One reading covers every event
-//    in its block, and 3,941 of production's 11,972 rows are not the last event
-//    in theirs. `positionEventsInBlock` is what tells the two apart, so the
-//    heading is the thing that changes: at 1 (or at 0, a line-scope row whose
-//    block holds none of this position's events) it reads "After this event";
-//    above 1 it counts the block's events instead, and the note says the reading
-//    covers them all. Quiet where the figure is this event's alone,
-//    unmistakable where it is not.
+//    in its block, and 3,248 of production's 8,680 position-blocks hold more
+//    than one. `positionEventsInBlock` is what tells the two apart, and the
+//    heading is where it shows: at or below the card's own leg count the
+//    reading covers what the card draws and nothing else, so the heading names
+//    the transaction (or the lone event); above it the block holds events this
+//    card does not draw, and the heading counts the block's instead.
 //
 // 3. AN ABSENT READING IS NOT A ZERO. A custody Transfer moves neither axis, so
 //    it is not a block the sweep stops at: 1,867 of production's 4,988 position
@@ -30,11 +28,21 @@
 //    `fmtHeaderMagnitude`, which renders zero as the empty string (rails-ops
 //    TO-DO-ui-jobs item 74) — the grid's own `formatCompact` keeps it.
 //
+// WHAT THE CARD FACE SAYS ABOUT ALL THAT IS THE BLOCK, AND NOTHING ELSE. The
+// three figures used to carry a forty-five-word note repeating rules 1 and 2
+// and the two unit caveats, on every card and once per leg of a transaction.
+// The rules did not go: they are bullets behind the info toggle
+// (`alchemixReadingClauses`) and notes on each figure's own receipt, which is
+// where a reader asks "where did this number come from". The heading names the
+// block and stops.
+//
 // EARMARKED IS SHOWN, AND ONLY BECAUSE THE HEADING NAMES THE BLOCK. Decision
 // 0032 point 6 permits stating it as of the block it was read at and forbids
 // carrying it anywhere else. All three figures here come from one call at one
-// block, the note says the amount grows every block, and nothing on this card
-// puts it beside a figure from another block.
+// block, and nothing on this card puts it beside a figure from another block. A
+// ZERO KEEPS ITS CELL: the grid is a fixed triple a reader reads across cards,
+// and by rule 3 an absent cell already means "not stated", so dropping a
+// measured zero would make the two look alike.
 
 import type { AlchemixStateAtBlockFromReading } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, type ChainTruthStat } from "@/components/shared/chain-truth-event";
@@ -60,6 +68,10 @@ export interface AlchemixStateAtBlockProps {
    *  the wire sends no block with one, because the figures it has none of would
    *  mean nothing without it. */
   eventBlock: number | undefined;
+  /** How many of this position's logs the card draws. One is a lone event;
+   *  above one the card is a whole transaction, and rule 2's heading reads
+   *  against this number. */
+  legCount: number;
   coords: AlchemixCoords;
 }
 
@@ -68,17 +80,20 @@ export function AlchemixStateAtBlock({
   syntheticSymbol,
   mytSymbol,
   eventBlock,
+  legCount,
   coords,
 }: AlchemixStateAtBlockProps) {
   // Absent on Transmuter rows, which have neither axis.
   if (!state) return null;
+
+  const subject = legCount > 1 ? "This transaction" : "This event";
 
   if (state.status !== "stated" || state.blockNumber == null) {
     const at = eventBlock != null ? ` at block ${block(eventBlock)}` : "";
     const why =
       state.reason === "reading-stale"
         ? `The reading${at} did not complete, so what this position held here is not stated.`
-        : `No reading was taken${at}. This event moved neither of this position's axes, so it is not a block the reading stops at, and what this position held here is not stated.`;
+        : `No reading was taken${at}. ${subject} moved neither of this position's axes, so it is not a block the reading stops at, and what this position held here is not stated.`;
     return (
       <p className="mt-1 border-t border-rb-200 px-5 pb-3 pt-2 text-[11px] leading-relaxed text-rb-500 dark:border-rb-800">
         {why}
@@ -87,7 +102,9 @@ export function AlchemixStateAtBlock({
   }
 
   const atBlock = state.blockNumber;
-  const shared = state.positionEventsInBlock > 1;
+  // Rule 2. Above the card's own leg count the reading covers events this card
+  // does not draw, and the heading has to count the block's instead.
+  const beyondCard = state.positionEventsInBlock > legCount;
 
   const axis = (label: string, raw: string | null, symbol: string): ChainTruthStat | null => {
     if (raw == null) return null;
@@ -107,30 +124,18 @@ export function AlchemixStateAtBlock({
 
   if (stats.length === 0) return null;
 
-  const showsEarmarked = state.earmarkedRaw != null;
+  const heading = beyondCard
+    ? `After this block’s ${state.positionEventsInBlock} events`
+    : legCount > 1
+      ? "After this transaction"
+      : "After this event";
 
   return (
-    <div className="mt-1 border-t border-rb-200 pt-2 dark:border-rb-800">
+    <div className="mt-1 border-t border-rb-200 pt-2 pb-3 dark:border-rb-800">
       <h4 className={`${OVERLAY_HEADING} px-5 text-rb-500`}>
-        {shared ? `After this block’s ${state.positionEventsInBlock} events` : "After this event"}
+        {heading} · block {block(atBlock)}
       </h4>
       <ChainTruthDetail stats={stats} />
-      <p className="px-5 pb-3 text-[11px] leading-relaxed text-rb-500">
-        Read from the Alchemist at block {block(atBlock)}
-        {shared ? (
-          <>
-            , where {state.positionEventsInBlock} of this position&rsquo;s events landed. One reading covers them all,
-            so these figures are where it stood after the last of them. Nothing here is worked out from the events on
-            this page.
-          </>
-        ) : (
-          <>, not worked out from the events on this page.</>
-        )}{" "}
-        Collateral is the vault share count.
-        {showsEarmarked ? (
-          <> The amount set aside for repayment grows every block, so it is true at that block and at no other.</>
-        ) : null}
-      </p>
     </div>
   );
 }

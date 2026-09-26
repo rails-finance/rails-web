@@ -253,6 +253,15 @@ export interface TimelineRunSpec {
    *  the same run when this returns true (e.g. auction slices grouped by
    *  challenge number). Omit for a plain streak of any matching events. */
   sameRun?: (prev: BaseActivityEvent, next: BaseActivityEvent) => boolean;
+  /** This spec's row IS one event's row, not a collapse of like rows: several
+   *  logs of ONE TRANSACTION drawn as one card (Alchemix's opening: the NFT's
+   *  mint, the deposit that funded it and the forwarding hop). Two things
+   *  follow. The reader's "Collapse like events" choice does not reach it,
+   *  because nothing is being hidden behind a click; and the row is wrapped the
+   *  way a single card is, with the day prefix, the share link and the `?at=`
+   *  landing target all taken from the run's first member. A spec that leaves
+   *  this off keeps the collapse behaviour unchanged. */
+  asOneEvent?: boolean;
   /** Render the collapsed row. `children` holds the run's member cards
    *  (already rendered via renderCard, date-prefixed) for in-place expansion,
    *  one per member in run order; isFirst/isLast are the run's spine-terminus
@@ -597,7 +606,10 @@ function ChainTruthTimelineBody({
   // rows memo, so it maps events straight to lone cards (the plain
   // renderEventRow path already handles date prefixes and spine flags).
   const { collapseRuns, showMarketNotes, toggle: toggleDisplay } = useTimelineDisplay();
-  const activeRuns = collapseRuns ? runs : undefined;
+  // Turning the collapse off leaves the `asOneEvent` specs standing: they draw
+  // one transaction as one card and hide nothing, so there is nothing for the
+  // choice to give back.
+  const activeRuns = useMemo(() => (collapseRuns ? runs : runs?.filter((r) => r.asOneEvent)), [collapseRuns, runs]);
   const events = tl.displayedEvents;
   const [windowSize, setWindowSize] = useState(WINDOW_CHUNK);
   const folders = useFolderMembers();
@@ -1133,6 +1145,32 @@ function ChainTruthTimelineBody({
   const shareHrefFor = (id: string) =>
     `${positionPath}/event/${encodeURIComponent(id)}${subjectQuery ? `?${subjectQuery}` : ""}`;
 
+  /** An `asOneEvent` run row is one card for one transaction, so it takes the
+   *  wrappers a single card takes: the day prefix from its place in the flat
+   *  list, its own share link, and the `?at=` landing target. All three read
+   *  the run's FIRST member, which is the row a link to any leg of that
+   *  transaction resolves to. Every other run row is returned untouched. */
+  const wrapRunRow = (row: TimelineRow & { kind: "run" }, node: ReactNode): ReactNode => {
+    if (!row.spec.asOneEvent) return node;
+    const lead = row.events[0];
+    return (
+      <EventDateContext.Provider value={datePrefixAt(row.flatIdx)}>
+        <EventShareProvider href={shareHrefFor(lead.id)}>
+          <div
+            id={`event-${lead.id}`}
+            data-event-id={lead.id}
+            data-row-at={lead.timestamp}
+            className={`rounded-xl transition-shadow duration-[2000ms] ${
+              highlightId === lead.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
+            }`}
+          >
+            {node}
+          </div>
+        </EventShareProvider>
+      </EventDateContext.Provider>
+    );
+  };
+
   const renderEventRow = (
     event: BaseActivityEvent,
     flatIdx: number,
@@ -1242,7 +1280,9 @@ function ChainTruthTimelineBody({
   // Never on a served page: its folders are not a reader's choice (decision
   // 0021). `?folders=0` answers flat, so that page groups in the browser and
   // keeps the toggle.
-  const items = runs?.length && !servedRows ? [...displayItems, COLLAPSE_RUNS_ITEM] : displayItems;
+  // An `asOneEvent` spec is not a collapse and does not earn the toggle on its
+  // own: a page with only those would show one that changes nothing.
+  const items = runs?.some((r) => !r.asOneEvent) && !servedRows ? [...displayItems, COLLAPSE_RUNS_ITEM] : displayItems;
 
   /** The notes that sit beside one row: an event row's own, or the union over
    *  a collapsed run's members — a note whose anchor is inside a folder
@@ -1396,11 +1436,14 @@ function ChainTruthTimelineBody({
                     // event is among its members; the members re-provide null.
                     value={!liveHoldsTip && row.events.some((e) => e.id === tipEventId) ? tipSide : null}
                   >
-                    {row.spec.render(row.events, {
-                      isFirst: row.flatIdx === 0 && !topTerminusTaken,
-                      isLast: row.flatIdx + row.events.length === events.length && !bottomTerminusTaken,
-                      children: row.events.map((e, k) => renderEventRow(e, row.flatIdx + k, { inRun: true })),
-                    })}
+                    {wrapRunRow(
+                      row,
+                      row.spec.render(row.events, {
+                        isFirst: row.flatIdx === 0 && !topTerminusTaken,
+                        isLast: row.flatIdx + row.events.length === events.length && !bottomTerminusTaken,
+                        children: row.events.map((e, k) => renderEventRow(e, row.flatIdx + k, { inRun: true })),
+                      }),
+                    )}
                   </SpineTipContext.Provider>
                 );
               const rowNotes = notesFor(row);

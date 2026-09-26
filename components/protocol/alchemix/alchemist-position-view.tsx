@@ -166,16 +166,18 @@ export function AlchemistPositionView({
   }, [position.owner, setWallets]);
 
   const coords: AlchemixCoords = useMemo(() => ({ chainId, lineKey, tokenId }), [chainId, lineKey, tokenId]);
-  // A redemption belongs to the line, so most of this timeline is them; a
-  // streak of three or more collapses into one dated row (lib/alchemix/timeline-runs).
-  const timelineRuns = useAlchemixTimelineRuns(coords);
 
   const alchemistEvents = useMemo(() => events.filter(isAlchemistEvent), [events]);
   // An opening emits three logs in one transaction — the NFT's mint, the
   // deposit, and often a transfer passing the NFT on to the address that asked
-  // for it. Each keeps its own card; the mint card needs the other two to say
-  // what the transaction did rather than that an address was handed a position.
+  // for it. They draw ONE card (lib/alchemix/timeline-runs), and a card drawing
+  // one leg a filter left standing still reads this map: it is what tells a
+  // forwarding hop from a change of owner.
   const siblingsByTx = useMemo(() => groupEventsByTx(alchemistEvents), [alchemistEvents]);
+  // One transaction is one card; and a redemption belongs to the line, so most
+  // of this timeline is them, and a streak of three or more collapses into one
+  // dated row.
+  const timelineRuns = useAlchemixTimelineRuns(coords, mytSymbol, siblingsByTx);
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - alchemistEvents.length) : 0;
   const tl = useTimelineEvents(alchemistEvents, {
     storageKey: `alchemix-${lineKey}-${tokenId}`,
@@ -583,7 +585,7 @@ export function AlchemistPositionView({
             if (!isAlchemistEvent(event)) return null;
             return (
               <AlchemixEventCard
-                event={event}
+                legs={[event]}
                 mytSymbol={mytSymbol}
                 siblings={siblingsByTx.get(event.txHash) ?? [event]}
                 isFirst={meta.isFirst}

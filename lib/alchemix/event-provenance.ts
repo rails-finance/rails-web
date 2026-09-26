@@ -273,6 +273,28 @@ export function stateAtBlockFromReadingProv(
             ? "this event alone, so the reading is its state-after"
             : "none — the block belongs to a line-scope event, and the reading is the state after it",
       },
+      // The two unit caveats the card face used to carry in prose, each on the
+      // receipt of the figure it governs and nowhere else.
+      ...(label === "Collateral"
+        ? [
+            {
+              label: "what this counts",
+              value: `${symbol} shares`,
+              kind: "chain" as const,
+              note: "the vault share count, not the asset underneath it; the panel above the timeline leads with the asset instead",
+            },
+          ]
+        : []),
+      ...(label === "Set aside for repayment"
+        ? [
+            {
+              label: "how long it holds",
+              value: `block ${atBlock} only`,
+              kind: "chain" as const,
+              note: "it grows every block (decisions/0032 point 6), so it is true at that block and at no other",
+            },
+          ]
+        : []),
     ]),
     scaling: raw ? { raw, from: "call", places: decimals, why: `${symbol} carries ${decimals} decimals` } : undefined,
   };

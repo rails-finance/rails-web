@@ -1,23 +1,39 @@
 "use client";
 
-// Plain-words pane for one Alchemist event. The clauses are in
+// Plain-words pane for one Alchemist transaction. The clauses are in
 // lib/alchemix/explainer-clauses.tsx; this file wires them into the shared
 // pane and picks the mechanic modal.
 //
 // The card shows the first bullet as its teaser, so the pane renders the rest
 // (skipLead) and nothing is said twice.
+//
+// THE OPENING'S NARRATION LEADS. An opening's logs arrive in the chain's own
+// order, which puts the NFT's mint after the deposit that funded it, so the
+// teaser would otherwise be "the position took in N vault shares" under a label
+// reading `Open`. The mint is the leg that narrates the whole transaction, so
+// its bullets go first; every other card keeps log order.
+//
+// THE READING'S CAVEATS COME LAST. They govern the grid above the pane rather
+// than any one leg, and they are what replaced the paragraph that used to sit
+// on the card face once per leg.
 
 import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { composeBullets, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { alchemixEventClauses, type AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
+import { composeBullets, splitLead, ProseExplainer, type ClauseInput } from "@/lib/shared/explainer-prose";
+import {
+  alchemixCustodyRoundTripClause,
+  alchemixEventClauses,
+  alchemixReadingClauses,
+  custodyPathInTx,
+  type AlchemistEvent,
+} from "@/lib/alchemix/explainer-clauses";
 
 export interface AlchemixEventExplainerProps {
-  ctx: AlchemixV3Context;
-  /** The rows sharing this event's transaction, and this row among them. An
-   *  opening takes three logs to state, and the mint card narrates it. */
-  siblings?: AlchemistEvent[];
-  self?: AlchemistEvent;
+  /** The legs of one transaction this card draws, in log order. */
+  legs: AlchemistEvent[];
+  /** Every row sharing the transaction, filtered or not. It is what tells a
+   *  forwarding hop from a change of owner. */
+  siblings: AlchemistEvent[];
   /** The card shows the lead bullet as its teaser; render only the rest. */
   skipLead?: boolean;
 }
@@ -101,13 +117,59 @@ export function alchemixLearnMoreContent(ctx: AlchemixV3Context): LearnMoreConte
   }
 }
 
-/** The teaser: the first bullet, rendered on the card face. */
-export function alchemixExplainerTeaser(ctx: AlchemixV3Context, siblings?: AlchemistEvent[], self?: AlchemistEvent) {
-  return splitLead(alchemixEventClauses(ctx, siblings, self)).lead;
+/** The mechanic a whole transaction is about. A custody leg rides along with
+ *  an opening and with a hand-over that moved an axis in the same transaction;
+ *  what the reader needs explained there is the axis, so the leg that moved one
+ *  chooses the modal and a transaction of transfers alone keeps custody. */
+export function alchemixLearnMoreFor(legs: AlchemistEvent[]): LearnMoreContent {
+  const lead = legs.find((l) => l.context.data.eventType !== "transfer") ?? legs[0];
+  return alchemixLearnMoreContent(lead.context.data);
 }
 
-export function AlchemixEventExplainer({ ctx, siblings, self, skipLead }: AlchemixEventExplainerProps) {
-  const clauses = alchemixEventClauses(ctx, siblings, self);
+/** The legs in the order their bullets read: an opening's narrator first (see
+ *  the header note), log order otherwise. */
+function proseOrder(legs: AlchemistEvent[]): AlchemistEvent[] {
+  if (legs.length < 2) return legs;
+  const mintIdx = legs.findIndex((l) => l.context.data.transfer?.transferType === "mint");
+  if (mintIdx < 1) return legs;
+  return [legs[mintIdx], ...legs.filter((_, i) => i !== mintIdx)];
+}
+
+/** Every bullet the card can show, teaser included. */
+function alchemixCardClauses(legs: AlchemistEvent[], siblings: AlchemistEvent[]): ClauseInput[] {
+  const combined = legs.length > 1;
+  // The reading's own bullets state the share unit, so the deposit's
+  // continuation saying it a second time is dropped.
+  const reading = legs.find((l) => l.context.data.stateAtBlockFromReading?.status === "stated")?.context.data
+    .stateAtBlockFromReading;
+  const readingClauses = alchemixReadingClauses(reading, legs.length);
+  // A custody ROUND TRIP inside one transaction is one fact, not one per hop:
+  // the NFT went out to a contract that acted with it and came back, and each
+  // hop read alone would narrate a change of owner that did not happen.
+  const path = combined
+    ? custodyPathInTx(legs, legs.find((l) => l.context.data.tokenId != null)?.context.data.tokenId ?? null)
+    : null;
+  const roundTrip = path && !path.moved && !path.burnedFrom && path.moves.length > 1 ? path : null;
+  return [
+    ...proseOrder(legs).flatMap((leg) =>
+      alchemixEventClauses(leg.context.data, siblings, leg, {
+        combined,
+        skipShareUnit: readingClauses.length > 0,
+        skipCustody: roundTrip != null,
+      }),
+    ),
+    ...(roundTrip ? [alchemixCustodyRoundTripClause(roundTrip)] : []),
+    ...readingClauses,
+  ];
+}
+
+/** The teaser: the first bullet, rendered on the card face. */
+export function alchemixExplainerTeaser(legs: AlchemistEvent[], siblings: AlchemistEvent[]) {
+  return splitLead(alchemixCardClauses(legs, siblings)).lead;
+}
+
+export function AlchemixEventExplainer({ legs, siblings, skipLead }: AlchemixEventExplainerProps) {
+  const clauses = alchemixCardClauses(legs, siblings);
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
   return <ProseExplainer items={items} />;
 }

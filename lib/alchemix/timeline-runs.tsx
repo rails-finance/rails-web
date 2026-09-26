@@ -1,7 +1,26 @@
 "use client";
 
 // Timeline run specs for the Alchemist position page's ChainTruthTimeline —
-// one kind, the redemption streak.
+// two kinds, and they are not the same kind of thing.
+//
+// THE TRANSACTION ROW IS THE UNIT, NOT A COLLAPSE. Several of a position's logs
+// in one transaction draw one card, the way Liquity V2's `Open` is one card for
+// a deposit and a borrow. It rides the run machinery because that machinery is
+// what turns consecutive rows into one row, but it is `asOneEvent`: the
+// reader's "Collapse like events" choice does not reach it, because nothing is
+// being collapsed: the card IS the transaction.
+//
+// THE UNIT IS THE TRANSACTION AND THE READING BELONGS TO THE BLOCK, and those
+// are two different things. Measured against production on 2026-09-26: 3,248 of
+// the 8,680 blocks holding one of a position's events hold more than one, and
+// NONE of them holds more than one transaction for that position: every
+// multi-event block is a single transaction. So the reading covers exactly the
+// card's legs today, and the card still does not assume it: `legCount` reaches
+// `AlchemixStateAtBlock`, and where the block holds more of this position's
+// events than the card draws, the heading counts the block's instead of naming
+// the transaction.
+//
+// AND THE REDEMPTION STREAK, which is a collapse and stays one.
 //
 // WHY THIS PAGE NEEDED ONE. A redemption belongs to the whole line, so every
 // open position on the line carries every one of them: across the 23 Ethereum
@@ -32,6 +51,8 @@ import { renderRunFolders } from "@/lib/shared/run-folders";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { AlchemixRedemptionRunCard } from "@/components/protocol/alchemix/alchemix-redemption-run-card";
+import { AlchemixEventCard } from "@/components/protocol/alchemix/alchemix-event-card";
+import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
 import { clearedRunProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
 
 /** Runs shorter than this stay as individual cards.
@@ -66,11 +87,49 @@ function rangeOf(events: BaseActivityEvent[]): string {
     : `${shortDate(from)} ${shortDateYear(from)} – ${shortDate(to)} ${shortDateYear(to)}`;
 }
 
+/** The legs of one transaction in LOG ORDER. The displayed list is newest
+ *  first, so a transaction's legs arrive reversed; the id is `txHash:logIndex`,
+ *  which is where the order comes from. */
+function inLogOrder(run: BaseActivityEvent[]): AlchemistEvent[] {
+  const legs = run.filter(isAlchemistEvent);
+  return [...legs].sort((a, b) => logIndexOf(a) - logIndexOf(b));
+}
+
+const logIndexOf = (e: BaseActivityEvent): number => {
+  const n = Number(e.id.split(":").pop());
+  return Number.isFinite(n) ? n : 0;
+};
+
 /** The run specs for one position. Memoised by the caller: a fresh array
  *  identity per render recomputes the timeline's rows. */
-export function useAlchemixTimelineRuns(coords: AlchemixCoords): TimelineRunSpec[] {
+export function useAlchemixTimelineRuns(
+  coords: AlchemixCoords,
+  mytSymbol: string,
+  siblingsByTx: Map<string, AlchemistEvent[]>,
+): TimelineRunSpec[] {
   return useMemo(
     () => [
+      {
+        // One transaction, one card. A line-scope row names no position and is
+        // nobody's leg, so it is not a candidate.
+        asOneEvent: true,
+        match: (e: BaseActivityEvent) => isAlchemistEvent(e) && e.context.data.scope === "position",
+        min: 2,
+        sameRun: (prev: BaseActivityEvent, next: BaseActivityEvent) => prev.txHash === next.txHash,
+        render: (run, meta) => {
+          const legs = inLogOrder(run);
+          return (
+            <AlchemixEventCard
+              key={legs[0].id}
+              legs={legs}
+              mytSymbol={mytSymbol}
+              siblings={siblingsByTx.get(legs[0].txHash) ?? legs}
+              isFirst={meta.isFirst}
+              isLast={meta.isLast}
+            />
+          );
+        },
+      },
       {
         match: (e: BaseActivityEvent) => isAlchemistEvent(e) && e.context.data.eventType === "redemption",
         min: MIN_REDEMPTION_RUN,
@@ -113,6 +172,6 @@ export function useAlchemixTimelineRuns(coords: AlchemixCoords): TimelineRunSpec
           }),
       },
     ],
-    [coords],
+    [coords, mytSymbol, siblingsByTx],
   );
 }
