@@ -17,7 +17,8 @@
 // of the LINE, not of the position (rails-ops decisions/0032), so filtering by
 // it would only be a second, less legible way to pick lines — and it would
 // teach a reader that the grade is something a position has. The Line facet is
-// the honest control, and the grade is stated in words beside the figures.
+// the control that matches the thing, and the grade is stated in words beside
+// the figures.
 //
 // THERE IS NO DEBT SORT ACROSS LINES YET. alUSD and alETH are different tokens,
 // so ranking one page by "debt" would rank a dollar figure against an ether one
