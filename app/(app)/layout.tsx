@@ -12,14 +12,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           padding: `md:pl-14` reserves the rail's 56px on the outer block and
           the inner `mx-auto` then centres the content in what is left, rather
           than the rail pushing a viewport-centred column off centre.
-          `md:pt-4` replaces the air the header band used to give these pages:
-          from `md` up the bar is gone (ui-jobs 68) and the page would
-          otherwise open hard against the top of the viewport. It is a quarter
-          of what the bar cost, since the pages carry their own `py-8` under
-          it. Below `md` the bar is still there, so no padding is owed. */}
+          `md:-mt-[17px]` pulls the column up to close the gap above the
+          protocol title (ui-jobs 71): every page's top-level wrapper carries
+          `py-8` (32px) before its content, and the Rails glyph in the rail
+          centres 31px below the viewport top, so the column has to land 17px
+          above its zero-margin position for the title's centre to meet the
+          glyph's. This replaces the positive `md:pt-4` that used to sit here:
+          that padding covered for the header band's absence (ui-jobs 68), but
+          it stacked on top of the `py-8` below it instead of accounting for
+          it, which is what left the title sitting low. Below `md` the bar is
+          still there and carries its spacing, so no margin is owed. */}
       <BrandRail />
       <div className="md:pl-14">
-        <main className="max-w-7xl mx-auto px-4 md:px-6 md:pt-4">{children}</main>
+        <main className="max-w-7xl mx-auto px-4 md:px-6 md:-mt-[17px]">{children}</main>
         <AppFooter />
       </div>
       {/* Invisible: measures the tagged real sections and feeds the skeleton
