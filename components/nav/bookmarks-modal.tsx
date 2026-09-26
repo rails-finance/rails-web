@@ -18,6 +18,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 
 import { Facehash } from "@/components/shared/facehash";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
@@ -166,7 +167,7 @@ export function BookmarksModal({ onClose }: { onClose: () => void }) {
             </svg>
           </button>
 
-          <div className="mb-5 flex items-center gap-2">
+          <div className="mb-1.5 flex items-center gap-2">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="18"
@@ -182,7 +183,21 @@ export function BookmarksModal({ onClose }: { onClose: () => void }) {
             >
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
             </svg>
-            <h2 className="text-base font-semibold text-foreground">Bookmarks</h2>
+            <h2 className="text-base font-semibold text-foreground">My bookmarks</h2>
+          </div>
+
+          {/* Storage smallprint. Bookmarks live in this origin's localStorage
+              only, with no server copy, so a reader deciding whether to rely
+              on one deserves to be told before they fill a list, not after a
+              cleared browser loses it. Shown in both branches below (empty
+              and populated) since the empty state is exactly when this is
+              most worth knowing. */}
+          <div className="mb-5 flex items-start gap-1.5 text-[11px] text-rb-500">
+            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+            <p>
+              Bookmarks are stored in your browser&apos;s local storage. Nothing is saved to our servers or anywhere
+              else. To keep a copy safe, use Export to file below.
+            </p>
           </div>
 
           {groups.length === 0 ? (
