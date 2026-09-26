@@ -16,6 +16,7 @@
 
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import { AlchemixPositionCard } from "@/components/protocol/alchemix/alchemix-position-card";
+import { AlchemixTypeTabs } from "@/components/protocol/alchemix/alchemix-type-tabs";
 import { fetchAlchemixPositions } from "@/lib/api/fetch-alchemix-positions";
 import type { AlchemixDeployment } from "@/lib/alchemix/lines";
 import {
@@ -48,6 +49,9 @@ export function AlchemixListing({
       title="Alchemix Positions"
       noun="positions"
       basePath={deployment.basePath}
+      // The type tab: Alchemist positions here, Transmuter positions on their
+      // own route beside it.
+      headerExtra={<AlchemixTypeTabs deployment={deployment} active="alchemist" />}
       bookmarksProtocol={deployment.session}
       defaults={ALCHEMIX_LIST_DEFAULTS}
       sortOptions={alchemixSortOptions}

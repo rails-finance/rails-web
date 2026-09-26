@@ -311,3 +311,83 @@ export interface AlchemixStateResponse {
   data: AlchemixLiveState;
   notes: { earmarked: string };
 }
+
+// ── The Transmuter position: the other position type ─────────────────────────
+//
+// `/api/alchemix/transmuter/positions` and `/transmuter/position/:lineKey/:nftId`
+// (rails-server-onboarding `shapeTransmuter`). A Transmuter position is its own
+// NFT, keyed like an Alchemist one by (lineKey, nftId), and a wallet can hold
+// one with no Alchemist position at all, which is why it has pages of its own
+// (rails-ops TO-DO-alchemix-scoping §8.4).
+//
+// IT HAS NO GRADE AND NO READING. Every figure below is one of the Transmuter's
+// own logs, replayed: the stake from `PositionCreated`, the maturity block the
+// reducer settled from the `timeToTransmute` in force at the start block, and
+// the claim from `PositionClaimed`. There is no getCDP for it, which is why its
+// timeline rows carry no `stateAtBlockFromReading`.
+//
+// MATURITY IS IN BLOCKS. `referenceBlock` is how far the indexer has reached on
+// the line, and `matured` / `blocksRemaining` are stated against it, never
+// against a wall clock.
+//
+// THE CLAIM IS IN TWO UNITS. `claimed` is the converted part of the stake, paid
+// out in vault shares (18 decimals on every line); `unclaimed` is the part
+// handed back as the synthetic (also 18).
+
+export interface AlchemixTransmuterClaim {
+  blockNumber: number;
+  claimer: string | null;
+  claimed: (AlchemixAmount & { unit: "myt-shares"; symbol: string | null }) | null;
+  unclaimed: (AlchemixAmount & { symbol: string }) | null;
+}
+
+export interface AlchemixTransmuterMaturity {
+  startBlock: number;
+  maturationBlock: number;
+  /** The block `matured` and `blocksRemaining` are stated against. Null when
+   *  the line has no scan state yet. */
+  referenceBlock: number | null;
+  matured: boolean | null;
+  blocksRemaining: number | null;
+}
+
+export interface AlchemixTransmuterPositionSummary {
+  lineKey: string;
+  chainId: number;
+  chainName: string | null;
+  nftId: string;
+  positionKind: "transmuter";
+  syntheticSymbol: string;
+  lineDisplayName: string;
+  /** The vault share a claim pays out in. */
+  mytSymbol: string | null;
+  creator: string;
+  /** Null once claimed: the claim burns the NFT. */
+  owner: string | null;
+  status: "outstanding" | "claimed";
+  staked: AlchemixAmount & { symbol: string };
+  maturity: AlchemixTransmuterMaturity;
+  claim: AlchemixTransmuterClaim | null;
+  reducedToBlock: number;
+  transmuterUrl: string | null;
+}
+
+export interface AlchemixTransmuterPositionsResponse {
+  success: true;
+  data: AlchemixTransmuterPositionSummary[];
+  pagination: AlchemixPagination;
+  coverage: { lines: AlchemixLineCoverage[] };
+}
+
+/** One Transmuter position with its whole event stream inline: a stake, its
+ *  pokes, custody moves and at most one claim, bounded by the position's life. */
+export interface AlchemixTransmuterPositionData<TEvent> extends AlchemixTransmuterPositionSummary {
+  events: TEvent[];
+  eventCount: number;
+  eventsTruncated: boolean;
+}
+
+export interface AlchemixTransmuterPositionResponse<TEvent> {
+  success: true;
+  data: AlchemixTransmuterPositionData<TEvent>;
+}

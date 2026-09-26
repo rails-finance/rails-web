@@ -48,6 +48,7 @@ import type {
   AlchemixUsdValue,
 } from "@/types/api/alchemix";
 import { formatCompact } from "@/lib/shared/format-event";
+import { alchemixPositionName } from "@/lib/alchemix/naming";
 
 /** The collateral, as either surface holds it. The listing serves it with the
  *  block it was settled at; the live read pins one block to the whole reading,
@@ -215,9 +216,12 @@ export function AlchemixPositionCard({ p, session }: { p: AlchemixPositionSummar
         statusPill={<AlchemixLifecyclePill status={p.status} />}
         leadingIdentity={
           <>
-            <span className="text-xs font-bold uppercase tracking-wide text-foreground/80">{p.lineDisplayName}</span>
+            {/* "alUSD position 1221": the naming ruling (lib/alchemix/naming.ts).
+                Not uppercased, because the symbol's case is part of its name. */}
+            <span className="text-xs font-bold tracking-wide text-foreground/80">
+              {alchemixPositionName(p.syntheticSymbol, p.tokenId)}
+            </span>
             <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-rb-500">
-              <span className="tabular-nums">position {p.tokenId}</span>
               <span>{p.chainName ?? `chain ${p.chainId}`}</span>
               {p.owner ? (
                 <WalletPill wallet={p.owner} ensName={null} filterProtocol={session} bookmarkProtocol={session} />

@@ -15,6 +15,7 @@ import { formatNumber } from "@/lib/utils/format";
 import type { AlchemistPositionTail } from "@/lib/alchemix/position-page-data";
 import type { AlchemixDeployment } from "@/lib/alchemix/lines";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
+import { alchemixMarketWord } from "@/lib/alchemix/naming";
 
 const STATUS_WORD: Record<string, string> = {
   open: "Open",
@@ -62,7 +63,8 @@ export function alchemixShareCardModel(
   return {
     session: deployment.session,
     subject: tokenId,
-    market: p.lineDisplayName,
+    // "alUSD Position 1221" on the card's headline: the naming ruling.
+    market: alchemixMarketWord(p.syntheticSymbol),
     status: STATUS_WORD[p.status] ?? p.status,
     stats,
     asOf: new Date(),

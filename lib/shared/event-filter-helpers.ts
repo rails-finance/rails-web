@@ -526,6 +526,10 @@ const ALCHEMIX_OP_LABELS: Record<string, string> = {
   redemption: "Redemption (line-wide)",
   batch_liquidated: "Batch liquidation (line-wide)",
   fee_shortfall: "Fee shortfall (line-wide)",
+  // The Transmuter position's own three, on the same arm.
+  transmuter_position_created: "Stake",
+  transmuter_position_claimed: "Claim",
+  transmuter_position_poked: "Poke",
 };
 
 /**

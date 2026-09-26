@@ -67,6 +67,18 @@ export const ALCHEMIX_BASE: AlchemixDeployment = {
   lines: linesForChain(8453),
 };
 
+/** Where this explorer lists its Transmuter positions, and where one lives.
+ *  The Transmuter is a position type inside the explorer, reached by a type tab
+ *  on the listing, not a roster entry of its own (rails-ops
+ *  TO-DO-alchemix-scoping §8.4). */
+export function transmuterListingPath(deployment: AlchemixDeployment): string {
+  return `${deployment.basePath}/transmuter`;
+}
+
+export function transmuterPositionPath(deployment: AlchemixDeployment, lineKey: string, nftId: string): string {
+  return `${transmuterListingPath(deployment)}/${encodeURIComponent(lineKey)}/${nftId}`;
+}
+
 /** The lines deployed on one chain. The only way to get a line out of the
  *  catalog, so nothing can hold a line without having named its chain. */
 export function linesForChain(chainId: ChainId): AlchemixLine[] {

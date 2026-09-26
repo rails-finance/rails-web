@@ -9,8 +9,8 @@ export default function AlchemixPositionNotFound() {
       backHref="/ethereum/alchemix"
       backLabel="Browse Alchemix positions on Ethereum"
     >
-      An Alchemix position is keyed by both. The line names which synthetic on which chain holds it — the alUSD and alETH lines here —
-      and an id that exists on one line is a different position on another.
+      An Alchemix position is keyed by both. The line names which synthetic on which chain holds it, the alUSD and alETH
+      lines here, and an id that exists on one line is a different position on another.
     </RouteNotFound>
   );
 }

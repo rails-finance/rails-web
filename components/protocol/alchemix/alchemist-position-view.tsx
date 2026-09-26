@@ -81,6 +81,7 @@ import {
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
 import type { AlchemixDeployment } from "@/lib/alchemix/lines";
+import { alchemixPositionName } from "@/lib/alchemix/naming";
 import type {
   AlchemixLineCoverage,
   AlchemixLineEventWindow,
@@ -280,11 +281,10 @@ export function AlchemistPositionView({
             statusPill={<AlchemixStatusPill status={position.status} />}
             leadingIdentity={
               <>
-                <span className="text-xs font-bold uppercase tracking-wide text-foreground/80">
-                  {position.lineDisplayName}
+                <span className="text-xs font-bold tracking-wide text-foreground/80">
+                  {alchemixPositionName(sym, tokenId)}
                 </span>
                 <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-rb-500">
-                  <span className="tabular-nums">position {tokenId}</span>
                   <span>{position.chainName ?? `chain ${chainId}`}</span>
                   {position.owner ? (
                     <span className="inline-flex items-center gap-1.5">

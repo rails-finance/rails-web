@@ -19,6 +19,7 @@ import { AlchemistPositionView } from "@/components/protocol/alchemix/alchemist-
 import { isLineOnChain, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import { loadAlchemistPositionTail, loadAlchemistLiveState } from "@/lib/alchemix/position-page-data";
 import { alchemixShareCardModel } from "@/lib/alchemix/share-card";
+import { alchemixMarketWord } from "@/lib/alchemix/naming";
 import { ALCHEMIX_TOKEN_ID } from "@/lib/sources/api/alchemix-position-backend";
 
 export interface AlchemixPositionParams {
@@ -26,14 +27,19 @@ export interface AlchemixPositionParams {
   tokenId: string;
 }
 
-export function alchemixPositionMetadata(
+export async function alchemixPositionMetadata(
   deployment: AlchemixDeployment,
   { lineKey, tokenId }: AlchemixPositionParams,
-): Metadata {
+): Promise<Metadata> {
+  // The page's own cached read, so the title costs no second request.
+  const tail = await loadAlchemistPositionTail(deployment.chainId, lineKey, tokenId);
   return positionMetadata({
     session: deployment.session,
     subject: tokenId,
-    market: lineKey,
+    // "Alchemix alUSD Position 1221": the naming ruling (lib/alchemix/naming.ts)
+    // in the house title's capitalisation. The line key stands in only when
+    // the read failed.
+    market: alchemixMarketWord(tail.position?.syntheticSymbol ?? lineKey),
     canonicalPath: `${deployment.basePath}/${lineKey}/${tokenId}`,
     // This route carries its own opengraph-image; the static per-explorer PNG
     // stays its fallback.

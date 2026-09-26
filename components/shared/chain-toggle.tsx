@@ -13,10 +13,12 @@ import { launchedChains } from "@/lib/shared/protocols";
 import { CTRL_GHOST, ctrlWaking } from "@/lib/shared/ui-grammar";
 import { useHydrated } from "@/hooks/useHydrated";
 
-const SHELL =
+/** The segmented pill's shell and segment, exported so another two-way switch
+ *  between routes (the Alchemix position-type tabs) wears the same control. */
+export const SEGMENT_SHELL =
   "inline-flex items-center gap-0.5 rounded-full border border-rb-200 bg-background/60 p-0.5 dark:border-rb-800";
 
-const segmentClass = (active: boolean) =>
+export const segmentClass = (active: boolean) =>
   `${CTRL_GHOST} inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium ${
     active ? "bg-rb-100 text-foreground dark:bg-rb-800" : "text-rb-500 hover:text-foreground"
   }`;
@@ -81,7 +83,7 @@ const TOGGLE_CHAINS: ChainId[] = launchedChains().map((c) => c.id);
 export function ChainToggleButtons({ chainId, onChange }: { chainId: ChainId; onChange: (id: ChainId) => void }) {
   const hydrated = useHydrated();
   return (
-    <div className={SHELL} {...ctrlWaking(hydrated)}>
+    <div className={SEGMENT_SHELL} {...ctrlWaking(hydrated)}>
       {TOGGLE_CHAINS.map((id) => {
         const active = chainId === id;
         return (
@@ -108,7 +110,7 @@ export function ChainToggleButtons({ chainId, onChange }: { chainId: ChainId; on
  *  gate: links are live in the server-rendered HTML. */
 export function ChainToggleLinks({ chainId, basePath }: { chainId: ChainId; basePath: string }) {
   return (
-    <div className={SHELL}>
+    <div className={SEGMENT_SHELL}>
       {TOGGLE_CHAINS.map((id) => {
         const active = chainId === id;
         return (

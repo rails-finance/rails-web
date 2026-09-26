@@ -2853,6 +2853,17 @@ export function isAlchemixV3Event(
   return e.context?.protocol === "alchemix-v3";
 }
 
+/** An Alchemix V3 row belonging to a TRANSMUTER position — the other position
+ *  type, on the same context arm. Its rows carry no `stateAtBlockFromReading`:
+ *  a Transmuter position has neither axis the Alchemist reading states. */
+export function isTransmuterEvent(
+  e: BaseActivityEvent,
+): e is BaseActivityEvent & {
+  context: { protocol: "alchemix-v3"; data: AlchemixV3Context };
+} {
+  return isAlchemixV3Event(e) && e.context.data.positionKind === "transmuter";
+}
+
 /** An Alchemix V3 row belonging to an ALCHEMIST position — the borrow side.
  *  The Transmuter is its own position type with its own page, and a row of its
  *  kind on this timeline would be a different position's event. */
