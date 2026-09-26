@@ -42,7 +42,7 @@ export function ToolsMenuItem({
       onClick={onClick}
       disabled={disabled}
       role="menuitem"
-      className="flex w-full items-start gap-3 px-3 py-2 text-left transition-colors hover:bg-rb-200/60 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-rb-900/60"
+      className="flex items-start gap-3 mx-1 my-0.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-[rgba(196,205,217,0.08)]"
     >
       <span className="mt-0.5 shrink-0 text-rb-500">{icon}</span>
       <span className="min-w-0">

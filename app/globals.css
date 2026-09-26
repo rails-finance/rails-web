@@ -1470,16 +1470,19 @@ label[for] {
   font-size: 11px;
   white-space: nowrap;
 }
-/* the toggle as a row of the Tools dropdown: the panel's full-width
-   title/subtitle shape instead of the dock's icon button. These rules follow
-   the dock ones so the armed teal wash gives way to the panel's own hover
-   treatment, leaving the crosshair to carry the armed colour it inherits. */
+/* the toggle as a row of the Tools dropdown: the panel's title/subtitle shape
+   instead of the dock's icon button. These rules follow the dock ones so the
+   armed teal wash gives way to the panel's own hover treatment, leaving the
+   crosshair to carry the armed colour it inherits. Inset + rounded like
+   .overlay-item, so the row reads as a button within the panel rather than a
+   full-bleed strip; the same reasoning stretches its width to the panel
+   minus this margin, so no explicit width is set here. */
 .prov-inspect-toggle-menu {
-  width: 100%;
   align-items: flex-start;
   gap: 12px;
+  margin: 2px 4px;
   padding: 8px 12px;
-  border-radius: 0;
+  border-radius: 0.5rem;
   text-align: left;
   background: transparent;
 }
