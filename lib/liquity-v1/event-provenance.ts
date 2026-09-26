@@ -139,7 +139,7 @@ export const collAfterProv = (coords: LiquityV1Coords): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `ETH collateral the Trove held AFTER this event — the absolute balance the TroveManager emitted at this event${atBlock(coords)}, scaled by 18 decimals. Emitted whole, not a reconstructed sum.`,
+  summary: `ETH collateral the Trove held AFTER this event — the absolute balance the TroveManager emitted at this event${atBlock(coords)}, scaled by 18 decimals. Emitted whole.`,
   contract: TROVE_MANAGER,
   via: `${LIQUITY_V1_VIA} · TroveUpdated log · _coll · ÷10^18`,
   inputs: eventInputs(coords),
@@ -261,7 +261,7 @@ export const liqPremiumProv = (
 export const positionCollateralProv = (atBlockNum?: number): Provenance => ({
   kind: "chain",
   pclass: "emitted",
-  summary: `ETH collateral the Trove currently holds — the latest absolute balance the TroveManager emitted for this borrower${atBlockNum ? ` at block ${atBlockNum}` : ""}. Emitted whole, not a reconstructed sum.`,
+  summary: `ETH collateral the Trove currently holds — the latest absolute balance the TroveManager emitted for this borrower${atBlockNum ? ` at block ${atBlockNum}` : ""}. Emitted whole.`,
   contract: TROVE_MANAGER,
   via: `${LIQUITY_V1_VIA} · latest TroveUpdated log · _coll · ÷10^18`,
 });

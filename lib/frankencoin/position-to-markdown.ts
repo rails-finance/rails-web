@@ -51,7 +51,7 @@ export function frankencoinPositionToMarkdown(args: FrankencoinPositionMarkdownA
       `The position is its own contract (a minimal-proxy clone) — the address is the identity, the owner a ` +
       `transferable fact. ALL UNITS ARE NATIVE: debt in ZCHF (a Swiss-franc stablecoin), collateral in the ` +
       `position's own token. Frankencoin is ORACLE-FREE: the liquidation price is DECLARED BY THE OWNER and ` +
-      `enforced by challenge auctions, not a price feed — there is no health factor and no USD anywhere. ` +
+      `enforced by challenge auctions — there is no health factor and no USD anywhere. ` +
       `Interest is charged up front at minting time (nothing accrues). Everything drifts as the position ` +
       `changes. Not financial advice.`,
   );

@@ -79,7 +79,7 @@ export const totalDebtAllPoolsProv = (): Provenance => ({
 export const positionsMintedProv = (label: string, address: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `Positions ever minted in the ${label} — the pool's own getNextPositionId minus one (ids are assigned sequentially from 1; the pool contract is itself the position ERC721). A count of everything ever opened, not of positions still live.`,
+  summary: `Positions ever minted in the ${label} — the pool's own getNextPositionId minus one (ids are assigned sequentially from 1; the pool contract is itself the position ERC721). A count of everything ever opened.`,
   contract: pool(label, address),
   via: `${SYSTEM_VIA} · pool.getNextPositionId() − 1`,
   formula: "getNextPositionId − 1",
@@ -114,7 +114,7 @@ export const indexIdentityProv = (label: string, address: string, exact: boolean
   kind: "chain-derived",
   pclass: "state",
   summary: exact
-    ? `The index identities re-checked on THIS read, in integers: totalRawDebts == debtShares × debtIndex ÷ 2^96 and totalRawCollaterals == collShares × 2^96 ÷ collIndex, both exact. These are the same identities every per-tick amount below is derived through, so the check covers the ladder's arithmetic, not just the headline.`
+    ? `The index identities re-checked on THIS read, in integers: totalRawDebts == debtShares × debtIndex ÷ 2^96 and totalRawCollaterals == collShares × 2^96 ÷ collIndex, both exact. These are the same identities every per-tick amount below is derived through, so the check covers the ladder's arithmetic.`
     : `The index identities did NOT close on this read — shares × index disagrees with the pool's own raw totals. The per-tick amounts below pass through this same arithmetic, so treat them as suspect until a later block closes it.`,
   contract: pool(label, address),
   via: `${SYSTEM_VIA} · derived check`,
@@ -238,7 +238,7 @@ export const totalPositionsMintedProv = (): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   summary:
-    "Positions ever minted across both pools — Σ of each pool's own getNextPositionId minus one (ids are sequential from 1 per pool; each pool is its own ERC721). Everything ever opened, not positions still live.",
+    "Positions ever minted across both pools — Σ of each pool's own getNextPositionId minus one (ids are sequential from 1 per pool; each pool is its own ERC721). Everything ever opened.",
   contract: POOL_MANAGER,
   via: `${SYSTEM_VIA} · Σ pool.getNextPositionId() − 1 across the roster`,
   formula: "Σ (getNextPositionId − 1) over both pools",
@@ -353,7 +353,7 @@ export const ladderReconcileProv = (label: string, address: string, ok: boolean,
 export const collOutsideLadderProv = (label: string, address: string, normalizedSym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `Collateral sitting OUTSIDE the tick ladder in the ${label} — the pool's total collateral shares minus the sum over every occupied tick, converted through the collateral index (NORMALIZED ${normalizedSym}). A position with no debt belongs to no tick (its stored nodeId is 0), so its collateral is in the pool's total but on no rung. The gap is that bucket, stated rather than smoothed: debt reconciles to zero residual, collateral reconciles to exactly this.`,
+  summary: `Collateral sitting OUTSIDE the tick ladder in the ${label} — the pool's total collateral shares minus the sum over every occupied tick, converted through the collateral index (NORMALIZED ${normalizedSym}). A position with no debt belongs to no tick (its stored nodeId is 0), so its collateral is in the pool's total but on no rung. The gap is that bucket: debt reconciles to zero residual, collateral reconciles to exactly this.`,
   contract: pool(label, address),
   via: `${SYSTEM_VIA} · derived difference (integer share space, then ÷ collIndex)`,
   formula: "(total coll shares − Σ tick coll shares) × 2^96 ÷ collIndex",

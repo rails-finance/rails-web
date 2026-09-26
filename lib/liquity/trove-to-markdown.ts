@@ -180,7 +180,7 @@ function marketNotesSection(notes: MarketNote[]): string[] {
       "timeline table below reads exactly as it would without any of them. The price is not fetched for the note — " +
       "every event on this trove already carries the price Liquity's own PriceFeed stated at that event's block. The " +
       "two ratios hold the debt and collateral the earlier event recorded and move only the price, so the later one " +
-      "is what that state came to be worth, not a second reading of the trove.",
+      "is what that state came to be worth.",
   );
   out.push("");
   for (const n of notes) {

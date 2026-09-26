@@ -54,7 +54,7 @@ function holderDebtProv(): Provenance {
       text: "Add the entire debt of each open trove the wallet holds — every one of them is on the page under this strip.",
     },
     summary:
-      "All the BOLD the wallet's open troves owe — the sum of each trove's entire debt (recorded principal plus the interest accrued to its last indexed state), from the index. Exact rather than approximate: every branch borrows the same token, so the sum is a quantity of it. Interest accrued since each trove's last indexed state is not in it.",
+      "All the BOLD the wallet's open troves owe — the sum of each trove's entire debt (recorded principal plus the interest accrued to its last indexed state), from the index. Exact: every branch borrows the same token, so the sum is a quantity of it. Interest accrued since each trove's last indexed state is not in it.",
     via: "GET /api/troves?ownerAddress=… · Σ entire debt over the open rows",
     formula: "Σ debt over the wallet's open troves",
     inputs: [

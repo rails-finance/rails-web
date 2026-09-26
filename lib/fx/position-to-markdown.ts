@@ -113,9 +113,7 @@ export function fxPositionToMarkdown(args: FxPositionMarkdownArgs): string {
   );
   lines.push(`- **Pool:** ${pool.address} (${tokenSym} collateral → ${colSym} normalized, debt in fxUSD)`);
   if (view.owner)
-    lines.push(
-      `- **Owner:** ${view.owner}${view.ownerIsContract ? " (a contract — a Safe or manager, not an EOA)" : ""}`,
-    );
+    lines.push(`- **Owner:** ${view.owner}${view.ownerIsContract ? " (a contract — a Safe or manager)" : ""}`);
   const statusWord =
     view.status === "unknown"
       ? "Unsettled (the sweep has not landed)"
@@ -137,7 +135,7 @@ export function fxPositionToMarkdown(args: FxPositionMarkdownArgs): string {
     lines.push(
       `- The settled sweep has not landed for this position, so its CURRENT collateral and debt are not stated here. ` +
         `The event-implied running debt is ${amt(view.impliedDebt.amount)} fxUSD — history only, and known to be wrong ` +
-        `by whatever rebalances, write-offs and socialized bad debt have applied since. It is deliberately not presented as the current figure.`,
+        `by whatever rebalances, write-offs and socialized bad debt have applied since.`,
     );
     lines.push("");
   } else {

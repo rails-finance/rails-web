@@ -438,7 +438,7 @@ export const lifetimeCollateralDriftProv = (
   summary: `Collateral moved with no event of this position's own (NORMALIZED ${unit} units) — the sum of the collateral drift over ${
     complete
       ? `every quiet stretch of the position's life (${intervals} interval${intervals === 1 ? "" : "s"})`
-      : `the ${intervals} most recent quiet stretch${intervals === 1 ? "" : "es"} read so far, not yet its whole life`
+      : `the ${intervals} most recent quiet stretch${intervals === 1 ? "" : "es"} read so far`
   }, each stretch being the pool's own \`getPosition\` view at its end minus the same read at its start. Funding is charged on collateral (the pool's collateral index), so this is where funding shows; tick and pool rebalances trim collateral here too. The last stretch ends at the settled sweep${
     headBlock != null ? ` (block ${headBlock})` : ""
   }, the same read the collateral figure above comes from, so this line and that figure are one accounting.`,
@@ -526,7 +526,7 @@ export const driftSliceProv = (
 export const fxPositionUsdProv = (normalizedSym: string, priceBlock?: number | null): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `The position's collateral valued in USD — the settled collateral (the pool's own getPosition, NORMALIZED ${normalizedSym} units) multiplied by the pool oracle's USD price per normalized unit${priceBlock != null ? `, read at block ${priceBlock}` : ""}. Both legs are chain reads at named blocks — the same oracle the pool's own liquidation math consults, not an off-chain market feed. The oracle quotes three prices (anchor / min / max) and this figure uses the MIN leg — the conservative price the protocol itself calls getLiquidatePrice, chain-verified as the one the sweep snapshots (scripts/verify-fx-chain.mjs). The debt ratio beside it is judged at the ANCHOR leg instead, so the two figures deliberately sit at different prices. Normalized amounts only: an operate's token-unit deltas are never priced with this figure.`,
+  summary: `The position's collateral valued in USD — the settled collateral (the pool's own getPosition, NORMALIZED ${normalizedSym} units) multiplied by the pool oracle's USD price per normalized unit${priceBlock != null ? `, read at block ${priceBlock}` : ""}. Both legs are chain reads at named blocks — the same oracle the pool's own liquidation math consults. The oracle quotes three prices (anchor / min / max) and this figure uses the MIN leg — the conservative price the protocol itself calls getLiquidatePrice, chain-verified as the one the sweep snapshots (scripts/verify-fx-chain.mjs). The debt ratio beside it is judged at the ANCHOR leg instead, so the two figures deliberately sit at different prices. Normalized amounts only: an operate's token-unit deltas are never priced with this figure.`,
   contract: { name: "AaveFundingPool", address: "" },
   via: "settled collateral × pool oracle min (liquidate) price (both eth_call at named blocks)",
   formula: "settled colls × oracle min (liquidate) price",

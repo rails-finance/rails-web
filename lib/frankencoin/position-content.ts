@@ -51,11 +51,11 @@ export function frankencoinPositionContent(opts: {
       details: [
         {
           bold: "Owner-set expiration",
-          text: "expiration is a term the owner sets, not a challenge outcome — the panel above shows what it held at its height, since the current figures may still be settling.",
+          text: "expiration is a term the owner sets — the panel above shows what it held at its height, since the current figures may still be settling.",
         },
         {
           bold: "Owner-declared price",
-          text: "Frankencoin has no oracle; the liquidation price shown is the value the owner themselves set, held to the market by challenge auctions rather than a price feed.",
+          text: "Frankencoin has no oracle; the liquidation price shown is the value the owner set, held to the market by challenge auctions.",
         },
       ],
       links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],

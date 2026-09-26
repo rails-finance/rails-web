@@ -346,8 +346,7 @@ export function LiquityForkBranchesView({
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read {protocolName}&apos;s branches from chain.</p>
         <p className="text-sm">
-          This view is a live contract read with no cached fallback — rather than show stale figures, it shows nothing.
-          Try again shortly.
+          This view is a live contract read with no cached fallback — it shows nothing. Try again shortly.
         </p>
       </div>
     );

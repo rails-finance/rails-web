@@ -335,7 +335,7 @@ export function queueOrderProv(): Provenance {
     pclass: "state",
     verify: STATE_VERIFY,
     summary:
-      "The redemption order — the protocol's OWN SortedTroves list, swept through MultiTroveGetter at the latest block. The contract keeps it in descending collateral ratio and redemptions take the LOWEST first, so the queue is shown reversed: front (redeemed first) at the top. The order is the protocol's, not a re-sort of ours. Unlike Liquity V2 and its forks, nothing about this position is chosen — a Trove's place is its collateral ratio, which the ETH price moves.",
+      "The redemption order — the protocol's OWN SortedTroves list, swept through MultiTroveGetter at the latest block. The contract keeps it in descending collateral ratio and redemptions take the LOWEST first, so the queue is shown reversed: front (redeemed first) at the top. The order is the protocol's. Unlike Liquity V2 and its forks, nothing about this position is chosen — a Trove's place is its collateral ratio, which the ETH price moves.",
     contract: MULTI_TROVE_GETTER,
     via: `${SYSTEM_VIA} · MultiTroveGetter sweep of SortedTroves @ head (reversed to redemption order)`,
   };
