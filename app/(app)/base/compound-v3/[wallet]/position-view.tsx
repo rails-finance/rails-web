@@ -183,7 +183,7 @@ function MarketSection({
       : {
           ...built,
           flowsNote:
-            "Lifetime flows are hidden because the history sweep did not read every block of this market's life — see the note under the timeline for where it stopped or what it missed. Summing what did arrive would label a partial history “all time”. The current balances above are unaffected: they are read from the Comet, not replayed from the events.",
+            "Lifetime flows are hidden because the history sweep did not read every block of this market's life — see the note under the timeline for where it stopped or what it missed. Summing what did arrive would label a partial history “all time”. The current balances above are unaffected: they are read from the Comet.",
         };
   }, [view, replay, sweptClean]);
 

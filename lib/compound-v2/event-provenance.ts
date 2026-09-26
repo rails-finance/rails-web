@@ -164,7 +164,7 @@ export const accountBorrowsProv = (
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `Total ${sym} debt the position owed AFTER this event — the \`accountBorrows\` field the cToken emitted verbatim${atBlock(coords)}. Interest accrued up to this moment is INCLUDED (Compound V2 accrues per block and settles interest before every borrow/repay), so this is the contract's own reckoning of the debt, not a replayed sum.${
+  summary: `Total ${sym} debt the position owed AFTER this event — the \`accountBorrows\` field the cToken emitted verbatim${atBlock(coords)}. Interest accrued up to this moment is INCLUDED (Compound V2 accrues per block and settles interest before every borrow/repay), so this is the contract's own reckoning of the debt.${
     fromLiquidation
       ? " On a liquidation the figure comes from the RepayBorrow log the liquidation itself emitted in the same transaction (liquidateBorrowFresh calls repayBorrowFresh internally) — one event, one row."
       : ""
@@ -237,7 +237,7 @@ export const seizeLegProv = (
       ? `${cSym} taken from this position in a liquidation seizure — the borrower→liquidator Transfer leg the seize emitted${atBlock(coords)}, scaled by the cToken's 8 decimals. The leg is attributed to the same-transaction LiquidateBorrow (its position between the liquidation's repay leg and the LiquidateBorrow log is the chain fact), so it renders as collateral being TAKEN — not as a transfer the borrower made.`
       : leg === "seize_in"
         ? `${cSym} this wallet received as the liquidator in a seizure — the borrower→liquidator Transfer leg the seize emitted${atBlock(coords)}, scaled by the cToken's 8 decimals, attributed to the same-transaction LiquidateBorrow. Worth the repaid debt plus the liquidation incentive, less the protocol's own burned cut.`
-        : `The protocol's cut of this seizure — the borrower→cToken Transfer leg (protocolSeizeShare, 2.8% of the seize), burned: totalSupply drops and no wallet receives it${atBlock(coords)}. A real loss to the borrower with no counterparty, which is why it is named rather than dropped as a structural transfer. Liquidations before the protocolSeizeShare upgrade (2021) have no such leg.`,
+        : `The protocol's cut of this seizure — the borrower→cToken Transfer leg (protocolSeizeShare, 2.8% of the seize), burned: totalSupply drops and no wallet receives it${atBlock(coords)}. A real loss to the borrower with no counterparty. Liquidations before the protocolSeizeShare upgrade (2021) have no such leg.`,
   contract: ctokenContract(coords),
   via: `${COMPOUND_V2_VIA} · Transfer log (seize leg, paired to same-tx LiquidateBorrow) · ${fieldSeg("amount", raw)}`,
   inputs: eventInputs(coords),
@@ -531,7 +531,7 @@ export const positionDebtProv = (sym: string, atBlockNum?: number): Provenance =
 export const peakSupplyProv = (sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `The highest ${sym} supply PRINCIPAL this wallet ever recorded — the maximum of the replayed principal lane (each captured event's own supplied-balance-after) across its whole history. The index's arithmetic over the emitted amounts, not an on-chain slot. Interest lives in the exchange rate outside this lane, so the claim's value at its height sat above this figure; cTokens that arrived by transfer or seizure never entered it.`,
+  summary: `The highest ${sym} supply PRINCIPAL this wallet ever recorded — the maximum of the replayed principal lane (each captured event's own supplied-balance-after) across its whole history. Interest lives in the exchange rate outside this lane, so the claim's value at its height sat above this figure; cTokens that arrived by transfer or seizure never entered it.`,
   contract: { name: "cToken", address: "" },
   via: `${COMPOUND_V2_VIA} · max(supply-after) across Mint/Redeem logs`,
 });
@@ -554,7 +554,7 @@ export const compoundV2UsdProvOnchain = (what: string, includesFixed?: boolean):
   kind: "chain-derived",
   // Both legs on-chain; the oracle price is the furthest class, so it leads.
   pclass: "oracle",
-  summary: `${what} valued in USD from Compound's own on-chain oracle — the replayed token balance multiplied by the same price the Comptroller reads for liquidity and liquidation math (\`getUnderlyingPrice\`), not an off-chain market feed.${
+  summary: `${what} valued in USD from Compound's own on-chain oracle — the replayed token balance multiplied by the same price the Comptroller reads for liquidity and liquidation math (\`getUnderlyingPrice\`).${
     includesFixed
       ? " ⚠ At least one contributing market is priced by a CONSTANT stored in the oracle with no price feed behind it (read from the oracle's own getConfig — cSAI's constant is $14.4263 on a token that targets $1). The figure is the one the protocol itself would use, but nothing updates that leg."
       : ""

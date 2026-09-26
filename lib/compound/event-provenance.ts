@@ -200,7 +200,7 @@ export const transferCounterpartyProv = (
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `The ${dir === "in" ? "sending" : "receiving"} account on the other side of this position transfer — the ${dir === "in" ? "from" : "to"} address the Comet's ${collateral ? "TransferCollateral" : "Transfer"} log carries${atBlock(coords)}. The counterparty of the move itself, not who signed the transaction.`,
+  summary: `The ${dir === "in" ? "sending" : "receiving"} account on the other side of this position transfer — the ${dir === "in" ? "from" : "to"} address the Comet's ${collateral ? "TransferCollateral" : "Transfer"} log carries${atBlock(coords)}. The counterparty of the move, not who signed the transaction.`,
   contract: cometContract(coords),
   via: `${captureVia(coords)} · ${collateral ? "TransferCollateral" : "Transfer"} log · ${dir === "in" ? "from" : "to"}`,
   inputs: eventInputs(coords),
@@ -379,7 +379,7 @@ export const collateralAfterProv = (sym: string, coords: CompoundCoords): Proven
 export const baseBeforeProv = (sym: string, coords: CompoundCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `The SIGNED ${sym} base balance the position held BEFORE this event — the after-balance minus this event's own signed base amount (after − change), reconstructed in the browser from the replayed after and the logged delta, not a distinct chain read. Nominal principal, same basis as the after (accrued interest is a separate layer).`,
+  summary: `The SIGNED ${sym} base balance the position held BEFORE this event — the after-balance minus this event's own signed base amount (after − change), reconstructed in the browser from the replayed after and the logged delta. Nominal principal, same basis as the after (accrued interest is a separate layer).`,
   contract: cometContract(coords),
   via: "base after − signed amount",
   formula: "after − change",
@@ -397,7 +397,7 @@ export const baseBeforeProv = (sym: string, coords: CompoundCoords): Provenance 
 export const collateralBeforeProv = (sym: string, coords: CompoundCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `The ${sym} collateral the position held BEFORE this event — the after-balance minus this event's own collateral amount (after − change), reconstructed in the browser from the replayed after and the logged delta, not a distinct chain read. Collateral doesn't accrue in Comet, so this is exact.`,
+  summary: `The ${sym} collateral the position held BEFORE this event — the after-balance minus this event's own collateral amount (after − change), reconstructed in the browser from the replayed after and the logged delta. Collateral doesn't accrue in Comet, so this is exact.`,
   contract: cometContract(coords),
   via: "collateral after − amount",
   formula: "after − change",
@@ -504,7 +504,7 @@ export const compoundUsdProvOnchain = (what: string, coords?: CompoundCoords): P
   kind: "chain-derived",
   // Both legs on-chain; the oracle price is the furthest class, so it leads.
   pclass: "oracle",
-  summary: `${what} valued in USD from Comet's own on-chain oracle — the chain-state token balance multiplied by the same Chainlink price Comet's liquidation engine reads (\`getPrice\`), not an off-chain market feed. The cWETHv3 market's feeds quote in ETH, so its values are converted with Comet's own WETH/USD feed (read from the cUSDCv3 market) — both legs the protocol's own oracle.`,
+  summary: `${what} valued in USD from Comet's own on-chain oracle — the chain-state token balance multiplied by the same Chainlink price Comet's liquidation engine reads (\`getPrice\`). The cWETHv3 market's feeds quote in ETH, so its values are converted with Comet's own WETH/USD feed (read from the cUSDCv3 market) — both legs the protocol's own oracle.`,
   contract: cometContract(coords),
   via: "chain balance × on-chain oracle price",
   formula: "balance × oracle price",
