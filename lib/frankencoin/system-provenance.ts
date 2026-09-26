@@ -70,7 +70,7 @@ export const reserveIdentityProv = (reserveAddress?: string | null): Provenance 
     text: "Re-run balanceOf(reserve()), equity() and minterReserve() at one block — the first equals the sum of the other two by the contract's own accounting.",
   },
   summary:
-    "The reserve's actual ZCHF balance — balanceOf(reserve()) at the stamped block, read beside its two components: it equals equity() + minterReserve() by the Frankencoin contract's own accounting, and this page reads all three sides of that identity at the same block so the split it shows is a checked fact, not a description.",
+    "The reserve's actual ZCHF balance — balanceOf(reserve()) at the stamped block, read beside its two components: it equals equity() + minterReserve() by the Frankencoin contract's own accounting, and this page reads all three sides of that identity at the same block so the split it shows is a checked fact.",
   contract: equityContract(reserveAddress),
   via: "balanceOf(reserve()) = equity() + minterReserve() · one block",
   formula: "reserve balance = equity + minter reserve",

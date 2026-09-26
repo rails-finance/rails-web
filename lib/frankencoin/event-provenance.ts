@@ -245,7 +245,7 @@ export const forcedSaleProv = (sym: string, coords: FrankencoinCoords, raw?: str
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `${sym} sold in a forced sale — the V2 hub's own ForcedSale log${atBlock(coords)}: after a position's expiration passes, anyone can buy its collateral through the hub at a declining price and the proceeds repay the debt. The expiry is a hard lifecycle edge, not a display nicety.`,
+  summary: `${sym} sold in a forced sale — the V2 hub's own ForcedSale log${atBlock(coords)}: after a position's expiration passes, anyone can buy its collateral through the hub at a declining price and the proceeds repay the debt. The expiry is a hard lifecycle edge.`,
   contract: hubContract(coords),
   via: `${FRANKENCOIN_VIA} · ForcedSale · ${fieldSeg("amount", raw)}`,
   inputs: eventInputs(coords),

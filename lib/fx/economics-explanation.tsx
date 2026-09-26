@@ -130,7 +130,7 @@ export function fxEconomicsContent(): LearnMoreContent {
       },
       {
         bold: "fxUSD",
-        text: "the debt token positions mint; it is not pinned to $1, so amounts are shown in fxUSD tokens, not assumed dollars.",
+        text: "the debt token positions mint; it is not pinned to $1, so amounts are shown in fxUSD tokens.",
       },
     ],
     links: [{ label: "f(x) docs", url: FX_DOC_URL }],

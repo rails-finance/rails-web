@@ -61,7 +61,7 @@ export function fxPositionContent(opts: { status: "open" | "closed" | "liquidate
     details: [
       {
         bold: "Tick-tree shares",
-        text: "a position's stored value is a share count in the pool's tick tree, not a fixed amount — the collateral and debt above are resolved from that share through the pool's own getPosition view at a named block.",
+        text: "a position's stored value is a share count in the pool's tick tree — the collateral and debt above are resolved from that share through the pool's own getPosition view at a named block.",
       },
       {
         bold: "Funding costs",

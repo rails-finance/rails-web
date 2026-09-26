@@ -376,7 +376,7 @@ export function queueBelowMinimumProv(): Provenance {
     pclass: "state",
     verify: STATE_VERIFY,
     summary:
-      "Troves below the 110% minimum — how many in the protocol's own sorted list sit under its minimum collateral ratio at its own price. The contract's own comparison, counted over EVERY listed Trove rather than inferred from where the queue's order breaks: each ICR is TroveManager.getCurrentICR at the same block and price as the rest of this page. Below the minimum means liquidatable now, by anyone — a fact about the contract's threshold, not a judgement about a borrower.",
+      "Troves below the 110% minimum — how many in the protocol's own sorted list sit under its minimum collateral ratio at its own price. The contract's own comparison, counted over EVERY listed Trove rather than inferred from where the queue's order breaks: each ICR is TroveManager.getCurrentICR at the same block and price as the rest of this page. Below the minimum means liquidatable now, by anyone — a fact about the contract's threshold.",
     contract: TROVE_MANAGER,
     via: `${SYSTEM_VIA} · count of TroveManager.getCurrentICR(borrower, price) < MCR @ head`,
     formula: "count(ICR < 110%) across the sorted list",
