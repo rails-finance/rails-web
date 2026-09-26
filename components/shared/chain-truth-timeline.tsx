@@ -1125,13 +1125,23 @@ function ChainTruthTimelineBody({
   // `verify-timeline-navigator.mjs` asserts that every row of a loaded
   // segment falls inside its month.
 
-  // Day-grouping over the FLAT displayed list (run members included), so the
-  // date shows on the first card of each calendar day whether or not the
-  // preceding event sits inside a collapsed run — the V2 trove behavior.
-  const datePrefixAt = (flatIdx: number) => {
+  // Day-grouping over the FLAT displayed list (run members included). The date
+  // shows on the NEWEST and the OLDEST card of each calendar day, whether or
+  // not a neighbour sits inside a collapsed run. Only the newest used to carry
+  // it, so a day's older cards read as a bare time sitting directly above a
+  // card dated the day before, and a reader going back in time gave them that
+  // earlier date (eth-alusd/1221: three 1 September cards read as 27 August).
+  // `lastIdx` is the last flat index the row covers, for a one-transaction run.
+  const datePrefixAt = (flatIdx: number, lastIdx: number = flatIdx) => {
     const event = events[flatIdx];
+    const last = events[lastIdx] ?? event;
     const prev = flatIdx > 0 ? events[flatIdx - 1] : undefined;
-    const showDate = !prev || dayKey(event.timestamp) !== dayKey(prev.timestamp);
+    const next = lastIdx + 1 < events.length ? events[lastIdx + 1] : undefined;
+    const showDate =
+      !prev ||
+      !next ||
+      dayKey(event.timestamp) !== dayKey(prev.timestamp) ||
+      dayKey(last.timestamp) !== dayKey(next.timestamp);
     return showDate ? `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}` : null;
   };
 
@@ -1154,7 +1164,7 @@ function ChainTruthTimelineBody({
     if (!row.spec.asOneEvent) return node;
     const lead = row.events[0];
     return (
-      <EventDateContext.Provider value={datePrefixAt(row.flatIdx)}>
+      <EventDateContext.Provider value={datePrefixAt(row.flatIdx, row.flatIdx + row.events.length - 1)}>
         <EventShareProvider href={shareHrefFor(lead.id)}>
           <div
             id={`event-${lead.id}`}

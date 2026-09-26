@@ -6,12 +6,10 @@
 // TWO GRIDS, AND THE SEAM BETWEEN THEM IS THE POINT. The first is what the logs
 // state: amounts the transaction's legs emitted, plus the two a `Repay` does
 // not emit and the index resolved when it captured the log. The second is a
-// `getCDP` READING at the block, served on the wire, not a balance replayed
-// from the rows above it. A replayed one would be wrong on the lines a reader
-// most wants it on: a redemption moves debt across the whole line and names no
-// position, so the position's own events cannot account for every step
-// (rails-ops decisions/0032). NO BEFORE→AFTER TRANSITION joins the two, for the
-// same reason: with no trustworthy before there is nothing to subtract.
+// `getCDP` READING at the block, served on the wire, with the reading at the
+// previous reading block beside it as the "before" (lib/alchemix/readings-before).
+// Both are readings; neither is a balance replayed from the rows above it
+// (rails-ops decisions/0032).
 //
 // ONE READING PER CARD, AND IT COMES FROM WHICHEVER LEG HAS ONE. Every leg of a
 // transaction carries the same reading of the same block, so drawing it per leg
@@ -32,7 +30,9 @@ import { formatExact } from "@/lib/utils/format";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
 import { AlchemixStateAtBlock } from "./alchemix-state-at-block";
+import { collateralTakenRaw, useReadingBefore, type AlchemixReading } from "@/lib/alchemix/readings-before";
 import {
+  collateralTakenFromReadingsProv,
   debtClearedFromReadingsProv,
   emittedAmountProv,
   resolvedAtCaptureProv,
@@ -56,8 +56,15 @@ export interface AlchemixEventDetailProps {
   coordsFor: (leg: AlchemistEvent) => AlchemixCoords;
 }
 
-/** What one leg's log states. */
-function legStats(ctx: AlchemixV3Context, mytSymbol: string, coords: AlchemixCoords): ChainTruthStat[] {
+/** What one leg's log states. `before` is the reading before this block, which
+ *  a redemption's collateral figure is measured from. */
+function legStats(
+  leg: AlchemistEvent,
+  mytSymbol: string,
+  coords: AlchemixCoords,
+  before: AlchemixReading | null,
+): ChainTruthStat[] {
+  const ctx: AlchemixV3Context = leg.context.data;
   const raw = ctx.raw;
   const sym = ctx.syntheticSymbol;
   const stats: ChainTruthStat[] = [];
@@ -123,15 +130,14 @@ function legStats(ctx: AlchemixV3Context, mytSymbol: string, coords: AlchemixCoo
       break;
     case "redemption": {
       stat("Redeemed across the line", "amount", sym);
-      // The per-position figure is not in the log and is not worked out from
-      // it: it is this position's debt read either side of the redemption,
-      // subtracted. The label says so, and a zero stands as an answer — the
-      // unavailable case drops the row instead, which is the only way the two
-      // can be told apart.
+      // The per-position figures are not in the log: each is this position's
+      // reading either side of the redemption, subtracted. A zero stands as an
+      // answer; the unavailable case drops the row, which is the only way the
+      // two can be told apart.
       const cleared = ctx.debtClearedFromReadings;
       if (cleared?.status === "stated" && cleared.amountRaw != null) {
         stats.push({
-          label: "Cleared for this position, from two readings",
+          label: "Debt cleared from this position",
           value: formatExact(scaled(cleared.amountRaw) ?? 0),
           symbol: sym,
           prov: debtClearedFromReadingsProv(
@@ -142,6 +148,21 @@ function legStats(ctx: AlchemixV3Context, mytSymbol: string, coords: AlchemixCoo
             coords,
           ),
         });
+        const taken = collateralTakenRaw(leg, before);
+        if (taken != null) {
+          stats.push({
+            label: "Collateral taken from this position",
+            value: formatExact(scaled(taken) ?? 0),
+            symbol: mytSymbol,
+            prov: collateralTakenFromReadingsProv(
+              mytSymbol,
+              taken,
+              cleared.fromBlock ?? 0,
+              cleared.atBlock ?? 0,
+              coords,
+            ),
+          });
+        }
       }
       break;
     }
@@ -161,7 +182,12 @@ function legStats(ctx: AlchemixV3Context, mytSymbol: string, coords: AlchemixCoo
 }
 
 export function AlchemixEventDetail({ legs, mytSymbol, coordsFor }: AlchemixEventDetailProps) {
-  const stats = legs.flatMap((leg) => legStats(leg.context.data, mytSymbol, coordsFor(leg)));
+  // The reading, taken once from whichever leg states one; with none stated,
+  // the first leg's, whose own reason is what the sentence reports.
+  const readingLeg = legs.find((l) => l.context.data.stateAtBlockFromReading?.status === "stated") ?? legs[0];
+  const readingCtx = readingLeg.context.data;
+  const before = useReadingBefore(readingCtx.stateAtBlockFromReading?.blockNumber);
+  const stats = legs.flatMap((leg) => legStats(leg, mytSymbol, coordsFor(leg), before));
 
   // A line-scope row is never a leg of anybody's transaction, so a card that
   // carries one carries it alone and this narrows to that row.
@@ -172,11 +198,6 @@ export function AlchemixEventDetail({ legs, mytSymbol, coordsFor }: AlchemixEven
     span?.status === "stated" && span.fromBlock != null && span.atBlock != null
       ? { fromBlock: span.fromBlock, atBlock: span.atBlock }
       : null;
-
-  // The reading, taken once from whichever leg states one; with none stated,
-  // the first leg's, whose own reason is what the sentence reports.
-  const readingLeg = legs.find((l) => l.context.data.stateAtBlockFromReading?.status === "stated") ?? legs[0];
-  const readingCtx = readingLeg.context.data;
 
   return (
     <>
@@ -189,16 +210,16 @@ export function AlchemixEventDetail({ legs, mytSymbol, coordsFor }: AlchemixEven
           {legs.length > 1 ? "What the logs state" : "What the log states"}
         </h4>
       ) : null}
-      <ChainTruthDetail stats={stats} />
+      <ChainTruthDetail stats={stats} symbolText />
       {lineCtx ? (
         <p className="px-5 pb-3 text-[11px] leading-relaxed text-rb-500">
-          This event names no position. It is on this timeline because it fell inside this position&rsquo;s life and
-          moved its figures, not because the holder did anything.
+          This event belongs to the whole line. It is on this timeline because it fell inside this position&rsquo;s
+          life.
           {clearedSpan ? (
             <>
               {" "}
-              The second figure is this position&rsquo;s debt read at block {block(clearedSpan.fromBlock)} less its debt
-              read at block {block(clearedSpan.atBlock)} &mdash; the two blocks this redemption sits between.
+              The figures for this position are its readings at blocks {block(clearedSpan.fromBlock)} and{" "}
+              {block(clearedSpan.atBlock)}, the two this redemption sits between, subtracted.
             </>
           ) : null}
           {lineCtx.eventType === "batch_liquidated" && lineCtx.accountsTopic ? (
@@ -217,6 +238,7 @@ export function AlchemixEventDetail({ legs, mytSymbol, coordsFor }: AlchemixEven
         eventBlock={readingLeg.blockNumber}
         legCount={legs.length}
         coords={coordsFor(readingLeg)}
+        before={before}
       />
     </>
   );

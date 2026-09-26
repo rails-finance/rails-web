@@ -45,16 +45,32 @@
 // measured zero would make the two look alike.
 
 import type { AlchemixStateAtBlockFromReading } from "@/lib/shared/types/event-shape";
-import { ChainTruthDetail, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import {
+  ChainTruthDetail,
+  type ChainTruthStat,
+  type ChainTruthTransition,
+} from "@/components/shared/chain-truth-event";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
-import { stateAtBlockFromReadingProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
+import { readingChangeProv, stateAtBlockFromReadingProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
+import type { AlchemixReading } from "@/lib/alchemix/readings-before";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
 /** Both alAssets and the MYT share count carry 18 decimals, the same scale the
  *  rest of this card reads its emitted amounts at. */
 const DECIMALS = 18;
+
+/** The grid's figure: whole units from a thousand up, so a small move on a
+ *  large balance still shows between before and after (Liquity V2's
+ *  `36,887 → 35,899`); two places below that. */
+const gridFigure = (raw: string): string => {
+  const n = Number(raw) / 10 ** DECIMALS;
+  if (n === 0) return "0";
+  if (Math.abs(n) >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  if (Math.abs(n) < 0.01) return "<0.01";
+  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+};
 
 export interface AlchemixStateAtBlockProps {
   state: AlchemixStateAtBlockFromReading | undefined;
@@ -73,6 +89,10 @@ export interface AlchemixStateAtBlockProps {
    *  against this number. */
   legCount: number;
   coords: AlchemixCoords;
+  /** The reading at the previous reading block on the timeline
+   *  (lib/alchemix/readings-before), for before → after. Null draws the
+   *  after-figures alone. */
+  before?: AlchemixReading | null;
 }
 
 export function AlchemixStateAtBlock({
@@ -82,6 +102,7 @@ export function AlchemixStateAtBlock({
   eventBlock,
   legCount,
   coords,
+  before = null,
 }: AlchemixStateAtBlockProps) {
   // Absent on Transmuter rows, which have neither axis.
   if (!state) return null;
@@ -93,7 +114,7 @@ export function AlchemixStateAtBlock({
     const why =
       state.reason === "reading-stale"
         ? `The reading${at} did not complete, so what this position held here is not stated.`
-        : `No reading was taken${at}. ${subject} moved neither of this position's axes, so it is not a block the reading stops at, and what this position held here is not stated.`;
+        : `No reading was taken${at}: ${subject.toLowerCase()} moved neither debt nor collateral, so the explorer stores no figures for this block.`;
     return (
       <p className="mt-1 border-t border-rb-200 px-5 pb-3 pt-2 text-[11px] leading-relaxed text-rb-500 dark:border-rb-800">
         {why}
@@ -106,36 +127,64 @@ export function AlchemixStateAtBlock({
   // does not draw, and the heading has to count the block's instead.
   const beyondCard = state.positionEventsInBlock > legCount;
 
-  const axis = (label: string, raw: string | null, symbol: string): ChainTruthStat | null => {
+  /** Before → after on one axis, from the reading before this block. None
+   *  where there is no earlier reading or the axis did not move. */
+  const transition = (label: string, symbol: string, raw: string, beforeRaw: string | null | undefined) => {
+    if (!before || beforeRaw == null) return undefined;
+    const delta = BigInt(raw) - BigInt(beforeRaw);
+    // One wei either way is getCDP's rounding, not a move.
+    if (delta >= BigInt(-1) && delta <= BigInt(1)) return undefined;
+    const sign = delta > BigInt(0) ? "+" : "−";
+    const abs = (delta < BigInt(0) ? -delta : delta).toString();
+    const t: ChainTruthTransition = {
+      before: gridFigure(beforeRaw),
+      beforeExact: formatUnitsExact(beforeRaw, DECIMALS),
+      beforeProv: stateAtBlockFromReadingProv(label, symbol, beforeRaw, before.blockNumber, 0, coords, DECIMALS),
+      change: `${sign}${gridFigure(abs)}`,
+      changeExact: `${sign}${formatUnitsExact(abs, DECIMALS)}`,
+      changeProv: readingChangeProv(label, symbol, before.blockNumber, atBlock, coords),
+    };
+    return t;
+  };
+
+  const axis = (
+    label: string,
+    raw: string | null,
+    symbol: string,
+    beforeRaw: string | null | undefined,
+  ): ChainTruthStat | null => {
     if (raw == null) return null;
     return {
       label,
       value: formatUnitsExact(raw, DECIMALS),
       symbol,
+      display: gridFigure(raw),
       prov: stateAtBlockFromReadingProv(label, symbol, raw, atBlock, state.positionEventsInBlock, coords, DECIMALS),
+      transition: transition(label, symbol, raw, beforeRaw),
     };
   };
 
   const stats = [
-    axis("Debt", state.debtRaw, syntheticSymbol),
-    axis("Collateral", state.collateralRaw, mytSymbol),
-    axis("Set aside for repayment", state.earmarkedRaw, syntheticSymbol),
+    axis("Debt", state.debtRaw, syntheticSymbol, before?.debtRaw),
+    axis("Collateral", state.collateralRaw, mytSymbol, before?.collateralRaw),
+    axis("Set aside for repayment", state.earmarkedRaw, syntheticSymbol, before?.earmarkedRaw),
   ].filter((s): s is ChainTruthStat => s != null);
 
   if (stats.length === 0) return null;
 
-  const heading = beyondCard
-    ? `After this block’s ${state.positionEventsInBlock} events`
+  const subjectWord = beyondCard
+    ? `this block’s ${state.positionEventsInBlock} events`
     : legCount > 1
-      ? "After this transaction"
-      : "After this event";
+      ? "this transaction"
+      : "this event";
+  const heading = before ? `Before and after ${subjectWord}` : `After ${subjectWord}`;
 
   return (
     <div className="mt-1 border-t border-rb-200 pt-2 pb-3 dark:border-rb-800">
       <h4 className={`${OVERLAY_HEADING} px-5 text-rb-500`}>
         {heading} · block {block(atBlock)}
       </h4>
-      <ChainTruthDetail stats={stats} />
+      <ChainTruthDetail stats={stats} symbolText />
     </div>
   );
 }

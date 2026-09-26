@@ -4,12 +4,10 @@
 // line-scope redemptions on a position's timeline.
 //
 // WHY NOT THE SHARED `RedemptionRunCard`. That card states two summed legs,
-// "Cleared <collateral>" and "Reduced <debt>", both taken from each member's
-// own per-Trove operation. An Alchemix redemption names no position and moves
-// no collateral this timeline can attribute, so one of those legs has no figure
-// here and the other means something the shared card cannot say: what a member
-// cleared is a DIFFERENCE OF TWO DEBT READINGS, and a member whose readings are
-// missing leaves the total short. Those two facts — a stated zero that must
+// both taken from each member's own per-Trove operation. An Alchemix redemption
+// names no position, so both legs here mean something the shared card cannot
+// say: what a member cleared and took is a DIFFERENCE OF TWO READINGS, and a
+// member whose readings are missing leaves the total short. Those two facts — a stated zero that must
 // still draw, and a total that must say when it covers part of the run — are
 // the card, so the vocabulary is its own and the mechanics stay shared
 // (`TimelineRunCard`: folder register, date range, in-place expansion, dotted
@@ -38,6 +36,11 @@ export interface AlchemixRedemptionRunCardProps {
   /** The exact total, digits intact, for the receipt. */
   totalClearedExact: string;
   syntheticSymbol: string;
+  /** The vault share ticker the collateral is counted in. */
+  mytSymbol: string;
+  /** What the run took from this position's collateral, summed the same way.
+   *  Null where not every member with a debt figure has one. */
+  taken: { value: number; exact: string; prov: Provenance } | null;
   prov: Provenance;
   /** Chronological bounds of the run (either display order). */
   firstTimestamp: number;
@@ -54,6 +57,8 @@ export function AlchemixRedemptionRunCard({
   statedCount,
   totalClearedExact,
   syntheticSymbol,
+  mytSymbol,
+  taken,
   prov,
   firstTimestamp,
   lastTimestamp,
@@ -78,6 +83,15 @@ export function AlchemixRedemptionRunCard({
           <span className="font-bold text-foreground">{shown}</span>
         </Prov>
         <TokenChipIcon symbol={syntheticSymbol} size={16} />
+        {taken && taken.value > 0 ? (
+          <>
+            <span className="ml-1 text-caution-600 dark:text-caution-400">Took</span>
+            <Prov value={taken.exact} symbol={mytSymbol} info={taken.prov}>
+              <span className="font-bold text-foreground">{fmtHeaderMagnitude(taken.value)}</span>
+            </Prov>
+            <TokenChipIcon symbol={mytSymbol} size={16} />
+          </>
+        ) : null}
       </span>
     ) : null;
 
@@ -85,7 +99,7 @@ export function AlchemixRedemptionRunCard({
     statedCount < count ? (
       <span className="text-[11px] leading-relaxed text-rb-500">
         {statedCount > 0
-          ? `part of the run — ${statedCount} of the ${count} could be read for this position`
+          ? `part of the run: ${statedCount} of the ${count} could be read for this position`
           : `none of these ${count} could be read for this position`}
       </span>
     ) : null;

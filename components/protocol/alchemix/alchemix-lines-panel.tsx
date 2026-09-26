@@ -38,9 +38,9 @@ function gradeSentence(line: AlchemixLineCoverage): string {
   return (
     `${line.displayName} has had ${line.redemptionCount.toLocaleString("en-US")} ` +
     `redemption${line.redemptionCount === 1 ? "" : "s"}, the first at block ${block(line.firstRedemptionBlock)}. ` +
-    `A redemption moves every open position's debt at once, with nothing in a position's own events to see, so ` +
-    `from that block the replay is a lower bound. The figures shown are read from the contract's getCDP at the ` +
-    `block beside them, not computed by Rails.`
+    `A redemption clears every open position's set-aside debt at once, with nothing in a position's own events to ` +
+    `see, so from that block a position's events alone miss what the redemptions cleared. The figures shown are ` +
+    `read from the contract's getCDP at the block beside them.`
   );
 }
 
@@ -71,7 +71,7 @@ export function AlchemixLinesPanel({ lines }: { lines: AlchemixLineCoverage[] })
           {line.staleHeadReadings > 0 ? (
             <p className="mt-2 text-xs leading-relaxed text-rb-500">
               {line.staleHeadReadings.toLocaleString("en-US")} positions on this line have no current reading. Their
-              replayed figures are a floor, not their debt.
+              figures come from their own events alone and miss what redemptions cleared.
             </p>
           ) : null}
         </section>

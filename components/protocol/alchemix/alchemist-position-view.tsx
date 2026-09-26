@@ -83,6 +83,14 @@ import {
 } from "@/components/protocol/alchemix/alchemix-position-card";
 import { computeAlchemixEconomics } from "@/lib/alchemix/economics";
 import { useAlchemixTimelineRuns } from "@/lib/alchemix/timeline-runs";
+import { AlchemixReadingsBeforeContext, collateralTakenRaw, readingsBefore } from "@/lib/alchemix/readings-before";
+import {
+  AlchemixPositionExplanation,
+  AlchemixStoredPanelExplanation,
+  type AlchemixRedemptionTotals,
+} from "@/components/protocol/alchemix/alchemix-position-explanation";
+import { ALCHEMIX_HOW_IT_WORKS } from "@/components/protocol/alchemix/alchemix-event-explainer";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import {
   collateralAppreciationProv,
   liveFigureProv,
@@ -215,7 +223,36 @@ export function AlchemistPositionView({
   // One transaction is one card; and a redemption belongs to the line, so most
   // of this timeline is them, and a streak of three or more collapses into one
   // dated row.
-  const timelineRuns = useAlchemixTimelineRuns(coords, mytSymbol, underlyingDecimals, siblingsByTx);
+  // The reading before each block on the timeline, for before → after on
+  // every card and for what each redemption took from the collateral.
+  const beforeByBlock = useMemo(() => readingsBefore(alchemistEvents), [alchemistEvents]);
+  const timelineRuns = useAlchemixTimelineRuns(coords, mytSymbol, underlyingDecimals, siblingsByTx, beforeByBlock);
+  const redemptionTotals = useMemo<AlchemixRedemptionTotals>(() => {
+    let count = 0;
+    let stated = 0;
+    let cleared = BigInt(0);
+    let taken = BigInt(0);
+    let takenStated = 0;
+    for (const e of alchemistEvents) {
+      if (e.context.data.eventType !== "redemption") continue;
+      count++;
+      const c = e.context.data.debtClearedFromReadings;
+      if (c?.status !== "stated" || c.amountRaw == null) continue;
+      stated++;
+      cleared += BigInt(c.amountRaw);
+      const t = collateralTakenRaw(e, beforeByBlock.get(e.blockNumber) ?? null);
+      if (t != null) {
+        takenStated++;
+        taken += BigInt(t);
+      }
+    }
+    return {
+      count,
+      stated,
+      cleared: Number(cleared) / 1e18,
+      taken: takenStated === stated ? Number(taken) / 1e18 : null,
+    };
+  }, [alchemistEvents, beforeByBlock]);
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - alchemistEvents.length) : 0;
   // Rule 7. The V2 rows join the list the timeline draws and nothing else.
   const v2Events = useMemo(
@@ -272,10 +309,43 @@ export function AlchemistPositionView({
     return { endedAtBlock: w.endedAtBlock, lineFrontierBlock: w.lineFrontierBlock };
   }, [lineEventWindow]);
 
+  // The top row's price list: the asset underneath in dollars, a vault share
+  // in that asset, and the synthetic, which carries no price here.
+  const priceView = live?.collateral ?? position.figures.collateral ?? null;
+  const priceAssets = useMemo<LatestPriceAsset[]>(() => {
+    const u = priceView?.underlying;
+    const out: LatestPriceAsset[] = [];
+    if (u?.symbol && priceView?.usd)
+      out.push({ symbol: u.symbol, address: u.address, price: priceView.usd.pricePerUnit });
+    if (u?.symbol && priceView && priceView.formatted > 0)
+      out.push({
+        symbol: mytSymbol,
+        price: u.formatted / priceView.formatted,
+        unit: u.symbol,
+        label: `One ${mytSymbol} in ${u.symbol}`,
+      });
+    out.push({ symbol: sym });
+    return out;
+  }, [priceView, mytSymbol, sym]);
+  const underSym = priceView?.underlying?.symbol ?? null;
+  const priceReason = underSym
+    ? `${underSym} is priced in dollars, and a ${mytSymbol} share in ${underSym} at the vault's share price; together they give the collateral's dollar value. ${sym} is shown in ${sym} with no dollar price.`
+    : `${sym} and ${mytSymbol} are shown in their own units with no dollar price: no share price has been read for this position.`;
+
   const collateral = position.figures.collateral;
   const underlying = collateral?.underlying ?? null;
   const usd = collateral?.usd ?? null;
   const dlb = position.figures.derivedLowerBound;
+  // The event-only figure less the stored one, against what the timeline's
+  // redemptions cleared: equal (to a thousandth of a unit) only when every
+  // redemption since the event-only figure stopped being exact is on the
+  // timeline with a stated figure.
+  const dlbGapMatches = (() => {
+    const stored = position.figures.debt;
+    if (!dlb || !stored || redemptionTotals.stated !== redemptionTotals.count || olderCount > 0) return false;
+    const gap = Number(dlb.debtRaw) / 1e18 - stored.formatted;
+    return gap > 0 && Math.abs(gap - redemptionTotals.cleared) < 1e-3;
+  })();
 
   // Rule 6. What the vault did for the collateral, and only where every part of
   // it is in hand. An `unavailable` figure draws nothing at all — a stated ZERO
@@ -306,10 +376,28 @@ export function AlchemistPositionView({
   return (
     <ProvReceiptsScope registry={registry}>
       <div className="space-y-6 py-8">
-        <DetailTopRow session={deployment.session} wallet={position.owner} />
+        <DetailTopRow
+          session={deployment.session}
+          wallet={position.owner}
+          assets={priceAssets}
+          priceReason={priceReason}
+        />
 
         {/* ── The position card: the current figures, one reading, one block ── */}
-        <PositionCardShell receipts>
+        <PositionCardShell
+          receipts
+          explanation={
+            live ? (
+              <AlchemixPositionExplanation
+                live={live}
+                syntheticSymbol={sym}
+                mytSymbol={mytSymbol}
+                redemptions={redemptionTotals}
+              />
+            ) : undefined
+          }
+          learnMore={live ? ALCHEMIX_HOW_IT_WORKS : undefined}
+        >
           <OpenPositionStats
             statusPill={<AlchemixStatusPill status={position.status} />}
             leadingIdentity={
@@ -394,7 +482,7 @@ export function AlchemistPositionView({
                           live.asOfBlock,
                           coords,
                         ),
-                        note: "It grows every block, so this is true at that block and at no other.",
+                        note: "It grows block by block, so this holds at that block.",
                       },
                     ),
                   ]
@@ -405,7 +493,7 @@ export function AlchemistPositionView({
             <p className="text-sm text-rb-500">
               {livePending
                 ? "Reading the position now…"
-                : "The current figures did not come back. Nothing stored is put in their place: the amount set aside for repayment grows every block, so no figure taken earlier is the figure now."}
+                : "The current figures did not come back. The panel below holds the last stored ones, each at its own block."}
             </p>
           )}
           {/* Rule 5, said outright rather than left to be inferred. */}
@@ -435,7 +523,15 @@ export function AlchemistPositionView({
         {/* The same shell the card above draws in, so the two sets of figures
             line up column for column: they are the same three figures on two
             bases, and a reader compares them across the gap. */}
-        <PositionCardShell receipts>
+        <PositionCardShell
+          receipts
+          explanation={
+            <AlchemixStoredPanelExplanation
+              storedBlock={position.figures.debt?.asOfBlock ?? collateral?.asOfBlock ?? null}
+              linesHref={`${deployment.basePath}/lines`}
+            />
+          }
+        >
           <OpenPositionStats
             // The card above states the status once. This panel leads with the
             // basis instead — what a pill would say here is already said.
@@ -490,7 +586,7 @@ export function AlchemistPositionView({
                   position.figures.grade,
                   coords,
                 ),
-                note: "The last reading taken. It is not this position's figure now.",
+                note: "The last reading stored, true at that block.",
               }),
             ]}
           />
@@ -502,8 +598,7 @@ export function AlchemistPositionView({
               repeated; both are in the column, each with its own receipt. */}
             {underlying ? (
               <p className="text-[11px] leading-relaxed text-rb-500">
-                Collateral is held as shares in the vault, not as the asset underneath it. The figure above is that
-                share count
+                The {underlying.symbol ?? "underlying"} figure above is the {mytSymbol} share count valued
                 {underlying.sharePriceAsOfBlock != null ? (
                   <> at the share price read at block {block(underlying.sharePriceAsOfBlock)}</>
                 ) : (
@@ -553,7 +648,7 @@ export function AlchemistPositionView({
                 </Prov>{" "}
                 over the readings from block {block(appStated.fromBlock)} to block {block(appStated.toBlock)}. That is
                 the share count against each step the price took, summed over {appStated.intervals}{" "}
-                {appStated.intervals === 1 ? "step" : "steps"}, with deposits and withdrawals left out — a vault share
+                {appStated.intervals === 1 ? "step" : "steps"}, with deposits and withdrawals left out. A vault share
                 can lose value as well as gain it.
               </p>
             ) : null}
@@ -561,16 +656,28 @@ export function AlchemistPositionView({
             {/* Rule 3. The route's own words for this line's grade. */}
             <p className="text-xs leading-relaxed text-rb-500">{position.figures.gradeReason}</p>
 
-            {/* Rule 4. The figure, its block, and no direction. */}
+            {/* Rule 4. The figure, its block, and no direction. Where the
+                gap to the figure above equals what the timeline's redemptions
+                cleared, the sentence says so: both are stated figures. */}
             {dlb ? (
               <p className="text-xs leading-relaxed text-rb-500">
                 Worked out from this position&rsquo;s own events alone, the debt is{" "}
                 <span className="tabular-nums">
                   {formatCompact(Number(dlb.debtRaw) / 1e18).display} {sym}
                 </span>
-                , exact to block {block(dlb.validToBlock)}. Redemptions after that block moved the debt with nothing in
-                these events to see, so that figure and the one above it differ, and by how much is not something either
-                of them states.
+                , exact to block {block(dlb.validToBlock)}.{" "}
+                {dlbGapMatches ? (
+                  <>
+                    The gap to the figure above is the{" "}
+                    <span className="tabular-nums">
+                      {formatCompact(redemptionTotals.cleared).display} {sym}
+                    </span>{" "}
+                    the line&rsquo;s {redemptionTotals.count} redemptions since then cleared from this position, each
+                    one on the timeline.
+                  </>
+                ) : (
+                  <>Redemptions after that block moved the debt, and each one on the timeline states what it cleared.</>
+                )}
               </p>
             ) : null}
 
@@ -594,10 +701,6 @@ export function AlchemistPositionView({
                   : ""}
               </p>
             ) : null}
-
-            <Link href={`${deployment.basePath}/lines`} className="link inline-block text-xs">
-              How each line answers
-            </Link>
           </div>
         </PositionCardShell>
 
@@ -608,73 +711,79 @@ export function AlchemistPositionView({
           // The tower's own "nothing to draw" placeholder, in the slot the
           // tower would have filled.
           <p className="rounded-md border border-dashed border-rb-300/50 px-4 py-6 text-center text-[11px] leading-relaxed text-rb-400 dark:border-rb-700/50">
-            This position has more events than the page draws, so no lifetime totals are given: a total over part of a
-            life would carry a label it has not earned.
+            This position has more events than the page draws, so no lifetime totals are given.
           </p>
         ) : null}
 
         {/* ── The timeline ───────────────────────────────────────────────── */}
-        <ChainTruthTimeline
-          persistKeyPrefix="alchemix-v3"
-          closed={position.status === "closed"}
-          tl={tl}
-          runs={timelineRuns}
-          boundary={boundary}
-          displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-          emptyLabel="No events recorded for this position"
-          toolbarLeading={
-            <TimelineActivityHeader
-              events={alchemistEvents}
-              closed={position.status === "closed"}
-              tenurePending={olderCount > 0}
-            />
-          }
-          notice={
-            lineScopedNote || endedWindow ? (
-              <div className="space-y-1">
-                {lineScopedNote ? (
-                  <p className="px-1 text-[11px] leading-relaxed text-rb-500">{lineScopedNote}</p>
-                ) : null}
-                {/* Why a closed position's timeline stops carrying the line's
+        <AlchemixReadingsBeforeContext.Provider value={beforeByBlock}>
+          <ChainTruthTimeline
+            persistKeyPrefix="alchemix-v3"
+            closed={position.status === "closed"}
+            tl={tl}
+            runs={timelineRuns}
+            boundary={boundary}
+            displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+            emptyLabel="No events recorded for this position"
+            toolbarLeading={
+              <TimelineActivityHeader
+                events={alchemistEvents}
+                closed={position.status === "closed"}
+                tenurePending={olderCount > 0}
+              />
+            }
+            notice={
+              (lineScopedNote && redemptionTotals.count > 0) || endedWindow ? (
+                <div className="space-y-1">
+                  {lineScopedNote && redemptionTotals.count > 0 ? (
+                    // The route sends its own statement about line rows in
+                    // the index's vocabulary; the reader gets it in plain words.
+                    <p className="px-1 text-[11px] leading-relaxed text-rb-500">
+                      Redemption rows are the whole line&rsquo;s events, and the holder did none of them. Each states
+                      what it cleared from this position&rsquo;s debt and took from its collateral.
+                    </p>
+                  ) : null}
+                  {/* Why a closed position's timeline stops carrying the line's
                     events while the line goes on having them. Open positions
                     get nothing: their window ends at the frontier, so the
                     sentence would restate the timeline. */}
-                {endedWindow ? (
-                  <p className="px-1 text-[11px] leading-relaxed text-rb-500">
-                    This position ended at block {block(endedWindow.endedAtBlock)}, and the line has been indexed to
-                    block {block(endedWindow.lineFrontierBlock)} since. A position that has ended cannot be moved by a
-                    later redemption, so none of the line&rsquo;s events past that block are on this timeline.
-                  </p>
-                ) : null}
-              </div>
-            ) : undefined
-          }
-          renderCard={(event, meta) => {
-            if (isAlchemixV2Event(event)) {
+                  {endedWindow ? (
+                    <p className="px-1 text-[11px] leading-relaxed text-rb-500">
+                      This position ended at block {block(endedWindow.endedAtBlock)}, and the line has been indexed to
+                      block {block(endedWindow.lineFrontierBlock)} since. A position that has ended cannot be moved by a
+                      later redemption, so none of the line&rsquo;s events past that block are on this timeline.
+                    </p>
+                  ) : null}
+                </div>
+              ) : undefined
+            }
+            renderCard={(event, meta) => {
+              if (isAlchemixV2Event(event)) {
+                return (
+                  <AlchemixV2EventCard
+                    event={event as AlchemixV2Event}
+                    showVersion
+                    isFirst={meta.isFirst}
+                    isLast={meta.isLast}
+                    eventNumber={meta.eventNumber}
+                  />
+                );
+              }
+              if (!isAlchemistEvent(event)) return null;
               return (
-                <AlchemixV2EventCard
-                  event={event as AlchemixV2Event}
-                  showVersion
+                <AlchemixEventCard
+                  legs={[event]}
+                  mytSymbol={mytSymbol}
+                  underlyingDecimals={underlyingDecimals}
+                  siblings={siblingsByTx.get(event.txHash) ?? [event]}
                   isFirst={meta.isFirst}
                   isLast={meta.isLast}
                   eventNumber={meta.eventNumber}
                 />
               );
-            }
-            if (!isAlchemistEvent(event)) return null;
-            return (
-              <AlchemixEventCard
-                legs={[event]}
-                mytSymbol={mytSymbol}
-                underlyingDecimals={underlyingDecimals}
-                siblings={siblingsByTx.get(event.txHash) ?? [event]}
-                isFirst={meta.isFirst}
-                isLast={meta.isLast}
-                eventNumber={meta.eventNumber}
-              />
-            );
-          }}
-        />
+            }}
+          />
+        </AlchemixReadingsBeforeContext.Provider>
       </div>
       <ProvInspectorLayer />
     </ProvReceiptsScope>

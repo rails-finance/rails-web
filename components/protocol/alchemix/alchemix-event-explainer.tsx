@@ -13,9 +13,9 @@
 // reading `Open`. The mint is the leg that narrates the whole transaction, so
 // its bullets go first; every other card keeps log order.
 //
-// THE READING'S CAVEATS COME LAST. They govern the grid above the pane rather
-// than any one leg, and they are what replaced the paragraph that used to sit
-// on the card face once per leg.
+// THE CAVEATS THAT HOLD FOR EVERY CARD ARE NOT HERE. They are said once, on the
+// position card's Explanation pane and in `ALCHEMIX_HOW_IT_WORKS`, so each
+// card's bullets are about its own event.
 
 import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
@@ -36,27 +36,61 @@ export interface AlchemixEventExplainerProps {
   siblings: AlchemistEvent[];
   /** The card shows the lead bullet as its teaser; render only the rest. */
   skipLead?: boolean;
-  /** The decimals of the asset under this line's MYT, from the position's own
-   *  row. Carried for the two fees paid in that asset, which are 6-decimal
-   *  figures on the USDC lines and 18-decimal ones on the WETH line. */
-  underlyingDecimals?: number | null;
+  /** The line facts and the redemption figure the bullets name. */
+  prose: AlchemixCardProse;
 }
 
 const BORROWING: LearnMoreContent = {
-  title: "Borrowing against a yield position",
+  title: "Borrowing against vault shares",
   intro:
-    "Collateral goes in as shares of a vault that earns yield. The position mints a synthetic token against those shares, and the yield the vault earns is set aside against the debt over time, so the debt falls on its own.",
+    "Collateral goes in as shares of a vault that lends out the asset underneath (mixUSDC is a vault over USDC). The position mints a synthetic token against those shares, alUSD or alETH, and that is its debt.",
   detailsHeading: "What moves the two sides",
   details: [
     { bold: "Deposit and withdraw", text: "move the vault shares the position holds." },
-    { bold: "Mint and burn", text: "move the debt directly, and the holder chooses both." },
+    { bold: "Mint and burn", text: "move the debt one for one, and the holder chooses both." },
     {
       bold: "Repay",
-      text: "offers vault shares against the debt. What they clear depends on what a share is worth at that moment, and it stops at whichever is smaller, this position's debt or the line's.",
+      text: "pays the debt with vault shares. Each share counts at its value in the asset underneath at that block, one synthetic per unit, and the line keeps a protocol fee in shares on the part that pays off debt set aside for repayment (0.25% on Ethereum, 0.1% on Base).",
     },
     {
       bold: "Set aside for repayment",
-      text: "grows every block as the vault earns. It is a figure with a block attached, never a running balance.",
+      text: "is the part of the debt the Transmuter has claimed as its stakers' deposits matured. It grows block by block, and the line's next redemption clears it. See How Alchemix repays a loan, on a redemption card or the position card.",
+    },
+  ],
+};
+
+/** The protocol's central idea, the one a reader has to own to read an
+ *  Alchemix timeline: Transmuter stakes maturing are what set debt aside and
+ *  what redemptions clear. Opened from every redemption card and from the
+ *  position card's Explanation pane. */
+export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
+  title: "How Alchemix repays a loan",
+  intro:
+    "Every Alchemix line has two halves. The Alchemist holds borrowers' positions: vault shares in, a synthetic token such as alUSD out. The Transmuter takes that synthetic back from anyone who holds it and, over time, turns it into the vault shares borrowers put up. The second half is what repays the first.",
+  stepsHeading: "How a redemption happens",
+  steps: [
+    "Someone holding alUSD deposits it in the line's Transmuter, where it matures over a period measured in blocks.",
+    "As those deposits mature, the Alchemist sets aside a matching amount of debt across every open position on the line. That is each position's Set aside for repayment figure, and it grows block by block.",
+    "When a staker claims, the Transmuter redeems: every open position's set-aside debt is cleared by the same ratio, and a matching slice of its collateral moves to the Transmuter: vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared.",
+    "The Transmuter pays the staker in those vault shares (mixUSDC on the alUSD line) for the part of the deposit that has matured, and hands back the rest as alUSD.",
+  ],
+  detailsHeading: "What it means for a borrower",
+  details: [
+    {
+      bold: "The loan is repaid over time without the holder acting.",
+      text: "Each redemption lowers the debt and the collateral by matching values, so the position's collateral less its debt stays about where it was.",
+    },
+    {
+      bold: "The vault's share price decides what is left over.",
+      text: "A rising share price grows the collateral while the debt stays put. A share price can also fall, and then the collateral shrinks.",
+    },
+    {
+      bold: "A redemption row is the line's event.",
+      text: "It names no position. The explorer reads each position before and after it to state what it cleared and took from that one.",
+    },
+    {
+      bold: "The holder can still repay directly",
+      text: "by burning the synthetic or repaying with vault shares, or close out with a self-liquidation, which pays the debt from the collateral.",
     },
   ],
 };
@@ -67,11 +101,8 @@ const LIQUIDATION: LearnMoreContent = {
     "A position whose collateral no longer covers its debt can have shares taken from it and put against the debt. The holder can do it themselves, or anyone can do it and take a fee for it.",
   detailsHeading: "What the event states",
   details: [
-    { bold: "Shares taken", text: "is in the log, so it is shown." },
-    {
-      bold: "Debt cleared",
-      text: "is not in the log. No figure is given for it here rather than one worked out from something else.",
-    },
+    { bold: "Shares taken", text: "are in the log, so they are shown." },
+    { bold: "Debt cleared", text: "shows in the card's before and after figures." },
     { bold: "The fee", text: "is paid to whoever did it, in shares and in the asset underneath." },
   ],
 };
@@ -79,12 +110,12 @@ const LIQUIDATION: LearnMoreContent = {
 const LINE_WIDE: LearnMoreContent = {
   title: "Events that belong to the whole line",
   intro:
-    "Three kinds of event on this timeline name no position at all. They are here because they are what moved this position's figures, and never because the holder did anything.",
-  detailsHeading: "The three",
+    "Some events on this timeline name no position at all. They are here because they fell inside this position's life, and the holder did none of them.",
+  detailsHeading: "The kinds",
   details: [
     {
       bold: "Redemption",
-      text: "moves every open position's debt on the line at once, by one ratio, with nothing in any position's own events to see. It is why the figures on a line that has had one are taken from the contract rather than worked out from the events.",
+      text: "clears every open position's set-aside debt on the line at once, by one ratio, and takes a matching slice of each one's collateral for the Transmuter.",
     },
     {
       bold: "Batch liquidation",
@@ -111,6 +142,7 @@ export function alchemixLearnMoreContent(ctx: AlchemixV3Context): LearnMoreConte
     case "repayment_fee":
       return LIQUIDATION;
     case "redemption":
+      return ALCHEMIX_HOW_IT_WORKS;
     case "batch_liquidated":
     case "fee_shortfall":
       return LINE_WIDE;
@@ -139,15 +171,22 @@ function proseOrder(legs: AlchemistEvent[]): AlchemistEvent[] {
   return [legs[mintIdx], ...legs.filter((_, i) => i !== mintIdx)];
 }
 
+/** What a card's bullets need beyond its legs: the line's share ticker, its
+ *  fee rate, and what a redemption took from the collateral. */
+export interface AlchemixCardProse {
+  underlyingDecimals: number | null;
+  mytSymbol: string;
+  protocolFeeBps: number | null;
+  collateralTakenRaw: string | null;
+}
+
 /** Every bullet the card can show, teaser included. */
 function alchemixCardClauses(
   legs: AlchemistEvent[],
   siblings: AlchemistEvent[],
-  underlyingDecimals: number | null,
+  prose: AlchemixCardProse,
 ): ClauseInput[] {
   const combined = legs.length > 1;
-  // The reading's own bullets state the share unit, so the deposit's
-  // continuation saying it a second time is dropped.
   const reading = legs.find((l) => l.context.data.stateAtBlockFromReading?.status === "stated")?.context.data
     .stateAtBlockFromReading;
   const readingClauses = alchemixReadingClauses(reading, legs.length);
@@ -162,9 +201,11 @@ function alchemixCardClauses(
     ...proseOrder(legs).flatMap((leg) =>
       alchemixEventClauses(leg.context.data, siblings, leg, {
         combined,
-        skipShareUnit: readingClauses.length > 0,
         skipCustody: roundTrip != null,
-        underlyingDecimals,
+        underlyingDecimals: prose.underlyingDecimals,
+        mytSymbol: prose.mytSymbol,
+        protocolFeeBps: prose.protocolFeeBps,
+        collateralTakenRaw: prose.collateralTakenRaw,
       }),
     ),
     ...(roundTrip ? [alchemixCustodyRoundTripClause(roundTrip)] : []),
@@ -173,21 +214,12 @@ function alchemixCardClauses(
 }
 
 /** The teaser: the first bullet, rendered on the card face. */
-export function alchemixExplainerTeaser(
-  legs: AlchemistEvent[],
-  siblings: AlchemistEvent[],
-  underlyingDecimals: number | null = null,
-) {
-  return splitLead(alchemixCardClauses(legs, siblings, underlyingDecimals)).lead;
+export function alchemixExplainerTeaser(legs: AlchemistEvent[], siblings: AlchemistEvent[], prose: AlchemixCardProse) {
+  return splitLead(alchemixCardClauses(legs, siblings, prose)).lead;
 }
 
-export function AlchemixEventExplainer({
-  legs,
-  siblings,
-  skipLead,
-  underlyingDecimals = null,
-}: AlchemixEventExplainerProps) {
-  const clauses = alchemixCardClauses(legs, siblings, underlyingDecimals);
+export function AlchemixEventExplainer({ legs, siblings, skipLead, prose }: AlchemixEventExplainerProps) {
+  const clauses = alchemixCardClauses(legs, siblings, prose);
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
   return <ProseExplainer items={items} />;
 }

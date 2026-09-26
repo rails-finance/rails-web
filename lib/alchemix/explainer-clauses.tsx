@@ -33,12 +33,13 @@
 // never off an address anyone wrote down. A transfer in ANOTHER transaction is
 // a change of owner and keeps its own card, unchanged.
 //
-// THE READING'S CAVEATS ARE BULLETS HERE, not a paragraph on the card face.
-// `alchemixReadingClauses` at the foot of this file carries what the grid's
-// note used to say out loud: that the figures are read rather than accumulated,
-// how many events the one reading covers, which unit its collateral is in, and
-// that an earmarked figure is true at its block and at no other. Every one of
-// them is also on the receipt of the figure it governs.
+// THE CAVEATS THAT HOLD FOR EVERY CARD ARE SAID ONCE, on the position card's
+// Explanation pane and in the "How Alchemix repays a loan" modal: that the
+// figures are readings, that collateral is a vault share count, and that
+// set-aside grows between readings. Each is also on the receipt of the figure
+// it governs. The bullets here are specific to the event. The one reading
+// caveat left in `alchemixReadingClauses` is event-specific: a block holding
+// more of this position's events than the card draws.
 
 import type {
   AlchemixStateAtBlockFromReading,
@@ -199,9 +200,15 @@ export interface AlchemixClauseOptions {
   /** This leg shares its card with the other legs of its transaction, so a
    *  bullet pointing at one of them repeats what is already on the card. */
   combined?: boolean;
-  /** The reading's own bullets say collateral is a share count, so the deposit
-   *  bullet's continuation saying the same thing is dropped. */
-  skipShareUnit?: boolean;
+  /** The vault share ticker for this line, so a bullet names the unit
+   *  ("mixUSDC") beside the figure. */
+  mytSymbol?: string;
+  /** What this redemption took from this position's collateral, in share wei:
+   *  the reading before it less the reading at it (lib/alchemix/readings-before).
+   *  Null where the two readings are not in hand. */
+  collateralTakenRaw?: string | null;
+  /** The line's protocol fee in basis points, for the repay fee's rate. */
+  protocolFeeBps?: number | null;
   /** This leg is a hop of a custody ROUND TRIP, which the card narrates once
    *  (`alchemixCustodyRoundTripClause`) rather than once per hop. */
   skipCustody?: boolean;
@@ -224,17 +231,28 @@ export function alchemixEventClauses(
   self?: AlchemistEvent,
   opts: AlchemixClauseOptions = {},
 ): ClauseInput[] {
-  const { combined = false, skipShareUnit = false, skipCustody = false, underlyingDecimals = null } = opts;
+  const {
+    combined = false,
+    skipCustody = false,
+    underlyingDecimals = null,
+    mytSymbol = "vault shares",
+    collateralTakenRaw = null,
+    protocolFeeBps = null,
+  } = opts;
+  const myt = mytSymbol;
   const raw = ctx.raw;
   const sym = ctx.syntheticSymbol;
   const out: ClauseInput[] = [];
 
   switch (ctx.eventType) {
     case "deposit":
-      out.push(clause(<>The position took in {amount(raw.amount)} vault shares as collateral.</>));
-      if (!skipShareUnit) {
-        out.push(cont(<> Collateral is held as shares in the vault, not as the asset underneath it.</>));
-      }
+      out.push(
+        clause(
+          <>
+            The position took in {amount(raw.amount)} {myt} as collateral.
+          </>,
+        ),
+      );
       // The cross-reference back to the narrator, so two SEPARATE cards read as
       // one act without either of them losing its own receipt. On one card the
       // mint is a bullet away and the sentence says nothing.
@@ -244,7 +262,13 @@ export function alchemixEventClauses(
       break;
 
     case "withdraw":
-      out.push(clause(<>{amount(raw.amount)} vault shares left the position.</>));
+      out.push(
+        clause(
+          <>
+            {amount(raw.amount)} {myt} of collateral left the position.
+          </>,
+        ),
+      );
       out.push(cont(<> They went to {who(raw.recipient)}.</>));
       break;
 
@@ -252,7 +276,7 @@ export function alchemixEventClauses(
       out.push(
         clause(
           <>
-            The position minted {amount(raw.amount)} {sym} against its collateral, which is what its debt is owed in.
+            The position minted {amount(raw.amount)} {sym} against its collateral, adding that much to its debt.
           </>,
         ),
       );
@@ -282,31 +306,36 @@ export function alchemixEventClauses(
       out.push(
         clause(
           <>
-            {who(raw.sender)} offered {amount(raw.amount)} vault shares against this position&rsquo;s debt.
+            {who(raw.sender)} repaid this position&rsquo;s debt with {amount(raw.amount)} {myt}.
           </>,
         ),
       );
-      out.push(
-        credit != null
-          ? cont(
-              <>
-                {" "}
-                That cleared {amount(credit)} {sym} of debt. The shares are worth what they are worth at this moment,
-                and the amount cleared stops at whichever is smaller, the position&rsquo;s debt or the line&rsquo;s.
-              </>,
-            )
-          : cont(
-              <>
-                {" "}
-                How much debt that cleared is not stated here, so this card does not give a figure for it rather than
-                give the wrong one.
-              </>,
-            ),
-      );
+      if (credit != null) {
+        out.push(
+          cont(
+            <>
+              {" "}
+              That cleared {amount(credit)} {sym}: each share counts at its value in the asset underneath at this block,
+              one {sym} per unit, up to whichever is smaller, the position&rsquo;s debt or the line&rsquo;s.
+            </>,
+          ),
+        );
+      }
       if (ctx.resolvedAtCapture?.collateralFee) {
         out.push(
           clause(
-            <>A fee of {amount(ctx.resolvedAtCapture.collateralFee)} vault shares was taken in the same transaction.</>,
+            protocolFeeBps != null ? (
+              <>
+                A protocol fee of {amount(ctx.resolvedAtCapture.collateralFee)} {myt} left the collateral for
+                Alchemix&rsquo;s fee receiver: {(protocolFeeBps / 100).toLocaleString("en-US")}% of the shares that paid
+                off debt set aside for repayment.
+              </>
+            ) : (
+              <>
+                A protocol fee of {amount(ctx.resolvedAtCapture.collateralFee)} {myt} left the collateral for
+                Alchemix&rsquo;s fee receiver, charged on the shares that paid off debt set aside for repayment.
+              </>
+            ),
           ),
         );
       }
@@ -317,8 +346,8 @@ export function alchemixEventClauses(
       out.push(
         clause(
           <>
-            {amount(raw.credit_to_yield)} vault shares were put against this position&rsquo;s debt without the holder
-            asking.
+            {amount(raw.credit_to_yield)} {myt} of collateral paid off this position&rsquo;s debt set aside for
+            repayment.
           </>,
         ),
       );
@@ -326,7 +355,7 @@ export function alchemixEventClauses(
         cont(
           <>
             {" "}
-            A further {amount(raw.protocol_fee_total)} shares went to the protocol as its fee, so the collateral fell by
+            A further {amount(raw.protocol_fee_total)} {myt} went to Alchemix as its fee, so the collateral fell by
             both.
           </>,
         ),
@@ -336,17 +365,19 @@ export function alchemixEventClauses(
     case "self_liquidated":
       out.push(
         clause(
-          <>The holder liquidated {amount(raw.amount_liquidated)} of their own vault shares to bring the debt down.</>,
+          <>
+            The holder chose to close out the position: {amount(raw.amount_liquidated)} {myt} of its collateral paid off
+            its debt.
+          </>,
         ),
       );
-      out.push(cont(<> The debt this cleared is not in the log, so no figure for it is given.</>));
       break;
 
     case "liquidated":
       out.push(
         clause(
           <>
-            {who(raw.liquidator)} liquidated this position, taking {amount(raw.amount)} vault shares from it.
+            {who(raw.liquidator)} liquidated this position, taking {amount(raw.amount)} {myt} from it.
           </>,
         ),
       );
@@ -379,14 +410,14 @@ export function alchemixEventClauses(
         clause(
           fee != null ? (
             <>
-              A repayment fee went to {who(raw.fee_receiver)}: {amount(raw.fee_in_yield)} vault shares and {fee} of the
-              asset underneath.
+              A repayment fee went to {who(raw.fee_receiver)}: {amount(raw.fee_in_yield)} {myt} and {fee} of the asset
+              underneath.
             </>
           ) : (
             <>
-              A repayment fee went to {who(raw.fee_receiver)}: {amount(raw.fee_in_yield)} vault shares, and an amount of
-              the asset underneath which is not stated here — its decimals come from a reading of this position, and
-              none has been taken.
+              A repayment fee went to {who(raw.fee_receiver)}: {amount(raw.fee_in_yield)} {myt}, and an amount of the
+              asset underneath with no figure here, because its decimals come from a reading of this position and none
+              has been taken.
             </>
           ),
         ),
@@ -413,7 +444,13 @@ export function alchemixEventClauses(
         const funding = combined
           ? null
           : opening?.depositRaw
-            ? { node: <>funded with {amount(opening.depositRaw)} vault shares</> }
+            ? {
+                node: (
+                  <>
+                    funded with {amount(opening.depositRaw)} {myt}
+                  </>
+                ),
+              }
             : opening?.debtRaw
               ? {
                   node: (
@@ -424,7 +461,7 @@ export function alchemixEventClauses(
                 }
               : null;
         const routed = opening?.forwardedTo ? (
-          <> That first address is a step inside the one transaction, not somebody who held the position.</>
+          <> That first address is a contract the transaction routed through.</>
         ) : null;
 
         if (opening && opening.forwardedTo && funding) {
@@ -475,7 +512,7 @@ export function alchemixEventClauses(
             <>
               {" "}
               The address it came from is the one it was minted to in that transaction, so this is the last step of the
-              opening rather than a change of owner later on.
+              opening.
             </>,
           ),
         );
@@ -487,7 +524,7 @@ export function alchemixEventClauses(
             </>,
           ),
         );
-        out.push(cont(<> Nothing about the debt or the collateral moved; only who owns them did.</>));
+        out.push(cont(<> The debt and the collateral stayed as they were.</>));
       }
       break;
     }
@@ -497,51 +534,64 @@ export function alchemixEventClauses(
       out.push(
         clause(
           <>
-            Nobody here did this: the whole line redeemed {amount(raw.amount)} {sym} at once, and every open position on
-            it had its debt moved by the same ratio.
+            The line&rsquo;s Transmuter redeemed {amount(raw.amount)} {sym} across every open position at once, when a
+            staker claimed a matured deposit; nobody holding this position acted.
           </>,
         ),
       );
-      out.push(
-        cont(
-          <>
-            {" "}
-            The event names no position and carries no share-out, so how much of it landed on this one cannot be read
-            off it.
-          </>,
-        ),
-      );
-      // The figure the event cannot give, measured instead: this position's
-      // debt either side of the redemption. A stated ZERO is an answer and says
-      // so in its own words; an unavailable one adds no bullet at all, which is
-      // the only thing that keeps the two apart.
+      // What it did HERE: this position's readings either side of it,
+      // subtracted (rails-ops decisions/0032). A stated ZERO says so in its own
+      // words; an unavailable figure adds no bullet at all, which is the only
+      // thing that keeps the two apart.
       if (cleared?.status === "stated" && cleared.amountRaw != null) {
-        out.push(
-          cleared.amountRaw === "0"
-            ? clause(
-                <>
-                  This position&rsquo;s debt was read from the contract on both sides of it and came out the same, so
-                  this redemption cleared none of this one&rsquo;s.
-                </>,
-              )
-            : clause(
-                <>
-                  This position&rsquo;s debt was read from the contract on both sides of it. The two readings are{" "}
-                  {amount(cleared.amountRaw)} {sym} apart, and that is what this redemption cleared here.
-                </>,
-              ),
-        );
-      }
-      out.push(
-        raw.swept === "true"
-          ? clause(<>The figures for this position have since been taken from the contract past this point.</>)
-          : clause(
+        if (cleared.amountRaw === "0") {
+          out.push(
+            clause(
               <>
-                No reading has been taken from the contract past this point yet, so the figures above do not cover this
-                event.
+                It cleared none of this position&rsquo;s debt and took none of its collateral: the readings either side
+                of it match.
               </>,
             ),
-      );
+          );
+        } else if (collateralTakenRaw != null && collateralTakenRaw !== "0") {
+          out.push(
+            clause(
+              <>
+                Here it cleared {amount(cleared.amountRaw)} {sym} of debt set aside for repayment and took{" "}
+                {amount(collateralTakenRaw)} {myt} of collateral to back it, measured from this position&rsquo;s
+                readings either side of it.
+              </>,
+            ),
+          );
+          out.push(
+            clause(
+              <>
+                Those {myt} went to the Transmuter, which pays its stakers in them, so the position&rsquo;s debt and
+                collateral fell by matching values.
+              </>,
+            ),
+          );
+        } else {
+          out.push(
+            clause(
+              <>
+                Here it cleared {amount(cleared.amountRaw)} {sym} of debt set aside for repayment, and took a matching
+                amount of {myt} from the collateral, measured from this position&rsquo;s readings either side of it.
+              </>,
+            ),
+          );
+        }
+      }
+      if (raw.swept !== "true") {
+        out.push(
+          clause(
+            <>
+              No reading has been taken from the contract past this point yet, so the figures above do not cover this
+              event.
+            </>,
+          ),
+        );
+      }
       break;
     }
 
@@ -550,7 +600,7 @@ export function alchemixEventClauses(
         clause(
           <>
             Nobody here did this: {who(raw.liquidator)} liquidated a batch of positions at once, taking{" "}
-            {amount(raw.amount)} vault shares across all of them.
+            {amount(raw.amount)} {myt} across all of them.
           </>,
         ),
       );
@@ -584,86 +634,27 @@ export function alchemixEventClauses(
   return out;
 }
 
-/** What the card's reading is, said where a reader goes for an explanation
- *  rather than over the figures themselves.
+/** The one reading caveat that belongs to a single card: its block holds more
+ *  of this position's events than the card draws, so the reading is where the
+ *  position stood after all of them. The caveats that hold for every card
+ *  (the figures are readings, collateral is a share count, set-aside grows
+ *  between readings) are said once, on the position card's Explanation pane
+ *  and in the "How Alchemix repays a loan" modal, and on each figure's receipt.
  *
- *  FOUR FACTS, AND EACH IS ALSO ON A RECEIPT. Decision 0032 requires all of
- *  them wherever the reading is shown; none may be dropped, and none earns the
- *  loudest place on the card:
- *    • the figures are READ at a block, never accumulated from the timeline:
- *      a redemption moves debt line-wide and names no position, so the events
- *      cannot reach them;
- *    • one reading covers every one of this position's events in its block, so
- *      a reader can find out when it covers more than the card does;
- *    • collateral there is the MYT share count, while the panel above the
- *      timeline leads with the asset underneath;
- *    • earmarked is true at its block and at no other (point 6).
- *
- *  `legCount` is how many of this position's logs the card draws. Above the
- *  reading's own `positionEventsInBlock` it cannot go; below it, the block
- *  holds events this card does not cover and the bullet says so. */
+ *  `legCount` is how many of this position's logs the card draws. */
 export function alchemixReadingClauses(
   state: AlchemixStateAtBlockFromReading | undefined,
   legCount: number,
 ): ClauseInput[] {
   if (!state || state.status !== "stated" || state.blockNumber == null) return [];
-  const at = state.blockNumber.toLocaleString("en-US");
   const inBlock = state.positionEventsInBlock;
-  const out: ClauseInput[] = [];
-
-  out.push(clause(<>The figures above are one reading of the Alchemist at block {at}.</>));
-  // Instance-bound on purpose (the explanation-copy charter's register gate):
-  // the sentence is about what THIS line's redemptions did to THIS position's
-  // figures, not a rule about redemptions.
-  out.push(
-    cont(
+  if (inBlock <= legCount) return [];
+  return [
+    clause(
       <>
-        {" "}
-        A redemption on this line moves every open position&rsquo;s debt at once and names none of them, so this
-        position&rsquo;s events cannot reach these figures.
+        {inBlock} of this position&rsquo;s events landed in that block, more than this card draws, so the figures are
+        where it stood after the last of them.
       </>,
     ),
-  );
-
-  if (inBlock > legCount) {
-    out.push(
-      clause(
-        <>
-          {inBlock} of this position&rsquo;s events landed in that block, more than this card draws, so the reading is
-          where it stood after the last of them.
-        </>,
-      ),
-    );
-  } else if (legCount > 1) {
-    out.push(
-      clause(
-        <>
-          The {legCount} logs on this card came in one transaction, and the one reading at its block covers all of them.
-        </>,
-      ),
-    );
-  }
-
-  out.push(clause(<>Collateral in the reading is the vault share count.</>));
-  out.push(
-    cont(
-      <>
-        {" "}
-        The panel above the timeline leads with the asset underneath instead, so the word carries two units on this
-        page.
-      </>,
-    ),
-  );
-
-  if (state.earmarkedRaw != null) {
-    out.push(
-      clause(
-        <>
-          The amount set aside for repayment grows every block, so that figure is true at block {at} and at no other.
-        </>,
-      ),
-    );
-  }
-
-  return out;
+  ];
 }
