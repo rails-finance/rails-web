@@ -53,7 +53,8 @@ import { formatUnitsExact } from "@/lib/utils/format";
 import { AlchemixRedemptionRunCard } from "@/components/protocol/alchemix/alchemix-redemption-run-card";
 import { AlchemixEventCard } from "@/components/protocol/alchemix/alchemix-event-card";
 import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
-import { clearedRunProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
+import { clearedRunProv, takenRunProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
+import { collateralTakenRaw, type AlchemixReadingsBefore } from "@/lib/alchemix/readings-before";
 
 /** Runs shorter than this stay as individual cards.
  *
@@ -107,6 +108,7 @@ export function useAlchemixTimelineRuns(
   mytSymbol: string,
   underlyingDecimals: number | null,
   siblingsByTx: Map<string, AlchemistEvent[]>,
+  before: AlchemixReadingsBefore,
 ): TimelineRunSpec[] {
   return useMemo(
     () => [
@@ -143,6 +145,8 @@ export function useAlchemixTimelineRuns(
             // total covers.
             let totalRaw = BigInt(0);
             let stated = 0;
+            let takenRaw = BigInt(0);
+            let takenStated = 0;
             let symbol = "";
             for (const e of events) {
               if (!isAlchemistEvent(e)) continue;
@@ -151,8 +155,24 @@ export function useAlchemixTimelineRuns(
               if (cleared?.status !== "stated" || cleared.amountRaw == null) continue;
               stated++;
               totalRaw += BigInt(cleared.amountRaw);
+              const taken = collateralTakenRaw(e, before.get(e.blockNumber) ?? null);
+              if (taken != null) {
+                takenStated++;
+                takenRaw += BigInt(taken);
+              }
             }
             const raw = totalRaw.toString();
+            // The collateral total is stated only where every member that has
+            // a debt figure has a collateral one too, so the two span the
+            // same redemptions.
+            const taken =
+              takenStated === stated && stated > 0
+                ? {
+                    value: Number(takenRaw) / WAD,
+                    exact: formatUnitsExact(takenRaw.toString(), 18),
+                    prov: takenRunProv(mytSymbol, takenRaw.toString(), events.length, stated, rangeOf(events), coords),
+                  }
+                : null;
             const range = rangeOf(events);
             return (
               <AlchemixRedemptionRunCard
@@ -162,6 +182,8 @@ export function useAlchemixTimelineRuns(
                 totalClearedExact={formatUnitsExact(raw, 18)}
                 statedCount={stated}
                 syntheticSymbol={symbol}
+                mytSymbol={mytSymbol}
+                taken={taken}
                 prov={clearedRunProv(symbol, raw, events.length, stated, range, coords)}
                 firstTimestamp={events[0].timestamp}
                 lastTimestamp={events[events.length - 1].timestamp}
@@ -174,6 +196,6 @@ export function useAlchemixTimelineRuns(
           }),
       },
     ],
-    [coords, mytSymbol, underlyingDecimals, siblingsByTx],
+    [coords, mytSymbol, underlyingDecimals, siblingsByTx, before],
   );
 }

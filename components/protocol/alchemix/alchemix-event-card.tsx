@@ -37,7 +37,14 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
 import { AlchemixEventHeader, ALCHEMIX_CAUTION } from "./alchemix-event-header";
 import { AlchemixEventDetail } from "./alchemix-event-detail";
-import { AlchemixEventExplainer, alchemixExplainerTeaser, alchemixLearnMoreFor } from "./alchemix-event-explainer";
+import {
+  AlchemixEventExplainer,
+  alchemixExplainerTeaser,
+  alchemixLearnMoreFor,
+  type AlchemixCardProse,
+} from "./alchemix-event-explainer";
+import { collateralTakenRaw, useReadingBefore } from "@/lib/alchemix/readings-before";
+import { lineProtocolFeeBps } from "@/lib/alchemix/lines";
 
 const WAD = 1e18;
 
@@ -126,6 +133,13 @@ export function AlchemixEventCard({
 }: AlchemixEventCardProps) {
   const lead = legs[0];
   const sibs = siblings ?? legs;
+  const before = useReadingBefore(lead.context.data.stateAtBlockFromReading?.blockNumber);
+  const prose: AlchemixCardProse = {
+    underlyingDecimals,
+    mytSymbol,
+    protocolFeeBps: lineProtocolFeeBps(lead.context.data.chainId, lead.context.data.lineKey),
+    collateralTakenRaw: lead.context.data.eventType === "redemption" ? collateralTakenRaw(lead, before) : null,
+  };
 
   const coordsFor = (leg: AlchemistEvent): AlchemixCoords => {
     const ctx = leg.context.data;
@@ -181,11 +195,9 @@ export function AlchemixEventCard({
       }
       detail={<AlchemixEventDetail legs={legs} mytSymbol={mytSymbol} coordsFor={coordsFor} />}
       detailLabel="What the logs state"
-      explainer={
-        <AlchemixEventExplainer legs={legs} siblings={sibs} skipLead underlyingDecimals={underlyingDecimals} />
-      }
+      explainer={<AlchemixEventExplainer legs={legs} siblings={sibs} skipLead prose={prose} />}
       explainerLabel="Plain English"
-      explainerTeaser={alchemixExplainerTeaser(legs, sibs, underlyingDecimals)}
+      explainerTeaser={alchemixExplainerTeaser(legs, sibs, prose)}
       txHash={lead.txHash}
       learnMore={<LearnMore inline content={alchemixLearnMoreFor(legs)} />}
       persistKey={`alchemix-v3:${lead.id}`}

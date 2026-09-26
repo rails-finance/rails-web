@@ -33,13 +33,17 @@ export interface AlchemixLine {
   /** How the line is named on a surface ("alUSD"), which is not the same string
    *  as the synthetic's symbol on every line. */
   displayName: string;
+  /** The Alchemist's `protocolFee`, in basis points, read from chain
+   *  2026-09-25 (rails-ops TO-DO-alchemix-scoping §2): charged in vault shares
+   *  on a repay's set-aside part. Stated on the repay card as a rate. */
+  protocolFeeBps: number;
 }
 
 /** Every line, chain first. The order is the display order. */
 const LINES: AlchemixLine[] = [
-  { key: "eth-alusd", chainId: 1, displayName: "alUSD" },
-  { key: "eth-aleth", chainId: 1, displayName: "alETH" },
-  { key: "base-alusdb", chainId: 8453, displayName: "alUSDb" },
+  { key: "eth-alusd", chainId: 1, displayName: "alUSD", protocolFeeBps: 25 },
+  { key: "eth-aleth", chainId: 1, displayName: "alETH", protocolFeeBps: 25 },
+  { key: "base-alusdb", chainId: 8453, displayName: "alUSDb", protocolFeeBps: 10 },
 ];
 
 /** One explorer — a chain, its route, its session key, and the lines it lists.
@@ -87,13 +91,13 @@ export function transmuterPositionPath(deployment: AlchemixDeployment, lineKey: 
 // `<explorer>/v2/<line>/<account>`: the position is a wallet account, so the
 // account is the second half of the key where a V3 position has a token id.
 
-const V2_LINES: AlchemixLine[] = [
+const V2_LINES: Omit<AlchemixLine, "protocolFeeBps">[] = [
   { key: "eth-alusd-v2", chainId: 1, displayName: "alUSD" },
   { key: "eth-aleth-v2", chainId: 1, displayName: "alETH" },
 ];
 
 /** The V2 lines on one chain: both on Ethereum, none anywhere else. */
-export function v2LinesForChain(chainId: ChainId): AlchemixLine[] {
+export function v2LinesForChain(chainId: ChainId): Omit<AlchemixLine, "protocolFeeBps">[] {
   return V2_LINES.filter((l) => l.chainId === chainId);
 }
 
@@ -120,6 +124,12 @@ export function v3PositionPath(deployment: AlchemixDeployment, lineKey: string, 
  *  catalog, so nothing can hold a line without having named its chain. */
 export function linesForChain(chainId: ChainId): AlchemixLine[] {
   return LINES.filter((l) => l.chainId === chainId);
+}
+
+/** The line's protocol fee in basis points, or null for a key this catalog
+ *  does not hold. */
+export function lineProtocolFeeBps(chainId: number, key: string): number | null {
+  return LINES.find((l) => l.chainId === chainId && l.key === key)?.protocolFeeBps ?? null;
 }
 
 /** Is this line key one of the lines on this chain? The validity gate for a

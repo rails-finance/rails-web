@@ -16,11 +16,12 @@
 //    contract does not emit, resolved when the log was captured. They are drawn
 //    as two deltas with two receipts, never as one number in two places.
 //
-// 2. A LINE-SCOPE ROW GETS NO ACTOR AND NO AXIS. A redemption names no
-//    position and applies one ratio to every open position at once. It rides
-//    the caution label with the line's own amount and no delta against this
-//    position, because there is no per-position figure in it to draw. It is
-//    also never a leg of anybody's transaction: it joins no combined row.
+// 2. A LINE-SCOPE ROW GETS NO ACTOR. A redemption names no position and
+//    applies one ratio to every open position at once. It rides the caution
+//    label with what it cleared and took HERE, each a difference of this
+//    position's two readings either side of it (rails-ops decisions/0032),
+//    and with the line's own amount where there is no such figure. It is also
+//    never a leg of anybody's transaction: it joins no combined row.
 //
 // 3. A SINGLE-AXIS ROW NAMES THE ACTION ONCE. On a lone card, deposit,
 //    withdraw, mint and burn each move one figure, and the row's own label
@@ -53,7 +54,14 @@ import {
   type AlchemistEvent,
   type AlchemixCustodyPath,
 } from "@/lib/alchemix/explainer-clauses";
-import { emittedAmountProv, resolvedAtCaptureProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
+import {
+  collateralTakenFromReadingsProv,
+  debtClearedFromReadingsProv,
+  emittedAmountProv,
+  resolvedAtCaptureProv,
+  type AlchemixCoords,
+} from "@/lib/alchemix/event-provenance";
+import { collateralTakenRaw, useReadingBefore, type AlchemixReading } from "@/lib/alchemix/readings-before";
 
 const WAD = 1e18;
 
@@ -109,6 +117,7 @@ function legSpec(
   coords: AlchemixCoords,
   siblings: AlchemistEvent[],
   combined: boolean,
+  before: AlchemixReading | null = null,
 ): ChainTruthRowSpec {
   const ctx = leg.context.data;
   const raw = ctx.raw;
@@ -241,19 +250,58 @@ function legSpec(
       }
       break;
     }
-    case "redemption":
-      // The line's own figure, drawn with no direction against this position:
-      // the event states one total for the whole line and no share-out.
-      deltas.push({
-        value: scaled(raw.amount),
-        symbol: sym,
-        label: "Across the whole line",
-        noSpineCounterpart: true,
-        tone: "caution",
-        prov: emittedAmountProv("amount", sym, raw.amount, coords),
-      });
+    case "redemption": {
+      // What this redemption did to THIS position: the debt it cleared and the
+      // collateral it took, each two readings subtracted. Where it cleared
+      // nothing here, or the readings are not in hand, the row states the
+      // line's own figure instead, labelled as the line's.
+      const cleared = ctx.debtClearedFromReadings;
+      const clearedN = cleared?.status === "stated" && cleared.amountRaw != null ? scaled(cleared.amountRaw) : 0;
+      const taken = collateralTakenRaw(leg, before);
+      if (cleared?.status === "stated" && cleared.amountRaw != null && clearedN > 0) {
+        deltas.push({
+          value: clearedN,
+          symbol: sym,
+          label: "Cleared",
+          noSpineCounterpart: true,
+          tone: "caution",
+          prov: debtClearedFromReadingsProv(
+            sym,
+            cleared.amountRaw,
+            cleared.fromBlock ?? 0,
+            cleared.atBlock ?? 0,
+            coords,
+          ),
+        });
+        if (taken != null && taken !== "0") {
+          deltas.push({
+            value: scaled(taken),
+            symbol: mytSymbol,
+            label: "Took",
+            noSpineCounterpart: true,
+            tone: "caution",
+            prov: collateralTakenFromReadingsProv(
+              mytSymbol,
+              taken,
+              cleared.fromBlock ?? 0,
+              cleared.atBlock ?? 0,
+              coords,
+            ),
+          });
+        }
+      } else {
+        deltas.push({
+          value: scaled(raw.amount),
+          symbol: sym,
+          label: "Across the whole line",
+          noSpineCounterpart: true,
+          tone: "caution",
+          prov: emittedAmountProv("amount", sym, raw.amount, coords),
+        });
+      }
       spec = { ...spec, labelOnSpine: true };
       break;
+    }
     case "batch_liquidated":
       deltas.push({
         value: scaled(raw.amount),
@@ -350,7 +398,8 @@ export function AlchemixEventHeader({
   coordsFor,
 }: AlchemixEventHeaderProps) {
   const combined = legs.length > 1;
-  const specs = legs.map((leg) => legSpec(leg, mytSymbol, coordsFor(leg), siblings, combined));
+  const before = useReadingBefore(legs[0].context.data.stateAtBlockFromReading?.blockNumber);
+  const specs = legs.map((leg) => legSpec(leg, mytSymbol, coordsFor(leg), siblings, combined, before));
   const tokenId = legTokenId(legs);
   const spec = combined
     ? combineLegSpecs(specs, legs, openingInTx(siblings, tokenId), custodyPathInTx(legs, tokenId), coordsFor)

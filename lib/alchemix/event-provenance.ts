@@ -222,6 +222,103 @@ export function clearedRunProv(
   };
 }
 
+/** The collateral one redemption took from this position, from the same two
+ *  readings the cleared debt is taken from. Only built where the reading before
+ *  it is the one `debtClearedFromReadings` names, so the two figures always
+ *  span the same pair of blocks. */
+export function collateralTakenFromReadingsProv(
+  symbol: string,
+  raw: string,
+  fromBlock: number,
+  atBlock: number,
+  coords: AlchemixCoords,
+): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `${symbol} this redemption took from this position's collateral — the share count read at two blocks, one either side of it`,
+    contract: alchemistContract(coords),
+    via: `getCDP(${coords.tokenId}) at blocks ${fromBlock} and ${atBlock}`,
+    formula: `collateral at block ${fromBlock} − collateral at block ${atBlock}`,
+    verify: {
+      kind: "recompute",
+      text: `Call getCDP(${coords.tokenId}) at blocks ${fromBlock} and ${atBlock} and take the difference`,
+    },
+    source: { block: atBlock },
+    inputs: coordInputs(coords, [
+      { label: "collateral read before", value: `block ${fromBlock}`, kind: "chain" },
+      { label: "collateral read at the redemption", value: `block ${atBlock}`, kind: "chain" },
+      {
+        label: "where it went",
+        value: "the line's Transmuter",
+        kind: "chain",
+        note: "it backs the debt the redemption cleared",
+      },
+    ]),
+    scaling: { raw, from: "call", places: 18, why: `${symbol} carries 18 decimals` },
+  };
+}
+
+/** The collateral a RUN of redemptions took from this position, summed the
+ *  way `clearedRunProv` sums the debt. */
+export function takenRunProv(
+  symbol: string,
+  raw: string,
+  count: number,
+  stated: number,
+  range: string,
+  coords: AlchemixCoords,
+): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `${symbol} this run took from this position's collateral — the sum over each redemption in it`,
+    contract: alchemistContract(coords),
+    via: `getCDP(${coords.tokenId}) either side of each redemption in the run`,
+    formula: `Σ (collateral before − collateral at) over ${stated} redemption${stated === 1 ? "" : "s"}`,
+    verify: { kind: "rollup", text: "It rolls up the redemptions in this run, each with its own receipt" },
+    inputs: coordInputs(coords, [
+      { label: "redemptions in the run", value: `${count}, ${range}`, kind: "chain" },
+      {
+        label: "of those, read",
+        value: String(stated),
+        kind: "chain",
+        note: stated === count ? "every one" : "the total covers these and stops there",
+      },
+    ]),
+    scaling: { raw, from: "call", places: 18, why: `${symbol} carries 18 decimals` },
+  };
+}
+
+/** The change on one axis between the reading before a card and the reading at
+ *  it: two readings, subtracted. On set-aside the two readings are true at
+ *  their own blocks, and the receipt names both. */
+export function readingChangeProv(
+  label: string,
+  symbol: string,
+  fromBlock: number,
+  atBlock: number,
+  coords: AlchemixCoords,
+): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `${label} change — this position read at block ${fromBlock} and again at block ${atBlock}`,
+    contract: alchemistContract(coords),
+    via: `getCDP(${coords.tokenId}) at blocks ${fromBlock} and ${atBlock}`,
+    formula: `${label.toLowerCase()} after − ${label.toLowerCase()} before`,
+    verify: {
+      kind: "recompute",
+      text: `Call getCDP(${coords.tokenId}) at blocks ${fromBlock} and ${atBlock} and take the difference`,
+    },
+    source: { block: atBlock },
+    inputs: coordInputs(coords, [
+      { label: `${label.toLowerCase()} before`, value: "", kind: "chain", note: `read at block ${fromBlock}` },
+      { label: `${label.toLowerCase()} after`, value: "", kind: "chain", note: `read at block ${atBlock}` },
+    ]),
+  };
+}
+
 // ── What the position read as at one event's block ──────────────────────────
 //
 // A READING, NOT AN ACCUMULATION. The sweep stores a `getCDP` result at every
@@ -259,7 +356,7 @@ export function stateAtBlockFromReadingProv(
     inputs: coordInputs({ ...coords, blockNumber: atBlock }, [
       {
         label: "what the figure is",
-        value: "a reading, not the events added up",
+        value: "one reading of the Alchemist at this block",
         kind: "chain",
         note: "a redemption moves debt across the whole line, so the position's own events cannot reach this figure",
       },
@@ -268,7 +365,7 @@ export function stateAtBlockFromReadingProv(
         value: String(eventsInBlock),
         kind: "chain",
         note: shared
-          ? "the reading covers all of them, so it is not this event's state-after alone"
+          ? "the reading covers all of them, so it is the state after the last of them"
           : eventsInBlock === 1
             ? "this event alone, so the reading is its state-after"
             : "none — the block belongs to a line-scope event, and the reading is the state after it",
@@ -281,7 +378,7 @@ export function stateAtBlockFromReadingProv(
               label: "what this counts",
               value: `${symbol} shares`,
               kind: "chain" as const,
-              note: "the vault share count, not the asset underneath it; the panel above the timeline leads with the asset instead",
+              note: "the vault share count",
             },
           ]
         : []),
@@ -291,7 +388,7 @@ export function stateAtBlockFromReadingProv(
               label: "how long it holds",
               value: `block ${atBlock} only`,
               kind: "chain" as const,
-              note: "it grows every block (decisions/0032 point 6), so it is true at that block and at no other",
+              note: "it grows block by block as the Transmuter's stakes mature (decisions/0032 point 6), so it holds at this block alone",
             },
           ]
         : []),
@@ -360,7 +457,7 @@ const GRADE_BASIS: Record<AlchemixGrade, string> = {
   derived: "the position's own events, with no redemption on this line to move it otherwise",
   read: "a getCDP call on the Alchemist at the block named",
   unavailable: "nothing current — this line carries the read grade and no reading is in hand",
-  refused: "nothing — the reducer declined this position rather than serve a wrong figure",
+  refused: "nothing: the reducer declined this position",
 };
 
 /** A figure the position row serves, under its line's grade, at its own block. */
@@ -390,7 +487,9 @@ export function servedFigureProv(
     inputs: coordInputs(coords, [
       { label: "grade", value: grade, kind: "offchain", note: "the line's grade, which every position on it carries" },
     ]),
-    scaling: raw ? { raw, from: readGraded ? "call" : "log", places: decimals, why: `${symbol} carries ${decimals} decimals` } : undefined,
+    scaling: raw
+      ? { raw, from: readGraded ? "call" : "log", places: decimals, why: `${symbol} carries ${decimals} decimals` }
+      : undefined,
   };
 }
 
@@ -415,7 +514,7 @@ export function liveFigureProv(
     inputs: coordInputs(coords, [
       {
         label: "reading",
-        value: `debt, collateral and earmarked at block ${asOfBlock}`,
+        value: `debt, collateral and set aside for repayment at block ${asOfBlock}`,
         kind: "chain",
         note: "one call, one block — which is what lets these three stand together",
       },
@@ -494,8 +593,6 @@ export function lifetimeProv(label: string, symbol: string, events: number, coor
     via: `${ALCHEMIX_VIA} · ${events} event${events === 1 ? "" : "s"}`,
     formula: `the sum of every ${symbol} amount this position's events state`,
     verify: { kind: "rollup", text: "It rolls up the events on this page" },
-    inputs: coordInputs(coords, [
-      { label: "events counted", value: String(events), kind: "chain-derived" },
-    ]),
+    inputs: coordInputs(coords, [{ label: "events counted", value: String(events), kind: "chain-derived" }]),
   };
 }

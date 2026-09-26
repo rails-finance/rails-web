@@ -533,7 +533,16 @@ function PartyChip({ party }: { party: NonNullable<ChainTruthRowSpec["party"]> }
   );
 }
 
-export function ChainTruthDetail({ stats }: { stats: ChainTruthStat[] }) {
+export function ChainTruthDetail({
+  stats,
+  symbolText = false,
+}: {
+  stats: ChainTruthStat[];
+  /** Print the symbol as a word after each figure, beside its icon. For a
+   *  protocol whose figures carry units a reader could confuse (a vault share
+   *  count beside the asset underneath it). Off everywhere else. */
+  symbolText?: boolean;
+}) {
   // USD chips (stat.usd) follow the shared display flag, like the richer tiers.
   const { showUsdValues } = useTimelineDisplay();
   // The before→after toggle surfaces a reconstructed before (after − change).
@@ -576,6 +585,7 @@ export function ChainTruthDetail({ stats }: { stats: ChainTruthStat[] }) {
                   className="text-sm font-semibold tabular-nums"
                 >
                   {s.display ?? compactAmount(s.value)}
+                  {symbolText && s.symbol ? <span className="font-normal text-rb-500"> {s.symbol}</span> : null}
                 </span>
               </Prov>
               {showUsdValues && s.usd && (

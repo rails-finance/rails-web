@@ -272,10 +272,10 @@ export function computeAlchemixEconomics(
     collateralInflowLabel: "Deposited",
     debtInflowLabel: "Minted",
     interestNote:
-      "An Alchemix debt does not carry interest. It falls as the vault's yield is earmarked against it, and that figure is true only at the block it was taken at, so it is stated on its own above rather than split out here.",
+      "An Alchemix debt carries no interest. It falls when the holder repays and when the line's Transmuter redeems the part set aside for repayment, and that set-aside figure is stated on the position card at its own block.",
     flowsNote:
       figures.debtCreditUnresolved > 0
-        ? "One or more repayments on this position carry no settled debt figure, so the debt cleared by repaying is left out of the totals rather than understated."
+        ? "One or more repayments on this position carry no settled debt figure, so the debt cleared by repaying is left out of the totals."
         : undefined,
   };
 

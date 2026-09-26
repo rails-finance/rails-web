@@ -45,10 +45,16 @@
 // measured zero would make the two look alike.
 
 import type { AlchemixStateAtBlockFromReading } from "@/lib/shared/types/event-shape";
-import { ChainTruthDetail, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import {
+  ChainTruthDetail,
+  type ChainTruthStat,
+  type ChainTruthTransition,
+} from "@/components/shared/chain-truth-event";
 import { formatUnitsExact } from "@/lib/utils/format";
+import { formatCompact } from "@/lib/shared/format-event";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
-import { stateAtBlockFromReadingProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
+import { readingChangeProv, stateAtBlockFromReadingProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
+import type { AlchemixReading } from "@/lib/alchemix/readings-before";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -73,6 +79,10 @@ export interface AlchemixStateAtBlockProps {
    *  against this number. */
   legCount: number;
   coords: AlchemixCoords;
+  /** The reading at the previous reading block on the timeline
+   *  (lib/alchemix/readings-before), for before → after. Null draws the
+   *  after-figures alone. */
+  before?: AlchemixReading | null;
 }
 
 export function AlchemixStateAtBlock({
@@ -82,6 +92,7 @@ export function AlchemixStateAtBlock({
   eventBlock,
   legCount,
   coords,
+  before = null,
 }: AlchemixStateAtBlockProps) {
   // Absent on Transmuter rows, which have neither axis.
   if (!state) return null;
@@ -106,36 +117,63 @@ export function AlchemixStateAtBlock({
   // does not draw, and the heading has to count the block's instead.
   const beyondCard = state.positionEventsInBlock > legCount;
 
-  const axis = (label: string, raw: string | null, symbol: string): ChainTruthStat | null => {
+  /** Before → after on one axis, from the reading before this block. None
+   *  where there is no earlier reading or the axis did not move. */
+  const transition = (label: string, symbol: string, raw: string, beforeRaw: string | null | undefined) => {
+    if (!before || beforeRaw == null) return undefined;
+    const delta = BigInt(raw) - BigInt(beforeRaw);
+    // One wei either way is getCDP's rounding, not a move.
+    if (delta >= BigInt(-1) && delta <= BigInt(1)) return undefined;
+    const sign = delta > BigInt(0) ? "+" : "−";
+    const abs = (delta < BigInt(0) ? -delta : delta).toString();
+    const t: ChainTruthTransition = {
+      before: formatCompact(Number(beforeRaw) / 10 ** DECIMALS).display,
+      beforeExact: formatUnitsExact(beforeRaw, DECIMALS),
+      beforeProv: stateAtBlockFromReadingProv(label, symbol, beforeRaw, before.blockNumber, 0, coords, DECIMALS),
+      change: `${sign}${formatCompact(Number(abs) / 10 ** DECIMALS).display}`,
+      changeExact: `${sign}${formatUnitsExact(abs, DECIMALS)}`,
+      changeProv: readingChangeProv(label, symbol, before.blockNumber, atBlock, coords),
+    };
+    return t;
+  };
+
+  const axis = (
+    label: string,
+    raw: string | null,
+    symbol: string,
+    beforeRaw: string | null | undefined,
+  ): ChainTruthStat | null => {
     if (raw == null) return null;
     return {
       label,
       value: formatUnitsExact(raw, DECIMALS),
       symbol,
       prov: stateAtBlockFromReadingProv(label, symbol, raw, atBlock, state.positionEventsInBlock, coords, DECIMALS),
+      transition: transition(label, symbol, raw, beforeRaw),
     };
   };
 
   const stats = [
-    axis("Debt", state.debtRaw, syntheticSymbol),
-    axis("Collateral", state.collateralRaw, mytSymbol),
-    axis("Set aside for repayment", state.earmarkedRaw, syntheticSymbol),
+    axis("Debt", state.debtRaw, syntheticSymbol, before?.debtRaw),
+    axis("Collateral", state.collateralRaw, mytSymbol, before?.collateralRaw),
+    axis("Set aside for repayment", state.earmarkedRaw, syntheticSymbol, before?.earmarkedRaw),
   ].filter((s): s is ChainTruthStat => s != null);
 
   if (stats.length === 0) return null;
 
-  const heading = beyondCard
-    ? `After this block’s ${state.positionEventsInBlock} events`
+  const subjectWord = beyondCard
+    ? `this block’s ${state.positionEventsInBlock} events`
     : legCount > 1
-      ? "After this transaction"
-      : "After this event";
+      ? "this transaction"
+      : "this event";
+  const heading = before ? `Before and after ${subjectWord}` : `After ${subjectWord}`;
 
   return (
     <div className="mt-1 border-t border-rb-200 pt-2 pb-3 dark:border-rb-800">
       <h4 className={`${OVERLAY_HEADING} px-5 text-rb-500`}>
         {heading} · block {block(atBlock)}
       </h4>
-      <ChainTruthDetail stats={stats} />
+      <ChainTruthDetail stats={stats} symbolText />
     </div>
   );
 }
