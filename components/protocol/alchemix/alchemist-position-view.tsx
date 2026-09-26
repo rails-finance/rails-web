@@ -35,6 +35,15 @@
 //    without the position closing, so the holder shown is the holder now and
 //    the page says so wherever it names one.
 //
+// 7. A V2 HISTORY IS SHOWN, NEVER ADDED. Where the holder closed a V2 account
+//    on this synthetic, its rows join the timeline marked V2, so a wallet
+//    that migrated reads as one story, and the version filter shows or hides
+//    them. They ride their own context arm, and every figure on this page
+//    (Lifetime flows, the tenure line, the stored and current figures) is
+//    reduced over the V3 rows alone: a V2 debt and this position's debt are
+//    one obligation at two points in time (rails-ops
+//    reference/alchemix-v2-frozen-record.md).
+//
 // THE CHROME IS THE HOUSE'S. The page is the roster's detail anatomy — the top
 // row, the position card, Lifetime flows, the timeline — drawn with the shared
 // components (`PositionCardShell`, `OpenPositionStats`, `StatValue`,
@@ -63,7 +72,9 @@ import { useWalletContext } from "@/components/nav/wallet-context";
 import { formatCompact } from "@/lib/shared/format-event";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { isAlchemistEvent } from "@/lib/shared/types/event-shape";
+import { isAlchemistEvent, isAlchemixV2Event } from "@/lib/shared/types/event-shape";
+import { AlchemixV2EventCard, type AlchemixV2Event } from "@/components/protocol/alchemix/v2-event-card";
+import { v2PositionPath } from "@/lib/alchemix/lines";
 import { AlchemixEventCard } from "@/components/protocol/alchemix/alchemix-event-card";
 import {
   AlchemixStatusPill,
@@ -81,7 +92,7 @@ import {
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
 import type { AlchemixDeployment } from "@/lib/alchemix/lines";
-import { alchemixPositionName } from "@/lib/alchemix/naming";
+import { alchemixPositionName, alchemixV2PositionName } from "@/lib/alchemix/naming";
 import type {
   AlchemixLineCoverage,
   AlchemixLineEventWindow,
@@ -90,6 +101,15 @@ import type {
 } from "@/types/api/alchemix";
 
 const block = (n: number) => n.toLocaleString("en-US");
+
+/** The V2 account(s) this position's holder closed, and their rows. `joined`
+ *  is false when the rows are not on the timeline: the V3 history is windowed,
+ *  or a V2 read did not land whole. The links stand either way. */
+export interface AlchemixV2History {
+  links: { lineKey: string; account: string; syntheticSymbol: string | null }[];
+  events: BaseActivityEvent[];
+  joined: boolean;
+}
 
 export interface AlchemistPositionViewProps {
   deployment: AlchemixDeployment;
@@ -112,6 +132,8 @@ export interface AlchemistPositionViewProps {
   /** The current figures, read at render. Null when that read did not land —
    *  and then the slot says so, because no stored figure is current. */
   initialLiveState: AlchemixLiveState | null;
+  /** The holder's closed V2 account on this synthetic, where one is linked. */
+  v2History?: AlchemixV2History | null;
 }
 
 export function AlchemistPositionView({
@@ -125,6 +147,7 @@ export function AlchemistPositionView({
   lineScopedNote,
   lineEventWindow,
   initialLiveState,
+  v2History = null,
 }: AlchemistPositionViewProps) {
   const registry = useReceiptRegistry();
   const chainId = deployment.chainId;
@@ -194,7 +217,16 @@ export function AlchemistPositionView({
   // dated row.
   const timelineRuns = useAlchemixTimelineRuns(coords, mytSymbol, underlyingDecimals, siblingsByTx);
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - alchemistEvents.length) : 0;
-  const tl = useTimelineEvents(alchemistEvents, {
+  // Rule 7. The V2 rows join the list the timeline draws and nothing else.
+  const v2Events = useMemo(
+    () => (v2History?.joined ? (v2History.events.filter(isAlchemixV2Event) as AlchemixV2Event[]) : []),
+    [v2History],
+  );
+  const timelineEvents = useMemo(
+    () => (v2Events.length > 0 ? [...alchemistEvents, ...v2Events] : alchemistEvents),
+    [alchemistEvents, v2Events],
+  );
+  const tl = useTimelineEvents(timelineEvents, {
     storageKey: `alchemix-${lineKey}-${tokenId}`,
     protocolKey: "alchemix-v3",
     olderCount,
@@ -217,7 +249,8 @@ export function AlchemistPositionView({
 
   const economics = useMemo(
     () =>
-      computeAlchemixEconomics(tl.sortedEvents, {
+      // Rule 7: V3 rows only. The reducer guards on the arm as well.
+      computeAlchemixEconomics(tl.sortedEvents.filter(isAlchemistEvent), {
         syntheticSymbol: sym,
         mytSymbol,
         currentCollateral: live?.collateral.formatted ?? position.figures.collateral?.formatted ?? null,
@@ -376,6 +409,22 @@ export function AlchemistPositionView({
             </p>
           )}
           {/* Rule 5, said outright rather than left to be inferred. */}
+          {v2History && v2History.links.length > 0 ? (
+            <p className="mt-3 text-[11px] leading-relaxed text-rb-500">
+              {v2History.links.map((l, i) => (
+                <span key={`${l.lineKey}:${l.account}`}>
+                  {i > 0 ? ", " : ""}
+                  <Link href={v2PositionPath(deployment, l.lineKey, l.account)} className="link">
+                    {alchemixV2PositionName(l.syntheticSymbol ?? sym, l.account)}
+                  </Link>
+                </span>
+              ))}{" "}
+              is this holder&rsquo;s account from before Alchemix V3, closed on 2 April 2026.
+              {v2History.joined
+                ? " Its events are on the timeline below, marked V2, and the figures on this page are V3's alone."
+                : " Its events are on its own page."}
+            </p>
+          ) : null}
           <p className="mt-3 text-[11px] leading-relaxed text-rb-500">
             This position is a token that can be sold. It can change hands without closing, so the address above is who
             holds it now and need not be who did any of what is below.
@@ -601,6 +650,17 @@ export function AlchemistPositionView({
             ) : undefined
           }
           renderCard={(event, meta) => {
+            if (isAlchemixV2Event(event)) {
+              return (
+                <AlchemixV2EventCard
+                  event={event as AlchemixV2Event}
+                  showVersion
+                  isFirst={meta.isFirst}
+                  isLast={meta.isLast}
+                  eventNumber={meta.eventNumber}
+                />
+              );
+            }
             if (!isAlchemistEvent(event)) return null;
             return (
               <AlchemixEventCard

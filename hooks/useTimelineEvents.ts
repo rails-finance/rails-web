@@ -14,6 +14,7 @@
 //   ?hide=op1,op2               hidden event types
 //   ?hideAssets=USDT,WETH       hidden assets
 //   ?hideAddresses=0xab…,0xcd…  hidden counterparties
+//   ?hideVersions=V2            hidden protocol versions
 //   ?from=2025-01-01&to=2025-03-31   date range, UTC calendar days inclusive
 //
 // Every axis is written as what is HIDDEN, never what is shown: a list of
@@ -85,6 +86,7 @@ import {
   getEventActionKey,
   getEventAssetKeys,
   getEventCounterpartyKeys,
+  getEventVersionKeys,
   actionLabel,
   DEMOTED_ACTIONS,
   DEFAULT_HIDDEN_ACTIONS,
@@ -208,6 +210,16 @@ export interface TimelineEventsState {
   toggleHiddenCounterparty: (key: string) => void;
   resetHiddenCounterparties: () => void;
 
+  /** Protocol-version buckets for the FilterDropdown ("V2", "V3"). Empty or
+   *  single-entry on every timeline that carries one version, which is every
+   *  protocol but Alchemix (see getEventVersionKeys), and the toolbar renders
+   *  no control then. The axis shows and hides rows and does nothing else. */
+  versionOptions: FilterOption[];
+  /** Versions currently shown (FilterDropdown `selected` for multi mode). */
+  visibleVersionKeys: Set<string>;
+  toggleHiddenVersion: (key: string) => void;
+  resetHiddenVersions: () => void;
+
   dateRange: [number, number] | null;
   setDateRange: (next: [number, number] | null) => void;
   heatmapOpen: boolean;
@@ -255,9 +267,12 @@ interface PersistedState {
   /** Absent in entries written before the asset axis existed — read as none
    *  hidden, which is what those readers were seeing. */
   hiddenAssets?: string[];
-  /** Absent in entries written before the counterparty axis existed — read as
+  /** Absent in entries written before the counterparty axis existed: read as
    *  none hidden, same as hiddenAssets above. */
   hiddenCounterparties?: string[];
+  /** Absent in entries written before the version axis existed: read as
+   *  none hidden. */
+  hiddenVersions?: string[];
 }
 
 /** The view as the URL carries it — the hook's own state, minus display. */
@@ -265,6 +280,7 @@ interface ViewParams {
   hiddenActions: string[];
   hiddenAssets: string[];
   hiddenCounterparties: string[];
+  hiddenVersions: string[];
   dateRange: [number, number] | null;
 }
 
@@ -301,6 +317,7 @@ function writeViewParams(sp: URLSearchParams, view: ViewParams): void {
   list("hide", view.hiddenActions);
   list("hideAssets", view.hiddenAssets);
   list("hideAddresses", view.hiddenCounterparties);
+  list("hideVersions", view.hiddenVersions);
   if (view.dateRange) {
     sp.set("from", formatUtcDay(view.dateRange[0]));
     sp.set("to", formatUtcDay(view.dateRange[1]));
@@ -322,6 +339,8 @@ function readViewParams(sp: URLSearchParams): Partial<ViewParams> {
   if (hideAssets) view.hiddenAssets = hideAssets;
   const hideAddresses = splitList(sp.get("hideAddresses"));
   if (hideAddresses) view.hiddenCounterparties = hideAddresses;
+  const hideVersions = splitList(sp.get("hideVersions"));
+  if (hideVersions) view.hiddenVersions = hideVersions;
   const from = parseUtcDay(sp.get("from"));
   const to = parseUtcDay(sp.get("to"));
   if (from !== null && to !== null && from <= to) view.dateRange = [from, to + SECONDS_PER_DAY - 1];
@@ -388,6 +407,7 @@ export function useTimelineEvents(
   const [hiddenActions, setHiddenActions] = useState<string[]>(defaultHidden);
   const [hiddenAssets, setHiddenAssets] = useState<string[]>([]);
   const [hiddenCounterparties, setHiddenCounterparties] = useState<string[]>([]);
+  const [hiddenVersions, setHiddenVersions] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<[number, number] | null>(null);
   const [heatmapOpen, setHeatmapOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -408,6 +428,7 @@ export function useTimelineEvents(
     setHiddenActions(defaultHidden);
     setHiddenAssets([]);
     setHiddenCounterparties([]);
+    setHiddenVersions([]);
     setDateRange(null);
     if (!storageKey) {
       setHydrated(true);
@@ -420,6 +441,7 @@ export function useTimelineEvents(
         setHiddenActions(Array.isArray(parsed.hiddenActions) ? parsed.hiddenActions : defaultHidden);
         setHiddenAssets(Array.isArray(parsed.hiddenAssets) ? parsed.hiddenAssets : []);
         setHiddenCounterparties(Array.isArray(parsed.hiddenCounterparties) ? parsed.hiddenCounterparties : []);
+        setHiddenVersions(Array.isArray(parsed.hiddenVersions) ? parsed.hiddenVersions : []);
       }
     } catch {
       /* corrupt entry — fall back to defaults */
@@ -429,6 +451,7 @@ export function useTimelineEvents(
         if (view.hiddenActions) setHiddenActions(view.hiddenActions);
         if (view.hiddenAssets) setHiddenAssets(view.hiddenAssets);
         if (view.hiddenCounterparties) setHiddenCounterparties(view.hiddenCounterparties);
+        if (view.hiddenVersions) setHiddenVersions(view.hiddenVersions);
         if (view.dateRange) setDateRange(view.dateRange);
       } catch {
         /* malformed query string — keep the storage-derived state */
@@ -451,12 +474,12 @@ export function useTimelineEvents(
     try {
       localStorage.setItem(
         `rails-ui-${storageKey}`,
-        JSON.stringify({ hiddenActions, hiddenAssets, hiddenCounterparties }),
+        JSON.stringify({ hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions }),
       );
     } catch {
       /* storage full / unavailable — non-fatal */
     }
-  }, [storageKey, hydrated, hiddenActions, hiddenAssets, hiddenCounterparties]);
+  }, [storageKey, hydrated, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions]);
 
   // Mirror the view into the URL after the visitor's first live toggle (never
   // for a pinned `initialHidden` embed — see file header). Only ever a
@@ -470,6 +493,7 @@ export function useTimelineEvents(
         hiddenActions,
         hiddenAssets,
         hiddenCounterparties,
+        hiddenVersions,
         dateRange,
       });
       const next = `${url.pathname}${url.search}${url.hash}`;
@@ -478,7 +502,7 @@ export function useTimelineEvents(
     } catch {
       /* non-fatal — the view still works, it just won't be shareable */
     }
-  }, [hydrated, initialHidden, hiddenActions, hiddenAssets, hiddenCounterparties, dateRange]);
+  }, [hydrated, initialHidden, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange]);
 
   // The same grammar, composed on demand for the copy-link control. Reads the
   // pinned set where an embed pins one, so the link carries what the page
@@ -489,14 +513,16 @@ export function useTimelineEvents(
       hiddenActions: initialHidden ?? hiddenActions,
       hiddenAssets,
       hiddenCounterparties,
+      hiddenVersions,
       dateRange,
     });
     return url.toString();
-  }, [initialHidden, hiddenActions, hiddenAssets, hiddenCounterparties, dateRange]);
+  }, [initialHidden, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange]);
 
   const hiddenSet = useMemo(() => new Set(initialHidden ?? hiddenActions), [initialHidden, hiddenActions]);
   const hiddenAssetSet = useMemo(() => new Set(hiddenAssets), [hiddenAssets]);
   const hiddenCounterpartySet = useMemo(() => new Set(hiddenCounterparties), [hiddenCounterparties]);
+  const hiddenVersionSet = useMemo(() => new Set(hiddenVersions), [hiddenVersions]);
 
   const sortedEvents = useMemo(() => [...events].sort((a, b) => a.timestamp - b.timestamp), [events]);
 
@@ -570,9 +596,13 @@ export function useTimelineEvents(
         const counterparties = getEventCounterpartyKeys(e);
         if (counterparties.length > 0 && !counterparties.some((c) => !hiddenCounterpartySet.has(c))) return false;
       }
+      if (hiddenVersionSet.size > 0) {
+        const versions = getEventVersionKeys(e);
+        if (versions.length > 0 && !versions.some((v) => !hiddenVersionSet.has(v))) return false;
+      }
       return true;
     },
-    [hiddenSet, hiddenAssetSet, hiddenCounterpartySet],
+    [hiddenSet, hiddenAssetSet, hiddenCounterpartySet, hiddenVersionSet],
   );
   const visibleEvents = useMemo(() => sortedEvents.filter(passesAxes), [sortedEvents, passesAxes]);
 
@@ -739,6 +769,23 @@ export function useTimelineEvents(
       .map(([key, count]) => ({ key, label: shortAddr(key), count }));
   }, [sortedEvents]);
 
+  // Newest version first. A count per version is a count of rows, so it is
+  // stated the way the other menus state theirs.
+  const versionOptions = useMemo<FilterOption[]>(() => {
+    const counts = new Map<string, number>();
+    for (const e of sortedEvents) {
+      for (const key of getEventVersionKeys(e)) counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0], "en-US", { numeric: true }))
+      .map(([key, count]) => ({ key, label: key, count }));
+  }, [sortedEvents]);
+
+  const visibleVersionKeys = useMemo(
+    () => new Set(versionOptions.map((o) => o.key).filter((k) => !hiddenVersionSet.has(k))),
+    [versionOptions, hiddenVersionSet],
+  );
+
   const visibleAssetKeys = useMemo(
     () => new Set(assetOptions.map((o) => o.key).filter((k) => !hiddenAssetSet.has(k))),
     [assetOptions, hiddenAssetSet],
@@ -784,6 +831,16 @@ export function useTimelineEvents(
     });
   }, []);
 
+  const toggleHiddenVersion = useCallback((key: string) => {
+    interactedRef.current = true;
+    setHiddenVersions((prev) => {
+      const set = new Set(prev);
+      if (set.has(key)) set.delete(key);
+      else set.add(key);
+      return [...set];
+    });
+  }, []);
+
   const resetHiddenActions = useCallback(() => {
     interactedRef.current = true;
     setHiddenActions([]);
@@ -796,6 +853,10 @@ export function useTimelineEvents(
     interactedRef.current = true;
     setHiddenCounterparties([]);
   }, []);
+  const resetHiddenVersions = useCallback(() => {
+    interactedRef.current = true;
+    setHiddenVersions([]);
+  }, []);
   const toggleHeatmap = useCallback(() => setHeatmapOpen((v) => !v), []);
   // See the field doc on `TimelineEventsState.revealEvent`. Reads current
   // state directly (not via a setState updater) so the "does this actually
@@ -807,18 +868,21 @@ export function useTimelineEvents(
       const actionKey = getEventActionKey(event);
       const assetKeys = getEventAssetKeys(event);
       const counterpartyKeys = getEventCounterpartyKeys(event);
+      const versionKeys = getEventVersionKeys(event);
       const needsAction = hiddenActions.includes(actionKey);
       const needsAssets = assetKeys.some((k) => hiddenAssets.includes(k));
       const needsCounterparties = counterpartyKeys.some((k) => hiddenCounterparties.includes(k));
+      const needsVersions = versionKeys.some((k) => hiddenVersions.includes(k));
       const needsDateClear = dateRange !== null;
-      if (!needsAction && !needsAssets && !needsCounterparties && !needsDateClear) return;
+      if (!needsAction && !needsAssets && !needsCounterparties && !needsVersions && !needsDateClear) return;
       suppressNextPersistRef.current = true;
       if (needsAction) setHiddenActions((prev) => prev.filter((k) => k !== actionKey));
       if (needsAssets) setHiddenAssets((prev) => prev.filter((k) => !assetKeys.includes(k)));
       if (needsCounterparties) setHiddenCounterparties((prev) => prev.filter((k) => !counterpartyKeys.includes(k)));
+      if (needsVersions) setHiddenVersions((prev) => prev.filter((k) => !versionKeys.includes(k)));
       if (needsDateClear) setDateRange(null);
     },
-    [hiddenActions, hiddenAssets, hiddenCounterparties, dateRange],
+    [hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange],
   );
   // The one setter handed out raw: selecting a range in the heatmap is a live
   // toggle like any other, so it opens the address-bar mirror too.
@@ -828,7 +892,11 @@ export function useTimelineEvents(
   }, []);
 
   const isFiltered =
-    hiddenSet.size > 0 || hiddenAssetSet.size > 0 || hiddenCounterpartySet.size > 0 || dateRange !== null;
+    hiddenSet.size > 0 ||
+    hiddenAssetSet.size > 0 ||
+    hiddenCounterpartySet.size > 0 ||
+    hiddenVersionSet.size > 0 ||
+    dateRange !== null;
 
   return {
     sortedEvents,
@@ -852,6 +920,10 @@ export function useTimelineEvents(
     visibleCounterpartyKeys,
     toggleHiddenCounterparty,
     resetHiddenCounterparties,
+    versionOptions,
+    visibleVersionKeys,
+    toggleHiddenVersion,
+    resetHiddenVersions,
     dateRange,
     setDateRange: setDateRangeLive,
     heatmapOpen,

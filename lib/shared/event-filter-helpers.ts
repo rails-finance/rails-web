@@ -171,6 +171,26 @@ export function getEventAssetKeys(e: BaseActivityEvent): string[] {
 }
 
 /**
+ * The protocol version an event belongs to — the timeline's version axis.
+ *
+ * A roster entry can carry more than one version of a protocol on one
+ * timeline: an Alchemix V3 position whose holder closed a V2 account on the
+ * same line shows that account's history beside its own (rails-ops
+ * TO-DO-alchemix-scoping §7 item 4). The axis only shows and hides rows. It
+ * reads the context arm, because on Alchemix the arm IS the version, and no
+ * reduction on the page runs over the rows it admits across versions.
+ *
+ * An EMPTY list means the event has no version to offer, and it is never
+ * hidden by this axis: every other protocol, today. The toolbar hides the
+ * control below two options, so a timeline of one version never grows one.
+ */
+export function getEventVersionKeys(e: BaseActivityEvent): string[] {
+  if (e.context?.protocol === "alchemix-v3") return ["V3"];
+  if (e.context?.protocol === "alchemix-v2") return ["V2"];
+  return [];
+}
+
+/**
  * The counterparty address(es) an event moved value with — the timeline's
  * address axis, beside the action-type, asset, and date-range axes.
  *
@@ -530,6 +550,10 @@ const ALCHEMIX_OP_LABELS: Record<string, string> = {
   transmuter_position_created: "Stake",
   transmuter_position_claimed: "Claim",
   transmuter_position_poked: "Poke",
+  // Alchemix V2's one verb V3 does not share. A V2 row on a V3 position's
+  // timeline is labelled from this same table; the version filter, not the
+  // label, is what tells the two versions apart.
+  liquidate: "Liquidated",
 };
 
 /**
@@ -564,6 +588,7 @@ const PROTOCOL_OP_LABELS: Record<string, Record<string, string>> = {
   polaris: POLARIS_OP_LABELS,
   "aave-vaults": AAVE_VAULT_OP_LABELS,
   "alchemix-v3": ALCHEMIX_OP_LABELS,
+  "alchemix-v2": ALCHEMIX_OP_LABELS,
 };
 
 /**
