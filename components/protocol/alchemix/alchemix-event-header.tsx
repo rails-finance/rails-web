@@ -2,7 +2,7 @@
 
 // Alchemist event header — adapter onto the shared ChainTruthRow grammar.
 //
-// THREE THINGS THIS HEADER GETS RIGHT THAT A GENERIC ONE WOULD NOT.
+// FOUR THINGS THIS HEADER GETS RIGHT THAT A GENERIC ONE WOULD NOT.
 //
 // 1. A REPAY SHOWS TWO DIFFERENT QUANTITIES. The log's `amount` is the vault
 //    shares the caller offered; the debt it cleared is a separate figure the
@@ -14,12 +14,27 @@
 //    the caution label with the line's own amount and no delta against this
 //    position, because there is no per-position figure in it to draw.
 //
-// 3. A CUSTODY MOVE IS NOT A FLOW. The position is a freely transferable
-//    ERC721; a transfer moves neither axis and renders as the shared custody
-//    row, with the counterparty chip carrying the direction.
+// 3. A SINGLE-AXIS ROW NAMES THE ACTION ONCE. Deposit, withdraw, mint and burn
+//    each move one figure, and the row's own label already says what that move
+//    was ("Deposit collateral"); the delta itself carries no second verb, just
+//    a signed magnitude — the sign is the direction, the way Morpho's chain-
+//    state rows already read. A per-axis verb belongs only to a COMBINED row
+//    (Liquity V2's Open: `Open  Deposit 6 ◊  Borrow 10K ♭`), where the row
+//    label is not itself one of the verbs.
+//
+// 4. A CUSTODY MOVE IS NOT ALWAYS A LATER TRANSFER. The position NFT's own
+//    mint, and a same-transaction forwarding hop that follows it, are both
+//    `transfer` logs but neither is a change of owner — the mint made the
+//    position and the hop is a routing step, both read off `openingInTx`
+//    (lib/alchemix/explainer-clauses). Each gets a label that says so, with
+//    the counterparty chip kept exactly where a real, later transfer keeps
+//    it. Only a transfer OUTSIDE the opening — a genuine change of hands —
+//    stays the bare custody row: no label, the chip's to/from is the verb,
+//    because nothing else moved for it to name.
 
 import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
 import { ChainTruthRow, type ChainTruthDelta, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { openingInTx, type AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
 import {
   emittedAmountProv,
   resolvedAtCaptureProv,
@@ -42,6 +57,12 @@ export interface AlchemixEventHeaderProps {
   timestamp: number;
   eventNumber?: number;
   coords: AlchemixCoords;
+  /** The rows sharing this event's transaction, and this row among them —
+   *  the same pair the explainer takes, needed here for the identical reason:
+   *  a `transfer` row cannot tell a position's mint or its same-transaction
+   *  forwarding hop from a later change of owner without them. */
+  siblings?: AlchemistEvent[];
+  self?: AlchemistEvent;
 }
 
 export function AlchemixEventHeader({
@@ -51,6 +72,8 @@ export function AlchemixEventHeader({
   timestamp,
   eventNumber,
   coords,
+  siblings,
+  self,
 }: AlchemixEventHeaderProps) {
   const raw = ctx.raw;
   const sym = ctx.syntheticSymbol;
@@ -63,28 +86,24 @@ export function AlchemixEventHeader({
     axisVerb: true,
     prov: emittedAmountProv(field, mytSymbol, raw[field], coords),
   });
-  const synthetic = (field: string, value: number, label: string): ChainTruthDelta => ({
-    value,
-    symbol: sym,
-    label,
-    axisVerb: true,
-    prov: emittedAmountProv(field, sym, raw[field], coords),
-  });
 
   let spec: ChainTruthRowSpec = { label: actionLabel, deltas };
 
   switch (ctx.eventType) {
+    // Single-axis rows: the row's own label already names the move
+    // ("Deposit collateral", "Mint debt", …), so the delta carries no second
+    // verb — a signed magnitude, direction and all, the way Morpho's rows do.
     case "deposit":
-      deltas.push(shares("amount", scaled(raw.amount), "Deposit"));
+      deltas.push({ value: scaled(raw.amount), symbol: mytSymbol, prov: emittedAmountProv("amount", mytSymbol, raw.amount, coords) });
       break;
     case "withdraw":
-      deltas.push(shares("amount", scaled(raw.amount), "Withdraw"));
+      deltas.push({ value: -scaled(raw.amount), symbol: mytSymbol, prov: emittedAmountProv("amount", mytSymbol, raw.amount, coords) });
       break;
     case "mint":
-      deltas.push(synthetic("amount", scaled(raw.amount), "Mint"));
+      deltas.push({ value: scaled(raw.amount), symbol: sym, prov: emittedAmountProv("amount", sym, raw.amount, coords) });
       break;
     case "burn":
-      deltas.push(synthetic("amount", scaled(raw.amount), "Burn"));
+      deltas.push({ value: -scaled(raw.amount), symbol: sym, prov: emittedAmountProv("amount", sym, raw.amount, coords) });
       break;
     case "repay": {
       deltas.push(shares("amount", scaled(raw.amount), "Offered"));
@@ -149,19 +168,30 @@ export function AlchemixEventHeader({
       const t = ctx.transfer;
       const burned = t?.transferType === "burn";
       const counterparty = burned ? t?.fromAddress : t?.toAddress;
-      spec = {
-        label: actionLabel,
-        deltas: [],
-        custody: true,
-        party: counterparty
-          ? {
-              prefix: burned ? "from" : "to",
-              address: counterparty,
-              prov: emittedAmountProv(burned ? "from_addr" : "to_addr", sym, null, coords),
-              ens: true,
-            }
-          : undefined,
-      };
+      const party = counterparty
+        ? {
+            prefix: burned ? "from" : "to",
+            address: counterparty,
+            prov: emittedAmountProv(burned ? "from_addr" : "to_addr", sym, null, coords),
+            ens: true,
+          }
+        : undefined;
+
+      // Two of this row's cases belong to the SAME transaction that opened
+      // the position, not to a later change of hands, and each gets a label
+      // that says which: the mint's own transfer (openingInTx reads this log
+      // regardless of where the NFT ended up) and, where the mint routed
+      // through another address, the hop that followed it in the same tx
+      // (openingInTx's forwardingMoves). Only a transfer outside both stays
+      // the bare custody row below.
+      const opening = openingInTx(siblings ?? [], ctx.tokenId);
+      if (t?.transferType === "mint") {
+        spec = { label: "Mint position", deltas: [], party };
+      } else if (self && opening?.forwardingMoves.includes(self)) {
+        spec = { label: "Forward position", deltas: [], party };
+      } else {
+        spec = { label: actionLabel, deltas: [], custody: true, party };
+      }
       break;
     }
     case "redemption":

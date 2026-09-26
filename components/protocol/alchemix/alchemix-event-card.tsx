@@ -161,6 +161,8 @@ export function AlchemixEventCard({
           timestamp={event.timestamp}
           eventNumber={eventNumber}
           coords={coords}
+          siblings={sibs}
+          self={event}
         />
       }
       detail={<AlchemixEventDetail ctx={ctx} mytSymbol={mytSymbol} coords={coords} />}
