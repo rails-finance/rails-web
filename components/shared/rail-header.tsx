@@ -20,10 +20,14 @@
 // protocol, not to one account's position, and nothing in them was ever lit
 // here; the identity keeps its link, which is the one door back to the rail.
 // The recency stamp left with them — a position states its chain head in the
-// row under this one. The identity keeps the small-caps register too, where
-// the other venues take the title scale: the subject of a position view is the
-// account named in its h1. The chooser stays, because it is the only one an
-// app page has above `md`.
+// row under this one. The identity now takes the title scale like every other
+// venue. The earlier justification for holding it at small caps here (the
+// subject of a position view is the account named in its h1) does not hold:
+// a position view has no h1. DetailBackRow and DetailTopRow, which mount this
+// row, add none. That left the position page with no large identity of any
+// kind, its biggest type being the collateral figure. Giving a position view
+// a heading that names its account is a separate gap, logged as an item. The
+// chooser stays, because it is the only one an app page has above `md`.
 //
 // THE CHOOSER IS `md` AND UP ONLY. Below `md` there is no brand rail and
 // HeaderBar keeps the chain trigger and the theme toggle, so drawing it here
@@ -90,7 +94,7 @@ export function RailHeader({
   if (venue === "position") {
     return (
       <div className="flex min-h-9 items-center justify-between gap-3">
-        <ProtocolIdentity session={session} />
+        <ProtocolIdentity session={session} scale="title" />
         <TitleRowChooser />
       </div>
     );
