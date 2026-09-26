@@ -270,7 +270,7 @@ export function alchemixEventClauses(
           ? cont(
               <>
                 {" "}
-                That cleared {amount(credit)} {sym} of debt — the shares are worth what they are worth at this moment,
+                That cleared {amount(credit)} {sym} of debt. The shares are worth what they are worth at this moment,
                 and the amount cleared stops at whichever is smaller, the position&rsquo;s debt or the line&rsquo;s.
               </>,
             )
@@ -515,7 +515,7 @@ export function alchemixEventClauses(
         cont(
           <>
             {" "}
-            The list of positions arrives as a single hash, so which of them were in it — and whether this one was —
+            The list of positions arrives as a single hash, so which of them were in it, and whether this one was,
             cannot be recovered from the event.
           </>,
         ),
