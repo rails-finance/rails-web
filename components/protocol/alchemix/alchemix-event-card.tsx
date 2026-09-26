@@ -15,7 +15,7 @@
 // rows carry the hash of an account list. Drawing this position's spine flank
 // for any of them would attribute a movement the event does not state.
 
-import type { AlchemixV3Context, BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -38,10 +38,14 @@ const scaled = (raw: string | null | undefined): number => {
 };
 
 export interface AlchemixEventCardProps {
-  event: BaseActivityEvent & { context: { protocol: "alchemix-v3"; data: AlchemixV3Context } };
+  event: AlchemistEvent;
   /** The vault share ticker for this line, from the position's own row — the
    *  events do not carry it, and it is not guessed from the line key. */
   mytSymbol: string;
+  /** Every row sharing this event's transaction. An opening emits three logs
+   *  from two contracts, so the mint card needs its siblings to state what the
+   *  transaction did; each card still carries its own receipt and tx link. */
+  siblings?: AlchemistEvent[];
   isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
@@ -50,8 +54,16 @@ export interface AlchemixEventCardProps {
 /** Adverse but chosen-for-you; the position's own consequence. */
 const CAUTION = new Set(["force_repay", "self_liquidated", "redemption", "batch_liquidated", "fee_shortfall"]);
 
-export function AlchemixEventCard({ event, mytSymbol, isFirst, isLast, eventNumber }: AlchemixEventCardProps) {
+export function AlchemixEventCard({
+  event,
+  mytSymbol,
+  siblings,
+  isFirst,
+  isLast,
+  eventNumber,
+}: AlchemixEventCardProps) {
   const ctx = event.context.data;
+  const sibs = siblings ?? [event];
   const raw = ctx.raw;
   const coords: AlchemixCoords = {
     chainId: ctx.chainId as AlchemixCoords["chainId"],
@@ -153,9 +165,9 @@ export function AlchemixEventCard({ event, mytSymbol, isFirst, isLast, eventNumb
       }
       detail={<AlchemixEventDetail ctx={ctx} mytSymbol={mytSymbol} coords={coords} />}
       detailLabel="What the log states"
-      explainer={<AlchemixEventExplainer ctx={ctx} skipLead />}
+      explainer={<AlchemixEventExplainer ctx={ctx} siblings={sibs} self={event} skipLead />}
       explainerLabel="Plain English"
-      explainerTeaser={alchemixExplainerTeaser(ctx)}
+      explainerTeaser={alchemixExplainerTeaser(ctx, sibs, event)}
       txHash={event.txHash}
       learnMore={<LearnMore inline content={alchemixLearnMoreContent(ctx)} />}
       persistKey={`alchemix-v3:${event.id}`}

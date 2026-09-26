@@ -13,8 +13,26 @@
 //     caller offered; the debt that bought is a separate figure, capped by both
 //     the position's debt and the line's. The bullets keep them apart and name
 //     which is which.
+//
+// AND ONE SHAPE THAT TAKES THREE LOGS TO STATE. An opening emits the position
+// NFT's mint from the Alchemist's NFT contract and the deposit from the
+// Alchemist, and often a third log: a transfer passing the freshly minted NFT
+// on to the address that asked for it, because a periphery contract took the
+// deposit and was minted to first. Read one log at a time, that third address
+// is the owner and the second is somebody who "was handed a position" — which
+// is a sentence about a routing step.
+//
+// The cards stay separate, the way Fluid's do (lib/fluid/explainer-clauses):
+// the logs come from two different contracts, and every receipt carries its own
+// contract link, which one merged card could not answer. Instead THE MINT CARD
+// NARRATES the whole opening, pulling the funding figure and the forwarding
+// address in from its siblings, and the two sibling cards cross-reference back.
+// The shape is read off the data — one transaction hash, the transfer types,
+// and whether the mint's recipient is the sender of a later transfer in the
+// same transaction — never off an address anyone wrote down. A transfer in
+// ANOTHER transaction is a change of owner and keeps its own card, unchanged.
 
-import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
+import type { AlchemixV3Context, BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { clause, cont, type ClauseInput } from "@/lib/shared/explainer-prose";
 import { shortAddr } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
@@ -30,9 +48,82 @@ const amount = (raw: string | null | undefined): string | null => {
 
 const who = (addr: string | null | undefined): string => (addr ? shortAddr(addr) : "an address the log does not name");
 
+const sameAddr = (a: string | null | undefined, b: string | null | undefined): boolean =>
+  a != null && b != null && a.toLowerCase() === b.toLowerCase();
+
+/** One Alchemist row, as the timeline hands it over. */
+export type AlchemistEvent = BaseActivityEvent & {
+  context: { protocol: "alchemix-v3"; data: AlchemixV3Context };
+};
+
+/** The opening this transaction performed, read off the logs it carries. */
+export interface AlchemixOpening {
+  /** The address the position NFT was minted to. */
+  mintedTo: string;
+  /** Where the NFT ended the transaction, when a later transfer in the same one
+   *  moved it on from the mint's recipient. Null when the mint's recipient kept
+   *  it — a position minted straight to its owner. */
+  forwardedTo: string | null;
+  /** The transfers that did the forwarding, so each of them can tell that it is
+   *  part of the opening rather than a change of owner later on. */
+  forwardingMoves: AlchemistEvent[];
+  /** The collateral the same transaction put behind the position, unscaled. */
+  depositRaw: string | null;
+  /** The synthetic the same transaction drew against it, unscaled. Used only
+   *  where there is no deposit to lead with. */
+  debtRaw: string | null;
+}
+
+/**
+ * The opening, when these same-transaction siblings are one. Null when the
+ * transaction carries no mint of this position's NFT, which is every
+ * transaction but the first.
+ */
+export function openingInTx(siblings: AlchemistEvent[], tokenId: string | null): AlchemixOpening | null {
+  if (tokenId == null) return null;
+  const mine = siblings.filter((e) => e.context.data.tokenId === tokenId);
+  const minted = mine.find(
+    (e) => e.context.data.eventType === "transfer" && e.context.data.transfer?.transferType === "mint",
+  );
+  const mintedTo = minted?.context.data.transfer?.toAddress;
+  if (!mintedTo) return null;
+
+  // Follow the NFT out of the address it was minted to, one transfer at a time,
+  // so a hop through two contracts reads as one forwarding and not as a sale.
+  const moves = mine.filter(
+    (e) => e.context.data.eventType === "transfer" && e.context.data.transfer?.transferType === "transfer",
+  );
+  const forwardingMoves: AlchemistEvent[] = [];
+  let holder = mintedTo;
+  for (let i = 0; i < moves.length; i++) {
+    const next = moves.find(
+      (m) => !forwardingMoves.includes(m) && sameAddr(m.context.data.transfer?.fromAddress, holder),
+    );
+    if (!next) break;
+    forwardingMoves.push(next);
+    holder = next.context.data.transfer!.toAddress;
+  }
+
+  return {
+    mintedTo,
+    forwardedTo: sameAddr(holder, mintedTo) ? null : holder,
+    forwardingMoves,
+    depositRaw: mine.find((e) => e.context.data.eventType === "deposit")?.context.data.raw.amount ?? null,
+    debtRaw: mine.find((e) => e.context.data.eventType === "mint")?.context.data.raw.amount ?? null,
+  };
+}
+
 /** The bullets for one event, in reading order. The first survives as the
- *  card's teaser; the rest fill the pane. */
-export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
+ *  card's teaser; the rest fill the pane.
+ *
+ *  `siblings` are the rows sharing this event's transaction hash, and `self` is
+ *  this row among them. Both are optional: with neither, every card says what
+ *  its own log states and the opening reads as a bare mint. */
+export function alchemixEventClauses(
+  ctx: AlchemixV3Context,
+  siblings: AlchemistEvent[] = [],
+  self?: AlchemistEvent,
+): ClauseInput[] {
   const raw = ctx.raw;
   const sym = ctx.syntheticSymbol;
   const out: ClauseInput[] = [];
@@ -41,6 +132,11 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
     case "deposit":
       out.push(clause(<>The position took in {amount(raw.amount)} vault shares as collateral.</>));
       out.push(cont(<>{" "}Collateral is held as shares in the vault, not as the asset underneath it.</>));
+      // The cross-reference back to the narrator, so the two cards read as one
+      // act without either of them losing its own receipt.
+      if (openingInTx(siblings, ctx.tokenId)) {
+        out.push(clause(<>This is the deposit that funded the position minted in this same transaction.</>));
+      }
       break;
 
     case "withdraw":
@@ -169,10 +265,72 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
 
     case "transfer": {
       const kind = ctx.transfer?.transferType;
+      const opening = openingInTx(siblings, ctx.tokenId);
+
       if (kind === "mint") {
-        out.push(clause(<>The position was created and handed to {who(ctx.transfer?.toAddress)}.</>));
+        // The narrator. What the mint alone can say is that an address was
+        // given an NFT; what the transaction says is that a position was made,
+        // funded, and in some openings handed on — and where it was handed on,
+        // the address in the middle is a step in the routing, so the card names
+        // it as that rather than as somebody who was given a position.
+        const funding = opening?.depositRaw
+          ? { node: <>funded with {amount(opening.depositRaw)} vault shares</> }
+          : opening?.debtRaw
+            ? { node: <>drew {amount(opening.debtRaw)} {sym} against it</> }
+            : null;
+        const routed = opening?.forwardedTo ? <>{" "}That first address is a step inside the one transaction, not somebody who held the position.</> : null;
+
+        if (opening && opening.forwardedTo && funding) {
+          out.push(
+            clause(
+              <>
+                The position was created in this transaction: minted to {who(opening.mintedTo)}, {funding.node}, and
+                passed on to {who(opening.forwardedTo)} before the transaction ended.
+              </>,
+            ),
+          );
+        } else if (opening && opening.forwardedTo) {
+          out.push(
+            clause(
+              <>
+                The position was created in this transaction: minted to {who(opening.mintedTo)} and passed on to{" "}
+                {who(opening.forwardedTo)} before the transaction ended.
+              </>,
+            ),
+          );
+        } else if (opening && funding) {
+          out.push(
+            clause(
+              <>
+                The position was created in this transaction: minted to {who(opening.mintedTo)} and {funding.node}.
+              </>,
+            ),
+          );
+        } else {
+          out.push(clause(<>The position was created and handed to {who(ctx.transfer?.toAddress)}.</>));
+        }
+        if (routed) out.push(cont(routed));
       } else if (kind === "burn") {
         out.push(clause(<>The position was destroyed; {who(ctx.transfer?.fromAddress)} held it until then.</>));
+      } else if (self && opening?.forwardingMoves.includes(self)) {
+        // The forwarding leg of an opening. A transfer in any OTHER transaction
+        // is a change of owner and falls through to the clause below.
+        out.push(
+          clause(
+            <>
+              The position reached {who(ctx.transfer?.toAddress)} here, in the same transaction that minted it.
+            </>,
+          ),
+        );
+        out.push(
+          cont(
+            <>
+              {" "}
+              The address it came from is the one it was minted to in that transaction, so this is the last step of the
+              opening rather than a change of owner later on.
+            </>,
+          ),
+        );
       } else {
         out.push(
           clause(

@@ -55,6 +55,7 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { ProvReceiptsScope, useReceiptRegistry, Prov } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
@@ -157,6 +158,11 @@ export function AlchemistPositionView({
   const timelineRuns = useAlchemixTimelineRuns(coords);
 
   const alchemistEvents = useMemo(() => events.filter(isAlchemistEvent), [events]);
+  // An opening emits three logs in one transaction — the NFT's mint, the
+  // deposit, and often a transfer passing the NFT on to the address that asked
+  // for it. Each keeps its own card; the mint card needs the other two to say
+  // what the transaction did rather than that an address was handed a position.
+  const siblingsByTx = useMemo(() => groupEventsByTx(alchemistEvents), [alchemistEvents]);
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - alchemistEvents.length) : 0;
   const tl = useTimelineEvents(alchemistEvents, {
     storageKey: `alchemix-${lineKey}-${tokenId}`,
@@ -483,6 +489,7 @@ export function AlchemistPositionView({
               <AlchemixEventCard
                 event={event}
                 mytSymbol={mytSymbol}
+                siblings={siblingsByTx.get(event.txHash) ?? [event]}
                 isFirst={meta.isFirst}
                 isLast={meta.isLast}
                 eventNumber={meta.eventNumber}

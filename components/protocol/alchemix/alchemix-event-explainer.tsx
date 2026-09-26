@@ -10,10 +10,14 @@
 import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { composeBullets, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { alchemixEventClauses } from "@/lib/alchemix/explainer-clauses";
+import { alchemixEventClauses, type AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
 
 export interface AlchemixEventExplainerProps {
   ctx: AlchemixV3Context;
+  /** The rows sharing this event's transaction, and this row among them. An
+   *  opening takes three logs to state, and the mint card narrates it. */
+  siblings?: AlchemistEvent[];
+  self?: AlchemistEvent;
   /** The card shows the lead bullet as its teaser; render only the rest. */
   skipLead?: boolean;
 }
@@ -98,12 +102,12 @@ export function alchemixLearnMoreContent(ctx: AlchemixV3Context): LearnMoreConte
 }
 
 /** The teaser: the first bullet, rendered on the card face. */
-export function alchemixExplainerTeaser(ctx: AlchemixV3Context) {
-  return splitLead(alchemixEventClauses(ctx)).lead;
+export function alchemixExplainerTeaser(ctx: AlchemixV3Context, siblings?: AlchemistEvent[], self?: AlchemistEvent) {
+  return splitLead(alchemixEventClauses(ctx, siblings, self)).lead;
 }
 
-export function AlchemixEventExplainer({ ctx, skipLead }: AlchemixEventExplainerProps) {
-  const clauses = alchemixEventClauses(ctx);
+export function AlchemixEventExplainer({ ctx, siblings, self, skipLead }: AlchemixEventExplainerProps) {
+  const clauses = alchemixEventClauses(ctx, siblings, self);
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
   return <ProseExplainer items={items} />;
 }
