@@ -158,7 +158,7 @@ export const SPOKE_META: Record<string, SpokeMeta> = {
       "Bluechip is a Prime Hub Spoke: collateral (wstETH, BTC variants) sits in Prime, but borrows are drawn from Core Hub liquidity over a cross-hub credit line.",
       "The rate here is favorable because high-quality bluechip collateral earns a low risk premium, layered on top of Core Hub's base rate.",
       "Liquidation parameters and the recovery health factor are Spoke-specific and may differ from other Spokes — Hub-level safeguards cap how much liquidity the Spoke can draw.",
-      "A health factor in the mid-1s is normal here: the Spoke's liquidation thresholds keep some headroom in reserve at launch, so the displayed HF will sit lower than V3 users may expect for the same collateral mix.",
+      "A health factor in the mid-1s is normal here, not a sign of an overlevered position: the Spoke's liquidation thresholds keep some headroom in reserve at launch, so the displayed HF will sit lower than V3 users may expect for the same collateral mix.",
     ],
     rateNote: RATE_NOTE_CROSS_HUB,
   },
@@ -241,7 +241,7 @@ export const SPOKE_META: Record<string, SpokeMeta> = {
     borrowHub: "Core",
     narrative: [
       "Lombard BTC e-Mode Spoke on the Core Hub: LBTC — Lombard's Babylon-staked BTC — borrowing wBTC and cbBTC.",
-      "The dedicated Spoke keeps Babylon-protocol exposure inside its own bounded perimeter.",
+      "The dedicated Spoke keeps Babylon-protocol exposure inside its own bounded perimeter rather than in the Hub-wide collateral pool.",
     ],
   },
   "stablecoin-correlated": {

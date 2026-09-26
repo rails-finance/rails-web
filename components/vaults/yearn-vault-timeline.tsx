@@ -181,7 +181,7 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
             (reconcile.refetchDiffered
               ? " Both sweeps were run a second time and returned a different number of logs from the first, which is direct evidence of the lane answering one question two ways."
               : " Both sweeps were run a second time and returned the same number of logs.")}{" "}
-          The figures above this are unaffected — they are calls at block {n(timeline.blockNumber)}.
+          The figures above this are unaffected — they are calls at block {n(timeline.blockNumber)}, not a replay.
         </p>
       ) : (
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-reconciled">

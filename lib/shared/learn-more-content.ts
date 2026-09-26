@@ -383,7 +383,7 @@ export function liquityInterestRateContent(opts?: { delegated?: boolean; delegat
       },
       {
         bold: "Continuous accrual",
-        text: "interest compounds onto the principal over time.",
+        text: "interest compounds onto the principal over time rather than being charged upfront.",
       },
       {
         bold: "Premium on change",
@@ -785,7 +785,7 @@ export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "
   return {
     title: "How the market overview works",
     intro: seamless
-      ? "Seamless is a single Aave-V3-architecture market on Base: one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. It is a fork, with its own contracts, its own risk parameters and its own oracle. Every one of its reserves has been frozen since April 2025, which closes the market to new supplies and new borrows while leaving interest, repayment, withdrawal and liquidation working exactly as before. This page reads each reserve's size, rates and risk parameters from that Pool and prices them with the oracle it liquidates with."
+      ? "Seamless is a single Aave-V3-architecture market on Base: one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. It is a fork rather than an Aave deployment, with its own contracts, its own risk parameters and its own oracle. Every one of its reserves has been frozen since April 2025, which closes the market to new supplies and new borrows while leaving interest, repayment, withdrawal and liquidation working exactly as before. This page reads each reserve's size, rates and risk parameters from that Pool and prices them with the oracle it liquidates with."
       : spark
         ? "SparkLend is a single Aave-V3-architecture market: one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. This page reads each reserve's size, rates and risk parameters live from that Pool and prices them with SparkLend's own oracle."
         : onBase
@@ -800,7 +800,7 @@ export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "
       {
         bold: "Utilisation & rates",
         text: spark
-          ? "utilisation is borrowed ÷ supplied per reserve. Most SparkLend rates follow a utilisation curve; DAI is the exception — its borrow rate is set by Sky governance (the D3M policy rate)."
+          ? "utilisation is borrowed ÷ supplied per reserve. Most SparkLend rates follow a utilisation curve; DAI is the exception — its borrow rate is set by Sky governance (the D3M policy rate), not by utilisation."
           : "utilisation is borrowed ÷ supplied per reserve; the interest-rate curve prices borrowing from it, and suppliers earn the borrow interest net of the reserve factor.",
       },
       {
@@ -831,13 +831,13 @@ export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "
       },
       {
         bold: "Oracle price",
-        text: `USD comes from ${name}'s own IAaveOracle — the same prices the Pool liquidates with.`,
+        text: `USD comes from ${name}'s own IAaveOracle — the same prices the Pool liquidates with, not an off-chain feed.`,
       },
       ...(seamless
         ? [
             {
               bold: "Frozen",
-              text: "a bit in the reserve's own configuration word. A frozen reserve accepts no new supply and no new borrow, but keeps accruing interest and stays liquidatable — so a frozen market's rates and thresholds are live and enforced. All eighteen here were frozen in one block.",
+              text: "a bit in the reserve's own configuration word. A frozen reserve accepts no new supply and no new borrow, but keeps accruing interest and stays liquidatable — so a frozen market's rates and thresholds are live and enforced rather than historical. All eighteen here were frozen in one block.",
             },
           ]
         : []),
@@ -962,8 +962,8 @@ export function aaveV3LiquidationContent(protocol: V3Protocol = "Aave V3"): Lear
     title: "How Liquidations Work",
     intro: `${account} becomes eligible for liquidation when its health factor falls below 1.0 — the point where its borrowed value, measured against each collateral asset's liquidation threshold, is no longer sufficiently covered. Once eligible, anyone (in practice, automated liquidator bots) can step in.`,
     extraParagraphs: [
-      "A liquidator repays part of the account's outstanding debt and, in return, receives an equivalent value of its collateral plus a liquidation bonus — so the collateral seized is worth more than the debt cleared. That bonus is the liquidator's incentive and the borrower's effective penalty. Because V3 pools everything into one cross-collateralised account, the liquidator can take any of the account's collateral assets.",
-      `${v3Brand(protocol)} liquidates only partially — enough to nudge the health factor back above 1.0. Health factor = (collateral value × each asset's liquidation threshold) ÷ total debt; keep it comfortably above 1.0 by holding more collateral or carrying less debt.`,
+      "A liquidator repays part of the account's outstanding debt and, in return, receives an equivalent value of its collateral plus a liquidation bonus — so the collateral seized is worth more than the debt cleared. That bonus is the liquidator's incentive and the borrower's effective penalty. Because V3 pools everything into one cross-collateralised account, the liquidator can take any of the account's collateral assets, not just one in isolation.",
+      `${v3Brand(protocol)} liquidates only partially — enough to nudge the health factor back above 1.0 — rather than closing the whole position at once. Health factor = (collateral value × each asset's liquidation threshold) ÷ total debt; keep it comfortably above 1.0 by holding more collateral or carrying less debt.`,
     ],
     links: v3ModalLinks(protocol, [
       { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
@@ -987,8 +987,8 @@ export function aaveV3BadDebtContent(protocol: V3Protocol = "Aave V3"): LearnMor
       {
         bold: "Who absorbs it",
         text: isAave
-          ? "the reserve's deficit is covered by Aave's Umbrella safety module and the DAO treasury."
-          : `the reserve's deficit is covered from ${brand}'s own reserves.`,
+          ? "the reserve's deficit is covered by Aave's Umbrella safety module and the DAO treasury, not by charging other borrowers."
+          : `the reserve's deficit is covered from ${brand}'s own reserves, not by charging other borrowers.`,
       },
       {
         bold: "Why it happens",
@@ -1014,7 +1014,7 @@ export function aaveV3TransferContent(protocol: V3Protocol = "Aave V3"): LearnMo
     details: [
       {
         bold: "Not a deposit or withdrawal",
-        text: "a transfer is a change of custody — so this explorer counts it on its own line rather than merging it into supplied/withdrawn, which stay true to real Pool flows.",
+        text: "a transfer is a change of custody, not new capital arriving or leaving — so this explorer counts it on its own line rather than merging it into supplied/withdrawn, which stay true to real Pool flows.",
       },
       {
         bold: "Two accounts, one move",
@@ -1131,7 +1131,7 @@ export function sparkBorrowRepayContent(eventType: "borrow" | "repay"): LearnMor
       },
       {
         bold: "Variable borrow interest",
-        text: "debt accrues interest continuously at the reserve's variable borrow rate. Most reserves price off pool utilisation; DAI is the exception — its rate is a flat policy rate set by Sky governance through the D3M credit line, so it moves with governance votes.",
+        text: "debt accrues interest continuously at the reserve's variable borrow rate. Most reserves price off pool utilisation; DAI is the exception — its rate is a flat policy rate set by Sky governance through the D3M credit line, so it moves with governance votes, not utilisation.",
       },
     ],
     links: [
@@ -1148,8 +1148,8 @@ export function sparkLiquidationContent(): LearnMoreContent {
     intro:
       "A SparkLend account becomes eligible for liquidation when its health factor falls below 1.0 — the point where its borrowed value, measured against each collateral asset's liquidation threshold, is no longer sufficiently covered. Once eligible, anyone (in practice, automated liquidator bots) can step in.",
     extraParagraphs: [
-      "A liquidator repays part of the account's outstanding debt and, in return, receives an equivalent value of its collateral plus a liquidation bonus — so the collateral seized is worth more than the debt cleared. That bonus is the liquidator's incentive and the borrower's effective penalty. Because SparkLend pools everything into one cross-collateralised account, the liquidator can take any of the account's collateral assets.",
-      "SparkLend liquidates only partially — enough to nudge the health factor back above 1.0. Health factor = (collateral value × each asset's liquidation threshold) ÷ total debt; keep it comfortably above 1.0 by holding more collateral or carrying less debt.",
+      "A liquidator repays part of the account's outstanding debt and, in return, receives an equivalent value of its collateral plus a liquidation bonus — so the collateral seized is worth more than the debt cleared. That bonus is the liquidator's incentive and the borrower's effective penalty. Because SparkLend pools everything into one cross-collateralised account, the liquidator can take any of the account's collateral assets, not just one in isolation.",
+      "SparkLend liquidates only partially — enough to nudge the health factor back above 1.0 — rather than closing the whole position at once. Health factor = (collateral value × each asset's liquidation threshold) ÷ total debt; keep it comfortably above 1.0 by holding more collateral or carrying less debt.",
     ],
     links: [
       { label: "Liquidations", url: SPARK_DOC_URLS.LIQUIDATIONS },
@@ -1167,7 +1167,7 @@ export function sparkTransferContent(): LearnMoreContent {
     details: [
       {
         bold: "Not a deposit or withdrawal",
-        text: "a transfer is a change of custody — so this explorer counts it on its own line rather than merging it into supplied/withdrawn, which stay true to real Pool flows.",
+        text: "a transfer is a change of custody, not new capital arriving or leaving — so this explorer counts it on its own line rather than merging it into supplied/withdrawn, which stay true to real Pool flows.",
       },
       {
         bold: "Two accounts, one move",
@@ -1324,7 +1324,7 @@ export function moonwellLiquidationContent(): LearnMoreContent {
       "A Moonwell account becomes eligible for liquidation when the Comptroller's account liquidity turns to shortfall — its borrowed value is no longer covered by the collateral-factor-weighted supplied value. Once eligible, anyone (in practice, automated liquidator bots) can step in.",
     extraParagraphs: [
       "A liquidator repays part of the account's debt (up to the close factor, 50% per liquidation) and, in return, seizes the borrower's mTokens in a collateral market of the liquidator's choosing — worth the repaid debt plus a 10% liquidation incentive. The seize is an mToken transfer from borrower to liquidator, so it shows on the collateral market's balance lane too.",
-      "Liquidation is partial and repeatable: each one clears at most half the debt, nudging the account back toward solvency.",
+      "Liquidation is partial and repeatable: each one clears at most half the debt, nudging the account back toward solvency rather than closing it outright.",
     ],
     links: [{ label: "Moonwell docs", url: MOONWELL_DOC_URL }],
   };
@@ -3126,7 +3126,7 @@ export function polarisTransferContent(): LearnMoreContent {
       },
       {
         bold: "The mint and the burn",
-        text: "the NFT is minted when the CDP opens and burned when it closes or is liquidated — those two transfers are the open and the close.",
+        text: "the NFT is minted when the CDP opens and burned when it closes or is liquidated — those two transfers are the open and the close themselves, not custody events.",
       },
     ],
     links: [POLARIS_DOC_LINKS.passetMarkets, POLARIS_DOC_LINKS.polaris101, POLARIS_APP_LINK],
@@ -3225,7 +3225,7 @@ export function aaveVaultFlowsContent(assetSymbol: string, shareSymbol: string):
     ],
     extraParagraphs: [
       "No rate, no yield and no profit or loss is drawn. A cost basis over a pooled fungible share is not something any chain read supplies, and the difference between two share prices read at two blocks the holder happened to transact in is not a return.",
-      "The tower is drawn under exactly the condition the rows are: a history that could not be reconciled against the vault's own balanceOf, and one too large to draw whole, both leave it off the page.",
+      "The tower is drawn under exactly the condition the rows are: a history that could not be reconciled against the vault's own balanceOf, and one too large to draw whole, both leave it off the page rather than summing part of a life.",
     ],
   };
 }

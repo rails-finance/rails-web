@@ -272,9 +272,9 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords): EventProseS
       const through = paraswap ? "made through ParaSwap" : "settled through CoW Protocol";
       const paired = clause(
         paraswap ? (
-          <>The rows are paired by the ParaSwap adapter that made every one of them.</>
+          <>The rows are paired by the ParaSwap adapter that made every one of them, not by sharing a transaction.</>
         ) : (
-          <>The two legs are paired by the settlement&rsquo;s Trade log.</>
+          <>The two legs are paired by the settlement&rsquo;s Trade log, not by sharing a transaction.</>
         ),
       );
       // What a ParaSwap adapter returned from the part of the swap it did not

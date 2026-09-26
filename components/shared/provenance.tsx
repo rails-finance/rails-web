@@ -628,7 +628,7 @@ export function LadderModal({ onClose }: { onClose: () => void }) {
       <p className="prov-prose">
         <b>Computed</b> isn&rsquo;t a rung — it&rsquo;s the operator between them, and it inherits the furthest class of
         its inputs. The result&rsquo;s badge is that <b>weakest link</b>. Temperature carries the split —{" "}
-        <b>cool = on-chain</b>, <b>warm = trust required</b>.
+        <b>cool = on-chain</b>, <b>warm = trust required</b>. A categorical ladder, not a score.
       </p>
       <p className="prov-prose">
         <b>Delivery is not verification.</b> How Rails fetched a number — replayed by our indexer or read live from a

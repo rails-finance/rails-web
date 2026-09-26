@@ -331,7 +331,7 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
               ? "The vault's own accrual is not a row here."
               : family === "stata"
                 ? "This vault emits no accrual event at all."
-                : "This token's assets are a stored counter."}
+                : "This token's assets are a stored counter rather than a balance read."}
           </Prov>{" "}
           A row is something this address did.
         </p>
@@ -396,7 +396,7 @@ function GateFailure({
         (r.refetchDiffered
           ? " Both sweeps were run a second time and returned a different number of logs from the first, which is direct evidence of the lane answering one question two ways."
           : " Both sweeps were run a second time and returned the same number of logs.")}{" "}
-      The figures above this are unaffected — they are calls at block {n(timeline.blockNumber)}.
+      The figures above this are unaffected — they are calls at block {n(timeline.blockNumber)}, not a replay.
     </p>
   );
 }
