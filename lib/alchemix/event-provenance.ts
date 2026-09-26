@@ -596,3 +596,78 @@ export function lifetimeProv(label: string, symbol: string, events: number, coor
     inputs: coordInputs(coords, [{ label: "events counted", value: String(events), kind: "chain-derived" }]),
   };
 }
+
+// ── The position's health ───────────────────────────────────────────────────
+
+/** The collateralisation: `totalValue(tokenId)` over the debt, both at one
+ *  block. `totalValue` is the collateral in debt-token units, where the
+ *  contract counts one unit of the underlying as one unit of debt. */
+export function collateralisationProv(
+  collateralValueRaw: string,
+  debtRaw: string,
+  asOfBlock: number,
+  coords: AlchemixCoords,
+): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: "Collateralisation — the collateral in the underlying over the debt, at one block",
+    contract: alchemistContract(coords),
+    formula: "totalValue(tokenId) ÷ debt",
+    via: `totalValue(${coords.tokenId}) and getCDP(${coords.tokenId}) at block ${asOfBlock}`,
+    verify: {
+      kind: "recompute",
+      text: `Call totalValue(${coords.tokenId}) and getCDP(${coords.tokenId}) at block ${asOfBlock} and divide`,
+    },
+    source: { block: asOfBlock },
+    inputs: coordInputs(coords, [
+      {
+        label: "collateral value",
+        value: collateralValueRaw,
+        kind: "chain",
+        note: "totalValue: the vault shares in the underlying, one underlying counted as one unit of debt, 18 decimals",
+      },
+      { label: "debt", value: debtRaw, kind: "chain", note: "getCDP's debt, 18 decimals" },
+    ]),
+  };
+}
+
+/** One of the line's two ratios, read from the Alchemist at the reading's
+ *  block. Both have setters, so neither is a constant. */
+export function lineRatioProv(
+  getter: "minimumCollateralization" | "collateralizationLowerBound",
+  raw: string,
+  asOfBlock: number,
+  coords: AlchemixCoords,
+): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    summary:
+      getter === "minimumCollateralization"
+        ? "Minimum collateralisation — a mint or a withdrawal must leave the position above it"
+        : "Liquidation line — at or below it, anyone may liquidate the position",
+    contract: alchemistContract(coords),
+    via: `${getter}() at block ${asOfBlock}`,
+    verify: { kind: "recompute", text: `Call ${getter}() on the Alchemist at block ${asOfBlock}` },
+    source: { block: asOfBlock },
+    inputs: coordInputs(coords, [
+      { label: getter, value: raw, kind: "chain", note: "1e18 is 100%; governance can change it" },
+    ]),
+    scaling: { raw, from: "call", places: 16, why: "a 1e18-scaled ratio, shown as a percentage" },
+  };
+}
+
+/** How many liquidations the line has had, counted over the captured logs. */
+export function lineLiquidationsProv(count: number, throughBlock: number | null, coords: AlchemixCoords): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "indexed",
+    summary: "Liquidations on this line — every Liquidated and BatchLiquidated log captured",
+    contract: alchemistContract(coords),
+    via: `${ALCHEMIX_VIA}${throughBlock != null ? ` · to block ${throughBlock}` : ""}`,
+    verify: { kind: "rollup", text: "It counts the line's captured liquidation logs" },
+    source: { block: throughBlock ?? undefined },
+    inputs: coordInputs(coords, [{ label: "liquidations", value: String(count), kind: "chain-derived" }]),
+  };
+}

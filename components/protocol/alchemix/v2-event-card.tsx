@@ -32,6 +32,7 @@ import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import type { AlchemixV2Context, BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { ChainId } from "@/lib/shared/chains";
 import { v2EmittedProv, type AlchemixV2Coords } from "@/lib/alchemix/v2-provenance";
+import { ProseExplainer } from "@/lib/shared/explainer-prose";
 
 export type AlchemixV2Event = BaseActivityEvent & { context: { protocol: "alchemix-v2"; data: AlchemixV2Context } };
 
@@ -272,7 +273,9 @@ export function AlchemixV2EventCard({
         ) : undefined
       }
       detailLabel="What the log states"
-      explainer={line ? <p className="px-5 py-2 text-xs leading-relaxed text-rb-500">{line}</p> : undefined}
+      // The one sentence is the teaser, which the pane draws as its lead; the
+      // body adds nothing, so the sentence shows once.
+      explainer={line ? <ProseExplainer items={[]} /> : undefined}
       explainerLabel="Plain English"
       explainerTeaser={line ?? undefined}
       txHash={event.txHash}

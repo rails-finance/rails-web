@@ -37,6 +37,7 @@ import type { AlchemixDeployment } from "@/lib/alchemix/lines";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
 import { transmuterEmittedProv, transmuterMaturityProv } from "@/lib/alchemix/transmuter-provenance";
 import { computeTransmuterEconomics } from "@/lib/alchemix/transmuter-economics";
+import { logIndexOf, splitRidingTransfers, withRiders } from "@/lib/alchemix/riding-transfers";
 import {
   claimColumn,
   maturityColumn,
@@ -51,11 +52,6 @@ import {
 import type { AlchemixTransmuterPositionData } from "@/types/api/alchemix";
 
 const STATE_WORD = { maturing: "Maturing", matured: "Matured", claimed: "Claimed" } as const;
-
-const logIndexOf = (e: BaseActivityEvent): number => {
-  const n = Number(e.id.split(":").pop());
-  return Number.isFinite(n) ? n : 0;
-};
 
 export function TransmuterPositionView({
   deployment,
@@ -87,8 +83,11 @@ export function TransmuterPositionView({
   const stakeCoords = created ? coordsForTransmuterLeg(created) : base;
   const claimCoords = claimed ? coordsForTransmuterLeg(claimed) : null;
 
+  // The NFT's mint rides on the stake's card and its hand-over and burn on the
+  // claim's, so the timeline counts those cards and not the transfers inside.
+  const { drawn, ridersByTx } = useMemo(() => splitRidingTransfers(events, () => true), [events]);
   const olderCount = p.eventsTruncated ? Math.max(0, p.eventCount - events.length) : 0;
-  const tl = useTimelineEvents(events, {
+  const tl = useTimelineEvents(drawn, {
     storageKey: `alchemix-transmuter-${p.lineKey}-${p.nftId}`,
     protocolKey: "alchemix-v3",
     olderCount,
@@ -104,8 +103,9 @@ export function TransmuterPositionView({
         min: 2,
         sameRun: (prev: BaseActivityEvent, next: BaseActivityEvent) => prev.txHash === next.txHash,
         render: (run, meta) => {
-          const legs = (run.filter(isTransmuterEvent) as TransmuterEvent[]).sort(
-            (a, b) => logIndexOf(a) - logIndexOf(b),
+          const legs = withRiders(
+            (run.filter(isTransmuterEvent) as TransmuterEvent[]).sort((a, b) => logIndexOf(a) - logIndexOf(b)),
+            ridersByTx,
           );
           return (
             <TransmuterEventCard
@@ -119,7 +119,7 @@ export function TransmuterPositionView({
         },
       },
     ],
-    [mytSymbol],
+    [mytSymbol, ridersByTx],
   );
 
   const economics = useMemo(
@@ -223,13 +223,13 @@ export function TransmuterPositionView({
           displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
           emptyLabel="No events recorded for this position"
           toolbarLeading={
-            <TimelineActivityHeader events={events} closed={p.status === "claimed"} tenurePending={olderCount > 0} />
+            <TimelineActivityHeader events={drawn} closed={p.status === "claimed"} tenurePending={olderCount > 0} />
           }
           renderCard={(event, meta) => {
             if (!isTransmuterEvent(event)) return null;
             return (
               <TransmuterEventCard
-                legs={[event as TransmuterEvent]}
+                legs={withRiders([event as TransmuterEvent], ridersByTx)}
                 mytSymbol={mytSymbol}
                 isFirst={meta.isFirst}
                 isLast={meta.isLast}

@@ -250,10 +250,10 @@ export function AlchemixPositionCard({ p, session }: { p: AlchemixPositionSummar
             of the truth it falls. See the report on this stage. */}
         {p.figures.derivedLowerBound ? (
           <p className="text-xs leading-relaxed text-rb-500">
-            Replayed from this position&rsquo;s own events alone, the debt is{" "}
-            {formatCompact(Number(p.figures.derivedLowerBound.debtRaw) / 1e18).display} {p.syntheticSymbol}, exact to
-            block {block(p.figures.derivedLowerBound.validToBlock)}. Redemptions after that block moved the debt with
-            nothing in these events to see.
+            Adding up this position&rsquo;s own events to block {block(p.figures.derivedLowerBound.reducedToBlock)}{" "}
+            gives a debt of {formatCompact(Number(p.figures.derivedLowerBound.debtRaw) / 1e18).display}{" "}
+            {p.syntheticSymbol}. Since block {block(p.figures.derivedLowerBound.validToBlock)}, the line&rsquo;s first
+            redemption, a redemption can clear debt with no event of the position&rsquo;s to show it.
           </p>
         ) : null}
 

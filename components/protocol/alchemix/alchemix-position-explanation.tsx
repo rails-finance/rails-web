@@ -111,7 +111,8 @@ export function AlchemixPositionExplanation({
     live.earmarked ? (
       <>The set-aside figure grows block by block between readings, so each one holds at the block it was read at.</>
     ) : null,
-    redemptions.stated > 0 ? (
+    // Where they cleared nothing, the timeline says so in their place.
+    redemptions.stated > 0 && redemptions.cleared > 0 ? (
       <>
         Across the {redemptions.count} line redemptions on the timeline below, the Transmuter cleared{" "}
         {two(redemptions.cleared)} {sym} of this position&rsquo;s debt

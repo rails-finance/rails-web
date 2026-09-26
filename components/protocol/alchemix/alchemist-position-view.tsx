@@ -58,7 +58,8 @@ import Link from "next/link";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
+import { OpenPositionStats, type OpenPositionStatsColumn } from "@/components/shared/open-position-stats";
+import { StatFootnote, StatValue } from "@/components/shared/stat-value";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
@@ -82,7 +83,8 @@ import {
   collateralColumn,
 } from "@/components/protocol/alchemix/alchemix-position-card";
 import { computeAlchemixEconomics } from "@/lib/alchemix/economics";
-import { useAlchemixTimelineRuns } from "@/lib/alchemix/timeline-runs";
+import { splitRidingTransfers, withRiders } from "@/lib/alchemix/riding-transfers";
+import { isZeroEffectRedemption, useAlchemixTimelineRuns } from "@/lib/alchemix/timeline-runs";
 import { AlchemixReadingsBeforeContext, collateralTakenRaw, readingsBefore } from "@/lib/alchemix/readings-before";
 import {
   AlchemixPositionExplanation,
@@ -93,6 +95,9 @@ import { ALCHEMIX_HOW_IT_WORKS } from "@/components/protocol/alchemix/alchemix-e
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import {
   collateralAppreciationProv,
+  collateralisationProv,
+  lineLiquidationsProv,
+  lineRatioProv,
   liveFigureProv,
   servedFigureProv,
   underlyingProv,
@@ -102,6 +107,7 @@ import {
 import type { AlchemixDeployment } from "@/lib/alchemix/lines";
 import { alchemixPositionName, alchemixV2PositionName } from "@/lib/alchemix/naming";
 import type {
+  AlchemixHealth,
   AlchemixLineCoverage,
   AlchemixLineEventWindow,
   AlchemixLiveState,
@@ -110,9 +116,92 @@ import type {
 
 const block = (n: number) => n.toLocaleString("en-US");
 
+/** A 1e18-scaled ratio as a percentage: one decimal below 1,000%, whole
+ *  numbers above it, and "over 10,000%" past that, where a dust debt makes the
+ *  figure a count of digits. The receipt holds the exact value. */
+function ratioPct(raw: string): string {
+  const pct = Number(raw) / 1e16;
+  if (pct >= 10000) return "over 10,000%";
+  return pct < 1000
+    ? `${pct.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+    : `${Math.round(pct).toLocaleString("en-US")}%`;
+}
+
+/** The health column: collateralisation at the reading's block, with the
+ *  line's two ratios under it. Liquity V2's ratio column is the model: the
+ *  figure, and under it the line it is measured against. */
+function healthColumn(health: AlchemixHealth, debtRaw: string | null, coords: AlchemixCoords): OpenPositionStatsColumn {
+  const b = health.asOfBlock;
+  const ratio =
+    health.collateralizationRaw != null && health.collateralValueRaw != null && debtRaw != null ? (
+      <StatValue>
+        <Prov
+          info={collateralisationProv(health.collateralValueRaw, debtRaw, b, coords)}
+          value={String(Number(health.collateralizationRaw) / 1e16)}
+        >
+          {ratioPct(health.collateralizationRaw)}
+        </Prov>
+      </StatValue>
+    ) : (
+      <StatValue color="text-rb-500">No debt</StatValue>
+    );
+  return {
+    label: "Collateralisation",
+    value: ratio,
+    footnote: (
+      <StatFootnote>
+        <span className="tabular-nums">
+          minimum{" "}
+          <Prov info={lineRatioProv("minimumCollateralization", health.minimumCollateralizationRaw, b, coords)}>
+            {ratioPct(health.minimumCollateralizationRaw)}
+          </Prov>
+          {" · "}liquidation at{" "}
+          <Prov info={lineRatioProv("collateralizationLowerBound", health.collateralizationLowerBoundRaw, b, coords)}>
+            {ratioPct(health.collateralizationLowerBoundRaw)}
+          </Prov>
+        </span>
+      </StatFootnote>
+    ),
+  };
+}
+
 /** The V2 account(s) this position's holder closed, and their rows. `joined`
  *  is false when the rows are not on the timeline: the V3 history is windowed,
  *  or a V2 read did not land whole. The links stand either way. */
+/** What the health column's two lines mean, and how many liquidations the
+ *  line has had. One sentence of mechanics; the modal holds the rest. */
+function HealthSentence({
+  health,
+  syntheticSymbol,
+  underlyingSymbol,
+  coords,
+}: {
+  health: AlchemixHealth;
+  syntheticSymbol: string;
+  underlyingSymbol: string | null;
+  coords: AlchemixCoords;
+}) {
+  const under = underlyingSymbol ?? "the asset underneath";
+  const liq = health.lineLiquidations;
+  return (
+    <p className="mt-3 text-[11px] leading-relaxed text-rb-500">
+      Collateralisation is the collateral in {under} divided by the debt, with one {syntheticSymbol} counted as one{" "}
+      {under}. Borrowing more or withdrawing must leave it above the minimum. At the liquidation line or below, anyone
+      can liquidate the position and is paid a fee from its collateral.
+      {liq ? (
+        <>
+          {" "}
+          The {syntheticSymbol} line has had{" "}
+          <Prov info={lineLiquidationsProv(liq.count, liq.throughBlock, coords)} value={String(liq.count)}>
+            {liq.count === 0 ? "no liquidation" : `${liq.count} ${liq.count === 1 ? "liquidation" : "liquidations"}`}
+          </Prov>
+          {liq.throughBlock != null ? ` to block ${block(liq.throughBlock)}` : ""}.
+        </>
+      ) : null}
+    </p>
+  );
+}
+
 export interface AlchemixV2History {
   links: { lineKey: string; account: string; syntheticSymbol: string | null }[];
   events: BaseActivityEvent[];
@@ -226,7 +315,20 @@ export function AlchemistPositionView({
   // The reading before each block on the timeline, for before → after on
   // every card and for what each redemption took from the collateral.
   const beforeByBlock = useMemo(() => readingsBefore(alchemistEvents), [alchemistEvents]);
-  const timelineRuns = useAlchemixTimelineRuns(coords, mytSymbol, underlyingDecimals, siblingsByTx, beforeByBlock);
+  // A transfer sharing its transaction with another leg is drawn inside that
+  // card, so the timeline counts the card and not the transfer.
+  const { drawn: drawnEvents, ridersByTx } = useMemo(
+    () => splitRidingTransfers(alchemistEvents, (e) => e.context.data.scope === "position"),
+    [alchemistEvents],
+  );
+  const timelineRuns = useAlchemixTimelineRuns(
+    coords,
+    mytSymbol,
+    underlyingDecimals,
+    siblingsByTx,
+    beforeByBlock,
+    ridersByTx,
+  );
   const redemptionTotals = useMemo<AlchemixRedemptionTotals>(() => {
     let count = 0;
     let stated = 0;
@@ -253,6 +355,15 @@ export function AlchemistPositionView({
       taken: takenStated === stated ? Number(taken) / 1e18 : null,
     };
   }, [alchemistEvents, beforeByBlock]);
+  // The route's note on redemption rows earns its place only where one is
+  // drawn: redemptions that changed nothing are one sentence of their own.
+  const redemptionRowDrawn = useMemo(
+    () =>
+      alchemistEvents.some(
+        (e) => e.context.data.eventType === "redemption" && !isZeroEffectRedemption(e, beforeByBlock),
+      ),
+    [alchemistEvents, beforeByBlock],
+  );
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - alchemistEvents.length) : 0;
   // Rule 7. The V2 rows join the list the timeline draws and nothing else.
   const v2Events = useMemo(
@@ -260,8 +371,8 @@ export function AlchemistPositionView({
     [v2History],
   );
   const timelineEvents = useMemo(
-    () => (v2Events.length > 0 ? [...alchemistEvents, ...v2Events] : alchemistEvents),
-    [alchemistEvents, v2Events],
+    () => (v2Events.length > 0 ? [...drawnEvents, ...v2Events] : drawnEvents),
+    [drawnEvents, v2Events],
   );
   const tl = useTimelineEvents(timelineEvents, {
     storageKey: `alchemix-${lineKey}-${tokenId}`,
@@ -310,7 +421,8 @@ export function AlchemistPositionView({
   }, [lineEventWindow]);
 
   // The top row's price list: the asset underneath in dollars, a vault share
-  // in that asset, and the synthetic, which carries no price here.
+  // in that asset, and the synthetic at the value the protocol counts it at,
+  // one unit of the asset underneath.
   const priceView = live?.collateral ?? position.figures.collateral ?? null;
   const priceAssets = useMemo<LatestPriceAsset[]>(() => {
     const u = priceView?.underlying;
@@ -324,12 +436,16 @@ export function AlchemistPositionView({
         unit: u.symbol,
         label: `One ${mytSymbol} in ${u.symbol}`,
       });
-    out.push({ symbol: sym });
+    out.push(
+      u?.symbol
+        ? { symbol: sym, price: 1, unit: u.symbol, label: `One ${sym} as the protocol counts it, in ${u.symbol}` }
+        : { symbol: sym },
+    );
     return out;
   }, [priceView, mytSymbol, sym]);
   const underSym = priceView?.underlying?.symbol ?? null;
   const priceReason = underSym
-    ? `${underSym} is priced in dollars, and a ${mytSymbol} share in ${underSym} at the vault's share price; together they give the collateral's dollar value. ${sym} is shown in ${sym} with no dollar price.`
+    ? `${underSym} is priced in dollars, and a ${mytSymbol} share in ${underSym} at the vault's share price; together they give the collateral's dollar value. ${sym} is shown at 1 ${underSym}, the protocol's accounting value: Alchemix counts each ${sym} of debt as one ${underSym}. Its market price can differ.`
     : `${sym} and ${mytSymbol} are shown in their own units with no dollar price: no share price has been read for this position.`;
 
   const collateral = position.figures.collateral;
@@ -345,6 +461,15 @@ export function AlchemistPositionView({
     if (!dlb || !stored || redemptionTotals.stated !== redemptionTotals.count || olderCount > 0) return false;
     const gap = Number(dlb.debtRaw) / 1e18 - stored.formatted;
     return gap > 0 && Math.abs(gap - redemptionTotals.cleared) < 1e-3;
+  })();
+
+  // Every redemption on the timeline is stated and cleared nothing here, and
+  // the event sum equals the stored figure: then the sum is the debt.
+  const dlbNoneCleared = (() => {
+    const stored = position.figures.debt;
+    if (!dlb || !stored || olderCount > 0 || redemptionTotals.count === 0) return false;
+    if (redemptionTotals.stated !== redemptionTotals.count || redemptionTotals.cleared !== 0) return false;
+    return dlb.debtRaw === stored.raw;
   })();
 
   // Rule 6. What the vault did for the collateral, and only where every part of
@@ -485,10 +610,19 @@ export function AlchemistPositionView({
                         note: "It grows block by block, so this holds at that block.",
                       },
                     ),
+                    live.health ? healthColumn(live.health, live.debt?.raw ?? null, coords) : null,
                   ]
                 : []
             }
           />
+          {live?.health ? (
+            <HealthSentence
+              health={live.health}
+              syntheticSymbol={sym}
+              underlyingSymbol={live.collateral.underlying?.symbol ?? null}
+              coords={coords}
+            />
+          ) : null}
           {live ? null : (
             <p className="text-sm text-rb-500">
               {livePending
@@ -588,6 +722,9 @@ export function AlchemistPositionView({
                 ),
                 note: "The last reading stored, true at that block.",
               }),
+              // The card above has a fourth column, health, which is read live
+              // only; the empty slot keeps the three figures aligned with it.
+              ...(live?.health ? [null] : []),
             ]}
           />
 
@@ -661,12 +798,18 @@ export function AlchemistPositionView({
                 cleared, the sentence says so: both are stated figures. */}
             {dlb ? (
               <p className="text-xs leading-relaxed text-rb-500">
-                Worked out from this position&rsquo;s own events alone, the debt is{" "}
+                Adding up this position&rsquo;s own events to block {block(dlb.reducedToBlock)} gives a debt of{" "}
                 <span className="tabular-nums">
                   {formatCompact(Number(dlb.debtRaw) / 1e18).display} {sym}
                 </span>
-                , exact to block {block(dlb.validToBlock)}.{" "}
-                {dlbGapMatches ? (
+                . Since block {block(dlb.validToBlock)}, the line&rsquo;s first redemption, a redemption can clear debt
+                with no event of the position&rsquo;s to show it, so the sum can differ from the figure above.{" "}
+                {dlbNoneCleared ? (
+                  <>
+                    The line&rsquo;s {redemptionTotals.count} redemptions in this position&rsquo;s life cleared none of
+                    its debt, so the sum and the figure above agree.
+                  </>
+                ) : dlbGapMatches ? (
                   <>
                     The gap to the figure above is the{" "}
                     <span className="tabular-nums">
@@ -676,7 +819,7 @@ export function AlchemistPositionView({
                     one on the timeline.
                   </>
                 ) : (
-                  <>Redemptions after that block moved the debt, and each one on the timeline states what it cleared.</>
+                  <>Each redemption on the timeline states what it cleared.</>
                 )}
               </p>
             ) : null}
@@ -727,21 +870,17 @@ export function AlchemistPositionView({
             emptyLabel="No events recorded for this position"
             toolbarLeading={
               <TimelineActivityHeader
-                events={alchemistEvents}
+                events={drawnEvents}
                 closed={position.status === "closed"}
                 tenurePending={olderCount > 0}
               />
             }
             notice={
-              (lineScopedNote && redemptionTotals.count > 0) || endedWindow ? (
+              (lineScopedNote && redemptionRowDrawn) || endedWindow ? (
                 <div className="space-y-1">
-                  {lineScopedNote && redemptionTotals.count > 0 ? (
-                    // The route sends its own statement about line rows in
-                    // the index's vocabulary; the reader gets it in plain words.
-                    <p className="px-1 text-[11px] leading-relaxed text-rb-500">
-                      Redemption rows are the whole line&rsquo;s events, and the holder did none of them. Each states
-                      what it cleared from this position&rsquo;s debt and took from its collateral.
-                    </p>
+                  {lineScopedNote && redemptionRowDrawn ? (
+                    // The route's own sentence about line rows, rendered as given.
+                    <p className="px-1 text-[11px] leading-relaxed text-rb-500">{lineScopedNote}</p>
                   ) : null}
                   {/* Why a closed position's timeline stops carrying the line's
                     events while the line goes on having them. Open positions
@@ -772,7 +911,7 @@ export function AlchemistPositionView({
               if (!isAlchemistEvent(event)) return null;
               return (
                 <AlchemixEventCard
-                  legs={[event]}
+                  legs={withRiders([event], ridersByTx)}
                   mytSymbol={mytSymbol}
                   underlyingDecimals={underlyingDecimals}
                   siblings={siblingsByTx.get(event.txHash) ?? [event]}

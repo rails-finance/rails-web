@@ -28,6 +28,7 @@ import {
 } from "@/components/shared/chain-truth-event";
 import { formatExact, formatUnitsExact } from "@/lib/utils/format";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import type { AlchemixV3Context, BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
 import { transmuterEmittedProv } from "@/lib/alchemix/transmuter-provenance";
@@ -220,10 +221,16 @@ function detailStats(legs: TransmuterEvent[], mytSymbol: string): ChainTruthStat
   return stats;
 }
 
-/** The transaction in plain words, one sentence a leg. */
+/** The transaction in plain words, one sentence a leg. The stake or the claim
+ *  leads, since it is what the card is about; the NFT's moves follow in log
+ *  order. */
 function explainerLines(legs: TransmuterEvent[], mytSymbol: string): string[] {
   const out: string[] = [];
-  for (const leg of legs) {
+  const ordered = [
+    ...legs.filter((l) => l.context.data.eventType !== "transfer"),
+    ...legs.filter((l) => l.context.data.eventType === "transfer"),
+  ];
+  for (const leg of ordered) {
     const d = leg.context.data;
     const amount = (field: string) => formatUnitsExact(d.raw[field] ?? "0", 18);
     switch (d.eventType) {
@@ -300,15 +307,9 @@ export function TransmuterEventCard({
         ) : undefined
       }
       detailLabel="What the logs state"
-      explainer={
-        lines.length > 0 ? (
-          <ul className="list-disc space-y-1 px-5 py-2 pl-9 text-xs leading-relaxed text-rb-500">
-            {lines.map((l, i) => (
-              <li key={i}>{l}</li>
-            ))}
-          </ul>
-        ) : undefined
-      }
+      // The first sentence is the teaser, which the pane draws as its lead
+      // bullet; the pane lists the rest, so no sentence shows twice.
+      explainer={lines.length > 0 ? <ProseExplainer items={lines.slice(1)} /> : undefined}
       explainerLabel="Plain English"
       explainerTeaser={lines[0]}
       txHash={lead.txHash}

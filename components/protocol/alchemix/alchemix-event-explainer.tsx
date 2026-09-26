@@ -92,6 +92,10 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
       bold: "The holder can still repay directly",
       text: "by burning the synthetic or repaying with vault shares, or close out with a self-liquidation, which pays the debt from the collateral.",
     },
+    {
+      bold: "A position that falls too low can be liquidated by anyone.",
+      text: "Its collateralisation is the collateral in the asset underneath divided by the debt, with one synthetic counted as one unit of that asset. Minting more or withdrawing must leave it above the line's minimum. If a falling share price takes it to the line's liquidation line or below, anyone can liquidate the position: the Alchemist uses its collateral to repay debt until the ratio is back above the minimum, and pays the liquidator a fee from it. The position card states both lines, read from the Alchemist, and how many liquidations the line has had.",
+    },
   ],
 };
 

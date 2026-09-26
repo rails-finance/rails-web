@@ -55,6 +55,8 @@ import { AlchemixEventCard } from "@/components/protocol/alchemix/alchemix-event
 import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
 import { clearedRunProv, takenRunProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
 import { collateralTakenRaw, type AlchemixReadingsBefore } from "@/lib/alchemix/readings-before";
+import { logIndexOf, withRiders } from "@/lib/alchemix/riding-transfers";
+import { AlchemixQuietRedemptions } from "@/components/protocol/alchemix/alchemix-quiet-redemptions";
 
 /** Runs shorter than this stay as individual cards.
  *
@@ -96,10 +98,17 @@ function inLogOrder(run: BaseActivityEvent[]): AlchemistEvent[] {
   return [...legs].sort((a, b) => logIndexOf(a) - logIndexOf(b));
 }
 
-const logIndexOf = (e: BaseActivityEvent): number => {
-  const n = Number(e.id.split(":").pop());
-  return Number.isFinite(n) ? n : 0;
-};
+/** A redemption that cleared nothing from this position and took nothing
+ *  from it. A stated zero only: a member with no figure is not known to be
+ *  one, and stays a row. */
+export function isZeroEffectRedemption(e: BaseActivityEvent, before: AlchemixReadingsBefore): boolean {
+  if (!isAlchemistEvent(e) || e.context.data.eventType !== "redemption") return false;
+  const cleared = e.context.data.debtClearedFromReadings;
+  if (cleared?.status !== "stated" || cleared.amountRaw == null || BigInt(cleared.amountRaw) !== BigInt(0))
+    return false;
+  const taken = collateralTakenRaw(e, before.get(e.blockNumber) ?? null);
+  return taken == null || BigInt(taken) === BigInt(0);
+}
 
 /** The run specs for one position. Memoised by the caller: a fresh array
  *  identity per render recomputes the timeline's rows. */
@@ -109,6 +118,7 @@ export function useAlchemixTimelineRuns(
   underlyingDecimals: number | null,
   siblingsByTx: Map<string, AlchemistEvent[]>,
   before: AlchemixReadingsBefore,
+  ridersByTx: Map<string, AlchemistEvent[]>,
 ): TimelineRunSpec[] {
   return useMemo(
     () => [
@@ -120,7 +130,7 @@ export function useAlchemixTimelineRuns(
         min: 2,
         sameRun: (prev: BaseActivityEvent, next: BaseActivityEvent) => prev.txHash === next.txHash,
         render: (run, meta) => {
-          const legs = inLogOrder(run);
+          const legs = withRiders(inLogOrder(run), ridersByTx);
           return (
             <AlchemixEventCard
               key={legs[0].id}
@@ -133,6 +143,25 @@ export function useAlchemixTimelineRuns(
             />
           );
         },
+      },
+      {
+        // Redemptions that did nothing to this position are not drawn as rows:
+        // one sentence stands in the run's place, and its members open under
+        // it. `asOneEvent` so the reader's collapse choice does not turn them
+        // back into rows. rails-ops decisions/0032.
+        asOneEvent: true,
+        match: (e: BaseActivityEvent) => isZeroEffectRedemption(e, before),
+        min: 1,
+        render: (run, meta) => (
+          <AlchemixQuietRedemptions
+            key={`quiet_${run[0].id}`}
+            events={run.filter(isAlchemistEvent)}
+            isFirst={meta.isFirst}
+            isLast={meta.isLast}
+          >
+            {meta.children}
+          </AlchemixQuietRedemptions>
+        ),
       },
       {
         match: (e: BaseActivityEvent) => isAlchemistEvent(e) && e.context.data.eventType === "redemption",
@@ -196,6 +225,6 @@ export function useAlchemixTimelineRuns(
           }),
       },
     ],
-    [coords, mytSymbol, underlyingDecimals, siblingsByTx, before],
+    [coords, mytSymbol, underlyingDecimals, siblingsByTx, before, ridersByTx],
   );
 }

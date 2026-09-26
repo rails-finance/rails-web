@@ -316,6 +316,25 @@ export interface AlchemixLiveState {
   debt: AlchemixAmount | null;
   collateral: AlchemixLiveCollateral;
   earmarked: AlchemixAmount | null;
+  /** The position's health at `asOfBlock`. Absent on a backend that predates
+   *  it, null when either ratio did not read. */
+  health?: AlchemixHealth | null;
+}
+
+/** `totalValue(tokenId)`, `minimumCollateralization()` and
+ *  `collateralizationLowerBound()` on the Alchemist, all at `asOfBlock`. The
+ *  ratios are 1e18-scaled; `collateralizationRaw` is null where the position
+ *  has no debt. */
+export interface AlchemixHealth {
+  asOfBlock: number;
+  /** The collateral in debt-token units: one unit of the underlying counts as
+   *  one unit of debt. */
+  collateralValueRaw: string | null;
+  collateralizationRaw: string | null;
+  minimumCollateralizationRaw: string;
+  collateralizationLowerBoundRaw: string;
+  /** The line's Liquidated and BatchLiquidated events to the indexed frontier. */
+  lineLiquidations: { count: number; throughBlock: number | null } | null;
 }
 
 export interface AlchemixStateResponse {
