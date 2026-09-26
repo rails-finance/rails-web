@@ -40,12 +40,12 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
   switch (ctx.eventType) {
     case "deposit":
       out.push(clause(<>The position took in {amount(raw.amount)} vault shares as collateral.</>));
-      out.push(cont(<>Collateral is held as shares in the vault, not as the asset underneath it.</>));
+      out.push(cont(<>{" "}Collateral is held as shares in the vault, not as the asset underneath it.</>));
       break;
 
     case "withdraw":
       out.push(clause(<>{amount(raw.amount)} vault shares left the position.</>));
-      out.push(cont(<>They went to {who(raw.recipient)}.</>));
+      out.push(cont(<>{" "}They went to {who(raw.recipient)}.</>));
       break;
 
     case "mint":
@@ -56,7 +56,7 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
           </>,
         ),
       );
-      out.push(cont(<>The {sym} went to {who(raw.recipient)}.</>));
+      out.push(cont(<>{" "}The {sym} went to {who(raw.recipient)}.</>));
       break;
 
     case "burn":
@@ -83,6 +83,7 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
         credit != null ? (
           cont(
             <>
+              {" "}
               That cleared {amount(credit)} {sym} of debt — the shares are worth what they are worth at this moment, and
               the amount cleared stops at whichever is smaller, the position&rsquo;s debt or the line&rsquo;s.
             </>,
@@ -90,6 +91,7 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
         ) : (
           cont(
             <>
+              {" "}
               How much debt that cleared is not stated here, so this card does not give a figure for it rather than give
               the wrong one.
             </>,
@@ -118,6 +120,7 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
       out.push(
         cont(
           <>
+            {" "}
             A further {amount(raw.protocol_fee_total)} shares went to the protocol as its fee, so the collateral fell by
             both.
           </>,
@@ -131,7 +134,7 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
           <>The holder liquidated {amount(raw.amount_liquidated)} of their own vault shares to bring the debt down.</>,
         ),
       );
-      out.push(cont(<>The debt this cleared is not in the log, so no figure for it is given.</>));
+      out.push(cont(<>{" "}The debt this cleared is not in the log, so no figure for it is given.</>));
       break;
 
     case "liquidated":
@@ -145,6 +148,7 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
       out.push(
         cont(
           <>
+            {" "}
             The liquidator was paid {amount(raw.fee_in_yield)} shares and {amount(raw.fee_in_underlying)} of the asset
             underneath for doing it.
           </>,
@@ -178,7 +182,7 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
           ),
         );
         out.push(
-          cont(<>Nothing about the debt or the collateral moved; only who owns them did.</>),
+          cont(<>{" "}Nothing about the debt or the collateral moved; only who owns them did.</>),
         );
       }
       break;
@@ -196,6 +200,7 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
       out.push(
         cont(
           <>
+            {" "}
             The event names no position and carries no share-out, so how much of it landed on this one cannot be read
             off it.
           </>,
@@ -227,6 +232,7 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
       out.push(
         cont(
           <>
+            {" "}
             The list of positions arrives as a single hash, so which of them were in it — and whether this one was —
             cannot be recovered from the event.
           </>,
@@ -243,7 +249,7 @@ export function alchemixEventClauses(ctx: AlchemixV3Context): ClauseInput[] {
           </>,
         ),
       );
-      out.push(cont(<>It names no position, and sits here because it falls inside this one&rsquo;s life.</>));
+      out.push(cont(<>{" "}It names no position, and sits here because it falls inside this one&rsquo;s life.</>));
       break;
 
     default:
