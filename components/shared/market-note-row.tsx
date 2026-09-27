@@ -1060,7 +1060,7 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
       after: { text: f.toBlock, prov: priceProv(note, "blocks"), exact: String(note.to.block) },
     },
     stats,
-    learnMore: marketNotePriceGapContent(),
+    learnMore: marketNotePriceGapContent(isPolaris ? "polaris" : "liquity-v2"),
     derivation,
   };
 }
@@ -1208,7 +1208,7 @@ function alchemixSharePriceBody(note: PriceGapNote, links: NoteLinks): NoteBody 
       after: { text: f.toBlock, prov: alchemixSharePriceProv(note, "blocks"), exact: String(note.to.block) },
     },
     stats,
-    learnMore: marketNotePriceGapContent(),
+    learnMore: marketNotePriceGapContent("alchemix-v3"),
     derivation,
   };
 }
@@ -1386,7 +1386,7 @@ function aaveV4PriceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
       after: { text: f.toBlock, prov: aaveV4PriceGapProv(note, "blocks"), exact: String(note.to.block) },
     },
     stats,
-    learnMore: marketNotePriceGapContent(),
+    learnMore: marketNotePriceGapContent("aave-v4"),
     derivation: note.live ? (
       <>
         This is a LIVE note: {end(note.from, "earlier")}; {end(note.to, "later")}. It states one asset&rsquo;s price —
@@ -1494,7 +1494,7 @@ function aaveFamilyPriceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody 
       after: { text: f.toBlock, prov: aaveFamilyPriceGapProv(note, "blocks"), exact: String(note.to.block) },
     },
     stats,
-    learnMore: marketNotePriceGapContent(),
+    learnMore: marketNotePriceGapContent(note.protocol === "spark" ? "spark" : "aave-v3"),
     derivation: (
       <>
         The price is not read for this note: each end is a row on this page that carries the {sym} price{" "}
@@ -1650,7 +1650,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     headline: { text: f.toRate, prov: rateStepProv(note, "rate"), exact: String(note.to.value) },
     quantity: "primary rate",
     ...liftTimeCells(stats),
-    learnMore: marketNoteRateStepContent(),
+    learnMore: marketNoteRateStepContent("polaris"),
     derivation: note.live ? (
       <>
         This is a LIVE note: the primary rate is the market&rsquo;s Peg Stability Rate — algorithmic, set on the
@@ -1840,7 +1840,7 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     headline: { text: f.toRate, prov: makerRateStepProv(note, "rate"), exact: String(note.to.value) },
     quantity: "stability fee",
     ...liftTimeCells(stats),
-    learnMore: marketNoteRateStepContent(),
+    learnMore: marketNoteRateStepContent("makerdao"),
     derivation: note.live ? (
       <>
         This is a LIVE note: the {ilk} stability fee is governance&rsquo;s own duty on the Jug — nobody borrowing in
@@ -2024,7 +2024,7 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
     headline: { text: f.toRate, prov: aaveFamilyRateStepProv(note, "rate"), exact: String(note.to.value) },
     quantity: rateNoun,
     ...liftTimeCells(stats),
-    learnMore: marketNoteRateStepContent(),
+    learnMore: marketNoteRateStepContent(note.protocol === "spark" ? "spark" : "aave-v3"),
     derivation: note.live ? (
       <>
         This is a LIVE note: the {note.marketSymbol} {rateNoun} on {marketName} is the reserve&rsquo;s own, not this

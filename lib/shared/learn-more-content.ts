@@ -5,6 +5,7 @@ import type { UniswapEventType } from "@/lib/shared/types/protocols/uniswap";
 import { getSpokeMeta, ARCHETYPE_LABEL } from "@/lib/aave-v4/spoke-meta";
 import { SEAMLESS_DOCS_URL, v3Brand, v3Possessive, type V3Protocol } from "@/lib/aave-v3/protocol-name";
 import { FAQ_URLS, AAVE_FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
+import { ALCHEMIX_DOCS } from "@/lib/alchemix/learn-more";
 import type { VaultPositionFamily } from "@/lib/aave-vaults/vault-position";
 
 // ── CoW Protocol ─────────────────────────────────────────────────────────────
@@ -2926,7 +2927,9 @@ export function frankencoinEventFallbackContent(): LearnMoreContent {
 // The "?" behind a market note row (components/shared/market-note-row.tsx).
 // Layer 2 only: how this KIND of note is read, never this note's figures — the
 // figures live on the row and their receipts in the inspector. One modal per
-// note kind, so a third kind adds a third function here.
+// note kind, taking the protocol the note was built for where a kind has more
+// than one home: the modal teaches that protocol's mechanism and links that
+// protocol's docs. A new kind adds a function here; a new home adds a case.
 
 export function marketNoteShareRateContent(): LearnMoreContent {
   return {
@@ -2956,56 +2959,193 @@ export function marketNoteShareRateContent(): LearnMoreContent {
   };
 }
 
-export function marketNotePriceGapContent(): LearnMoreContent {
-  return {
-    title: "About price-gap notes",
-    intro:
-      "A market note is a row in a position's timeline that states something which happened to the market while this position transacted nothing. It is never counted: no total, filter, run or export table moves because a note is shown. This kind states how the market's own oracle price moved between two of the position's own events — a Liquity V2 trove's branch, or a Polaris CDP's price feed.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Oracle price",
-        text: "every event on a trove carries the collateral price Liquity's own PriceFeed stated at that event's block, and every priced Polaris touch carries the market's own price feed at that block. The two ends of a note are two such events; no price is read for the note itself, and none is drawn between them.",
-      },
-      {
-        bold: "Runway",
-        text: "how far the price could fall from the earlier event before the position's collateral ratio reached the minimum, at the debt and collateral its own log recorded there.",
-      },
-      {
-        bold: "Which stretches are stated",
-        text: "a stretch is shown when the price move used at least a quarter of that runway, in either direction, and always when it ends in a liquidation or (Liquity V2 only) a redemption. Quieter stretches stay silent.",
-      },
-      {
-        bold: "The two ratios",
-        text: "the earlier event's debt and collateral, valued at each end's price. The later figure is what that state came to be worth — interest kept accruing across the stretch.",
-      },
-      {
-        bold: "On a Polaris CDP",
-        text: "the minimum named is always the market's own normal-mode MCR() — a defensive-mode minimum can be in force at a past block, but it is not indexed here, and Polaris has no redemption row of its own, so a stretch here ends only in a liquidation or an adjustment.",
-      },
-      {
-        bold: "On an Aave V4 spoke position",
-        text: "a position holds a basket, so a note states ONE asset's price and what that move alone did to the whole basket's health factor — every other amount and price held as the earlier row recorded them, each collateral weighted by the liquidation threshold the spoke reports now, against liquidation at 1.00. A stretch ending in a liquidation is drawn only for the asset that liquidation seized.",
-      },
-      {
-        bold: "On Aave V3 and SparkLend",
-        text: "a row carries the price of the one reserve it touched, so a note here is drawn only before a liquidation, for the asset it seized: that asset's price at the position's last row that touched it, and at the liquidation. Rows touching other reserves can sit between the two. No runway or health factor is stated, because the rest of the account is not priced at the earlier block. The note states the move alone: the debt side moves too, and a seized asset's price can rise into its liquidation.",
-      },
-      {
-        bold: "On an Alchemix V3 position",
-        text: "the price is the vault's share price, one share in the asset underneath, stored with each reading of the position. It moves the collateral's value in that asset and the collateralisation, read against the line's liquidation line as the Alchemist reports it now. The same quarter-of-the-runway rule applies, so a share price that rises a little between readings draws no note, and a line redemption is held to it like any other end.",
-      },
-      {
-        bold: "A live note",
-        text: "the same idea, but the later end is the chain head: this position's own newest priced event or touch against the market's oracle price read right now. Shown on any OPEN position, whatever the move.",
-      },
-    ],
-    links: [
-      { label: "How do I decide on my collateral ratio?", url: FAQ_URLS.LTV_COLLATERAL_RATIO },
-      { label: "How do liquidations work?", url: FAQ_URLS.LIQUIDATIONS },
-      { label: "What are redemptions?", url: FAQ_URLS.REDEMPTIONS },
-    ],
-  };
+/** The sentence every market-note modal opens on, naming what the page calls
+ *  the position. */
+function marketNoteLead(noun: string): string {
+  return `A market note is a row in a ${noun}'s timeline that states something which happened to the market while this ${noun} transacted nothing. It is never counted: no total, filter, run or export table moves because a note is shown.`;
+}
+
+/** The protocols a price-gap note is built for; the modal is that protocol's
+ *  price move, with that protocol's own docs. */
+export type PriceGapProtocol = "liquity-v2" | "polaris" | "aave-v4" | "aave-v3" | "spark" | "alchemix-v3";
+
+export function marketNotePriceGapContent(protocol: PriceGapProtocol): LearnMoreContent {
+  switch (protocol) {
+    case "polaris":
+      return {
+        title: "How a price move reaches a CDP",
+        intro: `${marketNoteLead("CDP")} This kind states how the market's own price feed moved between two of the CDP's own touches, and what that move alone did to its collateral ratio.`,
+        detailsHeading: "Key concepts:",
+        details: [
+          {
+            bold: "Oracle price",
+            text: "every priced touch carries the market's own price feed at that block, in the market's own unit (USDp or GOLDp) rather than in dollars. The two ends of a note are two such touches; no price is read for the note itself, and none is drawn between them.",
+          },
+          {
+            bold: "Collateral ratio",
+            text: "the pETH collateral's value at that price divided by the debt. The same collateral at a lower price covers less of the debt, so a fall lowers the ratio with nothing else moving.",
+          },
+          {
+            bold: "The liquidation line",
+            text: "the market's normal-mode MCR(). A CDP below it can be liquidated. A defensive-mode minimum can be in force at a past block, but it is not indexed here, so the note always names the normal-mode one.",
+          },
+          {
+            bold: "Runway",
+            text: "how far the price could fall from the earlier touch before the collateral ratio reached that line, at the debt and collateral the CDP's own log recorded there.",
+          },
+          {
+            bold: "Which stretches are stated",
+            text: "a stretch is shown when the price move used at least a quarter of that runway, in either direction, and always when it ends in a liquidation. Polaris has no redemption row of its own, so a stretch ends only in a liquidation or an adjustment.",
+          },
+          {
+            bold: "A live note",
+            text: "the same idea, but the later end is the chain head: this CDP's newest priced touch against the market's price feed read right now. Shown on any open CDP, whatever the move.",
+          },
+        ],
+        links: [POLARIS_DOC_LINKS.oracles, POLARIS_DOC_LINKS.liquidations, POLARIS_DOC_LINKS.defensiveMode],
+      };
+    case "aave-v4":
+      return {
+        title: "How a price move reaches an Aave V4 position",
+        intro: `${marketNoteLead("position")} This kind states how one asset's price, as the spoke's oracle gives it, moved between two of the position's own rows, and what that move alone did to the health factor.`,
+        detailsHeading: "Key concepts:",
+        details: [
+          {
+            bold: "Oracle price",
+            text: "the price the spoke's Aave oracle states for an asset, recorded on the position's own rows. A live note reads the same oracle at the chain head and at the block of the row it runs from.",
+          },
+          {
+            bold: "One asset at a time",
+            text: "a position holds a basket of collaterals and debts in one spoke, and their prices move independently. A note moves one asset's price and holds every other amount and price as the earlier row recorded them.",
+          },
+          {
+            bold: "Health factor",
+            text: "the collateral, each asset weighted by its liquidation threshold, divided by the debt. A collateral's price falling lowers it, and so does a debt's price rising. The thresholds are the ones the spoke reports now: the threshold in force at a past block is not indexed.",
+          },
+          {
+            bold: "The liquidation line",
+            text: "a health factor of 1.00. Below it, a liquidator can repay part of the debt and take collateral worth more than it repaid.",
+          },
+          {
+            bold: "Which stretches are stated",
+            text: "a stretch is shown when the move used at least a quarter of the runway, how far this asset's price alone could move before the health factor reaches 1.00, and always when it ends in a liquidation, for the asset that liquidation seized. Where a row does not price the whole basket, the note states the price alone and only a liquidation-ended stretch is shown.",
+          },
+          {
+            bold: "A live note",
+            text: "the same idea, but the later end is the chain head: this position's newest priced row against the oracle price read right now. Shown on any open position, whatever the move.",
+          },
+        ],
+        links: [
+          { label: "Aave V4 positions", url: AAVE_FAQ_URLS.V4_POSITIONS },
+          { label: "Liquidations in Aave V4", url: AAVE_FAQ_URLS.V4_LIQUIDATIONS },
+          { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
+        ],
+      };
+    case "aave-v3":
+    case "spark": {
+      const spark = protocol === "spark";
+      const brand = spark ? "SparkLend" : "Aave V3";
+      return {
+        title: `How a price move reaches ${spark ? "a SparkLend" : "an Aave V3"} account`,
+        intro: `${marketNoteLead("account")} This kind states how the price of the asset a liquidation seized moved before that liquidation, as ${brand}'s oracle gives it.`,
+        detailsHeading: "Key concepts:",
+        details: [
+          {
+            bold: "Oracle price",
+            text: "each row carries the oracle price of the one reserve it touched. A note takes the seized asset's price at the account's last row that touched it, and at the liquidation. Rows touching other reserves can sit between the two.",
+          },
+          {
+            bold: "Health factor",
+            text: "the collateral, each asset weighted by its liquidation threshold, divided by the debt, across the whole account. A collateral's price falling lowers it, and so does a debt's price rising.",
+          },
+          {
+            bold: "The liquidation line",
+            text: "a health factor of 1.0. Below it, a liquidator can repay part of the debt and take any of the account's collateral plus a bonus.",
+          },
+          {
+            bold: "What the note states",
+            text: "the seized asset's move alone. No runway or health factor is stated, because the rest of the account is not priced at the earlier block. The debt side moves too, and a seized asset's price can rise into its liquidation.",
+          },
+        ],
+        links: spark
+          ? [
+              { label: "Liquidations", url: SPARK_DOC_URLS.LIQUIDATIONS },
+              { label: "SparkLend overview", url: SPARK_DOC_URLS.SPARKLEND },
+              { label: "Spark FAQ", url: SPARK_DOC_URLS.FAQ },
+            ]
+          : [
+              { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
+              { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
+            ],
+      };
+    }
+    case "alchemix-v3":
+      return {
+        title: "How the vault share price reaches a position",
+        intro: `${marketNoteLead("position")} This kind states how the vault's share price moved between two readings of the position, and what that move alone did to its collateralisation.`,
+        detailsHeading: "Key concepts:",
+        details: [
+          {
+            bold: "Share price",
+            text: "what one vault share is worth in the asset underneath (mixUSDC in USDC, mixWETH in WETH), stored with each reading of the position. It can fall as well as rise.",
+          },
+          {
+            bold: "Collateralisation",
+            text: "the shares' value in the asset underneath divided by the debt, with one synthetic counted as one unit of that asset. The share count does not change across a note; what the shares are worth does.",
+          },
+          {
+            bold: "The liquidation line",
+            text: "at the line's liquidation line or below, anyone can liquidate the position. The note reads against the line as the Alchemist reports it now.",
+          },
+          {
+            bold: "Which stretches are stated",
+            text: "a stretch is shown when the move used at least a quarter of the runway, how far the share price could fall before collateralisation reached the liquidation line. A share price that rises a little between readings draws no note, and a line redemption is held to the same rule as any other end.",
+          },
+        ],
+        links: [ALCHEMIX_DOCS.liquidations, ALCHEMIX_DOCS.myt, ALCHEMIX_DOCS.selfRepayingLoans],
+      };
+    case "liquity-v2":
+      return {
+        title: "How a price move reaches a trove",
+        intro: `${marketNoteLead("trove")} This kind states how the branch's oracle price moved between two of the trove's own events, and what that move alone did to its collateral ratio.`,
+        detailsHeading: "Key concepts:",
+        details: [
+          {
+            bold: "Oracle price",
+            text: "every event on a trove carries the collateral price Liquity's own PriceFeed stated at that event's block. The two ends of a note are two such events; no price is read for the note itself, and none is drawn between them.",
+          },
+          {
+            bold: "Collateral ratio",
+            text: "the collateral's value at that price divided by the debt. The same collateral at a lower price covers less of the debt, so a fall lowers the ratio with nothing else moving.",
+          },
+          {
+            bold: "The liquidation line",
+            text: "the branch's minimum collateral ratio. A trove below it can be liquidated.",
+          },
+          {
+            bold: "Runway",
+            text: "how far the price could fall from the earlier event before the collateral ratio reached that minimum, at the debt and collateral the trove's own log recorded there.",
+          },
+          {
+            bold: "Which stretches are stated",
+            text: "a stretch is shown when the price move used at least a quarter of that runway, in either direction, and always when it ends in a liquidation or a redemption. Quieter stretches stay silent.",
+          },
+          {
+            bold: "The two ratios",
+            text: "the earlier event's debt and collateral, valued at each end's price. The later figure is what that state came to be worth, while interest kept accruing across the stretch.",
+          },
+          {
+            bold: "A live note",
+            text: "the same idea, but the later end is the chain head: this trove's newest event against the branch's oracle price read right now. Shown on any open trove, whatever the move.",
+          },
+        ],
+        links: [
+          { label: "How do I decide on my collateral ratio?", url: FAQ_URLS.LTV_COLLATERAL_RATIO },
+          { label: "How do liquidations work?", url: FAQ_URLS.LIQUIDATIONS },
+          { label: "What are redemptions?", url: FAQ_URLS.REDEMPTIONS },
+        ],
+      };
+  }
 }
 
 // ── Polaris (Sepolia testnet) ───────────────────────────────────────────────
@@ -3038,48 +3178,111 @@ export function marketNoteVaultTermsContent(): LearnMoreContent {
   };
 }
 
-export function marketNoteRateStepContent(): LearnMoreContent {
-  return {
-    title: "About rate-step notes",
-    intro:
-      "A market note is a row in a position's timeline that states something which happened to the market while this CDP transacted nothing. It is never counted: no total, filter, run or export table moves because a note is shown. This kind states a step in the market's primary rate between two of the CDP's OWN touches — unlike the other kinds of note, both ends are this position's own events. On an Aave V3 or SparkLend position the same kind reads one RESERVE and one SIDE of it — the supply rate an account earns or the variable borrow rate it pays, which move independently — and the rate is the reserve's own ReserveDataUpdated read AROUND the position's own transactions: at or before its earlier action, and before its next touch but never from inside that touch's own transaction, so a move the position itself caused is not stated as the market's.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Primary rate",
-        text: "the market's Peg Stability Rate, set algorithmically on the market's own PSM mints and redemptions. It is already on every touch as the rate in force at that block.",
-      },
-      {
-        bold: "Rate in force at a touch",
-        text: "the market's last PrimaryRateSet at or before the touch's block. Nothing is read for the note itself: the rate is the same figure the touch's own row already states.",
-      },
-      {
-        bold: "Which stretches are stated",
-        text: "a stretch is shown when the rate moved by at least one percentage point between the CDP's two touches, in either direction. Consecutive moves in the same direction are stated as one note, from the first touch to the last — the receipt lists each step it took in, and a move too small to be stated on its own never breaks a run. A move the other way ends the run and begins the next note. There is no exception for a stretch ending in a liquidation — the primary rate does not cause one.",
-      },
-      {
-        bold: "The figure in the header",
-        text: "the rate at the LATER end — what the market charged by the end of the stretch, or charges now on a live note. The move itself is stated in the panel, where the two rates sit side by side and the derivation says it in words.",
-      },
-      {
-        bold: "The interest figure",
-        text: "the yearly interest the CDP's own debt at the earlier touch would cost at each end's rate, holding that debt fixed and moving only the rate. The secondary, utilisation-driven rate is added on top by the protocol and is not on this log.",
-      },
-      {
-        bold: "On an Alchemix V3 position",
-        text: "the price is the vault's share price, one share in the asset underneath, stored with each reading of the position. It moves the collateral's value in that asset and the collateralisation, read against the line's liquidation line as the Alchemist reports it now. The same quarter-of-the-runway rule applies, so a share price that rises a little between readings draws no note, and a line redemption is held to it like any other end.",
-      },
-      {
-        bold: "A live note",
-        text: "the same idea, but the later end is the chain head: this CDP's own last touch against the cdpManager's own primary rate read right now. Shown on any OPEN CDP, whatever the move — there is no percentage-point threshold for a live note, because nothing having moved since is the fact it states.",
-      },
-      {
-        bold: "The same note on a MakerDAO vault",
-        text: "the quantity there is the collateral type's stability fee, and Maker states it nowhere a row can carry it — governance files a duty on the Jug and the spell's own block is not indexed. So the fee in force at a touch is read off the Vat's own fold series (every Jug.drip's delta encodes the duty it compounded at) and then confirmed by reading the Jug's duty at that drip's own block, which is the figure the note states.",
-      },
-    ],
-    links: [POLARIS_DOC_LINKS.interestRates, POLARIS_APP_LINK],
-  };
+/** The protocols a rate-step note is built for. */
+export type RateStepProtocol = "polaris" | "makerdao" | "aave-v3" | "spark";
+
+export function marketNoteRateStepContent(protocol: RateStepProtocol): LearnMoreContent {
+  switch (protocol) {
+    case "makerdao":
+      return {
+        title: "How the stability fee moves a vault",
+        intro: `${marketNoteLead("vault")} This kind states a step in the collateral type's stability fee between two of the vault's own touches.`,
+        detailsHeading: "Key concepts:",
+        details: [
+          {
+            bold: "Stability fee",
+            text: "the yearly rate a collateral type's debt compounds at, set by governance as the duty on the Jug.",
+          },
+          {
+            bold: "Fee in force at a touch",
+            text: "a vault's rows carry no fee, and the spell that set it is not indexed. So the fee in force at a touch is read off the Vat's own fold series (every Jug.drip's delta encodes the duty it compounded at) and then confirmed by reading the Jug's duty at that drip's own block, which is the figure the note states.",
+          },
+          {
+            bold: "Which stretches are stated",
+            text: "a stretch is shown when the fee moved by at least one percentage point between the vault's two touches, in either direction. Consecutive moves in the same direction are stated as one note.",
+          },
+          {
+            bold: "A live note",
+            text: "the same idea, but the later end is the chain head: the Jug's base plus duty for this collateral type, compounded over a year and read right now.",
+          },
+        ],
+        links: [
+          { label: "Rates module (stability fees)", url: MAKER_DOCS.RATES },
+          { label: "Vat, the core accounting", url: MAKER_DOCS.VAT },
+          { label: "Maker protocol docs", url: MAKER_DOCS.OVERVIEW },
+        ],
+      };
+    case "aave-v3":
+    case "spark": {
+      const spark = protocol === "spark";
+      return {
+        title: `How ${spark ? "SparkLend" : "Aave V3"} rates move an account`,
+        intro: `${marketNoteLead("account")} This kind states a step in one reserve's rate, on one side of it, between two of the account's own touches.`,
+        detailsHeading: "Key concepts:",
+        details: [
+          {
+            bold: "Two rates per reserve",
+            text: "the supply rate an account earns and the variable borrow rate it pays. They move independently, so a note reads one of them.",
+          },
+          {
+            bold: "Where the rate is read",
+            text: "the reserve's own ReserveDataUpdated log around the account's own transactions: at or before its earlier action, and before its next touch but never from inside that touch's transaction, so a move the account caused is not stated as the market's.",
+          },
+          {
+            bold: "Which stretches are stated",
+            text: "a stretch is shown when the rate moved by at least one percentage point between the two touches, in either direction.",
+          },
+          {
+            bold: "A live note",
+            text: "the same idea, but the later end is the Pool's getReserveData for the reserve, read at the chain head.",
+          },
+        ],
+        links: spark
+          ? [
+              { label: "SparkLend overview", url: SPARK_DOC_URLS.SPARKLEND },
+              { label: "Spark FAQ", url: SPARK_DOC_URLS.FAQ },
+            ]
+          : [
+              { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
+              { label: "Borrowing assets", url: AAVE_FAQ_URLS.BORROWING },
+              { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
+            ],
+      };
+    }
+    case "polaris":
+      return {
+        title: "How the primary rate moves a CDP",
+        intro: `${marketNoteLead("CDP")} This kind states a step in the market's primary rate between two of the CDP's own touches; both ends are this CDP's own events.`,
+        detailsHeading: "Key concepts:",
+        details: [
+          {
+            bold: "Primary rate",
+            text: "the market's Peg Stability Rate, set algorithmically on the market's own PSM mints and redemptions. It is on every touch as the rate in force at that block.",
+          },
+          {
+            bold: "Rate in force at a touch",
+            text: "the market's last PrimaryRateSet at or before the touch's block. Nothing is read for the note itself: the rate is the figure the touch's own row states.",
+          },
+          {
+            bold: "Which stretches are stated",
+            text: "a stretch is shown when the rate moved by at least one percentage point between the CDP's two touches, in either direction. Consecutive moves in the same direction are stated as one note, from the first touch to the last; the receipt lists each step it took in, and a move too small to be stated on its own never breaks a run. A move the other way ends the run and begins the next note. A stretch ending in a liquidation has no exception, because the primary rate does not cause one.",
+          },
+          {
+            bold: "The figure in the header",
+            text: "the rate at the later end: what the market charged by the end of the stretch, or charges now on a live note. The panel sets the two rates side by side.",
+          },
+          {
+            bold: "The interest figure",
+            text: "the yearly interest the CDP's debt at the earlier touch would cost at each end's rate, holding that debt fixed and moving only the rate. The secondary, utilisation-driven rate is added on top by the protocol and is not on this log.",
+          },
+          {
+            bold: "A live note",
+            text: "the same idea, but the later end is the chain head: this CDP's last touch against the cdpManager's primary rate read right now. Shown on any open CDP, whatever the move.",
+          },
+        ],
+        links: [POLARIS_DOC_LINKS.interestRates, POLARIS_APP_LINK],
+      };
+  }
 }
 
 export function polarisCdpContent(): LearnMoreContent {
