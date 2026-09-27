@@ -960,10 +960,10 @@ function AaveV4SpokeTowerBlock({
                   <span className="select-none text-rb-500">•</span>
                   <span>
                     {fig(totals.depositedUsd)} of collateral has moved through this position over its life
-                    {totals.withdrawnUsd > 0.01 && <> — {fig(totals.withdrawnUsd)} withdrawn</>}
+                    {totals.withdrawnUsd > 0.01 && <>: {fig(totals.withdrawnUsd)} withdrawn</>}
                     {totals.liquidatedCollUsd > 0.01 && (
                       <>
-                        {totals.withdrawnUsd > 0.01 ? " and " : " — "}
+                        {totals.withdrawnUsd > 0.01 ? " and " : ": "}
                         {fig(totals.liquidatedCollUsd)} liquidated
                       </>
                     )}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
+import { formatTinyNonZero } from "@/lib/utils/format";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -128,10 +129,15 @@ function compactSuffix(n: number, divisor: number, suffix: string): string {
   return v.endsWith(".0") ? v.slice(0, -2) + suffix : v + suffix;
 }
 
+/** A non-zero amount never renders as "0": one the fixed decimals would round
+ *  away keeps its sign and first significant digits (formatTinyNonZero, the
+ *  rule formatNumber applies everywhere else). */
 export function fmt(n: number, decimals = 2): string {
   if (Math.abs(n) >= 1_000_000) return compactSuffix(n, 1_000_000, "M");
   if (Math.abs(n) >= 1_000) return compactSuffix(n, 1_000, "K");
-  return n.toLocaleString("en-US", { maximumFractionDigits: decimals });
+  const s = n.toLocaleString("en-US", { maximumFractionDigits: decimals });
+  if (n !== 0 && Number.isFinite(n) && parseFloat(s) === 0) return formatTinyNonZero(n);
+  return s;
 }
 
 // ── Layout ─────────────────────────────────────────────────────────────────
