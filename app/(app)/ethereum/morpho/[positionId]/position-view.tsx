@@ -22,7 +22,11 @@ import { summariseExternalActors, withOpeningActors } from "@/lib/shared/externa
 import { fetchMorphoPositions } from "@/lib/api/fetch-morpho-positions";
 import { splitMorphoPositionId } from "@/lib/morpho/position-id";
 import type { MorphoPositionSummary } from "@/lib/sources/api/morpho-positions";
-import { fetchMorphoTimeline } from "@/lib/api/fetch-morpho-timeline";
+import {
+  fetchMorphoTimeline,
+  fetchMorphoGroupedTimeline,
+  type MorphoGroupedTimelineResult,
+} from "@/lib/api/fetch-morpho-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
@@ -34,9 +38,11 @@ import {
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import { fetchMorphoPosition, type MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { MORPHO_LIQUIDATION_RUNS } from "@/lib/morpho/timeline-runs";
+import { MORPHO_FOLDER_REGISTER, MORPHO_LIQUIDATION_RUNS } from "@/lib/morpho/timeline-runs";
+import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
+import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
@@ -73,6 +79,11 @@ interface MorphoPositionViewProps {
   initialEvents: BaseActivityEvent[] | null;
   initialCutoffBlock: number | null;
   initialOpening: TimelineOpeningBalance | null;
+  /** The grouped answer WHOLE, when the load read its history as ROWS (the
+   *  default; `?folders=0` reads the flat window). Its row plan puts the
+   *  folders back between the ungrouped events, and its folders carry the
+   *  arithmetic the whole-history reductions read. */
+  initialGrouped: MorphoGroupedTimelineResult | null;
 }
 
 export default function MorphoPositionView({
@@ -81,6 +92,7 @@ export default function MorphoPositionView({
   initialEvents,
   initialCutoffBlock,
   initialOpening,
+  initialGrouped,
 }: MorphoPositionViewProps) {
   // Keyed on the timeline, not the row: a pair the singleton has never seen is
   // a real answer the server can seed, and its `initialPosition` is null.
@@ -89,6 +101,12 @@ export default function MorphoPositionView({
     initialPosition ? viewFromSummary(initialPosition) : null,
   );
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);
+  // The same history as ROWS (decision 0019's evening amendment): the index
+  // groups this family, because every row carries the position's own running
+  // collateral and debt, so a folder leaves nothing here to reconstruct. The
+  // grouped answer REPLACES the flat window: `events` holds its ungrouped
+  // events and this its row plan and folders.
+  const [groupedTail, setGroupedTail] = useState<MorphoGroupedTimelineResult | null>(initialGrouped);
   // The checkpoint model. The timeline fetch asks for a WINDOW of the most
   // recent events; on a position that needs one, the response names the block
   // the window opened at and everything below it arrives as a declared opening
@@ -111,14 +129,20 @@ export default function MorphoPositionView({
       setLoading(true);
       try {
         const { market: mkt, user: usr } = splitMorphoPositionId(positionId);
-        const [pData, tData] = await Promise.all([
+        // The same choice the server half made (`position-page-data.ts`): ONE
+        // timeline read, in the shape the URL asked for.
+        const asked = servedFoldersEnabled();
+        const [pData, flat, grouped] = await Promise.all([
           fetchMorphoPositions({ market: mkt, user: usr, limit: 1 }),
-          fetchMorphoTimeline(positionId, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchMorphoTimeline(positionId, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? fetchMorphoGroupedTimeline(positionId) : null,
         ]);
+        const tData = grouped ?? flat;
         const summary = pData.data[0] ?? null;
         setView(summary ? viewFromSummary(summary) : null);
-        setEvents(tData.events ?? []);
-        setCutoffBlock(tData.cutoffBlock ?? null);
+        setEvents(tData?.events ?? []);
+        setCutoffBlock(tData?.cutoffBlock ?? null);
+        setGroupedTail(grouped);
       } finally {
         setLoading(false);
       }
@@ -180,10 +204,48 @@ export default function MorphoPositionView({
   }, [positionId]);
 
   const morphoEvents = useMemo(() => events.filter(isMorphoEvent), [events]);
-  const tl = useTimelineEvents(morphoEvents, {
+  // The served list as ROWS, from the same answer as `morphoEvents`.
+  const servedRows = useMemo(
+    () => (groupedTail ? interleaveRowPlan(groupedTail.rowPlan, morphoEvents) : undefined),
+    [groupedTail, morphoEvents],
+  );
+  /** The folders the index served, whole and unfiltered: the third
+   *  contributor to the page's partition, which every whole-history reduction
+   *  below adds to `opening + events`. */
+  const servedFolders = useMemo(
+    () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
+    [servedRows],
+  );
+  /** The oldest member any folder stands for, so a page whose oldest row is a
+   *  folder still dates the position from inside it. */
+  const oldestFolderAt = useMemo(
+    () =>
+      servedFolders?.reduce<number | undefined>(
+        (min, f) => (min == null || f.firstAt < min ? f.firstAt : min),
+        undefined,
+      ),
+    [servedFolders],
+  );
+
+  // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
+  // Decision 0019, amendments 2026-09-24 and 2026-09-25: a month the loaded
+  // rows do not hold is read from the index as its segment
+  // (hooks/useTimelineSegment.ts). The preload stays the page's whole-history
+  // record; the timeline alone swaps.
+  const { tl, segments, readFolderMembers } = useTimelineSegment({
+    events: morphoEvents,
+    groupedTail,
+    servedRows,
+    servedFolders,
+    opening,
+    historyWindow,
+    isEvent: isMorphoEvent,
+    readGrouped: (span, signal) => fetchMorphoGroupedTimeline(positionId, { span, signal }),
+    readFlat: (span) => fetchMorphoTimeline(positionId, { span }),
+    folderPath: `/api/morpho/position/${encodeURIComponent(positionId)}/timeline/folder`,
+    folderParams: {},
     storageKey: `morpho-${positionId}`,
     protocolKey: "morpho",
-    window: historyWindow,
   });
 
   // ⚠️ On a windowed page every lifetime surface must read the MERGED history,
@@ -193,7 +255,10 @@ export default function MorphoPositionView({
   // the whole, which is the only correct answer between the two requests.
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? morphoEvents : undefined;
-  const precomputedLifetime = useMemo(() => morphoLifetimeWithOpening(morphoEvents, opening), [morphoEvents, opening]);
+  const precomputedLifetime = useMemo(
+    () => morphoLifetimeWithOpening(morphoEvents, opening, servedFolders),
+    [morphoEvents, opening, servedFolders],
+  );
 
   // The CSV is the export whose purpose IS the rows, so on a windowed page it
   // fetches the whole history at click time rather than handing over the
@@ -229,10 +294,13 @@ export default function MorphoPositionView({
   // reconstructs the same two-fact verdict from the base tables (liquidation
   // excluded, exactly as the rows exclude it), so both halves judge on the
   // same fact and never count one event twice.
-  const externalActivityWithOpening = useMemo(
-    () => withOpeningActors(externalActivity, opening?.actors, opening?.totalEvents ?? 0),
-    [externalActivity, opening],
-  );
+  //
+  // The folders add theirs the same way: rails-server judges a member by the
+  // route's own two-fact verdict, liquidations excluded.
+  const externalActivityWithOpening = useMemo(() => {
+    const withOpening = withOpeningActors(externalActivity, opening?.actors, opening?.totalEvents ?? 0);
+    return servedFolders && servedFolders.length > 0 ? withFolderActors(withOpening, servedFolders) : withOpening;
+  }, [externalActivity, opening, servedFolders]);
 
   // Upgrade the card's current-debt figure to the live head read when the chain
   // lane agrees with the index wei-exact on borrow shares (the verified normal
@@ -285,9 +353,11 @@ export default function MorphoPositionView({
             chain={chain}
             events={morphoEvents}
             csvFilename={`morpho-${positionId.slice(0, 10)}-activity.csv`}
-            fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-            history={markdownHistoryScope(historyWindow, morphoEvents)}
-            scopeNote={exportScopeNote(historyWindow, morphoEvents, "this position's whole history")}
+            // A folder's members are not in `morphoEvents`, so a grouped page
+            // reads the whole history for the CSV as a windowed one does.
+            fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
+            history={markdownHistoryScope(historyWindow, morphoEvents, servedFolders)}
+            scopeNote={exportScopeNote(historyWindow, morphoEvents, "this position's whole history", servedFolders)}
           />
         )}
       </DetailTopRow>
@@ -354,12 +424,15 @@ export default function MorphoPositionView({
             closed={liveView?.status !== "open"}
             tl={tl}
             runs={MORPHO_LIQUIDATION_RUNS}
+            folderRegister={MORPHO_FOLDER_REGISTER}
+            readFolderMembers={readFolderMembers}
+            segments={segments}
             toolbarLeading={
               <TimelineActivityHeader
                 events={tl.sortedEvents}
                 closed={liveView?.status !== "open"}
                 // When the position actually opened, not when the window does.
-                firstAt={opening?.firstTimestamp}
+                firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                 tenurePending={!lifetimeFiguresKnown(historyWindow)}
               />
             }

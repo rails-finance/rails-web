@@ -13,6 +13,8 @@ import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline
 import { renderRunFolders, DANGER_FOLDER_BADGE } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 import { DAI_META } from "@/lib/makerdao/asset-catalog";
+import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
+import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
 
 /** Runs shorter than this stay as individual cards — the four-row floor every
  *  explorer's liquidation run uses. */
@@ -73,3 +75,33 @@ export const MAKERDAO_LIQUIDATION_RUNS: TimelineRunSpec[] = [
       }),
   },
 ];
+
+// ── Folders the INDEX served ────────────────────────────────────────────────
+//
+// The vault page reads its history as ROWS (decision 0019's evening
+// amendment): rails-server transcribes the spec above as the `liquidation`
+// kind and adds the owner run (decision 0021, 2026-09-24) as `owner_run`, in
+// `api/src/services/makerdao-timeline-folders.ts`. This register is how those
+// two kinds draw; the spec above stays for the flat answer (`?folders=0`).
+
+const LIQUIDATION_FOLDER: FolderRegisterEntry = {
+  memberNoun: "liquidation",
+  tone: "danger",
+  warningLabel: "Liquidations",
+  folderBadge: DANGER_FOLDER_BADGE,
+};
+
+/** One member of an owner run, by the frob shape it repeats (the summary's
+ *  `frob:<shape>` key). A frob that moves both sides is a vault adjustment;
+ *  the header's two sums say which way each side went. */
+const OWNER_RUN_NOUN: Record<string, string> = {
+  "frob:lock": "deposit",
+  "frob:free": "withdrawal",
+  "frob:draw": "debt draw",
+  "frob:wipe": "repayment",
+};
+
+export const MAKERDAO_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry =>
+  folder.kind === OWNER_RUN_KIND
+    ? ownerRunEntry(folder, (a) => OWNER_RUN_NOUN[a] ?? "vault adjustment")
+    : LIQUIDATION_FOLDER;

@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
+import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { loadMorphoPositionTail } from "@/lib/morpho/position-page-data";
 import MorphoPositionView from "./position-view";
 
 interface Props {
   params: Promise<{ positionId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // The position's numbers are stated as current, so the route renders per request
@@ -42,22 +44,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function MorphoPositionPage({ params }: Props) {
+export default async function MorphoPositionPage({ params, searchParams }: Props) {
   const { positionId } = await params;
   if (!POSITION_ID.test(positionId)) notFound();
 
-  const tail = await loadMorphoPositionTail(positionId);
+  // Rows by default; `?folders=0` reads the flat window.
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = await loadMorphoPositionTail(positionId, grouped);
 
   return (
     <MorphoPositionView
       // Keyed on the pair so a client-side navigation to another position
       // remounts with that position's server tail as its initial state.
-      key={positionId}
+      key={`${positionId}:${grouped ? "rows" : "events"}`}
       positionId={positionId}
       initialPosition={tail.position}
       initialEvents={tail.events}
       initialCutoffBlock={tail.cutoffBlock}
       initialOpening={tail.opening}
+      initialGrouped={tail.grouped}
     />
   );
 }

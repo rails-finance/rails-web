@@ -23,7 +23,12 @@
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
 import { fetchMakerVaults } from "@/lib/api/fetch-makerdao-vaults";
-import { fetchMakerTimeline } from "@/lib/api/fetch-makerdao-timeline";
+import {
+  fetchMakerTimeline,
+  fetchMakerGroupedTimeline,
+  type MakerGroupedTimelineResult,
+} from "@/lib/api/fetch-makerdao-timeline";
+import type { MakerTimelineResult } from "@/lib/sources/api/makerdao-timeline";
 import { loadMakerVaultStateFromChain } from "@/lib/sources/chain/makerdao-position";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
@@ -35,9 +40,18 @@ interface MakerVaultReads {
   chain: MakerVaultState | null;
 }
 
-export const loadMakerVaultTail = cache(async (vault: string) => {
+/**
+ * ONE timeline read, whichever shape the URL asked for — the SparkLend and
+ * Aave V3 loaders' rule: the grouped answer REPLACES the flat window, and
+ * `grouped` is a boolean because `cache()` keys on argument identity. It
+ * defaults to FALSE for the callers that omit it, the opengraph images and the
+ * event page's metadata, which name ONE event and need it findable by id; a
+ * grouped answer carries only the ungrouped events. The page passes the URL's
+ * answer.
+ */
+export const loadMakerVaultTail = cache(async (vault: string, grouped: boolean = false) => {
   const isUrnAddr = /^0x[0-9a-fA-F]{40}$/.test(vault);
-  const tail = await loadPositionTail<MakerVaultReads>({
+  const tail = await loadPositionTail<MakerVaultReads, MakerTimelineResult | MakerGroupedTimelineResult>({
     label: "makerdao",
     readPositions: async (baseUrl, headers) => {
       const [vaults, chain] = await Promise.all([
@@ -62,7 +76,10 @@ export const loadMakerVaultTail = cache(async (vault: string) => {
         : null;
       return { summary, chain: chain ?? directChain };
     },
-    readTimeline: (baseUrl, headers) => fetchMakerTimeline(vault, { recent: TIMELINE_WINDOW_EVENTS, baseUrl, headers }),
+    readTimeline: (baseUrl, headers) =>
+      grouped
+        ? fetchMakerGroupedTimeline(vault, { baseUrl, headers })
+        : fetchMakerTimeline(vault, { recent: TIMELINE_WINDOW_EVENTS, baseUrl, headers }),
     readOpening: (baseUrl, cutoffBlock, headers) =>
       fetchTimelineOpeningBalance({
         path: `/api/makerdao/vault/${encodeURIComponent(vault)}/timeline/summary`,
@@ -72,5 +89,11 @@ export const loadMakerVaultTail = cache(async (vault: string) => {
         headers,
       }),
   });
-  return { ...tail, summary: tail.positions?.summary ?? null, chain: tail.positions?.chain ?? null };
+  return {
+    ...tail,
+    summary: tail.positions?.summary ?? null,
+    chain: tail.positions?.chain ?? null,
+    // The flag alone does not prove a grouped answer arrived.
+    grouped: tail.timeline && "grouped" in tail.timeline ? (tail.timeline as MakerGroupedTimelineResult) : null,
+  };
 });

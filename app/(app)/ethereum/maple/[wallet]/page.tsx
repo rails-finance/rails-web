@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
+import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { getCcipEscrow } from "@/lib/shared/known-infrastructure";
 import { loadMaplePositionTail } from "@/lib/maple/position-page-data";
 import MaplePositionView from "./position-view";
 
 interface Props {
   params: Promise<{ wallet: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // The position's numbers are stated as current, so the route renders per request
@@ -32,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function MaplePositionPage({ params }: Props) {
+export default async function MaplePositionPage({ params, searchParams }: Props) {
   const { wallet: raw } = await params;
   if (!ADDRESS.test(raw)) notFound();
   const wallet = raw.toLowerCase();
@@ -41,19 +43,22 @@ export default async function MaplePositionPage({ params }: Props) {
   // and no timeline for them, and the page renders a custody view off its own
   // chain read. Asking for a tail they cannot have would spend two reads to
   // learn nothing.
-  const tail = getCcipEscrow(wallet) ? null : await loadMaplePositionTail(wallet);
+  // Rows by default; `?folders=0` reads the flat window.
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = getCcipEscrow(wallet) ? null : await loadMaplePositionTail(wallet, grouped);
 
   return (
     <MaplePositionView
       // Keyed on the wallet so a client-side navigation to another lender
       // remounts with that lender's server tail as its initial state.
-      key={wallet}
+      key={`${wallet}:${grouped ? "rows" : "events"}`}
       wallet={wallet}
       initialPosition={tail?.position ?? null}
       initialPoolState={tail?.poolState ?? null}
       initialEvents={tail?.events ?? null}
       initialCutoffBlock={tail?.cutoffBlock ?? null}
       initialOpening={tail?.opening ?? null}
+      initialGrouped={tail?.grouped ?? null}
     />
   );
 }

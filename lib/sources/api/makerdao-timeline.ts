@@ -78,6 +78,9 @@ export interface RawMakerTimelineRow {
    *  mig 111: Vat spot × Spotter mat) — non-NULL only on priced grab blocks. */
   price_usd?: string | null;
   price_source?: string | null;
+  /** On a grouped or span answer: whether this is the vault's first row. The
+   *  route states it, since a grouped answer's first event row need not be. */
+  is_open?: boolean;
 }
 
 /** The rails timeline response envelope. */
@@ -213,7 +216,7 @@ export function buildMakerTimeline(resp: RawMakerTimelineResponse): MakerTimelin
     const dink = BigInt(r.dink);
     const dart = BigInt(r.dart);
     const eventType: MakerDAOEventType = r.src;
-    const isOpen = wholeHistory && idx === 0 && eventType === "frob";
+    const isOpen = (r.is_open ?? (wholeHistory && idx === 0)) && eventType === "frob";
     const { actionType, actionLabel } = labelFor(eventType, dink, dart, isOpen, ilkDebtMeta(r.ilk).symbol);
     const sym = collateralSymbol ?? ilkToCollateralSymbol(r.ilk);
 

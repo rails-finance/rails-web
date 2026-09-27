@@ -16,7 +16,11 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMapleEvent } from "@/lib/shared/types/event-shape";
 import { fetchMaplePositions } from "@/lib/api/fetch-maple-positions";
 import type { MaplePositionSummary } from "@/lib/sources/api/maple-positions";
-import { fetchMapleTimeline } from "@/lib/api/fetch-maple-timeline";
+import {
+  fetchMapleTimeline,
+  fetchMapleGroupedTimeline,
+  type MapleGroupedTimelineResult,
+} from "@/lib/api/fetch-maple-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
@@ -26,8 +30,10 @@ import {
   type TimelineWindow,
 } from "@/lib/shared/timeline-opening-balance";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { MAPLE_QUEUE_FILL_RUNS } from "@/lib/maple/timeline-runs";
-import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { MAPLE_FOLDER_REGISTER, MAPLE_QUEUE_FILL_RUNS } from "@/lib/maple/timeline-runs";
+import { useTimelineSegment } from "@/hooks/useTimelineSegment";
+import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
+import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
 import { MapleEventCard } from "@/components/protocol/maple/maple-event-card";
 import { MaplePoolStatsBand } from "@/components/protocol/maple/maple-pool-stats-band";
 import {
@@ -74,6 +80,11 @@ interface MaplePositionViewProps {
   initialEvents: BaseActivityEvent[] | null;
   initialCutoffBlock: number | null;
   initialOpening: TimelineOpeningBalance | null;
+  /** The grouped answer WHOLE, when the load read its history as ROWS (the
+   *  default; `?folders=0` reads the flat window). Its row plan puts the
+   *  folders back between the ungrouped events, and its folders carry the
+   *  arithmetic the whole-history reductions read. */
+  initialGrouped: MapleGroupedTimelineResult | null;
 }
 
 export default function MaplePositionView({
@@ -83,6 +94,7 @@ export default function MaplePositionView({
   initialEvents,
   initialCutoffBlock,
   initialOpening,
+  initialGrouped,
 }: MaplePositionViewProps) {
   // Keyed on the timeline, not the row: a wallet with no Maple position is a
   // real answer the server can seed, and its `initialPosition` is null.
@@ -92,6 +104,12 @@ export default function MaplePositionView({
   );
   const [poolState, setPoolState] = useState<Record<string, MaplePoolState>>(initialPoolState ?? {});
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);
+  // The same history as ROWS (decision 0019's evening amendment): the index
+  // groups this family, because every row carries the wallet's own share,
+  // escrow and principal lanes, so a folder leaves nothing here to
+  // reconstruct. The grouped answer REPLACES the flat window: `events` holds
+  // its ungrouped events and this its row plan and folders.
+  const [groupedTail, setGroupedTail] = useState<MapleGroupedTimelineResult | null>(initialGrouped);
   // The checkpoint model. The timeline fetch asks for a WINDOW of the most
   // recent events; on a position that needs one, the response names the block
   // the window opened at and everything below it arrives as a declared opening
@@ -135,15 +153,21 @@ export default function MaplePositionView({
     (async () => {
       setLoading(true);
       try {
-        const [pData, tData] = await Promise.all([
+        // The same choice the server half made (`position-page-data.ts`): ONE
+        // timeline read, in the shape the URL asked for.
+        const asked = servedFoldersEnabled();
+        const [pData, flat, grouped] = await Promise.all([
           fetchMaplePositions({ wallet, limit: 1, status: undefined }),
-          fetchMapleTimeline(wallet, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchMapleTimeline(wallet, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? fetchMapleGroupedTimeline(wallet) : null,
         ]);
+        const tData = grouped ?? flat;
         const summary = pData.data[0] ?? null;
         setView(summary ? viewFromSummary(summary) : null);
         setPoolState(pData.poolState ?? {});
-        setEvents(tData.events ?? []);
-        setCutoffBlock(tData.cutoffBlock ?? null);
+        setEvents(tData?.events ?? []);
+        setCutoffBlock(tData?.cutoffBlock ?? null);
+        setGroupedTail(grouped);
       } finally {
         setLoading(false);
       }
@@ -208,12 +232,53 @@ export default function MaplePositionView({
   // the interest split state nothing while they cannot state the whole, which is
   // the only correct answer between the two requests.
   const lifetimeEvents = lifetimeFiguresKnown(historyWindow) ? mapleEvents : undefined;
-  const precomputedLifetime = useMemo(() => mapleLifetimeWithOpening(mapleEvents, opening), [mapleEvents, opening]);
 
-  const tl = useTimelineEvents(mapleEvents, {
+  // The served list as ROWS, from the same answer as `mapleEvents`.
+  const servedRows = useMemo(
+    () => (groupedTail ? interleaveRowPlan(groupedTail.rowPlan, mapleEvents) : undefined),
+    [groupedTail, mapleEvents],
+  );
+  /** The folders the index served, whole and unfiltered: the third
+   *  contributor to the page's partition, which every whole-history reduction
+   *  below adds to `opening + events`. */
+  const servedFolders = useMemo(
+    () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
+    [servedRows],
+  );
+  /** The oldest member any folder stands for, so a page whose oldest row is a
+   *  folder still dates the wallet from inside it. */
+  const oldestFolderAt = useMemo(
+    () =>
+      servedFolders?.reduce<number | undefined>(
+        (min, f) => (min == null || f.firstAt < min ? f.firstAt : min),
+        undefined,
+      ),
+    [servedFolders],
+  );
+  const precomputedLifetime = useMemo(
+    () => mapleLifetimeWithOpening(mapleEvents, opening, servedFolders),
+    [mapleEvents, opening, servedFolders],
+  );
+
+  // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
+  // Decision 0019, amendments 2026-09-24 and 2026-09-25: a month the loaded
+  // rows do not hold is read from the index as its segment
+  // (hooks/useTimelineSegment.ts). The preload stays the page's whole-history
+  // record; the timeline alone swaps.
+  const { tl, segments, readFolderMembers } = useTimelineSegment({
+    events: mapleEvents,
+    groupedTail,
+    servedRows,
+    servedFolders,
+    opening,
+    historyWindow,
+    isEvent: isMapleEvent,
+    readGrouped: (span, signal) => fetchMapleGroupedTimeline(wallet, { span, signal }),
+    readFlat: (span) => fetchMapleTimeline(wallet, { span }),
+    folderPath: "/api/maple/timeline/folder",
+    folderParams: { wallet },
     storageKey: `maple-${wallet}`,
     protocolKey: "maple",
-    window: historyWindow,
   });
 
   // Who executed this account's events — the SAME verdict each event card
@@ -227,22 +292,22 @@ export default function MaplePositionView({
   // makes the SAME exclusion in SQL (`action <> 'request_fill'`) and reads
   // tx_from and caller from the base tables exactly as /timeline does, so both
   // halves judge on the same fact. The two never count one event twice — they
-  // are the two sides of an exclusive cut.
-  const externalActivity = useMemo(
-    () =>
-      withOpeningActors(
-        summariseExternalActors(
-          mapleEvents.map((e) =>
-            e.context.data.eventType === "request_fill"
-              ? { wallet: e.wallet }
-              : { txFrom: e.context.data.txFrom, poolCaller: e.context.data.caller, wallet: e.wallet },
-          ),
+  // are the two sides of an exclusive cut. The folders add theirs the same way:
+  // rails-server judges a member by the same rule, queue fills excluded.
+  const externalActivity = useMemo(() => {
+    const withOpening = withOpeningActors(
+      summariseExternalActors(
+        mapleEvents.map((e) =>
+          e.context.data.eventType === "request_fill"
+            ? { wallet: e.wallet }
+            : { txFrom: e.context.data.txFrom, poolCaller: e.context.data.caller, wallet: e.wallet },
         ),
-        opening?.actors,
-        opening?.totalEvents ?? 0,
       ),
-    [mapleEvents, opening],
-  );
+      opening?.actors,
+      opening?.totalEvents ?? 0,
+    );
+    return servedFolders && servedFolders.length > 0 ? withFolderActors(withOpening, servedFolders) : withOpening;
+  }, [mapleEvents, opening, servedFolders]);
 
   // Stat captions (earned interest) — the event stream feeds the split; the
   // rate rides the listing row's per-pool chain read.
@@ -326,14 +391,16 @@ export default function MaplePositionView({
             events={mapleEvents}
             captions={captions}
             csvFilename={`maple-${wallet}-activity.csv`}
-            fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
+            // A folder's members are not in `mapleEvents`, so a grouped page
+            // reads the whole history for the CSV as a windowed one does.
+            fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
             queued={{
               protocol: "maple",
               params: { wallet },
               totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
             }}
-            history={markdownHistoryScope(historyWindow, mapleEvents)}
-            scopeNote={exportScopeNote(historyWindow, mapleEvents, "this wallet's whole history")}
+            history={markdownHistoryScope(historyWindow, mapleEvents, servedFolders)}
+            scopeNote={exportScopeNote(historyWindow, mapleEvents, "this wallet's whole history", servedFolders)}
           />
         )}
       </DetailTopRow>
@@ -401,12 +468,15 @@ export default function MaplePositionView({
                   // When the position actually opened, not when the window
                   // does — otherwise a wallet with 41,000 events reads as days
                   // old because its oldest loaded card is.
-                  firstAt={opening?.firstTimestamp}
+                  firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                   tenurePending={!lifetimeFiguresKnown(historyWindow)}
                 />
               ) : undefined
             }
             runs={MAPLE_QUEUE_FILL_RUNS}
+            folderRegister={MAPLE_FOLDER_REGISTER}
+            readFolderMembers={readFolderMembers}
+            segments={segments}
             renderCard={(event, meta) =>
               isMapleEvent(event) ? (
                 <MapleEventCard

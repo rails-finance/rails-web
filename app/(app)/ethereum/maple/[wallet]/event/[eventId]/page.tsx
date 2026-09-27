@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
+import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { getCcipEscrow } from "@/lib/shared/known-infrastructure";
 import { loadMaplePositionTail } from "@/lib/maple/position-page-data";
 import MaplePositionPage from "../../page";
 
 interface Props {
   params: Promise<{ wallet: string; eventId: string }>;
+  /** The parent position page reads `?folders=` off this to choose which
+   *  timeline read its tail makes, so this segment carries it through. */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // Restated (not re-exported — see twitter-image.tsx's own header on why Next
@@ -18,14 +22,18 @@ export const dynamic = "force-dynamic";
 // `loadMaplePositionTail` is the same `cache()`-wrapped read the parent page
 // and its own opengraph-image already call, so finding the event here costs
 // no second backend round trip within one request.
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { wallet: raw, eventId } = await params;
   const wallet = raw.toLowerCase();
   const decoded = decodeEventId(eventId);
   // The CCIP bridge escrows carry no roster row and no timeline — mirrors the
   // page's own gate exactly, so an escrow's event link states no event rather
   // than throwing on a read that would return nothing anyway.
-  const tail = getCcipEscrow(wallet) ? null : await loadMaplePositionTail(wallet);
+  // The same test the page decides on, so both reach one `cache()` entry. A
+  // grouped answer names only the ungrouped events, so an event inside a
+  // folder falls back to the generic metadata.
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = getCcipEscrow(wallet) ? null : await loadMaplePositionTail(wallet, grouped);
   const event = tail?.events?.find((e) => e.id === decoded) ?? null;
   return eventMetadata({
     session: "maple",
@@ -43,6 +51,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // component's pinned-mode branch. `params` here carries an extra `eventId`
 // key the parent's own `Props` type doesn't declare; passing the same promise
 // through is still structurally valid (the parent only reads `wallet` off it).
-export default async function MapleEventPage({ params }: Props) {
-  return MaplePositionPage({ params });
+export default async function MapleEventPage({ params, searchParams }: Props) {
+  return MaplePositionPage({ params, searchParams });
 }

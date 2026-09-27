@@ -21,7 +21,11 @@ import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
 import type { MakerVaultSummary } from "@/lib/sources/api/makerdao-vaults";
 import type { MakerVaultState } from "@/lib/sources/chain/makerdao-position";
 import { fetchMakerVaults } from "@/lib/api/fetch-makerdao-vaults";
-import { fetchMakerTimeline } from "@/lib/api/fetch-makerdao-timeline";
+import {
+  fetchMakerTimeline,
+  fetchMakerGroupedTimeline,
+  type MakerGroupedTimelineResult,
+} from "@/lib/api/fetch-makerdao-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
@@ -32,9 +36,11 @@ import {
 } from "@/lib/shared/timeline-opening-balance";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { MAKERDAO_LIQUIDATION_RUNS } from "@/lib/makerdao/timeline-runs";
+import { MAKERDAO_FOLDER_REGISTER, MAKERDAO_LIQUIDATION_RUNS } from "@/lib/makerdao/timeline-runs";
+import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
+import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { MakerDAOEventCard } from "@/components/protocol/makerdao/makerdao-event-card";
@@ -119,6 +125,11 @@ interface MakerVaultViewProps {
   initialEvents: BaseActivityEvent[] | null;
   initialCutoffBlock: number | null;
   initialOpening: TimelineOpeningBalance | null;
+  /** The grouped answer WHOLE, when the load read its history as ROWS (the
+   *  default; `?folders=0` reads the flat window). Its row plan puts the
+   *  folders back between the ungrouped events, and its folders carry the
+   *  arithmetic the whole-history reductions read. */
+  initialGrouped: MakerGroupedTimelineResult | null;
 }
 
 // Named ...DetailView, not MakerVaultView: that name is already the imported
@@ -130,12 +141,19 @@ export default function MakerVaultDetailView({
   initialEvents,
   initialCutoffBlock,
   initialOpening,
+  initialGrouped,
 }: MakerVaultViewProps) {
   // Keyed on the timeline, not the row: a vault the index has never seen is a
   // real answer the server can seed, and its `initialSummary` is null.
   const seeded = initialEvents != null;
   const [view, setView] = useState<MakerVaultView | null>(() => mergeView(initialChain, initialSummary));
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);
+  // The same history as ROWS (decision 0019's evening amendment): the index
+  // groups this family, because every row carries the urn's own running ink
+  // and art, so a folder standing for a hundred frobs leaves nothing here to
+  // reconstruct. The grouped answer REPLACES the flat window: `events` holds
+  // its ungrouped events and this its row plan and folders.
+  const [groupedTail, setGroupedTail] = useState<MakerGroupedTimelineResult | null>(initialGrouped);
   // The checkpoint model. The timeline fetch asks for a WINDOW of the most
   // recent events; on a vault that needs one, the response names the block
   // the window opened at and everything below it arrives as a declared opening
@@ -171,11 +189,16 @@ export default function MakerVaultDetailView({
         // matching filter (a non-numeric cdpId is ignored server-side and
         // would silently return the wrong vault's page-1 row).
         const isUrnAddr = /^0x[0-9a-fA-F]{40}$/.test(vault);
-        const [chainRes, vData, tData] = await Promise.all([
+        // The same choice the server half made (`position-page-data.ts`): ONE
+        // timeline read, in the shape the URL asked for.
+        const asked = servedFoldersEnabled();
+        const [chainRes, vData, flat, grouped] = await Promise.all([
           fetch(`/api/chain/makerdao/vault/${encodeURIComponent(vault)}`).catch(() => null),
           fetchMakerVaults(isUrnAddr ? { urn: vault, limit: 1 } : { cdpId: vault, limit: 1 }),
-          fetchMakerTimeline(vault, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchMakerTimeline(vault, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? fetchMakerGroupedTimeline(vault) : null,
         ]);
+        const tData = grouped ?? flat;
         let chain: MakerVaultState | null = chainRes && chainRes.ok ? (await chainRes.json()).state : null;
         const summary: MakerVaultSummary | null = vData.data[0] ?? null;
         // A direct-Vat urn: the Vat read needs the ilk the index row names.
@@ -187,8 +210,9 @@ export default function MakerVaultDetailView({
         }
         setView(mergeView(chain, summary));
         setChainState(chain);
-        setEvents(tData.events ?? []);
-        setCutoffBlock(tData.cutoffBlock ?? null);
+        setEvents(tData?.events ?? []);
+        setCutoffBlock(tData?.cutoffBlock ?? null);
+        setGroupedTail(grouped);
       } finally {
         setChainSettled(true);
         setLoading(false);
@@ -253,10 +277,48 @@ export default function MakerVaultDetailView({
     () => (ilk && rateLog ? { ilk, collateralSymbol: view?.collateralSymbol ?? ilk, jug: rateLog.jug } : null),
     [ilk, rateLog, view?.collateralSymbol],
   );
-  const tl = useTimelineEvents(makerEvents, {
+  // The served list as ROWS, from the same answer as `makerEvents`.
+  const servedRows = useMemo(
+    () => (groupedTail ? interleaveRowPlan(groupedTail.rowPlan, makerEvents) : undefined),
+    [groupedTail, makerEvents],
+  );
+  /** The folders the index served, whole and unfiltered: the third
+   *  contributor to the page's partition, which every whole-history reduction
+   *  below adds to `opening + events`. */
+  const servedFolders = useMemo(
+    () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
+    [servedRows],
+  );
+  /** The oldest member any folder stands for, so a page whose oldest row is a
+   *  folder still dates the vault from inside it. */
+  const oldestFolderAt = useMemo(
+    () =>
+      servedFolders?.reduce<number | undefined>(
+        (min, f) => (min == null || f.firstAt < min ? f.firstAt : min),
+        undefined,
+      ),
+    [servedFolders],
+  );
+
+  // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
+  // Decision 0019, amendments 2026-09-24 and 2026-09-25: a month the loaded
+  // rows do not hold is read from the index as its segment
+  // (hooks/useTimelineSegment.ts). The preload stays the page's whole-history
+  // record; the timeline alone swaps.
+  const { tl, segments, readFolderMembers } = useTimelineSegment({
+    events: makerEvents,
+    groupedTail,
+    servedRows,
+    servedFolders,
+    opening,
+    historyWindow,
+    isEvent: isMakerDAOEvent,
+    readGrouped: (span, signal) => fetchMakerGroupedTimeline(vault, { span, signal }),
+    readFlat: (span) => fetchMakerTimeline(vault, { span }),
+    folderPath: `/api/makerdao/vault/${encodeURIComponent(vault)}/timeline/folder`,
+    folderParams: {},
     storageKey: `makerdao-${vault}`,
     protocolKey: "makerdao-vaults",
-    window: historyWindow,
   });
 
   // ⚠️ On a windowed page every lifetime surface must read the MERGED history,
@@ -266,7 +328,10 @@ export default function MakerVaultDetailView({
   // the whole, which is the only correct answer between the two requests.
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? makerEvents : undefined;
-  const precomputedLifetime = useMemo(() => makerLifetimeWithOpening(makerEvents, opening), [makerEvents, opening]);
+  const precomputedLifetime = useMemo(
+    () => makerLifetimeWithOpening(makerEvents, opening, servedFolders),
+    [makerEvents, opening, servedFolders],
+  );
 
   // The CSV is the export whose purpose IS the rows, so on a windowed page it
   // fetches the whole history at click time rather than handing over the
@@ -301,10 +366,13 @@ export default function MakerVaultDetailView({
   // restates the same era-aware two-fact verdict over the base tables — the
   // owner in force at each event, gated on a resolved EOA — so both halves
   // judge on the same fact and never count one event twice.
-  const externalActivityWithOpening = useMemo(
-    () => withOpeningActors(externalActivity, opening?.actors, opening?.totalEvents ?? 0),
-    [externalActivity, opening],
-  );
+  //
+  // The folders add theirs the same way: rails-server judges a member by the
+  // route's own era-aware verdict.
+  const externalActivityWithOpening = useMemo(() => {
+    const withOpening = withOpeningActors(externalActivity, opening?.actors, opening?.totalEvents ?? 0);
+    return servedFolders && servedFolders.length > 0 ? withFolderActors(withOpening, servedFolders) : withOpening;
+  }, [externalActivity, opening, servedFolders]);
 
   // Market notes: the stretches between two of this vault's own touches where
   // the ilk's stability fee moved at least a percentage point. Both ends are
@@ -358,9 +426,11 @@ export default function MakerVaultDetailView({
             notes={notes}
             liveNotes={liveNotes}
             csvFilename={`makerdao-${vault}-activity.csv`}
-            fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-            history={markdownHistoryScope(historyWindow, makerEvents)}
-            scopeNote={exportScopeNote(historyWindow, makerEvents, "this vault's whole history")}
+            // A folder's members are not in `makerEvents`, so a grouped page
+            // reads the whole history for the CSV as a windowed one does.
+            fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
+            history={markdownHistoryScope(historyWindow, makerEvents, servedFolders)}
+            scopeNote={exportScopeNote(historyWindow, makerEvents, "this vault's whole history", servedFolders)}
           />
         )}
       </DetailTopRow>
@@ -420,12 +490,15 @@ export default function MakerVaultDetailView({
             liveNotes={liveNotes}
             liveNotesPending={liveNotesPending}
             runs={MAKERDAO_LIQUIDATION_RUNS}
+            folderRegister={MAKERDAO_FOLDER_REGISTER}
+            readFolderMembers={readFolderMembers}
+            segments={segments}
             toolbarLeading={
               <TimelineActivityHeader
                 events={tl.sortedEvents}
                 closed={view?.status !== "open"}
                 // When the vault actually opened, not when the window does.
-                firstAt={opening?.firstTimestamp}
+                firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                 tenurePending={!lifetimeFiguresKnown(historyWindow)}
               />
             }

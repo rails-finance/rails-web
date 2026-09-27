@@ -1659,10 +1659,30 @@ const FOLDER_HEADER = '[role="button"][aria-expanded][aria-label*=" consecutive 
 // (interleaved mints, redeems and cToken transfers; alternating supplies and
 // withdrawals), so they run with `folders: false`: G0 asks for loose events
 // alone and G5, which needs a folder's day, is skipped.
+//
+// Row-cut batch 6 (2026-09-28) adds MakerDAO, Morpho (Ethereum) and Maple,
+// grouped by rails-server (each family's run spec and the owner run). Their
+// timelines are keyed by a vault id or a position id in the path, so a fixture
+// may name its own `timeline` and `summary` URLs. `grouped-maker-deep` vault
+// 19172 (3,398 events) and `grouped-morpho-deep` b8fc…a85e-0xb8a4…715e (5,739)
+// are cut by rows with owner-run folders in their newest 2,500;
+// `grouped-maple-deepest` 0x134c…df76 (43,120, alternating deposits and share
+// transfers) holds no folder in its newest rows; `grouped-maple-whole`
+// 0x1601…347e (4,726) groups to 2,342 rows and loads whole. MakerDAO's deepest
+// urn by events, 0xa426…1507 (34,607 frobs), is a LockStake urn that never
+// borrowed, which the vault roster leaves out, so it has no page.
 const AAVE_V3 = { page: "/ethereum/aave-v3", api: "/api/aave-v3", q: "market=core&" };
 const SPARK = { page: "/ethereum/spark", api: "/api/spark", q: "" };
 const COMPOUND_V2 = { page: "/ethereum/compound-v2", api: "/api/compound-v2", q: "" };
 const COMPOUND_V3_USDC = { page: "/ethereum/compound-v3/usdc", api: "/api/compound", q: "market=usdc&" };
+const MAKER_19172 = {
+  page: "/ethereum/makerdao",
+  timeline: "/api/makerdao/vault/19172/timeline?group=1",
+  summary: "/api/makerdao/vault/19172/timeline/summary?cutoffBlock=99999999",
+};
+const MORPHO_DEEP_ID =
+  "b8fc70e82bc5bb53e773626fcc6a23f7eefa036918d7ef216ecfb1950a94a85e-0xb8a451107a9f87fde481d4d686247d6e43ed715e";
+const MAPLE = { page: "/ethereum/maple", api: "/api/maple", q: "" };
 const GROUPED_FIXTURES = [
   { id: "grouped-deep", wallet: "0xee7ca610d896c53ffe716b801c05748efd902954", ...AAVE_V3 },
   { id: "grouped-whole", wallet: "0x9984a1d407bc6ac53b404aabf66b80b99d96bb47", ...AAVE_V3 },
@@ -1677,6 +1697,16 @@ const GROUPED_FIXTURES = [
     ...COMPOUND_V3_USDC,
     folders: false,
   },
+  { id: "grouped-maker-deep", wallet: "19172", ...MAKER_19172 },
+  {
+    id: "grouped-morpho-deep",
+    wallet: MORPHO_DEEP_ID,
+    page: "/ethereum/morpho",
+    timeline: `/api/morpho/position/${MORPHO_DEEP_ID}/timeline?group=1`,
+    summary: `/api/morpho/timeline/summary?positionId=${MORPHO_DEEP_ID}&cutoffBlock=99999999`,
+  },
+  { id: "grouped-maple-deepest", wallet: "0x134ccaaa4f1e4552ec8aecb9e4a2360ddcf8df76", ...MAPLE, folders: false },
+  { id: "grouped-maple-whole", wallet: "0x1601843c5e9bc251a3272907010afa41fa18347e", ...MAPLE },
 ];
 
 /** The drawn list as rows: folder headers, and event rows. With every folder
@@ -1701,7 +1731,7 @@ for (const g of GROUPED_FIXTURES) {
   const page = await ctx.newPage();
   page.setDefaultTimeout(300_000);
   try {
-    const route = await getJson(`${g.api}/timeline?${g.q}wallet=${g.wallet}&group=1`);
+    const route = await getJson(g.timeline ?? `${g.api}/timeline?${g.q}wallet=${g.wallet}&group=1`);
     const plan = route.rowPlan ?? [];
     const folders = plan.filter((r) => r.kind === "folder").map((r) => r.folder);
     const loose = route.events ?? [];
@@ -1829,7 +1859,7 @@ for (const g of GROUPED_FIXTURES) {
     // The whole life by month: the summary read past the tip IS the life, and
     // is what the page's own `lifeDays` sums to from the opening balance, the
     // folders' `byDay` and the loose events.
-    const life = await getJson(`${g.api}/timeline/summary?${g.q}wallet=${g.wallet}&cutoffBlock=99999999`);
+    const life = await getJson(g.summary ?? `${g.api}/timeline/summary?${g.q}wallet=${g.wallet}&cutoffBlock=99999999`);
     const lifeMonths = new Map();
     for (const b of life?.byDay ?? []) {
       const i = monthIdxOf(Number(b.key));

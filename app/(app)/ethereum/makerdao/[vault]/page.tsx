@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
+import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { loadMakerVaultTail } from "@/lib/makerdao/position-page-data";
 import MakerVaultDetailView from "./position-view";
 
 interface Props {
   params: Promise<{ vault: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // The vault's numbers are stated as current, so the route renders per request
@@ -33,23 +35,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function MakerVaultPage({ params }: Props) {
+export default async function MakerVaultPage({ params, searchParams }: Props) {
   const { vault } = await params;
   if (!CDP_ID.test(vault) && !URN_ADDRESS.test(vault)) notFound();
 
-  const tail = await loadMakerVaultTail(vault);
+  // Rows by default; `?folders=0` reads the flat window.
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = await loadMakerVaultTail(vault, grouped);
 
   return (
     <MakerVaultDetailView
       // Keyed on the vault so a client-side navigation to another one remounts
       // with that vault's server tail as its initial state.
-      key={vault}
+      key={`${vault}:${grouped ? "rows" : "events"}`}
       vault={vault}
       initialSummary={tail.summary}
       initialChain={tail.chain}
       initialEvents={tail.events}
       initialCutoffBlock={tail.cutoffBlock}
       initialOpening={tail.opening}
+      initialGrouped={tail.grouped}
     />
   );
 }

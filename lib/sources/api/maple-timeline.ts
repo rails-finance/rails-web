@@ -59,6 +59,9 @@ export interface MvRow {
   escrow_after: string;
   principal_before: string;
   principal_after: string;
+  /** On a grouped or span answer: whether this is the wallet's first row. The
+   *  route states it, since a grouped answer's first event row need not be. */
+  is_open?: boolean;
 }
 
 const LABELS: Record<MapleEventType, string> = {
@@ -158,7 +161,7 @@ export function buildMapleTimeline(rows: MvRow[], walletRaw: string): MapleTimel
       escrowAfter: scaledStr(r.escrow_after, MAPLE_SHARE_DECIMALS),
       principalBefore: scaledStr(r.principal_before, p.decimals),
       principalAfter: scaledStr(r.principal_after, p.decimals),
-      isOpen: idx === 0,
+      isOpen: r.is_open ?? idx === 0,
       ...(caller ? { caller } : {}),
       ...(r.tx_from ? { txFrom: r.tx_from.toLowerCase() } : {}),
       raw: {

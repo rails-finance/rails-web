@@ -32,6 +32,8 @@ import { formatNumber } from "@/lib/utils/format";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
 import { type ChainTruthTowerData, type TowerLine, flowsReconcile } from "@/lib/shared/chain-truth-economics";
+import type { ServedFolder } from "@/lib/shared/timeline-folder";
+import { folderFlows, mergeFlowBuckets } from "@/lib/shared/timeline-folder-reductions";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import { unreadToken } from "@/lib/shared/decimals-unread";
 import type { UnreadToken } from "@/lib/shared/types/event-shape";
@@ -133,15 +135,20 @@ function reduceLifetime(events: BaseActivityEvent[]): MorphoTowerLifetime {
 export function morphoLifetimeWithOpening(
   events: BaseActivityEvent[],
   opening: TimelineOpeningBalance | null | undefined,
+  folders?: readonly ServedFolder[] | null,
 ): MorphoTowerLifetime | undefined {
-  if (!opening) return undefined;
+  // Undefined = nothing outside `events`, so the reducer reads them as the
+  // whole history. On a grouped answer the folders hold members `events` does
+  // not, and their flows are the third half of the partition (the summary
+  // below the cut, the events and the folders above it).
+  if (!opening && (folders?.length ?? 0) === 0) return undefined;
   const f = reduceLifetime(events);
   // (bucket key, summary leg) → the MorphoTowerLifetime field it lands on.
   const FIELD: Record<string, Partial<Record<string, keyof MorphoTowerLifetime>>> = {
     collateral: { deposited: "deposited", withdrawn: "collateralWithdrawn", liquidated: "collateralLiquidated" },
     debt: { borrowed: "borrowed", repaid: "repaid" },
   };
-  for (const bucket of opening.flows ?? []) {
+  for (const bucket of mergeFlowBuckets(opening?.flows, folderFlows(folders))) {
     const fields = FIELD[bucket.key];
     if (!fields) continue;
     for (const [leg, raw] of Object.entries(bucket.legs)) {

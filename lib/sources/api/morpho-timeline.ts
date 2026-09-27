@@ -64,6 +64,9 @@ export interface RawMorphoTimelineRow {
    *  unit) — non-NULL only on priced liquidation blocks. */
   price_raw?: string | null;
   price_source?: string | null;
+  /** On a grouped or span answer: whether this is the position's first row.
+   *  The route states it, since a grouped answer's first event row need not be. */
+  is_open?: boolean;
 }
 
 /** The rails timeline response envelope. */
@@ -122,7 +125,7 @@ interface MarketMeta {
   isIdle: boolean;
 }
 
-async function resolveMarketMeta(marketId: string, marketParams: string | null): Promise<MarketMeta | null> {
+export async function resolveMarketMeta(marketId: string, marketParams: string | null): Promise<MarketMeta | null> {
   if (!marketParams) return null;
   const p = parseMarketParams(marketId, marketParams);
   if (!p) return null;
@@ -203,7 +206,7 @@ export async function buildMorphoTimeline(resp: RawMorphoTimelineResponse): Prom
       sharesDelta: shareDelta,
       collateralAfter: r.coll_after != null ? fmtUnits(bigintOf(r.coll_after), collDec) : undefined,
       borrowedAfter: r.borr_after != null ? fmtUnits(bigintOf(r.borr_after), loanDec) : undefined,
-      isOpen: wholeHistory && idx === 0,
+      isOpen: r.is_open ?? (wholeHistory && idx === 0),
       // The acting parties, present only on two-fact external rows (the route
       // pre-filters). The card derives third-party marking from these.
       ...(r.tx_from && r.caller ? { txFrom: r.tx_from.toLowerCase(), caller: r.caller.toLowerCase() } : {}),

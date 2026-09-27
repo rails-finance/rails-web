@@ -16,16 +16,32 @@
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
 import { fetchMaplePositions, type MaplePositionsResult } from "@/lib/api/fetch-maple-positions";
-import { fetchMapleTimeline } from "@/lib/api/fetch-maple-timeline";
+import {
+  fetchMapleTimeline,
+  fetchMapleGroupedTimeline,
+  type MapleGroupedTimelineResult,
+  type MapleTimelineResponse,
+} from "@/lib/api/fetch-maple-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
 
-export const loadMaplePositionTail = cache(async (wallet: string) => {
-  const tail = await loadPositionTail<MaplePositionsResult>({
+/**
+ * ONE timeline read, whichever shape the URL asked for — the SparkLend and
+ * Aave V3 loaders' rule: the grouped answer REPLACES the flat window, and
+ * `grouped` is a boolean because `cache()` keys on argument identity. It
+ * defaults to FALSE for the callers that omit it, the opengraph images and the
+ * event page's metadata, which name ONE event and need it findable by id; a
+ * grouped answer carries only the ungrouped events. The page passes the URL's
+ * answer.
+ */
+export const loadMaplePositionTail = cache(async (wallet: string, grouped: boolean = false) => {
+  const tail = await loadPositionTail<MaplePositionsResult, MapleTimelineResponse | MapleGroupedTimelineResult>({
     label: "maple",
     readPositions: (baseUrl, headers) => fetchMaplePositions({ wallet, limit: 1, status: undefined, baseUrl, headers }),
     readTimeline: (baseUrl, headers) =>
-      fetchMapleTimeline(wallet, { recent: TIMELINE_WINDOW_EVENTS, baseUrl, headers }),
+      grouped
+        ? fetchMapleGroupedTimeline(wallet, { baseUrl, headers })
+        : fetchMapleTimeline(wallet, { recent: TIMELINE_WINDOW_EVENTS, baseUrl, headers }),
     readOpening: (baseUrl, cutoffBlock, headers) =>
       fetchTimelineOpeningBalance({
         path: "/api/maple/timeline/summary",
@@ -39,5 +55,7 @@ export const loadMaplePositionTail = cache(async (wallet: string) => {
     ...tail,
     position: tail.positions?.data[0] ?? null,
     poolState: tail.positions?.poolState ?? null,
+    // The flag alone does not prove a grouped answer arrived.
+    grouped: tail.timeline && "grouped" in tail.timeline ? (tail.timeline as MapleGroupedTimelineResult) : null,
   };
 });

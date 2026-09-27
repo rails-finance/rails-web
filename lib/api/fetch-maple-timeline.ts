@@ -10,6 +10,7 @@
 import type { MapleTimelineResult } from "@/lib/sources/api/maple-timeline";
 import { settleFetchMark } from "@/lib/perf/settle-marks";
 import { fromTimelineWire, type WireTimeline } from "@/lib/shared/timeline-wire";
+import type { GroupedTimelineFields } from "@/lib/shared/timeline-folder";
 
 /** What the route returns: the transform's result plus the one field the route
  *  itself attaches. The transform reduces rows and knows nothing about where a
@@ -21,7 +22,13 @@ export interface MapleTimelineResponse extends MapleTimelineResult {
    *  whenever `recent` was not asked for, and also when the wallet holds fewer
    *  events than the window. */
   cutoffBlock?: number | null;
+  /** The span `?from=`/`?to=` asked for, echoed in unix seconds. */
+  span?: { from: number; to: number } | null;
 }
+
+/** The grouped answer: the flat result plus the interleaving plan and the two
+ *  figures a cut in ROWS has to state. See lib/shared/timeline-folder.ts. */
+export type MapleGroupedTimelineResult = MapleTimelineResponse & GroupedTimelineFields;
 
 export interface FetchMapleTimelineOptions {
   baseUrl?: string;
@@ -34,6 +41,9 @@ export interface FetchMapleTimelineOptions {
    *  of positions and the only one for a caller that reduces the array itself
    *  without seeding from a summary. */
   recent?: number;
+  /** A span of time in unix seconds, inclusive, in place of the newest window.
+   *  Never given with `recent`: the index refuses the pair. */
+  span?: [number, number];
 }
 
 export async function fetchMapleTimeline(
@@ -42,6 +52,10 @@ export async function fetchMapleTimeline(
 ): Promise<MapleTimelineResponse> {
   const qs = new URLSearchParams({ wallet });
   if (opts.recent) qs.set("recent", String(opts.recent));
+  if (opts.span) {
+    qs.set("from", String(opts.span[0]));
+    qs.set("to", String(opts.span[1]));
+  }
   const url = `${opts.baseUrl ?? ""}/api/maple/timeline?${qs.toString()}`;
   const done = settleFetchMark("maple-timeline");
   const res = await fetch(url, { cache: "no-store", headers: opts.headers });
@@ -52,4 +66,33 @@ export async function fetchMapleTimeline(
   const json = (await res.json()) as WireTimeline<MapleTimelineResponse>;
   done(true);
   return fromTimelineWire<MapleTimelineResponse>(json);
+}
+
+/**
+ * The same history as ROWS (decision 0019's evening amendment): repetitive
+ * stretches arrive as folders carrying their members' aggregate, ungrouped
+ * events arrive as themselves, and the cut counts rows. A separate function
+ * because it answers a different shape: `events` holds only the ungrouped
+ * events. A `span` reads a month grouped the same way (decision 0019,
+ * amendment 2026-09-25), echoed back as `span`.
+ */
+export async function fetchMapleGroupedTimeline(
+  wallet: string,
+  opts: { baseUrl?: string; signal?: AbortSignal; headers?: HeadersInit; span?: [number, number] } = {},
+): Promise<MapleGroupedTimelineResult> {
+  const qs = new URLSearchParams({ wallet, group: "1" });
+  if (opts.span) {
+    qs.set("from", String(opts.span[0]));
+    qs.set("to", String(opts.span[1]));
+  }
+  const url = `${opts.baseUrl ?? ""}/api/maple/timeline?${qs.toString()}`;
+  const done = settleFetchMark("maple-timeline-grouped");
+  const res = await fetch(url, { cache: "no-store", signal: opts.signal, headers: opts.headers });
+  if (!res.ok) {
+    done(false);
+    throw new Error(`fetchMapleGroupedTimeline failed: ${res.status} ${res.statusText}`);
+  }
+  const json = (await res.json()) as WireTimeline<MapleGroupedTimelineResult>;
+  done(true);
+  return fromTimelineWire<MapleGroupedTimelineResult>(json);
 }
