@@ -6,7 +6,7 @@
 // valuing a lifetime of flows at one of them would state a figure no block
 // supports.
 //
-// FOUR RULES THIS MODULE ENCODES, each of them a way an Alchemix position's
+// FIVE RULES THIS MODULE ENCODES, each of them a way an Alchemix position's
 // arithmetic can be got wrong.
 //
 // 1. A REPAY'S AMOUNT IS NOT ITS DEBT DELTA. `Repay` states the yield-token
@@ -15,9 +15,10 @@
 //    the line's total debt)` and the contract does not emit it. The API
 //    resolves it when the log is captured and carries it apart from the log's
 //    own fields. This module reads the resolved figure for the debt side and
-//    the log's amount for the collateral side, and where the resolution is
-//    absent it counts the event as unresolved rather than substituting one for
-//    the other.
+//    no collateral leg at all: `repay` pulls those shares from the CALLER's
+//    wallet (`safeTransferFrom(msg.sender, …)`), and only the protocol fee on
+//    the set-aside part leaves the collateral. Where the resolution is absent
+//    it counts the event as unresolved.
 //
 // 2. A LINE-SCOPE ROW MOVED NOTHING OF THIS HOLDER'S. A redemption applies one
 //    ratio to every open position at once; the two batch rows carry the hash of
@@ -29,6 +30,13 @@
 //    carry the shares taken and no debt figure, so the debt side counts none.
 //    The collateral side counts the shares, because those the log does state.
 //
+// 5. A SELF-LIQUIDATION'S AMOUNT OVERLAPS ITS FORCE REPAY, AND ITS LAST STEP
+//    EMITS NOTHING. `SelfLiquidated` states the set-aside shares its own
+//    `ForceRepay` already stated, plus the shares that paid the rest; the
+//    collateral left over is swept to the holder's chosen address with no event.
+//    lib/alchemix/self-liquidation.ts splits it, and the sweep is measured from
+//    the reading before the close.
+//
 // 4. A CUT LIST HAS NO LIFETIME. The timeline is windowed on `limit`, so when
 //    the served page stopped short of the position's whole history these totals
 //    would be a window's arithmetic wearing a lifetime's label. The builder
@@ -37,7 +45,10 @@
 import type { ChainTruthTowerData, TowerLine, TowerSideData } from "@/lib/shared/chain-truth-economics";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAlchemistEvent } from "@/lib/shared/types/event-shape";
-import { lifetimeProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
+import { closeFromReadingProv, lifetimeProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
+import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
+import { readingsBefore } from "@/lib/alchemix/readings-before";
+import { selfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
 
 const WAD = 1e18;
 
@@ -67,24 +78,37 @@ export interface AlchemixEconomicsFigures {
   deposited: Bucket;
   /** Shares withdrawn by the holder. */
   withdrawn: Bucket;
-  /** Shares OFFERED against the debt — the repay and force-repay legs, each
-   *  the quantity its own log states. A repay's separately resolved fee is not
-   *  in here: it is a figure the contract did not emit, and adding it would put
-   *  a resolved number inside a total of emitted ones. The event's own card
-   *  shows it. */
+  /** Collateral put against the debt set aside for repayment by a force
+   *  repay: its `creditToYield` plus its protocol fee, both stated by its log. */
   spentRepaying: Bucket;
-  /** Shares that repaid the debt when the holder closed the position with its
-   *  collateral (a self-liquidation): the holder's own act, drawn as an exit. */
+  /** Shares a caller paid in from outside the position with `repay`. Not a
+   *  collateral leg: the contract takes them from the caller's wallet. */
+  repaidFromOutside: Bucket;
+  /** Shares that paid the rest of the debt when the holder closed the
+   *  position with its collateral (a self-liquidation): the close's amount
+   *  less the same transaction's force-repay shares. */
   closedWith: Bucket;
+  /** Collateral a self-liquidation swept back to the holder's chosen address.
+   *  No event states it: the reading before the close less the shares that
+   *  paid debt and the fee. */
+  returnedOnClose: Bucket;
+  /** A self-liquidation whose sweep has no reading before it on the timeline,
+   *  so the collateral side cannot be closed. */
+  returnedUnstated: number;
+  /** Each close's reading-measured figures, for their receipts. */
+  closes: { fromBlock: number; txHash: string; blockNumber: number; returnedRaw: string; debtRaw: string }[];
   /** Shares taken by another party's liquidation. */
   liquidated: Bucket;
   /** Synthetic minted against the position. */
   minted: Bucket;
   /** Synthetic burned directly against the debt. */
   burned: Bucket;
-  /** Debt cleared by a repay or force repay — the RESOLVED figure, never the
-   *  offered amount. */
+  /** Debt cleared by a repay, or by a force repay outside a close — the
+   *  RESOLVED figure, never the offered amount. */
   debtCleared: Bucket;
+  /** Debt a self-liquidation paid off, set-aside part included: the reading
+   *  before the close, which leaves none. */
+  debtClosed: Bucket;
   /** Repay and force-repay rows whose debt leg the capture could not resolve.
    *  While this is above zero the debt-cleared total is a floor, and the page
    *  says so rather than printing it as a total. */
@@ -135,19 +159,26 @@ export function computeAlchemixEconomics(
     deposited: empty(),
     withdrawn: empty(),
     spentRepaying: empty(),
+    repaidFromOutside: empty(),
     closedWith: empty(),
+    returnedOnClose: empty(),
+    returnedUnstated: 0,
+    closes: [],
     liquidated: empty(),
     minted: empty(),
     burned: empty(),
     debtCleared: empty(),
+    debtClosed: empty(),
     debtCreditUnresolved: 0,
     repayFeeShares: 0,
     custodyMoves: 0,
     lineEvents: 0,
   };
 
-  for (const event of events) {
-    if (!isAlchemistEvent(event)) continue;
+  const alchemist = events.filter(isAlchemistEvent) as AlchemistEvent[];
+  const before = readingsBefore(alchemist);
+
+  for (const event of alchemist) {
     const ctx = event.context.data;
     // Rule 2: a line-scope row names no position and totals into nothing.
     if (ctx.scope === "line") {
@@ -169,9 +200,9 @@ export function computeAlchemixEconomics(
         add(figures.burned, scaled(raw.amount));
         break;
       case "repay": {
-        // Rule 1: the log's amount is the shares offered; the debt it cleared
-        // is the resolved figure and nothing else.
-        add(figures.spentRepaying, scaled(raw.amount));
+        // Rule 1: the log's amount is the shares the caller paid in; the debt
+        // it cleared is the resolved figure and nothing else.
+        add(figures.repaidFromOutside, scaled(raw.amount));
         const credit = ctx.resolvedAtCapture?.debtCredit ?? null;
         if (credit == null) figures.debtCreditUnresolved += 1;
         else add(figures.debtCleared, scaled(credit));
@@ -180,15 +211,36 @@ export function computeAlchemixEconomics(
       }
       case "force_repay": {
         add(figures.spentRepaying, scaled(raw.credit_to_yield) + scaled(raw.protocol_fee_total));
+        // Inside a close, the close's debt figure covers this part.
+        const inClose = alchemist.some(
+          (e) => e.txHash === event.txHash && e.context.data.eventType === "self_liquidated",
+        );
+        if (inClose) break;
         const credit = ctx.resolvedAtCapture?.debtCredit ?? null;
         if (credit == null) figures.debtCreditUnresolved += 1;
         else add(figures.debtCleared, scaled(credit));
         break;
       }
-      case "self_liquidated":
-        // Rule 3: the shares are stated, the debt leg is not.
-        add(figures.closedWith, scaled(raw.amount_liquidated));
+      case "self_liquidated": {
+        // Rules 3 and 5: the shares are stated, the debt leg is not, and the
+        // set-aside part is the force repay's.
+        const block = ctx.stateAtBlockFromReading?.blockNumber ?? event.blockNumber;
+        const split = selfLiquidationSplit(event, alchemist, before.get(block) ?? null);
+        if (!split) break;
+        add(figures.closedWith, Number(split.restRaw) / WAD);
+        if (split.debtBeforeRaw != null) add(figures.debtClosed, Number(split.debtBeforeRaw) / WAD);
+        if (split.returnedRaw == null) figures.returnedUnstated += 1;
+        else if (split.returnedRaw > BigInt(0)) add(figures.returnedOnClose, Number(split.returnedRaw) / WAD);
+        if (split.beforeBlock != null && split.returnedRaw != null && split.debtBeforeRaw != null)
+          figures.closes.push({
+            fromBlock: split.beforeBlock,
+            txHash: event.txHash,
+            blockNumber: block,
+            returnedRaw: split.returnedRaw.toString(),
+            debtRaw: split.debtBeforeRaw.toString(),
+          });
         break;
+      }
       case "liquidated":
         add(figures.liquidated, scaled(raw.amount));
         break;
@@ -206,6 +258,7 @@ export function computeAlchemixEconomics(
     figures.deposited.events +
     figures.withdrawn.events +
     figures.spentRepaying.events +
+    figures.repaidFromOutside.events +
     figures.closedWith.events +
     figures.liquidated.events +
     figures.minted.events +
@@ -220,6 +273,7 @@ export function computeAlchemixEconomics(
     symbol: string,
     bucket: Bucket,
     flow?: TowerLine["flowLabel"],
+    prov?: TowerLine["prov"],
   ): TowerLine[] =>
     bucket.amount > 0
       ? [
@@ -228,11 +282,16 @@ export function computeAlchemixEconomics(
             symbol,
             amount: bucket.amount,
             usd: null,
-            prov: lifetimeProv(label, symbol, bucket.events, coords),
+            prov: prov ?? lifetimeProv(label, symbol, bucket.events, coords),
             flowLabel: flow,
           },
         ]
       : [];
+
+  // A single close's reading-measured figure carries that reading's receipt;
+  // several closes (a refunded position closed again) fall back to the rollup.
+  const onlyClose = figures.closes.length === 1 ? figures.closes[0] : null;
+  const closeCoords = onlyClose ? { ...coords, txHash: onlyClose.txHash, blockNumber: onlyClose.blockNumber } : coords;
 
   const collateral: TowerSideData = {
     current:
@@ -251,17 +310,27 @@ export function computeAlchemixEconomics(
       ...line("coll-withdrawn", "Vault shares withdrawn", mytSymbol, figures.withdrawn, "Withdrawn"),
       ...line(
         "coll-repaid",
-        "Vault shares offered against the debt",
+        "Vault shares put against the debt set aside for repayment",
         mytSymbol,
         figures.spentRepaying,
-        "Offered against the debt",
+        "Put against set-aside debt",
       ),
       ...line(
         "coll-closed",
-        "Vault shares that repaid the debt when the holder closed the position",
+        "Vault shares that paid the rest of the debt when the holder closed the position",
         mytSymbol,
         figures.closedWith,
         "Closed with collateral",
+      ),
+      ...line(
+        "coll-returned",
+        "Vault shares returned to the holder when the position closed",
+        mytSymbol,
+        figures.returnedOnClose,
+        "Returned on close",
+        onlyClose
+          ? closeFromReadingProv("returned", mytSymbol, onlyClose.returnedRaw, onlyClose.fromBlock, closeCoords)
+          : undefined,
       ),
     ],
     liquidated: line(
@@ -292,6 +361,16 @@ export function computeAlchemixEconomics(
       ...(figures.debtCreditUnresolved === 0
         ? line("debt-cleared", "Debt cleared by a repay", syntheticSymbol, figures.debtCleared, "Cleared by repaying")
         : []),
+      ...line(
+        "debt-closed",
+        "Debt paid off when the holder closed the position with its collateral",
+        syntheticSymbol,
+        figures.debtClosed,
+        "Closed with collateral",
+        onlyClose
+          ? closeFromReadingProv("debt", syntheticSymbol, onlyClose.debtRaw, onlyClose.fromBlock, closeCoords)
+          : undefined,
+      ),
     ],
     liquidated: [],
     lifetimeInflow: figures.minted.amount,

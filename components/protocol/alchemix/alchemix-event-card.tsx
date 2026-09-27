@@ -144,6 +144,7 @@ export function AlchemixEventCard({
     mytSymbol,
     protocolFeeBps: feeBps,
     collateralTakenRaw: isRedemption ? collateralTakenRaw(lead, before) : null,
+    readingBefore: before,
     redemptionNet: isRedemption ? redemptionNet(lead, before, unit?.decimals ?? null, feeBps) : null,
     underlyingSymbol: unit?.symbol ?? null,
   };

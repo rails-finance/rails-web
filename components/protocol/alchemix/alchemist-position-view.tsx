@@ -636,6 +636,7 @@ export function AlchemistPositionView({
                     ? explorerUrl(chainId as ChainId, "address", live.collateral.mytAddress)
                     : null
                 }
+                clearedOnCard={Boolean(eventsAlone && dlb && eventsAlone.clearedAccounts)}
                 fall={
                   live.health
                     ? shareFallToLiquidation(

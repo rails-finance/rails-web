@@ -222,13 +222,17 @@ export function AlchemixStateAtBlock({
     beforeRaw: string | null | undefined,
   ): ChainTruthStat | null => {
     if (raw == null) return null;
+    const t = transition(label, symbol, raw, beforeRaw);
     return {
       label,
       value: formatUnitsExact(raw, DECIMALS),
       symbol,
       display: gridFigure(raw),
       prov: stateAtBlockFromReadingProv(label, symbol, raw, atBlock, state.positionEventsInBlock, coords, DECIMALS),
-      transition: transition(label, symbol, raw, beforeRaw),
+      transition: t,
+      // Colour shows change: an axis this block left where the reading before
+      // had it is muted. With no reading before, the figure is new.
+      changed: t != null || !before || beforeRaw == null,
     };
   };
 
@@ -247,6 +251,7 @@ export function AlchemixStateAtBlock({
           value: String(Number(ratioAfter) / 1e16),
           symbol: "",
           display: gridRatio(ratioAfter),
+          changed: ratioBefore == null || ratioBefore !== ratioAfter,
           prov: readingCollateralisationProv(
             state.collateralRaw,
             state.sharePriceRaw,

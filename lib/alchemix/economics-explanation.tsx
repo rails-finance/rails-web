@@ -11,7 +11,7 @@
 
 import type { ReactNode } from "react";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { formatNumber } from "@/lib/utils/format";
+import { formatCompact, formatNumber } from "@/lib/utils/format";
 import type { AlchemixEconomicsFigures } from "@/lib/alchemix/economics";
 
 export interface AlchemixFlowsRedemptions {
@@ -42,21 +42,34 @@ export function alchemixFlowsExplanation(opts: {
   gas: AlchemixFlowsGas | null;
 }): ReactNode {
   const { figures: f, syntheticSymbol: sym, mytSymbol: myt, redemptions: r } = opts;
+  // A figure the tower draws is foreground (`H`), at the tower's format; one
+  // only this pane states is muted (rails-ops standards/detail-page-anatomy.md,
+  // "Colour points back to T2").
   const n = (v: number, unit: string) => (
     <span className="tabular-nums">
       {formatNumber(v)} {unit}
     </span>
+  );
+  const h = (v: number, unit: string) => (
+    <H>
+      <span className="tabular-nums">
+        {formatCompact(v)} {unit}
+      </span>
+    </H>
   );
   const redeemedAll = r.count > 0 && r.stated === r.count && r.cleared > 0;
   const items: ReactNode[] = [];
 
   if (f.deposited.amount > 0) {
     const exits: ReactNode[] = [];
-    if (f.withdrawn.amount > 0) exits.push(<>{n(f.withdrawn.amount, myt)} withdrawn</>);
-    if (f.spentRepaying.amount > 0) exits.push(<>{n(f.spentRepaying.amount, myt)} offered against the debt</>);
+    if (f.withdrawn.amount > 0) exits.push(<>{h(f.withdrawn.amount, myt)} withdrawn</>);
+    if (f.spentRepaying.amount > 0)
+      exits.push(<>{h(f.spentRepaying.amount, myt)} put against debt set aside for repayment, fee included</>);
     if (f.repayFeeShares > 0) exits.push(<>{n(f.repayFeeShares, myt)} taken as repay fees</>);
-    if (f.closedWith.amount > 0) exits.push(<>{n(f.closedWith.amount, myt)} used to close the position</>);
-    if (f.liquidated.amount > 0) exits.push(<>{n(f.liquidated.amount, myt)} taken by liquidation</>);
+    if (f.closedWith.amount > 0) exits.push(<>{h(f.closedWith.amount, myt)} paid the rest of the debt at the close</>);
+    if (f.returnedOnClose.amount > 0)
+      exits.push(<>{h(f.returnedOnClose.amount, myt)} returned to the holder at the close</>);
+    if (f.liquidated.amount > 0) exits.push(<>{h(f.liquidated.amount, myt)} taken by liquidation</>);
     if (redeemedAll && r.taken != null && r.taken > 0)
       exits.push(
         <>
@@ -69,17 +82,14 @@ export function alchemixFlowsExplanation(opts: {
       f.spentRepaying.amount -
       f.repayFeeShares -
       f.closedWith.amount -
+      f.returnedOnClose.amount -
       f.liquidated.amount -
       (redeemedAll && r.taken != null ? r.taken : 0);
     const current = opts.currentCollateral ?? 0;
     const closes = Math.abs(accounted - current) < RECONCILE_TOLERANCE;
     items.push(
       <>
-        Collateral started from{" "}
-        <H>
-          {formatNumber(f.deposited.amount)} {myt}
-        </H>{" "}
-        deposited
+        Collateral started from {h(f.deposited.amount, myt)} deposited
         {exits.length > 0 ? (
           <>
             , then{" "}
@@ -91,23 +101,21 @@ export function alchemixFlowsExplanation(opts: {
             ))}
           </>
         ) : null}
-        {opts.currentCollateral != null ? (
-          <>
-            , leaving{" "}
-            <H>
-              {formatNumber(current)} {myt}
-            </H>{" "}
-            held now.
-          </>
-        ) : (
-          "."
-        )}
+        {opts.currentCollateral != null ? <>, leaving {h(current, myt)} held now.</> : "."}
         {opts.currentCollateral != null && !closes ? (
-          <>
-            {" "}
-            The other {n(Math.abs(accounted - current), myt)} {accounted > current ? "left" : "came into"} the position
-            in ways these events do not state.
-          </>
+          f.returnedUnstated > 0 ? (
+            <>
+              {" "}
+              The other {n(Math.abs(accounted - current), myt)} is the collateral the close returned to the holder,
+              which no event states.
+            </>
+          ) : (
+            <>
+              {" "}
+              The other {n(Math.abs(accounted - current), myt)} {accounted > current ? "left" : "came into"} the
+              position in ways these events do not state.
+            </>
+          )
         ) : null}
       </>,
     );
@@ -115,22 +123,24 @@ export function alchemixFlowsExplanation(opts: {
 
   if (f.minted.amount > 0) {
     const exits: ReactNode[] = [];
-    if (f.burned.amount > 0) exits.push(<>{n(f.burned.amount, sym)} burned</>);
+    if (f.burned.amount > 0) exits.push(<>{h(f.burned.amount, sym)} burned</>);
     if (f.debtCleared.amount > 0 && f.debtCreditUnresolved === 0)
-      exits.push(<>{n(f.debtCleared.amount, sym)} cleared by repays</>);
+      exits.push(
+        <>
+          {h(f.debtCleared.amount, sym)} cleared by repays paid with {n(f.repaidFromOutside.amount, myt)} from outside
+          the collateral
+        </>,
+      );
     if (redeemedAll)
       exits.push(
         <>
           {n(r.cleared, sym)} cleared by {r.count} line {r.count === 1 ? "redemption" : "redemptions"}
         </>,
       );
+    if (f.debtClosed.amount > 0) exits.push(<>{h(f.debtClosed.amount, sym)} paid off with collateral at the close</>);
     items.push(
       <>
-        Debt started from{" "}
-        <H>
-          {formatNumber(f.minted.amount)} {sym}
-        </H>{" "}
-        minted
+        Debt started from {h(f.minted.amount, sym)} minted
         {exits.length > 0 ? (
           <>
             , then{" "}
@@ -142,18 +152,8 @@ export function alchemixFlowsExplanation(opts: {
             ))}
           </>
         ) : null}
-        {opts.currentDebt != null ? (
-          <>
-            , leaving{" "}
-            <H>
-              {formatNumber(opts.currentDebt)} {sym}
-            </H>{" "}
-            owed now.
-          </>
-        ) : (
-          "."
-        )}{" "}
-        No interest was added to it.
+        {opts.currentDebt != null ? <>, leaving {h(opts.currentDebt, sym)} owed now.</> : "."} No interest was added to
+        it.
       </>,
     );
   }

@@ -9,17 +9,21 @@
 // event (rails-ops standards/explanation-copy-charter §4). The protocol's
 // mechanic sits one click further, in `ALCHEMIX_HOW_IT_WORKS`.
 //
-// Bold only what the card above states (the charter's highlight rule).
+// Colour points back to the card (rails-ops standards/detail-page-anatomy.md,
+// "The disclosure ladder"): a figure the card above states is foreground (`H`),
+// written in the card's format; one stated only here is muted.
 
 import { ProseExplainer, H } from "@/lib/shared/explainer-prose";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { RedemptionNetTotal } from "@/lib/alchemix/redemption-net";
 import { formatCompact } from "@/lib/shared/format-event";
+import { formatNumber } from "@/lib/utils/format";
 import type { AlchemixLiveState } from "@/types/api/alchemix";
 
 const compact = (n: number) => formatCompact(n).display;
-const two = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const signedTwo = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${two(Math.abs(n))}`;
+/** A signed figure that keeps its sign and size however small: a lifetime net
+ *  of a few millionths reads as that, never as "−0.00". */
+const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${formatNumber(Math.abs(n))}`;
 
 /** What the timeline's redemptions did to this position, summed over the
  *  ones with stated figures. */
@@ -46,6 +50,7 @@ export function AlchemixPositionExplanation({
   net = null,
   vaultHref = null,
   fall = null,
+  clearedOnCard = false,
 }: {
   live: AlchemixLiveState | null;
   syntheticSymbol: string;
@@ -56,6 +61,8 @@ export function AlchemixPositionExplanation({
   vaultHref?: string | null;
   /** The share-price fall to the liquidation line, 0 to 1; null with no debt. */
   fall?: number | null;
+  /** The card's "Events alone" line states the debt the redemptions cleared. */
+  clearedOnCard?: boolean;
 }) {
   if (!live) return null;
   const sym = syntheticSymbol;
@@ -121,7 +128,7 @@ export function AlchemixPositionExplanation({
         <>
           Debt and collateral are both counted in {underSym}, so only a fall in the vault&rsquo;s share price can bring
           this position to its liquidation line: a fall of{" "}
-          {(fall * 100).toLocaleString("en-US", { maximumFractionDigits: fall < 0.01 ? 2 : 1 })}% would do it.
+          <H>{(fall * 100).toLocaleString("en-US", { maximumFractionDigits: fall < 0.01 ? 2 : 1 })}%</H> would do it.
         </>
       ) : (
         <>This position is at or below its liquidation line, so anyone can liquidate it.</>
@@ -144,11 +151,20 @@ export function AlchemixPositionExplanation({
     redemptions.stated > 0 && redemptions.cleared > 0 ? (
       <>
         Across the {redemptions.count} line redemptions on the timeline below, the line cleared{" "}
-        {two(redemptions.cleared)} {sym} of this position&rsquo;s debt
+        {clearedOnCard ? (
+          <H>
+            {compact(redemptions.cleared)} {sym}
+          </H>
+        ) : (
+          <>
+            {formatNumber(redemptions.cleared)} {sym}
+          </>
+        )}{" "}
+        of this position&rsquo;s debt
         {redemptions.taken != null ? (
           <>
             {" "}
-            and took {two(redemptions.taken)} {mytSymbol} of its collateral
+            and took {formatNumber(redemptions.taken)} {mytSymbol} of its collateral
           </>
         ) : null}
         .
@@ -161,23 +177,21 @@ export function AlchemixPositionExplanation({
           Valued in {net.underlyingSymbol} at each redemption&rsquo;s block, with one {sym} counted as one{" "}
           {net.underlyingSymbol}, that is a net of{" "}
           <Prov info={net.prov} value={String(netN)} symbol={net.underlyingSymbol}>
-            <H>
-              {netN > 0 ? "+" : netN < 0 ? "−" : ""}
-              {two(Math.abs(netN))} {net.underlyingSymbol}
-            </H>
+            <span className="tabular-nums">
+              {signed(netN)} {net.underlyingSymbol}
+            </span>
           </Prov>{" "}
           for the holder: the debt cleared less the value of the collateral taken.
           {net.total.fee && net.total.restRaw != null ? (
             <>
               {" "}
               The line&rsquo;s {(net.total.fee.bps / 100).toLocaleString("en-US")}% redemption fee, charged on every
-              redemption and paid to Alchemix&rsquo;s fee receiver, is{" "}
-              {signedTwo(-Number(net.total.fee.valueRaw) / 1e18)} {net.underlyingSymbol} of it (
-              {two(Number(net.total.fee.sharesRaw) / 1e18)} {mytSymbol}).
-              {Math.abs(Number(net.total.restRaw) / 1e18) >= 0.005 ? (
+              redemption and paid to Alchemix&rsquo;s fee receiver, is {signed(-Number(net.total.fee.valueRaw) / 1e18)}{" "}
+              {net.underlyingSymbol} of it ({formatNumber(Number(net.total.fee.sharesRaw) / 1e18)} {mytSymbol}).
+              {Math.abs(Number(net.total.restRaw) / 1e18) >= Math.abs(Number(net.total.fee.valueRaw) / 1e18) * 0.01 ? (
                 <>
                   {" "}
-                  The other {signedTwo(Number(net.total.restRaw) / 1e18)} {net.underlyingSymbol} is how the Alchemist
+                  The other {signed(Number(net.total.restRaw) / 1e18)} {net.underlyingSymbol} is how the Alchemist
                   charges a position: at the line&rsquo;s average shares per unit of debt across every redemption since
                   the position&rsquo;s own last event, while the share price moved between them.
                 </>

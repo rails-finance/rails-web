@@ -538,6 +538,65 @@ export function lifetimeProv(label: string, symbol: string, events: number, coor
   };
 }
 
+/** The shares a self-liquidation used on the debt left after its force repay:
+ *  `SelfLiquidated.amount` states both parts, so the set-aside part the same
+ *  transaction's `ForceRepay` states is taken off (lib/alchemix/self-liquidation.ts). */
+export function selfLiquidationRestProv(symbol: string, raw: string, coords: AlchemixCoords): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "emitted",
+    summary: `${symbol} that paid the rest of the debt — the close's amount less the set-aside part its force repay states`,
+    contract: alchemistContract(coords),
+    via: `${ALCHEMIX_VIA} · SelfLiquidated.amount − ForceRepay.creditToYield`,
+    formula: "SelfLiquidated.amount − ForceRepay.creditToYield, both in this transaction",
+    verify: txVerify(coords),
+    source: { block: coords.blockNumber, txHash: coords.txHash },
+    inputs: coordInputs(coords, [{ label: "where it went", value: "the line's Transmuter", kind: "chain" }]),
+    scaling: { raw, from: "log", places: 18, why: `${symbol} carries 18 decimals` },
+  };
+}
+
+/** What a self-liquidation did that its logs do not state, measured from the
+ *  reading before it (lib/alchemix/self-liquidation.ts): the collateral swept
+ *  back to the holder, or the debt the close paid off. */
+export function closeFromReadingProv(
+  what: "returned" | "debt",
+  symbol: string,
+  raw: string,
+  fromBlock: number,
+  coords: AlchemixCoords,
+): Provenance {
+  const returned = what === "returned";
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: returned
+      ? `${symbol} returned at the close — the collateral read before it, less the shares that paid debt and the fee`
+      : `${symbol} paid off at the close — the debt read before it, which the close takes to zero`,
+    contract: alchemistContract(coords),
+    via: `getCDP(${coords.tokenId}) at block ${fromBlock}${returned ? " · SelfLiquidated.amount · ForceRepay.protocolFeeTotal" : ""}`,
+    formula: returned
+      ? `collateral at block ${fromBlock} − SelfLiquidated.amount − ForceRepay.protocolFeeTotal`
+      : `debt at block ${fromBlock}`,
+    verify:
+      returned && coords.txHash
+        ? {
+            kind: "etherscan",
+            href: explorerUrl(coords.chainId, "tx-logs", coords.txHash),
+            text: "Match the vault share transfer to the recipient in the close's transaction",
+          }
+        : { kind: "recompute", text: `Call getCDP(${coords.tokenId}) at block ${fromBlock}` },
+    source: { block: coords.blockNumber, txHash: coords.txHash },
+    inputs: coordInputs(coords, [
+      { label: "reading before the close", value: `block ${fromBlock}`, kind: "chain" },
+      ...(returned
+        ? [{ label: "where it went", value: "the address the holder named in selfLiquidate", kind: "chain" as const }]
+        : []),
+    ]),
+    scaling: { raw, from: "call", places: 18, why: `${symbol} carries 18 decimals` },
+  };
+}
+
 // ── The position's health ───────────────────────────────────────────────────
 
 /** The collateralisation: `totalValue(tokenId)` over the debt, both at one

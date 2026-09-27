@@ -20,6 +20,7 @@
 import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { RedemptionNet } from "@/lib/alchemix/redemption-net";
+import type { AlchemixReading } from "@/lib/alchemix/readings-before";
 import { clause, composeBullets, splitLead, ProseExplainer, type ClauseInput } from "@/lib/shared/explainer-prose";
 import { formatGasCost } from "@/lib/shared/format-event";
 import {
@@ -112,6 +113,9 @@ export interface AlchemixCardProse {
   collateralTakenRaw: string | null;
   redemptionNet: RedemptionNet | null;
   underlyingSymbol: string | null;
+  /** The reading before this card's block, which a close's returned
+   *  collateral is measured from. */
+  readingBefore?: AlchemixReading | null;
 }
 
 /** The trailing gas bullet, Liquity's: the holder's own transactions only. A
@@ -151,6 +155,7 @@ function alchemixCardClauses(
         collateralTakenRaw: prose.collateralTakenRaw,
         redemptionNet: prose.redemptionNet,
         underlyingSymbol: prose.underlyingSymbol,
+        readingBefore: prose.readingBefore ?? null,
       }),
     ),
     ...(roundTrip ? [alchemixCustodyRoundTripClause(roundTrip)] : []),
