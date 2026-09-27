@@ -183,7 +183,11 @@ function legSpec(
     }
     case "self_liquidated":
       // The holder's own close: a plain holder-action label, no caution pill.
-      deltas.push(shares("amount_liquidated", scaled(raw.amount_liquidated), "Paid the debt"));
+      // No spine row carries the number, so the header does.
+      deltas.push({
+        ...shares("amount_liquidated", scaled(raw.amount_liquidated), "Paid the debt"),
+        noSpineCounterpart: true,
+      });
       spec = { ...spec, label: SELF_LIQUIDATION_LABEL };
       break;
     case "liquidated":

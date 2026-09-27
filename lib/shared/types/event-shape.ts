@@ -2573,6 +2573,10 @@ export interface AlchemixStateAtBlockFromReading {
   collateralRaw: string | null;
   /** Earmarked debt in the synthetic's wei, as read at `blockNumber`. */
   earmarkedRaw: string | null;
+  /** The MYT's convertToAssets(1e18) read with the same reading: one share in
+   *  the underlying's smallest unit. Null (or absent, on an older backend)
+   *  where the reading carries none, and then nothing is valued at this block. */
+  sharePriceRaw?: string | null;
   /** How many of this position's OWN events sit in `blockNumber`, counted over
    *  its whole event stream and not over the page. Stated whether or not the
    *  reading is: it is a count of rows, not a reading. Zero on a line-scope

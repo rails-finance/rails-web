@@ -73,7 +73,10 @@ export interface AlchemixEconomicsFigures {
    *  a resolved number inside a total of emitted ones. The event's own card
    *  shows it. */
   spentRepaying: Bucket;
-  /** Shares taken by a liquidation, the holder's own or another party's. */
+  /** Shares that repaid the debt when the holder closed the position with its
+   *  collateral (a self-liquidation): the holder's own act, drawn as an exit. */
+  closedWith: Bucket;
+  /** Shares taken by another party's liquidation. */
   liquidated: Bucket;
   /** Synthetic minted against the position. */
   minted: Bucket;
@@ -128,6 +131,7 @@ export function computeAlchemixEconomics(
     deposited: empty(),
     withdrawn: empty(),
     spentRepaying: empty(),
+    closedWith: empty(),
     liquidated: empty(),
     minted: empty(),
     burned: empty(),
@@ -177,7 +181,7 @@ export function computeAlchemixEconomics(
       }
       case "self_liquidated":
         // Rule 3: the shares are stated, the debt leg is not.
-        add(figures.liquidated, scaled(raw.amount_liquidated));
+        add(figures.closedWith, scaled(raw.amount_liquidated));
         break;
       case "liquidated":
         add(figures.liquidated, scaled(raw.amount));
@@ -196,6 +200,7 @@ export function computeAlchemixEconomics(
     figures.deposited.events +
     figures.withdrawn.events +
     figures.spentRepaying.events +
+    figures.closedWith.events +
     figures.liquidated.events +
     figures.minted.events +
     figures.burned.events;
@@ -203,7 +208,13 @@ export function computeAlchemixEconomics(
 
   const { syntheticSymbol, mytSymbol, coords } = input;
 
-  const line = (key: string, label: string, symbol: string, bucket: Bucket, flow?: TowerLine["flowLabel"]): TowerLine[] =>
+  const line = (
+    key: string,
+    label: string,
+    symbol: string,
+    bucket: Bucket,
+    flow?: TowerLine["flowLabel"],
+  ): TowerLine[] =>
     bucket.amount > 0
       ? [
           {
@@ -232,9 +243,28 @@ export function computeAlchemixEconomics(
         : [],
     exited: [
       ...line("coll-withdrawn", "Vault shares withdrawn", mytSymbol, figures.withdrawn, "Withdrawn"),
-      ...line("coll-repaid", "Vault shares offered against the debt", mytSymbol, figures.spentRepaying, "Offered against the debt"),
+      ...line(
+        "coll-repaid",
+        "Vault shares offered against the debt",
+        mytSymbol,
+        figures.spentRepaying,
+        "Offered against the debt",
+      ),
+      ...line(
+        "coll-closed",
+        "Vault shares that repaid the debt when the holder closed the position",
+        mytSymbol,
+        figures.closedWith,
+        "Closed with collateral",
+      ),
     ],
-    liquidated: line("coll-liquidated", "Vault shares taken by a liquidation", mytSymbol, figures.liquidated, "Liquidated"),
+    liquidated: line(
+      "coll-liquidated",
+      "Vault shares taken by a liquidation",
+      mytSymbol,
+      figures.liquidated,
+      "Liquidated",
+    ),
     lifetimeInflow: figures.deposited.amount,
   };
 

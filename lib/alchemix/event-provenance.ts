@@ -30,6 +30,7 @@
 // not have been read at the same block — both blocks are on the wire and both
 // are in the receipt.
 
+import type { RedemptionNet } from "@/lib/alchemix/redemption-net";
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import type { AlchemixGrade } from "@/types/api/alchemix";
@@ -669,5 +670,149 @@ export function lineLiquidationsProv(count: number, throughBlock: number | null,
     verify: { kind: "rollup", text: "It counts the line's captured liquidation logs" },
     source: { block: throughBlock ?? undefined },
     inputs: coordInputs(coords, [{ label: "liquidations", value: String(count), kind: "chain-derived" }]),
+  };
+}
+
+// ── Redemption net, share price, distance to liquidation ─────────────────────
+
+const fmtUnits = (raw: string, places: number, max = 6) => {
+  const n = Number(raw) / 10 ** places;
+  return n.toLocaleString("en-US", { maximumFractionDigits: max });
+};
+
+/** One redemption's net for this position, in the underlying
+ *  (lib/alchemix/redemption-net): the debt cleared at one underlying each, less
+ *  the shares taken at the share price read at the redemption's block. */
+export function redemptionNetProv(
+  n: Extract<RedemptionNet, { status: "stated" }>,
+  syntheticSymbol: string,
+  mytSymbol: string,
+  underlyingSymbol: string,
+  coords: AlchemixCoords,
+): Provenance {
+  const price = fmtUnits(n.sharePriceRaw, n.underlyingDecimals, 8);
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `Net for this position — the ${syntheticSymbol} debt cleared, valued at 1 ${underlyingSymbol} each as the protocol counts it, less the ${mytSymbol} taken, valued at the share price read at the redemption's block`,
+    contract: alchemistContract(coords),
+    via: `getCDP(${coords.tokenId}) at blocks ${n.fromBlock} and ${n.atBlock}, and the ${mytSymbol} share price at block ${n.atBlock}`,
+    formula:
+      `${fmtUnits(n.clearedRaw, 18)} ${syntheticSymbol} × 1 − ${fmtUnits(n.takenRaw, 18)} ${mytSymbol} × ${price} ${underlyingSymbol} ` +
+      `= ${fmtUnits(n.clearedRaw, 18)} − ${fmtUnits(n.takenValueRaw, 18)} = ${fmtUnits(n.netRaw, 18)} ${underlyingSymbol}`,
+    verify: { kind: "recompute", text: "Recompute it from the debt cleared, the collateral taken and the share price" },
+    source: { block: n.atBlock },
+    inputs: coordInputs(coords, [
+      {
+        label: "debt cleared",
+        value: n.clearedRaw,
+        kind: "chain",
+        note: `getCDP debt at ${n.fromBlock} − at ${n.atBlock}`,
+      },
+      {
+        label: "collateral taken",
+        value: n.takenRaw,
+        kind: "chain",
+        note: `getCDP collateral at ${n.fromBlock} − at ${n.atBlock}, in ${mytSymbol} shares`,
+      },
+      {
+        label: "share price",
+        value: n.sharePriceRaw,
+        kind: "chain",
+        note: `convertToAssets(1e18) at block ${n.atBlock}, ${n.underlyingDecimals} decimals of ${underlyingSymbol}`,
+      },
+    ]),
+  };
+}
+
+/** The position's redemptions' nets summed. */
+export function redemptionNetTotalProv(
+  netRaw: string,
+  counted: number,
+  underlyingSymbol: string,
+  coords: AlchemixCoords,
+): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `Net for this position across its redemptions, in ${underlyingSymbol} — the sum of each redemption's net`,
+    contract: alchemistContract(coords),
+    via: `getCDP(${coords.tokenId}) either side of each redemption, and the share price at each redemption's block`,
+    formula: `Σ (debt cleared × 1 − shares taken × share price) over ${counted} redemption${counted === 1 ? "" : "s"} = ${fmtUnits(netRaw, 18)} ${underlyingSymbol}`,
+    verify: { kind: "rollup", text: "It rolls up the redemptions on the timeline, each with its own receipt" },
+    inputs: coordInputs(coords, [{ label: "redemptions summed", value: String(counted), kind: "chain" }]),
+  };
+}
+
+/** The MYT's share price: one share in the underlying, read at a block. */
+export function sharePriceProv(
+  mytSymbol: string,
+  underlyingSymbol: string,
+  raw: string,
+  decimals: number,
+  asOfBlock: number | null,
+  mytAddress: string | null,
+  coords: AlchemixCoords,
+): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    summary: `${mytSymbol} share price — what one share is worth in ${underlyingSymbol}, which moves as the vault earns or loses`,
+    contract: { name: `${mytSymbol} (Morpho Vault V2)`, ...(mytAddress ? { address: mytAddress } : {}) },
+    via: `convertToAssets(1e18)${asOfBlock != null ? ` at block ${asOfBlock}` : ""}`,
+    verify: {
+      kind: "recompute",
+      text: `Call convertToAssets(1e18) on the ${mytSymbol} vault${asOfBlock != null ? ` at block ${asOfBlock}` : ""}`,
+    },
+    source: { block: asOfBlock ?? undefined },
+    inputs: coordInputs(coords),
+    scaling: { raw, from: "call", places: decimals, why: `${underlyingSymbol} carries ${decimals} decimals` },
+  };
+}
+
+/** How far the share price could fall before the liquidation line. */
+export function liquidationDistanceProv(
+  collateralizationRaw: string,
+  lowerBoundRaw: string,
+  fall: number,
+  asOfBlock: number,
+  coords: AlchemixCoords,
+): Provenance {
+  const pct = (raw: string) => `${(Number(raw) / 1e16).toLocaleString("en-US", { maximumFractionDigits: 4 })}%`;
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary:
+      "Distance to liquidation — the fall in the vault's share price that would take this position to the liquidation line. Debt and collateral are counted in one underlying, so the ratio moves with the share price alone",
+    contract: alchemistContract(coords),
+    via: `totalValue(${coords.tokenId}), getCDP(${coords.tokenId}) and collateralizationLowerBound() at block ${asOfBlock}`,
+    formula: `1 − ${pct(lowerBoundRaw)} ÷ ${pct(collateralizationRaw)} = ${(fall * 100).toLocaleString("en-US", { maximumFractionDigits: 4 })}%`,
+    verify: { kind: "recompute", text: "Recompute it from the collateralisation and the liquidation line beside it" },
+    source: { block: asOfBlock },
+    inputs: coordInputs(coords, [
+      {
+        label: "collateralisation",
+        value: collateralizationRaw,
+        kind: "chain",
+        note: "totalValue ÷ debt, 1e18 is 100%",
+      },
+      { label: "collateralizationLowerBound", value: lowerBoundRaw, kind: "chain", note: "1e18 is 100%" },
+    ]),
+  };
+}
+
+/** The net's absence: the reading at the redemption's block carries no share
+ *  price, so the collateral taken has no value in the underlying there. */
+export function redemptionNetUnavailableProv(atBlock: number, coords: AlchemixCoords): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary:
+      "Net not stated — the reading at this redemption's block carries no share price, so the collateral taken cannot be valued in the underlying there",
+    contract: alchemistContract(coords),
+    via: `getCDP(${coords.tokenId}) at block ${atBlock}, with no share price beside it`,
+    verify: { kind: "none", text: "There is no figure to check" },
+    source: { block: atBlock },
+    inputs: coordInputs(coords),
   };
 }

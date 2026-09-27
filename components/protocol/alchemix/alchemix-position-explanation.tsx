@@ -14,6 +14,8 @@
 
 import Link from "next/link";
 import { ProseExplainer, H } from "@/lib/shared/explainer-prose";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import type { RedemptionNetTotal } from "@/lib/alchemix/redemption-net";
 import { formatCompact } from "@/lib/shared/format-event";
 import type { AlchemixLiveState } from "@/types/api/alchemix";
 
@@ -31,22 +33,37 @@ export interface AlchemixRedemptionTotals {
   taken: number | null;
 }
 
+/** The redemptions' net for the holder, summed, with its receipt. */
+export interface AlchemixRedemptionNetView {
+  total: RedemptionNetTotal;
+  underlyingSymbol: string;
+  prov: Provenance | null;
+}
+
 export function AlchemixPositionExplanation({
   live,
   syntheticSymbol,
   mytSymbol,
   redemptions,
+  net = null,
+  vaultHref = null,
+  fall = null,
 }: {
   live: AlchemixLiveState | null;
   syntheticSymbol: string;
   mytSymbol: string;
   redemptions: AlchemixRedemptionTotals;
+  net?: AlchemixRedemptionNetView | null;
+  /** The MYT's address on the chain's explorer. */
+  vaultHref?: string | null;
+  /** The share-price fall to the liquidation line, 0 to 1; null with no debt. */
+  fall?: number | null;
 }) {
   if (!live) return null;
   const sym = syntheticSymbol;
   const under = live.collateral.underlying;
   const underSym = under?.symbol ?? "the asset underneath";
-  const sharePrice = under && live.collateral.formatted > 0 ? under.formatted / live.collateral.formatted : null;
+  const netN = net?.total.netRaw != null ? Number(net.total.netRaw) / 1e18 : null;
 
   const lead =
     under && live.debt ? (
@@ -81,15 +98,18 @@ export function AlchemixPositionExplanation({
       <H>
         {compact(live.collateral.formatted)} {mytSymbol}
       </H>
-      , shares in a vault that lends out {underSym}. Every Collateral figure on the event cards below is this share
-      count, in {mytSymbol}.
+      , shares in{" "}
+      {vaultHref ? (
+        <a href={vaultHref} target="_blank" rel="noopener noreferrer" className="link">
+          the {mytSymbol} vault
+        </a>
+      ) : (
+        <>the {mytSymbol} vault</>
+      )}
+      , a Morpho Vault V2. The vault spreads the {underSym} deposited in it across several lending strategies, and what
+      they earn or lose moves its share price, shown beside the Collateral figure. Every Collateral figure on the event
+      cards below is this share count, in {mytSymbol}.
     </>,
-    sharePrice != null ? (
-      <>
-        One {mytSymbol} was worth {sharePrice.toLocaleString("en-US", { maximumFractionDigits: 4 })} {underSym} at block{" "}
-        {block(live.asOfBlock)}. That share price moves as the vault earns or loses.
-      </>
-    ) : null,
     live.collateral.usd ? (
       <>
         At {underSym}&rsquo;s price of $
@@ -98,6 +118,17 @@ export function AlchemixPositionExplanation({
       </>
     ) : null,
     <>The debt is owed in {sym}, the synthetic token this position minted against its collateral.</>,
+    fall != null && live.debt ? (
+      fall > 0 ? (
+        <>
+          Debt and collateral are both counted in {underSym}, so only a fall in the vault&rsquo;s share price can bring
+          this position to its liquidation line: a fall of{" "}
+          {(fall * 100).toLocaleString("en-US", { maximumFractionDigits: fall < 0.01 ? 2 : 1 })}% would do it.
+        </>
+      ) : (
+        <>This position is at or below its liquidation line, so anyone can liquidate it.</>
+      )
+    ) : null,
     live.earmarked ? (
       <>
         <H>
@@ -124,6 +155,33 @@ export function AlchemixPositionExplanation({
         ) : null}
         .
       </>
+    ) : null,
+    // The net for the holder, Liquity's redemption P/L, in the underlying.
+    net && redemptions.stated > 0 && redemptions.cleared > 0 ? (
+      netN != null && net.prov ? (
+        <>
+          Valued in {net.underlyingSymbol} at each redemption&rsquo;s block, with one {sym} counted as one{" "}
+          {net.underlyingSymbol}, that is a net of{" "}
+          <Prov info={net.prov} value={String(netN)} symbol={net.underlyingSymbol}>
+            <H>
+              {netN > 0 ? "+" : netN < 0 ? "−" : ""}
+              {two(Math.abs(netN))} {net.underlyingSymbol}
+            </H>
+          </Prov>{" "}
+          for the holder
+          {netN < 0
+            ? ": the collateral taken was worth that much more than the debt cleared."
+            : netN > 0
+              ? ": the debt cleared was worth that much more than the collateral taken."
+              : "."}{" "}
+          Each redemption&rsquo;s own net is in its card&rsquo;s detail.
+        </>
+      ) : net.total.missingPrice > 0 ? (
+        <>
+          {net.total.missingPrice} of those redemptions {net.total.missingPrice === 1 ? "has" : "have"} no share price
+          read at {net.total.missingPrice === 1 ? "its" : "their"} block, so no net for the holder is given.
+        </>
+      ) : null
     ) : null,
     <>
       Each event card shows debt, collateral and set-aside before and after it. The before figure is the reading at the

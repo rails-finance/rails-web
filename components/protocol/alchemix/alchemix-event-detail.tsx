@@ -30,11 +30,20 @@ import { formatExact } from "@/lib/utils/format";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
 import { AlchemixStateAtBlock } from "./alchemix-state-at-block";
-import { collateralTakenRaw, useReadingBefore, type AlchemixReading } from "@/lib/alchemix/readings-before";
+import {
+  collateralTakenRaw,
+  useAlchemixUnderlying,
+  useReadingBefore,
+  type AlchemixReading,
+  type AlchemixUnderlyingUnit,
+} from "@/lib/alchemix/readings-before";
+import { redemptionNet } from "@/lib/alchemix/redemption-net";
 import {
   collateralTakenFromReadingsProv,
   debtClearedFromReadingsProv,
   emittedAmountProv,
+  redemptionNetProv,
+  redemptionNetUnavailableProv,
   resolvedAtCaptureProv,
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
@@ -63,6 +72,7 @@ function legStats(
   mytSymbol: string,
   coords: AlchemixCoords,
   before: AlchemixReading | null,
+  unit: AlchemixUnderlyingUnit | null,
 ): ChainTruthStat[] {
   const ctx: AlchemixV3Context = leg.context.data;
   const raw = ctx.raw;
@@ -163,6 +173,28 @@ function legStats(
             ),
           });
         }
+        // The net for the holder, in the underlying: Liquity's redemption
+        // P/L, over the same two readings (lib/alchemix/redemption-net).
+        const net = redemptionNet(leg, before, unit?.decimals ?? null);
+        if (net?.status === "stated" && unit) {
+          const n = Number(net.netRaw) / WAD;
+          stats.push({
+            label: "Net for this position",
+            value: formatExact(n),
+            display: `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 4 })}`,
+            symbol: unit.symbol,
+            prov: redemptionNetProv(net, sym, mytSymbol, unit.symbol, coords),
+          });
+        } else if (net?.status === "no-share-price") {
+          stats.push({
+            label: "Net for this position",
+            value: "Not stated",
+            display: "No share price read at this block",
+            dimmed: true,
+            symbol: "",
+            prov: redemptionNetUnavailableProv(net.atBlock, coords),
+          });
+        }
       }
       break;
     }
@@ -187,7 +219,8 @@ export function AlchemixEventDetail({ legs, mytSymbol, coordsFor }: AlchemixEven
   const readingLeg = legs.find((l) => l.context.data.stateAtBlockFromReading?.status === "stated") ?? legs[0];
   const readingCtx = readingLeg.context.data;
   const before = useReadingBefore(readingCtx.stateAtBlockFromReading?.blockNumber);
-  const stats = legs.flatMap((leg) => legStats(leg, mytSymbol, coordsFor(leg), before));
+  const unit = useAlchemixUnderlying();
+  const stats = legs.flatMap((leg) => legStats(leg, mytSymbol, coordsFor(leg), before, unit));
 
   // A line-scope row is never a leg of anybody's transaction, so a card that
   // carries one carries it alone and this narrows to that row.

@@ -76,3 +76,16 @@ export function collateralTakenRaw(event: AlchemistEvent, before: AlchemixReadin
   if (taken <= BigInt(1)) return "0";
   return taken.toString();
 }
+
+/** The asset under the line's MYT, for a figure valued in it (a redemption's
+ *  net). Null where the page has no reading that names it. */
+export interface AlchemixUnderlyingUnit {
+  symbol: string;
+  decimals: number;
+}
+
+export const AlchemixUnderlyingContext = createContext<AlchemixUnderlyingUnit | null>(null);
+
+export function useAlchemixUnderlying(): AlchemixUnderlyingUnit | null {
+  return useContext(AlchemixUnderlyingContext);
+}

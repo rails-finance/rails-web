@@ -85,7 +85,14 @@ import {
 import { computeAlchemixEconomics } from "@/lib/alchemix/economics";
 import { splitRidingTransfers, withRiders } from "@/lib/alchemix/riding-transfers";
 import { isZeroEffectRedemption, useAlchemixTimelineRuns } from "@/lib/alchemix/timeline-runs";
-import { AlchemixReadingsBeforeContext, collateralTakenRaw, readingsBefore } from "@/lib/alchemix/readings-before";
+import {
+  AlchemixReadingsBeforeContext,
+  AlchemixUnderlyingContext,
+  collateralTakenRaw,
+  readingsBefore,
+  type AlchemixUnderlyingUnit,
+} from "@/lib/alchemix/readings-before";
+import { redemptionNet, shareFallToLiquidation, sumRedemptionNets } from "@/lib/alchemix/redemption-net";
 import {
   AlchemixPositionExplanation,
   AlchemixStoredPanelExplanation,
@@ -98,7 +105,10 @@ import {
   collateralisationProv,
   lineLiquidationsProv,
   lineRatioProv,
+  liquidationDistanceProv,
   liveFigureProv,
+  redemptionNetTotalProv,
+  sharePriceProv,
   servedFigureProv,
   underlyingProv,
   usdProv,
@@ -127,11 +137,18 @@ function ratioPct(raw: string): string {
     : `${Math.round(pct).toLocaleString("en-US")}%`;
 }
 
+/** A share-price fall as a percentage: one decimal, two under 1%. */
+export function fallPct(fall: number): string {
+  const pct = fall * 100;
+  return `${pct.toLocaleString("en-US", { maximumFractionDigits: pct < 1 ? 2 : 1 })}%`;
+}
+
 /** The health column: collateralisation at the reading's block, with the
  *  line's two ratios under it. Liquity V2's ratio column is the model: the
  *  figure, and under it the line it is measured against. */
 function healthColumn(health: AlchemixHealth, debtRaw: string | null, coords: AlchemixCoords): OpenPositionStatsColumn {
   const b = health.asOfBlock;
+  const fall = shareFallToLiquidation(health.collateralizationRaw, health.collateralizationLowerBoundRaw);
   const ratio =
     health.collateralizationRaw != null && health.collateralValueRaw != null && debtRaw != null ? (
       <StatValue>
@@ -160,6 +177,30 @@ function healthColumn(health: AlchemixHealth, debtRaw: string | null, coords: Al
             {ratioPct(health.collateralizationLowerBoundRaw)}
           </Prov>
         </span>
+        {fall != null && health.collateralizationRaw != null ? (
+          <div className="mt-0.5 leading-snug">
+            {fall > 0 ? (
+              <>
+                the vault&rsquo;s share price would need to fall{" "}
+                <Prov
+                  info={liquidationDistanceProv(
+                    health.collateralizationRaw,
+                    health.collateralizationLowerBoundRaw,
+                    fall,
+                    b,
+                    coords,
+                  )}
+                  value={String(fall * 100)}
+                >
+                  <span className="tabular-nums">{fallPct(fall)}</span>
+                </Prov>{" "}
+                for liquidation
+              </>
+            ) : (
+              <>at or below the liquidation line</>
+            )}
+          </div>
+        ) : null}
       </StatFootnote>
     ),
   };
@@ -355,6 +396,21 @@ export function AlchemistPositionView({
       taken: takenStated === stated ? Number(taken) / 1e18 : null,
     };
   }, [alchemistEvents, beforeByBlock]);
+  // Each redemption's net for the holder in the underlying, summed. The unit
+  // is the underlying the readings name; with none named, nothing is valued.
+  const underlyingUnit = useMemo<AlchemixUnderlyingUnit | null>(() => {
+    const u = live?.collateral.underlying ?? position.figures.collateral?.underlying ?? null;
+    return u?.symbol ? { symbol: u.symbol, decimals: u.decimals } : null;
+  }, [live, position.figures.collateral]);
+  const redemptionNetTotal = useMemo(
+    () =>
+      sumRedemptionNets(
+        alchemistEvents
+          .filter((e) => e.context.data.eventType === "redemption")
+          .map((e) => redemptionNet(e, beforeByBlock.get(e.blockNumber) ?? null, underlyingUnit?.decimals ?? null)),
+      ),
+    [alchemistEvents, beforeByBlock, underlyingUnit],
+  );
   // The route's note on redemption rows earns its place only where one is
   // drawn: redemptions that changed nothing are one sentence of their own.
   const redemptionRowDrawn = useMemo(
@@ -518,6 +574,36 @@ export function AlchemistPositionView({
                 syntheticSymbol={sym}
                 mytSymbol={mytSymbol}
                 redemptions={redemptionTotals}
+                net={
+                  underlyingUnit && olderCount === 0
+                    ? {
+                        total: redemptionNetTotal,
+                        underlyingSymbol: underlyingUnit.symbol,
+                        prov:
+                          redemptionNetTotal.netRaw != null
+                            ? redemptionNetTotalProv(
+                                redemptionNetTotal.netRaw,
+                                redemptionNetTotal.counted,
+                                underlyingUnit.symbol,
+                                coords,
+                              )
+                            : null,
+                      }
+                    : null
+                }
+                vaultHref={
+                  live.collateral.mytAddress
+                    ? explorerUrl(chainId as ChainId, "address", live.collateral.mytAddress)
+                    : null
+                }
+                fall={
+                  live.health
+                    ? shareFallToLiquidation(
+                        live.health.collateralizationRaw,
+                        live.health.collateralizationLowerBoundRaw,
+                      )
+                    : null
+                }
               />
             ) : undefined
           }
@@ -591,6 +677,17 @@ export function AlchemistPositionView({
                             live.collateral.usd.pricePerUnit,
                             live.collateral.usd.priceSource,
                             live.collateral.usd.pricedAt,
+                          )
+                        : undefined,
+                      sharePrice: live.collateral.underlying
+                        ? sharePriceProv(
+                            mytSymbol,
+                            live.collateral.underlying.symbol ?? "the asset underneath",
+                            live.collateral.underlying.sharePriceRaw,
+                            live.collateral.underlying.decimals,
+                            live.collateral.underlying.sharePriceAsOfBlock,
+                            live.collateral.mytAddress ?? null,
+                            coords,
                           )
                         : undefined,
                     }),
@@ -860,68 +957,70 @@ export function AlchemistPositionView({
 
         {/* ── The timeline ───────────────────────────────────────────────── */}
         <AlchemixReadingsBeforeContext.Provider value={beforeByBlock}>
-          <ChainTruthTimeline
-            persistKeyPrefix="alchemix-v3"
-            closed={position.status === "closed"}
-            tl={tl}
-            runs={timelineRuns}
-            boundary={boundary}
-            displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-            emptyLabel="No events recorded for this position"
-            toolbarLeading={
-              <TimelineActivityHeader
-                events={drawnEvents}
-                closed={position.status === "closed"}
-                tenurePending={olderCount > 0}
-              />
-            }
-            notice={
-              (lineScopedNote && redemptionRowDrawn) || endedWindow ? (
-                <div className="space-y-1">
-                  {lineScopedNote && redemptionRowDrawn ? (
-                    // The route's own sentence about line rows, rendered as given.
-                    <p className="px-1 text-[11px] leading-relaxed text-rb-500">{lineScopedNote}</p>
-                  ) : null}
-                  {/* Why a closed position's timeline stops carrying the line's
+          <AlchemixUnderlyingContext.Provider value={underlyingUnit}>
+            <ChainTruthTimeline
+              persistKeyPrefix="alchemix-v3"
+              closed={position.status === "closed"}
+              tl={tl}
+              runs={timelineRuns}
+              boundary={boundary}
+              displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+              emptyLabel="No events recorded for this position"
+              toolbarLeading={
+                <TimelineActivityHeader
+                  events={drawnEvents}
+                  closed={position.status === "closed"}
+                  tenurePending={olderCount > 0}
+                />
+              }
+              notice={
+                (lineScopedNote && redemptionRowDrawn) || endedWindow ? (
+                  <div className="space-y-1">
+                    {lineScopedNote && redemptionRowDrawn ? (
+                      // The route's own sentence about line rows, rendered as given.
+                      <p className="px-1 text-[11px] leading-relaxed text-rb-500">{lineScopedNote}</p>
+                    ) : null}
+                    {/* Why a closed position's timeline stops carrying the line's
                     events while the line goes on having them. Open positions
                     get nothing: their window ends at the frontier, so the
                     sentence would restate the timeline. */}
-                  {endedWindow ? (
-                    <p className="px-1 text-[11px] leading-relaxed text-rb-500">
-                      This position ended at block {block(endedWindow.endedAtBlock)}, and the line has been indexed to
-                      block {block(endedWindow.lineFrontierBlock)} since. A position that has ended cannot be moved by a
-                      later redemption, so none of the line&rsquo;s events past that block are on this timeline.
-                    </p>
-                  ) : null}
-                </div>
-              ) : undefined
-            }
-            renderCard={(event, meta) => {
-              if (isAlchemixV2Event(event)) {
+                    {endedWindow ? (
+                      <p className="px-1 text-[11px] leading-relaxed text-rb-500">
+                        This position ended at block {block(endedWindow.endedAtBlock)}, and the line has been indexed to
+                        block {block(endedWindow.lineFrontierBlock)} since. A position that has ended cannot be moved by
+                        a later redemption, so none of the line&rsquo;s events past that block are on this timeline.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : undefined
+              }
+              renderCard={(event, meta) => {
+                if (isAlchemixV2Event(event)) {
+                  return (
+                    <AlchemixV2EventCard
+                      event={event as AlchemixV2Event}
+                      showVersion
+                      isFirst={meta.isFirst}
+                      isLast={meta.isLast}
+                      eventNumber={meta.eventNumber}
+                    />
+                  );
+                }
+                if (!isAlchemistEvent(event)) return null;
                 return (
-                  <AlchemixV2EventCard
-                    event={event as AlchemixV2Event}
-                    showVersion
+                  <AlchemixEventCard
+                    legs={withRiders([event], ridersByTx)}
+                    mytSymbol={mytSymbol}
+                    underlyingDecimals={underlyingDecimals}
+                    siblings={siblingsByTx.get(event.txHash) ?? [event]}
                     isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     eventNumber={meta.eventNumber}
                   />
                 );
-              }
-              if (!isAlchemistEvent(event)) return null;
-              return (
-                <AlchemixEventCard
-                  legs={withRiders([event], ridersByTx)}
-                  mytSymbol={mytSymbol}
-                  underlyingDecimals={underlyingDecimals}
-                  siblings={siblingsByTx.get(event.txHash) ?? [event]}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                  eventNumber={meta.eventNumber}
-                />
-              );
-            }}
-          />
+              }}
+            />
+          </AlchemixUnderlyingContext.Provider>
         </AlchemixReadingsBeforeContext.Provider>
       </div>
       <ProvInspectorLayer />

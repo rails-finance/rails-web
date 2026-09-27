@@ -157,7 +157,8 @@ export function amountColumn(
 export function collateralColumn(
   c: AlchemixCollateralView | null,
   fallbackMytSymbol: string,
-  prov?: { shares?: Provenance; underlying?: Provenance; usd?: Provenance },
+  prov?: { shares?: Provenance; underlying?: Provenance; usd?: Provenance; sharePrice?: Provenance },
+  opts?: { showSharePrice?: boolean },
 ): OpenPositionStatsColumn {
   const myt = c?.mytSymbol ?? fallbackMytSymbol;
   const underlying = c?.underlying ?? null;
@@ -175,6 +176,18 @@ export function collateralColumn(
     </span>
   );
   const usd = c.usd ? <span className="tabular-nums">${formatCompact(c.usd.usd).display}</span> : null;
+  // The share price beside the two figures it relates, so the gap between the
+  // share count and the underlying reads as a price and not a mismatch. Drawn
+  // where the caller asks for it or hands its receipt.
+  const priceShown = (opts?.showSharePrice || prov?.sharePrice) && underlying.sharePriceRaw;
+  const priceValue = priceShown ? Number(underlying.sharePriceRaw) / 10 ** underlying.decimals : null;
+  const priceText =
+    priceValue != null ? (
+      <span className="tabular-nums">
+        1 {myt} = {priceValue.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}{" "}
+        {underlying.symbol ?? "underlying"}
+      </span>
+    ) : null;
   return amountColumn(
     "Collateral",
     { raw: underlying.raw, formatted: underlying.formatted, asOfBlock: c.asOfBlock },
@@ -202,6 +215,17 @@ export function collateralColumn(
                 usd
               )}
             </>
+          ) : null}
+          {priceText ? (
+            <div>
+              {prov?.sharePrice ? (
+                <Prov info={prov.sharePrice} value={String(priceValue)} symbol={underlying.symbol ?? undefined}>
+                  {priceText}
+                </Prov>
+              ) : (
+                priceText
+              )}
+            </div>
           ) : null}
         </>
       ),
@@ -231,7 +255,7 @@ export function AlchemixPositionCard({ p, session }: { p: AlchemixPositionSummar
         }
         columns={[
           amountColumn("Debt", p.figures.debt, p.syntheticSymbol),
-          collateralColumn(p.figures.collateral, "shares"),
+          collateralColumn(p.figures.collateral, "shares", undefined, { showSharePrice: true }),
           // Its own slot, never added to the debt beside it.
           amountColumn("Set aside for repayment", p.figures.earmarked, p.syntheticSymbol),
         ]}

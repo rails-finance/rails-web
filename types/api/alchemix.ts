@@ -300,6 +300,9 @@ export interface AlchemixTimelineResponse<TEvent> {
 export interface AlchemixLiveCollateral extends AlchemixAmount {
   unit: "myt-shares";
   mytSymbol: string | null;
+  /** The MYT's own address, a Morpho Vault V2. Absent on a backend that
+   *  predates it. */
+  mytAddress?: string | null;
   underlying: AlchemixUnderlyingValue | null;
   usd: AlchemixUsdValue | null;
 }
