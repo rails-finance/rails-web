@@ -27,6 +27,10 @@ export interface AaveV3ReserveSummary {
    *  `"chain"` — a balanceOf read at the row's `chainBlock` (the Base lenders,
    *  which have no replay lane at all). */
   balanceSource: "reduced" | "replayed" | "chain";
+  /** Set when the token's ERC20 `decimals` could not be read (the RPC did not
+   *  answer). `decimals` then holds a placeholder, so the raw balance has no
+   *  known scale and the card states no amount for this reserve. */
+  decimalsUnread?: true;
 }
 
 export interface AaveV3PositionRow {

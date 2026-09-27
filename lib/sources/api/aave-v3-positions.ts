@@ -161,6 +161,7 @@ export async function buildAaveV3PositionRows(
         // A Base lender's balance is a balanceOf at the row's chainBlock, not
         // the index's reduction — the row says which.
         balanceSource: w.chainBlock != null ? "chain" : "reduced",
+        ...(meta == null || meta.unresolved ? { decimalsUnread: true as const } : {}),
         _rank: supplyRaw + debtRaw,
       });
       if (hasSupply) {
@@ -201,6 +202,7 @@ export async function buildAaveV3PositionRows(
         isCollateral: true,
         lt: meta?.lt ?? null,
         usdPrice: null,
+        ...(meta == null || meta.unresolved ? { decimalsUnread: true as const } : {}),
         _rank: supplyRaw + debtRaw,
       });
     }

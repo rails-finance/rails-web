@@ -54,6 +54,28 @@ export interface AaveV3ReserveAmount {
   decimals: number;
   amount: number;
   amountRaw: string;
+  /** The token's `decimals` was not read, so `amount` has no known scale and
+   *  is never shown (see AaveV3ReserveSummary.decimalsUnread). */
+  decimalsUnread?: true;
+}
+
+/** The stand-in for a reserve whose decimals were not read: the raw balance is
+ *  known, its scale is not, so the card names the token and states no amount. */
+function UnreadAmount({ r }: { r: AaveV3ReserveAmount }) {
+  return (
+    <span
+      className="text-rb-500"
+      title={`${r.address}: the token's decimals were not read from the chain, so no amount is shown`}
+    >
+      Unread <span className="font-mono text-sm font-normal">{r.symbol}</span>
+    </span>
+  );
+}
+
+/** Symbols for an icon cluster, leaving out reserves whose token was not read:
+ *  their placeholder symbol is an address, which has no icon. */
+function clusterSymbols(reserves: AaveV3ReserveAmount[]): string[] {
+  return reserves.filter((r) => !r.decimalsUnread).map((r) => r.symbol);
 }
 
 export interface AaveV3PositionView {
@@ -101,6 +123,7 @@ function totalUsd(v: AaveV3PositionView, reserves: AaveV3ReserveAmount[]): numbe
   let sum = 0;
   let any = false;
   for (const r of reserves) {
+    if (r.decimalsUnread) return null;
     if (r.amount <= 0) continue;
     const u = reserveUsd(v, r.address, r.amount);
     if (u == null) return null;
@@ -142,6 +165,12 @@ function ReserveFootnoteLines({
   return (
     <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
       {reserves.map((r) => {
+        if (r.decimalsUnread)
+          return (
+            <div key={r.address}>
+              <UnreadAmount r={r} />
+            </div>
+          );
         const exact = formatUnitsExact(r.amountRaw, r.decimals);
         return (
           <div key={r.address}>
@@ -255,7 +284,11 @@ function ReserveStack({
       {reserves.map((r) => (
         <StatValue key={r.address}>
           <Prov info={side === "supply" ? dep.supply(r.symbol, atBlock) : dep.debt(r.symbol, atBlock)}>
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            {r.decimalsUnread ? (
+              <UnreadAmount r={r} />
+            ) : (
+              <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            )}
           </Prov>
         </StatValue>
       ))}
@@ -277,7 +310,11 @@ function PeakStack({ reserves, side }: { reserves: AaveV3ReserveAmount[]; side: 
       {reserves.map((r) => (
         <StatValue key={r.address}>
           <Prov info={side === "supply" ? dep.peakSupply(r.symbol) : dep.peakDebt(r.symbol)}>
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            {r.decimalsUnread ? (
+              <UnreadAmount r={r} />
+            ) : (
+              <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            )}
           </Prov>
         </StatValue>
       ))}
@@ -508,7 +545,7 @@ function AaveV3PositionCardBody({
             assetIcons:
               v.supplies.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={suppliesRanked.map((r) => r.symbol)} />
+                  <InlineAssetCluster symbols={clusterSymbols(suppliesRanked)} />
                   <ReserveDisclosureToggle disclosure={supplyDisclosure} count={v.supplies.length} />
                 </span>
               ) : undefined,
@@ -539,7 +576,7 @@ function AaveV3PositionCardBody({
             assetIcons:
               v.borrows.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={borrowsRanked.map((r) => r.symbol)} />
+                  <InlineAssetCluster symbols={clusterSymbols(borrowsRanked)} />
                   <ReserveDisclosureToggle disclosure={debtDisclosure} count={v.borrows.length} />
                 </span>
               ) : undefined,
@@ -618,6 +655,7 @@ function splitSides(reserves: AaveV3ReserveSummary[]): {
         decimals: r.decimals,
         amount: scaleRaw(r.supplyBalanceRaw, r.decimals),
         amountRaw: r.supplyBalanceRaw,
+        ...(r.decimalsUnread ? { decimalsUnread: true as const } : {}),
         _rank: scaleRaw(r.supplyBalanceRaw, r.decimals),
       });
     if (rawBigInt(r.debtBalanceRaw) > BigInt(0))
@@ -627,6 +665,7 @@ function splitSides(reserves: AaveV3ReserveSummary[]): {
         decimals: r.decimals,
         amount: scaleRaw(r.debtBalanceRaw, r.decimals),
         amountRaw: r.debtBalanceRaw,
+        ...(r.decimalsUnread ? { decimalsUnread: true as const } : {}),
         _rank: scaleRaw(r.debtBalanceRaw, r.decimals),
       });
   }
