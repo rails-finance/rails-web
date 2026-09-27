@@ -68,6 +68,8 @@ import {
   setFlowsCollapsed,
 } from "@/lib/shared/flows-collapse-store";
 import { formatCompact, formatNumber } from "@/lib/utils/format";
+import { NotLoaded } from "@/components/shared/not-loaded";
+import { leftOutTitle } from "@/lib/shared/decimals-unread";
 import {
   type ChainTruthTowerData,
   type TowerLine,
@@ -1035,7 +1037,11 @@ export function ChainTruthTower({
   // lifetime story is drawable — once a position closes, the flows ARE the
   // story. Without drawable flows there is nothing to show; feeders that never
   // populate flows are unaffected.
-  if (!hasDebt && !hasColl && !lifetimeAvailable) return null;
+  // A token left out because its decimals did not load is stated, even where
+  // it leaves nothing else to draw.
+  const leftOut = data.notLoaded ?? [];
+  const drawable = hasDebt || hasColl || lifetimeAvailable;
+  if (!drawable && leftOut.length === 0) return null;
   const canGroup = showBars && (sideCanGroup(data.collateral, data.valued) || sideCanGroup(data.debt, data.valued));
   const grouped = canGroup && (groupOverride ?? true);
   const chartData: ChainTruthTowerData = grouped
@@ -1137,13 +1143,21 @@ export function ChainTruthTower({
           )}
           {/* Bars pull up under the toolbar row; the gated reserve LIST keeps its
             own row (text would collide with the title). */}
-          <div className={showBars ? "-mt-7" : "mt-3"}>
-            {showBars ? (
-              <ChainTruthTowerChart data={chartData} hideHistorical={hideHistorical} />
-            ) : (
-              <GatedEconomics data={data} />
-            )}
-          </div>
+          {drawable && (
+            <div className={showBars ? "-mt-7" : "mt-3"}>
+              {showBars ? (
+                <ChainTruthTowerChart data={chartData} hideHistorical={hideHistorical} />
+              ) : (
+                <GatedEconomics data={data} />
+              )}
+            </div>
+          )}
+          {leftOut.length > 0 && (
+            <p className="mt-3 text-[11px] leading-snug text-rb-400" data-not-loaded="">
+              Leaves out {leftOut.map((t) => t.label).join(", ")}:{" "}
+              <NotLoaded inline className="text-rb-500" title={leftOutTitle(leftOut)} />
+            </p>
+          )}
           <ProvenanceInfoTabs className="mt-3" explanation={explanation} learnMore={learnMore} rowExtra={rowExtra} />
         </div>
       </section>

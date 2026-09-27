@@ -13,6 +13,7 @@
 // pill under the grid. A block the price walk hasn't reached keeps the card
 // token-only. Current debt WITH interest (needs the reserve index) is a layer.
 
+import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import type { SparkContext, SparkSnapshotItem } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -87,10 +88,16 @@ function BasketList({
       <div className="mt-1 space-y-0.5 text-xs tabular-nums">
         {items.map((it) => (
           <div key={it.address ?? it.symbol} className="flex items-baseline justify-between gap-3">
-            <span className="text-rb-500">{it.symbol}</span>
-            <Prov info={provOf(it.symbol, coords)}>
-              <span className="text-foreground/80">{fmt(it.amount)}</span>
-            </Prov>
+            {it.decimalsUnread ? (
+              <TokenAmountNotLoaded address={it.address} label={it.symbol} />
+            ) : (
+              <>
+                <span className="text-rb-500">{it.symbol}</span>
+                <Prov info={provOf(it.symbol, coords)}>
+                  <span className="text-foreground/80">{fmt(it.amount)}</span>
+                </Prov>
+              </>
+            )}
           </div>
         ))}
       </div>

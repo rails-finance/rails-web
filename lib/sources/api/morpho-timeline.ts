@@ -11,6 +11,7 @@ import { parseMarketParams, marketLabel } from "@/lib/morpho/asset-catalog";
 import type { BaseActivityEvent, AssetFlow, MorphoContext, MorphoEventType } from "@/lib/shared/types/event-shape";
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { decimalsUnreadField, unreadTokensOf } from "@/lib/shared/decimals-unread";
 
 export interface MorphoTimelineResult {
   positionId: string;
@@ -123,6 +124,7 @@ async function resolveMarketMeta(marketId: string, marketParams: string | null):
     address: addr,
     symbol: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
     decimals: 18,
+    unresolved: true,
   });
   return {
     marketId: p.marketId,
@@ -155,6 +157,16 @@ export async function buildMorphoTimeline(resp: RawMorphoTimelineResponse): Prom
   const loanSym = meta?.loan.symbol ?? "?";
   const collSym = meta?.collateral?.symbol ?? null;
   const owner = resp.owner.toLowerCase();
+  // Every row carries both running balances, so a token that did not load is
+  // named on every event of the market.
+  const unread = decimalsUnreadField(
+    meta
+      ? unreadTokensOf([
+          { address: meta.loan.address, meta: meta.loan },
+          ...(meta.collateral ? [{ address: meta.collateral.address, meta: meta.collateral }] : []),
+        ])
+      : [],
+  );
 
   let collRun = ZERO;
   let borrRun = ZERO;
@@ -211,6 +223,7 @@ export async function buildMorphoTimeline(resp: RawMorphoTimelineResponse): Prom
       flows: flowsFor(eventType, coll, borr, collDec, loanDec, collSym, loanSym, meta),
       etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", r.tx),
       context: { protocol: "morpho", data: ctx },
+      ...unread,
     };
   });
 
@@ -247,6 +260,7 @@ function flowsFor(
       amount: mag.toString(),
       amountFormatted: Number(fmtUnits(mag, collDec)),
       direction: coll > ZERO ? "in" : "out",
+      ...(meta?.collateral?.unresolved ? { decimalsUnread: true as const } : {}),
     });
   }
   if (borr !== ZERO) {
@@ -258,6 +272,7 @@ function flowsFor(
       amount: mag.toString(),
       amountFormatted: Number(fmtUnits(mag, loanDec)),
       direction: borr > ZERO ? "out" : "in",
+      ...(meta?.loan.unresolved ? { decimalsUnread: true as const } : {}),
     });
   }
   return flows;

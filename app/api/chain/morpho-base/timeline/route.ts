@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timelineCacheHeaders } from "@/lib/shared/decimals-unread";
+import type { MorphoChainTimelineResult } from "@/lib/sources/chain/morpho-blue-events";
 import { loadMorphoEventsFromChain } from "@/lib/sources/chain/morpho-blue-events";
 import { loadMorphoEventsFromIndex } from "@/lib/sources/api/morpho-base-timeline";
 import { MORPHO_BASE_DEPLOYMENT } from "@/lib/sources/chain/morpho-deployments";
@@ -24,6 +26,10 @@ import { readerIpFromRequest } from "@/lib/api/reader-ip";
 // renders the verdict. Both are replayed per market by the one replay.
 //
 // Node runtime — the readers are server-only (RPC endpoints live in env).
+
+/** A token whose decimals did not load, named outside the drawn events. */
+const unreadElsewhere = (r: MorphoChainTimelineResult) =>
+  r.positions.some((p) => p.loanDecimalsUnread || p.collateralDecimalsUnread);
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,7 +60,11 @@ export async function GET(request: NextRequest) {
     });
     if (indexed?.whole)
       return NextResponse.json(toGroupedTimelineWire(indexed.result, BASE_CHAIN_ID), {
-        headers: { "Cache-Control": CACHE_CONTROL },
+        headers: timelineCacheHeaders(
+          indexed.result.positions.flatMap((p) => p.events),
+          { "Cache-Control": CACHE_CONTROL },
+          unreadElsewhere(indexed.result),
+        ),
       });
     if (indexed) console.warn(`Morpho Blue Base index not whole for ${wallet} (${indexed.reason}) — sweeping`);
 
@@ -64,7 +74,11 @@ export async function GET(request: NextRequest) {
       deployBlock: MORPHO_BASE_DEPLOY_BLOCK,
     });
     return NextResponse.json(toGroupedTimelineWire(data, BASE_CHAIN_ID), {
-      headers: { "Cache-Control": CACHE_CONTROL },
+      headers: timelineCacheHeaders(
+        data.positions.flatMap((p) => p.events),
+        { "Cache-Control": CACHE_CONTROL },
+        unreadElsewhere(data),
+      ),
     });
   } catch (error) {
     // Distinguished on purpose: an unconfigured endpoint is not an empty

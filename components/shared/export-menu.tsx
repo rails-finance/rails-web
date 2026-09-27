@@ -26,7 +26,7 @@
 
 import { useState } from "react";
 import { Copy, FileText, Download } from "lucide-react";
-import { eventsToCsv, TokenMetaUnresolvedError } from "@/lib/shared/events-to-csv";
+import { eventsToCsv } from "@/lib/shared/events-to-csv";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
 import { shouldQueueExport, type QueuedExportRequest } from "@/lib/shared/queued-export";
@@ -145,16 +145,7 @@ export function ExportMenu({
     // Lead with a UTF-8 BOM so Excel reads non-ASCII token symbols correctly.
     // A page with a queued export writes its family's fixed columns, the same
     // bytes the queued file carries for the same rows.
-    let csv: string;
-    try {
-      csv = "\uFEFF" + eventsToCsv(rows, queued?.protocol);
-    } catch (err) {
-      if (!(err instanceof TokenMetaUnresolvedError)) throw err;
-      setCsvError(
-        "A token's details could not be read when this history loaded, so nothing was downloaded. Reload the page and try again.",
-      );
-      return;
-    }
+    const csv = "\uFEFF" + eventsToCsv(rows, queued?.protocol);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");

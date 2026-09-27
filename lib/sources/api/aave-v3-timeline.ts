@@ -12,6 +12,7 @@
 //
 // SERVER-ONLY — imported from the /api/aave-v3/* route handlers.
 
+import { decimalsUnreadField, unreadTokensOf } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent, OriginEnvelope } from "@/lib/shared/types/event-shape";
 import type { AaveV3Context, AaveV3EventType } from "@/lib/shared/types/protocols/aave-v3";
 import type {
@@ -247,8 +248,9 @@ export async function buildAaveV3Timeline(rows: MvRow[], walletRaw: string): Pro
   // the received leg's columns riding in `swap.received`.
   const events: BaseActivityEvent[] = rows.map((r) => {
     const e = r.swap?.role === "given" && r.swap.received ? swapEvent(r, r.swap, r.swap.received) : rowEvent(r);
-    if (aaveV3RowTokens(r).some((a) => !metas.has(a) || metas.get(a)!.unresolved === true))
-      e.tokenMetaUnresolved = true;
+    const unread = unreadTokensOf(aaveV3RowTokens(r).map((a) => ({ address: a, meta: metas.get(a) })));
+    Object.assign(e, decimalsUnreadField(unread));
+    for (const f of e.flows) if (unread.some((t) => t.address === f.token.toLowerCase())) f.decimalsUnread = true;
     return e;
   });
 

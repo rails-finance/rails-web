@@ -61,10 +61,16 @@ export async function GET(request: NextRequest) {
     const decimalsOf = (key: string): number | undefined => {
       if (!entry || !meta) return undefined;
       const token = key === "collateral" ? entry.collateralToken : key === "debt" ? entry.loanToken : null;
-      return token ? meta.get(token.toLowerCase())?.decimals : undefined;
+      const m = token ? meta.get(token.toLowerCase()) : undefined;
+      return m && !m.unresolved ? m.decimals : undefined;
     };
     const opening = resolveOpeningAssetKeys(upstream, () => undefined, decimalsOf);
-    return NextResponse.json(opening, { headers: proxyCacheControl(response, LISTING_CACHE_CONTROL) });
+    // A token whose decimals did not load leaves its bucket's decimals null
+    // (unknown, never added), and the answer is not kept.
+    const unread = !!meta && [...meta.values()].some((m) => m.unresolved);
+    return NextResponse.json(opening, {
+      headers: unread ? { "Cache-Control": "no-store" } : proxyCacheControl(response, LISTING_CACHE_CONTROL),
+    });
   } catch (error) {
     console.error("Error fetching morpho timeline summary from backend:", error);
     const message = error instanceof Error ? error.message : "Failed to fetch opening balance";

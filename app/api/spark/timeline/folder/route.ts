@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
+import { timelineCacheHeaders } from "@/lib/shared/decimals-unread";
 import { buildSparkTimeline, type MvRow } from "@/lib/sources/api/spark-timeline";
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -77,10 +78,12 @@ export async function GET(request: NextRequest) {
     ]);
     const folder = toServedFolder(upstream.folder, {
       symbol: (key: string) => legMetas.get(key)?.symbol,
-      decimals: (key: string) => legMetas.get(key)?.decimals,
+      decimals: (key: string) => (legMetas.get(key)?.unresolved ? undefined : legMetas.get(key)?.decimals),
     });
     return NextResponse.json(toTimelineWire({ ...data, folder }, MAINNET_CHAIN_ID), {
-      headers: proxyCacheControl(response, LISTING_CACHE_CONTROL),
+      headers: [...legMetas.values()].some((m) => m.unresolved)
+        ? { "Cache-Control": "no-store" }
+        : timelineCacheHeaders(data.events, proxyCacheControl(response, LISTING_CACHE_CONTROL)),
     });
   } catch (error) {
     console.error("Error opening spark timeline folder:", error);

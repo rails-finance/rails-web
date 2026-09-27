@@ -33,6 +33,8 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
 import { type ChainTruthTowerData, type TowerLine, flowsReconcile } from "@/lib/shared/chain-truth-economics";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { unreadToken } from "@/lib/shared/decimals-unread";
+import type { UnreadToken } from "@/lib/shared/types/event-shape";
 
 const DUST = 1e-9;
 
@@ -87,6 +89,8 @@ function reduceLifetime(events: BaseActivityEvent[]): MorphoTowerLifetime {
   for (const ev of events) {
     if (!isMorphoEvent(ev)) continue;
     const ctx = ev.context.data;
+    // An amount in a token whose decimals did not load joins no sum.
+    if (unreadToken(ev, ctx.side === "collateral" ? ctx.collateralSymbol : ctx.loanSymbol)) continue;
     const amt = Math.abs(Number(ctx.assetsDelta));
     if (!Number.isFinite(amt) || amt === 0) continue;
     switch (ctx.eventType) {
@@ -157,10 +161,22 @@ export function computeMorphoEconomics(
   vocab: MorphoTowerVocabulary = MORPHO_INDEXED_VOCABULARY,
   precomputedLifetime?: MorphoTowerLifetime,
 ): ChainTruthTowerData {
-  const coll = Math.max(0, view.collateral);
-  const principal = Math.max(0, view.borrowed);
+  // A side whose token's decimals did not load (on the card, or on any event)
+  // is left out whole: no current line, no flow, no lifetime total. The tower
+  // names it instead.
+  const eventUnread = (sym: string | null | undefined) =>
+    sym ? events.map((e) => unreadToken(e, sym)).find((t) => t != null) : undefined;
+  const collUnread: UnreadToken | undefined = view.collateralDecimalsUnread
+    ? { address: (view.collateralToken ?? "").toLowerCase(), label: view.collateralSymbol ?? "collateral" }
+    : eventUnread(view.collateralSymbol);
+  const loanUnread: UnreadToken | undefined = view.loanDecimalsUnread
+    ? { address: (view.loanToken ?? "").toLowerCase(), label: view.loanSymbol }
+    : eventUnread(view.loanSymbol);
+  const notLoaded = [collUnread, loanUnread].filter((t): t is UnreadToken => t != null);
+  const coll = collUnread ? 0 : Math.max(0, view.collateral);
+  const principal = loanUnread ? 0 : Math.max(0, view.borrowed);
   const collSym = view.collateralSymbol ?? "—";
-  const cd = view.currentDebt;
+  const cd = loanUnread ? undefined : view.currentDebt;
   const accrued = cd ? Math.max(0, cd.accruedAmount) : 0;
 
   const {
@@ -173,8 +189,9 @@ export function computeMorphoEconomics(
   // Surface lifetime flows only where the captured events reconcile to current
   // state (history complete from the position's first event). Per side, since
   // one can be complete while the other isn't.
-  const collComplete = flowsReconcile(deposited - cWithdrawn - cLiquidated, coll, deposited + cWithdrawn + cLiquidated);
-  const debtComplete = flowsReconcile(borrowed - repaid, principal, borrowed + repaid);
+  const collComplete =
+    !collUnread && flowsReconcile(deposited - cWithdrawn - cLiquidated, coll, deposited + cWithdrawn + cLiquidated);
+  const debtComplete = !loanUnread && flowsReconcile(borrowed - repaid, principal, borrowed + repaid);
   // Every tower line carries the token's own address beside its symbol. Morpho
   // Blue is permissionless — the market params ARE two addresses — so the
   // symbol alone leaves the icon chip to guess from the 88-entry house table,
@@ -250,8 +267,10 @@ export function computeMorphoEconomics(
       liquidated: [],
       lifetimeInflow: debtComplete ? borrowed : 0,
     },
-    interestNote: cd
-      ? undefined
-      : "Accrued interest isn't shown here — the position has no open debt for it to build on.",
+    interestNote:
+      cd || loanUnread
+        ? undefined
+        : "Accrued interest isn't shown here — the position has no open debt for it to build on.",
+    ...(notLoaded.length > 0 ? { notLoaded } : {}),
   };
 }

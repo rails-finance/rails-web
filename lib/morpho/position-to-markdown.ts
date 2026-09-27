@@ -11,6 +11,7 @@
 // deliberately excludes. A PURE function of the data already in scope on the
 // detail page — no fetching.
 
+import { NOT_LOADED_CELL, unreadToken } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
 import type { MorphoPositionView } from "@/components/protocol/morpho/morpho-position-card";
@@ -171,9 +172,11 @@ function timelineTable(events: BaseActivityEvent[], history: MarkdownHistoryScop
     const d = e.context.data;
     const label = (d.eventType[0].toUpperCase() + d.eventType.slice(1)).replace(/_/g, " ");
     const token = d.side === "collateral" ? d.collateralSymbol : d.loanSymbol;
-    const amount = amt(Math.abs(parseFloat(d.assetsDelta)));
+    // A figure in a token whose decimals did not load reads "not loaded".
+    const fig = (v: string, sym: string) => (unreadToken(e, sym) ? NOT_LOADED_CELL : amt(parseFloat(v)));
+    const amount = unreadToken(e, token) ? NOT_LOADED_CELL : amt(Math.abs(parseFloat(d.assetsDelta)));
     out.push(
-      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${token} | ${amount} | ${amt(parseFloat(d.collateralAfter))} | ${amt(parseFloat(d.borrowedAfter))} | ${txCell(e)} |`,
+      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${token} | ${amount} | ${fig(d.collateralAfter, d.collateralSymbol)} | ${fig(d.borrowedAfter, d.loanSymbol)} | ${txCell(e)} |`,
     );
   });
   out.push("");

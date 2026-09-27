@@ -12,6 +12,7 @@
 // precision (no compact "60K" notation) because an LLM reasons better over
 // exact values than over rounded display strings.
 
+import { NOT_LOADED_CELL, unreadToken } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import type { AaveV3PositionView, AaveV3ReserveAmount } from "@/components/protocol/aave-v3/aave-v3-position-card";
@@ -309,11 +310,13 @@ function timelineTable(
       ? `${d.reserveSymbol ?? "—"} → ${d.swap.receivedSymbol ?? "—"}`
       : ((isLiq ? d.collateralSymbol : d.reserveSymbol) ?? d.reserveSymbol ?? "—");
     const rawAmount = isLiq ? d.debtToCover : d.amount;
+    // A figure in a token whose decimals did not load reads "not loaded".
+    const fig = (v: string | undefined, token: string | undefined) =>
+      v == null ? "—" : unreadToken(e, token) ? NOT_LOADED_CELL : amt(parseFloat(v));
+    const given = d.reserve ?? d.reserveSymbol;
     const amount = d.swap
-      ? `${rawAmount != null ? amt(parseFloat(rawAmount)) : "—"} → ${d.swap.receivedAmount != null ? amt(parseFloat(d.swap.receivedAmount)) : "—"}`
-      : rawAmount != null
-        ? amt(parseFloat(rawAmount))
-        : "—";
+      ? `${fig(rawAmount, given)} → ${fig(d.swap.receivedAmount, d.swap.receivedAsset ?? d.swap.receivedSymbol)}`
+      : fig(rawAmount, given);
     const noted = (anchoredNotes.get(e.id) ?? []).map(marketNoteRowAnnotation).join("; ");
     out.push(
       `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${asset} | ${amount} | ${txCell(e)}${noted ? ` — ${noted}` : ""} |`,

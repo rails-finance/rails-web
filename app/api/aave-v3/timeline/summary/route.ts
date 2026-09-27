@@ -58,10 +58,15 @@ export async function GET(request: NextRequest) {
     const opening = resolveOpeningAssetKeys(
       upstream,
       (addr) => meta.get(addr.toLowerCase())?.symbol,
-      (addr) => meta.get(addr.toLowerCase())?.decimals,
+      (addr) => (meta.get(addr.toLowerCase())?.unresolved ? undefined : meta.get(addr.toLowerCase())?.decimals),
     );
 
-    return NextResponse.json(opening, { headers: proxyCacheControl(response, LISTING_CACHE_CONTROL) });
+    // A token whose decimals did not load leaves its bucket's decimals null
+    // (unknown, never added), and the answer is not kept.
+    const unread = [...meta.values()].some((m) => m.unresolved);
+    return NextResponse.json(opening, {
+      headers: unread ? { "Cache-Control": "no-store" } : proxyCacheControl(response, LISTING_CACHE_CONTROL),
+    });
   } catch (error) {
     console.error("Error fetching aave-v3 timeline summary from backend:", error);
     const message = error instanceof Error ? error.message : "Failed to fetch opening balance";

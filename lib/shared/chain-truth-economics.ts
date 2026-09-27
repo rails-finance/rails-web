@@ -15,6 +15,7 @@
 // dropped (the don't-mislead rule of the chain-truth charter).
 
 import type { Provenance, ProvKind } from "@/components/shared/provenance";
+import type { UnreadToken } from "@/lib/shared/types/event-shape";
 
 /** One valued line in a tower side — a token amount, its USD value when
  *  priceable, and the provenance that traces it back to the chain. */
@@ -172,6 +173,10 @@ export interface ChainTruthTowerData {
    *  assert a borrowable axis the protocol never offers here. Bar mode ignores
    *  it (a debt-side figure forces bar mode, so the two can't meet). */
   debtAxisAbsent?: boolean;
+  /** Tokens the tower leaves out because their `decimals` did not load: no
+   *  line, flow or total includes them, and the tower says so
+   *  (lib/shared/decimals-unread.ts). */
+  notLoaded?: UnreadToken[];
 }
 
 /** The scalar a tower stacks by: USD when valued, else the token amount. */

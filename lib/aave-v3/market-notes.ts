@@ -51,6 +51,7 @@
 // helpers are exported for scripts/verify/verify-aave-family-rate-step.mjs,
 // which restates the rule rather than importing it.
 
+import { unreadToken } from "@/lib/shared/decimals-unread";
 import type { AaveV3ChainReserve } from "@/lib/api/fetch-aave-v3-position";
 import {
   ratePointKey,
@@ -158,7 +159,7 @@ const num = (v: string | undefined): number | null => {
 export function aaveFamilyHoldings(events: readonly BaseActivityEvent[]): AaveFamilyTouch[] {
   const rows = [...events].sort(byChainOrder);
   const held = new Map<string, { supply: number; debt: number }>();
-  const at = (reserve: string) => {
+  const atHeld = (reserve: string) => {
     const cur = held.get(reserve) ?? { supply: 0, debt: 0 };
     held.set(reserve, cur);
     return cur;
@@ -168,6 +169,9 @@ export function aaveFamilyHoldings(events: readonly BaseActivityEvent[]): AaveFa
   for (const e of rows) {
     const d = familyData(e);
     if (!d) continue;
+    // A reserve whose decimals did not load has no stated balance: the notes
+    // hold nothing of it rather than a figure scaled by the 18 stand-in.
+    const at = (reserve: string) => (unreadToken(e, reserve) ? { supply: 0, debt: 0 } : atHeld(reserve));
     if (d.eventType === "liquidation") {
       // One LiquidationCall moves both sides: the seized collateral reserve
       // (`collateralAsset`) and the covered debt reserve, which is the row's

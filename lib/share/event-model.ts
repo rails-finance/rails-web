@@ -27,6 +27,7 @@ function pickFlows(flows: AssetFlow[]): AssetFlow[] {
  *  them carry a price, so the card omits the line rather than asserting a
  *  partial total as the whole. */
 function sumShownUsd(shown: AssetFlow[]): number | undefined {
+  if (shown.some((f) => f.decimalsUnread)) return undefined;
   const known = shown.map((f) => f.valueUsd).filter((v): v is number => typeof v === "number");
   return known.length > 0 ? known.reduce((s, v) => s + Math.abs(v), 0) : undefined;
 }
@@ -44,11 +45,16 @@ export function eventCardModel(
     // A family whose actionLabel is empty for some rows (a composed-label edge
     // case) falls back to the raw actionType rather than an empty verb.
     actionLabel: event.actionLabel || event.actionType,
-    flows: shown.map((f) => ({
-      sign: f.direction === "in" ? "+" : "−",
-      amount: formatHeadlineAmount(Math.abs(f.amountFormatted)),
-      symbol: f.tokenSymbol,
-    })),
+    // A flow in a token whose decimals did not load states no amount.
+    flows: shown.map((f) =>
+      f.decimalsUnread
+        ? { sign: "" as const, amount: "Not loaded", symbol: f.tokenSymbol }
+        : {
+            sign: f.direction === "in" ? ("+" as const) : ("−" as const),
+            amount: formatHeadlineAmount(Math.abs(f.amountFormatted)),
+            symbol: f.tokenSymbol,
+          },
+    ),
     usd: usd != null ? formatUsd(usd) : undefined,
     at: new Date(event.timestamp * 1000),
     txHash: event.txHash,

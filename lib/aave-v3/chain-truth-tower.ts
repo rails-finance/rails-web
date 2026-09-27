@@ -22,6 +22,8 @@
 // reserve is unpriced, the tower degrades to the token-only gated list (a
 // strict per-total guard) rather than assert a partial USD total.
 
+import { unreadTokensIn } from "@/lib/shared/decimals-unread";
+import type { UnreadToken } from "@/lib/shared/types/event-shape";
 import type { AaveV3PositionView } from "@/components/protocol/aave-v3/aave-v3-position-card";
 import type { AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
 import { scaleV3ChainBalance } from "@/lib/api/fetch-aave-v3-position";
@@ -93,6 +95,9 @@ export interface ReserveFlows {
   /** Debt the Pool burned as bad debt (DeficitCreated): left the position
    *  without a repayment. A debt outflow beside repaid and liquidatedDebt. */
   writtenOff: number;
+  /** Set when the token's `decimals` did not load (a swept lane's sums): the
+   *  tower leaves the token out. */
+  decimalsUnread?: true;
 }
 
 /** Key prefix of the tower's written-off debt lines: they ride the debt
@@ -428,11 +433,15 @@ export function computeAaveV3CardCaptions(
     const p = prices?.[address.toLowerCase()];
     return typeof p === "number" && p > 0 ? amount * p : null;
   };
-  const lifetime = precomputedLifetime
-    ? bySymbol(precomputedLifetime)
-    : events && events.length > 0
-      ? foldAaveV3Lifetime(events)
-      : null;
+  const leftOut = new Set(aaveV3NotLoaded(view, events ?? [], precomputedLifetime).map((t) => t.label));
+  const lifetime = withoutLeftOut(
+    precomputedLifetime
+      ? bySymbol(precomputedLifetime)
+      : events && events.length > 0
+        ? foldAaveV3Lifetime(events)
+        : null,
+    leftOut,
+  );
 
   // Borrow rate — from the live Pool read (getReserveData @ head). One borrowed
   // reserve → its own rate; several → the debt-USD-weighted average, with the
@@ -469,6 +478,31 @@ export function computeAaveV3CardCaptions(
 /** Index precomputed flows the way the reducer keys them. */
 const bySymbol = (rows: ReserveFlows[]): Map<string, ReserveFlows> => new Map(rows.map((r) => [r.symbol, r]));
 
+/** The tokens the tower leaves out: a reserve the card flags, and any token an
+ *  event names whose decimals did not load (lib/shared/decimals-unread.ts). */
+function aaveV3NotLoaded(
+  view: AaveV3PositionView,
+  events: BaseActivityEvent[],
+  precomputed?: ReserveFlows[],
+): UnreadToken[] {
+  const out = new Map<string, UnreadToken>();
+  for (const f of precomputed ?? [])
+    if (f.decimalsUnread) out.set(f.symbol, { address: (f.address ?? "").toLowerCase(), label: f.symbol });
+  for (const r of [...view.supplies, ...view.borrows])
+    if (r.decimalsUnread) out.set(r.symbol, { address: r.address.toLowerCase(), label: r.symbol });
+  for (const t of unreadTokensIn(events)) if (!out.has(t.label)) out.set(t.label, t);
+  return [...out.values()];
+}
+
+/** The lifetime flows without the left-out tokens: every leg of theirs is
+ *  scaled by the 18 stand-in. */
+function withoutLeftOut(
+  lifetime: Map<string, ReserveFlows> | null,
+  leftOut: Set<string>,
+): Map<string, ReserveFlows> | null {
+  return lifetime && leftOut.size > 0 ? new Map([...lifetime].filter(([sym]) => !leftOut.has(sym))) : lifetime;
+}
+
 export function computeAaveV3Economics(
   view: AaveV3PositionView,
   events?: BaseActivityEvent[],
@@ -487,8 +521,12 @@ export function computeAaveV3Economics(
     return typeof p === "number" && p > 0 ? amount * p : null;
   };
 
+  // Tokens whose decimals did not load are left out of every line and total,
+  // and the tower names them.
+  const notLoaded = aaveV3NotLoaded(view, events ?? [], precomputedLifetime);
+  const leftOut = new Set(notLoaded.map((t) => t.label));
   const supplyLines: TowerLine[] = view.supplies
-    .filter((r) => r.amount > 0)
+    .filter((r) => r.amount > 0 && !leftOut.has(r.symbol))
     .map((r) => ({
       key: r.address,
       symbol: r.symbol,
@@ -498,7 +536,7 @@ export function computeAaveV3Economics(
     }));
 
   const debtLines: TowerLine[] = view.borrows
-    .filter((r) => r.amount > 0)
+    .filter((r) => r.amount > 0 && !leftOut.has(r.symbol))
     .map((r) => ({
       key: r.address,
       symbol: r.symbol,
@@ -508,11 +546,14 @@ export function computeAaveV3Economics(
     }));
 
   // ── Lifetime layer ─────────────────────────────────────────────────────────
-  const lifetime = precomputedLifetime
-    ? bySymbol(precomputedLifetime)
-    : events && events.length > 0
-      ? foldAaveV3Lifetime(events)
-      : null;
+  const lifetime = withoutLeftOut(
+    precomputedLifetime
+      ? bySymbol(precomputedLifetime)
+      : events && events.length > 0
+        ? foldAaveV3Lifetime(events)
+        : null,
+    leftOut,
+  );
   const flowLines = (pick: (r: ReserveFlows) => number, flow: AaveV3LifetimeFlow, keyPrefix: string): TowerLine[] =>
     lifetime
       ? [...lifetime.values()]
@@ -615,5 +656,6 @@ export function computeAaveV3Economics(
       interest != null
         ? undefined
         : `Balances include the interest built up since each supply and borrow, so every figure is what the position holds now rather than the amount originally moved. The split between principal and accrued interest is shown only when the debt is a single asset whose history adds up cleanly. Dollar values use ${v3Possessive(v3Brand(vocab.protocol ?? "Aave V3"), "'")} own price for each asset.`,
+    ...(notLoaded.length > 0 ? { notLoaded } : {}),
   };
 }

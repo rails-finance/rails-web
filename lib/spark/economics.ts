@@ -21,6 +21,8 @@
 // contributing reserve is unpriced, the tower degrades to the token-only gated
 // list (a strict per-total guard) rather than assert a partial USD total.
 
+import { unreadToken, unreadTokensIn } from "@/lib/shared/decimals-unread";
+import type { UnreadToken } from "@/lib/shared/types/event-shape";
 import type { SparkPositionView } from "@/components/protocol/spark/spark-position-card";
 import type { SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
 import { scaleSparkChainBalance } from "@/lib/api/fetch-spark-position";
@@ -85,11 +87,14 @@ function reduceSparkLifetime(events: BaseActivityEvent[]): Map<string, ReserveFl
       // flows: [collateral out, debt out] — addresses for pricing.
       const collAddr = ctx.collateralAsset ?? ev.flows[0]?.token;
       const debtAddr = ev.flows[1]?.token;
-      if (ctx.collateralSymbol && Number.isFinite(seized))
+      // An amount in a token whose decimals did not load joins no sum.
+      if (ctx.collateralSymbol && Number.isFinite(seized) && !unreadToken(ev, collAddr ?? ctx.collateralSymbol))
         get(ctx.collateralSymbol, collAddr).liquidatedCollateral += seized;
-      if (Number.isFinite(covered)) get(ctx.reserveSymbol, debtAddr).liquidatedDebt += covered;
+      if (Number.isFinite(covered) && !unreadToken(ev, ctx.reserveSymbol))
+        get(ctx.reserveSymbol, debtAddr).liquidatedDebt += covered;
       continue;
     }
+    if (unreadToken(ev, ctx.reserveSymbol)) continue;
     const mag = Math.abs(Number(ctx.assetsDelta));
     if (!Number.isFinite(mag) || mag === 0) continue;
     const r = get(ctx.reserveSymbol, ev.flows[0]?.token);
@@ -378,8 +383,12 @@ export function computeSparkEconomics(
     return typeof p === "number" && p > 0 ? amount * p : null;
   };
 
+  // Tokens whose decimals did not load (on the card or on any event) are
+  // left out of every line and total, and the tower names them.
+  const notLoaded = sparkNotLoaded(view, events ?? []);
+  const leftOut = new Set(notLoaded.map((t) => t.label));
   const supplyLines: TowerLine[] = view.supplies
-    .filter((r) => r.amount > 0)
+    .filter((r) => r.amount > 0 && !leftOut.has(r.symbol))
     .map((r) => ({
       key: r.address,
       symbol: r.symbol,
@@ -389,7 +398,7 @@ export function computeSparkEconomics(
     }));
 
   const debtLines: TowerLine[] = view.borrows
-    .filter((r) => r.amount > 0)
+    .filter((r) => r.amount > 0 && !leftOut.has(r.symbol))
     .map((r) => ({
       key: r.address,
       symbol: r.symbol,
@@ -399,11 +408,12 @@ export function computeSparkEconomics(
     }));
 
   // ── Lifetime layer (needs the event stream) ────────────────────────────────
-  const lifetime = precomputedLifetime
+  const lifetimeAll = precomputedLifetime
     ? bySymbol(precomputedLifetime)
     : events && events.length > 0
       ? reduceSparkLifetime(events)
       : null;
+  const lifetime = lifetimeAll ? new Map([...lifetimeAll].filter(([sym]) => !leftOut.has(sym))) : null;
   const flowLines = (
     pick: (r: ReserveFlows) => number,
     flow: "withdrawn" | "repaid" | "liquidated collateral" | "liquidated debt",
@@ -503,5 +513,16 @@ export function computeSparkEconomics(
       interest != null
         ? undefined
         : "Balances include the interest built up since each supply and borrow, so every figure is what the position holds now rather than the amount originally moved. The split between principal and accrued interest is shown only when the debt is a single asset whose history adds up cleanly. Dollar values use SparkLend's own price for each asset.",
+    ...(notLoaded.length > 0 ? { notLoaded } : {}),
   };
+}
+
+/** The tokens the tower leaves out: a reserve the card flags, and any token an
+ *  event names whose decimals did not load. */
+function sparkNotLoaded(view: SparkPositionView, events: BaseActivityEvent[]): UnreadToken[] {
+  const out = new Map<string, UnreadToken>();
+  for (const r of [...view.supplies, ...view.borrows])
+    if (r.decimalsUnread) out.set(r.symbol, { address: r.address.toLowerCase(), label: r.symbol });
+  for (const t of unreadTokensIn(events)) if (!out.has(t.label)) out.set(t.label, t);
+  return [...out.values()];
 }

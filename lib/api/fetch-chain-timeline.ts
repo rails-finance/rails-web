@@ -139,6 +139,9 @@ export interface ChainLifetimeFlows {
   /** Debt the Pool burned as bad debt (DeficitCreated). The Base sweep does
    *  not read that topic and states 0; the Ethereum index lane carries it. */
   writtenOff: number;
+  /** Set when the token's `decimals` did not load: every figure on this entry
+   *  is scaled by the 18 stand-in and is not stated. */
+  decimalsUnread?: true;
   /** The highest running PRINCIPAL the replay recorded on each axis over the
    *  whole swept history — what a closed position's card shows as "highest
    *  recorded". Principal, not the rebased balance: the sweep replays emitted

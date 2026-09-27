@@ -21,8 +21,9 @@
 //   F4  BALANCES — the file's balance-after cells equal the served row's
 //       *_after fields scaled here from raw.
 //   F5  REFUSAL — with the chain reader unreachable, the proxy refuses the
-//       file (EXPORT_TOKEN_META) and the in-browser serializer throws, rather
-//       than writing a stand-in's 18 decimals (Aave V3 and SparkLend fixtures).
+//       file (EXPORT_TOKEN_META) and the in-browser serializer writes "not
+//       loaded" in every Amount cell, rather than a stand-in's 18 decimals
+//       (Aave V3 and SparkLend fixtures).
 //   F6  OTHER FAMILIES — eventsToCsv without a family keeps the core columns
 //       and its protocol blocks.
 //
@@ -102,7 +103,7 @@ const BREAK = process.env.BREAK ?? "";
 if (process.env.VERIFY_EXPORT_REFUSAL_ARM) {
   if (process.env.VERIFY_RPC_OVERRIDE) process.env.ALCHEMY_URL = process.env.VERIFY_RPC_OVERRIDE;
   const { formatQueuedExport } = await import("../../lib/sources/api/queued-export-format.ts");
-  const { eventsToCsv, TokenMetaUnresolvedError } = await import("../../lib/shared/events-to-csv.ts");
+  const { eventsToCsv } = await import("../../lib/shared/events-to-csv.ts");
   const { buildAaveV3Timeline } = await import("../../lib/sources/api/aave-v3-timeline.ts");
   const { buildSparkTimeline } = await import("../../lib/sources/api/spark-timeline.ts");
   const input = JSON.parse(readFileSync(0, "utf8"));
@@ -110,13 +111,13 @@ if (process.env.VERIFY_EXPORT_REFUSAL_ARM) {
   for (const { family, gz, rows, wallet } of input) {
     const f = await formatQueuedExport(new Uint8Array(Buffer.from(gz, "base64")), family);
     const build = family === "aave-v3" ? buildAaveV3Timeline : buildSparkTimeline;
-    let threw = false;
-    try {
-      eventsToCsv((await build(rows, wallet)).events, family);
-    } catch (e) {
-      threw = e instanceof TokenMetaUnresolvedError;
-    }
-    out.push({ family, proxy: f.ok ? "wrote the file" : f.code, instantThrew: threw });
+    // Every Amount cell with a figure in it must read "not loaded".
+    const lines = eventsToCsv((await build(rows, wallet)).events, family).split("\r\n");
+    const at = lines[0].split(",").indexOf("Amount");
+    const cells = lines.slice(1).map((l) => l.split(",")[at] ?? "");
+    const filled = cells.filter((c) => c !== "");
+    const stated = filled.filter((c) => c !== "not loaded").length;
+    out.push({ family, proxy: f.ok ? "wrote the file" : f.code, notLoaded: filled.length - stated, stated });
   }
   process.stdout.write(JSON.stringify(out));
   process.exit(0);
@@ -484,8 +485,8 @@ if (process.env.FILE && process.env.FAMILY) {
   for (const o of out)
     check(
       `${o.family} F5`,
-      o.proxy === "EXPORT_TOKEN_META" && o.instantThrew,
-      `chain reader unreachable: proxy ${o.proxy}; in-browser serializer ${o.instantThrew ? "refused" : "wrote a file"}`,
+      o.proxy === "EXPORT_TOKEN_META" && o.notLoaded > 0 && o.stated === 0,
+      `chain reader unreachable: proxy ${o.proxy}; in-browser serializer: ${o.notLoaded} Amount cells "not loaded", ${o.stated} stated`,
     );
   if (out.length === 0) check("F5", false, `the refusal arm did not answer (exit ${r.status})`);
 }

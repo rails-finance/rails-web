@@ -37,6 +37,8 @@ import { DeltaToggle, StatCard, StateTransition, ValuePill, changeTone } from "@
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import { formatCompact, formatExact, formatUsdValue } from "@/lib/utils/format";
+import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
+import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 
 /** Compact a full grouped number string ("10,967,283.723" → "10.97M") for the
  *  snapshot grid; the full string rides the tooltip + provenance trace. Passes
@@ -341,6 +343,7 @@ export function ChainTruthRow({
   // Timestamps gate inside <EventTime>. px-5 pt-4 pb-3 matches the Aave header so
   // the row sits inset from the card edge (and aligns with the detail's px-5).
   const { showEventNumbers } = useTimelineDisplay();
+  const unreadOf = useUnreadTokenOf();
   // `externalActor` is deliberately NOT passive. It used to be: the spine
   // replaced the token flow with a lone glyph on a third-party action, so there
   // was no flank to hand the amount to and the header had to keep it. The spine
@@ -393,6 +396,16 @@ export function ChainTruthRow({
         const magnitude = fmtHeaderMagnitude(Math.abs(d.value));
         const text = bare ? magnitude : `${d.value < 0 ? "−" : "+"}${magnitude.startsWith("<") ? " " : ""}${magnitude}`;
         const toneClass = d.tone === "caution" ? "text-caution-600 dark:text-caution-400" : "text-rb-500";
+        // A token whose decimals did not load states no amount, at any width:
+        // the spine draws no flank for it either.
+        const unread = unreadOf(d.address, d.symbol);
+        if (unread)
+          return (
+            <span key={i} className="inline-flex items-center gap-1.5 text-sm" data-not-loaded="">
+              {d.label && <span className={toneClass}>{d.label}</span>}
+              <TokenAmountNotLoaded address={unread.address} label={unread.label} />
+            </span>
+          );
         // The header shows the compact form; the exact figure — full pipeline
         // precision, no re-rounding — rides the trace. Number only: the token
         // rides as `symbol` (the receipt shows its icon).
@@ -550,6 +563,7 @@ export function ChainTruthDetail({
 }) {
   // USD chips (stat.usd) follow the shared display flag, like the richer tiers.
   const { showUsdValues } = useTimelineDisplay();
+  const unreadOf = useUnreadTokenOf();
   // The before→after toggle surfaces a reconstructed before (after − change).
   // Every leaf is on-chain (the replayed after, the logged delta), so the before
   // is chain-derived — it belongs in the chain-state view alongside the after it
@@ -563,6 +577,17 @@ export function ChainTruthDetail({
     <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:auto-rows-fr sm:grid-cols-2">
       {stats.map((s, i) => {
         const changed = s.changed ?? (s.transition ? true : !s.dimmed);
+        const unread = s.symbol ? unreadOf(s.address, s.symbol) : undefined;
+        if (unread)
+          return (
+            <div key={i} className={`h-full ${s.dimmed ? "opacity-50" : ""}`} data-not-loaded="">
+              <StatCard label={s.label}>
+                <span className="text-sm font-semibold">
+                  <TokenAmountNotLoaded address={unread.address} label={unread.label} />
+                </span>
+              </StatCard>
+            </div>
+          );
         return (
           <div key={i} className={`h-full ${s.dimmed ? "opacity-50" : ""}`}>
             <StatCard label={s.label}>

@@ -11,6 +11,7 @@
 // (sparkLiquidationRead, computeSparkCardCaptions' output), so the export
 // agrees with the card number-for-number.
 
+import { NOT_LOADED_CELL, unreadToken } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isSparkEvent } from "@/lib/shared/types/event-shape";
 import type { SparkPositionView } from "@/components/protocol/spark/spark-position-card";
@@ -276,9 +277,14 @@ function timelineTable(
     const isLiq = d.eventType === "liquidation";
     const asset = (isLiq ? d.collateralSymbol : d.reserveSymbol) ?? d.reserveSymbol;
     const rawAmount = isLiq ? (d.debtToCover ?? d.debtDelta) : d.assetsDelta;
-    const amount = rawAmount != null ? amt(Math.abs(parseFloat(rawAmount))) : "—";
-    const supplyAfter = d.supplyAfter != null ? amt(parseFloat(d.supplyAfter)) : "—";
-    const debtAfter = d.debtAfter != null ? amt(parseFloat(d.debtAfter)) : "—";
+    // A figure in a token whose decimals did not load reads "not loaded". On a
+    // liquidation the supply side is the seized collateral.
+    const fig = (v: string | undefined, token: string | undefined, abs = false) =>
+      v == null ? "—" : unreadToken(e, token) ? NOT_LOADED_CELL : amt(abs ? Math.abs(parseFloat(v)) : parseFloat(v));
+    const supplyToken = isLiq ? (d.collateralAsset ?? d.collateralSymbol) : d.reserveSymbol;
+    const amount = fig(rawAmount, d.reserveSymbol, true);
+    const supplyAfter = fig(d.supplyAfter, supplyToken);
+    const debtAfter = fig(d.debtAfter, d.reserveSymbol);
     const noted = (anchoredNotes.get(e.id) ?? []).map(marketNoteRowAnnotation).join("; ");
     out.push(
       `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${asset} | ${amount} | ${supplyAfter} | ${debtAfter} | ${txCell(e)}${noted ? ` — ${noted}` : ""} |`,

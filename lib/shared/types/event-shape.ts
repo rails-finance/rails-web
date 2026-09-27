@@ -52,6 +52,18 @@ export interface AssetFlow {
   counterparty?: string;
   /** USD value at time of event, if known. */
   valueUsd?: number;
+  /** Set when the token's `decimals` did not load, so `amountFormatted` and
+   *  `tokenDecimals` rest on the 18 stand-in and must not be shown. */
+  decimalsUnread?: true;
+}
+
+/** A token an event names whose `decimals` did not load (lib/shared/decimals-unread.ts).
+ *  `label` is the symbol the event's context carries for it: the on-chain
+ *  symbol, or the truncated address that stands in for one. */
+export interface UnreadToken {
+  /** Lowercased token address. */
+  address: string;
+  label: string;
 }
 
 export interface GasCost {
@@ -833,6 +845,8 @@ export interface SparkSnapshotItem {
   amount: string;
   /** Lowercased underlying token address. */
   address?: string;
+  /** Set when the token's `decimals` did not load: `amount` is not stated. */
+  decimalsUnread?: true;
 }
 
 export interface SparkContextRaw {
@@ -2697,10 +2711,12 @@ export interface BaseActivityEvent {
   // ── Links ──
   etherscanUrl: string;
 
-  /** Set (only ever `true`) when a token this event names could not be read on
-   *  chain, so its symbol or decimals are a stand-in. The CSV export refuses an
-   *  event carrying it (lib/shared/events-to-csv.ts). */
-  tokenMetaUnresolved?: true;
+  /** The tokens this event names, or whose balances its context carries,
+   *  whose `decimals` did not load: every figure in them is scaled by the 18
+   *  stand-in. Rows, totals and exports state "Not loaded" for them and leave
+   *  them out of sums (lib/shared/decimals-unread.ts); a timeline response
+   *  carrying one is not cached. Absent when every token loaded. */
+  decimalsUnread?: UnreadToken[];
 
   // ── Protocol-specific detail ──
   //

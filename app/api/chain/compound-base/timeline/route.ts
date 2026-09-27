@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timelineCacheHeaders } from "@/lib/shared/decimals-unread";
+import type { CometChainTimelineResult } from "@/lib/sources/chain/compound-v3-events";
 import { loadCometEventsFromChain } from "@/lib/sources/chain/compound-v3-events";
 import { loadCometEventsFromIndex } from "@/lib/sources/api/compound-base-timeline";
 import { COMPOUND_BASE_DEPLOYMENT, COMPOUND_BASE_DEPLOY_BLOCK } from "@/lib/compound-base/asset-catalog";
@@ -25,6 +27,15 @@ import { readerIpFromRequest } from "@/lib/api/reader-ip";
 // 503 with `unavailable: true` when neither could run (no history endpoint
 // configured, or an RPC that refused everything) — deliberately distinct from
 // an empty history, which is a 200 with no events.
+
+/** A token whose decimals did not load, named outside the drawn events. */
+const unreadElsewhere = (r: CometChainTimelineResult) =>
+  r.markets.some(
+    (m) =>
+      m.collateral.some((c) => c.decimalsUnread) ||
+      m.peak.collateral.some((c) => c.decimalsUnread) ||
+      Object.values(m.lifetime.collateral).some((c) => c.decimalsUnread),
+  );
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,7 +74,11 @@ export async function GET(request: NextRequest) {
       if (indexed.heavy && !indexed.whole)
         console.warn(`Compound V3 Base index answered a heavy wallet ${wallet} (${indexed.reason})`);
       return NextResponse.json(toTimelineWire(indexed.result, BASE_CHAIN_ID), {
-        headers: { "Cache-Control": CACHE_CONTROL },
+        headers: timelineCacheHeaders(
+          indexed.result.events,
+          { "Cache-Control": CACHE_CONTROL },
+          unreadElsewhere(indexed.result),
+        ),
       });
     }
     if (indexed) console.warn(`Compound V3 Base index not whole for ${wallet} (${indexed.reason}) — sweeping`);
@@ -77,7 +92,9 @@ export async function GET(request: NextRequest) {
       // 0024).
       peakWithheldMarkets: indexed?.peakWithheldMarkets ?? [],
     });
-    return NextResponse.json(toTimelineWire(data, BASE_CHAIN_ID), { headers: { "Cache-Control": CACHE_CONTROL } });
+    return NextResponse.json(toTimelineWire(data, BASE_CHAIN_ID), {
+      headers: timelineCacheHeaders(data.events, { "Cache-Control": CACHE_CONTROL }, unreadElsewhere(data)),
+    });
   } catch (error) {
     // An unconfigured endpoint is not an empty history, and the page says which.
     console.error("Error reading Compound V3 Base history:", error);

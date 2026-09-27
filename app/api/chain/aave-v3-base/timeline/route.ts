@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timelineCacheHeaders } from "@/lib/shared/decimals-unread";
+import type { AaveV3ChainTimelineResult } from "@/lib/sources/chain/aave-v3-events";
 import { loadAaveV3EventsFromChain } from "@/lib/sources/chain/aave-v3-events";
 import { loadAaveV3EventsFromIndex } from "@/lib/sources/api/aave-v3-base-timeline";
 import { AAVE_V3_BASE_CHAIN_ID, AAVE_V3_BASE_POOL, AAVE_V3_BASE_DEPLOY_BLOCK } from "@/lib/aave-v3-base/asset-catalog";
@@ -19,6 +21,9 @@ import { readerIpFromRequest } from "@/lib/api/reader-ip";
 // request. Whichever answered, the response names it in `coverage.source`
 // and always carries `coverage` — a timeline drawn over a partial record
 // looks exactly like a complete one, so the page renders the verdict.
+
+/** A token whose decimals did not load, named outside the drawn events. */
+const unreadElsewhere = (r: AaveV3ChainTimelineResult) => r.lifetime.some((f) => f.decimalsUnread);
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,7 +60,11 @@ export async function GET(request: NextRequest) {
     if (indexed?.whole || indexed?.heavy) {
       if (indexed.heavy) console.warn(`Aave V3 Base index answered a heavy wallet ${wallet} (${indexed.reason})`);
       return NextResponse.json(toTimelineWire(indexed.result, AAVE_V3_BASE_CHAIN_ID), {
-        headers: { "Cache-Control": CACHE_CONTROL },
+        headers: timelineCacheHeaders(
+          indexed.result.events,
+          { "Cache-Control": CACHE_CONTROL },
+          unreadElsewhere(indexed.result),
+        ),
       });
     }
     if (indexed) console.warn(`Aave V3 Base index not whole for ${wallet} (${indexed.reason}) — sweeping`);
@@ -70,7 +79,7 @@ export async function GET(request: NextRequest) {
       peakWithheld: indexed?.peakWithheld ?? false,
     });
     return NextResponse.json(toTimelineWire(data, AAVE_V3_BASE_CHAIN_ID), {
-      headers: { "Cache-Control": CACHE_CONTROL },
+      headers: timelineCacheHeaders(data.events, { "Cache-Control": CACHE_CONTROL }, unreadElsewhere(data)),
     });
   } catch (error) {
     // An unconfigured endpoint is not an empty history, and the page says which.

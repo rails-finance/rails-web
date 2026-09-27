@@ -16,6 +16,7 @@
 import type { PwnPositionView } from "@/components/protocol/pwn/pwn-position-card";
 import { positionCreditProv, positionInterestProv, positionCollateralProv } from "@/lib/pwn/event-provenance";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
+import type { UnreadToken } from "@/lib/shared/types/event-shape";
 
 /** The loan's lapse moment (unix seconds): expiration terms state it outright;
  *  duration terms run from creation. Null when unresolvable. Pure and
@@ -35,9 +36,15 @@ export const loanDueAt = (l: {
 
 export function computePwnEconomics(view: PwnPositionView): ChainTruthTowerData {
   const open = view.status === "open";
+  // A token whose decimals did not load is left out, and the tower names it.
+  const notLoaded: UnreadToken[] = [view.collateral, view.credit]
+    .filter((a) => a?.decimalsUnread)
+    .map((a) => ({ address: a!.address.toLowerCase(), label: a!.symbol }));
+  const collUnread = !!view.collateral?.decimalsUnread;
+  const creditUnread = !!view.credit?.decimalsUnread;
 
   const collLines: TowerLine[] =
-    open && view.collateral && view.collateral.amount > 0
+    open && view.collateral && view.collateral.amount > 0 && !collUnread
       ? [
           {
             key: view.collateral.address,
@@ -51,7 +58,7 @@ export function computePwnEconomics(view: PwnPositionView): ChainTruthTowerData 
 
   // Debt = credit PRINCIPAL + FIXED INTEREST, same credit token → stackable.
   const debtLines: TowerLine[] =
-    open && view.credit && view.credit.amount > 0
+    open && view.credit && view.credit.amount > 0 && !creditUnread
       ? [
           {
             key: `${view.credit.address}-principal`,
@@ -64,7 +71,7 @@ export function computePwnEconomics(view: PwnPositionView): ChainTruthTowerData 
       : [];
 
   const interestLine: TowerLine | null =
-    open && view.credit && view.fixedInterest != null && view.fixedInterest > 0
+    open && view.credit && !creditUnread && view.fixedInterest != null && view.fixedInterest > 0
       ? {
           key: `${view.credit.address}-interest`,
           symbol: view.credit.symbol,
@@ -102,5 +109,6 @@ export function computePwnEconomics(view: PwnPositionView): ChainTruthTowerData 
       liquidated: [],
       lifetimeInflow: 0,
     },
+    ...(open && notLoaded.length > 0 ? { notLoaded } : {}),
   };
 }

@@ -28,6 +28,8 @@
 // in an asset the position no longer holds), the tower degrades to the token
 // gated list rather than assert a partial USD total.
 
+import { unreadToken, unreadTokensIn } from "@/lib/shared/decimals-unread";
+import type { UnreadToken } from "@/lib/shared/types/event-shape";
 import type { CompoundPositionView } from "@/components/protocol/compound/compound-position-card";
 import type { Provenance } from "@/components/shared/provenance";
 import type { BaseActivityEvent, CompoundEventType } from "@/lib/shared/types/event-shape";
@@ -88,6 +90,9 @@ export interface CompoundCollateralFlows {
   absorbed: number;
   received: number;
   sent: number;
+  /** Set when the asset's `decimals` did not load: the sums are scaled by the
+   *  18 stand-in, and the tower leaves the asset out. */
+  decimalsUnread?: true;
 }
 
 /** Base flows decomposed at the running balance's zero crossings, plus per-asset
@@ -343,6 +348,8 @@ export function replayCompoundLifetime(events: BaseActivityEvent[], market: stri
 
     const addr = (flow?.token ?? "").toLowerCase();
     if (!addr || !flow) return null;
+    // An asset whose decimals did not load joins no sum; the tower names it.
+    if (flow.decimalsUnread || unreadToken(ev, addr)) continue;
     const delta = parseUnits(ctx.assetsDelta, flow.tokenDecimals);
     if (delta == null) return null;
     const c = compoundCollateralFlowsOf(raw, addr, ctx.assetSymbol, flow.tokenDecimals);
@@ -513,15 +520,32 @@ export function computeCompoundEconomics(
   const netBase = replayed
     ? replayed.deposited + replayed.repaid + replayed.absorbedDebt - replayed.withdrawn - replayed.borrowed
     : 0;
+  // Collateral assets whose decimals did not load (on the card or on any
+  // event) are left out of every line, flow and total, and the tower names
+  // them. The base token's decimals come from the market catalog.
+  const notLoaded = compoundNotLoaded(view, events ?? [], precomputedLifetime);
+  const leftOut = new Set(notLoaded.map((t) => t.address));
+  const replayedKept = replayed
+    ? {
+        ...replayed,
+        collateral: Object.fromEntries(
+          Object.entries(replayed.collateral).filter(([addr]) => !leftOut.has(addr.toLowerCase())),
+        ),
+      }
+    : null;
   const collateralByAddr = new Map(view.collateral.map((c) => [c.address.toLowerCase(), c]));
   const lifetime =
-    replayed &&
+    replayedKept &&
     flowsReconcile(
       netBase,
       view.base.amount,
-      replayed.deposited + replayed.repaid + replayed.absorbedDebt + replayed.withdrawn + replayed.borrowed,
+      replayedKept.deposited +
+        replayedKept.repaid +
+        replayedKept.absorbedDebt +
+        replayedKept.withdrawn +
+        replayedKept.borrowed,
     ) &&
-    Object.entries(replayed.collateral).every(([addr, c]) =>
+    Object.entries(replayedKept.collateral).every(([addr, c]) =>
       // supplied + received − withdrawn − absorbed − sent = current: transfers
       // are custody moves, so both legs must enter the conservation or a
       // transfer-touched asset never reconciles (and the whole layer suppresses).
@@ -531,7 +555,7 @@ export function computeCompoundEconomics(
         c.supplied + c.received + c.withdrawn + c.absorbed + c.sent,
       ),
     )
-      ? replayed
+      ? replayedKept
       : null;
 
   const flowLine = (
@@ -587,7 +611,7 @@ export function computeCompoundEconomics(
 
   // Collateral side: the non-earning collateral assets, exact from the event replay.
   const collateralLines: TowerLine[] = view.collateral
-    .filter((c) => c.amount > 0)
+    .filter((c) => c.amount > 0 && !leftOut.has(c.address.toLowerCase()))
     .map((c) => ({
       key: c.address,
       symbol: c.symbol,
@@ -713,5 +737,23 @@ export function computeCompoundEconomics(
         : chain
           ? "Base amounts are the current value, with interest included. Collateral does not accrue, so it is exact."
           : "Base amounts are principal only — interest that has built up since each supply or borrow isn't included here. Collateral does not accrue, so it is exact.",
+    ...(notLoaded.length > 0 ? { notLoaded } : {}),
   };
+}
+
+/** The collateral assets the tower leaves out: one the card flags, and any
+ *  token an event of this market names whose decimals did not load. */
+function compoundNotLoaded(
+  view: CompoundPositionView,
+  events: BaseActivityEvent[],
+  precomputed?: CompoundLifetimeFlows,
+): UnreadToken[] {
+  const out = new Map<string, UnreadToken>();
+  for (const [addr, c] of Object.entries(precomputed?.collateral ?? {}))
+    if (c.decimalsUnread) out.set(addr.toLowerCase(), { address: addr.toLowerCase(), label: c.symbol });
+  for (const c of view.collateral)
+    if (c.decimalsUnread) out.set(c.address.toLowerCase(), { address: c.address.toLowerCase(), label: c.symbol });
+  const mine = events.filter((e) => isCompoundEvent(e) && e.context.data.market === view.market);
+  for (const t of unreadTokensIn(mine)) if (!out.has(t.address)) out.set(t.address, t);
+  return [...out.values()];
 }

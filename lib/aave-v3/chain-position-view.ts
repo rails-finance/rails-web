@@ -45,7 +45,14 @@ function peaksFrom(timeline: ChainTimelineResponse, side: "supply" | "debt"): Aa
     const amount = side === "supply" ? f.peakSupplied : f.peakBorrowed;
     const raw = side === "supply" ? f.peakSuppliedRaw : f.peakBorrowedRaw;
     if (amount == null || raw == null || amount <= 0 || !f.address || f.decimals == null) continue;
-    out.push({ symbol: f.symbol, address: f.address, decimals: f.decimals, amount, amountRaw: raw });
+    out.push({
+      symbol: f.symbol,
+      address: f.address,
+      decimals: f.decimals,
+      amount,
+      amountRaw: raw,
+      ...(f.decimalsUnread ? { decimalsUnread: true as const } : {}),
+    });
   }
   out.sort((a, b) => b.amount - a.amount);
   return out;

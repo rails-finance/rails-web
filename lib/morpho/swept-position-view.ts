@@ -57,6 +57,9 @@ export function morphoViewFromSweep(
     loanToken: pos.loanToken,
     collateralToken: pos.isIdle ? undefined : pos.collateralToken,
     isIdle: pos.isIdle,
+    // A token whose decimals did not load reads "Not loaded" on the card.
+    ...(pos.loanDecimalsUnread ? { loanDecimalsUnread: true as const } : {}),
+    ...(pos.collateralDecimalsUnread ? { collateralDecimalsUnread: true as const } : {}),
     owner: wallet,
     status,
     collateral: status === "open" ? pos.collateral : 0,

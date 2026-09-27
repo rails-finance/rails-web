@@ -41,6 +41,7 @@
 //
 // SERVER-ONLY.
 
+import { decimalsUnreadField, unreadTokensOf } from "@/lib/shared/decimals-unread";
 import type { TimelineFillState } from "@/lib/api/fetch-chain-timeline";
 import { decodeEventLog, encodeEventTopics, parseAbi } from "viem";
 import { chainBatchClient, chainLogsClient } from "./rpc";
@@ -178,6 +179,9 @@ export interface ChainLifetimeFlows {
    *  sweep, which does not read that topic: a stated zero, not a claim that
    *  none happened. The Ethereum index lane carries the real figure. */
   writtenOff: number;
+  /** Set when the token's `decimals` did not load: every figure on this entry
+   *  is scaled by the 18 stand-in and is not stated. */
+  decimalsUnread?: true;
   /** The highest running PRINCIPAL the replay recorded on each axis — the
    *  closed card's "highest recorded" figures. Principal because the replay
    *  sums emitted amounts; the interest that accrued between events is not
@@ -700,6 +704,12 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     return { before, after };
   };
 
+  /** A boundary figure: "Not loaded" for a token whose decimals did not load. */
+  const stated = (raw: bigint, m: V3TokenMeta): string =>
+    m.unresolved ? "Not loaded" : String(scaleV3(raw, m.decimals));
+  /** The event fields naming the tokens whose decimals did not load. */
+  const unreadOf = (...ms: (V3TokenMeta | undefined)[]) =>
+    decimalsUnreadField(unreadTokensOf(ms.flatMap((m) => (m ? [{ address: m.address, meta: m }] : []))));
   const amt = (raw: bigint | undefined, m: V3TokenMeta | undefined): string | undefined =>
     raw == null || m == null ? undefined : String(scaleV3(raw, m.decimals));
 
@@ -740,6 +750,7 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       lifetime.set(symbol, cur);
     }
     if (address && !cur.address) cur.address = address;
+    if (address && meta(address)?.unresolved) cur.decimalsUnread = true;
     return cur;
   };
   // The highest running principal on each axis — noted after every bump, so a
@@ -807,12 +818,11 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     const out: BoundaryStateLine[] = [];
     for (const [reserve, v] of supplyRaw) {
       const m = meta(reserve);
-      if (v > ZERO && m)
-        out.push({ label: `${m.symbol} supply`, value: String(scaleV3(v, m.decimals)), unit: m.symbol });
+      if (v > ZERO && m) out.push({ label: `${m.symbol} supply`, value: stated(v, m), unit: m.symbol });
     }
     for (const [reserve, v] of debtRaw) {
       const m = meta(reserve);
-      if (v > ZERO && m) out.push({ label: `${m.symbol} debt`, value: String(scaleV3(v, m.decimals)), unit: m.symbol });
+      if (v > ZERO && m) out.push({ label: `${m.symbol} debt`, value: stated(v, m), unit: m.symbol });
     }
     return out.length > 0 ? out : null;
   };
@@ -913,6 +923,7 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       if (render)
         events.push({
           ...base,
+          ...unreadOf(collMeta, rMeta),
           actionType: d.kind,
           actionLabel: LABELS[d.kind],
           flows: [] as AssetFlow[],
@@ -942,7 +953,9 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     else if (d.kind === "repay") lt.repaid += d.amount;
     // "in" = toward the wallet, "out" = toward the protocol.
     const dir: "in" | "out" = d.kind === "supply" || d.kind === "repay" || d.kind === "transfer_out" ? "out" : "in";
-    const flows = rMeta ? [flowV3(rMeta, d.amount, dir)] : [];
+    const flows = rMeta
+      ? [{ ...flowV3(rMeta, d.amount, dir), ...(rMeta.unresolved ? { decimalsUnread: true as const } : {}) }]
+      : [];
     const txFrom = fromOf.get(d.txHash);
 
     const ctx: AaveV3Context = {
@@ -972,6 +985,7 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     if (render)
       events.push({
         ...base,
+        ...unreadOf(rMeta),
         actionType: d.kind,
         actionLabel: LABELS[d.kind],
         flows,

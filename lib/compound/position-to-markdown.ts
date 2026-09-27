@@ -10,6 +10,7 @@
 // same shape as the page — then the unified cross-market timeline. A PURE
 // function of the data already in scope on the detail page — no fetching.
 
+import { NOT_LOADED_CELL, unreadToken } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
 import type { CompoundPositionView } from "@/components/protocol/compound/compound-position-card";
@@ -174,9 +175,11 @@ function timelineTable(events: BaseActivityEvent[], history: MarkdownHistoryScop
     const d = e.context.data;
     // Comet's own verbs, prettified: absorb_debt → "Absorb debt" (a liquidation).
     const label = (d.eventType[0].toUpperCase() + d.eventType.slice(1)).replace(/_/g, " ");
-    const amount = amt(Math.abs(parseFloat(d.assetsDelta)));
+    // A figure in a collateral token whose decimals did not load reads "not loaded".
+    const unread = !d.isBase && !!unreadToken(e, d.assetSymbol);
+    const amount = unread ? NOT_LOADED_CELL : amt(Math.abs(parseFloat(d.assetsDelta)));
     const baseAfter = d.baseAfter != null ? amt(parseFloat(d.baseAfter)) : "—";
-    const collAfter = d.collateralAfter != null ? amt(parseFloat(d.collateralAfter)) : "—";
+    const collAfter = d.collateralAfter != null ? (unread ? NOT_LOADED_CELL : amt(parseFloat(d.collateralAfter))) : "—";
     out.push(
       `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${d.marketLabel} | ${d.assetSymbol} | ${amount} | ${baseAfter} | ${collAfter} | ${txCell(e)} |`,
     );

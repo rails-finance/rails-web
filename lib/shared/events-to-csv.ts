@@ -32,6 +32,7 @@ import {
 } from "./types/event-shape";
 import type { QueuedExportProtocol } from "./queued-export";
 import { compoundV2LiquidationValues } from "@/lib/compound-v2/liquidation-values";
+import { NOT_LOADED_CELL, unreadToken } from "./decimals-unread";
 
 type Column = {
   header: string;
@@ -59,6 +60,7 @@ function summarizeFlows(flows: AssetFlow[] | undefined): string {
   if (!flows || flows.length === 0) return "";
   return flows
     .map((f) => {
+      if (f.decimalsUnread) return `${f.tokenSymbol} ${NOT_LOADED_CELL}`;
       const sign = f.direction === "in" ? "+" : "-";
       const usd = f.valueUsd != null ? ` ($${f.valueUsd.toFixed(2)})` : "";
       return `${f.tokenSymbol} ${sign}${f.amountFormatted}${usd}`;
@@ -128,15 +130,6 @@ const AAVE_COLUMNS: Column[] = [
 // served row carries; a cell the row has no value for is empty, never 0. There
 // are no gas columns: none of these rows carries a gas cost in ETH and USD.
 
-/** The CSV of one of these families cannot be written: a token the rows name
- *  was not read on chain, so an amount would be scaled by a stand-in. */
-export class TokenMetaUnresolvedError extends Error {
-  constructor() {
-    super("A token's symbol and decimals could not be read, so the file was not written.");
-    this.name = "TokenMetaUnresolvedError";
-  }
-}
-
 export type CsvFamily = QueuedExportProtocol;
 
 /** amount × price, to the cent; empty when either is missing. */
@@ -148,13 +141,26 @@ function usdOf(amount: string | number | undefined | null, price: number | undef
 
 const unsigned = (v: string | undefined): string | undefined => (v == null ? undefined : v.replace(/^-/, ""));
 
-/** A column that reads one family's context, empty on any other event. */
+/** A column that reads one family's context, empty on any other event. With
+ *  `token`, the column is an amount in that token (its address or the symbol
+ *  the context carries), and reads "not loaded" where its decimals did not
+ *  load and the row has a figure. */
 function col<D>(
   guard: (e: BaseActivityEvent) => boolean,
   header: string,
   get: (d: D, e: BaseActivityEvent) => string | number | undefined | null,
+  token?: (d: D) => string | null | undefined,
 ): Column {
-  return { header, get: (e) => (guard(e) ? get(e.context!.data as D, e) : "") };
+  return {
+    header,
+    get: (e) => {
+      if (!guard(e)) return "";
+      const d = e.context!.data as D;
+      const v = get(d, e);
+      if (token && v != null && v !== "" && unreadToken(e, token(d))) return NOT_LOADED_CELL;
+      return v;
+    },
+  };
 }
 
 /** Aave V3's liquidation row carries no flows (the page reads the two legs from
@@ -164,9 +170,11 @@ function aaveV3Flows(e: BaseActivityEvent): string {
   if (!isAaveV3Event(e) || e.context.data.eventType !== "liquidation") return summarizeFlows(e.flows);
   const d = e.context.data;
   const legs: string[] = [];
+  const leg = (symbol: string, token: string | undefined, amount: string) =>
+    unreadToken(e, token ?? symbol) ? `${symbol} ${NOT_LOADED_CELL}` : `${symbol} -${amount}`;
   if (d.collateralSymbol && d.liquidatedCollateralAmount)
-    legs.push(`${d.collateralSymbol} -${d.liquidatedCollateralAmount}`);
-  if (d.reserveSymbol && d.debtToCover) legs.push(`${d.reserveSymbol} -${d.debtToCover}`);
+    legs.push(leg(d.collateralSymbol, d.collateralAsset, d.liquidatedCollateralAmount));
+  if (d.reserveSymbol && d.debtToCover) legs.push(leg(d.reserveSymbol, d.reserve, d.debtToCover));
   return legs.join("; ");
 }
 
@@ -174,44 +182,69 @@ const HEAD: Column[] = CORE_COLUMNS.filter((c) => ["Date (UTC)", "Block", "Actio
 const TAIL: Column[] = CORE_COLUMNS.filter((c) => ["Tx Hash", "Etherscan"].includes(c.header));
 const FLOWS: Column = { header: "Token Flows", get: (e) => summarizeFlows(e.flows) };
 
+// The token each amount column is in. On a liquidation row the supply
+// columns are the collateral reserve's and the debt columns the debt
+// reserve's; otherwise both are the row's own reserve.
+const v3Reserve = (d: AaveV3Context) => d.reserve ?? d.reserveSymbol;
+const v3Collateral = (d: AaveV3Context) => d.collateralAsset ?? d.collateralSymbol;
+const v3Supply = (d: AaveV3Context) => (d.eventType === "liquidation" ? v3Collateral(d) : v3Reserve(d));
+
 const AAVE_V3_FAMILY: Column[] = [
   { header: "Token Flows", get: aaveV3Flows },
   col<AaveV3Context>(isAaveV3Event, "Reserve", (d) => d.reserveSymbol),
-  col<AaveV3Context>(isAaveV3Event, "Amount", (d) => d.amount),
+  col<AaveV3Context>(isAaveV3Event, "Amount", (d) => d.amount, v3Reserve),
   col<AaveV3Context>(isAaveV3Event, "Price (USD)", (d) => d.price?.usd),
-  col<AaveV3Context>(isAaveV3Event, "Value (USD)", (d) => usdOf(d.amount, d.price?.usd)),
-  col<AaveV3Context>(isAaveV3Event, "Supply Before", (d) => d.supplyBefore),
-  col<AaveV3Context>(isAaveV3Event, "Supply After", (d) => d.supplyAfter),
-  col<AaveV3Context>(isAaveV3Event, "Debt Before", (d) => d.debtBefore),
-  col<AaveV3Context>(isAaveV3Event, "Debt After", (d) => d.debtAfter),
+  col<AaveV3Context>(isAaveV3Event, "Value (USD)", (d) => usdOf(d.amount, d.price?.usd), v3Reserve),
+  col<AaveV3Context>(isAaveV3Event, "Supply Before", (d) => d.supplyBefore, v3Supply),
+  col<AaveV3Context>(isAaveV3Event, "Supply After", (d) => d.supplyAfter, v3Supply),
+  col<AaveV3Context>(isAaveV3Event, "Debt Before", (d) => d.debtBefore, v3Reserve),
+  col<AaveV3Context>(isAaveV3Event, "Debt After", (d) => d.debtAfter, v3Reserve),
   col<AaveV3Context>(isAaveV3Event, "Liq Collateral", (d) => d.collateralSymbol),
-  col<AaveV3Context>(isAaveV3Event, "Liq Collateral Seized", (d) => d.liquidatedCollateralAmount),
-  col<AaveV3Context>(isAaveV3Event, "Liq Collateral Value (USD)", (d) =>
-    usdOf(d.liquidatedCollateralAmount, d.collateralPrice?.usd),
+  col<AaveV3Context>(isAaveV3Event, "Liq Collateral Seized", (d) => d.liquidatedCollateralAmount, v3Collateral),
+  col<AaveV3Context>(
+    isAaveV3Event,
+    "Liq Collateral Value (USD)",
+    (d) => usdOf(d.liquidatedCollateralAmount, d.collateralPrice?.usd),
+    v3Collateral,
   ),
-  col<AaveV3Context>(isAaveV3Event, "Liq Debt Covered", (d) => d.debtToCover),
-  col<AaveV3Context>(isAaveV3Event, "Liq Debt Value (USD)", (d) => usdOf(d.debtToCover, d.debtPrice?.usd)),
+  col<AaveV3Context>(isAaveV3Event, "Liq Debt Covered", (d) => d.debtToCover, v3Reserve),
+  col<AaveV3Context>(isAaveV3Event, "Liq Debt Value (USD)", (d) => usdOf(d.debtToCover, d.debtPrice?.usd), v3Reserve),
 ];
+
+const sparkReserve = (d: SparkContext) => d.reserveSymbol;
+const sparkCollateral = (d: SparkContext) => d.collateralAsset ?? d.collateralSymbol;
+const sparkSupply = (d: SparkContext) => (d.eventType === "liquidation" ? sparkCollateral(d) : sparkReserve(d));
 
 const SPARK_FAMILY: Column[] = [
   FLOWS,
   col<SparkContext>(isSparkEvent, "Reserve", (d) => d.reserveSymbol),
-  col<SparkContext>(isSparkEvent, "Amount", (d) => (d.eventType === "liquidation" ? "" : unsigned(d.assetsDelta))),
+  col<SparkContext>(
+    isSparkEvent,
+    "Amount",
+    (d) => (d.eventType === "liquidation" ? "" : unsigned(d.assetsDelta)),
+    sparkReserve,
+  ),
   col<SparkContext>(isSparkEvent, "Price (USD)", (d) => d.price?.usd),
-  col<SparkContext>(isSparkEvent, "Value (USD)", (d) =>
-    d.eventType === "liquidation" ? "" : usdOf(d.assetsDelta, d.price?.usd),
+  col<SparkContext>(
+    isSparkEvent,
+    "Value (USD)",
+    (d) => (d.eventType === "liquidation" ? "" : usdOf(d.assetsDelta, d.price?.usd)),
+    sparkReserve,
   ),
-  col<SparkContext>(isSparkEvent, "Supply Before", (d) => d.supplyBefore),
-  col<SparkContext>(isSparkEvent, "Supply After", (d) => d.supplyAfter),
-  col<SparkContext>(isSparkEvent, "Debt Before", (d) => d.debtBefore),
-  col<SparkContext>(isSparkEvent, "Debt After", (d) => d.debtAfter),
+  col<SparkContext>(isSparkEvent, "Supply Before", (d) => d.supplyBefore, sparkSupply),
+  col<SparkContext>(isSparkEvent, "Supply After", (d) => d.supplyAfter, sparkSupply),
+  col<SparkContext>(isSparkEvent, "Debt Before", (d) => d.debtBefore, sparkReserve),
+  col<SparkContext>(isSparkEvent, "Debt After", (d) => d.debtAfter, sparkReserve),
   col<SparkContext>(isSparkEvent, "Liq Collateral", (d) => d.collateralSymbol),
-  col<SparkContext>(isSparkEvent, "Liq Collateral Seized", (d) => d.liquidatedCollateralAmount),
-  col<SparkContext>(isSparkEvent, "Liq Collateral Value (USD)", (d) =>
-    usdOf(d.liquidatedCollateralAmount, d.collateralPrice?.usd),
+  col<SparkContext>(isSparkEvent, "Liq Collateral Seized", (d) => d.liquidatedCollateralAmount, sparkCollateral),
+  col<SparkContext>(
+    isSparkEvent,
+    "Liq Collateral Value (USD)",
+    (d) => usdOf(d.liquidatedCollateralAmount, d.collateralPrice?.usd),
+    sparkCollateral,
   ),
-  col<SparkContext>(isSparkEvent, "Liq Debt Covered", (d) => d.debtToCover),
-  col<SparkContext>(isSparkEvent, "Liq Debt Value (USD)", (d) => usdOf(d.debtToCover, d.debtPrice?.usd)),
+  col<SparkContext>(isSparkEvent, "Liq Debt Covered", (d) => d.debtToCover, sparkReserve),
+  col<SparkContext>(isSparkEvent, "Liq Debt Value (USD)", (d) => usdOf(d.debtToCover, d.debtPrice?.usd), sparkReserve),
 ];
 
 // Maple's rows carry no price, so its file has no USD column.
@@ -235,10 +268,20 @@ const COMPOUND_V3_FAMILY: Column[] = [
   FLOWS,
   col<CompoundContext>(isCompoundEvent, "Market", (d) => d.marketLabel),
   col<CompoundContext>(isCompoundEvent, "Asset", (d) => d.assetSymbol),
-  col<CompoundContext>(isCompoundEvent, "Amount", (d) => d.assetsDelta),
+  col<CompoundContext>(
+    isCompoundEvent,
+    "Amount",
+    (d) => d.assetsDelta,
+    (d) => d.assetSymbol,
+  ),
   col<CompoundContext>(isCompoundEvent, "Value (USD)", (d) => d.usdValue),
   col<CompoundContext>(isCompoundEvent, "Base Balance After", (d) => d.baseAfter),
-  col<CompoundContext>(isCompoundEvent, "Collateral After", (d) => d.collateralAfter),
+  col<CompoundContext>(
+    isCompoundEvent,
+    "Collateral After",
+    (d) => d.collateralAfter,
+    (d) => d.assetSymbol,
+  ),
 ];
 
 // Compound V2's rows carry prices on liquidations only, in USD after the
@@ -279,10 +322,9 @@ export function timelineCsvHeader(family: CsvFamily): string {
   return FAMILY_COLUMNS[family].map((c) => escapeCsv(c.header)).join(",");
 }
 
-/** A family's data lines for these events (no line ends). Throws
- *  TokenMetaUnresolvedError when any event names a token that was not read. */
+/** A family's data lines for these events (no line ends). An amount in a
+ *  token whose decimals did not load reads "not loaded". */
 export function timelineCsvLines(events: BaseActivityEvent[], family: CsvFamily): string[] {
-  if (events.some((e) => e.tokenMetaUnresolved)) throw new TokenMetaUnresolvedError();
   const columns = FAMILY_COLUMNS[family];
   return events.map((e) => columns.map((c) => escapeCsv(c.get(e))).join(","));
 }

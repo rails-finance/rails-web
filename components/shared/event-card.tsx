@@ -8,6 +8,24 @@ import { useEventShareHref } from "@/components/shared/event-share-context";
 import { InfoDisclosure, InfoTabsDisclosure, type InfoDisclosureTab } from "@/components/shared/info-disclosure";
 import { isCardOpen, setCardOpen } from "@/lib/shared/card-open-store";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
+import type { UnreadToken } from "@/lib/shared/types/event-shape";
+
+/** The Explanation of an event naming a token whose decimals did not load: its
+ *  prose states amounts, so it waits for the chain in full. */
+function ExplanationNotLoaded({ tokens }: { tokens: UnreadToken[] }) {
+  const names = tokens.map((t) => t.label).join(", ");
+  return (
+    <p
+      className="text-sm leading-relaxed text-rb-500"
+      data-not-loaded=""
+      title={tokens.map((t) => t.address).join(", ")}
+    >
+      Not loaded: the chain didn&rsquo;t answer for the decimals of {names}, so this event&rsquo;s amounts can&rsquo;t
+      be stated yet. The explanation shows once it does.
+    </p>
+  );
+}
 
 export interface EventCardProps {
   avatar: React.ReactNode;
@@ -69,14 +87,14 @@ export function EventCard({
   header,
   headerBars,
   detail,
-  explainer,
+  explainer: explainerProp,
   detailOpen: detailOpenProp,
   onDetailToggle,
   detailLoading,
   detailError,
   onDetailRetry,
   priceBadge,
-  explainerTeaser,
+  explainerTeaser: explainerTeaserProp,
   explainerTeaserVariant = "bullet",
   txHash,
   footerExtra,
@@ -124,6 +142,12 @@ export function EventCard({
       if (persistKey) setCardOpen(persistKey, next);
     }
   }, [showDetail, isControlled, onDetailToggle, persistKey]);
+
+  // An event naming a token whose decimals did not load (the timeline provides
+  // them): the explainer and its teaser give way to one line saying so.
+  const unread = useUnreadTokens();
+  const explainerTeaser = unread ? undefined : explainerTeaserProp;
+  const explainer = unread && explainerProp != null ? <ExplanationNotLoaded tokens={unread} /> : explainerProp;
 
   const hasDetail = detail != null || detailLoading || detailError;
   const hasExplainer = explainer != null;

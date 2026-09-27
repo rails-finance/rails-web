@@ -68,6 +68,8 @@
 // it, when a date filter leaves it standing, or when a permalink lands in it.
 // On a client-grouped page the flag still bypasses the run specs, as before.
 
+import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context";
+import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -1241,19 +1243,21 @@ function ChainTruthTimelineBody({
               highlightId === event.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
             }`}
           >
-            {renderCard(event, {
-              eventNumber: opts?.eventNumber ?? tl.eventNumberOf(event),
-              // Line ends only — the dot is the tip's (see `tipEventId`).
-              // Inside an expanded run the LAST member still owns the spine
-              // terminus so the dotted segment ends where the timeline does.
-              // Suppressed at the top when a live note now sits there
-              // instead — see `liveSlotAtTop`.
-              isFirst: flatIdx === 0 && !opts?.inRun && !topTerminusTaken,
-              isLast:
-                opts?.isLastMember !== undefined
-                  ? opts.isLastMember
-                  : flatIdx === events.length - 1 && !bottomTerminusTaken,
-            })}
+            <UnreadTokensProvider tokens={event.decimalsUnread}>
+              {renderCard(event, {
+                eventNumber: opts?.eventNumber ?? tl.eventNumberOf(event),
+                // Line ends only — the dot is the tip's (see `tipEventId`).
+                // Inside an expanded run the LAST member still owns the spine
+                // terminus so the dotted segment ends where the timeline does.
+                // Suppressed at the top when a live note now sits there
+                // instead — see `liveSlotAtTop`.
+                isFirst: flatIdx === 0 && !opts?.inRun && !topTerminusTaken,
+                isLast:
+                  opts?.isLastMember !== undefined
+                    ? opts.isLastMember
+                    : flatIdx === events.length - 1 && !bottomTerminusTaken,
+              })}
+            </UnreadTokensProvider>
           </div>
         </SpineTipContext.Provider>
       </EventShareProvider>
@@ -1289,7 +1293,9 @@ function ChainTruthTimelineBody({
           >
             <EventShareProvider href={shareHrefFor(pinnedEvent.id)}>
               <div id={`event-${pinnedEvent.id}`} data-event-id={pinnedEvent.id} className="rounded-xl">
-                {renderCard(pinnedEvent, { eventNumber: pinnedNumber, isFirst: true, isLast: true })}
+                <UnreadTokensProvider tokens={pinnedEvent.decimalsUnread}>
+                  {renderCard(pinnedEvent, { eventNumber: pinnedNumber, isFirst: true, isLast: true })}
+                </UnreadTokensProvider>
               </div>
             </EventShareProvider>
           </EventDateContext.Provider>
@@ -1467,14 +1473,16 @@ function ChainTruthTimelineBody({
                     // event is among its members; the members re-provide null.
                     value={!liveHoldsTip && row.events.some((e) => e.id === tipEventId) ? tipSide : null}
                   >
-                    {wrapRunRow(
-                      row,
-                      row.spec.render(row.events, {
-                        isFirst: row.flatIdx === 0 && !topTerminusTaken,
-                        isLast: row.flatIdx + row.events.length === events.length && !bottomTerminusTaken,
-                        children: row.events.map((e, k) => renderEventRow(e, row.flatIdx + k, { inRun: true })),
-                      }),
-                    )}
+                    <UnreadTokensProvider tokens={unreadTokensIn(row.events)}>
+                      {wrapRunRow(
+                        row,
+                        row.spec.render(row.events, {
+                          isFirst: row.flatIdx === 0 && !topTerminusTaken,
+                          isLast: row.flatIdx + row.events.length === events.length && !bottomTerminusTaken,
+                          children: row.events.map((e, k) => renderEventRow(e, row.flatIdx + k, { inRun: true })),
+                        }),
+                      )}
+                    </UnreadTokensProvider>
                   </SpineTipContext.Provider>
                 );
               const rowNotes = notesFor(row);

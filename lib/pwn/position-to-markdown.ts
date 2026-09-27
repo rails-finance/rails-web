@@ -8,6 +8,7 @@
 // liquidation — the preamble says so, so an LLM doesn't invent them. A PURE
 // function of the data already in scope on the detail page — no fetching.
 
+import { NOT_LOADED_CELL, unreadToken } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isPwnEvent } from "@/lib/shared/types/event-shape";
 import type { PwnPositionView } from "@/components/protocol/pwn/pwn-position-card";
@@ -127,22 +128,24 @@ export function pwnPositionToMarkdown(args: PwnPositionMarkdownArgs): string {
 function eventValue(e: BaseActivityEvent, creditSym: string): string {
   if (!isPwnEvent(e)) return "—";
   const d = e.context.data;
+  // A credit amount whose decimals did not load reads "not loaded".
+  const credit = (v: string) => (unreadToken(e, d.creditAsset ?? d.creditSymbol) ? NOT_LOADED_CELL : amt(Number(v)));
   switch (d.eventType) {
     case "created":
       return d.creditAmount != null
-        ? `${amt(Number(d.creditAmount))} ${d.creditSymbol ?? creditSym} advanced to the borrower`
+        ? `${credit(d.creditAmount)} ${d.creditSymbol ?? creditSym} advanced to the borrower`
         : "loan struck";
     case "minted":
       return "LOAN note (ERC-721) minted to the lender — the transferable claim on this loan";
     case "paid_back":
       return d.loanRepayAmount != null
-        ? `${amt(Number(d.loanRepayAmount))} ${d.creditSymbol ?? creditSym} repaid (principal + fixed interest)`
+        ? `${credit(d.loanRepayAmount)} ${d.creditSymbol ?? creditSym} repaid (principal + fixed interest)`
         : "repaid";
     case "claimed":
       return d.defaulted
         ? `collateral seized by the lender — the loan expired unpaid`
         : d.loanRepayAmount != null
-          ? `${amt(Number(d.loanRepayAmount))} ${d.creditSymbol ?? creditSym} collected by the lender`
+          ? `${credit(d.loanRepayAmount)} ${d.creditSymbol ?? creditSym} collected by the lender`
           : "repayment collected by the lender";
     case "extended":
       return d.extendedDefaultTimestamp != null

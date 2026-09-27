@@ -59,6 +59,7 @@
 //
 // SERVER-ONLY.
 
+import { decimalsUnreadField, unreadTokensOf } from "@/lib/shared/decimals-unread";
 import { decodeEventLog, encodeEventTopics, parseAbi } from "viem";
 import { chainBatchClient, chainLogsClient } from "./rpc";
 import { addressTopic, splitCoverage, sweepLogs, type BlockRange, type RawLog } from "./log-sweep";
@@ -168,6 +169,10 @@ export interface MorphoSweptPosition {
   collateralToken: string;
   collateralSymbol: string | null;
   collateralDecimals: number;
+  /** Set when that token's `decimals` did not load: every figure in it is
+   *  scaled by the 18 stand-in and must not be stated. */
+  loanDecimalsUnread?: true;
+  collateralDecimalsUnread?: true;
   isIdle: boolean;
   /** Liquidation LTV as a 0..1 fraction — the market's one line. */
   lltv: number;
@@ -478,6 +483,7 @@ async function resolveMarkets(
     address: addr,
     symbol: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
     decimals: 18,
+    unresolved: true,
   });
 
   const out = new Map<string, MarketMeta>();
@@ -852,12 +858,12 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
     const elided = !render[i] && !anchored;
     if (render[i] && r.cutState === undefined && r.omitted > 0) {
       const out: BoundaryStateLine[] = [];
-      if (r.coll > ZERO && collSym)
-        out.push({ label: `${collSym} collateral`, value: String(scaleRaw(r.coll, collDec)), unit: collSym });
-      if (r.borr > ZERO)
-        out.push({ label: `${loanSym} debt`, value: String(scaleRaw(r.borr, loanDec)), unit: loanSym });
-      if (r.sup > ZERO)
-        out.push({ label: `${loanSym} supplied`, value: String(scaleRaw(r.sup, loanDec)), unit: loanSym });
+      // A token whose decimals did not load states no figure.
+      const collVal = m?.collateral?.unresolved ? "Not loaded" : String(scaleRaw(r.coll, collDec));
+      const loanVal = (v: bigint) => (m?.loan.unresolved ? "Not loaded" : String(scaleRaw(v, loanDec)));
+      if (r.coll > ZERO && collSym) out.push({ label: `${collSym} collateral`, value: collVal, unit: collSym });
+      if (r.borr > ZERO) out.push({ label: `${loanSym} debt`, value: loanVal(r.borr), unit: loanSym });
+      if (r.sup > ZERO) out.push({ label: `${loanSym} supplied`, value: loanVal(r.sup), unit: loanSym });
       r.cutState = out.length > 0 ? out : null;
     }
     if (elided) r.cutTypes.set(d.kind, (r.cutTypes.get(d.kind) ?? 0) + 1);
@@ -1000,7 +1006,24 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
       });
     }
 
+    // Every row carries both running balances, so a token of the market whose
+    // decimals did not load is named on every event of it.
+    for (const f of flows)
+      if (
+        (f.token === m?.loan.address && m?.loan.unresolved) ||
+        (f.token === m?.collateral?.address && m?.collateral?.unresolved)
+      )
+        f.decimalsUnread = true;
+    const unread = decimalsUnreadField(
+      m
+        ? unreadTokensOf([
+            { address: m.loan.address, meta: m.loan },
+            ...(m.collateral ? [{ address: m.collateral.address, meta: m.collateral }] : []),
+          ])
+        : [],
+    );
     r.events.push({
+      ...unread,
       id: `${d.txHash}:${d.logIndex}`,
       txHash: d.txHash,
       blockNumber: d.blockNumber,
@@ -1033,6 +1056,8 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
       collateralToken: m?.collateral?.address ?? ZERO_ADDR,
       collateralSymbol: collSym,
       collateralDecimals: collDec,
+      ...(m?.loan.unresolved ? { loanDecimalsUnread: true as const } : {}),
+      ...(m?.collateral?.unresolved ? { collateralDecimalsUnread: true as const } : {}),
       isIdle: m?.isIdle ?? collSym == null,
       lltv: m?.lltv ?? 0,
       collateral: scaleRaw(r.coll, collDec),

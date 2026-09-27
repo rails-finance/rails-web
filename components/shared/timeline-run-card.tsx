@@ -1,5 +1,7 @@
 "use client";
 
+import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
+import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Calculator, Folder, FolderOpen } from "lucide-react";
@@ -255,6 +257,9 @@ export function TimelineRunCard({
     ],
   });
   const fullNum = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 6 });
+  // A leg in a token whose decimals did not load (the timeline provides the
+  // run's members' tokens) states no sum.
+  const unreadOf = useUnreadTokenOf();
 
   const header = (
     <div
@@ -321,8 +326,20 @@ export function TimelineRunCard({
             <span className="sm:hidden">{count.toLocaleString("en-US")}</span>
           </span>
         )}
-        {aggregates?.map(
-          (agg, i) =>
+        {aggregates?.map((agg, i) => {
+          const unread = unreadOf(undefined, agg.symbol);
+          if (unread)
+            return (
+              <span
+                key={`${agg.verb}_${agg.symbol}_${i}`}
+                className="inline-flex items-center gap-1.5 text-sm"
+                data-not-loaded=""
+              >
+                <span className={VERB_CLASSES[tone]}>{agg.verb}</span>
+                <TokenAmountNotLoaded address={unread.address} label={unread.label} />
+              </span>
+            );
+          return (
             agg.value > 0 && (
               <span key={`${agg.verb}_${agg.symbol}_${i}`} className="inline-flex items-center gap-1.5 text-sm">
                 <span className={VERB_CLASSES[tone]}>{agg.verb}</span>
@@ -336,8 +353,9 @@ export function TimelineRunCard({
                   </span>
                 )}
               </span>
-            ),
-        )}
+            )
+          );
+        })}
         {extraHeader}
         {/* `evt-meta`: below sm this span becomes the header's own first
             row (app/globals.css) — the date range sits right-aligned above

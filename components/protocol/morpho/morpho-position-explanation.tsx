@@ -257,8 +257,9 @@ export function MorphoClosedPositionExplanation({
   // with the seizure; the rest closed by their own hand afterwards).
   const endedBySeizure = lastType === "liquidation";
 
-  const hasPeakColl = v.peakCollateral > 0 && v.collateralSymbol != null;
-  const hasPeakBorr = v.peakBorrowed > 0;
+  // A peak in a token whose decimals did not load is not stated.
+  const hasPeakColl = v.peakCollateral > 0 && v.collateralSymbol != null && !v.collateralDecimalsUnread;
+  const hasPeakBorr = v.peakBorrowed > 0 && !v.loanDecimalsUnread;
 
   const lead = endedBySeizure ? (
     <>This position was emptied by liquidation — the final seizure took the last of its collateral to cover its debt:</>
@@ -267,7 +268,7 @@ export function MorphoClosedPositionExplanation({
       This position ran its course and closed — the remaining collateral withdrawn and the debt repaid — with
       liquidation seizures in its record:
     </>
-  ) : hasPeakBorr ? (
+  ) : v.peakBorrowed > 0 ? (
     <>This position ran its course and closed — the collateral withdrawn and the debt repaid:</>
   ) : (
     <>This position ran its course and closed — its collateral withdrawn, with nothing ever borrowed against it:</>
@@ -334,7 +335,7 @@ export function MorphoClosedPositionExplanation({
     // merges repaid + badDebt, so the written-off share rides its own backend
     // sum (morpho_liquidation.bad_debt_assets). Stated only when it exists —
     // most liquidated records cleared fully against their collateral.
-    if (v.badDebt > 0) {
+    if (v.badDebt > 0 && !v.loanDecimalsUnread) {
       bullets.push(
         <span key="bad-debt">
           The seizures did not cover everything: {formatNumber(v.badDebt)} {v.loanSymbol} of the debt had no collateral

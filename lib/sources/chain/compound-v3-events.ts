@@ -61,6 +61,7 @@
 //
 // SERVER-ONLY.
 
+import { decimalsUnreadField, unreadTokensOf } from "@/lib/shared/decimals-unread";
 import { decodeEventLog, encodeEventTopics, parseAbi } from "viem";
 import { chainBatchClient, chainLogsClient } from "./rpc";
 import { addressTopic, splitCoverage, sweepLogs, type BlockRange, type RawLog } from "./log-sweep";
@@ -747,7 +748,11 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
     address,
     symbol: `${address.slice(0, 6)}…${address.slice(-4)}`,
     decimals: 18,
+    unresolved: true,
   });
+  /** A collateral asset whose decimals did not load (the base token's come
+   *  from the market catalog). */
+  const collUnread = (address: string): boolean => (metas.get(address) ?? fallback(address)).unresolved === true;
   const metaOf = (d: CometDecodedRow): Erc20Meta =>
     BASE_KINDS.has(d.kind)
       ? { address: d.market.baseToken.toLowerCase(), symbol: d.market.baseSymbol, decimals: d.market.baseDecimals }
@@ -897,7 +902,7 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
       // collateral in both, and two identical labels would read as one.
       out.push({
         label: `${cm.symbol} collateral · ${mk.label}`,
-        value: String(scaleRaw(v, cm.decimals)),
+        value: cm.unresolved ? "Not loaded" : String(scaleRaw(v, cm.decimals)),
         unit: cm.symbol,
       });
     }
@@ -1043,11 +1048,18 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
               amount: mag.toString(),
               amountFormatted: Number(fmtUnits(mag, meta.decimals)),
               direction: OUT_KINDS.has(d.kind) ? "out" : "in",
+              ...(!isBase && collUnread(d.asset) ? { decimalsUnread: true as const } : {}),
             },
           ]
         : [];
+    // The collateral assets this row names: its own, and an absorb's legs.
+    const named = [
+      ...(isBase ? [] : [d.asset]),
+      ...(d.kind === "absorb_debt" ? (absorbCollByTx.get(`${m.key}:${d.txHash}`) ?? []).map((leg) => leg.asset) : []),
+    ];
 
     events.push({
+      ...decimalsUnreadField(unreadTokensOf(named.map((a) => ({ address: a, meta: metas.get(a) ?? fallback(a) })))),
       id: `${d.txHash}-${d.logIndex}-${d.kind}`,
       txHash: d.txHash,
       blockNumber: d.blockNumber,
@@ -1071,6 +1083,7 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
       decimals: meta.decimals,
       amount: scaleRaw(raw, meta.decimals),
       amountRaw: raw.toString(),
+      ...(meta.unresolved ? { decimalsUnread: true as const } : {}),
     };
   };
   const markets: CometMarketReplay[] = p.deployment.markets
@@ -1135,7 +1148,11 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
         firstEventAt: s.seed ? s.seed.firstTimestamp : s.first ? (tsOf.get(s.first.blockNumber) ?? null) : null,
         lastActivityAt: s.last ? (tsOf.get(s.last.blockNumber) ?? null) : (s.seed?.lastTimestamp ?? null),
         // Scaled ONCE here, at the edge; the raw twin is the exact total.
-        lifetime: scaleCompoundLifetime(s.lifetime),
+        lifetime: (() => {
+          const scaled = scaleCompoundLifetime(s.lifetime);
+          for (const [addr, c] of Object.entries(scaled.collateral)) if (collUnread(addr)) c.decimalsUnread = true;
+          return scaled;
+        })(),
         lifetimeRaw: compoundLifetimeRawToWire(s.lifetime),
       };
     });

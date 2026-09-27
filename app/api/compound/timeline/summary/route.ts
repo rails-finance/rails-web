@@ -78,10 +78,20 @@ export async function GET(request: NextRequest) {
       (key) => (isTokenAddress(key) ? meta.get(key.toLowerCase())?.symbol : COMPOUND_MARKETS[key]?.baseSymbol),
       // Undefined leaves the bucket's decimals null, which the page reads as
       // unknown and refuses to add — never as zero.
-      (key) => (isTokenAddress(key) ? meta.get(key.toLowerCase())?.decimals : COMPOUND_MARKETS[key]?.baseDecimals),
+      (key) =>
+        isTokenAddress(key)
+          ? meta.get(key.toLowerCase())?.unresolved
+            ? undefined
+            : meta.get(key.toLowerCase())?.decimals
+          : COMPOUND_MARKETS[key]?.baseDecimals,
     );
 
-    return NextResponse.json(opening, { headers: proxyCacheControl(response, LISTING_CACHE_CONTROL) });
+    // A token whose decimals did not load leaves its bucket's decimals null
+    // (unknown, never added), and the answer is not kept.
+    const unread = [...meta.values()].some((m) => m.unresolved);
+    return NextResponse.json(opening, {
+      headers: unread ? { "Cache-Control": "no-store" } : proxyCacheControl(response, LISTING_CACHE_CONTROL),
+    });
   } catch (error) {
     console.error("Error fetching compound timeline summary from backend:", error);
     const message = error instanceof Error ? error.message : "Failed to fetch opening balance";

@@ -1,5 +1,6 @@
 "use client";
 
+import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { createContext, useContext, type ReactNode } from "react";
 import { Folder, FolderOpen, Layers, LogOut } from "lucide-react";
 
@@ -404,10 +405,12 @@ function SwapIcon({ size, axis = "mixed" }: { size: number; axis?: SpineSwapAxis
 /** The swap's legs on the node's right flank, one row each, given first: the
  *  token, then the compact amount echoing the header's receipt. */
 function SwapLegs({ legs }: { legs: SpineSwapLeg[] }) {
+  const unreadOf = useUnreadTokenOf();
   return (
     <span className="justify-self-start pl-1 flex flex-col gap-1" style={{ gridColumn: "4 / 6" }} data-swap-legs="">
       {legs.map((leg, i) => {
-        const txt = fmtSpine(leg.value);
+        // A leg whose decimals did not load keeps its token and states no figure.
+        const txt = unreadOf(leg.address, leg.symbol) ? "" : fmtSpine(leg.value);
         return (
           <span key={i} className="inline-flex items-center gap-2 text-base font-semibold whitespace-nowrap">
             <TokenChipIcon symbol={leg.symbol} address={leg.address} size={20} />
@@ -732,6 +735,7 @@ export function SpineColumn({
   const contextTip = useContext(SpineTipContext);
   const effectiveTip: SpineTip | null = tip !== undefined ? tip : contextTip;
   const { showTimelineValues } = useTimelineDisplay();
+  const unreadOf = useUnreadTokenOf();
   // ── The spine is never empty; the icon states WHY there is no flow ────────
   //
   // A card reaches this component with no token rows for many reasons unrelated
@@ -1220,7 +1224,9 @@ export function SpineColumn({
             style={{ gridTemplateColumns: scale.gridCols }}
           >
             <SpineVal
-              value={spineValues && row.direction === "left" ? row.value : undefined}
+              value={
+                spineValues && row.direction === "left" && !unreadOf(row.address, row.symbol) ? row.value : undefined
+              }
               side="left"
               onChange={row.direction === "left" ? row.onValueChange : undefined}
               decimals={row.valueDecimals}
@@ -1262,7 +1268,9 @@ export function SpineColumn({
             )}
             {row.direction === "right" ? <ArrowFromDot direction="right" size={scale.arrowSize} /> : <span />}
             <SpineVal
-              value={spineValues && row.direction === "right" ? row.value : undefined}
+              value={
+                spineValues && row.direction === "right" && !unreadOf(row.address, row.symbol) ? row.value : undefined
+              }
               side="right"
               onChange={row.direction === "right" ? row.onValueChange : undefined}
               decimals={row.valueDecimals}

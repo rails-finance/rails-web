@@ -28,6 +28,7 @@ import type {
 import { resolveErc20Meta, scaleRaw, type Erc20Meta } from "@/lib/sources/chain/erc20-meta";
 
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
+import { decimalsUnreadField, unreadTokensOf } from "@/lib/shared/decimals-unread";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 export interface SparkTimelineResult {
@@ -205,7 +206,7 @@ export async function buildSparkTimeline(rows: MvRow[], walletRaw: string): Prom
     decimals: 18,
     unresolved: true,
   });
-  const unresolved = (r: MvRow) => sparkRowTokens(r).some((a) => !metas.has(a) || metas.get(a)!.unresolved === true);
+  const isUnread = (a: string) => !metas.has(a) || metas.get(a)!.unresolved === true;
   const meta = (a: string | null): Erc20Meta | undefined =>
     a == null ? undefined : (metas.get(a.toLowerCase()) ?? fallback(a.toLowerCase()));
 
@@ -214,16 +215,28 @@ export async function buildSparkTimeline(rows: MvRow[], walletRaw: string): Prom
   // view's replayed *_after columns.
   const supplyBasket = new Map<string, { symbol: string; amount: number }>();
   const debtBasket = new Map<string, { symbol: string; amount: number }>();
+  // A basket line in a token whose decimals did not load is kept (the reserve
+  // is held) with its amount flagged, and the dust test does not apply to it.
   const snapshot = (m: Map<string, { symbol: string; amount: number }>): SparkSnapshotItem[] => {
     const out: SparkSnapshotItem[] = [];
-    for (const [address, v] of m.entries())
-      if (v.amount > BASKET_DUST) out.push({ symbol: v.symbol, amount: String(v.amount), address });
+    for (const [address, v] of m.entries()) {
+      if (isUnread(address)) out.push({ symbol: v.symbol, amount: "", address, decimalsUnread: true });
+      else if (v.amount > BASKET_DUST) out.push({ symbol: v.symbol, amount: String(v.amount), address });
+    }
     return out;
   };
 
+  // An event names its row's tokens and every token in the baskets it carries.
   const events: BaseActivityEvent[] = rows.map((r, idx) => {
     const e = sparkEvent(r, idx);
-    if (unresolved(r)) e.tokenMetaUnresolved = true;
+    const d = e.context?.protocol === "spark" ? e.context.data : undefined;
+    const named = [
+      ...sparkRowTokens(r),
+      ...(d?.allSupplies ?? []).flatMap((i) => (i.address ? [i.address] : [])),
+      ...(d?.allDebts ?? []).flatMap((i) => (i.address ? [i.address] : [])),
+    ];
+    Object.assign(e, decimalsUnreadField(unreadTokensOf(named.map((a) => ({ address: a, meta: meta(a) })))));
+    for (const f of e.flows) if (isUnread(f.token)) f.decimalsUnread = true;
     return e;
   });
 

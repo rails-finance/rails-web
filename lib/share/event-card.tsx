@@ -35,7 +35,9 @@ export interface EventCardModel {
   actionLabel: string;
   /** Up to three flows, the largest by |valueUsd| when any flow carries one,
    *  else the first three in the event's own order. */
-  flows: { sign: "+" | "−"; amount: string; symbol: string }[];
+  /** `sign` is empty where the amount is "Not loaded" (the token's decimals
+   *  did not load). */
+  flows: { sign: "+" | "−" | ""; amount: string; symbol: string }[];
   /** The summed |valueUsd| of the shown flows, formatted like the position
    *  card's stats — omitted when none of the shown flows carry a price. */
   usd?: string;

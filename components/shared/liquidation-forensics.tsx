@@ -20,6 +20,9 @@
 // a half-valued breakdown would invite a cross-leg comparison the data can't
 // support yet.
 
+import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
+import { NotLoaded } from "@/components/shared/not-loaded";
+import { decimalsTitle } from "@/lib/shared/decimals-unread";
 import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { StatCard, StateTransition } from "@/components/shared/state-transition";
@@ -187,6 +190,15 @@ export function LiquidationForensics({
 }: LiquidationForensicsProps) {
   const fmtValue = format?.value ?? formatUsdValue;
   const fmtPrice = format?.price ?? formatPrice;
+  // Every figure here is an amount scaled by a token's decimals (or a price
+  // converted with them): with any token in scope unread, none is stated.
+  const unread = useUnreadTokens();
+  if (unread)
+    return (
+      <div className="px-5 pb-2 text-sm text-rb-500" data-not-loaded="">
+        Liquidation figures: <NotLoaded inline title={decimalsTitle(unread)} />
+      </div>
+    );
   const sign = premium >= 0 ? "+" : "−";
   const premiumPct = `${sign}${(Math.abs(premium) * 100).toFixed(2)}%`;
   return (

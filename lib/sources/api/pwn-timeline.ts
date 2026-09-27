@@ -25,6 +25,7 @@ import { pwnAssetSymbolOverride } from "@/lib/pwn/asset-catalog";
 
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { decimalsUnreadField, unreadTokensOf } from "@/lib/shared/decimals-unread";
 
 export interface PwnTimelineResult {
   wallet: string;
@@ -134,6 +135,7 @@ export async function buildPwnTimeline(rows: MvRow[], walletRaw: string): Promis
     address: addr,
     symbol: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
     decimals: 18,
+    unresolved: true,
   });
   const meta = (a: string | null): Erc20Meta | undefined => {
     if (a == null) return undefined;
@@ -161,6 +163,12 @@ export async function buildPwnTimeline(rows: MvRow[], walletRaw: string): Promis
     const creditRaw = bigintOf(r.credit_amount);
     const repayRaw = bigintOf(r.loan_repay_amount);
     const collRaw = bigintOf(r.collateral_amount);
+    // Only an ERC20 amount is scaled by decimals (displayAmount), so only an
+    // ERC20 whose decimals did not load is unread.
+    const unread = unreadTokensOf([
+      ...(collCat === "ERC20" && collMeta ? [{ address: collMeta.address, meta: collMeta }] : []),
+      ...(creditCat === "ERC20" && creditMeta ? [{ address: creditMeta.address, meta: creditMeta }] : []),
+    ]);
 
     const ctx: PwnContext = {
       eventType: kind,
@@ -216,6 +224,7 @@ export async function buildPwnTimeline(rows: MvRow[], walletRaw: string): Promis
         amount: raw.toString(),
         amountFormatted: Number(fmtUnits(raw, decimals)),
         direction: dir,
+        ...(cat === "ERC20" && m.unresolved ? { decimalsUnread: true as const } : {}),
       });
     };
     if (kind === "created") push(creditMeta, creditCat, creditRaw, true);
@@ -233,6 +242,7 @@ export async function buildPwnTimeline(rows: MvRow[], walletRaw: string): Promis
       flows,
       etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", tx),
       context: { protocol: "pwn", data: ctx },
+      ...decimalsUnreadField(unread),
     };
   });
 

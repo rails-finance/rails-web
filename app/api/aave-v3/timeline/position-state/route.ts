@@ -69,19 +69,25 @@ export async function GET(request: NextRequest) {
     // answered: the resolver's fallback is a guess, and a balance scaled by a
     // guess would read as a real figure.
     const unnamed = state.reserves.filter((r) => r.symbol == null || r.decimals == null).map((r) => r.reserve);
+    let unread = false;
     if (unnamed.length > 0) {
       const metas = await resolveErc20Meta(unnamed);
       state.reserves = state.reserves.map((r) => {
         const meta = metas.get(r.reserve.toLowerCase());
         if (!meta) return r;
+        // A token whose decimals did not load is left unscaled, and the
+        // answer is not kept: the next read asks again.
+        if (r.decimals == null && meta.unresolved) unread = true;
         return {
           ...r,
           symbol: r.symbol ?? meta.symbol,
-          decimals: r.decimals ?? (meta.named === false ? null : meta.decimals),
+          decimals: r.decimals ?? (meta.named === false || meta.unresolved ? null : meta.decimals),
         };
       });
     }
-    return NextResponse.json(state, { headers: proxyCacheControl(response) });
+    return NextResponse.json(state, {
+      headers: unread ? { "Cache-Control": "no-store" } : proxyCacheControl(response),
+    });
   } catch (error) {
     console.error("Error reading aave-v3 position state:", error);
     const message = error instanceof Error ? error.message : "Failed to read position state";

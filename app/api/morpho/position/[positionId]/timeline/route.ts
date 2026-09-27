@@ -6,6 +6,7 @@ import { withRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import { buildMorphoTimeline, type RawMorphoTimelineResponse } from "@/lib/sources/api/morpho-timeline";
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { timelineCacheHeaders } from "@/lib/shared/decimals-unread";
 
 // Proxies a single Morpho position's timeline from the live rails-server index.
 // rails returns the raw per-event signed deltas + the market params; we replay
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pos
       cutoffBlock: raw.cutoffBlock ?? null,
     };
     return NextResponse.json(toTimelineWire(windowed, MAINNET_CHAIN_ID), {
-      headers: proxyCacheControl(response, LISTING_CACHE_CONTROL),
+      headers: timelineCacheHeaders(result.events, proxyCacheControl(response, LISTING_CACHE_CONTROL)),
     });
   } catch (error) {
     console.error("Error fetching morpho position timeline from backend:", error);

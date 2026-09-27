@@ -12,6 +12,7 @@
 //
 // SERVER-ONLY — imported from the /api/compound/* route handlers.
 
+import { decimalsUnreadField, unreadTokensOf } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent, AssetFlow, CompoundContext, CompoundEventType } from "@/lib/shared/types/event-shape";
 import { resolveErc20Meta, scaleRaw, type Erc20Meta } from "@/lib/sources/chain/erc20-meta";
 import { marketOf } from "@/lib/compound/asset-catalog";
@@ -149,8 +150,8 @@ export async function buildCompoundTimeline(
     decimals: 18,
     unresolved: true,
   });
-  const unresolved = (rs: MvRow[]) =>
-    rs.some((r) => compoundRowTokens(r).some((a) => !metas.has(a) || metas.get(a)!.unresolved === true));
+  const unreadOf = (rs: MvRow[]) =>
+    unreadTokensOf(rs.flatMap((r) => compoundRowTokens(r)).map((a) => ({ address: a, meta: metas.get(a) })));
 
   // Comet absorbs the whole account in one call: one AbsorbDebt + one
   // AbsorbCollateral per collateral asset, all in the same tx. Group the
@@ -239,6 +240,7 @@ export async function buildCompoundTimeline(
               amount: mag.toString(),
               amountFormatted: Number(fmtUnits(mag, meta.decimals)),
               direction: dir,
+              ...(!isBase && unreadOf([r]).length > 0 ? { decimalsUnread: true as const } : {}),
             },
           ]
         : [];
@@ -246,7 +248,7 @@ export async function buildCompoundTimeline(
     // The debt leg states its same-transaction collateral legs too.
     const named = kind === "absorb_debt" ? [r, ...(absorbCollByTx.get(r.tx_hash) ?? [])] : [r];
     return {
-      ...(unresolved(named) ? { tokenMetaUnresolved: true as const } : {}),
+      ...decimalsUnreadField(unreadOf(named)),
       id: `${tx}-${r.log_index}`,
       txHash: tx,
       blockNumber: block,

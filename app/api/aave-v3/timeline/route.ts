@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
+import { timelineCacheHeaders } from "@/lib/shared/decimals-unread";
 import { withRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import { buildAaveV3Timeline, type MvRow } from "@/lib/sources/api/aave-v3-timeline";
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
@@ -131,7 +132,7 @@ export async function GET(request: NextRequest) {
       ]);
       const resolve = {
         symbol: (key: string) => legMetas.get(key)?.symbol,
-        decimals: (key: string) => legMetas.get(key)?.decimals,
+        decimals: (key: string) => (legMetas.get(key)?.unresolved ? undefined : legMetas.get(key)?.decimals),
       };
       const rowPlan: TimelineRowPlanEntry[] = upstream.rows.map((r) =>
         r.kind === "event" ? { kind: "event" } : { kind: "folder", folder: toServedFolder(r.folder, resolve) },
@@ -148,8 +149,13 @@ export async function GET(request: NextRequest) {
         boundBy: upstream.boundBy,
         span: upstream.span ?? null,
       };
+      // A leg whose decimals did not load is left off its folder header; the
+      // answer is then not kept, like a row carrying one.
+      const legsUnread = [...legMetas.values()].some((m) => m.unresolved);
       return NextResponse.json(toTimelineWire(body, MAINNET_CHAIN_ID), {
-        headers: proxyCacheControl(response, LISTING_CACHE_CONTROL),
+        headers: legsUnread
+          ? { "Cache-Control": "no-store" }
+          : timelineCacheHeaders(data.events, proxyCacheControl(response, LISTING_CACHE_CONTROL)),
       });
     }
 
@@ -176,7 +182,7 @@ export async function GET(request: NextRequest) {
       span: span ?? null,
     };
     return NextResponse.json(toTimelineWire(windowed, MAINNET_CHAIN_ID), {
-      headers: proxyCacheControl(response, LISTING_CACHE_CONTROL),
+      headers: timelineCacheHeaders(data.events, proxyCacheControl(response, LISTING_CACHE_CONTROL)),
     });
   } catch (error) {
     console.error("Error fetching aave-v3 timeline from backend:", error);
