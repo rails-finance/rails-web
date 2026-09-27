@@ -142,7 +142,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
   const groupChip = ctx.blockGrouping?.isGrouped ? (
     <span
       className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide bg-sunken text-rb-500"
-      title={`Operation ${ctx.blockGrouping.sameBlockIndex} of ${ctx.blockGrouping.sameBlockCount} in this transaction`}
+      title={`This trove had ${ctx.blockGrouping.sameBlockCount} events in the same block; this is event ${ctx.blockGrouping.sameBlockIndex} of ${ctx.blockGrouping.sameBlockCount}, in the order the block recorded them`}
     >
       {ctx.blockGrouping.sameBlockIndex} of {ctx.blockGrouping.sameBlockCount}
     </span>

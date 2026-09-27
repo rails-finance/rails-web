@@ -122,6 +122,34 @@ function fig(prov: AnyProv | undefined, display: ReactNode): ReactNode {
   );
 }
 
+/** The upfront fee the debt cell's sub-line shows ("+30.79 fee"), stated with
+ *  its reason so the before→after debt adds up. `reason` finishes the sentence
+ *  after the fee. Null where the event charged none. */
+function upfrontFeeClause(ctx: LiquityContext, coords: EventCoords, reason: ReactNode): ClauseInput {
+  const fee = ctx.troveOperation?.debtIncreaseFromUpfrontFee ?? 0;
+  if (!(fee > 0)) return null;
+  const debtSym = ctx.assetType ?? "BOLD";
+  return clause(
+    <>
+      An upfront fee of {fig(upfrontFeeProv(ctx, coords), fmtCurrency(fee, debtSym))} was added to the debt{reason}.
+    </>,
+  );
+}
+
+/** Same-block note: the header's "1 of 2" chip means this trove had more than
+ *  one event in the block. Stated once, in plain words, with the block. */
+function sameBlockClause(ctx: LiquityContext, coords: EventCoords): ClauseInput {
+  const g = ctx.blockGrouping;
+  if (!g?.isGrouped || !(g.sameBlockCount > 1)) return null;
+  return clause(
+    <>
+      This trove had {g.sameBlockCount} events in block{" "}
+      {coords.blockNumber != null ? coords.blockNumber.toLocaleString("en-US") : "this block"}; this is{" "}
+      {fig(undefined, `${g.sameBlockIndex} of ${g.sameBlockCount}`)}, in the order the block recorded them.
+    </>,
+  );
+}
+
 // ── open ─────────────────────────────────────────────────────────────────────
 
 function openTroveSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlots {
@@ -503,6 +531,16 @@ function adjustRateSlots(
       ),
     );
   }
+  changed.push(
+    upfrontFeeClause(
+      ctx,
+      coords,
+      <>
+        , because the rate changed within 7 days of the trove&rsquo;s previous rate change; the fee equals 7 days of
+        average interest
+      </>,
+    ),
+  );
 
   const meansNow: ClauseInput[] = [];
   if (stateAfter.debt > 0) {
@@ -987,6 +1025,17 @@ function setBatchManagerSlots(ctx: LiquityContext, coords: EventCoords, accruedI
     );
   }
 
+  changed.push(
+    upfrontFeeClause(
+      ctx,
+      coords,
+      <>
+        , because joining a delegate within 7 days of the trove&rsquo;s previous rate change counts as a rate change;
+        the fee equals 7 days of average interest
+      </>,
+    ),
+  );
+
   const meansNow: ClauseInput[] = [];
   if (stateAfter.coll > 0) {
     meansNow.push(
@@ -1044,6 +1093,16 @@ function removeFromBatchSlots(
       ),
     );
   }
+  changed.push(
+    upfrontFeeClause(
+      ctx,
+      coords,
+      <>
+        , because leaving a delegate within 7 days of the trove&rsquo;s previous rate change counts as a rate change;
+        the fee equals 7 days of average interest
+      </>,
+    ),
+  );
 
   const meansNow: ClauseInput[] = [];
   if (stateAfter.debt > 0) {
@@ -1206,6 +1265,18 @@ export function liquityEventSlots(
     accruedManagementFees = calc.accruedManagementFees;
   }
 
+  const slots = liquityEventSlotsFor(ctx, coords, accruedInterest, accruedManagementFees, currentPrice);
+  const same = sameBlockClause(ctx, coords);
+  return same ? { ...slots, meansNow: [...(slots.meansNow ?? []), same] } : slots;
+}
+
+function liquityEventSlotsFor(
+  ctx: LiquityContext,
+  coords: EventCoords,
+  accruedInterest: number,
+  accruedManagementFees: number,
+  currentPrice?: number,
+): EventProseSlots {
   switch (ctx.operation) {
     case "openTrove":
     case "openTroveAndJoinBatch":
