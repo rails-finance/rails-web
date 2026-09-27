@@ -8,7 +8,10 @@
 import type { BasedollarContext } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
 import { LiquidationForensics } from "@/components/shared/liquidation-forensics";
-import { buildForkLiquidationForensics } from "@/components/protocol/liquity-fork/liquity-fork-forensics";
+import {
+  buildForkLiquidationForensics,
+  forkLiquidationStats,
+} from "@/components/protocol/liquity-fork/liquity-fork-forensics";
 import {
   collAfterProv,
   debtAfterProv,
@@ -20,6 +23,7 @@ import {
   liqSeizedUsdProv,
   liqClearedFaceProv,
   liqPremiumProv,
+  liquidationLegProv,
   rateAtEventProv,
   upfrontFeeProv,
   accruedInterestProv,
@@ -29,7 +33,7 @@ import {
   type BasedollarCoords,
 } from "@/lib/basedollar/event-provenance";
 import { FORK_RATE_PILL_EVENTS } from "@/lib/shared/liquity-fork-ops";
-import { DEBT_SYMBOL, resolveBranch } from "@/lib/basedollar/asset-catalog";
+import { DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
 // formatUsdValue, not format-event's formatUsd: the prose echo keys on the
 // value STRING, and the two round differently ($1,912.94 vs $1,913).
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
@@ -162,16 +166,19 @@ export function BasedollarEventDetail({ ctx, txHash, blockNumber }: BasedollarEv
     });
   }
 
-  // The whole-trove valued block — the branch's own MCR names where the
-  // premium tops out (this branch's liquidation line).
-  const mcr = resolveBranch(ctx.collateralSymbol)?.mcr;
+  // Where a liquidation's debt went and the surplus left for the owner — the
+  // Liquidation log's legs, the receipts the prose echoes.
+  stats.push(...forkLiquidationStats(ctx, coords, liquidationLegProv, DEBT_SYMBOL));
+
+  // The whole-trove valued block — the branch's MCR at the event's block names
+  // where the premium tops out (the transform stamps it as mcrAtEvent).
   const forensics =
     ctx.eventType === "liquidate"
       ? buildForkLiquidationForensics(
           ctx,
           coords,
           { atBlockPriceProv, liqSeizedUsdProv, liqClearedFaceProv, liqPremiumProv },
-          { stablecoin: DEBT_SYMBOL, mcrPct: mcr != null ? mcr * 100 : undefined },
+          { stablecoin: DEBT_SYMBOL },
         )
       : undefined;
 

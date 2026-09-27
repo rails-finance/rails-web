@@ -17,6 +17,11 @@ const intro = (
       at a dollar by paying off the lowest-rate loans first.
     </p>
     <p>
+      Each branch sets a minimum collateral ratio, below which anyone can liquidate a Trove. Ebisu&apos;s governance can
+      change it: weETH&apos;s was 128% and WBTC&apos;s 132% until 4 January 2026, when both became 120%. A past
+      liquidation is shown against the minimum in force at its block.
+    </p>
+    <p>
       Each row of the listing is one Trove: its collateral, its ebUSD debt, the rate its owner chose, and its status.
       Collateral ratios and dollar values are off by default — Ebisu states amounts in each Trove&apos;s own tokens, and
       those extra figures are conversions layered on top. Or{" "}

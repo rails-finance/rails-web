@@ -14,6 +14,7 @@
 // TroveManagers themselves by scripts/verify-liquity-forks-chain.mjs.
 
 import { chainMeta, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import type { ForkMcrStep } from "@/lib/shared/liquity-fork-ops";
 
 export interface EbisuBranch {
   /** Lowercase branch key as stored in the MV (weeth | susde | wbtc | lbtc | stcusd). */
@@ -46,6 +47,14 @@ export interface EbisuBranch {
   mcr: number;
   ccr: number;
   scr: number;
+  /** The MCRs in force before `mcr`, oldest first — governance moves the
+   *  minimum, so an event is judged against the one in force at its block
+   *  (forkMcrAt). Each step ends at the block of the EbisuBranchManager log
+   *  that set the next value: parameter 0 of event topic 0xb01c6cf0…, read with
+   *  one eth_getLogs over the five branch managers on 2026-09-27, the earlier
+   *  values read with MCR() at the block before. sUSDe, LBTC and stcUSD have no
+   *  such log, so their minimum has not moved. */
+  mcrBefore?: readonly ForkMcrStep[];
 }
 
 export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
@@ -60,6 +69,8 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     sortedTroves: "0xcf24189972002ecb283b453571e829249cde039c",
     troveNft: "0x32541a7a06d3792b46512f3b6c7d8467b5c7d754",
     mcr: 1.2,
+    // 128% until tx 0x4bec5d42…edbd1 set 120% (block 24,160,712, 4 Jan 2026).
+    mcrBefore: [{ mcr: 1.28, untilBlock: 24_160_712, untilTimestamp: 1_767_522_647 }],
     ccr: 1.5,
     scr: 1.2,
   },
@@ -88,6 +99,8 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     sortedTroves: "0x4e5e60cd7d33b00e308504f75bb6737c14f113dd",
     troveNft: "0x7ef172d1869c50cc3a3de88033d1f36b2ed83fdf",
     mcr: 1.2,
+    // 132% until tx 0x1362365d…77570 set 120% (block 24,160,701, 4 Jan 2026).
+    mcrBefore: [{ mcr: 1.32, untilBlock: 24_160_701, untilTimestamp: 1_767_522_515 }],
     ccr: 1.5,
     scr: 1.2,
   },

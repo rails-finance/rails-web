@@ -46,6 +46,7 @@ import { LIQUITY_FORK_CARD_CONFIGS, type LiquityForkCardConfig } from "@/lib/sha
 import { liquityTroveFaceProv, trovePeakCollProv, trovePeakDebtProv } from "@/lib/liquity/trove-card-provenance";
 import { liquityPositionContent } from "@/lib/shared/learn-more-content";
 import { liquityForkPositionContent } from "@/lib/shared/liquity-fork-position-content";
+import { forkMcrAt, type ForkMcrStep } from "@/lib/shared/liquity-fork-ops";
 import { forkLiveVocab } from "@/lib/shared/liquity-fork-live-provenance";
 import type { LiquityForkCoords } from "@/lib/shared/liquity-fork-provenance";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
@@ -164,7 +165,9 @@ type ForkProtocol = "asymmetry" | "ebisu" | "basedollar";
 
 interface ForkCardDeps {
   shortId: (id: string) => string;
-  resolveBranch: (collateralType: string | undefined | null) => { priceFeed: string; mcr: number } | undefined;
+  resolveBranch: (
+    collateralType: string | undefined | null,
+  ) => { priceFeed: string; mcr: number; mcrBefore?: readonly ForkMcrStep[] } | undefined;
   /** Fallback PriceFeed address for the receipt's contract identity when the
    *  branch can't be resolved (mirrors each card's prior `?? BRANCHES.<default>`). */
   defaultPriceFeed: string;
@@ -260,9 +263,13 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
         debtSymbol: cfg.debtSymbol,
         status: v.status,
         isBatched: v.isBatched,
+        // A liquidated Trove is described against the minimum in force when
+        // it was liquidated (its last event); governance can have moved it since.
         minCR: (() => {
-          const mcr = deps.resolveBranch(v.collateralType)?.mcr;
-          return mcr != null ? `${Math.round(mcr * 100)}%` : undefined;
+          const branch = deps.resolveBranch(v.collateralType);
+          if (!branch) return undefined;
+          const mcr = v.status === "liquidated" ? forkMcrAt(branch, { timestamp: v.lastActivityAt }) : branch.mcr;
+          return `${Math.round(mcr * 100)}%`;
         })(),
         docsLink: cfg.docsLink,
       }),
@@ -474,9 +481,8 @@ export function LiquityPositionCard({
         ) : (
           <>
             The {v.batch.managerName} delegate will no longer be maintained after{" "}
-            {formatMonthDayYear(v.batch.deprecation.deprecatedDate + "T00:00:00Z")}
-            . This position should be moved to a new delegate before this date.{" "}
-            <AnnouncementLink url={cfg.delegateDeprecationAnnouncement} />
+            {formatMonthDayYear(v.batch.deprecation.deprecatedDate + "T00:00:00Z")}. This position should be moved to a
+            new delegate before this date. <AnnouncementLink url={cfg.delegateDeprecationAnnouncement} />
           </>
         )}
       </p>

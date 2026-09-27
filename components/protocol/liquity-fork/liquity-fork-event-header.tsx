@@ -29,7 +29,14 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
 import type { Provenance } from "@/components/shared/provenance";
 import type { LiquityForkCoords, DeltaOps } from "@/lib/shared/liquity-fork-provenance";
-import { FORK_RATE_PILL_EVENTS, COLL_VERB, DEBT_VERB } from "@/lib/shared/liquity-fork-ops";
+import {
+  FORK_RATE_PILL_EVENTS,
+  COLL_VERB,
+  DEBT_VERB,
+  FORK_DEBT_DUST_FLOAT,
+  forkDebtMove,
+  forkDebtMoveOps,
+} from "@/lib/shared/liquity-fork-ops";
 import { getForkBatchManagerName } from "@/lib/shared/fork-batch-managers";
 
 /** The two fork contexts are structural twins; either drives the header. */
@@ -119,20 +126,16 @@ export function LiquityForkEventHeader({
           : {}),
     });
 
-  const debt = Number(ctx.debtDelta) || 0;
-  if (debt !== 0 && !noChange)
+  // The debt axis states what the act moved (TroveOperation's own figure), so
+  // interest accrued since the last touch never reads as a borrow, a repayment
+  // or a redemption. The accrued interest is its own figure on the detail grid.
+  const debt = forkDebtMove(ctx).value;
+  if (Math.abs(debt) >= FORK_DEBT_DUST_FLOAT && !noChange)
     deltas.push({
       value: debt,
       symbol: builders.debtSymbol,
       address: soleFlowAddress(flows, builders.debtSymbol),
-      prov: builders.debtDeltaProv(
-        coords,
-        {
-          after: ctx.debtAfter,
-          before: ctx.debtAfter != null ? Number(ctx.debtAfter) - debt : null,
-        },
-        ctx.origin?.debt,
-      ),
+      prov: builders.debtDeltaProv(coords, forkDebtMoveOps(ctx), ctx.origin?.debt),
       ...(isRedemption
         ? { label: "Reduced", tone: "caution" as const }
         : perAxis

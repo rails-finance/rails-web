@@ -46,6 +46,12 @@ export interface LiquityForkCoords {
 export interface DeltaOps {
   after?: number | string | null;
   before?: number | string | null;
+  /** The act's own debt move, TroveOperation `_debtChangeFromOperation` (human,
+   *  signed). Present, the debt receipt names that field instead of the net
+   *  change over two balances (see forkDebtMoveOps). */
+  fromOperation?: number | string | null;
+  /** The event is a redemption, whose TroveOperation the redemption emitter logs. */
+  redemption?: boolean;
 }
 
 /** A lifetime gross flow — the sum of one kind of signed delta across the
@@ -198,7 +204,32 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     ],
   });
 
-  const debtDeltaProv = (coords: LiquityForkCoords, ops?: DeltaOps, origin?: OriginEnvelope | null): Provenance => ({
+  const debtDeltaProv = (coords: LiquityForkCoords, ops?: DeltaOps, origin?: OriginEnvelope | null): Provenance =>
+    ops?.fromOperation != null ? debtMoveProv(coords, ops) : debtNetDeltaProv(coords, ops, origin);
+
+  /** The act's own debt move — a decoded TroveOperation param, so the interest
+   *  accrued since the last touch, the upfront fee and any redistributed debt
+   *  are not in it. */
+  const debtMoveProv = (coords: LiquityForkCoords, ops: DeltaOps): Provenance => ({
+    kind: "chain",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary: `${cfg.stablecoin} debt moved by this act — the amount the contract logged for the operation: what was borrowed, repaid, redeemed or cleared. Interest accrued since the Trove's last change, the upfront fee and any debt passed on from a liquidated Trove are logged as separate figures.`,
+    contract: ops.redemption ? redemptionContract(coords) : troveManagerContract(coords),
+    via: `${streamVia()} · TroveOperation log · _debtChangeFromOperation · ÷10^18`,
+    inputs: [
+      {
+        label: "debt from operation",
+        value: opVal(ops.fromOperation),
+        kind: "chain",
+        pclass: "emitted",
+        note: "_debtChangeFromOperation",
+      },
+      ...eventInputs(coords),
+    ],
+  });
+
+  const debtNetDeltaProv = (coords: LiquityForkCoords, ops?: DeltaOps, origin?: OriginEnvelope | null): Provenance => ({
     kind: "chain-derived",
     pclass: "indexed",
     verify: txVerify(coords),
@@ -532,25 +563,73 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     ],
   });
 
-  /** The cleared-debt leg — the stablecoin at $1. */
-  const liqClearedFaceProv = (coords: LiquityForkCoords, vals: { amount: string }): Provenance => ({
+  /** The cleared-debt leg — the stablecoin at $1. `fromOperation` says the
+   *  amount is the liquidation's own TroveOperation figure (the whole debt,
+   *  interest included) rather than the debt logged at the previous change. */
+  const liqClearedFaceProv = (
+    coords: LiquityForkCoords,
+    vals: { amount: string; fromOperation?: boolean },
+  ): Provenance => ({
     kind: "chain-derived",
     pclass: "emitted",
     formula: "debt at $1 redemption face value",
     verify: txVerify(coords),
-    summary: `Value of the cleared debt — the Trove's whole ${cfg.stablecoin} debt as the contract logged it at the Trove's previous change, counted at $1 per ${cfg.stablecoin}. The contract's collateral-ratio check counts each ${cfg.stablecoin} as one dollar, and redemptions hold it to that value. Interest accrued since that change is missing from the logged debt.`,
+    summary: vals.fromOperation
+      ? `Value of the cleared debt — the ${cfg.stablecoin} debt the liquidation cleared, as its TroveOperation log records it (the whole debt, interest accrued since the Trove's previous change included), counted at $1 per ${cfg.stablecoin}. The contract's collateral-ratio check counts each ${cfg.stablecoin} as one dollar, and redemptions hold it to that value.`
+      : `Value of the cleared debt — the Trove's whole ${cfg.stablecoin} debt as the contract logged it at the Trove's previous change, counted at $1 per ${cfg.stablecoin}. The contract's collateral-ratio check counts each ${cfg.stablecoin} as one dollar, and redemptions hold it to that value. Interest accrued since that change is missing from the logged debt.`,
     contract: troveManagerContract(coords),
-    via: `debt at $1 per ${cfg.stablecoin}`,
+    via: vals.fromOperation
+      ? `${streamVia()} · TroveOperation log · _debtChangeFromOperation · at $1 per ${cfg.stablecoin}`
+      : `debt at $1 per ${cfg.stablecoin}`,
     inputs: [
       {
         label: "debt cleared",
         value: vals.amount,
         kind: "chain",
-        note: `the trove's ${cfg.stablecoin} entering the event`,
+        note: vals.fromOperation ? "_debtChangeFromOperation" : `the trove's ${cfg.stablecoin} entering the event`,
       },
       ...eventInputs(coords),
     ],
   });
+
+  /** One leg of the branch's Liquidation log — the Stability Pool's share of
+   *  the debt, the redistributed share, or the collateral surplus left for the
+   *  owner. The log reports the transaction's totals; the read path attaches it
+   *  only where the transaction liquidated this Trove alone. */
+  const liquidationLegProv = (
+    coords: LiquityForkCoords,
+    vals: { leg: "offset" | "redistributed" | "surplus"; amount: string },
+  ): Provenance => {
+    const legs = {
+      offset: {
+        param: "_debtOffsetBySP",
+        unit: cfg.stablecoin,
+        summary: `Debt the Stability Pool absorbed — the part of the liquidated debt the branch's Stability Pool deposits paid off, taking the matching collateral in exchange.`,
+      },
+      redistributed: {
+        param: "_debtRedistributed",
+        unit: cfg.stablecoin,
+        summary: `Debt redistributed — the part of the liquidated debt the Stability Pool could not absorb, passed with its collateral to the branch's other Troves in proportion to their collateral.`,
+      },
+      surplus: {
+        param: "_collSurplus",
+        unit: collSym(coords),
+        summary: `Collateral surplus — the collateral left after the debt and the liquidation penalty were covered. The contract credits it to the Trove's owner in the branch's CollSurplusPool, where the owner can claim it.`,
+      },
+    }[vals.leg];
+    return {
+      kind: "chain",
+      pclass: "emitted",
+      verify: txVerify(coords),
+      summary: legs.summary,
+      contract: troveManagerContract(coords),
+      via: `${streamVia()} · Liquidation log · ${legs.param} · ÷10^${vals.leg === "surplus" ? collDecimals(coords) : 18}`,
+      inputs: [
+        { label: legs.param, value: vals.amount, kind: "chain", pclass: "emitted", note: legs.unit },
+        ...eventInputs(coords),
+      ],
+    };
+  };
 
   /** The premium — seized ÷ cleared − 1 (the collateral ratio on the logged
    *  balances, less 100%). */
@@ -758,6 +837,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     liqSeizedUsdProv,
     liqClearedFaceProv,
     liqPremiumProv,
+    liquidationLegProv,
     positionCollateralProv,
     positionDebtProv,
     positionRateProv,

@@ -1051,6 +1051,27 @@ export interface LiquityForkRedemptionFacts {
   collSent: string;
 }
 
+/** The branch's Liquidation log for the transaction that liquidated this Trove.
+ *  The log reports the liquidation's totals; the read path attaches it only
+ *  where the transaction liquidated this one Trove on the branch, so the totals
+ *  are this Trove's. Human decimal strings: debt legs in the stablecoin (18),
+ *  collateral legs in the branch's own units. */
+export interface LiquityForkLiquidationFacts {
+  /** Debt the Stability Pool absorbed — `_debtOffsetBySP`. */
+  debtOffsetBySP: string;
+  /** Debt passed to the branch's other Troves — `_debtRedistributed`. */
+  debtRedistributed: string;
+  /** Collateral sent to the Stability Pool — `_collSentToSP`. */
+  collSentToSP: string;
+  /** Collateral passed to the other Troves with that debt — `_collRedistributed`. */
+  collRedistributed: string;
+  /** Collateral left over after the debt and the penalty, which the owner can
+   *  claim from the branch's CollSurplusPool — `_collSurplus`. */
+  collSurplus: string;
+  /** Collateral paid to the liquidator as gas compensation — `_collGasCompensation`. */
+  collGasCompensation: string;
+}
+
 // ───────────────────────── Ebisu (Liquity V2 fork) detail types ─────────────────────────
 //
 // Ebisu Money — a mainnet Liquity V2 FORK minting ebUSD against FIVE collateral
@@ -1133,6 +1154,12 @@ export interface EbisuContext {
    *  deployment's events MV does not carry the Redemption / RedemptionFeePaidToTrove
    *  joins. */
   redemption?: LiquityForkRedemptionFacts;
+  /** liquidate rows only — the Liquidation log's legs, where the read path
+   *  carries them and the transaction liquidated this Trove alone. */
+  liquidation?: LiquityForkLiquidationFacts;
+  /** liquidate rows only — the branch's minimum collateral ratio in force at
+   *  this block (a ratio, 1.28 = 128%), which governance can move. */
+  mcrAtEvent?: number;
 }
 
 // ───────────────────────── Asymmetry (Liquity V2 fork) detail types ─────────────────────────
@@ -1217,6 +1244,12 @@ export interface AsymmetryContext {
    *  deployment's events MV does not carry the Redemption / RedemptionFeePaidToTrove
    *  joins. */
   redemption?: LiquityForkRedemptionFacts;
+  /** liquidate rows only — the Liquidation log's legs, where the read path
+   *  carries them and the transaction liquidated this Trove alone. */
+  liquidation?: LiquityForkLiquidationFacts;
+  /** liquidate rows only — the branch's minimum collateral ratio in force at
+   *  this block (a ratio, 1.28 = 128%), which governance can move. */
+  mcrAtEvent?: number;
 }
 
 // ───────────────────────── Basedollar (Liquity V2 fork on Base) detail types ─────────────────────────
@@ -1304,6 +1337,12 @@ export interface BasedollarContext {
    *  deployment's events MV does not carry the Redemption / RedemptionFeePaidToTrove
    *  joins. */
   redemption?: LiquityForkRedemptionFacts;
+  /** liquidate rows only — the Liquidation log's legs, where the read path
+   *  carries them and the transaction liquidated this Trove alone. */
+  liquidation?: LiquityForkLiquidationFacts;
+  /** liquidate rows only — the branch's minimum collateral ratio in force at
+   *  this block (a ratio, 1.28 = 128%), which governance can move. */
+  mcrAtEvent?: number;
 }
 
 // ───────────────────────── Compound V3 (Comet) detail types ─────────────────────────

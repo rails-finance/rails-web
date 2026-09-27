@@ -20,6 +20,7 @@
 // deltas include upfront fees and interest applied at each touch (the
 // V2-family anatomy); the receipts and the note say so.
 
+import { forkDebtMove } from "@/lib/shared/liquity-fork-ops";
 import type { BasedollarTroveView } from "@/components/protocol/basedollar/basedollar-position-card";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isBasedollarEvent } from "@/lib/shared/types/event-shape";
@@ -60,21 +61,26 @@ function replayLifetime(events: BaseActivityEvent[]): TroveFlows {
     if (!isBasedollarEvent(ev)) continue;
     const ctx = ev.context.data;
     const collDelta = Number(ctx.collDelta) || 0;
-    const debtDelta = Number(ctx.debtDelta) || 0;
+    // The act's own debt move (TroveOperation) is what was repaid, redeemed or
+    // liquidated; the rest of the net change (upfront fee, interest accrued
+    // since the last touch, redistributed debt) is debt added, so the flows
+    // still reconcile to the recorded balance.
+    const debtMove = forkDebtMove(ctx).value;
+    f.borrowed += (Number(ctx.debtDelta) || 0) - debtMove;
     if (ctx.eventType === "liquidate") {
       f.collLiquidated += Math.abs(Math.min(collDelta, 0));
-      f.debtLiquidated += Math.abs(Math.min(debtDelta, 0));
+      f.debtLiquidated += Math.abs(Math.min(debtMove, 0));
       continue;
     }
     if (ctx.eventType === "redeemCollateral") {
       f.collRedeemed += Math.abs(Math.min(collDelta, 0));
-      f.debtRedeemed += Math.abs(Math.min(debtDelta, 0));
+      f.debtRedeemed += Math.abs(Math.min(debtMove, 0));
       continue;
     }
     if (collDelta > 0) f.deposited += collDelta;
     else f.withdrawn += -collDelta;
-    if (debtDelta > 0) f.borrowed += debtDelta;
-    else f.repaid += -debtDelta;
+    if (debtMove > 0) f.borrowed += debtMove;
+    else f.repaid += -debtMove;
   }
   return f;
 }

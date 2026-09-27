@@ -89,9 +89,10 @@ import type { Provenance } from "@/components/shared/provenance";
 import type { LiquityForkLearnMoreParams } from "@/lib/shared/learn-more-content";
 import { Prov } from "@/components/shared/provenance";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
-import { FORK_RATE_PILL_EVENTS } from "@/lib/shared/liquity-fork-ops";
+import { FORK_RATE_PILL_EVENTS, forkDebtMove, forkDebtMoveOps } from "@/lib/shared/liquity-fork-ops";
 import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots } from "@/lib/shared/explainer-prose";
 import { formatNumber, formatUsdValue, formatPrice } from "@/lib/utils/format";
+import { forkLiquidationCleared } from "@/components/protocol/liquity-fork/liquity-fork-forensics";
 
 /** The two fork contexts are structural twins; either drives the explainer. */
 export type LiquityForkEventContext = EbisuContext | AsymmetryContext | BasedollarContext;
@@ -108,7 +109,11 @@ export interface LiquityForkExplainerProvs {
   rateAtEventProv: (coords?: LiquityForkCoords) => Provenance;
   atBlockPriceProv: (coords: LiquityForkCoords, priceUsd: number) => Provenance;
   liqSeizedUsdProv: (coords: LiquityForkCoords, vals: { amount: string; priceUsd: number }) => Provenance;
-  liqClearedFaceProv: (coords: LiquityForkCoords, vals: { amount: string }) => Provenance;
+  liqClearedFaceProv: (coords: LiquityForkCoords, vals: { amount: string; fromOperation?: boolean }) => Provenance;
+  liquidationLegProv: (
+    coords: LiquityForkCoords,
+    vals: { leg: "offset" | "redistributed" | "surplus"; amount: string },
+  ) => Provenance;
   liqPremiumProv: (
     coords: LiquityForkCoords,
     vals: { seizedUsd: string; clearedUsd: string; mcrPct?: number },
@@ -175,7 +180,10 @@ export function liquityForkEventSlots(
   const debt = fork.stablecoin;
   const et = ctx.eventType;
   const collDelta = Number(ctx.collDelta) || 0;
-  const debtDelta = Number(ctx.debtDelta) || 0;
+  // What the act moved (TroveOperation's figure), which the header's debt axis
+  // states too. The net change also carries accrued interest, the upfront fee
+  // and redistributed debt, each stated as its own figure below.
+  const debtMove = forkDebtMove(ctx).value;
   const collAfter = Number(ctx.collAfter);
   const debtAfter = Number(ctx.debtAfter);
   const hasDebtAfter = Number.isFinite(debtAfter) && debtAfter > DEBT_EPS;
@@ -187,8 +195,6 @@ export function liquityForkEventSlots(
   const deltaLabeled = perAxis || et === "redeemCollateral";
 
   const collBefore = ctx.collAfter != null ? Number(ctx.collAfter) - collDelta : null;
-  const debtBefore = ctx.debtAfter != null ? Number(ctx.debtAfter) - debtDelta : null;
-
   const collDeltaFig = () => (
     <Fig
       info={b.collDeltaProv(coords, { after: ctx.collAfter, before: collBefore }, ctx.origin?.coll)}
@@ -200,11 +206,11 @@ export function liquityForkEventSlots(
   );
   const debtDeltaFig = () => (
     <Fig
-      info={b.debtDeltaProv(coords, { after: ctx.debtAfter, before: debtBefore }, ctx.origin?.debt)}
-      value={chainTruthDeltaValue(debtDelta, deltaLabeled)}
+      info={b.debtDeltaProv(coords, forkDebtMoveOps(ctx), ctx.origin?.debt)}
+      value={chainTruthDeltaValue(debtMove, deltaLabeled)}
       symbol={debt}
     >
-      {fmtAbs(ctx.debtDelta)} {debt}
+      {formatNumber(Math.abs(debtMove))} {debt}
     </Fig>
   );
 
@@ -271,6 +277,8 @@ export function liquityForkEventSlots(
         {fmtNum(accrued)} {debt}
       </Fig>
     ) : null;
+  const interestClause = (): ClauseInput =>
+    clause(<>{interestFig()} of interest accrued since the Trove was last touched is now part of its debt.</>);
 
   const red = ctx.redemption;
   const redFeeFig = () =>
@@ -307,7 +315,7 @@ export function liquityForkEventSlots(
       const rate = rateFig();
       const happened = (
         <>
-          Opened the Trove with {collDeltaFig()} of collateral, minting {debtDeltaFig()}
+          Opened the Trove with {collDeltaFig()} of collateral and borrowed {debtDeltaFig()}
           {rate ? (
             batched ? (
               <> at its batch manager&rsquo;s {rate} rate</>
@@ -325,14 +333,12 @@ export function liquityForkEventSlots(
       const feeNote = hasFee
         ? clause(
             <>
-              Of the debt minted, {feeFig()} is {fork.protocolName}&rsquo;s one-time borrowing fee — about a week of the
-              branch&rsquo;s average interest, added to what the Trove owes rather than paid out of pocket.
+              {fork.protocolName} added its one-time borrowing fee of {feeFig()} to the debt — about a week of the
+              branch&rsquo;s average interest, owed rather than paid out of pocket.
             </>,
           )
         : clause(
-            <>
-              The minted amount includes a one-time borrowing fee, about 7 days of the branch&rsquo;s average interest.
-            </>,
+            <>The debt also carries a one-time borrowing fee, about 7 days of the branch&rsquo;s average interest.</>,
           );
       const meansNow: ClauseInput[] = batched
         ? [
@@ -357,7 +363,7 @@ export function liquityForkEventSlots(
 
     case "adjustTrove": {
       const collMoved = Math.abs(collDelta) > COLL_EPS;
-      const debtMoved = Math.abs(debtDelta) > DEBT_EPS;
+      const debtMoved = Math.abs(debtMove) > DEBT_EPS;
       const collPhrase = collMoved ? (
         collDelta > 0 ? (
           <>added {collDeltaFig()} of collateral</>
@@ -366,7 +372,7 @@ export function liquityForkEventSlots(
         )
       ) : null;
       const debtPhrase = debtMoved ? (
-        debtDelta > 0 ? (
+        debtMove > 0 ? (
           <>drew {debtDeltaFig()} of new debt</>
         ) : (
           <>repaid {debtDeltaFig()} of debt</>
@@ -395,12 +401,12 @@ export function liquityForkEventSlots(
       );
       const meansNow: ClauseInput[] = [
         // A drawn-debt fee, as a figure where the decomposition carries one.
-        debtMoved && debtDelta > 0
+        debtMoved && debtMove > 0
           ? hasFee
             ? clause(
                 <>
-                  {feeFig()} of that is the one-time borrowing fee on the new debt — about a week of the branch&rsquo;s
-                  average interest.
+                  The new debt also carries a one-time borrowing fee of {feeFig()}, about a week of the branch&rsquo;s
+                  average interest, added to what the Trove owes.
                 </>,
               )
             : clause(
@@ -409,17 +415,9 @@ export function liquityForkEventSlots(
                 </>,
               )
           : null,
-        // The interest that built up while the Trove sat untouched. It is part
-        // of the debt move above, so the sentence says so — a reader comparing
-        // the delta to what they did needs to know the rest wasn't theirs.
-        accrued != null
-          ? clause(
-              <>
-                The debt figure also absorbed {interestFig()} of interest that accrued since this Trove was last touched
-                — carried, not charged at this moment.
-              </>,
-            )
-          : null,
+        // The interest that built up while the Trove sat untouched: its own
+        // figure, because the act's figure above leaves it out.
+        accrued != null ? interestClause() : null,
       ];
       return { happened: [clause(happened)], changed: [changed], meansNow };
     }
@@ -554,20 +552,24 @@ export function liquityForkEventSlots(
     }
 
     case "liquidate": {
+      // The minimum in force at this block: governance can have moved it since.
+      const mcrText = ctx.mcrAtEvent != null ? `${Math.round(ctx.mcrAtEvent * 1000) / 10}%` : null;
       const happened = (
         <>
-          The Trove&rsquo;s collateral ratio fell below the branch&rsquo;s minimum at the branch&rsquo;s own price, so
-          anyone could liquidate it: {collDeltaFig()} of collateral was seized and {debtDeltaFig()} of debt cleared.
+          The Trove&rsquo;s collateral ratio fell below the branch&rsquo;s minimum
+          {mcrText ? <> of {mcrText} at the time</> : null} at the branch&rsquo;s own price, so anyone could liquidate
+          it: {collDeltaFig()} of collateral was seized and {debtDeltaFig()} of debt cleared.
         </>
       );
-      const changed = clause(
-        <>{fork.protocolName} liquidates the whole Trove at once, so nothing remains on either side.</>,
-      );
-      // The disjunctive pool-or-redistribution rule is Layer-2 material (the
-      // pane cannot say which route THIS liquidation took) — the "?" modal
-      // (liquityForkLiquidationContent) carries it verbatim.
-      const meansNow: ClauseInput[] = [liquidationValued(ctx, coords, coll, debt, b)];
-      return { happened: [clause(happened)], changed: [changed], meansNow };
+      const changed: ClauseInput[] = [
+        clause(<>{fork.protocolName} liquidates the whole Trove at once, so nothing remains on either side.</>),
+        liquidationRoute(ctx, coords, debt, b),
+      ];
+      const meansNow: ClauseInput[] = [
+        liquidationValued(ctx, coords, coll, debt, b),
+        ...liquidationSurplus(ctx, coords, coll, b),
+      ];
+      return { happened: [clause(happened)], changed, meansNow };
     }
 
     case "redeemCollateral": {
@@ -599,22 +601,35 @@ export function liquityForkEventSlots(
               </>,
             )
           : null,
-        red != null
+        red != null && Math.abs(Math.abs(debtMove) - Number(red.actual)) <= DEBT_EPS
           ? clause(
               <>
-                This Trove was one slice of a {redActFig()} redemption against the {coll} branch
+                That was the whole of a {redActFig()} redemption against the {coll} branch
                 {Number(red.attempted) - Number(red.actual) > DEBT_EPS ? (
                   <>
                     {" "}
                     — {fmtNum(red.attempted)} {debt} was put up, and the branch could fill that much of it
                   </>
-                ) : (
-                  <>, which the branch filled in full</>
-                )}
-                . Redemptions sweep the lowest-rate Troves in order until the ask is met.
+                ) : null}
+                . Redemptions take from the lowest-rate Troves first, and this one covered it alone.
               </>,
             )
-          : null,
+          : red != null
+            ? clause(
+                <>
+                  This Trove was one slice of a {redActFig()} redemption against the {coll} branch
+                  {Number(red.attempted) - Number(red.actual) > DEBT_EPS ? (
+                    <>
+                      {" "}
+                      — {fmtNum(red.attempted)} {debt} was put up, and the branch could fill that much of it
+                    </>
+                  ) : (
+                    <>, which the branch filled in full</>
+                  )}
+                  . Redemptions sweep the lowest-rate Troves in order until the ask is met.
+                </>,
+              )
+            : null,
       ];
       if (!hasDebtAfter) {
         return {
@@ -624,6 +639,7 @@ export function liquityForkEventSlots(
               <>That cleared the Trove&rsquo;s debt entirely; it now holds only {collAfterFig()} of collateral.</>,
             ),
             ...redemptionContext,
+            accrued != null ? interestClause() : null,
           ],
           meansNow: [
             clause(
@@ -644,6 +660,7 @@ export function liquityForkEventSlots(
             </>,
           ),
           ...redemptionContext,
+          accrued != null ? interestClause() : null,
         ],
         meansNow: [
           clause(
@@ -675,6 +692,25 @@ export function liquityForkEventSlots(
   }
 }
 
+/** The seized collateral valued at the branch's price at the block, against
+ *  the cleared debt at $1 face. Shared by the premium, surplus and loss
+ *  sentences so they all compute from one pair. Null when the block is unpriced
+ *  or a leg does not resolve. */
+function liquidationValues(ctx: LiquityForkEventContext) {
+  const price = ctx.priceAtBlock?.usd;
+  const seizedAmt = Number(ctx.collBefore);
+  const cleared = forkLiquidationCleared(ctx);
+  if (
+    price == null ||
+    !Number.isFinite(seizedAmt) ||
+    seizedAmt <= 0 ||
+    !Number.isFinite(cleared.amount) ||
+    cleared.amount <= 0
+  )
+    return null;
+  return { price, seizedUsd: seizedAmt * price, clearedUsd: cleared.amount, cleared };
+}
+
 /** The liquidation valued sentence — the branch's own price at the block, the
  *  seized collateral and cleared debt at $1 face, and the premium (= the Trove's
  *  ratio at fire minus 100%). Echoes the card's forensics block; drops WHOLE
@@ -686,13 +722,9 @@ function liquidationValued(
   debt: string,
   b: LiquityForkExplainerProvs,
 ): ClauseInput {
-  const price = ctx.priceAtBlock?.usd;
-  const seizedAmt = Number(ctx.collBefore);
-  const clearedAmt = Number(ctx.debtBefore);
-  if (price == null || !Number.isFinite(seizedAmt) || seizedAmt <= 0 || !Number.isFinite(clearedAmt) || clearedAmt <= 0)
-    return null;
-  const seizedUsd = seizedAmt * price;
-  const clearedUsd = clearedAmt; // $1 redemption face
+  const v = liquidationValues(ctx);
+  if (!v) return null;
+  const { price, seizedUsd, clearedUsd, cleared } = v;
   const premium = seizedUsd / clearedUsd - 1;
   const premiumPct = `${premium >= 0 ? "+" : "−"}${(Math.abs(premium) * 100).toFixed(2)}%`;
   const priceFig = (
@@ -711,7 +743,10 @@ function liquidationValued(
   );
   const clearedFig = (
     <Fig
-      info={b.liqClearedFaceProv(coords, { amount: `${ctx.debtBefore} ${debt}` })}
+      info={b.liqClearedFaceProv(coords, {
+        amount: `${cleared.amountText} ${debt}`,
+        fromOperation: cleared.fromOperation,
+      })}
       value={formatUsdValue(clearedUsd)}
       symbol={debt}
     >
@@ -726,14 +761,116 @@ function liquidationValued(
       {premiumPct}
     </Fig>
   );
+  // Where the Liquidation log is carried, the surplus sentence says how much of
+  // the premium came back to the owner, so this one stops at the ratio.
   return clause(
     <>
       At the branch&rsquo;s own price at the time ({priceFig} per {coll}) the seized collateral was worth {seizedFig}{" "}
-      against {clearedFig} of debt counted at $1 face — a {premiumFig} premium. That premium is the Trove&rsquo;s
-      collateral ratio at fire minus 100%, the cushion the Stability Pool&rsquo;s depositors (or the surviving Troves)
-      realized for absorbing the debt.
+      against {clearedFig} of debt counted at $1 face — a {premiumFig} premium, the Trove&rsquo;s collateral ratio at
+      fire minus 100%
+      {ctx.liquidation
+        ? null
+        : ". It is the most the Stability Pool’s depositors (or the surviving Troves) could realize for absorbing the debt"}
+      .
     </>,
   );
+}
+
+/** Where the liquidated debt went: the Stability Pool, the branch's other
+ *  Troves, or both — the Liquidation log's legs, echoing the detail grid. Drops
+ *  where the read path carries no Liquidation log. */
+function liquidationRoute(
+  ctx: LiquityForkEventContext,
+  coords: LiquityForkCoords,
+  debt: string,
+  b: LiquityForkExplainerProvs,
+): ClauseInput {
+  const liq = ctx.liquidation;
+  if (!liq) return null;
+  const sp = Number(liq.debtOffsetBySP);
+  const redist = Number(liq.debtRedistributed);
+  const spFig = (
+    <Fig
+      info={b.liquidationLegProv(coords, { leg: "offset", amount: liq.debtOffsetBySP })}
+      value={fmtNum(liq.debtOffsetBySP)}
+    >
+      {fmtNum(liq.debtOffsetBySP)} {debt}
+    </Fig>
+  );
+  const redistFig = (
+    <Fig
+      info={b.liquidationLegProv(coords, { leg: "redistributed", amount: liq.debtRedistributed })}
+      value={fmtNum(liq.debtRedistributed)}
+    >
+      {fmtNum(liq.debtRedistributed)} {debt}
+    </Fig>
+  );
+  if (sp > 0 && redist > 0)
+    return clause(
+      <>
+        The Stability Pool absorbed {spFig} of the debt, taking the matching collateral; it could not cover the rest, so{" "}
+        {redistFig} was redistributed, with its collateral, to the branch&rsquo;s other Troves.
+      </>,
+    );
+  if (sp > 0) return clause(<>The Stability Pool absorbed all {spFig} of the debt, taking the matching collateral.</>);
+  if (redist > 0)
+    return clause(
+      <>
+        The Stability Pool held nothing to absorb it, so all {redistFig} of the debt was redistributed, with its
+        collateral, to the branch&rsquo;s other Troves.
+      </>,
+    );
+  return null;
+}
+
+/** The collateral surplus the owner can claim, and the owner's loss after it —
+ *  Liquity V2's forward path (lib/liquity/explainer-clauses.tsx, the
+ *  destructive liquidation's meansNow). The surplus figure echoes the detail
+ *  grid; its dollar value and the loss need the priced block. */
+function liquidationSurplus(
+  ctx: LiquityForkEventContext,
+  coords: LiquityForkCoords,
+  coll: string,
+  b: LiquityForkExplainerProvs,
+): ClauseInput[] {
+  const liq = ctx.liquidation;
+  if (!liq) return [];
+  const surplus = Number(liq.collSurplus);
+  const v = liquidationValues(ctx);
+  const out: ClauseInput[] = [];
+  if (surplus > 0) {
+    const surplusUsd = v ? surplus * v.price : null;
+    out.push(
+      clause(
+        <>
+          {
+            <Fig
+              info={b.liquidationLegProv(coords, { leg: "surplus", amount: liq.collSurplus })}
+              value={fmtNum(liq.collSurplus)}
+            >
+              {fmtNum(liq.collSurplus)} {coll}
+            </Fig>
+          }
+          {surplusUsd != null ? <> ({formatUsdValue(surplusUsd)} at that price)</> : null} of the collateral was left
+          after the debt and the liquidation penalty, and the contract credited it to the owner to claim from the
+          branch&rsquo;s CollSurplusPool.
+        </>,
+      ),
+    );
+  }
+  if (v) {
+    const equity = v.seizedUsd - v.clearedUsd;
+    const loss = equity - (surplus > 0 ? surplus * v.price : 0);
+    if (loss > 0)
+      out.push(
+        clause(
+          <>
+            {surplus > 0 ? "After that surplus, the" : "The"} owner&rsquo;s loss was about {formatUsdValue(loss)}.
+          </>,
+        ),
+      );
+  }
+  return out;
 }
 
 /** The teaser = the lead of the composed arc (the first sentence plus its

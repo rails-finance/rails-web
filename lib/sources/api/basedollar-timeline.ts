@@ -17,6 +17,7 @@ import type {
   OriginEnvelope,
   LiquityForkOperationFacts,
   LiquityForkRedemptionFacts,
+  LiquityForkLiquidationFacts,
 } from "@/lib/shared/types/event-shape";
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import { explorerUrl, BASE_CHAIN_ID } from "@/lib/shared/chains";
@@ -32,6 +33,8 @@ import {
   forkAdjustLabel,
   forkRateChangeLabel,
   FORK_DEBT_DUST,
+  forkDebtMoveRaw,
+  forkMcrAt,
 } from "@/lib/shared/liquity-fork-ops";
 
 export interface BasedollarTimelineResult {
@@ -102,6 +105,15 @@ export interface MvRow {
    *  captured row so far, so the transform reads ONE price and ignores this;
    *  declared so a future divergence is a visible column, not a silent one. */
   redemption_price_used?: string | null;
+  /** The branch's Liquidation log for this transaction — liquidate rows only,
+   *  and only where the transaction liquidated this one Trove on the branch.
+   *  NULL elsewhere; absent where the route does not join it (mig 336, Ebisu). */
+  liq_debt_offset_by_sp?: string | null;
+  liq_debt_redistributed?: string | null;
+  liq_coll_sent_to_sp?: string | null;
+  liq_coll_redistributed?: string | null;
+  liq_coll_surplus?: string | null;
+  liq_coll_gas_compensation?: string | null;
 }
 
 const LABELS: Record<BasedollarEventType, string> = {
@@ -208,6 +220,22 @@ function redemptionOf(r: MvRow, collDecimals: number): LiquityForkRedemptionFact
   };
 }
 
+/** The Liquidation log's legs → ctx shape. Undefined where the read path
+ *  carries none: a route without the join, a block the capture has not
+ *  reached, or a transaction that liquidated several Troves on the branch,
+ *  whose one log cannot be split between them. */
+function liquidationOf(r: MvRow, collDecimals: number): LiquityForkLiquidationFacts | undefined {
+  if (r.liq_coll_surplus == null) return undefined;
+  return {
+    debtOffsetBySP: fmtUnits(bigintOf(r.liq_debt_offset_by_sp ?? null), DEBT_DECIMALS),
+    debtRedistributed: fmtUnits(bigintOf(r.liq_debt_redistributed ?? null), DEBT_DECIMALS),
+    collSentToSP: fmtUnits(bigintOf(r.liq_coll_sent_to_sp ?? null), collDecimals),
+    collRedistributed: fmtUnits(bigintOf(r.liq_coll_redistributed ?? null), collDecimals),
+    collSurplus: fmtUnits(bigintOf(r.liq_coll_surplus), collDecimals),
+    collGasCompensation: fmtUnits(bigintOf(r.liq_coll_gas_compensation ?? null), collDecimals),
+  };
+}
+
 /** The price the branch acted at, preferring the figure the protocol EMITTED.
  *
  *  A Redemption log carries `_price` in the same event as the act, so on a
@@ -287,6 +315,9 @@ export function buildBasedollarTimeline(
       // path doesn't carry them, which is what the other two forks see today.
       operation: operationOf(r, debtDelta, r.is_batched, collDec),
       redemption: kind === "redeemCollateral" ? redemptionOf(r, collDec) : undefined,
+      ...(kind === "liquidate"
+        ? { mcrAtEvent: forkMcrAt(branch, { block }), liquidation: liquidationOf(r, collDec) }
+        : {}),
       // Mirrors mig 068's two arms. Batched rows: coll comes off the trove's
       // own BatchedTroveUpdated, the rate off the batch's BatchUpdated, and
       // the debt is shares/total × batch debt — derived, so NO envelope.
@@ -326,8 +357,13 @@ export function buildBasedollarTimeline(
     // debt delta below the 0.01 display epsilon. Labelling these "Adjust Trove"
     // would claim a change that never happened; a distinct actionType gives the
     // filter its own (demoted) bucket.
-    const absDebtDelta = debtDelta < ZERO ? -debtDelta : debtDelta;
-    const isNoChange = kind === "adjustTrove" && collDelta === ZERO && absDebtDelta < FORK_DEBT_DUST;
+    // The debt the act moved (TroveOperation), not the net change: accrued
+    // interest alone must not make an add-collateral read as a borrow, nor a
+    // collateral-free touch as anything but "No change". The summary route's
+    // actionColumn keys on the same figure.
+    const debtMove = forkDebtMoveRaw(debtDelta, r.debt_change_from_operation);
+    const absDebtMove = debtMove < ZERO ? -debtMove : debtMove;
+    const isNoChange = kind === "adjustTrove" && collDelta === ZERO && absDebtMove < FORK_DEBT_DUST;
 
     // Derive the verb where the event type underdetermines it (mirrors
     // fx-timeline). AFTER the isNoChange check — a run's summed dust can exceed
@@ -338,7 +374,7 @@ export function buildBasedollarTimeline(
     const actionLabel = isNoChange
       ? "No change"
       : kind === "adjustTrove"
-        ? (forkAdjustLabel(classifyTroveAdjust({ collDelta, debtDelta })) ?? LABELS[kind])
+        ? (forkAdjustLabel(classifyTroveAdjust({ collDelta, debtDelta: debtMove })) ?? LABELS[kind])
         : kind === "adjustTroveInterestRate"
           ? forkRateChangeLabel(rateBefore, ctx.interestRate, r.is_batched)
           : (LABELS[kind] ?? kind);
@@ -349,8 +385,8 @@ export function buildBasedollarTimeline(
     const flows: AssetFlow[] = [];
     if (collDelta !== ZERO)
       flows.push(flowFor(branch.collateralAddr, branch.symbol, collDec, collDelta, collDelta > ZERO ? "out" : "in"));
-    if (debtDelta !== ZERO)
-      flows.push(flowFor(DEBT_ADDRESS, DEBT_SYMBOL, DEBT_DECIMALS, debtDelta, debtDelta > ZERO ? "in" : "out"));
+    if (debtMove !== ZERO)
+      flows.push(flowFor(DEBT_ADDRESS, DEBT_SYMBOL, DEBT_DECIMALS, debtMove, debtMove > ZERO ? "in" : "out"));
 
     return {
       id: `${tx}-${r.log_index}`,

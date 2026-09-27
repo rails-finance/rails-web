@@ -14,6 +14,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { RedemptionRunCard } from "@/components/shared/redemption-run-card";
 import { renderRunFolders } from "@/lib/shared/run-folders";
+import { forkDebtMove } from "@/lib/shared/liquity-fork-ops";
 
 /** Runs shorter than this stay as individual cards (the V2 trove threshold). */
 export const MIN_REDEMPTION_RUN = 4;
@@ -25,6 +26,7 @@ interface ForkRunContext {
   collDelta: string;
   debtDelta: string;
   collateralSymbol: string;
+  operation?: { debtFromOperation: string };
 }
 
 type ForkRunEvent = BaseActivityEvent & { context: { data: ForkRunContext } };
@@ -45,8 +47,9 @@ export function liquityForkTimelineRuns<E extends ForkRunEvent>(opts: {
       min: MIN_REDEMPTION_RUN,
       render: (run, meta) =>
         renderRunFolders(run, meta, MIN_REDEMPTION_RUN, (events, folder) => {
-          // Each member's delta is after − before over the emitted absolutes;
-          // the folder carries the summed magnitudes. A trove page is one
+          // Collateral is after − before over the emitted absolutes; debt is
+          // what each redemption cancelled (TroveOperation), which leaves out
+          // the interest accrued between touches. The folder sums magnitudes. A trove page is one
           // branch, so the collateral symbol is constant across the run.
           let totalColl = 0;
           let totalDebt = 0;
@@ -54,7 +57,7 @@ export function liquityForkTimelineRuns<E extends ForkRunEvent>(opts: {
           for (const e of events) {
             if (!is(e)) continue;
             totalColl += Math.abs(Number(e.context.data.collDelta) || 0);
-            totalDebt += Math.abs(Number(e.context.data.debtDelta) || 0);
+            totalDebt += Math.abs(forkDebtMove(e.context.data).value);
             collSym = e.context.data.collateralSymbol;
           }
           return (

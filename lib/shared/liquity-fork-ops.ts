@@ -11,6 +11,8 @@
 // TROVE_DELTA_EPSILON exists only because its numbers are already floats). This
 // is the fork analogue of lib/liquity/trove-ops.ts, over raw units.
 
+import type { DeltaOps } from "@/lib/shared/liquity-fork-provenance";
+
 const ZERO = BigInt(0);
 
 /** The display epsilon below which a DEBT delta reads as "no movement" — 0.01
@@ -19,6 +21,45 @@ const ZERO = BigInt(0);
  *  and this classifier share ONE epsilon. Both forks mint an 18-decimal debt
  *  token, so the scale is fixed here. */
 export const FORK_DEBT_DUST = BigInt(10) ** BigInt(16);
+
+/** The debt THIS event's act moved, as the contract logged it. A Trove's debt
+ *  changes between two events for four reasons: the act itself (a borrow, a
+ *  repayment, the amount a redemption cancelled or a liquidation cleared), the
+ *  upfront fee, debt redistributed from a liquidated neighbour, and the interest
+ *  accrued since the last touch. TroveOperation logs the act as
+ *  `_debtChangeFromOperation`, so that is the amount redeemed, repaid or
+ *  borrowed. `debtAfter − debtBefore` carries the other three as well: an
+ *  add-collateral adjust would read as a borrow of its accrued interest, and a
+ *  redemption would read short by the same amount. Liquity V2's own cards key
+ *  on the same field (lib/liquity/trove-ops.ts, `debtChangeFromOperation`).
+ *
+ *  Server-side transforms pass the raw columns (bigint); the client passes the
+ *  context's human strings. Where the read path carries no operation row, the
+ *  net change is the only figure there is, and it stands. */
+export function forkDebtMoveRaw(debtDelta: bigint, debtChangeFromOperation: string | null | undefined): bigint {
+  if (debtChangeFromOperation == null || debtChangeFromOperation === "") return debtDelta;
+  try {
+    return BigInt(debtChangeFromOperation.split(".")[0]);
+  } catch {
+    return debtDelta;
+  }
+}
+
+/** The client twin of forkDebtMoveRaw over a fork event context: the signed
+ *  debt the act moved, and whether it came from the operation log. */
+export function forkDebtMove(ctx: { debtDelta: string; operation?: { debtFromOperation: string } }): {
+  value: number;
+  fromOperation: boolean;
+} {
+  const op = ctx.operation?.debtFromOperation;
+  const n = op != null ? Number(op) : NaN;
+  if (Number.isFinite(n)) return { value: n, fromOperation: true };
+  return { value: Number(ctx.debtDelta) || 0, fromOperation: false };
+}
+
+/** The display floor below which the act's debt move reads as nothing — the
+ *  float twin of FORK_DEBT_DUST. */
+export const FORK_DEBT_DUST_FLOAT = 0.01;
 
 /** The direction each axis of a trove adjustment moved, or null when it didn't.
  *  "add"/"withdraw" is collateral in/out; "borrow"/"repay" is debt drawn/repaid. */
@@ -105,4 +146,49 @@ export function forkRateChangeLabel(
     return a > b ? "Increase interest rate" : "Decrease interest rate";
   }
   return "Adjust interest rate";
+}
+
+/** The receipt operands for the act's debt figure — the shape debtDeltaProv
+ *  takes. With an operation row it names TroveOperation's field (and, on a
+ *  redemption, the contract that emitted it); without one it traces the net
+ *  change over the two emitted balances, as before. */
+export function forkDebtMoveOps(ctx: {
+  eventType: string;
+  debtDelta: string;
+  debtAfter?: string;
+  operation?: { debtFromOperation: string };
+}): DeltaOps {
+  const m = forkDebtMove(ctx);
+  const net = Number(ctx.debtDelta) || 0;
+  return {
+    after: ctx.debtAfter,
+    before: ctx.debtAfter != null ? Number(ctx.debtAfter) - net : null,
+    ...(m.fromOperation
+      ? { fromOperation: ctx.operation!.debtFromOperation, redemption: ctx.eventType === "redeemCollateral" }
+      : {}),
+  };
+}
+
+/** One governance-set minimum collateral ratio that has since been replaced:
+ *  in force below `untilBlock` (and before `untilTimestamp`, the same block's
+ *  time, for callers that hold a time and no block). */
+export interface ForkMcrStep {
+  mcr: number;
+  untilBlock: number;
+  untilTimestamp: number;
+}
+
+/** The branch's minimum collateral ratio in force at a block (or a time). A
+ *  fork whose governance can move the minimum lists the earlier values as
+ *  `mcrBefore`; a past liquidation is judged against the one it crossed, not
+ *  today's. With no point in time given, today's. */
+export function forkMcrAt(
+  branch: { mcr: number; mcrBefore?: readonly ForkMcrStep[] },
+  at: { block?: number | null; timestamp?: number | null },
+): number {
+  for (const step of branch.mcrBefore ?? []) {
+    if (at.block != null ? at.block < step.untilBlock : at.timestamp != null && at.timestamp < step.untilTimestamp)
+      return step.mcr;
+  }
+  return branch.mcr;
 }

@@ -30,6 +30,7 @@ export const {
   liqSeizedUsdProv,
   liqClearedFaceProv,
   liqPremiumProv,
+  liquidationLegProv,
   positionCollateralProv,
   positionDebtProv,
   positionRateProv,

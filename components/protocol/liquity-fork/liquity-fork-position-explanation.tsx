@@ -17,6 +17,9 @@
 
 import { formatNumber, formatCompact } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
+// The position card's own formatter for this figure, so a $1.18 line reads
+// $1.18 in both places.
+import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import { FORK_DEBT_SYMBOL } from "@/lib/shared/liquity-fork-live-provenance";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -210,8 +213,8 @@ export function LiquityForkPositionExplanation({
     if (dropPct != null && chain.liqPriceUsd != null) {
       bullets.push(
         <span key="drop">
-          {chain.symbol} can fall about <H>{dropPct}%</H> (to <H>{formatUsd(chain.liqPriceUsd)}</H>) before liquidation
-          begins.
+          {chain.symbol} can fall about <H>{dropPct}%</H> (to <H>{formatLiquidationPrice(chain.liqPriceUsd)}</H>) before
+          liquidation begins.
         </span>,
       );
     }

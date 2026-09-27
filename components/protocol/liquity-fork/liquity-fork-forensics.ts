@@ -11,23 +11,86 @@
 // the branch's Stability Pool (or the redistributed troves) realized.
 // Undefined until the block is priced; the card stays token-only meanwhile.
 
-import type { EbisuContext, AsymmetryContext } from "@/lib/shared/types/event-shape";
+import type { EbisuContext, AsymmetryContext, BasedollarContext } from "@/lib/shared/types/event-shape";
 import type { LiquityForkCoords, LiquityForkForensicsVocab } from "@/lib/shared/liquity-fork-provenance";
 import type { LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
-import { formatUsdValue } from "@/lib/utils/format";
+import type { ChainTruthStat } from "@/components/shared/chain-truth-event";
+import type { Provenance } from "@/components/shared/provenance";
+import { forkDebtMove } from "@/lib/shared/liquity-fork-ops";
+import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 
-/** Either fork's context — structural twins for this purpose. */
-export type LiquityForkForensicsContext = EbisuContext | AsymmetryContext;
+/** Any fork's context — structural twins for this purpose. */
+export type LiquityForkForensicsContext = EbisuContext | AsymmetryContext | BasedollarContext;
+
+/** The debt a liquidation cleared: the liquidation's own TroveOperation figure
+ *  (the whole debt, interest since the previous change included) where the read
+ *  path carries it, else the debt logged at the previous change. */
+export function forkLiquidationCleared(ctx: LiquityForkForensicsContext): {
+  amount: number;
+  amountText: string;
+  fromOperation: boolean;
+} {
+  const move = forkDebtMove(ctx);
+  if (move.fromOperation && Math.abs(move.value) > 0) {
+    const abs = Math.abs(move.value);
+    return { amount: abs, amountText: ctx.operation!.debtFromOperation.replace(/^-/, ""), fromOperation: true };
+  }
+  return { amount: Number(ctx.debtBefore), amountText: ctx.debtBefore, fromOperation: false };
+}
+
+type LegProv = (
+  coords: LiquityForkCoords,
+  vals: { leg: "offset" | "redistributed" | "surplus"; amount: string },
+) => Provenance;
+
+/** The Liquidation log's legs as detail-grid stats — where the debt went (the
+ *  Stability Pool, the other Troves) and the collateral surplus left for the
+ *  owner. These are the receipts the liquidation prose echoes; values are
+ *  formatted with the same formatNumber the prose uses. Empty where the read
+ *  path carries no Liquidation log for the event. */
+export function forkLiquidationStats(
+  ctx: LiquityForkForensicsContext,
+  coords: LiquityForkCoords,
+  liquidationLegProv: LegProv,
+  debtSymbol: string,
+): ChainTruthStat[] {
+  const liq = ctx.liquidation;
+  if (ctx.eventType !== "liquidate" || !liq) return [];
+  const stats: ChainTruthStat[] = [];
+  if (Number(liq.debtOffsetBySP) > 0)
+    stats.push({
+      label: "Stability Pool absorbed",
+      value: formatNumber(Number(liq.debtOffsetBySP)),
+      symbol: debtSymbol,
+      prov: liquidationLegProv(coords, { leg: "offset", amount: liq.debtOffsetBySP }),
+    });
+  if (Number(liq.debtRedistributed) > 0)
+    stats.push({
+      label: "Redistributed",
+      value: formatNumber(Number(liq.debtRedistributed)),
+      symbol: debtSymbol,
+      prov: liquidationLegProv(coords, { leg: "redistributed", amount: liq.debtRedistributed }),
+    });
+  if (Number(liq.collSurplus) > 0)
+    stats.push({
+      label: "Surplus for the owner",
+      value: formatNumber(Number(liq.collSurplus)),
+      symbol: ctx.collateralSymbol,
+      prov: liquidationLegProv(coords, { leg: "surplus", amount: liq.collSurplus }),
+    });
+  return stats;
+}
 
 export function buildForkLiquidationForensics(
   ctx: LiquityForkForensicsContext,
   coords: LiquityForkCoords,
   vocab: LiquityForkForensicsVocab,
-  opts: { stablecoin: string; mcrPct?: number },
+  opts: { stablecoin: string },
 ): LiquidationForensicsProps | undefined {
   const price = ctx.priceAtBlock;
   const seizedAmt = Number(ctx.collBefore);
-  const clearedAmt = Number(ctx.debtBefore);
+  const cleared = forkLiquidationCleared(ctx);
+  const clearedAmt = cleared.amount;
   if (!price || !Number.isFinite(seizedAmt) || !Number.isFinite(clearedAmt) || seizedAmt <= 0 || clearedAmt <= 0)
     return undefined;
   const coll = ctx.collateralSymbol;
@@ -42,13 +105,17 @@ export function buildForkLiquidationForensics(
     cleared: {
       symbol: opts.stablecoin,
       usd: clearedUsd,
-      usdProv: vocab.liqClearedFaceProv(coords, { amount: `${ctx.debtBefore} ${opts.stablecoin}` }),
+      usdProv: vocab.liqClearedFaceProv(coords, {
+        amount: `${cleared.amountText} ${opts.stablecoin}`,
+        fromOperation: cleared.fromOperation,
+      }),
     },
     premium: seizedUsd / clearedUsd - 1,
     premiumProv: vocab.liqPremiumProv(coords, {
       seizedUsd: formatUsdValue(seizedUsd),
       clearedUsd: formatUsdValue(clearedUsd),
-      mcrPct: opts.mcrPct,
+      // The minimum in force at this block — governance can move it since.
+      mcrPct: ctx.mcrAtEvent != null ? Math.round(ctx.mcrAtEvent * 1000) / 10 : undefined,
     }),
     pricePills: [
       {

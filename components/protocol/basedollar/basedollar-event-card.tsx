@@ -6,6 +6,7 @@
 // (branch collateral + BD debt); a liquidation shows the critical warning
 // spine, a redemption the caution one.
 
+import { forkDebtMove, forkDebtMoveOps, FORK_DEBT_DUST_FLOAT } from "@/lib/shared/liquity-fork-ops";
 import type { BaseActivityEvent, BasedollarContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
@@ -36,6 +37,7 @@ import {
   liqSeizedUsdProv,
   liqClearedFaceProv,
   liqPremiumProv,
+  liquidationLegProv,
   type BasedollarCoords,
 } from "@/lib/basedollar/event-provenance";
 import { DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
@@ -64,6 +66,7 @@ const BASEDOLLAR_EXPLAINER_PROVS = {
   liqSeizedUsdProv,
   liqClearedFaceProv,
   liqPremiumProv,
+  liquidationLegProv,
 };
 
 export interface BasedollarEventCardProps {
@@ -86,7 +89,8 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
   const isNoChange = event.actionType === "adjustTrove_noChange";
 
   const collDelta = Number(ctx.collDelta) || 0;
-  const debtDelta = Number(ctx.debtDelta) || 0;
+  // The debt the act moved (TroveOperation), the figure the header states.
+  const debtDelta = forkDebtMove(ctx).value;
 
   // The spine flanking value re-renders the header's change figure, so it
   // echoes into that receipt (LiquityForkEventHeader): open/adjust register a
@@ -113,18 +117,14 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
           symbol: ctx.collateralSymbol,
         }
       : undefined;
-  const debtProv: SpineValProv | undefined =
-    debtDelta !== 0
-      ? {
-          info: debtDeltaProv(
-            coords,
-            { after: ctx.debtAfter, before: ctx.debtAfter != null ? Number(ctx.debtAfter) - debtDelta : null },
-            ctx.origin?.debt,
-          ),
-          value: chainTruthDeltaValue(debtDelta, labeled),
-          symbol: DEBT_SYMBOL,
-        }
-      : undefined;
+  const debtMoved = Math.abs(debtDelta) >= FORK_DEBT_DUST_FLOAT;
+  const debtProv: SpineValProv | undefined = debtMoved
+    ? {
+        info: debtDeltaProv(coords, forkDebtMoveOps(ctx), ctx.origin?.debt),
+        value: chainTruthDeltaValue(debtDelta, labeled),
+        symbol: DEBT_SYMBOL,
+      }
+    : undefined;
 
   // direction "right" = token moves toward the protocol (collateral deposit / debt
   // repay), "left" = toward the wallet (collateral withdraw / debt draw).
@@ -148,7 +148,7 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
                 prov: collProv,
               }
             : null,
-          debtDelta !== 0
+          debtMoved
             ? {
                 symbol: DEBT_SYMBOL,
                 address: soleFlowAddress(event.flows, DEBT_SYMBOL),

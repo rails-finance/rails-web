@@ -37,7 +37,7 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
       details: [
         {
           bold: "Liquidation threshold",
-          text: `each ${name} branch sets its own minimum collateral ratio, checked against the branch's own oracle price. Anyone can trigger the liquidation once a Trove falls below it.`,
+          text: `each ${name} branch sets its own minimum collateral ratio, checked against the branch's own oracle price. Anyone can trigger the liquidation once a Trove falls below it. The minimum named above is the one in force when this Trove was liquidated.`,
         },
         {
           bold: "Trove NFT",

@@ -2627,6 +2627,7 @@ export function liquityForkLiquidationContent(p: LiquityForkLearnMoreParams): Le
     steps: [
       "Liquidation closes the whole Trove — collateral is seized, debt cleared.",
       "Stability Pool depositors buy the collateral at a discount; redistributed portions land on other Troves as pending gains (collateral AND debt), settled on their next touch.",
+      "The Stability Pool and the other Troves take collateral worth at most the debt plus the branch's liquidation penalty. Any collateral above that is the owner's surplus, credited to them in the branch's CollSurplusPool to claim.",
       "Each branch sets its own minimum ratio, so the same price move can liquidate one branch's Troves and not another's.",
     ],
     links: forkLinks(p),
