@@ -55,12 +55,15 @@ import {
   type AlchemixCustodyPath,
 } from "@/lib/alchemix/explainer-clauses";
 import {
+  closeFromReadingProv,
   collateralTakenFromReadingsProv,
   debtClearedFromReadingsProv,
   emittedAmountProv,
   resolvedAtCaptureProv,
+  selfLiquidationRestProv,
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
+import { selfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
 import { collateralTakenRaw, useReadingBefore, type AlchemixReading } from "@/lib/alchemix/readings-before";
 
 const WAD = 1e18;
@@ -181,15 +184,41 @@ function legSpec(
       spec = { ...spec, labelOnSpine: true };
       break;
     }
-    case "self_liquidated":
+    case "self_liquidated": {
       // The holder's own close: a plain holder-action label, no caution pill.
-      // No spine row carries the number, so the header does.
-      deltas.push({
-        ...shares("amount_liquidated", scaled(raw.amount_liquidated), "Paid the debt"),
-        noSpineCounterpart: true,
-      });
+      // No spine row carries the number, so the header does. The log's amount
+      // repeats the set-aside shares the force repay beside it states, so the
+      // card draws the rest; the collateral swept back has no log and is
+      // measured from the reading before (lib/alchemix/self-liquidation.ts).
+      const split = selfLiquidationSplit(leg, siblings, before);
+      if (split && split.setAsideRaw > BigInt(0)) {
+        deltas.push({
+          value: Number(split.restRaw) / WAD,
+          symbol: mytSymbol,
+          label: "Paid the rest",
+          axisVerb: true,
+          noSpineCounterpart: true,
+          prov: selfLiquidationRestProv(mytSymbol, split.restRaw.toString(), coords),
+        });
+      } else {
+        deltas.push({
+          ...shares("amount_liquidated", scaled(raw.amount_liquidated), "Paid the debt"),
+          noSpineCounterpart: true,
+        });
+      }
+      if (split?.returnedRaw != null && split.returnedRaw > BigInt(0) && split.beforeBlock != null) {
+        deltas.push({
+          value: Number(split.returnedRaw) / WAD,
+          symbol: mytSymbol,
+          label: "Returned",
+          axisVerb: true,
+          noSpineCounterpart: true,
+          prov: closeFromReadingProv("returned", mytSymbol, split.returnedRaw.toString(), split.beforeBlock, coords),
+        });
+      }
       spec = { ...spec, label: SELF_LIQUIDATION_LABEL };
       break;
+    }
     case "liquidated":
       // The chip names the LIQUIDATOR, which is a role, not a verdict about
       // agency: a liquidation is somebody else's act by definition, and the

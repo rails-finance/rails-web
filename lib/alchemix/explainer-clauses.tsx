@@ -46,11 +46,14 @@ import type {
   AlchemixV3Context,
   BaseActivityEvent,
 } from "@/lib/shared/types/event-shape";
-import { clause, cont, type ClauseInput } from "@/lib/shared/explainer-prose";
+import type { ReactNode } from "react";
+import { clause, cont, H, type ClauseInput } from "@/lib/shared/explainer-prose";
 import { shortAddr } from "@/lib/shared/format-event";
-import { formatNumber } from "@/lib/utils/format";
+import { formatCompact, formatNumber } from "@/lib/utils/format";
 import type { RedemptionNet } from "@/lib/alchemix/redemption-net";
 import { isLineRouter } from "@/lib/alchemix/lines";
+import type { AlchemixReading } from "@/lib/alchemix/readings-before";
+import { selfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
 
 // The synthetic and every MYT carry 18 decimals on every line, so every figure
 // an Alchemist log emits in one of those two is scaled here (see the note on
@@ -75,6 +78,21 @@ const underlying = (raw: string | null | undefined, decimals: number | null | un
   const n = Number(raw.split(".")[0]);
   if (!Number.isFinite(n)) return null;
   return formatNumber(n / 10 ** decimals);
+};
+
+/** A figure the card's T1 row or T2 grid also shows, in the grid's format and
+ *  the foreground tone (rails-ops standards/detail-page-anatomy.md, "Colour
+ *  points back to T2"). A figure stated only in the bullets goes through
+ *  `amount` and stays muted. */
+const shown = (raw: string | null | undefined, unit: string): ReactNode => {
+  if (raw == null) return null;
+  const n = Number(raw.split(".")[0]);
+  if (!Number.isFinite(n)) return null;
+  return (
+    <H>
+      {formatCompact(n / WAD)} {unit}
+    </H>
+  );
 };
 
 const who = (addr: string | null | undefined): string => (addr ? shortAddr(addr) : "an address the log does not name");
@@ -224,6 +242,9 @@ export interface AlchemixClauseOptions {
   /** This leg is a hop of a custody ROUND TRIP, which the card narrates once
    *  (`alchemixCustodyRoundTripClause`) rather than once per hop. */
   skipCustody?: boolean;
+  /** The reading before this card's block (lib/alchemix/readings-before), which
+   *  a close's returned collateral is measured from. */
+  readingBefore?: AlchemixReading | null;
   /** The decimals of the asset under this line's MYT, from the position's own
    *  row — 6 on the USDC lines, 18 on the WETH one. The events do not carry it
    *  and it is not guessed from the line key. Null leaves the two fees that are
@@ -258,13 +279,7 @@ export function alchemixEventClauses(
 
   switch (ctx.eventType) {
     case "deposit":
-      out.push(
-        clause(
-          <>
-            The position took in {amount(raw.amount)} {myt} as collateral.
-          </>,
-        ),
-      );
+      out.push(clause(<>The position took in {shown(raw.amount, myt)} as collateral.</>));
       // The cross-reference back to the narrator, so two SEPARATE cards read as
       // one act without either of them losing its own receipt. On one card the
       // mint is a bullet away and the sentence says nothing.
@@ -274,23 +289,13 @@ export function alchemixEventClauses(
       break;
 
     case "withdraw":
-      out.push(
-        clause(
-          <>
-            {amount(raw.amount)} {myt} of collateral left the position.
-          </>,
-        ),
-      );
+      out.push(clause(<>{shown(raw.amount, myt)} of collateral left the position.</>));
       out.push(cont(<> They went to {whoOn(ctx, raw.recipient)}.</>));
       break;
 
     case "mint":
       out.push(
-        clause(
-          <>
-            The position minted {amount(raw.amount)} {sym} against its collateral, adding that much to its debt.
-          </>,
-        ),
+        clause(<>The position minted {shown(raw.amount, sym)} against its collateral, adding that much to its debt.</>),
       );
       out.push(
         cont(
@@ -306,8 +311,7 @@ export function alchemixEventClauses(
       out.push(
         clause(
           <>
-            {who(raw.sender)} burned {amount(raw.amount)} {sym} against this position, taking its debt down by that
-            much.
+            {who(raw.sender)} burned {shown(raw.amount, sym)} against this position, taking its debt down by that much.
           </>,
         ),
       );
@@ -318,7 +322,7 @@ export function alchemixEventClauses(
       out.push(
         clause(
           <>
-            {who(raw.sender)} repaid this position&rsquo;s debt with {amount(raw.amount)} {myt}.
+            {who(raw.sender)} repaid this position&rsquo;s debt with {shown(raw.amount, myt)}.
           </>,
         ),
       );
@@ -327,7 +331,7 @@ export function alchemixEventClauses(
           cont(
             <>
               {" "}
-              That cleared {amount(credit)} {sym}: each share counts at its value in the asset underneath at this block,
+              That cleared {shown(credit, sym)}: each share counts at its value in the asset underneath at this block,
               one {sym} per unit, up to whichever is smaller, the position&rsquo;s debt or the line&rsquo;s.
             </>,
           ),
@@ -338,13 +342,13 @@ export function alchemixEventClauses(
           clause(
             protocolFeeBps != null ? (
               <>
-                A protocol fee of {amount(ctx.resolvedAtCapture.collateralFee)} {myt} left the collateral for
+                A protocol fee of {shown(ctx.resolvedAtCapture.collateralFee, myt)} left the collateral for
                 Alchemix&rsquo;s fee receiver: {(protocolFeeBps / 100).toLocaleString("en-US")}% of the shares that paid
                 off debt set aside for repayment.
               </>
             ) : (
               <>
-                A protocol fee of {amount(ctx.resolvedAtCapture.collateralFee)} {myt} left the collateral for
+                A protocol fee of {shown(ctx.resolvedAtCapture.collateralFee, myt)} left the collateral for
                 Alchemix&rsquo;s fee receiver, charged on the shares that paid off debt set aside for repayment.
               </>
             ),
@@ -354,42 +358,81 @@ export function alchemixEventClauses(
       break;
     }
 
-    case "force_repay":
+    case "force_repay": {
+      const inClose = siblings.some((e) => e.txHash === self?.txHash && e.context.data.eventType === "self_liquidated");
       out.push(
         clause(
           <>
-            {amount(raw.credit_to_yield)} {myt} of collateral paid off this position&rsquo;s debt set aside for
-            repayment.
+            {shown(raw.credit_to_yield, myt)} of collateral paid off this position&rsquo;s debt set aside for repayment
+            {inClose ? ", the first step of closing it" : ""}.
           </>,
         ),
       );
-      out.push(
-        cont(
-          <>
-            {" "}
-            A further {amount(raw.protocol_fee_total)} {myt} went to Alchemix as its fee, so the collateral fell by
-            both.
-          </>,
-        ),
-      );
+      if (raw.protocol_fee_total && raw.protocol_fee_total !== "0") {
+        out.push(
+          clause(
+            <>
+              Alchemix took a protocol fee of {shown(raw.protocol_fee_total, myt)} from the collateral
+              {protocolFeeBps != null ? (
+                <>, {(protocolFeeBps / 100).toLocaleString("en-US")}% of those shares,</>
+              ) : null}{" "}
+              and paid it to its fee receiver.
+            </>,
+          ),
+        );
+      }
       break;
+    }
 
-    case "self_liquidated":
+    case "self_liquidated": {
+      const split = self ? selfLiquidationSplit(self, siblings, opts.readingBefore ?? null) : null;
+      const rest = split && split.setAsideRaw > BigInt(0) ? split.restRaw.toString() : null;
       out.push(
         clause(
-          <>
-            The holder chose to close out the position: {amount(raw.amount_liquidated)} {myt} of its collateral paid off
-            its debt.
-          </>,
+          rest != null ? (
+            <>
+              The holder chose to close the position: {shown(rest, myt)} of its collateral paid off the rest of its
+              debt.
+            </>
+          ) : (
+            <>
+              The holder chose to close the position: {shown(raw.amount_liquidated, myt)} of its collateral paid off its
+              debt.
+            </>
+          ),
+        ),
+      );
+      if (split?.returnedRaw != null && split.returnedRaw > BigInt(0)) {
+        out.push(
+          clause(
+            <>
+              The remaining {shown(split.returnedRaw.toString(), myt)} of collateral went back to an address the holder
+              chose. No event states it: it is the collateral read before the close, less the shares that paid debt and
+              the fee.
+            </>,
+          ),
+        );
+      }
+      out.push(
+        clause(
+          split && split.feeRaw > BigInt(0) ? (
+            <>That protocol fee is the only charge for closing this way: a close with collateral pays no liquidator.</>
+          ) : (
+            <>
+              No fee was charged: the protocol fee applies only to debt set aside for repayment, and a close with
+              collateral pays no liquidator.
+            </>
+          ),
         ),
       );
       break;
+    }
 
     case "liquidated":
       out.push(
         clause(
           <>
-            {who(raw.liquidator)} liquidated this position, taking {amount(raw.amount)} {myt} from it.
+            {who(raw.liquidator)} liquidated this position, taking {shown(raw.amount, myt)} from it.
           </>,
         ),
       );
@@ -405,7 +448,7 @@ export function alchemixEventClauses(
             inShares ? (
               <>
                 {" "}
-                The liquidator was paid {amount(raw.fee_in_yield)} {myt} of it, taken from this position&rsquo;s
+                The liquidator was paid {shown(raw.fee_in_yield, myt)} of it, taken from this position&rsquo;s
                 collateral.
               </>
             ) : inVault ? (
@@ -437,12 +480,12 @@ export function alchemixEventClauses(
         clause(
           fee != null ? (
             <>
-              A repayment fee went to {who(raw.fee_receiver)}: {amount(raw.fee_in_yield)} {myt} and {fee} of the asset
+              A repayment fee went to {who(raw.fee_receiver)}: {shown(raw.fee_in_yield, myt)} and {fee} of the asset
               underneath.
             </>
           ) : (
             <>
-              A repayment fee went to {who(raw.fee_receiver)}: {amount(raw.fee_in_yield)} {myt}, and an amount of the
+              A repayment fee went to {who(raw.fee_receiver)}: {shown(raw.fee_in_yield, myt)}, and an amount of the
               asset underneath with no figure here, because its decimals come from a reading of this position and none
               has been taken.
             </>
@@ -565,7 +608,7 @@ export function alchemixEventClauses(
       out.push(
         clause(
           <>
-            The line&rsquo;s Transmuter redeemed {amount(raw.amount)} {sym} across every open position at once, when a
+            The line&rsquo;s Transmuter redeemed {shown(raw.amount, sym)} across every open position at once, when a
             staker claimed a matured deposit; nobody holding this position acted.
           </>,
         ),
@@ -588,9 +631,9 @@ export function alchemixEventClauses(
           out.push(
             clause(
               <>
-                Here it cleared {amount(cleared.amountRaw)} {sym} of debt set aside for repayment and took{" "}
-                {amount(collateralTakenRaw)} {myt} of collateral, measured from this position&rsquo;s readings either
-                side of it.
+                Here it cleared {shown(cleared.amountRaw, sym)} of debt set aside for repayment and took{" "}
+                {shown(collateralTakenRaw, myt)} of collateral, measured from this position&rsquo;s readings either side
+                of it.
               </>,
             ),
           );
@@ -601,7 +644,7 @@ export function alchemixEventClauses(
             clause(
               fee ? (
                 <>
-                  {amount(fee.sharesRaw)} {myt} of those are the line&rsquo;s {pct} redemption fee, which the Alchemist
+                  {shown(fee.sharesRaw, myt)} of those are the line&rsquo;s {pct} redemption fee, which the Alchemist
                   charges on every redemption on top of the shares the Transmuter gets and pays to Alchemix&rsquo;s fee
                   receiver. The rest went to the Transmuter, which pays its stakers in them.
                 </>
@@ -626,7 +669,10 @@ export function alchemixEventClauses(
                   At this block&rsquo;s share price the shares taken were worth{" "}
                   {(Number(net.takenValueRaw) / WAD).toLocaleString("en-US", { maximumSignificantDigits: 6 })} {under},
                   so the net for this position, the debt cleared (one {under} per {sym}) less that value, is{" "}
-                  {signed(netN)} {under}.
+                  <H>
+                    {signed(netN)} {under}
+                  </H>
+                  .
                   {feeN != null && pct ? (
                     restShows && restN != null ? (
                       <>
@@ -647,7 +693,7 @@ export function alchemixEventClauses(
           out.push(
             clause(
               <>
-                Here it cleared {amount(cleared.amountRaw)} {sym} of debt set aside for repayment, measured from this
+                Here it cleared {shown(cleared.amountRaw, sym)} of debt set aside for repayment, measured from this
                 position&rsquo;s readings either side of it, and took {myt} from the collateral for it, including the
                 line&rsquo;s redemption fee.
               </>,
@@ -673,7 +719,7 @@ export function alchemixEventClauses(
         clause(
           <>
             Nobody here did this: {who(raw.liquidator)} liquidated a batch of positions at once, taking{" "}
-            {amount(raw.amount)} {myt} across all of them.
+            {shown(raw.amount, myt)} across all of them.
           </>,
         ),
       );

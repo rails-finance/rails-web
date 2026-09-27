@@ -39,7 +39,10 @@ import {
 } from "@/lib/alchemix/readings-before";
 import { redemptionNet } from "@/lib/alchemix/redemption-net";
 import { lineProtocolFeeBps } from "@/lib/alchemix/lines";
+import { selfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
 import {
+  closeFromReadingProv,
+  selfLiquidationRestProv,
   collateralTakenFromReadingsProv,
   debtClearedFromReadingsProv,
   emittedAmountProv,
@@ -76,6 +79,7 @@ function legStats(
   coords: AlchemixCoords,
   before: AlchemixReading | null,
   unit: AlchemixUnderlyingUnit | null,
+  siblings: AlchemistEvent[] = [],
 ): ChainTruthStat[] {
   const ctx: AlchemixV3Context = leg.context.data;
   const raw = ctx.raw;
@@ -129,9 +133,30 @@ function legStats(
       stat("Protocol fee", "protocol_fee_total", mytSymbol);
       stat("Requested", "amount", sym);
       break;
-    case "self_liquidated":
-      stat("Vault shares used to repay the debt", "amount_liquidated", mytSymbol);
+    case "self_liquidated": {
+      // The log's amount repeats the force repay's set-aside shares; the sweep
+      // back to the holder has no log (lib/alchemix/self-liquidation.ts).
+      const split = selfLiquidationSplit(leg, siblings, before);
+      if (split && split.setAsideRaw > BigInt(0)) {
+        stats.push({
+          label: "Vault shares that paid the rest of the debt",
+          value: formatExact(Number(split.restRaw) / WAD),
+          symbol: mytSymbol,
+          prov: selfLiquidationRestProv(mytSymbol, split.restRaw.toString(), coords),
+        });
+      } else {
+        stat("Vault shares that paid the debt", "amount_liquidated", mytSymbol);
+      }
+      if (split?.returnedRaw != null && split.returnedRaw > BigInt(0) && split.beforeBlock != null) {
+        stats.push({
+          label: "Collateral returned to the holder",
+          value: formatExact(Number(split.returnedRaw) / WAD),
+          symbol: mytSymbol,
+          prov: closeFromReadingProv("returned", mytSymbol, split.returnedRaw.toString(), split.beforeBlock, coords),
+        });
+      }
       break;
+    }
     case "liquidated":
       stat("Vault shares taken", "amount", mytSymbol);
       stat("Liquidator fee, in shares", "fee_in_yield", mytSymbol);
@@ -265,7 +290,7 @@ export function AlchemixEventDetail({ legs, mytSymbol, coordsFor }: AlchemixEven
   const readingCtx = readingLeg.context.data;
   const before = useReadingBefore(readingCtx.stateAtBlockFromReading?.blockNumber);
   const unit = useAlchemixUnderlying();
-  const stats = legs.flatMap((leg) => legStats(leg, mytSymbol, coordsFor(leg), before, unit));
+  const stats = legs.flatMap((leg) => legStats(leg, mytSymbol, coordsFor(leg), before, unit, legs));
 
   // A line-scope row is never a leg of anybody's transaction, so a card that
   // carries one carries it alone and this narrows to that row.
@@ -285,7 +310,11 @@ export function AlchemixEventDetail({ legs, mytSymbol, coordsFor }: AlchemixEven
           which figures the transaction emitted and which were read. */}
       {stats.length > 0 ? (
         <h4 className={`${OVERLAY_HEADING} px-5 pt-2 text-rb-500`}>
-          {legs.length > 1 ? "What the logs state" : "What the log states"}
+          {legs.some((l) => l.context.data.eventType === "self_liquidated")
+            ? "What the transaction moved"
+            : legs.length > 1
+              ? "What the logs state"
+              : "What the log states"}
         </h4>
       ) : null}
       <ChainTruthDetail stats={stats} symbolText />

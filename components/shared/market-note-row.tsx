@@ -1077,16 +1077,14 @@ function alchemixSharePriceBody(note: PriceGapNote, links: NoteLinks): NoteBody 
   const f = priceGapFigures(note);
   const p = note.position;
   const under = p?.valueSymbol ?? "the asset underneath";
-  const end = (point: MarketNotePoint, which: "earlier" | "later") =>
+  /** Where one end's share price was read: a reading at one of this
+   *  position's rows, or, on a live note's later end, the position card's. */
+  const source = (point: MarketNotePoint, which: "earlier" | "later") =>
     which === "later" && note.live ? (
-      <>
-        the later price is the share price read with the position card&rsquo;s figures, at block{" "}
-        {point.block.toLocaleString("en-US")}
-      </>
+      <>the position card&rsquo;s reading at block {point.block.toLocaleString("en-US")}</>
     ) : (
       <>
-        the {which} price is the reading at this position&rsquo;s {alchemixEndLabel(point)} at block{" "}
-        {point.block.toLocaleString("en-US")}
+        this position&rsquo;s {alchemixEndLabel(point)} at block {point.block.toLocaleString("en-US")}
         {observationLinks(point, links)}
       </>
     );
@@ -1098,6 +1096,11 @@ function alchemixSharePriceBody(note: PriceGapNote, links: NoteLinks): NoteBody 
   // the collateralisation the position card states. The share count and the
   // debt are the earlier reading's; only the share price moves.
   const stats: NoteStat[] = [];
+  // The figures the (i) repeats, kept as the cells built them.
+  let collFig: NoteFigure | undefined;
+  let valueFigs: { before: NoteFigure; after: NoteFigure } | undefined;
+  let crFigs: { before: NoteFigure; after: NoteFigure } | undefined;
+  let mcrFig: NoteFigure | undefined;
   if (p) {
     stats.push({
       label: "Debt",
@@ -1109,46 +1112,86 @@ function alchemixSharePriceBody(note: PriceGapNote, links: NoteLinks): NoteBody 
         prov: heldAmountProv(note, "debt", String(p.debt), held),
       },
     });
-    stats.push({
-      label: "Collateral",
-      figure: {
-        text: amountText(p.coll),
-        exact: String(p.coll),
-        symbol: note.marketSymbol,
-        muted: true,
-        prov: heldAmountProv(note, "share count", String(p.coll), held),
-      },
-      ...(f.valueBefore && f.valueAfter
+    collFig = {
+      text: amountText(p.coll),
+      exact: String(p.coll),
+      symbol: note.marketSymbol,
+      muted: true,
+      prov: heldAmountProv(note, "share count", String(p.coll), held),
+    };
+    valueFigs =
+      f.valueBefore && f.valueAfter
         ? {
-            values: {
-              before: {
-                text: f.valueBefore,
-                prov: alchemixSharePricePositionProv(note, "valueBefore"),
-                exact: String(p.coll * note.from.value),
-              },
-              after: {
-                text: f.valueAfter,
-                prov: alchemixSharePricePositionProv(note, "valueAfter"),
-                exact: String(p.coll * note.to.value),
-              },
+            before: {
+              text: f.valueBefore,
+              prov: alchemixSharePricePositionProv(note, "valueBefore"),
+              exact: String(p.coll * note.from.value),
+            },
+            after: {
+              text: f.valueAfter,
+              prov: alchemixSharePricePositionProv(note, "valueAfter"),
+              exact: String(p.coll * note.to.value),
             },
           }
-        : {}),
-    });
+        : undefined;
+    stats.push({ label: "Collateral", figure: collFig, ...(valueFigs ? { values: valueFigs } : {}) });
   }
   if (p && f.crBefore && f.crAfter && f.mcr) {
-    stats.push({
-      label: "Collateralisation",
-      transition: {
-        before: { text: f.crBefore, prov: alchemixSharePricePositionProv(note, "crBefore"), exact: String(p.crBefore) },
-        after: { text: f.crAfter, prov: alchemixSharePricePositionProv(note, "crAfter"), exact: String(p.crAfter) },
-      },
-      sub: {
-        text: "liquidation at",
-        figure: { text: f.mcr, prov: alchemixSharePricePositionProv(note, "mcr"), exact: String(p.mcrPct) },
-      },
-    });
+    crFigs = {
+      before: { text: f.crBefore, prov: alchemixSharePricePositionProv(note, "crBefore"), exact: String(p.crBefore) },
+      after: { text: f.crAfter, prov: alchemixSharePricePositionProv(note, "crAfter"), exact: String(p.crAfter) },
+    };
+    mcrFig = { text: f.mcr, prov: alchemixSharePricePositionProv(note, "mcr"), exact: String(p.mcrPct) };
+    stats.push({ label: "Collateralisation", transition: crFigs, sub: { text: "liquidation at", figure: mcrFig } });
   }
+  const chip: NoteChip = {
+    before: { text: f.fromPrice, prov: alchemixSharePriceProv(note, "price"), exact: String(note.from.value) },
+    after: { text: f.toPrice, prov: alchemixSharePriceProv(note, "price"), exact: String(note.to.value) },
+    symbol: note.marketSymbol,
+    unit: under,
+    title: `One ${note.marketSymbol} share in ${under} at each end of the stretch`,
+  };
+  // "then" and "now" on a live note; the two rows on a historical one.
+  const [thenWord, nowWord] = note.live ? ["then", "now"] : ["at the earlier reading", "at the later reading"];
+  const is = note.live ? "is" : "was";
+  const derivation: ReactNode[] = [
+    <>
+      One {note.marketSymbol} share was worth <Echo figure={chip.before} suffix={` ${under}`} /> at{" "}
+      {source(note.from, "earlier")}, and {is} <Echo figure={chip.after} suffix={` ${under}`} /> at{" "}
+      {source(note.to, "later")}.
+    </>,
+    collFig && valueFigs && (
+      <>
+        The <Echo figure={collFig} suffix={` ${note.marketSymbol}`} /> of collateral was worth{" "}
+        <Echo figure={valueFigs.before} /> {thenWord} and {is} worth <Echo figure={valueFigs.after} /> {nowWord}.
+      </>
+    ),
+    crFigs && mcrFig && (
+      <>
+        Collateralisation was <Echo figure={crFigs.before} /> {thenWord} and {is} <Echo figure={crFigs.after} />{" "}
+        {nowWord}, against the liquidation line of <Echo figure={mcrFig} />.
+      </>
+    ),
+    p && (
+      <>
+        Both use the share count and debt read at block{" "}
+        <Prov info={alchemixSharePricePositionProv(note, "state")} value={String(p.atBlock)}>
+          <span className="tabular-nums">{f.atBlock}</span>
+        </Prov>
+        ; only the share price moves.
+      </>
+    ),
+    <>
+      {note.live ? (
+        <>
+          It is drawn where the price has moved at least {LIVE_GAP_MOVE_FLOOR * 100}% since the earlier reading, or the
+          move used {LIVE_GAP_RUNWAY_SHARE * 100}% of the position&rsquo;s runway to the liquidation line.
+        </>
+      ) : (
+        <>It is stated because {priceGapReason(note)}.</>
+      )}
+    </>,
+  ].filter(Boolean) as ReactNode[];
   return {
     label: `${note.marketSymbol} share price`,
     measure: { kind: "token", symbol: under },
@@ -1159,43 +1202,14 @@ function alchemixSharePriceBody(note: PriceGapNote, links: NoteLinks): NoteBody 
       lead: "Market fluctuation since the last event",
       ...(f.elapsed ? { elapsed: elapsedFigure(note, f.elapsed, alchemixSharePriceProv(note, "elapsed")) } : {}),
     },
-    chip: {
-      before: { text: f.fromPrice, prov: alchemixSharePriceProv(note, "price"), exact: String(note.from.value) },
-      after: { text: f.toPrice, prov: alchemixSharePriceProv(note, "price"), exact: String(note.to.value) },
-      symbol: note.marketSymbol,
-      unit: under,
-      title: `One ${note.marketSymbol} share in ${under} at each end of the stretch`,
-    },
+    chip,
     blocks: {
       before: { text: f.fromBlock, prov: alchemixSharePriceProv(note, "blocks"), exact: String(note.from.block) },
       after: { text: f.toBlock, prov: alchemixSharePriceProv(note, "blocks"), exact: String(note.to.block) },
     },
     stats,
     learnMore: marketNotePriceGapContent(),
-    derivation: (
-      <>
-        Each reading of this position stores the vault&rsquo;s share price, one {note.marketSymbol} in {under}, at its
-        block. Here {end(note.from, "earlier")}, and {end(note.to, "later")}.
-        {p && (
-          <>
-            {" "}
-            The collateral and collateralisation figures hold the share count and debt read at block{" "}
-            <Prov info={alchemixSharePricePositionProv(note, "state")} value={String(p.atBlock)}>
-              <span className="tabular-nums">{f.atBlock}</span>
-            </Prov>{" "}
-            and move only the share price.
-          </>
-        )}{" "}
-        {note.live ? (
-          <>
-            It is drawn where the price has moved at least {LIVE_GAP_MOVE_FLOOR * 100}% since that reading, or the move
-            used {LIVE_GAP_RUNWAY_SHARE * 100}% of the position&rsquo;s runway to the liquidation line.
-          </>
-        ) : (
-          <>The stretch is stated because {priceGapReason(note)}.</>
-        )}
-      </>
-    ),
+    derivation,
   };
 }
 

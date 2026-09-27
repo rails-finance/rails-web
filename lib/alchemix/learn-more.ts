@@ -122,13 +122,24 @@ export const ALCHEMIX_WITHDRAW: LearnMoreContent = {
 export const ALCHEMIX_SELF_LIQUIDATE: LearnMoreContent = {
   title: "Closing a position with its collateral",
   intro:
-    "The holder can close a position in one step without bringing the synthetic back: the Alchemist puts enough of the position's vault shares against its debt to repay all of it, and returns the rest of the collateral. Alchemix calls this a self-liquidation. The holder chose it, and no liquidator takes a fee.",
-  detailsHeading: "What the event states",
+    "The holder can close a position in one step without bringing the synthetic back: the position's vault shares pay off all of its debt, and the collateral left over goes to an address the holder names. Alchemix calls this a self-liquidation. The holder chooses it, so no liquidator takes part.",
+  detailsHeading: "What the close does",
   details: [
-    { bold: "Shares used", text: "are in the log: the vault shares that went against the debt." },
     {
       bold: "Debt set aside for repayment",
-      text: "is repaid first, as a force repay in the same transaction, with the protocol's fee on that part.",
+      text: "is paid first, as a force repay in the same transaction, whose event states the shares used and the fee.",
+    },
+    {
+      bold: "The fee",
+      text: "is the line's protocol fee on those set-aside shares (0.25% on Ethereum, 0.1% on Base), paid to Alchemix's fee receiver. The rest of the debt is paid without a fee, and no liquidator fee applies.",
+    },
+    {
+      bold: "Shares used",
+      text: "are in the close's own event, which counts every share that paid debt, the set-aside part included.",
+    },
+    {
+      bold: "Collateral returned",
+      text: "is what is left once the debt is paid. No event states it: the card measures it from the reading before the close.",
     },
     { bold: "Debt and collateral after", text: "are both zero: the position is closed." },
   ],
@@ -243,15 +254,15 @@ export const ALCHEMIX_LIFETIME_FLOWS: LearnMoreContent = {
   details: [
     {
       bold: "Collateral side",
-      text: "shares deposited, then shares withdrawn, offered against the debt in a repay, used to close the position or taken by a liquidation, and the shares held now, from the current reading.",
+      text: "shares deposited, then shares withdrawn, put against debt set aside for repayment, used to pay the rest of the debt at a close, returned to the holder at a close, or taken by a liquidation, and the shares held now, from the current reading. The shares a repay pays with come from the caller's wallet, so they are not drawn here.",
     },
     {
       bold: "Debt side",
-      text: "synthetic minted, then synthetic burned and debt cleared by repays, and the debt read now.",
+      text: "synthetic minted, then synthetic burned, debt cleared by repays and debt paid off at a close, and the debt read now.",
     },
     {
       bold: "What the totals leave out",
-      text: "redemptions, which are the line's events rather than the position's, and the protocol fee a repay takes in shares. So the shares deposited less the exits drawn need not equal the shares held now; the Explanation pane states the difference for this position.",
+      text: "redemptions, which are the line's events, and the protocol fee a repay takes from the collateral. The Explanation pane adds both, so its account of the collateral closes on the shares held now.",
     },
     {
       bold: "Interest",
