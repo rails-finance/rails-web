@@ -277,6 +277,15 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
   };
 }
 
+/** A fork's collateral on the card face. The forks run BTC branches, where two
+ *  decimals move the amount by up to a quarter (0.016237 tBTC reads 0.02), so an
+ *  amount below one keeps five significant digits; one and above keeps two
+ *  decimals, as Liquity V2's face does. */
+const forkCollateralFace = (value: number): string =>
+  Math.abs(value) > 0 && Math.abs(value) < 1
+    ? value.toLocaleString("en-US", { maximumSignificantDigits: 5 })
+    : value.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
 const OPS: Record<LiquityFamilyId, LiquityFamilyCardOps> = {
   "liquity-v2": v2Ops,
   asymmetry: makeForkCardOps("asymmetry", {
@@ -654,7 +663,11 @@ export function LiquityPositionCard({
                 <span className="flex items-center gap-1.5">
                   <Prov info={fp.coll}>
                     <HighlightableValue type="collateral" state="after" value={coll} className="text-foreground/80">
-                      <FadeNumber value={coll} animateOnMount={animate} />
+                      <FadeNumber
+                        value={coll}
+                        formatFn={protocol === "liquity-v2" ? undefined : forkCollateralFace}
+                        animateOnMount={animate}
+                      />
                     </HighlightableValue>
                   </Prov>
                   <TokenChipIcon symbol={ct} size={28} filterable={false} />
