@@ -59,13 +59,15 @@ export interface FetchAaveV4SpokePositionParams {
   /** The headers a server render's hop carries, naming the reader to whatever
    *  answers (lib/shared/listing-ssr.ts `ssrHop` / `boxHop`). */
   headers?: HeadersInit;
+  /** The deployment's api root ("/api/aave-v4", "/api/aave-v4-base"). */
+  apiRoot?: string;
 }
 
 export async function fetchAaveV4SpokePosition(
   p: FetchAaveV4SpokePositionParams,
 ): Promise<AaveV4SpokePositionChainResponse> {
   const qs = new URLSearchParams({ wallet: p.wallet, spoke: p.spoke });
-  const url = `${p.baseUrl ?? ""}/api/aave-v4/spoke-position?${qs.toString()}`;
+  const url = `${p.baseUrl ?? ""}${p.apiRoot ?? "/api/aave-v4"}/spoke-position?${qs.toString()}`;
   const res = await fetch(url, { cache: "no-store", headers: p.headers });
   if (!res.ok) {
     throw new Error(`fetchAaveV4SpokePosition failed: ${res.status} ${res.statusText}`);

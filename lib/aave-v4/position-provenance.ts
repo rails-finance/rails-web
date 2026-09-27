@@ -38,6 +38,7 @@ import type { Provenance, ProvInput, ProvScaling, ProvVerify } from "@/component
 import type { AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
 import type { OriginEnvelope } from "@/lib/shared/types/event-shape";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { chainIdForSpokeAddress } from "@/lib/aave-v4/spoke-meta";
 
 // Both vias lead with the custody segment the embedded receipt drops
 // (provenance.tsx), so every segment after it is origin and nothing is lost.
@@ -115,7 +116,7 @@ function txVerify(detail?: EventProvDetail): ProvVerify | undefined {
   return detail?.txHash
     ? {
         kind: "etherscan",
-        href: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", detail.txHash),
+        href: explorerUrl(chainIdForSpokeAddress(detail.spokeAddress), "tx-logs", detail.txHash),
         text: "Confirm in the tx event logs",
       }
     : undefined;

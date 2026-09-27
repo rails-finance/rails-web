@@ -46,6 +46,27 @@ export const TOKEN_ADDR: Record<string, string> = {
   "PT-USDG-24SEP2026": "0xc1906aecf868749a2dee203f59b904c0cf212140",
 };
 
+/** Price keys for symbols that exist only on Aave V4 Base: the seven Coinbase
+ *  B20 tokenized stocks the Mag7 spoke lists (Aave's address book,
+ *  AaveV4Base.sol; each answered symbol() on Base 2026-09-27). No mainnet token
+ *  shares these symbols, so they key the same address-keyed price map; only
+ *  the Base oracle map (/api/oracle/aave-v4-base) carries their prices. Base
+ *  USDC is priced under TOKEN_ADDR.USDC by that map's own hook. */
+export const BASE_ONLY_PRICE_KEYS: Record<string, string> = {
+  AAPLc: "0xb200000000000000000000c2e324d24d7eecd1fb",
+  AMZNc: "0xb200000000000000000000d9192b6b456483c2e8",
+  GOOGLc: "0xb2000000000000000000002d0ba3164cc74f58b7",
+  METAc: "0xb2000000000000000000008bc8786b856e61707c",
+  MSFTc: "0xb200000000000000000000ab99cfa739e253872b",
+  NVDAc: "0xb20000000000000000000078ee7ce2fe4908108c",
+  TSLAc: "0xb2000000000000000000001e800a7f5189430cd0",
+};
+
+/** The key a symbol's price sits under in an address-keyed price map. */
+export function priceKeyFor(symbol: string): string | undefined {
+  return TOKEN_ADDR[symbol] ?? BASE_ONLY_PRICE_KEYS[symbol];
+}
+
 /** Every address `resolvePrice` can reach. A symbol outside TOKEN_ADDR resolves
  *  to `null` whatever the price map holds, so this list is the whole set a
  *  server render has to ask for to price a card's figures in the document. */
@@ -55,7 +76,7 @@ export const PRICEABLE_TOKEN_ADDRESSES: string[] = [...new Set(Object.values(TOK
  *  a fact the surface has to state, never a number to substitute for. */
 export function resolvePrice(symbol: string, prices?: Record<string, PriceEntry | number>): number | null {
   if (!prices) return null;
-  const addr = TOKEN_ADDR[symbol];
+  const addr = priceKeyFor(symbol);
   if (!addr) return null;
   const p = prices[addr];
   if (!p) return null;

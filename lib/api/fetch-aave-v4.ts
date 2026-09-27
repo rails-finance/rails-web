@@ -69,6 +69,8 @@ export interface FetchAaveV4Params {
   /** The headers a server render's hop carries, naming the reader to whatever
    *  answers (lib/shared/listing-ssr.ts `ssrHop` / `boxHop`). */
   headers?: HeadersInit;
+  /** The deployment's api root ("/api/aave-v4", "/api/aave-v4-base"). */
+  apiRoot?: string;
 }
 
 export interface FetchAaveV4TimelineParams extends FetchAaveV4Params {
@@ -85,9 +87,10 @@ export async function fetchAaveV4Timeline({
   baseUrl = "",
   headers,
   recent,
+  apiRoot = "/api/aave-v4",
 }: FetchAaveV4TimelineParams): Promise<FetchAaveV4TimelineResult> {
   const recentQs = recent ? `&recent=${encodeURIComponent(String(recent))}` : "";
-  const url = `${baseUrl}/api/aave-v4/timeline?wallet=${encodeURIComponent(wallet)}${recentQs}`;
+  const url = `${baseUrl}${apiRoot}/timeline?wallet=${encodeURIComponent(wallet)}${recentQs}`;
   const done = settleFetchMark("aave-v4-timeline");
   const res = await fetch(url, { cache: "no-store", headers });
   if (!res.ok) {
@@ -103,8 +106,9 @@ export async function fetchAaveV4Positions({
   wallet,
   baseUrl = "",
   headers,
+  apiRoot = "/api/aave-v4",
 }: FetchAaveV4Params): Promise<FetchAaveV4PositionsResult> {
-  const url = `${baseUrl}/api/aave-v4/positions?wallet=${encodeURIComponent(wallet)}`;
+  const url = `${baseUrl}${apiRoot}/positions?wallet=${encodeURIComponent(wallet)}`;
   const res = await fetch(url, { cache: "no-store", headers });
   if (!res.ok) {
     throw new Error(`fetchAaveV4Positions failed: ${res.status} ${res.statusText}`);

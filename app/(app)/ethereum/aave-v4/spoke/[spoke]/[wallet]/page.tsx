@@ -3,7 +3,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { resolveSpokeSegment } from "@/lib/aave-v4/spoke-meta";
 import { loadAaveV4CardPrices, loadAaveV4SpokeTail } from "@/lib/aave-v4/spoke-position-page-data";
-import AaveV4SpokeView from "./position-view";
+import AaveV4SpokeView from "@/components/protocol/aave-v4/aave-v4-spoke-view";
 
 interface Props {
   params: Promise<{ spoke: string; wallet: string }>;

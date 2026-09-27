@@ -21,6 +21,9 @@
 export type SessionProtocol =
   | "liquity-v2"
   | "aave-v4"
+  // Aave V4 on Base (the Equities hub's Mag7 spoke), at `/base/aave-v4`: separate
+  // contracts, the reason `aave-v3-base` is its own scope.
+  | "aave-v4-base"
   | "aave-v3"
   | "aave-v3-base"
   // Aave's vault layer — savings GHO, Umbrella stake tokens and static

@@ -48,41 +48,45 @@ import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { boxHop } from "@/lib/shared/listing-ssr";
 import { fetchPrices } from "@/lib/api/fetch-prices";
 import { PRICEABLE_TOKEN_ADDRESSES } from "@/lib/aave/prices";
+import { AAVE_V4_API_ROOT } from "@/lib/aave-v4/deployment-routes";
 
 interface AaveV4SpokeReads {
   positions: AaveV4Position[];
   chain: AaveV4SpokePositionChainResponse | null;
 }
 
-export const loadAaveV4SpokeTail = cache(async (wallet: string, spokeName: string) => {
-  const spokeKey = SPOKE_NAME_TO_KEY[spokeName];
-  const tail = await loadPositionTail<AaveV4SpokeReads, FetchAaveV4TimelineResult>({
-    label: "aave-v4",
-    readPositions: async (baseUrl, headers) => {
-      const [posResult, chain] = await Promise.all([
-        fetchAaveV4Positions({ wallet, baseUrl, headers }),
-        spokeKey
-          ? fetchAaveV4SpokePosition({ wallet, spoke: spokeKey, baseUrl, headers }).catch((err) => {
-              console.warn("aave-v4-spoke-page-data: chain-state read failed; indexed figures stand", err);
-              return null;
-            })
-          : Promise.resolve(null),
-      ]);
-      return { positions: posResult.positions, chain };
-    },
-    readTimeline: (baseUrl, headers) => fetchAaveV4Timeline({ wallet, baseUrl, headers, recent: TIMELINE_WINDOW_ROWS }),
-    hop: boxHop,
-  });
-  return {
-    ...tail,
-    spokePositions: tail.positions?.positions ?? null,
-    chain: tail.positions?.chain ?? null,
-    // What this spoke holds over the whole life, so the client half can number
-    // its rows and state its cut without a second read. Null on a whole-history
-    // answer and on a failed one alike: there is no cut to state either way.
-    spokeTotalEvents: tail.timeline?.eventsBySpoke?.[spokeName] ?? null,
-  };
-});
+export const loadAaveV4SpokeTail = cache(
+  async (wallet: string, spokeName: string, apiRoot: string = AAVE_V4_API_ROOT) => {
+    const spokeKey = SPOKE_NAME_TO_KEY[spokeName];
+    const tail = await loadPositionTail<AaveV4SpokeReads, FetchAaveV4TimelineResult>({
+      label: apiRoot === AAVE_V4_API_ROOT ? "aave-v4" : "aave-v4-base",
+      readPositions: async (baseUrl, headers) => {
+        const [posResult, chain] = await Promise.all([
+          fetchAaveV4Positions({ wallet, baseUrl, headers, apiRoot }),
+          spokeKey
+            ? fetchAaveV4SpokePosition({ wallet, spoke: spokeKey, baseUrl, headers, apiRoot }).catch((err) => {
+                console.warn("aave-v4-spoke-page-data: chain-state read failed; indexed figures stand", err);
+                return null;
+              })
+            : Promise.resolve(null),
+        ]);
+        return { positions: posResult.positions, chain };
+      },
+      readTimeline: (baseUrl, headers) =>
+        fetchAaveV4Timeline({ wallet, baseUrl, headers, recent: TIMELINE_WINDOW_ROWS, apiRoot }),
+      hop: boxHop,
+    });
+    return {
+      ...tail,
+      spokePositions: tail.positions?.positions ?? null,
+      chain: tail.positions?.chain ?? null,
+      // What this spoke holds over the whole life, so the client half can number
+      // its rows and state its cut without a second read. Null on a whole-history
+      // answer and on a failed one alike: there is no cut to state either way.
+      spokeTotalEvents: tail.timeline?.eventsBySpoke?.[spokeName] ?? null,
+    };
+  },
+);
 
 // Bound the price leg the way the tail beside it is bounded.
 const PRICES_FETCH_TIMEOUT_MS = 8000;

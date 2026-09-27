@@ -54,6 +54,8 @@ const SPOKE_SLUG_TO_NAME: Record<string, string> = {
   // Legacy slug: /aave-v4/spoke/global-dollar/… links predate the display rename
   // (hub "Global Dollar" / spoke "Stablecoin Correlated"). Kept so they resolve.
   "global-dollar": "Stablecoin Correlated",
+  // Aave V4 on Base (/base/aave-v4/spoke/mag7/…).
+  mag7: "Mag7",
 };
 
 const SPOKE_NAME_TO_SLUG: Record<string, string> = {
@@ -130,6 +132,8 @@ export interface SpokeMeta {
    *  decompose live; this surfaces the layered nature of V4 borrow rates
    *  (Hub base + Spoke premium) without inventing numbers. */
   rateNote?: string;
+  /** Further reading for the spoke's learn-more modal, official sources only. */
+  links?: { label: string; url: string }[];
 }
 
 const RATE_NOTE_CROSS_HUB =
@@ -257,6 +261,28 @@ export const SPOKE_META: Record<string, SpokeMeta> = {
   },
 };
 
+// Aave V4 on Base. Structure from Aave's announcement
+// (aave.com/blog/coinbase-tokenized-stocks, 2026-09-25) and address book
+// (bgd-labs/aave-address-book AaveV4Base.sol), each confirmed on chain
+// 2026-09-27: eight reserves, the seven stocks not borrowable, USDC the only
+// borrowable reserve, one hub. Live parameters are read, never written here.
+SPOKE_META.mag7 = {
+  name: "Mag7",
+  archetype: "isolation",
+  collateralHub: "Equities",
+  borrowHub: "Equities",
+  narrative: [
+    "The Mag7 Spoke is the one lending market of Aave V4 on Base: its Equities Hub holds one USDC reserve, and this Spoke pools seven Coinbase tokenized stocks (AAPLc, AMZNc, GOOGLc, METAc, MSFTc, NVDAc, TSLAc) as collateral against it.",
+    "The stocks are collateral only; USDC is the one asset that can be borrowed. Each stock's price is a Chainlink feed that publishes from Sunday 20:00 ET to Friday 20:00 ET and holds its last value outside those hours, so a price read at the weekend can be days old.",
+    "A corporate action such as a split pauses the affected reserve until the token's multiplier is updated; dividends are reinvested into the token rather than paid out.",
+  ],
+  links: [
+    { label: "Coinbase tokenized stocks on Aave V4", url: "https://aave.com/blog/coinbase-tokenized-stocks" },
+    { label: "Aave V4 docs", url: "https://aave.com/docs/aave-v4" },
+    { label: "ARFC: deploy Aave V4 on Base", url: "https://governance.aave.com/t/arfc-deploy-aave-v4-on-base/25427" },
+  ],
+};
+
 /** Look up a spoke's editorial metadata by API display name ("Lombard BTC"),
  *  legacy alias ("Lombard"), or raw slug ("lombard"). All three normalize to
  *  the canonical slug that keys SPOKE_META, so callers never have to match the
@@ -304,6 +330,15 @@ export const SPOKE_ADDRESS_BY_KEY: Record<string, `0x${string}`> = {
   usdg_pendle: "0x956d8e0a89cfa3744428c4641b5a53b56167a7f9",
 };
 
+/** Spoke contracts of Aave V4 on Base (Aave's address book, AaveV4Base.sol). */
+export const BASE_SPOKE_ADDRESSES = new Set<string>(["0x17905db0e4a3514467539956c084180616ae7b8d"]);
+
+/** The chain a spoke contract lives on: Base for the Base deployment's
+ *  spokes, Ethereum otherwise (every other spoke this explorer knows). */
+export function chainIdForSpokeAddress(address?: string | null): 1 | 8453 {
+  return address && BASE_SPOKE_ADDRESSES.has(address.toLowerCase()) ? 8453 : 1;
+}
+
 export const ARCHETYPE_LABEL: Record<SpokeArchetype, string> = {
   standard: "Standard Spoke",
   "cross-hub-credit": "Cross-Hub Credit",
@@ -341,4 +376,6 @@ export const SPOKE_NAME_TO_KEY: Record<string, string> = {
   // Legacy alias: pre-rename URLs/bookmarks resolved this spoke as "Global
   // Dollar". Kept so the chain-state fetch still resolves for those.
   "Global Dollar": "usdg_pendle",
+  // Aave V4 on Base.
+  Mag7: "mag7",
 };

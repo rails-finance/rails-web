@@ -26,6 +26,7 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { usdProv, usdProvOnchain, accumProv, healthFactorProv, interestProv } from "@/lib/aave-v4/position-provenance";
 import { listSymbols, NO_PRICE_HINT, PARTIAL_LABEL_SUFFIX, partialSumProv } from "@/lib/aave-v4/unpriced";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
+import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 
 // The borrow-rate / peak / interest figures are accumulated over this spoke's
 // indexed event stream.
@@ -275,10 +276,11 @@ function AaveV4SpokeCard({
   //     liquidation runway beneath it (both key off debt > 0). An earlier `< $1`
   //     collapse made those three disagree: a ~$0.57 loan read as a lone
   //     "Supplied" up top while the pill + runway called it an active loan.
+  const { session } = useAaveV4Deployment();
   const supplyOnly = isClosed ? spoke.peakDebtUsd < 1 : spoke.totalDebtUsd <= 0;
   const bucket = bucketForHealth(spoke.healthFactor);
   const walletPill = wallet ? (
-    <WalletPill wallet={wallet} ensName={ensName ?? null} filterProtocol="aave-v4" bookmarkProtocol="aave-v4" />
+    <WalletPill wallet={wallet} ensName={ensName ?? null} filterProtocol={session} bookmarkProtocol={session} />
   ) : null;
 
   // Collateral USD lags when the supply asset's price is still resolving:

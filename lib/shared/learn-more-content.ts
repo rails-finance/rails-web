@@ -694,6 +694,7 @@ export function aaveV4SpokeContent(spokeName: string): LearnMoreContent | null {
     title: `How the ${meta.name} Spoke Works`,
     intro: `${archetype} — ${meta.name} on Aave V4's Hub & Spoke model. ${hubMapping}`,
     extraParagraphs,
+    ...(meta.links ? { links: meta.links } : {}),
   };
 }
 
@@ -768,6 +769,41 @@ export function aaveV4HubsContent(): LearnMoreContent {
       { label: "Aave V4 architecture", url: AAVE_FAQ_URLS.V4_ARCHITECTURE },
       { label: "Hubs & liquidity model", url: AAVE_FAQ_URLS.V4_LIQUIDITY_MODEL },
       { label: "Aave V4 docs", url: AAVE_FAQ_URLS.V4_DOCS },
+    ],
+  };
+}
+
+// Page-level explainer for Aave V4 on Base's hub page (/base/aave-v4/hubs):
+// one hub, one spoke, the reserves' parameters and the stock feeds' hours.
+// Mechanics only, no snapshot numbers.
+export function aaveV4BaseHubContent(): LearnMoreContent {
+  return {
+    title: "How the Equities hub works",
+    intro:
+      "Aave V4 on Base has one Liquidity Hub, the Equities hub, holding one USDC reserve, and one Spoke drawing from it, Mag7. Seven Coinbase tokenized stocks are supplied to the Spoke as collateral and USDC is borrowed against them; the stocks cannot themselves be borrowed.",
+    detailsHeading: "Key concepts:",
+    details: [
+      {
+        bold: "Collateral factor",
+        text: "the share of a stock's value that counts toward the health factor. A position's health factor is its collateral, each asset weighted by its factor, divided by its debt; below 1.0 it can be liquidated.",
+      },
+      {
+        bold: "Supply cap and credit line",
+        text: "the hub caps how much of each asset the Spoke may add (the supply cap) and how much USDC it may draw (the credit line), in whole tokens.",
+      },
+      {
+        bold: "Stock prices",
+        text: "each stock's price is a Chainlink feed that publishes from Sunday 20:00 ET to Friday 20:00 ET and holds its last value outside those hours; the Aave market itself stays open, so a weekend price can be days old. Rails states when each price was published.",
+      },
+      {
+        bold: "Paused reserve",
+        text: "a split or other corporate action pauses the stock's reserve until the token's multiplier is updated. Dividends are reinvested into the token.",
+      },
+    ],
+    links: [
+      { label: "Coinbase tokenized stocks on Aave V4", url: "https://aave.com/blog/coinbase-tokenized-stocks" },
+      { label: "Aave V4 docs", url: "https://aave.com/docs/aave-v4" },
+      { label: "ARFC: deploy Aave V4 on Base", url: "https://governance.aave.com/t/arfc-deploy-aave-v4-on-base/25427" },
     ],
   };
 }

@@ -3,7 +3,8 @@
 // keeps the wallet-page chunk from pulling in `aave-spoke-card.tsx` and its
 // transitive deps just to render a hub label.
 
-export type HubTier = "Core" | "Plus" | "Prime" | "Paxos";
+// `Equities` is Aave V4 on Base's one hub (EQUITIES_HUB in Aave's address book).
+export type HubTier = "Core" | "Plus" | "Prime" | "Paxos" | "Equities";
 
 // Hub tiers render as neutral text badges (see SpokeIdentity / position card) —
 // the tier is identity, not a status, so it carries no color. A former
@@ -19,6 +20,7 @@ export const HUB_TIER_LABEL: Record<HubTier, string> = {
   Plus: "Plus",
   Prime: "Prime",
   Paxos: "Global Dollar",
+  Equities: "Equities",
 };
 
 export const SPOKE_HUB: Record<string, HubTier> = {
@@ -36,4 +38,6 @@ export const SPOKE_HUB: Record<string, HubTier> = {
   // Legacy alias: the API briefly returned this spoke as "Global Dollar" before
   // the display-name rename. Kept so the badge resolves during a split deploy.
   "Global Dollar": "Paxos",
+  // Aave V4 on Base.
+  Mag7: "Equities",
 };

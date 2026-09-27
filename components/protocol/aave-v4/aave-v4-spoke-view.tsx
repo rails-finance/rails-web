@@ -1,6 +1,9 @@
 "use client";
 
-// Aave V4 spoke detail — the addressable per-spoke deep view for a wallet.
+// Aave V4 spoke detail — the addressable per-spoke deep view for a wallet, on
+// either deployment: the route's layout provides lib/aave-v4/deployment.tsx
+// (Ethereum by default, Base under /base/aave-v4), which names the api root,
+// the oracle route, the roster session and the chain every read and link uses.
 // The spoke is the unit of risk isolation (one shared health factor inside,
 // fully independent between spokes), so it's the right URL-addressable unit
 // for "this position." The wallet's other spokes live on the listing-filtered
@@ -91,7 +94,10 @@ import { useAaveV4OraclePrices, type OraclePriceMap } from "@/lib/aave-v4/use-or
 import { listSymbols } from "@/lib/aave-v4/unpriced";
 import { computeOnchainUsd } from "@/lib/aave-v4/onchain-usd";
 import { AaveV4BarsProvider } from "@/lib/aave-v4/use-position-bars";
-import { TOKEN_ADDR } from "@/lib/aave/prices";
+import { priceKeyFor } from "@/lib/aave/prices";
+import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
+import { AaveV4BaseReserveNotice } from "@/components/protocol/aave-v4/aave-v4-base-reserve-notice";
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 
 export interface AaveV4SpokeViewProps {
   /** Already lower-cased and address-shaped — the server route rejected
@@ -143,10 +149,12 @@ function AaveV4SpokePageInner({
   initialSpokeTotalEvents = null,
 }: AaveV4SpokeViewProps) {
   const isValidWallet = /^0x[a-f0-9]{40}$/.test(wallet);
+  const deployment = useAaveV4Deployment();
+  const { apiRoot, session, oracleRoute } = deployment;
   // The listing filtered to this wallet — formed in one place (the wallet param
   // is `q`, read centrally by the shared listing driver). Feeds the "other
   // spokes" link; the back button derives the same href internally.
-  const walletFilterHref = listingHrefForWallet("aave-v4", wallet) ?? "/ethereum/aave-v4";
+  const walletFilterHref = listingHrefForWallet(session, wallet) ?? deployment.basePath;
 
   // Keyed on the timeline, not the roster: a wallet with no position in this
   // spoke is a real answer the server can seed, and `initialPositions` is empty.
@@ -219,18 +227,18 @@ function AaveV4SpokePageInner({
           // 429 (rails-ops decisions/0019). Settled separately from the two
           // reads beside it: a refused history must not take the position with
           // it.
-          fetchAaveV4Timeline({ wallet, recent: TIMELINE_WINDOW_ROWS }).catch((err) => {
+          fetchAaveV4Timeline({ wallet, recent: TIMELINE_WINDOW_ROWS, apiRoot }).catch((err) => {
             console.error("aave-v4 spoke page: timeline read failed", err);
             return null;
           }),
           // Positions seed price requests.
-          fetchAaveV4Positions({ wallet }),
+          fetchAaveV4Positions({ wallet, apiRoot }),
           // Headline chain-state overlay — already a live spoke-contract read in
           // both modes. Best-effort: when the URL spoke name doesn't map to a
           // known server key, skip it and fall back to event-derived numbers
           // (the "no activity on this spoke" path below will catch it).
           spokeKey
-            ? fetchAaveV4SpokePosition({ wallet, spoke: spokeKey }).catch((err) => {
+            ? fetchAaveV4SpokePosition({ wallet, spoke: spokeKey, apiRoot }).catch((err) => {
                 console.warn("Chain-state fetch failed; falling back to indexed", err);
                 return null;
               })
@@ -252,7 +260,7 @@ function AaveV4SpokePageInner({
     return () => {
       cancelled = true;
     };
-  }, [wallet, isValidWallet, spokeName, seeded]);
+  }, [wallet, isValidWallet, spokeName, seeded, apiRoot]);
 
   const sortedEvents = useMemo(
     () => [...events].sort((a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp),
@@ -353,7 +361,7 @@ function AaveV4SpokePageInner({
     const symbols = [...new Set([...activeCard.supplyingSymbols, ...activeCard.borrowingSymbols])];
     return symbols.flatMap((symbol) => {
       const price = resolvePrice(symbol, chainTruthPrices);
-      return price != null ? [{ symbol, address: TOKEN_ADDR[symbol], price }] : [];
+      return price != null ? [{ symbol, address: priceKeyFor(symbol) ?? "", price }] : [];
     });
   }, [activeCard, chainTruthPrices]);
 
@@ -442,7 +450,7 @@ function AaveV4SpokePageInner({
   // page applies to its own events applies here, so the spreadsheet and the
   // timeline agree.
   const fetchAllHistory = useCallback(async () => {
-    const res = await fetchAaveV4Timeline({ wallet });
+    const res = await fetchAaveV4Timeline({ wallet, apiRoot });
     const served = res.events ?? [];
     return {
       events: served.filter((e) => isAaveV4Event(e) && (e.context.data.spokeName ?? "Main") === spokeName),
@@ -451,7 +459,7 @@ function AaveV4SpokePageInner({
       // there to prevent. Nothing to pass through until the route says.
       missing: 0,
     };
-  }, [wallet, spokeName]);
+  }, [wallet, spokeName, apiRoot]);
 
   // The shared timeline pipeline: type/date filtering, sort direction, render
   // windowing and the months heatmap all live here + in ChainTruthTimeline.
@@ -538,9 +546,9 @@ function AaveV4SpokePageInner({
     (async () => {
       try {
         const [oracleRes, headRes, ...pinnedRes] = await Promise.all([
-          fetch("/api/oracle/aave-v4"),
-          fetch("/api/head"),
-          ...earlierBlocks.map((b) => fetch(`/api/oracle/aave-v4?block=${b}`)),
+          fetch(oracleRoute),
+          fetch(deployment.chainId === BASE_CHAIN_ID ? `/api/head?chain=${BASE_CHAIN_ID}` : "/api/head"),
+          ...earlierBlocks.map((b) => fetch(`${oracleRoute}?block=${b}`)),
         ]);
         type OracleAnswer = {
           success?: boolean;
@@ -584,7 +592,7 @@ function AaveV4SpokePageInner({
     return () => {
       cancelled = true;
     };
-  }, [loading, hasLiveDebt, chainPosition, earlierBlocks]);
+  }, [loading, hasLiveDebt, chainPosition, earlierBlocks, oracleRoute, deployment.chainId]);
 
   // One live note per collateral asset the spoke shows this position holding
   // right now, while it carries debt.
@@ -597,7 +605,7 @@ function AaveV4SpokePageInner({
     const out = new Set<string>();
     for (const p of positions) {
       if (p.reserveAddress) out.add(p.reserveAddress.toLowerCase());
-      const fromSymbol = TOKEN_ADDR[p.reserveSymbol];
+      const fromSymbol = priceKeyFor(p.reserveSymbol);
       if (fromSymbol) out.add(fromSymbol);
     }
     for (const e of sortedEvents) {
@@ -611,7 +619,7 @@ function AaveV4SpokePageInner({
       ];
       for (const s of symbols) {
         if (!s) continue;
-        const addr = TOKEN_ADDR[s];
+        const addr = priceKeyFor(s);
         if (addr) out.add(addr);
       }
     }
@@ -633,7 +641,7 @@ function AaveV4SpokePageInner({
     // their real shapes, so the content lands without a layout jump.
     return (
       <div className="space-y-6 py-8">
-        <DetailBackButton session="aave-v4" wallet={wallet} />
+        <DetailBackButton session={session} wallet={wallet} />
         <DetailBodySkeleton />
       </div>
     );
@@ -663,7 +671,7 @@ function AaveV4SpokePageInner({
   if (timelineState === "failed" && !activeCard && !loading) {
     return (
       <div className="py-8 space-y-6">
-        <DetailBackButton session="aave-v4" wallet={wallet} />
+        <DetailBackButton session={session} wallet={wallet} />
         <div className="text-center py-12">
           <p className="text-foreground text-lg mb-3">
             This wallet&rsquo;s history could not be read, so the {spokeName} position and its activity are unavailable.
@@ -685,7 +693,7 @@ function AaveV4SpokePageInner({
     return (
       <>
         <div className="py-8 space-y-6">
-          <DetailBackButton session="aave-v4" wallet={wallet} />
+          <DetailBackButton session={session} wallet={wallet} />
           <div className="text-center py-12">
             <p className="text-foreground text-lg mb-3">
               {shortAddr(wallet)} has no activity on the {spokeName} spoke
@@ -704,7 +712,7 @@ function AaveV4SpokePageInner({
   return (
     <>
       <div className="py-8 space-y-6">
-        <DetailTopRow session="aave-v4" wallet={wallet} assets={stripAssets}>
+        <DetailTopRow session={session} wallet={wallet} assets={stripAssets}>
           {activeCard && (
             <AaveV4ExportMenu
               spokeName={spokeName}
@@ -715,7 +723,7 @@ function AaveV4SpokePageInner({
               events={spokeScopedEvents}
               notes={notes}
               liveNotes={liveNotes}
-              csvFilename={`aave-v4-${rawSpoke}-${wallet.slice(0, 10)}-activity.csv`}
+              csvFilename={`${session}-${rawSpoke}-${wallet.slice(0, 10)}-activity.csv`}
               fetchAllEvents={olderCount > 0 ? fetchAllHistory : undefined}
             />
           )}
@@ -756,6 +764,9 @@ function AaveV4SpokePageInner({
                 }
               />
               <RiskPremiumNotice raw={chainPosition?.riskPremiumRaw ?? null} spokeName={spokeName} />
+              {deployment.key === "base" && chainPosition && !chainPosition.chainStale && (
+                <AaveV4BaseReserveNotice reserves={chainPosition.reserves} />
+              )}
             </div>
           </ProvReceiptsScope>
         )}

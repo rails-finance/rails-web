@@ -57,6 +57,7 @@ import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { effectiveBorrowAPR, borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
 import { formatExact } from "@/lib/utils/format";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { chainIdForSpokeAddress } from "@/lib/aave-v4/spoke-meta";
 
 export type AaveV4Event = BaseActivityEvent & { context: { protocol: "aave-v4"; data: AaveV4Context } };
 
@@ -566,7 +567,7 @@ function liquidationSlots(ctx: AaveV4Context, coord: EventProvDetail, token: str
           <>
             Cleared by a third-party liquidator:{" "}
             <a
-              href={explorerUrl(MAINNET_CHAIN_ID, "address", ctx.liquidator)}
+              href={explorerUrl(chainIdForSpokeAddress(ctx.spokeAddress), "address", ctx.liquidator)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-500 hover:underline"

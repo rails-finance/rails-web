@@ -169,6 +169,9 @@ export interface FetchAaveV4SpokePositionsParams {
   limit?: number;
   offset?: number;
   baseUrl?: string;
+  /** The deployment's api root ("/api/aave-v4", "/api/aave-v4-base"). Not
+   *  part of the query string. */
+  apiRoot?: string;
 }
 
 /** Deterministic querystring for the spoke-positions endpoint. Shared by the
@@ -201,7 +204,7 @@ export function buildAaveV4SpokePositionsQuery(p: FetchAaveV4SpokePositionsParam
 export async function fetchAaveV4SpokePositions(
   p: FetchAaveV4SpokePositionsParams,
 ): Promise<AaveV4SpokePositionsResponse> {
-  const url = `${p.baseUrl ?? ""}/api/aave-v4/spoke-positions?${buildAaveV4SpokePositionsQuery(p)}`;
+  const url = `${p.baseUrl ?? ""}${p.apiRoot ?? "/api/aave-v4"}/spoke-positions?${buildAaveV4SpokePositionsQuery(p)}`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
     throw new Error(`fetchAaveV4SpokePositions failed: ${res.status} ${res.statusText}`);

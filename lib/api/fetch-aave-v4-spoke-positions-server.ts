@@ -48,7 +48,7 @@ export async function fetchAaveV4SpokePositionsServer(
   }
 
   const readerIp = await readerIpFromHeaders();
-  const url = `${RAILS_API_URL}/api/aave-v4/spoke-positions?${buildAaveV4SpokePositionsQuery(params)}`;
+  const url = `${RAILS_API_URL}${params.apiRoot ?? "/api/aave-v4"}/spoke-positions?${buildAaveV4SpokePositionsQuery(params)}`;
   const res = await fetch(
     url,
     createAuthFetchOptions({ cache: "no-store", signal: AbortSignal.timeout(SSR_FETCH_TIMEOUT_MS) }, readerIp),

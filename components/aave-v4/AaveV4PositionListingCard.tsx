@@ -38,6 +38,7 @@ import { useMemo } from "react";
 import type { AaveV4SpokePositionRow } from "@/lib/api/fetch-aave-v4-spoke-positions";
 import { scaleChainBalance } from "@/lib/api/fetch-aave-v4-spoke-position";
 import { SPOKE_HUB, HUB_TIER_LABEL } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
+import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
@@ -115,6 +116,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   // Chain overlay failed for this row → balances are MV-indexed (potentially
   // drifted from on-chain). The card still renders; the indicator warns.
   const hfStale = hasDebt && row.chainHfStale;
+  const { session } = useAaveV4Deployment();
   const hubTier = SPOKE_HUB[row.spokeName] ?? "Core";
 
   // Lifecycle (two-axis model). Status is structural: open vs closed (no live
@@ -212,7 +214,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   // this tally.
   const leadingIdentity = (
     <>
-      <WalletPill wallet={row.wallet} ensName={row.ensName} filterProtocol="aave-v4" bookmarkProtocol="aave-v4" />
+      <WalletPill wallet={row.wallet} ensName={row.ensName} filterProtocol={session} bookmarkProtocol={session} />
       <span className="flex items-center gap-1.5 leading-none text-foreground">
         <span className="text-xs font-semibold">{row.spokeName}</span>
         <span className="text-xs font-bold uppercase tracking-wide">{HUB_TIER_LABEL[hubTier]}</span>

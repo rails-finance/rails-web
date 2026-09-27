@@ -25,7 +25,7 @@ export function publishedText(unix: number, readUnix: number): string {
 }
 
 /** "40 s", "35 min", "21 h", "2 d 9 h". */
-function ageText(seconds: number): string {
+export function ageText(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
   if (s < 60) return `${s} s`;
   if (s < 3600) return `${Math.floor(s / 60)} min`;

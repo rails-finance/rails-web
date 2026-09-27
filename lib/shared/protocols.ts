@@ -181,6 +181,22 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "hubs", label: "Hub comparison", tab: "Hubs" }],
   },
   {
+    // Aave V4's Base deployment — the Equities hub and its one spoke, Mag7:
+    // seven Coinbase tokenized stocks as collateral, USDC to borrow. A second
+    // roster row rather than a chain switch, for the reason aave-v3 /
+    // aave-v3-base are two: separate contracts, separate accounts. A seventh
+    // Base explorer, off the nav until Miles launches it.
+    id: "aave-v4-base",
+    session: "aave-v4-base",
+    label: "Aave V4",
+    chainId: 8453,
+    slug: "aave-v4",
+    unlaunched: true,
+    tags: ["Lend", "Borrow"],
+    desc: "Aave V4's Base deployment — the Equities hub's Mag7 spoke, where seven Coinbase tokenized stocks back USDC loans, each account read from the spoke and each stock price stated with the time it was published",
+    subPages: [{ segment: "hubs", label: "Equities hub", tab: "Hub" }],
+  },
+  {
     // Aave's VAULT LAYER, and a third Aave row on Ethereum beside the two pool
     // explorers — intended (rails-ops decision 0028 point 5). The door is
     // unstamped because savings GHO and Umbrella stake tokens are Aave-wide
@@ -607,6 +623,7 @@ export function isLaunchedChain(chainId: ChainId): boolean {
 export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "liquity-v2": "Trove",
   "aave-v4": "Position",
+  "aave-v4-base": "Position",
   "aave-v3": "Position",
   "aave-v3-base": "Position",
   // A holder's reading of one vault. It names no headline position — the vault
