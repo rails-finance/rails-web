@@ -2,7 +2,7 @@
 
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { createContext, useContext, type ReactNode } from "react";
-import { Folder, FolderOpen, Layers, LogOut } from "lucide-react";
+import { ArrowRightToLine, Folder, FolderOpen, Layers, LogOut } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { DisclosureChevron } from "@/components/shared/expand-chevron";
@@ -24,6 +24,7 @@ export type SpineIcon =
   | "burn" // Token burned / destroyed (e.g. a settled loan NFT) — flame
   | "extend" // Term renegotiated / duration extended — clock
   | "close" // The holder closed the position in one step with nothing left to draw (e.g. an Alchemix self-liquidation, collateral paying the debt) — lucide `log-out`, neutral ink: a holder action, never a hazard
+  | "dead-end" // Debt repaid from the position's own collateral, with nothing else moved — an Alchemix V2 `Liquidate`: the account holder selling their own collateral shares to clear their own debt, never a third party (rails-ops reference/alchemix-v2-frozen-record.md) — lucide `arrow-right-to-line`, neutral ink: a holder action, never a hazard
   | "no-change" // Operation that moved nothing (zero-delta adjust) — equals-in-circle
   | "custody" // Position moved between accounts (a receipt-token transfer run) — the paper plane in a neutral disc, the same custody mark a single row wears as `badge: "send"`
   | "swap" // A position swap: one asset became another under an order the owner signed, both legs staying in the position (rails-ops TO-DO-ui-jobs §15, §19) — a bare arrow-down-up at 45° in its axis hues, the legs stacked on the right flank (`swapLegs`)
@@ -1027,6 +1028,25 @@ export function SpineColumn({
               <span />
               <span />
               <LogOut
+                size={scale.tokenSize}
+                strokeWidth={1.5}
+                absoluteStrokeWidth
+                color="var(--color-rb-500)"
+                aria-hidden="true"
+              />
+              <span />
+              <span />
+            </div>
+          );
+        case "dead-end":
+          return (
+            <div
+              className="grid grid-rows-1 items-center justify-items-center"
+              style={{ gridTemplateColumns: scale.gridCols }}
+            >
+              <span />
+              <span />
+              <ArrowRightToLine
                 size={scale.tokenSize}
                 strokeWidth={1.5}
                 absoluteStrokeWidth

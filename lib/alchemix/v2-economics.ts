@@ -5,12 +5,18 @@
 // reference/alchemix-v2-frozen-record.md).
 //
 //   • The DEBT side, in the synthetic: minted over the account's life, and
-//     against it what was burned, and the debt a repayment or a liquidation
+//     against it what was burned, and the debt a Repay or a Liquidate
 //     cancelled (the log's `credit`). Before block 14,755,727 those two logs
 //     carried no credit, so a side with a pre-break row states neither total:
 //     a sum over part of them would read as the whole. What is left owing at
 //     close is the frozen read. The gap between the flows and it is the
 //     harvested yield, which paid the debt down every block with no log.
+//     V2's `Liquidate` is the account holder repaying their own debt by
+//     selling their own collateral shares — nobody else is involved, so its
+//     credit joins `exited` (voluntary) beside Repaid, never `liquidated`
+//     (rails-ops reference/alchemix-v2-frozen-record.md). V2 has no event for
+//     a third party acting on the account, so that bucket is always empty
+//     here.
 //   • The COLLATERAL side: what the account held at close, in the underlying,
 //     one line per underlying token. Deposits are logged in yield tokens and
 //     withdrawals in shares, two units that do not subtract, so no deposited or
@@ -81,18 +87,20 @@ export function computeAlchemixV2Economics(
       flowLabel: "Repaid",
     });
   }
-  const liquidatedLines: TowerLine[] =
-    liquidated.complete && liquidated.raw > BigInt(0)
-      ? [
-          {
-            key: "liquidated",
-            symbol: sym,
-            amount: scaled(liquidated.raw, SYNTHETIC_DECIMALS),
-            usd: null,
-            prov: v2SummedProv("Liquidated", sym, liquidated.count, coords),
-          },
-        ]
-      : [];
+  // A V2 Liquidate is the account holder repaying their own debt by selling
+  // their own collateral shares, so its credit is a voluntary exit beside
+  // Repaid — never the involuntary `liquidated` bucket, which V2 has no event
+  // to fill (rails-ops reference/alchemix-v2-frozen-record.md).
+  if (liquidated.complete && liquidated.raw > BigInt(0)) {
+    exited.push({
+      key: "liquidated",
+      symbol: sym,
+      amount: scaled(liquidated.raw, SYNTHETIC_DECIMALS),
+      usd: null,
+      prov: v2SummedProv("Repaid from collateral", sym, liquidated.count, coords),
+      flowLabel: "Repaid from collateral",
+    });
+  }
 
   const debt = p.frozenDebt;
   const owed =
@@ -155,7 +163,9 @@ export function computeAlchemixV2Economics(
     debt: {
       current: owed,
       exited,
-      liquidated: liquidatedLines,
+      // V2 has no event for a third party acting on the account, so this
+      // side never carries a line.
+      liquidated: [],
       lifetimeInflow: scaled(minted.raw, SYNTHETIC_DECIMALS),
     },
     collateralUnit: oneUnit ? held[0]?.symbol : undefined,

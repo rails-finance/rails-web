@@ -11,7 +11,11 @@
 //
 // SPINE GRAMMAR, as on the V3 card: the holder's own moves draw token rows on a
 // solid spine with the amount beside them at ≥sm and the header carrying the
-// verbs (detail-page-anatomy §4); a liquidation draws the critical triangle.
+// verbs (detail-page-anatomy §4). V2's `Liquidate` is one of those holder
+// moves, not an adverse one: it is the account holder repaying their own debt
+// by selling their own collateral shares, with no third party and no seizure
+// (rails-ops reference/alchemix-v2-frozen-record.md). It draws the dead-end
+// arrow on the same solid, agency spine, never the warning triangle.
 //
 // THE VERSION IS NAMED ON THE ROW where the timeline carries both versions (a
 // V3 position showing its holder's V2 account), and not on the V2 page, where
@@ -48,7 +52,11 @@ const VERB: Record<AlchemixV2Context["eventType"], string> = {
   mint: "Mint",
   burn: "Burn",
   repay: "Repay",
-  liquidate: "Liquidated",
+  // Alchemix V2's Liquidate is the account holder repaying their own debt by
+  // selling their own collateral shares — nobody else is involved, so the
+  // card reads as a repayment, not a liquidation (rails-ops
+  // reference/alchemix-v2-frozen-record.md).
+  liquidate: "Repay from collateral",
 };
 
 interface Amount {
@@ -146,9 +154,11 @@ function rowSpec(e: AlchemixV2Event, a: Amount | null, showVersion: boolean): Ch
       address: a.address,
       suffix: a.shares ? " shares" : undefined,
       label: VERB[d.eventType],
-      // The number hands off to the spine at ≥sm (a liquidation's warning
-      // spine carries none, and `critical` keeps it here).
+      // The number hands off to the spine at ≥sm — except a liquidate's
+      // dead-end icon carries no flank value of its own, so its amount stays
+      // in the header at every width.
       axisVerb: true,
+      noSpineCounterpart: d.eventType === "liquidate" ? true : undefined,
       prov: v2EmittedProv(a.field, a.symbol, a.raw, a.decimals, coords),
     });
   }
@@ -163,7 +173,6 @@ function rowSpec(e: AlchemixV2Event, a: Amount | null, showVersion: boolean): Ch
   }
   return {
     label: showVersion ? "V2" : "",
-    critical: d.eventType === "liquidate",
     deltas,
   };
 }
@@ -218,10 +227,13 @@ function explainer(e: AlchemixV2Event, a: Amount | null): string | null {
           : `${amt} was repaid. The log from before 11 May 2022 does not state how much debt that cleared.`
         : null;
     case "liquidate":
+      // Alchemix V2's Liquidate is the account holder's own action: it sells
+      // their collateral shares to repay their own debt, with no third party
+      // (rails-ops reference/alchemix-v2-frozen-record.md).
       return amt
         ? cleared
-          ? `${amt} shares were sold to clear ${cleared} of debt.`
-          : `${amt} shares were sold against the debt. The log from before 11 May 2022 does not state how much it cleared.`
+          ? `The holder repaid ${cleared} of debt by selling ${amt} shares of their own collateral.`
+          : `The holder sold ${amt} shares of their own collateral to repay debt. The log from before 11 May 2022 does not state how much debt that cleared.`
         : null;
     default:
       return null;
@@ -245,15 +257,11 @@ export function AlchemixV2EventCard({
   const d = event.context.data;
   const a = movedAmount(d);
   const iconSlot =
+    // Repayment styling, no warning: the holder's own action closes with the
+    // dead-end arrow on a solid (agency) spine, the same register as V3's
+    // self-liquidation `close` mark.
     d.eventType === "liquidate" ? (
-      <SpineColumn
-        icon="warning"
-        warningTone="critical"
-        warningLabel="Liquidation"
-        spine="dotted"
-        isFirst={isFirst}
-        isLast={!!isLast}
-      />
+      <SpineColumn icon="dead-end" isFirst={isFirst} isLast={!!isLast} />
     ) : (
       <SpineColumn tokens={spine(d, a)} isFirst={isFirst} isLast={!!isLast} />
     );

@@ -347,7 +347,11 @@ export const ALCHEMIX_V2: LearnMoreContent = {
     },
     {
       bold: "The debt it cleared",
-      text: "on a repay or a liquidation, where the log carries it. Logs from before 11 May 2022 do not.",
+      text: "on a Repay or a Liquidate, where the log carries it. Logs from before 11 May 2022 do not.",
+    },
+    {
+      bold: "A V2 Liquidate",
+      text: "is the account holder repaying their own debt by selling their own collateral shares. Nobody else is involved.",
     },
     {
       bold: "The account's figures",

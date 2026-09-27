@@ -222,7 +222,7 @@ export function AlchemixV2PositionView({
                 V2 paid debt down every block from the collateral&rsquo;s harvested yield, with no log at those blocks,
                 so the flows below do not add up to the debt at close.
                 {creditWithheld
-                  ? " A repayment or liquidation logged before 11 May 2022 does not state the debt it cleared, so no total of either is given."
+                  ? " A Repay or a Liquidate logged before 11 May 2022 does not state the debt it cleared, so no total of either is given."
                   : ""}
               </p>
             ) : null}
