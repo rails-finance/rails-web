@@ -215,6 +215,7 @@ import { normalize } from "viem/ens";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { enGb } from "./lib/date.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3612";
@@ -403,7 +404,7 @@ const durationText = (seconds) => {
 };
 /** …its `utcInstant`: en-GB, UTC, both pinned. */
 const utcInstant = (unixSeconds) =>
-  `${new Date(unixSeconds * 1000).toLocaleString("en-GB", {
+  `${enGb(new Date(unixSeconds * 1000), {
     day: "numeric",
     month: "short",
     year: "numeric",

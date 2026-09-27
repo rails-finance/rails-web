@@ -532,6 +532,7 @@
 import { chromium } from "playwright";
 import { RECENT_QS } from "./_timeline-window.mjs";
 import { BASE, bypassHeaders, hostFetch } from "./lib/host.mjs";
+import { enGb } from "./lib/date.mjs";
 
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(",")) : null;
 const SECONDS_PER_DAY = 86_400;
@@ -984,15 +985,14 @@ const monthShort = (idx) => `${MONTH_SHORT[idx % 12]} ${Math.floor(idx / 12)}`;
 const monthStartTs = (idx) => Math.floor(Date.UTC(Math.floor(idx / 12), idx % 12, 1) / 1000);
 /** The count line's own date register: "14 Nov 2025". */
 const dateText = (ts) =>
-  new Date(ts * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
+  enGb(new Date(ts * 1000), { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
 /** The Date button's OTHER register (picker-inline, 2026-09-25): a range that
  *  is not exactly one calendar month reads as short date – short date, "24
  *  Sep – 24 Sep" for a single day. Mirrors `timeline-toolbar.tsx`'s own
  *  `toLocaleDateString` call exactly, en dash included, so a check comparing
  *  strings is comparing the same format on both sides. */
 const shortRangeLabel = (fromTs, toTs) => {
-  const short = (ts) =>
-    new Date(ts * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric" });
+  const short = (ts) => enGb(new Date(ts * 1000), { timeZone: "UTC", month: "short", day: "numeric" });
   return `${short(fromTs)} – ${short(toTs)}`;
 };
 

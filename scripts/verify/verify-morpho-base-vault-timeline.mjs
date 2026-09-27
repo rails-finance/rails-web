@@ -234,6 +234,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LOADED_SPAN, NAMES_THE_CAP } from "../lib/timeline-draw.mjs";
+import { enGb } from "./lib/date.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE_URL = process.env.BASE ?? "http://localhost:3761";
@@ -424,7 +425,7 @@ const shareText = (raw, decimals) => {
 const pctText = (fraction) => `${(fraction * 100).toPrecision(4)}%`;
 /** …`lib/shared/format-event.ts` shortDate + shortDateYear: en-GB, UTC. */
 const dayPrefix = (unix) =>
-  `${new Date(unix * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric" })} '${String(
+  `${enGb(new Date(unix * 1000), { timeZone: "UTC", month: "short", day: "numeric" })} '${String(
     new Date(unix * 1000).getUTCFullYear(),
   ).slice(-2)}`;
 const dayKey = (unix) => new Date(unix * 1000).toISOString().slice(0, 10);

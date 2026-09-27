@@ -128,6 +128,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readPositionsRoute } from "../lib/read-positions-route.mjs";
+import { enGb } from "./lib/date.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE_URL = process.env.BASE ?? "http://localhost:3801";
@@ -235,7 +236,7 @@ const vaultRoot = (chain) => (chain === 8453 ? "/base/morpho/vaults" : "/ethereu
 
 /** components/vaults/aave-vault-format.ts `utcInstant` — en-GB, UTC, stated. */
 const utcInstant = (unixSeconds) =>
-  `${new Date(unixSeconds * 1000).toLocaleString("en-GB", {
+  `${enGb(new Date(unixSeconds * 1000), {
     day: "numeric",
     month: "short",
     year: "numeric",

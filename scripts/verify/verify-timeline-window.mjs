@@ -31,6 +31,7 @@
 
 import { chromium } from "@playwright/test";
 import { countLineText, parseCountLine, NAMES_THE_CAP } from "../lib/timeline-draw.mjs";
+import { enGb } from "./lib/date.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const WALLET = (process.env.WALLET ?? "0xee7ca610d896c53ffe716b801c05748efd902954").toLowerCase();
@@ -224,7 +225,7 @@ async function main() {
       // timestamps of the rows the API returned for it. `loaded` rows, oldest
       // and newest: one date where they sit inside a day.
       const day = (ts) =>
-        new Date(ts * 1000).toLocaleDateString("en-GB", {
+        enGb(new Date(ts * 1000), {
           timeZone: "UTC",
           day: "numeric",
           month: "short",

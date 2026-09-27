@@ -276,6 +276,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readPositionsRoute } from "../lib/read-positions-route.mjs";
+import { enGb } from "./lib/date.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3762";
@@ -372,7 +373,7 @@ const headline = (exact, value) => (Math.abs(value) >= 1000 ? formatApproximate(
 
 /** lib/date.ts `formatDate`: en-GB, UTC. */
 const ukDate = (unix) =>
-  new Date(unix * 1000).toLocaleDateString("en-GB", {
+  enGb(new Date(unix * 1000), {
     day: "numeric",
     month: "short",
     year: "numeric",

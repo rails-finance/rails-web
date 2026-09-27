@@ -259,6 +259,7 @@ import { mainnet } from "viem/chains";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { enGb } from "./lib/date.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3741";
@@ -465,7 +466,7 @@ const shareText = (raw, decimals) => {
 };
 /** …`lib/shared/format-event.ts` shortDate + shortDateYear: en-GB, UTC. */
 const dayPrefix = (unix) =>
-  `${new Date(unix * 1000).toLocaleDateString("en-GB", { timeZone: "UTC", month: "short", day: "numeric" })} '${String(
+  `${enGb(new Date(unix * 1000), { timeZone: "UTC", month: "short", day: "numeric" })} '${String(
     new Date(unix * 1000).getUTCFullYear(),
   ).slice(-2)}`;
 const dayKey = (unix) => new Date(unix * 1000).toISOString().slice(0, 10);
