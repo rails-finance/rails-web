@@ -49,6 +49,11 @@ export interface MorphoPositionSummary {
   isIdle: boolean;
   owner: string;
   status: MorphoPositionStatus;
+  /** The loan / collateral token's `decimals` did not load (the RPC did not
+   *  answer): every figure in that token is scaled by a stand-in, and the card
+   *  states "Not loaded" for it. */
+  loanDecimalsUnread?: true;
+  collateralDecimalsUnread?: true;
   /** Collateral held (exact, clamped >=0). */
   collateral: { amount: number; amountRaw: string; symbol: string | null };
   /** Net borrowed PRINCIPAL while open; 0 when closed (excludes accrued interest). */
@@ -247,6 +252,18 @@ function servedStatus(r: RawMorphoPositionRow): MorphoPositionStatus {
   return r.liquidated ? "liquidated" : "closed";
 }
 
+/** The row's unread-decimals flags. `meta.get(...) ?? fallback(...)` hides a
+ *  missing entry, so the fallback carries `unresolved` too. */
+function unreadFlags(
+  loan: Erc20Meta,
+  collateral: Erc20Meta | null,
+): Pick<MorphoPositionSummary, "loanDecimalsUnread" | "collateralDecimalsUnread"> {
+  return {
+    ...(loan.unresolved ? { loanDecimalsUnread: true as const } : {}),
+    ...(collateral?.unresolved ? { collateralDecimalsUnread: true as const } : {}),
+  };
+}
+
 /** Assemble the listing rows from the rails route's raw page slice. Filtering,
  *  sorting and pagination already happened server-side, so this only decodes
  *  params, resolves metadata and shapes the rows — order is preserved. */
@@ -269,6 +286,7 @@ export async function buildMorphoPositionRows(
     address: addr,
     symbol: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
     decimals: 18,
+    unresolved: true,
   });
 
   const out: MorphoPositionSummary[] = [];
@@ -327,6 +345,7 @@ export async function buildMorphoPositionRows(
       isIdle: p.isIdle,
       owner: r.borrower,
       status: servedStatus(r),
+      ...unreadFlags(loan, collateral),
       collateral: { amount: coll, amountRaw: r.coll_raw, symbol: collSym },
       borrowed: { amount: borrowedPrincipal, amountRaw: r.borr_raw, symbol: loanSym },
       peak: {
@@ -413,6 +432,7 @@ function listedRow(
     isIdle: p.isIdle,
     owner: r.borrower,
     status,
+    ...unreadFlags(loan, collateral),
     collateral: { amount: coll, amountRaw: r.coll_raw, symbol: collSym },
     borrowed: { amount: debt, amountRaw: debtRaw.toString(), symbol: loanSym },
     peak: { collateral: 0, collateralRaw: "0", borrowed: 0, borrowedRaw: "0" },

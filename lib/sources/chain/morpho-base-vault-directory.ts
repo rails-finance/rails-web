@@ -203,6 +203,9 @@ async function readDirectory(): Promise<MorphoBaseVaultDirectoryResponse> {
         const at = (name: (typeof CALLS)[number]) => ok(results[c][i * CALLS.length + CALLS.indexOf(name)]);
         const assetMeta = meta.get(vault.asset);
         const decimals = assetMeta?.decimals ?? 18;
+        // An asset whose decimals did not load has no known scale: its figures
+        // are not stated, and the row reads "Not loaded" for them.
+        const assetScaled = assetMeta != null && !assetMeta.unresolved;
         const totalAssetsRaw = at("totalAssets") as bigint | undefined;
         const totalSupplyRaw = at("totalSupply") as bigint | undefined;
         const sharePriceRaw = at("convertToAssets") as bigint | undefined;
@@ -220,9 +223,9 @@ async function readDirectory(): Promise<MorphoBaseVaultDirectoryResponse> {
             decimals,
             named: Boolean(assetMeta?.named),
           },
-          totalAssets: totalAssetsRaw == null ? null : amount(totalAssetsRaw, decimals),
+          totalAssets: totalAssetsRaw == null || !assetScaled ? null : amount(totalAssetsRaw, decimals),
           totalSupply: totalSupplyRaw == null ? null : amount(totalSupplyRaw, 18),
-          sharePrice: sharePriceRaw == null ? null : amount(sharePriceRaw, decimals),
+          sharePrice: sharePriceRaw == null || !assetScaled ? null : amount(sharePriceRaw, decimals),
           curator: curatorRaw == null || curatorRaw === ZERO_ADDR ? null : curatorRaw,
           owner: ownerRaw ?? null,
         });

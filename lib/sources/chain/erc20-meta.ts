@@ -34,6 +34,24 @@ export interface Erc20Meta {
   unresolved?: true;
 }
 
+/** `{ decimalsUnread: true }` for a token whose `decimals` did not load (no
+ *  metadata at all, or `unresolved`), else `{}` — spread into a row so a card
+ *  states "Not loaded" rather than an amount scaled by the 18 stand-in. */
+export function decimalsUnreadFlag(meta: { unresolved?: true } | null | undefined): { decimalsUnread?: true } {
+  return meta == null || meta.unresolved ? { decimalsUnread: true } : {};
+}
+
+/** Throws when any of `addresses` has no loaded `decimals`. For a live chain
+ *  overlay: a balance scaled by the 18 stand-in is a wrong amount, so the read
+ *  fails whole, the way it does when the balance itself does not answer. */
+export function assertDecimalsRead(metas: Map<string, { unresolved?: true }>, addresses: string[]): void {
+  const missing = addresses.filter((a) => {
+    const m = metas.get(a.toLowerCase());
+    return m == null || m.unresolved;
+  });
+  if (missing.length > 0) throw new Error(`token decimals not read: ${missing.join(", ")}`);
+}
+
 // Process-lifetime cache: symbol/decimals never change, so resolve each at most
 // once. Keyed `chainId:address` — the same address is a DIFFERENT token on a
 // different chain, and a chain-blind cache would serve Base a mainnet symbol.

@@ -15,6 +15,7 @@ import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { StatValue, StatFootnote, StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
+import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { WalletPill } from "@/components/shared/wallet-pill";
@@ -62,6 +63,10 @@ export interface MorphoPositionView {
   /** "unread" is a listing row whose account has not been read from the
    *  chain yet — no state recorded, never mapped to "closed" (0018). */
   status: "open" | "closed" | "liquidated" | "unread";
+  /** The loan / collateral token's decimals did not load, so every figure in
+   *  that token reads "Not loaded" (MorphoPositionSummary.loanDecimalsUnread). */
+  loanDecimalsUnread?: true;
+  collateralDecimalsUnread?: true;
   collateral: number;
   borrowed: number;
   /** Highest recorded collateral / borrowed principal over the life (closed cards). */
@@ -151,6 +156,20 @@ export function MorphoPositionCard({
   const coords: MorphoCoords = { marketId: v.marketId, chainId: useChainId(), source: useCaptureSource() };
   const hasColl = v.collateral > 0;
   const collSym = v.collateralSymbol ?? "—";
+  // A token whose decimals did not load has no known scale: its figures name
+  // the token and state no amount.
+  const collFigure = (value: number) =>
+    v.collateralDecimalsUnread ? (
+      <TokenAmountNotLoaded address={v.collateralToken ?? ""} label={collSym} />
+    ) : (
+      <AssetAmount value={value} symbol={collSym} address={v.collateralToken} />
+    );
+  const loanFigure = (value: number) =>
+    v.loanDecimalsUnread ? (
+      <TokenAmountNotLoaded address={v.loanToken ?? ""} label={v.loanSymbol} />
+    ) : (
+      <AssetAmount value={value} symbol={v.loanSymbol} address={v.loanToken} />
+    );
   // The "?" cell every state panel owns — the same content function serves
   // Morpho on Ethereum and Morpho Blue on Base; only the deployment named by
   // the card's own session changes the prose.
@@ -243,15 +262,13 @@ export function MorphoPositionCard({
               label: CARD_VOCAB.collateral,
               value: hasColl ? (
                 <StatValue>
-                  <Prov info={R.collateral(collSym, L.block)}>
-                    <AssetAmount value={v.collateral} symbol={collSym} address={v.collateralToken} />
-                  </Prov>
+                  <Prov info={R.collateral(collSym, L.block)}>{collFigure(v.collateral)}</Prov>
                 </StatValue>
               ) : (
                 <StatDash />
               ),
               footnote:
-                hasColl && L.collateralValue != null ? (
+                hasColl && L.collateralValue != null && !v.loanDecimalsUnread ? (
                   <StatFootnote>
                     <Prov info={R.collateralValue(collSym, v.loanSymbol, L.block)}>
                       worth {formatNumber(L.collateralValue)} {v.loanSymbol} at the market&rsquo;s oracle
@@ -274,7 +291,7 @@ export function MorphoPositionCard({
                       L.block,
                     )}
                   >
-                    <AssetAmount value={v.borrowed} symbol={v.loanSymbol} address={v.loanToken} />
+                    {loanFigure(v.borrowed)}
                   </Prov>
                 </StatValue>
               ) : (
@@ -328,9 +345,7 @@ export function MorphoPositionCard({
               <StatDash />
             ) : v.peakCollateral > 0 ? (
               <StatValue>
-                <Prov info={morphoPeakCollateralProv(collSym, coords)}>
-                  <AssetAmount value={v.peakCollateral} symbol={collSym} address={v.collateralToken} />
-                </Prov>
+                <Prov info={morphoPeakCollateralProv(collSym, coords)}>{collFigure(v.peakCollateral)}</Prov>
               </StatValue>
             ) : (
               <StatDash />
@@ -350,9 +365,7 @@ export function MorphoPositionCard({
               <StatDash />
             ) : v.peakBorrowed > 0 ? (
               <StatValue>
-                <Prov info={morphoPeakBorrowedProv(v.loanSymbol, coords)}>
-                  <AssetAmount value={v.peakBorrowed} symbol={v.loanSymbol} address={v.loanToken} />
-                </Prov>
+                <Prov info={morphoPeakBorrowedProv(v.loanSymbol, coords)}>{loanFigure(v.peakBorrowed)}</Prov>
               </StatValue>
             ) : (
               <StatDash />
@@ -416,9 +429,7 @@ export function MorphoPositionCard({
             label: CARD_VOCAB.collateral,
             value: hasColl ? (
               <StatValue>
-                <Prov info={positionCollateralProv(collSym, v.atBlock, coords)}>
-                  <AssetAmount value={v.collateral} symbol={collSym} address={v.collateralToken} />
-                </Prov>
+                <Prov info={positionCollateralProv(collSym, v.atBlock, coords)}>{collFigure(v.collateral)}</Prov>
               </StatValue>
             ) : (
               <StatDash />
@@ -428,9 +439,7 @@ export function MorphoPositionCard({
             label: CARD_VOCAB.debt,
             value: (
               <StatValue>
-                <Prov info={positionBorrowedProv(v.loanSymbol, v.atBlock, coords)}>
-                  <AssetAmount value={v.borrowed} symbol={v.loanSymbol} address={v.loanToken} />
-                </Prov>
+                <Prov info={positionBorrowedProv(v.loanSymbol, v.atBlock, coords)}>{loanFigure(v.borrowed)}</Prov>
               </StatValue>
             ),
             footnote: <StatFootnote>principal (ex-interest)</StatFootnote>,
@@ -449,23 +458,26 @@ export function MorphoPositionCard({
                     v.currentDebt.index,
                   )}
                 >
-                  <AssetAmount value={v.currentDebt.amount} symbol={v.loanSymbol} address={v.loanToken} />
+                  {loanFigure(v.currentDebt.amount)}
                 </Prov>
               </StatValue>
             ) : (
               <StatDash />
             ),
-            footnote: v.currentDebt ? (
-              <StatFootnote>
-                <Prov info={morphoAccruedProv(v.loanSymbol)}>+{formatNumber(v.currentDebt.accruedAmount)} accrued</Prov>
-                {v.currentDebt.index?.stale && (
-                  <div>
-                    interest to {formatDate(v.currentDebt.index.readAt)} (block{" "}
-                    {v.currentDebt.index.block.toLocaleString("en-US")})
-                  </div>
-                )}
-              </StatFootnote>
-            ) : undefined,
+            footnote:
+              v.currentDebt && !v.loanDecimalsUnread ? (
+                <StatFootnote>
+                  <Prov info={morphoAccruedProv(v.loanSymbol)}>
+                    +{formatNumber(v.currentDebt.accruedAmount)} accrued
+                  </Prov>
+                  {v.currentDebt.index?.stale && (
+                    <div>
+                      interest to {formatDate(v.currentDebt.index.readAt)} (block{" "}
+                      {v.currentDebt.index.block.toLocaleString("en-US")})
+                    </div>
+                  )}
+                </StatFootnote>
+              ) : undefined,
           },
         ]}
       />
@@ -486,6 +498,8 @@ export function viewFromSummary(s: MorphoPositionSummary): MorphoPositionView {
     isIdle: s.isIdle,
     owner: s.owner,
     status: s.status,
+    ...(s.loanDecimalsUnread ? { loanDecimalsUnread: true as const } : {}),
+    ...(s.collateralDecimalsUnread ? { collateralDecimalsUnread: true as const } : {}),
     collateral: s.collateral.amount,
     borrowed: s.borrowed.amount,
     peakCollateral: s.peak.collateral,

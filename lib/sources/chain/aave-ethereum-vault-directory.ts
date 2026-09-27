@@ -329,6 +329,9 @@ async function readDirectory(): Promise<AaveEthereumVaultDirectoryResponse> {
       const assetAddress = assets[i];
       const assetMeta = assetAddress ? tokens.get(assetAddress) : undefined;
       const assetDecimals = assetMeta?.decimals ?? 18;
+      // An asset whose decimals did not load has no known scale: its figures
+      // are not stated, and the row reads "Not loaded" for them.
+      const assetScaled = assetMeta != null && !assetMeta.unresolved;
       const dec = shareDecimals[i];
       const totalAssetsRaw = at(i, "totalAssets") as bigint | undefined;
       const totalSupplyRaw = at(i, "totalSupply") as bigint | undefined;
@@ -352,9 +355,9 @@ async function readDirectory(): Promise<AaveEthereumVaultDirectoryResponse> {
           decimals: assetDecimals,
           named: Boolean(assetMeta?.named),
         },
-        totalAssets: totalAssetsRaw == null ? null : amount(totalAssetsRaw, assetDecimals),
+        totalAssets: totalAssetsRaw == null || !assetScaled ? null : amount(totalAssetsRaw, assetDecimals),
         totalSupply: totalSupplyRaw == null || dec == null ? null : amount(totalSupplyRaw, dec),
-        sharePrice: sharePriceRaw == null ? null : amount(sharePriceRaw, assetDecimals),
+        sharePrice: sharePriceRaw == null || !assetScaled ? null : amount(sharePriceRaw, assetDecimals),
         aToken: ((answered(i, "aToken") as string | undefined) ?? null)?.toLowerCase() ?? null,
         cooldownSeconds: cooldown == null ? null : Number(cooldown),
         unstakeWindowSeconds: unstakeWindow == null ? null : Number(unstakeWindow),
@@ -364,7 +367,7 @@ async function readDirectory(): Promise<AaveEthereumVaultDirectoryResponse> {
             : { address: reserveAddress, symbol: reserveMeta?.symbol ?? reserveAddress.slice(0, 6) },
         reserveSlashable: slashable == null ? null : slashable[0],
         targetRateBps: targetRate == null ? null : Number(targetRate),
-        supplyCap: supplyCap == null ? null : amount(supplyCap, assetDecimals),
+        supplyCap: supplyCap == null || !assetScaled ? null : amount(supplyCap, assetDecimals),
       };
     });
 

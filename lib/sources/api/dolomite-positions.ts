@@ -50,6 +50,10 @@ export interface DolomiteBalanceAmount {
   current: number | null;
   /** The raw integer wei behind `current` (unsigned string). */
   currentRaw: string | null;
+  /** Neither the index nor the market-state read named this market's
+   *  decimals, so `par` / `current` are scaled by a stand-in and the card
+   *  states "Not loaded" for the leg. */
+  decimalsUnread?: true;
 }
 
 export interface DolomitePositionSummary {
@@ -97,6 +101,8 @@ export interface DolomitePeakAmount {
   /** |peak par| scaled by decimals — par, not wei (labeled so). */
   amount: number;
   amountRaw: string;
+  /** As DolomiteBalanceAmount.decimalsUnread. */
+  decimalsUnread?: true;
 }
 
 /** One market leg as the rails route returns it (pre-presentation).
@@ -205,6 +211,7 @@ export async function buildDolomitePositionRows(raw: RawDolomiteAccountRow[]): P
         parRaw: par.toString(),
         current: currentRaw != null ? scale(currentRaw, decimals) : null,
         currentRaw: currentRaw != null ? currentRaw.toString() : null,
+        ...(b.decimals == null && st?.decimals == null ? { decimalsUnread: true as const } : {}),
       };
       if (par > ZERO) supplies.push(leg);
       else borrows.push(leg);
@@ -223,10 +230,25 @@ export async function buildDolomitePositionRows(raw: RawDolomiteAccountRow[]): P
       const sup = bigintOf(p.peakSupplyParRaw);
       const dbt = bigintOf(p.peakBorrowParRaw);
       const dbtMag = dbt < ZERO ? -dbt : dbt;
+      const unread = p.decimals == null && st?.decimals == null ? { decimalsUnread: true as const } : {};
       if (sup > ZERO)
-        peakSupplies.push({ marketId, symbol, decimals, amount: scale(sup, decimals), amountRaw: sup.toString() });
+        peakSupplies.push({
+          marketId,
+          symbol,
+          decimals,
+          amount: scale(sup, decimals),
+          amountRaw: sup.toString(),
+          ...unread,
+        });
       if (dbtMag > ZERO)
-        peakBorrows.push({ marketId, symbol, decimals, amount: scale(dbtMag, decimals), amountRaw: dbtMag.toString() });
+        peakBorrows.push({
+          marketId,
+          symbol,
+          decimals,
+          amount: scale(dbtMag, decimals),
+          amountRaw: dbtMag.toString(),
+          ...unread,
+        });
     }
 
     return {

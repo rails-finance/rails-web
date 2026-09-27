@@ -30,6 +30,7 @@ function totalUsd(position: SparkPositionSummary, reserves: SparkReserveAmount[]
   let sum = 0;
   let any = false;
   for (const r of reserves) {
+    if (r.decimalsUnread) return null;
     if (r.amount <= 0) continue;
     const u = reserveUsd(position, r.address, r.amount);
     if (u == null) return null;
@@ -42,7 +43,7 @@ function totalUsd(position: SparkPositionSummary, reserves: SparkReserveAmount[]
 function largest(reserves: SparkReserveAmount[]): SparkReserveAmount | null {
   let best: SparkReserveAmount | null = null;
   for (const r of reserves) {
-    if (r.amount > 0 && (!best || r.amount > best.amount)) best = r;
+    if (!r.decimalsUnread && r.amount > 0 && (!best || r.amount > best.amount)) best = r;
   }
   return best;
 }

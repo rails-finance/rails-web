@@ -107,7 +107,7 @@
 
 import { parseAbi, type ContractFunctionParameters } from "viem";
 import { chainBatchClient } from "./rpc";
-import { resolveErc20Meta } from "./erc20-meta";
+import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import type { RawAmount } from "./morpho-base-vault";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import {
@@ -807,6 +807,9 @@ export async function loadAaveEthereumVault(vault: string, holder?: string): Pro
     if (assetAddress) toName.add(assetAddress);
     if (reserveAddress) toName.add(reserveAddress);
     const tokens = await resolveErc20Meta([...toName], MAINNET_CHAIN_ID);
+    // Every asset figure on the page scales by these decimals: without them
+    // the read fails whole rather than state amounts scaled by the 18 stand-in.
+    assertDecimalsRead(tokens, [...toName]);
     const named = (addr: string | null): AaveVaultToken | null => {
       if (!addr) return null;
       const meta = tokens.get(addr);

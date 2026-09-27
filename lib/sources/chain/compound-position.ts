@@ -207,7 +207,9 @@ async function loadCompoundPositions(
       return {
         address: addr,
         symbol: meta?.symbol ?? `${addr.slice(0, 6)}…${addr.slice(-4)}`,
-        decimals: meta?.decimals ?? 18,
+        // Comet's own asset scale is 10^decimals, so a token whose decimals()
+        // did not answer still scales by the market's word, never by 18.
+        decimals: meta && !meta.unresolved ? meta.decimals : h.info.scale.toString().length - 1,
         balanceRaw: h.balance.toString(),
         price: h.price,
         borrowCollateralFactor: bcf,

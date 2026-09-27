@@ -68,7 +68,7 @@ function marketSection(view: CompoundPositionView, chain: CompoundMarketChainRes
       lines.push(`- **Highest recorded lent base:** ${amt(view.peak.lentBase)} ${view.base.symbol}`);
     }
     for (const c of view.peak.collateral) {
-      lines.push(`- **Highest recorded collateral:** ${amt(c.amount)} ${c.symbol}`);
+      lines.push(`- **Highest recorded collateral:** ${c.decimalsUnread ? "not loaded" : amt(c.amount)} ${c.symbol}`);
     }
     if (view.peak.borrowedBase > 0) {
       lines.push(`- **Highest recorded borrowed principal:** ${amt(view.peak.borrowedBase)} ${view.base.symbol}`);
@@ -90,7 +90,11 @@ function marketSection(view: CompoundPositionView, chain: CompoundMarketChainRes
   if (view.collateral.length > 0) {
     lines.push(`- **Collateral (non-earning):**`);
     for (const c of view.collateral) {
-      lines.push(`  - ${tokenWithUsd(view, c.address, c.amount, c.symbol)}`);
+      lines.push(
+        c.decimalsUnread
+          ? `  - not loaded ${c.symbol} (the chain didn't answer for this token's decimals, ${c.address})`
+          : `  - ${tokenWithUsd(view, c.address, c.amount, c.symbol)}`,
+      );
     }
   }
 

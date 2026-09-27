@@ -28,7 +28,7 @@
 
 import { getAddress } from "viem";
 import { alchemyClient } from "./rpc";
-import { resolveErc20Meta, scaleRaw } from "./erc20-meta";
+import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import { FLUID_ADDRESSES, fluidOraclePriceScale, isFluidEthSentinel, vaultKindOf } from "@/lib/fluid/asset-catalog";
 import { FLUID_VAULT_RESOLVER_ABI } from "@/lib/fluid/vault-resolver-abi";
 
@@ -221,6 +221,14 @@ export async function loadFluidPositionFromChain(nftIdRaw: string): Promise<Flui
       ...(smartDebt ? [borrowToken1] : []),
     ].filter((a) => !isFluidEthSentinel(a) && BigInt(a) !== ZERO);
     const meta = await resolveErc20Meta(wanted);
+    // A token leg scales by its decimals (and so does the oracle price): without
+    // them the read fails whole rather than state figures scaled by a stand-in.
+    assertDecimalsRead(
+      meta,
+      [...(smartCol ? [] : [supplyToken]), ...(smartDebt ? [] : [borrowToken])].filter(
+        (a) => !isFluidEthSentinel(a) && BigInt(a) !== ZERO,
+      ),
+    );
     const supplyMeta = smartCol ? null : (meta.get(supplyToken.toLowerCase()) ?? null);
     const borrowMeta = smartDebt ? null : (meta.get(borrowToken.toLowerCase()) ?? null);
     const sideName = (addr: string): string | null => {

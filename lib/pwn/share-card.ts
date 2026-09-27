@@ -34,6 +34,7 @@ const STATUS_WORD: Record<PwnPositionSummary["status"], string> = {
 function assetValue(asset: PwnAsset): string {
   const isNft = asset.category === "ERC721" || asset.category === "ERC1155";
   if (isNft && asset.tokenId != null) return `${asset.symbol} #${shortTokenId(asset.tokenId)}`;
+  if (asset.decimalsUnread) return `Not loaded ${asset.symbol}`;
   return `${formatCompact(asset.amount)} ${asset.symbol}`;
 }
 
@@ -57,7 +58,7 @@ export function pwnShareCardModel(summaries: PwnPositionSummary[] | null, wallet
     // outside the three-stat cap here.
     if (loan.collateral) stats.push({ label: CARD_VOCAB.collateral, value: assetValue(loan.collateral) });
     if (loan.credit) stats.push({ label: CARD_VOCAB.debt, value: assetValue(loan.credit) });
-    if (loan.repayAmount != null && loan.credit) {
+    if (loan.repayAmount != null && loan.credit && !loan.credit.decimalsUnread) {
       stats.push({ label: "Repay", value: `${formatCompact(loan.repayAmount)} ${loan.credit.symbol}` });
     }
   } else {

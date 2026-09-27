@@ -9,7 +9,7 @@
 // so no lookup), scales the signed base and each collateral line, and shapes a
 // CompoundPositionSummary. Chain-direct amounts only — no HF, no USD (layers).
 
-import { resolveErc20Meta, scaleRaw, type Erc20Meta } from "@/lib/sources/chain/erc20-meta";
+import { resolveErc20Meta, scaleRaw, decimalsUnreadFlag, type Erc20Meta } from "@/lib/sources/chain/erc20-meta";
 import { resolveCometPrices, cometPriceOf, type CometPriceRequest } from "@/lib/sources/chain/compound-prices";
 import { marketOf, COMPOUND_DEPLOYMENT, type CometDeployment, type CometMarket } from "@/lib/compound/asset-catalog";
 
@@ -32,6 +32,9 @@ export interface CompoundAssetAmount {
   decimals: number;
   amount: number;
   amountRaw: string;
+  /** The token's `decimals` did not load (the RPC did not answer), so `amount`
+   *  is scaled by a stand-in and the card states no amount for this asset. */
+  decimalsUnread?: true;
 }
 
 /** The signed base position for a market. */
@@ -208,13 +211,16 @@ export async function buildCompoundPositionRows(
       const rawAmt = bigintOf(c.amountRaw);
       if (rawAmt <= ZERO) continue;
       const amount = scaleRaw(rawAmt, meta.decimals);
-      if (amount <= DUST) continue;
+      const unread = decimalsUnreadFlag(metas.get(addr));
+      // The dust floor needs a known scale: an unread token is kept and named.
+      if (amount <= DUST && !unread.decimalsUnread) continue;
       collateral.push({
         symbol: meta.symbol,
         address: addr,
         decimals: meta.decimals,
         amount,
         amountRaw: c.amountRaw,
+        ...unread,
         _rank: rawAmt,
       });
     }
@@ -233,13 +239,16 @@ export async function buildCompoundPositionRows(
       const rawAmt = bigintOf(c.amountRaw);
       if (rawAmt <= ZERO) continue;
       const amount = scaleRaw(rawAmt, meta.decimals);
-      if (amount <= DUST) continue;
+      const unread = decimalsUnreadFlag(metas.get(addr));
+      // The dust floor needs a known scale: an unread token is kept and named.
+      if (amount <= DUST && !unread.decimalsUnread) continue;
       peakCollateral.push({
         symbol: meta.symbol,
         address: addr,
         decimals: meta.decimals,
         amount,
         amountRaw: c.amountRaw,
+        ...unread,
         _rank: rawAmt,
       });
     }

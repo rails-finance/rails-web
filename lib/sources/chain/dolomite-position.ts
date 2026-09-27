@@ -27,7 +27,7 @@
 
 import { getAddress, parseAbi } from "viem";
 import { alchemyClient } from "./rpc";
-import { resolveErc20Meta } from "./erc20-meta";
+import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import {
   DOLOMITE_ADDRESSES,
   DOLOMITE_BASE,
@@ -174,6 +174,9 @@ export async function loadDolomitePositionFromChain(
     }
     const tokens = bals[1].map((t) => getAddress(t).toLowerCase());
     const meta = await resolveErc20Meta(tokens);
+    // Balances and the oracle's price scale both hang on these decimals: without
+    // them the read fails whole rather than state figures scaled by the 18 stand-in.
+    assertDecimalsRead(meta, tokens);
 
     const balances: DolomiteChainBalance[] = marketIds.map((marketId, i) => {
       const base = i * PER_MARKET;

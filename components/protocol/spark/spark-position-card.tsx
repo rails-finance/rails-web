@@ -19,6 +19,7 @@ import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
@@ -88,6 +89,7 @@ function totalUsd(v: SparkPositionView, reserves: SparkReserveAmount[]): number 
   let sum = 0;
   let any = false;
   for (const r of reserves) {
+    if (r.decimalsUnread) return null;
     if (r.amount <= 0) continue;
     const u = reserveUsd(v, r.address, r.amount);
     if (u == null) return null;
@@ -105,7 +107,7 @@ function totalUsd(v: SparkPositionView, reserves: SparkReserveAmount[]): number 
 function rankByValue(v: SparkPositionView, reserves: SparkReserveAmount[]): SparkReserveAmount[] {
   const usd = new Map<string, number>();
   for (const r of reserves) {
-    const u = reserveUsd(v, r.address, r.amount);
+    const u = r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
     if (u == null) return reserves;
     usd.set(r.address, u);
   }
@@ -128,6 +130,12 @@ function ReserveFootnoteLines({
   return (
     <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
       {reserves.map((r) => {
+        if (r.decimalsUnread)
+          return (
+            <div key={r.address}>
+              <TokenAmountNotLoaded address={r.address} label={r.symbol} />
+            </div>
+          );
         const exact = formatUnitsExact(r.amountRaw, r.decimals);
         return (
           <div key={r.address}>
@@ -222,7 +230,11 @@ function ReserveStack({
       {reserves.map((r) => (
         <StatValue key={r.address}>
           <Prov info={side === "supply" ? positionSupplyProv(r.symbol, atBlock) : positionDebtProv(r.symbol, atBlock)}>
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            {r.decimalsUnread ? (
+              <TokenAmountNotLoaded address={r.address} label={r.symbol} />
+            ) : (
+              <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            )}
           </Prov>
         </StatValue>
       ))}
@@ -243,7 +255,11 @@ function PeakStack({ reserves, side }: { reserves: SparkReserveAmount[]; side: "
       {reserves.map((r) => (
         <StatValue key={r.address}>
           <Prov info={side === "supply" ? sparkPeakSupplyProv(r.symbol) : sparkPeakBorrowProv(r.symbol)}>
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            {r.decimalsUnread ? (
+              <TokenAmountNotLoaded address={r.address} label={r.symbol} />
+            ) : (
+              <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            )}
           </Prov>
         </StatValue>
       ))}
@@ -385,7 +401,7 @@ export function SparkPositionCard({
             assetIcons:
               v.supplies.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={suppliesRanked.map((r) => r.symbol)} />
+                  <InlineAssetCluster symbols={loadedSymbols(suppliesRanked)} />
                   <ReserveDisclosureToggle disclosure={supplyDisclosure} count={v.supplies.length} />
                 </span>
               ) : undefined,
@@ -416,7 +432,7 @@ export function SparkPositionCard({
             assetIcons:
               v.borrows.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={borrowsRanked.map((r) => r.symbol)} />
+                  <InlineAssetCluster symbols={loadedSymbols(borrowsRanked)} />
                   <ReserveDisclosureToggle disclosure={debtDisclosure} count={v.borrows.length} />
                 </span>
               ) : undefined,

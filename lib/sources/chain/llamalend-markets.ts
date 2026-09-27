@@ -39,7 +39,7 @@
 
 import { getAddress, parseAbi, keccak256, toHex } from "viem";
 import { alchemyClient } from "./rpc";
-import { resolveErc20Meta, scaleRaw } from "./erc20-meta";
+import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import {
   LLAMALEND_ADDRESSES,
   SECONDS_PER_YEAR,
@@ -329,6 +329,10 @@ export async function discoverLlamalendMarkets(): Promise<LlamalendMarketMap> {
       contracts: pending.map((p) => ({ address: p.amm as `0x${string}`, abi: AMM_ABI, functionName: "A" }) as const),
     }) as Promise<Res[]>,
   ]);
+
+  // A token whose decimals did not load would cache a mis-scaled market for
+  // the TTL: the sweep fails instead, as it does when discovery finds nothing.
+  assertDecimalsRead(meta, tokens);
 
   const map: LlamalendMarketMap = new Map();
   pending.forEach((p, i) => {

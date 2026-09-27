@@ -10,7 +10,7 @@
 
 import { parseAbi } from "viem";
 import { alchemyClient } from "./rpc";
-import { resolveErc20Meta, scaleRaw } from "./erc20-meta";
+import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import { PWN_ADDRESSES } from "@/lib/pwn/asset-catalog";
 import type { PwnBundleAsset, PwnBundleContentsResponse } from "@/lib/api/fetch-pwn-bundle";
 
@@ -36,6 +36,12 @@ export async function loadPwnBundleContents(bundleId: string, atBlock: number): 
   });
 
   const metas = await resolveErc20Meta(raw.map((t) => t.assetAddress.toLowerCase()));
+  // An ERC20 in the bundle scales by its decimals: without them the read fails
+  // whole rather than state an amount scaled by the 18 stand-in.
+  assertDecimalsRead(
+    metas,
+    raw.filter((t) => categoryOf(t.category) === "ERC20").map((t) => t.assetAddress),
+  );
 
   const assets: PwnBundleAsset[] = raw.map((t) => {
     const address = t.assetAddress.toLowerCase();

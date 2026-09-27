@@ -19,7 +19,7 @@
 
 import { getAddress, parseAbi } from "viem";
 import { alchemyClient, chainClient } from "./rpc";
-import { resolveErc20Meta, scaleRaw } from "./erc20-meta";
+import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import {
   MOONWELL_MARKETS,
   MOONWELL_ADDRESSES,
@@ -402,6 +402,9 @@ export async function loadMoonwellMarkets(
       if (und && !isZeroAddr(und)) wanted.push(und);
     });
     const meta = await resolveErc20Meta(wanted, deployment.chainId);
+    // Every market figure scales by its underlying's decimals: without them the
+    // read fails whole rather than state amounts scaled by the 18 stand-in.
+    assertDecimalsRead(meta, wanted);
 
     const markets: MoonwellMarketRow[] = mTokens.map((c, i) => {
       const base = i * PER_MARKET;

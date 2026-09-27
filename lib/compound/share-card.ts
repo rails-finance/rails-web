@@ -26,7 +26,7 @@ const STATUS_WORD: Record<CompoundPositionSummary["status"], string> = {
   closed: "Closed",
   liquidated: "Liquidated",
   // No state recorded for the account yet (0018); never read as closed.
-  unread: "Unread",
+  unread: "Not loaded",
 };
 
 /** One named token amount — the shape both Compound mappers pick a "largest"
@@ -100,13 +100,16 @@ export function compoundShareCardModel(
       ...(eff.side === "lend" ? [{ address: position.base.address, amount: eff.amount }] : []),
       ...position.collateral.map((c) => ({ address: c.address, amount: c.amount })),
     ];
-    const supplyUsd = totalUsd(position.priceByAddress, supplyLegs);
+    // A collateral whose decimals did not load has no known amount: no total
+    // stands over it, and it is never the headline.
+    const anyUnread = position.collateral.some((c) => c.decimalsUnread);
+    const supplyUsd = anyUnread ? null : totalUsd(position.priceByAddress, supplyLegs);
     if (supplyUsd != null) {
       stats.push({ label: CARD_VOCAB.collateral, value: formatUsd(supplyUsd) });
     } else {
       const assets: CompoundAssetLike[] = [
         ...(eff.side === "lend" ? [{ symbol: position.base.symbol, amount: eff.amount }] : []),
-        ...position.collateral.map((c) => ({ symbol: c.symbol, amount: c.amount })),
+        ...position.collateral.filter((c) => !c.decimalsUnread).map((c) => ({ symbol: c.symbol, amount: c.amount })),
       ];
       const top = largestCompoundAsset(assets);
       if (top) stats.push({ label: CARD_VOCAB.collateral, value: `${formatCompact(top.amount)} ${top.symbol}` });
@@ -128,7 +131,7 @@ export function compoundShareCardModel(
     // amounts only, no USD, matching the detail card's own closed layout.
     const supplyPeaks: CompoundAssetLike[] = [
       ...(position.peak.lentBase > 0 ? [{ symbol: position.base.symbol, amount: position.peak.lentBase }] : []),
-      ...position.peak.collateral.map((c) => ({ symbol: c.symbol, amount: c.amount })),
+      ...position.peak.collateral.filter((c) => !c.decimalsUnread).map((c) => ({ symbol: c.symbol, amount: c.amount })),
     ];
     const supplyOnly = position.peak.collateral.length === 0 && position.peak.lentBase > 0;
     const topSupply = largestCompoundAsset(supplyPeaks);

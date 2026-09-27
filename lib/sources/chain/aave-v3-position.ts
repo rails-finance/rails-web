@@ -20,6 +20,7 @@ import { chainClient } from "./rpc";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { AAVE_V3_POOL, V3_LT_BY_ADDR } from "@/lib/aave-v3/asset-catalog";
 import { resolveV3Tokens } from "./aave-v3-tokens";
+import { assertDecimalsRead } from "./erc20-meta";
 import type { AaveV3ChainReserve, AaveV3EMode, AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
 
 const POOL_ABI = parseAbi([
@@ -289,6 +290,12 @@ export async function loadAaveV3PositionFromChain(
 
     // Symbols/decimals for the reserves with any balance.
     const metas = await resolveV3Tokens(reserves, chainId);
+    // A held reserve whose decimals did not load would scale by the 18 stand-in:
+    // the read fails whole instead, and the caller keeps its indexed figures.
+    assertDecimalsRead(
+      metas,
+      reserveData.filter((_, i) => balances[i * 4] > ZERO || balances[i * 4 + 1] > ZERO).map((r) => r.addr),
+    );
 
     const out: AaveV3ChainReserve[] = [];
     let supplyAssetCount = 0;

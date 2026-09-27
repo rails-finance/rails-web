@@ -86,6 +86,9 @@ export interface MorphoMarketRow {
   /** False when the loan token's own decimals() does not survive resolveDecimalsTrust — the
    *  amounts below cannot be scaled to a quantity, so the page must not state them. */
   amountsTrusted: boolean;
+  /** The loan token's decimals() did not load (the RPC did not answer): `amountsTrusted`
+   *  is false for that reason, and the page says "Not loaded" rather than "misreports". */
+  loanDecimalsUnread?: true;
 
   /** The one rung, as a 0..1 fraction. Borrow limit AND liquidation line — Morpho has one
    *  number, not two. Zero on an idle market, where nobody can ever borrow. */
@@ -127,6 +130,8 @@ export interface MorphoLoanGroup {
   /** False when this token's decimals() cannot be trusted: the group's totals are then not a
    *  quantity of anything and the page states none. */
   amountsTrusted: boolean;
+  /** As MorphoMarketRow.loanDecimalsUnread. */
+  loanDecimalsUnread?: true;
   markets: MorphoMarketRow[];
   totalSupply: number;
   totalBorrow: number;
@@ -259,7 +264,8 @@ function marketRow(
   const loan = meta.get(m.loanToken);
   const coll = m.collateralToken === ZERO_ADDR ? undefined : meta.get(m.collateralToken);
   const loanDecimals = loan?.decimals ?? 18;
-  const amountsTrusted = trust.get(m.loanToken) ?? true;
+  const loanUnread = loan == null || loan.unresolved === true;
+  const amountsTrusted = (trust.get(m.loanToken) ?? true) && !loanUnread;
 
   // Stored state, not projected — see the note at the top of this file.
   const totalSupply = scaleRaw(totalSupplyAssets, loanDecimals);
@@ -287,6 +293,7 @@ function marketRow(
     collateralSymbol: coll?.symbol ?? null,
     collateralNamed: Boolean(coll?.named),
     amountsTrusted,
+    ...(loanUnread ? { loanDecimalsUnread: true as const } : {}),
 
     lltv,
     // Derived, not configured — the whole point. Undefined at lltv 0, where the formula
@@ -393,7 +400,8 @@ export async function loadMorphoMarketsFromChain(
         loanSymbol: m0?.symbol ?? loanToken.slice(0, 6),
         loanDecimals: m0?.decimals ?? 18,
         loanNamed: Boolean(m0?.named),
-        amountsTrusted: trust.get(loanToken) ?? true,
+        amountsTrusted: (trust.get(loanToken) ?? true) && m0 != null && !m0.unresolved,
+        ...(m0 == null || m0.unresolved ? { loanDecimalsUnread: true as const } : {}),
         markets,
         // A group total is a sum over ONE token, so it is a real quantity — this is the only
         // place summing is legitimate, and it is why the page groups before it totals.
@@ -547,7 +555,11 @@ export async function loadMorphoMarketFromChain(
       collateralDecimals,
       // Scaled 1e(36 + loan decimals − collateral decimals) per whole collateral token, as the
       // position loader scales it.
-      oraclePrice: price > ZERO ? Number(price) / 10 ** (36 + loanDecimals - collateralDecimals) : null,
+      // No price is stated when either side's decimals did not load: its scale is unknown.
+      oraclePrice:
+        price > ZERO && !market.loanDecimalsUnread && !meta.get(params.collateralToken)?.unresolved
+          ? Number(price) / 10 ** (36 + loanDecimals - collateralDecimals)
+          : null,
       oracleFeeds: feeds,
       oraclePublishedAt: feeds ? Math.min(...feeds.map((f) => f.updatedAt)) : null,
       chainStale: false,

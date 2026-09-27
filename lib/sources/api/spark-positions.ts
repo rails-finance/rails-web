@@ -14,7 +14,7 @@
 // spark_position_chain sweep hasn't covered the wallet); risk is read live on
 // the position page.
 
-import { resolveErc20Meta, scaleRaw, type Erc20Meta } from "@/lib/sources/chain/erc20-meta";
+import { resolveErc20Meta, scaleRaw, decimalsUnreadFlag, type Erc20Meta } from "@/lib/sources/chain/erc20-meta";
 import { resolveAaveOraclePrices, aaveOraclePriceOf } from "@/lib/sources/chain/aave-oracle-prices";
 import { sanityCheckAaveBalances } from "@/lib/sources/chain/aave-family-balances";
 import { SPARK_ADDRESSES } from "@/lib/spark/asset-catalog";
@@ -37,6 +37,9 @@ export interface SparkReserveAmount {
    *  to aToken/variableDebtToken `balanceOf` at the indexed head. `"replayed"` —
    *  an event-replay figure (only the PEAK lines, which are per-event maxima). */
   balanceSource: "reduced" | "replayed";
+  /** The token's `decimals` did not load (the RPC did not answer), so `amount`
+   *  is scaled by a stand-in and the card states no amount for this reserve. */
+  decimalsUnread?: true;
 }
 
 export interface SparkPositionSummary {
@@ -180,6 +183,7 @@ export async function buildSparkPositionRows(raw: RawSparkWalletRow[]): Promise<
           amount: scaleRaw(supplyRaw, meta.decimals),
           amountRaw: supplyRaw.toString(),
           balanceSource: "reduced",
+          ...decimalsUnreadFlag(metas.get(addr)),
           _rank: supplyRaw,
         });
       }
@@ -191,6 +195,7 @@ export async function buildSparkPositionRows(raw: RawSparkWalletRow[]): Promise<
           amount: scaleRaw(debtRaw, meta.decimals),
           amountRaw: debtRaw.toString(),
           balanceSource: "reduced",
+          ...decimalsUnreadFlag(metas.get(addr)),
           _rank: debtRaw,
         });
       }
@@ -222,6 +227,7 @@ export async function buildSparkPositionRows(raw: RawSparkWalletRow[]): Promise<
           amount: scaleRaw(supplyRaw, meta.decimals),
           amountRaw: r.peakSupplyRaw,
           balanceSource: "replayed",
+          ...decimalsUnreadFlag(metas.get(addr)),
           _rank: supplyRaw,
         });
       }
@@ -233,6 +239,7 @@ export async function buildSparkPositionRows(raw: RawSparkWalletRow[]): Promise<
           amount: scaleRaw(debtRaw, meta.decimals),
           amountRaw: r.peakDebtRaw,
           balanceSource: "replayed",
+          ...decimalsUnreadFlag(metas.get(addr)),
           _rank: debtRaw,
         });
       }

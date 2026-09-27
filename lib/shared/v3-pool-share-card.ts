@@ -22,7 +22,7 @@ import type { PositionCardModel } from "@/lib/share/position-card";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 
 // "unread": no state recorded for the account yet (0018); never read as closed.
-const STATUS_WORD = { open: "Open", closed: "Closed", liquidated: "Liquidated", unread: "Unread" } as const;
+const STATUS_WORD = { open: "Open", closed: "Closed", liquidated: "Liquidated", unread: "Not loaded" } as const;
 
 /** Neutral HF headline — matches the detail card's own reading (the ratio
  *  stops meaning anything as a number once it clears 100). */
@@ -33,7 +33,7 @@ function hfLabel(hf: number): string {
 function largest(reserves: AaveV3ReserveAmount[]): AaveV3ReserveAmount | null {
   let best: AaveV3ReserveAmount | null = null;
   for (const r of reserves) {
-    if (r.amount > 0 && (!best || r.amount > best.amount)) best = r;
+    if (!r.decimalsUnread && r.amount > 0 && (!best || r.amount > best.amount)) best = r;
   }
   return best;
 }

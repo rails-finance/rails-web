@@ -18,6 +18,7 @@ import { BookmarkToggle } from "@/components/shared/bookmark-toggle";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { StatValue, StatFootnote, StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
+import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
@@ -73,6 +74,16 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   defaulted: { label: "DEFAULTED", cls: "bg-red-500/20 text-red-500" },
 };
 
+/** A fungible amount in `asset`, or "Not loaded" where its decimals did not
+ *  load (the amount has no known scale). */
+function FungibleAmount({ asset, value }: { asset: PwnAsset; value: number }) {
+  return asset.decimalsUnread ? (
+    <TokenAmountNotLoaded address={asset.address} label={asset.symbol} />
+  ) : (
+    <AssetAmount value={value} symbol={asset.symbol} />
+  );
+}
+
 /** An asset value: an NFT reads "SYMBOL #id", a fungible token reads amount+symbol.
  *  An NFT contract with no on-chain name (ERC-1155 has no symbol()/name()) has
  *  only its address for an identity — render that as a mono identifier, not
@@ -97,7 +108,7 @@ function AssetValue({ asset, prov }: { asset: PwnAsset | null; prov?: Provenance
       )
     ) : (
       <StatValue>
-        <AssetAmount value={asset.amount} symbol={asset.symbol} />
+        <FungibleAmount asset={asset} value={asset.amount} />
       </StatValue>
     );
   return prov ? <Prov info={prov}>{inner}</Prov> : inner;
@@ -265,7 +276,7 @@ export function PwnPositionCard({
             v.credit ? (
               <StatValue>
                 <Prov info={positionCreditProv(v.credit.symbol, v.version)}>
-                  <AssetAmount value={v.credit.amount} symbol={v.credit.symbol} />
+                  <FungibleAmount asset={v.credit} value={v.credit.amount} />
                 </Prov>
               </StatValue>
             ) : (
@@ -321,7 +332,7 @@ export function PwnPositionCard({
             value: v.credit ? (
               <StatValue>
                 <Prov info={positionCreditProv(v.credit.symbol, v.version)}>
-                  <AssetAmount value={v.credit.amount} symbol={v.credit.symbol} />
+                  <FungibleAmount asset={v.credit} value={v.credit.amount} />
                 </Prov>
               </StatValue>
             ) : (
@@ -335,7 +346,7 @@ export function PwnPositionCard({
               v.repayAmount != null && v.credit ? (
                 <StatValue>
                   <Prov info={positionRepayProv(v.credit.symbol, v.version)}>
-                    <AssetAmount value={v.repayAmount} symbol={v.credit.symbol} />
+                    <FungibleAmount asset={v.credit} value={v.repayAmount} />
                   </Prov>
                 </StatValue>
               ) : (
@@ -372,7 +383,10 @@ export function PwnPositionCard({
 
 /** Build a card view from the listing summary row. */
 export function viewFromSummary(s: PwnPositionSummary): PwnPositionView {
-  const fixedInterest = s.repayAmount != null && s.credit != null ? Math.max(0, s.repayAmount - s.credit.amount) : null;
+  const fixedInterest =
+    s.repayAmount != null && s.credit != null && !s.credit.decimalsUnread
+      ? Math.max(0, s.repayAmount - s.credit.amount)
+      : null;
   return {
     loanId: s.loanId,
     status: s.status,

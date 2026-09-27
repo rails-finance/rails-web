@@ -55,7 +55,7 @@
 
 import { getAddress, parseAbi } from "viem";
 import { alchemyClient } from "./rpc";
-import { resolveErc20Meta, scaleRaw } from "./erc20-meta";
+import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import {
   COMPOUND_V2_ADDRESSES,
   CTOKEN_DECIMALS,
@@ -290,6 +290,9 @@ export async function loadCompoundV2Markets(): Promise<CompoundV2MarketsResponse
       if (und && !isZeroAddr(und)) wanted.push(und);
     });
     const meta = await resolveErc20Meta(wanted);
+    // Every market figure scales by its underlying's decimals: without them the
+    // read fails whole rather than state amounts scaled by the 18 stand-in.
+    assertDecimalsRead(meta, wanted);
 
     // The oracle lane: the price the Comptroller would use, and whether a live
     // feed stands behind it at all.

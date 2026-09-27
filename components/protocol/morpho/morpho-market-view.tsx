@@ -191,6 +191,12 @@ export function MorphoMarketView({ data, chainId }: { data: MorphoMarketViewData
                 </span>{" "}
                 still borrowable
               </span>
+            ) : m.loanDecimalsUnread ? (
+              <span
+                title={`${m.loanToken}: the chain didn't answer for this token's decimals. The sizes show once it does.`}
+              >
+                sizes not loaded
+              </span>
             ) : (
               <span
                 title={`${m.loanSymbol} misreports its own decimals, so its balances cannot be scaled to a quantity.`}

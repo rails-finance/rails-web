@@ -43,7 +43,7 @@
 
 import { getAddress } from "viem";
 import { alchemyClient } from "./rpc";
-import { resolveErc20Meta, scaleRaw } from "./erc20-meta";
+import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import {
   FLUID_ADDRESSES,
   fluidOraclePriceScale,
@@ -212,6 +212,9 @@ export async function loadFluidVaultsFromChain(): Promise<FluidVaultsChainRespon
       }
     }
     const meta = await resolveErc20Meta(wanted);
+    // Every leg's figures scale by these decimals: without them the read fails
+    // whole rather than state amounts scaled by a stand-in.
+    assertDecimalsRead(meta, wanted);
 
     // Resolve every smart leg's shares into the tokens they are a slice OF.
     // The vaults name their own pools (constantVariables.supply/borrow points at

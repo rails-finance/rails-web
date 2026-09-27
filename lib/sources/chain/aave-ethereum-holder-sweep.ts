@@ -249,7 +249,8 @@ export async function loadAaveEthereumHolderSweep(holder: string): Promise<AaveE
         totalSupply: totalSupplyRaw == null || dec == null ? null : amount(totalSupplyRaw, dec),
         fraction,
         dust: fraction > 0 && fraction < 0.000001,
-        claim: maybeAmount(claimByRow.get(i), assetDecimals),
+        // No claim is stated in an asset whose decimals did not load.
+        claim: maybeAmount(assetMeta == null || assetMeta.unresolved ? undefined : claimByRow.get(i), assetDecimals),
         maxRedeem: maybeAmount(at(i, "maxRedeem") as bigint | undefined, dec ?? 18),
       };
     });

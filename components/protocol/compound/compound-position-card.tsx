@@ -28,6 +28,7 @@ import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { StatValue, StatFootnote, StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { WalletPill } from "@/components/shared/wallet-pill";
@@ -129,10 +130,14 @@ function assetUsd(v: CompoundPositionView, address: string, amount: number): num
 /** Total USD across a set of {address, amount} legs, with the STRICT guard from
  *  Aave's on-chain USD: null the moment any contributing leg is unpriced, so a
  *  partial total is never asserted (it degrades to no footnote). */
-function totalUsd(v: CompoundPositionView, legs: { address: string; amount: number }[]): number | null {
+function totalUsd(
+  v: CompoundPositionView,
+  legs: { address: string; amount: number; decimalsUnread?: true }[],
+): number | null {
   let sum = 0;
   let any = false;
-  for (const { address, amount } of legs) {
+  for (const { address, amount, decimalsUnread } of legs) {
+    if (decimalsUnread) return null;
     if (amount <= 0) continue;
     const u = assetUsd(v, address, amount);
     if (u == null) return null;
@@ -152,7 +157,7 @@ export function cardSideUsd(v: CompoundPositionView): { supplyUsd: number | null
   const eff = effectiveBase(v);
   const supplyLegs = [
     ...(eff.side === "lend" ? [{ address: v.base.address, amount: eff.amount }] : []),
-    ...v.collateral.map((c) => ({ address: c.address, amount: c.amount })),
+    ...v.collateral.map((c) => ({ address: c.address, amount: c.amount, decimalsUnread: c.decimalsUnread })),
   ];
   return {
     supplyUsd: totalUsd(v, supplyLegs),
@@ -186,11 +191,26 @@ function LegFootnoteLine({
 }
 
 /** A traced reserve line (the lent base or one collateral asset). */
-function ReserveLine({ symbol, amount, info }: { symbol: string; amount: number; info: Provenance }) {
+function ReserveLine({
+  symbol,
+  amount,
+  info,
+  unreadAddress,
+}: {
+  symbol: string;
+  amount: number;
+  info: Provenance;
+  /** Set to the token's address when its decimals did not load. */
+  unreadAddress?: string;
+}) {
   return (
     <StatValue>
       <Prov info={info}>
-        <AssetAmount value={amount} symbol={symbol} />
+        {unreadAddress ? (
+          <TokenAmountNotLoaded address={unreadAddress} label={symbol} />
+        ) : (
+          <AssetAmount value={amount} symbol={symbol} />
+        )}
       </Prov>
     </StatValue>
   );
@@ -228,6 +248,7 @@ function SuppliedStack({
         symbol={c.symbol}
         amount={c.amount}
         info={vocab.positionCollateral(c.symbol, { ...coords, asset: c.address })}
+        unreadAddress={c.decimalsUnread ? c.address : undefined}
       />,
     );
   }
@@ -355,7 +376,11 @@ export function CompoundPositionCard({
       supplyLines.push(
         <StatValue key={c.address}>
           <Prov info={peakCollateralProv(c.symbol, { ...peakCoords, asset: c.address })}>
-            <AssetAmount value={c.amount} symbol={c.symbol} />
+            {c.decimalsUnread ? (
+              <TokenAmountNotLoaded address={c.address} label={c.symbol} />
+            ) : (
+              <AssetAmount value={c.amount} symbol={c.symbol} />
+            )}
           </Prov>
         </StatValue>,
       );
@@ -429,7 +454,7 @@ export function CompoundPositionCard({
     /^-/,
     "",
   );
-  const supplySymbols = [...(eff.side === "lend" ? [v.base.symbol] : []), ...v.collateral.map((c) => c.symbol)];
+  const supplySymbols = [...(eff.side === "lend" ? [v.base.symbol] : []), ...loadedSymbols(v.collateral)];
 
   return (
     <PositionCardShell
@@ -494,15 +519,21 @@ export function CompoundPositionCard({
                         info={baseProv(v, eff, "lend", vocab, lane)}
                       />
                     )}
-                    {v.collateral.map((c) => (
-                      <LegFootnoteLine
-                        key={c.address}
-                        symbol={c.symbol}
-                        amount={c.amount}
-                        exact={formatUnitsExact(c.amountRaw, c.decimals)}
-                        info={vocab.positionCollateral(c.symbol, { ...coords, asset: c.address })}
-                      />
-                    ))}
+                    {v.collateral.map((c) =>
+                      c.decimalsUnread ? (
+                        <div key={c.address}>
+                          <TokenAmountNotLoaded address={c.address} label={c.symbol} />
+                        </div>
+                      ) : (
+                        <LegFootnoteLine
+                          key={c.address}
+                          symbol={c.symbol}
+                          amount={c.amount}
+                          exact={formatUnitsExact(c.amountRaw, c.decimals)}
+                          info={vocab.positionCollateral(c.symbol, { ...coords, asset: c.address })}
+                        />
+                      ),
+                    )}
                   </div>
                 )}
                 {eff.side === "lend" && <StatFootnote>{lentNote}</StatFootnote>}

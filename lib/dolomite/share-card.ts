@@ -29,6 +29,7 @@ function totalUsd(lines: DolomiteBalanceAmount[], priceByMarket: Record<string, 
   let sum = 0;
   let any = false;
   for (const l of lines) {
+    if (l.decimalsUnread) return null;
     const amount = legAmount(l);
     if (amount <= 0) continue;
     const price = priceByMarket[String(l.marketId)];
@@ -46,6 +47,7 @@ function totalUsd(lines: DolomiteBalanceAmount[], priceByMarket: Record<string, 
 function largestLeg(lines: DolomiteBalanceAmount[]): { symbol: string; amount: number } | null {
   let best: { symbol: string; amount: number } | null = null;
   for (const l of lines) {
+    if (l.decimalsUnread) continue;
     const amount = legAmount(l);
     if (amount <= 0) continue;
     if (!best || amount > best.amount) best = { symbol: l.symbol, amount };
@@ -56,7 +58,7 @@ function largestLeg(lines: DolomiteBalanceAmount[]): { symbol: string; amount: n
 function largestPeak(lines: DolomitePeakAmount[]): { symbol: string; amount: number } | null {
   let best: { symbol: string; amount: number } | null = null;
   for (const l of lines) {
-    if (l.amount <= 0) continue;
+    if (l.decimalsUnread || l.amount <= 0) continue;
     if (!best || l.amount > best.amount) best = { symbol: l.symbol, amount: l.amount };
   }
   return best;

@@ -25,7 +25,7 @@ const STATUS_WORD: Record<MorphoPositionSummary["status"], string> = {
   closed: "Closed",
   liquidated: "Liquidated",
   // No state recorded for the account yet (0018); never read as closed.
-  unread: "Unread",
+  unread: "Not loaded",
 };
 
 const DUST = 1e-6;
@@ -41,23 +41,24 @@ export function morphoShareCardModel(
   const stats: PositionCardModel["stats"] = [];
 
   if (position.status === "open") {
-    if (position.collateral.amount > DUST) {
+    // A token whose decimals did not load has no known amount to state.
+    if (position.collateral.amount > DUST && !position.collateralDecimalsUnread) {
       const collSym = position.collateral.symbol ?? position.collateralSymbol ?? "";
       stats.push({ label: CARD_VOCAB.collateral, value: `${formatCompact(position.collateral.amount)} ${collSym}` });
     }
     const debtAmount = position.currentDebt?.amount ?? position.borrowed.amount;
-    if (debtAmount > DUST) {
+    if (debtAmount > DUST && !position.loanDecimalsUnread) {
       stats.push({ label: CARD_VOCAB.debt, value: `${formatCompact(debtAmount)} ${position.loanSymbol}` });
     }
   } else {
     // Closed/liquidated: collateral and borrowed have unwound to 0 — the
     // highest-recorded amounts are what `peak` carries. Token amounts only,
     // no USD, matching the detail card's own closed layout.
-    if (position.peak.collateral > DUST) {
+    if (position.peak.collateral > DUST && !position.collateralDecimalsUnread) {
       const collSym = position.collateral.symbol ?? position.collateralSymbol ?? "";
       stats.push({ label: CARD_VOCAB.peakCollateral, value: `${formatCompact(position.peak.collateral)} ${collSym}` });
     }
-    if (position.peak.borrowed > DUST) {
+    if (position.peak.borrowed > DUST && !position.loanDecimalsUnread) {
       stats.push({
         label: CARD_VOCAB.peakDebt,
         value: `${formatCompact(position.peak.borrowed)} ${position.loanSymbol}`,

@@ -14,7 +14,7 @@ const STATUS_WORD: Record<AaveV3PositionRow["status"], string> = {
   closed: "Closed",
   liquidated: "Liquidated",
   // No state recorded for the account yet (0018); never read as closed.
-  unread: "Unread",
+  unread: "Not loaded",
 };
 
 /** The single largest reserve on one side, in display units — the card's
@@ -26,6 +26,7 @@ function largestReserve(
 ): { symbol: string; amount: number } | null {
   let best: { symbol: string; amount: number } | null = null;
   for (const r of reserves) {
+    if (r.decimalsUnread) continue;
     const rawValue = raw(r);
     if (!rawValue || rawValue === "0") continue;
     let wei: bigint;

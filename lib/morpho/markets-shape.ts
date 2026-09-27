@@ -208,6 +208,7 @@ export interface MorphoLoanGroupSummary {
   loanSymbol: string;
   loanNamed: boolean;
   amountsTrusted: boolean;
+  loanDecimalsUnread?: true;
   /** More than one token on the roster answers this symbol. */
   ambiguous: boolean;
   markets: number;
@@ -246,6 +247,7 @@ export function overviewData(resp: MorphoMarketsChainResponse): MorphoMarketsOve
         loanSymbol: g.loanSymbol,
         loanNamed: g.loanNamed,
         amountsTrusted: g.amountsTrusted,
+        ...(g.loanDecimalsUnread ? { loanDecimalsUnread: true as const } : {}),
         ambiguous: ambiguous.has(g.loanSymbol),
         markets: g.markets.length,
         funded: g.funded,
@@ -279,6 +281,7 @@ export type MorphoLoanTokenViewData = MorphoLoanGroupShape &
     | "loanSymbol"
     | "loanNamed"
     | "amountsTrusted"
+    | "loanDecimalsUnread"
     | "ambiguous"
     | "markets"
     | "funded"
@@ -294,6 +297,7 @@ export function loanTokenViewData(resp: MorphoMarketsChainResponse, g: MorphoLoa
     loanSymbol: g.loanSymbol,
     loanNamed: g.loanNamed,
     amountsTrusted: g.amountsTrusted,
+    ...(g.loanDecimalsUnread ? { loanDecimalsUnread: true as const } : {}),
     ambiguous: ambiguousSymbols(resp.groups).has(g.loanSymbol),
     markets: g.markets.length,
     funded: g.funded,

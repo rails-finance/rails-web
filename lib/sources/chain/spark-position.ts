@@ -14,7 +14,7 @@
 import { parseAbi, getAddress } from "viem";
 import { alchemyClient } from "./rpc";
 import { SPARK_ADDRESSES, SPARK_LT_BY_ADDR } from "@/lib/spark/asset-catalog";
-import { resolveErc20Meta } from "./erc20-meta";
+import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import type { SparkChainReserve, SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
 
 const SPARK_POOL = SPARK_ADDRESSES.POOL as `0x${string}`;
@@ -156,6 +156,12 @@ export async function loadSparkPositionFromChain(
 
     // Symbols/decimals for the candidate reserves.
     const metas = await resolveErc20Meta(reserves);
+    // A held reserve whose decimals did not load would scale by the 18 stand-in:
+    // the read fails whole instead, and the caller keeps its indexed figures.
+    assertDecimalsRead(
+      metas,
+      reserveData.filter((_, i) => balances[i * 4] > ZERO || balances[i * 4 + 1] > ZERO).map((r) => r.addr),
+    );
 
     const out: SparkChainReserve[] = [];
     let supplyAssetCount = 0;

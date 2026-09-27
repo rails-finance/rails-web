@@ -28,6 +28,9 @@ export interface PwnAsset {
   /** Display amount — scaled by decimals for ERC20, raw integer for NFTs. */
   amount: number;
   amountRaw: string;
+  /** An ERC20 whose `decimals` did not load (the RPC did not answer): `amount`
+   *  is scaled by a stand-in and the card states no amount for it. */
+  decimalsUnread?: true;
 }
 
 export interface PwnPositionSummary {
@@ -143,6 +146,7 @@ export async function buildPwnPositionRows(raw: RawPwnPositionRow[]): Promise<Pw
       tokenId: cat === "ERC20" ? null : (id ?? null),
       amount: scaleRaw(bigintOf(rawStr), decimals),
       amountRaw: rawStr,
+      ...(cat === "ERC20" && (meta.unresolved || !metas.has(a)) ? { decimalsUnread: true as const } : {}),
     };
   };
 

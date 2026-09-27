@@ -21,6 +21,7 @@ import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
@@ -57,25 +58,6 @@ export interface AaveV3ReserveAmount {
   /** The token's `decimals` was not read, so `amount` has no known scale and
    *  is never shown (see AaveV3ReserveSummary.decimalsUnread). */
   decimalsUnread?: true;
-}
-
-/** The stand-in for a reserve whose decimals were not read: the raw balance is
- *  known, its scale is not, so the card names the token and states no amount. */
-function UnreadAmount({ r }: { r: AaveV3ReserveAmount }) {
-  return (
-    <span
-      className="text-rb-500"
-      title={`${r.address}: the chain didn't answer for this token's decimals. The amount shows once it does.`}
-    >
-      Not loaded <span className="font-mono text-sm font-normal">{r.symbol}</span>
-    </span>
-  );
-}
-
-/** Symbols for an icon cluster, leaving out reserves whose token was not read:
- *  their placeholder symbol is an address, which has no icon. */
-function clusterSymbols(reserves: AaveV3ReserveAmount[]): string[] {
-  return reserves.filter((r) => !r.decimalsUnread).map((r) => r.symbol);
 }
 
 export interface AaveV3PositionView {
@@ -141,7 +123,7 @@ function totalUsd(v: AaveV3PositionView, reserves: AaveV3ReserveAmount[]): numbe
 function rankByValue(v: AaveV3PositionView, reserves: AaveV3ReserveAmount[]): AaveV3ReserveAmount[] {
   const usd = new Map<string, number>();
   for (const r of reserves) {
-    const u = reserveUsd(v, r.address, r.amount);
+    const u = r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
     if (u == null) return reserves;
     usd.set(r.address, u);
   }
@@ -168,7 +150,7 @@ function ReserveFootnoteLines({
         if (r.decimalsUnread)
           return (
             <div key={r.address}>
-              <UnreadAmount r={r} />
+              <TokenAmountNotLoaded address={r.address} label={r.symbol} />
             </div>
           );
         const exact = formatUnitsExact(r.amountRaw, r.decimals);
@@ -285,7 +267,7 @@ function ReserveStack({
         <StatValue key={r.address}>
           <Prov info={side === "supply" ? dep.supply(r.symbol, atBlock) : dep.debt(r.symbol, atBlock)}>
             {r.decimalsUnread ? (
-              <UnreadAmount r={r} />
+              <TokenAmountNotLoaded address={r.address} label={r.symbol} />
             ) : (
               <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
             )}
@@ -311,7 +293,7 @@ function PeakStack({ reserves, side }: { reserves: AaveV3ReserveAmount[]; side: 
         <StatValue key={r.address}>
           <Prov info={side === "supply" ? dep.peakSupply(r.symbol) : dep.peakDebt(r.symbol)}>
             {r.decimalsUnread ? (
-              <UnreadAmount r={r} />
+              <TokenAmountNotLoaded address={r.address} label={r.symbol} />
             ) : (
               <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
             )}
@@ -545,7 +527,7 @@ function AaveV3PositionCardBody({
             assetIcons:
               v.supplies.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={clusterSymbols(suppliesRanked)} />
+                  <InlineAssetCluster symbols={loadedSymbols(suppliesRanked)} />
                   <ReserveDisclosureToggle disclosure={supplyDisclosure} count={v.supplies.length} />
                 </span>
               ) : undefined,
@@ -576,7 +558,7 @@ function AaveV3PositionCardBody({
             assetIcons:
               v.borrows.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={clusterSymbols(borrowsRanked)} />
+                  <InlineAssetCluster symbols={loadedSymbols(borrowsRanked)} />
                   <ReserveDisclosureToggle disclosure={debtDisclosure} count={v.borrows.length} />
                 </span>
               ) : undefined,

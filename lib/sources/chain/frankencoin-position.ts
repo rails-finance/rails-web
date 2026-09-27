@@ -27,7 +27,7 @@
 
 import { erc20Abi, getAddress } from "viem";
 import { alchemyClient } from "./rpc";
-import { resolveErc20Meta, scaleRaw } from "./erc20-meta";
+import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import { POSITION_COMMON_ABI, POSITION_V2_ABI } from "@/lib/frankencoin/position-abi";
 import { COOLDOWN_CLOCK_BOUND, normalizePositionAddress } from "@/lib/frankencoin/asset-catalog";
 import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-position";
@@ -143,6 +143,9 @@ export async function loadFrankencoinPositionFromChain(positionRaw: string): Pro
         .then((v) => v as bigint)
         .catch(() => null),
     ]);
+    // Collateral and the stored price both scale by these decimals: without
+    // them the read fails whole rather than state figures scaled by the 18 stand-in.
+    assertDecimalsRead(meta, [tokenAddr]);
     const tokenMeta = meta.get(tokenAddr);
     const decimals = tokenMeta?.decimals ?? 18;
 

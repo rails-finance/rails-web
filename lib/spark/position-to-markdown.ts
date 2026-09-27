@@ -71,6 +71,7 @@ function sideUsd(view: SparkPositionView, reserves: SparkReserveAmount[]): numbe
   let sum = 0;
   let any = false;
   for (const r of reserves) {
+    if (r.decimalsUnread) return null;
     if (r.amount <= 0) continue;
     const p = view.priceByAddress?.[r.address.toLowerCase()];
     if (typeof p !== "number" || p <= 0) return null;
@@ -83,13 +84,17 @@ function sideUsd(view: SparkPositionView, reserves: SparkReserveAmount[]): numbe
 function sideLines(view: SparkPositionView, reserves: SparkReserveAmount[], label: string): string[] {
   const out: string[] = [];
   const total = sideUsd(view, reserves);
-  const live = reserves.filter((r) => r.amount > 0);
+  const live = reserves.filter((r) => r.amount > 0 || r.decimalsUnread);
   if (live.length === 0) {
     out.push(`- **${label}:** none`);
     return out;
   }
   out.push(`- **${label}:** ${total != null ? usd(total) + " (on-chain oracle)" : "see per-reserve amounts"}`);
   for (const r of live) {
+    if (r.decimalsUnread) {
+      out.push(`  - ${r.symbol}: not loaded (the chain didn't answer for this token's decimals, ${r.address})`);
+      continue;
+    }
     const p = view.priceByAddress?.[r.address.toLowerCase()];
     const priced = typeof p === "number" && p > 0 ? ` (${usd(r.amount * p)})` : "";
     out.push(`  - ${r.symbol}: ${amt(r.amount)}${priced}`);
@@ -155,7 +160,7 @@ export function sparkPositionToMarkdown(args: SparkPositionMarkdownArgs): string
         return;
       }
       lines.push(`- **${label}:**`);
-      for (const r of reserves) lines.push(`  - ${r.symbol}: ${amt(r.amount)}`);
+      for (const r of reserves) lines.push(`  - ${r.symbol}: ${r.decimalsUnread ? "not loaded" : amt(r.amount)}`);
     };
     peakLines("Supplied (peak)", view.peakSupplies);
     peakLines("Borrowed (peak)", view.peakBorrows);

@@ -24,7 +24,7 @@
 
 import { parseAbi, getAddress } from "viem";
 import { chainClient } from "./rpc";
-import { resolveErc20Meta, scaleRaw } from "./erc20-meta";
+import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import { MORPHO_DEPLOYMENT, type MorphoDeployment } from "./morpho-deployments";
 import type { MorphoChainPositionResponse, MorphoOracleFeed } from "@/lib/api/fetch-morpho-position";
 
@@ -273,6 +273,9 @@ export async function loadMorphoPositionFromChain(
       ),
     ]);
 
+    // Every figure below is scaled by these decimals: a stand-in 18 would state
+    // wrong amounts, so the read fails whole instead.
+    assertDecimalsRead(metas, [loanToken, ...(isIdle ? [] : [collateralToken])]);
     const loan = metas.get(loanToken.toLowerCase());
     const coll = metas.get(collateralToken.toLowerCase());
     const loanDecimals = loan?.decimals ?? 18;

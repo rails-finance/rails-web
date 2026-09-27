@@ -44,7 +44,7 @@
 
 import { parseAbi } from "viem";
 import { chainBatchClient } from "./rpc";
-import { resolveErc20Meta } from "./erc20-meta";
+import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import { MORPHO_BASE_BLUE, MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { type MorphoBaseVaultCatalogEntry, type MorphoBaseVaultFactory } from "@/lib/morpho-base/vault-catalog";
 import { loadMorphoBaseVaultRoster, type MorphoBaseVaultRoster } from "@/lib/morpho-base/vault-roster";
@@ -667,6 +667,9 @@ export async function loadMorphoBaseVault(
       [assetAddress, ...collateralTokens, ...(shapeAsset && shapeAsset !== vaultAddress ? [shapeAsset] : [])],
       MORPHO_BASE_CHAIN_ID,
     );
+    // Every figure on the page is in the vault's asset: without its decimals the
+    // read fails whole rather than state amounts scaled by the 18 stand-in.
+    assertDecimalsRead(meta, [assetAddress]);
     const assetMeta = meta.get(assetAddress);
     const assetDecimals = assetMeta?.decimals ?? 18;
 

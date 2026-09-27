@@ -86,6 +86,7 @@ import type {
   MorphoMarketsStampData,
 } from "@/lib/morpho/markets-shape";
 import type { MorphoMarketRow } from "@/lib/sources/chain/morpho-markets";
+import { NotLoaded } from "@/components/shared/not-loaded";
 
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -216,6 +217,11 @@ function MarketRow({ m, block, chainId }: { m: MorphoMarketRow; block: number; c
         <span className="w-20 shrink-0 text-right text-foreground">
           <Prov info={morphoMarketSizeProv("supplied", coords)}>{amount(m.totalSupply)}</Prov>
         </span>
+      ) : m.loanDecimalsUnread ? (
+        <NotLoaded
+          className="w-20 shrink-0 text-right text-rb-500"
+          title={`${m.loanToken}: the chain didn't answer for this token's decimals. The amounts show once it does.`}
+        />
       ) : (
         <span
           className="w-20 shrink-0 text-right text-rb-500"
@@ -452,6 +458,11 @@ function LoanTokenRow({ g, block, chainId }: { g: MorphoLoanGroupSummary; block:
             <Prov info={morphoGroupTotalProv("borrowed", coords)}>{amount(g.totalBorrow)}</Prov>
           </span>
         </>
+      ) : g.loanDecimalsUnread ? (
+        <NotLoaded
+          className="w-[10.75rem] shrink-0 text-right text-rb-500"
+          title={`${g.loanToken}: the chain didn't answer for this token's decimals. The totals show once it does.`}
+        />
       ) : (
         <span
           className="w-[10.75rem] shrink-0 text-right text-rb-500"
@@ -787,13 +798,20 @@ export function MorphoLoanTokenView({
               <span className="text-foreground">{g.funded.toLocaleString("en-US")}</span> hold supply ·{" "}
               <span className="text-foreground">{g.borrowing.toLocaleString("en-US")}</span> have borrowing
             </span>
-            {!g.amountsTrusted && (
-              <span
-                title={`${g.loanSymbol} misreports its own decimals, so a total over it would not be a quantity of anything.`}
-              >
-                totals not stated — {g.loanSymbol} misreports its decimals
-              </span>
-            )}
+            {!g.amountsTrusted &&
+              (g.loanDecimalsUnread ? (
+                <span
+                  title={`${g.loanToken}: the chain didn't answer for this token's decimals. The totals show once it does.`}
+                >
+                  totals not loaded
+                </span>
+              ) : (
+                <span
+                  title={`${g.loanSymbol} misreports its own decimals, so a total over it would not be a quantity of anything.`}
+                >
+                  totals not stated — {g.loanSymbol} misreports its decimals
+                </span>
+              ))}
             {g.amountsTrusted && g.loanTokenSupply != null && (
               <span>
                 <span className="text-foreground">

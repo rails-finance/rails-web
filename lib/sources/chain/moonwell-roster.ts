@@ -22,7 +22,7 @@
 
 import { getAddress, parseAbi } from "viem";
 import { chainClient } from "./rpc";
-import { resolveErc20Meta } from "./erc20-meta";
+import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import type { MoonwellDeployment, MoonwellRosterMarket } from "@/lib/moonwell/asset-catalog";
 
 const COMPTROLLER_ABI = parseAbi([
@@ -88,6 +88,14 @@ export async function resolveMoonwellRoster(
     const meta = await resolveErc20Meta(
       pairs.map((p) => p.underlying),
       deployment.chainId,
+    );
+
+    // An underlying whose decimals did not load would scale every balance in
+    // its market by the 18 stand-in, and the roster is cached: the read fails
+    // instead, and the catch below keeps the last good roster.
+    assertDecimalsRead(
+      meta,
+      pairs.map((p) => p.underlying),
     );
 
     const markets: MoonwellRosterMarket[] = pairs.flatMap((p) => {

@@ -31,6 +31,7 @@ import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
@@ -92,6 +93,7 @@ function totalUsd(v: DolomitePositionView, lines: DolomiteBalanceAmount[]): numb
   let sum = 0;
   let any = false;
   for (const l of lines) {
+    if (l.decimalsUnread) return null;
     const amount = legAmount(l);
     if (amount <= 0) continue;
     const u = lineUsd(v, l.marketId, amount);
@@ -121,11 +123,15 @@ function FootnoteLines({ v, side }: { v: DolomitePositionView; side: "supply" | 
     <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
       {lines.map((r) => (
         <div key={r.marketId}>
-          <Prov info={legProv(r, side)}>
-            <span title={legExact(r)} data-prov-exact={legExact(r)} data-prov-symbol={r.symbol}>
-              {formatCompact(legAmount(r))} {r.symbol}
-            </span>
-          </Prov>
+          {r.decimalsUnread ? (
+            <TokenAmountNotLoaded label={r.symbol} />
+          ) : (
+            <Prov info={legProv(r, side)}>
+              <span title={legExact(r)} data-prov-exact={legExact(r)} data-prov-symbol={r.symbol}>
+                {formatCompact(legAmount(r))} {r.symbol}
+              </span>
+            </Prov>
+          )}
         </div>
       ))}
     </div>
@@ -153,7 +159,11 @@ function LegStack({ v, side }: { v: DolomitePositionView; side: "supply" | "debt
       {lines.map((r) => (
         <StatValue key={r.marketId}>
           <Prov info={legProv(r, side)}>
-            <AssetAmount value={legAmount(r)} symbol={r.symbol} exact={legExact(r)} />
+            {r.decimalsUnread ? (
+              <TokenAmountNotLoaded label={r.symbol} />
+            ) : (
+              <AssetAmount value={legAmount(r)} symbol={r.symbol} exact={legExact(r)} />
+            )}
           </Prov>
         </StatValue>
       ))}
@@ -171,11 +181,15 @@ function PeakStack({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply
       {lines.map((r) => (
         <StatValue key={r.marketId}>
           <Prov info={dolomitePeakParProv(r.symbol, side)}>
-            <AssetAmount
-              value={r.amount}
-              symbol={r.symbol}
-              exact={`${formatUnitsExact(r.amountRaw, r.decimals)} (par — × the market's index for tokens)`}
-            />
+            {r.decimalsUnread ? (
+              <TokenAmountNotLoaded label={r.symbol} />
+            ) : (
+              <AssetAmount
+                value={r.amount}
+                symbol={r.symbol}
+                exact={`${formatUnitsExact(r.amountRaw, r.decimals)} (par — × the market's index for tokens)`}
+              />
+            )}
           </Prov>
         </StatValue>
       ))}
@@ -292,8 +306,7 @@ export function DolomitePositionCard({
           // USD total is never asserted.
           {
             label: CARD_VOCAB.collateral,
-            assetIcons:
-              v.supplies.length > 0 ? <InlineAssetCluster symbols={v.supplies.map((r) => r.symbol)} /> : undefined,
+            assetIcons: v.supplies.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(v.supplies)} /> : undefined,
             value:
               collUsd != null ? (
                 <UsdHeadline usd={collUsd} info={dolomiteUsdProv("Collateral")} />
@@ -304,8 +317,7 @@ export function DolomitePositionCard({
           },
           {
             label: CARD_VOCAB.debt,
-            assetIcons:
-              v.borrows.length > 0 ? <InlineAssetCluster symbols={v.borrows.map((r) => r.symbol)} /> : undefined,
+            assetIcons: v.borrows.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(v.borrows)} /> : undefined,
             value:
               debtUsd != null ? (
                 <UsdHeadline usd={debtUsd} info={dolomiteUsdProv("Borrowed")} />
