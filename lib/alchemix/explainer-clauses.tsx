@@ -701,6 +701,27 @@ export function alchemixEventClauses(
           );
         }
       }
+      // Set aside also grows every block, so this redemption's own clearing is
+      // rarely the whole story behind its before/after move (rails-ops
+      // decisions/0032). Stated once here, with both figures, rather than left
+      // to the position card's general caveat.
+      if (cleared?.status === "stated" && cleared.amountRaw != null && cleared.amountRaw !== "0") {
+        const before = opts.readingBefore;
+        const at = ctx.stateAtBlockFromReading;
+        if (before?.earmarkedRaw != null && at?.status === "stated" && at.earmarkedRaw != null) {
+          const grew = BigInt(at.earmarkedRaw) - BigInt(before.earmarkedRaw) + BigInt(cleared.amountRaw);
+          if (grew > BigInt(1)) {
+            out.push(
+              clause(
+                <>
+                  Set aside for repayment moved by more than the {shown(cleared.amountRaw, sym)} cleared here: another{" "}
+                  {amount(grew.toString())} {sym} matured into it since the reading before this one.
+                </>,
+              ),
+            );
+          }
+        }
+      }
       if (raw.swept !== "true") {
         out.push(
           clause(

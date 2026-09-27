@@ -22,9 +22,14 @@
 //
 // 2. A LINE-SCOPE ROW MOVED NOTHING OF THIS HOLDER'S. A redemption applies one
 //    ratio to every open position at once; the two batch rows carry the hash of
-//    an account list. None of them names this position, so none is totalled
-//    here — they are on the timeline because they are what moved the figures,
-//    not as this holder's own actions.
+//    an account list. None of them names this position, so none of THEIR OWN
+//    fields is totalled here — they are on the timeline because they are what
+//    moved the figures, not as this holder's own actions. What a line's
+//    redemptions cleared and took FROM THIS POSITION is a different figure —
+//    a difference of two readings either side of each one, never derived from
+//    the redemption's own log (rails-ops decisions/0032) — and the caller
+//    passes it in already summed, so the bars can show it without this module
+//    reading a single redemption event.
 //
 // 3. A LIQUIDATION'S DEBT LEG IS NOT STATED. `Liquidated` and `SelfLiquidated`
 //    carry the shares taken and no debt figure, so the debt side counts none.
@@ -45,7 +50,13 @@
 import type { ChainTruthTowerData, TowerLine, TowerSideData } from "@/lib/shared/chain-truth-economics";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAlchemistEvent } from "@/lib/shared/types/event-shape";
-import { closeFromReadingProv, lifetimeProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
+import {
+  clearedRunProv,
+  closeFromReadingProv,
+  lifetimeProv,
+  takenRunProv,
+  type AlchemixCoords,
+} from "@/lib/alchemix/event-provenance";
 import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
 import { readingsBefore } from "@/lib/alchemix/readings-before";
 import { selfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
@@ -143,6 +154,20 @@ export interface AlchemixEconomicsInput {
   /** True when the drawn rows are NOT the position's whole history. */
   windowed: boolean;
   coords: AlchemixCoords;
+  /** What every line redemption on this position's timeline cleared and took,
+   *  each a difference of two readings (rails-ops decisions/0032) — not this
+   *  module's own arithmetic. Added to the bars only where `stated` covers the
+   *  whole `count`: a partial total would understate what a redemption took,
+   *  which is worse than leaving it out (the same guard the position card's
+   *  own redemption total uses). */
+  redemptions?: {
+    count: number;
+    stated: number;
+    cleared: number;
+    clearedRaw: string;
+    taken: number | null;
+    takenRaw: string | null;
+  };
 }
 
 /**
@@ -274,6 +299,7 @@ export function computeAlchemixEconomics(
     bucket: Bucket,
     flow?: TowerLine["flowLabel"],
     prov?: TowerLine["prov"],
+    flowKind?: TowerLine["flowKind"],
   ): TowerLine[] =>
     bucket.amount > 0
       ? [
@@ -284,6 +310,7 @@ export function computeAlchemixEconomics(
             usd: null,
             prov: prov ?? lifetimeProv(label, symbol, bucket.events, coords),
             flowLabel: flow,
+            ...(flowKind ? { flowKind } : {}),
           },
         ]
       : [];
@@ -292,6 +319,14 @@ export function computeAlchemixEconomics(
   // several closes (a refunded position closed again) fall back to the rollup.
   const onlyClose = figures.closes.length === 1 ? figures.closes[0] : null;
   const closeCoords = onlyClose ? { ...coords, txHash: onlyClose.txHash, blockNumber: onlyClose.blockNumber } : coords;
+
+  // Rule 2's exception: what the line's redemptions cleared and took, summed
+  // from readings the caller already measured. Added only where every stated
+  // redemption's figure is in hand — a short total would read as complete.
+  const r = input.redemptions;
+  const redeemedAll = r != null && r.count > 0 && r.stated === r.count && r.cleared > 0;
+  const redeemedCleared: Bucket = redeemedAll ? { amount: r!.cleared, events: r!.stated } : empty();
+  const redeemedTaken: Bucket = redeemedAll && r!.taken != null && r!.taken > 0 ? { amount: r!.taken, events: r!.stated } : empty();
 
   const collateral: TowerSideData = {
     current:
@@ -332,6 +367,17 @@ export function computeAlchemixEconomics(
           ? closeFromReadingProv("returned", mytSymbol, onlyClose.returnedRaw, onlyClose.fromBlock, closeCoords)
           : undefined,
       ),
+      ...line(
+        "coll-redeemed",
+        "Vault shares taken by every line redemption on this position's timeline",
+        mytSymbol,
+        redeemedTaken,
+        "Taken by line redemptions",
+        redeemedTaken.amount > 0
+          ? takenRunProv(mytSymbol, r!.takenRaw!, r!.count, r!.stated, "every redemption on this timeline", coords)
+          : undefined,
+        "redeemed",
+      ),
     ],
     liquidated: line(
       "coll-liquidated",
@@ -361,6 +407,17 @@ export function computeAlchemixEconomics(
       ...(figures.debtCreditUnresolved === 0
         ? line("debt-cleared", "Debt cleared by a repay", syntheticSymbol, figures.debtCleared, "Cleared by repaying")
         : []),
+      ...line(
+        "debt-redeemed",
+        "Debt cleared by every line redemption on this position's timeline",
+        syntheticSymbol,
+        redeemedCleared,
+        "Cleared by line redemptions",
+        redeemedCleared.amount > 0
+          ? clearedRunProv(syntheticSymbol, r!.clearedRaw, r!.count, r!.stated, "every redemption on this timeline", coords)
+          : undefined,
+        "redeemed",
+      ),
       ...line(
         "debt-closed",
         "Debt paid off when the holder closed the position with its collateral",

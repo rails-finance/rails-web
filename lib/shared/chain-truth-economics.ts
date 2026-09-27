@@ -46,9 +46,11 @@ export interface TowerLine {
   /** Mechanic tag for a FLOW line that the side's default hatch would misname
    *  visually: both values draw the shared pink checker (another party's act
    *  on the position) instead of the bucket's liquidation/exit pattern.
-   *  `"redeemed"` is the leg an actual redemption moved (Liquity V2, and a
-   *  Polaris PSM redemption-share outflow — both are literally a redemption's
-   *  leg). `"external"` is the same mechanic where "redeemed" would misname
+   *  `"redeemed"` is the leg an actual redemption moved (Liquity V2, a
+   *  Polaris PSM redemption-share outflow, and an Alchemix line redemption's
+   *  cleared/taken row, summed from readings rather than replayed — all three
+   *  are literally a redemption's leg). `"external"` is the same mechanic
+   *  where "redeemed" would misname
    *  the direction (a Polaris PSM mint-share INFLOW is another party's act
    *  too, but it is a mint, not a redemption). Ignored on `current` lines. */
   flowKind?: "redeemed" | "external";

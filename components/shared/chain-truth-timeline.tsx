@@ -285,6 +285,11 @@ export interface ChainTruthTimelineProps {
   renderCard: (event: BaseActivityEvent, meta: { eventNumber: number; isFirst: boolean; isLast: boolean }) => ReactNode;
   /** Toolbar leading text (default "replayed from chain"). */
   toolbarLeading?: ReactNode;
+  /** A title on the toolbar's event-count line, for a family whose count is a
+   *  true but surprising number — e.g. Alchemix, where an opening or a close
+   *  combines two of the position's own logs into one card, so the count runs
+   *  ahead of the cards on screen. Unset renders identically to today. */
+  countTooltip?: string;
   /** Display-menu items (default CHAIN_TRUTH_DISPLAY_ITEMS). */
   displayItems?: TimelineDisplayItem[];
   /** Message when the wallet has no events at all (vs filtered out). */
@@ -586,6 +591,7 @@ function ChainTruthTimelineBody({
   tl,
   renderCard,
   toolbarLeading = "replayed from chain",
+  countTooltip,
   displayItems = CHAIN_TRUTH_DISPLAY_ITEMS,
   emptyLabel = "No transaction history available.",
   runs,
@@ -1346,6 +1352,7 @@ function ChainTruthTimelineBody({
           tl={toolbarTl}
           displayItems={items}
           leading={toolbarLeading}
+          countTooltip={countTooltip}
           marketNoteCount={marketNoteCount}
           marketNotesOn={showMarketNotes}
           onToggleMarketNotes={() => toggleDisplay("showMarketNotes")}

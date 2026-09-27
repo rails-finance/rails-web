@@ -178,7 +178,7 @@ function legSpec(
       break;
     }
     case "force_repay": {
-      deltas.push(shares("credit_to_yield", scaled(raw.credit_to_yield), "Put against the debt"));
+      deltas.push(shares("credit_to_yield", scaled(raw.credit_to_yield), "Paid off set-aside debt"));
       const fee = scaled(raw.protocol_fee_total);
       if (fee > 0) deltas.push(shares("protocol_fee_total", fee, "Fee"));
       spec = { ...spec, labelOnSpine: true };
