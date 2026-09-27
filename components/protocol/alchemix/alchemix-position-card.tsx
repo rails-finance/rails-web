@@ -97,7 +97,9 @@ export function AlchemixStatusPill({ status }: { status: AlchemixPositionStatus 
  *  column says the figure did not settle rather than printing a bare number.
  *
  *  The figure carries its token chip beside the word, as other protocols'
- *  cards do.
+ *  cards do — except on the position page's headline (`hideUnit`), which
+ *  drops the ticker text after the chip the way Liquity V2's card does: the
+ *  chip alone carries the symbol, on hover, same as there.
  *
  *  One builder for both surfaces — the listing row passes neither receipt nor
  *  note, the position page passes both. */
@@ -105,7 +107,7 @@ export function amountColumn(
   label: string,
   value: AlchemixAmountAtBlock | null,
   unit: string,
-  extra?: { prov?: Provenance; note?: ReactNode; hideBlock?: boolean },
+  extra?: { prov?: Provenance; note?: ReactNode; hideBlock?: boolean; hideUnit?: boolean },
 ): OpenPositionStatsColumn {
   // The note stays on the footnote's own rb-500 rather than dropping to rb-400:
   // rb-400 is the LIGHTER end of the ramp, so it reads dimmer than the block
@@ -124,7 +126,7 @@ export function amountColumn(
     <span className="inline-flex items-center gap-1.5">
       {display}
       <TokenChipIcon symbol={unit} size={20} filterable={false} />
-      {unit}
+      {extra?.hideUnit ? null : unit}
     </span>
   );
   return {
@@ -168,7 +170,7 @@ export function collateralColumn(
   c: AlchemixCollateralView | null,
   fallbackMytSymbol: string,
   prov?: { shares?: Provenance; underlying?: Provenance; usd?: Provenance; sharePrice?: Provenance },
-  opts?: { showSharePrice?: boolean; hideBlock?: boolean },
+  opts?: { showSharePrice?: boolean; hideBlock?: boolean; hideUnit?: boolean },
 ): OpenPositionStatsColumn {
   const myt = c?.mytSymbol ?? fallbackMytSymbol;
   const underlying = c?.underlying ?? null;
@@ -178,6 +180,7 @@ export function collateralColumn(
       prov: prov?.shares,
       note: c ? "No share price in hand, so no figure for the asset underneath." : undefined,
       hideBlock: opts?.hideBlock,
+      hideUnit: opts?.hideUnit,
     });
   }
 
@@ -251,6 +254,7 @@ export function collateralColumn(
         </>
       ),
       hideBlock: opts?.hideBlock,
+      hideUnit: opts?.hideUnit,
     },
   );
 }
