@@ -198,13 +198,17 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // same protocol-view shape as the Ethereum row's hub comparison, just one
   // hub rather than four.
   //
-  // `verification` is not stated: no chain verifier has been written for this
-  // deployment yet (unlike aave-v3-base's scripts/verify-aave-v3-base-chain.mjs),
-  // so the cell stays `false` until one exists.
+  // chain verification (scripts/verify-aave-v4-base-chain.mjs): the Ethereum
+  // Aave V4 verifier's own checks, cut down to Base's one spoke and one hub —
+  // the address graph, reserve config, liquidation config, the hub's caps and
+  // USDC's drawn rate, the oracle prices and sources, and a sampled position's
+  // health factor and collateral factor reconciled against the oracle — all
+  // re-derived from chain at head and checked against the served API.
   "aave-v4-base": explorerDepth({
     dashboard: true,
     oracleUsd: true,
     atBlockPrices: true,
+    verification: true,
     llm: true,
     explainers: true,
     forensics: true,

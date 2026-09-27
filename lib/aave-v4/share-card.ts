@@ -23,6 +23,7 @@ import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import type { PositionCardModel } from "@/lib/share/position-card";
+import type { SessionProtocol } from "@/lib/shared/sessions";
 
 /** Neutral HF headline — matches the V3/Spark mappers' identical reading (the
  *  ratio stops meaning anything as a number once it clears 100). */
@@ -55,7 +56,10 @@ function chainAmounts(
 export function aaveV4SpokeShareCardModel(
   tail: { chain: AaveV4SpokePositionChainResponse | null; events: BaseActivityEvent[] | null },
   wallet: string,
-  opts: { spokeName: string; market: string },
+  // `session` defaults to the Ethereum row; the Base wrapper
+  // (`lib/aave-v4-base/share-card.ts`) passes "aave-v4-base" so the card's
+  // fallback and label resolve to that deployment's own roster entry.
+  opts: { spokeName: string; market: string; session?: SessionProtocol },
 ): PositionCardModel | null {
   const chain = tail.chain && !tail.chain.chainStale ? tail.chain : null;
   const spokeEvents = (tail.events ?? []).filter(
@@ -129,7 +133,7 @@ export function aaveV4SpokeShareCardModel(
   }
 
   return {
-    session: "aave-v4",
+    session: opts.session ?? "aave-v4",
     subject: shortSubject(wallet),
     market: opts.market,
     status,

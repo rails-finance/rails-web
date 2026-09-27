@@ -27,7 +27,7 @@ function resolveSpoke(rawSpoke: string, wallet: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { spoke, wallet } = await params;
   const { name, canonicalPath } = resolveSpoke(spoke, wallet);
-  return positionMetadata({ session: "aave-v4-base", subject: wallet, market: name, canonicalPath });
+  return positionMetadata({ session: "aave-v4-base", subject: wallet, market: name, canonicalPath, image: "dynamic" });
 }
 
 export default async function AaveV4BaseSpokePage({ params }: Props) {
