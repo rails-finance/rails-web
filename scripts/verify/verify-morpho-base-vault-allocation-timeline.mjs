@@ -386,6 +386,33 @@ async function readPage(vault, holder) {
   await page.waitForSelector("[data-vault-timeline-rows]", { timeout: 120_000 }).catch(() => {});
   const blockNumber = Number(await page.locator("[data-vault-block]").first().getAttribute("data-vault-block"));
 
+  // ── 2026-09-08 · THE RUNS ARE OPENED FIRST ───────────────────────────────
+  // The rows ride `ChainTruthTimeline` now (rails-ops plan D11), so a stretch
+  // of consecutive same-kind rows is painted as ONE collapsed folder and its
+  // members are not in the document at all. A panel that is not mounted is not
+  // a panel that says nothing — it is a row this script never saw — so every
+  // run is opened by the reader's own click before the rows are, and the
+  // panels below are then the whole life's. The labels flip from "expand the
+  // run" to "collapse" as they open, which is what stops the loop.
+  //     FAIL 10d — "page rows [], own walk rows [2]" (case study) and
+  //                "page rows [1], own walk rows [1, 2]" (wide vault)
+  //     🔑 The wide vault's line is the one that reads clearly: ONE of its two
+  //     queue-change rows was inside a folder, so the check saw a page that
+  //     stated the sentence on some rows and not others — which is exactly the
+  //     fault it exists to catch, produced by a page that was right.
+  //
+  // 2026-09-27 · the bands are read after the runs open too. The wide holder
+  // withdrew twice more after it was pinned, so its seven rows became two runs
+  // (four withdrawals, three deposits) and every band sat inside a closed
+  // folder: 6b "0 of 0 bands", 10b "0 rule paragraphs", on a page that was
+  // right.
+  for (let guard = 0; guard < 40; guard++) {
+    const toOpen = page.locator("[data-vault-timeline-rows] [aria-label*='expand the run']");
+    if ((await toOpen.count()) === 0) break;
+    await toOpen.first().click({ force: true });
+    await page.waitForTimeout(250);
+  }
+
   // The bands, in the page's own row order (newest first), each with its
   // segments' STAMPED RAW figures, inline widths and composited colours. The
   // colour is composited by the browser itself onto white and onto black, so a
@@ -435,27 +462,6 @@ async function readPage(vault, holder) {
   const emptyLabels = await page.locator("[data-alloc-empty-label]").allTextContents();
   const summaries = await page.locator("[data-figure='row-allocation-summary']").allTextContents();
   const ruleTexts = await page.locator("[data-figure='allocation-rule']").allTextContents();
-
-  // ── 2026-09-08 · THE RUNS ARE OPENED FIRST ───────────────────────────────
-  // The rows ride `ChainTruthTimeline` now (rails-ops plan D11), so a stretch
-  // of consecutive same-kind rows is painted as ONE collapsed folder and its
-  // members are not in the document at all. A panel that is not mounted is not
-  // a panel that says nothing — it is a row this script never saw — so every
-  // run is opened by the reader's own click before the rows are, and the
-  // panels below are then the whole life's. The labels flip from "expand the
-  // run" to "collapse" as they open, which is what stops the loop.
-  //     FAIL 10d — "page rows [], own walk rows [2]" (case study) and
-  //                "page rows [1], own walk rows [1, 2]" (wide vault)
-  //     🔑 The wide vault's line is the one that reads clearly: ONE of its two
-  //     queue-change rows was inside a folder, so the check saw a page that
-  //     stated the sentence on some rows and not others — which is exactly the
-  //     fault it exists to catch, produced by a page that was right.
-  for (let guard = 0; guard < 40; guard++) {
-    const toOpen = page.locator("[data-vault-timeline-rows] [aria-label*='expand the run']");
-    if ((await toOpen.count()) === 0) break;
-    await toOpen.first().click({ force: true });
-    await page.waitForTimeout(250);
-  }
 
   // Expand every row so the panels — the record — are in the DOM.
   const heads = page.locator("[data-vault-timeline-rows] [data-event-id] [role='button']");

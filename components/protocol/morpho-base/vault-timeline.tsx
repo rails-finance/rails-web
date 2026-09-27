@@ -350,7 +350,10 @@ export function MorphoBaseVaultTimeline({
                       event={row}
                       coords={{ ...coords, blockNumber: row.blockNumber, txHash: row.txHash }}
                       assetSymbol={assetSymbol}
-                      first={meta.isFirst}
+                      // The newest row states the rule. `meta.isFirst` is the
+                      // spine terminus, which no member of a run carries, so a
+                      // newest row inside a run would leave the rule unstated.
+                      first={i === 0}
                     />
                   }
                   detailCards={(rowCoords) => <ShareOfVaultCard event={row} coords={rowCoords} shareUnit={shareUnit} />}

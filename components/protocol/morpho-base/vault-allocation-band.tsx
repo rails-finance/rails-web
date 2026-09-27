@@ -157,8 +157,8 @@ export function VaultAllocationBand({ event, coords, assetSymbol, first }: Vault
     return (
       <div className="px-5 pb-1">
         <p className="text-[11px] leading-relaxed text-rb-500" data-figure="row-allocation-unread">
-          What the vault&rsquo;s asset sat in at this block was not read, so no band is drawn for this row. That is a
-          missing reading, not an empty one — the rest of this row is unaffected.
+          The chain didn&rsquo;t answer for where the vault&rsquo;s asset sat at this block, so this row has no band. It
+          shows once it does.
         </p>
       </div>
     );
@@ -227,7 +227,7 @@ export function VaultAllocationBand({ event, coords, assetSymbol, first }: Vault
         ariaLabel={`What this address's claim sat in at block ${n(event.blockNumber)}`}
         emptyLabel={
           empty
-            ? `Empty — this address held no shares at block ${n(event.blockNumber)}, so nothing is attributed to any market. The vault's own allocation at that block is in the panel below, and it is not zero.`
+            ? `Empty: this address held no shares at block ${n(event.blockNumber)}, so nothing is attributed to any market. The vault's allocation at that block is in the panel below.`
             : undefined
         }
       />
@@ -242,8 +242,8 @@ export function VaultAllocationBand({ event, coords, assetSymbol, first }: Vault
         <div className="px-5 pb-1">
           <p className="text-[11px] leading-relaxed text-rb-500" data-figure="row-allocation-partial">
             {plan.unread.length === 1 ? "One market" : `${n(plan.unread.length)} markets`} in the queue at this block
-            did not answer, so {plan.unread.length === 1 ? "it is" : "they are"} in neither the band nor its total. Not
-            read is not zero, and the panel below names {plan.unread.length === 1 ? "it" : "them"}.
+            did not answer, so {plan.unread.length === 1 ? "it is" : "they are"} in neither the band nor its total. The
+            panel below names {plan.unread.length === 1 ? "it" : "them"} as not loaded.
           </p>
         </div>
       )}
@@ -422,8 +422,8 @@ export function VaultAllocationDetail({ event, earlier, coords, assetSymbol }: V
           {entered.length > 0 && (
             <>
               {entered.length === 1 ? "One market is" : `${n(entered.length)} markets are`} in the queue at this block
-              and {entered.length === 1 ? "was" : "were"} not in it at this address&rsquo;s previous event — the earlier
-              row, at block {n(earlier.blockNumber)}:{" "}
+              and {entered.length === 1 ? "was" : "were"} not in it at this address&rsquo;s previous event, the earlier
+              row at block {n(earlier.blockNumber)}:{" "}
               {entered.map((l) => `${legLabel(l)} ${shortId(l.marketId)}`).join(", ")}.{" "}
             </>
           )}
@@ -434,8 +434,8 @@ export function VaultAllocationDetail({ event, earlier, coords, assetSymbol }: V
               {left.map((l) => `${legLabel(l)} ${shortId(l.marketId)}`).join(", ")}.{" "}
             </>
           )}
-          The vault changed its queue somewhere between those two blocks. Which block, and how many times, is not read
-          here — no event on this page says so.
+          The vault changed its queue somewhere between those two blocks. No event on this page says at which block, or
+          how many times.
         </p>
       )}
     </div>
