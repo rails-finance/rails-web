@@ -16,7 +16,13 @@ export async function GET(request: NextRequest, context: { params: Promise<{ vau
   const { vaultId } = await context.params;
   try {
     // No named block: the loader resolves the head itself and pins to it.
-    const state = await loadMakerVaultStateFromChain(vaultId);
+    // `?ilk=` names a direct-Vat urn's ilk, which only the index row carries.
+    const ilk = request.nextUrl.searchParams.get("ilk");
+    const state = await loadMakerVaultStateFromChain(
+      vaultId,
+      undefined,
+      ilk && /^[A-Z0-9-]{1,32}$/.test(ilk) ? ilk : null,
+    );
     if (!state) return NextResponse.json({ state: null }, { status: 404 });
     return NextResponse.json({ state });
   } catch (err) {

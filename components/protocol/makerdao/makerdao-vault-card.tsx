@@ -94,8 +94,8 @@ export interface MakerVaultView {
 }
 
 /** The vault's number-or-address identity: CdpManager vaults have the friendly
- *  cdp id; LockStake urns have only their urn address (there is no global LSE
- *  ordinal — Open.index is owner-scoped). */
+ *  cdp id; LockStake urns and direct-Vat urns have only their urn address
+ *  (there is no global LSE ordinal — Open.index is owner-scoped). */
 function vaultIdentityLabel(v: MakerVaultView): string {
   if (v.cdpId != null) return `Vault #${v.cdpId}`;
   return `Urn ${v.urn.slice(0, 6)}…${v.urn.slice(-4)}`;
@@ -239,6 +239,15 @@ export function MakerVaultCard({
               // vault lives in the Sky LockStake Engine, not the CdpManager.
               <span className="rounded-sm bg-rb-300 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground/60 dark:bg-rb-700">
                 LockStake
+              </span>
+            ) : v.cdpId == null ? (
+              // Same marking for a urn opened on the Vat with no manager: its
+              // owner is the urn, often a contract.
+              <span
+                className="rounded-sm bg-rb-300 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground/60 dark:bg-rb-700"
+                title="Opened directly on the Vat, with no CdpManager id; the urn is its own owner."
+              >
+                Direct
               </span>
             ) : null}
           </span>

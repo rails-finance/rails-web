@@ -19,7 +19,7 @@
 //
 // SERVER-ONLY (reads ALCHEMY_URL via lib/sources/chain/rpc).
 
-import { parseAbi, getAddress } from "viem";
+import { parseAbi, getAddress, stringToHex } from "viem";
 import { alchemyClient } from "./rpc";
 import { MAKER_ADDRESSES, ilkToCollateralSymbol } from "@/lib/makerdao/asset-catalog";
 
@@ -57,7 +57,8 @@ const SECONDS_PER_YEAR = 31536000;
 const bytes32ToStr = (b32: string): string => Buffer.from(b32.slice(2), "hex").toString("utf8").replace(/\0+$/, "");
 
 export interface MakerVaultState {
-  /** CdpManager id — null for LockStake engine urns (urn-addressed). */
+  /** CdpManager id — null for LockStake engine urns and direct-Vat urns
+   *  (urn-addressed). */
   cdpId: string | null;
   /** LockStake engine urn (decision 0013). */
   lse: boolean;
@@ -110,13 +111,21 @@ export interface MakerVaultState {
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
 /** Read a vault's state from chain at ONE block. `vaultId` is a CDP Manager id,
- *  or a urn ADDRESS for LockStake engine urns (decision 0013 — cdp-less;
- *  resolved via the engine's own urnOwners/ilk reads). `atBlock` pins the
- *  eth_calls to a named past block; omit it and the head is resolved first and
- *  pins them instead — never left unpinned, so the reads cannot straddle two
- *  blocks and the answer always names the block it came from. Returns null for
- *  an unknown / never-opened cdp or a non-engine urn address. */
-export async function loadMakerVaultStateFromChain(vaultId: string, atBlock?: number): Promise<MakerVaultState | null> {
+ *  or a urn ADDRESS — a LockStake engine urn (decision 0013 — cdp-less;
+ *  resolved via the engine's own urnOwners/ilk reads) or a direct-Vat urn. A
+ *  direct urn has no owner record to resolve it: the Vat keys its slots by
+ *  (ilk, urn) and nothing on chain maps the urn to its ilk, so the caller passes
+ *  `directIlk` from the index row, and the owner is the urn itself. `atBlock`
+ *  pins the eth_calls to a named past block; omit it and the head is resolved
+ *  first and pins them instead — never left unpinned, so the reads cannot
+ *  straddle two blocks and the answer always names the block it came from.
+ *  Returns null for an unknown / never-opened cdp, or a urn address that is
+ *  neither an engine urn nor given a `directIlk`. */
+export async function loadMakerVaultStateFromChain(
+  vaultId: string,
+  atBlock?: number,
+  directIlk?: string | null,
+): Promise<MakerVaultState | null> {
   const isCdp = /^\d+$/.test(vaultId);
   const isUrnAddr = /^0x[0-9a-fA-F]{40}$/.test(vaultId);
   if (!isCdp && !isUrnAddr) return null;
@@ -169,12 +178,19 @@ export async function loadMakerVaultStateFromChain(vaultId: string, atBlock?: nu
       ],
       ...blk,
     });
-    if (!o || o === ZERO_ADDR) return null;
     urn = vaultId as `0x${string}`;
-    ilkB = i;
-    owner = o;
     cdpId = null;
-    lse = true;
+    if (o && o !== ZERO_ADDR) {
+      ilkB = i;
+      owner = o;
+      lse = true;
+    } else if (directIlk) {
+      ilkB = stringToHex(directIlk, { size: 32 });
+      owner = urn;
+      lse = false;
+    } else {
+      return null;
+    }
   }
 
   const [urnSlot, vatIlk, spotIlk, par, jugBase, jugIlk] = await client.multicall({

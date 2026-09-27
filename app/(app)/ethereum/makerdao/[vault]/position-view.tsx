@@ -176,8 +176,15 @@ export default function MakerVaultDetailView({
           fetchMakerVaults(isUrnAddr ? { urn: vault, limit: 1 } : { cdpId: vault, limit: 1 }),
           fetchMakerTimeline(vault, { recent: TIMELINE_WINDOW_EVENTS }),
         ]);
-        const chain: MakerVaultState | null = chainRes && chainRes.ok ? (await chainRes.json()).state : null;
+        let chain: MakerVaultState | null = chainRes && chainRes.ok ? (await chainRes.json()).state : null;
         const summary: MakerVaultSummary | null = vData.data[0] ?? null;
+        // A direct-Vat urn: the Vat read needs the ilk the index row names.
+        if (isUrnAddr && !chain && summary && summary.cdpId == null && !summary.lse) {
+          const directRes = await fetch(
+            `/api/chain/makerdao/vault/${encodeURIComponent(vault)}?ilk=${encodeURIComponent(summary.ilk)}`,
+          ).catch(() => null);
+          chain = directRes && directRes.ok ? (await directRes.json()).state : null;
+        }
         setView(mergeView(chain, summary));
         setChainState(chain);
         setEvents(tData.events ?? []);

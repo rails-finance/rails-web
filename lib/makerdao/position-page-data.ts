@@ -14,9 +14,11 @@
 // /api/chain/makerdao/vault/<id>: that handler runs exactly this line.
 //
 // The [vault] param is a cdp id, or a urn ADDRESS for LockStake engine urns
-// (cdp-less, decision 0013). The roster lookup must use the matching filter — a
-// non-numeric cdpId is ignored server-side and would silently return some other
-// vault's page-1 row.
+// (cdp-less, decision 0013) and direct-Vat urns. The roster lookup must use the
+// matching filter — a non-numeric cdpId is ignored server-side and would
+// silently return some other vault's page-1 row. A direct urn's Vat read needs
+// its ilk, which only the index row names, so for that one kind the read
+// follows the row instead of running beside it.
 //
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
@@ -50,7 +52,15 @@ export const loadMakerVaultTail = cache(async (vault: string) => {
           return null;
         }),
       ]);
-      return { summary: vaults.data[0] ?? null, chain: chain ?? null };
+      const summary = vaults.data[0] ?? null;
+      const direct = isUrnAddr && chain == null && summary != null && summary.cdpId == null && !summary.lse;
+      const directChain = direct
+        ? await loadMakerVaultStateFromChain(vault, undefined, summary.ilk).catch((err) => {
+            console.error("makerdao-position-page-data: Vat read failed", err);
+            return null;
+          })
+        : null;
+      return { summary, chain: chain ?? directChain };
     },
     readTimeline: (baseUrl, headers) => fetchMakerTimeline(vault, { recent: TIMELINE_WINDOW_EVENTS, baseUrl, headers }),
     readOpening: (baseUrl, cutoffBlock, headers) =>

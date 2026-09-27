@@ -27,7 +27,9 @@ export interface MakerVaultSummary {
   urn: string;
   ilk: string;
   collateralSymbol: string;
-  /** Resolved EOA owner (via the DSProxy hop), when captured. */
+  /** The owner: the EOA behind the DSProxy hop, the LockStake engine's owner
+   *  record, or — for a direct-Vat urn, which has neither — the urn itself,
+   *  often a contract. */
   owner: string | null;
   status: MakerVaultStatus;
   collateral: { amount: number; amountRaw: string; symbol: string; valueUsd: number | null };

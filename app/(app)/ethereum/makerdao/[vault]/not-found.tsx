@@ -10,8 +10,9 @@ export default function MakerVaultNotFound() {
       backHref="/ethereum/makerdao"
       backLabel="Browse MakerDAO vaults"
     >
-      A MakerDAO vault is named by its cdp id, or — for a LockStake engine urn, which has none — by the urn&rsquo;s own
-      20-byte address. The URL carries neither, so there is nothing the Vat could answer to.
+      A MakerDAO vault is named by its cdp id, or — for a LockStake engine urn or a urn opened directly on the Vat,
+      which have none — by the urn&rsquo;s own 20-byte address. The URL carries neither, so there is nothing the Vat
+      could answer to.
     </RouteNotFound>
   );
 }
