@@ -2,27 +2,43 @@
 // Event links below the render cap — the pinned page, the `?at=` landing and
 // the server-side lookup all reach an event the default card list elides.
 // ----------------------------------------------------------------------------
-// Moonwell Base's index arm draws the newest 2,000 rows plus every
-// wallet-signed row below that cut; unsigned rows below it (liquidations,
-// their repay legs and seize transfers) are elided until the reader loads
-// older events. Before 2026-09-03 an `/event/<id>` link to one of those
+// Moonwell Base's index arm omits certain event TYPES from the default list —
+// unsigned rows (liquidations, their repay legs and seize transfers) — no
+// matter how deep a reader reads; it states what it left out in
+// `coverage.omitted`. Before 2026-09-03 an `/event/<id>` link to one of those
 // rendered a title with no verb and the card slot read "not among what's
 // here", and the pinned page's own "View in timeline" (`?at=<id>`) did the
-// same. Both now ask for the whole history once before saying so, and the
-// event route's server lookup reads the life uncapped.
+// same. Both now reach the event through the server-side lookup that reads
+// the life uncapped, regardless of what the list route serves.
 //
-// The fixture is the wallet with the deepest elided prefix on the roster —
-// the 2026-08-27 MAMO exploiter (2,405 rows, 384 elided at the default
-// limit). Its first liquidation (09:30:45 UTC, block 50,516,849) sits below
-// the cut; a liquidation from 09:33:51 (the earliest the default limit
-// serves) is the control. Check 0 asserts that shape against the timeline
-// route first: if the cap, the limit or the wallet's history ever changes so
-// that the "deep" id is served by default, this verifier says so instead of
-// passing on a fixture that no longer exercises anything.
+// REBUILT 2026-09-27 (rails-ops TO-DO-infra-and-backend.md §8): leg C
+// (2026-09-13) moved Moonwell Base's index arm to server-side folders
+// (`?group=1`), and with it the omission rule went from DEPTH (a row below
+// some cut) to TYPE (liquidations are never individually listed, whatever a
+// caller asks for). `?limit=` on the list route stopped doing anything —
+// 0d/0e/5a all assumed the old depth cut and went red without a page bug: the
+// fix they guard (the server-side lookup route, checks 1/2/3/4) still passes.
+// The `?at=` landing's own deeper-read path changed with it: it no longer
+// re-asks the list route with a bigger `limit=`, it asks the FOLDER route by
+// event key (`/api/chain/moonwell-base/timeline/folder?wallet=…&event=<id>`,
+// lib/moonwell-base/timeline-folders.ts) — 5a now watches for that request.
+//
+// DEEP_ID is left exactly as it was: a real liquidation from the 2026-08-27
+// MAMO exploiter, and liquidations are the omitted TYPE now just as
+// consistently as they were the below-cut rows before — if anything, more
+// durably, since no amount of future activity from this wallet can push it
+// back into the list. SHALLOW_ID could not stay: it was ALSO a liquidation
+// (the old "first one above the cut"), and every liquidation is omitted now,
+// so it stopped being served — 0d's own failure. The control has to be a
+// SERVED row, which no longer correlates with block or timestamp, only with
+// event type; §0 below queries the wallet's own default response for one
+// rather than pin a second literal that the next redesign could just as
+// easily retire.
 //
 // Checks:
-//   0. Precondition — the default timeline response omits DEEP_ID and serves
-//      SHALLOW_ID; a `limit=3000` read serves DEEP_ID (the id exists).
+//   0. Precondition — DEEP_ID (a liquidation) is never in the default list;
+//      the list's own `coverage.omitted` shows liquidations are the reason;
+//      SHALLOW_ID (read off the default list itself) IS served.
 //   1. Server lookup — the event page's HTML (no JS) titles DEEP_ID with its
 //      verb ("· Liquidation"), so metadata and the share image name it.
 //   2. Pinned page, fresh context — `/event/DEEP_ID` renders the card
@@ -30,8 +46,8 @@
 //   3. Control — `/event/SHALLOW_ID` renders the same way.
 //   4. Not-found still works — a fabricated id renders the notice, no card,
 //      and the "reading the rest" line does not stay up.
-//   5. `?at=DEEP_ID` on the position page asks for the deeper read and
-//      renders no not-found notice once it has come back.
+//   5. `?at=DEEP_ID` on the position page asks the folder route for the
+//      event by key and renders no not-found notice once it has come back.
 //
 // Proved it can fail 2026-09-03: run against the deployed site before the fix
 // (BASE=https://rails-web-onboarding.vercel.app), checks 1, 2 and 5 FAIL while
@@ -49,11 +65,8 @@ const CARD_TIMEOUT_MS = 240000;
 const WALLET = "0x719eae70d4a83f35bf82a2740699f5db84be919d";
 const POSITION = `/base/moonwell/${WALLET}`;
 // 27 Aug 2026 09:30:45 UTC — the first liquidation, 32 s after the last
-// borrow. An unsigned row below the default render cut.
+// borrow. Omitted-by-type from the list route, whatever a caller asks for.
 const DEEP_ID = "0x3f5bc84f9bd32daa3961aa601ba39488b633ca87419f7caaba4344e8e0cc0161-27";
-// 27 Aug 2026 09:33:51 UTC — the earliest liquidation the default limit
-// serves (the first row above the cut).
-const SHALLOW_ID = "0x2736d8b5a8f2e508b6e90faa007637cd82c74ef71858b0f6bbd193741ab52f77-20";
 const FAKE_ID = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff-999999";
 const NOT_FOUND_TEXT = "among the events Rails has served";
 
@@ -87,24 +100,36 @@ async function timeline(params = "") {
 
 await waitForBase();
 
-// ── 0. Precondition: the fixture still straddles the cut ──────────────────
+// ── 0. Precondition: the fixture still exercises an omitted-type event ────
 const byDefault = await timeline();
-const whole = await timeline("&limit=3000");
 const defaultIds = new Set(byDefault.events.map((e) => e.id));
-const wholeIds = new Set(whole.events.map((e) => e.id));
 check(
   "0a index arm serves this wallet",
   byDefault.coverage?.source === "index",
   `source=${byDefault.coverage?.source}`,
 );
 check(
-  "0b default response is render-capped",
+  "0b default response omits rows",
   byDefault.totalEvents > byDefault.events.length,
   `${byDefault.events.length} served of ${byDefault.totalEvents}`,
 );
-check("0c DEEP_ID is NOT served at the default limit", !defaultIds.has(DEEP_ID));
-check("0d SHALLOW_ID IS served at the default limit", defaultIds.has(SHALLOW_ID));
-check("0e DEEP_ID exists in the whole history", wholeIds.has(DEEP_ID), `${whole.events.length} rows at limit=3000`);
+check("0c DEEP_ID is NOT served", !defaultIds.has(DEEP_ID));
+// The reason 0c holds: liquidations are an omitted TYPE, not a below-cut
+// depth — `?limit=` does not change this (retired 2026-09-27, see the
+// header). `omitted.summary.byType` states which types and how many.
+const omittedTypes = byDefault.coverage?.omitted?.summary?.byType ?? [];
+const omittedLiquidations = omittedTypes.find((t) => t.key === "liquidation")?.count ?? 0;
+check(
+  "0d the default response's own omitted-summary names liquidations as a reason",
+  omittedLiquidations > 0,
+  `omitted by type: ${JSON.stringify(omittedTypes)}`,
+);
+// The control: whichever row the list route itself currently serves — read
+// off the list rather than a second pinned id, so a future redesign of WHAT
+// gets served (not just how deep) fails this precondition instead of quietly
+// testing nothing. Any served id does the control's job in checks 0e/3.
+const SHALLOW_ID = byDefault.events[0]?.id;
+check("0e the default response serves at least one row to use as the control", Boolean(SHALLOW_ID), `${SHALLOW_ID}`);
 
 // ── 1. Server lookup reads the life uncapped ──────────────────────────────
 {
@@ -165,23 +190,27 @@ await pinnedCase("2  /event/DEEP_ID", DEEP_ID, true);
 await pinnedCase("3  /event/SHALLOW_ID (control)", SHALLOW_ID, true);
 await pinnedCase("4  /event/FAKE_ID", FAKE_ID, false);
 
-// ── 5. `?at=` landing below the cut ───────────────────────────────────────
+// ── 5. `?at=` landing on an omitted-type event ─────────────────────────────
 {
   const { ctx, page } = await fresh();
+  // The landing asks the FOLDER route by event key, not the list route with a
+  // bigger `limit=` (retired — see the header): resolveEventKey in
+  // lib/moonwell-base/timeline-folders.ts.
   const deeper = page
-    .waitForResponse((r) => r.url().includes("/api/chain/moonwell-base/timeline") && /[?&]limit=/.test(r.url()), {
-      timeout: CARD_TIMEOUT_MS,
-    })
+    .waitForResponse(
+      (r) => r.url().includes("/api/chain/moonwell-base/timeline/folder") && r.url().includes(`event=${DEEP_ID}`),
+      { timeout: CARD_TIMEOUT_MS },
+    )
     .then(() => true)
     .catch(() => false);
   await page.goto(`${BASE}${POSITION}?at=${encodeURIComponent(DEEP_ID)}`, NAV);
   const askedDeeper = await deeper;
-  check("5a ?at= below the cut asks for the deeper read", askedDeeper);
+  check("5a ?at= on an omitted-type event asks the folder route for it by key", askedDeeper);
   await page.waitForLoadState("networkidle", { timeout: CARD_TIMEOUT_MS }).catch(() => {});
   // The list re-renders after the deeper read lands; give it a beat.
   await page.waitForTimeout(3000);
   const notice = (await page.getByText(NOT_FOUND_TEXT).count()) > 0;
-  check("5b ?at= below the cut shows no not-found notice", !notice);
+  check("5b ?at= on an omitted-type event shows no not-found notice", !notice);
   await ctx.close();
 }
 

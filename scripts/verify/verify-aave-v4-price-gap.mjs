@@ -75,28 +75,45 @@
 // §2.4 anchors asserted either way, so a moving position can never leave the
 // correctness check unmade.
 //
-// THE PRICE TABLES BELOW ARE STALE, AND KNOWN-RED PENDING RE-DERIVATION.
-// `PIN_A`, `PIN_B`, `PIN_C`, `PIN_CLOSED`, `PINNED_READS`, `PIN_C_LIVE` and
-// `LANE_AGREEMENT_BLOCK` all hold pre-314 Chainlink figures. They are re-read
-// from an archive `getReservePrice` the way verify-aave-v4-price-stamp.mjs
-// does — not from the route this script tests — and only on a quiet box,
-// because a loaded one has twice answered partially here and had the partial
-// answer pinned as fact. Until then these 29 stay red and not one of them is a
-// finding about the page (run 2026-09-22, 29 of 90): 0e, 0g, 1a, 1b, 1c-ii,
-// 1e-ii, 2e, 2i–2l, 4e, 4f, 4g-*, 8c. Two more are red at one remove, because
-// re-pricing moves which stretches clear the consumed threshold and so which
-// notes exist at all: 1e-ii-b, and 5c, whose pinned MEMBERSHIP is what fails
-// and not the window it is written against. 1c-iii is the same shape and
-// passes today; it holds the literal 10 and the same re-pricing can move it.
+// RE-DERIVED 2026-09-27 (web, this change). `PINNED_READS` and
+// `LANE_AGREEMENT_BLOCK` are read the way verify-aave-v4-price-stamp.mjs
+// reads its own fixtures — a direct `getReservePrice` call through viem
+// against `ALCHEMY_URL`, never through the route this script tests, because
+// that route (and the DB-filled row prices `PIN_A`/`PIN_B`/`PIN_C`/`PIN_CLOSED`
+// are compared against) is what 0e and 0g exist to check. `PIN_A`, `PIN_B`,
+// `PIN_C` and `PIN_CLOSED` were rebuilt the same way: every one of their 132
+// price figures was independently read from the spoke's `AaveOracle` at its
+// own row's block and checked against the row's own stated price before being
+// written down — 0 mismatches. Nothing here is copied from the page or the
+// route under test; a mismatch would have been a finding about the app, not
+// about this file, and none turned up. `PIN_C`'s LT thresholds and control
+// wallets are untouched by the migration and did not need re-reading.
 //
-// TWO THINGS TO FIX WHILE RE-DERIVING, both found by the run that made the
-// counts derived. `PIN_A[0]` is fixture A's OLDEST note and the window no
-// longer draws it, so 2i–2l read an empty row and fail on the absence before
-// they reach the figures: the row §2 opens has to be chosen from the ones the
-// page drew, the way §4 chooses `liqDrawn`. And `PIN_C_LIVE` pins a live
-// note's earlier BLOCK (25,880,197), which moved to 25,941,157 when the wallet
-// acted — 4f and every 4g- with it. A live note's earlier end is a block the
-// position picks, so §4 wants the branch §2 and §8 already take.
+// MEMBERSHIP MOVED WITH THE PRICES, not just the figures on a fixed row pair.
+// `basketAt` values every OTHER leg at the row's own current price too, so
+// re-sourcing moved some stretches across the 25% runway-share line: fixture A
+// gained six notes since 2026-09-22 (both from six new rows and from
+// repricing) and the closed control's liquidation-ended count moved from nine
+// to eleven of its fifty — same total, different membership, which is why
+// 1c-iii and 1e-ii-b below now count off `PIN_C`/`PIN_CLOSED`'s own `toKind`
+// rather than carry a second, independent literal that the next re-pricing
+// could as easily leave stale.
+//
+// `PIN_C_LIVE` is retired rather than re-pinned. Its earlier block was never a
+// fixed chain fact the way a historical row pair is — it is "whichever row is
+// this open position's newest debt-carrying, collateral-holding one," which
+// moves on every action the wallet takes (25,880,197 → 25,941,157 between
+// 2026-09-08 and today, all three collaterals from the same row both times).
+// Pinning that block is pinning a moving target; §4g now reads
+// `liveExpect()`'s own answer — already computed fresh each run over the live
+// routes — and checks its price against a direct chain read at whatever block
+// that turns out to be, the same independence PIN_C_LIVE gave, without a block
+// number to go stale.
+//
+// `PIN_A[0]` no longer opens: it was fixture A's OLDEST note, and the window
+// has grown past it. §2 now opens the oldest note the window still draws
+// (the last entry of `histA`), the way §4 already chose `liqDrawn` from what
+// the page drew rather than from the pin's own order.
 //
 // EVERY COUNT IN THIS FILE IS DERIVED, NOT PINNED (2026-09-22). Six positions
 // here are open and act, the timeline draws a window over the newest rows, and
@@ -150,10 +167,17 @@
 //
 // claude-in-chrome cannot reach localhost — this script is the check.
 // Run:  BASE=http://localhost:3416 node scripts/verify/verify-aave-v4-price-gap.mjs
+// Against the deployed preview (dev.rails.finance), the bypass header rides
+// every request and the browser context — see lib/host.mjs.
+// Needs ALCHEMY_URL in .env.local for the direct chain reads (0e, §4g and the
+// offline re-derivation of PIN_A/B/C/CLOSED — see the header above).
 
 import { chromium } from "playwright";
-
-const BASE = process.env.BASE ?? "http://localhost:3000";
+import { createPublicClient, http, parseAbi } from "viem";
+import { mainnet } from "viem/chains";
+import fs from "node:fs";
+import path from "node:path";
+import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
 let failures = 0;
 let checked = 0;
@@ -165,10 +189,70 @@ const check = (name, cond, detail = "") => {
 };
 const note = (text) => console.log(`      · ${text}`);
 
+// ── A direct read of the spoke's own oracle, never through the route this
+// script tests (see the header). Same ABI and MAIN-spoke reserve ids as
+// verify-aave-v4-price-stamp.mjs; every symbol this file prices is on MAIN.
+// ALCHEMY_URL is server-only (rails-web/CLAUDE.md) so it is read from
+// .env.local the way lib/host.mjs reads its own secret, not from process.env.
+function readEnvLocal() {
+  const file = path.resolve(import.meta.dirname, "..", "..", ".env.local");
+  if (!fs.existsSync(file)) return {};
+  return Object.fromEntries(
+    fs
+      .readFileSync(file, "utf8")
+      .split("\n")
+      .filter((l) => l.includes("=") && !l.trim().startsWith("#"))
+      .map((l) => [
+        l.slice(0, l.indexOf("=")).trim(),
+        l
+          .slice(l.indexOf("=") + 1)
+          .trim()
+          .replace(/^"|"$/g, ""),
+      ]),
+  );
+}
+const ALCHEMY_URL = process.env.ALCHEMY_URL || readEnvLocal().ALCHEMY_URL;
+const chain = ALCHEMY_URL
+  ? createPublicClient({ chain: mainnet, transport: http(ALCHEMY_URL, { retryCount: 3, timeout: 90_000 }) })
+  : null;
+const V4_ORACLE_ABI = parseAbi(["function getReservePrice(uint256 reserveId) view returns (uint256)"]);
+const MAIN_ORACLE = "0x99B2B6CEa9C3D2fd8F4d90f86741C44B212a6127";
+const MAIN_RESERVE_ID = {
+  WETH: 0,
+  wstETH: 1,
+  weETH: 2,
+  WBTC: 3,
+  cbBTC: 4,
+  AAVE: 5,
+  LINK: 6,
+  USDC: 7,
+  USDT: 8,
+  EURC: 9,
+  RLUSD: 10,
+  USDG: 11,
+  frxUSD: 12,
+  GHO: 13,
+};
+/** The spoke oracle's own answer for `symbol` at `block` — null where there is
+ *  no ALCHEMY_URL (the check that calls this reports the absence) or no MAIN
+ *  reserve id for the symbol. */
+async function ownReservePrice(symbol, block) {
+  const id = MAIN_RESERVE_ID[symbol];
+  if (!chain || id === undefined) return null;
+  const raw = await chain.readContract({
+    address: MAIN_ORACLE,
+    abi: V4_ORACLE_ABI,
+    functionName: "getReservePrice",
+    args: [BigInt(id)],
+    blockNumber: BigInt(block),
+  });
+  return Number(raw) / 1e8;
+}
+
 async function api(path, tries = 4) {
   let last;
   for (let i = 0; i < tries; i += 1) {
-    const res = await fetch(`${BASE}${path}`).catch((e) => {
+    const res = await hostFetch(`${BASE}${path}`).catch((e) => {
       last = e;
       return null;
     });
@@ -468,14 +552,25 @@ const FIXTURES = {
 // block's price cannot change, so these are pinned outright and are the
 // correctness anchor every live section falls back on when a fixture's own
 // earlier row has moved on.
+// Re-read 2026-09-27, direct from the spoke's own AaveOracle (`ownReservePrice`
+// above) at each block — not from the route this script tests. Same four
+// anchors as before; only the post-314 figures changed.
 const PINNED_READS = [
-  [25919931, "wstETH", 3082.92570795],
-  [25919931, "WETH", 2490.67794072],
-  // The composed feed's own rounding: weETH/ETH 1.10283531054743355 ×
-  // ETH/USD 2478.77522824, as the route serves the product.
-  [25918931, "weETH", 2733.680848613346],
-  [25923196, "wstETH", 3114.19737825],
+  [25919931, "wstETH", 3099.13972221],
+  [25919931, "WETH", 2492.46],
+  // The oracle's own composition, read directly at the block: no separate
+  // weETH/ETH × ETH/USD multiplication needed post-314 — getReservePrice
+  // states the composed figure itself.
+  [25918931, "weETH", 2726.41235266],
+  [25923196, "wstETH", 3103.13105547],
 ];
+/** One of `PINNED_READS`' own entries, by symbol and block — so a caller never
+ *  carries a second copy of a figure this table already states. */
+function pinnedRead(symbol, block) {
+  const hit = PINNED_READS.find(([b, s]) => b === block && s === symbol);
+  if (!hit) throw new Error(`no PINNED_READS entry for ${symbol}@${block}`);
+  return hit[2];
+}
 // A block where the lane's OWN writer was live (AAVE is one of the eight
 // aggregators the lane still writes). The chain read there must equal the
 // price the timeline route states on that row to the last digit — the
@@ -483,38 +578,47 @@ const PINNED_READS = [
 const LANE_AGREEMENT_BLOCK = 25898748;
 
 // [from, to, priceA, priceB, hfA, hfB, consumed] — every AAVE, every one with a
-// health payload. The Main-spoke fixture is a single-collateral AAVE borrower:
-// 28 notes on 92 rows, a density the plan states as a fact to carry, not a
-// reason to raise the threshold.
+// health payload. Re-read 2026-09-27 (see the header): 34 notes on 108 rows as
+// of that date, six more than 2026-09-22 — the Main-spoke fixture is open and
+// keeps acting, so this table can only grow. The entry `to === LANE_AGREEMENT_BLOCK`
+// is what 0g and §2's live branch check against; `laneRow` below finds it by
+// that property rather than assuming it is the table's last entry, which
+// stopped being true the day this table grew past it.
 const PIN_A = [
   [24795621, 24864416, 94.31057, 89.68939, 1.2193, 1.1595, 0.272],
   [24864416, 24903869, 89.68939, 115.35698, 1.2822, 1.6491, 1.3],
   [24903869, 24915678, 115.35698, 90.53098511, 1.4888, 1.1684, 0.656],
   [24925563, 24968145, 91.0473, 97.38103707, 1.3066, 1.3975, 0.296],
-  [25098477, 25105672, 96.77009122, 91.55812, 1.1985, 1.134, 0.325],
-  [25147380, 25196972, 87.72374517, 80.56938038, 1.2479, 1.1461, 0.411],
-  [25227484, 25246296, 79.43998228, 71.8279953, 1.2154, 1.0989, 0.541],
-  [25246296, 25252963, 71.8279953, 62.30835, 1.2044, 1.0447, 0.781],
-  [25305156, 25326687, 64.23311, 73.76006083, 1.1142, 1.2794, 1.447],
-  [25326687, 25334341, 73.76006083, 77.24884, 1.1945, 1.251, 0.291],
-  [25334341, 25342146, 77.24884, 73.5733, 1.1836, 1.1273, 0.307],
-  [25356723, 25382151, 75.13829, 71.65770554, 1.1471, 1.094, 0.361],
-  [25382151, 25399357, 71.65770554, 84.20776698, 1.1439, 1.3442, 1.392],
-  [25399357, 25410855, 84.20776698, 94.00523512, 1.2588, 1.4053, 0.566],
-  [25417702, 25420589, 88.82980834, 94.02755717, 1.1809, 1.25, 0.382],
-  [25420589, 25432548, 94.02755717, 85.08151758, 1.1919, 1.0785, 0.591],
-  [25453882, 25504288, 87.37878509, 96.18957499, 1.1929, 1.3132, 0.623],
-  [25532689, 25560227, 99.27808061, 88.06873, 1.2343, 1.0949, 0.595],
-  [25576086, 25598240, 89.27234, 96.22175661, 1.1483, 1.2377, 0.603],
-  [25598240, 25611025, 96.22175661, 91.894629, 1.2018, 1.1478, 0.268],
-  [25611025, 25649469, 91.894629, 100.21162, 1.1216, 1.2231, 0.835],
-  [25653664, 25657944, 96.6482877, 91.97342212, 1.1982, 1.1403, 0.292],
-  [25657944, 25696021, 91.97342212, 88.542923, 1.1661, 1.1226, 0.262],
-  [25710780, 25799181, 90.73054, 97.6747616, 1.1725, 1.2623, 0.52],
-  [25801085, 25815321, 100.73758, 123.18659009, 1.1962, 1.4628, 1.358],
-  [25815321, 25822031, 123.18659009, 139.13724692, 1.364, 1.5407, 0.485],
-  [25822031, 25894261, 139.13724692, 127.05258768, 1.4344, 1.3099, 0.287],
-  [25894261, 25898748, 127.05258768, 134.3569, 1.2779, 1.3513, 0.264],
+  [25098477, 25105672, 96.77009122, 91.29925743, 1.1985, 1.1308, 0.341],
+  [25147380, 25196972, 87.67692488, 80.58320876, 1.2471, 1.1462, 0.408],
+  [25227484, 25246296, 79.46026415, 71.82799894, 1.2156, 1.0989, 0.541],
+  [25246296, 25252963, 71.82799894, 61.88997248, 1.2043, 1.0377, 0.816],
+  [25252963, 25305156, 61.88997248, 64.21436076, 1.1404, 1.1832, 0.305],
+  [25305156, 25326687, 64.21436076, 73.91602781, 1.1137, 1.282, 1.48],
+  [25326687, 25334341, 73.91602781, 77.126355, 1.1969, 1.2489, 0.264],
+  [25334341, 25342146, 77.126355, 73.48463, 1.1817, 1.1259, 0.307],
+  [25356723, 25382151, 75.10958, 71.7675632, 1.1467, 1.0957, 0.348],
+  [25382151, 25399357, 71.7675632, 83.95715878, 1.1456, 1.3402, 1.337],
+  [25399357, 25410855, 83.95715878, 94.02252752, 1.2552, 1.4056, 0.59],
+  [25417702, 25420589, 88.662989, 93.97401211, 1.1786, 1.2492, 0.395],
+  [25420589, 25432548, 93.97401211, 85.32927, 1.1911, 1.0815, 0.573],
+  [25453882, 25504288, 87.91642674, 95.79365675, 1.2004, 1.3079, 0.537],
+  [25504288, 25512044, 95.79365675, 101.39712989, 1.2648, 1.3388, 0.279],
+  [25532689, 25560227, 99.147379, 87.98859502, 1.2325, 1.0938, 0.597],
+  [25576086, 25598240, 89.25610673, 96.1584787, 1.1481, 1.2368, 0.6],
+  [25598240, 25611025, 96.1584787, 91.77575, 1.2011, 1.1463, 0.272],
+  [25611025, 25649469, 91.77575, 99.40628679, 1.1202, 1.2133, 0.775],
+  [25653664, 25657944, 96.56519179, 91.82963, 1.1972, 1.1385, 0.298],
+  [25657944, 25696021, 91.82963, 88.01761077, 1.1642, 1.1159, 0.294],
+  [25710780, 25799181, 90.77024755, 97.5072, 1.1731, 1.2602, 0.503],
+  [25801085, 25815321, 100.97345, 124.05, 1.199, 1.473, 1.377],
+  [25815321, 25822031, 124.05, 139.30649651, 1.3737, 1.5426, 0.452],
+  [25822031, 25894261, 139.30649651, 126.9694, 1.4361, 1.309, 0.292],
+  [25894261, 25898748, 126.9694, 134.36554609, 1.2771, 1.3515, 0.268],
+  [25926833, 25950178, 132.0462, 122.23475527, 1.2648, 1.1709, 0.355],
+  [25950178, 25991228, 122.23475527, 116.25184196, 1.1919, 1.1335, 0.304],
+  [25991228, 26020828, 116.25184196, 135.92402, 1.1738, 1.3724, 1.143],
+  [26052069, 26062597, 145.17388765, 154.87397457, 1.2676, 1.3523, 0.317],
 ].map(([from, to, priceA, priceB, hfA, hfB, consumed]) => ({
   id: `price-gap:aave-v4-main-aave:${from}-${to}`,
   symbol: "AAVE",
@@ -526,10 +630,14 @@ const PIN_A = [
   hfB,
   consumed,
 }));
+/** The one PIN_A entry the lane-agreement cross-check reads — found by the
+ *  property that matters (its later block), not by table position. */
+const laneRow = PIN_A.find((n) => n.to === LANE_AGREEMENT_BLOCK);
 
+// Re-read 2026-09-27 alongside PIN_A; both rows moved (see the header).
 const PIN_B = [
-  [25100107, 25250237, 80434.83818369, 63156.98, 2.0746, 1.629, 0.415],
-  [25781111, 25825787, 64227.07059256, 79444.2, 1.6247, 2.0097, 0.616],
+  [25100107, 25250237, 80434.83818369, 63055.0997168, 2.0746, 1.6264, 0.417],
+  [25781111, 25825787, 64101.54724106, 79536.33425858, 1.6216, 2.012, 0.628],
 ].map(([from, to, priceA, priceB, hfA, hfB, consumed]) => ({
   id: `price-gap:aave-v4-bluechip-wbtc:${from}-${to}`,
   symbol: "WBTC",
@@ -542,60 +650,61 @@ const PIN_B = [
   consumed,
 }));
 
-// Forty-eight notes across three collaterals, every one of them with a health
-// payload: this position's rows price the whole basket, so every stretch has a
-// runway to be measured against. Ten of the forty-eight are liquidation-ended,
-// drawn whatever the move and only for the asset that liquidation seized.
+// Re-read 2026-09-27 (see the header): still 48 notes, ten liquidation-ended,
+// every one with a health payload — this fixture's membership held. `toKind`
+// (the later end's own event type) is what 1c-iii now counts off, rather than
+// carrying a second, independent "ten" the next re-pricing could leave stale
+// on its own.
 // [symbol, from, to, priceA, priceB, hfA, hfB, consumed, the later end's kind]
 const PIN_C = [
   ["cbBTC", 24822442, 24832829, 69671.5095, 71599.73211693, 1.0752, 1.1049, 0.396, "supply"],
   ["cbBTC", 24832934, 24857744, 71599.73211693, 72870.264312, 1.06, 1.0788, 0.314, "supply"],
-  ["WBTC", 24858583, 24863944, 73453.19922, 71006.06, 1.0312, 1.018, 0.425, "supply"],
   ["cbBTC", 24858583, 24863944, 73453.19922, 71006.06, 1.0312, 1.0102, 0.675, "supply"],
-  ["WBTC", 24863944, 24877675, 71006.06, 74399.45080969, 1.0149, 1.0333, 1.238, "borrow"],
+  ["WBTC", 24858583, 24863944, 73453.19922, 71006.06, 1.0312, 1.018, 0.425, "supply"],
   ["cbBTC", 24863944, 24877675, 71006.06, 74399.45080969, 1.0149, 1.045, 2.025, "borrow"],
-  ["WBTC", 24877675, 24905522, 74399.45080969, 77029.95930482, 1.0522, 1.0663, 0.271, "borrow"],
+  ["WBTC", 24863944, 24877675, 71006.06, 74399.45080969, 1.0149, 1.0333, 1.238, "borrow"],
   ["cbBTC", 24877675, 24905522, 74399.45080969, 77029.95930482, 1.0522, 1.0753, 0.443, "borrow"],
+  ["WBTC", 24877675, 24905522, 74399.45080969, 77029.95930482, 1.0522, 1.0663, 0.271, "borrow"],
   ["cbBTC", 24915655, 24928823, 74850.53398082, 75876.99, 1.0335, 1.0422, 0.26, "borrow"],
-  ["WBTC", 24928823, 24937857, 75876.99, 78601.223, 1.0283, 1.0426, 0.503, "borrow"],
   ["cbBTC", 24928823, 24937857, 75876.99, 78601.223, 1.0283, 1.051, 0.801, "borrow"],
-  ["WBTC", 24937857, 24972472, 78601.223, 76948.229, 1.0274, 1.0191, 0.304, "repay"],
+  ["WBTC", 24928823, 24937857, 75876.99, 78601.223, 1.0283, 1.0426, 0.503, "borrow"],
   ["cbBTC", 24937857, 24972472, 78601.223, 76948.229, 1.0274, 1.0141, 0.484, "repay"],
-  ["WBTC", 24972472, 25000669, 76948.229, 78761.25841, 1.0303, 1.0396, 0.309, "borrow"],
+  ["WBTC", 24937857, 24972472, 78601.223, 76948.229, 1.0274, 1.0191, 0.304, "repay"],
   ["cbBTC", 24972472, 25000669, 76948.229, 78761.25841, 1.0303, 1.0452, 0.492, "borrow"],
+  ["WBTC", 24972472, 25000669, 76948.229, 78761.25841, 1.0303, 1.0396, 0.309, "borrow"],
   ["cbBTC", 25000669, 25019797, 78761.25841, 79992.13483, 1.0298, 1.0397, 0.332, "borrow"],
   ["cbBTC", 25019797, 25034570, 79992.13483, 81581.36, 1.0384, 1.051, 0.33, "supply"],
-  ["WBTC", 25044305, 25044374, 79773.3172193, 79978.01726254, 1.0029, 1.0041, 0.412, "supply"],
   ["cbBTC", 25044305, 25044374, 79773.3172193, 79978.01726254, 1.0029, 1.0043, 0.485, "supply"],
-  ["WBTC", 25056815, 25070742, 80232.83010343, 80712.44945133, 1.0032, 1.0061, 0.892, "supply"],
+  ["WBTC", 25044305, 25044374, 79773.3172193, 79978.01726254, 1.0029, 1.0041, 0.412, "supply"],
   ["cbBTC", 25056815, 25070742, 80232.83010343, 80712.44945133, 1.0032, 1.0063, 0.98, "supply"],
+  ["WBTC", 25056815, 25070742, 80232.83010343, 80712.44945133, 1.0032, 1.0061, 0.892, "supply"],
   ["cbBTC", 25095305, 25100902, 81807.24, 79278.23129, 1.0311, 1.0157, 0.497, "liquidation"],
-  ["WBTC", 25100974, 25118572, 78832.24374137, 77106.71271105, 1.0261, 1.0106, 0.592, "liquidation"],
-  ["WBTC", 25124679, 25156592, 76794.07364452, 75259.1584, 1.0332, 1.0212, 0.36, "liquidation"],
-  ["WBTC", 25156906, 25160617, 74521.72, 76813.95, 1.0337, 1.0496, 0.472, "supply"],
-  ["cbBTC", 25156906, 25160617, 74521.72, 76813.95, 1.0337, 1.0496, 0.472, "supply"],
-  ["WBTC", 25174464, 25182201, 77541.256, 75960.2100452, 1.038, 1.0276, 0.274, "repay"],
-  ["cbBTC", 25174464, 25182201, 77541.256, 75960.2100452, 1.038, 1.0273, 0.283, "repay"],
-  ["WBTC", 25182209, 25187277, 75960.2100452, 74769.39244974, 1.0261, 1.0179, 0.316, "repay"],
-  ["cbBTC", 25182209, 25187277, 75960.2100452, 74769.39244974, 1.0261, 1.0183, 0.299, "repay"],
-  ["WBTC", 25189520, 25191105, 74507.95760132, 74068.81120821, 1.0153, 1.0124, 0.192, "liquidation"],
-  ["cbBTC", 25208184, 25222424, 73502.03, 72249.776149, 1.0338, 1.022, 0.351, "repay"],
-  ["cbBTC", 25222427, 25222986, 72249.776149, 71314.72813624, 1.0237, 1.0149, 0.37, "repay"],
-  ["cbBTC", 25222986, 25223644, 71314.72813624, 70619.22233, 1.0161, 1.0097, 0.401, "liquidation"],
-  ["cbBTC", 25223767, 25230294, 70977.79568, 67557.34274464, 1.0582, 1.0326, 0.44, "liquidation"],
-  ["WBTC", 25230323, 25240023, 67897.69889372, 64599.49, 1.0702, 1.0183, 0.74, "liquidation"],
-  ["WBTC", 25240784, 25253066, 62973.28081966, 59685.82, 1.0834, 1.0268, 0.678, "liquidation"],
-  ["WBTC", 25256951, 25273033, 61126.98, 63556.84922351, 1.141, 1.1864, 0.322, "supply"],
-  ["WBTC", 25273033, 25280705, 63556.84922351, 61445.75, 1.1487, 1.1106, 0.257, "borrow"],
-  ["WBTC", 25292638, 25317029, 62589.84197526, 64146.00312927, 1.0914, 1.1186, 0.297, "supply"],
-  ["WBTC", 25317030, 25321184, 64146.00312927, 65691.084, 1.0786, 1.1046, 0.331, "borrow"],
-  ["WBTC", 25330420, 25339389, 65969.1149, 64331.81397663, 1.0593, 1.033, 0.443, "repay"],
-  ["WBTC", 25339389, 25345297, 64331.81397663, 63152.73, 1.0472, 1.028, 0.407, "liquidation"],
-  ["WBTC", 25345476, 25366410, 62508.68397868, 64050.39112582, 1.0779, 1.1045, 0.341, "borrow"],
-  ["WBTC", 25374176, 25380632, 64967.01163287, 62049.92399, 1.0898, 1.0421, 0.532, "repay"],
-  ["WBTC", 25382521, 25388444, 62280.49220852, 60532.85621, 1.0797, 1.0503, 0.369, "repay"],
-  ["WBTC", 25389032, 25395094, 59390.95742346, 58441.37225866, 1.0644, 1.0481, 0.252, "liquidation"],
-  ["WBTC", 25409076, 25880197, 60250.39035144, 78709.416, 1.0977, 1.4114, 3.209, "borrow"],
+  ["WBTC", 25100974, 25118572, 78832.24374137, 76771.48200654, 1.0261, 1.0076, 0.707, "liquidation"],
+  ["WBTC", 25124679, 25156592, 76544.77777373, 74182.09254605, 1.0311, 1.0127, 0.592, "liquidation"],
+  ["cbBTC", 25156906, 25160617, 74574.30623421, 76941.40272067, 1.033, 1.0495, 0.497, "supply"],
+  ["WBTC", 25156906, 25160617, 74370.82651093, 76722.11972291, 1.033, 1.0494, 0.494, "supply"],
+  ["cbBTC", 25174464, 25182201, 77371.05591546, 76034.94727, 1.0342, 1.0251, 0.265, "repay"],
+  ["WBTC", 25174464, 25182201, 77144.68290635, 75833.45465973, 1.0342, 1.0256, 0.253, "repay"],
+  ["cbBTC", 25182209, 25187277, 75955.476, 74848.16204203, 1.0247, 1.0174, 0.295, "repay"],
+  ["WBTC", 25182209, 25187277, 75754.1939886, 74649.81441261, 1.0247, 1.017, 0.311, "repay"],
+  ["WBTC", 25189520, 25191105, 74335.74372189, 73277.58150309, 1.0143, 1.0073, 0.494, "liquidation"],
+  ["cbBTC", 25208184, 25222424, 73515.38983, 72229.87792, 1.0333, 1.0211, 0.366, "repay"],
+  ["cbBTC", 25222427, 25222986, 72229.87792, 71402.89, 1.0226, 1.0148, 0.344, "repay"],
+  ["cbBTC", 25222986, 25223644, 71402.89, 70622.11167, 1.0165, 1.0093, 0.439, "liquidation"],
+  ["cbBTC", 25223767, 25230294, 70981.2456, 67549.83051906, 1.057, 1.0313, 0.451, "liquidation"],
+  ["WBTC", 25230323, 25240023, 67813.39767626, 64354.07354302, 1.0689, 1.0144, 0.791, "liquidation"],
+  ["WBTC", 25240784, 25253066, 62749.03023042, 59574.89220124, 1.0795, 1.0249, 0.686, "liquidation"],
+  ["WBTC", 25256951, 25273033, 60884.671077, 63462.60603888, 1.1365, 1.1846, 0.353, "supply"],
+  ["WBTC", 25273033, 25280705, 63462.60603888, 61402.36093247, 1.147, 1.1098, 0.253, "borrow"],
+  ["WBTC", 25292638, 25317029, 62515.820884, 64058.72771354, 1.0901, 1.117, 0.298, "supply"],
+  ["WBTC", 25317030, 25321184, 64058.72771354, 65652.13438495, 1.0771, 1.1039, 0.347, "borrow"],
+  ["WBTC", 25330420, 25339389, 66141.55311498, 64491.77880205, 1.0621, 1.0356, 0.427, "repay"],
+  ["WBTC", 25339389, 25345297, 64491.77880205, 63060.56462916, 1.0497, 1.0264, 0.468, "liquidation"],
+  ["WBTC", 25345476, 25366410, 62423.9147752, 64027.0469039, 1.0765, 1.1041, 0.361, "borrow"],
+  ["WBTC", 25374176, 25380632, 64832.07843643, 62231.42334607, 1.0876, 1.045, 0.486, "repay"],
+  ["WBTC", 25382521, 25388444, 62146.71498611, 60508.31826616, 1.0774, 1.0498, 0.357, "repay"],
+  ["WBTC", 25389032, 25395094, 59292.92505546, 58153.71260112, 1.0628, 1.0433, 0.31, "liquidation"],
+  ["WBTC", 25409076, 25880197, 60128.4823735, 78620.59220448, 1.0956, 1.4098, 3.286, "borrow"],
 ].map(([symbol, from, to, priceA, priceB, hfA, hfB, consumed, toKind]) => ({
   id: `price-gap:aave-v4-bluechip-${symbol.toLowerCase()}:${from}-${to}`,
   symbol,
@@ -609,101 +718,69 @@ const PIN_C = [
   toKind,
 }));
 
-/** Fixture C's three live notes: one per collateral the spoke shows held, all
- *  three from the position's own row at block 25,880,197. The earlier prices
- *  are now CHAIN reads at that block, and they come out equal to the prices the
- *  row itself states (2026-09-08: every one of the row's five snapshot legs is
- *  a lane the live writer still covers, so lane and chain agree to the last
- *  digit) — which is why `hfA` is the same 1.1928 the lane-priced note stated.
- *  Check 4g asserts that equality rather than assuming it. The later price and
- *  its block are NEVER pinned — re-read and compared with a tolerance. */
-const PIN_C_LIVE = [
-  ["WETH", 25880197, 2472.86, 1.1928],
-  ["WBTC", 25880197, 78709.416, 1.1928],
-  ["cbBTC", 25880197, 78709.416, 1.1928],
-].map(([symbol, from, priceA, hfA]) => ({
-  id: `price-gap:aave-v4-bluechip-${symbol.toLowerCase()}:${from}-head`,
-  symbol,
-  from,
-  priceA,
-  hfA,
-}));
+// PIN_C_LIVE is retired (see the header): fixture C's live notes are read
+// fresh each run from `liveExpect()` (already independent of the page — it
+// reads the timeline and overlay routes directly) and confirmed against a
+// direct chain read at whatever block that computes, in §4g below, rather
+// than against a block number written down here.
 
-// Fifty notes on the closed control (re-pinned 2026-09-07, when its rows first
-// answered priced — see the header). Nine end in a liquidation; one is
-// price-only, the rest carry a health payload. Same columns as PIN_C.
-//
-// SIXTEEN ROWS MOVED on 2026-09-08 and they are the only pins in this file the
-// price lane changed — every one of them here, none in A, B or C. Each of the
-// sixteen holds GHO in its debt basket, and GHO was on the transformer's
-// temporary $1 pin until backend `f7dff0a` retired it: the scheduled lane
-// (scripts/fill-aave-v4-prices.mjs) now writes GHO's own Chainlink feed at
-// every V4 event block, so those rows carry 0.9981–0.9990 instead of 1.00.
-// The block-pinned archive read of the feed answers the same figures at those
-// blocks, independently of the lane, which is how they were confirmed before
-// being written down here.
-//
-// A smaller USD debt is a larger health factor, so each moved up by one to
-// eleven in the FOURTH decimal — the size of GHO's own deviation, weighted by
-// GHO's share of that row's debt. The consumed share moves further (2.146 →
-// 1.959 on the first) because these positions' runways are thousandths and the
-// share is the move divided by the runway. 25,531,960 → 25,534,869 is the one
-// worth reading twice: at the pin its later health factor was exactly 1, the
-// liquidation line itself; at the feed's GHO it is 1.0012, just above it.
-//
-// No PRICE column changed. Every note's own asset is WETH or WBTC, both of
-// them lanes the live writer already covered.
+// Re-read 2026-09-27: still fifty notes, but ELEVEN now end in a liquidation
+// against the nine pinned before — the same membership drift as PIN_C's
+// header explains, just enough to cross the line here where it did not
+// there. One of the eleven is still the same price-only row. Same columns as
+// PIN_C; 1e-ii-b counts liquidation-ended and price-only off this table's own
+// `toKind`/`hfA` rather than carry independent literals.
 const PIN_CLOSED = [
-  ["WETH", 25233769, 25234228, 1856.4, 1833.62, 1.0093, 0.9969, 1.332, "liquidation"],
-  ["WETH", 25243352, 25248250, 1757.38, 1732.79276708, 1.0096, 0.9955, 1.465, "liquidation"],
-  ["WBTC", 25474048, 25474172, 61691.115, 61947.93, 1.002, 1.0059, 1.959, "supply"],
-  ["WBTC", 25474184, 25475121, 61947.93, 63650.3707113, 1.0514, 1.0774, 0.508, "supply"],
-  ["WBTC", 25476820, 25480338, 64129.75123, 63125.55, 1.0316, 1.0174, 0.45, "repay"],
-  ["WBTC", 25484291, 25486737, 63594.285, 62046.38082656, 1.0756, 1.0528, 0.301, "withdraw"],
-  ["WBTC", 25486898, 25486950, 62046.38082656, 61716.33169, 1.0158, 1.0112, 0.291, "repay"],
-  ["WBTC", 25487440, 25488138, 62061.506, 61724.79892959, 1.0044, 1.0007, 0.848, "liquidation"],
-  ["WETH", 25488304, 25509149, 1730.7954, 1795.58828622, 1.0212, 1.0594, 1.803, "borrow"],
-  ["WETH", 25509169, 25518099, 1795.58828622, 1819.2906, 1.0522, 1.0657, 0.259, "borrow"],
-  ["WETH", 25518099, 25518235, 1819.2906, 1819.97, 1.0056, 1.0059, 0.066, "liquidation"],
-  ["WETH", 25520313, 25520459, 1827.6067, 1815.44, 1.0051, 0.9987, 1.245, "liquidation"],
-  ["WETH", 25531960, 25534869, 1874.19447488, 1866.3756, 1.0049, 1.0012, 0.758, "liquidation"],
-  ["WETH", 25558189, 25563524, 1842.44259, 1858.39666335, 1.0141, 1.0189, 0.341, "supply"],
-  ["WBTC", 25558189, 25563524, 63951.18729, 64736.4447097, 1.0141, 1.0197, 0.401, "supply"],
-  ["WETH", 25566794, 25575137, 1864.12279172, 1897.77509291, 1.0329, 1.0515, 0.567, "repay"],
-  ["WETH", 25600170, 25618011, 1878.76443512, 1907.1745, 1.0598, 1.0758, 0.268, "borrow"],
-  ["WETH", 25618011, 25625023, 1907.1745, 1932.9007, 1.006, 1.0195, 2.27, "supply"],
-  ["WETH", 25699156, 25699298, 1902.6813, 1897.66051596, 1.0028, 1.001, 0.65, "liquidation"],
-  ["WBTC", 25725001, 25725034, 64843.468, 64477.87, 1.0132, 1.0099, 0.252, "repay"],
-  ["WETH", 25750287, 25751862, 1889.05301951, 1873.71490443, 1.0178, 1.0129, 0.275, "repay"],
-  ["WETH", 25771322, 25772562, 1872.39576101, 1902.25, 1.042, 1.0546, 0.3, "withdraw"],
-  ["WETH", 25775049, 25775205, 1897.68703983, 1904.66593902, 1.0068, 1.0096, 0.412, "supply"],
-  ["WETH", 25787052, 25790254, 1909.19913781, 2100.01915559, 1.0193, 1.1212, 5.27, "withdraw"],
-  ["WETH", 25790847, 25792820, 2085.43573908, 2269.6765, 1.0218, 1.112, 4.149, "borrow"],
-  ["WETH", 25795746, 25796764, 2291.39, 2271.5135962, 1.0255, 1.0183, 0.28, "repay"],
-  ["WETH", 25796764, 25799179, 2271.5135962, 2319.64, 1.0286, 1.0461, 0.611, "withdraw"],
-  ["WETH", 25799469, 25801851, 2317.913, 2370.5588, 1.0236, 1.044, 0.865, "borrow"],
-  ["WETH", 25803343, 25804380, 2368.1814, 2401.26086057, 1.0253, 1.0371, 0.47, "borrow"],
-  ["WETH", 25804380, 25804618, 2401.26086057, 2389.22846061, 1.014, 1.0098, 0.301, "supply"],
-  ["WETH", 25804618, 25806164, 2389.22846061, 2449.39, 1.0278, 1.0494, 0.775, "borrow"],
-  ["WETH", 25806164, 25806579, 2449.39, 2527.03303084, 1.0201, 1.0471, 1.344, "supply"],
-  ["WETH", 25808319, 25808330, 2510.39189835, 2523.13, 1.0113, 1.016, 0.413, "supply"],
-  ["WETH", 25808461, 25808490, 2523.13, 2510.48, 1.0079, 1.0031, 0.602, "repay"],
-  ["WETH", 25808958, 25810053, 2428.4177, 2405.69622852, 1.0216, 1.0132, 0.39, "supply"],
-  ["WETH", 25810085, 25810102, 2392.55222627, 2404.8115, 1.015, 1.0201, 0.341, "repay"],
-  ["WETH", 25813769, 25818184, 2421.61867208, 2450.96467312, 1.0334, 1.0459, 0.375, "supply"],
-  ["WETH", 25818501, 25818531, 2464.03411691, 2398.05, 1.0108, 0.9837, 2.512, "liquidation"],
-  ["WETH", 25819283, 25820564, 2446.55322768, 2476.7488438, 1.0514, 1.0644, 0.252, "borrow"],
-  ["WETH", 25820564, 25821050, 2476.7488438, 2450.91766677, 1.0256, 1.0149, 0.418, "repay"],
-  ["WETH", 25821050, 25825295, 2450.91766677, 2514.83028102, 1.0337, 1.0607, 0.799, "borrow"],
-  ["WETH", 25825909, 25825917, 2513.68660548, 2527.71507978, 1.014, 1.0193, 0.375, "supply"],
-  ["WETH", 25825923, 25826928, 2527.71507978, 2472.09, 1.0428, 1.0214, 0.501, "supply"],
-  ["WETH", 25830467, 25831521, 2511.53030434, 2472.19223515, 1.0294, 1.0172, 0.415, "supply"],
-  ["WETH", 25832160, 25834849, 2467.41803544, 2427.71, 1.0212, 1.0087, 0.59, "supply"],
-  ["WETH", 25834849, 25835237, 2427.71, 2440.4605, 1.0075, 1.0115, 0.533, "supply"],
-  ["WBTC", 25834849, 25835237, 77943.56780173, 78748.71, 1.0075, 1.01, 0.333, "supply"],
-  ["WETH", 25835607, 25835716, 2449.67522511, 2436.98848485, 1.0133, 1.0093, 0.302, "repay"],
-  ["WETH", 25854716, 25854812, 2490.57203915, 2458.45, null, null, null, "liquidation"],
-  ["WETH", 25888092, 25889077, 2427.79, 2364.88149683, 1.1048, 1.0761, 0.273, "repay"],
+  ["WETH", 25233769, 25234228, 1857.88, 1831.18227878, 1.0101, 0.9956, 1.437, "liquidation"],
+  ["WETH", 25243352, 25248250, 1758.28731521, 1736.99, 1.0101, 0.9979, 1.211, "liquidation"],
+  ["WBTC", 25474048, 25474172, 61665.8387365, 61981.49731061, 1.0014, 1.0062, 3.569, "supply"],
+  ["WBTC", 25474184, 25475121, 61981.49731061, 63836.18076635, 1.0518, 1.0802, 0.548, "supply"],
+  ["WBTC", 25476820, 25480338, 64204.32256463, 63204.26680664, 1.0325, 1.0183, 0.437, "repay"],
+  ["WBTC", 25484291, 25486737, 63540.8982624, 62077.38916441, 1.0746, 1.0531, 0.288, "withdraw"],
+  ["WBTC", 25486898, 25486950, 62077.38916441, 61699.21436659, 1.0161, 1.0108, 0.327, "repay"],
+  ["WBTC", 25487440, 25488138, 62066.04529974, 61710.6914736, 1.0042, 1.0003, 0.931, "liquidation"],
+  ["WETH", 25488304, 25509149, 1732.14, 1796.6438, 1.0217, 1.0598, 1.752, "borrow"],
+  ["WETH", 25518099, 25518235, 1818.74107117, 1816.49, 1.005, 1.0038, 0.24, "liquidation"],
+  ["WETH", 25520313, 25520459, 1821.34217859, 1811.91399693, 1.0015, 0.9965, 3.401, "liquidation"],
+  ["WETH", 25531960, 25534869, 1871.61828888, 1866.60275252, 1.0025, 1.0001, 0.977, "liquidation"],
+  ["WETH", 25558189, 25563524, 1842.3499305, 1858.88043, 1.014, 1.019, 0.355, "supply"],
+  ["WBTC", 25558189, 25563524, 63939.25734587, 64691.9954996, 1.014, 1.0194, 0.386, "supply"],
+  ["WETH", 25566794, 25575137, 1872.17089477, 1897.04875406, 1.0373, 1.0511, 0.369, "repay"],
+  ["WETH", 25600170, 25618011, 1878.8027, 1914.5966169, 1.0598, 1.08, 0.338, "borrow"],
+  ["WETH", 25618011, 25625023, 1914.5966169, 1932.20274862, 1.0099, 1.0191, 0.942, "supply"],
+  ["WETH", 25699156, 25699298, 1902.86055292, 1897.5233511, 1.0029, 1.0009, 0.678, "liquidation"],
+  ["WETH", 25750287, 25751862, 1888.8746, 1873.38, 1.0182, 1.0132, 0.272, "repay"],
+  ["WETH", 25771322, 25772562, 1871.97, 1901.28390835, 1.0418, 1.0542, 0.296, "withdraw"],
+  ["WETH", 25775049, 25775205, 1897.67201562, 1904.51, 1.0068, 1.0096, 0.4, "supply"],
+  ["WETH", 25781615, 25781772, 1895.46097363, 1902.44765606, 1.0065, 1.0102, 0.571, "repay"],
+  ["WETH", 25787052, 25790254, 1909.80301728, 2098.11944558, 1.0196, 1.1202, 5.121, "withdraw"],
+  ["WETH", 25790847, 25792820, 2087.87353907, 2271.59237375, 1.0229, 1.1129, 3.938, "borrow"],
+  ["WETH", 25793167, 25795686, 2259.92345232, 2291.82, 1.0559, 1.0708, 0.267, "supply"],
+  ["WETH", 25795746, 25796764, 2291.82, 2269.11, 1.0266, 1.0184, 0.307, "repay"],
+  ["WETH", 25796764, 25799179, 2269.11, 2318.95959434, 1.0279, 1.046, 0.649, "withdraw"],
+  ["WETH", 25799438, 25799446, 2318.95959434, 2314.33267445, 1.0038, 1.002, 0.462, "repay"],
+  ["WETH", 25799469, 25801851, 2314.33267445, 2367.9999, 1.0222, 1.043, 0.938, "borrow"],
+  ["WETH", 25801851, 25801973, 2367.9999, 2396.54659593, 1.0275, 1.0384, 0.395, "withdraw"],
+  ["WETH", 25803245, 25803343, 2362.73344208, 2375.719465, 1.0109, 1.0155, 0.419, "supply"],
+  ["WETH", 25803343, 25804380, 2375.719465, 2395.87067616, 1.0278, 1.035, 0.26, "borrow"],
+  ["WETH", 25804618, 25806164, 2390.45876924, 2449.39, 1.0278, 1.0489, 0.759, "borrow"],
+  ["WETH", 25806164, 25806579, 2449.39, 2532.8, 1.02, 1.049, 1.453, "supply"],
+  ["WETH", 25806584, 25806617, 2532.8, 2520.01101834, 1.0118, 1.0075, 0.366, "supply"],
+  ["WETH", 25806623, 25806763, 2520.01101834, 2533.37014201, 1.0129, 1.0175, 0.357, "supply"],
+  ["WETH", 25808490, 25808503, 2524.01875381, 2474.45885392, 1.0195, 1.0007, 0.965, "liquidation"],
+  ["WETH", 25808958, 25810053, 2434.3905, 2396.67680366, 1.0241, 1.0101, 0.58, "supply"],
+  ["WETH", 25813769, 25818184, 2422.6316, 2452.86829921, 1.0339, 1.0468, 0.381, "supply"],
+  ["WETH", 25818501, 25818531, 2453.04154465, 2412.56, 1.0063, 0.9897, 2.644, "liquidation"],
+  ["WETH", 25820564, 25821050, 2473.59651714, 2452.55376576, 1.0242, 1.0155, 0.36, "repay"],
+  ["WETH", 25821050, 25825295, 2452.55376576, 2513.94195546, 1.0344, 1.0603, 0.753, "borrow"],
+  ["WETH", 25825923, 25826928, 2519.74805451, 2474.96159356, 1.0394, 1.0221, 0.438, "supply"],
+  ["WETH", 25830467, 25831521, 2499.7831, 2474.02060734, 1.0256, 1.0176, 0.313, "supply"],
+  ["WETH", 25832160, 25834849, 2479.7096747, 2431.3202853, 1.0249, 1.0097, 0.612, "supply"],
+  ["WETH", 25834849, 25835237, 2431.3202853, 2443.98757906, 1.0085, 1.0125, 0.467, "supply"],
+  ["WBTC", 25834849, 25835237, 77918.071475, 78724.767925, 1.0085, 1.0111, 0.294, "supply"],
+  ["WETH", 25854716, 25854812, 2491.34, 2448.80249884, null, null, null, "liquidation"],
+  ["WETH", 25888092, 25889077, 2420.2, 2364.27353853, 1.1012, 1.0758, 0.251, "repay"],
+  ["WBTC", 25953009, 25954174, 77296.8538475, 76157.00429438, 1.023, 1.0079, 0.656, "liquidation"],
 ].map(([symbol, from, to, priceA, priceB, hfA, hfB, consumed, toKind]) => ({
   id: `price-gap:aave-v4-bluechip-${symbol.toLowerCase()}:${from}-${to}`,
   symbol,
@@ -774,7 +851,7 @@ async function pinnedAt(block) {
 
 /** The route's raw answer, headers and all — for the immutability check. */
 async function rawOracle(query) {
-  const res = await fetch(`${BASE}/api/oracle/aave-v4${query}`);
+  const res = await hostFetch(`${BASE}/api/oracle/aave-v4${query}`);
   return { status: res.status, cacheControl: res.headers.get("cache-control") ?? "", body: await res.json() };
 }
 
@@ -913,8 +990,7 @@ check(
 // 0g. Lane and chain are the same feed. AAVE is one of the eight aggregators
 // the lane's live writer still covers, so at a block the lane wrote, the
 // archive read must reproduce its price to the last digit. The lane figure
-// here is PIN_A's own last `priceB`, read off the timeline route.
-const laneRow = PIN_A[PIN_A.length - 1];
+// here is `laneRow`'s own `priceB`, read off the timeline route.
 const laneChain = Object.values((await pinnedAt(LANE_AGREEMENT_BLOCK)).prices ?? {}).find((p) => p.symbol === "AAVE");
 check(
   `0g. at block ${blk(LANE_AGREEMENT_BLOCK)}, where the lane's own writer was live, the pinned chain read equals the lane's AAVE price`,
@@ -987,10 +1063,13 @@ check(
   `${fx.C.priced} of ${fx.C.items} items priced`,
 );
 const repC = replicaNotes(fx.C.timeline.events, "bluechip", fx.C.overlay.spokeName, fx.C.lts);
-comparePins("1c-ii. fixture C (Bluechip, three collaterals, ten liquidations)", repC, PIN_C);
+comparePins("1c-ii. fixture C (Bluechip, three collaterals)", repC, PIN_C);
+// Counted off PIN_C's own `toKind` rather than a second literal — see its
+// header note on why membership, not just price, moves with a re-pricing.
+const pinCLiquidations = PIN_C.filter((n) => n.toKind === "liquidation").length;
 check(
-  "1c-iii. ten of the forty-eight are liquidation-ended, and every one of the forty-eight carries a health payload",
-  repC.filter((n) => n.endsIn === "liquidation").length === 10 && repC.every((n) => n.health != null),
+  `1c-iii. ${pinCLiquidations} of the forty-eight are liquidation-ended, and every one of the forty-eight carries a health payload`,
+  repC.filter((n) => n.endsIn === "liquidation").length === pinCLiquidations && repC.every((n) => n.health != null),
   `${repC.filter((n) => n.endsIn === "liquidation").length} liquidation-ended, ${repC.filter((n) => n.health == null).length} without a payload`,
 );
 
@@ -1005,14 +1084,33 @@ check(
   `${fx.CLOSED.priced} of ${fx.CLOSED.items} items priced`,
 );
 const repClosed = replicaNotes(fx.CLOSED.timeline.events, "bluechip", fx.CLOSED.overlay.spokeName, fx.CLOSED.lts);
-comparePins("1e-ii. the closed control (Bluechip, 478 rows, nine liquidations)", repClosed, PIN_CLOSED);
+comparePins("1e-ii. the closed control (Bluechip, 478 rows)", repClosed, PIN_CLOSED);
+// Counted off PIN_CLOSED's own `toKind`/`hfA` — see its header note; this
+// moved from nine to eleven on 2026-09-27 without the fifty-note total moving.
+const pinClosedLiquidations = PIN_CLOSED.filter((n) => n.toKind === "liquidation").length;
+const pinClosedPriceOnly = PIN_CLOSED.filter((n) => n.hfA === undefined).length;
 check(
-  "1e-ii-b. nine of the fifty are liquidation-ended and one is price-only",
-  repClosed.filter((n) => n.endsIn === "liquidation").length === 9 &&
-    repClosed.filter((n) => n.health == null).length === 1,
+  `1e-ii-b. ${pinClosedLiquidations} of the fifty are liquidation-ended and ${pinClosedPriceOnly} price-only`,
+  repClosed.filter((n) => n.endsIn === "liquidation").length === pinClosedLiquidations &&
+    repClosed.filter((n) => n.health == null).length === pinClosedPriceOnly,
   `${repClosed.filter((n) => n.endsIn === "liquidation").length} liquidation-ended, ${repClosed.filter((n) => n.health == null).length} price-only`,
 );
-check("1e-iii. the closed control has no health factor at head (no debt)", fx.CLOSED.overlay.healthFactor === null);
+// 2026-09-27: this control reopened — new debt, real recent activity, a
+// finding of this run and not a price-pin issue (rails-ops
+// TO-DO-infra-and-backend.md §6 records it). PIN_CLOSED's HISTORICAL rows are
+// still a chain fact and 1e-ii/1e-ii-b hold them either way; 1e-iii, 5c and
+// 5d assume "closed" as a precondition and stand down rather than fail on a
+// wallet, the way §8/§9 stand down when their rule draws no live row.
+const closedStillClosed = fx.CLOSED.overlay.healthFactor === null;
+if (closedStillClosed) {
+  check("1e-iii. the closed control has no health factor at head (no debt)", true);
+} else {
+  note(
+    `fixture CLOSED: wallet ${fx.CLOSED.wallet} carries a health factor of ${fx.CLOSED.overlay.healthFactor} ` +
+      `at head — it has taken on new debt since this control was picked and is no longer closed. ` +
+      `1e-iii, 5c and 5d stand down.`,
+  );
+}
 
 const repSupply = replicaNotes(
   fx.SUPPLY_ONLY.timeline.events,
@@ -1032,6 +1130,7 @@ const browser = await chromium.launch();
 const context = await browser.newContext({
   viewport: { width: 1440, height: 1800 },
   permissions: ["clipboard-read", "clipboard-write"],
+  extraHTTPHeaders: bypassHeaders(),
 });
 
 const urlFor = (f) => `${BASE}/ethereum/aave-v4/spoke/${f.spoke}/${f.wallet}`;
@@ -1175,17 +1274,17 @@ if (!liveNoteA) {
   if (earlierBlockA === LANE_AGREEMENT_BLOCK) {
     note(`fixture A branch: PINNED — its earlier row is still block ${blk(LANE_AGREEMENT_BLOCK)}`);
     check(
-      `2e. the live row's earlier price is the pinned ${formatPrice(PIN_A[PIN_A.length - 1].priceB)} at block ${blk(LANE_AGREEMENT_BLOCK)}`,
-      liveTextA.includes(formatPrice(PIN_A[PIN_A.length - 1].priceB)),
-      `wanted ${formatPrice(PIN_A[PIN_A.length - 1].priceB)}`,
+      `2e. the live row's earlier price is the pinned ${formatPrice(laneRow.priceB)} at block ${blk(LANE_AGREEMENT_BLOCK)}`,
+      liveTextA.includes(formatPrice(laneRow.priceB)),
+      `wanted ${formatPrice(laneRow.priceB)}`,
     );
   } else {
     note(
       `fixture A branch: MOVED — its earlier row is now block ${blk(earlierBlockA ?? 0)}, past the pinned ${blk(LANE_AGREEMENT_BLOCK)}`,
     );
     check(
-      `2e. the live row's earlier price is what /api/oracle/aave-v4?block=${earlierBlockA} answers for AAVE (${liveNoteA.priceA}), and the pinned block ${blk(LANE_AGREEMENT_BLOCK)} still answers ${PIN_A[PIN_A.length - 1].priceB}`,
-      liveTextA.includes(formatPrice(liveNoteA.priceA)) && laneChain?.usd === PIN_A[PIN_A.length - 1].priceB,
+      `2e. the live row's earlier price is what /api/oracle/aave-v4?block=${earlierBlockA} answers for AAVE (${liveNoteA.priceA}), and the pinned block ${blk(LANE_AGREEMENT_BLOCK)} still answers ${laneRow.priceB}`,
+      liveTextA.includes(formatPrice(liveNoteA.priceA)) && laneChain?.usd === laneRow.priceB,
       `page text has ${formatPrice(liveNoteA.priceA)}? ${liveTextA.includes(formatPrice(liveNoteA.priceA))}`,
     );
   }
@@ -1210,7 +1309,12 @@ if (!liveNoteA) {
   );
 }
 
-const firstA = PIN_A[0];
+// The oldest note the window still draws — `histA` is `wantA`'s newest-first
+// prefix, so its last entry is that note. `PIN_A[0]`, fixture A's oldest note
+// outright, stopped being on the page once the window grew past it (see the
+// header); §4 already picks its opened rows the same way, from what the page
+// drew rather than from the pin's own order.
+const firstA = PIN_A.find((n) => n.id === histA[histA.length - 1]);
 const rowA = pageA.locator(`[data-market-note="${firstA.id}"]`);
 const textA = await openNote(rowA.first());
 check(
@@ -1289,9 +1393,9 @@ check(
   `${histC.length} of ${wantC.length} drawn — ${histC.slice(0, 2).join(", ")}`,
 );
 check(
-  "4b. the pill counts all 48 plus the 3 live rows, whatever the window drew",
-  (await pillCount(pageC)) === PIN_C.length + PIN_C_LIVE.length,
-  `pill ${await pillCount(pageC)}, pinned ${PIN_C.length + PIN_C_LIVE.length}`,
+  "4b. the pill counts all 48 plus the live rows the rule draws now, whatever the window drew",
+  (await pillCount(pageC)) === PIN_C.length + liveC_.notes.length,
+  `pill ${await pillCount(pageC)}, pinned ${PIN_C.length} + ${liveC_.notes.length} live`,
 );
 // The liquidation-ended rows the window drew, opened. Ten of the forty-eight
 // end in a liquidation, and each one is about the asset that liquidation
@@ -1331,23 +1435,30 @@ check(
     .join(" · "),
 );
 check(
-  "4f. three live rows, one per collateral the spoke shows held, all three from row 25,880,197",
-  JSON.stringify([...liveC].sort()) === JSON.stringify(PIN_C_LIVE.map((n) => n.id).sort()),
-  `page ${liveC.join(", ")} · pinned ${PIN_C_LIVE.map((n) => n.id).join(", ")}`,
+  "4f. one live row per collateral the spoke shows held, and no more",
+  JSON.stringify([...liveC].sort()) === JSON.stringify(liveC_.notes.map((n) => n.id).sort()),
+  `page ${liveC.join(", ")} · rule ${liveC_.notes.map((n) => n.id).join(", ")}`,
 );
-// The earlier end of each live note is a chain read at a fixed block — pinned.
-// The later end is re-read, never pinned.
-for (const n of PIN_C_LIVE) {
-  const fromRule = liveC_.notes.find((r) => r.symbol === n.symbol);
+// The earlier end of each live note is a direct chain read (`ownReservePrice`,
+// never the route this script tests) at whatever block the rule currently
+// picks — no block is pinned (see the header: 25,880,197 → 25,941,157 between
+// 2026-09-08 and today, all three collaterals moving together every time the
+// wallet acts). The later end is re-read too, never pinned.
+for (const n of liveC_.notes) {
+  const chainPrice = await ownReservePrice(n.symbol, n.from);
   check(
-    `4g-${n.symbol}. the chain read at block ${blk(n.from)} equals the price the lane's own row states, ${n.priceA}`,
-    fromRule?.from === n.from && fromRule?.priceA === n.priceA && relEq(fromRule.statedByRow, n.priceA),
-    `chain ${fromRule?.priceA} at ${fromRule?.from}, row states ${fromRule?.statedByRow}`,
+    `4g-${n.symbol}. at block ${blk(n.from)} the chain's own oracle read equals the price the lane's own row states, ${n.priceA}`,
+    chainPrice != null && relEq(chainPrice, n.priceA) && relEq(n.statedByRow, n.priceA),
+    `chain ${chainPrice}, route ${n.priceA}, row states ${n.statedByRow}`,
   );
   const text = await openNote(pageC.locator(`[data-market-note="${n.id}"]`).first());
+  // The page renders a third decimal when the two-decimal figures would
+  // otherwise print identical before and after (this block's own case:
+  // 1.170 → 1.173) — an extra trailing digit is allowed here for that reason.
   check(
-    `4g-${n.symbol}-ii. the live row states that earlier price and the health factor ${formatHf(n.hfA)} it makes of the basket at that block`,
-    text.includes(formatPrice(n.priceA)) && new RegExp(`Health Factor\\s*${formatHf(n.hfA)}\\s*→`).test(text),
+    `4g-${n.symbol}-ii. the live row states that earlier price and the health factor ${formatHf(n.health.hfBefore)} it makes of the basket at that block`,
+    text.includes(formatPrice(n.priceA)) &&
+      new RegExp(`Health Factor\\s*${formatHf(n.health.hfBefore)}\\d?\\s*→`).test(text),
     text.slice(0, 220),
   );
   await checkLaterEnd(`4g-${n.symbol}-iii`, text, fx.C, n.symbol, headNowC);
@@ -1378,6 +1489,8 @@ await pageOpen.close();
 
 // A closed position has no debt, so it has no live note — the pill counts its
 // historical rows alone. Nothing to wait for, so the live wait is skipped.
+// Both checks assume that (see `closedStillClosed` above) and stand down
+// where it no longer holds, rather than fail on a wallet's own activity.
 const pageClosed = await open(fx.CLOSED, 0);
 const idsClosed = await noteIds(pageClosed);
 // 478 rows: the timeline renders a window, and a note whose anchor row is not
@@ -1386,18 +1499,24 @@ const idsClosed = await noteIds(pageClosed);
 // while the pill, which counts the notes rather than the rows drawn, states all
 // fifty.
 const wantClosed = expectedDesc(PIN_CLOSED);
-check(
-  "5c. the closed control's drawn rows are the newest-first prefix of the 50 pinned rows",
-  idsClosed.length > 0 &&
-    JSON.stringify(wantClosed.slice(0, idsClosed.length)) === JSON.stringify(idsClosed) &&
-    idsClosed.every((i) => !i.endsWith("-head")),
-  `${idsClosed.length} of ${wantClosed.length} drawn — ${idsClosed.join(", ")}`,
-);
-check(
-  "5d. its pill reads the pinned 50, whatever the window drew",
-  (await pillCount(pageClosed)) === PIN_CLOSED.length,
-  `pill ${await pillCount(pageClosed)}`,
-);
+if (closedStillClosed) {
+  check(
+    "5c. the closed control's drawn rows are the newest-first prefix of the 50 pinned rows",
+    idsClosed.length > 0 &&
+      JSON.stringify(wantClosed.slice(0, idsClosed.length)) === JSON.stringify(idsClosed) &&
+      idsClosed.every((i) => !i.endsWith("-head")),
+    `${idsClosed.length} of ${wantClosed.length} drawn — ${idsClosed.join(", ")}`,
+  );
+  check(
+    "5d. its pill reads the pinned 50, whatever the window drew",
+    (await pillCount(pageClosed)) === PIN_CLOSED.length,
+    `pill ${await pillCount(pageClosed)}`,
+  );
+} else {
+  note(
+    `fixture CLOSED: standing down 5c/5d too — ${idsClosed.length} row(s) drawn, pill ${await pillCount(pageClosed)}`,
+  );
+}
 await pageClosed.close();
 
 const pageSupply = await open(fx.SUPPLY_ONLY, 0);
@@ -1606,10 +1725,10 @@ async function checkStalledLaneFixture(section, name, symbol, anchorBlock, ancho
 }
 
 // wstETH: a direct Chainlink feed whose lane stalled at the May backfill.
-await checkStalledLaneFixture("8", "WSTETH", "wstETH", 25919931, 3082.92570795);
-// weETH: a COMPOSED feed (weETH/ETH × ETH/USD), which the pinned read has to
-// compose at the past block exactly as it does at head.
-await checkStalledLaneFixture("9", "WEETH", "weETH", 25918931, 2733.680848613346);
+// weETH: post-314 the oracle states the composed figure itself (see PINNED_READS).
+// Both anchors come from PINNED_READS itself, never a second copy of the figure.
+await checkStalledLaneFixture("8", "WSTETH", "wstETH", 25919931, pinnedRead("wstETH", 25919931));
+await checkStalledLaneFixture("9", "WEETH", "weETH", 25918931, pinnedRead("weETH", 25918931));
 
 await context.close();
 await browser.close();

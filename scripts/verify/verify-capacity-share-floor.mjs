@@ -14,14 +14,21 @@
 // liquidation line". The receipt behind the figure is the same division.
 //
 // Fixture: the exploiter wallet (the ratio is ~1.9e11 today and only grows
-// as interest accrues on a debt nothing backs); the control is the second
-// wallet by debt on the Base roster, well inside the ceiling. Check 0 reads
-// both from the position route first, so a fixture that stopped straddling
-// the ceiling is reported, not silently passed.
+// as interest accrues on a debt nothing backs) is a permanent chain fact —
+// pinned outright. The control is QUERIED, not pinned (rebuilt 2026-09-27,
+// rails-ops TO-DO-infra-and-backend.md §8): a hardcoded second-largest-debt
+// wallet is exactly the kind of pin a position closing under it breaks
+// silently, and did — `0x70c1997c…` now answers `debtValueUsd 0`, `ratio
+// NaN`, no strip. `findControl()` reads the Base roster sorted by debt and
+// checks each candidate's own live ratio (the same read check 0 already
+// makes), so the control is always whichever wallet is CURRENTLY the largest
+// well-behaved debt — the intent "well inside the ceiling" stated as a query
+// instead of a snapshot of one day's roster. Check 0 still asserts the shape
+// this file needs before trusting it.
 //
 // Checks:
-//   0. Precondition — EXPLOITER's debt ÷ capacity is above the ceiling;
-//      CONTROL's sits between 0 and the ceiling.
+//   0. Precondition — EXPLOITER's debt ÷ capacity is above the ceiling; the
+//      queried CONTROL's sits between 0 and the ceiling.
 //   1. EXPLOITER page — the strip reads "Borrow capacity: over 1,000× the
 //      liquidation line".
 //   2. EXPLOITER page — no seven-digit-plus percentage anywhere in the
@@ -44,7 +51,6 @@ const STRIP_TIMEOUT_MS = 240000;
 const CEILING = 1000;
 
 const EXPLOITER = "0x719eae70d4a83f35bf82a2740699f5db84be919d";
-const CONTROL = "0x70c1997ca695cc2c3a08ac1ba0f19d5a7e30c7fc";
 const FLOOR_TEXT = "Borrow capacity: over 1,000× the liquidation line";
 const SHARE_RE = /Borrow capacity: \d+\.\d% of the liquidation line/;
 const GIANT_PCT_RE = /\d{7,}\.\d%/;
@@ -77,13 +83,38 @@ async function ratioOf(wallet) {
   return { ratio: d.debtValueUsd / d.collateralCapacityUsd, debt: d.debtValueUsd, cap: d.collateralCapacityUsd };
 }
 
+/** The control: the largest-debt wallet on the Base roster whose live ratio
+ *  sits inside the ceiling (0 < ratio < CEILING) — never NaN or Infinity,
+ *  which a fully-repaid or fully-uncollateralised wallet answers. Queried
+ *  fresh each run off the debt-sorted listing rather than pinned, because a
+ *  pinned wallet's own position can close (it did — see the header). Several
+ *  wallets near the top of this roster carry the same bad-debt shape as
+ *  EXPLOITER (the same incident), so this walks past every one of those too,
+ *  not just the first candidate. */
+async function findControl() {
+  const res = await fetch(`${BASE}/api/moonwell-base/positions?sortBy=debt&sortOrder=desc&hasDebt=true&limit=25`);
+  if (!res.ok) throw new Error(`positions listing ${res.status}`);
+  const { data } = await res.json();
+  for (const row of data ?? []) {
+    if (row.wallet === EXPLOITER) continue;
+    const r = await ratioOf(row.wallet);
+    if (r.ratio > 0 && r.ratio < CEILING) return { wallet: row.wallet, ...r };
+  }
+  throw new Error("no candidate on the debt-sorted Base roster sits inside the ceiling");
+}
+
 await waitForBase();
 
 // ── 0. Precondition: the fixtures straddle the ceiling ────────────────────
 const ex = await ratioOf(EXPLOITER);
-const ct = await ratioOf(CONTROL);
+const control = await findControl();
+const CONTROL = control.wallet;
 check("0a EXPLOITER is past the ceiling", ex.ratio > CEILING, `debt ${ex.debt} ÷ capacity ${ex.cap} = ${ex.ratio}`);
-check("0b CONTROL is inside the ceiling", ct.ratio > 0 && ct.ratio < CEILING, `ratio ${ct.ratio}`);
+check(
+  "0b CONTROL is inside the ceiling",
+  control.ratio > 0 && control.ratio < CEILING,
+  `${CONTROL} ratio ${control.ratio}`,
+);
 
 const browser = await chromium.launch();
 
