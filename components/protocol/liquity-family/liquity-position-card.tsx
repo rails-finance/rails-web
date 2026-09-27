@@ -263,6 +263,7 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
         debtSymbol: cfg.debtSymbol,
         status: v.status,
         isBatched: v.isBatched,
+        isZombie: v.isZombie,
         // A liquidated Trove is described against the minimum in force when
         // it was liquidated (its last event); governance can have moved it since.
         minCR: (() => {
@@ -456,7 +457,7 @@ export function LiquityPositionCard({
   const pending = !!receipts && !!v.pricePending; // skeleton slots while a detail-page price is expected
 
   const fp = ops.faceProv({ v, live: lv, coll, debt, rate, priceUsd, collUsd, crPct, liqPrice, mcrPct });
-  const learnMore = ops.positionContent(v);
+  const learnMore = ops.positionContent({ ...v, isZombie: zombie });
 
   // The owner deep-links to its wallet-filtered listing; lastOwner stands in
   // on a burned/closed trove so a closed row still names who held it.

@@ -26,8 +26,9 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAsymmetryEvent } from "@/lib/shared/types/event-shape";
 import { positionCollateralProv, positionDebtProv, lifetimeFlowProv } from "@/lib/asymmetry/event-provenance";
 import type { LiquityForkLifetimeFlow } from "@/lib/shared/liquity-fork-provenance";
+import type { LiquityForkTowerData } from "@/lib/shared/liquity-fork-economics-explanation";
 import { DEBT_SYMBOL } from "@/lib/asymmetry/asset-catalog";
-import { flowsReconcile, type ChainTruthTowerData, type TowerLine } from "@/lib/shared/chain-truth-economics";
+import { flowsReconcile, type TowerLine } from "@/lib/shared/chain-truth-economics";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 
 const DUST = 1e-9;
@@ -44,6 +45,10 @@ interface TroveFlows {
   repaid: number; // USDaf repaid, voluntary
   debtLiquidated: number; // USDaf cleared by liquidation
   debtRedeemed: number; // USDaf repaid by redemptions
+  /** Σ collateral redeemed × the price its Redemption log emitted. */
+  collRedeemedUsd: number;
+  /** Redemptions whose price did not load; any makes collRedeemedUsd partial. */
+  redemptionsUnpriced: number;
 }
 
 function replayLifetime(events: BaseActivityEvent[]): TroveFlows {
@@ -56,6 +61,8 @@ function replayLifetime(events: BaseActivityEvent[]): TroveFlows {
     repaid: 0,
     debtLiquidated: 0,
     debtRedeemed: 0,
+    collRedeemedUsd: 0,
+    redemptionsUnpriced: 0,
   };
   for (const ev of events) {
     if (!isAsymmetryEvent(ev)) continue;
@@ -73,8 +80,14 @@ function replayLifetime(events: BaseActivityEvent[]): TroveFlows {
       continue;
     }
     if (ctx.eventType === "redeemCollateral") {
-      f.collRedeemed += Math.abs(Math.min(collDelta, 0));
+      const taken = Math.abs(Math.min(collDelta, 0));
+      f.collRedeemed += taken;
       f.debtRedeemed += Math.abs(Math.min(debtMove, 0));
+      const px = ctx.priceAtBlock?.usd;
+      if (taken > 0) {
+        if (px != null && px > 0) f.collRedeemedUsd += taken * px;
+        else f.redemptionsUnpriced += 1;
+      }
       continue;
     }
     if (collDelta > 0) f.deposited += collDelta;
@@ -106,14 +119,21 @@ export function asymmetryLifetimeWithOpening(
 ): TroveFlows | undefined {
   if (!opening) return undefined;
   const f = replayLifetime(events);
+  let openingRedeemed = 0;
+  let openingValued = false;
   for (const bucket of opening.flows ?? []) {
     for (const [leg, raw] of Object.entries(bucket.legs)) {
       if (!(leg in f)) continue;
       const value = scaleBaseUnits(raw, bucket.decimals);
       if (value == null) return undefined;
       f[leg as keyof TroveFlows] += value;
+      if (leg === "collRedeemed") openingRedeemed += value;
+      if (leg === "collRedeemedUsd" || leg === "redemptionsUnpriced") openingValued = true;
     }
   }
+  // A summary that predates the priced leg leaves the value below the cut
+  // unknown, so the at-redemption total is not stated.
+  if (openingRedeemed > 0 && !openingValued) f.redemptionsUnpriced += 1;
   return f;
 }
 
@@ -127,7 +147,7 @@ export function computeAsymmetryEconomics(
    *  NEITHER — the lifetime layer states nothing rather than a window's
    *  arithmetic. */
   precomputedLifetime?: TroveFlows,
-): ChainTruthTowerData {
+): LiquityForkTowerData {
   const coords = {
     collateralType: view.collateralType,
     blockNumber: view.atBlock,
@@ -216,7 +236,18 @@ export function computeAsymmetryEconomics(
     return valued ? (usdOf(symbol, amount) ?? 0) : amount;
   };
 
+  const redemptionOutcome =
+    reconciles && f != null && f.debtRedeemed > DUST
+      ? {
+          debtCleared: f.debtRedeemed,
+          collTaken: f.collRedeemed,
+          collValueAtRedemption: f.redemptionsUnpriced === 0 ? f.collRedeemedUsd : null,
+          currentPrice: priced ? (view.priceUsd as number) : null,
+        }
+      : undefined;
+
   return {
+    ...(redemptionOutcome ? { redemptionOutcome } : {}),
     valued,
     // The branch's own PriceFeed → chain-derived, so the USD bars survive
     // On-chain-values; the debt leg is the $1 redemption face.

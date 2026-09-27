@@ -65,6 +65,7 @@ import { computeAsymmetryEconomics, asymmetryLifetimeWithOpening } from "@/lib/a
 import {
   liquityForkEconomicsExplanation,
   liquityForkEconomicsContent,
+  liquityForkRedemptionOutcome,
 } from "@/lib/shared/liquity-fork-economics-explanation";
 import { DEBT_SYMBOL } from "@/lib/asymmetry/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
@@ -337,6 +338,7 @@ export default function AsymmetryTroveDetail({
                   data={towerData}
                   explanation={liquityForkEconomicsExplanation(towerData, forkOpts)}
                   learnMore={liquityForkEconomicsContent(forkOpts)}
+                  rowExtra={liquityForkRedemptionOutcome(towerData, forkOpts)}
                 />
               );
             })()}

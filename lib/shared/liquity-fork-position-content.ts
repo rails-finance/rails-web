@@ -10,6 +10,7 @@
 // stablecoin, and each branch's own minimum collateral ratio.
 
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
+import { forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
 
 export interface LiquityForkPositionContentParams {
   /** Display name ("Ebisu" | "Asymmetry" | "Base Dollar"). */
@@ -18,6 +19,8 @@ export interface LiquityForkPositionContentParams {
   debtSymbol: string;
   status: "open" | "closed" | "liquidated";
   isBatched?: boolean;
+  /** A redemption left the Trove below the branch's minimum debt. */
+  isZombie?: boolean;
   /** This branch's minimum collateral ratio, e.g. "115%" — omit rather than guess. */
   minCR?: string;
   /** One live-verified docs/site link. */
@@ -25,7 +28,8 @@ export interface LiquityForkPositionContentParams {
 }
 
 export function liquityForkPositionContent(opts: LiquityForkPositionContentParams): LearnMoreContent {
-  const { name, debtSymbol, status, isBatched, minCR, docsLink } = opts;
+  const { name, debtSymbol, status, isBatched, isZombie, minCR, docsLink } = opts;
+  const reserve = forkLiquidationReserve(name);
   const links = docsLink ? [docsLink] : undefined;
   const minCRText = minCR ? `below ${minCR}` : "below its branch's minimum";
 
@@ -56,7 +60,9 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
       details: [
         {
           bold: "Closing a Trove",
-          text: "repaying all debt returns the collateral above the liquidation reserve to the owner and burns the Trove NFT.",
+          text: reserve
+            ? `repaying all debt returns all the collateral to the owner, refunds the ${reserve} liquidation reserve paid apart from it at open, and burns the Trove NFT.`
+            : "repaying all debt returns all the collateral to the owner and burns the Trove NFT.",
         },
         {
           bold: "Trove NFT",
@@ -83,6 +89,12 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
     details.push({
       bold: "Interest rate",
       text: "the borrower sets the rate, or delegates it to a batch manager. Lower rates cost less but sit earlier in the redemption queue.",
+    });
+  }
+  if (isZombie) {
+    details.push({
+      bold: "Zombie Trove",
+      text: `a redemption can leave a Trove below its branch's minimum debt. It then leaves the rate-ordered queue: while it still owes ${debtSymbol}, the next redemption on the branch takes from it first; once its debt is zero there is nothing left to redeem. The owner can close it and take back the collateral${reserve ? ` and the ${reserve} liquidation reserve` : ""}.`,
     });
   }
   details.push(

@@ -65,6 +65,7 @@ import { computeBasedollarEconomics, basedollarLifetimeWithOpening } from "@/lib
 import {
   liquityForkEconomicsExplanation,
   liquityForkEconomicsContent,
+  liquityForkRedemptionOutcome,
 } from "@/lib/shared/liquity-fork-economics-explanation";
 import { DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
@@ -337,6 +338,7 @@ export default function BasedollarTroveDetail({
                   data={towerData}
                   explanation={liquityForkEconomicsExplanation(towerData, forkOpts)}
                   learnMore={liquityForkEconomicsContent(forkOpts)}
+                  rowExtra={liquityForkRedemptionOutcome(towerData, forkOpts)}
                 />
               );
             })()}

@@ -21,6 +21,7 @@ import { formatUsd } from "@/lib/shared/format-event";
 // $1.18 in both places.
 import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import { FORK_DEBT_SYMBOL } from "@/lib/shared/liquity-fork-live-provenance";
+import { forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 
@@ -122,6 +123,7 @@ export function LiquityForkPositionExplanation({
 }) {
   if (chain.chainStale || (chain.status !== "active" && chain.status !== "zombie")) return null;
   const debtSymbol = FORK_DEBT_SYMBOL[chain.protocol] ?? "debt";
+  const reserve = forkLiquidationReserve(chain.protocol);
   const hasDebt = chain.entireDebt > 0;
   const dropPct =
     chain.priceUsd != null && chain.liqPriceUsd != null && chain.priceUsd > chain.liqPriceUsd
@@ -234,17 +236,30 @@ export function LiquityForkPositionExplanation({
   }
 
   if (chain.status === "zombie") {
+    // The TroveManager points its next redemption at a zombie only while the
+    // zombie still owes debt; one redeemed to zero has nothing left to give.
     bullets.push(
-      <span key="zombie">
-        A partial redemption left this Trove below the branch&rsquo;s minimum debt — a <H>zombie</H>: outside the
-        rate-ordered redemption queue, and redeemed first when the next redemption routes through this branch.
-      </span>,
+      hasDebt ? (
+        <span key="zombie">
+          A partial redemption left this Trove below the branch&rsquo;s minimum debt — a <H>zombie</H>: outside the
+          rate-ordered redemption queue, and redeemed first when the next redemption routes through this branch.
+        </span>
+      ) : (
+        <span key="zombie">
+          Redemption cancelled all of its debt, which leaves it a <H>zombie</H>: outside the redemption queue, with
+          nothing left to redeem. Closing the Trove returns the{" "}
+          <H>
+            {formatNumber(chain.entireColl)} {chain.symbol}
+          </H>
+          {reserve ? <> and the {reserve} liquidation reserve</> : null} to the owner.
+        </span>
+      ),
     );
   } else if (hasDebt && chain.debtInFront != null) {
     bullets.push(
       <span key="queue">
-        {formatNumber(chain.debtInFront)} {debtSymbol} of this branch&rsquo;s debt sits at lower interest rates,
-        redeemed before this Trove when {debtSymbol} holders redeem at $1 face.
+        {formatNumber(chain.debtInFront)} {debtSymbol} of this branch&rsquo;s debt sits at the same or lower interest
+        rate, redeemed before this Trove when {debtSymbol} holders redeem at $1 face.
       </span>,
     );
   }

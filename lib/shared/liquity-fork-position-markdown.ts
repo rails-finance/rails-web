@@ -168,11 +168,13 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
         );
       if (live.status === "zombie") {
         lines.push(
-          `- **Redemption queue:** ZOMBIE — a partial redemption left the trove below the minimum debt; it sits outside the rate-ordered queue and is redeemed FIRST when redemptions next route through this branch`,
+          live.entireDebt > 0
+            ? `- **Redemption queue:** ZOMBIE — a partial redemption left the trove below the minimum debt; it sits outside the rate-ordered queue and is redeemed FIRST when redemptions next route through this branch`
+            : `- **Redemption queue:** ZOMBIE — redemption cancelled all of its debt; it sits outside the queue with nothing left to redeem, and closing it returns its ${coll} to the owner`,
         );
       } else if (live.debtInFront != null) {
         lines.push(
-          `- **Redemption queue (this branch):** ${amt(live.debtInFront)} ${debtSymbol} of debt sits at lower interest rates (${live.trovesAhead ?? 0} trove${(live.trovesAhead ?? 0) === 1 ? "" : "s"}) — redeemed before this one; redemptions sweep the lowest user-set rates first at $1 face`,
+          `- **Redemption queue (this branch):** ${amt(live.debtInFront)} ${debtSymbol} of debt sits at the same or lower interest rate (${live.trovesAhead ?? 0} trove${(live.trovesAhead ?? 0) === 1 ? "" : "s"}) — redeemed before this one; redemptions sweep the lowest user-set rates first at $1 face`,
         );
       }
       if (live.branchTcr != null)

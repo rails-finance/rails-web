@@ -7,8 +7,10 @@
 import type { ReactNode } from "react";
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
 import type { ChainTruthTowerData, TowerSideData } from "@/lib/shared/chain-truth-economics";
-import { formatCompact } from "@/lib/utils/format";
-import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
+import { formatCompact, formatExact } from "@/lib/utils/format";
+import { formatCompactUsd, formatUsdValue } from "@/components/shared/economics-chart-primitives";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
 
 const DUST = 1e-9;
 
@@ -20,6 +22,24 @@ export interface LiquityForkEconomicsParams {
   /** One live-verified docs/site link for the FAQ. */
   docsLink?: LearnMoreLink;
 }
+
+/** The Trove's redemptions as Liquity V2 states them: the debt they cleared at
+ *  $1 face against the collateral they took, valued at the price each
+ *  Redemption log emitted, and again at today's branch price. Set by each
+ *  fork's economics only when the lifetime flows reconcile. */
+export interface LiquityForkRedemptionOutcome {
+  debtCleared: number;
+  collTaken: number;
+  /** Σ collateral taken × the price its redemption emitted; null when a
+   *  redemption's price did not load, so no partial sum poses as the total. */
+  collValueAtRedemption: number | null;
+  /** The branch's price on this load; null when unpriced. */
+  currentPrice: number | null;
+}
+
+export type LiquityForkTowerData = ChainTruthTowerData & { redemptionOutcome?: LiquityForkRedemptionOutcome };
+
+const signedUsd = (n: number): string => `${n >= 0 ? "+" : "−"}${formatUsdValue(Math.abs(n))}`;
 
 const sideSymbol = (side: TowerSideData, fallback: string): string =>
   side.current[0]?.symbol ?? side.exited[0]?.symbol ?? side.liquidated[0]?.symbol ?? fallback;
@@ -39,7 +59,7 @@ const liquidatedLine = (side: TowerSideData) => side.liquidated.find((l) => l.fl
 /** Explanation body for a Liquity V2 fork tower — a lead sentence plus bullets
  *  derived from `data`. Returns null when there's nothing to narrate. */
 export function liquityForkEconomicsExplanation(
-  data: ChainTruthTowerData,
+  data: LiquityForkTowerData,
   { name, debtSymbol }: LiquityForkEconomicsParams,
 ): ReactNode {
   const { collateral, debt, valued } = data;
@@ -85,7 +105,34 @@ export function liquityForkEconomicsExplanation(
 
   const redeemedDebt = redeemedLine(debt);
   const redeemedColl = redeemedLine(collateral);
-  if (redeemedDebt) {
+  const outcome = data.redemptionOutcome;
+  if (outcome) {
+    const strong = (t: string) => <span className="font-semibold text-foreground tabular-nums">{t}</span>;
+    const collText = `${formatCompact(outcome.collTaken)} ${collSym}`;
+    const atToday = outcome.currentPrice != null ? outcome.collTaken * outcome.currentPrice : null;
+    bullets.push(
+      <span key="redeemed">
+        Redemptions cleared {strong(`${formatCompact(outcome.debtCleared)} ${debtSym}`)} of debt at face value and took{" "}
+        {strong(collText)}
+        {outcome.collValueAtRedemption != null ? (
+          <>
+            , worth {strong(formatUsdValue(outcome.collValueAtRedemption))} at {name}&apos;s price when each redemption
+            happened — a net {strong(signedUsd(outcome.debtCleared - outcome.collValueAtRedemption))} to the borrower.
+          </>
+        ) : (
+          <>.</>
+        )}
+        {atToday != null && outcome.currentPrice != null && (
+          <>
+            {" "}
+            The same {collSym} repriced at today&apos;s {strong(formatUsdValue(outcome.currentPrice))} is worth{" "}
+            {strong(formatUsdValue(atToday))}, which makes it {strong(signedUsd(outcome.debtCleared - atToday))} at
+            today&apos;s value.
+          </>
+        )}
+      </span>,
+    );
+  } else if (redeemedDebt) {
     bullets.push(
       <span key="redeemed">
         The trove has been redeemed against: {fig(redeemedDebt.amount, redeemedDebt.usd, valued, debtSym)} of debt was
@@ -108,6 +155,7 @@ export function liquityForkEconomicsExplanation(
 
   const collNow = collateral.current[0];
   const debtNow = debt.current[0];
+  const reserve = forkLiquidationReserve(name);
   if (collNow || debtNow) {
     bullets.push(
       <span key="current">
@@ -115,6 +163,9 @@ export function liquityForkEconomicsExplanation(
         backing {debtNow ? fig(debtNow.amount, debtNow.usd, valued, debtSym) : "no debt"}.
       </span>,
     );
+    if (reserve) {
+      bullets.push(<span key="liq-reserve">{reserve} is held in reserve and refunded when the trove is closed.</span>);
+    }
   } else if (bullets.length > 0) {
     bullets.push(<span key="closed">The trove is closed — no collateral or debt remain.</span>);
   }
@@ -152,6 +203,82 @@ export function liquityForkEconomicsExplanation(
   );
 }
 
+/** The redemption net-outcome strip on the tower's heading-button row — the
+ *  fork mirror of Liquity V2's `liquityRedemptionOutcome`: the net at each
+ *  redemption's own price and, with a price on this load, at today's. */
+export function liquityForkRedemptionOutcome(
+  data: LiquityForkTowerData,
+  { name, debtSymbol }: LiquityForkEconomicsParams,
+): ReactNode {
+  const o = data.redemptionOutcome;
+  if (!o || o.collValueAtRedemption == null) return undefined;
+  const atRedemption = o.debtCleared - o.collValueAtRedemption;
+  const realizedProv: Provenance = {
+    kind: "derived",
+    summary: `Redemption net outcome — the ${debtSymbol} debt that redemptions cleared, counted at $1 each, minus the dollar value of the collateral they took at the price ${name}'s branch emitted in each Redemption log.`,
+    via: "added up across the trove's redemptions",
+    formula: "debt cleared − collateral value at redemption",
+    inputs: [
+      { label: "debt cleared", value: formatExact(o.debtCleared), kind: "derived", note: "Σ redemption debt changes" },
+      {
+        label: "collateral value at redemption",
+        value: formatExact(o.collValueAtRedemption),
+        kind: "derived",
+        note: "Σ collateral taken × price at each redemption",
+        pclass: "oracle",
+      },
+    ],
+  };
+  const today = o.currentPrice != null ? o.debtCleared - o.collTaken * o.currentPrice : null;
+  const todayProv: Provenance | null =
+    o.currentPrice != null
+      ? {
+          kind: "derived",
+          summary: `Redemption net outcome at today's value — the ${debtSymbol} debt that redemptions cleared, counted at $1 each, minus the collateral they took valued at the branch's current price.`,
+          via: "added up across the trove's redemptions",
+          formula: "debt cleared − collateral taken × current price",
+          inputs: [
+            {
+              label: "debt cleared",
+              value: formatExact(o.debtCleared),
+              kind: "derived",
+              note: "Σ redemption debt changes",
+            },
+            {
+              label: "collateral taken",
+              value: formatExact(o.collTaken),
+              kind: "derived",
+              note: "Σ collateral sent to redeemers",
+            },
+            {
+              label: "current price",
+              value: formatExact(o.currentPrice),
+              kind: "chain-derived",
+              pclass: "oracle",
+              note: "the branch's own PriceFeed on this load",
+            },
+          ],
+        }
+      : null;
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-2 text-xs text-rb-500">
+      <span>Borrower&apos;s net outcome from redemptions was</span>
+      <Prov info={realizedProv} value={formatExact(atRedemption)}>
+        <span className={atRedemption >= 0 ? "text-green-400" : "text-red-400"}>{signedUsd(atRedemption)}</span>
+      </Prov>
+      {today != null && todayProv && (
+        <>
+          <span> or </span>
+          <Prov info={todayProv} value={formatExact(today)}>
+            <span className={today >= 0 ? "text-green-400" : "text-red-400"}>{signedUsd(today)}</span>
+          </Prov>
+          <span>at today&apos;s value</span>
+        </>
+      )}
+    </div>
+  );
+}
+
 /** The tower's "?" FAQ for a Liquity V2 fork. */
 export function liquityForkEconomicsContent({
   name,
@@ -160,13 +287,14 @@ export function liquityForkEconomicsContent({
 }: LiquityForkEconomicsParams): LearnMoreContent {
   return {
     title: "About the Economics",
-    intro: `This panel replays the trove's own events into lifetime flows, and reads its current collateral and ${debtSymbol} debt from the chain at the head block — the Liquity V2 architecture ${name} runs.`,
+    intro: `This panel replays the trove's own events on ${name} into lifetime flows. Its current collateral and ${debtSymbol} debt are the balances the trove's last event recorded; the position card above reads the live figures from the chain.`,
     stepsHeading: "How the tower is built:",
     steps: [
       "Deposited, withdrawn, borrowed and repaid are summed from the trove's own signed balance deltas, event by event.",
       'Debt increases counted as "borrowed" include new draws, the one-time upfront fee, and interest applied whenever an operation touched the trove.',
       "Redemptions and liquidations are kept apart from voluntary flows — each is its own bar.",
       `USD values use the branch's own oracle price for collateral and ${debtSymbol}'s $1 redemption face for debt, and appear only once that on-chain price has loaded.`,
+      "The borrower's net outcome from redemptions sets the debt they cleared against the collateral they took, valued at the price each Redemption log emitted, and again at today's price.",
     ],
     detailsHeading: "Key concepts:",
     details: [

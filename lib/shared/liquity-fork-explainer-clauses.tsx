@@ -75,8 +75,9 @@
 //     not emit the price on the Trove's own liquidation row the way it does on a
 //     redemption, so that lane still depends on the capture. Basedollar has had no
 //     liquidations, so nothing is currently withheld by it.
-//   • Whether the forks carry a fixed liquidation reserve / gas-comp constant is
-//     not asserted — the fork context does not surface one.
+//   • The fixed liquidation reserve is stated only where it was read
+//     (forkLiquidationReserve in lib/shared/liquity-fork-ops.ts): the fork
+//     context does not carry it, so a fork with no reading states none.
 //   • Gas. The MV carries tx_gas_used and tx_gas_price, but on an L2 their product
 //     is the execution fee ALONE and omits the L1 data fee, so a gas figure built
 //     from them would understate the true cost. Stating it would be worse than
@@ -89,7 +90,12 @@ import type { Provenance } from "@/components/shared/provenance";
 import type { LiquityForkLearnMoreParams } from "@/lib/shared/learn-more-content";
 import { Prov } from "@/components/shared/provenance";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
-import { FORK_RATE_PILL_EVENTS, forkDebtMove, forkDebtMoveOps } from "@/lib/shared/liquity-fork-ops";
+import {
+  FORK_RATE_PILL_EVENTS,
+  forkDebtMove,
+  forkDebtMoveOps,
+  forkLiquidationReserve,
+} from "@/lib/shared/liquity-fork-ops";
 import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots } from "@/lib/shared/explainer-prose";
 import { formatNumber, formatUsdValue, formatPrice } from "@/lib/utils/format";
 import { forkLiquidationCleared } from "@/components/protocol/liquity-fork/liquity-fork-forensics";
@@ -358,7 +364,18 @@ export function liquityForkEventSlots(
               </>,
             ),
           ];
-      return { happened: [clause(happened)], changed: [feeNote], meansNow };
+      const reserve = forkLiquidationReserve(fork.protocolName);
+      const reserveNote = reserve
+        ? [
+            clause(
+              <>
+                The owner also paid a {reserve} liquidation reserve, apart from the collateral; it pays a liquidator if
+                the Trove is liquidated and is refunded when the Trove closes.
+              </>,
+            ),
+          ]
+        : [];
+      return { happened: [clause(happened)], changed: [feeNote, ...reserveNote], meansNow };
     }
 
     case "adjustTrove": {

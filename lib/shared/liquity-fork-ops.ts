@@ -192,3 +192,38 @@ export function forkMcrAt(
   }
   return branch.mcr;
 }
+
+/** A listing amount scaled from the route's raw base-unit string. The route's
+ *  `amount` is rounded to two decimals, which on a BTC branch moves a dollar
+ *  figure by up to a quarter (0.016237 tBTC reads 0.02); Liquity V2 prices the
+ *  raw amount, and so do the forks. A raw string the route stored with a scale
+ *  ("123.000") keeps its integer part; one that cannot be read falls back to the
+ *  rounded amount. */
+export function forkExactAmount(raw: string | null | undefined, decimals: number, rounded: number): number {
+  if (!raw) return rounded;
+  let value: bigint;
+  try {
+    value = BigInt(raw.split(".")[0] || "0");
+  } catch {
+    return rounded;
+  }
+  const divisor = BigInt(10) ** BigInt(decimals);
+  return Number(value / divisor) + Number(value % divisor) / Number(divisor);
+}
+
+/** The fixed liquidation reserve a Trove pays at open, in WETH and apart from its
+ *  collateral: it goes to the branch's gas pool, pays a liquidator, and comes
+ *  back to the owner when the Trove closes. Stated only where it was read:
+ *  Asymmetry from an open transaction's WETH transfer to the gas pool (scrvUSD
+ *  3036…5877, tx 0x02801dfe…4536), Ebisu from its Liquidation logs (every one
+ *  carries a 0.0375 WETH gas compensation). Basedollar has had no liquidation and
+ *  no open transaction has been read for it, so it states none. Keyed by the
+ *  fork's id or display name, lower-cased with spaces removed. */
+const FORK_LIQUIDATION_RESERVE: Record<string, string> = {
+  asymmetry: "0.0375 WETH",
+  ebisu: "0.0375 WETH",
+};
+
+export function forkLiquidationReserve(fork: string): string | undefined {
+  return FORK_LIQUIDATION_RESERVE[fork.toLowerCase().replace(/\s+/g, "")];
+}

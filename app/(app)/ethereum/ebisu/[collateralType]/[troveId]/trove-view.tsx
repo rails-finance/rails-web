@@ -65,6 +65,7 @@ import { computeEbisuEconomics, ebisuLifetimeWithOpening } from "@/lib/ebisu/eco
 import {
   liquityForkEconomicsExplanation,
   liquityForkEconomicsContent,
+  liquityForkRedemptionOutcome,
 } from "@/lib/shared/liquity-fork-economics-explanation";
 import { DEBT_SYMBOL } from "@/lib/ebisu/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
@@ -332,6 +333,7 @@ export default function EbisuTroveDetail({
                   data={towerData}
                   explanation={liquityForkEconomicsExplanation(towerData, forkOpts)}
                   learnMore={liquityForkEconomicsContent(forkOpts)}
+                  rowExtra={liquityForkRedemptionOutcome(towerData, forkOpts)}
                 />
               );
             })()}

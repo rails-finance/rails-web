@@ -13,6 +13,7 @@
 
 import { resolveBranch } from "@/lib/asymmetry/asset-catalog";
 import type { LiquityForkPriceMap } from "@/lib/sources/chain/liquity-fork-prices";
+import { forkExactAmount } from "@/lib/shared/liquity-fork-ops";
 
 export type AsymmetryTroveStatus = "open" | "closed" | "liquidated";
 /** Backend sort keys (all chain-direct). */
@@ -99,14 +100,16 @@ export function buildAsymmetryTroveRows(
   return raw.map((r) => {
     const branch = resolveBranch(r.collateralType);
     const p = branch ? prices?.get(branch.key) : undefined;
-    const collateralUsd = p != null && r.collateral.amount > 0 ? r.collateral.amount * p.priceUsd : null;
+    const collateral = forkExactAmount(r.collateral.amountRaw, branch?.decimals ?? 18, r.collateral.amount);
+    const debt = forkExactAmount(r.debt.currentRaw, 18, r.debt.current);
+    const collateralUsd = p != null && collateral > 0 ? collateral * p.priceUsd : null;
     return {
       id: r.id,
       status: r.status,
       collateralType: r.collateralType,
-      collateral: r.collateral.amount,
+      collateral,
       collateralRaw: r.collateral.amountRaw,
-      debt: r.debt.current,
+      debt,
       debtRaw: r.debt.currentRaw,
       peakCollateral: r.collateral.peakAmount,
       peakDebt: r.debt.peak,
@@ -119,7 +122,7 @@ export function buildAsymmetryTroveRows(
       priceUsd: p?.priceUsd ?? null,
       priceStale: p?.stale ?? false,
       collateralUsd,
-      collateralRatio: p != null && r.debt.current > 0 ? (r.collateral.amount * p.priceUsd) / r.debt.current : null,
+      collateralRatio: p != null && debt > 0 ? (collateral * p.priceUsd) / debt : null,
       owner: r.owner ?? null,
       lastOwner: r.lastOwner ?? null,
       ownerEns: r.ownerEns ?? null,
