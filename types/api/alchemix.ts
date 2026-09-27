@@ -209,6 +209,42 @@ export interface AlchemixLineCoverage {
   lastRefreshedAt: string | null;
 }
 
+/** The Transmuter's own coverage row. A Transmuter position has no grade and
+ *  no reading: its figures are its own events, so what it depends on is how
+ *  far the Transmuter's logs are scanned and reduced, whether every claim was
+ *  paired to the burn that names its position, and how many times the
+ *  maturity parameter moved. Never the Alchemist row above. */
+export interface AlchemixTransmuterLineCoverage {
+  lineKey: string;
+  chainId: number;
+  displayName: string;
+  indexedToBlock: number | null;
+  reducedToBlock: number | null;
+  positions: number;
+  outstanding: number;
+  claims: number;
+  /** A claim no served position shows: it could not be paired to a burn. */
+  unattributedClaims: number;
+  maturityParameterChanges: number;
+}
+
+/** V2's own coverage row. V2 is closed, so the questions are whether every
+ *  captured contract was scanned to the frozen block and whether every
+ *  account's read landed. It also covers the V2 rows a V3 timeline carries
+ *  behind the version filter, which come from the V2 position route. */
+export interface AlchemixV2LineCoverage {
+  lineKey: string;
+  chainId: number;
+  syntheticSymbol: string;
+  frozenAtBlock: number;
+  closedAt: string;
+  contractsScanned: number;
+  contractsScannedWhole: number;
+  accounts: number;
+  /** Accounts whose read did not land; they carry no debt figure. */
+  staleReads: number;
+}
+
 export interface AlchemixPagination {
   total: number;
   limit: number;
@@ -410,7 +446,7 @@ export interface AlchemixTransmuterPositionsResponse {
   success: true;
   data: AlchemixTransmuterPositionSummary[];
   pagination: AlchemixPagination;
-  coverage: { lines: AlchemixLineCoverage[] };
+  coverage: { lines: AlchemixTransmuterLineCoverage[] };
 }
 
 /** One Transmuter position with its whole event stream inline: a stake, its
@@ -424,6 +460,7 @@ export interface AlchemixTransmuterPositionData<TEvent> extends AlchemixTransmut
 export interface AlchemixTransmuterPositionResponse<TEvent> {
   success: true;
   data: AlchemixTransmuterPositionData<TEvent>;
+  coverage: { lines: AlchemixTransmuterLineCoverage[] };
 }
 
 // ── Alchemix V2: the closed record ───────────────────────────────────────────
@@ -489,6 +526,7 @@ export interface AlchemixV2PositionsResponse {
   success: true;
   data: AlchemixV2PositionSummary[];
   pagination: AlchemixPagination;
+  coverage: { lines: AlchemixV2LineCoverage[] };
   notes: { closure: string };
 }
 
@@ -501,5 +539,6 @@ export interface AlchemixV2PositionData<TEvent> extends AlchemixV2PositionSummar
 export interface AlchemixV2PositionResponse<TEvent> {
   success: true;
   data: AlchemixV2PositionData<TEvent>;
+  coverage: { lines: AlchemixV2LineCoverage[] };
   notes: { closure: string };
 }
