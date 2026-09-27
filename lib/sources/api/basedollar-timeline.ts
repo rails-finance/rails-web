@@ -81,6 +81,10 @@ export interface MvRow {
   debt_before: string | null;
   stake: string | null;
   annual_interest_rate: string | null;
+  /** The Trove's rate on its previous event, served on an
+   *  adjustTroveInterestRate row (NULL on the Trove's first event); absent on
+   *  every other row and on older responses. */
+  rate_before?: string | null;
   /** The branch's own collateral price at the event's block
    *  (PriceFeed.lastGoodPrice, mig 113) — non-NULL only on priced
    *  liquidation/redemption blocks; absent on pre-migration responses. */
@@ -293,7 +297,16 @@ export function buildBasedollarTimeline(
 
     // The previous event's rate — the join only this transform can see, so the
     // header can name a rate move's DIRECTION (Increase / Decrease).
-    const prevRate = idx > 0 ? rows[idx - 1].annual_interest_rate : null;
+    // A rate move names its previous rate from its own row (`rate_before`),
+    // because a row served beside a folder, or first in a window or a span,
+    // has no neighbour here. An older response carries none, and the row
+    // before it stands in.
+    const prevRate =
+      kind === "adjustTroveInterestRate" && r.rate_before !== undefined
+        ? r.rate_before
+        : idx > 0
+          ? rows[idx - 1].annual_interest_rate
+          : null;
     const rateBefore = prevRate != null ? fmtUnits(bigintOf(prevRate), RATE_DECIMALS) : undefined;
 
     const ctx: BasedollarContext = {

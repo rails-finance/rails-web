@@ -1683,6 +1683,12 @@ const MAKER_19172 = {
 const MORPHO_DEEP_ID =
   "b8fc70e82bc5bb53e773626fcc6a23f7eefa036918d7ef216ecfb1950a94a85e-0xb8a451107a9f87fde481d4d686247d6e43ed715e";
 const MAPLE = { page: "/ethereum/maple", api: "/api/maple", q: "" };
+// Row-cut batch 7 (2026-09-28) puts the three Liquity V2 forks on the same read,
+// grouped by rails-server (the redemption spec and the owner run).
+// `grouped-asym-deepest` is Asymmetry's deepest Trove, sUSDS 8309…2410 (4,731
+// events, 4,708 of them redemptions), which groups whole into 73 rows; a
+// Trove's `wallet` is its id, and its reads are named whole.
+const ASYM_SUSDS_DEEPEST = "8309122898133156698498852897464396224593631760337811282458430493454418132410";
 const GROUPED_FIXTURES = [
   { id: "grouped-deep", wallet: "0xee7ca610d896c53ffe716b801c05748efd902954", ...AAVE_V3 },
   { id: "grouped-whole", wallet: "0x9984a1d407bc6ac53b404aabf66b80b99d96bb47", ...AAVE_V3 },
@@ -1707,6 +1713,13 @@ const GROUPED_FIXTURES = [
   },
   { id: "grouped-maple-deepest", wallet: "0x134ccaaa4f1e4552ec8aecb9e4a2360ddcf8df76", ...MAPLE, folders: false },
   { id: "grouped-maple-whole", wallet: "0x1601843c5e9bc251a3272907010afa41fa18347e", ...MAPLE },
+  {
+    id: "grouped-asym-deepest",
+    wallet: ASYM_SUSDS_DEEPEST,
+    page: "/ethereum/asymmetry/sUSDS",
+    timeline: `/api/asymmetry/susds/${ASYM_SUSDS_DEEPEST}/timeline?group=1`,
+    summary: `/api/asymmetry/susds/${ASYM_SUSDS_DEEPEST}/timeline/summary?cutoffBlock=99999999`,
+  },
 ];
 
 /** The drawn list as rows: folder headers, and event rows. With every folder

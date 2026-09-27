@@ -13,8 +13,10 @@
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { RedemptionRunCard } from "@/components/shared/redemption-run-card";
-import { renderRunFolders } from "@/lib/shared/run-folders";
+import { renderRunFolders, CAUTION_FOLDER_BADGE } from "@/lib/shared/run-folders";
 import { forkDebtMove } from "@/lib/shared/liquity-fork-ops";
+import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
+import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
 
 /** Runs shorter than this stay as individual cards (the V2 trove threshold). */
 export const MIN_REDEMPTION_RUN = 4;
@@ -80,3 +82,30 @@ export function liquityForkTimelineRuns<E extends ForkRunEvent>(opts: {
     },
   ];
 }
+
+// ── Folders the INDEX served ────────────────────────────────────────────────
+//
+// The three fork trove pages read their history as ROWS (decision 0019's
+// evening amendment): rails-server transcribes the spec above as the
+// `redemption` kind and adds the owner run (decision 0021, 2026-09-24) as
+// `owner_run`, in `api/src/services/liquity-fork-timeline-folders.ts`. This
+// register is how those two kinds draw; the spec above stays for the flat
+// answer (`?folders=0`).
+
+/** The redemption card's register (`RedemptionRunCard`), for a served folder. */
+const REDEMPTION_FOLDER: FolderRegisterEntry = {
+  memberNoun: "redemption",
+  tone: "caution",
+  warningLabel: "Redemptions",
+  folderBadge: CAUTION_FOLDER_BADGE,
+};
+
+/** One member of an owner run, by the action it repeats. */
+const OWNER_RUN_NOUN: Record<string, string> = {
+  adjustTrove: "adjustment",
+  adjustTrove_noChange: "unchanged adjustment",
+  adjustTroveInterestRate: "rate change",
+};
+
+export const LIQUITY_FORK_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry =>
+  folder.kind === OWNER_RUN_KIND ? ownerRunEntry(folder, (a) => OWNER_RUN_NOUN[a] ?? "event") : REDEMPTION_FOLDER;

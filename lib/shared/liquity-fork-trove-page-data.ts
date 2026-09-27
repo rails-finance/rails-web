@@ -31,6 +31,7 @@ import { ssrHop } from "@/lib/shared/listing-ssr";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
+import type { GroupedTimelineFields } from "@/lib/shared/timeline-folder";
 
 // Bound the server wait. A force-dynamic page whose backend read runs long would
 // otherwise hold the render until the platform kills it with a function-timeout
@@ -38,7 +39,14 @@ import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-ba
 // which fetches under its own skeleton. Same budget as the listing SSR driver.
 const TAIL_FETCH_TIMEOUT_MS = 8000;
 
-export interface ForkTroveTail<Summary> {
+/** A fork's grouped `/timeline?group=1` answer as the page reads it. */
+export type ForkGroupedTimeline = GroupedTimelineFields & {
+  events: BaseActivityEvent[];
+  cutoffBlock?: number | null;
+  span?: { from: number; to: number } | null;
+};
+
+export interface ForkTroveTail<Summary, Grouped extends ForkGroupedTimeline = ForkGroupedTimeline> {
   trove: Summary | null;
   events: BaseActivityEvent[] | null;
   /** Where the timeline's `recent` window opened. Null means `events` IS the
@@ -51,6 +59,10 @@ export interface ForkTroveTail<Summary> {
   opening: TimelineOpeningBalance | null;
   /** The backend answered and has no such trove — render a 404, not a retry. */
   missing: boolean;
+  /** The grouped answer WHOLE, when the load read the history as ROWS (the
+   *  page's default; `?folders=0` reads the flat window). `events` then holds
+   *  its ungrouped events. */
+  grouped: Grouped | null;
 }
 
 function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
@@ -66,7 +78,7 @@ function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
  * returned function is wrapped in React `cache`, so `generateMetadata` and the
  * page body share a single read per request.
  */
-export function forkTroveTailLoader<Summary>(opts: {
+export function forkTroveTailLoader<Summary, Grouped extends ForkGroupedTimeline = ForkGroupedTimeline>(opts: {
   /** Protocol id, for log lines only. */
   label: string;
   /** The fork's own `resolveBranch` — accepts a branch key or its symbol. */
@@ -86,6 +98,12 @@ export function forkTroveTailLoader<Summary>(opts: {
     events: BaseActivityEvent[];
     cutoffBlock?: number | null;
   }>;
+  /** The same history as ROWS (decision 0019's evening amendment). */
+  fetchGroupedTimeline?: (
+    collateralType: string,
+    troveId: string,
+    o: { baseUrl: string; headers: Record<string, string> },
+  ) => Promise<Grouped>;
   /** The most recent N events to window the timeline to. Omitted keeps the
    *  whole-history fetch — the pre-window behaviour, byte for byte. */
   recent?: number;
@@ -95,15 +113,26 @@ export function forkTroveTailLoader<Summary>(opts: {
    *  third read belongs on the server too. */
   openingPath?: (collateralType: string, troveId: string) => string;
 }) {
-  const empty: ForkTroveTail<Summary> = {
+  const empty: ForkTroveTail<Summary, Grouped> = {
     trove: null,
     events: null,
     cutoffBlock: null,
     opening: null,
     missing: false,
+    grouped: null,
   };
 
-  return cache(async (collateralType: string, troveId: string): Promise<ForkTroveTail<Summary>> => {
+  // ONE timeline read, in the shape the URL asked for — the SparkLend and Aave
+  // V3 loaders' rule: the grouped answer REPLACES the flat window. `grouped`
+  // is a boolean because `cache()` keys on argument identity, and it defaults
+  // to FALSE for the callers that omit it (the opengraph images), which need
+  // every event findable by id; a grouped answer carries only the ungrouped
+  // events. The page and the event page pass the URL's answer.
+  const load = async (
+    collateralType: string,
+    troveId: string,
+    grouped = false,
+  ): Promise<ForkTroveTail<Summary, Grouped>> => {
     // The branch is part of the URL's claim, and neither proxy validates it —
     // an unknown one reaches the backend, which answers for whatever it makes
     // of the string. Resolve it here so an unknown branch is a 404 rather than
@@ -122,8 +151,10 @@ export function forkTroveTailLoader<Summary>(opts: {
         opts.fetchTroves({ troveId, collateralTypes: [collateralType], limit: 1, baseUrl: origin, headers }),
         `${opts.label} troves`,
       ),
-      withTimeout(
-        opts.fetchTimeline(collateralType, troveId, { baseUrl: origin, headers, recent: opts.recent }),
+      withTimeout<{ events: BaseActivityEvent[]; cutoffBlock?: number | null } | Grouped>(
+        grouped && opts.fetchGroupedTimeline
+          ? opts.fetchGroupedTimeline(collateralType, troveId, { baseUrl: origin, headers })
+          : opts.fetchTimeline(collateralType, troveId, { baseUrl: origin, headers, recent: opts.recent }),
         `${opts.label} timeline`,
       ),
     ]);
@@ -174,6 +205,9 @@ export function forkTroveTailLoader<Summary>(opts: {
       cutoffBlock,
       opening,
       missing: false,
+      // The flag alone does not prove a grouped answer arrived.
+      grouped: "grouped" in timeline.value ? (timeline.value as Grouped) : null,
     };
-  });
+  };
+  return cache(load);
 }

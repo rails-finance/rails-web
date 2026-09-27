@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
+import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { shortId } from "@/lib/basedollar/asset-catalog";
 import { loadBasedollarTroveTail } from "@/lib/basedollar/trove-page-data";
 import BasedollarTroveDetail from "./trove-view";
 
 interface Props {
   params: Promise<{ collateralType: string; troveId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // A trove's settled facts change only when the trove transacts, but its numbers
@@ -37,10 +39,12 @@ export async function generateMetadata({
   });
 }
 
-export default async function BasedollarTrovePage({ params }: Props) {
+export default async function BasedollarTrovePage({ params, searchParams }: Props) {
   const { collateralType, troveId } = await params;
 
-  const tail = await loadBasedollarTroveTail(collateralType, troveId);
+  // Rows by default; `?folders=0` reads the flat window.
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = await loadBasedollarTroveTail(collateralType, troveId, grouped);
   // Only an unknown branch, or an answered-and-empty roster, reaches this — a
   // failed read leaves `missing` false and hands the client an unseeded view to
   // retry. It resolves to a real 404 because no Suspense boundary sits above
@@ -53,13 +57,14 @@ export default async function BasedollarTrovePage({ params }: Props) {
       // Keyed on the trove so a client-side navigation to another position
       // remounts with the new server tail as its initial state, rather than
       // holding the previous trove's numbers in state under new props.
-      key={`${collateralType}:${troveId}`}
+      key={`${collateralType}:${troveId}:${grouped ? "rows" : "events"}`}
       collateralType={collateralType}
       troveId={troveId}
       initialTrove={tail.trove}
       initialEvents={tail.events}
       initialCutoffBlock={tail.cutoffBlock}
       initialOpening={tail.opening}
+      initialGrouped={tail.grouped}
     />
   );
 }

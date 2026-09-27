@@ -7,14 +7,19 @@ import { forkTroveTailLoader } from "@/lib/shared/liquity-fork-trove-page-data";
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
 import { resolveBranch } from "@/lib/basedollar/asset-catalog";
 import { fetchBasedollarTroves } from "@/lib/api/fetch-basedollar-troves";
-import { fetchBasedollarTimeline } from "@/lib/api/fetch-basedollar-timeline";
+import {
+  fetchBasedollarTimeline,
+  fetchBasedollarGroupedTimeline,
+  type BasedollarGroupedTimelineResult,
+} from "@/lib/api/fetch-basedollar-timeline";
 import type { BasedollarTroveSummary } from "@/lib/sources/api/basedollar-troves";
 
-export const loadBasedollarTroveTail = forkTroveTailLoader<BasedollarTroveSummary>({
+export const loadBasedollarTroveTail = forkTroveTailLoader<BasedollarTroveSummary, BasedollarGroupedTimelineResult>({
   label: "basedollar",
   resolveBranch,
   fetchTroves: fetchBasedollarTroves,
   fetchTimeline: fetchBasedollarTimeline,
+  fetchGroupedTimeline: fetchBasedollarGroupedTimeline,
   recent: TIMELINE_WINDOW_EVENTS,
   openingPath: (collateralType, troveId) =>
     `/api/basedollar/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}/timeline/summary`,

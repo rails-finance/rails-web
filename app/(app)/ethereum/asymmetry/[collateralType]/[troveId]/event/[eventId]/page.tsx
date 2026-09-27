@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
+import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { shortId } from "@/lib/asymmetry/asset-catalog";
 import { loadAsymmetryTroveTail } from "@/lib/asymmetry/trove-page-data";
 import AsymmetryTrovePage from "../../page";
 
 interface Props {
   params: Promise<{ collateralType: string; troveId: string; eventId: string }>;
+  /** The parent trove page reads `?folders=` off this to choose which
+   *  timeline read its tail makes, so this segment carries it through. */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // Restated (not re-exported — see twitter-image.tsx's own header on why Next
@@ -18,10 +22,14 @@ export const dynamic = "force-dynamic";
 // `loadAsymmetryTroveTail` is the same `cache()`-wrapped read the parent page
 // and its own opengraph-image already call, so finding the event here costs
 // no second backend round trip within one request.
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { collateralType, troveId, eventId } = await params;
   const decoded = decodeEventId(eventId);
-  const tail = await loadAsymmetryTroveTail(collateralType, troveId);
+  // The same test the page decides on, so both reach one `cache()` entry. A
+  // grouped answer names only the ungrouped events, so an event inside a
+  // folder falls back to the generic metadata.
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = await loadAsymmetryTroveTail(collateralType, troveId, grouped);
   const event = tail.events?.find((e) => e.id === decoded) ?? null;
   return eventMetadata({
     session: "asymmetry",
@@ -43,6 +51,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // key the parent's own `Props` type doesn't declare; passing the same
 // promise through is still structurally valid (the parent only reads
 // `collateralType`/`troveId` off it).
-export default async function AsymmetryEventPage({ params }: Props) {
-  return AsymmetryTrovePage({ params });
+export default async function AsymmetryEventPage({ params, searchParams }: Props) {
+  return AsymmetryTrovePage({ params, searchParams });
 }

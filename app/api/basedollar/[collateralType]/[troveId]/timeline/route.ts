@@ -6,11 +6,20 @@ import { withRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import { buildBasedollarTimeline, type MvRow } from "@/lib/sources/api/basedollar-timeline";
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import type { UpstreamGroupedTimeline } from "@/lib/sources/api/timeline-folder-wire";
+import type { TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
+import { basedollarServedFolder } from "@/lib/sources/api/basedollar-folder";
 
 // api arm of a single Basedollar Trove's timeline — the LIVE rails-server index.
 // rails-server returns the raw mv_basedollar_events rows for one (branch, troveId); we run
 // the presentation transform (buildBasedollarTimeline) server-side and return the shaped
 // { collateralType, troveId, events, totalEvents }.
+//
+// `?group=1` is the same history as ROWS (decision 0019's evening amendment):
+// one upstream read, the bounds the route's own. The events travel flat and
+// the rows as a plan, as on the SparkLend route, which carries the argument in
+// full. `?from=`/`?to=` names a span of time in place of the newest window,
+// grouped or flat, and is passed straight through.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +40,8 @@ interface TimelineBackendResponse {
    *  /summary twin with THIS number. Null (or absent, on a backend that
    *  predates it) means the rows ARE the whole history. */
   cutoffBlock?: number | null;
+  /** The span `?from=`/`?to=` asked for, echoed in unix seconds. */
+  span?: { from: number; to: number } | null;
 }
 
 export async function GET(
@@ -48,13 +59,60 @@ export async function GET(
     // Passed straight through, validated upstream: rails-server owns the shape
     // of `recent` and answers a bad one with its own 400. Re-validating it here
     // would be a second opinion about the same parameter, and the two would drift.
-    const recent = request.nextUrl.searchParams.get("recent");
-    const recentQs = recent ? `?recent=${encodeURIComponent(recent)}` : "";
-    const url = `${RAILS_API_URL}/api/basedollar/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}/timeline${recentQs}`;
+    const sp = request.nextUrl.searchParams;
+    const qs = new URLSearchParams();
+    for (const k of ["recent", "group", "from", "to"]) {
+      const v = sp.get(k);
+      if (v) qs.set(k, v);
+    }
+    const q = qs.toString();
+    const url = `${RAILS_API_URL}/api/basedollar/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}/timeline${q ? `?${q}` : ""}`;
     const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));
     if (!response.ok) {
       console.error(`Backend API error: ${response.status} ${response.statusText}`);
       return NextResponse.json({ error: `Backend error: ${response.statusText}` }, { status: response.status });
+    }
+    if (sp.get("group") === "1") {
+      const upstream = (await response.json()) as UpstreamGroupedTimeline<MvRow> & {
+        collateralType?: string;
+        troveId?: string;
+      };
+      // A backend that predates the grouping answers the flat shape; reading it
+      // as rows would draw a page of folders that are not folders.
+      if (upstream.grouped !== true || !Array.isArray(upstream.rows)) {
+        return NextResponse.json(
+          {
+            error: "Not grouped",
+            code: "GROUPING_UNAVAILABLE",
+            message: "This backend does not serve grouped timelines yet, so there are no folders to read.",
+          },
+          { status: 502 },
+        );
+      }
+      const eventRows = upstream.rows.flatMap((r) => (r.kind === "event" ? [r.event] : []));
+      const data = buildBasedollarTimeline(
+        eventRows,
+        upstream.collateralType ?? collateralType,
+        upstream.troveId ?? troveId,
+      );
+      const rowPlan: TimelineRowPlanEntry[] = upstream.rows.map((r) =>
+        r.kind === "event"
+          ? { kind: "event" }
+          : { kind: "folder", folder: basedollarServedFolder(r.folder, collateralType) },
+      );
+      const body = {
+        ...data,
+        totalEvents: upstream.totalEvents,
+        cutoffBlock: upstream.cutoffBlock ?? null,
+        grouped: true as const,
+        rowPlan,
+        eventsServed: upstream.eventsServed,
+        boundBy: upstream.boundBy,
+        span: upstream.span ?? null,
+      };
+      return NextResponse.json(toTimelineWire(body, BASE_CHAIN_ID), {
+        headers: proxyCacheControl(response, LISTING_CACHE_CONTROL),
+      });
     }
     const raw = (await response.json()) as TimelineBackendResponse;
     const result = buildBasedollarTimeline(
@@ -68,6 +126,7 @@ export async function GET(
     const windowed = {
       ...withRowCeiling(result, { totalEvents: raw.totalEvents, truncated: raw.truncated }),
       cutoffBlock: raw.cutoffBlock ?? null,
+      span: raw.span ?? null,
     };
     return NextResponse.json(toTimelineWire(windowed, BASE_CHAIN_ID), {
       headers: proxyCacheControl(response, LISTING_CACHE_CONTROL),

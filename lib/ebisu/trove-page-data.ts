@@ -7,14 +7,19 @@ import { forkTroveTailLoader } from "@/lib/shared/liquity-fork-trove-page-data";
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
 import { resolveBranch } from "@/lib/ebisu/asset-catalog";
 import { fetchEbisuTroves } from "@/lib/api/fetch-ebisu-troves";
-import { fetchEbisuTimeline } from "@/lib/api/fetch-ebisu-timeline";
+import {
+  fetchEbisuTimeline,
+  fetchEbisuGroupedTimeline,
+  type EbisuGroupedTimelineResult,
+} from "@/lib/api/fetch-ebisu-timeline";
 import type { EbisuTroveSummary } from "@/lib/sources/api/ebisu-troves";
 
-export const loadEbisuTroveTail = forkTroveTailLoader<EbisuTroveSummary>({
+export const loadEbisuTroveTail = forkTroveTailLoader<EbisuTroveSummary, EbisuGroupedTimelineResult>({
   label: "ebisu",
   resolveBranch,
   fetchTroves: fetchEbisuTroves,
   fetchTimeline: fetchEbisuTimeline,
+  fetchGroupedTimeline: fetchEbisuGroupedTimeline,
   recent: TIMELINE_WINDOW_EVENTS,
   openingPath: (collateralType, troveId) =>
     `/api/ebisu/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}/timeline/summary`,

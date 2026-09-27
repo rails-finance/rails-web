@@ -84,7 +84,9 @@ export interface ServedFolderLeg {
   decimals: number | null;
   /** The name the header draws, where it is not `symbol` — a receipt token
    *  counted under its underlying (Moonwell's mTokens: filed as "cbBTC",
-   *  drawn as "mcbBTC" wearing cbBTC's mark). Absent: `symbol` is drawn. */
+   *  drawn as "mcbBTC" wearing cbBTC's mark). Absent: `symbol` is drawn. With
+   *  `symbol` null it is drawn and filed nowhere: a Liquity fork Trove's
+   *  collateral and debt, which the page offers no asset filter for. */
   displaySymbol?: string;
 }
 
@@ -340,14 +342,15 @@ export type ServedFolderRegister = (folder: ServedFolder) => FolderRegisterEntry
  * the same mini-pill a client-grouped folder already wears.
  */
 export function legAsAggregate(leg: ServedFolderLeg): RunAggregate | null {
-  if (!leg.symbol) return null;
+  const shown = leg.displaySymbol ?? leg.symbol;
+  if (!shown) return null;
   const value = scaleBaseUnits(leg.amount, leg.decimals);
   if (value == null) return null;
   return {
     verb: leg.verb,
     value,
-    symbol: leg.displaySymbol ?? leg.symbol,
-    ...(leg.displaySymbol ? { iconSymbol: leg.symbol } : {}),
+    symbol: shown,
+    ...(leg.displaySymbol && leg.symbol ? { iconSymbol: leg.symbol } : {}),
     provWhat: leg.provWhat,
     count: leg.count,
   };

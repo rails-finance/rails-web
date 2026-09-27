@@ -34,7 +34,11 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAsymmetryEvent } from "@/lib/shared/types/event-shape";
 import type { AsymmetryTroveSummary } from "@/lib/sources/api/asymmetry-troves";
 import { fetchAsymmetryTroves } from "@/lib/api/fetch-asymmetry-troves";
-import { fetchAsymmetryTimeline } from "@/lib/api/fetch-asymmetry-timeline";
+import {
+  fetchAsymmetryTimeline,
+  fetchAsymmetryGroupedTimeline,
+  type AsymmetryGroupedTimelineResult,
+} from "@/lib/api/fetch-asymmetry-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
@@ -46,9 +50,10 @@ import {
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import { fetchLiquityForkPosition, type LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { liquityForkTimelineRuns } from "@/lib/shared/liquity-fork-timeline-runs";
+import { LIQUITY_FORK_FOLDER_REGISTER, liquityForkTimelineRuns } from "@/lib/shared/liquity-fork-timeline-runs";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
+import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { AsymmetryEventCard } from "@/components/protocol/asymmetry/asymmetry-event-card";
 import {
   AsymmetryPositionCard,
@@ -92,6 +97,11 @@ interface AsymmetryTroveDetailProps {
   initialEvents: BaseActivityEvent[] | null;
   initialCutoffBlock: number | null;
   initialOpening: TimelineOpeningBalance | null;
+  /** The grouped answer WHOLE, when the load read its history as ROWS (the
+   *  default; `?folders=0` reads the flat window). Its row plan puts the
+   *  folders back between the ungrouped events, and its folders carry the
+   *  arithmetic the whole-history reductions read. */
+  initialGrouped: AsymmetryGroupedTimelineResult | null;
 }
 
 export default function AsymmetryTroveDetail({
@@ -101,6 +111,7 @@ export default function AsymmetryTroveDetail({
   initialEvents,
   initialCutoffBlock,
   initialOpening,
+  initialGrouped,
 }: AsymmetryTroveDetailProps) {
   // One flag, and the loader guarantees it is truthful: the tail arrives
   // whole (summary AND timeline) or not at all, so a seeded view never
@@ -110,6 +121,12 @@ export default function AsymmetryTroveDetail({
     initialTrove ? viewFromSummary(initialTrove) : null,
   );
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);
+  // The same history as ROWS (decision 0019's evening amendment): the index
+  // groups this family, because every row carries the Trove's collateral and
+  // debt either side of it, so a folder standing for a hundred rows leaves
+  // nothing here to reconstruct. The grouped answer REPLACES the flat window:
+  // `events` holds its ungrouped events and this its row plan and folders.
+  const [groupedTail, setGroupedTail] = useState<AsymmetryGroupedTimelineResult | null>(initialGrouped);
   // The checkpoint model. The timeline fetch asks for a WINDOW of the most
   // recent events; on a Trove that needs one, the response names the block
   // the window opened at and everything below it arrives as a declared opening
@@ -135,14 +152,20 @@ export default function AsymmetryTroveDetail({
     (async () => {
       setLoading(true);
       try {
-        const [pData, tData] = await Promise.all([
+        // The same choice the server half made (`trove-page-data.ts`): ONE
+        // timeline read, in the shape the URL asked for.
+        const asked = servedFoldersEnabled();
+        const [pData, flat, grouped] = await Promise.all([
           fetchAsymmetryTroves({ troveId, collateralTypes: [collateralType], limit: 1 }),
-          fetchAsymmetryTimeline(collateralType, troveId, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchAsymmetryTimeline(collateralType, troveId, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? fetchAsymmetryGroupedTimeline(collateralType, troveId) : null,
         ]);
+        const tData = grouped ?? flat;
         const summary = pData.data[0] ?? null;
         setView(summary ? viewFromSummary(summary) : null);
-        setEvents(tData.events ?? []);
-        setCutoffBlock(tData.cutoffBlock ?? null);
+        setEvents(tData?.events ?? []);
+        setCutoffBlock(tData?.cutoffBlock ?? null);
+        setGroupedTail(grouped);
       } finally {
         setLoading(false);
       }
@@ -203,10 +226,48 @@ export default function AsymmetryTroveDetail({
   }, [collateralType, troveId]);
 
   const asymmetryEvents = useMemo(() => events.filter(isAsymmetryEvent), [events]);
-  const tl = useTimelineEvents(asymmetryEvents, {
+  // The served list as ROWS, from the same answer as `asymmetryEvents`.
+  const servedRows = useMemo(
+    () => (groupedTail ? interleaveRowPlan(groupedTail.rowPlan, asymmetryEvents) : undefined),
+    [groupedTail, asymmetryEvents],
+  );
+  /** The folders the index served, whole and unfiltered: the third
+   *  contributor to the page's partition, which every whole-history reduction
+   *  below adds to `opening + events`. */
+  const servedFolders = useMemo(
+    () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
+    [servedRows],
+  );
+  /** The rows' times with every folder's first and last member beside them,
+   *  so the tenure and the "ago" pill read the Trove's whole span when its
+   *  newest or oldest row is a folder. */
+  const activityStamps = useMemo(
+    () =>
+      servedFolders?.length
+        ? [...asymmetryEvents, ...servedFolders.flatMap((f) => [{ timestamp: f.firstAt }, { timestamp: f.lastAt }])]
+        : asymmetryEvents,
+    [asymmetryEvents, servedFolders],
+  );
+
+  // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
+  // Decision 0019, amendments 2026-09-24 and 2026-09-25: a month the loaded
+  // rows do not hold is read from the index as its segment
+  // (hooks/useTimelineSegment.ts). The preload stays the page's whole-history
+  // record; the timeline alone swaps.
+  const { tl, segments, readFolderMembers } = useTimelineSegment({
+    events: asymmetryEvents,
+    groupedTail,
+    servedRows,
+    servedFolders,
+    opening,
+    historyWindow,
+    isEvent: isAsymmetryEvent,
+    readGrouped: (span, signal) => fetchAsymmetryGroupedTimeline(collateralType, troveId, { span, signal }),
+    readFlat: (span) => fetchAsymmetryTimeline(collateralType, troveId, { span }),
+    folderPath: `/api/asymmetry/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}/timeline/folder`,
+    folderParams: {},
     storageKey: `asymmetry-${collateralType}-${troveId}`,
     protocolKey: "asymmetry",
-    window: historyWindow,
   });
 
   // ⚠️ On a windowed page every lifetime surface must read the MERGED history,
@@ -217,8 +278,8 @@ export default function AsymmetryTroveDetail({
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? asymmetryEvents : undefined;
   const precomputedLifetime = useMemo(
-    () => asymmetryLifetimeWithOpening(asymmetryEvents, opening),
-    [asymmetryEvents, opening],
+    () => asymmetryLifetimeWithOpening(asymmetryEvents, opening, servedFolders),
+    [asymmetryEvents, opening, servedFolders],
   );
 
   // The CSV is the export whose purpose IS the rows, so on a windowed page it
@@ -287,9 +348,11 @@ export default function AsymmetryTroveDetail({
             chain={chain}
             events={asymmetryEvents}
             csvFilename={`asymmetry-${collateralType}-${troveId.slice(0, 10)}-activity.csv`}
-            fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-            history={markdownHistoryScope(historyWindow, asymmetryEvents)}
-            scopeNote={exportScopeNote(historyWindow, asymmetryEvents, "this Trove's whole history")}
+            // A grouped page's `events` hold only the ungrouped rows, so its
+            // CSV reads the whole history too.
+            fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
+            history={markdownHistoryScope(historyWindow, asymmetryEvents, servedFolders)}
+            scopeNote={exportScopeNote(historyWindow, asymmetryEvents, "this Trove's whole history", servedFolders)}
           />
         )}
       </DetailTopRow>
@@ -352,13 +415,16 @@ export default function AsymmetryTroveDetail({
             closed={view ? view.status !== "open" : undefined}
             tl={tl}
             runs={FORK_RUNS}
+            folderRegister={LIQUITY_FORK_FOLDER_REGISTER}
+            readFolderMembers={readFolderMembers}
+            segments={segments}
             // Tenure eyebrow (the V2 trove's "Opened … · tenure · ago"), read off
             // the captured event stream — a closed or liquidated life measures
             // its tenure to the last event instead of now.
             toolbarLeading={
               view ? (
                 <TimelineActivityHeader
-                  events={asymmetryEvents}
+                  events={activityStamps}
                   closed={view.status !== "open"}
                   // When the Trove actually opened, not when the window does —
                   // otherwise a long life reads as days old because its oldest
