@@ -7,9 +7,8 @@ import type { RawSearchParams } from "@/lib/shared/listing-ssr";
 
 // Alchemix V3 on Ethereum — the alUSD and alETH lines.
 //
-// `robots: { index: false }` is not written here: the roster entry carries
-// `unlaunched: true`, and `listingMetadata` reads it. The route serves and
-// renders; nothing on the site points at it.
+// `robots` is not written here: `listingMetadata` reads it off the roster
+// entry.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;

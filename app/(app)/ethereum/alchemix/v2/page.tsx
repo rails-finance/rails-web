@@ -6,8 +6,8 @@ import { listingMetadata } from "@/lib/shared/page-metadata";
 import type { RawSearchParams } from "@/lib/shared/listing-ssr";
 
 // Alchemix V2 on Ethereum, the third type tab of the explorer. Every position
-// closed on 2026-04-02. `robots: { index: false }` comes from the roster entry's
-// `unlaunched: true`, which `listingMetadata` resolves by path prefix.
+// closed on 2026-04-02. `robots` comes from the roster entry, which
+// `listingMetadata` resolves by path prefix.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;

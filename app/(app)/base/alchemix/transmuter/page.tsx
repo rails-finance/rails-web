@@ -6,8 +6,8 @@ import { listingMetadata } from "@/lib/shared/page-metadata";
 import type { RawSearchParams } from "@/lib/shared/listing-ssr";
 
 // Alchemix V3 Transmuter positions on Base, the second type tab of the
-// explorer. `robots: { index: false }` comes from the roster entry's
-// `unlaunched: true`, which `listingMetadata` resolves by path prefix.
+// explorer. `robots` comes from the roster entry, which `listingMetadata`
+// resolves by path prefix.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;

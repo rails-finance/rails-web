@@ -11,8 +11,8 @@ import {
 // which is what carries the chain — and the chain is half of the position's
 // identity.
 //
-// `robots: { index: false }` is not written here: the roster entry carries
-// `unlaunched: true` and `positionMetadata` reads it.
+// `robots` is not written here: `positionMetadata` reads it off the roster
+// entry.
 //
 // force-dynamic because the page states current figures and every backend read
 // is `no-store`. Serving a position page from a previous request's read would

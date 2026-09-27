@@ -1224,6 +1224,85 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     },
     views: true,
   }),
+  // Alchemix V3 on Ethereum, the alUSD and alETH lines, with V2 as a closed
+  // record (launched 2026-09-27). Three position types: Alchemist positions,
+  // Transmuter positions and V2 accounts.
+  //
+  // `dashboard`: the position card reads getCDP at head through
+  // /api/alchemix/position/<line>/<id>/state, and states collateralisation
+  // against the line's minimumCollateralization and
+  // collateralizationLowerBound, read at the same block.
+  //
+  // `oracleUsd` is ruled out by the protocol: the Alchemist values collateral
+  // as MYT shares at the vault's share price in the asset underneath and
+  // counts one synthetic as one unit of that asset. The dollar figure beside
+  // the collateral is a market price the page labels as such.
+  //
+  // `atBlockPrices`: every Alchemist reading stores the MYT share price read at
+  // its block, and every event block carries a reading (check E of the V3
+  // gate), so each Alchemist card values its move at its own block. Transmuter
+  // and V2 cards carry no share price.
+  //
+  // `verification` (rails-server-onboarding, both passing against production
+  // 2026-09-27 at da5e12d): scripts/verify-alchemix-v3-replay.mjs replays each
+  // position wei-exact against getCDP up to its line's first Redemption (check
+  // G: eth-alusd 1,213 of 1,213, eth-aleth 817 of 817), matches every
+  // Transmuter position against getPosition with the open total against
+  // totalLocked() (B), counts Redemption logs on chain against the table (C),
+  // and proves every redemption and event block carries its getCDP reading
+  // (D, E). scripts/verify-alchemix-v2-frozen.mjs matches accounts() and
+  // positions() wei-exact on every V2 account, with 0 undeclared topics.
+  //
+  // `forensics` waits on a first instance: the Liquidated card states what was
+  // taken and the liquidator's fee, but no `Liquidated` has fired on any line.
+  //
+  // `llm`: no Copy-for-LLM export on any Alchemix page yet. `views`: the Lines
+  // page states each line's index coverage and grade; no page reads the
+  // Alchemists' state at head yet.
+  alchemix: explorerDepth({
+    dashboard: true,
+    oracleUsd: {
+      why: "the asset underneath by design: the Alchemist values collateral as vault shares at the vault's share price, and counts each synthetic as one unit of the asset underneath. Alchemix runs no USD feed",
+    },
+    atBlockPrices: {
+      except:
+        "Transmuter positions and V2 accounts, whose cards state amounts in the synthetic or in vault shares with no share price read at the block",
+    },
+    verification: true,
+    explainers: true,
+    forensics: {
+      awaiting:
+        "the liquidation card is built, but no Alchemix V3 position on Ethereum has been liquidated, so there is nothing yet to show or verify against",
+    },
+  }),
+  // Alchemix V3 on Base, the alUSDb line (launched 2026-09-27). No V2 here.
+  // The cells follow the Ethereum row with these differences:
+  //
+  // `verification`: Base has had no Redemption, so the V3 gate's check A
+  // replays every position wei-exact against getCDP at head (38 of 38 on
+  // 2026-09-27, including the two positions carrying a Repay), B matches
+  // every Transmuter position against getPosition, C counts 0 Redemptions on
+  // chain to block 51,876,292, and F checks the MYT's underlying and its
+  // decimals against myt.asset(). Check G holds `derived_valid_to_block` NULL
+  // until a first Redemption lands.
+  //
+  // `forensics`: no `Liquidated` on Base either.
+  "alchemix-base": explorerDepth({
+    dashboard: true,
+    oracleUsd: {
+      why: "the asset underneath by design: the Alchemist values collateral as vault shares at the vault's share price, and counts each alUSDb as one unit of the asset underneath. Alchemix runs no USD feed",
+    },
+    atBlockPrices: {
+      except:
+        "Transmuter positions, whose cards state amounts in alUSDb or in vault shares with no share price read at the block",
+    },
+    verification: true,
+    explainers: true,
+    forensics: {
+      awaiting:
+        "the liquidation card is built, but no Alchemix position on Base has been liquidated, so there is nothing yet to show or verify against",
+    },
+  }),
 };
 
 /**

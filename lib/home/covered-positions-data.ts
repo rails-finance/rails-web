@@ -81,6 +81,11 @@ const LISTING_ENDPOINT: Record<string, string> = {
   "aave-v3-base": "/api/aave-v3-base/positions",
   "aave-v4": "/api/aave-v4/spoke-positions",
   "aave-v4-base": "/api/aave-v4-base/spoke-positions",
+  // Both Alchemix explorers read one route and separate by chain. The count is
+  // Alchemist positions; Transmuter positions and V2 accounts are listed on
+  // their own tabs and are not added to it.
+  alchemix: "/api/alchemix/positions?chainId=1",
+  "alchemix-base": "/api/alchemix/positions?chainId=8453",
   asymmetry: "/api/asymmetry/troves",
   basedollar: "/api/basedollar/troves",
   compound: "/api/compound/positions",
@@ -142,6 +147,10 @@ const ALL_TIME_STATUS: Record<string, string> = {
   seamless: "open,closed,liquidated",
 };
 
+/** Listings whose `coverage` is the Alchemix per-line record rather than the
+ *  Base lending `shapeCoverage`. */
+const LINE_COVERAGE_LISTINGS = new Set<string>(["alchemix", "alchemix-base"]);
+
 /** Both listing envelopes carry the filtered total; neither nests it deeper.
  *  The Base listings also state their `coverage` (rails-server
  *  `shapeCoverage`); only `historyComplete` is read here. */
@@ -180,7 +189,7 @@ async function fetchTotal(id: string, path: string, status: string | null): Prom
   // answer with and is discarded.
   const qs = new URLSearchParams({ limit: "1" });
   if (status) qs.set("status", status);
-  const url = `${RAILS_API_URL}${path}?${qs.toString()}`;
+  const url = `${RAILS_API_URL}${path}${path.includes("?") ? "&" : "?"}${qs.toString()}`;
   try {
     // fetchWithRetry, not bare fetch: the all-or-nothing sum below means one
     // transient failure among the ~50 legs suppresses the whole headline for
@@ -197,7 +206,10 @@ async function fetchTotal(id: string, path: string, status: string | null): Prom
       console.error(`covered-positions: ${id} ${path} [${status ?? "all-time"}] -> no total`);
       return null;
     }
-    const cov = json.coverage;
+    // Only the Base lending listings state `historyComplete`. Alchemix's
+    // `coverage` is a per-line record with no backfill cursor, so it is not
+    // read as one.
+    const cov = LINE_COVERAGE_LISTINGS.has(id) ? null : json.coverage;
     // A null cursor is a backfill that has not started (the Base box runs them
     // in sequence, one protocol at a time); a number is where it has reached.
     const pending =

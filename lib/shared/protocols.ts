@@ -220,15 +220,12 @@ const SPECS: ProtocolSpec[] = [
     // Alchemix V3's ETHEREUM lines — alUSD and alETH. Two entries rather than a
     // chain switch, for the reason aave-v3 / aave-v3-base are two: a position's
     // identity is the (chain, line) pair, and a token id on one chain says
-    // nothing about the same number on the other.
-    //
-    // Off the nav while the surface is being built — see `unlaunched`.
+    // nothing about the same number on the other. Launched 2026-09-27.
     id: "alchemix",
     session: "alchemix",
     label: "Alchemix",
     chainId: 1,
     slug: "alchemix",
-    unlaunched: true,
     tags: ["CDP", "Yield"],
     desc: "Self-repaying loans against a yield-bearing vault token — each position's debt and collateral stated with the grade and the block they were settled at, and the line-wide redemptions that moved them",
     subPages: [{ segment: "lines", label: "Lines overview", tab: "Lines" }],
@@ -239,13 +236,13 @@ const SPECS: ProtocolSpec[] = [
     // Ethereum lines: Base has had no redemption, so its figures replay
     // wei-exact from the position's own events, while Ethereum's are read from
     // getCDP at a block (rails-ops decisions/0032). That difference is a thing
-    // each explorer says in words, not a property of the roster.
+    // each explorer says in words, not a property of the roster. Launched
+    // 2026-09-27.
     id: "alchemix-base",
     session: "alchemix-base",
     label: "Alchemix",
     chainId: 8453,
     slug: "alchemix",
-    unlaunched: true,
     tags: ["CDP", "Yield"],
     desc: "Alchemix V3's Base deployment — the alUSDb line, every position's debt and collateral replayed from its own events, with the block each figure was settled at stated beside it",
     subPages: [{ segment: "lines", label: "Lines overview", tab: "Lines" }],
