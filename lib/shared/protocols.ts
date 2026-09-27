@@ -184,14 +184,13 @@ const SPECS: ProtocolSpec[] = [
     // Aave V4's Base deployment — the Equities hub and its one spoke, Mag7:
     // seven Coinbase tokenized stocks as collateral, USDC to borrow. A second
     // roster row rather than a chain switch, for the reason aave-v3 /
-    // aave-v3-base are two: separate contracts, separate accounts. A seventh
-    // Base explorer, off the nav until Miles launches it.
+    // aave-v3-base are two: separate contracts, separate accounts. The
+    // seventh Base explorer, launched 2026-09-27.
     id: "aave-v4-base",
     session: "aave-v4-base",
     label: "Aave V4",
     chainId: 8453,
     slug: "aave-v4",
-    unlaunched: true,
     tags: ["Lend", "Borrow"],
     desc: "Aave V4's Base deployment — the Equities hub's Mag7 spoke, where seven Coinbase tokenized stocks back USDC loans, each account read from the spoke and each stock price stated with the time it was published",
     subPages: [{ segment: "hubs", label: "Equities hub", tab: "Hub" }],

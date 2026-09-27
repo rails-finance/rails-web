@@ -80,6 +80,7 @@ const LISTING_ENDPOINT: Record<string, string> = {
   "aave-v3": "/api/aave-v3/positions",
   "aave-v3-base": "/api/aave-v3-base/positions",
   "aave-v4": "/api/aave-v4/spoke-positions",
+  "aave-v4-base": "/api/aave-v4-base/spoke-positions",
   asymmetry: "/api/asymmetry/troves",
   basedollar: "/api/basedollar/troves",
   compound: "/api/compound/positions",
@@ -115,7 +116,9 @@ const LISTING_ENDPOINT: Record<string, string> = {
  * recognized status there that happens to be 0 today (it answers 0, where an
  * unrecognized value would answer the full set), so naming it now means the
  * first Aave V4 liquidation lands in the count instead of silently falling
- * outside it.
+ * outside it. Aave V4 Base (launched 2026-09-27) shares the same
+ * `spoke-positions` fetcher and the same default, so it carries the same
+ * override.
  *
  * The five Base explorers are here for a different reason: their listings are
  * not a replay but an accounts table joined to a CHAIN read at a pinned block,
@@ -131,6 +134,7 @@ const LISTING_ENDPOINT: Record<string, string> = {
  */
 const ALL_TIME_STATUS: Record<string, string> = {
   "aave-v4": "open,closed,liquidated",
+  "aave-v4-base": "open,closed,liquidated",
   "aave-v3-base": "open,closed,liquidated",
   "compound-base": "open,closed,liquidated",
   "moonwell-base": "open,closed,liquidated",

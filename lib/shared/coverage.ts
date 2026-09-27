@@ -180,6 +180,36 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     forensics: true,
     views: true,
   }),
+  // Aave V4's Base deployment (launched 2026-09-27): the Equities hub and its
+  // one spoke, Mag7, seven Coinbase tokenized stocks as collateral, USDC to
+  // borrow. The explorer's components are the Ethereum Aave V4 ones, shared
+  // rather than forked (`lib/aave-v4/deployment.tsx`): the spoke position
+  // page, its event cards, explainers and Copy-for-LLM export are the same
+  // code the Ethereum row already carries these cells for, told which
+  // deployment they are by app/(app)/base/aave-v4/layout.tsx (`dashboard`,
+  // `explainers`, `forensics`, `llm`).
+  //
+  // The market's own oracle (MAG7_SPOKE_ORACLE, an AaveOracle) carries USD
+  // (`oracleUsd`); `/api/aave-v4-base/timeline` prices each row at the last
+  // oracle round at or before its block (`atBlockPrices`), per
+  // `rails-ops/reference/aave-v4-base.md` §5.
+  //
+  // `views`: /base/aave-v4/hubs reads the one Equities hub live at head, the
+  // same protocol-view shape as the Ethereum row's hub comparison, just one
+  // hub rather than four.
+  //
+  // `verification` is not stated: no chain verifier has been written for this
+  // deployment yet (unlike aave-v3-base's scripts/verify-aave-v3-base-chain.mjs),
+  // so the cell stays `false` until one exists.
+  "aave-v4-base": explorerDepth({
+    dashboard: true,
+    oracleUsd: true,
+    atBlockPrices: true,
+    llm: true,
+    explainers: true,
+    forensics: true,
+    views: true,
+  }),
   // Liquidation forensics (2026-07-14): the valued two-leg breakdown — seized
   // vs cleared at the market's own oracle price AT the event's block (mig 092
   // capture), with the liquidator's realized premium derived from the pair.
@@ -1302,8 +1332,8 @@ export function coverageRows(comingSoon: ComingSoonEntry[], chainId: ChainId): C
  * block above; do not invent capabilities a view doesn't offer.
  *
  * Invariant: an entry exists here iff that protocol's `views` cell is `true`.
- * All nineteen qualify — frankencoin's /frankencoin/system (2026-08-08)
- * closed the matrix's last views dash.
+ * All twenty qualify; aave-v4-base's /base/aave-v4/hubs (launched 2026-09-27)
+ * is the newest.
  */
 export const VIEW_NOTES: Record<string, string> = {
   frankencoin:
@@ -1311,6 +1341,7 @@ export const VIEW_NOTES: Record<string, string> = {
   liquity:
     "The branches side by side — the span of rates borrowers set on each, and redemption exposure as debt-in-front.",
   "aave-v4": "The hubs compared side by side.",
+  "aave-v4-base": "The Equities hub, read live: the Mag7 spoke's eight reserves, sizes, caps and oracle prices.",
   yearn:
     "Every vault the five V3 factories made — the endorsed and the rest alike — grouped by the token each takes, with its totals, share price and endorsement read from the contracts at one block the page names.",
   "aave-vaults":
