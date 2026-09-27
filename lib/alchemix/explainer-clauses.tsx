@@ -394,22 +394,37 @@ export function alchemixEventClauses(
         ),
       );
       {
+        // The Alchemist pays the liquidator from one source: shares from the
+        // position's collateral, or, where the collateral no longer covers the
+        // debt, the asset underneath from the line's fee vault.
         const fee = underlying(raw.fee_in_underlying, underlyingDecimals);
+        const inShares = raw.fee_in_yield != null && raw.fee_in_yield !== "0";
+        const inVault = raw.fee_in_underlying != null && raw.fee_in_underlying !== "0";
         out.push(
           cont(
-            fee != null ? (
+            inShares ? (
               <>
                 {" "}
-                The liquidator was paid {amount(raw.fee_in_yield)} shares and {fee} of the asset underneath for doing
-                it.
+                The liquidator was paid {amount(raw.fee_in_yield)} {myt} of it, taken from this position&rsquo;s
+                collateral.
               </>
+            ) : inVault ? (
+              fee != null ? (
+                <>
+                  {" "}
+                  The liquidator was paid {fee} of the asset underneath from the line&rsquo;s fee vault, outside this
+                  position.
+                </>
+              ) : (
+                <>
+                  {" "}
+                  The liquidator was paid in the asset underneath from the line&rsquo;s fee vault, outside this
+                  position; its decimals come from a reading of this position and none has been taken, so no figure is
+                  given.
+                </>
+              )
             ) : (
-              <>
-                {" "}
-                The liquidator was paid {amount(raw.fee_in_yield)} shares for doing it, and a further amount of the
-                asset underneath which is not stated here: what that asset is, and the decimals its figure is in, come
-                from a reading of this position, and none has been taken.
-              </>
+              <> The liquidator was paid no fee.</>
             ),
           ),
         );
@@ -574,36 +589,67 @@ export function alchemixEventClauses(
             clause(
               <>
                 Here it cleared {amount(cleared.amountRaw)} {sym} of debt set aside for repayment and took{" "}
-                {amount(collateralTakenRaw)} {myt} of collateral to back it, measured from this position&rsquo;s
-                readings either side of it.
+                {amount(collateralTakenRaw)} {myt} of collateral, measured from this position&rsquo;s readings either
+                side of it.
               </>,
             ),
           );
           const net = opts.redemptionNet;
+          const fee = net && net.status === "stated" ? net.fee : null;
+          const pct = fee ? `${(fee.bps / 100).toLocaleString("en-US")}%` : null;
+          out.push(
+            clause(
+              fee ? (
+                <>
+                  {amount(fee.sharesRaw)} {myt} of those are the line&rsquo;s {pct} redemption fee, which the Alchemist
+                  charges on every redemption on top of the shares the Transmuter gets and pays to Alchemix&rsquo;s fee
+                  receiver. The rest went to the Transmuter, which pays its stakers in them.
+                </>
+              ) : (
+                <>Those {myt} went to the Transmuter, which pays its stakers in them.</>
+              ),
+            ),
+          );
           if (net && net.status === "stated" && opts.underlyingSymbol) {
             const under = opts.underlyingSymbol;
             const netN = Number(net.netRaw) / WAD;
+            const signed = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${formatNumber(Math.abs(v))}`;
+            const feeN = fee ? Number(fee.valueRaw) / WAD : null;
+            const restN = net.restRaw != null ? Number(net.restRaw) / WAD : null;
+            // The averaging remainder is named only above the share price's
+            // own rounding: a tenth of a basis point of the debt cleared.
+            const clearedN = Number(net.clearedRaw) / WAD;
+            const restShows = restN != null && Math.abs(restN) >= clearedN * 1e-5;
             out.push(
               clause(
                 <>
-                  Those {myt} went to the Transmuter, which pays its stakers in them. At this block&rsquo;s share price
-                  they were worth{" "}
+                  At this block&rsquo;s share price the shares taken were worth{" "}
                   {(Number(net.takenValueRaw) / WAD).toLocaleString("en-US", { maximumSignificantDigits: 6 })} {under},
                   so the net for this position, the debt cleared (one {under} per {sym}) less that value, is{" "}
-                  {netN > 0 ? "+" : netN < 0 ? "−" : ""}
-                  {formatNumber(Math.abs(netN))} {under}.
+                  {signed(netN)} {under}.
+                  {feeN != null && pct ? (
+                    restShows && restN != null ? (
+                      <>
+                        {" "}
+                        The {pct} fee is {signed(-feeN)} {under} of it. The other {signed(restN)} {under} is how the
+                        Alchemist charges a position: at the line&rsquo;s average shares per unit of debt across every
+                        redemption since this position&rsquo;s own last event, while the share price moved between them.
+                      </>
+                    ) : (
+                      <> That is the {pct} fee.</>
+                    )
+                  ) : null}
                 </>,
               ),
             );
-          } else {
-            out.push(clause(<>Those {myt} went to the Transmuter, which pays its stakers in them.</>));
           }
         } else {
           out.push(
             clause(
               <>
-                Here it cleared {amount(cleared.amountRaw)} {sym} of debt set aside for repayment, and took a matching
-                amount of {myt} from the collateral, measured from this position&rsquo;s readings either side of it.
+                Here it cleared {amount(cleared.amountRaw)} {sym} of debt set aside for repayment, measured from this
+                position&rsquo;s readings either side of it, and took {myt} from the collateral for it, including the
+                line&rsquo;s redemption fee.
               </>,
             ),
           );

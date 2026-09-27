@@ -34,8 +34,10 @@ export interface AlchemixLine {
    *  as the synthetic's symbol on every line. */
   displayName: string;
   /** The Alchemist's `protocolFee`, in basis points, read from chain
-   *  2026-09-25 (rails-ops TO-DO-alchemix-scoping §2): charged in vault shares
-   *  on a repay's set-aside part. Stated on the repay card as a rate. */
+   *  2026-09-25 and again 2026-09-27 (rails-ops decisions/0032): charged in
+   *  vault shares on a repay's set-aside part, and on every redemption on top
+   *  of the shares the Transmuter gets. Stated on the repay and redemption
+   *  cards. */
   protocolFeeBps: number;
 }
 

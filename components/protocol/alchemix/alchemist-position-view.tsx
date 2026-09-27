@@ -66,7 +66,7 @@ import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAlchemistEvent, isAlchemixV2Event } from "@/lib/shared/types/event-shape";
 import { AlchemixV2EventCard, type AlchemixV2Event } from "@/components/protocol/alchemix/v2-event-card";
-import { v2PositionPath } from "@/lib/alchemix/lines";
+import { lineProtocolFeeBps, v2PositionPath } from "@/lib/alchemix/lines";
 import { AlchemixEventCard } from "@/components/protocol/alchemix/alchemix-event-card";
 import {
   AlchemixStatusPill,
@@ -227,7 +227,8 @@ function HealthSentence({
     <p className="mt-3 text-[11px] leading-relaxed text-rb-500">
       Collateralisation is the collateral in {under} divided by the debt, with one {syntheticSymbol} counted as one{" "}
       {under}. Borrowing more or withdrawing must leave it above the minimum. At the liquidation line or below, anyone
-      can liquidate the position and is paid a fee from its collateral.
+      can liquidate the position for a fee: a share of the collateral above the debt, taken from the position, or, where
+      the collateral no longer covers the debt, a share of the debt paid from the line&rsquo;s fee vault.
       {liq ? (
         <>
           {" "}
@@ -414,9 +415,16 @@ export function AlchemistPositionView({
       sumRedemptionNets(
         alchemistEvents
           .filter((e) => e.context.data.eventType === "redemption")
-          .map((e) => redemptionNet(e, beforeByBlock.get(e.blockNumber) ?? null, underlyingUnit?.decimals ?? null)),
+          .map((e) =>
+            redemptionNet(
+              e,
+              beforeByBlock.get(e.blockNumber) ?? null,
+              underlyingUnit?.decimals ?? null,
+              lineProtocolFeeBps(chainId, lineKey),
+            ),
+          ),
       ),
-    [alchemistEvents, beforeByBlock, underlyingUnit],
+    [alchemistEvents, beforeByBlock, underlyingUnit, chainId, lineKey],
   );
   // The route's note on redemption rows earns its place only where one is
   // drawn: redemptions that changed nothing are one sentence of their own.
@@ -617,6 +625,7 @@ export function AlchemistPositionView({
                                 redemptionNetTotal.counted,
                                 underlyingUnit.symbol,
                                 coords,
+                                redemptionNetTotal.fee,
                               )
                             : null,
                       }
