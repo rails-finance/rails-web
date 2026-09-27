@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // The boundary — the cut's own statement at the end of a drawn list, on every
 // timeline that draws fewer rows than the position has (rails-ops decision
-// 0019), and ONE CUT of 1,000 on every arm (its 2026-09-10 amendment).
+// 0019), and ONE preload on every arm (2,500 since 2026-09-27; the vault
+// holder draw keeps 1,000).
 // ----------------------------------------------------------------------------
 //
 // ── ⚠️ THE CARD BECAME A BARE SPINE NODE ON 2026-09-11, EVERYWHERE ──────────
@@ -68,7 +69,7 @@
 //      ("balance brought forward", "Reading the opening balance"), the
 //      footer's "earlier events are not listed", and the ceiling footer's
 //      "This list is capped";
-//   6  THE CUT IS 1,000 PLUS THE ANCHORED ROWS, GIVE OR TAKE A SHARED BOUNDARY
+//   6  THE CUT IS THE PRELOAD PLUS THE ANCHORED ROWS, GIVE OR TAKE A SHARED BOUNDARY
 //      BLOCK: `listed` on every cut fixture whose served rows reach the cut
 //      is the cut plus the wallet-signed rows the Base route anchored from
 //      below it (`omitted.anchored`, read off the route on this run, seeded
@@ -117,9 +118,10 @@
 //      collateral) by design, so there the by-asset sum is bounded instead:
 //      at least the count, at most the count plus the elided liquidations.
 //      A seeded cut carries a count and no breakdown, and reports so. The
-//      `moonwell-base-anchored` fixture is ROUTE-ONLY (`routeOnly`): the
-//      exploiter wallet whose 21 anchored rows exposed the double count, read
-//      without a browser because the figures live on the route alone;
+//      `moonwell-base-anchored` fixture is ROUTE-ONLY (`routeOnly`): a wallet
+//      with anchored rows below the cut (the exploiter wallet whose 21 anchored
+//      rows exposed the double count until the 2,500 preload drew it whole),
+//      read without a browser because the figures live on the route alone;
 //  10  the pulsing dot marks the TIP — the newest event — never a list
 //      position: exactly one dot on the page, inside the newest row's spine
 //      column (the first row, or a live market-note row standing above it),
@@ -228,6 +230,10 @@ const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(",")) : null;
 // here. A literal would keep asserting the old number on the day it moves, and
 // a check comparing a window against a different window goes quiet, not red.
 const CUT = TIMELINE_WINDOW_ROWS;
+/** `VAULT_TIMELINE_DRAW_ROWS` in lib/shared/vault-holder-timeline.ts: the vault
+ *  holder draw kept 1,000 when the preload rose to 2,500 (2026-09-27). */
+const VAULT_CUT = 1000;
+const cutOf = (f) => (f.arm === "vault" ? VAULT_CUT : CUT);
 // Enough presses to draw a list the anchor has lengthened (check 6): the
 // Aave V3 Base fixture 0x2017… draws 5,364 rows, 50 a press.
 const PAGE_CLICKS_MAX = 200;
@@ -302,7 +308,9 @@ const FIXTURES = [
   // events) — the window is declined at that grain (its view says why). So
   // no Liquity V1 page is windowed today, and this is a no-card control.
   { id: "liquity-v1", control: true, path: "/ethereum/liquity-v1/0x0561a78021d8966ddd20c28c6c4318d8675ee1f0" },
-  { id: "fluid", arm: "window", path: "/ethereum/fluid/1566", route: `/api/fluid/timeline?nft=1566&${RECENT_QS}` },
+  // Fluid's deepest position (1,440 events) sits under the 2,500 preload since
+  // 2026-09-27, so no Fluid page is windowed and this is a no-card control.
+  { id: "fluid", control: true, path: "/ethereum/fluid/1566" },
   {
     id: "compound-v2",
     arm: "window",
@@ -354,17 +362,26 @@ const FIXTURES = [
     route: "/api/chain/moonwell-base/timeline?wallet=0x11a020d80b0a4468bf45888a0ab33cf4169f520a",
   },
   {
-    // The Moonwell Base exploiter (2,407 events, 21 of them owner-signed rows
-    // below the cut): the wallet on which the anchored rows were counted into
-    // the boundary's pills as well as drawn (decision 0019 leg A). Route only
-    // — check 12 reads the count and the pills off the route, and the page
-    // adds nothing to that statement. `anchored` asserts the route DID anchor
-    // rows here, so the check is known to have a subject.
+    // A Moonwell Base wallet deeper than the preload with wallet-signed rows
+    // below the cut: 6,487 events, the flat route draws the newest 2,500 plus
+    // 3,971 anchored rows and omits 16 (read 2026-09-27). The exploiter wallet
+    // that held this fixture (2,407 events) loads whole since the preload rose
+    // to 2,500. Route only — check 12 reads the count and the pills off the
+    // route, and the page adds nothing to that statement. `anchored` asserts
+    // the route DID anchor rows here, so the check is known to have a subject.
     id: "moonwell-base-anchored",
     arm: "base",
     routeOnly: true,
     anchored: true,
-    route: "/api/chain/moonwell-base/timeline?wallet=0x719eae70d4a83f35bf82a2740699f5db84be919d",
+    route: "/api/chain/moonwell-base/timeline?wallet=0xcb6586874cc04b01cc4fdb777de502cea7b3d6c1",
+  },
+  {
+    // The same wallet on its DEFAULT page, grouped in the web route after the
+    // replay: 2,500 rows (2,496 events, 4 folders) of 6,487 events.
+    id: "moonwell-base-grouped",
+    arm: "grouped",
+    path: "/base/moonwell/0xcb6586874cc04b01cc4fdb777de502cea7b3d6c1",
+    route: "/api/chain/moonwell-base/timeline?wallet=0xcb6586874cc04b01cc4fdb777de502cea7b3d6c1&group=1",
   },
   {
     id: "seamless",
@@ -1067,7 +1084,7 @@ for (const f of FIXTURES) {
       }
     }
 
-    // 6 — the cut is 1,000 exactly, and the page says so in the amended form.
+    // 6 — the cut is the preload, and the page says so in the amended form.
     if (counts?.listed != null) {
       // The anchored rows and the guarantee flag, off the route on this run.
       // `omitted.anchored` rides seeded or not — a seed leaves the anchor ON
@@ -1077,11 +1094,12 @@ for (const f of FIXTURES) {
       // what a seed withholds: the guarantee that the figure is the whole set.
       const anchor = f.arm === "base" && f.route ? await anchoredOf(f, said) : NO_ANCHOR;
       const anchoredRows = anchor.anchored ?? 0;
+      const cut = cutOf(f);
       if (f.tail && anchoredRows === 0) {
         check(
           `6  ${f.id}: a seeded tail shorter than the cut is drawn whole`,
-          counts.listed < CUT,
-          `listed ${n(counts.listed)} (cut ${n(CUT)})`,
+          counts.listed < cut,
+          `listed ${n(counts.listed)} (cut ${n(cut)})`,
         );
       } else {
         // ⚠️ NOT "EXACTLY", AND IT NEVER COULD BE. The window opens at the
@@ -1096,7 +1114,7 @@ for (const f of FIXTURES) {
         // the cut, and short of one more page of rows.
         //
         // PLUS THE ANCHORED ROWS ON THE BASE ARM (2026-09-16, decision 0019
-        // leg F). A Base replay draws the newest CUT rows AND every older row
+        // leg F). A Base replay draws the newest cut rows AND every older row
         // the wallet signed itself (rails-ops
         // reference/timeline-attention-budget.md, adjustment 1), and the route
         // says how many it drew from below the cut as `omitted.anchored`. On a
@@ -1134,8 +1152,8 @@ for (const f of FIXTURES) {
         } else {
           check(
             `6  ${f.id}: listed is the cut${anchoredRows > 0 ? " plus the anchored rows" : ""}, give or take a shared boundary block`,
-            counts.listed >= CUT && counts.listed < CUT + anchoredRows + 50,
-            `listed ${n(counts.listed)} (cut ${n(CUT)}, anchored ${n(anchoredRows)}, overshoot ${n(counts.listed - CUT - anchoredRows)})`,
+            counts.listed >= cut && counts.listed < cut + anchoredRows + 50,
+            `listed ${n(counts.listed)} (cut ${n(cut)}, anchored ${n(anchoredRows)}, overshoot ${n(counts.listed - cut - anchoredRows)})`,
           );
         }
       }
@@ -1190,8 +1208,8 @@ for (const f of FIXTURES) {
       // stopped running.
       if (emptyList && !f.tail && counts.total != null && said != null && !horizon) {
         check(
-          `6  ${f.id}: card count = M − ${n(CUT)}`,
-          said === counts.total - CUT,
+          `6  ${f.id}: card count = M − ${n(cut)}`,
+          said === counts.total - cut,
           `card ${n(said)}, M ${n(counts.total)}`,
         );
       }
