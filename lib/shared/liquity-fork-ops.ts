@@ -216,12 +216,18 @@ export function forkExactAmount(raw: string | null | undefined, decimals: number
  *  back to the owner when the Trove closes. Stated only where it was read:
  *  Asymmetry from an open transaction's WETH transfer to the gas pool (scrvUSD
  *  3036…5877, tx 0x02801dfe…4536), Ebisu from its Liquidation logs (every one
- *  carries a 0.0375 WETH gas compensation). Basedollar has had no liquidation and
- *  no open transaction has been read for it, so it states none. Keyed by the
- *  fork's id or display name, lower-cased with spaces removed. */
+ *  carries a 0.0375 WETH gas compensation). Basedollar reads lower — its
+ *  BorrowerOperations exposes no getter for the constant (every candidate
+ *  selector reverts), so it was read off two open transactions on Base: WETH
+ *  branch tx 0x682b096e…71fd4 (0.5 WETH collateral) and 0xdbdd9b59…98323 (6.5
+ *  WETH), and cbETH branch tx 0xee93ad95…6ba3f (0.2016 cbETH) — each wraps
+ *  exactly 0.001 more ETH than its collateral and sends that 0.001 WETH to the
+ *  same address (0x6cc943f5…258324), fixed regardless of branch or Trove size.
+ *  Keyed by the fork's id or display name, lower-cased with spaces removed. */
 const FORK_LIQUIDATION_RESERVE: Record<string, string> = {
   asymmetry: "0.0375 WETH",
   ebisu: "0.0375 WETH",
+  basedollar: "0.001 WETH",
 };
 
 export function forkLiquidationReserve(fork: string): string | undefined {
