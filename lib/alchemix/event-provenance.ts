@@ -634,7 +634,7 @@ export function redemptionNetProv(
   return {
     kind: "chain-derived",
     pclass: "state",
-    summary: `Net for this position — the ${syntheticSymbol} debt cleared, valued at 1 ${underlyingSymbol} each as the protocol counts it, less the ${mytSymbol} taken, valued at the share price read at the redemption's block`,
+    summary: `Net for this position — the ${syntheticSymbol} debt cleared, valued at 1 ${underlyingSymbol} each as the protocol counts it, less the ${mytSymbol} taken, valued at the share price read at the redemption's block. The shares taken include the line's redemption fee${n.fee ? ` (${n.fee.bps / 100}%, ${fmtUnits(n.fee.sharesRaw, 18)} ${mytSymbol})` : ""}`,
     contract: alchemistContract(coords),
     via: `getCDP(${coords.tokenId}) at blocks ${n.fromBlock} and ${n.atBlock}, and the ${mytSymbol} share price at block ${n.atBlock}`,
     formula:
@@ -665,12 +665,54 @@ export function redemptionNetProv(
   };
 }
 
+/** The line's redemption fee inside one redemption's shares taken from this
+ *  position (lib/alchemix/redemption-net). The Alchemist sends the Transmuter
+ *  shares worth the debt cleared and its fee receiver `protocolFee` bps on top,
+ *  so bps ÷ (10,000 + bps) of what a position gives up is the fee. */
+export function redemptionFeeProv(
+  n: Extract<RedemptionNet, { status: "stated" }>,
+  mytSymbol: string,
+  underlyingSymbol: string,
+  coords: AlchemixCoords,
+): Provenance {
+  const fee = n.fee!;
+  const price = fmtUnits(n.sharePriceRaw, n.underlyingDecimals, 8);
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `Redemption fee — the line's ${fee.bps / 100}% protocol fee, charged on every redemption in ${mytSymbol} on top of the shares the Transmuter gets, and paid to Alchemix's fee receiver. It is the main part of the net`,
+    contract: alchemistContract(coords),
+    via: `protocolFee() = ${fee.bps} bps · getCDP(${coords.tokenId}) at blocks ${n.fromBlock} and ${n.atBlock} · the ${mytSymbol} share price at block ${n.atBlock}`,
+    formula:
+      `${fmtUnits(n.takenRaw, 18)} ${mytSymbol} × ${fee.bps} ÷ ${10000 + fee.bps} = ${fmtUnits(fee.sharesRaw, 18)} ${mytSymbol}` +
+      ` × ${price} = ${fmtUnits(fee.valueRaw, 18)} ${underlyingSymbol}` +
+      (n.restRaw != null
+        ? ` · the rest of the net: ${fmtUnits(n.netRaw, 18)} + ${fmtUnits(fee.valueRaw, 18)} = ${fmtUnits(n.restRaw, 18)} ${underlyingSymbol}`
+        : ""),
+    verify: {
+      kind: "recompute",
+      text: `In the redemption's transaction, the ${mytSymbol} sent to the fee receiver is ${fee.bps / 100}% of the ${mytSymbol} sent to the Transmuter`,
+    },
+    source: { block: n.atBlock },
+    inputs: coordInputs(coords, [
+      { label: "protocolFee", value: String(fee.bps), kind: "chain", note: "basis points, read from the Alchemist" },
+      {
+        label: "collateral taken",
+        value: n.takenRaw,
+        kind: "chain",
+        note: `getCDP collateral at ${n.fromBlock} − at ${n.atBlock}, in ${mytSymbol} shares`,
+      },
+    ]),
+  };
+}
+
 /** The position's redemptions' nets summed. */
 export function redemptionNetTotalProv(
   netRaw: string,
   counted: number,
   underlyingSymbol: string,
   coords: AlchemixCoords,
+  fee: { bps: number; valueRaw: string } | null = null,
 ): Provenance {
   return {
     kind: "chain-derived",
@@ -678,7 +720,7 @@ export function redemptionNetTotalProv(
     summary: `Net for this position across its redemptions, in ${underlyingSymbol} — the sum of each redemption's net`,
     contract: alchemistContract(coords),
     via: `getCDP(${coords.tokenId}) either side of each redemption, and the share price at each redemption's block`,
-    formula: `Σ (debt cleared × 1 − shares taken × share price) over ${counted} redemption${counted === 1 ? "" : "s"} = ${fmtUnits(netRaw, 18)} ${underlyingSymbol}`,
+    formula: `Σ (debt cleared × 1 − shares taken × share price) over ${counted} redemption${counted === 1 ? "" : "s"} = ${fmtUnits(netRaw, 18)} ${underlyingSymbol}${fee ? `, of which the ${fee.bps / 100}% redemption fee is −${fmtUnits(fee.valueRaw, 18)} ${underlyingSymbol}` : ""}`,
     verify: { kind: "rollup", text: "It rolls up the redemptions on the timeline, each with its own receipt" },
     inputs: coordInputs(coords, [{ label: "redemptions summed", value: String(counted), kind: "chain" }]),
   };

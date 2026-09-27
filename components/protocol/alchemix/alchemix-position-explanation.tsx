@@ -19,6 +19,7 @@ import type { AlchemixLiveState } from "@/types/api/alchemix";
 
 const compact = (n: number) => formatCompact(n).display;
 const two = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signedTwo = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${two(Math.abs(n))}`;
 
 /** What the timeline's redemptions did to this position, summed over the
  *  ones with stated figures. */
@@ -132,8 +133,8 @@ export function AlchemixPositionExplanation({
           {compact(live.earmarked.formatted)} {sym}
         </H>{" "}
         of that debt is set aside for repayment: the line&rsquo;s Transmuter has claimed it as its stakers&rsquo;
-        deposits matured, and the next redemption on the line clears it and takes a matching amount of {mytSymbol} from
-        the collateral.
+        deposits matured, and the next redemption on the line clears it and takes {mytSymbol} worth it from the
+        collateral, plus the line&rsquo;s redemption fee.
       </>
     ) : null,
     live.earmarked ? (
@@ -142,7 +143,7 @@ export function AlchemixPositionExplanation({
     // Where they cleared nothing, the timeline says so in their place.
     redemptions.stated > 0 && redemptions.cleared > 0 ? (
       <>
-        Across the {redemptions.count} line redemptions on the timeline below, the Transmuter cleared{" "}
+        Across the {redemptions.count} line redemptions on the timeline below, the line cleared{" "}
         {two(redemptions.cleared)} {sym} of this position&rsquo;s debt
         {redemptions.taken != null ? (
           <>
@@ -165,8 +166,25 @@ export function AlchemixPositionExplanation({
               {two(Math.abs(netN))} {net.underlyingSymbol}
             </H>
           </Prov>{" "}
-          for the holder: the debt cleared less the value of the collateral taken. Each redemption&rsquo;s own net is in
-          its card&rsquo;s detail.
+          for the holder: the debt cleared less the value of the collateral taken.
+          {net.total.fee && net.total.restRaw != null ? (
+            <>
+              {" "}
+              The line&rsquo;s {(net.total.fee.bps / 100).toLocaleString("en-US")}% redemption fee, charged on every
+              redemption and paid to Alchemix&rsquo;s fee receiver, is{" "}
+              {signedTwo(-Number(net.total.fee.valueRaw) / 1e18)} {net.underlyingSymbol} of it (
+              {two(Number(net.total.fee.sharesRaw) / 1e18)} {mytSymbol}).
+              {Math.abs(Number(net.total.restRaw) / 1e18) >= 0.005 ? (
+                <>
+                  {" "}
+                  The other {signedTwo(Number(net.total.restRaw) / 1e18)} {net.underlyingSymbol} is how the Alchemist
+                  charges a position: at the line&rsquo;s average shares per unit of debt across every redemption since
+                  the position&rsquo;s own last event, while the share price moved between them.
+                </>
+              ) : null}
+            </>
+          ) : null}{" "}
+          Each redemption&rsquo;s own net is in its card&rsquo;s detail.
         </>
       ) : net.total.missingPrice > 0 ? (
         <>

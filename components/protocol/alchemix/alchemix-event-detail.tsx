@@ -38,10 +38,12 @@ import {
   type AlchemixUnderlyingUnit,
 } from "@/lib/alchemix/readings-before";
 import { redemptionNet } from "@/lib/alchemix/redemption-net";
+import { lineProtocolFeeBps } from "@/lib/alchemix/lines";
 import {
   collateralTakenFromReadingsProv,
   debtClearedFromReadingsProv,
   emittedAmountProv,
+  redemptionFeeProv,
   redemptionNetProv,
   redemptionNetUnavailableProv,
   redemptionNetUsdProv,
@@ -133,7 +135,17 @@ function legStats(
     case "liquidated":
       stat("Vault shares taken", "amount", mytSymbol);
       stat("Liquidator fee, in shares", "fee_in_yield", mytSymbol);
-      stat("Liquidator fee, in the asset underneath", "fee_in_underlying", mytSymbol);
+      // Paid from the line's fee vault in the asset underneath, at its own
+      // decimals; with no unit in hand it is not scaled at a guessed power.
+      if (unit && raw.fee_in_underlying != null && /^\d+$/.test(raw.fee_in_underlying)) {
+        const v = Number(raw.fee_in_underlying) / 10 ** unit.decimals;
+        stats.push({
+          label: "Liquidator fee from the fee vault",
+          value: formatExact(v),
+          symbol: unit.symbol,
+          prov: emittedAmountProv("fee_in_underlying", unit.symbol, raw.fee_in_underlying, coords, unit.decimals),
+        });
+      }
       break;
     case "repayment_fee":
       stat("Fee in shares", "fee_in_yield", mytSymbol);
@@ -176,7 +188,7 @@ function legStats(
         }
         // The net for the holder, in the underlying: Liquity's redemption
         // P/L, over the same two readings (lib/alchemix/redemption-net).
-        const net = redemptionNet(leg, before, unit?.decimals ?? null);
+        const net = redemptionNet(leg, before, unit?.decimals ?? null, lineProtocolFeeBps(ctx.chainId, ctx.lineKey));
         if (net?.status === "stated" && unit) {
           const n = Number(net.netRaw) / WAD;
           const sign = n > 0 ? "+" : n < 0 ? "−" : "";
@@ -206,6 +218,16 @@ function legStats(
                 unit.usd.priceSource,
                 unit.usd.pricedAt,
               ),
+            });
+          }
+          // The line's redemption fee, inside the shares taken: the main part
+          // of the net (lib/alchemix/redemption-net).
+          if (net.fee) {
+            stats.push({
+              label: `${(net.fee.bps / 100).toLocaleString("en-US")}% redemption fee`,
+              value: formatExact(scaled(net.fee.sharesRaw) ?? 0),
+              symbol: mytSymbol,
+              prov: redemptionFeeProv(net, mytSymbol, unit.symbol, coords),
             });
           }
         } else if (net?.status === "no-share-price") {

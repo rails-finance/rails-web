@@ -138,12 +138,13 @@ export function AlchemixEventCard({
   const before = useReadingBefore(lead.context.data.stateAtBlockFromReading?.blockNumber);
   const unit = useAlchemixUnderlying();
   const isRedemption = lead.context.data.eventType === "redemption";
+  const feeBps = lineProtocolFeeBps(lead.context.data.chainId, lead.context.data.lineKey);
   const prose: AlchemixCardProse = {
     underlyingDecimals,
     mytSymbol,
-    protocolFeeBps: lineProtocolFeeBps(lead.context.data.chainId, lead.context.data.lineKey),
+    protocolFeeBps: feeBps,
     collateralTakenRaw: isRedemption ? collateralTakenRaw(lead, before) : null,
-    redemptionNet: isRedemption ? redemptionNet(lead, before, unit?.decimals ?? null) : null,
+    redemptionNet: isRedemption ? redemptionNet(lead, before, unit?.decimals ?? null, feeBps) : null,
     underlyingSymbol: unit?.symbol ?? null,
   };
 

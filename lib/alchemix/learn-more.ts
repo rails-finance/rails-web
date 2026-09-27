@@ -147,7 +147,7 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
   steps: [
     "Someone holding alUSD deposits it in the line's Transmuter, where it matures over a period measured in blocks.",
     "As those deposits mature, the Alchemist sets aside a matching amount of debt across every open position on the line, in proportion to what each position owes. That is each position's Set aside for repayment figure, and it grows block by block.",
-    "When a staker claims, the Transmuter redeems: every open position's set-aside debt is cleared by the same ratio, and a matching slice of its collateral moves to the Transmuter: vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared.",
+    "When a staker claims, the Transmuter redeems: every open position's set-aside debt is cleared by the same ratio, and the Alchemist takes collateral for it. Vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared go to the Transmuter, and the line's redemption fee, 0.25% on top of those shares on Ethereum and 0.1% on Base, goes to Alchemix's fee receiver.",
     "The Transmuter pays the staker in those vault shares (mixUSDC on the alUSD line) for the part of the deposit that has matured, and hands back the rest as alUSD.",
   ],
   // The staker's side, which a borrower reading a redemption also needs: a
@@ -159,7 +159,7 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
   details: [
     {
       bold: "The loan is repaid over time without the holder acting.",
-      text: "Each redemption lowers the debt and the collateral by matching values, so the position's collateral less its debt stays about where it was. Each redemption card states the difference for that position as its net.",
+      text: "Each redemption lowers the debt by what it clears and the collateral by that much plus the redemption fee, so the position's collateral less its debt falls by about the fee each time. Each redemption card states the difference for that position as its net and the fee inside it.",
     },
     {
       bold: "The vault's share price decides what is left over.",
@@ -175,7 +175,7 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
     },
     {
       bold: "A position that falls too low can be liquidated by anyone.",
-      text: "Its collateralisation is the collateral in the asset underneath divided by the debt, with one synthetic counted as one unit of that asset. Minting more or withdrawing must leave it above the line's minimum. If a falling share price takes it to the line's liquidation line or below, anyone can liquidate the position: the Alchemist uses its collateral to repay debt until the ratio is back above the minimum, and pays the liquidator a fee from it. The position card states both lines, read from the Alchemist, and how many liquidations the line has had.",
+      text: "Its collateralisation is the collateral in the asset underneath divided by the debt, with one synthetic counted as one unit of that asset. Minting more or withdrawing must leave it above the line's minimum. If a falling share price takes it to the line's liquidation line or below, anyone can liquidate the position: the Alchemist uses its collateral to repay debt until the ratio is back above the minimum, and pays the liquidator 1.5% of the collateral above the debt, in shares from the position. Where the collateral no longer covers the debt, or the whole line is below its global minimum, the entire debt is cleared from the collateral and the liquidator's fee, 1.5% of the debt, comes from the line's fee vault in the asset underneath. The position card states both lines, read from the Alchemist, and how many liquidations the line has had.",
     },
   ],
   links: [
@@ -183,6 +183,7 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
     ALCHEMIX_DOCS.transmuter,
     ALCHEMIX_DOCS.redemptionRate,
     ALCHEMIX_DOCS.earmarking,
+    ALCHEMIX_DOCS.borrowerFee,
     ALCHEMIX_DOCS.liquidations,
   ],
 };
@@ -195,7 +196,10 @@ export const ALCHEMIX_LIQUIDATION: LearnMoreContent = {
   details: [
     { bold: "Shares taken", text: "are in the log, so they are shown." },
     { bold: "Debt cleared", text: "shows in the card's before and after figures." },
-    { bold: "The fee", text: "is paid to whoever did it, in shares and in the asset underneath." },
+    {
+      bold: "The fee",
+      text: "is 1.5% of the collateral above the debt, paid to the liquidator in shares from the position. Where the collateral no longer covers the debt, or the whole line is below its global minimum, the entire debt is cleared and the fee, 1.5% of the debt, is paid in the asset underneath from the line's fee vault. If the vault holds less, a fee shortfall event records what was owed and what was paid.",
+    },
   ],
   links: [ALCHEMIX_DOCS.liquidations, ALCHEMIX_DOCS.liquidatorFee],
 };
@@ -208,7 +212,7 @@ export const ALCHEMIX_LINE_WIDE: LearnMoreContent = {
   details: [
     {
       bold: "Redemption",
-      text: "clears every open position's set-aside debt on the line at once, by one ratio, and takes a matching slice of each one's collateral for the Transmuter.",
+      text: "clears every open position's set-aside debt on the line at once, by one ratio, and takes shares from each one's collateral: shares worth the debt cleared for the Transmuter, and the line's redemption fee on top for Alchemix's fee receiver.",
     },
     {
       bold: "Batch liquidation",
