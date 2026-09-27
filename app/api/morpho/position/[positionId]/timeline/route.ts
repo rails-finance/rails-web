@@ -9,8 +9,8 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { timelineCacheHeaders } from "@/lib/shared/decimals-unread";
 
 // Proxies a single Morpho position's timeline from the live rails-server index.
-// rails returns the raw per-event signed deltas + the market params; we replay
-// the running balances and shape the BaseActivityEvent[] (buildMorphoTimeline).
+// rails returns the per-event signed deltas with each row's running balances,
+// plus the market params; buildMorphoTimeline shapes the BaseActivityEvent[].
 // `positionId` = `${marketIdHex}-${owner}`.
 
 export const runtime = "nodejs";

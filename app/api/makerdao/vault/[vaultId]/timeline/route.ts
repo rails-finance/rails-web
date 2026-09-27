@@ -7,8 +7,8 @@ import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 // Proxies a single MakerDAO vault's timeline from the live rails-server index.
-// rails returns the raw frob/grab deltas + vault meta; we replay the running
-// ink/art and shape the BaseActivityEvent[] (buildMakerTimeline). `vaultId` is
+// rails returns the frob/grab deltas with each row's running ink/art, plus the
+// vault meta; buildMakerTimeline shapes the BaseActivityEvent[]. `vaultId` is
 // the CdpManager id (a urn address also resolves).
 
 export const runtime = "nodejs";
