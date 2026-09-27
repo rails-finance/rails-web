@@ -46,6 +46,7 @@ import {
   type YearnVaultCoords,
 } from "@/lib/yearn/vault-provenance";
 import type { YearnVaultResponse } from "@/lib/sources/chain/yearn-ethereum-vault";
+import { NotLoaded } from "@/components/shared/not-loaded";
 
 const CHAIN_ID = 1;
 const n = (v: number) => v.toLocaleString("en-US");
@@ -95,7 +96,7 @@ export function YearnVaultView({ data }: { data: YearnVaultResponse }) {
                 <span className={assetClass}>{v.asset.symbol}</span>
               </>
             ) : (
-              <span className="text-rb-500">not read</span>
+              <NotLoaded />
             )}
           </Figure>
           <Figure label="Idle" cell="total-idle" raw={v.totalIdle?.raw}>
@@ -105,7 +106,7 @@ export function YearnVaultView({ data }: { data: YearnVaultResponse }) {
                 <span className={assetClass}>{v.asset.symbol}</span>
               </>
             ) : (
-              <span className="text-rb-500">not read</span>
+              <NotLoaded />
             )}
           </Figure>
           <Figure label="Deployed" cell="total-debt" raw={v.totalDebt?.raw}>
@@ -115,7 +116,7 @@ export function YearnVaultView({ data }: { data: YearnVaultResponse }) {
                 <span className={assetClass}>{v.asset.symbol}</span>
               </>
             ) : (
-              <span className="text-rb-500">not read</span>
+              <NotLoaded />
             )}
           </Figure>
           <Figure label="Share price" cell="share-price" raw={v.sharePrice?.raw}>
@@ -125,7 +126,7 @@ export function YearnVaultView({ data }: { data: YearnVaultResponse }) {
                 <span className={assetClass}>{v.asset.symbol}</span>
               </>
             ) : (
-              <span className="text-rb-500">not read</span>
+              <NotLoaded />
             )}
           </Figure>
         </dl>
@@ -202,7 +203,7 @@ export function YearnVaultView({ data }: { data: YearnVaultResponse }) {
                             <span className={assetClass}>{v.asset.symbol}</span>
                           </>
                         ) : (
-                          <span className="text-rb-500">not read</span>
+                          <NotLoaded />
                         )}
                       </td>
                       <td className="py-2 text-right tabular-nums text-rb-500 whitespace-nowrap">
@@ -211,7 +212,7 @@ export function YearnVaultView({ data }: { data: YearnVaultResponse }) {
                             {assetText(s.maxDebt, decimals)}
                           </Prov>
                         ) : (
-                          "not read"
+                          <NotLoaded />
                         )}
                       </td>
                     </tr>
@@ -245,7 +246,7 @@ export function YearnVaultView({ data }: { data: YearnVaultResponse }) {
                 <Prov info={yearnVaultRoleProv(coords, "role manager")}>{shortAddress(v.roleManager)}</Prov>
               </a>
             ) : (
-              <span className="text-rb-500">not read</span>
+              <NotLoaded />
             )}
           </Figure>
           <Figure label="Accountant" cell="accountant">
@@ -266,7 +267,7 @@ export function YearnVaultView({ data }: { data: YearnVaultResponse }) {
             {v.profitMaxUnlockTime != null ? (
               <Prov info={yearnVaultUnlockProv(coords, v.profitMaxUnlockTime)}>{spanWords(v.profitMaxUnlockTime)}</Prov>
             ) : (
-              <span className="text-rb-500">not read</span>
+              <NotLoaded />
             )}
           </Figure>
         </dl>

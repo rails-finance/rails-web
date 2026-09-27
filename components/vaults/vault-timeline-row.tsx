@@ -55,6 +55,7 @@ import { StatCard, assetText, shareText, shortAddress } from "@/components/proto
 import { sharePriceText } from "@/components/vaults/aave-vault-format";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { KIND_LABEL, type VaultHolderEvent, type VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
+import { NotLoaded } from "@/components/shared/not-loaded";
 
 /** A raw integer and the number a formatter wants, from one string. Scaled here
  *  at the render edge and nowhere earlier — the row data is wei-exact. */
@@ -293,7 +294,7 @@ function RowDetail({
           {event.sharePriceAtBlock ? (
             <Prov info={prov.sharePrice(coords, sd)}>{sharePriceText(rawAmount(event.sharePriceAtBlock, ad), ad)}</Prov>
           ) : (
-            <span className="text-base font-normal text-rb-500">not read</span>
+            <NotLoaded className="text-base font-normal text-rb-500" />
           )}
         </StatCard>
         <StatCard

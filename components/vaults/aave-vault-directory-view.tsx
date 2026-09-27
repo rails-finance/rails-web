@@ -91,6 +91,7 @@ import type {
   AaveEthereumVaultRow,
 } from "@/lib/sources/chain/aave-ethereum-vault-directory";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
+import { NotLoaded } from "@/components/shared/not-loaded";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const ZERO = BigInt(0);
@@ -506,7 +507,7 @@ function VaultRow({
             <span className={r.asset.named ? "text-rb-500" : "font-mono text-rb-500"}>{r.asset.symbol}</span>
           </>
         ) : (
-          <span className="text-rb-500">not read</span>
+          <NotLoaded />
         )}
       </td>
       <td className="py-2 pr-3 text-right tabular-nums text-foreground whitespace-nowrap" data-cell="total-supply">
@@ -515,7 +516,7 @@ function VaultRow({
             {shareText(r.totalSupply, r.shareDecimals)}
           </Prov>
         ) : (
-          <span className="text-rb-500">not read</span>
+          <NotLoaded />
         )}
       </td>
       <td className="py-2 pr-3 text-right tabular-nums text-foreground whitespace-nowrap" data-cell="share-price">
@@ -527,7 +528,7 @@ function VaultRow({
             <span className={r.asset.named ? "text-rb-500" : "font-mono text-rb-500"}>{r.asset.symbol}</span>
           </>
         ) : (
-          <span className="text-rb-500">not read</span>
+          <NotLoaded />
         )}
       </td>
       <td className="py-2 text-rb-500" data-cell={withMechanic ? "mechanic" : "family"}>
@@ -554,7 +555,7 @@ function MechanicCell({ row: r, coords }: { row: AaveEthereumVaultRow; coords: A
         <span className="text-rb-500">{r.asset.symbol}</span>
       </span>
     ) : (
-      <span>not read</span>
+      <NotLoaded inline className="" />
     );
   }
   if (r.family === "stata") {
@@ -568,7 +569,7 @@ function MechanicCell({ row: r, coords }: { row: AaveEthereumVaultRow; coords: A
         <Prov info={aaveVaultATokenProv(coords)}>{shortAddress(r.aToken)}</Prov>
       </Link>
     ) : (
-      <span>not read</span>
+      <NotLoaded inline className="" />
     );
   }
   return (
@@ -580,7 +581,9 @@ function MechanicCell({ row: r, coords }: { row: AaveEthereumVaultRow; coords: A
           </span>
         </Prov>
       ) : (
-        <span>cooldown not read</span>
+        <span title="The chain didn't answer for this vault's cooldown. It shows once it does.">
+          cooldown not loaded
+        </span>
       )}
       {r.reserve && (
         <span className="whitespace-nowrap">

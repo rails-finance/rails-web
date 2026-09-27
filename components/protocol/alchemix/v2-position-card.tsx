@@ -23,6 +23,7 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 import { formatHeadlineAmount, formatUnitsExact } from "@/lib/utils/format";
 import { alchemixPositionName, alchemixV2PositionName } from "@/lib/alchemix/naming";
 import type { AlchemixV2PositionSummary } from "@/types/api/alchemix";
+import { NotLoaded } from "@/components/shared/not-loaded";
 
 /** alUSD and alETH are 18 decimals each, read from the tokens. */
 const SYNTHETIC_DECIMALS = 18;
@@ -44,7 +45,17 @@ export function V2ClosedPill() {
 export function v2DebtColumn(p: AlchemixV2PositionSummary, prov?: Provenance): OpenPositionStatsColumn {
   const d = p.frozenDebt;
   if (!d) {
-    return { label: "Debt at close", value: <StatValue color="text-rb-500">Not read</StatValue> };
+    return {
+      label: "Debt at close",
+      value: (
+        <StatValue color="text-rb-500">
+          <NotLoaded
+            className=""
+            title="The chain didn't answer for this position's debt at close. It shows once it does."
+          />
+        </StatValue>
+      ),
+    };
   }
   const magnitude = d.raw.replace(/^-/, "");
   const figure = (

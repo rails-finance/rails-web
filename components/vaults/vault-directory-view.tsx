@@ -71,6 +71,7 @@ import type {
 } from "@/lib/sources/chain/morpho-base-vault-directory";
 import { baseVaultsListingHref } from "@/lib/vaults/routes";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
+import { NotLoaded } from "@/components/shared/not-loaded";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const ZERO = BigInt(0);
@@ -453,7 +454,7 @@ function DirectoryTable({
                     {r.name != null ? (
                       <Prov info={vaultDirectoryNameProv(rowCoords)}>{r.name}</Prov>
                     ) : (
-                      <span title="name not read at this block; the census snapshot is shown">{r.censusName}</span>
+                      <span title="name not loaded at this block; the census snapshot is shown">{r.censusName}</span>
                     )}
                   </Link>{" "}
                   <span className="font-mono text-[11px] text-rb-500">{shortAddress(r.address)}</span>
@@ -478,7 +479,7 @@ function DirectoryTable({
                       <span className={r.asset.named ? "text-rb-500" : "font-mono text-rb-500"}>{r.asset.symbol}</span>
                     </>
                   ) : (
-                    <span className="text-rb-500">not read</span>
+                    <NotLoaded />
                   )}
                 </td>
                 <td
@@ -493,7 +494,7 @@ function DirectoryTable({
                       <span className={r.asset.named ? "text-rb-500" : "font-mono text-rb-500"}>{r.asset.symbol}</span>
                     </>
                   ) : (
-                    <span className="text-rb-500">not read</span>
+                    <NotLoaded />
                   )}
                 </td>
                 {withCensus && (
@@ -545,7 +546,7 @@ function DirectoryTable({
                       {stewardRole === "owner" && <span className="ml-1.5 text-[11px] text-rb-500">owner</span>}
                     </>
                   ) : (
-                    <span className="text-rb-500">not read</span>
+                    <NotLoaded />
                   )}
                 </td>
               </tr>

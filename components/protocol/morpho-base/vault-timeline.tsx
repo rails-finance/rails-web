@@ -97,6 +97,7 @@ import {
   type VaultNote,
   type VaultTimelineCoords,
 } from "@/lib/shared/vault-holder-timeline";
+import { NotLoaded } from "@/components/shared/not-loaded";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -475,7 +476,7 @@ function ShareOfVaultCard({
           {pctText(Number(balance) / Number(BigInt(supply)))}
         </Prov>
       ) : (
-        <span className="text-base font-normal text-rb-500">not read</span>
+        <NotLoaded className="text-base font-normal text-rb-500" />
       )}
     </StatCard>
   );

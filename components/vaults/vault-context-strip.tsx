@@ -25,13 +25,14 @@
 // same reason: a check that reads "what is redeemable" off either chain reads
 // the name the page's own loader answers under.
 //
-// AN UNREAD CALL IS SAID IN WORDS. `{ unread: true }` prints "not read" —
+// AN UNREAD CALL IS SAID IN WORDS. `{ unread: true }` prints "Not loaded" —
 // never a dash, never a zero. A zero that WAS read is a reading and prints as
 // one, which on a stake token outside its window is the whole point.
 
 import { Fragment } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
+import { NotLoaded } from "@/components/shared/not-loaded";
 
 /** The redeemable reading, or the statement that it was not read. `figure` is
  *  the `data-figure` name the cluster wears, and it names the CALL: Ethereum's
@@ -56,7 +57,7 @@ export function VaultContextStrip({ redeemable, exit, cooldown }: VaultContextSt
       <RiskFigure label="Redeemable now">
         <span data-figure={redeemable.figure}>
           {"unread" in redeemable ? (
-            <span>not read</span>
+            <NotLoaded inline className="" />
           ) : (
             <RiskStrong>
               <Prov info={redeemable.prov}>{redeemable.text}</Prov>

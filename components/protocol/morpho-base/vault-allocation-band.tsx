@@ -59,6 +59,7 @@ import type {
   VaultHolderEvent,
   VaultTimelineCoords,
 } from "@/lib/shared/vault-holder-timeline";
+import { NotLoaded } from "@/components/shared/not-loaded";
 
 const ZERO = BigInt(0);
 const n = (v: number) => v.toLocaleString("en-US");
@@ -77,7 +78,7 @@ const metaExtra = (event: VaultHolderEvent): MetaMorphoEventExtra | null =>
  *  is the vault's idle market, and its own short id beside either. Never a
  *  curator's or a brand's name — a market is a collateral and a hash. */
 export const legLabel = (leg: VaultAllocationLeg): string =>
-  leg.isIdle ? "Idle market" : (leg.collateralSymbol ?? (leg.marketId ? shortId(leg.marketId) : "Unread market"));
+  leg.isIdle ? "Idle market" : (leg.collateralSymbol ?? (leg.marketId ? shortId(leg.marketId) : "Market not loaded"));
 
 const legTitle = (leg: VaultAllocationLeg, assetSymbol: string, assetDecimals: number, share: number): string =>
   `${legLabel(leg)} ${leg.marketId ? shortId(leg.marketId) : ""} · ${assetText(
@@ -181,7 +182,7 @@ export function VaultAllocationBand({ event, coords, assetSymbol, first }: Vault
     wrap: (bar: ReactNode) => (
       <Prov
         info={morphoVaultAllocationLegProv(coords, leg, operands)}
-        value={`${leg.attributed ?? "unread"}`}
+        value={`${leg.attributed ?? "not loaded"}`}
         symbol={assetSymbol}
         className="block h-full"
       >
@@ -352,6 +353,11 @@ export function VaultAllocationDetail({ event, earlier, coords, assetSymbol }: V
                   <td className="py-1.5 pr-3">
                     <span
                       className={leg.collateralNamed || leg.isIdle ? "text-foreground" : "font-mono text-foreground"}
+                      title={
+                        leg.isIdle || leg.collateralSymbol || leg.marketId
+                          ? undefined
+                          : "The chain didn't answer for this market at this block. It shows once it does."
+                      }
                     >
                       {legLabel(leg)}
                     </span>
@@ -361,7 +367,7 @@ export function VaultAllocationDetail({ event, earlier, coords, assetSymbol }: V
                   </td>
                   <td className="py-1.5 pr-3 text-right tabular-nums text-rb-500" data-cell="leg-supplied">
                     {leg.vaultSupplied == null ? (
-                      <span className="text-rb-500">not read</span>
+                      <NotLoaded />
                     ) : (
                       <Prov info={morphoVaultAllocationSuppliedProv(coords, leg)}>
                         {assetText(raw(leg.vaultSupplied), ad)}
@@ -370,7 +376,7 @@ export function VaultAllocationDetail({ event, earlier, coords, assetSymbol }: V
                   </td>
                   <td className="py-1.5 pr-3 text-right tabular-nums text-foreground" data-cell="leg-attributed">
                     {leg.attributed == null ? (
-                      <span className="text-rb-500">not read</span>
+                      <NotLoaded />
                     ) : (
                       <Prov info={morphoVaultAllocationLegProv(coords, leg, operands)}>
                         {assetText(raw(leg.attributed), ad)}
@@ -379,7 +385,7 @@ export function VaultAllocationDetail({ event, earlier, coords, assetSymbol }: V
                   </td>
                   <td className="py-1.5 text-right tabular-nums text-rb-500" data-cell="leg-share">
                     {attributed == null ? (
-                      "not read"
+                      <NotLoaded />
                     ) : f == null ? (
                       "none"
                     ) : (

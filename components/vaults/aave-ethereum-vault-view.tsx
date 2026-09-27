@@ -107,11 +107,12 @@ import {
   type AaveVaultCoords,
 } from "@/lib/aave-vaults/vault-provenance";
 import type { AaveEthereumVaultResponse } from "@/lib/sources/chain/aave-ethereum-vault";
+import { NotLoaded } from "@/components/shared/not-loaded";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const ZERO = BigInt(0);
 const AAVE_V3_MARKET_HREF = "/ethereum/aave-v3/market";
-const UNREAD = <span className="text-base font-normal text-rb-500">not read</span>;
+const UNREAD = <NotLoaded className="text-base font-normal text-rb-500" />;
 
 /** THE MARKET VIEW — /ethereum/aave/vaults/<vault>. What the vault is, what it
  *  holds, and the two ways on from it: one address's own position (the form,
@@ -433,7 +434,7 @@ function SghoSection({ data, coords }: { data: AaveEthereumVaultResponse; coords
             <Prov info={aaveSghoYieldIndexProv(coords)}>{s.yieldIndex}</Prov>
           </span>
         ) : (
-          <span>not read</span>
+          <NotLoaded inline className="" />
         )}{" "}
         and the rate per second{" "}
         {s.ratePerSecond ? (
@@ -441,7 +442,7 @@ function SghoSection({ data, coords }: { data: AaveEthereumVaultResponse; coords
             <Prov info={aaveSghoRatePerSecondProv(coords)}>{s.ratePerSecond}</Prov>
           </span>
         ) : (
-          <span>not read</span>
+          <NotLoaded inline className="" />
         )}
         .
       </p>
@@ -505,9 +506,9 @@ function StataSection({ data, coords }: { data: AaveEthereumVaultResponse; coord
             <Prov info={aaveStataLiquidityIndexProv(coords, s.pool)}>{s.liquidityIndex}</Prov>
           </span>
         ) : (
-          <span>not read</span>
+          <NotLoaded inline className="" />
         )}{" "}
-        — a RAY. The Pool is {s.pool ? addressLink(s.pool) : <span>not read</span>}.{" "}
+        — a RAY. The Pool is {s.pool ? addressLink(s.pool) : <NotLoaded inline className="" />}.{" "}
         {linkAgrees === true && (
           <span data-stata-link-agrees="true">
             That Pool answers the same aToken for this reserve as the wrapper does — read from both ends.
@@ -651,7 +652,7 @@ function UmbrellaSection({ data, coords }: { data: AaveEthereumVaultResponse; co
               coords={coords}
               what="This vault's asset"
             />
-            &rarr; {reserve ? reserve.symbol : "not read"}, via{" "}
+            &rarr; {reserve ? reserve.symbol : <NotLoaded inline className="" />}, via{" "}
             {u.wrapper.aToken && (
               <>
                 {addressLink(u.wrapper.aToken)} at index{" "}
@@ -661,7 +662,7 @@ function UmbrellaSection({ data, coords }: { data: AaveEthereumVaultResponse; co
                       {u.wrapper.liquidityIndex}
                     </Prov>
                   ) : (
-                    "not read"
+                    <NotLoaded />
                   )}
                 </span>
                 .
@@ -788,7 +789,7 @@ function HolderSection({
                   </Prov>
                 </span>
               ) : (
-                <span>not read</span>
+                <NotLoaded inline className="" />
               )}{" "}
               {reserve?.symbol ?? ""} — a conversion at this block, not a redemption.
             </p>

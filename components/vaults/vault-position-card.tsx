@@ -117,6 +117,7 @@ import {
   aaveVaultValueUsdProv,
   type AaveVaultCoords,
 } from "@/lib/aave-vaults/vault-provenance";
+import { NotLoaded } from "@/components/shared/not-loaded";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -292,7 +293,7 @@ export function VaultPositionCard({
         </StatValue>
       ) : (
         <StatValue>
-          <Unread what="not read" />
+          <NotLoaded className="text-base font-normal text-rb-500" />
         </StatValue>
       ),
     footnote: <div className="text-xs mt-0.5 text-rb-500">the vault&rsquo;s own convertToAssets()</div>,
@@ -307,7 +308,7 @@ export function VaultPositionCard({
         ) : fraction != null ? (
           <Prov info={aaveVaultHolderFractionProv(coords)}>{pctText(fraction)}</Prov>
         ) : (
-          <Unread what="not read" />
+          <NotLoaded className="text-base font-normal text-rb-500" />
         )}
       </StatValue>
     ),

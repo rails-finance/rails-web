@@ -23,7 +23,7 @@ const STATUS_WORD: Record<MoonwellPositionSummary["status"], string> = {
   closed: "Closed",
   liquidated: "Liquidated",
   // No state recorded for the account yet (0018); never read as closed.
-  unread: "Unread",
+  unread: "Not loaded",
 };
 
 /** The figure a supply line asserts: the current value (interest included)

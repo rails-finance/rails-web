@@ -150,7 +150,7 @@
 // branch is written and untested rather than wrong. It cannot be forced without
 // breaking the lane on purpose, and a check that manufactured its own subject
 // would be checking itself. 11b guards the other half and is NOT vacuous: it
-// asserts a leg that read ZERO prints a zero rather than "not read", so the two
+// asserts a leg that read ZERO prints a zero rather than "Not loaded", so the two
 // words can never become one.
 
 import { createPublicClient, http, parseAbi, parseAbiItem, toEventSelector } from "viem";
@@ -1148,18 +1148,18 @@ for (const f of SAMPLE) {
       `${withUnread.length} unread legs; ${partial.length} partial statements, ${unreadBands.length} unread-band statements`,
     );
   }
-  // A zero that IS read must never print as "not read": the two must not be
+  // A zero that IS read must never print as "Not loaded": the two must not be
   // one word, or the check above would be worthless.
   const zeroAsUnread = [];
   for (const f of SAMPLE) {
     const p = PAGE.get(f.label);
     for (const panel of p.panels ?? [])
       for (const leg of panel.legs)
-        if (/not read/i.test(leg.supplied) && /not read/i.test(leg.attributed))
+        if (/not loaded/i.test(leg.supplied) && /not loaded/i.test(leg.attributed))
           zeroAsUnread.push(`${f.label} ${short(leg.id)}`);
   }
   check(
-    "11b a leg that read ZERO prints a zero and not 'not read' — the two are different facts and the page keeps them apart",
+    "11b a leg that read ZERO prints a zero and not 'Not loaded' — the two are different facts and the page keeps them apart",
     zeroAsUnread.length === withUnread.length,
     zeroAsUnread.length ? zeroAsUnread.slice(0, 3).join(", ") : "no read leg prints as unread",
   );

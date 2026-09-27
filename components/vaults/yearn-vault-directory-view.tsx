@@ -75,6 +75,7 @@ import type {
   YearnVaultDirectoryResponse,
   YearnVaultDirectoryRow,
 } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
+import { NotLoaded } from "@/components/shared/not-loaded";
 
 const CHAIN_ID = 1;
 const n = (v: number) => v.toLocaleString("en-US");
@@ -430,7 +431,7 @@ function RosterTable({ rows, coords }: { rows: YearnVaultDirectoryRow[]; coords:
                     {r.name != null ? (
                       <Prov info={yearnVaultNameProv(rowCoords)}>{r.name}</Prov>
                     ) : (
-                      <span title="name not read at this block; the census snapshot is shown">{r.censusName}</span>
+                      <span title="name not loaded at this block; the census snapshot is shown">{r.censusName}</span>
                     )}
                   </Link>{" "}
                   <span className="font-mono text-[11px] text-rb-500">{shortAddress(r.address)}</span>
@@ -455,7 +456,7 @@ function RosterTable({ rows, coords }: { rows: YearnVaultDirectoryRow[]; coords:
                       <span className={r.asset.named ? "text-rb-500" : "font-mono text-rb-500"}>{r.asset.symbol}</span>
                     </>
                   ) : (
-                    <span className="text-rb-500">not read</span>
+                    <NotLoaded />
                   )}
                 </td>
                 <td
@@ -470,12 +471,17 @@ function RosterTable({ rows, coords }: { rows: YearnVaultDirectoryRow[]; coords:
                       <span className={r.asset.named ? "text-rb-500" : "font-mono text-rb-500"}>{r.asset.symbol}</span>
                     </>
                   ) : (
-                    <span className="text-rb-500">not read</span>
+                    <NotLoaded />
                   )}
                 </td>
                 <td className="py-2 whitespace-nowrap" data-cell="standing">
                   {r.endorsed == null ? (
-                    <span className="text-rb-500">endorsement not read</span>
+                    <span
+                      className="text-rb-500"
+                      title="The chain didn't answer for this vault's endorsement. It shows once it does."
+                    >
+                      endorsement not loaded
+                    </span>
                   ) : r.endorsed ? (
                     <span
                       className="rounded border border-rb-200 px-1.5 py-0.5 text-[11px] text-foreground dark:border-rb-500/30"

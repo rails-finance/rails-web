@@ -133,11 +133,11 @@ async function openListing(context, url) {
  *  two, one per market); the pill is the row's one all-caps status word. */
 async function readPills(page, rowSel) {
   return page.evaluate((sel) => {
-    // UNREAD is a listing row whose account has not been read from the chain
+    // NOT LOADED is a listing row whose account has not been read from the chain
     // yet — no state recorded, and never "closed" (rails-ops decision 0018).
     // It is a lifecycle word like the rest, so it is read as one; which sections
     // accept it is each section's own business.
-    const words = ["OPEN", "ZOMBIE", "CLOSED", "LIQUIDATED", "UNREAD"];
+    const words = ["OPEN", "ZOMBIE", "CLOSED", "LIQUIDATED", "NOT LOADED"];
     const rows = [...document.querySelectorAll(sel)];
     return rows.map((row) => {
       for (const el of row.querySelectorAll("span")) {
@@ -677,9 +677,9 @@ if (wants("Polaris")) {
 // narrowest separation on this roster is Compound V2's 283k open against 418k
 // all — so the slack cannot hide a broken default.
 
-const OPEN_PILLS_ROSTER = new Set(["OPEN", "UNREAD"]); // 0018: unread is an open row not yet chain-read
+const OPEN_PILLS_ROSTER = new Set(["OPEN", "NOT LOADED"]); // 0018: an open row not yet chain-read
 const ENDED_PILLS_ROSTER = new Set(["CLOSED", "LIQUIDATED"]);
-const ALL_PILLS_ROSTER = new Set(["OPEN", "UNREAD", "CLOSED", "LIQUIDATED"]);
+const ALL_PILLS_ROSTER = new Set(["OPEN", "NOT LOADED", "CLOSED", "LIQUIDATED"]);
 
 const rowsOf = (j) => j.rows ?? j.data ?? [];
 const totalOf = (j) => j.pagination?.total ?? j.total ?? null;
