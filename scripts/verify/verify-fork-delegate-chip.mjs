@@ -19,12 +19,16 @@
 // overlap between the row's children — rather than mere presence.
 //
 // Run: BASE=http://localhost:3007 node scripts/verify/verify-fork-delegate-chip.mjs
-// (RAILS_API_URL and API_BEARER_TOKEN come from .env.local, never printed.)
+// Against the deployed preview (dev.rails.finance), the bypass header rides
+// the browser context — see lib/host.mjs. RAILS_API_URL and API_BEARER_TOKEN
+// come from .env.local, never printed — that read is a direct backend call,
+// not through BASE, and carries no bypass header.
 
 import { chromium } from "playwright";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { armInspector } from "./lib/prov-inspector.mjs";
+import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 try {
@@ -32,7 +36,6 @@ try {
 } catch {
   /* the env must already carry RAILS_API_URL and API_BEARER_TOKEN */
 }
-const BASE = process.env.BASE ?? "http://localhost:3007";
 const API = process.env.RAILS_API_URL;
 const TOKEN = process.env.API_BEARER_TOKEN;
 if (!API || !TOKEN) {
@@ -190,7 +193,11 @@ for (const spec of SPECIMENS) {
   );
 
   for (const scheme of ["light", "dark"]) {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 2000 }, colorScheme: scheme });
+    const page = await browser.newPage({
+      viewport: { width: 1280, height: 2000 },
+      colorScheme: scheme,
+      extraHTTPHeaders: bypassHeaders(),
+    });
     try {
       if (!(await load(page, spec.path))) {
         assert(false, `[${scheme}] page rendered cards`);
@@ -391,7 +398,11 @@ for (const spec of NARROW_SPECIMENS) {
   const seen = {};
   for (const { w, label } of NARROW) {
     for (const scheme of ["light", "dark"]) {
-      const page = await browser.newPage({ viewport: { width: w, height: 1600 }, colorScheme: scheme });
+      const page = await browser.newPage({
+        viewport: { width: w, height: 1600 },
+        colorScheme: scheme,
+        extraHTTPHeaders: bypassHeaders(),
+      });
       try {
         if (!(await load(page, spec.path))) {
           assert(false, `[${label} ${scheme}] page rendered`);
@@ -437,7 +448,11 @@ for (const spec of NARROW_SPECIMENS) {
 
   // Prove the two sides of the sm breakpoint are genuinely different layouts —
   // otherwise a green 600px result might just be the lighter ≥sm layout again.
-  if (seen[600] && seen[640]) {
+  // Only where the header carries a delta at all: setInterestBatchManager
+  // moves no token, so its header never has one to hand off, and asserting a
+  // hand-off against a specimen that structurally cannot show one is not this
+  // check's premise — it belongs to the delta-bearing specimen instead.
+  if (seen[600] && seen[640] && (seen[600].deltasInline || seen[640].deltasInline)) {
     assert(
       seen[600].deltasInline && !seen[640].deltasInline,
       `the sm hand-off is real: deltas inline at 600px, handed to the spine at 640px (so 600px IS the crowded case)`,

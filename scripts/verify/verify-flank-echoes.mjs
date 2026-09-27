@@ -36,11 +36,13 @@
 // not resolution — it does not depend on the retired panel.
 //
 // Run with the dev server up:  BASE=http://localhost:3001 node scripts/verify/verify-flank-echoes.mjs
+// Against the deployed preview (dev.rails.finance), the bypass header rides
+// the browser context — see lib/host.mjs.
 
 import { chromium } from "playwright";
 import { armInspector, HALO, openInspectorHome } from "./lib/prov-inspector.mjs";
+import { BASE, bypassHeaders } from "./lib/host.mjs";
 
-const BASE = process.env.BASE || "http://localhost:3000";
 const VIEWPORT = { width: 1440, height: 1100 };
 
 // ── DOM contract (derived from source, not guessed) ─────────────────────────
@@ -306,7 +308,7 @@ async function testPwn(page, { label, url }) {
 
 async function main() {
   const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: VIEWPORT });
+  const context = await browser.newContext({ viewport: VIEWPORT, extraHTTPHeaders: bypassHeaders() });
   const page = await context.newPage();
 
   // The whole explorer roster, not a sample. The failure this guards is silent

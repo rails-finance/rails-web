@@ -9,11 +9,13 @@
 //
 // Usage:
 //   BASE=http://localhost:3000 node scripts/verify/verify-ladder-dots.mjs
+// Against the deployed preview (dev.rails.finance), the bypass header rides
+// the browser context — see lib/host.mjs.
 
 import { chromium } from "playwright";
 import { armInspector, HALO } from "./lib/prov-inspector.mjs";
+import { BASE, bypassHeaders } from "./lib/host.mjs";
 
-const BASE = process.env.BASE ?? "http://localhost:3000";
 const PATH = "/ethereum/liquity-v2/branches";
 
 const fails = [];
@@ -23,7 +25,7 @@ function check(name, cond, detail = "") {
 }
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, extraHTTPHeaders: bypassHeaders() });
 await page.goto(BASE + PATH, { waitUntil: "domcontentloaded", timeout: 180000 });
 
 await armInspector(page);

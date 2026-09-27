@@ -129,9 +129,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readPositionsRoute } from "../lib/read-positions-route.mjs";
 import { enGb } from "./lib/date.mjs";
+import { BASE as BASE_URL, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const BASE_URL = process.env.BASE ?? "http://localhost:3801";
 
 const env = Object.fromEntries(
   fs
@@ -296,7 +296,7 @@ const browser = await chromium.launch();
  *  it, which is what S2's fallback is about, and no localStorage from a
  *  previous fixture, which is what S4's is. */
 async function openFixture(f, init) {
-  const context = await browser.newContext();
+  const context = await browser.newContext({ extraHTTPHeaders: bypassHeaders() });
   if (init) await context.addInitScript(init);
   const page = await context.newPage();
   const url = `${BASE_URL}${vaultRoot(f.chain)}/${f.vault}/${f.holder}`;
@@ -523,7 +523,7 @@ for (const f of fixtures) {
   if (!f) continue;
   const isBase = f.chain === 8453;
   const url = `${BASE_URL}${vaultRoot(f.chain)}/${f.vault}/${f.holder}`;
-  const html = await (await fetch(url)).text();
+  const html = await (await hostFetch(url)).text();
   const title = (html.match(/<title>([^<]*)<\/title>/) ?? [])[1] ?? "";
   const meta = (prop) => {
     const re = new RegExp(`<meta[^>]+(?:property|name)="${prop}"[^>]+content="([^"]*)"`);
@@ -548,7 +548,7 @@ for (const f of fixtures) {
     const route = `${vaultRoot(f.chain)}/${f.vault}/${f.holder}/${kind}`;
     check(`S3c·${f.label} ${prop} points at this route's own ${kind}`, !!src && src.includes(route), String(src));
     if (src) {
-      const res = await fetch(src);
+      const res = await hostFetch(src);
       const bytes = Buffer.from(await res.arrayBuffer());
       check(
         `S3d·${f.label} ${prop} renders a PNG`,
@@ -647,7 +647,7 @@ for (const f of fixtures) {
   );
   const legacyWant = `${isBase ? "/base/morpho" : `${vaultRoot(f.chain)}/positions`}?q=${f.holder.toLowerCase()}`;
   const legacyStatus = legacyRows.includes(legacyWant)
-    ? await fetch(`${BASE_URL}${legacyWant}`).then((r) => r.status)
+    ? await hostFetch(`${BASE_URL}${legacyWant}`).then((r) => r.status)
     : 0;
   check(
     `S4d2·${f.label} a bookmark stored with no listing still opens the explorer's own listing, and it answers 200`,
@@ -707,7 +707,7 @@ for (const f of fixtures) {
   const backRows = await page.locator("[data-back-row]").count();
   const statuses = [];
   for (const href of titles) {
-    const r = await fetch(`${BASE_URL}${href}`, { redirect: "follow" });
+    const r = await hostFetch(`${BASE_URL}${href}`, { redirect: "follow" });
     statuses.push(`${href} ${r.status}`);
   }
   check(

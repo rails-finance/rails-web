@@ -40,6 +40,8 @@
 //
 // Run:
 //   BASE=http://localhost:3801 node scripts/verify/verify-base-vault-position-page.mjs
+// Against the deployed preview (dev.rails.finance), the bypass header rides
+// every route read and the browser context — see lib/host.mjs.
 // Needs BASE_RPC_URL (the `eth_call` lane) and BASE_BACKFILL_RPC_URL (the only
 // Base lane that answers a whole-life `eth_getLogs`) in .env.local — read,
 // never printed; named here by env var NAME only. One `next dev` at a time: two
@@ -232,9 +234,9 @@ import { base } from "viem/chains";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const BASE = process.env.BASE ?? "http://localhost:3801";
 const CHAIN = 8453;
 
 const env = Object.fromEntries(
@@ -575,7 +577,7 @@ async function readRoute(url, { attempts = 3 } = {}) {
   let last = null;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const started = Date.now();
-    const res = await fetch(url);
+    const res = await hostFetch(url);
     const json = res.status === 200 ? await res.json() : null;
     last = { status: res.status, json, ms: Date.now() - started };
     // A 500 from the dev server on one request is a bad minute, not a finding
@@ -587,11 +589,11 @@ async function readRoute(url, { attempts = 3 } = {}) {
   return last;
 }
 const readTail = async (f) => {
-  const res = await fetch(tailUrl(f));
+  const res = await hostFetch(tailUrl(f));
   return { status: res.status, json: res.status === 200 ? await res.json() : null };
 };
 const putTail = async (f, body) => {
-  const res = await fetch(tailUrl(f), {
+  const res = await hostFetch(tailUrl(f), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -603,7 +605,7 @@ const putTail = async (f, body) => {
  *  payload and never `body.textContent` — a `hidden` drawer's prose is not on
  *  the face, and the payload made an earlier vault check vacuous. */
 async function pageRead(browser, url, { expandRuns = false, growWindow = false } = {}) {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   const started = Date.now();
   const res = await page.goto(url, { waitUntil: "networkidle", timeout: 180_000 });
   const status = res?.status() ?? 0;
@@ -1631,7 +1633,7 @@ check(
   !/\byou\b|\byour\b|\bdepositor/i.test(f1Page.text),
   (f1Page.text.match(/\byou\b|\byour\b|\bdepositor\w*/gi) ?? []).join(", ") || "none",
 );
-const phone = await browser.newContext({ viewport: { width: 390, height: 844 } });
+const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, extraHTTPHeaders: bypassHeaders() });
 const phonePage = await phone.newPage();
 await phonePage.goto(pageUrl(F_B3), { waitUntil: "networkidle", timeout: 180_000 });
 const phoneWidth = await phonePage.evaluate(() => ({

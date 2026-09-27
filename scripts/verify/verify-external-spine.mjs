@@ -11,10 +11,15 @@
 //      carries both treatments and they can be compared without navigating.
 //
 // Run with the dev server up: BASE=http://localhost:3001 node scripts/verify/verify-external-spine.mjs
+// Section A (probeStructural) writes a throwaway route and relies on the dev
+// server's hot reload to serve it — it cannot pass against a deployed preview,
+// which cannot pick up a local file write, whatever BASE names. Sections B–D
+// read fixtures only and carry the bypass header — see lib/host.mjs.
 
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { armInspector } from "./lib/prov-inspector.mjs";
+import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 // Section A needs SpineColumn rendered in states no live position reaches, so it
 // writes a throwaway route, drives it, and removes it again — the repo keeps no
@@ -65,7 +70,6 @@ export default function SpineProbePage() {
 }
 `;
 
-const BASE = process.env.BASE || "http://localhost:3000";
 const VIEWPORT = { width: 1440, height: 1100 };
 const FIXTURE =
   "/ethereum/morpho/3a85e619751152991742810df6ec69ce473daef99e28a64ab2340d7b7ccfee49-0x405dbf6606336ab3d6574f78eddfa68038e9f9a1";
@@ -341,7 +345,7 @@ async function probeLiquidation(page) {
 }
 
 const browser = await chromium.launch();
-const context = await browser.newContext({ viewport: VIEWPORT });
+const context = await browser.newContext({ viewport: VIEWPORT, extraHTTPHeaders: bypassHeaders() });
 const page = await context.newPage();
 try {
   await probeStructural(page);

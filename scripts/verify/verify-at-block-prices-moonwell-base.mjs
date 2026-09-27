@@ -36,11 +36,13 @@
 // claude-in-chrome cannot reach localhost — this script is the check.
 // Run against a dev server:  BASE=http://localhost:3021 node scripts/verify/verify-at-block-prices-moonwell-base.mjs
 // The Ethereum arm:           EXPLORER=moonwell BASE=http://localhost:3021 node scripts/verify/verify-at-block-prices-moonwell-base.mjs
+// Against the deployed preview (dev.rails.finance), the bypass header rides
+// every request and the browser context — see lib/host.mjs.
 
 import { chromium } from "playwright";
 import { armInspector } from "./lib/prov-inspector.mjs";
+import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
-const BASE = process.env.BASE ?? "http://localhost:3000";
 const EXPLORERS = {
   "moonwell-base": {
     page: (w) => `/base/moonwell/${w}`,
@@ -80,7 +82,7 @@ const check = (name, cond, detail = "") => {
 async function api(path, tries = 4) {
   let last;
   for (let i = 0; i < tries; i += 1) {
-    const res = await fetch(`${BASE}${path}`).catch((e) => {
+    const res = await hostFetch(`${BASE}${path}`).catch((e) => {
       last = e;
       return null;
     });
@@ -229,7 +231,7 @@ else console.log("      NO EVIDENCE for the token-only arm on this wallet (every
 
 const browser = await chromium.launch();
 const pageErrors = [];
-const page = await browser.newPage();
+const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
 page.on("pageerror", (e) => pageErrors.push(String(e)));
 // `?folders=0` PINNED. The badges below are read card by card, so the page must
 // be flat. The default page is answered in folders (leg C of 0019), and since

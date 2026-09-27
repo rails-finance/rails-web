@@ -86,11 +86,14 @@
 // Run:
 //   BASE=http://localhost:3000 node scripts/verify/verify-moonwell-base-folders.mjs
 //   FIXTURES=exploiter BROWSER=0 node scripts/verify/verify-moonwell-base-folders.mjs
+// Against the deployed preview (dev.rails.finance), the bypass header rides
+// every request and the browser context — see lib/host.mjs.
 
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve as resolvePath } from "node:path";
 import { readFileSync, existsSync } from "node:fs";
+import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolvePath(HERE, "../..");
@@ -153,7 +156,6 @@ const { MOONWELL_BASE_DEPLOYMENT, MOONWELL_BASE_DEPLOY_BLOCK, MOONWELL_BASE_WETH
   "../../lib/moonwell-base/asset-catalog.ts"
 );
 
-const BASE = process.env.BASE ?? "http://localhost:3000";
 const BROWSER = process.env.BROWSER !== "0";
 const ONLY = process.env.FIXTURES ? new Set(process.env.FIXTURES.split(",")) : null;
 
@@ -193,7 +195,7 @@ function canonical(v) {
 }
 
 async function getJson(path) {
-  const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
+  const res = await hostFetch(`${BASE}${path}`, { cache: "no-store" });
   const body = await res.json().catch(() => null);
   return { status: res.status, body: body ? rehydrateChainTimelineWire(body) : null };
 }
@@ -678,7 +680,7 @@ async function runPage(f, got, noteIds) {
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   const id = (s) => `${s} [${f.id}]`;
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1400 } });
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1400 }, extraHTTPHeaders: bypassHeaders() });
   const countLine = async (page) =>
     page
       .waitForFunction(

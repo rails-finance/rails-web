@@ -25,6 +25,12 @@
 // that answers — which is the failure mode a silent retry would have bought.
 //
 // `retriedReads` tallies them for a caller that wants to say so in its verdict.
+//
+// Reads through hostFetch (verify/lib/host.mjs), so a `base` pointed at
+// dev.rails.finance carries the Vercel bypass header past Authentication —
+// hostFetch decides that from the URL itself, whatever `base` a caller passes.
+
+import { hostFetch } from "../verify/lib/host.mjs";
 
 /** Every read that needed more than one attempt: `{ qs, status, attempts }`. */
 export const retriedReads = [];
@@ -45,7 +51,7 @@ export async function readPositionsRoute(base, qs) {
   for (let attempt = 1; ; attempt++) {
     let res;
     try {
-      res = await fetch(`${base}/api/vaults/positions?${qs}`);
+      res = await hostFetch(`${base}/api/vaults/positions?${qs}`);
     } catch (e) {
       // A dropped connection is the same class as a 500 and gets the same
       // bounded three: a server that is not there at all still fails, and says

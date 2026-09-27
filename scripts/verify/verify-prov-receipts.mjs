@@ -6,6 +6,8 @@
 // /llamalend/markets, /dolomite/markets, /aave-v4/hubs, /liquity-v2/branches.
 // Run against a dev server:  BASE=http://localhost:3000 node scripts/verify/verify-prov-receipts.mjs
 // (claude-in-chrome cannot reach localhost — this script is the check.)
+// Against the deployed preview (dev.rails.finance), the bypass header rides
+// every page — see lib/host.mjs.
 //
 // This originally drove the per-card receipts panel ("Show provenance" →
 // .prov-receipts → .prov-rrow) — that surface is RETIRED, and waiting 120s per
@@ -42,8 +44,7 @@
 
 import { chromium } from "playwright";
 import { armInspector, openInspectorHome } from "./lib/prov-inspector.mjs";
-
-const BASE = process.env.BASE ?? "http://localhost:3000";
+import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 let failures = 0;
 const check = (name, cond, detail = "") => {
@@ -94,10 +95,10 @@ for (const p of PAGES) {
   // never the whole run's verdict.
   let page;
   try {
-    page = await browser.newPage();
+    page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   } catch {
     browser = await chromium.launch();
-    page = await browser.newPage();
+    page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   }
   try {
     await runPage(page, p);

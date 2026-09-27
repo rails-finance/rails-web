@@ -15,11 +15,12 @@
 //
 // Usage:
 //   BASE=http://localhost:3000 node scripts/verify/verify-trove-face-scaling.mjs
+// Against the deployed preview (dev.rails.finance), the bypass header rides
+// every request and the browser context — see lib/host.mjs.
 
 import { chromium } from "playwright";
 import { armInspector, openInspectorHome } from "./lib/prov-inspector.mjs";
-
-const BASE = process.env.BASE ?? "http://localhost:3000";
+import { BASE, bypassHeaders, hostFetch } from "./lib/host.mjs";
 
 const fails = [];
 function check(name, cond, detail = "") {
@@ -28,7 +29,7 @@ function check(name, cond, detail = "") {
 }
 
 // ── The subject: an open WETH trove with debt, from the roster ──────────────
-const roster = await fetch(`${BASE}/api/troves?collateralType=WETH&status=open&limit=20`)
+const roster = await hostFetch(`${BASE}/api/troves?collateralType=WETH&status=open&limit=20`)
   .then((r) => (r.ok ? r.json() : null))
   .catch(() => null);
 const rows = Array.isArray(roster?.data) ? roster.data : [];
@@ -42,7 +43,7 @@ const troveId = String(subject.id);
 const path = `/ethereum/liquity-v2/trove/WETH/${troveId}`;
 console.log(`  subject: ${path}`);
 
-const wire = await fetch(`${BASE}/api/trove/state/WETH/${troveId}`)
+const wire = await hostFetch(`${BASE}/api/trove/state/WETH/${troveId}`)
   .then((r) => (r.ok ? r.json() : null))
   .catch(() => null);
 const state = wire?.data;
@@ -59,7 +60,7 @@ check(
 
 // ── The page ────────────────────────────────────────────────────────────────
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, extraHTTPHeaders: bypassHeaders() });
 await page.goto(BASE + path, { waitUntil: "domcontentloaded", timeout: 180000 });
 
 // The live read has landed when a receipt's via line names the call

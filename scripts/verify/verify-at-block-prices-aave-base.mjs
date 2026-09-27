@@ -24,11 +24,13 @@
 // claude-in-chrome cannot reach localhost — this script is the check.
 // Run against a dev server:  BASE=http://localhost:3021 node scripts/verify/verify-at-block-prices-aave-base.mjs
 // One explorer only:         EXPLORER=seamless … ; a different wallet: WALLET=0x… (applies to that explorer)
+// Against the deployed preview (dev.rails.finance), the bypass header rides
+// every request and the browser context — see lib/host.mjs.
 
 import { chromium } from "playwright";
 import { armInspector } from "./lib/prov-inspector.mjs";
+import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
-const BASE = process.env.BASE ?? "http://localhost:3000";
 const ONLY = process.env.EXPLORER;
 const EXPLORERS = [
   {
@@ -61,7 +63,7 @@ const check = (name, cond, detail = "") => {
 async function api(path, tries = 4) {
   let last;
   for (let i = 0; i < tries; i += 1) {
-    const res = await fetch(`${BASE}${path}`).catch((e) => {
+    const res = await hostFetch(`${BASE}${path}`).catch((e) => {
       last = e;
       return null;
     });
@@ -197,7 +199,7 @@ async function discoverPricedOrdinary(x) {
 /** Open a wallet's page with numbers on and runs expanded; returns the page
  *  and the API-index → DOM-number map. */
 async function openPage(x, wallet, events) {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   page.on("pageerror", (e) => pageErrors.push(`${x.key}/${wallet}: ${e}`));
   await page.goto(`${BASE}${x.page(wallet)}`, { waitUntil: "domcontentloaded", timeout: 240000 });
   await page.getByText(COUNT_RE).first().waitFor({ state: "visible", timeout: 120000 });
