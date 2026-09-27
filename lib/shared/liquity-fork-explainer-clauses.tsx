@@ -52,9 +52,10 @@
 //     previously recorded here as uncomputable "because this explainer is not
 //     wired with the previous event". It never needed the previous event: the
 //     contract emits every OTHER reason the debt moved, so the interest is the
-//     residual of debtΔ − (borrower's move + fee + redistribution). Regular rows
-//     only; a batched Trove's after-debt is share-derived, so its residual would
-//     carry rounding as well as interest, and the transform withholds it.
+//     residual of debtΔ − (borrower's move + fee + redistribution). On a batched
+//     row the balances are share-derived against the same transaction's
+//     BatchUpdated, so the residual also carries the batch's fees and the
+//     clause names them.
 //
 // FILLED where the deployment carries the redemption join (ctx.redemption):
 //   • §5.2 on redemptions — the fee the redeemer paid INTO this Trove, which is
@@ -131,7 +132,14 @@ export interface LiquityForkExplainerProvs {
   upfrontFeeProv: (coords: LiquityForkCoords, vals: { fee: string }) => Provenance;
   accruedInterestProv: (
     coords: LiquityForkCoords,
-    vals: { interest: string; debtDelta: string; fromOperation: string; fee: string; redist: string },
+    vals: {
+      interest: string;
+      debtDelta: string;
+      fromOperation: string;
+      fee: string;
+      redist: string;
+      batched?: boolean;
+    },
   ) => Provenance;
   redemptionFeeKeptProv: (coords: LiquityForkCoords, vals: { fee: string }) => Provenance;
   redemptionActProv: (coords: LiquityForkCoords, vals: { actual: string; attempted: string }) => Provenance;
@@ -277,6 +285,7 @@ export function liquityForkEventSlots(
           fromOperation: ctx.operation!.debtFromOperation,
           fee: ctx.operation!.debtUpfrontFee,
           redist: ctx.operation!.debtFromRedist,
+          batched: ctx.operation!.accruedIncludesBatchFees,
         })}
         value={fmtNum(accrued)}
       >
@@ -284,7 +293,15 @@ export function liquityForkEventSlots(
       </Fig>
     ) : null;
   const interestClause = (): ClauseInput =>
-    clause(<>{interestFig()} of interest accrued since the Trove was last touched is now part of its debt.</>);
+    clause(
+      ctx.operation?.accruedIncludesBatchFees ? (
+        <>
+          {interestFig()} of interest and batch fees built up since the Trove was last touched is now part of its debt.
+        </>
+      ) : (
+        <>{interestFig()} of interest accrued since the Trove was last touched is now part of its debt.</>
+      ),
+    );
 
   const red = ctx.redemption;
   const redFeeFig = () =>

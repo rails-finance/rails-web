@@ -188,9 +188,9 @@ function priceOf(
  *
  *  `accruedInterest` is the residual of the identity the columns satisfy:
  *      debtAfter − debtBefore = fromOperation + upfrontFee + fromRedist + interest
- *  It is computed for REGULAR rows only. A batched Trove's after-debt is derived
- *  from batch shares rather than emitted, so its residual would carry
- *  share-rounding as well as interest, and withholding it is the correct read.
+ *  On a batched row both balances are derived from batch shares against the
+ *  BatchUpdated of the same transaction (server mig 338), so the residual is the
+ *  Trove's interest plus its share of the batch's fees, and is flagged as such.
  *  Sub-dust residuals are dropped too — an interest figure of 0.000003 USDaf is
  *  noise, and stating it would put a number on the card no reader can use.
  *
@@ -215,7 +215,9 @@ function operationOf(
     debtFromRedist: fmtUnits(redist, DEBT_DECIMALS),
     collFromOperation: fmtUnits(bigintOf(r.coll_change_from_operation ?? null), collDecimals),
     collFromRedist: fmtUnits(bigintOf(r.coll_increase_from_redist ?? null), collDecimals),
-    ...(!isBatched && residual > FORK_DEBT_DUST ? { accruedInterest: fmtUnits(residual, DEBT_DECIMALS) } : {}),
+    ...(residual > FORK_DEBT_DUST
+      ? { accruedInterest: fmtUnits(residual, DEBT_DECIMALS), ...(isBatched ? { accruedIncludesBatchFees: true } : {}) }
+      : {}),
   };
 }
 

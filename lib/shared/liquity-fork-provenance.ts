@@ -424,12 +424,19 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
    *  of the decomposition identity. */
   const accruedInterestProv = (
     coords: LiquityForkCoords,
-    vals: { interest: string; debtDelta: string; fromOperation: string; fee: string; redist: string },
+    vals: {
+      interest: string;
+      debtDelta: string;
+      fromOperation: string;
+      fee: string;
+      redist: string;
+      batched?: boolean;
+    },
   ): Provenance => ({
     kind: "chain-derived",
     pclass: "indexed",
     verify: txVerify(coords),
-    summary: `Interest accrued since the Trove's last change — the contract does not log this figure, but it logs every other reason the debt moved: the owner's borrowing or repayment, the upfront fee, and any share of a liquidated Trove's debt passed to this one. The interest is the change in debt minus those.`,
+    summary: `Interest accrued since the Trove's last change — the contract does not log this figure, but it logs every other reason the debt moved: the owner's borrowing or repayment, the upfront fee, and any share of a liquidated Trove's debt passed to this one. The interest is the change in debt minus those.${vals.batched ? " On a batched Trove the debt is its share of the batch's debt, so the figure also carries its share of the batch's management fee and of any fee the batch paid for an early rate change." : ""}`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · TroveUpdated Δ_debt − TroveOperation legs · ÷10^18`,
     formula: "debt change − borrower's move − upfront fee − redistribution",

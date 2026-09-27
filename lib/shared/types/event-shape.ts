@@ -1031,11 +1031,14 @@ export interface LiquityForkOperationFacts {
    *      debtAfter − debtBefore = fromOperation + upfrontFee + fromRedist + interest
    *  and therefore the one per-event interest figure this lane can state.
    *
-   *  Present on REGULAR rows only. A batched Trove's after-debt is derived from
-   *  batch shares rather than emitted, so its residual would carry share-rounding
-   *  as well as interest — an absent figure is the correct answer there, and the
-   *  transform withholds it rather than shipping a contaminated one. */
+   *  On a batched Trove both balances are derived from batch shares against the
+   *  BatchUpdated of the same transaction (server mig 338), which matches
+   *  getLatestTroveData, so the residual also carries the Trove's share of the
+   *  batch's management fee and of any fee the batch paid for an early rate
+   *  change; `accruedIncludesBatchFees` marks those rows. */
   accruedInterest?: string;
+  /** Set on a batched row: `accruedInterest` includes batch fees. */
+  accruedIncludesBatchFees?: boolean;
 }
 
 /** The redemption act this event was one Trove's slice of.
