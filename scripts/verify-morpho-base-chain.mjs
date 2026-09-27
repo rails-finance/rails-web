@@ -278,15 +278,32 @@ async function verifySample(s) {
 
   const row = await apiRow(s.market.replace(/^0x/, ""), s.user.toLowerCase());
   if (row) {
+    // The backend row is a periodically-refreshed snapshot pinned to its OWN
+    // block (`chain_block`), not head — on an actively-traded market
+    // (borrowShares above matched at head only because the wallet's debt leg
+    // hadn't moved in the interim) collateral can move between the row's
+    // refresh and this script's head read, which is a live position changing,
+    // not a mismatch. Re-read at the row's own block for the exact check.
+    const atRowBlock = row.chain_block != null ? BigInt(row.chain_block) : null;
+    const [, rowBorrowShares, rowCollateral] =
+      atRowBlock != null
+        ? await client.readContract({
+            address: MORPHO,
+            abi: morphoAbi,
+            functionName: "position",
+            args: [s.market, s.user],
+            blockNumber: atRowBlock,
+          })
+        : [null, borrowShares, collateral];
     check(
-      "chain collateral == replayed coll_raw (wei-exact)",
-      collateral === bigintOf(row.coll_raw),
-      `chain=${collateral}`,
+      "chain collateral == replayed coll_raw (wei-exact, at the row's own block)",
+      rowCollateral === bigintOf(row.coll_raw),
+      `row block=${row.chain_block} chain=${rowCollateral} served=${row.coll_raw}`,
     );
     check(
-      "chain borrowShares == replayed bsh_raw (exact)",
-      borrowShares === bigintOf(row.bsh_raw),
-      `chain=${borrowShares}`,
+      "chain borrowShares == replayed bsh_raw (exact, at the row's own block)",
+      rowBorrowShares === bigintOf(row.bsh_raw),
+      `row block=${row.chain_block} chain=${rowBorrowShares} served=${row.bsh_raw}`,
     );
   } else {
     console.log("      (no backend row — replay checks skipped)");

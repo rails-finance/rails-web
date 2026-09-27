@@ -154,7 +154,8 @@ async function apiMarkets(wallet) {
   });
   if (!res.ok) return null;
   const json = await res.json();
-  return json.rows?.[0]?.markets ?? null;
+  const row = json.rows?.[0];
+  return row ? { markets: row.markets ?? [], chainBlock: row.chainBlock ?? null } : null;
 }
 
 let samples = [];
@@ -354,18 +355,43 @@ for (const s of samples) {
     `liquidity $${(Number(liquidity) / 1e18).toFixed(2)} / shortfall $${(Number(shortfall) / 1e18).toFixed(2)}`,
   );
 
-  const rows = await apiMarkets(wallet);
+  const indexed = await apiMarkets(wallet);
+  const rows = indexed?.markets;
   if (rows && rows.length > 0) {
+    // The backend row is a snapshot pinned to its OWN block (`chainBlock`),
+    // not head — on an actively-traded wallet a supply balance can move
+    // between the row's refresh and this script's head reads above, which is
+    // a live position changing, not a mismatch. Re-read at the row's own
+    // block when one is named.
+    let chainAtBlock = null;
+    if (indexed.chainBlock != null) {
+      const res = await client.multicall({
+        allowFailure: true,
+        blockNumber: BigInt(indexed.chainBlock),
+        contracts: rows.map((r) => ({
+          address: getAddress(r.market),
+          abi: mtokenAbi,
+          functionName: "balanceOf",
+          args: [wallet],
+        })),
+      });
+      chainAtBlock = new Map(rows.map((r, i) => [r.market.toLowerCase(), res[i]]));
+    }
     let supplyExact = true;
     let matched = 0;
     for (const r of rows) {
       const i = allMarkets.findIndex((mt) => mt.toLowerCase() === r.market.toLowerCase());
       if (i < 0) continue;
       matched++;
-      const [bal] = perMarket[i];
+      const pinned = chainAtBlock?.get(r.market.toLowerCase());
+      const bal = pinned?.status === "success" ? pinned.result : perMarket[i][0];
       if (BigInt(r.mtokenBalanceRaw ?? "0") !== bal) supplyExact = false;
     }
-    check(`${wallet.slice(0, 8)}: replayed mToken balances wei-exact vs chain`, matched > 0 && supplyExact);
+    check(
+      `${wallet.slice(0, 8)}: replayed mToken balances wei-exact vs chain (at the row's own block)`,
+      matched > 0 && supplyExact,
+      `block=${indexed.chainBlock}`,
+    );
   } else {
     console.log("      (no live-index row — index check skipped)");
   }

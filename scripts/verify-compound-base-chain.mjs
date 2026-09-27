@@ -346,12 +346,33 @@ async function verifyAccount(sample, marketCtx) {
   const rows = await apiPositions(sample.account);
   const row = rows?.find((r) => r.market === sample.market);
   if (row?.collateral?.length) {
-    const byAddr = new Map(perAsset.map(([bal], i) => [infos[i].asset.toLowerCase(), bal]));
-    const replayExact = row.collateral.every((c) => byAddr.get(c.asset) === BigInt(c.amountRaw));
+    // The backend row is a snapshot pinned to its OWN block (`chainBlock`),
+    // not head — on an actively-traded account collateral can move between
+    // the row's refresh and this script's head reads above, which is a live
+    // position changing, not a mismatch. Re-read at the row's own block.
+    let replayExact;
+    if (row.chainBlock != null) {
+      const atRowBlock = await client.multicall({
+        allowFailure: true,
+        blockNumber: BigInt(row.chainBlock),
+        contracts: row.collateral.map((c) => ({
+          address: m.comet,
+          abi: cometAbi,
+          functionName: "collateralBalanceOf",
+          args: [account, getAddress(c.asset)],
+        })),
+      });
+      replayExact = row.collateral.every(
+        (c, i) => atRowBlock[i]?.status === "success" && atRowBlock[i].result === BigInt(c.amountRaw),
+      );
+    } else {
+      const byAddr = new Map(perAsset.map(([bal], i) => [infos[i].asset.toLowerCase(), bal]));
+      replayExact = row.collateral.every((c) => byAddr.get(c.asset) === BigInt(c.amountRaw));
+    }
     check(
-      `${sample.market}/${account.slice(0, 8)}: event-replay collateral wei-exact vs chain`,
+      `${sample.market}/${account.slice(0, 8)}: event-replay collateral wei-exact vs chain (at the row's own block)`,
       replayExact,
-      row.collateral.map((c) => c.amountRaw).join(", "),
+      `block=${row.chainBlock} ${row.collateral.map((c) => c.amountRaw).join(", ")}`,
     );
   } else {
     console.log("      (no backend collateral row — index check skipped)");
