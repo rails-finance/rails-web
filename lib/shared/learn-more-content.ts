@@ -183,7 +183,7 @@ export function liquityPositionContent(opts: {
       details: [
         {
           bold: "Closing a trove",
-          text: "repaying all debt returns the collateral above the liquidation reserve to the owner and burns the trove NFT.",
+          text: "repaying all debt returns all the collateral to the owner, refunds the 0.0375 ETH liquidation reserve paid apart from it at open, and burns the trove NFT.",
         },
         {
           bold: "Trove NFT",
