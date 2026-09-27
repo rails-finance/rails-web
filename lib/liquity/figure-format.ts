@@ -35,6 +35,25 @@ export function fmtRate(pct: number): string {
   return `${pct.toFixed(1)}%`;
 }
 
+/** A delegate's before/after rate for a batch rate-change clause. A step can be
+ *  smaller than the rate cell's one decimal place (a batch manager re-affirming
+ *  close to its old rate), which at fmtRate's precision reads as the same figure
+ *  on both sides. Widens the precision only as far as it takes for the two to
+ *  read apart, and reports `changed: false` when the rate is the same value, so
+ *  the clause can say "kept" instead of guessing "lowered" from a false `<`. */
+export function fmtRateChange(before: number, after: number): { before: string; after: string; changed: boolean } {
+  if (before === after) {
+    const at = fmtRate(after);
+    return { before: at, after: at, changed: false };
+  }
+  for (let digits = 1; digits <= 6; digits++) {
+    const beforeStr = `${before.toFixed(digits)}%`;
+    const afterStr = `${after.toFixed(digits)}%`;
+    if (beforeStr !== afterStr) return { before: beforeStr, after: afterStr, changed: true };
+  }
+  return { before: `${before.toFixed(6)}%`, after: `${after.toFixed(6)}%`, changed: true };
+}
+
 /** A collateral ratio as the ratio cell writes it in its default mode ("179.34%"). */
 export function fmtCr(pct: number): string {
   return `${pct.toFixed(2)}%`;

@@ -59,7 +59,7 @@ import {
 } from "@/lib/liquity/event-provenance";
 import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots } from "@/lib/shared/explainer-prose";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { fmtAccrued, fmtColl, fmtCr, fmtDebt, fmtRate, fmtUsdWhole } from "@/lib/liquity/figure-format";
+import { fmtAccrued, fmtColl, fmtCr, fmtDebt, fmtRate, fmtRateChange, fmtUsdWhole } from "@/lib/liquity/figure-format";
 import { formatRatio } from "@/lib/shared/ratio-format";
 import type { RatioMode } from "@/lib/shared/preferences";
 
@@ -1177,18 +1177,20 @@ function removeFromBatchSlots(
 function batchRateUpdateSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlots {
   const { stateBefore, stateAfter, collateralType, collateralPrice } = ctx;
   const debtSym = ctx.assetType ?? "BOLD";
-  const increased = stateAfter.annualInterestRate > stateBefore.annualInterestRate;
+  const rateChange = fmtRateChange(stateBefore.annualInterestRate, stateAfter.annualInterestRate);
   const afterCollUsd = stateAfter.coll * collateralPrice;
   const rateAfter = rateAfterProv(ctx, coords);
 
   const happened: ClauseInput[] = [
-    clause(
-      <>
-        The batch manager {increased ? "raised" : "lowered"} the delegated interest rate from{" "}
-        {fig(undefined, fmtRate(stateBefore.annualInterestRate))} to{" "}
-        {fig(rateAfter, `${stateAfter.annualInterestRate.toFixed(1)}%`)} APR.
-      </>,
-    ),
+    rateChange.changed
+      ? clause(
+          <>
+            The batch manager {stateAfter.annualInterestRate > stateBefore.annualInterestRate ? "raised" : "lowered"}{" "}
+            the delegated interest rate from {fig(undefined, rateChange.before)} to {fig(rateAfter, rateChange.after)}{" "}
+            APR.
+          </>,
+        )
+      : clause(<>The batch manager kept the delegated interest rate at {fig(rateAfter, rateChange.after)} APR.</>),
   ];
 
   const meansNow: ClauseInput[] = [];
