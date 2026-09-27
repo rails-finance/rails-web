@@ -1755,7 +1755,9 @@ for (const g of GROUPED_FIXTURES) {
       : `${n(route.totalEvents)} events`;
     check(
       `G1 ${g.id}: the count line at rest ${windowed ? "states the loaded span in time" : "is the whole history's count"}`,
-      restLine === wantRest && (!windowed || drawn.unit === "rows"),
+      // The unit is "rows" where the index grouped something (`eventCountState`
+      // in timeline-toolbar.tsx), so a page with no folder counts events.
+      restLine === wantRest && (!windowed || drawn.unit === (wantFolders ? "rows" : "events")),
       `"${restLine}" (want "${wantRest}"), unit ${drawn.unit}`,
     );
     check(
