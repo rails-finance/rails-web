@@ -45,6 +45,15 @@ export function morphoPositionToMarkdown(args: MorphoPositionMarkdownArgs): stri
   const lines: string[] = [];
   const loan = view.loanSymbol;
   const coll = view.collateralSymbol ?? chain?.collateralSymbol ?? "collateral";
+  // A token whose decimals did not load has no known scale: its figures name
+  // the token and its address and state no amount, as the card does.
+  const notLoaded = (symbol: string, address: string | undefined) =>
+    `not loaded ${symbol} (the chain didn't answer for this token's decimals${address ? `, ${address}` : ""})`;
+  const collFigure = (value: number) =>
+    view.collateralDecimalsUnread ? notLoaded(coll, view.collateralToken) : `${amt(value)} ${coll}`;
+  const loanFigure = (value: number) =>
+    view.loanDecimalsUnread ? notLoaded(loan, view.loanToken) : `${amt(value)} ${loan}`;
+  const scaled = !view.loanDecimalsUnread && !view.collateralDecimalsUnread;
 
   lines.push(`# Morpho Blue position — ${view.marketLabel}`);
   lines.push("");
@@ -64,7 +73,7 @@ export function morphoPositionToMarkdown(args: MorphoPositionMarkdownArgs): stri
   if (view.everLiquidated) lines.push(`- **Liquidated at least once over its life.**`);
   if (view.badDebt > 0)
     lines.push(
-      `- **Bad debt written off:** ${num(view.badDebt)} ${view.loanSymbol} — the share of the cleared debt the seized collateral could not cover, socialized to this market's lenders.`,
+      `- **Bad debt written off:** ${view.loanDecimalsUnread ? notLoaded(loan, view.loanToken) : `${num(view.badDebt)} ${loan}`} — the share of the cleared debt the seized collateral could not cover, socialized to this market's lenders.`,
     );
   lines.push("");
 
@@ -72,16 +81,19 @@ export function morphoPositionToMarkdown(args: MorphoPositionMarkdownArgs): stri
   lines.push("## Headlines");
   if (view.status !== "open") {
     // Unwound: the headline is what the position held at its height.
-    if (view.peakCollateral > 0) lines.push(`- **Highest recorded collateral:** ${amt(view.peakCollateral)} ${coll}`);
+    if (view.peakCollateral > 0) lines.push(`- **Highest recorded collateral:** ${collFigure(view.peakCollateral)}`);
     if (view.peakBorrowed > 0)
-      lines.push(`- **Highest recorded borrowed principal:** ${amt(view.peakBorrowed)} ${loan}`);
+      lines.push(`- **Highest recorded borrowed principal:** ${loanFigure(view.peakBorrowed)}`);
   } else {
-    const collValue = chain && !chain.chainStale && chain.oraclePrice > 0 ? view.collateral * chain.oraclePrice : null;
+    const collValue =
+      scaled && chain && !chain.chainStale && chain.oraclePrice > 0 ? view.collateral * chain.oraclePrice : null;
     lines.push(
-      `- **Collateral:** ${amt(view.collateral)} ${coll}` +
+      `- **Collateral:** ${collFigure(view.collateral)}` +
         (collValue != null ? ` (= ${amt(collValue)} ${loan} at the market's own oracle)` : ""),
     );
-    if (view.currentDebt) {
+    if (view.loanDecimalsUnread && (view.currentDebt || view.borrowed > 0)) {
+      lines.push(`- **Debt:** ${notLoaded(loan, view.loanToken)}`);
+    } else if (view.currentDebt) {
       lines.push(
         `- **Debt:** ${amt(view.currentDebt.amount)} ${loan} incl. accrued interest ` +
           `(borrowed principal ${amt(view.borrowed)} ${loan}, accrued ${amt(view.currentDebt.accruedAmount)} ${loan})` +
@@ -104,7 +116,7 @@ export function morphoPositionToMarkdown(args: MorphoPositionMarkdownArgs): stri
             (chain.healthy != null ? ` — _isHealthy replica says ${chain.healthy ? "healthy" : "NOT healthy"}` : ""),
         );
       }
-      if (chain.oraclePrice > 0) {
+      if (chain.oraclePrice > 0 && scaled) {
         const age = oracleAge(chain);
         const feeds = chain.oracleFeeds?.map((f) => f.description ?? f.address).join(", ");
         lines.push(

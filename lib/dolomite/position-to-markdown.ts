@@ -47,7 +47,22 @@ function legUsd(view: DolomitePositionView, marketId: number, amount: number): n
   return typeof p === "number" && p > 0 ? amount * p : null;
 }
 
-function tokenWithUsd(view: DolomitePositionView, marketId: number, amount: number, symbol: string): string {
+/** A market whose token decimals did not load has no known scale: the export
+ *  names the token and states no amount, as the card does. The listing reads
+ *  the market's token address from the same market-state read that failed, so
+ *  the market id is the identifier it carries. */
+function notLoaded(symbol: string, marketId: number): string {
+  return `not loaded ${symbol} (the chain didn't answer for this token's decimals, Dolomite market ${marketId})`;
+}
+
+function tokenWithUsd(
+  view: DolomitePositionView,
+  marketId: number,
+  amount: number,
+  symbol: string,
+  decimalsUnread?: true,
+): string {
+  if (decimalsUnread) return notLoaded(symbol, marketId);
   const u = legUsd(view, marketId, amount);
   return `${amt(amount)} ${symbol}${u != null ? ` (${usd(u)})` : ""}`;
 }
@@ -85,11 +100,13 @@ export function dolomitePositionToMarkdown(args: DolomitePositionMarkdownArgs): 
     // PAR amounts (the oracle prices the PRESENT, not history).
     for (const p of view.peakSupplies) {
       lines.push(
-        `- **Highest recorded balance (${p.symbol}, market ${p.marketId}):** ${amt(p.amount)} ${p.symbol} (par)`,
+        `- **Highest recorded balance (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol} (par)`}`,
       );
     }
     for (const p of view.peakBorrows) {
-      lines.push(`- **Highest recorded debt (${p.symbol}, market ${p.marketId}):** ${amt(p.amount)} ${p.symbol} (par)`);
+      lines.push(
+        `- **Highest recorded debt (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol} (par)`}`,
+      );
     }
     if (view.peakSupplies.length > 0 || view.peakBorrows.length > 0) lines.push("");
   }
@@ -105,7 +122,7 @@ export function dolomitePositionToMarkdown(args: DolomitePositionMarkdownArgs): 
             ? "par × current index, interest included"
             : "par — the scaled balance; multiply by the market's index for tokens";
         lines.push(
-          `- **${r.symbol} (market ${r.marketId}):** ${tokenWithUsd(view, r.marketId, amount, r.symbol)} (${basis})`,
+          `- **${r.symbol} (market ${r.marketId}):** ${tokenWithUsd(view, r.marketId, amount, r.symbol, r.decimalsUnread)}${r.decimalsUnread ? "" : ` (${basis})`}`,
         );
       }
       lines.push("");
@@ -120,7 +137,7 @@ export function dolomitePositionToMarkdown(args: DolomitePositionMarkdownArgs): 
             ? "par × current index, interest included"
             : "par — the scaled balance; multiply by the market's index for tokens";
         lines.push(
-          `- **${r.symbol} (market ${r.marketId}):** ${tokenWithUsd(view, r.marketId, amount, r.symbol)} (${basis})`,
+          `- **${r.symbol} (market ${r.marketId}):** ${tokenWithUsd(view, r.marketId, amount, r.symbol, r.decimalsUnread)}${r.decimalsUnread ? "" : ` (${basis})`}`,
         );
       }
       lines.push("");

@@ -45,7 +45,14 @@ function assetText(a: PwnAsset | null): string {
     const count = a.amount > 1 ? `${a.amount}× ` : "";
     return `${count}${name} #${a.tokenId} (${a.category === "ERC721" ? "ERC-721" : "ERC-1155"}, contract ${a.address})`;
   }
+  if (a.decimalsUnread) return notLoaded(a);
   return `${amt(a.amount)} ${a.symbol}`;
+}
+
+/** A fungible token whose decimals did not load has no known scale: the export
+ *  names the token and its address and states no amount, as the card does. */
+function notLoaded(a: PwnAsset): string {
+  return `not loaded ${a.symbol} (the chain didn't answer for this token's decimals, ${a.address})`;
 }
 
 export function pwnPositionToMarkdown(args: PwnPositionMarkdownArgs): string {
@@ -91,9 +98,11 @@ export function pwnPositionToMarkdown(args: PwnPositionMarkdownArgs): string {
       );
     }
   }
-  if (view.credit) lines.push(`- **Credit advanced (principal):** ${amt(view.credit.amount)} ${creditSym}`);
+  if (view.credit) lines.push(`- **Credit advanced (principal):** ${assetText(view.credit)}`);
   if (view.repayAmount != null) {
-    lines.push(`- **Repayment owed (fixed):** ${amt(view.repayAmount)} ${creditSym}`);
+    lines.push(
+      `- **Repayment owed (fixed):** ${view.credit?.decimalsUnread ? notLoaded(view.credit) : `${amt(view.repayAmount)} ${creditSym}`}`,
+    );
     if (view.fixedInterest != null && view.fixedInterest > 0)
       lines.push(
         `- **Fixed interest (repayment − principal):** ${amt(view.fixedInterest)} ${creditSym} — set when the loan was struck, it does not accrue`,
