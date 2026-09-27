@@ -12,6 +12,7 @@
 // live overlay supplied them, with their derivations named. A PURE function
 // of the data already in scope on the detail page — no fetching.
 
+import { NOT_LOADED_CELL } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
 import type { MakerVaultView } from "@/components/protocol/makerdao/makerdao-vault-card";
@@ -240,8 +241,10 @@ function timelineTable(
                 ? "Open (frob)"
                 : "Adjust (frob)";
     const noted = (anchoredNotes.get(e.id) ?? []).map(marketNoteRowAnnotation).join("; ");
+    // A running balance the answer did not carry reads "not loaded".
+    const after = (v: string | undefined) => (v == null ? NOT_LOADED_CELL : amt(parseFloat(v)));
     out.push(
-      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${amt(parseFloat(d.dink))} | ${amt(parseFloat(d.dart))} | ${amt(parseFloat(d.inkAfter))} | ${amt(parseFloat(d.artAfter))} | ${txCell(e)}${noted ? ` — ${noted}` : ""} |`,
+      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${amt(parseFloat(d.dink))} | ${amt(parseFloat(d.dart))} | ${after(d.inkAfter)} | ${after(d.artAfter)} | ${txCell(e)}${noted ? ` — ${noted}` : ""} |`,
     );
   });
   out.push("");

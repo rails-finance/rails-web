@@ -32,6 +32,8 @@ export interface MakerDAOEventDetailProps {
 }
 
 const fmt = (human: string): string => formatNumber(Number(human));
+/** A running balance the answer did not carry is stated, never filled in. */
+const fmtAfter = (human: string | undefined): string => (human == null ? "Not loaded" : fmt(human));
 
 /** The forensics for a grab — Maker's seizure variant of the shared two-leg
  *  block. Seized = |dink| at the ilk's own OSM price recovered at the block
@@ -89,7 +91,7 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber }: MakerDAOEventD
   const stats: ChainTruthStat[] = [
     {
       label: "Collateral",
-      value: fmt(ctx.inkAfter),
+      value: fmtAfter(ctx.inkAfter),
       symbol: ctx.collateralSymbol,
       prov: inkAfterProv(ctx.collateralSymbol, coords),
       transition: reconstructTransition({
@@ -104,7 +106,7 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber }: MakerDAOEventD
     // is a layer on the summary.
     {
       label: "Debt",
-      value: fmt(ctx.artAfter),
+      value: fmtAfter(ctx.artAfter),
       symbol: ilkDebtSymbol(ctx.ilk),
       prov: artAfterProv(coords),
       transition: reconstructTransition({

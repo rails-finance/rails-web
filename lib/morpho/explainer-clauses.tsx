@@ -132,6 +132,11 @@ const fmtAbs = (h?: string): string => formatNumber(Math.abs(Number(h)));
 // ── the variant table ────────────────────────────────────────────────────────
 
 function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventProseSlots {
+  // Every sentence below reads the position after the event. Without the
+  // index's running state for this row there is nothing true to say about it.
+  if (ctx.collateralAfter == null || ctx.borrowedAfter == null) {
+    return { happened: [clause(<>The position&rsquo;s balances after this event are not loaded.</>)] };
+  }
   const collSym = ctx.collateralSymbol;
   const loanSym = ctx.loanSymbol;
   const rs = resultingState(ctx);

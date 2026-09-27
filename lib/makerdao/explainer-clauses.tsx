@@ -189,6 +189,11 @@ export function makerdaoEventSlots(ctx: MakerDAOContext, coords: MakerCoords): E
 }
 
 function makerdaoEventSlotsBase(ctx: MakerDAOContext, coords: MakerCoords): EventProseSlots {
+  // Every sentence below reads the vault after the event. Without the index's
+  // running state for this row there is nothing true to say about it.
+  if (ctx.inkAfter == null || ctx.artAfter == null) {
+    return { happened: [clause(<>The vault&rsquo;s balances after this event are not loaded.</>)] };
+  }
   const sym = ctx.collateralSymbol;
   const dsym = ilkDebtSymbol(ctx.ilk);
   const dink = Number(ctx.dink) || 0;

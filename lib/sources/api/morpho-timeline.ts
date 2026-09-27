@@ -1,10 +1,13 @@
 // Morpho position timeline — the `api` arm's presentation transform.
 // ----------------------------------------------------------------------------
-// The rails-server route (/api/morpho/position/:id/timeline) returns the raw
-// per-event signed deltas (coll / borr / borrow-shares) in block order, plus the
-// market's decoded `market_params`. This builder owns the presentation: it
-// REPLAYS the running collateral / borrowed-principal cumulatively and shapes
-// each BaseActivityEvent + MorphoContext.
+// The rails-server route (/api/morpho/position/:id/timeline) returns the
+// per-event signed deltas (coll / borr / borrow-shares) in block order, each with
+// the position's running state after it, plus the market's decoded
+// `market_params`. This builder takes each row's collateral and borrowed
+// principal from the served columns and shapes each BaseActivityEvent +
+// MorphoContext. It never adds the deltas up: under a `?recent` window the
+// first row sits mid-history, and a sum from zero there is short by the balance
+// at the cut. A row without the columns states "Not loaded".
 
 import { resolveErc20Meta, type Erc20Meta } from "@/lib/sources/chain/erc20-meta";
 import { parseMarketParams, marketLabel } from "@/lib/morpho/asset-catalog";
@@ -40,6 +43,13 @@ export interface RawMorphoTimelineRow {
   coll: string;
   borr: string;
   bsh: string;
+  /** The position's running collateral / borrowed principal / borrow shares
+   *  after this row (raw units), from the served events. Optional: a response
+   *  from before the route sent them has none, and the row's balances then
+   *  read "Not loaded". */
+  coll_after?: string | null;
+  borr_after?: string | null;
+  bsh_after?: string | null;
   tx: string;
   log_index: number;
   block_number: string;
@@ -168,13 +178,11 @@ export async function buildMorphoTimeline(resp: RawMorphoTimelineResponse): Prom
       : [],
   );
 
-  let collRun = ZERO;
-  let borrRun = ZERO;
+  // A window's first row is not the position's first.
+  const wholeHistory = resp.cutoffBlock == null;
   const events: BaseActivityEvent[] = resp.rows.map((r, idx) => {
     const coll = bigintOf(r.coll);
     const borr = bigintOf(r.borr);
-    collRun += coll;
-    borrRun += borr;
 
     const eventType = r.src;
     const isCollateral = eventType === "supply_collateral" || eventType === "withdraw_collateral";
@@ -193,9 +201,9 @@ export async function buildMorphoTimeline(resp: RawMorphoTimelineResponse): Prom
       side,
       assetsDelta: fmtUnits(assetsRaw, assetsDec),
       sharesDelta: shareDelta,
-      collateralAfter: fmtUnits(collRun, collDec),
-      borrowedAfter: fmtUnits(borrRun, loanDec),
-      isOpen: idx === 0,
+      collateralAfter: r.coll_after != null ? fmtUnits(bigintOf(r.coll_after), collDec) : undefined,
+      borrowedAfter: r.borr_after != null ? fmtUnits(bigintOf(r.borr_after), loanDec) : undefined,
+      isOpen: wholeHistory && idx === 0,
       // The acting parties, present only on two-fact external rows (the route
       // pre-filters). The card derives third-party marking from these.
       ...(r.tx_from && r.caller ? { txFrom: r.tx_from.toLowerCase(), caller: r.caller.toLowerCase() } : {}),

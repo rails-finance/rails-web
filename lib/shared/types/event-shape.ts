@@ -706,10 +706,13 @@ export interface MakerDAOContext {
   dink: string;
   /** Signed normalized-debt delta `dart` this event applied (human-readable). */
   dart: string;
-  /** Collateral `ink` after = Σ dink ≤ this event (human-readable). */
-  inkAfter: string;
-  /** Normalized debt `art` after = Σ dart ≤ this event (human-readable). */
-  artAfter: string;
+  /** Collateral `ink` after this event (human-readable): the index's served
+   *  `ink_after`. Absent when the answer did not carry it; the page states
+   *  "Not loaded" and never adds up deltas from a window's first row. */
+  inkAfter?: string;
+  /** Normalized debt `art` after this event (human-readable): the index's
+   *  served `art_after`. Absent as `inkAfter` is. */
+  artAfter?: string;
   /** Vat rate accumulator (ray, 1e27) AS OF this event's block — chain-state,
    *  reconstructed server-side from captured `maker_fold` deltas. Optional: absent
    *  until the events-MV `rate_at_block` column lands; when present, values each
@@ -779,12 +782,15 @@ export interface MorphoContext {
    *  collateral-only events. Plain integer string (1e6-virtual-scaled). */
   sharesDelta?: string;
   /** Collateral the position holds AFTER this event = Σ collateral deltas
-   *  (raw collateral token, human-readable). Collateral doesn't accrue, so this is exact. */
-  collateralAfter: string;
+   *  (raw collateral token, human-readable). Collateral doesn't accrue, so this is exact.
+   *  On the mainnet lane it is the index's served `collateral_after`; absent
+   *  when the answer did not carry it, and the page states "Not loaded". */
+  collateralAfter?: string;
   /** Net borrowed PRINCIPAL after = Σ (borrow − repay − liquidation cover incl.
    *  bad debt) assets (human-readable loan token). Principal only — excludes
-   *  accrued interest (that's the derived layer). */
-  borrowedAfter: string;
+   *  accrued interest (that's the derived layer). The index's served
+   *  `borrowed_after` on the mainnet lane; absent as `collateralAfter` is. */
+  borrowedAfter?: string;
   /** Net supplied PRINCIPAL after, on the LENDER side = Σ (supply − withdraw)
    *  assets (human-readable loan token). Set only by the swept Base lane —
    *  the index carries no lender rows — and only on supply/withdraw rows, so

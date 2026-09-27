@@ -41,6 +41,8 @@ export interface MorphoEventDetailProps {
 }
 
 const fmt = (human: string): string => formatNumber(Number(human));
+/** A running balance the answer did not carry is stated, never filled in. */
+const fmtAfter = (human: string | undefined): string => (human == null ? "Not loaded" : fmt(human));
 
 /** The forensics for a Morpho liquidation — the loan-token-denominated variant
  *  of the shared two-leg block (Morpho prices in the loan token by design; no
@@ -117,7 +119,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
   const stats: ChainTruthStat[] = [
     {
       label: "Collateral",
-      value: fmt(ctx.collateralAfter),
+      value: fmtAfter(ctx.collateralAfter),
       symbol: ctx.collateralSymbol,
       address: collAddr,
       prov: collateralAfterProv(ctx.collateralSymbol, coords),
@@ -134,7 +136,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
     },
     {
       label: "Borrowed",
-      value: fmt(ctx.borrowedAfter),
+      value: fmtAfter(ctx.borrowedAfter),
       symbol: ctx.loanSymbol,
       address: loanAddr,
       prov: borrowedAfterProv(ctx.loanSymbol, coords),

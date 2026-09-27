@@ -1,10 +1,12 @@
 // MakerDAO vault timeline — the `api` arm's presentation transform.
 // ----------------------------------------------------------------------------
-// The rails-server route (/api/makerdao/vault/:id/timeline) returns the raw
-// frob/grab deltas (dink/dart) in block order, plus the vault meta. This builder
-// REPLAYS the running ink/art and shapes each BaseActivityEvent + MakerDAOContext
-// — the SAME thing loadMakerdaoTimelineFromSieve does, so the two arms render
-// byte-identical cards. Kept separate so the frozen-dump arm is untouched.
+// The rails-server route (/api/makerdao/vault/:id/timeline) returns the
+// frob/grab deltas (dink/dart) in block order, each with the urn's running
+// ink/art after it, plus the vault meta. This builder takes each row's balance
+// from those served columns and shapes each BaseActivityEvent +
+// MakerDAOContext. It never adds the deltas up: under a `?recent` window the
+// first row sits mid-history, and a sum from zero there is short by the
+// balance at the cut. A row without the columns states "Not loaded".
 
 import { ilkToCollateralSymbol, ilkDebtMeta } from "@/lib/makerdao/asset-catalog";
 import type { BaseActivityEvent, AssetFlow, MakerDAOContext, MakerDAOEventType } from "@/lib/shared/types/event-shape";
@@ -45,6 +47,11 @@ export interface RawMakerTimelineRow {
   ilk: string;
   dink: string;
   dart: string;
+  /** The urn's running ink / art after this row (Vat wad), from the served
+   *  view. Optional: a response from before the route sent them has none, and
+   *  the row's balances then read "Not loaded". */
+  ink_after?: string | null;
+  art_after?: string | null;
   tx_hash: string;
   log_index: number;
   block_number: string;
@@ -200,15 +207,13 @@ export function buildMakerTimeline(resp: RawMakerTimelineResponse): MakerTimelin
   const owner = resp.owner ?? null;
   const wallet = (owner ?? urn).toLowerCase();
 
-  let inkRun = ZERO;
-  let artRun = ZERO;
+  // A window's first row is not the vault's first.
+  const wholeHistory = resp.cutoffBlock == null;
   const events: BaseActivityEvent[] = resp.rows.map((r, idx) => {
     const dink = BigInt(r.dink);
     const dart = BigInt(r.dart);
-    inkRun += dink;
-    artRun += dart;
     const eventType: MakerDAOEventType = r.src;
-    const isOpen = idx === 0 && eventType === "frob";
+    const isOpen = wholeHistory && idx === 0 && eventType === "frob";
     const { actionType, actionLabel } = labelFor(eventType, dink, dart, isOpen, ilkDebtMeta(r.ilk).symbol);
     const sym = collateralSymbol ?? ilkToCollateralSymbol(r.ilk);
 
@@ -220,8 +225,8 @@ export function buildMakerTimeline(resp: RawMakerTimelineResponse): MakerTimelin
       cdpId: cdpId ?? undefined,
       dink: fmtWad(dink),
       dart: fmtWad(dart),
-      inkAfter: fmtWad(inkRun),
-      artAfter: fmtWad(artRun),
+      inkAfter: r.ink_after != null ? fmtWad(BigInt(r.ink_after)) : undefined,
+      artAfter: r.art_after != null ? fmtWad(BigInt(r.art_after)) : undefined,
       rateAtBlock: r.rate_at_block ?? undefined,
       isOpen,
       // The acting parties, present only on two-fact external frobs (the

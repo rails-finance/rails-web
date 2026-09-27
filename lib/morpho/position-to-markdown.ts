@@ -172,8 +172,10 @@ function timelineTable(events: BaseActivityEvent[], history: MarkdownHistoryScop
     const d = e.context.data;
     const label = (d.eventType[0].toUpperCase() + d.eventType.slice(1)).replace(/_/g, " ");
     const token = d.side === "collateral" ? d.collateralSymbol : d.loanSymbol;
-    // A figure in a token whose decimals did not load reads "not loaded".
-    const fig = (v: string, sym: string) => (unreadToken(e, sym) ? NOT_LOADED_CELL : amt(parseFloat(v)));
+    // A figure in a token whose decimals did not load, or a running balance the
+    // answer did not carry, reads "not loaded".
+    const fig = (v: string | undefined, sym: string) =>
+      v == null || unreadToken(e, sym) ? NOT_LOADED_CELL : amt(parseFloat(v));
     const amount = unreadToken(e, token) ? NOT_LOADED_CELL : amt(Math.abs(parseFloat(d.assetsDelta)));
     out.push(
       `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${token} | ${amount} | ${fig(d.collateralAfter, d.collateralSymbol)} | ${fig(d.borrowedAfter, d.loanSymbol)} | ${txCell(e)} |`,
