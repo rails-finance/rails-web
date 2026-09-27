@@ -61,8 +61,10 @@ import { InfoDisclosure } from "@/components/shared/info-disclosure";
 import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { StatCard, StateTransition } from "@/components/shared/state-transition";
+import { StatCard, StateTransition, TransitionArrow as CardArrow } from "@/components/shared/state-transition";
 import { StepMark } from "@/components/shared/step-mark";
+import { EventDateContext, EventTime } from "@/components/shared/event-time";
+import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl } from "@/lib/shared/chains";
@@ -101,6 +103,10 @@ import {
   marketNoteFigures,
   noteElapsedSeconds,
   notePriceFormat,
+  formatPrice,
+  priceDecimals,
+  PRICE_DECIMALS_CAP,
+  separatingDecimals,
   polarisEndLabel,
   priceGapEndLabel,
   priceGapFigures,
@@ -113,6 +119,20 @@ import {
   type ShareRateStepNote,
   type VaultTermsNote,
 } from "@/lib/shared/market-note";
+import { heldAmountProv, valueAtPriceProv, type HeldSource } from "@/lib/shared/market-note-cell-provenance";
+
+/** A figure at a fixed number of decimals, grouped. Locale pinned. */
+const grouped = (n: number, decimals: number): string =>
+  n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
+/** An amount the way a regular card's grid writes one: whole units from a
+ *  thousand up, two places below. */
+const amountText = (n: number): string => {
+  if (n === 0) return "0";
+  if (Math.abs(n) >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  if (Math.abs(n) < 0.01) return "<0.01";
+  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+};
 
 /** A receipted figure in a stat card: the text, its receipt, and the mark of
  *  the asset it counts (none for a block, a ratio, a percentage). */
@@ -124,6 +144,9 @@ interface NoteFigure {
   symbol?: string;
   /** Resolve the mark under another symbol (mMAMO wearing MAMO's). */
   iconAs?: string;
+  /** Greyed, the way a regular card states a figure the event left as it
+   *  was: the price move did not change it. */
+  muted?: boolean;
 }
 
 /** One cell of the open panel: a single figure, or a before → after pair. */
@@ -131,10 +154,27 @@ interface NoteStat {
   label: string;
   figure?: NoteFigure;
   transition?: { before: NoteFigure; after: NoteFigure };
-  /** A small receipted line under the value — "branch minimum 110%", "1
-   *  minute between them" — for the figure that qualifies the card's own
+  /** The figure's value at each end's price, drawn in the bordered value
+   *  pill a regular card draws beside a collateral amount. */
+  values?: { before: NoteFigure; after: NoteFigure };
+  /** A small receipted line under the value — "branch minimum 110%",
+   *  "23,739 BOLD / year" — for the figure that qualifies the card's own
    *  rather than deserving a card of its own. */
-  sub?: { text: string; figure: NoteFigure };
+  sub?: { text?: string; figure: NoteFigure; suffix?: string };
+}
+
+/** The price chip, bottom right, where a regular card states its price: one
+ *  unit of the asset at each end. */
+interface NoteChip {
+  before: NoteFigure;
+  after: NoteFigure;
+  /** The asset one unit of which is priced; its mark closes the chip. */
+  symbol: string;
+  iconAs?: string;
+  /** "$" for a USD price; otherwise the price is followed by its unit. */
+  prefix?: string;
+  unit?: string;
+  title: string;
 }
 
 /** The mark the asset was measured in, drawn overlapping the asset's own:
@@ -159,6 +199,12 @@ interface NoteBody {
    *  what moved. */
   quantity: string;
   stats: NoteStat[];
+  /** The line above the cells: what the stretch is, and how long it ran. */
+  intro?: { lead: string; elapsed?: NoteFigure; tail?: "ago" | "apart" };
+  /** The price chip. Absent on a kind with no price (a rate, a vault's terms). */
+  chip?: NoteChip;
+  /** The two blocks the stretch runs between, stated in the (i) beneath. */
+  blocks?: { before: NoteFigure; after: NoteFigure };
   derivation: ReactNode;
   /** False on a kind that observed ONE value rather than a move: the header
    *  then draws no direction glyph. A configuration event states its new
@@ -195,8 +241,12 @@ export function MarketNoteRow({
   note,
   isFirst = false,
   isLast = false,
+  datePrefix = null,
 }: {
   note: MarketNote;
+  /** The day stamp the timeline gives this row on its day-stamp rule
+   *  (`noteDatePrefixAfter` in ChainTruthTimeline). A live note reads "Now". */
+  datePrefix?: string | null;
   /** Spine terminus flags — default false, the historical (anchored) shape:
    *  a note always sits between two rows, so it is never truly first or
    *  last. A LIVE note in the timeline's head slot is the new visual first
@@ -264,36 +314,58 @@ export function MarketNoteRow({
           <Figure figure={body.headline} className="text-sm font-semibold" />
           <span className="text-xs text-rb-500">{body.quantity}</span>
           {body.format && <StepMark from={note.from.value} to={note.to.value} format={body.format} />}
+          <NoteTime note={note} datePrefix={datePrefix} />
         </>
       }
     >
-      <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:auto-rows-fr sm:grid-cols-2">
-        {body.stats.map((s) => (
-          <div key={s.label} className="h-full">
-            <StatCard label={s.label}>
-              <StateTransition>
-                {s.transition ? (
-                  <>
-                    <Figure figure={s.transition.before} className="text-sm font-semibold" />
-                    <span className="text-rb-400 dark:text-rb-500" aria-hidden="true">
-                      →
-                    </span>
-                    <Figure figure={s.transition.after} className="text-sm font-semibold" />
-                  </>
-                ) : (
-                  s.figure && <Figure figure={s.figure} className="text-sm font-semibold" />
+      {body.intro && (
+        <p className="px-5 pt-3 text-xs text-rb-500">
+          {body.intro.lead}
+          {body.intro.elapsed && (
+            <>
+              {", "}
+              <Figure figure={{ ...body.intro.elapsed, muted: true }} className="text-xs" />
+              {body.intro.tail === "apart" ? " apart" : " ago"}
+            </>
+          )}
+        </p>
+      )}
+      {body.stats.length > 0 && (
+        <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:auto-rows-fr sm:grid-cols-2">
+          {body.stats.map((s) => (
+            <div key={s.label} className="h-full">
+              <StatCard label={s.label}>
+                <StateTransition>
+                  {s.transition ? (
+                    <>
+                      <Figure figure={s.transition.before} className="text-sm font-semibold" />
+                      <TransitionArrow />
+                      <Figure figure={s.transition.after} className="text-sm font-semibold" />
+                    </>
+                  ) : (
+                    s.figure && <Figure figure={s.figure} className="text-sm font-semibold" />
+                  )}
+                  {s.values && (
+                    <>
+                      <ValuePill figure={s.values.before} />
+                      <TransitionArrow />
+                      <ValuePill figure={s.values.after} />
+                    </>
+                  )}
+                </StateTransition>
+                {s.sub && (
+                  <div className="mt-1 flex items-center gap-1 text-xs text-rb-500">
+                    {s.sub.text && <span>{s.sub.text}</span>}
+                    <Figure figure={s.sub.figure} className="text-xs font-medium" />
+                    {s.sub.suffix && <span>{s.sub.suffix}</span>}
+                  </div>
                 )}
-              </StateTransition>
-              {s.sub && (
-                <div className="mt-1 flex items-center gap-1 text-xs text-rb-500">
-                  <span>{s.sub.text}</span>
-                  <Figure figure={s.sub.figure} className="text-xs font-medium" />
-                </div>
-              )}
-            </StatCard>
-          </div>
-        ))}
-      </div>
+              </StatCard>
+            </div>
+          ))}
+        </div>
+      )}
+      {body.chip && <PriceChip chip={body.chip} />}
       <div className="px-4 pb-3 pt-1">
         <InfoDisclosure
           label="how this note was derived"
@@ -303,7 +375,17 @@ export function MarketNoteRow({
             </span>
           }
         >
-          <p className="text-xs leading-relaxed text-rb-500">{body.derivation}</p>
+          <p className="text-xs leading-relaxed text-rb-500">
+            {body.derivation}
+            {body.blocks && (
+              <>
+                {" "}
+                The stretch runs from block{" "}
+                <Figure figure={{ ...body.blocks.before, muted: true }} className="text-xs" /> to block{" "}
+                <Figure figure={{ ...body.blocks.after, muted: true }} className="text-xs" />.
+              </>
+            )}
+          </p>
         </InfoDisclosure>
       </div>
     </NoteRowShell>
@@ -353,6 +435,81 @@ function elapsedFigure(note: MarketNote, text: string, prov: Provenance): NoteFi
   return { text, prov, exact: `${noteElapsedSeconds(note) ?? ""} s` };
 }
 
+/** The row's time, where a card states its own: the date of the stretch's
+ *  later end, on the timeline's day-stamp rule, or "Now" on a live note, whose
+ *  later end is the price read at the chain head. Hidden with the timeline's
+ *  timestamps, like a card's. */
+function NoteTime({ note, datePrefix }: { note: MarketNote; datePrefix: string | null }) {
+  const { showTimestamps } = useTimelineDisplay();
+  if (!showTimestamps) return null;
+  if (note.live) {
+    return (
+      <span className="evt-meta ml-auto inline-flex items-center gap-2">
+        <span className="text-xs text-rb-500">Now</span>
+      </span>
+    );
+  }
+  if (!(note.to.timestamp > 0)) return null;
+  return (
+    <span className="evt-meta ml-auto inline-flex items-center gap-2">
+      <span className="text-xs">
+        <EventDateContext.Provider value={datePrefix}>
+          <EventTime ts={note.to.timestamp} />
+        </EventDateContext.Provider>
+      </span>
+    </span>
+  );
+}
+
+/** The regular card's arrow, with the "→" kept in the text so a copied or
+ *  exported reading of the note still says which way the pair runs. */
+function TransitionArrow() {
+  return (
+    <>
+      <CardArrow />
+      <span className="sr-only">→</span>
+    </>
+  );
+}
+
+/** A value in the bordered pill a regular card draws beside an amount. */
+function ValuePill({ figure }: { figure: NoteFigure }) {
+  return (
+    <Prov info={figure.prov} value={figure.exact ?? figure.text}>
+      <span className="flex items-center rounded-sm border-l-2 border-r-2 border-rb-500 px-1 py-0 text-xs font-bold tabular-nums text-rb-500">
+        {figure.text}
+      </span>
+    </Prov>
+  );
+}
+
+/** The price chip a regular card draws bottom right, with both ends. */
+function PriceChip({ chip }: { chip: NoteChip }) {
+  const end = (f: NoteFigure) => (
+    <Prov info={f.prov} value={f.exact ?? f.text}>
+      <span className="tabular-nums">
+        {chip.prefix ?? ""}
+        {f.text}
+      </span>
+    </Prov>
+  );
+  return (
+    <div className="flex items-center gap-2 px-4 py-2">
+      <span
+        className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-background px-2 py-1 text-xs font-bold text-rb-500"
+        title={chip.title}
+        data-note-price-chip=""
+      >
+        {end(chip.before)}
+        <span aria-hidden="true">→</span>
+        {end(chip.after)}
+        {chip.unit && <span>{chip.unit}</span>}
+        <TokenChipIcon symbol={chip.symbol} iconOverride={chip.iconAs} size={14} filterable={false} />
+      </span>
+    </div>
+  );
+}
+
 /** A receipted figure with, where it counts an asset, that asset's mark. */
 function Figure({ figure, className }: { figure: NoteFigure; className: string }) {
   return (
@@ -366,7 +523,9 @@ function Figure({ figure, className }: { figure: NoteFigure; className: string }
         ) : undefined
       }
     >
-      <span className={`tabular-nums text-foreground ${className}`}>{figure.text}</span>
+      <span className={`tabular-nums ${figure.muted ? "text-rb-500" : "text-foreground"} ${className}`}>
+        {figure.text}
+      </span>
     </Prov>
   );
 }
@@ -463,40 +622,26 @@ function shareRateBody(note: ShareRateStepNote, links: NoteLinks): NoteBody {
       </>
     );
   };
-  const stats: NoteStat[] = [
-    {
-      label: `Share rate (${note.unitLabel})`,
-      transition: {
-        before: { text: f.fromRate, prov: shareRateStepProv(note, "rate"), exact: String(note.from.value) },
-        after: { text: f.toRate, prov: shareRateStepProv(note, "rate"), exact: String(note.to.value) },
-      },
-    },
-    {
-      label: "Blocks",
-      transition: {
-        before: { text: f.fromBlock, prov: shareRateStepProv(note, "blocks"), exact: String(note.from.block) },
-        after: { text: f.toBlock, prov: shareRateStepProv(note, "blocks"), exact: String(note.to.block) },
-      },
-      ...(f.elapsed
-        ? { sub: { text: "elapsed", figure: elapsedFigure(note, f.elapsed, shareRateStepProv(note, "elapsed")) } }
-        : {}),
-    },
-  ];
+  // The regular Moonwell card states the mToken balance and what it
+  // represents in the underlying. The balance is the account's own; the rate
+  // moves what it is worth. A note with no slice states the rate alone.
+  const stats: NoteStat[] = [];
   if (note.slice && f.units && f.before && f.after) {
     const s = note.slice;
     stats.push(
       {
-        label: note.live ? "This account holds" : "This account held",
+        label: "mToken balance",
         figure: {
           text: f.units,
           prov: shareRateSliceProv(note, "units"),
           exact: String(s.units),
           symbol: s.unitSymbol,
           iconAs: s.valueSymbol,
+          muted: true,
         },
       },
       {
-        label: "Worth",
+        label: `Supplied (${s.valueSymbol})`,
         transition: {
           before: {
             text: f.before,
@@ -514,12 +659,34 @@ function shareRateBody(note: ShareRateStepNote, links: NoteLinks): NoteBody {
       },
     );
   }
+  const elapsed = f.elapsed ? elapsedFigure(note, f.elapsed, shareRateStepProv(note, "elapsed")) : undefined;
   return {
     label: `${note.marketSymbol} share rate`,
     measure: { kind: "protocol", id: "moonwell" },
     headline: { text: f.ratio, prov: shareRateStepProv(note, "ratio"), exact: String(note.ratio) },
     quantity: "share rate",
     format: formatShareRate,
+    // A historical step's two ends are other wallets' mints and redeems in the
+    // market, so it is dated by their distance apart; a live note's earlier end
+    // is this account's own last one.
+    intro: note.live
+      ? { lead: "Market fluctuation since this account's last mint or redeem", ...(elapsed ? { elapsed } : {}) }
+      : {
+          lead: "Share-rate step in the market, between two observations",
+          ...(elapsed ? { elapsed, tail: "apart" } : {}),
+        },
+    chip: {
+      before: { text: f.fromRate, prov: shareRateStepProv(note, "rate"), exact: String(note.from.value) },
+      after: { text: f.toRate, prov: shareRateStepProv(note, "rate"), exact: String(note.to.value) },
+      symbol: `m${note.marketSymbol}`,
+      iconAs: note.marketSymbol,
+      unit: note.marketSymbol,
+      title: `One m${note.marketSymbol} in ${note.marketSymbol} at each end (${note.unitLabel})`,
+    },
+    blocks: {
+      before: { text: f.fromBlock, prov: shareRateStepProv(note, "blocks"), exact: String(note.from.block) },
+      after: { text: f.toBlock, prov: shareRateStepProv(note, "blocks"), exact: String(note.to.block) },
+    },
     stats,
     learnMore: marketNoteShareRateContent(),
     derivation: note.live ? (
@@ -602,25 +769,70 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
       </>
     );
   };
-  const stats: NoteStat[] = [
-    {
-      label: `Oracle price (${note.unitLabel})`,
-      transition: {
-        before: { text: f.fromPrice, prov: priceProv(note, "price"), exact: String(note.from.value) },
-        after: { text: f.toPrice, prov: priceProv(note, "price"), exact: String(note.to.value) },
-      },
-    },
-    {
-      label: "Blocks",
-      transition: {
-        before: { text: f.fromBlock, prov: priceProv(note, "blocks"), exact: String(note.from.block) },
-        after: { text: f.toBlock, prov: priceProv(note, "blocks"), exact: String(note.to.block) },
-      },
-    },
-  ];
-  if (p && f.crBefore && f.crAfter && f.mcr && f.atBlock) {
+  const held: HeldSource = {
+    recordedBy: `this ${positionNoun}'s ${p ? endLabel(note.from) : "event"}`,
+    atBlock: p?.atBlock ?? note.from.block,
+    ...(note.marketAddress && !isPolaris
+      ? { contract: { name: `${note.marketSymbol} PriceFeed`, address: note.marketAddress } }
+      : {}),
+  };
+  // Polaris prices pETH in the market's own stable, so its values are in that
+  // stable, written after the figure; Liquity V2's are dollars.
+  const stable = isPolaris ? note.unitLabel.split(" per ")[0] : null;
+  const stats: NoteStat[] = [];
+  if (p) {
+    const vd = separatingDecimals(p.coll * note.from.value, p.coll * note.to.value, 0, 2);
+    const money = (n: number) => (stable ? `${grouped(n, vd)} ${stable}` : `$${grouped(n, vd)}`);
+    const priceText = (n: number) => formatPrice(n, priceDecimals(note));
+    const priceUnit = stable ?? "USD";
     stats.push({
-      label: "Collateral ratio at each price",
+      label: "Collateral",
+      figure: {
+        text: isPolaris ? grouped(p.coll, 4) : p.coll.toFixed(4),
+        exact: String(p.coll),
+        symbol: note.marketSymbol,
+        muted: true,
+        prov: heldAmountProv(note, "collateral", String(p.coll), held),
+      },
+      values: {
+        before: {
+          text: money(p.coll * note.from.value),
+          exact: String(p.coll * note.from.value),
+          prov: valueAtPriceProv(
+            note,
+            "before",
+            { label: "collateral", value: `${p.coll} ${note.marketSymbol}` },
+            { value: priceText(note.from.value), unit: priceUnit },
+            held,
+          ),
+        },
+        after: {
+          text: money(p.coll * note.to.value),
+          exact: String(p.coll * note.to.value),
+          prov: valueAtPriceProv(
+            note,
+            "after",
+            { label: "collateral", value: `${p.coll} ${note.marketSymbol}` },
+            { value: priceText(note.to.value), unit: priceUnit },
+            held,
+          ),
+        },
+      },
+    });
+    stats.push({
+      label: "Debt",
+      figure: {
+        text: amountText(p.debt),
+        exact: String(p.debt),
+        ...(p.debtSymbol ? { symbol: p.debtSymbol } : {}),
+        muted: true,
+        prov: heldAmountProv(note, "debt", String(p.debt), held),
+      },
+    });
+  }
+  if (p && f.crBefore && f.crAfter && f.mcr) {
+    stats.push({
+      label: isPolaris ? "Collateral ratio" : "Collateral Ratio",
       transition: {
         before: { text: f.crBefore, prov: positionProv(note, "crBefore"), exact: String(p.crBefore) },
         after: { text: f.crAfter, prov: positionProv(note, "crAfter"), exact: String(p.crAfter) },
@@ -631,9 +843,42 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
       },
     });
   }
-  if (f.elapsed) {
-    stats.push({ label: "Elapsed", figure: elapsedFigure(note, f.elapsed, priceProv(note, "elapsed")) });
+  if (p && !isPolaris && p.rate != null) {
+    const yearly = p.debt * (p.rate / 100);
+    stats.push({
+      label: "Interest Rate",
+      figure: {
+        text: `${p.rate.toFixed(1)}%`,
+        exact: String(p.rate),
+        muted: true,
+        prov: heldAmountProv(note, "annual interest rate", `${p.rate}%`, held),
+      },
+      ...(yearly > 0.01
+        ? {
+            sub: {
+              figure: {
+                text: amountText(yearly),
+                exact: String(yearly),
+                prov: heldAmountProv(note, "yearly interest", String(yearly), held, {
+                  formula: "debt × annual interest rate",
+                  inputs: [
+                    {
+                      label: "debt",
+                      value: `${p.debt} ${p.debtSymbol ?? ""}`.trim(),
+                      kind: "chain",
+                      pclass: "emitted",
+                    },
+                    { label: "annual interest rate", value: `${p.rate}%`, kind: "chain", pclass: "emitted" },
+                  ],
+                }),
+              },
+              suffix: `${p.debtSymbol ?? ""} / year`.trim(),
+            },
+          }
+        : {}),
+    });
   }
+  const pd = separatingDecimals(note.from.value, note.to.value, 0, PRICE_DECIMALS_CAP);
   return {
     label: `${note.marketSymbol} oracle price`,
     measure: isPolaris ? { kind: "protocol", id: note.measureProtocolId ?? "polaris" } : { kind: "usd" },
@@ -642,6 +887,21 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
     // The step mark states the same two prices the stat card does, so it takes
     // the note's own grain rather than a default that could round them alike.
     format: notePriceFormat(note),
+    intro: {
+      lead: "Market fluctuation since the last event",
+      ...(f.elapsed ? { elapsed: elapsedFigure(note, f.elapsed, priceProv(note, "elapsed")) } : {}),
+    },
+    chip: {
+      before: { text: grouped(note.from.value, pd), prov: priceProv(note, "price"), exact: String(note.from.value) },
+      after: { text: grouped(note.to.value, pd), prov: priceProv(note, "price"), exact: String(note.to.value) },
+      symbol: note.marketSymbol,
+      ...(stable ? { unit: stable } : { prefix: "$" }),
+      title: `${note.marketSymbol} price at each end of the stretch (${note.unitLabel})`,
+    },
+    blocks: {
+      before: { text: f.fromBlock, prov: priceProv(note, "blocks"), exact: String(note.from.block) },
+      after: { text: f.toBlock, prov: priceProv(note, "blocks"), exact: String(note.to.block) },
+    },
     stats,
     learnMore: marketNotePriceGapContent(),
     derivation: note.live ? (
@@ -723,42 +983,55 @@ function alchemixSharePriceBody(note: PriceGapNote, links: NoteLinks): NoteBody 
         {observationLinks(point, links)}
       </>
     );
-  const stats: NoteStat[] = [
-    {
-      label: `Share price (${note.unitLabel})`,
-      transition: {
-        before: { text: f.fromPrice, prov: alchemixSharePriceProv(note, "price"), exact: String(note.from.value) },
-        after: { text: f.toPrice, prov: alchemixSharePriceProv(note, "price"), exact: String(note.to.value) },
-      },
-    },
-    {
-      label: "Blocks",
-      transition: {
-        before: { text: f.fromBlock, prov: alchemixSharePriceProv(note, "blocks"), exact: String(note.from.block) },
-        after: { text: f.toBlock, prov: alchemixSharePriceProv(note, "blocks"), exact: String(note.to.block) },
-      },
-    },
-  ];
-  if (p && f.valueBefore && f.valueAfter) {
+  const held: HeldSource = {
+    recordedBy: `this position's ${alchemixEndLabel(note.from)}`,
+    atBlock: p?.atBlock ?? note.from.block,
+  };
+  // The regular card's reading grid: Debt, Collateral (the share count), and
+  // the collateralisation the position card states. The share count and the
+  // debt are the earlier reading's; only the share price moves.
+  const stats: NoteStat[] = [];
+  if (p) {
     stats.push({
-      label: `Collateral in ${under}`,
-      transition: {
-        before: {
-          text: f.valueBefore,
-          prov: alchemixSharePricePositionProv(note, "valueBefore"),
-          exact: String(p.coll * note.from.value),
-        },
-        after: {
-          text: f.valueAfter,
-          prov: alchemixSharePricePositionProv(note, "valueAfter"),
-          exact: String(p.coll * note.to.value),
-        },
+      label: "Debt",
+      figure: {
+        text: amountText(p.debt),
+        exact: String(p.debt),
+        ...(p.debtSymbol ? { symbol: p.debtSymbol } : {}),
+        muted: true,
+        prov: heldAmountProv(note, "debt", String(p.debt), held),
       },
+    });
+    stats.push({
+      label: "Collateral",
+      figure: {
+        text: amountText(p.coll),
+        exact: String(p.coll),
+        symbol: note.marketSymbol,
+        muted: true,
+        prov: heldAmountProv(note, "share count", String(p.coll), held),
+      },
+      ...(f.valueBefore && f.valueAfter
+        ? {
+            values: {
+              before: {
+                text: f.valueBefore,
+                prov: alchemixSharePricePositionProv(note, "valueBefore"),
+                exact: String(p.coll * note.from.value),
+              },
+              after: {
+                text: f.valueAfter,
+                prov: alchemixSharePricePositionProv(note, "valueAfter"),
+                exact: String(p.coll * note.to.value),
+              },
+            },
+          }
+        : {}),
     });
   }
   if (p && f.crBefore && f.crAfter && f.mcr) {
     stats.push({
-      label: "Collateralisation at each price",
+      label: "Collateralisation",
       transition: {
         before: { text: f.crBefore, prov: alchemixSharePricePositionProv(note, "crBefore"), exact: String(p.crBefore) },
         after: { text: f.crAfter, prov: alchemixSharePricePositionProv(note, "crAfter"), exact: String(p.crAfter) },
@@ -769,15 +1042,27 @@ function alchemixSharePriceBody(note: PriceGapNote, links: NoteLinks): NoteBody 
       },
     });
   }
-  if (f.elapsed) {
-    stats.push({ label: "Elapsed", figure: elapsedFigure(note, f.elapsed, alchemixSharePriceProv(note, "elapsed")) });
-  }
   return {
     label: `${note.marketSymbol} share price`,
     measure: { kind: "token", symbol: under },
     quantity: "share price",
     headline: { text: f.changeMagnitude, prov: alchemixSharePriceProv(note, "change"), exact: String(note.changePct) },
     format: notePriceFormat(note),
+    intro: {
+      lead: "Market fluctuation since the last event",
+      ...(f.elapsed ? { elapsed: elapsedFigure(note, f.elapsed, alchemixSharePriceProv(note, "elapsed")) } : {}),
+    },
+    chip: {
+      before: { text: f.fromPrice, prov: alchemixSharePriceProv(note, "price"), exact: String(note.from.value) },
+      after: { text: f.toPrice, prov: alchemixSharePriceProv(note, "price"), exact: String(note.to.value) },
+      symbol: note.marketSymbol,
+      unit: under,
+      title: `One ${note.marketSymbol} share in ${under} at each end of the stretch`,
+    },
+    blocks: {
+      before: { text: f.fromBlock, prov: alchemixSharePriceProv(note, "blocks"), exact: String(note.from.block) },
+      after: { text: f.toBlock, prov: alchemixSharePriceProv(note, "blocks"), exact: String(note.to.block) },
+    },
     stats,
     learnMore: marketNotePriceGapContent(),
     derivation: (
@@ -850,25 +1135,89 @@ function aaveV4PriceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
       </>
     );
   };
-  const stats: NoteStat[] = [
-    {
-      label: `Oracle price (${note.unitLabel})`,
-      transition: {
-        before: { text: f.fromPrice, prov: aaveV4PriceGapProv(note, "price"), exact: String(note.from.value) },
-        after: { text: f.toPrice, prov: aaveV4PriceGapProv(note, "price"), exact: String(note.to.value) },
-      },
-    },
-    {
-      label: "Blocks",
-      transition: {
-        before: { text: f.fromBlock, prov: aaveV4PriceGapProv(note, "blocks"), exact: String(note.from.block) },
-        after: { text: f.toBlock, prov: aaveV4PriceGapProv(note, "blocks"), exact: String(note.to.block) },
-      },
-    },
-  ];
+  // The regular card's grid is Collateral, Debt, the ratio and the borrow
+  // rate. The note carries the moved asset's own leg and the basket's totals
+  // at the earlier row, so the moved side states the asset's amount and its
+  // value at each price, the other side states its total, and the ratio cell
+  // is the health factor the note measures. The borrow rate is not on a note.
+  const held: HeldSource = {
+    recordedBy: `this position's ${aaveV4EndLabel(note.from)}`,
+    atBlock: h?.atBlock ?? note.from.block,
+  };
+  const stats: NoteStat[] = [];
+  if (h) {
+    const leg = h.leg;
+    const priceUnit = "USD";
+    const priceText = (n: number) => formatPrice(n, priceDecimals(note));
+    const legCell = (label: string): NoteStat | null => {
+      if (!leg) return null;
+      const vb = leg.amount * note.from.value;
+      const va = leg.amount * note.to.value;
+      const vd = separatingDecimals(vb, va, 0, 2);
+      const amount = { label: leg.side === "collateral" ? "collateral" : "debt", value: `${leg.amount} ${leg.symbol}` };
+      return {
+        label,
+        figure: {
+          text: amountText(leg.amount),
+          exact: String(leg.amount),
+          symbol: leg.symbol,
+          muted: true,
+          prov: heldAmountProv(note, `${leg.symbol} ${amount.label}`, String(leg.amount), held),
+        },
+        values: {
+          before: {
+            text: `$${grouped(vb, vd)}`,
+            exact: String(vb),
+            prov: valueAtPriceProv(
+              note,
+              "before",
+              amount,
+              { value: priceText(note.from.value), unit: priceUnit },
+              held,
+            ),
+          },
+          after: {
+            text: `$${grouped(va, vd)}`,
+            exact: String(va),
+            prov: valueAtPriceProv(note, "after", amount, { value: priceText(note.to.value), unit: priceUnit }, held),
+          },
+        },
+      };
+    };
+    const totalCell = (label: string, what: string, usd: number | undefined): NoteStat | null =>
+      usd == null
+        ? null
+        : {
+            label,
+            figure: {
+              text: `$${grouped(usd, 0)}`,
+              exact: String(usd),
+              muted: true,
+              prov: heldAmountProv(note, what, String(usd), held, {
+                formula: "Σ amount × price, at the row's own prices",
+                inputs: [
+                  {
+                    label: what,
+                    value: String(usd),
+                    kind: "chain-derived",
+                    pclass: "oracle",
+                    note: `every ${label.toLowerCase()} asset on the row at block ${h.atBlock}, at the price the row recorded for it`,
+                  },
+                ],
+              }),
+            },
+          };
+    const collateral =
+      leg?.side === "collateral"
+        ? legCell("Collateral")
+        : totalCell("Collateral", "collateral value", h.collateralValueUsd);
+    const debt = leg?.side === "debt" ? legCell("Debt") : totalCell("Debt", "debt value", h.debtUsd);
+    if (collateral) stats.push(collateral);
+    if (debt) stats.push(debt);
+  }
   if (h && f.hfBefore && f.hfAfter) {
     stats.push({
-      label: "Health factor at each price",
+      label: "Health Factor",
       transition: {
         before: { text: f.hfBefore, prov: aaveV4PriceGapHealthProv(note, "hfBefore"), exact: String(h.hfBefore) },
         after: { text: f.hfAfter, prov: aaveV4PriceGapHealthProv(note, "hfAfter"), exact: String(h.hfAfter) },
@@ -883,9 +1232,7 @@ function aaveV4PriceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
       },
     });
   }
-  if (f.elapsed) {
-    stats.push({ label: "Elapsed", figure: elapsedFigure(note, f.elapsed, aaveV4PriceGapProv(note, "elapsed")) });
-  }
+  const pd = separatingDecimals(note.from.value, note.to.value, 0, PRICE_DECIMALS_CAP);
   return {
     label: `${note.marketSymbol} oracle price`,
     measure: { kind: "usd" },
@@ -894,6 +1241,29 @@ function aaveV4PriceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
     // The step mark states the same two prices the stat card does, so it takes
     // the note's own grain rather than a default that could round them alike.
     format: notePriceFormat(note),
+    intro: {
+      lead: "Market fluctuation since the last event",
+      ...(f.elapsed ? { elapsed: elapsedFigure(note, f.elapsed, aaveV4PriceGapProv(note, "elapsed")) } : {}),
+    },
+    chip: {
+      before: {
+        text: grouped(note.from.value, pd),
+        prov: aaveV4PriceGapProv(note, "price"),
+        exact: String(note.from.value),
+      },
+      after: {
+        text: grouped(note.to.value, pd),
+        prov: aaveV4PriceGapProv(note, "price"),
+        exact: String(note.to.value),
+      },
+      symbol: note.marketSymbol,
+      prefix: "$",
+      title: `${note.marketSymbol} price at each end of the stretch (${note.unitLabel})`,
+    },
+    blocks: {
+      before: { text: f.fromBlock, prov: aaveV4PriceGapProv(note, "blocks"), exact: String(note.from.block) },
+      after: { text: f.toBlock, prov: aaveV4PriceGapProv(note, "blocks"), exact: String(note.to.block) },
+    },
     stats,
     learnMore: marketNotePriceGapContent(),
     derivation: note.live ? (
@@ -969,31 +1339,39 @@ function aaveFamilyPriceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody 
   const f = priceGapFigures(note);
   const sym = note.marketSymbol;
   const rowNoun = note.protocol === "spark" ? "a SparkLend row" : "an Aave V3 row";
-  const stats: NoteStat[] = [
-    {
-      label: `Oracle price (${note.unitLabel})`,
-      transition: {
-        before: { text: f.fromPrice, prov: aaveFamilyPriceGapProv(note, "price"), exact: String(note.from.value) },
-        after: { text: f.toPrice, prov: aaveFamilyPriceGapProv(note, "price"), exact: String(note.to.value) },
-      },
-    },
-    {
-      label: "Blocks",
-      transition: {
-        before: { text: f.fromBlock, prov: aaveFamilyPriceGapProv(note, "blocks"), exact: String(note.from.block) },
-        after: { text: f.toBlock, prov: aaveFamilyPriceGapProv(note, "blocks"), exact: String(note.to.block) },
-      },
-    },
-  ];
-  if (f.elapsed) {
-    stats.push({ label: "Elapsed", figure: elapsedFigure(note, f.elapsed, aaveFamilyPriceGapProv(note, "elapsed")) });
-  }
+  // Price-only: a V3 row prices the reserve it touched and no other, so there
+  // is no position state at the earlier row to draw the regular grid from.
+  const stats: NoteStat[] = [];
+  const pd = separatingDecimals(note.from.value, note.to.value, 0, PRICE_DECIMALS_CAP);
   return {
     label: `${sym} oracle price`,
     measure: { kind: "usd" },
     quantity: "oracle price",
     headline: { text: f.changeMagnitude, prov: aaveFamilyPriceGapProv(note, "change"), exact: String(note.changePct) },
     format: notePriceFormat(note),
+    intro: {
+      lead: `Market fluctuation since this position last touched ${sym}`,
+      ...(f.elapsed ? { elapsed: elapsedFigure(note, f.elapsed, aaveFamilyPriceGapProv(note, "elapsed")) } : {}),
+    },
+    chip: {
+      before: {
+        text: grouped(note.from.value, pd),
+        prov: aaveFamilyPriceGapProv(note, "price"),
+        exact: String(note.from.value),
+      },
+      after: {
+        text: grouped(note.to.value, pd),
+        prov: aaveFamilyPriceGapProv(note, "price"),
+        exact: String(note.to.value),
+      },
+      symbol: sym,
+      prefix: "$",
+      title: `${sym} price at each end of the stretch (${note.unitLabel})`,
+    },
+    blocks: {
+      before: { text: f.fromBlock, prov: aaveFamilyPriceGapProv(note, "blocks"), exact: String(note.from.block) },
+      after: { text: f.toBlock, prov: aaveFamilyPriceGapProv(note, "blocks"), exact: String(note.to.block) },
+    },
     stats,
     learnMore: marketNotePriceGapContent(),
     derivation: (
@@ -1146,7 +1524,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     measure: { kind: "protocol", id: "polaris" },
     headline: { text: f.toRate, prov: rateStepProv(note, "rate"), exact: String(note.to.value) },
     quantity: "primary rate",
-    stats,
+    ...liftTimeCells(stats),
     learnMore: marketNoteRateStepContent(),
     derivation: note.live ? (
       <>
@@ -1335,7 +1713,7 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     measure: { kind: "protocol", id: "makerdao" },
     headline: { text: f.toRate, prov: makerRateStepProv(note, "rate"), exact: String(note.to.value) },
     quantity: "stability fee",
-    stats,
+    ...liftTimeCells(stats),
     learnMore: marketNoteRateStepContent(),
     derivation: note.live ? (
       <>
@@ -1518,7 +1896,7 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
     measure: { kind: "protocol", id: note.protocol === "spark" ? "spark" : "aave-v3" },
     headline: { text: f.toRate, prov: aaveFamilyRateStepProv(note, "rate"), exact: String(note.to.value) },
     quantity: rateNoun,
-    stats,
+    ...liftTimeCells(stats),
     learnMore: marketNoteRateStepContent(),
     derivation: note.live ? (
       <>
@@ -1561,5 +1939,20 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
         )}
       </>
     ),
+  };
+}
+
+/** The rate-step kinds build their cells with the stretch's blocks and elapsed
+ *  time among them. The opened note states the elapsed time in its lead line
+ *  and the blocks in the (i), so they come out of the grid here, receipts and
+ *  all. */
+function liftTimeCells(stats: NoteStat[]): Pick<NoteBody, "stats" | "intro" | "blocks"> {
+  const blocksCell = stats.find((c) => c.label === "Blocks" && c.transition);
+  const elapsedCell = stats.find((c) => c.label === "Elapsed" && c.figure);
+  const elapsed = elapsedCell?.figure ?? (blocksCell?.sub?.text === "elapsed" ? blocksCell.sub.figure : undefined);
+  return {
+    stats: stats.filter((c) => c !== blocksCell && c !== elapsedCell),
+    intro: { lead: "Market fluctuation since the last event", ...(elapsed ? { elapsed } : {}) },
+    ...(blocksCell?.transition ? { blocks: blocksCell.transition } : {}),
   };
 }

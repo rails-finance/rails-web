@@ -291,6 +291,8 @@ function assetMove(
       debtUsd: basket.debtUsd,
       atBlock: e.blockNumber,
       ltSource: "chain-head",
+      leg: { symbol, amount: leg.amount, side: asCollateral ? "collateral" : "debt" },
+      collateralValueUsd: basket.collateral.reduce((sum, l) => sum + l.amount * l.price, 0),
     },
     runway,
     consumed,

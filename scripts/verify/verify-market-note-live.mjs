@@ -86,7 +86,7 @@ const blk = (n) => n.toLocaleString("en-US");
  *  the `label` stat card's before→after pair and assert it sits within `tol`
  *  blocks of a route read taken moments apart on this same run. */
 function blockNear(text, label, wantBlock, tol) {
-  const re = new RegExp(`${label}.*?[\\d,]+\\s*→\\s*([\\d,]+)`);
+  const re = new RegExp(`${label}.*?[\\d,]+\\s*(?:→|to block)\\s*([\\d,]+)`);
   const m = re.exec(text);
   if (!m) return { ok: false, got: null };
   const got = Number(m[1].replace(/,/g, ""));
@@ -105,6 +105,15 @@ function afterArrow(text, label) {
   const re = new RegExp(`${label}.*?([\\d.,]+)\\s*(?:%|pp)?\\s*→\\s*([\\d.,]+)`);
   const m = re.exec(text);
   return m ? Number(m[2].replace(/,/g, "")) : null;
+}
+
+/** The later half of the LAST before → after pair in the note's text. Since
+ *  2026-09-27 a price note states its price pair on the price chip under the
+ *  grid ("$1,565 → $2,709"), the last pair before the (i), whose prose states
+ *  none; the header's step mark draws its two prices with no arrow. */
+function lastArrowPair(text) {
+  const all = [...text.matchAll(/\$?([\d.,]+)\s*→\s*\$?([\d.,]+)/g)];
+  return all.length ? Number(all[all.length - 1][2].replace(/,/g, "")) : null;
 }
 
 console.log("Market notes — the toolbar pill and the live note\n");
@@ -202,13 +211,13 @@ check(
   priceText8.includes(formatPrice(FROM_PRICE_8)),
   `wanted ${formatPrice(FROM_PRICE_8)}`,
 );
-const gotPrice8 = afterArrow(priceText8, "Oracle price");
+const gotPrice8 = lastArrowPair(priceText8);
 check(
   "1e. the price note's later price is within 0.5% of the freshly-read overlay price",
   gotPrice8 != null && pctWithin(gotPrice8, liveChain8.price.pethInDebt, 0.005),
   `page ${gotPrice8}, overlay ${liveChain8.price.pethInDebt}`,
 );
-const priceBlock8 = blockNear(priceText8, "Blocks", liveChain8.blockNumber, 200);
+const priceBlock8 = blockNear(priceText8, "runs from block", liveChain8.blockNumber, 200);
 check(
   "1f. the price note's later block is within 200 blocks of the overlay's blockNumber",
   priceBlock8.ok,
@@ -499,13 +508,13 @@ check(
   textB.includes(formatPrice(FROM_PRICE_B)),
   textB.slice(0, 120),
 );
-const gotPriceB = afterArrow(textB, "Oracle price");
+const gotPriceB = lastArrowPair(textB);
 check(
   "5c. the note's later price is within 0.5% of the WETH oracle route's price, read just now",
   gotPriceB != null && pctWithin(gotPriceB, oracleB.data.weth, 0.005),
   `page ${gotPriceB}, route ${oracleB.data.weth}`,
 );
-const blockB = blockNear(textB, "Blocks", headB.blockNumber, 200);
+const blockB = blockNear(textB, "runs from block", headB.blockNumber, 200);
 check(
   "5d. the note's later block is within 200 blocks of /api/head",
   blockB.ok,
@@ -561,7 +570,7 @@ check(
   mamoText.includes(formatShareRate(FROM_RATE_MAMO)),
   `wanted ${formatShareRate(FROM_RATE_MAMO)}`,
 );
-const gotRateMamo = afterArrow(mamoText, "Share rate");
+const gotRateMamo = lastArrowPair(mamoText);
 check(
   "6d. the note's later rate is within 0.5% of the freshly-read overlay exchangeRate",
   gotRateMamo != null && pctWithin(gotRateMamo, freshMamo.exchangeRate, 0.005),

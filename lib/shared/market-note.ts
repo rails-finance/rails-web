@@ -227,6 +227,12 @@ export interface PriceGapHealth {
   /** The block the amounts and the other assets' prices were recorded at. */
   atBlock: number;
   ltSource: "chain-head";
+  /** The moved asset's own leg of the basket at the earlier row: its amount,
+   *  and which side of the position holds it. The opened note values this
+   *  amount at each end's price. */
+  leg?: { symbol: string; amount: number; side: "collateral" | "debt" };
+  /** The collateral at the earlier price, unweighted: Σ(collateral × price). */
+  collateralValueUsd?: number;
 }
 
 /** The position's own state across a price gap: the debt and collateral its
@@ -249,6 +255,12 @@ export interface PriceGapPosition {
    *  the collateral's value in this asset, stated at each end. Absent on the
    *  other homes, whose collateral is the priced asset. */
   valueSymbol?: string;
+  /** What the debt is denominated in ("BOLD", "USDp", "alUSD"), for the opened
+   *  note's Debt cell. Absent where the builder does not know it. */
+  debtSymbol?: string;
+  /** Liquity V2: the annual interest rate the earlier event logged, in percent
+   *  (4.1 = 4.1%), for the opened note's Interest Rate cell. */
+  rate?: number;
 }
 
 /** An ERC-4626 vault's OWN TERMS, changed for every holder at once — the
@@ -878,10 +890,17 @@ export function priceGapNotesFor(events: readonly BaseActivityEvent[], branch: P
       consumed,
       runway,
       endedBy,
-      position: { crBefore, crAfter, mcrPct, debt, coll, atBlock: a.blockNumber },
+      position: { crBefore, crAfter, mcrPct, debt, coll, atBlock: a.blockNumber, ...liquityPositionExtras(da) },
     });
   }
   return out;
+}
+
+/** The debt's symbol and the logged rate at the earlier event, for the opened
+ *  note's Debt and Interest Rate cells. */
+function liquityPositionExtras(d: LiquityContext): { debtSymbol: string; rate?: number } {
+  const rate = d.stateAfter?.annualInterestRate;
+  return { debtSymbol: d.assetType ?? "BOLD", ...(rate != null && rate > 0 ? { rate } : {}) };
 }
 
 /** One end of a price gap. Both ends are events on this page, so each carries
@@ -988,7 +1007,7 @@ export function livePriceGapNote(
     consumed,
     runway,
     endedBy: "head",
-    position: { crBefore, crAfter, mcrPct, debt, coll, atBlock: a.blockNumber },
+    position: { crBefore, crAfter, mcrPct, debt, coll, atBlock: a.blockNumber, ...liquityPositionExtras(da) },
     live: true,
   };
 }
@@ -1108,7 +1127,7 @@ export function polarisPriceGapNotesFor(
       consumed,
       runway,
       endedBy,
-      position: { crBefore, crAfter, mcrPct, debt, coll, atBlock: a.blockNumber },
+      position: { crBefore, crAfter, mcrPct, debt, coll, atBlock: a.blockNumber, debtSymbol: opts.stable },
       measureKind: "protocol",
       measureProtocolId: "polaris",
       polarisMarket: opts.market,
@@ -1174,7 +1193,7 @@ export function livePolarisPriceGapNote(
     consumed,
     runway,
     endedBy: "head",
-    position: { crBefore, crAfter, mcrPct, debt, coll, atBlock: a.blockNumber },
+    position: { crBefore, crAfter, mcrPct, debt, coll, atBlock: a.blockNumber, debtSymbol: opts.stable },
     measureKind: "protocol",
     measureProtocolId: "polaris",
     polarisMarket: opts.market,

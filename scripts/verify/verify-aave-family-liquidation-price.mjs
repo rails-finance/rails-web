@@ -395,9 +395,9 @@ for (const fx of FIXTURES) {
     const [a, b] = pair(first.priceA, first.priceB);
     check(
       `4a. ${first.id} states ${a} → ${b}`,
-      new RegExp(
-        `Oracle price \\(USD per ${fx.symbol}\\)\\s*${a.replace(/\./g, "\\.")}\\s*→\\s*${b.replace(/\./g, "\\.")}`,
-      ).test(text),
+      // 2026-09-27: the header's step mark states the pair at the note's grain
+      // ("23,547.71 21,347.44"); the price chip under the cells states it again.
+      new RegExp(`oracle price\\s*${a.replace(/\./g, "\\.")}\\s*${b.replace(/\./g, "\\.")}`).test(text),
       text.slice(0, 240),
     );
     check(

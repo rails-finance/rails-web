@@ -1092,7 +1092,7 @@ const expectedDesc = (rep) => [...rep].sort((a, b) => b.to - a.to || (a.id < b.i
 
 /** The two figures a note row states as a transition, read off its text. */
 const laterOf = (text, label) => {
-  const m = new RegExp(`${label}.*?[\\d.,]+\\s*→\\s*([\\d.,]+)`).exec(text);
+  const m = new RegExp(`${label}.*?[\\d.,]+\\s*(?:→|to block)\\s*\\$?([\\d.,]+)`).exec(text);
   return m ? Number(m[1].replace(/,/g, "")) : null;
 };
 
@@ -1107,8 +1107,11 @@ const laterEnd = async () => api("/api/oracle/aave-v4");
  *  page — never pinned. */
 async function checkLaterEnd(label, text, f, symbol, now) {
   const want = priceBySymbol(now, f.overlay.reserves)[symbol];
-  const gotPrice = laterOf(text, "Oracle price");
-  const gotBlock = laterOf(text, "Blocks");
+  // 2026-09-27: the price pair is the chip ("$2,497 → $2,709"), the last
+  // dollar pair before the (i), below the value pills; the blocks sit in the (i).
+  const chips = [...text.matchAll(/\$([\d.,]+)\s*→\s*\$([\d.,]+)/g)];
+  const gotPrice = chips.length ? Number(chips[chips.length - 1][2].replace(/,/g, "")) : null;
+  const gotBlock = laterOf(text, "runs from block");
   check(
     `${label}-i. its later price is within 1% of the ${symbol} price the oracle map answers when re-read`,
     gotPrice != null && want > 0 && pctWithin(gotPrice, want, 0.01),
@@ -1195,7 +1198,11 @@ if (!liveNoteA) {
     `row states ${liveNoteA.statedByRow}, chain ${liveNoteA.priceA}`,
   );
   await checkLaterEnd("2f", liveTextA, fx.A, "AAVE", await laterEnd());
-  check("2h. the live row states an Elapsed cell", /Elapsed/.test(liveTextA), liveTextA.slice(0, 120));
+  check(
+    "2h. the live row states the elapsed time in its lead line",
+    /Market fluctuation since the last event, \d+ (?:minutes?|hrs?|days?) ago/.test(liveTextA),
+    liveTextA.slice(0, 120),
+  );
   check(
     "2h-ii. and its receipt names the pinned read as the earlier end's source",
     liveTextA.includes(`/api/oracle/aave-v4?block=${earlierBlockA}`),
@@ -1208,7 +1215,7 @@ const rowA = pageA.locator(`[data-market-note="${firstA.id}"]`);
 const textA = await openNote(rowA.first());
 check(
   `2i. the ${blk(firstA.from)} → ${blk(firstA.to)} row states the health factor at each price, ${formatHf(firstA.hfA)} → ${formatHf(firstA.hfB)}`,
-  new RegExp(`Health factor at each price\\s*${formatHf(firstA.hfA)}\\s*→\\s*${formatHf(firstA.hfB)}`).test(textA),
+  new RegExp(`Health Factor\\s*${formatHf(firstA.hfA)}\\s*→\\s*${formatHf(firstA.hfB)}`).test(textA),
   textA.slice(0, 300),
 );
 check("2j. and the sub line reads liquidation at 1.00", /liquidation at\s*1\.00/.test(textA), "");
@@ -1303,7 +1310,7 @@ check(
   "4d. and each one states the health factor at each price — this position's rows price the whole basket",
   // `every` over an empty list is true, so the count is asserted first: a page
   // that drew no row must not read as a page whose rows all behaved.
-  cTexts.length > 0 && cTexts.every((t) => /Health factor at each price/.test(t)),
+  cTexts.length > 0 && cTexts.every((t) => /Health Factor/.test(t)),
   cTexts.length === 0 ? "no rows read" : (cTexts.find((t) => !/Health factor/.test(t))?.slice(0, 160) ?? ""),
 );
 check(
@@ -1312,7 +1319,7 @@ check(
     cTexts.every((t, i) => {
       const n = liqDrawn[i];
       return (
-        new RegExp(`Health factor at each price\\s*${formatHf(n.hfA)}\\s*→\\s*${formatHf(n.hfB)}`).test(t) &&
+        new RegExp(`Health Factor\\s*${formatHf(n.hfA)}\\s*→\\s*${formatHf(n.hfB)}`).test(t) &&
         /liquidation at\s*1\.00/.test(t) &&
         t.includes(formatPrice(n.priceA)) &&
         t.includes(formatPrice(n.priceB))
@@ -1340,8 +1347,7 @@ for (const n of PIN_C_LIVE) {
   const text = await openNote(pageC.locator(`[data-market-note="${n.id}"]`).first());
   check(
     `4g-${n.symbol}-ii. the live row states that earlier price and the health factor ${formatHf(n.hfA)} it makes of the basket at that block`,
-    text.includes(formatPrice(n.priceA)) &&
-      new RegExp(`Health factor at each price\\s*${formatHf(n.hfA)}\\s*→`).test(text),
+    text.includes(formatPrice(n.priceA)) && new RegExp(`Health Factor\\s*${formatHf(n.hfA)}\\s*→`).test(text),
     text.slice(0, 220),
   );
   await checkLaterEnd(`4g-${n.symbol}-iii`, text, fx.C, n.symbol, headNowC);
@@ -1587,7 +1593,7 @@ async function checkStalledLaneFixture(section, name, symbol, anchorBlock, ancho
   }
   check(
     `${section}d. the row carries a health payload, built leg by leg on the pinned read`,
-    n.health != null && /Health factor at each price/.test(text),
+    n.health != null && /Health Factor/.test(text),
     `rule health ${n.health ? "yes" : "no"}`,
   );
   check(

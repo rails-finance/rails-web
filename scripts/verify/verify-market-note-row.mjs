@@ -454,6 +454,14 @@ if (noteCount > 0) {
     .locator("[data-market-note-open]")
     .waitFor({ state: "attached", timeout: 10_000 })
     .catch(() => {});
+  // 2026-09-27: the blocks moved out of the opened grid into the (i).
+  const trigger = noteRow.getByRole("button", { name: /how this note was derived/i });
+  if (await trigger.count())
+    await trigger
+      .first()
+      .click()
+      .catch(() => {});
+  await page.waitForTimeout(200);
 }
 const opened = noteCount > 0 && (await page.locator("[data-market-note-open]").count()) === 1;
 check("2o  clicking the header opens the note's panel", opened);

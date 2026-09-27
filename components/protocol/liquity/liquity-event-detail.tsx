@@ -14,7 +14,6 @@ import {
   StatCard,
   StateTransition,
 } from "@/components/shared/state-transition";
-import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import type { ReactNode } from "react";
 import { Prov, type Provenance, type ProvVerify } from "@/components/shared/provenance";
 import {
@@ -164,7 +163,13 @@ function DebtMetric({
         </StateTransition>
         {((upfrontFee !== undefined && upfrontFee > 0) || totalAccruedFees > 0.01) && (
           <div className="text-xs  mt-0.5">
-            {totalAccruedFees > 0.01 && <span>incl. +{totalAccruedFees.toFixed(2)} interest</span>}
+            {totalAccruedFees > 0.01 && (
+              <span>
+                incl. +
+                {totalAccruedFees.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+                interest
+              </span>
+            )}
             {upfrontFee !== undefined && upfrontFee > 0 && (
               <>
                 {totalAccruedFees > 0.01 && <span> +</span>}
@@ -190,7 +195,7 @@ function CollateralMetric({
   beforeInUsd,
   afterInUsd,
   isClose,
-  isLiquidation,
+  beforeKnownAtThisBlock,
   provBefore,
   provAfter,
   usdProvBefore,
@@ -203,15 +208,24 @@ function CollateralMetric({
   beforeInUsd: number;
   afterInUsd: number;
   isClose: boolean;
-  isLiquidation: boolean;
+  /** The before amount is reconstructed at this event's block (liquidation,
+   *  close, redemption), so it can be valued at this event's price. */
+  beforeKnownAtThisBlock: boolean;
   provBefore?: Provenance;
   provAfter?: Provenance;
   usdProvBefore?: Provenance;
   usdProvAfter?: Provenance;
   changeEcho?: ChangeProv;
 }) {
-  const { showUsdValues } = useTimelineDisplay();
   const hasChange = isClose ? before !== after : before !== 0 && before !== after;
+  // The opened card states the collateral's USD value at this event's oracle
+  // price whenever that price is known. It does not read the timeline's "USD
+  // values" display switch: that switch thins the spine and the snapshot rows,
+  // and with it off the grid used to drop the only USD figure the event states.
+  // The before amount carries one where it is reconstructed at this same block
+  // (liquidation, close, redemption); an ordinary adjustment's before state
+  // was priced at the previous event, so it takes none here.
+  const beforeUsdKnown = beforeKnownAtThisBlock && beforeInUsd > 0;
 
   // Same arrow-as-toggle as Debt: `before →` ⟷ `+delta =` (delta in collateral
   // units). Disabled on close, where the "after" is the CLOSED label, not a
@@ -242,7 +256,7 @@ function CollateralMetric({
             before={<P info={provBefore}>{formatColl(before)}</P>}
             delta={isClose ? null : deltaNode}
             beforeExtra={
-              showUsdValues && isLiquidation && beforeInUsd > 0 ? (
+              beforeUsdKnown ? (
                 <P info={usdProvBefore}>
                   <span className="text-xs flex font-bold items-center text-rb-500 border-l-2 border-r-2 border-rb-500 rounded-sm px-1 py-0">
                     {formatUsd(beforeInUsd)}
@@ -264,7 +278,7 @@ function CollateralMetric({
             </span>
           </P>
         )}
-        {showUsdValues && !isClose && after > 0 && (
+        {!isClose && after > 0 && afterInUsd > 0 && (
           <P info={usdProvAfter}>
             <span className="text-xs flex font-bold items-center text-rb-500 border-l-2 border-r-2 border-rb-500 rounded-sm px-1 py-0">
               {formatUsd(afterInUsd)}
@@ -860,7 +874,7 @@ export function LiquityEventDetail({
                 beforeInUsd={beforeCollInUsd}
                 afterInUsd={afterCollInUsd}
                 isClose={isClose}
-                isLiquidation={isLiquidation}
+                beforeKnownAtThisBlock={isLiquidation || isCloseRecon || (isRedemption && !!troveOperation)}
                 provBefore={collBeforeProv}
                 provAfter={collAfterProv}
                 usdProvBefore={usdBeforeProv}

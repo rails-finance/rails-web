@@ -78,7 +78,7 @@ function afterArrow(text, label) {
  *  `label` stat card's before→after pair and assert it sits within `tol`
  *  blocks of a route read taken moments apart on this same run. */
 function blockNear(text, label, wantBlock, tol) {
-  const re = new RegExp(`${label}.*?[\\d,]+\\s*→\\s*([\\d,]+)`);
+  const re = new RegExp(`${label}.*?[\\d,]+\\s*(?:→|to block)\\s*([\\d,]+)`);
   const m = re.exec(text);
   if (!m) return { ok: false, got: null };
   const got = Number(m[1].replace(/,/g, ""));
@@ -326,13 +326,16 @@ async function checkWallet(label, wallet, fixtures) {
       text.includes(formatShareRate(f.fromRate)),
       `wanted ${formatShareRate(f.fromRate)}`,
     );
-    const gotRate = afterArrow(text, "Share rate");
+    // 2026-09-27: the rate pair is the price chip ("0.0200161 → 0.0200339
+    // WETH"), the first text arrow after the header's "share rate" word.
+    const gotRate = afterArrow(text, "share rate");
     check(
       `3/4.${label}.${f.key} to-rate within 0.5% of the freshly-read overlay exchangeRate`,
       gotRate != null && freshMarket != null && pctWithin(gotRate, freshMarket.exchangeRate, 0.005),
       `page ${gotRate}, overlay ${freshMarket?.exchangeRate}`,
     );
-    const blk = blockNear(text, "Blocks", fresh.blockNumber, 200);
+    // The blocks now sit in the (i): "runs from block X to block Y".
+    const blk = blockNear(text, "runs from block", fresh.blockNumber, 200);
     check(
       `3/4.${label}.${f.key} to-block within 200 of the overlay's blockNumber`,
       blk.ok,
@@ -345,8 +348,8 @@ async function checkWallet(label, wallet, fixtures) {
       `wanted ${formatUnits(wantUnits)}`,
     );
     check(
-      `3/4.${label}.${f.key} states "elapsed" — the timestamp landed`,
-      text.includes("elapsed"),
+      `3/4.${label}.${f.key} states the elapsed time — the timestamp landed`,
+      /\d+ (?:minutes?|hrs?|days?) (?:ago|apart)/.test(text),
       text.slice(0, 200),
     );
   }

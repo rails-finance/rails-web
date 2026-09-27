@@ -420,7 +420,15 @@ const rowText = async (page, noteId) =>
 // `textContent` runs the elements together with no space between them, so the
 // comparison is on content with ALL whitespace removed: exact about what the
 // row says, silent about how the DOM spaces it.
-const squash = (t) => t.replace(/\s+/g, "");
+// 2026-09-27: the header also carries the row's time where a card carries its
+// own (the later end's date and time, or "Now"), so the at-rest comparison
+// drops that trailing stamp and holds the rest exact.
+const squash = (t) =>
+  t
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/(?:\d{1,2} [A-Z][a-z]{2} '\d{2} )?\d{2}:\d{2}$|Now$/, "")
+    .replace(/\s+/g, "");
 const restA = await rowText(page27, want27[0].id);
 const restB = await rowText(page27, want27[1].id);
 check(
@@ -625,6 +633,10 @@ for (const key of ["usdp/296"]) {
     const row = page.locator(`[data-market-note="${allIds[0]}"]`);
     await row.getByRole("button", { expanded: false }).first().click();
     await page.waitForTimeout(300);
+    // The blocks sit in the (i) since 2026-09-27.
+    const trigger = row.getByRole("button", { name: /how this note was derived/i });
+    if (await trigger.count()) await trigger.first().click();
+    await page.waitForTimeout(200);
     opened = await rowText(page, allIds[0]);
   }
   check(

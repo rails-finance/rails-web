@@ -415,8 +415,13 @@ function adjustTroveSlots(
       clause(
         <>
           Its debt rose by {fmtCurrency(totalIncrease, debtSym)} in total: {fmtCurrency(debtChange, debtSym)} borrowed
-          {totalAccruedFees > 0.01 ? ` + ${totalAccruedFees.toFixed(2)} accrued` : ""}
-          {adjustFee > 0 ? ` + ${adjustFee.toFixed(2)} fee` : ""}.
+          {totalAccruedFees > 0.01
+            ? ` + ${totalAccruedFees.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} accrued`
+            : ""}
+          {adjustFee > 0
+            ? ` + ${adjustFee.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} fee`
+            : ""}
+          .
         </>,
       ),
     );

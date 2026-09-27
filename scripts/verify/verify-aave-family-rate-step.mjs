@@ -694,6 +694,11 @@ for (const p of PAGES) {
     const expander = row.getByRole("button", { expanded: false }).first();
     if (await expander.count()) await expander.click();
     await page.waitForTimeout(250);
+    // The blocks sit in the (i) since 2026-09-27, and the elapsed time in the
+    // lead line above the cells.
+    const derivation = row.getByRole("button", { name: /how this note was derived/i });
+    if (await derivation.count()) await derivation.first().click();
+    await page.waitForTimeout(150);
     const text = (await row.textContent()).replace(/\s+/g, " ");
     if (!text.includes(ratePct(w.fromRate / 100)))
       headDiffs.push(`${id} lacks the pinned ${ratePct(w.fromRate / 100)}`);
@@ -707,7 +712,8 @@ for (const p of PAGES) {
     if (!blocks.some((b) => Math.abs(b - (data.overlay.blockNumber ?? 0)) <= 200)) {
       headDiffs.push(`${id} names no block within 200 of the overlay's ${data.overlay.blockNumber}`);
     }
-    if (!/Elapsed/.test(text)) headDiffs.push(`${id} has no Elapsed cell`);
+    if (!/since the last event, \d+ (?:minutes?|hrs?|days?) ago/.test(text))
+      headDiffs.push(`${id} states no elapsed time in its lead line`);
     if (await row.getByRole("button", { expanded: true }).count()) {
       await row
         .getByRole("button", { expanded: true })
@@ -718,7 +724,7 @@ for (const p of PAGES) {
     }
   }
   check(
-    `2d. ${p.wallet.slice(0, 10)}… — each head row states its earlier rate, and its later end matches the overlay re-read in this run (rate within 0.05 pp, block within 200) with an Elapsed cell`,
+    `2d. ${p.wallet.slice(0, 10)}… — each head row states its earlier rate, and its later end matches the overlay re-read in this run (rate within 0.05 pp, block within 200) with the elapsed time stated`,
     headDiffs.length === 0,
     headDiffs.slice(0, 3).join(" | "),
   );

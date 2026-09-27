@@ -285,6 +285,10 @@ async function openNotes(page) {
     const row = rows.nth(i);
     await row.scrollIntoViewIfNeeded();
     await row.getByRole("button", { expanded: false }).first().click();
+    // 2026-09-27: the blocks moved out of the opened grid into the (i).
+    await page.waitForTimeout(120);
+    const trigger = row.getByRole("button", { name: /how this note was derived/i });
+    if (await trigger.count()) await trigger.click().catch(() => {});
   }
   await page.waitForTimeout(300);
   return n > 0 && (await page.locator("[data-market-note-open]").count()) === n;

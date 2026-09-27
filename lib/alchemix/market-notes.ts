@@ -35,6 +35,8 @@ export interface AlchemixSharePriceLine {
   /** The MYT vault, for the receipt's contract line. Empty where unknown. */
   mytAddress: string;
   underlyingSymbol: string;
+  /** The line's synthetic, the debt's denomination ("alUSD"). */
+  syntheticSymbol?: string;
   underlyingDecimals: number;
   /** `collateralizationLowerBound` as a multiplier (1.0526…), read now. */
   liquidationLine: number;
@@ -114,6 +116,7 @@ function gap(line: AlchemixSharePriceLine, a: Reading, toPrice: number) {
       coll: a.shares,
       atBlock: a.block,
       valueSymbol: line.underlyingSymbol,
+      ...(line.syntheticSymbol ? { debtSymbol: line.syntheticSymbol } : {}),
     },
   };
 }

@@ -435,10 +435,11 @@ export function AlchemistPositionView({
       mytSymbol,
       mytAddress: live?.collateral.mytAddress ?? "",
       underlyingSymbol: underlyingUnit.symbol,
+      syntheticSymbol: sym,
       underlyingDecimals: underlyingUnit.decimals,
       liquidationLine: Number(h.collateralizationLowerBoundRaw) / 1e18,
     };
-  }, [live, underlyingUnit, lineKey, mytSymbol]);
+  }, [live, underlyingUnit, lineKey, mytSymbol, sym]);
   const marketNotes = useMemo(
     () => (sharePriceLine ? alchemixSharePriceNotes(drawnEvents, sharePriceLine) : []),
     [drawnEvents, sharePriceLine],

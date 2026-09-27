@@ -1145,6 +1145,19 @@ function ChainTruthTimelineBody({
     return showDate ? `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}` : null;
   };
 
+  /** A market note's day stamp, on the same rule: the note is dated by its
+   *  stretch's later end and sits in the list just below the row it anchors
+   *  on (`lastIdx` is that row's last flat index), so it carries the date when
+   *  its day differs from the row above it or the row below it. */
+  const noteDatePrefixAfter = (note: MarketNote, lastIdx: number): string | null => {
+    const ts = note.to.timestamp;
+    if (!(ts > 0)) return null;
+    const prev = events[lastIdx];
+    const next = lastIdx + 1 < events.length ? events[lastIdx + 1] : undefined;
+    const showDate = !prev || !next || dayKey(ts) !== dayKey(prev.timestamp) || dayKey(ts) !== dayKey(next.timestamp);
+    return showDate ? `${shortDate(ts)} ${shortDateYear(ts)}` : null;
+  };
+
   // Every event row's own share href — right on the position page and on the
   // event page itself, since `positionPath` above already strips the latter's
   // `/event/…` suffix. Wrapping here (rather than inside each family's card
@@ -1462,7 +1475,10 @@ function ChainTruthTimelineBody({
               // Below is older, so a note FOLLOWS the event it is known to
               // have happened before. The row itself is untouched — this only
               // wraps it.
-              const noteRows = rowNotes.map((note) => <MarketNoteRow key={`note_${note.id}`} note={note} />);
+              const rowLastIdx = row.kind === "run" ? row.flatIdx + row.events.length - 1 : row.flatIdx;
+              const noteRows = rowNotes.map((note) => (
+                <MarketNoteRow key={`note_${note.id}`} note={note} datePrefix={noteDatePrefixAfter(note, rowLastIdx)} />
+              ));
               return (
                 <Fragment
                   key={
