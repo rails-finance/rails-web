@@ -16,6 +16,14 @@
 // deployment. Pages, loaders and share images that read through their own proxy
 // take the hop from `ssrHop()`, never a bare `ssrOrigin()`; a route handler
 // takes it from `routeHop(request)`, never a bare `request.nextUrl.origin`.
+//
+// dev.rails.finance sits behind Vercel Authentication, so a bare self-hop there
+// gets the login redirect back instead of the proxy's JSON. When this
+// deployment has a Protection Bypass secret (VERCEL_AUTOMATION_BYPASS_SECRET —
+// set on dev.rails.finance, unset on production), `ssrHop()` sends it as
+// `x-vercel-protection-bypass`, the same header scripts/verify/lib/host.mjs
+// sends from outside. Read from `process.env` in this server-only module, so
+// the value never reaches a client component or a response.
 
 import { headers } from "next/headers";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
@@ -65,12 +73,22 @@ export interface SsrHop {
   headers: Record<string, string>;
 }
 
+/** `x-vercel-protection-bypass: <secret>` when this deployment has a Protection
+ *  Bypass secret configured, `{}` otherwise (production, which has none). */
+function vercelBypassHeaders(): Record<string, string> {
+  const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  return secret ? { "x-vercel-protection-bypass": secret } : {};
+}
+
 /** The self-hop for a read made on the current reader's behalf, or null when
  *  the host header is absent (then SSR is skipped and the client fetches). */
 export async function ssrHop(): Promise<SsrHop | null> {
   const baseUrl = await ssrOrigin();
   if (!baseUrl) return null;
-  return { baseUrl, headers: readerHopHeaders(await readerIpFromHeaders()) };
+  return {
+    baseUrl,
+    headers: { ...readerHopHeaders(await readerIpFromHeaders()), ...vercelBypassHeaders() },
+  };
 }
 
 /** The hop for a server read whose own `/api/<proto>` proxy only forwards —
