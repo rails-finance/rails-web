@@ -178,8 +178,10 @@ export function collateralColumn(
   const usd = c.usd ? <span className="tabular-nums">${formatCompact(c.usd.usd).display}</span> : null;
   // The share price beside the two figures it relates, so the gap between the
   // share count and the underlying reads as a price and not a mismatch. Drawn
-  // where the caller asks for it or hands its receipt.
-  const priceShown = (opts?.showSharePrice || prov?.sharePrice) && underlying.sharePriceRaw;
+  // where the caller asks for it or hands its receipt, and never on a position
+  // holding no collateral: a price with nothing for it to value reads as a
+  // stray fact rather than as a wound-down position (e.g. closed eth-alusd/543).
+  const priceShown = (opts?.showSharePrice || prov?.sharePrice) && underlying.sharePriceRaw && c.raw !== "0";
   const priceValue = priceShown ? Number(underlying.sharePriceRaw) / 10 ** underlying.decimals : null;
   const priceText =
     priceValue != null ? (

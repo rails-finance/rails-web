@@ -17,8 +17,9 @@ export function AlchemixInfo({ deployment }: { deployment: AlchemixDeployment })
       <p>
         Alchemix lends a synthetic token against a vault share. A borrower deposits a MYT, a share in a Morpho vault
         that lends the asset out and earns on it (mixUSDC holds USDC, mixWETH holds WETH), and mints the matching
-        synthetic against it: alUSD against USDC, alETH against WETH, up to 90% of the collateral&apos;s value. The loan
-        charges no interest. It is repaid over time by the line&apos;s Transmuter, where holders of the synthetic stake
+        synthetic against it: alUSD against USDC, alETH against WETH, up to 90% of the collateral&apos;s value, the same
+        limit each position states as a minimum collateralisation of 111.1% (1 ÷ 1.111 ≈ 90%). The loan charges no
+        interest. It is repaid over time by the line&apos;s Transmuter, where holders of the synthetic stake
         it to turn it back into vault shares; as their stakes mature, the Alchemist sets debt aside across every open
         position and clears it when they claim. That clearing is a redemption.
       </p>
