@@ -85,6 +85,11 @@ import {
 } from "@/lib/alchemix/readings-before";
 import { redemptionNet, shareFallToLiquidation, sumRedemptionNets } from "@/lib/alchemix/redemption-net";
 import {
+  alchemixSharePriceNotes,
+  liveAlchemixSharePriceNote,
+  type AlchemixSharePriceLine,
+} from "@/lib/alchemix/market-notes";
+import {
   AlchemixPositionExplanation,
   type AlchemixRedemptionTotals,
 } from "@/components/protocol/alchemix/alchemix-position-explanation";
@@ -418,6 +423,36 @@ export function AlchemistPositionView({
     () => (v2Events.length > 0 ? [...drawnEvents, ...v2Events] : drawnEvents),
     [drawnEvents, v2Events],
   );
+  // Share-price market notes: the stretches between two readings where the
+  // vault's share price moved far enough to matter to this position, and the
+  // newest reading against the price read now (lib/alchemix/market-notes.ts).
+  // Read over the V3 rows the timeline draws, whatever the filter hides.
+  const sharePriceLine = useMemo<AlchemixSharePriceLine | null>(() => {
+    const h = live?.health;
+    if (!h || !underlyingUnit) return null;
+    return {
+      lineKey,
+      mytSymbol,
+      mytAddress: live?.collateral.mytAddress ?? "",
+      underlyingSymbol: underlyingUnit.symbol,
+      underlyingDecimals: underlyingUnit.decimals,
+      liquidationLine: Number(h.collateralizationLowerBoundRaw) / 1e18,
+    };
+  }, [live, underlyingUnit, lineKey, mytSymbol]);
+  const marketNotes = useMemo(
+    () => (sharePriceLine ? alchemixSharePriceNotes(drawnEvents, sharePriceLine) : []),
+    [drawnEvents, sharePriceLine],
+  );
+  const liveMarketNotes = useMemo(() => {
+    const u = live?.collateral.underlying;
+    if (!sharePriceLine || !u || position.status !== "open") return [];
+    const note = liveAlchemixSharePriceNote(drawnEvents, sharePriceLine, {
+      price: Number(u.sharePriceRaw) / 10 ** u.decimals,
+      block: u.sharePriceAsOfBlock ?? live.asOfBlock,
+    });
+    return note ? [note] : [];
+  }, [drawnEvents, sharePriceLine, live, position.status]);
+
   const tl = useTimelineEvents(timelineEvents, {
     storageKey: `alchemix-${lineKey}-${tokenId}`,
     protocolKey: "alchemix-v3",
@@ -769,6 +804,9 @@ export function AlchemistPositionView({
               tl={tl}
               runs={timelineRuns}
               boundary={boundary}
+              notes={marketNotes}
+              liveNotes={liveMarketNotes}
+              liveNotesPending={livePending}
               displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
               emptyLabel="No events recorded for this position"
               toolbarLeading={

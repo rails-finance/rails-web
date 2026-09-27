@@ -76,6 +76,7 @@ import {
 import { aaveFamilyRateStepInterestProv, aaveFamilyRateStepProv } from "@/lib/aave-v3/market-note-provenance";
 import { aaveFamilyPriceGapProv } from "@/lib/aave-v3/liquidation-price-note-provenance";
 import { aaveV4PriceGapHealthProv, aaveV4PriceGapProv } from "@/lib/aave-v4/market-note-provenance";
+import { alchemixSharePricePositionProv, alchemixSharePriceProv } from "@/lib/alchemix/market-note-provenance";
 import { priceGapPositionProv, priceGapProv } from "@/lib/liquity/market-note-provenance";
 import { makerRateStepInterestProv, makerRateStepProv } from "@/lib/makerdao/market-note-provenance";
 import { shareRateSliceProv, shareRateStepProv } from "@/lib/moonwell/market-note-provenance";
@@ -91,7 +92,10 @@ import {
   aaveFamilyOracleOwner,
   aaveFamilyRateNoun,
   aaveV4EndLabel,
+  alchemixEndLabel,
   formatShareRate,
+  LIVE_GAP_MOVE_FLOOR,
+  LIVE_GAP_RUNWAY_SHARE,
   isAaveFamilyPriceGap,
   makerRateEndLabel,
   marketNoteFigures,
@@ -135,7 +139,7 @@ interface NoteStat {
 
 /** The mark the asset was measured in, drawn overlapping the asset's own:
  *  the dollar for an oracle price, the protocol for a share rate. */
-type MeasureMark = { kind: "usd" } | { kind: "protocol"; id: string };
+type MeasureMark = { kind: "usd" } | { kind: "protocol"; id: string } | { kind: "token"; symbol: string };
 
 /** What one kind of note hands the shell. Nothing else varies. */
 interface NoteBody {
@@ -320,6 +324,8 @@ function MarkPair({ asset, measure }: { asset: string; measure: MeasureMark }) {
       <span className={chip} style={{ marginLeft: -8, zIndex: 1 }}>
         {measure.kind === "usd" ? (
           <img src="/icons/usd.svg" alt="" width={24} height={24} className="rounded-full" />
+        ) : measure.kind === "token" ? (
+          <TokenChipIcon symbol={measure.symbol} size={24} filterable={false} />
         ) : (
           <img src={protocolIconSrc(measure.id)} alt="" width={24} height={24} className="rounded-full" />
         )}
@@ -569,6 +575,7 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
   // two homes state one collateral ratio. Its own body below.
   if (note.protocol === "aave-v4") return aaveV4PriceGapBody(note, links);
   if (isAaveFamilyPriceGap(note)) return aaveFamilyPriceGapBody(note, links);
+  if (note.protocol === "alchemix-v3") return alchemixSharePriceBody(note, links);
   const f = priceGapFigures(note);
   const p = note.position;
   const isPolaris = note.measureKind === "protocol";
@@ -685,6 +692,115 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
             )}{" "}
             The stretch is stated because {priceGapReason(note)}.
           </>
+        )}
+      </>
+    ),
+  };
+}
+
+// ── Alchemix V3: the vault's share price, moved between two of a position's
+//    readings ────────────────────────────────────────────────────────────────
+// The price-gap kind on a position whose collateral is a vault share count.
+// The price is one share in the asset underneath, stored with each reading, so
+// the figures it moves are the collateral's value in that asset and the
+// collateralisation, against the line's liquidation line
+// (lib/alchemix/market-notes.ts).
+
+function alchemixSharePriceBody(note: PriceGapNote, links: NoteLinks): NoteBody {
+  const f = priceGapFigures(note);
+  const p = note.position;
+  const under = p?.valueSymbol ?? "the asset underneath";
+  const end = (point: MarketNotePoint, which: "earlier" | "later") =>
+    which === "later" && note.live ? (
+      <>
+        the later price is the share price read with the position card&rsquo;s figures, at block{" "}
+        {point.block.toLocaleString("en-US")}
+      </>
+    ) : (
+      <>
+        the {which} price is the reading at this position&rsquo;s {alchemixEndLabel(point)} at block{" "}
+        {point.block.toLocaleString("en-US")}
+        {observationLinks(point, links)}
+      </>
+    );
+  const stats: NoteStat[] = [
+    {
+      label: `Share price (${note.unitLabel})`,
+      transition: {
+        before: { text: f.fromPrice, prov: alchemixSharePriceProv(note, "price"), exact: String(note.from.value) },
+        after: { text: f.toPrice, prov: alchemixSharePriceProv(note, "price"), exact: String(note.to.value) },
+      },
+    },
+    {
+      label: "Blocks",
+      transition: {
+        before: { text: f.fromBlock, prov: alchemixSharePriceProv(note, "blocks"), exact: String(note.from.block) },
+        after: { text: f.toBlock, prov: alchemixSharePriceProv(note, "blocks"), exact: String(note.to.block) },
+      },
+    },
+  ];
+  if (p && f.valueBefore && f.valueAfter) {
+    stats.push({
+      label: `Collateral in ${under}`,
+      transition: {
+        before: {
+          text: f.valueBefore,
+          prov: alchemixSharePricePositionProv(note, "valueBefore"),
+          exact: String(p.coll * note.from.value),
+        },
+        after: {
+          text: f.valueAfter,
+          prov: alchemixSharePricePositionProv(note, "valueAfter"),
+          exact: String(p.coll * note.to.value),
+        },
+      },
+    });
+  }
+  if (p && f.crBefore && f.crAfter && f.mcr) {
+    stats.push({
+      label: "Collateralisation at each price",
+      transition: {
+        before: { text: f.crBefore, prov: alchemixSharePricePositionProv(note, "crBefore"), exact: String(p.crBefore) },
+        after: { text: f.crAfter, prov: alchemixSharePricePositionProv(note, "crAfter"), exact: String(p.crAfter) },
+      },
+      sub: {
+        text: "liquidation at",
+        figure: { text: f.mcr, prov: alchemixSharePricePositionProv(note, "mcr"), exact: String(p.mcrPct) },
+      },
+    });
+  }
+  if (f.elapsed) {
+    stats.push({ label: "Elapsed", figure: elapsedFigure(note, f.elapsed, alchemixSharePriceProv(note, "elapsed")) });
+  }
+  return {
+    label: `${note.marketSymbol} share price`,
+    measure: { kind: "token", symbol: under },
+    quantity: "share price",
+    headline: { text: f.changeMagnitude, prov: alchemixSharePriceProv(note, "change"), exact: String(note.changePct) },
+    format: notePriceFormat(note),
+    stats,
+    learnMore: marketNotePriceGapContent(),
+    derivation: (
+      <>
+        Each reading of this position stores the vault&rsquo;s share price, one {note.marketSymbol} in {under}, at its
+        block. Here {end(note.from, "earlier")}, and {end(note.to, "later")}.
+        {p && (
+          <>
+            {" "}
+            The collateral and collateralisation figures hold the share count and debt read at block{" "}
+            <Prov info={alchemixSharePricePositionProv(note, "state")} value={String(p.atBlock)}>
+              <span className="tabular-nums">{f.atBlock}</span>
+            </Prov>{" "}
+            and move only the share price.
+          </>
+        )}{" "}
+        {note.live ? (
+          <>
+            It is drawn where the price has moved at least {LIVE_GAP_MOVE_FLOOR * 100}% since that reading, or the move
+            used {LIVE_GAP_RUNWAY_SHARE * 100}% of the position&rsquo;s runway to the liquidation line.
+          </>
+        ) : (
+          <>The stretch is stated because {priceGapReason(note)}.</>
         )}
       </>
     ),

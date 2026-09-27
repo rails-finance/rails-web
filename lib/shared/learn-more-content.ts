@@ -2956,6 +2956,10 @@ export function marketNotePriceGapContent(): LearnMoreContent {
         text: "a row carries the price of the one reserve it touched, so a note here is drawn only before a liquidation, for the asset it seized: that asset's price at the position's last row that touched it, and at the liquidation. Rows touching other reserves can sit between the two. No runway or health factor is stated, because the rest of the account is not priced at the earlier block. The note states the move alone: the debt side moves too, and a seized asset's price can rise into its liquidation.",
       },
       {
+        bold: "On an Alchemix V3 position",
+        text: "the price is the vault's share price, one share in the asset underneath, stored with each reading of the position. It moves the collateral's value in that asset and the collateralisation, read against the line's liquidation line as the Alchemist reports it now. The same quarter-of-the-runway rule applies, so a share price that rises a little between readings draws no note, and a line redemption is held to it like any other end.",
+      },
+      {
         bold: "A live note",
         text: "the same idea, but the later end is the chain head: this position's own newest priced event or touch against the market's oracle price read right now. Shown on any OPEN position, whatever the move.",
       },
@@ -3024,6 +3028,10 @@ export function marketNoteRateStepContent(): LearnMoreContent {
       {
         bold: "The interest figure",
         text: "the yearly interest the CDP's own debt at the earlier touch would cost at each end's rate, holding that debt fixed and moving only the rate. The secondary, utilisation-driven rate is added on top by the protocol and is not on this log.",
+      },
+      {
+        bold: "On an Alchemix V3 position",
+        text: "the price is the vault's share price, one share in the asset underneath, stored with each reading of the position. It moves the collateral's value in that asset and the collateralisation, read against the line's liquidation line as the Alchemist reports it now. The same quarter-of-the-runway rule applies, so a share price that rises a little between readings draws no note, and a line redemption is held to it like any other end.",
       },
       {
         bold: "A live note",

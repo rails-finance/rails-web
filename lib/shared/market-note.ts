@@ -145,7 +145,7 @@ export interface MarketNoteBase {
   live?: true;
   /** Which protocol's selector built the note, where the kind alone does not
    *  say how to read it — the prose, the row body and the receipts branch on
-   *  it (`"aave-v4"`, `"makerdao"`). Absent on the three original homes
+   *  it (`"aave-v4"`, `"makerdao"`, `"alchemix-v3"`). Absent on the three original homes
    *  (Liquity V2, Polaris, Moonwell), which the kind and `measureKind`
    *  already tell apart. */
   protocol?: string;
@@ -244,6 +244,11 @@ export interface PriceGapPosition {
   coll: number;
   /** The block the debt and collateral were recorded at — A's block. */
   atBlock: number;
+  /** Alchemix V3 (`protocol: "alchemix-v3"`): `coll` is a vault share count
+   *  and the price is one share in the asset underneath, so `coll × price` is
+   *  the collateral's value in this asset, stated at each end. Absent on the
+   *  other homes, whose collateral is the priced asset. */
+  valueSymbol?: string;
 }
 
 /** An ERC-4626 vault's OWN TERMS, changed for every holder at once — the
@@ -901,9 +906,11 @@ export function priceGapReason(note: PriceGapNote): string {
   if (!Number.isFinite(note.consumed)) {
     // Aave V4 has no branch: the position is measured against its own health
     // factor, so the same "no runway left" case has to name that instead.
-    return note.protocol === "aave-v4"
-      ? `the position was already at or below a ${AAVE_V4_LIQUIDATION_HF} health factor at the earlier price`
-      : `the position was already at or below the branch minimum at the earlier price`;
+    if (note.protocol === "aave-v4")
+      return `the position was already at or below a ${AAVE_V4_LIQUIDATION_HF} health factor at the earlier price`;
+    if (note.protocol === "alchemix-v3")
+      return `the position was already at or below the liquidation line at the earlier share price`;
+    return `the position was already at or below the branch minimum at the earlier price`;
   }
   return (
     `the move consumed ${formatPercent(note.consumed * 100)} of the position's runway ` +
@@ -1754,6 +1761,10 @@ export interface PriceGapFigures {
    *  compact USD. */
   collateralUsd?: string;
   debtUsd?: string;
+  /** Alchemix V3 (`position.valueSymbol`): the share count read at the earlier
+   *  end, valued at each end's share price. */
+  valueBefore?: string;
+  valueAfter?: string;
 }
 
 /** A health factor, at the two decimals every other health-factor figure on a
@@ -1794,7 +1805,15 @@ export function priceGapFigures(note: PriceGapNote): PriceGapFigures {
           crBefore: formatPercent(p.crBefore, rd),
           crAfter: formatPercent(p.crAfter, rd),
           // The minimum is the branch's own constant, not one end of a pair.
-          mcr: formatPercent(p.mcrPct),
+          // Alchemix's liquidation line (105.26%) is stated to one decimal, the
+          // way the position card states it.
+          mcr: formatPercent(p.mcrPct, p.valueSymbol ? 1 : RATIO_DECIMALS_FLOOR),
+          ...(p.valueSymbol
+            ? {
+                valueBefore: `${formatUnits(p.coll * note.from.value)} ${p.valueSymbol}`,
+                valueAfter: `${formatUnits(p.coll * note.to.value)} ${p.valueSymbol}`,
+              }
+            : {}),
         }
       : {}),
     ...(h
@@ -2039,6 +2058,47 @@ function aaveFamilyInterestClause(note: RateStepNote, f: RateStepFigures, live: 
   );
 }
 
+// ── Alchemix V3's own words for a price gap ─────────────────────────────────
+// The price is the vault's SHARE PRICE (one MYT share in the asset underneath),
+// stored with each reading of the position (lib/alchemix/market-notes.ts). It is
+// the one price that moves an Alchemix position's collateral value and its
+// distance to liquidation, and the figures it moves are the collateral's value
+// in the asset underneath and the collateralisation, against the line's
+// liquidation line.
+
+/** What each end of an Alchemix stretch is called: the event card's own word,
+ *  lower-cased. Falls back to the raw event type. */
+const ALCHEMIX_END_LABELS: Record<string, string> = {
+  deposit: "deposit",
+  withdraw: "withdrawal",
+  mint: "mint",
+  burn: "burn",
+  repay: "repayment",
+  force_repay: "forced repayment",
+  self_liquidated: "close with collateral",
+  liquidated: "liquidation",
+  repayment_fee: "repayment fee",
+  redemption: "line redemption",
+  batch_liquidated: "batch liquidation",
+  fee_shortfall: "fee shortfall",
+  transfer: "transfer",
+  head: "the latest block",
+};
+
+export const alchemixEndLabel = (p: MarketNotePoint): string => ALCHEMIX_END_LABELS[p.kind] ?? p.kind;
+
+/** The Alchemix sentence's second half: what the move did to this position,
+ *  at the shares and debt read at the earlier end. Empty where the note
+ *  carries no position. */
+function alchemixEffectClause(note: PriceGapNote, f: PriceGapFigures): string {
+  if (!f.valueBefore || !f.valueAfter || !f.crBefore || !f.crAfter || !f.mcr) return "";
+  return (
+    ` At the shares and debt read at block ${f.atBlock} the collateral was worth ${f.valueBefore} at the earlier ` +
+    `price and ${f.valueAfter} at the ${note.live ? "price now" : "later one"}, a collateralisation of ` +
+    `${f.crBefore} and ${f.crAfter}, against liquidation at ${f.mcr}.`
+  );
+}
+
 // ── Prose — the four phrasings, each switching on `kind` exactly once ────────
 // Every surface that puts a note into words (the row, and each protocol's
 // markdown export) reads these, so a note reads the same on the page as in an
@@ -2076,6 +2136,20 @@ export function marketNoteSentence(note: MarketNote): string {
         `The ${note.marketSymbol} oracle price moved ${f.fromPrice} → ${f.toPrice} ${note.unitLabel}, ` +
         `${changeInWords(note)}, between this position's ${aaveV4EndLabel(note.from)} at block ${f.fromBlock} and ` +
         `its ${aaveV4EndLabel(note.to)} at block ${f.toBlock}.${health}`
+      );
+    }
+    if (note.protocol === "alchemix-v3") {
+      if (note.live) {
+        return (
+          `Since this position's ${alchemixEndLabel(note.from)} at block ${f.fromBlock} the ${note.marketSymbol} ` +
+          `share price has moved ${f.fromPrice} → ${f.toPrice} ${note.unitLabel}, ${changeInWords(note)}, at the ` +
+          `latest block ${f.toBlock}.${alchemixEffectClause(note, f)}`
+        );
+      }
+      return (
+        `The ${note.marketSymbol} share price moved ${f.fromPrice} → ${f.toPrice} ${note.unitLabel}, ` +
+        `${changeInWords(note)}, between this position's ${alchemixEndLabel(note.from)} at block ${f.fromBlock} and ` +
+        `its ${alchemixEndLabel(note.to)} at block ${f.toBlock}.${alchemixEffectClause(note, f)}`
       );
     }
     if (isAaveFamilyPriceGap(note)) {
@@ -2213,6 +2287,11 @@ export function marketNoteHeadline(note: MarketNote): string {
     if (isAaveFamilyPriceGap(note)) {
       return `the ${note.marketSymbol} oracle price moved ${f.change} between this position's ${aaveFamilyEndLabel(note.from)} at block ${f.fromBlock} and the liquidation at block ${f.toBlock} that seized it`;
     }
+    if (note.protocol === "alchemix-v3") {
+      return note.live
+        ? `the ${note.marketSymbol} share price has moved ${f.change} since block ${f.fromBlock}, at the latest block ${f.toBlock}`
+        : `the ${note.marketSymbol} share price moved ${f.change} between blocks ${f.fromBlock} and ${f.toBlock}`;
+    }
     return note.live
       ? `the ${note.marketSymbol} oracle price has moved ${f.change} since block ${f.fromBlock}, at the latest block ${f.toBlock}`
       : `the ${note.marketSymbol} oracle price moved ${f.change} between blocks ${f.fromBlock} and ${f.toBlock}`;
@@ -2264,6 +2343,13 @@ export function marketNoteRowAnnotation(note: MarketNote): string {
     }
     if (isAaveFamilyPriceGap(note)) {
       return `market note: the ${note.marketSymbol} oracle price moved ${f.change} by block ${f.toBlock}, since this position last touched ${note.marketSymbol} at block ${f.fromBlock}`;
+    }
+    if (note.protocol === "alchemix-v3") {
+      const cr =
+        f.crBefore && f.crAfter ? `; collateralisation ${f.crBefore} → ${f.crAfter} at those shares and debt` : "";
+      return note.live
+        ? `market note: the ${note.marketSymbol} share price has moved ${f.change} since block ${f.fromBlock}, at the latest block ${f.toBlock}${cr}`
+        : `market note: the ${note.marketSymbol} share price moved ${f.change} by block ${f.toBlock}${cr}`;
     }
     return note.live
       ? `market note: the ${note.marketSymbol} oracle price has moved ${f.change} since block ${f.fromBlock}, at the latest block ${f.toBlock}`
@@ -2354,6 +2440,15 @@ export function marketNoteReceiptLine(note: MarketNote): string {
         `that row; later price — the liquidation at block ${note.to.block}, tx ${note.to.txHash} log ` +
         `${note.to.logIndex}, its seized-collateral price. Stated because ${priceGapReason(note)} that seized ` +
         `${note.marketSymbol}.`
+      );
+    }
+    if (note.protocol === "alchemix-v3") {
+      const later = note.live
+        ? `the vault's share price read with the position card's figures at block ${note.to.block}`
+        : `the reading at its ${alchemixEndLabel(note.to)} at block ${note.to.block}, tx ${note.to.txHash}`;
+      return (
+        `- Receipt: earlier price: the reading of this position at its ${alchemixEndLabel(note.from)} at block ` +
+        `${note.from.block}, tx ${note.from.txHash}; later price: ${later}. Stated because ${priceGapReason(note)}.`
       );
     }
     const isPolaris = note.measureKind === "protocol";
