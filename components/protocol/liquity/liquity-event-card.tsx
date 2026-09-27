@@ -15,6 +15,7 @@ import { TroveBarsSlot } from "./trove-bar";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { collChangeProv, debtChangeProv } from "@/lib/liquity/event-provenance";
+import { usePreferences } from "@/lib/shared/preferences-context";
 
 function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}\u2026${addr.slice(-4)}`;
@@ -54,6 +55,7 @@ export function LiquityEventCard({
 }: LiquityEventCardProps) {
   const ctx = event.context.data;
   const wallet = event.wallet;
+  const { prefs } = usePreferences();
 
   // Column 1 — Avatar
   const avatarSlot =
@@ -210,6 +212,7 @@ export function LiquityEventCard({
   const liquityTeaser = getLiquityExplainerTeaser(
     ctx,
     { txHash: event.txHash, blockNumber: event.blockNumber },
+    prefs.ratioMode,
     previousEvent,
     event,
     currentPrice,

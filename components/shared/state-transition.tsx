@@ -37,10 +37,12 @@ export function DeltaToggle({
   before,
   delta,
   size = "md",
-  // A DeltaToggle is drawn only where the event moved the value, so both ends
-  // of the pair are changed values and take the foreground tone (the T2
-  // change-colour rule, rails-ops standards/detail-page-anatomy.md).
-  beforeClass = "text-sm font-semibold text-foreground",
+  // The T2 change-colour rule (rails-ops standards/detail-page-anatomy.md, "The
+  // disclosure ladder"): a changed pair's BEFORE value is muted, since it is
+  // what the event moved away from, not the fact it states, while the after
+  // value (drawn by the caller, after this control) and the delta both take
+  // the foreground tone.
+  beforeClass = "text-sm font-semibold text-rb-500",
   beforeExtra,
 }: {
   before: ReactNode;

@@ -62,6 +62,9 @@ import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more
 import { NoteRowShell } from "@/components/shared/note-row-shell";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { Prov, type Provenance } from "@/components/shared/provenance";
+import { usePreferences } from "@/lib/shared/preferences-context";
+import { formatRatio } from "@/lib/shared/ratio-format";
+import type { RatioMode } from "@/lib/shared/preferences";
 import {
   PriceChipShell,
   StatCard,
@@ -297,10 +300,14 @@ export function MarketNoteRow({
     explorer: (p) => explorerUrl(chainId, "tx-logs", p.txHash),
   };
 
+  // The T3 ratio-pair rule's viewer preference (see ratioPairNote): read once
+  // here, since it reaches only the price-gap kind's collateral-ratio bullet.
+  const { prefs } = usePreferences();
+
   // The one switch. Everything below it is the same row whatever was observed.
   const body =
     note.kind === "price-gap"
-      ? priceGapBody(note, links)
+      ? priceGapBody(note, links, prefs.ratioMode)
       : note.kind === "rate-step"
         ? rateStepBody(note, links)
         : note.kind === "vault-terms"
@@ -562,18 +569,55 @@ function Figure({ figure, className }: { figure: NoteFigure; className: string }
 
 /** A figure the (i) repeats from the cells or the chip above: the foreground
  *  tone of the T3 echo-colour rule, and an echo of the cell's receipt so the
- *  inspector's locator reaches both. Written exactly as the cell writes it. */
-function Echo({ figure, prefix = "", suffix = "" }: { figure: NoteFigure; prefix?: string; suffix?: string }) {
-  return (
-    <H>
-      <Prov echo info={figure.prov} value={figure.exact ?? figure.text} symbol={figure.symbol}>
-        <span className="tabular-nums">
-          {prefix}
-          {figure.text}
-          {suffix}
-        </span>
-      </Prov>
-    </H>
+ *  inspector's locator reaches both. Written exactly as the cell writes it.
+ *  `muted` keeps the same echoed receipt (the locator still reaches it) but
+ *  drops the foreground tone, for the T3 ratio-pair rule's "other form" case,
+ *  where the cell's own figure isn't the one the viewer's preference shows. */
+function Echo({
+  figure,
+  prefix = "",
+  suffix = "",
+  muted = false,
+}: {
+  figure: NoteFigure;
+  prefix?: string;
+  suffix?: string;
+  muted?: boolean;
+}) {
+  const echoed = (
+    <Prov echo info={figure.prov} value={figure.exact ?? figure.text} symbol={figure.symbol}>
+      <span className={`tabular-nums ${muted ? "text-rb-500" : ""}`}>
+        {prefix}
+        {figure.text}
+        {suffix}
+      </span>
+    </Prov>
+  );
+  return muted ? echoed : <H>{echoed}</H>;
+}
+
+/** The T3 ratio-pair rule (rails-ops standards/detail-page-anatomy.md, "The
+ *  disclosure ladder"): a T3 statement of the collateral ratio states the LTV
+ *  alongside it, the same fact read the other way, with whichever form the
+ *  viewer's CR/LTV preference shows elsewhere on the page foreground, the
+ *  other muted. This note's own stat card states only the collateral ratio
+ *  (no CR/LTV toggle of its own), so the preference is read directly
+ *  (`prefs.ratioMode`) rather than off a T2 cell that switches. The CR figure
+ *  keeps its own receipt in both cases (`Echo`'s `muted` only swaps the
+ *  colour); the LTV has none to echo, so its foreground is a plain `<H>` and
+ *  its muted form is plain text, with no invented provenance. Both forms are
+ *  written at a fixed two decimals, the ratio grain T2 uses elsewhere on the
+ *  page, not this note's own separating-decimals grain. */
+function ratioPairNote(cr: number, crFigure: NoteFigure, mode: RatioMode): ReactNode {
+  const ltvText = formatRatio(cr, "ltv", 2);
+  return mode === "ltv" ? (
+    <>
+      <Echo figure={crFigure} muted /> (LTV <H>{ltvText}</H>)
+    </>
+  ) : (
+    <>
+      <Echo figure={crFigure} /> (LTV {ltvText})
+    </>
   );
 }
 
@@ -783,7 +827,7 @@ function shareRateBody(note: ShareRateStepNote, links: NoteLinks): NoteBody {
 // mark, the end-label function, the position noun and the receipt builders
 // alike; nothing else in the body branches.
 
-function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
+function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): NoteBody {
   // Aave V4's basket is a different position shape, not a different kind: one
   // note per ASSET, and a health factor over the whole basket where the other
   // two homes state one collateral ratio. Its own body below.
@@ -971,10 +1015,10 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
         <Echo figure={valueFigs.after} /> {nowWord}.
       </>
     ),
-    crFigs && mcrFig && (
+    crFigs && mcrFig && p && (
       <>
-        The collateral ratio was <Echo figure={crFigs.before} /> {thenWord} and {note.live ? "is" : "was"}{" "}
-        <Echo figure={crFigs.after} /> {nowWord}, against{" "}
+        The collateral ratio was {ratioPairNote(p.crBefore, crFigs.before, mode)} {thenWord} and{" "}
+        {note.live ? "is" : "was"} {ratioPairNote(p.crAfter, crFigs.after, mode)} {nowWord}, against{" "}
         {isPolaris ? "the market's normal-mode minimum" : "the branch minimum"} of <Echo figure={mcrFig} />.
       </>
     ),

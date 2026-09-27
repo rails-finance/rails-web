@@ -13,6 +13,7 @@
 import type { ReactNode } from "react";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { BaseActivityEvent, GasCost } from "@/lib/shared/types/activity";
+import type { RatioMode } from "@/lib/shared/preferences";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { getBatchManagerByAddress } from "@/lib/liquity/batch-managers";
 import {
@@ -33,6 +34,7 @@ import {
   liquityGasClause,
   liquityExplainerTeaser,
 } from "@/lib/liquity/explainer-clauses";
+import { usePreferences } from "@/lib/shared/preferences-context";
 
 // ── LearnMore selection (byte-unchanged from the bullet-era explainer) ──────
 // Exported for the card composer, which renders the "?" trigger on the footer
@@ -85,11 +87,12 @@ export function liquityLearnMoreContent(ctx: LiquityContext): LearnMoreContent {
 export function getLiquityExplainerTeaser(
   ctx: LiquityContext,
   coords: { txHash?: string; blockNumber?: number },
+  mode: RatioMode,
   previousEvent?: BaseActivityEvent,
   currentEvent?: BaseActivityEvent,
   currentPrice?: number,
 ): ReactNode | null {
-  return liquityExplainerTeaser(ctx, coords, previousEvent, currentEvent, currentPrice);
+  return liquityExplainerTeaser(ctx, coords, mode, previousEvent, currentEvent, currentPrice);
 }
 
 // ── The pane ────────────────────────────────────────────────────────────────
@@ -122,8 +125,11 @@ export function LiquityEventExplainer({
   blockNumber,
   skipLead,
 }: LiquityEventExplainerProps) {
+  const { prefs } = usePreferences();
   const coords = { txHash, blockNumber };
-  const clauses = eventClauses(liquityEventSlots(ctx, coords, previousEvent, currentEvent, currentPrice));
+  const clauses = eventClauses(
+    liquityEventSlots(ctx, coords, prefs.ratioMode, previousEvent, currentEvent, currentPrice),
+  );
   // Gas rides last, after the arc — never the lead, so skipLead removes exactly
   // the teaser sentence and the gas clause always survives into the pane.
   const gasClause = gas ? liquityGasClause(ctx, gas) : null;

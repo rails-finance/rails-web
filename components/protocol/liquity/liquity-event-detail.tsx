@@ -390,7 +390,6 @@ function CollateralRatioMetric({
           <DeltaToggle
             before={<P info={provBefore}>{formatRatio(before, mode, 2)}</P>}
             delta={ratioCanToggle ? <P info={deltaProv}>{ratioDeltaStr}</P> : null}
-            beforeClass={`text-sm font-semibold ${crColor(before, collateralType)}`}
           />
         )}
         {isClose ? (

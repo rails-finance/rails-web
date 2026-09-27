@@ -60,6 +60,8 @@ import {
 import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots } from "@/lib/shared/explainer-prose";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { fmtAccrued, fmtColl, fmtCr, fmtDebt, fmtRate, fmtUsdWhole } from "@/lib/liquity/figure-format";
+import { formatRatio } from "@/lib/shared/ratio-format";
+import type { RatioMode } from "@/lib/shared/preferences";
 
 // ── Formatters ───────────────────────────────────────────────────────────────
 // fmtColl / fmtDebt / fmtUsdWhole / fmtAccrued / fmtRate / fmtCr are the T2
@@ -122,6 +124,30 @@ function fig(prov: AnyProv | undefined, display: ReactNode): ReactNode {
   );
 }
 
+/** A collateral ratio, stated alongside its LTV form (the T3 ratio-pair rule,
+ *  rails-ops standards/detail-page-anatomy.md, "The disclosure ladder"): T3
+ *  states both the collateral ratio and the LTV; whichever the viewer's
+ *  CR/LTV preference makes T2 show is foreground (bold, with no invented
+ *  provenance, since T2 exports no ratio receipt to echo, so this is
+ *  `fig(undefined, …)` rather than a `<Prov echo>`), and the other stays
+ *  plain (muted by the pane's ambient tone). The wording around the figure
+ *  never changes, only the bold moves. Both forms are written at T2's own
+ *  2-decimal format (`fmtCr` / `formatRatio(cr, "ltv", 2)`). `cr` must be > 0;
+ *  every call site already gates on that before reaching for a ratio figure. */
+function ratioPair(cr: number, mode: RatioMode): ReactNode {
+  const crText = fmtCr(cr);
+  const ltvText = formatRatio(cr, "ltv", 2);
+  return mode === "ltv" ? (
+    <>
+      {crText} (LTV {fig(undefined, ltvText)})
+    </>
+  ) : (
+    <>
+      {fig(undefined, crText)} (LTV {ltvText})
+    </>
+  );
+}
+
 /** The upfront fee the debt cell's sub-line shows ("+30.79 fee"), stated with
  *  its reason so the before→after debt adds up. `reason` finishes the sentence
  *  after the fee. Null where the event charged none. */
@@ -152,7 +178,7 @@ function sameBlockClause(ctx: LiquityContext, coords: EventCoords): ClauseInput 
 
 // ── open ─────────────────────────────────────────────────────────────────────
 
-function openTroveSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlots {
+function openTroveSlots(ctx: LiquityContext, coords: EventCoords, mode: RatioMode): EventProseSlots {
   const { stateAfter, troveOperation, collateralType, collateralPrice } = ctx;
   const collSym = collateralType;
   const debtSym = ctx.assetType ?? "BOLD";
@@ -207,7 +233,7 @@ function openTroveSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlo
   ];
 
   const meansNow: ClauseInput[] = [
-    clause(<>The trove opened at a {fig(undefined, fmtCr(stateAfter.collateralRatio))} collateral ratio.</>),
+    clause(<>The trove opened at a {ratioPair(stateAfter.collateralRatio, mode)} collateral ratio.</>),
     clause(
       <>
         It accrues interest at {fig(rateAfter, `${stateAfter.annualInterestRate.toFixed(1)}%`)} a year, compounding
@@ -240,7 +266,7 @@ function openTroveSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlo
 
 // ── close ──────────────────────────────────────────────────────────────────
 
-function closeTroveSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlots {
+function closeTroveSlots(ctx: LiquityContext, coords: EventCoords, mode: RatioMode): EventProseSlots {
   const { troveOperation, stateBefore, collateralType } = ctx;
   const debtSym = ctx.assetType ?? "BOLD";
   const debtRepaid = troveOperation ? Math.abs(troveOperation.debtChangeFromOperation) : stateBefore.debt;
@@ -279,7 +305,7 @@ function closeTroveSlots(ctx: LiquityContext, coords: EventCoords): EventProseSl
     );
   }
   if (debtRepaid > 0 && stateBefore.collateralRatio > 0) {
-    meansNow.push(clause(<>It closed at a {fig(undefined, fmtCr(stateBefore.collateralRatio))} collateral ratio.</>));
+    meansNow.push(clause(<>It closed at a {ratioPair(stateBefore.collateralRatio, mode)} collateral ratio.</>));
   }
   meansNow.push(clause(<>The trove NFT was sent to the burn address, ending its ownership.</>));
   meansNow.push(clause(<>Nothing remains on either side.</>));
@@ -294,6 +320,7 @@ function adjustTroveSlots(
   coords: EventCoords,
   accruedInterest: number,
   accruedManagementFees: number,
+  mode: RatioMode,
 ): EventProseSlots {
   const { troveOperation, stateBefore, stateAfter, collateralType, collateralPrice } = ctx;
   const debtSym = ctx.assetType ?? "BOLD";
@@ -468,9 +495,9 @@ function adjustTroveSlots(
     );
   }
   if (beforeCR > 0 && afterCR > 0 && afterCR > beforeCR) {
-    meansNow.push(clause(<>The collateral ratio rose to {fig(undefined, fmtCr(afterCR))}.</>));
+    meansNow.push(clause(<>The collateral ratio rose to {ratioPair(afterCR, mode)}.</>));
   } else if (beforeCR > 0 && afterCR > 0 && afterCR < beforeCR) {
-    meansNow.push(clause(<>The collateral ratio fell to {fig(undefined, fmtCr(afterCR))}.</>));
+    meansNow.push(clause(<>The collateral ratio fell to {ratioPair(afterCR, mode)}.</>));
   }
   if (stateBefore.annualInterestRate !== stateAfter.annualInterestRate) {
     meansNow.push(
@@ -497,6 +524,7 @@ function adjustRateSlots(
   coords: EventCoords,
   accruedInterest: number,
   accruedManagementFees: number,
+  mode: RatioMode,
 ): EventProseSlots {
   const { stateBefore, stateAfter, collateralType, collateralPrice } = ctx;
   const debtSym = ctx.assetType ?? "BOLD";
@@ -557,7 +585,7 @@ function adjustRateSlots(
     );
   }
   if (stateAfter.collateralRatio > 0) {
-    meansNow.push(clause(<>The collateral ratio is {fig(undefined, fmtCr(stateAfter.collateralRatio))}.</>));
+    meansNow.push(clause(<>The collateral ratio is {ratioPair(stateAfter.collateralRatio, mode)}.</>));
   }
 
   return { happened, changed, meansNow };
@@ -565,7 +593,7 @@ function adjustRateSlots(
 
 // ── applyPendingDebt ─────────────────────────────────────────────────────────
 
-function applyPendingDebtSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlots {
+function applyPendingDebtSlots(ctx: LiquityContext, coords: EventCoords, mode: RatioMode): EventProseSlots {
   const { troveOperation, stateAfter, collateralType, collateralPrice } = ctx;
   const debtSym = ctx.assetType ?? "BOLD";
   const redistDebt = troveOperation?.debtIncreaseFromRedist ?? 0;
@@ -610,7 +638,7 @@ function applyPendingDebtSlots(ctx: LiquityContext, coords: EventCoords): EventP
     clause(<>Interest accrues at {fig(rateAfter, `${stateAfter.annualInterestRate.toFixed(1)}%`)} a year.</>),
   );
   if (stateAfter.collateralRatio > 0) {
-    meansNow.push(clause(<>The collateral ratio is {fig(undefined, fmtCr(stateAfter.collateralRatio))}.</>));
+    meansNow.push(clause(<>The collateral ratio is {ratioPair(stateAfter.collateralRatio, mode)}.</>));
   }
 
   return { happened, changed, meansNow };
@@ -618,7 +646,7 @@ function applyPendingDebtSlots(ctx: LiquityContext, coords: EventCoords): EventP
 
 // ── liquidate (beneficial redistribution + destructive) ──────────────────────
 
-function liquidateSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlots {
+function liquidateSlots(ctx: LiquityContext, coords: EventCoords, mode: RatioMode): EventProseSlots {
   const { liquidation, troveOperation, stateBefore, stateAfter, collateralType, collateralPrice } = ctx;
   const debtSym = ctx.assetType ?? "BOLD";
 
@@ -667,8 +695,8 @@ function liquidateSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlo
       meansNow.push(
         clause(
           <>
-            Its collateral ratio moved from {fig(undefined, fmtCr(stateBefore.collateralRatio))} to{" "}
-            {fig(undefined, fmtCr(stateAfter.collateralRatio))}.
+            Its collateral ratio moved from {ratioPair(stateBefore.collateralRatio, mode)} to{" "}
+            {ratioPair(stateAfter.collateralRatio, mode)}.
           </>,
         ),
       );
@@ -699,8 +727,8 @@ function liquidateSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlo
   const happened: ClauseInput[] = [
     clause(
       <>
-        This trove was liquidated: its collateral ratio had dropped to {fig(undefined, fmtCr(crAtLiquidation))}, below
-        the {threshold}% liquidation line for {collateralType}.
+        This trove was liquidated: its collateral ratio had dropped to {ratioPair(crAtLiquidation, mode)}, below the{" "}
+        {threshold}% liquidation line for {collateralType}.
       </>,
     ),
   ];
@@ -796,7 +824,12 @@ export function liquityLiquidationLegs(ctx: LiquityContext): ReactNode[] | undef
 
 // ── redeem / zombie adjust ───────────────────────────────────────────────────
 
-function redeemSlots(ctx: LiquityContext, coords: EventCoords, currentPrice?: number): EventProseSlots {
+function redeemSlots(
+  ctx: LiquityContext,
+  coords: EventCoords,
+  mode: RatioMode,
+  currentPrice?: number,
+): EventProseSlots {
   const { redemption, stateAfter, troveOperation, collateralType, collateralPrice } = ctx;
   const debtSym = ctx.assetType ?? "BOLD";
 
@@ -899,7 +932,7 @@ function redeemSlots(ctx: LiquityContext, coords: EventCoords, currentPrice?: nu
           <>
             The trove now holds {fig(undefined, `${fmtCurrency(stateAfter.debt, debtSym)}`)} of debt, a low-debt zombie
             trove below the 2,000 {debtSym} minimum, and its collateral ratio adjusts to{" "}
-            {fig(undefined, fmtCr(stateAfter.collateralRatio))}.
+            {ratioPair(stateAfter.collateralRatio, mode)}.
           </>,
         ),
       );
@@ -932,7 +965,7 @@ function redeemSlots(ctx: LiquityContext, coords: EventCoords, currentPrice?: nu
         clause(
           <>
             The trove now holds {fig(undefined, `${fmtCurrency(stateAfter.debt, debtSym)}`)} of debt, adjusting its
-            collateral ratio to {fig(undefined, fmtCr(stateAfter.collateralRatio))}.
+            collateral ratio to {ratioPair(stateAfter.collateralRatio, mode)}.
           </>,
         ),
       );
@@ -994,7 +1027,12 @@ function delegateLink(managerAddr: string): ReactNode {
   );
 }
 
-function setBatchManagerSlots(ctx: LiquityContext, coords: EventCoords, accruedInterest: number): EventProseSlots {
+function setBatchManagerSlots(
+  ctx: LiquityContext,
+  coords: EventCoords,
+  accruedInterest: number,
+  mode: RatioMode,
+): EventProseSlots {
   const { stateAfter, stateBefore, collateralType } = ctx;
   const debtSym = ctx.assetType ?? "BOLD";
   const managerAddr = ctx.batchUpdate?.interestBatchManager ?? ctx.batchManager;
@@ -1053,7 +1091,7 @@ function setBatchManagerSlots(ctx: LiquityContext, coords: EventCoords, accruedI
     );
   }
   if (stateAfter.collateralRatio > 0) {
-    meansNow.push(clause(<>The collateral ratio is {fig(undefined, fmtCr(stateAfter.collateralRatio))}.</>));
+    meansNow.push(clause(<>The collateral ratio is {ratioPair(stateAfter.collateralRatio, mode)}.</>));
   }
 
   return { happened, changed, meansNow };
@@ -1063,6 +1101,7 @@ function removeFromBatchSlots(
   ctx: LiquityContext,
   coords: EventCoords,
   accruedManagementFees: number,
+  mode: RatioMode,
 ): EventProseSlots {
   const { stateAfter, stateBefore, collateralType, collateralPrice } = ctx;
   const debtSym = ctx.assetType ?? "BOLD";
@@ -1129,7 +1168,7 @@ function removeFromBatchSlots(
     );
   }
   if (stateAfter.collateralRatio > 0) {
-    meansNow.push(clause(<>The collateral ratio is {fig(undefined, fmtCr(stateAfter.collateralRatio))}.</>));
+    meansNow.push(clause(<>The collateral ratio is {ratioPair(stateAfter.collateralRatio, mode)}.</>));
   }
 
   return { happened, changed, meansNow };
@@ -1187,7 +1226,7 @@ function batchRateUpdateSlots(ctx: LiquityContext, coords: EventCoords): EventPr
 
 // ── transfer ─────────────────────────────────────────────────────────────────
 
-function transferSlots(ctx: LiquityContext): EventProseSlots {
+function transferSlots(ctx: LiquityContext, mode: RatioMode): EventProseSlots {
   const { transfer, stateAfter, collateralType, collateralPrice } = ctx;
   const debtSym = ctx.assetType ?? "BOLD";
 
@@ -1229,7 +1268,7 @@ function transferSlots(ctx: LiquityContext): EventProseSlots {
           <>
             The transferred trove holds {fig(undefined, `${fmtCurrency(stateAfter.debt, debtSym)}`)} of debt against{" "}
             {fig(undefined, `${fmtColl(stateAfter.coll)} ${collateralType}`)} of collateral, at a{" "}
-            {fig(undefined, fmtCr(stateAfter.collateralRatio))} ratio and a{" "}
+            {ratioPair(stateAfter.collateralRatio, mode)} ratio and a{" "}
             {fig(undefined, fmtRate(stateAfter.annualInterestRate))} interest rate
             {collateralPrice > 0 ? (
               <>
@@ -1253,6 +1292,7 @@ function transferSlots(ctx: LiquityContext): EventProseSlots {
 export function liquityEventSlots(
   ctx: LiquityContext,
   coords: EventCoords,
+  mode: RatioMode,
   previousEvent?: BaseActivityEvent,
   currentEvent?: BaseActivityEvent,
   currentPrice?: number,
@@ -1265,7 +1305,7 @@ export function liquityEventSlots(
     accruedManagementFees = calc.accruedManagementFees;
   }
 
-  const slots = liquityEventSlotsFor(ctx, coords, accruedInterest, accruedManagementFees, currentPrice);
+  const slots = liquityEventSlotsFor(ctx, coords, mode, accruedInterest, accruedManagementFees, currentPrice);
   const same = sameBlockClause(ctx, coords);
   return same ? { ...slots, meansNow: [...(slots.meansNow ?? []), same] } : slots;
 }
@@ -1273,6 +1313,7 @@ export function liquityEventSlots(
 function liquityEventSlotsFor(
   ctx: LiquityContext,
   coords: EventCoords,
+  mode: RatioMode,
   accruedInterest: number,
   accruedManagementFees: number,
   currentPrice?: number,
@@ -1280,29 +1321,29 @@ function liquityEventSlotsFor(
   switch (ctx.operation) {
     case "openTrove":
     case "openTroveAndJoinBatch":
-      return openTroveSlots(ctx, coords);
+      return openTroveSlots(ctx, coords, mode);
     case "closeTrove":
-      return closeTroveSlots(ctx, coords);
+      return closeTroveSlots(ctx, coords, mode);
     case "adjustTrove":
-      return adjustTroveSlots(ctx, coords, accruedInterest, accruedManagementFees);
+      return adjustTroveSlots(ctx, coords, accruedInterest, accruedManagementFees, mode);
     case "adjustTroveInterestRate":
-      return adjustRateSlots(ctx, coords, accruedInterest, accruedManagementFees);
+      return adjustRateSlots(ctx, coords, accruedInterest, accruedManagementFees, mode);
     case "liquidate":
-      return liquidateSlots(ctx, coords);
+      return liquidateSlots(ctx, coords, mode);
     case "redeemCollateral":
     case "adjustZombieTrove":
     case "adjustUnredeemableZombieTrove":
-      return redeemSlots(ctx, coords, currentPrice);
+      return redeemSlots(ctx, coords, mode, currentPrice);
     case "applyPendingDebt":
-      return applyPendingDebtSlots(ctx, coords);
+      return applyPendingDebtSlots(ctx, coords, mode);
     case "setInterestBatchManager":
-      return setBatchManagerSlots(ctx, coords, accruedInterest);
+      return setBatchManagerSlots(ctx, coords, accruedInterest, mode);
     case "removeFromBatch":
-      return removeFromBatchSlots(ctx, coords, accruedManagementFees);
+      return removeFromBatchSlots(ctx, coords, accruedManagementFees, mode);
     case "setBatchManagerAnnualInterestRate":
       return batchRateUpdateSlots(ctx, coords);
     case "transferTrove":
-      return transferSlots(ctx);
+      return transferSlots(ctx, mode);
     default:
       return {
         happened: [
@@ -1335,9 +1376,10 @@ export function liquityGasClause(ctx: LiquityContext, gas: GasCost): ClauseInput
 export function liquityExplainerTeaser(
   ctx: LiquityContext,
   coords: EventCoords,
+  mode: RatioMode,
   previousEvent?: BaseActivityEvent,
   currentEvent?: BaseActivityEvent,
   currentPrice?: number,
 ): ReactNode | null {
-  return splitLead(eventClauses(liquityEventSlots(ctx, coords, previousEvent, currentEvent, currentPrice))).lead;
+  return splitLead(eventClauses(liquityEventSlots(ctx, coords, mode, previousEvent, currentEvent, currentPrice))).lead;
 }
