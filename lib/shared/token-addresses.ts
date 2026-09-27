@@ -63,6 +63,17 @@ export const TOKEN_ADDRESSES: Record<string, string> = {
   LUSD: "0x5f98805a4e8be255a32880fdec7f6728c6568ba0",
   MATIC: "0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0",
   mETH: "0xd5f7838f5c461feff7fe49ea5ebaf7728bb0adfa",
+  // The Alchemix V3 eth-alusd line's MYT (a Morpho Vault V2 share over USDC),
+  // `alchemix_v3_lines.myt` (migration 328 on rails-server-onboarding);
+  // symbol() confirmed "mixUSDC" on chain. public/icons/tokens/mixusdc.png
+  // resolves first via the local-by-symbol tier; this entry is the CDN
+  // fallback behind it. Also the base-alusdb line's MYT symbol (a different
+  // address, chain 8453 — see token-addresses.base.ts), same on-chain symbol.
+  mixUSDC: "0x9b44efca3e2a707b63dc00ce79d646e5e5d24ba5",
+  // The eth-aleth line's MYT (a Morpho Vault V2 share over WETH); symbol()
+  // confirmed "mixWETH" on chain. public/icons/tokens/mixweth.png resolves
+  // first via the local-by-symbol tier; this entry is the CDN fallback.
+  mixWETH: "0x29bcfed246ce37319d94eba107db90c453d4c43d",
   MKR: "0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2",
   oETH: "0x856c4efb76c1d1ae02e20ceb03a2a6a08b0b8dc3",
   osETH: "0xf1c9acdc66974dfb6decb12aa385b9cd01190e38",

@@ -79,14 +79,13 @@ const ICON_SYMBOL_ALIASES: Record<string, string> = {
   rcbBTC: "cbBTC",
   rweETH: "weETH",
   rwstETH: "wstETH",
-  // Alchemix's MYT collateral: Morpho Vault V2 shares over USDC and WETH.
-  // Neither CDN indexes the vault contract, and the underlying's mark says
-  // more than a letter would — the same reasoning as rUSDC/rWETH above. The
-  // alias resolves to the local USDC/WETH PNG by symbol alone, before any
-  // address or chain id is consulted, so one entry each covers mixUSDC and
-  // mixWETH on every chain they appear on.
-  mixUSDC: "USDC",
-  mixWETH: "WETH",
+  // Alchemix's MYT collateral (mixUSDC, mixWETH) used to alias here to
+  // USDC/WETH's mark — neither CDN indexes the vault contract, and at the
+  // time the underlying's mark said more than a letter would. It now has its
+  // own local PNG (public/icons/tokens/mixusdc.png, mixweth.png, Alchemix's
+  // published artwork) resolved by symbol like any other local mark, so the
+  // alias is gone: a mixUSDC/mixWETH chip draws its own vault mark, not
+  // USDC/WETH's.
 };
 
 export interface TokenChipIconProps {
