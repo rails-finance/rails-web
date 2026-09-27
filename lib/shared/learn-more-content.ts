@@ -2,7 +2,8 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { POLARIS_APP_LINK, POLARIS_DOC_LINKS } from "@/lib/polaris/docs-links";
 import type { CurveEventType } from "@/lib/shared/types/protocols/curve";
 import type { UniswapEventType } from "@/lib/shared/types/protocols/uniswap";
-import { getSpokeMeta, ARCHETYPE_LABEL } from "@/lib/aave-v4/spoke-meta";
+import { getSpokeMeta, ARCHETYPE_LABEL, SPOKE_DOC_LINKS } from "@/lib/aave-v4/spoke-meta";
+import { HUB_TIER_LABEL, type HubTier } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { SEAMLESS_DOCS_URL, v3Brand, v3Possessive, type V3Protocol } from "@/lib/aave-v3/protocol-name";
 import { FAQ_URLS, AAVE_FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { ALCHEMIX_DOCS } from "@/lib/alchemix/learn-more";
@@ -682,10 +683,11 @@ export function aaveV4SpokeContent(spokeName: string): LearnMoreContent | null {
   const meta = getSpokeMeta(spokeName);
   if (!meta) return null;
 
-  const sameHub = meta.collateralHub === meta.borrowHub;
+  const hub = (h: HubTier) => HUB_TIER_LABEL[h];
+  const sameHub = meta.borrowHubs.length === 1 && meta.borrowHubs[0] === meta.collateralHub;
   const hubMapping = sameHub
-    ? `Collateral and borrows both sit in the ${meta.collateralHub} Hub.`
-    : `Collateral sits in the ${meta.collateralHub} Hub, while borrows are drawn from the ${meta.borrowHub} Hub.`;
+    ? `Collateral and borrows both sit in the ${hub(meta.collateralHub)} Hub.`
+    : `Collateral sits in the ${hub(meta.collateralHub)} Hub; borrows are drawn from the ${meta.borrowHubs.map(hub).join(" and ")} Hub${meta.borrowHubs.length > 1 ? "s" : ""}.`;
   const archetype = ARCHETYPE_LABEL[meta.archetype];
 
   const extraParagraphs = [...meta.narrative];
@@ -695,7 +697,7 @@ export function aaveV4SpokeContent(spokeName: string): LearnMoreContent | null {
     title: `How the ${meta.name} Spoke Works`,
     intro: `${archetype} — ${meta.name} on Aave V4's Hub & Spoke model. ${hubMapping}`,
     extraParagraphs,
-    ...(meta.links ? { links: meta.links } : {}),
+    links: meta.links ?? SPOKE_DOC_LINKS,
   };
 }
 
@@ -716,8 +718,9 @@ export function aaveV4LiquidationContent(spokeName?: string): LearnMoreContent {
     intro:
       "An Aave V4 position becomes eligible for liquidation when its health factor falls below 1.0 — the point where the borrowed value, measured against each collateral asset's liquidation threshold, is no longer sufficiently covered. Once eligible, anyone (in practice, automated liquidator bots) can step in.",
     extraParagraphs: [
-      "A liquidator repays part of the outstanding debt and, in return, receives an equivalent value of the borrower's collateral plus a liquidation bonus — so the collateral seized is worth more than the debt cleared. That bonus is the liquidator's incentive and the borrower's effective penalty." +
+      "A liquidator repays part of the outstanding debt and, in return, receives the same value of the borrower's collateral plus a liquidation bonus, so the collateral seized is worth more than the debt repaid. The bonus follows a Dutch auction: the lower the health factor, the higher the bonus, up to a maximum each Spoke sets per collateral asset. It is the liquidator's incentive and the borrower's penalty." +
         marketNote,
+      "A liquidator repays only enough to bring the health factor back to a healthy level, with one exception: if a partial liquidation would leave less than $1,000 of debt in the reserve being repaid, the liquidator must repay all of that reserve's debt.",
       "Health factor = (collateral value × each asset's liquidation threshold) ÷ total debt. To stay safe, keep it comfortably above 1.0 by holding more collateral or carrying less debt; falling collateral prices or rising debt both push it down.",
     ],
     links: [
@@ -755,7 +758,7 @@ export function aaveV4HubsContent(): LearnMoreContent {
       },
       {
         bold: "Spoke",
-        text: "a market users interact with, drawing from a Hub. One spoke can draw from more than one — Bluechip keeps collateral in Prime but borrows from Core.",
+        text: "a market users interact with, drawing from a Hub. One spoke can draw from more than one — Bluechip keeps its collateral in Prime and borrows from both Prime and Core.",
       },
       {
         bold: "Credit line & utilisation",

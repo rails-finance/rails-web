@@ -185,19 +185,20 @@ export function AaveV4EventHeader({
           <span className="text-sm text-rb-500">{label}</span>
         )}
         {ctx.eventType === "liquidation" ? (
-          // Liquidation reads like Liquity's redemption header: the two facts
-          // that matter — collateral cleared and debt reduced — each as
-          // value + token icon. Mirrors "Cleared X ◊ Reduced Y ⬡".
+          // Liquidation header: the two facts that matter, collateral seized
+          // and debt repaid, each as value + token icon: "Seized X ◊ Repaid Y ⬡".
+          // The verbs are the Aave V3 liquidation run's (lib/aave-v3/timeline-runs.tsx),
+          // and neither reuses "cleared", which the card's prose keeps for the debt.
           <>
             {ctx.liquidatedCollateralAmount && ctx.collateralSymbol && (
               <span className="inline-flex items-center gap-1.5 text-sm">
-                <span className="text-rb-500">Cleared</span>
+                <span className="text-rb-500">Seized</span>
                 <span className={`font-bold text-foreground ${hideVal}`}>
                   <Prov
                     value={formatExact(Number(ctx.liquidatedCollateralAmount))}
                     symbol={ctx.collateralSymbol}
                     info={eventLogProv(
-                      "Collateral cleared in the liquidation",
+                      "Collateral seized in the liquidation",
                       "collateralAmountRemoved",
                       {
                         ...coord,
@@ -216,13 +217,13 @@ export function AaveV4EventHeader({
             )}
             {ctx.debtToCover && (
               <span className="inline-flex items-center gap-1.5 text-sm">
-                <span className="text-rb-500">Reduced</span>
+                <span className="text-rb-500">Repaid</span>
                 <span className={`font-bold text-foreground ${hideVal}`}>
                   <Prov
                     value={formatExact(Number(ctx.debtToCover))}
                     symbol={ctx.reserveSymbol}
                     info={eventLogProv(
-                      "Debt reduced by the liquidation",
+                      "Debt repaid by the liquidation",
                       "debtAmountRestored",
                       { ...coord, asset: ctx.reserveSymbol, raw: ctx.raw?.amount, origin: ctx.origin?.amount },
                       "LiquidationCall",

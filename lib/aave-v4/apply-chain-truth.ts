@@ -186,11 +186,6 @@ export function patchSpokeCardWithChain(
     })
     .sort((a, b) => b.usdShare - a.usdShare);
 
-  // Use the chain's HF directly (not calc.healthFactor) — they should match
-  // when inputs align, but chain HF includes V4-specific accounting (risk
-  // premium, premium-shares, etc.) the calculation leaves out.
-  const healthFactor = chain.healthFactor;
-
   // Recompute the collateral-only blended LT from the SAME chain LTs the liq
   // price and weighted collateral now use — Σ(collateralUsd × lt) / Σ(collateral
   // Usd) over collateral-enabled reserves. Without this it would stay the stale
@@ -227,6 +222,17 @@ export function patchSpokeCardWithChain(
     ),
   ];
 
+  // RULE: the card's health factor comes from the same balances and prices as
+  // its collateral and debt (TO-DO-ui-jobs §101). The position read is a
+  // snapshot from an earlier block, priced then, while the card values the
+  // balances at the current oracle price, so its getUserAccountData figure can
+  // disagree with the totals beside it. The balances already carry the premium
+  // debt (getUserTotalDebt), so the calculation matches the spoke's own at the
+  // same prices. The read's figure stands in when a leg has no price.
+  const calcHf = pricesHaveLoaded(prices) && unpricedSymbols.length === 0 ? calc.healthFactor : null;
+  const healthFactor = calcHf ?? chain.healthFactor;
+  const healthFactorBasis: "calc" | "chain" = calcHf != null ? "calc" : "chain";
+
   return {
     ...card,
     unpricedSymbols,
@@ -238,6 +244,7 @@ export function patchSpokeCardWithChain(
     supplyingSymbols,
     borrowingSymbols,
     healthFactor,
+    healthFactorBasis,
     liqPrice,
     assetLiqPrices,
     borrowingPowerUsd: calc.borrowCapacityUsd,

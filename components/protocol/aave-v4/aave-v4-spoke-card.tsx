@@ -464,7 +464,7 @@ function AaveV4SpokeCard({
                       value:
                         spoke.healthFactor !== null ? (
                           <StatValue color={hfColorClass(spoke.healthFactor)}>
-                            <Prov info={healthFactorProv()}>{hfLabel(spoke.healthFactor)}</Prov>
+                            <Prov info={healthFactorProv(spoke.healthFactorBasis)}>{hfLabel(spoke.healthFactor)}</Prov>
                           </StatValue>
                         ) : (
                           <StatDash>{"∞"}</StatDash>

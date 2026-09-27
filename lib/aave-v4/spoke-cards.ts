@@ -166,6 +166,11 @@ export interface AaveSpokeCardInfo {
   latestBorrowRate: number | null;
   /** Aave-native HF = weightedCollateralUsd / totalDebtUsd. null when no debt. */
   healthFactor: number | null;
+  /** Where `healthFactor` came from: "calc" when it is worked out from the same
+   *  balances and prices as the card's collateral and debt, "chain" when it is
+   *  the spoke's getUserAccountData figure from the position read. Absent on an
+   *  event-derived card. */
+  healthFactorBasis?: "calc" | "chain";
   /** Liq price for the dominant collateral asset (largest USD share). null when
    *  no debt, single-asset can't reach liq, or there's no priced collateral. */
   liqPrice: { symbol: string; currentPrice: number; liqPrice: number; headroomPct: number } | null;

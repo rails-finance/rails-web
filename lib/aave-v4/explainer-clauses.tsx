@@ -16,7 +16,7 @@
 // Figures render through <Prov>: an `echo` when the same figure already has a
 // primary receipt on the open card (moved amount → the header; running
 // after-balance and borrow rate → the detail grid; liquidation legs → the
-// header's Cleared/Reduced), a plain primary only for a same-transaction
+// header's Seized/Repaid), a plain primary only for a same-transaction
 // sibling's figure, whose receipt lives in another card's scope — an echo can't
 // cross a ProvReceiptsScope boundary, so it registers here as a primary.
 //
@@ -501,7 +501,7 @@ function liquidationSlots(ctx: AaveV4Context, coord: EventProvDetail, token: str
       <Fig
         echo
         info={eventLogProv(
-          "Collateral cleared in the liquidation",
+          "Collateral seized in the liquidation",
           "collateralAmountRemoved",
           {
             ...coord,
@@ -521,7 +521,7 @@ function liquidationSlots(ctx: AaveV4Context, coord: EventProvDetail, token: str
     <Fig
       echo
       info={eventLogProv(
-        "Debt reduced by the liquidation",
+        "Debt repaid by the liquidation",
         "debtAmountRestored",
         { ...coord, asset: ctx.reserveSymbol, raw: ctx.raw?.amount, origin: ctx.origin?.amount },
         "LiquidationCall",

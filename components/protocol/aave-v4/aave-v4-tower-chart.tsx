@@ -103,11 +103,16 @@ const CURRENT_DEBT_PROV: Provenance = {
     "Current debt — what the spoke contract answers for this position at the latest block, carrying the interest accrued up to it. Where that read is unavailable the row falls back to the position's draws less what has been repaid or liquidated.",
 };
 
-// Receipts for the per-row USD hints. The two row families price differently
+// RULE (TO-DO-ui-jobs §101): the breakdown's figure column is USD on every
+// priced row, so the column adds up down the page; a row about one token
+// carries its chip and, with "Show token amounts" on, its token amount beside
+// the USD. An unpriced holding is the one exception: it has no USD figure, so
+// its row states the token amount and says it has no price source (§40).
+//
+// Receipts for the per-row USD figures. The two row families price differently
 // (see the totals derivation below): outflows are valued at price-at-the-time
 // so a closed position's history stays fixed; current holdings use the live
-// price, since "what's it worth now" is a current-price question. The token
-// amount is traced by the row's receipt.
+// price, since "what's it worth now" is a current-price question.
 const flowUsdHintProv = (symbol: string): Provenance => ({
   kind: "derived",
   summary: `${symbol} outflow value in USD — each event's amount at the price stored for its block, added up. The figure stays at what the tokens were worth as they left.`,
@@ -120,6 +125,19 @@ const currentUsdHintProv = (symbol: string, source: AaveV4PriceSource | null): P
   formula: "amount × live price",
   inputs: [livePriceInput(source)],
 });
+/** The token amount beside a single-asset flow row's USD figure. */
+const flowAmountProv = (label: string, symbol: string): Provenance =>
+  accumProv(`${symbol} ${label.toLowerCase()} over the position's life, in the token's units`, {
+    formula: "Σ flow amount",
+    inputs: [
+      {
+        label: "flow amount",
+        kind: "chain",
+        pclass: "indexed",
+        note: "the amount each of the position's events moved",
+      },
+    ],
+  });
 const flowProv = (label: string): Provenance =>
   accumProv(`${label} over the position's life`, {
     formula: "Σ(flow amount × price)",
@@ -191,8 +209,8 @@ function AaveChartDisplayMenu({
   hideHistorical,
   onToggleHistorical,
   hasHistory,
-  hideUsd,
-  onToggleHideUsd,
+  showTokens,
+  onToggleShowTokens,
   hideSurplus,
   onToggleHideSurplus,
   hasSurplus,
@@ -203,8 +221,8 @@ function AaveChartDisplayMenu({
   hideHistorical: boolean;
   onToggleHistorical: () => void;
   hasHistory: boolean;
-  hideUsd: boolean;
-  onToggleHideUsd: () => void;
+  showTokens: boolean;
+  onToggleShowTokens: () => void;
   hideSurplus?: boolean;
   onToggleHideSurplus?: () => void;
   hasSurplus?: boolean;
@@ -214,13 +232,13 @@ function AaveChartDisplayMenu({
 }) {
   const options: FilterOption[] = [
     ...(canGroup ? [{ key: "group-assets", label: "Group assets" }] : []),
-    { key: "hide-usd-values", label: "Hide USD values" },
+    { key: "show-token-amounts", label: "Show token amounts" },
     ...(hasHistory ? [{ key: "hide-historical", label: "Hide inactive / repaid" }] : []),
     ...(hasSurplus ? [{ key: "hide-surplus", label: "Hide surplus collateral" }] : []),
   ];
   const visible = new Set<string>();
   if (grouped) visible.add("group-assets");
-  if (hideUsd) visible.add("hide-usd-values");
+  if (showTokens) visible.add("show-token-amounts");
   if (hideHistorical) visible.add("hide-historical");
   if (hideSurplus) visible.add("hide-surplus");
   return (
@@ -237,7 +255,7 @@ function AaveChartDisplayMenu({
       onToggle={(key) => {
         if (key === "group-assets") onToggleGroup?.();
         if (key === "hide-historical") onToggleHistorical();
-        if (key === "hide-usd-values") onToggleHideUsd();
+        if (key === "show-token-amounts") onToggleShowTokens();
         if (key === "hide-surplus") onToggleHideSurplus?.();
       }}
     />
@@ -272,7 +290,7 @@ export function AaveV4TowerChart({
   title,
 }: AaveV4TowerChartProps) {
   const [hideHistorical, setHideHistorical] = useState(false);
-  const [hideUsd, setHideUsd] = useState(true);
+  const [showTokens, setShowTokens] = useState(false);
   // null = follow the auto-default (group when there's anything to merge); once
   // the reader toggles "Group assets" this pins their choice.
   const [groupOverride, setGroupOverride] = useState<boolean | null>(null);
@@ -604,6 +622,11 @@ export function AaveV4TowerChart({
       ? { heightPct: (totalBorrowedUsd / towerMax) * CHART_HEIGHT, color: DEBT_GREEN_FADED, hidden: isLiveView }
       : undefined;
 
+  // The token amount riding beside a single-asset row's USD figure, when the
+  // Display menu asks for it.
+  const tokenHint = (amount: number, symbol: string, prov: Provenance): Partial<BreakdownRow> =>
+    showTokens ? { usdHint: `${fmt(amount)} ${aaveV4DisplaySymbol(symbol)}`, usdProv: prov, usdExact: undefined } : {};
+
   // Breakdown-row counterparts to the segment builders: merge a category into a
   // single USD row when grouped & ≥2 (no icon — the row is a sum across assets),
   // else per-asset rows with the native amount + icon as before.
@@ -612,22 +635,20 @@ export function AaveV4TowerChart({
     pattern: CSSProperties,
     mergedLabel: string,
   ): BreakdownRow[] => {
-    const prov = flowProv(mergedLabel);
     if (grouped && items.length >= 2) {
+      const prov = flowProv(mergedLabel);
       const total = items.reduce((s, i) => s + i.usd, 0);
       return [{ sign: "−", label: mergedLabel, amount: fmtUsd(total).display, swatchStyle: pattern, prov }];
     }
     return items.map((i) => ({
       sign: "−",
-      label:
-        mergedLabel === "Liquidated" ? `${aaveV4DisplaySymbol(i.symbol)} liquidated` : aaveV4DisplaySymbol(i.symbol),
-      amount: fmt(i.amount),
-      usdHint: hideUsd ? undefined : fmtUsd(i.usd).display,
-      usdProv: hideUsd ? undefined : flowUsdHintProv(aaveV4DisplaySymbol(i.symbol)),
-      usdExact: hideUsd ? undefined : fmtUsd(i.usd).title,
+      label: mergedLabel,
+      amount: fmtUsd(i.usd).display,
+      exact: fmtUsd(i.usd).title,
+      ...tokenHint(i.amount, i.symbol, flowAmountProv(mergedLabel, aaveV4DisplaySymbol(i.symbol))),
       swatchStyle: pattern,
       icon: <TokenChipIcon symbol={i.symbol} size={14} filterable={false} />,
-      prov,
+      prov: flowUsdHintProv(aaveV4DisplaySymbol(i.symbol)),
     }));
   };
 
@@ -685,13 +706,12 @@ export function AaveV4TowerChart({
       ...[...assets].reverse().map((r) => ({
         sign: "",
         label: aaveV4DisplaySymbol(r.symbol),
-        amount: fmt(nativeOf(r)),
-        usdHint: hideUsd ? undefined : fmtUsd(usdOf(r)).display,
-        usdProv: hideUsd ? undefined : currentUsdHintProv(aaveV4DisplaySymbol(r.symbol), r.priceSource),
-        usdExact: hideUsd ? undefined : fmtUsd(usdOf(r)).title,
+        amount: fmtUsd(usdOf(r)).display,
+        exact: fmtUsd(usdOf(r)).title,
+        ...tokenHint(nativeOf(r), r.symbol, prov),
         swatchClass,
         icon: <TokenChipIcon symbol={r.symbol} size={14} filterable={false} />,
-        prov,
+        prov: currentUsdHintProv(aaveV4DisplaySymbol(r.symbol), r.priceSource),
       })),
       ...tail,
     ];
@@ -709,6 +729,22 @@ export function AaveV4TowerChart({
 
   const currentCollLabel = supplyOnly ? "Currently Supplied" : "Current Collateral";
 
+  // A side whose current holdings are one priced row states that figure once:
+  // the total takes the row's swatch, chip and token amount in its place.
+  const withTotal = (rows: BreakdownRow[], total: BreakdownRow): BreakdownRow[] => {
+    if (rows.length !== 1 || rows[0].usdHint === NO_PRICE_HINT) return [...rows, total];
+    const [only] = rows;
+    return [
+      {
+        ...total,
+        swatchClass: only.swatchClass,
+        icon: only.icon,
+        usdHint: only.usdHint,
+        usdProv: only.usdProv,
+      },
+    ];
+  };
+
   const collRows: BreakdownRow[] = [
     ...(!isLiveView
       ? [
@@ -724,25 +760,27 @@ export function AaveV4TowerChart({
       : []),
     ...(!isLiveView ? flowRows(withdrawnAssets, WITHDRAWN_PATTERN, "Withdrawn") : []),
     ...(!isLiveView ? flowRows(liquidatedCollAssets, LIQUIDATION_PATTERN, "Liquidated") : []),
-    ...currentRows(
-      supplyAssets,
-      unpricedSupply,
-      (r) => r.netSupply,
-      (r) => r.netSupplyUsd,
-      "bg-blue-500",
-      "Combined Collateral",
-      CURRENT_COLL_PROV,
+    ...withTotal(
+      currentRows(
+        supplyAssets,
+        unpricedSupply,
+        (r) => r.netSupply,
+        (r) => r.netSupplyUsd,
+        "bg-blue-500",
+        "Combined Collateral",
+        CURRENT_COLL_PROV,
+      ),
+      {
+        sign: "",
+        // Parity with Liquity's "Current Collateral" total for borrow positions;
+        // a never-borrowed wallet has nothing collateralised, so it reads as a
+        // plain supply balance instead.
+        label: partialLabel(currentCollLabel, unpricedSupplySymbols),
+        amount: totalAmount(totalSupplyUsd, unpricedSupplySymbols),
+        isResult: true,
+        prov: partialSumProv(CURRENT_COLL_PROV, currentCollLabel, unpricedSupplySymbols),
+      },
     ),
-    {
-      sign: "",
-      // Parity with Liquity's "Current Collateral" total for borrow positions;
-      // a never-borrowed wallet has nothing collateralised, so it reads as a
-      // plain supply balance instead.
-      label: partialLabel(currentCollLabel, unpricedSupplySymbols),
-      amount: totalAmount(totalSupplyUsd, unpricedSupplySymbols),
-      isResult: true,
-      prov: partialSumProv(CURRENT_COLL_PROV, currentCollLabel, unpricedSupplySymbols),
-    },
   ];
 
   const debtRows: BreakdownRow[] = [
@@ -760,22 +798,24 @@ export function AaveV4TowerChart({
       : []),
     ...(!isLiveView ? flowRows(repaidAssets, REPAID_PATTERN, "Repaid") : []),
     ...(!isLiveView ? flowRows(liquidatedDebtAssets, LIQUIDATION_PATTERN, "Liquidated") : []),
-    ...currentRows(
-      debtAssets,
-      unpricedDebt,
-      (r) => r.netDebt,
-      (r) => r.netDebtUsd,
-      "bg-green-400",
-      "Debt",
-      CURRENT_DEBT_PROV,
+    ...withTotal(
+      currentRows(
+        debtAssets,
+        unpricedDebt,
+        (r) => r.netDebt,
+        (r) => r.netDebtUsd,
+        "bg-green-400",
+        "Debt",
+        CURRENT_DEBT_PROV,
+      ),
+      {
+        sign: "",
+        label: partialLabel("Current Debt", unpricedDebtSymbols),
+        amount: totalAmount(totalDebtUsd, unpricedDebtSymbols),
+        isResult: true,
+        prov: partialSumProv(CURRENT_DEBT_PROV, "Current Debt", unpricedDebtSymbols),
+      },
     ),
-    {
-      sign: "",
-      label: partialLabel("Current Debt", unpricedDebtSymbols),
-      amount: totalAmount(totalDebtUsd, unpricedDebtSymbols),
-      isResult: true,
-      prov: partialSumProv(CURRENT_DEBT_PROV, "Current Debt", unpricedDebtSymbols),
-    },
   ];
 
   const placeholderClass =
@@ -816,8 +856,8 @@ export function AaveV4TowerChart({
                 hideHistorical={hideHistorical}
                 onToggleHistorical={() => setHideHistorical((v) => !v)}
                 hasHistory={hasHistory}
-                hideUsd={hideUsd}
-                onToggleHideUsd={() => setHideUsd((v) => !v)}
+                showTokens={showTokens}
+                onToggleShowTokens={() => setShowTokens((v) => !v)}
                 hideSurplus={hideSurplus}
                 onToggleHideSurplus={onToggleHideSurplus}
                 hasSurplus={(surplusSymbols?.size ?? 0) > 0}

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { AaveV4Context, AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
 import type { AaveV4SnapshotItem } from "@/lib/shared/types/event-shape";
 import {
@@ -14,7 +14,8 @@ import {
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { formatRatio, ratioLabel, ratioColorClass } from "@/lib/shared/ratio-format";
-import { StatCard } from "@/components/shared/state-transition";
+import { StatCard, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
+import { hfLabel } from "@/lib/aave-v4/format";
 import { PositionRow, fmtPositionUsd } from "@/components/shared/position-row";
 import { resolvePrice } from "@/lib/aave/prices";
 import { usePrices } from "@/lib/shared/prices-context";
@@ -23,6 +24,7 @@ import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
+  healthFactorAtBlockProv,
   heldDebtRateProv,
   snapshotProv,
   deltaProv,
@@ -109,6 +111,40 @@ function BorrowRateRow({ symbol, apr, coord }: { symbol: string; apr: string; co
   );
 }
 
+interface HealthFactorRead {
+  block: number;
+  wad: string | null;
+}
+
+/** The health factor at the end of the block before a liquidation and of its
+ *  own block, read from the spoke (fetched once, when the detail mounts on
+ *  expand). `undefined` while loading or after a miss: the card then draws no
+ *  health-factor section. */
+function useHealthFactorAround(
+  enabled: boolean,
+  spoke: string | undefined,
+  wallet: string,
+  blockNumber?: number,
+): { before: HealthFactorRead; after: HealthFactorRead } | undefined {
+  const [hf, setHf] = useState<{ before: HealthFactorRead; after: HealthFactorRead } | undefined>(undefined);
+  useEffect(() => {
+    if (!enabled || !spoke || !wallet || blockNumber == null) return;
+    let live = true;
+    fetch(`/api/chain/aave-v4/health-factor?spoke=${spoke}&wallet=${wallet}&block=${blockNumber}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (live && d?.before && d?.after) setHf({ before: d.before, after: d.after });
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [enabled, spoke, wallet, blockNumber]);
+  return hf;
+}
+
+const hfOf = (wad: string | null): number | null => (wad == null ? null : Number(wad) / 1e18);
+
 export interface AaveV4EventDetailProps {
   ctx: AaveV4Context;
   txHash: string;
@@ -167,7 +203,7 @@ function V4PositionRow({
   );
 }
 
-export function AaveV4EventDetail({ ctx, txHash, blockNumber }: AaveV4EventDetailProps) {
+export function AaveV4EventDetail({ ctx, txHash, blockNumber, wallet }: AaveV4EventDetailProps) {
   const { prefs } = usePreferences();
   const ratioMode = prefs.ratioMode;
   const prices = usePrices();
@@ -183,6 +219,7 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber }: AaveV4EventDetai
   const token = ctx.reserveSymbol ?? "???";
   const isLiq = ctx.eventType === "liquidation";
   const isToggle = ctx.eventType === "collateral_toggle";
+  const hfAround = useHealthFactorAround(isLiq, ctx.spokeAddress, ctx.owner ?? wallet, blockNumber);
 
   const isSupplySide = ctx.eventType === "supply" || ctx.eventType === "withdraw";
   const isDebtSide = ctx.eventType === "borrow" || ctx.eventType === "repay";
@@ -386,6 +423,30 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber }: AaveV4EventDetai
             {formatRatio(collRatio * 100, ratioMode, 0)}
           </Prov>
         </div>
+      ),
+    });
+  }
+  // Health factor before → after, on a liquidation: the figure the liquidation
+  // turned on, read from the spoke either side of the event's block, at the
+  // precision every health-factor display uses (hfLabel).
+  if (isLiq && hfAround) {
+    snapshotCards.push({
+      key: "health-factor",
+      label: "Health factor",
+      body: (
+        <StateTransition>
+          <span className="text-sm font-semibold tabular-nums text-rb-500">
+            <Prov info={healthFactorAtBlockProv("before", coord, hfAround.before)}>
+              {hfLabel(hfOf(hfAround.before.wad))}
+            </Prov>
+          </span>
+          <TransitionArrow size="sm" />
+          <span className="text-sm font-semibold tabular-nums">
+            <Prov info={healthFactorAtBlockProv("after", coord, hfAround.after)}>
+              {hfLabel(hfOf(hfAround.after.wad))}
+            </Prov>
+          </span>
+        </StateTransition>
       ),
     });
   }

@@ -36,7 +36,6 @@ import {
 // Explanation surface where that vocabulary can't be written inline.
 const SUPPLY_USD_PROV = usdProv("Collateral supplied", { amountLabel: "supply balance", amountKind: "chain" });
 const DEBT_USD_PROV = usdProv("Debt drawn", { amountLabel: "debt balance", amountKind: "chain" });
-const HF_PROV = healthFactorProv();
 const borrowRateProv = () =>
   accumProv("The latest borrow rate recorded on this spoke", { formula: "most recent on-chain borrow index → APR" });
 const peakSupplyProv = () => accumProv("Peak supply", { formula: "max(supply USD) across the event stream" });
@@ -254,7 +253,7 @@ function buildSpokePositionItems(spoke: AaveSpokeCardInfo): {
         <span key="hf">
           Health factor of{" "}
           <H>
-            <Prov info={HF_PROV}>{hfLabel(spoke.healthFactor)}</Prov>
+            <Prov info={healthFactorProv(spoke.healthFactorBasis)}>{hfLabel(spoke.healthFactor)}</Prov>
           </H>
           : the risk-adjusted collateral is worth {hfLabel(spoke.healthFactor)}× the outstanding debt, and the position
           becomes liquidatable if it falls to 1.00.

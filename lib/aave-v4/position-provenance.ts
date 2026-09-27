@@ -167,6 +167,30 @@ export function eventLogProv(what: string, field: string, detail?: EventProvDeta
   };
 }
 
+/** The health factor either side of an event — the spoke's getUserAccountData
+ *  read at the end of the block before the event's and at the end of its own
+ *  (TO-DO-ui-jobs §100). A later transaction in the same block lands in the
+ *  "after" figure too. */
+export function healthFactorAtBlockProv(
+  when: "before" | "after",
+  detail: EventProvDetail,
+  read: { block: number; wad: string | null },
+): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    summary: `Health factor ${when} this event — the spoke's getUserAccountData for this position, read at the end of block ${read.block.toLocaleString("en-US")}${
+      when === "before" ? ", the block before the event's" : ", the event's block"
+    }. The spoke works it out as the collateral, each asset weighted by its collateral factor, divided by the debt, at its oracle's prices. Below 1 the position can be liquidated.${
+      read.wad == null ? " The position had no debt, so the factor has no finite value." : ""
+    }`,
+    contract: spokeContract(detail),
+    via: `GET /api/chain/aave-v4/health-factor · spoke getUserAccountData @ block ${read.block} · healthFactor${
+      read.wad != null ? ` = ${read.wad}` : ""
+    } · ÷10^18`,
+  };
+}
+
 /** Third-party action: the position owner neither signed the transaction nor
  *  made the spoke call. Chain-derived over three chain facts — the tx
  *  envelope's sender, the spoke event's `caller` param (msg.sender,
@@ -303,7 +327,12 @@ export function accumProv(what: string, opts?: { formula?: string; inputs?: Prov
  *  getUserAccountData (the figure Aave's interface shows); falls back to a
  *  client-side calculation over the per-asset thresholds when the live read is
  *  unavailable. */
-export function healthFactorProv(): Provenance {
+export function healthFactorProv(basis: "calc" | "chain" = "chain"): Provenance {
+  if (basis === "calc")
+    return calcProv(
+      "Health factor, over the same balances and prices as the collateral and debt shown beside it (the spoke's getUserAccountData works it out the same way)",
+      { formula: "Σ(collateral × price × liquidation threshold) ÷ Σ(debt × price)" },
+    );
   return {
     kind: "chain",
     pclass: "state",
