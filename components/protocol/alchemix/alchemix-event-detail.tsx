@@ -129,7 +129,7 @@ function legStats(
       break;
     }
     case "force_repay":
-      stat("Put against the debt", "credit_to_yield", mytSymbol);
+      stat("Paid off set-aside debt", "credit_to_yield", mytSymbol);
       stat("Protocol fee", "protocol_fee_total", mytSymbol);
       stat("Requested", "amount", sym);
       break;

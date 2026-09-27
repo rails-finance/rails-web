@@ -254,15 +254,19 @@ export const ALCHEMIX_LIFETIME_FLOWS: LearnMoreContent = {
   details: [
     {
       bold: "Collateral side",
-      text: "shares deposited, then shares withdrawn, put against debt set aside for repayment, used to pay the rest of the debt at a close, returned to the holder at a close, or taken by a liquidation, and the shares held now, from the current reading. The shares a repay pays with come from the caller's wallet, so they are not drawn here.",
+      text: "shares deposited, then shares withdrawn, put against debt set aside for repayment, taken by every line redemption, used to pay the rest of the debt at a close, returned to the holder at a close, or taken by a liquidation, and the shares held now, from the current reading. The shares a repay pays with come from the caller's wallet, so they are not drawn here.",
     },
     {
       bold: "Debt side",
-      text: "synthetic minted, then synthetic burned, debt cleared by repays and debt paid off at a close, and the debt read now.",
+      text: "synthetic minted, then synthetic burned, debt cleared by repays, debt cleared by every line redemption, and debt paid off at a close, and the debt read now.",
+    },
+    {
+      bold: "What a redemption's row is",
+      text: "the sum of what every line redemption cleared and took from this position, each a difference of the readings either side of it, never a figure from the redemption's own event (rails-ops decisions/0032). Each redemption still has its own two figures on the timeline.",
     },
     {
       bold: "What the totals leave out",
-      text: "redemptions, which are the line's events, and the protocol fee a repay takes from the collateral. The Explanation pane adds both, so its account of the collateral closes on the shares held now.",
+      text: "the protocol fee a repay takes from the collateral. The Explanation pane adds it, so its account of the collateral closes on the shares held now.",
     },
     {
       bold: "Interest",

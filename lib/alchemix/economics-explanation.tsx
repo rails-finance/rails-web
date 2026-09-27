@@ -4,10 +4,12 @@
 // position's own figures, and where the gap between the flows and the reading
 // now comes from.
 //
-// The tower sums the position's own events only (lib/alchemix/economics.ts).
-// Redemptions are the line's events, so this pane adds what they cleared and
-// took, each a difference of two readings (rails-ops decisions/0032), and only
-// where every redemption on the timeline states its figure.
+// The tower sums the position's own events, plus one summed row per side for
+// what the line's redemptions cleared and took (lib/alchemix/economics.ts):
+// each a difference of two readings, not derived from a redemption's own log
+// (rails-ops decisions/0032), and drawn only where every redemption on the
+// timeline states its figure. This pane states the same figures in prose, in
+// the foreground colour the bars already gave them.
 
 import type { ReactNode } from "react";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -73,7 +75,7 @@ export function alchemixFlowsExplanation(opts: {
     if (redeemedAll && r.taken != null && r.taken > 0)
       exits.push(
         <>
-          {n(r.taken, myt)} taken by {r.count} line {r.count === 1 ? "redemption" : "redemptions"}
+          {h(r.taken, myt)} taken by {r.count} line {r.count === 1 ? "redemption" : "redemptions"}
         </>,
       );
     const accounted =
@@ -134,7 +136,7 @@ export function alchemixFlowsExplanation(opts: {
     if (redeemedAll)
       exits.push(
         <>
-          {n(r.cleared, sym)} cleared by {r.count} line {r.count === 1 ? "redemption" : "redemptions"}
+          {h(r.cleared, sym)} cleared by {r.count} line {r.count === 1 ? "redemption" : "redemptions"}
         </>,
       );
     if (f.debtClosed.amount > 0) exits.push(<>{h(f.debtClosed.amount, sym)} paid off with collateral at the close</>);
@@ -161,8 +163,8 @@ export function alchemixFlowsExplanation(opts: {
   if (redeemedAll) {
     items.push(
       <>
-        The tower draws the position&rsquo;s own events, so the redemptions above are in neither side&rsquo;s bars: each
-        is on the timeline, with what it cleared and took from this position.
+        Each line redemption is on the timeline, with what it cleared and took from this position; the row above sums
+        them from those readings, not from the position&rsquo;s own events.
       </>,
     );
   }

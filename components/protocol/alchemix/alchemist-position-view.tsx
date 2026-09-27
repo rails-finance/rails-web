@@ -370,7 +370,7 @@ export function AlchemistPositionView({
     beforeByBlock,
     ridersByTx,
   );
-  const redemptionTotals = useMemo<AlchemixRedemptionTotals & { clearedRaw: string }>(() => {
+  const redemptionTotals = useMemo<AlchemixRedemptionTotals & { clearedRaw: string; takenRaw: string | null }>(() => {
     let count = 0;
     let stated = 0;
     let cleared = BigInt(0);
@@ -395,6 +395,7 @@ export function AlchemistPositionView({
       cleared: Number(cleared) / 1e18,
       clearedRaw: cleared.toString(),
       taken: takenStated === stated ? Number(taken) / 1e18 : null,
+      takenRaw: takenStated === stated ? taken.toString() : null,
     };
   }, [alchemistEvents, beforeByBlock]);
   // Each redemption's net for the holder in the underlying, summed. The unit
@@ -519,8 +520,9 @@ export function AlchemistPositionView({
         currentDebt: live?.debt?.formatted ?? position.figures.debt?.formatted ?? null,
         windowed: olderCount > 0,
         coords,
+        redemptions: redemptionTotals,
       }),
-    [tl.sortedEvents, sym, mytSymbol, live, position.figures, olderCount, coords],
+    [tl.sortedEvents, sym, mytSymbol, live, position.figures, olderCount, coords, redemptionTotals],
   );
 
   // Gas over the position's own transactions, each counted once. Line rows
@@ -881,6 +883,12 @@ export function AlchemistPositionView({
                       tenurePending={olderCount > 0}
                     />
                   }
+                  // The count is this position's own logs plus every line
+                  // redemption's, not cards: an opening (deposit + mint) and a
+                  // close (force-repay + self-liquidated) are two logs each but
+                  // one card here, so the count reads ahead of the cards on
+                  // screen.
+                  countTooltip="Counts logs, not cards: an opening and a close each combine two of this position's own logs into one card."
                   notice={
                     (lineScopedNote && redemptionRowDrawn) || endedWindow ? (
                       <div className="space-y-1">

@@ -217,6 +217,10 @@ export interface TimelineToolbarProps {
   displayItems: TimelineDisplayItem[];
   /** Optional left-side eyebrow (e.g. "replayed from chain"). */
   leading?: React.ReactNode;
+  /** A title on the count line, for a family whose count is a true but
+   *  surprising number (see ChainTruthTimelineProps.countTooltip). Unset
+   *  renders identically to today. */
+  countTooltip?: string;
   /** Market notes: a pressed-state pill beside the eye menu, reading
    *  "Market notes · N" — N the count of note rows the page would show
    *  (historical anchored + live), whatever `marketNotesOn` currently is. Not
@@ -415,6 +419,7 @@ export function TimelineToolbar({
   tl,
   displayItems,
   leading,
+  countTooltip,
   marketNoteCount,
   marketNotesOn,
   onToggleMarketNotes,
@@ -542,7 +547,9 @@ export function TimelineToolbar({
             data-timeline-shown={countState.shown}
             className="inline-flex items-center gap-2 basis-full sm:basis-auto whitespace-nowrap"
           >
-            <span className="text-xs text-rb-500 tabular-nums">{countLine}</span>
+            <span className="text-xs text-rb-500 tabular-nums" title={countTooltip}>
+              {countLine}
+            </span>
           </span>
           {tl.eventOptions.length > 1 && (
             <FilterDropdown
