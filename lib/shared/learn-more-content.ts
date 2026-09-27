@@ -798,7 +798,7 @@ export function aaveV4BaseHubContent(): LearnMoreContent {
       },
       {
         bold: "Paused reserve",
-        text: "a split or other corporate action pauses the stock's reserve until the token's multiplier is updated. Dividends are reinvested into the token.",
+        text: "a split or other corporate action pauses the stock's reserve until the token's multiplier is updated. Dividends are reinvested into the token. Coinbase can also pause a stock at its token registry, which holds the stock's price feed at its last value; the Spoke does not read that flag, so the reserve stays open at the held price. Rails reads both and states each.",
       },
     ],
     links: [

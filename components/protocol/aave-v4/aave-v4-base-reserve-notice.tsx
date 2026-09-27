@@ -11,7 +11,9 @@
 // latestRoundData()'s updatedAt, and how long before the oracle read it was.
 // No market-hours logic, no threshold, no tone. A reserve the spoke reports
 // paused (getReserveConfig().paused, a split or other corporate action) is
-// stated as paused, in words.
+// stated as paused, in words. So is a stock Coinbase has paused at its token
+// registry (the api's registryPaused): the spoke does not read that flag, so
+// the reserve stays open at the price the paused feed holds.
 
 import { useEffect, useState } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -26,6 +28,7 @@ interface ReserveFlags {
   symbol: string | null;
   paused: boolean;
   frozen: boolean;
+  registryPaused?: boolean | null;
 }
 
 const MAG7_ORACLE = { name: "Mag7 spoke AaveOracle", address: "0xabaf048fd7675ea34a84332371ffd5d55e322a47" };
@@ -79,8 +82,9 @@ export function AaveV4BaseReserveNotice({ reserves }: { reserves: AaveV4SpokeCha
   });
   const paused = held.filter((r) => flags?.find((f) => f.reserveId === r.reserveId)?.paused);
   const frozen = held.filter((r) => flags?.find((f) => f.reserveId === r.reserveId && !f.paused)?.frozen);
+  const registryPaused = held.filter((r) => flags?.find((f) => f.reserveId === r.reserveId)?.registryPaused);
 
-  if (rows.length === 0 && paused.length === 0 && frozen.length === 0) return null;
+  if (rows.length === 0 && paused.length === 0 && frozen.length === 0 && registryPaused.length === 0) return null;
   return (
     <div className="px-4 md:px-6 pb-4 -mt-1 text-xs text-rb-500 space-y-1.5 max-w-prose">
       {rows.length > 0 && (
@@ -99,6 +103,13 @@ export function AaveV4BaseReserveNotice({ reserves }: { reserves: AaveV4SpokeCha
         <p key={`f${r.reserveId}`}>
           The {r.symbol} reserve is frozen on the Mag7 spoke: it takes no new supply or borrowing; withdrawals and
           repayments go through.
+        </p>
+      ))}
+      {registryPaused.map((r) => (
+        <p key={`r${r.reserveId}`}>
+          Coinbase has paused {r.symbol} at its token registry, which holds the stock&rsquo;s price feed at its last
+          value during a corporate action. The Mag7 spoke does not read that flag, so the {r.symbol} reserve stays
+          open, valued at the held price.
         </p>
       ))}
     </div>

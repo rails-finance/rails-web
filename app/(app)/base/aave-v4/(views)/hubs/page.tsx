@@ -30,6 +30,8 @@ interface Reserve {
   liquidationFeeBps: number | null;
   paused: boolean;
   frozen: boolean;
+  /** Coinbase's registry flag for the stock; null for USDC. */
+  registryPaused: boolean | null;
   borrowable: boolean;
   addCap: string | null;
   drawCap: string | null;
@@ -73,12 +75,19 @@ function tokens(raw: string | null, decimals: number): number | null {
 const pct = (bps: number | null) => (bps == null ? "—" : `${(bps / 100).toFixed(2)}%`);
 const usd = (n: number | null) => (n == null ? "—" : `$${formatNumber(n)}`);
 
-function statusWords(r: Reserve): string {
+// The spoke's state first, then Coinbase's registry pause beside it: the
+// spoke does not read the registry, so a stock paused there alone stays
+// open on the spoke at a held price, and both are stated.
+function spokeWords(r: Reserve): string {
   if (r.paused) return "Paused";
   if (r.frozen) return "Frozen";
   if (r.spokeHalted) return "Halted by the hub";
   if (r.spokeActive === false) return "Inactive on the hub";
   return r.borrowable ? "Borrowable" : "Collateral only";
+}
+function statusWords(r: Reserve): string {
+  const spoke = spokeWords(r);
+  return r.registryPaused ? `${spoke}; price paused by Coinbase` : spoke;
 }
 
 export default function AaveV4BaseHubPage() {
