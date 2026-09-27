@@ -13,7 +13,12 @@ import {
   ClosedLabel,
   StatCard,
   StateTransition,
+  StatSubline,
+  ValuePill,
+  PriceChipShell,
+  changeTone,
 } from "@/components/shared/state-transition";
+import { fmtDebt, fmtColl, fmtUsdWhole, fmtAccrued } from "@/lib/liquity/figure-format";
 import type { ReactNode } from "react";
 import { Prov, type Provenance, type ProvVerify } from "@/components/shared/provenance";
 import {
@@ -64,22 +69,11 @@ const P = ({
 
 // ── Formatters ──────────────────────────────────────────────────────
 
-function toLocaleStringHelper(n: number): string {
-  if (Math.abs(n) < 0.01) return "0";
-  if (Math.abs(n) >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
-}
-
-function formatColl(n: number): string {
-  if (n === 0) return "0";
-  return n.toFixed(4);
-}
-
-function formatUsd(value: number | undefined | null): string {
-  if (value == null || isNaN(value) || value < 0.01) return "< $0.01";
-  if (value < 1) return `$${value.toFixed(2)}`;
-  return "$" + value.toLocaleString("en-US", { maximumFractionDigits: 0 });
-}
+// The grid's formats live in lib/liquity/figure-format.ts, shared with the T3
+// explanation so an echoed figure reads the same in both.
+const toLocaleStringHelper = fmtDebt;
+const formatColl = fmtColl;
+const formatUsd = fmtUsdWhole;
 
 // ── Metric components ───────────────────────────────────────────────
 
@@ -111,7 +105,10 @@ function DebtMetric({
   feeProv?: FigureProv;
   changeEcho?: ChangeProv;
 }) {
-  const hasChange = isClose ? before !== after : before !== 0 && before !== after;
+  // `showBefore`: draw the `before →` half (never a bare "0 →" on an open).
+  // `changed`: the T2 change-colour rule, which an open's new debt meets too.
+  const showBefore = isClose ? before !== after : before !== 0 && before !== after;
+  const changed = before !== after;
   const totalAccruedFees = accruedInterest + accruedManagementFees;
 
   // The arrow doubles as a toggle (see DeltaToggle). The header headline and
@@ -142,7 +139,7 @@ function DebtMetric({
     <StatCard label="Debt">
       <div>
         <StateTransition>
-          {hasChange && (
+          {showBefore && (
             <DeltaToggle
               before={<P info={provBefore}>{toLocaleStringHelper(before)}</P>}
               delta={isClose ? null : deltaNode}
@@ -155,21 +152,13 @@ function DebtMetric({
             </>
           ) : (
             <P info={provAfter} icon={<TokenChipIcon symbol={stablecoinSymbol} size={16} />}>
-              <span className={hasChange ? "text-sm font-semibold" : "text-sm font-semibold text-rb-500"}>
-                {toLocaleStringHelper(after)}
-              </span>
+              <span className={`text-sm font-semibold ${changeTone(changed)}`}>{toLocaleStringHelper(after)}</span>
             </P>
           )}
         </StateTransition>
         {((upfrontFee !== undefined && upfrontFee > 0) || totalAccruedFees > 0.01) && (
-          <div className="text-xs  mt-0.5">
-            {totalAccruedFees > 0.01 && (
-              <span>
-                incl. +
-                {totalAccruedFees.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                interest
-              </span>
-            )}
+          <StatSubline changed={changed}>
+            {totalAccruedFees > 0.01 && <span>incl. +{fmtAccrued(totalAccruedFees)} interest</span>}
             {upfrontFee !== undefined && upfrontFee > 0 && (
               <>
                 {totalAccruedFees > 0.01 && <span> +</span>}
@@ -181,7 +170,7 @@ function DebtMetric({
                 </span>
               </>
             )}
-          </div>
+          </StatSubline>
         )}
       </div>
     </StatCard>
@@ -217,7 +206,8 @@ function CollateralMetric({
   usdProvAfter?: Provenance;
   changeEcho?: ChangeProv;
 }) {
-  const hasChange = isClose ? before !== after : before !== 0 && before !== after;
+  const showBefore = isClose ? before !== after : before !== 0 && before !== after;
+  const changed = before !== after;
   // The opened card states the collateral's USD value at this event's oracle
   // price whenever that price is known. It does not read the timeline's "USD
   // values" display switch: that switch thins the spine and the snapshot rows,
@@ -251,16 +241,14 @@ function CollateralMetric({
   return (
     <StatCard label="Collateral">
       <StateTransition>
-        {hasChange && (
+        {showBefore && (
           <DeltaToggle
             before={<P info={provBefore}>{formatColl(before)}</P>}
             delta={isClose ? null : deltaNode}
             beforeExtra={
               beforeUsdKnown ? (
                 <P info={usdProvBefore}>
-                  <span className="text-xs flex font-bold items-center text-rb-500 border-l-2 border-r-2 border-rb-500 rounded-sm px-1 py-0">
-                    {formatUsd(beforeInUsd)}
-                  </span>
+                  <ValuePill changed={changed}>{formatUsd(beforeInUsd)}</ValuePill>
                 </P>
               ) : undefined
             }
@@ -273,16 +261,14 @@ function CollateralMetric({
           </>
         ) : (
           <P info={provAfter} icon={<TokenChipIcon symbol={collateralType} size={16} />}>
-            <span className={hasChange ? "text-sm font-semibold" : "text-sm font-semibold text-rb-500"}>
+            <span className={`text-sm font-semibold ${changeTone(changed)}`}>
               {after === 0 ? "0" : formatColl(after)}
             </span>
           </P>
         )}
         {!isClose && after > 0 && afterInUsd > 0 && (
           <P info={usdProvAfter}>
-            <span className="text-xs flex font-bold items-center text-rb-500 border-l-2 border-r-2 border-rb-500 rounded-sm px-1 py-0">
-              {formatUsd(afterInUsd)}
-            </span>
+            <ValuePill changed={changed}>{formatUsd(afterInUsd)}</ValuePill>
           </P>
         )}
       </StateTransition>
@@ -315,6 +301,8 @@ function InterestRateMetric({
   const hasBeforeValue = before > 0;
   const hasAfterValue = after > 0;
   const hasChange = hasBeforeValue && before !== after;
+  // An open sets the rate from nothing: changed, with no `before →` to draw.
+  const changed = before !== after;
   // annualInterestRate is in percent units (3.4 = 3.4% APR), so divide by 100
   // to get the fractional rate for the BOLD/year cost.
   const yearlyCost = afterDebt && hasAfterValue ? afterDebt * (after / 100) : 0;
@@ -339,7 +327,7 @@ function InterestRateMetric({
           <span className="text-sm font-semibold text-rb-500">N/A</span>
         ) : (
           <P info={provAfter} value={afterExact}>
-            <span className={hasChange ? "text-sm font-semibold" : "text-sm font-semibold text-rb-500"}>
+            <span className={`text-sm font-semibold ${changeTone(changed)}`}>
               {after.toFixed(1)}
               <span className="ml-0.5">%</span>
             </span>
@@ -347,9 +335,10 @@ function InterestRateMetric({
         )}
       </StateTransition>
       {!isClose && yearlyCost > 0.01 && (
-        <div className="text-xs  mt-0.5 tabular-nums">
+        // The yearly cost qualifies the rate, so it takes the rate's tone.
+        <StatSubline changed={changed}>
           {toLocaleStringHelper(yearlyCost)} {stablecoinSymbol} / year
-        </div>
+        </StatSubline>
       )}
     </StatCard>
   );
@@ -376,6 +365,7 @@ function CollateralRatioMetric({
   const mode = prefs.ratioMode;
   const crColor = useLiquityRatioColorClass();
   const hasChange = before !== 0 && before !== after;
+  const changed = before !== after;
 
   // Delta in the displayed mode's own units (percentage points). CR is linear
   // so the delta is just after − before; LTV is 1/CR, so we diff the converted
@@ -411,7 +401,7 @@ function CollateralRatioMetric({
           <P info={provAfter}>
             <span
               className={
-                hasChange
+                changed
                   ? `text-sm font-semibold ${crColor(after, collateralType)}`
                   : "text-sm font-semibold text-rb-500"
               }
@@ -994,14 +984,11 @@ export function LiquityEventDetail({
                 </div>
               );
             })()}
-          <span
-            className="ml-auto inline-flex items-center gap-1.5 text-xs font-bold text-rb-500 bg-background px-2 py-1 rounded-md"
-            title={`${ctx.collateralType} price at the time of this event`}
-          >
+          <PriceChipShell title={`${ctx.collateralType} price at the time of this event`}>
             <P info={priceP?.info} value={priceP?.value} icon={<TokenChipIcon symbol={ctx.collateralType} size={14} />}>
               {formatUsd(collPrice)}
             </P>
-          </span>
+          </PriceChipShell>
         </div>
       )}
     </>

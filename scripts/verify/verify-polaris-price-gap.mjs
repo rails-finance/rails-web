@@ -243,8 +243,8 @@ check(
 
 // ── 4. the receipt names the market's PriceFeed and the oracle-at-block lane ─
 check(
-  "4. the derivation prose names the market's own price feed and the oracle-at-block reading",
-  /the market.s own price feed/i.test(full166),
+  "4. the derivation prose names the market's price feed and the oracle-at-block reading",
+  /the market.s price feed/i.test(full166),
   full166.slice(0, 600),
 );
 await page166.close();

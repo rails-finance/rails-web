@@ -203,7 +203,7 @@ const crBefore8 = ((FROM_COLL_8 * FROM_PRICE_8) / FROM_DEBT_8) * 100;
 
 check(
   "1c. the price note names its earlier end as this CDP's adjustment at block 11,610,231",
-  /this is a live note:.*the earlier price: this cdp.s adjustment at block 11,610,231/i.test(priceText8),
+  /the \S+ price was .* at this cdp.s adjustment at block 11,610,231/i.test(priceText8),
   priceText8.slice(0, 200),
 );
 check(
@@ -498,7 +498,7 @@ const crBeforeB = ((FROM_COLL_B * FROM_PRICE_B) / FROM_DEBT_B) * 100;
 check(
   `5a. TROVE_B's live note names its earlier end as this trove's ${endLabelB} at block ${FROM_BLOCK_B.toLocaleString("en-US")}`,
   new RegExp(
-    `this is a live note:.*the earlier price: this trove.s ${endLabelB} at block ${FROM_BLOCK_B.toLocaleString("en-US")}`,
+    `the WETH price was .* at this trove.s ${endLabelB} at block ${FROM_BLOCK_B.toLocaleString("en-US")}`,
     "i",
   ).test(textB),
   textB.slice(0, 200),
@@ -530,8 +530,8 @@ check(
 );
 check("5f. the note names the branch minimum, 110%", textB.includes(formatPercent0(110)), "");
 check(
-  "5g. the note states the sub-line about the position card's own live ratio carrying accrued interest",
-  /position card.s live ratio also carries the interest accrued since then/i.test(textB),
+  "5g. the note states that the position card's live ratio carries the interest accrued since",
+  /interest has accrued since block .*position card.s live ratio, which includes it, differs/i.test(textB),
   textB.slice(-300),
 );
 

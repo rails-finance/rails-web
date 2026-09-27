@@ -33,7 +33,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { EventTime } from "@/components/shared/event-time";
 import { ExternalActorChip } from "@/components/shared/external-actor-chip";
 import { useEnsName } from "@/lib/ens/use-ens-names";
-import { DeltaToggle, StatCard, StateTransition } from "@/components/shared/state-transition";
+import { DeltaToggle, StatCard, StateTransition, ValuePill, changeTone } from "@/components/shared/state-transition";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import { formatCompact, formatExact, formatUsdValue } from "@/lib/utils/format";
@@ -215,6 +215,11 @@ export interface ChainTruthStat {
   display?: string;
   /** Dim the card when this side wasn't touched by the event. */
   dimmed?: boolean;
+  /** Whether this event changed the value (the T2 change-colour rule: changed
+   *  renders foreground, unchanged muted). Defaults from the stat's own shape:
+   *  a transition means changed, `dimmed` means untouched, and a bare value
+   *  with neither keeps the foreground it always had. */
+  changed?: boolean;
   /** When the event moved this axis, its before→after transition, rendered as a
    *  DeltaToggle. Omit for untouched axes — they stay a plain after-value. */
   transition?: ChainTruthTransition;
@@ -556,53 +561,54 @@ export function ChainTruthDetail({
     // px-5 py-2 mirrors the Liquity / Aave detail bodies so the snapshot grid
     // sits inset from the shared bg-raised detail surface, not flush to its edge.
     <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:auto-rows-fr sm:grid-cols-2">
-      {stats.map((s, i) => (
-        <div key={i} className={`h-full ${s.dimmed ? "opacity-50" : ""}`}>
-          <StatCard label={s.label}>
-            <StateTransition>
-              {s.transition && (
-                <DeltaToggle
-                  before={
-                    <Prov info={s.transition.beforeProv} value={s.transition.beforeExact}>
-                      <span title={s.transition.beforeExact}>{s.transition.before}</span>
-                    </Prov>
-                  }
-                  delta={
-                    <Prov info={s.transition.changeProv} value={s.transition.changeExact}>
-                      <span title={s.transition.changeExact}>{s.transition.change}</span>
-                    </Prov>
-                  }
-                  size="sm"
-                />
-              )}
-              <Prov
-                info={s.prov}
-                value={s.value}
-                icon={s.symbol ? <TokenChipIcon symbol={s.symbol} address={s.address} size={16} /> : undefined}
-              >
-                <span
-                  title={s.symbol ? `${s.value} ${s.symbol}` : s.value}
-                  className="text-sm font-semibold tabular-nums"
+      {stats.map((s, i) => {
+        const changed = s.changed ?? (s.transition ? true : !s.dimmed);
+        return (
+          <div key={i} className={`h-full ${s.dimmed ? "opacity-50" : ""}`}>
+            <StatCard label={s.label}>
+              <StateTransition>
+                {s.transition && (
+                  <DeltaToggle
+                    before={
+                      <Prov info={s.transition.beforeProv} value={s.transition.beforeExact}>
+                        <span title={s.transition.beforeExact}>{s.transition.before}</span>
+                      </Prov>
+                    }
+                    delta={
+                      <Prov info={s.transition.changeProv} value={s.transition.changeExact}>
+                        <span title={s.transition.changeExact}>{s.transition.change}</span>
+                      </Prov>
+                    }
+                    size="sm"
+                  />
+                )}
+                <Prov
+                  info={s.prov}
+                  value={s.value}
+                  icon={s.symbol ? <TokenChipIcon symbol={s.symbol} address={s.address} size={16} /> : undefined}
                 >
-                  {s.display ?? compactAmount(s.value)}
-                  {symbolText && s.symbol ? <span className="font-normal text-rb-500"> {s.symbol}</span> : null}
-                </span>
-              </Prov>
-              {showUsdValues && s.usd && (
-                // The after-balance valued at the event-block oracle price —
-                // the bordered chip the Liquity V2 / Aave V4 details use
-                // (`3.0321 [ $7,062 ] ◊`). The exact 2-dp figure rides the
-                // receipt; the chip shows whole dollars.
-                <Prov info={s.usd.prov} value={formatUsdValue(s.usd.value)}>
-                  <span className="text-xs flex font-bold items-center text-rb-500 border-l-2 border-r-2 border-rb-500 rounded-sm px-1 py-0">
-                    {fmtUsdChip(s.usd.value)}
+                  <span
+                    title={s.symbol ? `${s.value} ${s.symbol}` : s.value}
+                    className={`text-sm font-semibold tabular-nums ${changeTone(changed)}`}
+                  >
+                    {s.display ?? compactAmount(s.value)}
+                    {symbolText && s.symbol ? <span className="font-normal text-rb-500"> {s.symbol}</span> : null}
                   </span>
                 </Prov>
-              )}
-            </StateTransition>
-          </StatCard>
-        </div>
-      ))}
+                {showUsdValues && s.usd && (
+                  // The after-balance valued at the event-block oracle price —
+                  // the bordered chip the Liquity V2 / Aave V4 details use
+                  // (`3.0321 [ $7,062 ] ◊`). The exact 2-dp figure rides the
+                  // receipt; the chip shows whole dollars.
+                  <Prov info={s.usd.prov} value={formatUsdValue(s.usd.value)}>
+                    <ValuePill changed={changed}>{fmtUsdChip(s.usd.value)}</ValuePill>
+                  </Prov>
+                )}
+              </StateTransition>
+            </StatCard>
+          </div>
+        );
+      })}
     </div>
   );
 }

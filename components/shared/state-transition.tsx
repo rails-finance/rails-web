@@ -37,7 +37,10 @@ export function DeltaToggle({
   before,
   delta,
   size = "md",
-  beforeClass = "text-sm font-semibold text-rb-500",
+  // A DeltaToggle is drawn only where the event moved the value, so both ends
+  // of the pair are changed values and take the foreground tone (the T2
+  // change-colour rule, rails-ops standards/detail-page-anatomy.md).
+  beforeClass = "text-sm font-semibold text-foreground",
   beforeExtra,
 }: {
   before: ReactNode;
@@ -69,7 +72,7 @@ export function DeltaToggle({
     >
       {showDelta ? (
         <>
-          <span className="text-sm font-semibold text-rb-500 tabular-nums">{delta}</span>
+          <span className="text-sm font-semibold text-foreground tabular-nums">{delta}</span>
           <span className="text-sm font-semibold text-rb-500">=</span>
         </>
       ) : (
@@ -100,6 +103,67 @@ export function StatCard({ label, children }: { label: string; children: ReactNo
       <div className="mb-1.5 text-xs font-semibold text-rb-500">{label}</div>
       {children}
     </div>
+  );
+}
+
+/** The T2 change-colour rule (rails-ops standards/detail-page-anatomy.md, "The
+ *  disclosure ladder"): in an opened card, a value this event changed renders in
+ *  the foreground tone and a value it left as it was renders muted. Every cell
+ *  part below takes `changed` and defaults to muted, so a caller states the
+ *  change rather than the colour. */
+export const changeTone = (changed: boolean): string => (changed ? "text-foreground" : "text-rb-500");
+
+/** The bordered value pill beside an amount (`660.2771 [ $1,033,376 ]`): the
+ *  amount's worth at the event's price. Foreground when the value changed. */
+export function ValuePill({ changed = false, children }: { changed?: boolean; children: ReactNode }) {
+  return (
+    <span
+      className={`flex items-center rounded-sm border-l-2 border-r-2 border-rb-500 px-1 py-0 text-xs font-bold tabular-nums ${changeTone(changed)}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** A small line under a cell's value ("23,739 BOLD / year", "branch minimum
+ *  110%", "incl. +6,206.62 interest"). A qualifier or a reference takes the
+ *  tone of what it qualifies; pass `changed` only where this event moved it. */
+export function StatSubline({
+  changed = false,
+  className = "mt-0.5",
+  children,
+}: {
+  changed?: boolean;
+  /** Layout classes; replaces the default top margin. */
+  className?: string;
+  children: ReactNode;
+}) {
+  return <div className={`text-xs tabular-nums ${changeTone(changed)} ${className}`}>{children}</div>;
+}
+
+/** The price chip at the foot of an opened card. A regular card's single price
+ *  is context the event did not change, so it is muted by default; a market
+ *  note's "$1,565 → $2,709" is the change and passes `changed`. */
+export function PriceChipShell({
+  changed = false,
+  title,
+  marker,
+  children,
+}: {
+  changed?: boolean;
+  title?: string;
+  /** Stamped as `data-note-price-chip` where a verifier reads the chip. */
+  marker?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <span
+      className={`ml-auto inline-flex items-center gap-1.5 rounded-md bg-background px-2 py-1 text-xs font-bold ${changeTone(changed)}`}
+      title={title}
+      data-note-price-chip={marker ? "" : undefined}
+    >
+      {children}
+    </span>
   );
 }
 

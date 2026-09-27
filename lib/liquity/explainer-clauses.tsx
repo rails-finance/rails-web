@@ -16,14 +16,15 @@
 // with the dual-priced P/L equation and zombie forward paths, both liquidation
 // variants, batch delegation, applyPendingDebt, transfers, and the trailing gas.
 //
-// Figures render through <Prov echo> when an EXPORTED provenance builder gives
-// them a primary receipt on the card chrome — the header's collateral/debt
-// change (coll/debtChangeProv), the after-rate (rateAfterProv), and the upfront
-// fee (upfrontFeeProv). Chrome figures with no exported builder (after-balances,
-// collateral ratio, the claimable-surplus pill, the no-change count) are plain
-// <strong> — the highlight rule's bold, with no invented provenance. Everything
-// else (USD values, oracle price, operation-wide redemption totals, fees, the
-// P/L result, accrued dust) stays muted.
+// Emphasis follows the T3 echo-colour rule (rails-ops
+// standards/detail-page-anatomy.md, "The disclosure ladder"): a figure that also
+// appears above, in the T2 grid (its cells, value pills, sub-lines and the price
+// chip) or in the T1 header and spine, renders in the foreground tone, written
+// in the grid's own format (lib/liquity/figure-format.ts); a figure stated only
+// here stays muted. A foreground figure renders through <Prov echo> when an
+// EXPORTED provenance builder gives it a primary receipt on the chrome (the
+// header's collateral/debt change, the after-rate, the upfront fee), and as a
+// plain <strong> otherwise, with no invented provenance.
 //
 // ── Fill-standard notes (charter §5) ─────────────────────────────────────────
 // Items filled: risk consequence (§5.1) as the collateral ratio before → after
@@ -58,8 +59,11 @@ import {
 } from "@/lib/liquity/event-provenance";
 import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots } from "@/lib/shared/explainer-prose";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { fmtAccrued, fmtColl, fmtCr, fmtDebt, fmtRate, fmtUsdWhole } from "@/lib/liquity/figure-format";
 
-// ── Formatters (carried from the old explainer) ──────────────────────────────
+// ── Formatters ───────────────────────────────────────────────────────────────
+// fmtColl / fmtDebt / fmtUsdWhole / fmtAccrued / fmtRate / fmtCr are the T2
+// grid's formats; `fmt` and `fmtUsd` are for figures stated only here.
 
 function fmt(n: number): string {
   if (!isFinite(n)) return "0";
@@ -71,19 +75,15 @@ function fmt(n: number): string {
   return n.toLocaleString("en-US", { maximumFractionDigits: decimals });
 }
 
-function fmtColl(n: number): string {
-  if (n === 0) return "0";
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
-}
-
 function fmtUsd(value: number): string {
   if (value < 0.01) return "< $0.01";
   if (value < 1) return `$${value.toFixed(2)}`;
   return "$" + value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** A debt figure as the grid writes it, with its symbol. */
 function fmtCurrency(n: number, asset: string): string {
-  return `${fmt(n)} ${asset}`;
+  return `${fmtDebt(n)} ${asset}`;
 }
 
 /** Short day label for run spans ("Jun 6" / "Jul 8 '26"). */
@@ -141,7 +141,7 @@ function openTroveSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlo
     clause(
       <>
         This trove opened, depositing {fig(collDelta, `${fmtColl(stateAfter.coll)} ${collSym}`)} as collateral and
-        borrowing {fmt(principalBorrowed)} {debtSym} against it.
+        borrowing {fig(undefined, fmtCurrency(principalBorrowed, debtSym))} against it.
       </>,
     ),
   ];
@@ -150,14 +150,14 @@ function openTroveSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlo
     upfrontFee > 0
       ? clause(
           <>
-            A one-time borrowing fee of {fig(feeAfter, `${upfrontFee.toFixed(2)} ${debtSym}`)} was added to the debt,
+            A one-time borrowing fee of {fig(feeAfter, fmtCurrency(upfrontFee, debtSym))} was added to the debt,
             equivalent to 7 days of average interest.
           </>,
         )
       : null,
     clause(
       <>
-        Its total initial debt stands at {fig(debtDelta, `${fmt(stateAfter.debt)} ${debtSym}`)}
+        Its total initial debt stands at {fig(debtDelta, fmtCurrency(stateAfter.debt, debtSym))}
         {upfrontFee > 0 ? ", including that fee" : ""}.
       </>,
     ),
@@ -165,11 +165,11 @@ function openTroveSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlo
     collUsd > 0
       ? clause(
           <>
-            At the price at the time, that collateral is worth {fmtUsd(collUsd)}
+            At the price at the time, that collateral is worth {fig(undefined, fmtUsdWhole(collUsd))}
             {collateralPrice > 0 ? (
               <>
                 {" "}
-                ({collSym} at {fmtUsd(collateralPrice)})
+                ({collSym} at {fig(undefined, fmtUsdWhole(collateralPrice))})
               </>
             ) : null}
             .
@@ -179,7 +179,7 @@ function openTroveSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlo
   ];
 
   const meansNow: ClauseInput[] = [
-    clause(<>The trove opened at a {fig(undefined, `${stateAfter.collateralRatio.toFixed(1)}%`)} collateral ratio.</>),
+    clause(<>The trove opened at a {fig(undefined, fmtCr(stateAfter.collateralRatio))} collateral ratio.</>),
     clause(
       <>
         It accrues interest at {fig(rateAfter, `${stateAfter.annualInterestRate.toFixed(1)}%`)} a year, compounding
@@ -196,8 +196,8 @@ function openTroveSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlo
           The trove joined a batch manager on open
           {bu.interestBatchManager ? (
             <>
-              , delegating its rate to {shortenAddress(bu.interestBatchManager)} at {bu.annualInterestRate.toFixed(1)}%
-              APR
+              , delegating its rate to {shortenAddress(bu.interestBatchManager)} at{" "}
+              {fig(undefined, fmtRate(bu.annualInterestRate))} APR
               {bu.annualManagementFee > 0 ? <>, with a {bu.annualManagementFee.toFixed(2)}% management fee</> : null}
             </>
           ) : null}
@@ -244,16 +244,14 @@ function closeTroveSlots(ctx: LiquityContext, coords: EventCoords): EventProseSl
     meansNow.push(
       clause(
         <>
-          Before closing, the trove was paying {fig(undefined, `${stateBefore.annualInterestRate.toFixed(1)}%`)} annual
+          Before closing, the trove was paying {fig(undefined, fmtRate(stateBefore.annualInterestRate))} annual
           interest.
         </>,
       ),
     );
   }
   if (debtRepaid > 0 && stateBefore.collateralRatio > 0) {
-    meansNow.push(
-      clause(<>It closed at a {fig(undefined, `${stateBefore.collateralRatio.toFixed(1)}%`)} collateral ratio.</>),
-    );
+    meansNow.push(clause(<>It closed at a {fig(undefined, fmtCr(stateBefore.collateralRatio))} collateral ratio.</>));
   }
   meansNow.push(clause(<>The trove NFT was sent to the burn address, ending its ownership.</>));
   meansNow.push(clause(<>Nothing remains on either side.</>));
@@ -388,7 +386,7 @@ function adjustTroveSlots(
     changed.push(
       clause(
         <>
-          Interest of {totalAccruedFees.toFixed(2)} {debtSym} accrued since the last operation
+          Interest of {fig(undefined, `${fmtAccrued(totalAccruedFees)} ${debtSym}`)} accrued since the last operation
           {accruedManagementFees > 0 ? (
             <>
               , including a {accruedManagementFees.toFixed(2)} {debtSym} management fee
@@ -403,8 +401,8 @@ function adjustTroveSlots(
     changed.push(
       clause(
         <>
-          The adjustment charged a {fig(feeAfter, `${adjustFee.toFixed(2)} ${debtSym}`)} borrowing fee, equivalent to 7
-          days of average interest on the borrow market.
+          The adjustment charged a {fig(feeAfter, fmtCurrency(adjustFee, debtSym))} borrowing fee, equivalent to 7 days
+          of average interest on the borrow market.
         </>,
       ),
     );
@@ -414,14 +412,10 @@ function adjustTroveSlots(
     changed.push(
       clause(
         <>
-          Its debt rose by {fmtCurrency(totalIncrease, debtSym)} in total: {fmtCurrency(debtChange, debtSym)} borrowed
-          {totalAccruedFees > 0.01
-            ? ` + ${totalAccruedFees.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} accrued`
-            : ""}
-          {adjustFee > 0
-            ? ` + ${adjustFee.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} fee`
-            : ""}
-          .
+          Its debt rose by {fig(undefined, fmtCurrency(totalIncrease, debtSym))} in total:{" "}
+          {fig(undefined, fmtCurrency(debtChange, debtSym))} borrowed
+          {totalAccruedFees > 0.01 ? <> + {fig(undefined, fmtAccrued(totalAccruedFees))} accrued</> : null}
+          {adjustFee > 0 ? <> + {fig(undefined, fmtDebt(adjustFee))} fee</> : null}.
         </>,
       ),
     );
@@ -439,22 +433,22 @@ function adjustTroveSlots(
     meansNow.push(
       clause(
         <>
-          At the price at the time, that collateral is worth {fmtUsd(afterCollUsd)} ({fmtUsd(collateralPrice)} /{" "}
-          {collateralType}).
+          At the price at the time, that collateral is worth {fig(undefined, fmtUsdWhole(afterCollUsd))} (
+          {fig(undefined, fmtUsdWhole(collateralPrice))} / {collateralType}).
         </>,
       ),
     );
   }
   if (beforeCR > 0 && afterCR > 0 && afterCR > beforeCR) {
-    meansNow.push(clause(<>The collateral ratio rose to {fig(undefined, `${afterCR.toFixed(1)}%`)}.</>));
+    meansNow.push(clause(<>The collateral ratio rose to {fig(undefined, fmtCr(afterCR))}.</>));
   } else if (beforeCR > 0 && afterCR > 0 && afterCR < beforeCR) {
-    meansNow.push(clause(<>The collateral ratio fell to {fig(undefined, `${afterCR.toFixed(1)}%`)}.</>));
+    meansNow.push(clause(<>The collateral ratio fell to {fig(undefined, fmtCr(afterCR))}.</>));
   }
   if (stateBefore.annualInterestRate !== stateAfter.annualInterestRate) {
     meansNow.push(
       clause(
         <>
-          The annual interest rate moved from {stateBefore.annualInterestRate.toFixed(1)}% to{" "}
+          The annual interest rate moved from {fig(undefined, fmtRate(stateBefore.annualInterestRate))} to{" "}
           {fig(rateAfter, `${stateAfter.annualInterestRate.toFixed(1)}%`)}.
         </>,
       ),
@@ -487,8 +481,8 @@ function adjustRateSlots(
     clause(
       <>
         This adjustment {increased ? "raised" : "lowered"} the trove&rsquo;s interest rate from{" "}
-        {stateBefore.annualInterestRate.toFixed(1)}% to {fig(rateAfter, `${stateAfter.annualInterestRate.toFixed(1)}%`)}{" "}
-        APR.
+        {fig(undefined, fmtRate(stateBefore.annualInterestRate))} to{" "}
+        {fig(rateAfter, `${stateAfter.annualInterestRate.toFixed(1)}%`)} APR.
       </>,
     ),
   ];
@@ -498,7 +492,7 @@ function adjustRateSlots(
     changed.push(
       clause(
         <>
-          Interest of {totalAccruedFees.toFixed(2)} {debtSym} accrued since the last operation
+          Interest of {fig(undefined, `${fmtAccrued(totalAccruedFees)} ${debtSym}`)} accrued since the last operation
           {accruedManagementFees > 0 ? (
             <>
               , including a {accruedManagementFees.toFixed(2)} {debtSym} management fee
@@ -519,14 +513,13 @@ function adjustRateSlots(
       clause(
         <>
           The collateral remains {fig(undefined, `${fmtColl(stateAfter.coll)} ${collateralType}`)} (
-          {fmtUsd(afterCollUsd)}
-          ).
+          {fig(undefined, fmtUsdWhole(afterCollUsd))}).
         </>,
       ),
     );
   }
   if (stateAfter.collateralRatio > 0) {
-    meansNow.push(clause(<>The collateral ratio is {fig(undefined, `${stateAfter.collateralRatio.toFixed(1)}%`)}.</>));
+    meansNow.push(clause(<>The collateral ratio is {fig(undefined, fmtCr(stateAfter.collateralRatio))}.</>));
   }
 
   return { happened, changed, meansNow };
@@ -547,7 +540,8 @@ function applyPendingDebtSlots(ctx: LiquityContext, coords: EventCoords): EventP
   const happened: ClauseInput[] = [
     clause(
       <>
-        This event applied {fig(debtDelta, `${fmt(redistDebt)} ${debtSym}`)} of pending redistribution debt to the trove
+        This event applied {fig(debtDelta, fmtCurrency(redistDebt, debtSym))} of pending redistribution debt to the
+        trove
         {collGain > 0 ? (
           <>, along with {fig(collDelta, `${fmtColl(collGain)} ${collateralType}`)} of redistributed collateral</>
         ) : null}
@@ -569,7 +563,7 @@ function applyPendingDebtSlots(ctx: LiquityContext, coords: EventCoords): EventP
       clause(
         <>
           The collateral is unchanged at {fig(undefined, `${fmtColl(stateAfter.coll)} ${collateralType}`)}
-          {afterCollUsd > 0 ? <> ({fmtUsd(afterCollUsd)})</> : null}.
+          {afterCollUsd > 0 ? <> ({fig(undefined, fmtUsdWhole(afterCollUsd))})</> : null}.
         </>,
       ),
     );
@@ -578,7 +572,7 @@ function applyPendingDebtSlots(ctx: LiquityContext, coords: EventCoords): EventP
     clause(<>Interest accrues at {fig(rateAfter, `${stateAfter.annualInterestRate.toFixed(1)}%`)} a year.</>),
   );
   if (stateAfter.collateralRatio > 0) {
-    meansNow.push(clause(<>The collateral ratio is {fig(undefined, `${stateAfter.collateralRatio.toFixed(1)}%`)}.</>));
+    meansNow.push(clause(<>The collateral ratio is {fig(undefined, fmtCr(stateAfter.collateralRatio))}.</>));
   }
 
   return { happened, changed, meansNow };
@@ -635,8 +629,8 @@ function liquidateSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlo
       meansNow.push(
         clause(
           <>
-            Its collateral ratio moved from {stateBefore.collateralRatio.toFixed(1)}% to{" "}
-            {fig(undefined, `${stateAfter.collateralRatio.toFixed(1)}%`)}.
+            Its collateral ratio moved from {fig(undefined, fmtCr(stateBefore.collateralRatio))} to{" "}
+            {fig(undefined, fmtCr(stateAfter.collateralRatio))}.
           </>,
         ),
       );
@@ -667,8 +661,8 @@ function liquidateSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlo
   const happened: ClauseInput[] = [
     clause(
       <>
-        This trove was liquidated: its collateral ratio had dropped to {crAtLiquidation.toFixed(2)}%, below the{" "}
-        {threshold}% liquidation line for {collateralType}.
+        This trove was liquidated: its collateral ratio had dropped to {fig(undefined, fmtCr(crAtLiquidation))}, below
+        the {threshold}% liquidation line for {collateralType}.
       </>,
     ),
   ];
@@ -683,7 +677,7 @@ function liquidateSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlo
     clause(
       <>
         {fig(undefined, `${fmtColl(collLiquidated)} ${collateralType}`)} of collateral was liquidated, worth{" "}
-        {fmtUsd(totalCollValueUsd)} at the price at the time.
+        {fig(undefined, fmtUsdWhole(totalCollValueUsd))} at the price at the time.
       </>,
     ),
   ];
@@ -836,8 +830,8 @@ function redeemSlots(ctx: LiquityContext, coords: EventCoords, currentPrice?: nu
       meansNow.push(
         clause(
           <>
-            With no debt, interest accrual has stopped and the {stateAfter.annualInterestRate.toFixed(1)}% rate is
-            inactive.
+            With no debt, interest accrual has stopped and the {fig(undefined, fmtRate(stateAfter.annualInterestRate))}{" "}
+            rate is inactive.
           </>,
         ),
       );
@@ -867,7 +861,7 @@ function redeemSlots(ctx: LiquityContext, coords: EventCoords, currentPrice?: nu
           <>
             The trove now holds {fig(undefined, `${fmtCurrency(stateAfter.debt, debtSym)}`)} of debt, a low-debt zombie
             trove below the 2,000 {debtSym} minimum, and its collateral ratio adjusts to{" "}
-            {fig(undefined, `${stateAfter.collateralRatio.toFixed(1)}%`)}.
+            {fig(undefined, fmtCr(stateAfter.collateralRatio))}.
           </>,
         ),
       );
@@ -900,7 +894,7 @@ function redeemSlots(ctx: LiquityContext, coords: EventCoords, currentPrice?: nu
         clause(
           <>
             The trove now holds {fig(undefined, `${fmtCurrency(stateAfter.debt, debtSym)}`)} of debt, adjusting its
-            collateral ratio to {fig(undefined, `${stateAfter.collateralRatio.toFixed(1)}%`)}.
+            collateral ratio to {fig(undefined, fmtCr(stateAfter.collateralRatio))}.
           </>,
         ),
       );
@@ -925,13 +919,14 @@ function redeemSlots(ctx: LiquityContext, coords: EventCoords, currentPrice?: nu
       clause(
         <>
           The borrower&rsquo;s net outcome is the debt cleared minus the value of the collateral given up:{" "}
-          {fmtUsd(debtRedeemed)} &minus; {fmtColl(collRedeemed)} {collateralType} &times; {fmtUsd(collateralPrice)} ={" "}
-          {s(netHistoric)}
-          {fmtUsd(Math.abs(netHistoric))} at the redemption-time price
+          {fig(undefined, fmtUsdWhole(debtRedeemed))} &minus;{" "}
+          {fig(collDelta, `${fmtColl(collRedeemed)} ${collateralType}`)} &times;{" "}
+          {fig(undefined, fmtUsdWhole(collateralPrice))} ={" "}
+          {fig(undefined, `${s(netHistoric)}${fmtUsdWhole(Math.abs(netHistoric))}`)} at the redemption-time price
           {netToday != null ? (
             <>
-              , or {s(netToday)}
-              {fmtUsd(Math.abs(netToday))} at today&rsquo;s {collateralType} price of {fmtUsd(currentPrice!)}
+              , or {fig(undefined, `${s(netToday)}${fmtUsdWhole(Math.abs(netToday))}`)} at today&rsquo;s{" "}
+              {collateralType} price of {fmtUsd(currentPrice!)}
             </>
           ) : null}
           .
@@ -983,7 +978,7 @@ function setBatchManagerSlots(ctx: LiquityContext, coords: EventCoords, accruedI
       debtChanged
         ? clause(
             <>
-              Its debt updated from {fmtCurrency(stateBefore.debt, debtSym)} to{" "}
+              Its debt updated from {fig(undefined, fmtCurrency(stateBefore.debt, debtSym))} to{" "}
               {fig(undefined, `${fmtCurrency(stateAfter.debt, debtSym)}`)}
               {accruedInterest > 0.01 ? ", reflecting accrued interest" : ""}.
             </>,
@@ -1009,7 +1004,7 @@ function setBatchManagerSlots(ctx: LiquityContext, coords: EventCoords, accruedI
     );
   }
   if (stateAfter.collateralRatio > 0) {
-    meansNow.push(clause(<>The collateral ratio is {fig(undefined, `${stateAfter.collateralRatio.toFixed(1)}%`)}.</>));
+    meansNow.push(clause(<>The collateral ratio is {fig(undefined, fmtCr(stateAfter.collateralRatio))}.</>));
   }
 
   return { happened, changed, meansNow };
@@ -1058,7 +1053,8 @@ function removeFromBatchSlots(
     meansNow.push(
       clause(
         <>
-          The collateral is {fig(undefined, `${fmtColl(stateAfter.coll)} ${collateralType}`)} ({fmtUsd(afterCollUsd)}).
+          The collateral is {fig(undefined, `${fmtColl(stateAfter.coll)} ${collateralType}`)} (
+          {fig(undefined, fmtUsdWhole(afterCollUsd))}).
         </>,
       ),
     );
@@ -1067,14 +1063,14 @@ function removeFromBatchSlots(
     meansNow.push(
       clause(
         <>
-          The rate moved from {stateBefore.annualInterestRate.toFixed(1)}% to a self-set{" "}
+          The rate moved from {fig(undefined, fmtRate(stateBefore.annualInterestRate))} to a self-set{" "}
           {fig(rateAfter, `${stateAfter.annualInterestRate.toFixed(1)}%`)}.
         </>,
       ),
     );
   }
   if (stateAfter.collateralRatio > 0) {
-    meansNow.push(clause(<>The collateral ratio is {fig(undefined, `${stateAfter.collateralRatio.toFixed(1)}%`)}.</>));
+    meansNow.push(clause(<>The collateral ratio is {fig(undefined, fmtCr(stateAfter.collateralRatio))}.</>));
   }
 
   return { happened, changed, meansNow };
@@ -1091,8 +1087,8 @@ function batchRateUpdateSlots(ctx: LiquityContext, coords: EventCoords): EventPr
     clause(
       <>
         The batch manager {increased ? "raised" : "lowered"} the delegated interest rate from{" "}
-        {stateBefore.annualInterestRate.toFixed(1)}% to {fig(rateAfter, `${stateAfter.annualInterestRate.toFixed(1)}%`)}{" "}
-        APR.
+        {fig(undefined, fmtRate(stateBefore.annualInterestRate))} to{" "}
+        {fig(rateAfter, `${stateAfter.annualInterestRate.toFixed(1)}%`)} APR.
       </>,
     ),
   ];
@@ -1109,20 +1105,22 @@ function batchRateUpdateSlots(ctx: LiquityContext, coords: EventCoords): EventPr
   }
   if (stateAfter.debt > 0) {
     meansNow.push(
-      clause(<>The trove&rsquo;s debt now stands at {fig(undefined, `${fmtCurrency(stateAfter.debt, debtSym)}`)}.</>),
+      // The grid shows only the rate cell on a delegate's rate change, so the
+      // position figures below are stated here alone and stay muted.
+      clause(<>The trove&rsquo;s debt now stands at {fmtCurrency(stateAfter.debt, debtSym)}.</>),
     );
   }
   if (stateAfter.coll > 0 && afterCollUsd > 0) {
     meansNow.push(
       clause(
         <>
-          Its collateral is {fig(undefined, `${fmtColl(stateAfter.coll)} ${collateralType}`)} ({fmtUsd(afterCollUsd)}).
+          Its collateral is {fmtColl(stateAfter.coll)} {collateralType} ({fmtUsd(afterCollUsd)}).
         </>,
       ),
     );
   }
   if (stateAfter.collateralRatio > 0) {
-    meansNow.push(clause(<>The collateral ratio is {fig(undefined, `${stateAfter.collateralRatio.toFixed(1)}%`)}.</>));
+    meansNow.push(clause(<>The collateral ratio is {fmtCr(stateAfter.collateralRatio)}.</>));
   }
 
   return { happened, meansNow };
@@ -1172,12 +1170,12 @@ function transferSlots(ctx: LiquityContext): EventProseSlots {
           <>
             The transferred trove holds {fig(undefined, `${fmtCurrency(stateAfter.debt, debtSym)}`)} of debt against{" "}
             {fig(undefined, `${fmtColl(stateAfter.coll)} ${collateralType}`)} of collateral, at a{" "}
-            {fig(undefined, `${stateAfter.collateralRatio.toFixed(1)}%`)} ratio and a{" "}
-            {fig(undefined, `${stateAfter.annualInterestRate.toFixed(1)}%`)} interest rate
+            {fig(undefined, fmtCr(stateAfter.collateralRatio))} ratio and a{" "}
+            {fig(undefined, fmtRate(stateAfter.annualInterestRate))} interest rate
             {collateralPrice > 0 ? (
               <>
                 {" "}
-                ({collateralType} at {fmtUsd(collateralPrice)})
+                ({collateralType} at {fig(undefined, fmtUsdWhole(collateralPrice))})
               </>
             ) : null}
             .

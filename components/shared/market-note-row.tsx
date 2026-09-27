@@ -60,8 +60,16 @@ import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { InfoDisclosure } from "@/components/shared/info-disclosure";
 import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
+import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { StatCard, StateTransition, TransitionArrow as CardArrow } from "@/components/shared/state-transition";
+import {
+  PriceChipShell,
+  StatCard,
+  StatSubline,
+  StateTransition,
+  TransitionArrow as CardArrow,
+  ValuePill as CardValuePill,
+} from "@/components/shared/state-transition";
 import { StepMark } from "@/components/shared/step-mark";
 import { EventDateContext, EventTime } from "@/components/shared/event-time";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
@@ -159,8 +167,10 @@ interface NoteStat {
   values?: { before: NoteFigure; after: NoteFigure };
   /** A small receipted line under the value — "branch minimum 110%",
    *  "23,739 BOLD / year" — for the figure that qualifies the card's own
-   *  rather than deserving a card of its own. */
-  sub?: { text?: string; figure: NoteFigure; suffix?: string };
+   *  rather than deserving a card of its own. Muted, as a reference or a
+   *  qualifier of a held figure is, unless `changed`: the one sub-line the
+   *  move itself sets (a rate step's "moved"). */
+  sub?: { text?: string; figure: NoteFigure; suffix?: string; changed?: boolean };
 }
 
 /** The price chip, bottom right, where a regular card states its price: one
@@ -205,7 +215,9 @@ interface NoteBody {
   chip?: NoteChip;
   /** The two blocks the stretch runs between, stated in the (i) beneath. */
   blocks?: { before: NoteFigure; after: NoteFigure };
-  derivation: ReactNode;
+  /** The (i) beneath the cells: a paragraph, or (the price gap's form) one
+   *  bullet per fact, in the shape of a regular event's explanation. */
+  derivation: ReactNode | ReactNode[];
   /** False on a kind that observed ONE value rather than a move: the header
    *  then draws no direction glyph. A configuration event states its new
    *  terms and, often, no earlier ones — an arrow over it would be a
@@ -354,11 +366,11 @@ export function MarketNoteRow({
                   )}
                 </StateTransition>
                 {s.sub && (
-                  <div className="mt-1 flex items-center gap-1 text-xs text-rb-500">
+                  <StatSubline changed={!!s.sub.changed} className="mt-1 flex items-center gap-1">
                     {s.sub.text && <span>{s.sub.text}</span>}
-                    <Figure figure={s.sub.figure} className="text-xs font-medium" />
+                    <Figure figure={{ ...s.sub.figure, muted: !s.sub.changed }} className="text-xs font-medium" />
                     {s.sub.suffix && <span>{s.sub.suffix}</span>}
-                  </div>
+                  </StatSubline>
                 )}
               </StatCard>
             </div>
@@ -375,17 +387,36 @@ export function MarketNoteRow({
             </span>
           }
         >
-          <p className="text-xs leading-relaxed text-rb-500">
-            {body.derivation}
-            {body.blocks && (
-              <>
-                {" "}
-                The stretch runs from block{" "}
-                <Figure figure={{ ...body.blocks.before, muted: true }} className="text-xs" /> to block{" "}
-                <Figure figure={{ ...body.blocks.after, muted: true }} className="text-xs" />.
-              </>
-            )}
-          </p>
+          {Array.isArray(body.derivation) ? (
+            // The bullet form of a regular event's (i), closing on the block
+            // range. The blocks are stated only here, so they stay muted.
+            <ProseExplainer
+              items={[
+                ...body.derivation,
+                ...(body.blocks
+                  ? [
+                      <>
+                        The stretch runs from block{" "}
+                        <Figure figure={{ ...body.blocks.before, muted: true }} className="" /> to block{" "}
+                        <Figure figure={{ ...body.blocks.after, muted: true }} className="" />.
+                      </>,
+                    ]
+                  : []),
+              ]}
+            />
+          ) : (
+            <p className="text-xs leading-relaxed text-rb-500">
+              {body.derivation}
+              {body.blocks && (
+                <>
+                  {" "}
+                  The stretch runs from block{" "}
+                  <Figure figure={{ ...body.blocks.before, muted: true }} className="text-xs" /> to block{" "}
+                  <Figure figure={{ ...body.blocks.after, muted: true }} className="text-xs" />.
+                </>
+              )}
+            </p>
+          )}
         </InfoDisclosure>
       </div>
     </NoteRowShell>
@@ -472,18 +503,19 @@ function TransitionArrow() {
   );
 }
 
-/** A value in the bordered pill a regular card draws beside an amount. */
+/** A value in the bordered pill a regular card draws beside an amount. The
+ *  price move is what changed it, so it takes the foreground tone unless the
+ *  figure says it is muted. */
 function ValuePill({ figure }: { figure: NoteFigure }) {
   return (
     <Prov info={figure.prov} value={figure.exact ?? figure.text}>
-      <span className="flex items-center rounded-sm border-l-2 border-r-2 border-rb-500 px-1 py-0 text-xs font-bold tabular-nums text-rb-500">
-        {figure.text}
-      </span>
+      <CardValuePill changed={!figure.muted}>{figure.text}</CardValuePill>
     </Prov>
   );
 }
 
-/** The price chip a regular card draws bottom right, with both ends. */
+/** The price chip a regular card draws bottom right, with both ends. The two
+ *  ends are the move the note states, so the chip takes the foreground tone. */
 function PriceChip({ chip }: { chip: NoteChip }) {
   const end = (f: NoteFigure) => (
     <Prov info={f.prov} value={f.exact ?? f.text}>
@@ -495,17 +527,15 @@ function PriceChip({ chip }: { chip: NoteChip }) {
   );
   return (
     <div className="flex items-center gap-2 px-4 py-2">
-      <span
-        className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-background px-2 py-1 text-xs font-bold text-rb-500"
-        title={chip.title}
-        data-note-price-chip=""
-      >
+      <PriceChipShell changed title={chip.title} marker>
         {end(chip.before)}
-        <span aria-hidden="true">→</span>
+        <span aria-hidden="true" className="text-rb-500">
+          →
+        </span>
         {end(chip.after)}
         {chip.unit && <span>{chip.unit}</span>}
         <TokenChipIcon symbol={chip.symbol} iconOverride={chip.iconAs} size={14} filterable={false} />
-      </span>
+      </PriceChipShell>
     </div>
   );
 }
@@ -527,6 +557,23 @@ function Figure({ figure, className }: { figure: NoteFigure; className: string }
         {figure.text}
       </span>
     </Prov>
+  );
+}
+
+/** A figure the (i) repeats from the cells or the chip above: the foreground
+ *  tone of the T3 echo-colour rule, and an echo of the cell's receipt so the
+ *  inspector's locator reaches both. Written exactly as the cell writes it. */
+function Echo({ figure, prefix = "", suffix = "" }: { figure: NoteFigure; prefix?: string; suffix?: string }) {
+  return (
+    <H>
+      <Prov echo info={figure.prov} value={figure.exact ?? figure.text} symbol={figure.symbol}>
+        <span className="tabular-nums">
+          {prefix}
+          {figure.text}
+          {suffix}
+        </span>
+      </Prov>
+    </H>
   );
 }
 
@@ -748,23 +795,24 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
   const isPolaris = note.measureKind === "protocol";
   const endLabel = isPolaris ? polarisEndLabel : priceGapEndLabel;
   const positionNoun = isPolaris ? "CDP" : "trove";
-  const feedNoun = isPolaris ? "the market's own price feed" : "Liquity&rsquo;s own PriceFeed";
+  const feedNoun = isPolaris ? "the market's price feed" : "Liquity's PriceFeed";
   const minimumLabel = isPolaris ? "the market's normal-mode minimum" : "branch minimum";
   const priceProv = isPolaris ? polarisPriceGapProv : priceGapProv;
   const positionProv = isPolaris ? polarisPriceGapPositionProv : priceGapPositionProv;
-  const end = (point: MarketNotePoint, which: "earlier" | "later") => {
+  /** Where one end's price was read: a position event (with its two links),
+   *  or, on a live note's later end, the live read at the chain head. */
+  const source = (point: MarketNotePoint, which: "earlier" | "later") => {
     if (which === "later" && note.live) {
-      const liveNoun = isPolaris ? "the market's own price feed, read live" : "the backend's live oracle read";
+      const liveNoun = isPolaris ? "the market's price feed, read live" : "the backend's live oracle read";
       return (
         <>
-          the later price: {liveNoun}, at the chain head block {point.block.toLocaleString("en-US")} — not a{" "}
-          {positionNoun} event
+          {liveNoun} at the chain head, block {point.block.toLocaleString("en-US")}
         </>
       );
     }
     return (
       <>
-        the {which} price: this {positionNoun}&rsquo;s {endLabel(point)} at block {point.block.toLocaleString("en-US")}
+        this {positionNoun}&rsquo;s {endLabel(point)} at block {point.block.toLocaleString("en-US")}
         {observationLinks(point, links)}
       </>
     );
@@ -780,45 +828,48 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
   // stable, written after the figure; Liquity V2's are dollars.
   const stable = isPolaris ? note.unitLabel.split(" per ")[0] : null;
   const stats: NoteStat[] = [];
+  // The figures the (i) repeats, kept as the cells built them.
+  let collFig: NoteFigure | undefined;
+  let valueFigs: { before: NoteFigure; after: NoteFigure } | undefined;
+  let crFigs: { before: NoteFigure; after: NoteFigure } | undefined;
+  let mcrFig: NoteFigure | undefined;
   if (p) {
     const vd = separatingDecimals(p.coll * note.from.value, p.coll * note.to.value, 0, 2);
     const money = (n: number) => (stable ? `${grouped(n, vd)} ${stable}` : `$${grouped(n, vd)}`);
     const priceText = (n: number) => formatPrice(n, priceDecimals(note));
     const priceUnit = stable ?? "USD";
-    stats.push({
-      label: "Collateral",
-      figure: {
-        text: isPolaris ? grouped(p.coll, 4) : p.coll.toFixed(4),
-        exact: String(p.coll),
-        symbol: note.marketSymbol,
-        muted: true,
-        prov: heldAmountProv(note, "collateral", String(p.coll), held),
+    collFig = {
+      text: isPolaris ? grouped(p.coll, 4) : p.coll.toFixed(4),
+      exact: String(p.coll),
+      symbol: note.marketSymbol,
+      muted: true,
+      prov: heldAmountProv(note, "collateral", String(p.coll), held),
+    };
+    valueFigs = {
+      before: {
+        text: money(p.coll * note.from.value),
+        exact: String(p.coll * note.from.value),
+        prov: valueAtPriceProv(
+          note,
+          "before",
+          { label: "collateral", value: `${p.coll} ${note.marketSymbol}` },
+          { value: priceText(note.from.value), unit: priceUnit },
+          held,
+        ),
       },
-      values: {
-        before: {
-          text: money(p.coll * note.from.value),
-          exact: String(p.coll * note.from.value),
-          prov: valueAtPriceProv(
-            note,
-            "before",
-            { label: "collateral", value: `${p.coll} ${note.marketSymbol}` },
-            { value: priceText(note.from.value), unit: priceUnit },
-            held,
-          ),
-        },
-        after: {
-          text: money(p.coll * note.to.value),
-          exact: String(p.coll * note.to.value),
-          prov: valueAtPriceProv(
-            note,
-            "after",
-            { label: "collateral", value: `${p.coll} ${note.marketSymbol}` },
-            { value: priceText(note.to.value), unit: priceUnit },
-            held,
-          ),
-        },
+      after: {
+        text: money(p.coll * note.to.value),
+        exact: String(p.coll * note.to.value),
+        prov: valueAtPriceProv(
+          note,
+          "after",
+          { label: "collateral", value: `${p.coll} ${note.marketSymbol}` },
+          { value: priceText(note.to.value), unit: priceUnit },
+          held,
+        ),
       },
-    });
+    };
+    stats.push({ label: "Collateral", figure: collFig, values: valueFigs });
     stats.push({
       label: "Debt",
       figure: {
@@ -831,16 +882,15 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
     });
   }
   if (p && f.crBefore && f.crAfter && f.mcr) {
+    crFigs = {
+      before: { text: f.crBefore, prov: positionProv(note, "crBefore"), exact: String(p.crBefore) },
+      after: { text: f.crAfter, prov: positionProv(note, "crAfter"), exact: String(p.crAfter) },
+    };
+    mcrFig = { text: f.mcr, prov: positionProv(note, "mcr"), exact: String(p.mcrPct) };
     stats.push({
       label: isPolaris ? "Collateral ratio" : "Collateral Ratio",
-      transition: {
-        before: { text: f.crBefore, prov: positionProv(note, "crBefore"), exact: String(p.crBefore) },
-        after: { text: f.crAfter, prov: positionProv(note, "crAfter"), exact: String(p.crAfter) },
-      },
-      sub: {
-        text: minimumLabel,
-        figure: { text: f.mcr, prov: positionProv(note, "mcr"), exact: String(p.mcrPct) },
-      },
+      transition: crFigs,
+      sub: { text: minimumLabel, figure: mcrFig },
     });
   }
   if (p && !isPolaris && p.rate != null) {
@@ -879,6 +929,75 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
     });
   }
   const pd = separatingDecimals(note.from.value, note.to.value, 0, PRICE_DECIMALS_CAP);
+  const chip: NoteChip = {
+    before: { text: grouped(note.from.value, pd), prov: priceProv(note, "price"), exact: String(note.from.value) },
+    after: { text: grouped(note.to.value, pd), prov: priceProv(note, "price"), exact: String(note.to.value) },
+    symbol: note.marketSymbol,
+    ...(stable ? { unit: stable } : { prefix: "$" }),
+    title: `${note.marketSymbol} price at each end of the stretch (${note.unitLabel})`,
+  };
+  const price = (fig: NoteFigure) => (
+    <Echo figure={fig} prefix={chip.prefix ?? ""} suffix={chip.unit ? ` ${chip.unit}` : ""} />
+  );
+  // "then" and "now" on a live note; the two events on a historical one.
+  const [thenWord, nowWord] = note.live ? ["then", "now"] : ["at the earlier event", "at the later event"];
+  const atBlock = p ? (
+    <Prov info={positionProv(note, "state")} value={String(p.atBlock)}>
+      <span className="tabular-nums">{f.atBlock}</span>
+    </Prov>
+  ) : null;
+  const derivation: ReactNode[] = [
+    note.live ? (
+      <>
+        The {note.marketSymbol} price was {price(chip.before)} at {source(note.from, "earlier")}, and is{" "}
+        {price(chip.after)} now, from {source(note.to, "later")}.
+      </>
+    ) : (
+      <>
+        The {note.marketSymbol} price was {price(chip.before)} at {source(note.from, "earlier")}, and{" "}
+        {price(chip.after)} at {source(note.to, "later")}.
+      </>
+    ),
+    !note.live && (
+      <>
+        Each price is the one {feedNoun} stated at that event&rsquo;s block. The {positionNoun} transacted nothing
+        between the two events, so nothing between them is drawn.
+      </>
+    ),
+    collFig && valueFigs && (
+      <>
+        The <Echo figure={collFig} suffix={` ${note.marketSymbol}`} /> of collateral was worth{" "}
+        <Echo figure={valueFigs.before} /> {thenWord} and {note.live ? "is" : "was"} worth{" "}
+        <Echo figure={valueFigs.after} /> {nowWord}.
+      </>
+    ),
+    crFigs && mcrFig && (
+      <>
+        The collateral ratio was <Echo figure={crFigs.before} /> {thenWord} and {note.live ? "is" : "was"}{" "}
+        <Echo figure={crFigs.after} /> {nowWord}, against{" "}
+        {isPolaris ? "the market's normal-mode minimum" : "the branch minimum"} of <Echo figure={mcrFig} />.
+      </>
+    ),
+    atBlock && <>Both ratios use the debt and collateral recorded at block {atBlock}; only the price moves.</>,
+    p &&
+      (note.live ? (
+        <>
+          Interest has accrued since block {f.atBlock}
+          {isPolaris
+            ? "."
+            : ", so the position card's live ratio, which includes it, differs from the later ratio here."}
+        </>
+      ) : (
+        <>Interest kept accruing across the stretch.</>
+      )),
+    p && isPolaris && (
+      <>
+        The minimum named here is the market&rsquo;s normal-mode MCR(). A defensive-mode minimum can be in force at a
+        past block, but it is not indexed.
+      </>
+    ),
+    p && !note.live && <>The stretch is stated because {priceGapReason(note)}.</>,
+  ].filter(Boolean) as ReactNode[];
   return {
     label: `${note.marketSymbol} oracle price`,
     measure: isPolaris ? { kind: "protocol", id: note.measureProtocolId ?? "polaris" } : { kind: "usd" },
@@ -891,70 +1010,14 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks): NoteBody {
       lead: "Market fluctuation since the last event",
       ...(f.elapsed ? { elapsed: elapsedFigure(note, f.elapsed, priceProv(note, "elapsed")) } : {}),
     },
-    chip: {
-      before: { text: grouped(note.from.value, pd), prov: priceProv(note, "price"), exact: String(note.from.value) },
-      after: { text: grouped(note.to.value, pd), prov: priceProv(note, "price"), exact: String(note.to.value) },
-      symbol: note.marketSymbol,
-      ...(stable ? { unit: stable } : { prefix: "$" }),
-      title: `${note.marketSymbol} price at each end of the stretch (${note.unitLabel})`,
-    },
+    chip,
     blocks: {
       before: { text: f.fromBlock, prov: priceProv(note, "blocks"), exact: String(note.from.block) },
       after: { text: f.toBlock, prov: priceProv(note, "blocks"), exact: String(note.to.block) },
     },
     stats,
     learnMore: marketNotePriceGapContent(),
-    derivation: note.live ? (
-      <>
-        This is a LIVE note: {end(note.from, "earlier")}; {end(note.to, "later")}. Shown whenever this {positionNoun} is
-        open, whatever the move — nothing having moved is itself the fact this note states.
-        {p && (
-          <>
-            {" "}
-            The two ratios hold the debt and collateral the earlier event recorded at block{" "}
-            <Prov info={positionProv(note, "state")} value={String(p.atBlock)}>
-              <span className="tabular-nums">{f.atBlock}</span>
-            </Prov>{" "}
-            fixed and move only the price, so the later one is what that state is worth NOW rather than a second
-            reading; interest has kept accruing since.
-            {!isPolaris && <> The position card&rsquo;s live ratio also carries the interest accrued since then.</>}
-            {isPolaris && (
-              <>
-                {" "}
-                The minimum named here is always the market&rsquo;s own normal-mode MCR() — a defensive-mode minimum can
-                be in force at a past block, but it is not indexed.
-              </>
-            )}
-          </>
-        )}
-      </>
-    ) : (
-      <>
-        The price is not read for this note: every event on this {positionNoun} already carries the {note.marketSymbol}{" "}
-        price {feedNoun} stated at that event&rsquo;s block, and these are the two events either side of the stretch —{" "}
-        {end(note.from, "earlier")}, {end(note.to, "later")}. Nothing between them is drawn, because the {positionNoun}{" "}
-        transacted nothing between them and the index states no price where it did not.
-        {p && (
-          <>
-            {" "}
-            The two ratios hold the debt and collateral the earlier event recorded at block{" "}
-            <Prov info={positionProv(note, "state")} value={String(p.atBlock)}>
-              <span className="tabular-nums">{f.atBlock}</span>
-            </Prov>{" "}
-            and move only the price, so the later one is what that state came to be worth rather than a second reading;
-            interest kept accruing across the stretch.
-            {isPolaris && (
-              <>
-                {" "}
-                The minimum named here is always the market&rsquo;s own normal-mode MCR() — a defensive-mode minimum can
-                be in force at a past block, but it is not indexed.
-              </>
-            )}{" "}
-            The stretch is stated because {priceGapReason(note)}.
-          </>
-        )}
-      </>
-    ),
+    derivation,
   };
 }
 
@@ -1460,7 +1523,11 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
       // The move itself, under the pair it is the difference of: the header
       // states the later rate now, so this card is where the size of the
       // step is stated — with its own receipt, as it always had.
-      sub: { text: "moved", figure: { text: f.delta, prov: rateStepProv(note, "delta"), exact: String(note.deltaPp) } },
+      sub: {
+        text: "moved",
+        changed: true,
+        figure: { text: f.delta, prov: rateStepProv(note, "delta"), exact: String(note.deltaPp) },
+      },
     },
     {
       label: "Blocks",
@@ -1648,6 +1715,7 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
       },
       sub: {
         text: "moved",
+        changed: true,
         figure: { text: f.delta, prov: makerRateStepProv(note, "delta"), exact: String(note.deltaPp) },
       },
     },
@@ -1847,6 +1915,7 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
       },
       sub: {
         text: "moved",
+        changed: true,
         figure: { text: f.delta, prov: aaveFamilyRateStepProv(note, "delta"), exact: String(note.deltaPp) },
       },
     },
