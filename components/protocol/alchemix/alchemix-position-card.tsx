@@ -235,6 +235,15 @@ export function collateralColumn(
   );
 }
 
+/** True where the events-only debt and the debt last read disagree by more
+ *  than a thousandth of a unit. */
+function eventsAloneDiffers(p: AlchemixPositionSummary): boolean {
+  const dlb = p.figures.derivedLowerBound;
+  const debt = p.figures.debt;
+  if (!dlb || !debt) return false;
+  return Math.abs(Number(dlb.debtRaw) / 1e18 - debt.formatted) >= 1e-3;
+}
+
 export function AlchemixPositionCard({ p, session }: { p: AlchemixPositionSummary; session: SessionProtocol }) {
   return (
     <PositionCardShell>
@@ -267,19 +276,14 @@ export function AlchemixPositionCard({ p, session }: { p: AlchemixPositionSummar
         {/* The route's own sentence for this line's grade, rendered as given. */}
         <p className="text-xs leading-relaxed text-rb-500">{p.figures.gradeReason}</p>
 
-        {/* The replayed figure, stated WITHOUT a direction. The API calls this
-            field `derivedLowerBound`, but measured against production on
-            2026-09-26 the replayed debt was at or above the read debt on every
-            row that carried both, never below — a redemption burns debt and the
-            replay does not see it. So the card says what the figure is and what
-            block it stopped being exact at, and claims nothing about which side
-            of the truth it falls. See the report on this stage. */}
-        {p.figures.derivedLowerBound ? (
-          <p className="text-xs leading-relaxed text-rb-500">
-            Adding up this position&rsquo;s own events to block {block(p.figures.derivedLowerBound.reducedToBlock)}{" "}
-            gives a debt of {formatCompact(Number(p.figures.derivedLowerBound.debtRaw) / 1e18).display}{" "}
-            {p.syntheticSymbol}. Since block {block(p.figures.derivedLowerBound.validToBlock)}, the line&rsquo;s first
-            redemption, a redemption can clear debt with no event of the position&rsquo;s to show it.
+        {/* The events-only debt beside the debt last read, only where the
+            two differ: a redemption clears debt with no event of the
+            position's to show it. The position page adds what the
+            redemptions cleared. */}
+        {eventsAloneDiffers(p) ? (
+          <p className="text-xs leading-relaxed text-rb-500 tabular-nums">
+            Events alone: {formatCompact(Number(p.figures.derivedLowerBound!.debtRaw) / 1e18).display}{" "}
+            {p.syntheticSymbol} · last read: {formatCompact(p.figures.debt!.formatted).display}
           </p>
         ) : null}
 

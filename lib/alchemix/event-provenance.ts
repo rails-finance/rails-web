@@ -33,7 +33,6 @@
 import type { RedemptionNet } from "@/lib/alchemix/redemption-net";
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
-import type { AlchemixGrade } from "@/types/api/alchemix";
 
 /** Where the figures on this page were captured from, in custody terms. */
 const ALCHEMIX_VIA = "captured Alchemist + position NFT logs (alchemix_v3_*)";
@@ -398,99 +397,40 @@ export function stateAtBlockFromReadingProv(
   };
 }
 
-// ── What the vault did for the collateral ───────────────────────────────────
+// ── The debt the position's own events add up to ────────────────────────────
 //
-// The same class of figure as the redemption subtraction above: a SUM OF
-// DIFFERENCES OF READINGS, not a rate and not a projection. The share count is
-// constant between two consecutive readings — every block that can move it is
-// itself a reading boundary — so each interval contributes shares × the move in
-// the share price, and the receipt names the span because the figure is true
-// for that span and no other. It is signed, and the receipt says so: a vault
-// share can lose value.
+// The card states it only where it differs from the debt read now. A
+// redemption clears debt line-wide with no event of the position's to show
+// it, so from the line's first redemption the sum of the position's own events
+// can sit above the debt the Alchemist reports.
 
-/** The underlying the collateral gained or lost from the MYT's share price
- *  moving, summed over the readings in a block range. */
-export function collateralAppreciationProv(
+/** The debt this position's own events add up to, replayed to a block. */
+export function eventsAloneDebtProv(
   symbol: string,
   raw: string,
-  decimals: number,
-  fromBlock: number,
-  toBlock: number,
-  intervals: number,
-  readings: number,
+  reducedToBlock: number,
+  validToBlock: number,
   coords: AlchemixCoords,
 ): Provenance {
   return {
     kind: "chain-derived",
-    pclass: "state",
-    summary: `${symbol} the collateral gained or lost from the vault's share price moving — this position's shares against each step the share price took`,
-    contract: { name: "Metavault (MYT)" },
-    formula: "Σ shares × (share price at the later reading − share price at the earlier one)",
-    via: `${readings} readings of getCDP(${coords.tokenId}) and the MYT's share price, blocks ${fromBlock} to ${toBlock}`,
-    verify: {
-      kind: "recompute",
-      text: `Take each pair of consecutive readings between blocks ${fromBlock} and ${toBlock} and sum the moves`,
-    },
-    source: { block: toBlock },
-    inputs: coordInputs(coords, [
-      { label: "first reading", value: `block ${fromBlock}`, kind: "chain" },
-      { label: "last reading", value: `block ${toBlock}`, kind: "chain" },
-      {
-        label: "steps summed",
-        value: `${intervals} of ${readings} readings`,
-        kind: "chain",
-        note: "the share count holds still across each one, so each step is a share-price move alone",
-      },
-      {
-        label: "sign",
-        value: "the figure can be negative",
-        kind: "offchain",
-        note: "a vault share can lose value, so this is what the price did and never a promised yield",
-      },
-    ]),
-    scaling: { raw, from: "call", places: decimals, why: `${symbol} carries ${decimals} decimals` },
-  };
-}
-
-// ── The headline figures ────────────────────────────────────────────────────
-
-const GRADE_BASIS: Record<AlchemixGrade, string> = {
-  derived: "the position's own events, with no redemption on this line to move it otherwise",
-  read: "a getCDP call on the Alchemist at the block named",
-  unavailable: "nothing current — this line carries the read grade and no reading is in hand",
-  refused: "nothing: the reducer declined this position",
-};
-
-/** A figure the position row serves, under its line's grade, at its own block. */
-export function servedFigureProv(
-  label: string,
-  symbol: string,
-  raw: string | null,
-  asOfBlock: number | null,
-  grade: AlchemixGrade,
-  coords: AlchemixCoords,
-  decimals = 18,
-): Provenance {
-  const readGraded = grade === "read";
-  return {
-    kind: readGraded ? "chain" : "chain-derived",
-    pclass: readGraded ? "state" : "indexed",
-    summary: `${label} — ${GRADE_BASIS[grade]}`,
+    pclass: "indexed",
+    summary: `${symbol} debt from this position's events alone: every mint, burn, repay and liquidation it emitted, added up to block ${reducedToBlock}. A redemption clears debt with no event of the position's to show it, so from the line's first redemption at block ${validToBlock} this sum can sit above the debt read now.`,
     contract: alchemistContract(coords),
-    via: readGraded
-      ? `getCDP(${coords.tokenId}) on the Alchemist${asOfBlock != null ? ` at block ${asOfBlock}` : ""}`
-      : `${ALCHEMIX_VIA} · reduced per-position state`,
-    verify:
-      readGraded && asOfBlock != null
-        ? { kind: "recompute", text: `Call getCDP(${coords.tokenId}) at block ${asOfBlock}` }
-        : { kind: "recompute", text: "Recompute it from this position's own events" },
-    source: { block: asOfBlock ?? undefined },
+    via: `${ALCHEMIX_VIA} · replayed per position`,
+    formula: "Σ debt added by the position's own events − Σ debt they cleared",
+    verify: { kind: "recompute", text: "Add up the debt moves on this position's own event cards" },
+    source: { block: reducedToBlock },
     inputs: coordInputs(coords, [
-      { label: "grade", value: grade, kind: "offchain", note: "the line's grade, which every position on it carries" },
+      { label: "replayed to", value: `block ${reducedToBlock}`, kind: "chain" },
+      {
+        label: "exact to",
+        value: `block ${validToBlock}`,
+        kind: "chain",
+        note: "the line's first redemption; past it the sum can differ from the debt read",
+      },
     ]),
-    scaling: raw
-      ? { raw, from: readGraded ? "call" : "log", places: decimals, why: `${symbol} carries ${decimals} decimals` }
-      : undefined,
+    scaling: { raw, from: "log", places: 18, why: `${symbol} carries 18 decimals` },
   };
 }
 

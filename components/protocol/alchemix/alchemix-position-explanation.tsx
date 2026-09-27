@@ -1,7 +1,6 @@
 "use client";
 
-// The Alchemist position card's Explanation pane, and the one for the panel
-// of stored figures below it.
+// The Alchemist position card's Explanation pane.
 // ----------------------------------------------------------------------------
 // THE CAVEATS THAT HOLD FOR EVERY EVENT CARD LIVE HERE, said once: collateral
 // is a vault share count, set-aside is debt the Transmuter has claimed and
@@ -12,7 +11,6 @@
 //
 // Bold only what the card above states (the charter's highlight rule).
 
-import Link from "next/link";
 import { ProseExplainer, H } from "@/lib/shared/explainer-prose";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { RedemptionNetTotal } from "@/lib/alchemix/redemption-net";
@@ -20,7 +18,6 @@ import { formatCompact } from "@/lib/shared/format-event";
 import type { AlchemixLiveState } from "@/types/api/alchemix";
 
 const compact = (n: number) => formatCompact(n).display;
-const block = (n: number) => n.toLocaleString("en-US");
 const two = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** What the timeline's redemptions did to this position, summed over the
@@ -190,36 +187,4 @@ export function AlchemixPositionExplanation({
   ].filter(Boolean);
 
   return <ProseExplainer paragraph={lead} items={items} />;
-}
-
-/** The pane on the panel of stored figures: what that panel is, and where every
- *  line's figures are described. */
-export function AlchemixStoredPanelExplanation({
-  storedBlock,
-  linesHref,
-}: {
-  storedBlock: number | null;
-  linesHref: string;
-}) {
-  const items = [
-    storedBlock != null ? (
-      <>
-        These are the last figures this explorer stored for the position, read at block {block(storedBlock)}. The card
-        above reads the contract again each time the page opens.
-      </>
-    ) : (
-      <>These are the last figures this explorer stored for the position. The card above reads the contract again.</>
-    ),
-    <>
-      Debt and collateral match between the two until the position acts or the line redeems again. Set-aside grows block
-      by block, so it differs by what built up between the two blocks.
-    </>,
-    <>
-      <Link href={linesHref} className="link">
-        Every Alchemix line on this chain
-      </Link>
-      , and how each one&rsquo;s figures are read.
-    </>,
-  ];
-  return <ProseExplainer items={items} />;
 }

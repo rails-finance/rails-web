@@ -1,57 +1,48 @@
 "use client";
 
 // One Alchemist position. The client half — the page above it is a server
-// component that has already read the position, its line's coverage, its event
-// history and its current figures.
+// component that has already read the position, its event history and its
+// current figures.
 //
 // FIVE RULES THIS VIEW KEEPS. Each is a way an Alchemix position's figures can
 // be read as saying something they do not.
 //
-// 1. THE CURRENT FIGURES AND THE STORED ONES ARE TWO DIFFERENT STATEMENTS, and
-//    they are drawn as two panels with two blocks. Earmarked debt accrues
-//    inside the Alchemist on every block, so a stored figure is true at the
-//    block it was taken at and at no other. The headline earmarked figure comes
-//    from the current reading — one call, one block — and never from the stored
-//    row. Nothing here carries either forward, interpolates between them, or
-//    adds earmarked to a debt figure from another block.
+// 1. THE CARD'S FIGURES ARE ONE READING AT ONE BLOCK. Earmarked debt accrues
+//    inside the Alchemist on every block, so a figure is true at the block it
+//    was read at and at no other. The card's figures come from the current
+//    reading, one call at one block, and never from a stored row. Nothing here
+//    carries a figure forward, interpolates between readings, or adds
+//    earmarked to a debt figure from another block.
 //
 // 2. EVERY AMOUNT IS DRAWN WITH ITS BLOCK, FROM ONE GUARD. An amount whose
 //    block is missing renders as not settled rather than as a bare number: the
 //    number would look stated and would not be.
 //
-// 3. THE GRADE IS A SENTENCE. Four are possible and they differ in what they
-//    can say at all, which no colour can carry. The route's own plain-words
-//    sentence is rendered as given, the way the listing already does it.
+// 3. THE EVENTS-ONLY DEBT IS STATED ONLY WHERE IT DIFFERS. The wire calls it
+//    `derivedLowerBound`, and a redemption can clear debt with no event of the
+//    position's to show it, so the sum of the position's own events can sit
+//    above the debt read now. The card states the two side by side where they
+//    differ, with what the timeline's redemptions cleared where that accounts
+//    for the gap, and says nothing where they agree.
 //
-// 4. THE EVENT-DERIVED FIGURE IS STATED WITH NO DIRECTION. The wire calls it
-//    `derivedLowerBound`. Measured against production while this was built, the
-//    figure was at or above the contract's own on every position that carried
-//    both and below it on none — a redemption burns debt that the position's
-//    own events do not show. So the panel says what the figure is and the block
-//    it stopped being exact at, and claims nothing about which side of the
-//    truth it falls on.
-//
-// 5. THE POSITION IS A FREELY TRANSFERABLE ERC721. Ownership can change
+// 4. THE POSITION IS A FREELY TRANSFERABLE ERC721. Ownership can change
 //    without the position closing, so the holder shown is the holder now and
 //    the page says so wherever it names one.
 //
-// 7. A V2 HISTORY IS SHOWN, NEVER ADDED. Where the holder closed a V2 account
+// 5. A V2 HISTORY IS SHOWN, NEVER ADDED. Where the holder closed a V2 account
 //    on this synthetic, its rows join the timeline marked V2, so a wallet
 //    that migrated reads as one story, and the version filter shows or hides
 //    them. They ride their own context arm, and every figure on this page
-//    (Lifetime flows, the tenure line, the stored and current figures) is
-//    reduced over the V3 rows alone: a V2 debt and this position's debt are
-//    one obligation at two points in time (rails-ops
-//    reference/alchemix-v2-frozen-record.md).
+//    (Lifetime flows, the tenure line, the card) is reduced over the V3 rows
+//    alone: a V2 debt and this position's debt are one obligation at two
+//    points in time (rails-ops reference/alchemix-v2-frozen-record.md).
 //
-// THE CHROME IS THE HOUSE'S. The page is the roster's detail anatomy — the top
-// row, the position card, Lifetime flows, the timeline — drawn with the shared
+// THE CHROME IS THE HOUSE'S. The page is the roster's detail anatomy: the top
+// row, the position card, Lifetime flows, the timeline, drawn with the shared
 // components (`PositionCardShell`, `OpenPositionStats`, `StatValue`,
-// `WalletPill`, the status pill), not with a frame, a type scale or a palette
-// of its own. The one departure is the second panel below the card, which
-// states the stored figures: rule 1 above is why they cannot be merged into the
-// card's, so they are a second statement in the same chrome rather than a
-// second column in the first.
+// `WalletPill`, the status pill), with no frame, type scale or palette of its
+// own. The timeline carries share-price market notes between events
+// (lib/alchemix/market-notes.ts).
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -95,21 +86,20 @@ import {
 import { redemptionNet, shareFallToLiquidation, sumRedemptionNets } from "@/lib/alchemix/redemption-net";
 import {
   AlchemixPositionExplanation,
-  AlchemixStoredPanelExplanation,
   type AlchemixRedemptionTotals,
 } from "@/components/protocol/alchemix/alchemix-position-explanation";
 import { ALCHEMIX_HOW_IT_WORKS } from "@/components/protocol/alchemix/alchemix-event-explainer";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import {
-  collateralAppreciationProv,
+  clearedRunProv,
   collateralisationProv,
+  eventsAloneDebtProv,
   lineLiquidationsProv,
   lineRatioProv,
   liquidationDistanceProv,
   liveFigureProv,
   redemptionNetTotalProv,
   sharePriceProv,
-  servedFigureProv,
   underlyingProv,
   usdProv,
   type AlchemixCoords,
@@ -118,7 +108,6 @@ import type { AlchemixDeployment } from "@/lib/alchemix/lines";
 import { alchemixPositionName, alchemixV2PositionName } from "@/lib/alchemix/naming";
 import type {
   AlchemixHealth,
-  AlchemixLineCoverage,
   AlchemixLineEventWindow,
   AlchemixLiveState,
   AlchemixPositionSummary,
@@ -254,7 +243,6 @@ export interface AlchemistPositionViewProps {
   lineKey: string;
   tokenId: string;
   position: AlchemixPositionSummary;
-  coverage: AlchemixLineCoverage | null;
   events: BaseActivityEvent[];
   /** The position's whole event count when the served page stopped short of
    *  it; null when the rows are the whole history. */
@@ -279,7 +267,6 @@ export function AlchemistPositionView({
   lineKey,
   tokenId,
   position,
-  coverage,
   events,
   totalEvents,
   lineScopedNote,
@@ -323,7 +310,7 @@ export function AlchemistPositionView({
     };
   }, [initialLiveState, lineKey, tokenId]);
 
-  // Rule 5. The header pill names the holder NOW. Nothing on this page assumes
+  // Rule 4. The header pill names the holder NOW. Nothing on this page assumes
   // that address held the position for any of the history below it.
   const { setWallets } = useWalletContext();
   useEffect(() => {
@@ -370,7 +357,7 @@ export function AlchemistPositionView({
     beforeByBlock,
     ridersByTx,
   );
-  const redemptionTotals = useMemo<AlchemixRedemptionTotals>(() => {
+  const redemptionTotals = useMemo<AlchemixRedemptionTotals & { clearedRaw: string }>(() => {
     let count = 0;
     let stated = 0;
     let cleared = BigInt(0);
@@ -393,6 +380,7 @@ export function AlchemistPositionView({
       count,
       stated,
       cleared: Number(cleared) / 1e18,
+      clearedRaw: cleared.toString(),
       taken: takenStated === stated ? Number(taken) / 1e18 : null,
     };
   }, [alchemistEvents, beforeByBlock]);
@@ -421,7 +409,7 @@ export function AlchemistPositionView({
     [alchemistEvents, beforeByBlock],
   );
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - alchemistEvents.length) : 0;
-  // Rule 7. The V2 rows join the list the timeline draws and nothing else.
+  // Rule 5. The V2 rows join the list the timeline draws and nothing else.
   const v2Events = useMemo(
     () => (v2History?.joined ? (v2History.events.filter(isAlchemixV2Event) as AlchemixV2Event[]) : []),
     [v2History],
@@ -453,7 +441,7 @@ export function AlchemistPositionView({
 
   const economics = useMemo(
     () =>
-      // Rule 7: V3 rows only. The reducer guards on the arm as well.
+      // Rule 5: V3 rows only. The reducer guards on the arm as well.
       computeAlchemixEconomics(tl.sortedEvents.filter(isAlchemistEvent), {
         syntheticSymbol: sym,
         mytSymbol,
@@ -504,55 +492,23 @@ export function AlchemistPositionView({
     ? `${underSym} is priced in dollars, and a ${mytSymbol} share in ${underSym} at the vault's share price; together they give the collateral's dollar value. ${sym} is shown at 1 ${underSym}, the protocol's accounting value: Alchemix counts each ${sym} of debt as one ${underSym}. Its market price can differ.`
     : `${sym} and ${mytSymbol} are shown in their own units with no dollar price: no share price has been read for this position.`;
 
-  const collateral = position.figures.collateral;
-  const underlying = collateral?.underlying ?? null;
-  const usd = collateral?.usd ?? null;
   const dlb = position.figures.derivedLowerBound;
-  // The event-only figure less the stored one, against what the timeline's
-  // redemptions cleared: equal (to a thousandth of a unit) only when every
-  // redemption since the event-only figure stopped being exact is on the
-  // timeline with a stated figure.
-  const dlbGapMatches = (() => {
-    const stored = position.figures.debt;
-    if (!dlb || !stored || redemptionTotals.stated !== redemptionTotals.count || olderCount > 0) return false;
-    const gap = Number(dlb.debtRaw) / 1e18 - stored.formatted;
-    return gap > 0 && Math.abs(gap - redemptionTotals.cleared) < 1e-3;
+  // Rule 3. The events-only debt beside the debt read now, where the two
+  // differ; and what the timeline's redemptions cleared, where every one of
+  // them states its figure and the sum accounts for the gap to a thousandth
+  // of a unit.
+  const eventsAlone = (() => {
+    const read = live?.debt;
+    if (!dlb || !live || !read) return null;
+    const gap = Number(dlb.debtRaw) / 1e18 - read.formatted;
+    if (Math.abs(gap) < 1e-3) return null;
+    const clearedAccounts =
+      olderCount === 0 &&
+      redemptionTotals.count > 0 &&
+      redemptionTotals.stated === redemptionTotals.count &&
+      Math.abs(gap - redemptionTotals.cleared) < 1e-3;
+    return { read, asOfBlock: live.asOfBlock, clearedAccounts };
   })();
-
-  // Every redemption on the timeline is stated and cleared nothing here, and
-  // the event sum equals the stored figure: then the sum is the debt.
-  const dlbNoneCleared = (() => {
-    const stored = position.figures.debt;
-    if (!dlb || !stored || olderCount > 0 || redemptionTotals.count === 0) return false;
-    if (redemptionTotals.stated !== redemptionTotals.count || redemptionTotals.cleared !== 0) return false;
-    return dlb.debtRaw === stored.raw;
-  })();
-
-  // Rule 6. What the vault did for the collateral, and only where every part of
-  // it is in hand. An `unavailable` figure draws nothing at all — a stated ZERO
-  // is an answer and is the reason the guard is on the status and not on the
-  // amount.
-  const app = position.figures.collateralAppreciationFromReadings;
-  const appStated =
-    app?.status === "stated" &&
-    app.formatted != null &&
-    app.amountRaw != null &&
-    app.decimals != null &&
-    app.fromBlock != null &&
-    app.toBlock != null &&
-    app.intervals != null &&
-    app.readings != null
-      ? {
-          formatted: app.formatted,
-          amountRaw: app.amountRaw,
-          decimals: app.decimals,
-          symbol: app.symbol ?? "the asset underneath",
-          fromBlock: app.fromBlock,
-          toBlock: app.toBlock,
-          intervals: app.intervals,
-          readings: app.readings,
-        }
-      : null;
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -720,14 +676,57 @@ export function AlchemistPositionView({
               coords={coords}
             />
           ) : null}
+          {eventsAlone && dlb ? (
+            <p className="mt-3 text-[11px] leading-relaxed text-rb-500 tabular-nums">
+              Events alone:{" "}
+              <Prov
+                info={eventsAloneDebtProv(sym, dlb.debtRaw, dlb.reducedToBlock, dlb.validToBlock, coords)}
+                value={String(Number(dlb.debtRaw) / 1e18)}
+                symbol={sym}
+              >
+                {formatCompact(Number(dlb.debtRaw) / 1e18).display} {sym}
+              </Prov>
+              {" · "}read now:{" "}
+              <Prov
+                info={liveFigureProv("Debt", sym, eventsAlone.read.raw, eventsAlone.asOfBlock, coords)}
+                value={String(eventsAlone.read.formatted)}
+                symbol={sym}
+              >
+                {formatCompact(eventsAlone.read.formatted).display}
+              </Prov>
+              {eventsAlone.clearedAccounts ? (
+                <>
+                  {" · "}
+                  <Prov
+                    info={clearedRunProv(
+                      sym,
+                      redemptionTotals.clearedRaw,
+                      redemptionTotals.count,
+                      redemptionTotals.stated,
+                      "every redemption on this timeline",
+                      coords,
+                    )}
+                    value={String(redemptionTotals.cleared)}
+                    symbol={sym}
+                  >
+                    {formatCompact(redemptionTotals.cleared).display}
+                  </Prov>{" "}
+                  cleared by {redemptionTotals.count} {redemptionTotals.count === 1 ? "redemption" : "redemptions"}
+                </>
+              ) : null}
+            </p>
+          ) : null}
+          {position.refusedReason ? (
+            <p className="mt-3 text-xs leading-relaxed text-rb-500">{position.refusedReason}</p>
+          ) : null}
           {live ? null : (
             <p className="text-sm text-rb-500">
               {livePending
                 ? "Reading the position now…"
-                : "The current figures did not come back. The panel below holds the last stored ones, each at its own block."}
+                : "The current figures did not come back. Reload the page to read them again."}
             </p>
           )}
-          {/* Rule 5, said outright rather than left to be inferred. */}
+          {/* Rule 4, said outright rather than left to be inferred. */}
           {v2History && v2History.links.length > 0 ? (
             <p className="mt-3 text-[11px] leading-relaxed text-rb-500">
               {v2History.links.map((l, i) => (
@@ -748,200 +747,6 @@ export function AlchemistPositionView({
             This position is a token that can be sold. It can change hands without closing, so the address above is who
             holds it now and need not be who did any of what is below.
           </p>
-        </PositionCardShell>
-
-        {/* ── What the index holds, and under which grade ────────────────── */}
-        {/* The same shell the card above draws in, so the two sets of figures
-            line up column for column: they are the same three figures on two
-            bases, and a reader compares them across the gap. */}
-        <PositionCardShell
-          receipts
-          explanation={
-            <AlchemixStoredPanelExplanation
-              storedBlock={position.figures.debt?.asOfBlock ?? collateral?.asOfBlock ?? null}
-              linesHref={`${deployment.basePath}/lines`}
-            />
-          }
-        >
-          <OpenPositionStats
-            // The card above states the status once. This panel leads with the
-            // basis instead — what a pill would say here is already said.
-            statusPill={null}
-            leadingIdentity={<h2 className={`${OVERLAY_HEADING} text-rb-500`}>As this explorer last settled it</h2>}
-            columns={[
-              amountColumn("Debt", position.figures.debt, sym, {
-                prov: servedFigureProv(
-                  "Debt",
-                  sym,
-                  position.figures.debt?.raw ?? null,
-                  position.figures.debt?.asOfBlock ?? null,
-                  position.figures.grade,
-                  coords,
-                ),
-              }),
-              collateralColumn(collateral, mytSymbol, {
-                shares: servedFigureProv(
-                  "Collateral",
-                  mytSymbol,
-                  collateral?.raw ?? null,
-                  collateral?.asOfBlock ?? null,
-                  position.figures.grade,
-                  coords,
-                ),
-                underlying: underlying
-                  ? underlyingProv(
-                      underlying.symbol ?? "the asset underneath",
-                      underlying.raw,
-                      underlying.decimals,
-                      collateral?.asOfBlock ?? null,
-                      underlying.sharePriceRaw,
-                      underlying.sharePriceAsOfBlock,
-                      coords,
-                    )
-                  : undefined,
-                usd: usd
-                  ? usdProv(
-                      underlying?.symbol ?? "the asset underneath",
-                      usd.pricePerUnit,
-                      usd.priceSource,
-                      usd.pricedAt,
-                    )
-                  : undefined,
-              }),
-              amountColumn("Set aside for repayment", position.figures.earmarked, sym, {
-                prov: servedFigureProv(
-                  "Set aside for repayment",
-                  sym,
-                  position.figures.earmarked?.raw ?? null,
-                  position.figures.earmarked?.asOfBlock ?? null,
-                  position.figures.grade,
-                  coords,
-                ),
-                note: "The last reading stored, true at that block.",
-              }),
-              // The card above has a fourth column, health, which is read live
-              // only; the empty slot keeps the three figures aligned with it.
-              ...(live?.health ? [null] : []),
-            ]}
-          />
-
-          <div className="mt-3 space-y-1.5">
-            {/* What the column above is a conversion OF, and at which block —
-              the share count and the share price need not have been read
-              together, so the second block is named here. Neither figure is
-              repeated; both are in the column, each with its own receipt. */}
-            {underlying ? (
-              <p className="text-[11px] leading-relaxed text-rb-500">
-                The {underlying.symbol ?? "underlying"} figure above is the {mytSymbol} share count valued
-                {underlying.sharePriceAsOfBlock != null ? (
-                  <> at the share price read at block {block(underlying.sharePriceAsOfBlock)}</>
-                ) : (
-                  <> at a share price with no block stated</>
-                )}
-                .
-              </p>
-            ) : (
-              // Rule 6 of the protocol's own shape: the share price lives only on
-              // a reading of the position. With no reading there is no price, so
-              // there is no figure for the asset underneath — and none is shown,
-              // rather than a zero.
-              <p className="text-[11px] leading-relaxed text-rb-500">
-                No share price has been read for this position, so what those shares are worth in the asset underneath
-                is not stated here.
-              </p>
-            )}
-
-            {/* What the vault did for the collateral. The verb carries the
-                sign — a share price that fell has to read as a loss, which is
-                why this is never labelled yield (rails-ops decisions/0032). */}
-            {appStated ? (
-              <p className="text-[11px] leading-relaxed text-rb-500">
-                The vault&rsquo;s share price{" "}
-                {appStated.formatted > 0
-                  ? "took this position’s collateral up by "
-                  : appStated.formatted < 0
-                    ? "took this position’s collateral down by "
-                    : "moved this position’s collateral by "}
-                <Prov
-                  info={collateralAppreciationProv(
-                    appStated.symbol,
-                    appStated.amountRaw,
-                    appStated.decimals,
-                    appStated.fromBlock,
-                    appStated.toBlock,
-                    appStated.intervals,
-                    appStated.readings,
-                    coords,
-                  )}
-                  value={String(appStated.formatted)}
-                  symbol={appStated.symbol}
-                >
-                  <span className="tabular-nums">
-                    {formatCompact(Math.abs(appStated.formatted)).display} {appStated.symbol}
-                  </span>
-                </Prov>{" "}
-                over the readings from block {block(appStated.fromBlock)} to block {block(appStated.toBlock)}. That is
-                the share count against each step the price took, summed over {appStated.intervals}{" "}
-                {appStated.intervals === 1 ? "step" : "steps"}, with deposits and withdrawals left out. A vault share
-                can lose value as well as gain it.
-              </p>
-            ) : null}
-
-            {/* Rule 3. The route's own words for this line's grade. */}
-            <p className="text-xs leading-relaxed text-rb-500">{position.figures.gradeReason}</p>
-
-            {/* Rule 4. The figure, its block, and no direction. Where the
-                gap to the figure above equals what the timeline's redemptions
-                cleared, the sentence says so: both are stated figures. */}
-            {dlb ? (
-              <p className="text-xs leading-relaxed text-rb-500">
-                Adding up this position&rsquo;s own events to block {block(dlb.reducedToBlock)} gives a debt of{" "}
-                <span className="tabular-nums">
-                  {formatCompact(Number(dlb.debtRaw) / 1e18).display} {sym}
-                </span>
-                . Since block {block(dlb.validToBlock)}, the line&rsquo;s first redemption, a redemption can clear debt
-                with no event of the position&rsquo;s to show it, so the sum can differ from the figure above.{" "}
-                {dlbNoneCleared ? (
-                  <>
-                    The line&rsquo;s {redemptionTotals.count} redemptions in this position&rsquo;s life cleared none of
-                    its debt, so the sum and the figure above agree.
-                  </>
-                ) : dlbGapMatches ? (
-                  <>
-                    The gap to the figure above is the{" "}
-                    <span className="tabular-nums">
-                      {formatCompact(redemptionTotals.cleared).display} {sym}
-                    </span>{" "}
-                    the line&rsquo;s {redemptionTotals.count} redemptions since then cleared from this position, each
-                    one on the timeline.
-                  </>
-                ) : (
-                  <>Each redemption on the timeline states what it cleared.</>
-                )}
-              </p>
-            ) : null}
-
-            {position.refusedReason ? (
-              <p className="text-xs leading-relaxed text-rb-500">{position.refusedReason}</p>
-            ) : null}
-
-            {coverage ? (
-              <p className="text-[11px] leading-relaxed text-rb-500">
-                This line has{" "}
-                {coverage.redemptionCount === 0 ? "had no redemption" : `had ${coverage.redemptionCount} redemptions`}
-                {coverage.firstRedemptionBlock != null
-                  ? `, the first at block ${block(coverage.firstRedemptionBlock)}`
-                  : ""}
-                {coverage.indexedToBlock != null
-                  ? `, and is covered here to block ${block(coverage.indexedToBlock)}`
-                  : ""}
-                .
-                {coverage.unsweptRedemptions > 0
-                  ? ` ${coverage.unsweptRedemptions} of them have no reading taken past them yet, so the figures above do not cover every point the debt could have stepped.`
-                  : ""}
-              </p>
-            ) : null}
-          </div>
         </PositionCardShell>
 
         {/* ── Lifetime flows ─────────────────────────────────────────────── */}

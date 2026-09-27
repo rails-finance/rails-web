@@ -85,7 +85,6 @@ export async function AlchemixPositionPage({
       lineKey={lineKey}
       tokenId={tokenId}
       position={tail.position}
-      coverage={tail.coverage}
       events={tail.events}
       totalEvents={tail.hasMore ? tail.totalEvents : null}
       lineScopedNote={tail.lineScopedNote}

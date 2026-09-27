@@ -8,18 +8,16 @@
 // TWO READS WITH DIFFERENT SHELF-LIVES, and the difference is this protocol's
 // whole point.
 //
-// THE TAIL is settled: the graded position row, its line's coverage, and the
-// event history. Each figure on it carries the block it is true at, and it
-// stays true at that block forever.
+// THE TAIL is settled: the graded position row and the event history. Each
+// figure on it carries the block it is true at, and it stays true at that
+// block forever.
 //
 // THE LIVE FIGURES are not. Earmarked debt accrues inside the Alchemist on
 // every block, so a stored earmarked figure is true at the block it was read at
 // and at no other — which is why the page's headline earmarked figure comes
 // from `/state`, one `getCDP` call whose debt, collateral and earmarked are all
-// one reading at one block, and never from the stored row. The stored figure
-// still renders, in its own slot, under its own block, as what it is: the last
-// reading taken. Nothing carries either forward or puts one beside a figure
-// from another block.
+// one reading at one block, and never from the stored row. Nothing carries
+// either forward or puts one beside a figure from another block.
 //
 // SEEDING IS WHOLE OR NOT AT ALL, the rule `loadTroveTail` sets next door: a
 // summary that arrived beside a FAILED timeline would render an empty history
@@ -43,12 +41,7 @@ import { isLineOnChain } from "@/lib/alchemix/lines";
 import type { ChainId } from "@/lib/shared/chains";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
-import type {
-  AlchemixLineCoverage,
-  AlchemixLineEventWindow,
-  AlchemixLiveState,
-  AlchemixPositionSummary,
-} from "@/types/api/alchemix";
+import type { AlchemixLineEventWindow, AlchemixLiveState, AlchemixPositionSummary } from "@/types/api/alchemix";
 
 /** The one cut on this timeline, and the same `limit` the client's own read
  *  sends, so the server-seeded page and a client refetch draw the same rows. */
@@ -67,8 +60,6 @@ const STATE_FETCH_TIMEOUT_MS = 4000;
 
 export interface AlchemistPositionTail {
   position: AlchemixPositionSummary | null;
-  /** This line's own coverage row — what it answers about its completeness. */
-  coverage: AlchemixLineCoverage | null;
   events: BaseActivityEvent[] | null;
   /** The position's whole event count as the route reported it beside the page
    *  it served, and whether that page stopped short of it. Null on a miss. */
@@ -86,7 +77,6 @@ export interface AlchemistPositionTail {
 
 const EMPTY_TAIL: AlchemistPositionTail = {
   position: null,
-  coverage: null,
   events: null,
   totalEvents: null,
   hasMore: false,
@@ -136,10 +126,8 @@ export const loadAlchemistPositionTail = cache(
         return EMPTY_TAIL;
       }
 
-      const coverage = positionRead.result.coverage?.lines?.find((l) => l.lineKey === lineKey) ?? null;
       return {
         position: positionRead.result.data,
-        coverage,
         events: timelineRead.result.data.events ?? [],
         totalEvents: timelineRead.result.pagination?.total ?? null,
         hasMore: timelineRead.result.pagination?.hasMore === true,
