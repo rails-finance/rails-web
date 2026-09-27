@@ -70,10 +70,10 @@ export function AlchemixRedemptionRunCard({
   // an aggregate pair is hidden at zero, and a run of stated zeros is a real
   // answer here — the position's debt came out the same at every one of them.
   // Drawing it as a bare count would put it in the unavailable case's clothes.
-  // `fmtHeaderMagnitude` renders zero as the empty string — a sensible default
-  // for a leg an event did not touch, and the wrong one here, where a run of
-  // stated zeros is the answer and a blank would read as the unavailable case.
-  const shown = totalCleared === 0 ? "0" : fmtHeaderMagnitude(totalCleared);
+  // `fmtHeaderMagnitude` now states a genuine zero as "0" (rails-ops
+  // TO-DO-ui-jobs item 74), so this reads a run of stated zeros correctly
+  // without a local zero check.
+  const shown = fmtHeaderMagnitude(totalCleared);
 
   const figure =
     statedCount > 0 ? (

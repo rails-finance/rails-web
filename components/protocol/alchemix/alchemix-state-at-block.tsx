@@ -27,9 +27,9 @@
 //    in force at that block, greyed as unchanged, and never set-aside, which
 //    grows every block (decisions/0032 point 6); with no earlier reading on the
 //    timeline they draw one sentence. A measured
-//    zero draws the grid with "0" in it, and never goes through
-//    `fmtHeaderMagnitude`, which renders zero as the empty string (rails-ops
-//    TO-DO-ui-jobs item 74) — the grid's own `formatCompact` keeps it.
+//    zero draws the grid with "0" in it via the grid's own `formatCompact`,
+//    never through `fmtHeaderMagnitude` (which now states a genuine zero as
+//    "0" too, fixed under rails-ops TO-DO-ui-jobs item 74).
 //
 // WHAT THE CARD FACE SAYS ABOUT ALL THAT IS THE BLOCK, AND NOTHING ELSE. The
 // three figures used to carry a forty-five-word note repeating rules 1 and 2

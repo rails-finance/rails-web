@@ -267,7 +267,7 @@ check(siteCov >= 1, `site footer links /coverage/ethereum (${siteCov})`);
 for (const [name, href] of [
   ["X", "https://x.com/rails_finance"],
   ["YouTube", "https://www.youtube.com/@rails_finance"],
-  ["GitHub", "https://github.com/rails-finance"],
+  ["GitHub", "https://github.com/rails-finance/rails-web"],
   ["Telegram", "https://t.me/railsfinance"],
 ]) {
   const n = await siteFooter.locator(`a[href="${href}"]`).count();

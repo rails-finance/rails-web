@@ -41,8 +41,17 @@ export function useHeaderValueHideClass(opts?: { isPassive?: boolean }): string 
  *  in lib/utils/format.ts, kept as its own guard rather than a call to that
  *  helper: `fmtSpine`'s own compact rounding (1dp above 1M) stays intact for
  *  every other magnitude, so the header still never disagrees with the spine
- *  it mirrors. The exact figure still rides the provenance trace. */
+ *  it mirrors. The exact figure still rides the provenance trace.
+ *
+ *  A genuine zero states "0" rather than `fmtSpine`'s empty string: `fmtSpine`
+ *  is written for the spine's flanking cells, where a blank cell is right,
+ *  but a header has no such cell to fall back to — a blank there reads as a
+ *  figure the page could not obtain, which is the one confusion a chain-truth
+ *  surface cannot afford (rails-ops TO-DO-ui-jobs item 74). An unmeasurable
+ *  value (`NaN`) still falls through to `fmtSpine` and reads blank, so that
+ *  distinction is kept. */
 export function fmtHeaderMagnitude(n: number): string {
+  if (n === 0) return "0";
   const abs = Math.abs(n);
   if (abs > 0 && abs < 0.01) return "<0.01";
   return fmtSpine(n);

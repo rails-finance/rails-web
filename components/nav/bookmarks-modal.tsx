@@ -13,7 +13,9 @@
 // whose factory deployed it, and that protocol's rail owns the bookmark — so
 // this reads the roster and nothing else.
 //
-// Shell mirrors AppPreferencesModal (createPortal + Esc-to-close + backdrop).
+// Shell mirrors AppPreferencesModal (createPortal + Esc-to-close + backdrop),
+// and the dialog role/label wiring matches DonateModal's
+// (role="dialog" + aria-modal + aria-labelledby pointing at the h2).
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -145,6 +147,9 @@ export function BookmarksModal({ onClose }: { onClose: () => void }) {
           className="relative rounded-2xl max-w-xl w-full my-8 p-6 sm:p-8 shadow-xl"
           style={{ background: "var(--surface-overlay)" }}
           onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bookmarks-modal-title"
         >
           <button
             onClick={onClose}
@@ -183,7 +188,9 @@ export function BookmarksModal({ onClose }: { onClose: () => void }) {
             >
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
             </svg>
-            <h2 className="text-base font-semibold text-foreground">My bookmarks</h2>
+            <h2 id="bookmarks-modal-title" className="text-base font-semibold text-foreground">
+              My bookmarks
+            </h2>
           </div>
 
           {/* Storage smallprint. Bookmarks live in this origin's localStorage

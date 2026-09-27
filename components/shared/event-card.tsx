@@ -87,6 +87,7 @@ export function EventCard({
   header,
   headerBars,
   detail,
+  detailLabel,
   explainer: explainerProp,
   detailOpen: detailOpenProp,
   onDetailToggle,
@@ -263,6 +264,14 @@ export function EventCard({
             </div>
           )}
 
+          {/* `detailLabel` names the pane for a reader moving by heading —
+              sr-only because the pane's own content already carries the
+              visible structure (rails-ops TO-DO-ui-jobs item 76: the prop
+              was declared and passed by every protocol but never rendered,
+              so the pane opened with no heading at all). A visible
+              treatment is a separate design call; this fixes the
+              accessibility gap without it. */}
+          {detailLabel && <h3 className="sr-only">{detailLabel}</h3>}
           {detail}
 
           {/* ── Info sections: the (i) Explanation heading is its own button
