@@ -121,6 +121,25 @@ const AAVE_V3_MARK: Glyph = {
   ],
 };
 
+// The inverse of the aave-v3 mark: a filled rounded square (20% corner
+// radius, matching the PNG tiles) with the same ghost geometry knocked out
+// via evenodd, so the mark shows the surface behind. One path, so the
+// knockout works; rect coordinates are authored in the pre-transform space
+// (viewBox rect minus the translate, divided by the 0.7 scale that insets
+// the mark inside the badge).
+// The extra 0.78125 factor insets the badge to 25px within the 32px tile
+// box (3.5px padding each side), matching the liquity glyph's inset.
+const AAVE_V4_MARK: Glyph = {
+  viewBox: "0 0 50 50",
+  transform: "matrix(0.546875, 0, 0, 0.546875, 12.435, 18.447)",
+  paths: [
+    {
+      fillRule: "evenodd",
+      d: "M 1.547 -23.731 H 44.404 A 14.286 14.286 0 0 1 58.69 -9.445 V 33.412 A 14.286 14.286 0 0 1 44.404 47.698 H 1.547 A 14.286 14.286 0 0 1 -12.739 33.412 V -9.445 A 14.286 14.286 0 0 1 1.547 -23.731 Z M 16.874 23.965 C 20.472 23.965 22.72 20.07 20.921 16.955 C 20.087 15.509 18.544 14.618 16.874 14.618 C 13.276 14.618 11.028 18.513 12.827 21.628 C 13.661 23.074 15.204 23.965 16.874 23.965 Z M 29.088 23.965 C 32.686 23.965 34.934 20.07 33.135 16.955 C 32.301 15.509 30.758 14.618 29.088 14.618 C 25.49 14.618 23.242 18.513 25.041 21.628 C 25.875 23.074 27.418 23.965 29.088 23.965 Z M22.973 0C10.284 0-.003 10.483 0 23.411h5.869c0-9.688 7.597-17.543 17.104-17.543 9.507 0 17.104 7.855 17.104 17.543h5.869C45.948 10.483 35.66 0 22.973 0Z",
+    },
+  ],
+};
+
 const GLYPHS: Record<string, Glyph> = {
   // viewBox inferred from path extents — source was pasted without the <svg>
   // wrapper. Compound is a centred mark, so a tight bounding box frames it well.
@@ -166,24 +185,9 @@ const GLYPHS: Record<string, Glyph> = {
   "aave-v3-base": AAVE_V3_MARK,
   // Aave's vault layer — same protocol, same mark, its own roster subject.
   "aave-vaults": AAVE_V3_MARK,
-  // The inverse of the aave-v3 mark: a filled rounded square (20% corner
-  // radius, matching the PNG tiles) with the same ghost geometry knocked out
-  // via evenodd, so the mark shows the surface behind. One path, so the
-  // knockout works; rect coordinates are authored in the pre-transform space
-  // (viewBox rect minus the translate, divided by the 0.7 scale that insets
-  // the mark inside the badge).
-  // The extra 0.78125 factor insets the badge to 25px within the 32px tile
-  // box (3.5px padding each side), matching the liquity glyph's inset.
-  "aave-v4": {
-    viewBox: "0 0 50 50",
-    transform: "matrix(0.546875, 0, 0, 0.546875, 12.435, 18.447)",
-    paths: [
-      {
-        fillRule: "evenodd",
-        d: "M 1.547 -23.731 H 44.404 A 14.286 14.286 0 0 1 58.69 -9.445 V 33.412 A 14.286 14.286 0 0 1 44.404 47.698 H 1.547 A 14.286 14.286 0 0 1 -12.739 33.412 V -9.445 A 14.286 14.286 0 0 1 1.547 -23.731 Z M 16.874 23.965 C 20.472 23.965 22.72 20.07 20.921 16.955 C 20.087 15.509 18.544 14.618 16.874 14.618 C 13.276 14.618 11.028 18.513 12.827 21.628 C 13.661 23.074 15.204 23.965 16.874 23.965 Z M 29.088 23.965 C 32.686 23.965 34.934 20.07 33.135 16.955 C 32.301 15.509 30.758 14.618 29.088 14.618 C 25.49 14.618 23.242 18.513 25.041 21.628 C 25.875 23.074 27.418 23.965 29.088 23.965 Z M22.973 0C10.284 0-.003 10.483 0 23.411h5.869c0-9.688 7.597-17.543 17.104-17.543 9.507 0 17.104 7.855 17.104 17.543h5.869C45.948 10.483 35.66 0 22.973 0Z",
-      },
-    ],
-  },
+  "aave-v4": AAVE_V4_MARK,
+  // Aave V4 on Base: the Ethereum mark, its own deployment.
+  "aave-v4-base": AAVE_V4_MARK,
   // Liquity V2 (directory id "liquity") — the circular two-tone mark from
   // `public/liquity-logo.svg` reduced to pure currentColor + transparent (no
   // opacity midtones): the light-blue disc becomes a 2-unit ring (outer minus
