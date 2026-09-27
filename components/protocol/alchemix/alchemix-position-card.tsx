@@ -15,7 +15,9 @@
 //    `asOfBlock` is typed nullable because the wire types it that way; a null
 //    there means the read did not settle, and an amount rendered without the
 //    block it belongs to is a number that looks stated and is not. So the
-//    amount and the block are drawn from one guard.
+//    amount and the block are drawn from one guard. The position page, whose
+//    figures are one reading, names the block once in its header
+//    (`hideBlock`); each figure's receipt still carries it.
 //
 // 3. EARMARKED IS SHOWN ONLY AT ITS OWN BLOCK, AND NEVER BESIDE DEBT AS THOUGH
 //    THEY SUMMED. It accrues every block; the reading is true at the block it
@@ -103,7 +105,7 @@ export function amountColumn(
   label: string,
   value: AlchemixAmountAtBlock | null,
   unit: string,
-  extra?: { prov?: Provenance; note?: ReactNode },
+  extra?: { prov?: Provenance; note?: ReactNode; hideBlock?: boolean },
 ): OpenPositionStatsColumn {
   // The note stays on the footnote's own rb-500 rather than dropping to rb-400:
   // rb-400 is the LIGHTER end of the ramp, so it reads dimmer than the block
@@ -138,7 +140,13 @@ export function amountColumn(
         )}
       </StatValue>
     ),
-    footnote: (
+    // The position page states the block once, in the card's header; the
+    // listing row has no header, so each figure carries it.
+    footnote: extra?.hideBlock ? (
+      note ? (
+        <StatFootnote>{note}</StatFootnote>
+      ) : undefined
+    ) : (
       <StatFootnote>
         <span className="tabular-nums">at block {block(value.asOfBlock)}</span>
         {note}
@@ -160,7 +168,7 @@ export function collateralColumn(
   c: AlchemixCollateralView | null,
   fallbackMytSymbol: string,
   prov?: { shares?: Provenance; underlying?: Provenance; usd?: Provenance; sharePrice?: Provenance },
-  opts?: { showSharePrice?: boolean },
+  opts?: { showSharePrice?: boolean; hideBlock?: boolean },
 ): OpenPositionStatsColumn {
   const myt = c?.mytSymbol ?? fallbackMytSymbol;
   const underlying = c?.underlying ?? null;
@@ -169,6 +177,7 @@ export function collateralColumn(
     return amountColumn("Collateral", c ? { raw: c.raw, formatted: c.formatted, asOfBlock: c.asOfBlock } : null, myt, {
       prov: prov?.shares,
       note: c ? "No share price in hand, so no figure for the asset underneath." : undefined,
+      hideBlock: opts?.hideBlock,
     });
   }
 
@@ -179,7 +188,13 @@ export function collateralColumn(
       {myt}
     </span>
   );
-  const usd = c.usd ? <span className="tabular-nums">${formatCompact(c.usd.usd).display}</span> : null;
+  // The dollar figure is dropped where it reads the same as the figure above
+  // it (USDC at $1): say it once.
+  const usdDisplay = c.usd ? formatCompact(c.usd.usd).display : null;
+  const usd =
+    usdDisplay != null && usdDisplay !== formatCompact(underlying.formatted).display ? (
+      <span className="tabular-nums">${usdDisplay}</span>
+    ) : null;
   // The share price beside the two figures it relates, so the gap between the
   // share count and the underlying reads as a price and not a mismatch. Drawn
   // where the caller asks for it or hands its receipt, and never on a position
@@ -235,6 +250,7 @@ export function collateralColumn(
           ) : null}
         </>
       ),
+      hideBlock: opts?.hideBlock,
     },
   );
 }
@@ -269,7 +285,16 @@ export function AlchemixPositionCard({ p, session }: { p: AlchemixPositionSummar
           </>
         }
         columns={[
-          amountColumn("Debt", p.figures.debt, p.syntheticSymbol),
+          amountColumn("Debt", p.figures.debt, p.syntheticSymbol, {
+            // The events-only debt, only where it differs from the debt read:
+            // a redemption clears debt with no event of the position's to show it.
+            note: eventsAloneDiffers(p) ? (
+              <span className="tabular-nums">
+                {formatCompact(Number(p.figures.derivedLowerBound!.debtRaw) / 1e18).display} {p.syntheticSymbol} from
+                events alone
+              </span>
+            ) : undefined,
+          }),
           collateralColumn(p.figures.collateral, "shares", undefined, { showSharePrice: true }),
           // Its own slot, never added to the debt beside it.
           amountColumn("Set aside for repayment", p.figures.earmarked, p.syntheticSymbol),
@@ -279,18 +304,6 @@ export function AlchemixPositionCard({ p, session }: { p: AlchemixPositionSummar
       <div className="mt-3 space-y-1.5">
         {/* The route's own sentence for this line's grade, rendered as given. */}
         <p className="text-xs leading-relaxed text-rb-500">{p.figures.gradeReason}</p>
-
-        {/* The events-only debt beside the debt last read, only where the
-            two differ: a redemption clears debt with no event of the
-            position's to show it. The position page adds what the
-            redemptions cleared. */}
-        {eventsAloneDiffers(p) ? (
-          <p className="text-xs leading-relaxed text-rb-500 tabular-nums">
-            Events alone: {formatCompact(Number(p.figures.derivedLowerBound!.debtRaw) / 1e18).display}{" "}
-            {p.syntheticSymbol} · last read: {formatCompact(p.figures.debt!.formatted).display}
-          </p>
-        ) : null}
-
         {p.refusedReason ? <p className="text-xs leading-relaxed text-rb-500">{p.refusedReason}</p> : null}
       </div>
     </PositionCardShell>

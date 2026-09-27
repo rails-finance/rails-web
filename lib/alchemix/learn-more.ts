@@ -53,7 +53,7 @@ const CORE_COLLATERAL = {
 
 const CORE_SET_ASIDE = {
   bold: "Set aside for repayment",
-  text: "the part of the debt the Transmuter has claimed as its stakers' deposits matured. It grows block by block, and the line's next redemption clears it. See How Alchemix repays a loan, on a redemption card or the position card.",
+  text: "the part of the debt the Transmuter has claimed as its stakers' deposits matured. It grows block by block, and the line's next redemption clears it. See How Alchemix repays a loan, on a redemption card.",
 };
 
 const CORE_RATIO = {
@@ -148,8 +148,7 @@ export const ALCHEMIX_SELF_LIQUIDATE: LearnMoreContent = {
 
 /** The protocol's central idea, the one a reader has to own to read an
  *  Alchemix timeline: Transmuter stakes maturing are what set debt aside and
- *  what redemptions clear. Opened from every redemption card and from the
- *  position card. */
+ *  what redemptions clear. Opened from every redemption card. */
 export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
   title: "How Alchemix repays a loan",
   intro:
@@ -186,7 +185,7 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
     },
     {
       bold: "A position that falls too low can be liquidated by anyone.",
-      text: "Its collateralisation is the collateral in the asset underneath divided by the debt, with one synthetic counted as one unit of that asset. Minting more or withdrawing must leave it above the line's minimum. If a falling share price takes it to the line's liquidation line or below, anyone can liquidate the position: the Alchemist uses its collateral to repay debt until the ratio is back above the minimum, and pays the liquidator 1.5% of the collateral above the debt, in shares from the position. Where the collateral no longer covers the debt, or the whole line is below its global minimum, the entire debt is cleared from the collateral and the liquidator's fee, 1.5% of the debt, comes from the line's fee vault in the asset underneath. The position card states both lines, read from the Alchemist, and how many liquidations the line has had.",
+      text: "Its collateralisation is the collateral in the asset underneath divided by the debt, with one synthetic counted as one unit of that asset. Minting more or withdrawing must leave it above the line's minimum. If a falling share price takes it to the line's liquidation line or below, anyone can liquidate the position: the Alchemist uses its collateral to repay debt until the ratio is back above the minimum, and pays the liquidator 1.5% of the collateral above the debt, in shares from the position. Where the collateral no longer covers the debt, or the whole line is below its global minimum, the entire debt is cleared from the collateral and the liquidator's fee, 1.5% of the debt, comes from the line's fee vault in the asset underneath. The position card states both lines, read from the Alchemist.",
     },
   ],
   links: [
@@ -243,6 +242,65 @@ export const ALCHEMIX_CUSTODY: LearnMoreContent = {
   ],
   links: [ALCHEMIX_DOCS.positionNft],
 };
+
+/** The position card's "?": what its figures are and how to read the
+ *  timeline under it, true of any position on any line. Liquity V2's
+ *  `liquityPositionContent` ("About This Position") is the model; this
+ *  position's own figures are in the card's Explanation pane. */
+export function alchemixPositionContent(status: string): LearnMoreContent {
+  return {
+    title: "About this position",
+    intro:
+      status === "closed"
+        ? "An Alchemix position is an NFT holding vault shares as collateral against a debt in the line's synthetic. This one has closed: its debt and collateral are zero, and the timeline below is its whole life."
+        : "An Alchemix position is an NFT holding vault shares as collateral against a debt in the line's synthetic. No interest accrues on the debt, and the line's redemptions pay it down over time from the collateral.",
+    detailsHeading: "Key concepts",
+    details: [
+      {
+        bold: "Collateral",
+        text: "vault shares. mixUSDC is a Morpho Vault V2 over USDC, and mixWETH one over WETH: the vault spreads what is deposited in it across several lending strategies, and what they earn or lose moves its share price, which can fall as well as rise. The card leads with the shares' value in the asset underneath; every Collateral figure on an event card is the share count.",
+      },
+      {
+        bold: "The debt",
+        text: "is owed in the line's synthetic (alUSD, alETH or alUSDb), a token the position minted against its collateral. Alchemix counts one synthetic as one unit of the asset underneath.",
+      },
+      {
+        bold: "Set aside for repayment",
+        text: "the part of the debt the line's Transmuter has claimed. Holders of the synthetic stake it in the Transmuter, and as those stakes mature the Alchemist sets aside a matching amount of debt across every open position on the line, in proportion to what each owes. The figure grows block by block, so a reading holds at its block. A line redemption clears set-aside debt and takes vault shares worth it from the collateral, plus the line's redemption fee. A redemption card's \"?\" explains the whole cycle.",
+      },
+      {
+        bold: "Collateralisation",
+        text: "the collateral in the asset underneath divided by the debt, with one synthetic counted as one unit of that asset. Minting more or withdrawing must leave it above the line's minimum.",
+      },
+      {
+        bold: "What can bring a liquidation",
+        text: "only the vault's share price. Debt and collateral are both counted in the asset underneath, so that asset's dollar price does not move collateralisation; a fall in the share price can take a position to its liquidation line.",
+      },
+      {
+        bold: "Liquidation",
+        text: "at the line's liquidation line or below, anyone can liquidate the position. The Alchemist uses its collateral to repay debt until the ratio is back above the minimum, and pays the liquidator 1.5% of the collateral above the debt, in shares from the position. Where the collateral no longer covers the debt, or the whole line is below its global minimum, the entire debt is cleared from the collateral and the liquidator's fee, 1.5% of the debt, comes from the line's fee vault in the asset underneath.",
+      },
+      {
+        bold: "Before and after on an event card",
+        text: "each card shows debt, collateral and set-aside before and after it. The after figures are the reading at the card's block, and the before figures the reading at the previous card's block.",
+      },
+      {
+        bold: "The position NFT",
+        text: "the position is a token that can be sold. It can change hands without the debt or the collateral moving and without closing, so the address shown as its holder is who holds it now and need not be who did any of what is on the timeline. Each event says who acted in it.",
+      },
+    ],
+    links: [
+      ALCHEMIX_DOCS.selfRepayingLoans,
+      ALCHEMIX_DOCS.myt,
+      ALCHEMIX_DOCS.alAssets,
+      ALCHEMIX_DOCS.transmuter,
+      ALCHEMIX_DOCS.earmarking,
+      ALCHEMIX_DOCS.liquidations,
+      ALCHEMIX_DOCS.liquidatorFee,
+      ALCHEMIX_DOCS.positionNft,
+    ],
+  };
+}
 
 /** The Lifetime flows "?": what the tower sums, in which unit, and what it
  *  leaves out. Liquity V2's `liquityEconomicsContent` is the model. */

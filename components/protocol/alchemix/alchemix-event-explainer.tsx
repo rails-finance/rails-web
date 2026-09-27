@@ -14,7 +14,7 @@
 // its bullets go first; every other card keeps log order.
 //
 // THE CAVEATS THAT HOLD FOR EVERY CARD ARE NOT HERE. They are said once, on the
-// position card's Explanation pane and in `ALCHEMIX_HOW_IT_WORKS`, so each
+// position card (its Explanation pane and its "?", `alchemixPositionContent`), so each
 // card's bullets are about its own event.
 
 import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";

@@ -14,20 +14,21 @@
 //    carries a figure forward, interpolates between readings, or adds
 //    earmarked to a debt figure from another block.
 //
-// 2. EVERY AMOUNT IS DRAWN WITH ITS BLOCK, FROM ONE GUARD. An amount whose
-//    block is missing renders as not settled rather than as a bare number: the
-//    number would look stated and would not be.
+// 2. EVERY AMOUNT IS DRAWN FROM ONE GUARD ON ITS BLOCK. An amount whose block
+//    is missing renders as not settled rather than as a bare number: the
+//    number would look stated and would not be. The card names the block once,
+//    in its header, and each figure's receipt carries it.
 //
 // 3. THE EVENTS-ONLY DEBT IS STATED ONLY WHERE IT DIFFERS. The wire calls it
 //    `derivedLowerBound`, and a redemption can clear debt with no event of the
 //    position's to show it, so the sum of the position's own events can sit
-//    above the debt read now. The card states the two side by side where they
-//    differ, with what the timeline's redemptions cleared where that accounts
-//    for the gap, and says nothing where they agree.
+//    above the debt read now. The Debt figure carries it as a subline where
+//    the two differ, with what the timeline's redemptions cleared where that
+//    accounts for the gap, and says nothing where they agree.
 //
 // 4. THE POSITION IS A FREELY TRANSFERABLE ERC721. Ownership can change
-//    without the position closing, so the holder shown is the holder now and
-//    the page says so wherever it names one.
+//    without the position closing, so the holder shown is the holder now
+//    ("held now by"), and the card's "?" says what that means.
 //
 // 5. A V2 HISTORY IS SHOWN, NEVER ADDED. Where the holder closed a V2 account
 //    on this synthetic, its rows join the timeline marked V2, so a wallet
@@ -36,6 +37,11 @@
 //    (Lifetime flows, the tenure line, the card) is reduced over the V3 rows
 //    alone: a V2 debt and this position's debt are one obligation at two
 //    points in time (rails-ops reference/alchemix-v2-frozen-record.md).
+//
+// THE CARD BODY IS FIGURES AND SHORT SUBLINES. This position's figures,
+// explained, are the Explanation pane (alchemix-position-explanation.tsx); what
+// is true of every position is its "?" (`alchemixPositionContent`) (rails-ops
+// standards/detail-page-anatomy.md, "The disclosure ladder").
 //
 // THE CHROME IS THE HOUSE'S. The page is the roster's detail anatomy: the top
 // row, the position card, Lifetime flows, the timeline, drawn with the shared
@@ -96,9 +102,11 @@ import {
 } from "@/lib/alchemix/market-notes";
 import {
   AlchemixPositionExplanation,
+  fallPct,
+  ratioPct,
   type AlchemixRedemptionTotals,
 } from "@/components/protocol/alchemix/alchemix-position-explanation";
-import { ALCHEMIX_HOW_IT_WORKS, ALCHEMIX_LIFETIME_FLOWS } from "@/lib/alchemix/learn-more";
+import { ALCHEMIX_LIFETIME_FLOWS, alchemixPositionContent } from "@/lib/alchemix/learn-more";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import {
   clearedRunProv,
@@ -124,23 +132,6 @@ import type {
 } from "@/types/api/alchemix";
 
 const block = (n: number) => n.toLocaleString("en-US");
-
-/** A 1e18-scaled ratio as a percentage: one decimal below 1,000%, whole
- *  numbers above it, and "over 10,000%" past that, where a dust debt makes the
- *  figure a count of digits. The receipt holds the exact value. */
-function ratioPct(raw: string): string {
-  const pct = Number(raw) / 1e16;
-  if (pct >= 10000) return "over 10,000%";
-  return pct < 1000
-    ? `${pct.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
-    : `${Math.round(pct).toLocaleString("en-US")}%`;
-}
-
-/** A share-price fall as a percentage: one decimal, two under 1%. */
-export function fallPct(fall: number): string {
-  const pct = fall * 100;
-  return `${pct.toLocaleString("en-US", { maximumFractionDigits: pct < 1 ? 2 : 1 })}%`;
-}
 
 /** The health column: collateralisation at the reading's block, with the
  *  line's two ratios under it. Liquity V2's ratio column is the model: the
@@ -200,6 +191,15 @@ function healthColumn(health: AlchemixHealth, debtRaw: string | null, coords: Al
             )}
           </div>
         ) : null}
+        {/* Said only while it is true; a count above zero is in the
+            Explanation pane. */}
+        {health.lineLiquidations?.count === 0 ? (
+          <div className="mt-0.5 leading-snug">
+            <Prov info={lineLiquidationsProv(0, health.lineLiquidations.throughBlock, coords)} value="0">
+              no liquidation on this line yet
+            </Prov>
+          </div>
+        ) : null}
       </StatFootnote>
     ),
   };
@@ -208,41 +208,6 @@ function healthColumn(health: AlchemixHealth, debtRaw: string | null, coords: Al
 /** The V2 account(s) this position's holder closed, and their rows. `joined`
  *  is false when the rows are not on the timeline: the V3 history is windowed,
  *  or a V2 read did not land whole. The links stand either way. */
-/** What the health column's two lines mean, and how many liquidations the
- *  line has had. One sentence of mechanics; the modal holds the rest. */
-function HealthSentence({
-  health,
-  syntheticSymbol,
-  underlyingSymbol,
-  coords,
-}: {
-  health: AlchemixHealth;
-  syntheticSymbol: string;
-  underlyingSymbol: string | null;
-  coords: AlchemixCoords;
-}) {
-  const under = underlyingSymbol ?? "the asset underneath";
-  const liq = health.lineLiquidations;
-  return (
-    <p className="mt-3 text-[11px] leading-relaxed text-rb-500">
-      Collateralisation is the collateral in {under} divided by the debt, with one {syntheticSymbol} counted as one{" "}
-      {under}. Borrowing more or withdrawing must leave it above the minimum. At the liquidation line or below, anyone
-      can liquidate the position for a fee: a share of the collateral above the debt, taken from the position, or, where
-      the collateral no longer covers the debt, a share of the debt paid from the line&rsquo;s fee vault.
-      {liq ? (
-        <>
-          {" "}
-          The {syntheticSymbol} line has had{" "}
-          <Prov info={lineLiquidationsProv(liq.count, liq.throughBlock, coords)} value={String(liq.count)}>
-            {liq.count === 0 ? "no liquidation" : `${liq.count} ${liq.count === 1 ? "liquidation" : "liquidations"}`}
-          </Prov>
-          {liq.throughBlock != null ? ` to block ${block(liq.throughBlock)}` : ""}.
-        </>
-      ) : null}
-    </p>
-  );
-}
-
 export interface AlchemixV2History {
   links: { lineKey: string; account: string; syntheticSymbol: string | null }[];
   events: BaseActivityEvent[];
@@ -595,6 +560,61 @@ export function AlchemistPositionView({
     return { read, asOfBlock: live.asOfBlock, clearedAccounts };
   })();
 
+  // The Debt subline: the events-only debt, and what the redemptions cleared.
+  const eventsAloneNote =
+    eventsAlone && dlb ? (
+      <span className="tabular-nums">
+        <Prov
+          info={eventsAloneDebtProv(sym, dlb.debtRaw, dlb.reducedToBlock, dlb.validToBlock, coords)}
+          value={String(Number(dlb.debtRaw) / 1e18)}
+          symbol={sym}
+        >
+          {formatCompact(Number(dlb.debtRaw) / 1e18).display}
+        </Prov>{" "}
+        from events alone
+        {eventsAlone.clearedAccounts ? (
+          <>
+            {" · "}
+            <Prov
+              info={clearedRunProv(
+                sym,
+                redemptionTotals.clearedRaw,
+                redemptionTotals.count,
+                redemptionTotals.stated,
+                "every redemption on this timeline",
+                coords,
+              )}
+              value={String(redemptionTotals.cleared)}
+              symbol={sym}
+            >
+              {formatCompact(redemptionTotals.cleared).display}
+            </Prov>{" "}
+            cleared by {redemptionTotals.count} {redemptionTotals.count === 1 ? "redemption" : "redemptions"}
+          </>
+        ) : null}
+      </span>
+    ) : undefined;
+  // The collateral column drops the dollar figure where it reads the same as
+  // the figure in the asset underneath (collateralColumn).
+  const usdOnCard = Boolean(
+    live?.collateral.usd &&
+      live.collateral.underlying &&
+      formatCompact(live.collateral.usd.usd).display !== formatCompact(live.collateral.underlying.formatted).display,
+  );
+  const v2Names =
+    v2History && v2History.links.length > 0 ? (
+      <>
+        {v2History.links.map((l, i) => (
+          <span key={`${l.lineKey}:${l.account}`}>
+            {i > 0 ? ", " : ""}
+            <Link href={v2PositionPath(deployment, l.lineKey, l.account)} className="link">
+              {alchemixV2PositionName(l.syntheticSymbol ?? sym, l.account)}
+            </Link>
+          </span>
+        ))}
+      </>
+    ) : null;
+
   return (
     <ProvReceiptsScope registry={registry}>
       <div className="space-y-6 py-8">
@@ -639,6 +659,21 @@ export function AlchemistPositionView({
                     : null
                 }
                 clearedOnCard={Boolean(eventsAlone && dlb && eventsAlone.clearedAccounts)}
+                usdOnCard={usdOnCard}
+                feeBps={lineProtocolFeeBps(chainId, lineKey)}
+                lineLiquidations={
+                  live.health?.lineLiquidations && live.health.lineLiquidations.count > 0
+                    ? {
+                        ...live.health.lineLiquidations,
+                        prov: lineLiquidationsProv(
+                          live.health.lineLiquidations.count,
+                          live.health.lineLiquidations.throughBlock,
+                          coords,
+                        ),
+                      }
+                    : null
+                }
+                v2={v2History && v2History.links.length > 0 ? { names: v2Names, joined: v2History.joined } : null}
                 fall={
                   live.health
                     ? shareFallToLiquidation(
@@ -650,7 +685,7 @@ export function AlchemistPositionView({
               />
             ) : undefined
           }
-          learnMore={live ? ALCHEMIX_HOW_IT_WORKS : undefined}
+          learnMore={live ? alchemixPositionContent(position.status) : undefined}
         >
           <OpenPositionStats
             statusPill={<AlchemixStatusPill status={position.status} />}
@@ -672,6 +707,19 @@ export function AlchemistPositionView({
                       />
                     </span>
                   ) : null}
+                  {/* The holder's V2 account: the Explanation pane says what it is. */}
+                  {v2History && v2History.links.length > 0
+                    ? v2History.links.map((l) => (
+                        <Link
+                          key={`${l.lineKey}:${l.account}`}
+                          href={v2PositionPath(deployment, l.lineKey, l.account)}
+                          className="link"
+                          title={alchemixV2PositionName(l.syntheticSymbol ?? sym, l.account)}
+                        >
+                          V2 history →
+                        </Link>
+                      ))
+                    : null}
                 </span>
               </>
             }
@@ -698,42 +746,49 @@ export function AlchemistPositionView({
                 ? [
                     amountColumn("Debt", live.debt ? { ...live.debt, asOfBlock: live.asOfBlock } : null, sym, {
                       prov: liveFigureProv("Debt", sym, live.debt?.raw ?? null, live.asOfBlock, coords),
+                      note: eventsAloneNote,
+                      hideBlock: true,
                     }),
                     // The asset underneath leads; the share count is what the
                     // position holds and stays beside it.
-                    collateralColumn({ ...live.collateral, asOfBlock: live.asOfBlock }, mytSymbol, {
-                      shares: liveFigureProv("Collateral", mytSymbol, live.collateral.raw, live.asOfBlock, coords),
-                      underlying: live.collateral.underlying
-                        ? underlyingProv(
-                            live.collateral.underlying.symbol ?? "the asset underneath",
-                            live.collateral.underlying.raw,
-                            live.collateral.underlying.decimals,
-                            live.asOfBlock,
-                            live.collateral.underlying.sharePriceRaw,
-                            live.collateral.underlying.sharePriceAsOfBlock,
-                            coords,
-                          )
-                        : undefined,
-                      usd: live.collateral.usd
-                        ? usdProv(
-                            live.collateral.underlying?.symbol ?? "the asset underneath",
-                            live.collateral.usd.pricePerUnit,
-                            live.collateral.usd.priceSource,
-                            live.collateral.usd.pricedAt,
-                          )
-                        : undefined,
-                      sharePrice: live.collateral.underlying
-                        ? sharePriceProv(
-                            mytSymbol,
-                            live.collateral.underlying.symbol ?? "the asset underneath",
-                            live.collateral.underlying.sharePriceRaw,
-                            live.collateral.underlying.decimals,
-                            live.collateral.underlying.sharePriceAsOfBlock,
-                            live.collateral.mytAddress ?? null,
-                            coords,
-                          )
-                        : undefined,
-                    }),
+                    collateralColumn(
+                      { ...live.collateral, asOfBlock: live.asOfBlock },
+                      mytSymbol,
+                      {
+                        shares: liveFigureProv("Collateral", mytSymbol, live.collateral.raw, live.asOfBlock, coords),
+                        underlying: live.collateral.underlying
+                          ? underlyingProv(
+                              live.collateral.underlying.symbol ?? "the asset underneath",
+                              live.collateral.underlying.raw,
+                              live.collateral.underlying.decimals,
+                              live.asOfBlock,
+                              live.collateral.underlying.sharePriceRaw,
+                              live.collateral.underlying.sharePriceAsOfBlock,
+                              coords,
+                            )
+                          : undefined,
+                        usd: live.collateral.usd
+                          ? usdProv(
+                              live.collateral.underlying?.symbol ?? "the asset underneath",
+                              live.collateral.usd.pricePerUnit,
+                              live.collateral.usd.priceSource,
+                              live.collateral.usd.pricedAt,
+                            )
+                          : undefined,
+                        sharePrice: live.collateral.underlying
+                          ? sharePriceProv(
+                              mytSymbol,
+                              live.collateral.underlying.symbol ?? "the asset underneath",
+                              live.collateral.underlying.sharePriceRaw,
+                              live.collateral.underlying.decimals,
+                              live.collateral.underlying.sharePriceAsOfBlock,
+                              live.collateral.mytAddress ?? null,
+                              coords,
+                            )
+                          : undefined,
+                      },
+                      { hideBlock: true },
+                    ),
                     // Rule 1. Its own slot, its own block, added to nothing.
                     amountColumn(
                       "Set aside for repayment",
@@ -747,7 +802,7 @@ export function AlchemistPositionView({
                           live.asOfBlock,
                           coords,
                         ),
-                        note: "It grows block by block, so this holds at that block.",
+                        hideBlock: true,
                       },
                     ),
                     live.health ? healthColumn(live.health, live.debt?.raw ?? null, coords) : null,
@@ -755,54 +810,6 @@ export function AlchemistPositionView({
                 : []
             }
           />
-          {live?.health ? (
-            <HealthSentence
-              health={live.health}
-              syntheticSymbol={sym}
-              underlyingSymbol={live.collateral.underlying?.symbol ?? null}
-              coords={coords}
-            />
-          ) : null}
-          {eventsAlone && dlb ? (
-            <p className="mt-3 text-[11px] leading-relaxed text-rb-500 tabular-nums">
-              Events alone:{" "}
-              <Prov
-                info={eventsAloneDebtProv(sym, dlb.debtRaw, dlb.reducedToBlock, dlb.validToBlock, coords)}
-                value={String(Number(dlb.debtRaw) / 1e18)}
-                symbol={sym}
-              >
-                {formatCompact(Number(dlb.debtRaw) / 1e18).display} {sym}
-              </Prov>
-              {" · "}read now:{" "}
-              <Prov
-                info={liveFigureProv("Debt", sym, eventsAlone.read.raw, eventsAlone.asOfBlock, coords)}
-                value={String(eventsAlone.read.formatted)}
-                symbol={sym}
-              >
-                {formatCompact(eventsAlone.read.formatted).display}
-              </Prov>
-              {eventsAlone.clearedAccounts ? (
-                <>
-                  {" · "}
-                  <Prov
-                    info={clearedRunProv(
-                      sym,
-                      redemptionTotals.clearedRaw,
-                      redemptionTotals.count,
-                      redemptionTotals.stated,
-                      "every redemption on this timeline",
-                      coords,
-                    )}
-                    value={String(redemptionTotals.cleared)}
-                    symbol={sym}
-                  >
-                    {formatCompact(redemptionTotals.cleared).display}
-                  </Prov>{" "}
-                  cleared by {redemptionTotals.count} {redemptionTotals.count === 1 ? "redemption" : "redemptions"}
-                </>
-              ) : null}
-            </p>
-          ) : null}
           {position.refusedReason ? (
             <p className="mt-3 text-xs leading-relaxed text-rb-500">{position.refusedReason}</p>
           ) : null}
@@ -813,27 +820,6 @@ export function AlchemistPositionView({
                 : "The current figures did not come back. Reload the page to read them again."}
             </p>
           )}
-          {/* Rule 4, said outright rather than left to be inferred. */}
-          {v2History && v2History.links.length > 0 ? (
-            <p className="mt-3 text-[11px] leading-relaxed text-rb-500">
-              {v2History.links.map((l, i) => (
-                <span key={`${l.lineKey}:${l.account}`}>
-                  {i > 0 ? ", " : ""}
-                  <Link href={v2PositionPath(deployment, l.lineKey, l.account)} className="link">
-                    {alchemixV2PositionName(l.syntheticSymbol ?? sym, l.account)}
-                  </Link>
-                </span>
-              ))}{" "}
-              is this holder&rsquo;s account from before Alchemix V3, closed on 2 April 2026.
-              {v2History.joined
-                ? " Its events are on the timeline below, marked V2, and the figures on this page are V3's alone."
-                : " Its events are on its own page."}
-            </p>
-          ) : null}
-          <p className="mt-3 text-[11px] leading-relaxed text-rb-500">
-            This position is a token that can be sold. It can change hands without closing, so the address above is who
-            holds it now and need not be who did any of what is below.
-          </p>
         </PositionCardShell>
 
         {/* ── Lifetime flows ─────────────────────────────────────────────── */}

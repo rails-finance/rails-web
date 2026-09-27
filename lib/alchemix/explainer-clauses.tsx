@@ -34,7 +34,7 @@
 // a change of owner and keeps its own card, unchanged.
 //
 // THE CAVEATS THAT HOLD FOR EVERY CARD ARE SAID ONCE, on the position card's
-// Explanation pane and in the "How Alchemix repays a loan" modal: that the
+// Explanation pane and in its "About this position" modal: that the
 // figures are readings, that collateral is a vault share count, and that
 // set-aside grows between readings. Each is also on the receipt of the figure
 // it governs. The bullets here are specific to the event. The one reading
@@ -779,7 +779,7 @@ export function alchemixEventClauses(
  *  position stood after all of them. The caveats that hold for every card
  *  (the figures are readings, collateral is a share count, set-aside grows
  *  between readings) are said once, on the position card's Explanation pane
- *  and in the "How Alchemix repays a loan" modal, and on each figure's receipt.
+ *  and in its "About this position" modal, and on each figure's receipt.
  *
  *  `legCount` is how many of this position's logs the card draws. */
 export function alchemixReadingClauses(
