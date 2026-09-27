@@ -50,7 +50,15 @@ import { addressTopic, splitCoverage, sweepLogs, type BlockRange, type RawLog } 
 import { resolveV3Tokens, scaleV3, flowV3, type V3TokenMeta } from "./aave-v3-tokens";
 import { bucketsOf, type BoundaryStateLine, type TimelineCutSummary } from "@/lib/shared/timeline-boundary";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
-import type { AssetFlow, BaseActivityEvent, OriginEnvelope } from "@/lib/shared/types/event-shape";
+import type {
+  AaveV3SwapDetail,
+  AaveV3SwapPoolEvent,
+  AssetFlow,
+  BaseActivityEvent,
+  OriginEnvelope,
+} from "@/lib/shared/types/event-shape";
+import { pairParaswapSwaps, type ParaswapSwapGroup } from "@/lib/aave-v3/paraswap-pairing";
+import { AAVE_V3_SWAP_LABELS } from "@/lib/aave-v3/swap-kinds";
 import type { AaveV3Context, AaveV3EventType, AaveV3PriceSource } from "@/lib/shared/types/protocols/aave-v3";
 
 const POOL_EVENTS_ABI = parseAbi([
@@ -828,6 +836,126 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
   };
 
   const events: BaseActivityEvent[] = [];
+
+  // ── Position swaps (rails-ops TO-DO-ui-jobs §18) ──────────────────────────
+  // The ParaSwap swaps these rows hold, paired by lib/aave-v3/paraswap-pairing
+  // before the walk. Each row behind one is noted as the walk passes it, and
+  // the last one closes the swap into one event, the shape the Ethereum
+  // route's `swapEvent` builds from the index's pair.
+  const swaps = pairParaswapSwaps(rows, wallet, p.chainId);
+  const swapWalked = new Map<
+    number,
+    {
+      d: AaveV3DecodedRow;
+      meta: V3TokenMeta | undefined;
+      before: bigint;
+      after: bigint;
+      render: boolean;
+      base: Omit<BaseActivityEvent, "actionType" | "actionLabel" | "flows" | "context">;
+    }
+  >();
+  const swapEventOf = (g: ParaswapSwapGroup): BaseActivityEvent | null => {
+    const given = swapWalked.get(g.given);
+    const received = swapWalked.get(g.received);
+    if (!given?.render || !received) return null;
+    const legRows = (leg: "given" | "received") =>
+      g.rows.filter(
+        (i) =>
+          (leg === "given" ? i === g.given : i === g.received) || (g.leftover?.row === i && g.leftover.leg === leg),
+      );
+    // A netted leg runs from its first row's balance before to its last row's after.
+    const span = (leg: "given" | "received") => {
+      const own = legRows(leg).map((i) => swapWalked.get(i)!);
+      return { before: own[0].before, after: own[own.length - 1].after };
+    };
+    const gSpan = span("given");
+    const xSpan = span("received");
+    const gMeta = given.meta;
+    const xMeta = received.meta;
+    const givenAction = given.d.kind === "repay" ? "repay" : "transfer_out";
+    const receivedAction = received.d.kind as "supply" | "borrow" | "repay";
+    const givenDebt = givenAction === "repay";
+    const receivedDebt = receivedAction !== "supply";
+    const netted = (leg: "given" | "received") => g.leftover?.leg === leg;
+    const poolEvents: AaveV3SwapPoolEvent[] | undefined = g.leftover
+      ? g.rows.map((i) => {
+          const w = swapWalked.get(i)!;
+          const action = w.d.kind as AaveV3SwapPoolEvent["action"];
+          return {
+            eventKey: w.base.id,
+            leg: i === g.given || (g.leftover?.row === i && g.leftover.leg === "given") ? "given" : "received",
+            leftover: i === g.leftover?.row,
+            action,
+            symbol: w.meta?.symbol,
+            asset: w.d.reserve,
+            amount: amt(w.d.amount, w.meta),
+            raw: w.d.amount.toString(),
+            origin:
+              action === "transfer_out" ? undefined : originVal(AMOUNT_EVENT[action], "amount", w.meta, w.d.amount),
+          };
+        })
+      : undefined;
+    const swap: AaveV3SwapDetail = {
+      kind: g.kind,
+      route: "paraswap",
+      givenAction,
+      receivedAction,
+      givenEventKey: given.base.id,
+      receivedEventKey: received.base.id,
+      receivedSymbol: xMeta?.symbol,
+      receivedAsset: received.d.reserve,
+      receivedAmount: amt(g.receivedNet, xMeta),
+      ...(receivedDebt
+        ? { receivedDebtBefore: amt(xSpan.before, xMeta), receivedDebtAfter: amt(xSpan.after, xMeta) }
+        : { receivedSupplyBefore: amt(xSpan.before, xMeta), receivedSupplyAfter: amt(xSpan.after, xMeta) }),
+      ...(received.d.price ? { receivedPrice: received.d.price } : {}),
+      receivedOrigin: netted("received")
+        ? undefined
+        : originVal(AMOUNT_EVENT[receivedAction], "amount", xMeta, received.d.amount),
+      // No Trade log on this route: nothing to equal (mig 248).
+      exact: false,
+      adapter: g.adapter,
+      ...(poolEvents ? { events: poolEvents } : {}),
+      raw: {
+        receivedAmount: g.receivedNet.toString(),
+        ...(receivedDebt
+          ? { receivedDebtBefore: xSpan.before.toString(), receivedDebtAfter: xSpan.after.toString() }
+          : { receivedSupplyBefore: xSpan.before.toString(), receivedSupplyAfter: xSpan.after.toString() }),
+      },
+    };
+    const ctx: AaveV3Context = {
+      eventType: "swap",
+      amount: amt(g.givenNet, gMeta),
+      reserveSymbol: gMeta?.symbol,
+      reserve: given.d.reserve,
+      ...(given.d.price ? { price: given.d.price } : {}),
+      // No counterparty and no acting parties: the venue names the adapter.
+      ...(givenDebt
+        ? { debtBefore: amt(gSpan.before, gMeta), debtAfter: amt(gSpan.after, gMeta) }
+        : { supplyBefore: amt(gSpan.before, gMeta), supplyAfter: amt(gSpan.after, gMeta) }),
+      raw: {
+        amount: g.givenNet.toString(),
+        ...(givenDebt
+          ? { debtBefore: gSpan.before.toString(), debtAfter: gSpan.after.toString() }
+          : { supplyBefore: gSpan.before.toString(), supplyAfter: gSpan.after.toString() }),
+      },
+      // A repay leg carries the Repay log's own amount; a transfer leg's is derived.
+      origin: givenDebt && !netted("given") ? { amount: originVal("Repay", "amount", gMeta, given.d.amount) } : {},
+      swap,
+    };
+    return {
+      ...given.base,
+      ...unreadOf(gMeta, xMeta),
+      actionType: "swap",
+      actionLabel: AAVE_V3_SWAP_LABELS[g.kind],
+      flows: [
+        ...(gMeta ? [flowV3(gMeta, g.givenNet, "out")] : []),
+        ...(xMeta ? [flowV3(xMeta, g.receivedNet, receivedAction === "repay" ? "out" : "in")] : []),
+      ],
+      context: { protocol: "aave-v3" as const, data: ctx },
+    };
+  };
+
   let undated = 0;
   // The render cut's ledger. Below the cut, a wallet-signed row is anchored
   // (drawn anyway, counted in `anchoredDrawn`); an unsigned one is elided
@@ -982,6 +1110,18 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
         amount: isTransfer ? undefined : originVal(AMOUNT_EVENT[d.kind] ?? d.kind, "amount", rMeta, d.amount),
       },
     };
+    // A row behind a paired swap advances the replay like any other and draws
+    // nothing of its own: the swap's card is drawn once its last row is walked,
+    // where the given row would have been.
+    const swap = swaps.get(i);
+    if (swap) {
+      swapWalked.set(i, { d, meta: rMeta, before: run.before, after: run.after, render, base });
+      if (i === swap.rows[swap.rows.length - 1]) {
+        const e = swapEventOf(swap);
+        if (e) events.push(e);
+      }
+      return;
+    }
     if (render)
       events.push({
         ...base,
