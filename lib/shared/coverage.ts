@@ -554,8 +554,22 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // (the repay leg, the liquidation row and both seize transfers, the
   // protocol's cut included, replaying to the mToken's own balance).
   //
-  // Still false: `verification` waits on a verifier script with a chain
-  // parameter — scripts/verify-moonwell-chain.mjs reads a single mainnet RPC.
+  // `verification` (2026-09-27): scripts/verify-moonwell-base-chain.mjs runs
+  // Ethereum's own Compound-v2 checks against this Comptroller, with its first
+  // two REWRITTEN for a roster that is read live rather than a four-market
+  // catalog: getAllMarkets() answers at least the 21-market floor verified
+  // 2026-08-23 (no fixed list to match, and no duplicate mToken addresses —
+  // Base lists both a bridged and a native USDC market, distinguishable only
+  // by address), and each market's collateral factor is checked internally
+  // sane rather than against a hand-written constant. The rest of the suite —
+  // exchange-rate identity, the per-timestamp accrual convention, the
+  // account-liquidity replica exact vs getAccountLiquidity — runs unchanged
+  // over the live roster, for wallets sampled BY QUERY (heaviest debt, a
+  // closed wallet, a liquidated one) rather than fixed addresses. It adds one
+  // check the mainnet script has no reason to: the explorer's own served
+  // supply/borrow figures checked against a live
+  // balanceOf/borrowBalanceStored read at the row's own block, on BOTH
+  // rails.finance and dev.rails.finance (the Vercel bypass header).
   // `llm` arrived 2026-08-26 with the shared position card (the serializer
   // names the swept lane).
   //
@@ -570,6 +584,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     forensics: true,
     views: true,
     llm: true,
+    verification: true,
   }),
   // Reference-depth pass (2026-07-15): live per-position chain lane
   // (VaultResolver.positionByNftId — the vault's OWN fetchLatestPosition
@@ -774,10 +789,19 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // page's export menu (components/protocol/morpho/morpho-export-menu.tsx over
   // lib/morpho/position-to-markdown.ts, the Ethereum surface reused); the
   // wallet hub, where one wallet is several isolated positions in different
-  // loan tokens, has no multi-market document yet. `verification` waits on a
-  // Base verifier of its own — scripts/verify-morpho-chain.mjs is a mainnet
-  // job, and the V3-fork core the two Aave Base rows now run through does not
-  // fit a Blue singleton.
+  // loan tokens, has no multi-market document yet.
+  //
+  // `verification` (2026-09-27): scripts/verify-morpho-base-chain.mjs runs
+  // Ethereum's own Blue checks — market id ==
+  // keccak256(abi.encode(idToMarketParams(id))), the oracle numeraire, market
+  // state, rate bounds, the _isHealthy replica (Blue has no public health
+  // getter) and the liquidation-incentive band — against the SAME singleton
+  // on Base, for positions sampled BY QUERY (the heaviest open debt, a closed
+  // one, a liquidated one) rather than fixed wallets. It adds one check the
+  // mainnet script has no reason to: the explorer's own served
+  // collateral/borrowShares checked against a live position() read at the
+  // row's own block, on BOTH rails.finance and dev.rails.finance (the Vercel
+  // bypass header).
   "morpho-base": explorerDepth({
     atBlockPrices: true,
     dashboard: true,
@@ -786,6 +810,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     explainers: true,
     forensics: true,
     views: true,
+    verification: true,
   }),
   // Aave's vault layer (rails-ops decision 0028). The row states what is built
   // and rules the two risk columns out rather than leaving them reading "not
@@ -906,10 +931,20 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // Ethereum, and feeds the SAME cards, explainers, tower and export the
   // Ethereum explorer uses — so these cells mean exactly what they mean on the
   // sibling row. Absorptions are captured with their own emitted usdValue
-  // legs (`forensics`). `verification` waits on a Base verifier of its own —
-  // scripts/verify-compound-v3-chain.mjs is a mainnet job, and a Comet is not
-  // an Aave Pool, so the core the two Aave Base rows now run through does not
-  // serve it.
+  // legs (`forensics`).
+  //
+  // `verification` (2026-09-27): scripts/verify-compound-base-chain.mjs adds
+  // the deployer check that is the whole reason this roster exists —
+  // governor() re-checked live against Compound's Base bridge receiver for
+  // all five pinned Comets, the fact that tells them apart from the three
+  // OTHER Base proxies also answering symbol()=="cUSDCv3" — then runs
+  // Ethereum's own asset-enumeration, rate and account-health checks over
+  // accounts sampled BY QUERY (heaviest debt, a closed account, a liquidated
+  // one). It adds one check the mainnet script has no reason to: the
+  // explorer's own served base/collateral figures checked against a live
+  // balanceOf/borrowBalanceOf/collateralBalanceOf read at the row's own
+  // block, on BOTH rails.finance and dev.rails.finance (the Vercel bypass
+  // header).
   //
   // The listing arrived 2026-08-26 on the Base lending lane at Comet's grain:
   // every (Comet, account) pair from the five Comets' own events, each row's
@@ -923,6 +958,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     forensics: true,
     llm: true,
     views: true,
+    verification: true,
   }),
   // Compound V2 (2026-07-15): the protocol view landed first — /compound-v2/markets
   // reads every listed market at head and states what is parked in it, with USD

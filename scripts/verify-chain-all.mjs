@@ -28,7 +28,9 @@
 //                                each of them throws on startup and reads CRASH.
 //   · BASE_RPC_URL             — required by the Base children
 //                                (verify-aave-v3-base-chain, verify-seamless-chain,
-//                                and verify-liquity-forks-chain's Basedollar pass).
+//                                verify-morpho-base-chain, verify-compound-base-chain,
+//                                verify-moonwell-base-chain, and
+//                                verify-liquity-forks-chain's Basedollar pass).
 //                                Full archive for eth_call; its eth_getLogs answers
 //                                ten blocks at a time, so no child here sweeps logs
 //                                on it.
