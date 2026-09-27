@@ -74,13 +74,18 @@ import {
   collateralColumn,
 } from "@/components/protocol/alchemix/alchemix-position-card";
 import { computeAlchemixEconomics } from "@/lib/alchemix/economics";
+import { alchemixFlowsExplanation } from "@/lib/alchemix/economics-explanation";
 import { splitRidingTransfers, withRiders } from "@/lib/alchemix/riding-transfers";
 import { isZeroEffectRedemption, useAlchemixTimelineRuns } from "@/lib/alchemix/timeline-runs";
 import {
+  AlchemixLineRatiosContext,
   AlchemixReadingsBeforeContext,
+  AlchemixReadingsInOrderContext,
   AlchemixUnderlyingContext,
   collateralTakenRaw,
   readingsBefore,
+  readingsInOrder,
+  type AlchemixLineRatios,
   type AlchemixUnderlyingUnit,
 } from "@/lib/alchemix/readings-before";
 import { redemptionNet, shareFallToLiquidation, sumRedemptionNets } from "@/lib/alchemix/redemption-net";
@@ -93,7 +98,7 @@ import {
   AlchemixPositionExplanation,
   type AlchemixRedemptionTotals,
 } from "@/components/protocol/alchemix/alchemix-position-explanation";
-import { ALCHEMIX_HOW_IT_WORKS } from "@/components/protocol/alchemix/alchemix-event-explainer";
+import { ALCHEMIX_HOW_IT_WORKS, ALCHEMIX_LIFETIME_FLOWS } from "@/lib/alchemix/learn-more";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import {
   clearedRunProv,
@@ -348,6 +353,8 @@ export function AlchemistPositionView({
   // The reading before each block on the timeline, for before → after on
   // every card and for what each redemption took from the collateral.
   const beforeByBlock = useMemo(() => readingsBefore(alchemistEvents), [alchemistEvents]);
+  // Every reading in block order, for a custody card's figures in force.
+  const readingList = useMemo(() => readingsInOrder(alchemistEvents), [alchemistEvents]);
   // A transfer sharing its transaction with another leg is drawn inside that
   // card, so the timeline counts the card and not the transfer.
   const { drawn: drawnEvents, ridersByTx } = useMemo(
@@ -393,7 +400,14 @@ export function AlchemistPositionView({
   // is the underlying the readings name; with none named, nothing is valued.
   const underlyingUnit = useMemo<AlchemixUnderlyingUnit | null>(() => {
     const u = live?.collateral.underlying ?? position.figures.collateral?.underlying ?? null;
-    return u?.symbol ? { symbol: u.symbol, decimals: u.decimals } : null;
+    const usd = live?.collateral.usd ?? position.figures.collateral?.usd ?? null;
+    return u?.symbol
+      ? {
+          symbol: u.symbol,
+          decimals: u.decimals,
+          usd: usd ? { pricePerUnit: usd.pricePerUnit, priceSource: usd.priceSource, pricedAt: usd.pricedAt } : null,
+        }
+      : null;
   }, [live, position.figures.collateral]);
   const redemptionNetTotal = useMemo(
     () =>
@@ -440,6 +454,18 @@ export function AlchemistPositionView({
       liquidationLine: Number(h.collateralizationLowerBoundRaw) / 1e18,
     };
   }, [live, underlyingUnit, lineKey, mytSymbol, sym]);
+  // The line's two ratios as the position card states them, for the event
+  // cards' collateralisation.
+  const lineRatios = useMemo<AlchemixLineRatios | null>(() => {
+    const h = live?.health;
+    return h
+      ? {
+          minimumRaw: h.minimumCollateralizationRaw,
+          lowerBoundRaw: h.collateralizationLowerBoundRaw,
+          asOfBlock: h.asOfBlock,
+        }
+      : null;
+  }, [live]);
   const marketNotes = useMemo(
     () => (sharePriceLine ? alchemixSharePriceNotes(drawnEvents, sharePriceLine) : []),
     [drawnEvents, sharePriceLine],
@@ -488,6 +514,19 @@ export function AlchemistPositionView({
       }),
     [tl.sortedEvents, sym, mytSymbol, live, position.figures, olderCount, coords],
   );
+
+  // Gas over the position's own transactions, each counted once. Line rows
+  // are the Transmuter's transactions, not this holder's.
+  const lifetimeGas = useMemo(() => {
+    const seen = new Set<string>();
+    let eth = 0;
+    for (const e of alchemistEvents) {
+      if (e.context.data.scope !== "position" || !e.gas || seen.has(e.txHash)) continue;
+      seen.add(e.txHash);
+      eth += e.gas.gasCostEth || 0;
+    }
+    return seen.size > 0 ? { transactions: seen.size, eth } : null;
+  }, [alchemistEvents]);
 
   // The window, narrowed to the one case it says something the timeline does
   // not: an ENDED position whose line has run on past it. Both blocks must be
@@ -787,7 +826,20 @@ export function AlchemistPositionView({
 
         {/* ── Lifetime flows ─────────────────────────────────────────────── */}
         {economics ? (
-          <ChainTruthTower data={economics.data} title="Lifetime flows" />
+          <ChainTruthTower
+            data={economics.data}
+            title="Lifetime flows"
+            explanation={alchemixFlowsExplanation({
+              figures: economics.figures,
+              syntheticSymbol: sym,
+              mytSymbol,
+              currentCollateral: live?.collateral.formatted ?? position.figures.collateral?.formatted ?? null,
+              currentDebt: live?.debt?.formatted ?? position.figures.debt?.formatted ?? null,
+              redemptions: redemptionTotals,
+              gas: lifetimeGas,
+            })}
+            learnMore={ALCHEMIX_LIFETIME_FLOWS}
+          />
         ) : olderCount > 0 ? (
           // The tower's own "nothing to draw" placeholder, in the slot the
           // tower would have filled.
@@ -798,73 +850,78 @@ export function AlchemistPositionView({
 
         {/* ── The timeline ───────────────────────────────────────────────── */}
         <AlchemixReadingsBeforeContext.Provider value={beforeByBlock}>
-          <AlchemixUnderlyingContext.Provider value={underlyingUnit}>
-            <ChainTruthTimeline
-              persistKeyPrefix="alchemix-v3"
-              closed={position.status === "closed"}
-              tl={tl}
-              runs={timelineRuns}
-              boundary={boundary}
-              notes={marketNotes}
-              liveNotes={liveMarketNotes}
-              liveNotesPending={livePending}
-              displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-              emptyLabel="No events recorded for this position"
-              toolbarLeading={
-                <TimelineActivityHeader
-                  events={drawnEvents}
+          <AlchemixReadingsInOrderContext.Provider value={readingList}>
+            <AlchemixLineRatiosContext.Provider value={lineRatios}>
+              <AlchemixUnderlyingContext.Provider value={underlyingUnit}>
+                <ChainTruthTimeline
+                  persistKeyPrefix="alchemix-v3"
                   closed={position.status === "closed"}
-                  tenurePending={olderCount > 0}
-                />
-              }
-              notice={
-                (lineScopedNote && redemptionRowDrawn) || endedWindow ? (
-                  <div className="space-y-1">
-                    {lineScopedNote && redemptionRowDrawn ? (
-                      // The route's own sentence about line rows, rendered as given.
-                      <p className="px-1 text-[11px] leading-relaxed text-rb-500">{lineScopedNote}</p>
-                    ) : null}
-                    {/* Why a closed position's timeline stops carrying the line's
+                  tl={tl}
+                  runs={timelineRuns}
+                  boundary={boundary}
+                  notes={marketNotes}
+                  liveNotes={liveMarketNotes}
+                  liveNotesPending={livePending}
+                  displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+                  emptyLabel="No events recorded for this position"
+                  toolbarLeading={
+                    <TimelineActivityHeader
+                      events={drawnEvents}
+                      closed={position.status === "closed"}
+                      tenurePending={olderCount > 0}
+                    />
+                  }
+                  notice={
+                    (lineScopedNote && redemptionRowDrawn) || endedWindow ? (
+                      <div className="space-y-1">
+                        {lineScopedNote && redemptionRowDrawn ? (
+                          // The route's own sentence about line rows, rendered as given.
+                          <p className="px-1 text-[11px] leading-relaxed text-rb-500">{lineScopedNote}</p>
+                        ) : null}
+                        {/* Why a closed position's timeline stops carrying the line's
                     events while the line goes on having them. Open positions
                     get nothing: their window ends at the frontier, so the
                     sentence would restate the timeline. */}
-                    {endedWindow ? (
-                      <p className="px-1 text-[11px] leading-relaxed text-rb-500">
-                        This position ended at block {block(endedWindow.endedAtBlock)}, and the line has been indexed to
-                        block {block(endedWindow.lineFrontierBlock)} since. A position that has ended cannot be moved by
-                        a later redemption, so none of the line&rsquo;s events past that block are on this timeline.
-                      </p>
-                    ) : null}
-                  </div>
-                ) : undefined
-              }
-              renderCard={(event, meta) => {
-                if (isAlchemixV2Event(event)) {
-                  return (
-                    <AlchemixV2EventCard
-                      event={event as AlchemixV2Event}
-                      showVersion
-                      isFirst={meta.isFirst}
-                      isLast={meta.isLast}
-                      eventNumber={meta.eventNumber}
-                    />
-                  );
-                }
-                if (!isAlchemistEvent(event)) return null;
-                return (
-                  <AlchemixEventCard
-                    legs={withRiders([event], ridersByTx)}
-                    mytSymbol={mytSymbol}
-                    underlyingDecimals={underlyingDecimals}
-                    siblings={siblingsByTx.get(event.txHash) ?? [event]}
-                    isFirst={meta.isFirst}
-                    isLast={meta.isLast}
-                    eventNumber={meta.eventNumber}
-                  />
-                );
-              }}
-            />
-          </AlchemixUnderlyingContext.Provider>
+                        {endedWindow ? (
+                          <p className="px-1 text-[11px] leading-relaxed text-rb-500">
+                            This position ended at block {block(endedWindow.endedAtBlock)}, and the line has been
+                            indexed to block {block(endedWindow.lineFrontierBlock)} since. A position that has ended
+                            cannot be moved by a later redemption, so none of the line&rsquo;s events past that block
+                            are on this timeline.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : undefined
+                  }
+                  renderCard={(event, meta) => {
+                    if (isAlchemixV2Event(event)) {
+                      return (
+                        <AlchemixV2EventCard
+                          event={event as AlchemixV2Event}
+                          showVersion
+                          isFirst={meta.isFirst}
+                          isLast={meta.isLast}
+                          eventNumber={meta.eventNumber}
+                        />
+                      );
+                    }
+                    if (!isAlchemistEvent(event)) return null;
+                    return (
+                      <AlchemixEventCard
+                        legs={withRiders([event], ridersByTx)}
+                        mytSymbol={mytSymbol}
+                        underlyingDecimals={underlyingDecimals}
+                        siblings={siblingsByTx.get(event.txHash) ?? [event]}
+                        isFirst={meta.isFirst}
+                        isLast={meta.isLast}
+                        eventNumber={meta.eventNumber}
+                      />
+                    );
+                  }}
+                />
+              </AlchemixUnderlyingContext.Provider>
+            </AlchemixLineRatiosContext.Provider>
+          </AlchemixReadingsInOrderContext.Provider>
         </AlchemixReadingsBeforeContext.Provider>
       </div>
       <ProvInspectorLayer />

@@ -409,9 +409,28 @@ export function AlchemixEventHeader({
   const before = useReadingBefore(legs[0].context.data.stateAtBlockFromReading?.blockNumber);
   const specs = legs.map((leg) => legSpec(leg, mytSymbol, coordsFor(leg), siblings, combined, before));
   const tokenId = legTokenId(legs);
-  const spec = combined
+  let spec = combined
     ? combineLegSpecs(specs, legs, openingInTx(siblings, tokenId), custodyPathInTx(legs, tokenId), coordsFor)
     : specs[0];
+  // A transaction of single-axis moves that is not an opening (a top-up that
+  // deposits and mints, a withdrawal through the router) is named by its verbs,
+  // "Deposit · Mint", and its deltas take the lone card's signed grammar, so it
+  // reads like every other event's row. Liquity names a combined Open the same
+  // way.
+  const axisLegs = legs.filter((l) => l.context.data.eventType !== "transfer");
+  if (
+    combined &&
+    spec.label === "" &&
+    axisLegs.length > 0 &&
+    axisLegs.every((l) => AXIS_VERB[l.context.data.eventType] != null)
+  ) {
+    const verbs = [...new Set(axisLegs.map((l) => AXIS_VERB[l.context.data.eventType]))];
+    spec = {
+      ...spec,
+      label: axisLegs.length === 1 ? axisLegs[0].actionLabel : verbs.join(" · "),
+      deltas: axisLegs.flatMap((l) => legSpec(l, mytSymbol, coordsFor(l), siblings, false, before).deltas),
+    };
+  }
 
   return <ChainTruthRow spec={spec} timestamp={timestamp} eventNumber={eventNumber} />;
 }

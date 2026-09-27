@@ -26,7 +26,7 @@
 
 import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, type ChainTruthStat } from "@/components/shared/chain-truth-event";
-import { formatExact } from "@/lib/utils/format";
+import { formatExact, formatNumber } from "@/lib/utils/format";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
 import { AlchemixStateAtBlock } from "./alchemix-state-at-block";
@@ -44,6 +44,7 @@ import {
   emittedAmountProv,
   redemptionNetProv,
   redemptionNetUnavailableProv,
+  redemptionNetUsdProv,
   resolvedAtCaptureProv,
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
@@ -178,13 +179,35 @@ function legStats(
         const net = redemptionNet(leg, before, unit?.decimals ?? null);
         if (net?.status === "stated" && unit) {
           const n = Number(net.netRaw) / WAD;
+          const sign = n > 0 ? "+" : n < 0 ? "−" : "";
           stats.push({
             label: "Net for this position",
             value: formatExact(n),
-            display: `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 4 })}`,
+            display: `${sign}${formatNumber(Math.abs(n))}`,
             symbol: unit.symbol,
             prov: redemptionNetProv(net, sym, mytSymbol, unit.symbol, coords),
           });
+          // The same net in dollars, at the underlying's price now: the only
+          // dollar price the page holds.
+          if (unit.usd) {
+            const usd = n * unit.usd.pricePerUnit;
+            stats.push({
+              label: `Net in USD, at ${unit.symbol}'s price now`,
+              value: formatExact(usd),
+              display: `${usd > 0 ? "+" : usd < 0 ? "−" : ""}$${Math.abs(usd).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: Math.abs(usd) < 0.01 ? 4 : 2,
+              })}`,
+              symbol: "",
+              prov: redemptionNetUsdProv(
+                n,
+                unit.symbol,
+                unit.usd.pricePerUnit,
+                unit.usd.priceSource,
+                unit.usd.pricedAt,
+              ),
+            });
+          }
         } else if (net?.status === "no-share-price") {
           stats.push({
             label: "Net for this position",

@@ -23,7 +23,10 @@
 //
 // 3. AN ABSENT READING IS NOT A ZERO. A custody Transfer moves neither axis, so
 //    it is not a block the sweep stops at: 1,867 of production's 4,988 position
-//    Transfers have no reading. Those draw a sentence and no grid. A measured
+//    Transfers have no reading. Those draw debt and collateral from the reading
+//    in force at that block, greyed as unchanged, and never set-aside, which
+//    grows every block (decisions/0032 point 6); with no earlier reading on the
+//    timeline they draw one sentence. A measured
 //    zero draws the grid with "0" in it, and never goes through
 //    `fmtHeaderMagnitude`, which renders zero as the empty string (rails-ops
 //    TO-DO-ui-jobs item 74) — the grid's own `formatCompact` keeps it.
@@ -52,8 +55,22 @@ import {
 } from "@/components/shared/chain-truth-event";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
-import { readingChangeProv, stateAtBlockFromReadingProv, type AlchemixCoords } from "@/lib/alchemix/event-provenance";
-import type { AlchemixReading } from "@/lib/alchemix/readings-before";
+import {
+  carriedReadingProv,
+  lineRatioProv,
+  readingChangeProv,
+  readingCollateralisationProv,
+  stateAtBlockFromReadingProv,
+  type AlchemixCoords,
+} from "@/lib/alchemix/event-provenance";
+import {
+  readingCollateralisationRaw,
+  useAlchemixLineRatios,
+  useAlchemixUnderlying,
+  useReadingInForce,
+  type AlchemixReading,
+} from "@/lib/alchemix/readings-before";
+import { Prov } from "@/components/shared/provenance";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -95,6 +112,23 @@ export interface AlchemixStateAtBlockProps {
   before?: AlchemixReading | null;
 }
 
+/** A 1e18-scaled ratio in the event grid: two places, Liquity's event grid,
+ *  so a small move still shows between before and after. */
+function gridRatio(raw: string): string {
+  const pct = Number(raw) / 1e16;
+  if (pct >= 10000) return "over 10,000%";
+  return `${pct.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+}
+
+/** A 1e18-scaled ratio as the position card draws it. */
+function ratioPct(raw: string): string {
+  const pct = Number(raw) / 1e16;
+  if (pct >= 10000) return "over 10,000%";
+  return pct < 1000
+    ? `${pct.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+    : `${Math.round(pct).toLocaleString("en-US")}%`;
+}
+
 export function AlchemixStateAtBlock({
   state,
   syntheticSymbol,
@@ -104,20 +138,54 @@ export function AlchemixStateAtBlock({
   coords,
   before = null,
 }: AlchemixStateAtBlockProps) {
+  const unit = useAlchemixUnderlying();
+  const ratios = useAlchemixLineRatios();
+  // Rule 3's exception, for a block with no reading of its own: the reading in
+  // force there, carried on debt and collateral only (lib/alchemix/readings-before).
+  const inForce = useReadingInForce(state && state.status !== "stated" ? eventBlock : null);
+
   // Absent on Transmuter rows, which have neither axis.
   if (!state) return null;
 
-  const subject = legCount > 1 ? "This transaction" : "This event";
-
   if (state.status !== "stated" || state.blockNumber == null) {
-    const at = eventBlock != null ? ` at block ${block(eventBlock)}` : "";
-    const why =
-      state.reason === "reading-stale"
-        ? `The reading${at} did not complete, so what this position held here is not stated.`
-        : `No reading was taken${at}: ${subject.toLowerCase()} moved neither debt nor collateral, so the explorer stores no figures for this block.`;
+    if (state.reason === "reading-stale") {
+      const at = eventBlock != null ? ` at block ${block(eventBlock)}` : "";
+      return (
+        <p className="mt-1 border-t border-rb-200 px-5 pb-3 pt-2 text-[11px] leading-relaxed text-rb-500 dark:border-rb-800">
+          The reading{at} did not complete, so what this position held here is not stated.
+        </p>
+      );
+    }
+    // A custody move: neither axis moved. The figures in force are shown
+    // greyed, the way an untouched axis is, and set-aside is left out because
+    // it grows every block and a reading holds it at its own block alone.
+    if (inForce && eventBlock != null && inForce.debtRaw != null && inForce.collateralRaw != null) {
+      const carried = (label: string, raw: string, symbol: string): ChainTruthStat => ({
+        label,
+        value: formatUnitsExact(raw, DECIMALS),
+        symbol,
+        display: gridFigure(raw),
+        dimmed: true,
+        prov: carriedReadingProv(label, symbol, raw, inForce.blockNumber, eventBlock, coords),
+      });
+      return (
+        <div className="mt-1 border-t border-rb-200 pt-2 pb-3 dark:border-rb-800">
+          <h4 className={`${OVERLAY_HEADING} px-5 text-rb-500`}>
+            Unchanged by {legCount > 1 ? "this transaction" : "this event"}
+          </h4>
+          <ChainTruthDetail
+            stats={[
+              carried("Debt", inForce.debtRaw, syntheticSymbol),
+              carried("Collateral", inForce.collateralRaw, mytSymbol),
+            ]}
+            symbolText
+          />
+        </div>
+      );
+    }
     return (
       <p className="mt-1 border-t border-rb-200 px-5 pb-3 pt-2 text-[11px] leading-relaxed text-rb-500 dark:border-rb-800">
-        {why}
+        Debt and collateral did not change.
       </p>
     );
   }
@@ -164,10 +232,68 @@ export function AlchemixStateAtBlock({
     };
   };
 
+  // Collateralisation at each reading, from its own share price. Where the
+  // before reading gives none, the after stands alone.
+  const underSym = unit?.symbol ?? "the asset underneath";
+  const ratioAfter = readingCollateralisationRaw(
+    { collateralRaw: state.collateralRaw, debtRaw: state.debtRaw, sharePriceRaw: state.sharePriceRaw ?? null },
+    unit?.decimals ?? null,
+  );
+  const ratioBefore = before ? readingCollateralisationRaw(before, unit?.decimals ?? null) : null;
+  const ratioStat: ChainTruthStat | null =
+    ratioAfter != null && unit && state.collateralRaw != null && state.debtRaw != null && state.sharePriceRaw
+      ? {
+          label: "Collateralisation",
+          value: String(Number(ratioAfter) / 1e16),
+          symbol: "",
+          display: gridRatio(ratioAfter),
+          prov: readingCollateralisationProv(
+            state.collateralRaw,
+            state.sharePriceRaw,
+            state.debtRaw,
+            atBlock,
+            unit.decimals,
+            mytSymbol,
+            underSym,
+            coords,
+          ),
+          transition:
+            ratioBefore != null &&
+            before &&
+            before.collateralRaw != null &&
+            before.debtRaw != null &&
+            before.sharePriceRaw != null &&
+            ratioBefore !== ratioAfter
+              ? (() => {
+                  const pts = (Number(ratioAfter) - Number(ratioBefore)) / 1e16;
+                  const change = `${pts >= 0 ? "+" : "−"}${Math.abs(pts).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+                  return {
+                    before: gridRatio(ratioBefore),
+                    beforeExact: String(Number(ratioBefore) / 1e16),
+                    beforeProv: readingCollateralisationProv(
+                      before.collateralRaw!,
+                      before.sharePriceRaw!,
+                      before.debtRaw!,
+                      before.blockNumber,
+                      unit.decimals,
+                      mytSymbol,
+                      underSym,
+                      coords,
+                    ),
+                    change,
+                    changeExact: `${pts >= 0 ? "+" : "−"}${Math.abs(pts)}`,
+                    changeProv: readingChangeProv("Collateralisation", "%", before.blockNumber, atBlock, coords),
+                  } satisfies ChainTruthTransition;
+                })()
+              : undefined,
+        }
+      : null;
+
   const stats = [
     axis("Debt", state.debtRaw, syntheticSymbol, before?.debtRaw),
     axis("Collateral", state.collateralRaw, mytSymbol, before?.collateralRaw),
     axis("Set aside for repayment", state.earmarkedRaw, syntheticSymbol, before?.earmarkedRaw),
+    ratioStat,
   ].filter((s): s is ChainTruthStat => s != null);
 
   if (stats.length === 0) return null;
@@ -185,6 +311,19 @@ export function AlchemixStateAtBlock({
         {heading} · block {block(atBlock)}
       </h4>
       <ChainTruthDetail stats={stats} symbolText />
+      {ratioStat && ratios ? (
+        <p className="px-5 text-[11px] leading-relaxed tabular-nums text-rb-500">
+          Collateralisation minimum{" "}
+          <Prov info={lineRatioProv("minimumCollateralization", ratios.minimumRaw, ratios.asOfBlock, coords)}>
+            {ratioPct(ratios.minimumRaw)}
+          </Prov>
+          {" · "}liquidation at{" "}
+          <Prov info={lineRatioProv("collateralizationLowerBound", ratios.lowerBoundRaw, ratios.asOfBlock, coords)}>
+            {ratioPct(ratios.lowerBoundRaw)}
+          </Prov>
+          , read at block {block(ratios.asOfBlock)}
+        </p>
+      ) : null}
     </div>
   );
 }

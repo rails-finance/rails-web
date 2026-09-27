@@ -49,6 +49,8 @@ import type {
 import { clause, cont, type ClauseInput } from "@/lib/shared/explainer-prose";
 import { shortAddr } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
+import type { RedemptionNet } from "@/lib/alchemix/redemption-net";
+import { isLineRouter } from "@/lib/alchemix/lines";
 
 // The synthetic and every MYT carry 18 decimals on every line, so every figure
 // an Alchemist log emits in one of those two is scaled here (see the note on
@@ -76,6 +78,12 @@ const underlying = (raw: string | null | undefined, decimals: number | null | un
 };
 
 const who = (addr: string | null | undefined): string => (addr ? shortAddr(addr) : "an address the log does not name");
+
+/** An address, named as the line's router where it is one. */
+const whoOn = (ctx: Pick<AlchemixV3Context, "chainId" | "lineKey">, addr: string | null | undefined): string =>
+  addr && isLineRouter(ctx.chainId, ctx.lineKey, addr)
+    ? `Alchemix's router for this line (${shortAddr(addr)})`
+    : who(addr);
 
 const sameAddr = (a: string | null | undefined, b: string | null | undefined): boolean =>
   a != null && b != null && a.toLowerCase() === b.toLowerCase();
@@ -189,8 +197,8 @@ export function custodyPathInTx(siblings: AlchemistEvent[], tokenId: string | nu
 export function alchemixCustodyRoundTripClause(path: AlchemixCustodyPath): ClauseInput {
   return clause(
     <>
-      The position was handed to {who(path.via)} and back inside this one transaction, so nobody&rsquo;s ownership of it
-      changed.
+      The position was handed to {whoOn(path.moves[0].context.data, path.via)} and back inside this one transaction, so
+      nobody&rsquo;s ownership of it changed.
     </>,
   );
 }
@@ -209,6 +217,10 @@ export interface AlchemixClauseOptions {
   collateralTakenRaw?: string | null;
   /** The line's protocol fee in basis points, for the repay fee's rate. */
   protocolFeeBps?: number | null;
+  /** A redemption's net for this position (lib/alchemix/redemption-net), and
+   *  the underlying it is in. */
+  redemptionNet?: RedemptionNet | null;
+  underlyingSymbol?: string | null;
   /** This leg is a hop of a custody ROUND TRIP, which the card narrates once
    *  (`alchemixCustodyRoundTripClause`) rather than once per hop. */
   skipCustody?: boolean;
@@ -269,7 +281,7 @@ export function alchemixEventClauses(
           </>,
         ),
       );
-      out.push(cont(<> They went to {who(raw.recipient)}.</>));
+      out.push(cont(<> They went to {whoOn(ctx, raw.recipient)}.</>));
       break;
 
     case "mint":
@@ -284,7 +296,7 @@ export function alchemixEventClauses(
         cont(
           <>
             {" "}
-            The {sym} went to {who(raw.recipient)}.
+            The {sym} went to {whoOn(ctx, raw.recipient)}.
           </>,
         ),
       );
@@ -461,7 +473,11 @@ export function alchemixEventClauses(
                 }
               : null;
         const routed = opening?.forwardedTo ? (
-          <> That first address is a contract the transaction routed through.</>
+          isLineRouter(ctx.chainId, ctx.lineKey, opening.mintedTo) ? (
+            <> That first address is Alchemix&rsquo;s router for this line, which the transaction went through.</>
+          ) : (
+            <> That first address is a contract the transaction routed through.</>
+          )
         ) : null;
 
         if (opening && opening.forwardedTo && funding) {
@@ -563,14 +579,25 @@ export function alchemixEventClauses(
               </>,
             ),
           );
-          out.push(
-            clause(
-              <>
-                Those {myt} went to the Transmuter, which pays its stakers in them, so the position&rsquo;s debt and
-                collateral fell by matching values.
-              </>,
-            ),
-          );
+          const net = opts.redemptionNet;
+          if (net && net.status === "stated" && opts.underlyingSymbol) {
+            const under = opts.underlyingSymbol;
+            const netN = Number(net.netRaw) / WAD;
+            out.push(
+              clause(
+                <>
+                  Those {myt} went to the Transmuter, which pays its stakers in them. At this block&rsquo;s share price
+                  they were worth{" "}
+                  {(Number(net.takenValueRaw) / WAD).toLocaleString("en-US", { maximumSignificantDigits: 6 })} {under},
+                  so the net for this position, the debt cleared (one {under} per {sym}) less that value, is{" "}
+                  {netN > 0 ? "+" : netN < 0 ? "−" : ""}
+                  {formatNumber(Math.abs(netN))} {under}.
+                </>,
+              ),
+            );
+          } else {
+            out.push(clause(<>Those {myt} went to the Transmuter, which pays its stakers in them.</>));
+          }
         } else {
           out.push(
             clause(

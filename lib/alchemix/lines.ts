@@ -16,7 +16,7 @@
 // by the wrong explorer.
 //
 // The display names are rails-server's own (`api/src/config/alchemix-v3.ts`).
-// What is NOT here: any address. Every address a line names — the Alchemist,
+// What is NOT here: any address but the routers (see below). Every address a line names — the Alchemist,
 // the Transmuter, the position NFT, the MYT, the MYT's underlying — is read
 // from `alchemix_v3_lines` by the API, which is the rule that table's migration
 // sets. A fixed address in this file would be a second source for something the
@@ -137,6 +137,30 @@ export function lineProtocolFeeBps(chainId: number, key: string): number | null 
  *  another chain is rejected here rather than served by the wrong explorer. */
 export function isLineOnChain(chainId: ChainId, key: string): boolean {
   return LINES.some((l) => l.chainId === chainId && l.key === key);
+}
+
+// ── The routers ──────────────────────────────────────────────────────────────
+//
+// THE ONE ADDRESS THIS FILE HOLDS, and why it breaks the rule above: the
+// router is a periphery contract the indexer does not capture, so
+// `alchemix_v3_lines` has no column for it. A deposit, a mint or a withdrawal
+// sent through it shows up in the logs as the position NFT passing to this
+// address and back, and the card names it rather than leaving a bare address.
+// Each was checked on chain 2026-09-27: `alchemist()` on the router returns
+// that line's Alchemist. Listed in Alchemix's contract pages
+// (docs.alchemix.fi/dev/contracts/ethereum and /base).
+
+const ROUTERS: { chainId: ChainId; key: string; address: string }[] = [
+  { chainId: 1, key: "eth-alusd", address: "0x6733aa6b2a622e43e8ff61945e8fbe5f1b6b00fd" },
+  { chainId: 1, key: "eth-aleth", address: "0xdb852896a23c7e2519b75aea692cacf834d086ab" },
+  { chainId: 8453, key: "base-alusdb", address: "0x720d1f945279a6d82eedcc9b7f85767279ea2f96" },
+];
+
+/** True where this address is the line's AlchemistRouter. */
+export function isLineRouter(chainId: number, key: string, address: string | null | undefined): boolean {
+  if (!address) return false;
+  const a = address.toLowerCase();
+  return ROUTERS.some((r) => r.chainId === chainId && r.key === key && r.address === a);
 }
 
 // There is no display-name lookup here, and a surface that wants one should not

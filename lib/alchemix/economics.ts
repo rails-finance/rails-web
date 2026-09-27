@@ -89,6 +89,10 @@ export interface AlchemixEconomicsFigures {
    *  While this is above zero the debt-cleared total is a floor, and the page
    *  says so rather than printing it as a total. */
   debtCreditUnresolved: number;
+  /** The protocol fee repays took in shares, resolved at capture. Kept out of
+   *  every tower line for the reason `spentRepaying` gives; the Explanation
+   *  pane names it so the collateral side reconciles. */
+  repayFeeShares: number;
   /** Custody moves — the position changed hands this many times. It is a freely
    *  transferable ERC721, so the current holder need not have held it for any
    *  of the history above. */
@@ -137,6 +141,7 @@ export function computeAlchemixEconomics(
     burned: empty(),
     debtCleared: empty(),
     debtCreditUnresolved: 0,
+    repayFeeShares: 0,
     custodyMoves: 0,
     lineEvents: 0,
   };
@@ -170,6 +175,7 @@ export function computeAlchemixEconomics(
         const credit = ctx.resolvedAtCapture?.debtCredit ?? null;
         if (credit == null) figures.debtCreditUnresolved += 1;
         else add(figures.debtCleared, scaled(credit));
+        figures.repayFeeShares += scaled(ctx.resolvedAtCapture?.collateralFee ?? null);
         break;
       }
       case "force_repay": {

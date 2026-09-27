@@ -39,6 +39,7 @@ import { LifecyclePill } from "@/components/shared/position-card-pills";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { StatValue, StatFootnote } from "@/components/shared/stat-value";
 import { WalletPill } from "@/components/shared/wallet-pill";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import type {
   AlchemixAmountAtBlock,
@@ -93,9 +94,8 @@ export function AlchemixStatusPill({ status }: { status: AlchemixPositionStatus 
 /** An amount is stated only with the block it was settled at. Without one the
  *  column says the figure did not settle rather than printing a bare number.
  *
- *  The symbol stays a WORD rather than becoming a token chip: no icon exists
- *  for a line's synthetic or its MYT share (alUSD, mixWETH), so a chip would
- *  draw the unknown-token placeholder beside every figure and name nothing.
+ *  The figure carries its token chip beside the word, as other protocols'
+ *  cards do.
  *
  *  One builder for both surfaces — the listing row passes neither receipt nor
  *  note, the position page passes both. */
@@ -119,9 +119,11 @@ export function amountColumn(
   }
   const { display, title } = formatCompact(value.formatted);
   const figure = (
-    <>
-      {display} {unit}
-    </>
+    <span className="inline-flex items-center gap-1.5">
+      {display}
+      <TokenChipIcon symbol={unit} size={20} filterable={false} />
+      {unit}
+    </span>
   );
   return {
     label,
@@ -171,8 +173,10 @@ export function collateralColumn(
   }
 
   const shares = (
-    <span className="tabular-nums">
-      {formatCompact(c.formatted).display} {myt}
+    <span className="inline-flex items-center gap-1 tabular-nums">
+      {formatCompact(c.formatted).display}
+      <TokenChipIcon symbol={myt} size={14} filterable={false} />
+      {myt}
     </span>
   );
   const usd = c.usd ? <span className="tabular-nums">${formatCompact(c.usd.usd).display}</span> : null;

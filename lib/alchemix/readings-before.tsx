@@ -26,6 +26,8 @@ export interface AlchemixReading {
   debtRaw: string | null;
   collateralRaw: string | null;
   earmarkedRaw: string | null;
+  /** The vault's share price read with it, in the underlying's decimals. */
+  sharePriceRaw: string | null;
 }
 
 /** Block number → the stated reading at the previous reading block on the
@@ -43,6 +45,7 @@ export function readingsBefore(events: AlchemistEvent[]): AlchemixReadingsBefore
         debtRaw: s.debtRaw,
         collateralRaw: s.collateralRaw,
         earmarkedRaw: s.earmarkedRaw,
+        sharePriceRaw: s.sharePriceRaw ?? null,
       });
     }
   }
@@ -50,6 +53,73 @@ export function readingsBefore(events: AlchemistEvent[]): AlchemixReadingsBefore
   const out: AlchemixReadingsBefore = new Map();
   for (let i = 1; i < blocks.length; i++) out.set(blocks[i], byBlock.get(blocks[i - 1])!);
   return out;
+}
+
+/** Every stated reading on the timeline, oldest first. */
+export function readingsInOrder(events: AlchemistEvent[]): AlchemixReading[] {
+  const byBlock = new Map<number, AlchemixReading>();
+  for (const e of events) {
+    const s = e.context.data.stateAtBlockFromReading;
+    if (s?.status !== "stated" || s.blockNumber == null || byBlock.has(s.blockNumber)) continue;
+    byBlock.set(s.blockNumber, {
+      blockNumber: s.blockNumber,
+      debtRaw: s.debtRaw,
+      collateralRaw: s.collateralRaw,
+      earmarkedRaw: s.earmarkedRaw,
+      sharePriceRaw: s.sharePriceRaw ?? null,
+    });
+  }
+  return [...byBlock.values()].sort((a, b) => a.blockNumber - b.blockNumber);
+}
+
+export const AlchemixReadingsInOrderContext = createContext<AlchemixReading[] | null>(null);
+
+/** The reading in force at a block with none of its own: the latest one at or
+ *  before it. Debt and collateral step only at blocks the sweep reads (rails-ops
+ *  decisions/0032 point 5), so this row states them at that block. Its
+ *  set-aside does not carry: it grows every block. Null where no earlier
+ *  reading is on the timeline. */
+export function useReadingInForce(block: number | null | undefined): AlchemixReading | null {
+  const list = useContext(AlchemixReadingsInOrderContext);
+  if (!list || block == null) return null;
+  let found: AlchemixReading | null = null;
+  for (const r of list) {
+    if (r.blockNumber > block) break;
+    found = r;
+  }
+  return found;
+}
+
+/** The line's two ratios as the position card states them, read at its
+ *  block. Null where the page has no current reading. */
+export interface AlchemixLineRatios {
+  minimumRaw: string;
+  lowerBoundRaw: string;
+  asOfBlock: number;
+}
+
+export const AlchemixLineRatiosContext = createContext<AlchemixLineRatios | null>(null);
+
+export function useAlchemixLineRatios(): AlchemixLineRatios | null {
+  return useContext(AlchemixLineRatiosContext);
+}
+
+/** Collateralisation at one reading, 1e18-scaled: the share count at the
+ *  share price read with it, over the debt. Null with no debt, no share
+ *  price, or no underlying decimals. */
+export function readingCollateralisationRaw(
+  r: Pick<AlchemixReading, "collateralRaw" | "debtRaw" | "sharePriceRaw">,
+  underlyingDecimals: number | null,
+): string | null {
+  if (r.collateralRaw == null || r.debtRaw == null || r.sharePriceRaw == null || underlyingDecimals == null)
+    return null;
+  if (underlyingDecimals > 18) return null;
+  const debt = BigInt(r.debtRaw);
+  if (debt === BigInt(0)) return null;
+  const wad = BigInt(10) ** BigInt(18);
+  const value =
+    (BigInt(r.collateralRaw) * BigInt(r.sharePriceRaw) * BigInt(10) ** BigInt(18 - underlyingDecimals)) / wad;
+  return ((value * wad) / debt).toString();
 }
 
 export const AlchemixReadingsBeforeContext = createContext<AlchemixReadingsBefore | null>(null);
@@ -82,6 +152,8 @@ export function collateralTakenRaw(event: AlchemistEvent, before: AlchemixReadin
 export interface AlchemixUnderlyingUnit {
   symbol: string;
   decimals: number;
+  /** The underlying's dollar price now, where the page has one. */
+  usd?: { pricePerUnit: number; priceSource: string; pricedAt: string } | null;
 }
 
 export const AlchemixUnderlyingContext = createContext<AlchemixUnderlyingUnit | null>(null);

@@ -165,13 +165,8 @@ export function AlchemixPositionExplanation({
               {two(Math.abs(netN))} {net.underlyingSymbol}
             </H>
           </Prov>{" "}
-          for the holder
-          {netN < 0
-            ? ": the collateral taken was worth that much more than the debt cleared."
-            : netN > 0
-              ? ": the debt cleared was worth that much more than the collateral taken."
-              : "."}{" "}
-          Each redemption&rsquo;s own net is in its card&rsquo;s detail.
+          for the holder: the debt cleared less the value of the collateral taken. Each redemption&rsquo;s own net is in
+          its card&rsquo;s detail.
         </>
       ) : net.total.missingPrice > 0 ? (
         <>

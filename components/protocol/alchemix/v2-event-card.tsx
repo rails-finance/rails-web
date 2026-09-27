@@ -33,6 +33,8 @@ import type { AlchemixV2Context, BaseActivityEvent } from "@/lib/shared/types/ev
 import type { ChainId } from "@/lib/shared/chains";
 import { v2EmittedProv, type AlchemixV2Coords } from "@/lib/alchemix/v2-provenance";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
+import { LearnMore } from "@/components/shared/learn-more-modal";
+import { ALCHEMIX_V2 } from "@/lib/alchemix/learn-more";
 
 export type AlchemixV2Event = BaseActivityEvent & { context: { protocol: "alchemix-v2"; data: AlchemixV2Context } };
 
@@ -269,6 +271,10 @@ export function AlchemixV2EventCard({
           <>
             <h4 className={`${OVERLAY_HEADING} px-5 pt-2 text-rb-500`}>What the log states</h4>
             <ChainTruthDetail stats={stats} />
+            <p className="px-5 pb-3 text-[11px] leading-relaxed text-rb-500">
+              V2 records what each event moved{credit(d) ? " and the debt it cleared" : ""}. It took no reading of the
+              account&rsquo;s debt or collateral here, so no before and after is shown.
+            </p>
           </>
         ) : undefined
       }
@@ -279,6 +285,7 @@ export function AlchemixV2EventCard({
       explainerLabel="Plain English"
       explainerTeaser={line ?? undefined}
       txHash={event.txHash}
+      learnMore={<LearnMore inline content={ALCHEMIX_V2} />}
       persistKey={`alchemix-v2:${event.id}`}
     />
   );

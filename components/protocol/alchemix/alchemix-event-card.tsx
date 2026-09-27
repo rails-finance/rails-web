@@ -45,7 +45,8 @@ import {
   alchemixLearnMoreFor,
   type AlchemixCardProse,
 } from "./alchemix-event-explainer";
-import { collateralTakenRaw, useReadingBefore } from "@/lib/alchemix/readings-before";
+import { collateralTakenRaw, useAlchemixUnderlying, useReadingBefore } from "@/lib/alchemix/readings-before";
+import { redemptionNet } from "@/lib/alchemix/redemption-net";
 import { lineProtocolFeeBps } from "@/lib/alchemix/lines";
 
 const WAD = 1e18;
@@ -135,11 +136,15 @@ export function AlchemixEventCard({
   const lead = legs[0];
   const sibs = siblings ?? legs;
   const before = useReadingBefore(lead.context.data.stateAtBlockFromReading?.blockNumber);
+  const unit = useAlchemixUnderlying();
+  const isRedemption = lead.context.data.eventType === "redemption";
   const prose: AlchemixCardProse = {
     underlyingDecimals,
     mytSymbol,
     protocolFeeBps: lineProtocolFeeBps(lead.context.data.chainId, lead.context.data.lineKey),
-    collateralTakenRaw: lead.context.data.eventType === "redemption" ? collateralTakenRaw(lead, before) : null,
+    collateralTakenRaw: isRedemption ? collateralTakenRaw(lead, before) : null,
+    redemptionNet: isRedemption ? redemptionNet(lead, before, unit?.decimals ?? null) : null,
+    underlyingSymbol: unit?.symbol ?? null,
   };
 
   const coordsFor = (leg: AlchemistEvent): AlchemixCoords => {

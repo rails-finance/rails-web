@@ -19,7 +19,9 @@
 
 import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { composeBullets, splitLead, ProseExplainer, type ClauseInput } from "@/lib/shared/explainer-prose";
+import type { RedemptionNet } from "@/lib/alchemix/redemption-net";
+import { clause, composeBullets, splitLead, ProseExplainer, type ClauseInput } from "@/lib/shared/explainer-prose";
+import { formatGasCost } from "@/lib/shared/format-event";
 import {
   alchemixCustodyRoundTripClause,
   alchemixEventClauses,
@@ -27,6 +29,17 @@ import {
   custodyPathInTx,
   type AlchemistEvent,
 } from "@/lib/alchemix/explainer-clauses";
+import {
+  ALCHEMIX_BURN_REPAY,
+  ALCHEMIX_CUSTODY,
+  ALCHEMIX_HOW_IT_WORKS,
+  ALCHEMIX_LINE_WIDE,
+  ALCHEMIX_LIQUIDATION,
+  ALCHEMIX_MINT,
+  ALCHEMIX_OPEN_DEPOSIT,
+  ALCHEMIX_SELF_LIQUIDATE,
+  ALCHEMIX_WITHDRAW,
+} from "@/lib/alchemix/learn-more";
 
 export interface AlchemixEventExplainerProps {
   /** The legs of one transaction this card draws, in log order. */
@@ -40,141 +53,32 @@ export interface AlchemixEventExplainerProps {
   prose: AlchemixCardProse;
 }
 
-const BORROWING: LearnMoreContent = {
-  title: "Borrowing against vault shares",
-  intro:
-    "Collateral goes in as shares of a vault that lends out the asset underneath (mixUSDC is a vault over USDC). The position mints a synthetic token against those shares, alUSD or alETH, and that is its debt.",
-  detailsHeading: "What moves the two sides",
-  details: [
-    { bold: "Deposit and withdraw", text: "move the vault shares the position holds." },
-    { bold: "Mint and burn", text: "move the debt one for one, and the holder chooses both." },
-    {
-      bold: "Repay",
-      text: "pays the debt with vault shares. Each share counts at its value in the asset underneath at that block, one synthetic per unit, and the line keeps a protocol fee in shares on the part that pays off debt set aside for repayment (0.25% on Ethereum, 0.1% on Base).",
-    },
-    {
-      bold: "Set aside for repayment",
-      text: "is the part of the debt the Transmuter has claimed as its stakers' deposits matured. It grows block by block, and the line's next redemption clears it. See How Alchemix repays a loan, on a redemption card or the position card.",
-    },
-  ],
-};
-
-/** The protocol's central idea, the one a reader has to own to read an
- *  Alchemix timeline: Transmuter stakes maturing are what set debt aside and
- *  what redemptions clear. Opened from every redemption card and from the
- *  position card's Explanation pane. */
-export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
-  title: "How Alchemix repays a loan",
-  intro:
-    "Every Alchemix line has two halves. The Alchemist holds borrowers' positions: vault shares in, a synthetic token such as alUSD out. The Transmuter takes that synthetic back from anyone who holds it and, over time, turns it into the vault shares borrowers put up. The second half is what repays the first.",
-  stepsHeading: "How a redemption happens",
-  steps: [
-    "Someone holding alUSD deposits it in the line's Transmuter, where it matures over a period measured in blocks.",
-    "As those deposits mature, the Alchemist sets aside a matching amount of debt across every open position on the line, in proportion to what each position owes. That is each position's Set aside for repayment figure, and it grows block by block.",
-    "When a staker claims, the Transmuter redeems: every open position's set-aside debt is cleared by the same ratio, and a matching slice of its collateral moves to the Transmuter: vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared.",
-    "The Transmuter pays the staker in those vault shares (mixUSDC on the alUSD line) for the part of the deposit that has matured, and hands back the rest as alUSD.",
-  ],
-  // The staker's side, which a borrower reading a redemption also needs: a
-  // claim can come before maturity, and what that costs.
-  extraParagraphs: [
-    "A stake converts a little every block, in equal parts from the block it is made to its maturity block. The staker can claim at any time. A claim before maturity converts only the part whose blocks have passed, hands the rest back as alUSD and keeps an early exit fee on that rest (1% on every early claim so far). So claiming early gives up converting the rest and pays the fee; to convert it, the staker stakes it again and waits a new full term.",
-  ],
-  detailsHeading: "What it means for a borrower",
-  details: [
-    {
-      bold: "The loan is repaid over time without the holder acting.",
-      text: "Each redemption lowers the debt and the collateral by matching values, so the position's collateral less its debt stays about where it was.",
-    },
-    {
-      bold: "The vault's share price decides what is left over.",
-      text: "A rising share price grows the collateral while the debt stays put. A share price can also fall, and then the collateral shrinks.",
-    },
-    {
-      bold: "A redemption row is the line's event.",
-      text: "It names no position. The explorer reads each position before and after it to state what it cleared and took from that one.",
-    },
-    {
-      bold: "The holder can still repay directly",
-      text: "by burning the synthetic or repaying with vault shares, or close out with a self-liquidation, which pays the debt from the collateral.",
-    },
-    {
-      bold: "A position that falls too low can be liquidated by anyone.",
-      text: "Its collateralisation is the collateral in the asset underneath divided by the debt, with one synthetic counted as one unit of that asset. Minting more or withdrawing must leave it above the line's minimum. If a falling share price takes it to the line's liquidation line or below, anyone can liquidate the position: the Alchemist uses its collateral to repay debt until the ratio is back above the minimum, and pays the liquidator a fee from it. The position card states both lines, read from the Alchemist, and how many liquidations the line has had.",
-    },
-  ],
-};
-
-const LIQUIDATION: LearnMoreContent = {
-  title: "When a position is liquidated",
-  intro:
-    "A position whose collateral no longer covers its debt can have shares taken from it and put against the debt. The holder can do it themselves, or anyone can do it and take a fee for it.",
-  detailsHeading: "What the event states",
-  details: [
-    { bold: "Shares taken", text: "are in the log, so they are shown." },
-    { bold: "Debt cleared", text: "shows in the card's before and after figures." },
-    { bold: "The fee", text: "is paid to whoever did it, in shares and in the asset underneath." },
-  ],
-};
-
-const CLOSED_WITH_COLLATERAL: LearnMoreContent = {
-  title: "Closing a position with its collateral",
-  intro:
-    "The holder can close a position in one step without bringing the synthetic back: the Alchemist puts enough of the position's vault shares against its debt to repay all of it, and returns the rest of the collateral. Alchemix calls this a self-liquidation. The holder chose it, and no liquidator takes a fee.",
-  detailsHeading: "What the event states",
-  details: [
-    { bold: "Shares used", text: "are in the log: the vault shares that went against the debt." },
-    {
-      bold: "Debt set aside for repayment",
-      text: "is repaid first, as a force repay in the same transaction, with the protocol's fee on that part.",
-    },
-    { bold: "Debt and collateral after", text: "are both zero: the position is closed." },
-  ],
-};
-
-const LINE_WIDE: LearnMoreContent = {
-  title: "Events that belong to the whole line",
-  intro:
-    "Some events on this timeline name no position at all. They are here because they fell inside this position's life, and the holder did none of them.",
-  detailsHeading: "The kinds",
-  details: [
-    {
-      bold: "Redemption",
-      text: "clears every open position's set-aside debt on the line at once, by one ratio, and takes a matching slice of each one's collateral for the Transmuter.",
-    },
-    {
-      bold: "Batch liquidation",
-      text: "carries the list of positions as a single hash, so which ones were in it cannot be recovered.",
-    },
-    { bold: "Fee shortfall", text: "records a liquidator being paid less than they were owed." },
-  ],
-};
-
-const CUSTODY: LearnMoreContent = {
-  title: "The position is a token that can be sold",
-  intro:
-    "An Alchemix position is an NFT. It can change hands at any time without the debt or the collateral moving, and without the position closing.",
-  extraParagraphs: [
-    "So the address holding it today need not be the address that opened it, or the address that did any of what is on this page. Each event says who acted in it.",
-  ],
-};
-
 export function alchemixLearnMoreContent(ctx: AlchemixV3Context): LearnMoreContent {
   switch (ctx.eventType) {
+    case "deposit":
+      return ALCHEMIX_OPEN_DEPOSIT;
+    case "mint":
+      return ALCHEMIX_MINT;
+    case "burn":
+    case "repay":
+      return ALCHEMIX_BURN_REPAY;
+    case "withdraw":
+      return ALCHEMIX_WITHDRAW;
     case "self_liquidated":
-      return CLOSED_WITH_COLLATERAL;
+      return ALCHEMIX_SELF_LIQUIDATE;
     case "liquidated":
     case "force_repay":
     case "repayment_fee":
-      return LIQUIDATION;
+      return ALCHEMIX_LIQUIDATION;
     case "redemption":
       return ALCHEMIX_HOW_IT_WORKS;
     case "batch_liquidated":
     case "fee_shortfall":
-      return LINE_WIDE;
+      return ALCHEMIX_LINE_WIDE;
     case "transfer":
-      return CUSTODY;
+      return ALCHEMIX_CUSTODY;
     default:
-      return BORROWING;
+      return ALCHEMIX_OPEN_DEPOSIT;
   }
 }
 
@@ -206,6 +110,17 @@ export interface AlchemixCardProse {
   mytSymbol: string;
   protocolFeeBps: number | null;
   collateralTakenRaw: string | null;
+  redemptionNet: RedemptionNet | null;
+  underlyingSymbol: string | null;
+}
+
+/** The trailing gas bullet, Liquity's: the holder's own transactions only. A
+ *  line row is the Transmuter's transaction, and its gas is nobody's here. */
+function gasClause(legs: AlchemistEvent[]): ClauseInput {
+  if (legs.some((l) => l.context.data.scope === "line")) return null;
+  const gas = legs.find((l) => l.gas && l.gas.gasCostEth > 0)?.gas;
+  if (!gas) return null;
+  return clause(<>Gas for this transaction: {formatGasCost(gas)}.</>);
 }
 
 /** Every bullet the card can show, teaser included. */
@@ -234,10 +149,13 @@ function alchemixCardClauses(
         mytSymbol: prose.mytSymbol,
         protocolFeeBps: prose.protocolFeeBps,
         collateralTakenRaw: prose.collateralTakenRaw,
+        redemptionNet: prose.redemptionNet,
+        underlyingSymbol: prose.underlyingSymbol,
       }),
     ),
     ...(roundTrip ? [alchemixCustodyRoundTripClause(roundTrip)] : []),
     ...readingClauses,
+    gasClause(legs),
   ];
 }
 

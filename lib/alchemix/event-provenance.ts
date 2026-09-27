@@ -756,3 +756,102 @@ export function redemptionNetUnavailableProv(atBlock: number, coords: AlchemixCo
     inputs: coordInputs(coords),
   };
 }
+
+/** Collateralisation at one reading: the reading's share count valued at the
+ *  share price stored with it, over the reading's debt. The same ratio the
+ *  position card reads from `totalValue`, taken here from the stored reading
+ *  so a past block has one. */
+export function readingCollateralisationProv(
+  collateralRaw: string,
+  sharePriceRaw: string,
+  debtRaw: string,
+  atBlock: number,
+  underlyingDecimals: number,
+  mytSymbol: string,
+  underlyingSymbol: string,
+  coords: AlchemixCoords,
+): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `Collateralisation at block ${atBlock} — the ${mytSymbol} held, valued in ${underlyingSymbol} at the share price read with it, over the debt, one debt unit counted as one ${underlyingSymbol}`,
+    contract: alchemistContract(coords),
+    via: `getCDP(${coords.tokenId}) and the ${mytSymbol} share price at block ${atBlock}`,
+    formula: "collateral × share price ÷ debt",
+    verify: {
+      kind: "recompute",
+      text: `Call getCDP(${coords.tokenId}) and the vault's convertToAssets(1e18) at block ${atBlock}, then divide`,
+    },
+    source: { block: atBlock },
+    inputs: coordInputs(coords, [
+      {
+        label: "collateral",
+        value: collateralRaw,
+        kind: "chain",
+        note: `getCDP collateral, ${mytSymbol} shares, 18 decimals`,
+      },
+      {
+        label: "share price",
+        value: sharePriceRaw,
+        kind: "chain",
+        note: `convertToAssets(1e18), ${underlyingDecimals} decimals of ${underlyingSymbol}`,
+      },
+      { label: "debt", value: debtRaw, kind: "chain", note: "getCDP debt, 18 decimals" },
+    ]),
+  };
+}
+
+/** A figure carried to a block with no reading of its own, from the reading
+ *  in force there. Debt and collateral step only at blocks the sweep reads
+ *  (decisions/0032 point 5), so the row in force at a block states them at
+ *  that block. Set-aside grows every block and is never carried. */
+export function carriedReadingProv(
+  label: string,
+  symbol: string,
+  raw: string,
+  readBlock: number,
+  eventBlock: number,
+  coords: AlchemixCoords,
+): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    summary: `${label} — unchanged since this position's reading at block ${readBlock}, the one in force at block ${eventBlock}`,
+    contract: alchemistContract(coords),
+    via: `getCDP(${coords.tokenId}) at block ${readBlock}`,
+    verify: { kind: "recompute", text: `Call getCDP(${coords.tokenId}) at block ${eventBlock}` },
+    source: { block: readBlock },
+    inputs: coordInputs(coords, [
+      {
+        label: "why it carries",
+        value: `no step between blocks ${readBlock} and ${eventBlock}`,
+        kind: "chain",
+        note: "debt and collateral move only at the position's own axis-moving events and the line's redemptions, and every such block carries a reading",
+      },
+    ]),
+    scaling: { raw, from: "call", places: 18, why: `${symbol} carries 18 decimals` },
+  };
+}
+
+/** A redemption's net, restated in USD at the underlying's price now. */
+export function redemptionNetUsdProv(
+  netUnderlying: number,
+  underlyingSymbol: string,
+  pricePerUnit: number,
+  priceSource: string,
+  pricedAt: string,
+): Provenance {
+  return {
+    kind: "offchain",
+    pclass: "offchain",
+    summary: `Net for this position in USD — the net in ${underlyingSymbol} at ${underlyingSymbol}'s price now`,
+    formula: "net × price per unit",
+    via: `${priceSource} · ${pricedAt}`,
+    verify: { kind: "none", text: "An off-chain price, with no on-chain anchor" },
+    inputs: [
+      { label: "net", value: String(netUnderlying), kind: "chain-derived", note: `in ${underlyingSymbol}` },
+      { label: "price per unit", value: String(pricePerUnit), kind: "offchain", note: priceSource },
+      { label: "priced at", value: pricedAt, kind: "offchain", note: "the price now" },
+    ],
+  };
+}
