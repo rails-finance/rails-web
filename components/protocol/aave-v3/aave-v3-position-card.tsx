@@ -65,9 +65,9 @@ function UnreadAmount({ r }: { r: AaveV3ReserveAmount }) {
   return (
     <span
       className="text-rb-500"
-      title={`${r.address}: the token's decimals were not read from the chain, so no amount is shown`}
+      title={`${r.address}: the chain didn't answer for this token's decimals. The amount shows once it does.`}
     >
-      Unread <span className="font-mono text-sm font-normal">{r.symbol}</span>
+      Not loaded <span className="font-mono text-sm font-normal">{r.symbol}</span>
     </span>
   );
 }
