@@ -140,6 +140,39 @@ const AAVE_V4_MARK: Glyph = {
   ],
 };
 
+// The Alchemix mark, shared by its two deployments (Ethereum and Base). The
+// source is stroke-only (width 2 in a 61-unit box, round caps and joins), which
+// is hairline at 20px, so the strokes were widened to 4 and converted to filled
+// outlines (Inkscape, stroke to path) to paint like every other glyph. The
+// widened ring reaches past the box edge (fill ~1.04), so `inset` brings it to
+// ~0.83.
+const ALCHEMIX_MARK: Glyph = {
+  viewBox: "0 0 61 61",
+  inset: 0.2,
+  paths: [
+    {
+      d: "M 30.391,-1.25 C 12.94,-1.25 -1.25,12.94 -1.25,30.391 c 0,17.451 14.19,31.639 31.641,31.639 17.451,0 31.639,-14.188 31.639,-31.639 C 62.029,12.94 47.841,-1.25 30.391,-1.25 Z m 0,4 c 15.289,0 27.639,12.352 27.639,27.641 0,15.289 -12.35,27.639 -27.639,27.639 C 15.102,58.029 2.75,45.679 2.75,30.391 2.75,15.102 15.102,2.75 30.391,2.75 Z",
+    },
+    { d: "m 30.391,36.971 a 2,2 0 0 0 -2,2 v 21.068 a 2,2 0 0 0 2,2 2,2 0 0 0 2,-2 V 38.971 a 2,2 0 0 0 -2,-2 z" },
+    { d: "m 30.391,-1.25 a 2,2 0 0 0 -2,2 v 6.24 a 2,2 0 0 0 2,2 2,2 0 0 0 2,-2 V 0.75 a 2,2 0 0 0 -2,-2 z" },
+    {
+      d: "M 29.148,5.422 8.949,21.412 a 2,2 0 0 0 0,3.137 L 29.148,40.539 a 2,2 0 0 0 2.811,-0.328 2,2 0 0 0 -0.328,-2.809 L 13.412,22.98 30.391,9.541 47.367,22.98 40.328,28.553 a 2,2 0 0 0 -0.326,2.809 2,2 0 0 0 2.809,0.326 l 9.021,-7.139 a 2,2 0 0 0 0,-3.137 L 31.631,5.422 a 2,2 0 0 0 -2.482,0 z",
+    },
+    {
+      d: "m 50.59,20.98 a 2,2 0 0 0 -2,2 V 36.951 L 46.25,38.801 a 2,2 0 0 0 -0.33,2.809 2,2 0 0 0 2.811,0.33 l 3.1,-2.451 a 2,2 0 0 0 0.76,-1.568 V 22.98 a 2,2 0 0 0 -2,-2 z",
+    },
+    {
+      d: "m 10.189,20.98 a 2,2 0 0 0 -2,2 v 14.939 a 2,2 0 0 0 0.76,1.568 L 29.148,55.469 a 2,2 0 0 0 2.482,0 L 40.75,48.26 a 2,2 0 0 0 0.328,-2.811 2,2 0 0 0 -2.809,-0.328 L 30.391,51.35 12.189,36.951 V 22.98 a 2,2 0 0 0 -2,-2 z",
+    },
+    {
+      d: "m 14.74,38.988 a 2,2 0 0 0 -2.732,0.73 l -3.449,5.971 a 2,2 0 0 0 1.73,3 h 10.99 a 2,2 0 0 0 2,-2 2,2 0 0 0 -2,-2 h -7.523 l 1.715,-2.969 a 2,2 0 0 0 -0.73,-2.732 z",
+    },
+    {
+      d: "M 30.391,9.871 A 2,2 0 0 0 28.658,10.869 L 18.148,29.07 a 2,2 0 0 0 0.73,2.732 2,2 0 0 0 2.732,-0.732 L 30.391,15.869 47.035,44.689 H 30.391 a 2,2 0 0 0 -2,2 2,2 0 0 0 2,2 H 50.5 a 2,2 0 0 0 1.732,-3 L 32.121,10.869 A 2,2 0 0 0 30.391,9.871 Z",
+    },
+  ],
+};
+
 const GLYPHS: Record<string, Glyph> = {
   // viewBox inferred from path extents — source was pasted without the <svg>
   // wrapper. Compound is a centred mark, so a tight bounding box frames it well.
@@ -188,6 +221,9 @@ const GLYPHS: Record<string, Glyph> = {
   "aave-v4": AAVE_V4_MARK,
   // Aave V4 on Base: the Ethereum mark, its own deployment.
   "aave-v4-base": AAVE_V4_MARK,
+  alchemix: ALCHEMIX_MARK,
+  // Alchemix on Base: the Ethereum mark, its own deployment.
+  "alchemix-base": ALCHEMIX_MARK,
   // Liquity V2 (directory id "liquity") — the circular two-tone mark from
   // `public/liquity-logo.svg` reduced to pure currentColor + transparent (no
   // opacity midtones): the light-blue disc becomes a 2-unit ring (outer minus
