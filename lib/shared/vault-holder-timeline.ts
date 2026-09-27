@@ -115,8 +115,15 @@ export interface VaultHolderEvent {
 
   /** `convertToAssets(10 ** shareDecimals)` at THIS row's own block, raw asset
    *  units, with the exponent stated. Null when the archive call did not
-   *  answer — an unread figure, never the head price and never a dash. */
+   *  answer — an unread figure, never the head price and never a dash — or
+   *  when it reverted, which `sharePriceReverted` then says. */
   sharePriceAtBlock: string | null;
+  /** `convertToAssets` REVERTED at this block (JSON-RPC code 3, or a node's
+   *  "execution reverted"). A revert is the chain's answer at that block and
+   *  asking again returns it again, so the row is whole and may be stored;
+   *  `sharePriceAtBlock` is null beside it. Absent on every other row, so a
+   *  row stored before the marker existed reads the same. */
+  sharePriceReverted?: true;
   shareDecimals: number;
   assetDecimals: number;
 
@@ -321,6 +328,20 @@ export const AAVE_VAULT_TAIL_VERSION = 3;
  *  block hold rows whose share price did not answer (1,608 rows in three lives
  *  on 2026-09-21), and a stored row is never read again. */
 export const MORPHO_BASE_VAULT_TAIL_VERSION = 2;
+
+/** Did every read this row is made of ANSWER — a block timestamp, and a share
+ *  price or a revert in its place? The one test the store gate, a stored tail
+ *  on the way out and the tail PUT route all apply: a stored row is never read
+ *  again, so a row missing an answer must not be stored. `sharePriceReverted`
+ *  arrived after both tail versions above without a bump, because a row stored
+ *  before it never carries a null price. */
+export const rowAnswered = (r: {
+  timestamp?: unknown;
+  sharePriceAtBlock?: unknown;
+  sharePriceReverted?: unknown;
+}): boolean =>
+  Number(r.timestamp) > 0 &&
+  (r.sharePriceAtBlock != null ? r.sharePriceReverted == null : r.sharePriceReverted === true);
 
 /** A stored history TAIL — every row of one holder's life in one vault at or
  *  below a FINALIZED block, kept because a reading at a named block never

@@ -158,7 +158,7 @@ import {
   type RawLog,
 } from "./vault-holder-logs";
 import { countRefusedSweeps } from "./vault-sweep-walk";
-import { emptyBlockReads, firstUnreadBlock, readBlockWave, type BlockReads } from "./vault-block-reads";
+import { emptyBlockReads, firstUnreadBlock, priceFields, readBlockWave, type BlockReads } from "./vault-block-reads";
 import { MAINNET_CHAIN_ID, chainMeta } from "@/lib/shared/chains";
 import type { AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
 import {
@@ -167,6 +167,7 @@ import {
   BUILD_CHUNK_BLOCKS,
   BUILD_WALL_MS,
   VAULT_TIMELINE_HORIZON,
+  rowAnswered,
   vaultDrawWindow,
   tailMaxRows,
   type StoredVaultTail,
@@ -290,9 +291,10 @@ function usableTail(
   // OUT as well as on the way in, so a tail written before this rule existed
   // self-heals: the request that finds one sweeps the whole life and stores a
   // clean tail over it. 0 is 1 January 1970 on the page, not an unread marker.
-  // A row with no share price is refused the same way: a stored row is never
-  // read again, so a price the lane refused would stay unread for good.
-  if (tail.rows.some((r) => !(r.timestamp > 0) || r.sharePriceAtBlock == null)) return null;
+  // A row with no share price is refused the same way unless it says the read
+  // reverted: a stored row is never read again, so a price the lane refused
+  // would stay unread for good, while a revert is the chain's answer there.
+  if (!tail.rows.every(rowAnswered)) return null;
   // …and a tail whose sweep counts cannot account for its own rows is refused
   // the same way. Every transfer row came out of at least one of the two
   // `eth_getLogs` (a self-transfer out of both), so `logsIn + logsOut` can
@@ -705,8 +707,8 @@ export async function loadAaveEthereumVaultTimelineWithTail(
     // tail is refused rather than the row, because a tail with a row missing
     // from the middle would not sum to its own `cutBalance`. A row whose share
     // price did not answer is refused on the same terms: stored, it would never
-    // be asked for again.
-    const wholeRows = store != null && store.rows.every((r) => r.timestamp > 0 && r.sharePriceAtBlock != null);
+    // be asked for again. A price that reverted is an answer (`rowAnswered`).
+    const wholeRows = store != null && store.rows.every(rowAnswered);
     const stale = tail != null && finalized != null && finalized - tail.cut > TAIL_REFRESH_BLOCKS;
     const shouldStore =
       tailsAllowed &&
@@ -839,10 +841,12 @@ interface ChunkedBuild {
  * A block has answered when BOTH its reads have: the timestamp and the share
  * price. A row carrying the `timestamp: 0` placeholder is never stored — the
  * store's rule refuses a tail with one in it, and 0 is 1 January 1970 on a page
- * rather than an unread marker — and neither is a row whose price is null,
- * because a stored row is never read again. So the chunk is stored up to the
- * block BEFORE the first one that did not answer: every row under that cut was read, the rows
- * are ascending, so that prefix is a whole up to its own cut like any other.
+ * rather than an unread marker — and neither is a row whose price did not
+ * answer, because a stored row is never read again. A price that REVERTED is an
+ * answer (`BlockReads.reverted`), so its block does not end the chunk. So the
+ * chunk is stored up to the block BEFORE the first one that did not answer:
+ * every row under that cut was read, the rows are ascending, so that prefix is
+ * a whole up to its own cut like any other.
  * The next attempt starts at the unread block and asks only for the blocks no
  * earlier attempt answered (`BlockReads`), so a retry repeats no call that
  * answered. `verify-ethereum-vault-cold-build.mjs` holds this against a lane
@@ -1014,7 +1018,6 @@ async function buildRows(
   // costing every large life its tail.
   await readBlockWave(client, vault, opts.shareDecimals, blocks, known);
   const timestampAt = known.timestamps;
-  const priceAt = known.prices;
 
   // The asset leg, claimed once each: a transaction that ever carries two of
   // this owner's legs pairs them by share count rather than taking the first.
@@ -1055,7 +1058,7 @@ async function buildRows(
       // Only a mint or a burn has an ERC-4626 leg to claim. A plain transfer
       // emits none, and stating one for it would be an invention.
       assets: kind === "deposit" || kind === "withdrawal" ? claimLeg(log.transactionHash, value) : null,
-      sharePriceAtBlock: priceAt.get(key) ?? null,
+      ...priceFields(known, key),
       shareDecimals: opts.shareDecimals,
       assetDecimals: opts.assetDecimals,
       extra: sameTxCooldowns.length ? umbrellaExtra(sameTxCooldowns) : undefined,
@@ -1092,7 +1095,7 @@ async function buildRows(
       sharesDelta: "0",
       balanceAfter: balanceHere,
       assets: null,
-      sharePriceAtBlock: priceAt.get(key) ?? null,
+      ...priceFields(known, key),
       shareDecimals: opts.shareDecimals,
       assetDecimals: opts.assetDecimals,
       extra: umbrellaExtra([log]),

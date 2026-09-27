@@ -261,6 +261,9 @@ function RowDetail({
       // that did not answer and a price of nothing are different facts, and the
       // panel above says so in words too.
       data-row-share-price={event.sharePriceAtBlock ?? ""}
+      // Set only where `convertToAssets` reverted at this block: the empty
+      // price beside it is then the chain's answer at that block.
+      data-row-share-price-reverted={event.sharePriceReverted ? "true" : undefined}
       data-row-assets={event.assets ?? ""}
     >
       <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
@@ -289,10 +292,16 @@ function RowDetail({
         <StatCard
           label={`Share price at this block · ${assetSymbol}`}
           figure="row-share-price"
-          note={`convertToAssets(10^${sd}) at block ${event.blockNumber.toLocaleString("en-US")} — the block this address's own transaction landed in.`}
+          note={
+            event.sharePriceReverted
+              ? `convertToAssets(10^${sd}) reverted at block ${event.blockNumber.toLocaleString("en-US")}, so the vault states no share price there. Asking again at that block returns the same revert.`
+              : `convertToAssets(10^${sd}) at block ${event.blockNumber.toLocaleString("en-US")} — the block this address's own transaction landed in.`
+          }
         >
           {event.sharePriceAtBlock ? (
             <Prov info={prov.sharePrice(coords, sd)}>{sharePriceText(rawAmount(event.sharePriceAtBlock, ad), ad)}</Prov>
+          ) : event.sharePriceReverted ? (
+            <span className="text-base font-normal text-rb-500">Reverted</span>
           ) : (
             <NotLoaded className="text-base font-normal text-rb-500" />
           )}

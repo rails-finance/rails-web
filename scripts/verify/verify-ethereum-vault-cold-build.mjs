@@ -52,6 +52,23 @@
 //         and still draws every row;
 //      6c a stored tail carrying a null price is refused on the way out, and
 //         the life is swept whole again.
+//   7  A SHARE PRICE THAT REVERTS IS AN ANSWER (rails-ops TO-DO-infra item 15).
+//      `convertToAssets` at some blocks answers JSON-RPC code 3 "execution
+//      reverted" (or a node's -32000 "execution reverted") for the whole run,
+//      beside other blocks that are refused. A revert is asked once, never
+//      retried, and its row is stored with `sharePriceAtBlock: null` and
+//      `sharePriceReverted: true`; a refusal still ends the chunk.
+//      7a a revert and a 429 in one chunk: the chunk runs past the revert and
+//         ends below the 429, the reverted block asked once;
+//      7b the chunk's very first block reverts: the build keeps the chunk, in
+//         the calls a quiet lane makes — no stall;
+//      7c a light life with a -32000 "execution reverted" row offers its tail;
+//      7d that tail is taken from the store on the way out;
+//      7e an internal error (-32603), which viem also reports as a reverted
+//         contract call, is a miss: the chunk ends below it.
+//   `--old` does not reach 7: its scratch copy keeps this checkout's
+//   vault-block-reads.ts. The break test for 7 is this script run in a
+//   checkout of the commit before the fix (the commit message has the count).
 //
 // `--old[=<commit>]` is the break test: the same checks against the loader and
 // rpc.ts as they were at <commit> (`git show <commit>:…` into a scratch copy).
@@ -171,7 +188,14 @@ const lane = {
   deadPrices: new Map(),
   /** until when every call is refused */
   allDeadUntil: 0,
+  /** block number → the error body its `convertToAssets` answers every time */
+  errorPrices: new Map(),
+  /** block number → how many times its `convertToAssets` was asked */
+  priceAsks: new Map(),
 };
+const REVERT_CODE_3 = { code: 3, message: "execution reverted", data: "0x" };
+const REVERT_GETH = { code: -32000, message: "execution reverted" };
+const INTERNAL = { code: -32603, message: "internal error" };
 const refusal = { code: 429, message: "Your app has exceeded its compute units per second capacity." };
 
 function refused(now) {
@@ -249,6 +273,8 @@ function answer(req) {
       return { jsonrpc: "2.0", id, result: toHex(bal, { size: 32 }) };
     }
     if (selector === "0x07a2d13a") {
+      lane.priceAsks.set(block, (lane.priceAsks.get(block) ?? 0) + 1);
+      if (lane.errorPrices.has(block)) return { jsonrpc: "2.0", id, error: lane.errorPrices.get(block) };
       if ((lane.deadPrices.get(block) ?? 0) > now) return { jsonrpc: "2.0", id, error: refusal };
       return { jsonrpc: "2.0", id, result: toHex(10n ** 6n, { size: 32 }) };
     }
@@ -320,13 +346,17 @@ const reset = () => {
   lane.deadBlocks.clear();
   lane.deadPrices.clear();
   lane.allDeadUntil = 0;
+  lane.errorPrices.clear();
+  lane.priceAsks.clear();
 };
 /** A tail is a whole up to its own cut: ascending, nothing above the cut, no
- *  placeholder timestamp, no unread share price, and its rows sum to its
+ *  placeholder timestamp, no unread share price (a null price beside
+ *  `sharePriceReverted` is a revert, which is read), and its rows sum to its
  *  cutBalance. */
+const priced = (r) => (r.sharePriceAtBlock != null) !== (r.sharePriceReverted === true);
 const wholeTail = (t) =>
   t.rows.every((r, i) => i === 0 || r.blockNumber > t.rows[i - 1].blockNumber) &&
-  t.rows.every((r) => r.blockNumber <= t.cut && r.timestamp > 0 && r.sharePriceAtBlock != null) &&
+  t.rows.every((r) => r.blockNumber <= t.cut && r.timestamp > 0 && priced(r)) &&
   t.rows.reduce((a, r) => a + BigInt(r.sharesDelta), 0n) === BigInt(t.cutBalance);
 const rowsBelow = (cut) => LOGS.filter((l) => Number(BigInt(l.blockNumber)) <= cut).length;
 
@@ -430,7 +460,7 @@ lane.allDeadUntil = Date.now() + 30_000;
 // whole run, longer than any backoff or retry). A stored row is never read
 // again, so an unpriced row must not reach the store.
 const NEVER = Number.POSITIVE_INFINITY;
-const unpriced = (t) => (t ? t.rows.filter((r) => r.sharePriceAtBlock == null).length : 0);
+const unpriced = (t) => (t ? t.rows.filter((r) => !priced(r)).length : 0);
 
 // 6a — the heavy life: the 701st block's price never answers.
 reset();
@@ -486,6 +516,113 @@ reset();
       `source ${r.timeline.history.source}, ${r.timeline.events.length} rows drawn, store ${r.store ? `${r.store.rows.length} rows, ${unpriced(r.store)} with no share price` : "null"}`,
     );
   }
+}
+
+// 7 — a share price that reverts. The revert answers the same way every time
+// it is asked, for the whole run.
+const reverted = (rows) => rows.filter((r) => r.sharePriceReverted === true);
+
+// 7a — the heavy life: the 301st block's price reverts (code 3) and the 701st
+// block's is refused for good.
+reset();
+{
+  const REVERT_AT = FIRST_BLOCK + 300 * STEP;
+  const REFUSED_AT = FIRST_BLOCK + 700 * STEP;
+  lane.errorPrices.set(REVERT_AT, REVERT_CODE_3);
+  lane.deadPrices.set(REFUSED_AT, NEVER);
+  const r = await load();
+  const rev = r.store ? reverted(r.store.rows) : [];
+  check(
+    "7a a revert beside a 429: the chunk runs past the revert, ends below the 429, and the revert is asked once",
+    r.store != null &&
+      r.store.cut === REFUSED_AT - STEP &&
+      r.store.rows.length === 700 &&
+      wholeTail(r.store) &&
+      rev.length === 1 &&
+      rev[0].blockNumber === REVERT_AT &&
+      rev[0].sharePriceAtBlock === null &&
+      lane.priceAsks.get(REVERT_AT) === 1 &&
+      lane.priceAsks.get(REFUSED_AT) > 1,
+    `store ${r.store ? `${r.store.rows.length} rows at cut ${r.store.cut}, reverted rows at ${rev.map((x) => x.blockNumber).join(",") || "none"}` : "null"}, wanted 700 rows at cut ${REFUSED_AT - STEP} with block ${REVERT_AT} reverted; asks: revert ${lane.priceAsks.get(REVERT_AT)}, 429 ${lane.priceAsks.get(REFUSED_AT)}`,
+  );
+}
+
+// 7b — the chunk's very first block reverts. Before the fix this was a stall
+// on every visit.
+reset();
+lane.errorPrices.set(FIRST_BLOCK, REVERT_CODE_3);
+{
+  const t0 = Date.now();
+  const r = await load();
+  const b = r.timeline.history.building;
+  check(
+    "7b a revert at the chunk's first block does not stall the build: the chunk is kept in a quiet lane's calls",
+    r.store != null &&
+      r.store.rows.length === 1500 &&
+      wholeTail(r.store) &&
+      reverted(r.store.rows).length === 1 &&
+      r.store.rows[0].blockNumber === FIRST_BLOCK &&
+      b != null &&
+      b.keptRows === 1500 &&
+      lane.calls === EXPECTED_QUIET_CALLS,
+    `store ${r.store ? `${r.store.rows.length} rows at cut ${r.store.cut}` : "null"}, building ${JSON.stringify(b)}, ${lane.calls} calls (quiet ${EXPECTED_QUIET_CALLS}), ${Date.now() - t0} ms`,
+  );
+}
+
+// 7c — the light life, with a -32000 "execution reverted" at one row: the tail
+// is offered and the row drawn with its marker.
+reset();
+const LIGHT_REVERT = Number(BigInt(LIGHT_LOGS[20].blockNumber));
+lane.errorPrices.set(LIGHT_REVERT, REVERT_GETH);
+let revertedTail = null;
+{
+  const r = await load(LIGHT);
+  const drawn = reverted(r.timeline.events);
+  revertedTail = r.store;
+  check(
+    "7c a light life with a reverted row offers its tail, and draws the row as reverted",
+    r.timeline.events.length === LIGHT_N &&
+      r.timeline.history.storedThisRequest &&
+      r.store != null &&
+      wholeTail(r.store) &&
+      reverted(r.store.rows).length === 1 &&
+      drawn.length === 1 &&
+      drawn[0].blockNumber === LIGHT_REVERT,
+    `${r.timeline.events.length} rows drawn (${drawn.length} reverted), store ${r.store ? `${r.store.rows.length} rows, ${reverted(r.store.rows).length} reverted` : "null"}, storedThisRequest ${r.timeline.history.storedThisRequest}`,
+  );
+}
+
+// 7d — that tail, handed back as the store would: taken, not swept again.
+reset();
+{
+  const r = revertedTail ? await load(LIGHT, revertedTail) : null;
+  check(
+    "7d a stored tail with a reverted row is taken on the way out",
+    r != null &&
+      r.timeline.history.source === "stored+head" &&
+      r.timeline.events.length === LIGHT_N &&
+      reverted(r.timeline.events).length === 1,
+    r
+      ? `source ${r.timeline.history.source}, ${r.timeline.events.length} rows drawn, ${reverted(r.timeline.events).length} reverted`
+      : "no tail from 7c",
+  );
+}
+
+// 7e — an internal error is the lane failing, whatever viem calls it.
+reset();
+{
+  const FAILED_AT = FIRST_BLOCK + 400 * STEP;
+  lane.errorPrices.set(FAILED_AT, INTERNAL);
+  const r = await load();
+  check(
+    "7e an internal error (-32603) is a miss: the chunk ends below it and nothing is marked reverted",
+    r.store != null &&
+      r.store.cut === FAILED_AT - STEP &&
+      r.store.rows.length === 400 &&
+      wholeTail(r.store) &&
+      reverted(r.store.rows).length === 0,
+    `store ${r.store ? `${r.store.rows.length} rows at cut ${r.store.cut}, ${reverted(r.store.rows).length} reverted` : "null"}, wanted 400 rows at cut ${FAILED_AT - STEP}`,
+  );
 }
 
 server.close();

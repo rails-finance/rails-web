@@ -145,7 +145,7 @@ import {
   type RawLog,
 } from "./vault-holder-logs";
 import { countRefusedSweeps } from "./vault-sweep-walk";
-import { emptyBlockReads, firstUnreadBlock, readBlockWave, type BlockReads } from "./vault-block-reads";
+import { emptyBlockReads, firstUnreadBlock, priceFields, readBlockWave, type BlockReads } from "./vault-block-reads";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import {
   BUILD_BLOCKS_INLINE,
@@ -153,6 +153,7 @@ import {
   BUILD_WALL_MS,
   MORPHO_BASE_VAULT_TAIL_VERSION,
   VAULT_TIMELINE_HORIZON,
+  rowAnswered,
   vaultDrawWindow,
   tailMaxRows,
   type MetaMorphoEventExtra,
@@ -307,9 +308,10 @@ function usableTail(
   // OUT as well as on the way in, so a tail written before this rule existed
   // self-heals: the request that finds one sweeps the whole life and stores a
   // clean tail over it. 0 is 1 January 1970 on the page, not an unread marker.
-  // A row with no share price is refused the same way: a stored row is never
-  // read again, so a price the lane refused would stay unread for good.
-  if (tail.rows.some((r) => !(r.timestamp > 0) || r.sharePriceAtBlock == null)) return null;
+  // A row with no share price is refused the same way unless it says the read
+  // reverted: a stored row is never read again, so a price the lane refused
+  // would stay unread for good, while a revert is the chain's answer there.
+  if (!tail.rows.every(rowAnswered)) return null;
   // …and a tail whose sweep counts cannot account for its own rows is refused
   // the same way. Every transfer row came out of at least one of the two
   // `eth_getLogs` (a self-transfer out of both), so `logsIn + logsOut` can
@@ -693,8 +695,8 @@ export async function loadMorphoBaseVaultTimelineWithTail(
     // and 0 is not an unread marker, it is 1 January 1970, so a page drawing a
     // stored one would state a date that is simply wrong. A row whose share
     // price did not answer is refused on the same terms: stored, it would never
-    // be asked for again.
-    const wholeRows = store != null && store.rows.every((r) => r.timestamp > 0 && r.sharePriceAtBlock != null);
+    // be asked for again. A price that reverted is an answer (`rowAnswered`).
+    const wholeRows = store != null && store.rows.every(rowAnswered);
     const stale = tail != null && finalized != null && finalized - tail.cut > BASE_TAIL_REFRESH_BLOCKS;
     const shouldStore =
       tailsAllowed &&
@@ -810,7 +812,8 @@ interface ChunkedBuild {
  * it has always been read.
  *
  * A BLOCK THAT DID NOT ANSWER ENDS THE CHUNK THERE, as on chain 1. A block
- * has answered when BOTH its reads have, the timestamp and the share price: a
+ * has answered when BOTH its reads have, the timestamp and the share price (a
+ * revert is the share price's answer, `BlockReads.reverted`): a
  * `timestamp: 0` placeholder in the store would be 1 January 1970 on a page,
  * and a null price would stay unread for good. The chunk is stored up to the
  * block BEFORE the first one that did not answer, and the next attempt asks
@@ -968,7 +971,6 @@ async function buildRows(
   // allocation band would then rest on different denominators.
   await readBlockWave(client, vault, opts.shareDecimals, blocks, known);
   const timestampAt = known.timestamps;
-  const priceAt = known.prices;
 
   const rows: VaultHolderEvent[] = [];
   let balance = openingBalance;
@@ -998,7 +1000,7 @@ async function buildRows(
       // Only a mint or a burn has an ERC-4626 leg to claim. A plain transfer
       // emits none, and stating one for it would be an invention.
       assets: kind === "deposit" || kind === "withdrawal" ? claimLeg(log.transactionHash, value) : null,
-      sharePriceAtBlock: priceAt.get(key) ?? null,
+      ...priceFields(known, key),
       shareDecimals: opts.shareDecimals,
       assetDecimals: opts.assetDecimals,
       // Unread here, and filled by `attachAllocation` over the MERGED rows —

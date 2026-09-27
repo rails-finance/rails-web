@@ -11,6 +11,12 @@
 // row grammar then leaves `timestamp: 0` or `sharePriceAtBlock: null`, and
 // neither may reach the store: a stored row is never read again.
 //
+// A REVERT IS AN ANSWER. `convertToAssets` that reverts at a block (JSON-RPC
+// code 3, or a node's "execution reverted") reverts there on every asking, so
+// the block goes into `reverted`, is not retried, and counts as read: its row
+// carries `sharePriceReverted` and may be stored. Anything else that fails — a
+// 429, a timeout, an internal error — is a miss, retried and never stored.
+//
 // ONE RETRY OVER THE MISSES, and only the misses. Measured on a 3,942-row
 // Ethereum fixture: a first wave over ~3,900 distinct blocks came back with a
 // few hundred refusals on the metered lane, and a second pass over just those
@@ -18,7 +24,7 @@
 // ./rpc.ts) has already waited out a rate-limit refusal for about seven seconds
 // before a call counts as a miss here.
 
-import { parseAbi, type PublicClient } from "viem";
+import { BaseError, decodeFunctionResult, encodeFunctionData, parseAbi, type PublicClient } from "viem";
 
 const PRICE_ABI = parseAbi(["function convertToAssets(uint256) view returns (uint256)"]);
 
@@ -29,9 +35,43 @@ const PRICE_ABI = parseAbi(["function convertToAssets(uint256) view returns (uin
 export interface BlockReads {
   timestamps: Map<string, number>;
   prices: Map<string, string>;
+  /** Blocks whose `convertToAssets` reverted — read, with no price. */
+  reverted: Set<string>;
 }
 
-export const emptyBlockReads = (): BlockReads => ({ timestamps: new Map(), prices: new Map() });
+export const emptyBlockReads = (): BlockReads => ({ timestamps: new Map(), prices: new Map(), reverted: new Set() });
+
+/** Is this error the node saying the call REVERTED at that block? JSON-RPC
+ *  code 3 is the revert code, with or without revert data; a node that reverts
+ *  with no data may answer -32000 "execution reverted" instead. The error must
+ *  come from `client.call`, which keeps the node's error in its cause chain.
+ *  `readContract` does not: it replaces a code-3 answer AND an internal error
+ *  (-32603) with the same `ContractFunctionRevertedError`, and the second is
+ *  the lane failing. */
+export function isRevert(error: unknown): boolean {
+  if (!(error instanceof BaseError)) return false;
+  return (
+    error.walk((e) => {
+      const o = e as { code?: unknown; details?: unknown };
+      if (typeof o.code !== "number") return false;
+      if (o.code === 3) return true;
+      return typeof o.details === "string" && /execution reverted/i.test(o.details);
+    }) != null
+  );
+}
+
+const REVERTED = Symbol("reverted");
+
+/** The share-price fields of the row at this block: the price, or null with
+ *  `sharePriceReverted` when the read reverted, or a bare null when it did not
+ *  answer. */
+export const priceFields = (
+  known: BlockReads,
+  key: string,
+): { sharePriceAtBlock: string | null; sharePriceReverted?: true } =>
+  known.reverted.has(key)
+    ? { sharePriceAtBlock: null, sharePriceReverted: true }
+    : { sharePriceAtBlock: known.prices.get(key) ?? null };
 
 /** Read a timestamp and a share price at each of these blocks that `known` does
  *  not already hold, retry the misses once, and record every answer in `known`.
@@ -49,11 +89,16 @@ export async function readBlockWave(
       .getBlock({ blockNumber })
       .then((b) => Number(b.timestamp))
       .catch(() => null);
+  const priceCall = encodeFunctionData({ abi: PRICE_ABI, functionName: "convertToAssets", args: [one] });
+  // `call` rather than `readContract`, so a revert can be told from a lane
+  // that failed (`isRevert`). An empty answer decodes to an error and is a miss.
   const readPrice = (blockNumber: bigint) =>
     client
-      .readContract({ address: vault, abi: PRICE_ABI, functionName: "convertToAssets", args: [one], blockNumber })
-      .then((v) => (v as bigint).toString())
-      .catch(() => null);
+      .call({ to: vault, data: priceCall, blockNumber })
+      .then(({ data }): string | typeof REVERTED =>
+        decodeFunctionResult({ abi: PRICE_ABI, functionName: "convertToAssets", data: data ?? "0x" }).toString(),
+      )
+      .catch((e) => (isRevert(e) ? REVERTED : null));
 
   const retryMisses = async <T>(
     first: (T | null)[],
@@ -69,22 +114,41 @@ export async function readBlockWave(
     return out;
   };
 
-  const unasked = <T>(have: Map<string, T>, read: (b: bigint) => Promise<T | null>) => {
-    const want = blocks.filter((b) => !have.has(b.toString()));
+  const unasked = <T>(
+    have: (key: string) => boolean,
+    read: (b: bigint) => Promise<T | null>,
+    keep: (key: string, v: T) => void,
+  ) => {
+    const want = blocks.filter((b) => !have(b.toString()));
     return Promise.all(want.map(read))
       .then((first) => retryMisses(first, want, read))
       .then((answers) =>
         answers.forEach((v, i) => {
-          if (v != null) have.set(want[i].toString(), v);
+          if (v != null) keep(want[i].toString(), v);
         }),
       );
   };
-  await Promise.all([unasked(known.timestamps, readTimestamp), unasked(known.prices, readPrice)]);
+  await Promise.all([
+    unasked(
+      (k) => known.timestamps.has(k),
+      readTimestamp,
+      (k, v) => known.timestamps.set(k, v),
+    ),
+    unasked(
+      (k) => known.prices.has(k) || known.reverted.has(k),
+      readPrice,
+      (k, v) => (v === REVERTED ? known.reverted.add(k) : known.prices.set(k, v)),
+    ),
+  ]);
 }
 
 /** The index of the first of these ascending blocks that is missing a
  *  timestamp OR a share price in `known`, or -1 when every one answered both.
- *  A chunked build keeps the blocks before it: every row under that cut was
- *  read whole, so the prefix is a whole tail up to its own cut. */
+ *  A revert counts as a share price answered. A chunked build keeps the blocks
+ *  before it: every row under that cut was read whole, so the prefix is a whole
+ *  tail up to its own cut. */
 export const firstUnreadBlock = (blocks: number[], known: BlockReads): number =>
-  blocks.findIndex((block) => !known.timestamps.has(String(block)) || !known.prices.has(String(block)));
+  blocks.findIndex((block) => {
+    const key = String(block);
+    return !known.timestamps.has(key) || !(known.prices.has(key) || known.reverted.has(key));
+  });

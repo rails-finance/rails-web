@@ -16,9 +16,9 @@
 // (409). Both refusals are forwarded verbatim. This route checks only the
 // shape it can check without reading the chain — the addresses, the chain, the
 // loader version, that every row sits at or below the cut in ascending order,
-// and that no row carries a read that did not answer (a `timestamp: 0` or a
-// null share price) — so a malformed body is refused before it costs the box a
-// round trip.
+// and that no row carries a read that did not answer (a `timestamp: 0`, or a
+// null share price without `sharePriceReverted`) — so a malformed body is
+// refused before it costs the box a round trip.
 //
 // NOTHING DERIVED IS EVER STORED (plan §3.5). The body is rows and a signed
 // sum, both at blocks it names, plus the env var NAME of the lane they were
@@ -33,7 +33,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
-import { AAVE_VAULT_TAIL_VERSION } from "@/lib/shared/vault-holder-timeline";
+import { AAVE_VAULT_TAIL_VERSION, rowAnswered } from "@/lib/shared/vault-holder-timeline";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 const RAILS_API_URL = process.env.RAILS_API_URL;
@@ -195,7 +195,8 @@ function tailShapeError(
   // A stored row is never read again, so a read that did not answer must not
   // reach the store. `timestamp: 0` is the placeholder for a block whose time
   // did not answer, and a null share price is a `convertToAssets` that did
-  // not; both loaders cut a chunk below either and never offer one.
+  // not; both loaders cut a chunk below either and never offer one. A null
+  // price marked `sharePriceReverted` is a revert, which is an answer.
   let previous = -1;
   let previousIndex = -1;
   for (const row of rows as {
@@ -203,13 +204,14 @@ function tailShapeError(
     logIndex?: unknown;
     timestamp?: unknown;
     sharePriceAtBlock?: unknown;
+    sharePriceReverted?: unknown;
   }[]) {
     const block = Number(row?.blockNumber);
     const index = Number(row?.logIndex);
     if (!Number.isInteger(block) || block <= 0) return bad("rows", "every row needs a block number");
     if (block > cut) return bad("rows", `a row at block ${block} is above the cut ${cut}`);
     if (!(Number(row.timestamp) > 0)) return bad("rows", `the row at block ${block} has no block timestamp`);
-    if (row.sharePriceAtBlock == null) return bad("rows", `the row at block ${block} has no share price`);
+    if (!rowAnswered(row)) return bad("rows", `the row at block ${block} has neither a share price nor a revert`);
     if (block < previous || (block === previous && index < previousIndex))
       return bad("rows", "rows must be ascending by (blockNumber, logIndex)");
     previous = block;
