@@ -15,6 +15,8 @@ import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline-run-card";
 import { renderRunFolders, DANGER_FOLDER_BADGE } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
+import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
+import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
 
 /** Runs shorter than this stay as individual cards — the four-row floor every
  *  explorer's liquidation run uses. One absorption is at least two rows
@@ -74,3 +76,33 @@ export const COMPOUND_LIQUIDATION_RUNS: TimelineRunSpec[] = [
       }),
   },
 ];
+
+// ── Folders the INDEX served ────────────────────────────────────────────────
+//
+// The Compound V3 mainnet page reads its history as ROWS (decision 0019's
+// evening amendment): rails-server transcribes the spec above as the
+// `liquidation` kind and adds the owner run (decision 0021, 2026-09-24) as
+// `owner_run`, in `api/src/services/compound-timeline-folders.ts`. This
+// register is how those two kinds draw; the spec above stays for the flat
+// answer (`?folders=0`) and for the Base deployment.
+
+/** A served liquidation folder counts its ROWS (the wire's `count`), where the
+ *  client spec above counts absorptions, so its member is an event: one
+ *  absorption is a debt row and a row per seized collateral. */
+const LIQUIDATION_FOLDER: FolderRegisterEntry = {
+  memberNoun: "event",
+  tone: "danger",
+  warningLabel: "Liquidations",
+  folderBadge: DANGER_FOLDER_BADGE,
+};
+
+/** One member of an owner run, by the action it repeats. */
+const OWNER_RUN_NOUN: Record<string, string> = {
+  supply: "deposit",
+  withdraw: "withdrawal",
+  supply_collateral: "collateral deposit",
+  withdraw_collateral: "collateral withdrawal",
+};
+
+export const COMPOUND_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry =>
+  folder.kind === OWNER_RUN_KIND ? ownerRunEntry(folder, (a) => OWNER_RUN_NOUN[a] ?? "event") : LIQUIDATION_FOLDER;

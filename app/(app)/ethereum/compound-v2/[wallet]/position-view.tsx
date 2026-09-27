@@ -26,7 +26,11 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCompoundV2Event } from "@/lib/shared/types/event-shape";
 import { fetchCompoundV2Positions } from "@/lib/api/fetch-compound-v2-positions";
 import type { CompoundV2PositionSummary } from "@/lib/sources/api/compound-v2-positions";
-import { fetchCompoundV2Timeline } from "@/lib/api/fetch-compound-v2-timeline";
+import {
+  fetchCompoundV2Timeline,
+  fetchCompoundV2GroupedTimeline,
+  type CompoundV2GroupedTimelineResult,
+} from "@/lib/api/fetch-compound-v2-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
@@ -38,9 +42,11 @@ import {
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import { fetchCompoundV2ChainPosition, type CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { COMPOUND_V2_LIQUIDATION_RUNS } from "@/lib/compound-v2/timeline-runs";
+import { COMPOUND_V2_FOLDER_REGISTER, COMPOUND_V2_LIQUIDATION_RUNS } from "@/lib/compound-v2/timeline-runs";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
-import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
+import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
+import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { CompoundV2EventCard } from "@/components/protocol/compound-v2/compound-v2-event-card";
 import {
   CompoundV2PositionCard,
@@ -84,6 +90,11 @@ interface CompoundV2PositionViewProps {
   initialEvents: BaseActivityEvent[] | null;
   initialCutoffBlock: number | null;
   initialOpening: TimelineOpeningBalance | null;
+  /** The grouped answer WHOLE, when the load read its history as ROWS (the
+   *  default; `?folders=0` reads the flat window). Its row plan puts the
+   *  folders back between the ungrouped events, and its folders carry the
+   *  arithmetic the whole-history reductions read. */
+  initialGrouped: CompoundV2GroupedTimelineResult | null;
 }
 
 export default function CompoundV2PositionView({
@@ -92,6 +103,7 @@ export default function CompoundV2PositionView({
   initialEvents,
   initialCutoffBlock,
   initialOpening,
+  initialGrouped,
 }: CompoundV2PositionViewProps) {
   // Keyed on the timeline, not the row: an account Compound V2 has never seen
   // is a real answer the server can seed, and its `initialPosition` is null.
@@ -100,6 +112,12 @@ export default function CompoundV2PositionView({
     initialPosition ? viewFromSummary(initialPosition) : null,
   );
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);
+  // The same history as ROWS (decision 0019's evening amendment): the index
+  // groups this family, because every row carries its own running state, so a
+  // folder standing for a hundred rows leaves nothing here to reconstruct. The
+  // grouped answer REPLACES the flat window: `events` holds its ungrouped
+  // events and this its row plan and folders, and the two move together.
+  const [groupedTail, setGroupedTail] = useState<CompoundV2GroupedTimelineResult | null>(initialGrouped);
   // The checkpoint model. The timeline fetch asks for a WINDOW of the most
   // recent events; on an account that needs one, the response names the block
   // the window opened at and everything below it arrives as a declared opening
@@ -121,14 +139,20 @@ export default function CompoundV2PositionView({
     (async () => {
       setLoading(true);
       try {
-        const [pData, tData] = await Promise.all([
+        // The same choice the server half made (`position-page-data.ts`): ONE
+        // timeline read, in the shape the URL asked for.
+        const asked = servedFoldersEnabled();
+        const [pData, flat, grouped] = await Promise.all([
           fetchCompoundV2Positions({ wallet, limit: 1 }),
-          fetchCompoundV2Timeline(wallet, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchCompoundV2Timeline(wallet, { recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? fetchCompoundV2GroupedTimeline(wallet) : null,
         ]);
+        const tData = grouped ?? flat;
         const summary = pData.data[0] ?? null;
         setView(summary ? viewFromSummary(summary) : null);
-        setEvents(tData.events ?? []);
-        setCutoffBlock(tData.cutoffBlock ?? null);
+        setEvents(tData?.events ?? []);
+        setCutoffBlock(tData?.cutoffBlock ?? null);
+        setGroupedTail(grouped);
       } finally {
         setLoading(false);
       }
@@ -210,10 +234,48 @@ export default function CompoundV2PositionView({
   // name the debt market of the liquidation it belongs to.
   const siblingsByTx = useMemo(() => groupEventsByTx(v2Events), [v2Events]);
 
-  const tl = useTimelineEvents(v2Events, {
+  // The served list as ROWS, from the same answer as `v2Events`.
+  const servedRows = useMemo(
+    () => (groupedTail ? interleaveRowPlan(groupedTail.rowPlan, v2Events) : undefined),
+    [groupedTail, v2Events],
+  );
+  /** The folders the index served, whole and unfiltered: the third
+   *  contributor to the page's partition, which every whole-history reduction
+   *  below adds to `opening + events`. */
+  const servedFolders = useMemo(
+    () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
+    [servedRows],
+  );
+  /** The oldest member any folder stands for, so a page whose oldest row is a
+   *  folder still dates the position from inside it. */
+  const oldestFolderAt = useMemo(
+    () =>
+      servedFolders?.reduce<number | undefined>(
+        (min, f) => (min == null || f.firstAt < min ? f.firstAt : min),
+        undefined,
+      ),
+    [servedFolders],
+  );
+
+  // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
+  // Decision 0019, amendments 2026-09-24 and 2026-09-25: a month the loaded
+  // rows do not hold is read from the index as its segment
+  // (hooks/useTimelineSegment.ts). The preload stays the page's whole-history
+  // record; the timeline alone swaps.
+  const { tl, segments, readFolderMembers } = useTimelineSegment({
+    events: v2Events,
+    groupedTail,
+    servedRows,
+    servedFolders,
+    opening,
+    historyWindow,
+    isEvent: isCompoundV2Event,
+    readGrouped: (span, signal) => fetchCompoundV2GroupedTimeline(wallet, { span, signal }),
+    readFlat: (span) => fetchCompoundV2Timeline(wallet, { span }),
+    folderPath: "/api/compound-v2/timeline/folder",
+    folderParams: { wallet },
     storageKey: `compound-v2-${wallet}`,
     protocolKey: "compound-v2",
-    window: historyWindow,
   });
 
   // ⚠️ On a windowed page every lifetime surface must read the MERGED history,
@@ -224,7 +286,10 @@ export default function CompoundV2PositionView({
   // two requests.
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? v2Events : undefined;
-  const precomputedLifetime = useMemo(() => compoundV2LifetimeWithOpening(v2Events, opening), [v2Events, opening]);
+  const precomputedLifetime = useMemo(
+    () => compoundV2LifetimeWithOpening(v2Events, opening, servedFolders),
+    [v2Events, opening, servedFolders],
+  );
 
   // The CSV is the export whose purpose IS the rows, so on a windowed page it
   // fetches the whole history at click time rather than handing over the
@@ -272,12 +337,27 @@ export default function CompoundV2PositionView({
   // event twice. The opening total subtracts the excluded actions (the
   // liquidation row and the three seize legs) from the summarised count, so
   // the proportion divides the same quantity the loaded half counts.
+  //
+  // The folders add theirs the same way: rails-server judges a member with the
+  // same exclusions, and their excluded members leave the total as the
+  // opening's do.
   const externalActivityWithOpening = useMemo(() => {
-    if (!opening) return externalActivity;
     const excluded = new Set(["liquidation", "seize_out", "seize_in", "seize_burn"]);
-    const excludedCount = opening.byAction.reduce((n, b) => n + (excluded.has(b.key) ? b.count : 0), 0);
-    return withOpeningActors(externalActivity, opening.actors, opening.totalEvents - excludedCount);
-  }, [externalActivity, opening]);
+    const withOpening = opening
+      ? withOpeningActors(
+          externalActivity,
+          opening.actors,
+          opening.totalEvents - opening.byAction.reduce((n, b) => n + (excluded.has(b.key) ? b.count : 0), 0),
+        )
+      : externalActivity;
+    if (!servedFolders || servedFolders.length === 0) return withOpening;
+    const merged = withFolderActors(withOpening, servedFolders);
+    const folderExcluded = servedFolders.reduce(
+      (n, f) => n + f.counts.reduce((m, c) => m + (excluded.has(c.key) ? c.count : 0), 0),
+      0,
+    );
+    return { ...merged, total: merged.total - folderExcluded };
+  }, [externalActivity, opening, servedFolders]);
 
   // Stat captions (accrued interest, borrow rate) — the event stream feeds the
   // interest splits; the rates ride the listing row's per-market chain read.
@@ -318,8 +398,8 @@ export default function CompoundV2PositionView({
               params: { wallet },
               totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
             }}
-            history={markdownHistoryScope(historyWindow, v2Events)}
-            scopeNote={exportScopeNote(historyWindow, v2Events, "this wallet's whole history")}
+            history={markdownHistoryScope(historyWindow, v2Events, servedFolders)}
+            scopeNote={exportScopeNote(historyWindow, v2Events, "this wallet's whole history", servedFolders)}
           />
         )}
       </DetailTopRow>
@@ -389,6 +469,9 @@ export default function CompoundV2PositionView({
             closed={liveView ? liveView.status !== "open" : undefined}
             tl={tl}
             runs={COMPOUND_V2_LIQUIDATION_RUNS}
+            folderRegister={COMPOUND_V2_FOLDER_REGISTER}
+            readFolderMembers={readFolderMembers}
+            segments={segments}
             // Tenure-first header: when the account started, how long it has
             // run, how fresh the latest activity is.
             toolbarLeading={
@@ -397,7 +480,7 @@ export default function CompoundV2PositionView({
                   events={v2Events}
                   closed={liveView.status !== "open"}
                   // When the account actually opened, not when the window does.
-                  firstAt={opening?.firstTimestamp}
+                  firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                   tenurePending={!lifetimeFiguresKnown(historyWindow)}
                 />
               ) : undefined

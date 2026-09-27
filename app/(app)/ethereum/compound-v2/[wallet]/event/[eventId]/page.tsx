@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
+import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { loadCompoundV2PositionTail } from "@/lib/compound-v2/position-page-data";
 import CompoundV2PositionPage from "../../page";
 
 interface Props {
   params: Promise<{ wallet: string; eventId: string }>;
+  /** The parent position page reads `?folders=` off this to choose which
+   *  timeline read its tail makes, so this segment carries it through. */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // Restated (not re-exported — see twitter-image.tsx's own header on why Next
@@ -17,11 +21,15 @@ export const dynamic = "force-dynamic";
 // `loadCompoundV2PositionTail` is the same `cache()`-wrapped read the parent
 // page and its own opengraph-image already call, so finding the event here
 // costs no second backend round trip within one request.
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { wallet: raw, eventId } = await params;
   const wallet = raw.toLowerCase();
   const decoded = decodeEventId(eventId);
-  const tail = await loadCompoundV2PositionTail(wallet);
+  // The same test the page decides on, so both reach one `cache()` entry. A
+  // grouped answer names only the ungrouped events, so an event inside a
+  // folder falls back to the generic metadata.
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = await loadCompoundV2PositionTail(wallet, grouped);
   const event = tail.events?.find((e) => e.id === decoded) ?? null;
   return eventMetadata({
     session: "compound-v2",
@@ -39,6 +47,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // component's pinned-mode branch. `params` here carries an extra `eventId`
 // key the parent's own `Props` type doesn't declare; passing the same promise
 // through is still structurally valid (the parent only reads `wallet` off it).
-export default async function CompoundV2EventPage({ params }: Props) {
-  return CompoundV2PositionPage({ params });
+export default async function CompoundV2EventPage({ params, searchParams }: Props) {
+  return CompoundV2PositionPage({ params, searchParams });
 }

@@ -11,6 +11,8 @@ import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline
 import { renderRunFolders, DANGER_FOLDER_BADGE } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
+import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
 
 /** Runs shorter than this stay as individual cards. A keeper liquidation burst
  *  is at least 2 liquidations (~2 member rows each, once the seize legs the
@@ -79,3 +81,29 @@ export const COMPOUND_V2_LIQUIDATION_RUNS: TimelineRunSpec[] = [
       }),
   },
 ];
+
+// ── Folders the INDEX served ────────────────────────────────────────────────
+//
+// The Compound V2 page reads its history as ROWS (decision 0019's evening
+// amendment): rails-server transcribes the spec above as the `liquidation`
+// kind and adds the owner run (decision 0021, 2026-09-24) as `owner_run`, in
+// `api/src/services/compound-timeline-folders.ts`. This register is how those
+// two kinds draw; the spec above stays for the flat answer (`?folders=0`).
+
+const LIQUIDATION_FOLDER: FolderRegisterEntry = {
+  memberNoun: "liquidation",
+  tone: "danger",
+  warningLabel: "Liquidations",
+  folderBadge: DANGER_FOLDER_BADGE,
+};
+
+/** One member of an owner run, by the action it repeats. */
+const OWNER_RUN_NOUN: Record<string, string> = {
+  mint: "deposit",
+  redeem: "withdrawal",
+  borrow: "borrow",
+  repay: "repayment",
+};
+
+export const COMPOUND_V2_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry =>
+  folder.kind === OWNER_RUN_KIND ? ownerRunEntry(folder, (a) => OWNER_RUN_NOUN[a] ?? "event") : LIQUIDATION_FOLDER;

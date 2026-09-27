@@ -1647,12 +1647,36 @@ const FOLDER_HEADER = '[role="button"][aria-expanded][aria-label*=" consecutive 
 // `grouped-spark-deep` 0x1601…347e is SparkLend's deepest position (29,914
 // events on 2026-09-27, cut by rows at 2,500), on the shared month read
 // (hooks/useTimelineSegment.ts) since row-cut batch 2.
+//
+// Row-cut batch 4 (2026-09-28) puts Compound V2 and Compound V3 mainnet on
+// the same read, each grouped by rails-server (the liquidation spec and the
+// owner run). `grouped-cv2-deep` 0x29fe…d958 (25,783 events) and
+// `grouped-cv3-deep` usdc/0xb9e6…2714 (5,688) are cut by rows with owner-run
+// folders in their newest 2,500; `grouped-cv2-liq` 0x8888…8888 (12,135)
+// carries liquidation folders too. The deepest position of each,
+// `grouped-cv2-deepest` 0xa2b4…7a56 (44,898) and `grouped-cv3-deepest`
+// usdc/0xe7f5…e110 (10,350), hold no folder in their newest 2,500 rows
+// (interleaved mints, redeems and cToken transfers; alternating supplies and
+// withdrawals), so they run with `folders: false`: G0 asks for loose events
+// alone and G5, which needs a folder's day, is skipped.
 const AAVE_V3 = { page: "/ethereum/aave-v3", api: "/api/aave-v3", q: "market=core&" };
 const SPARK = { page: "/ethereum/spark", api: "/api/spark", q: "" };
+const COMPOUND_V2 = { page: "/ethereum/compound-v2", api: "/api/compound-v2", q: "" };
+const COMPOUND_V3_USDC = { page: "/ethereum/compound-v3/usdc", api: "/api/compound", q: "market=usdc&" };
 const GROUPED_FIXTURES = [
   { id: "grouped-deep", wallet: "0xee7ca610d896c53ffe716b801c05748efd902954", ...AAVE_V3 },
   { id: "grouped-whole", wallet: "0x9984a1d407bc6ac53b404aabf66b80b99d96bb47", ...AAVE_V3 },
   { id: "grouped-spark-deep", wallet: "0x1601843c5e9bc251a3272907010afa41fa18347e", ...SPARK },
+  { id: "grouped-cv2-deep", wallet: "0x29fe7d60ddf151e5b52e5fab4f1325da6b2bd958", ...COMPOUND_V2 },
+  { id: "grouped-cv2-liq", wallet: "0x8888882f8f843896699869179fb6e4f7e3b58888", ...COMPOUND_V2 },
+  { id: "grouped-cv2-deepest", wallet: "0xa2b47e3d5c44877cca798226b7b8118f9bfb7a56", ...COMPOUND_V2, folders: false },
+  { id: "grouped-cv3-deep", wallet: "0xb9e62cb9b4ce8ec13c886fae67369da417ee2714", ...COMPOUND_V3_USDC },
+  {
+    id: "grouped-cv3-deepest",
+    wallet: "0xe7f525dd1bc6d748ae4d7f21d31e54741e05e110",
+    ...COMPOUND_V3_USDC,
+    folders: false,
+  },
 ];
 
 /** The drawn list as rows: folder headers, and event rows. With every folder
@@ -1681,12 +1705,18 @@ for (const g of GROUPED_FIXTURES) {
     const plan = route.rowPlan ?? [];
     const folders = plan.filter((r) => r.kind === "folder").map((r) => r.folder);
     const loose = route.events ?? [];
+    const wantFolders = g.folders !== false;
     check(
-      `G0 ${g.id}: the route answers grouped, part folders and part loose events`,
-      !route.error && route.grouped === true && folders.length > 0 && loose.length > 0,
+      wantFolders
+        ? `G0 ${g.id}: the route answers grouped, part folders and part loose events`
+        : `G0 ${g.id}: the route answers grouped, loose events and no folder in its newest rows`,
+      !route.error &&
+        route.grouped === true &&
+        (wantFolders ? folders.length > 0 : folders.length === 0) &&
+        loose.length > 0,
       route.error ?? `${plan.length} row(s): ${folders.length} folder(s), ${loose.length} event(s)`,
     );
-    if (route.error || folders.length === 0) continue;
+    if (route.error || (wantFolders && folders.length === 0)) continue;
     const windowed = route.cutoffBlock != null;
     const eventsServed = route.eventsServed ?? loose.length + folders.reduce((a, f) => a + f.count, 0);
     info(
@@ -2073,7 +2103,9 @@ for (const g of GROUPED_FIXTURES) {
         if (!windowed || at >= oldestServed) folderDays.set(at, (folderDays.get(at) ?? 0) + d.count);
       }
     const pickDay = [...folderDays.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-    if (pickDay == null) {
+    if (!wantFolders) {
+      info(`G5 ${g.id}: a day a folder covers`, "this fixture holds no folder in its newest rows");
+    } else if (pickDay == null) {
       check(`G5 ${g.id}: a day a folder covers`, false, "no folder day in the listed range");
     } else {
       const dayFrom = day(pickDay);

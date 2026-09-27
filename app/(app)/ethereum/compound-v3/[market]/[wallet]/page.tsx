@@ -3,10 +3,12 @@ import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { marketOf } from "@/lib/compound/asset-catalog";
 import { loadCompoundPositionTail } from "@/lib/compound/position-page-data";
+import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import CompoundPositionView from "./position-view";
 
 interface Props {
   params: Promise<{ market: string; wallet: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // The position's numbers are stated as current, so the route renders per request
@@ -42,25 +44,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function CompoundPositionPage({ params }: Props) {
+export default async function CompoundPositionPage({ params, searchParams }: Props) {
   const { market: rawMarket, wallet: rawWallet } = await params;
   if (!ADDRESS.test(rawWallet)) notFound();
   const wallet = rawWallet.toLowerCase();
   const market = rawMarket.toLowerCase();
 
-  const tail = await loadCompoundPositionTail(wallet, market);
+  // Rows by default; `?folders=0` reads the flat window.
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = await loadCompoundPositionTail(wallet, market, grouped);
 
   return (
     <CompoundPositionView
       // Keyed on the pair so a client-side navigation to another Comet account
       // remounts with that account's server tail as its initial state.
-      key={`${market}:${wallet}`}
+      key={`${market}:${wallet}:${grouped ? "rows" : "events"}`}
       wallet={wallet}
       market={market}
       initialPosition={tail.position}
       initialEvents={tail.events}
       initialCutoffBlock={tail.cutoffBlock}
       initialOpening={tail.opening}
+      initialGrouped={tail.grouped}
     />
   );
 }

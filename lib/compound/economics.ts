@@ -46,6 +46,8 @@ import {
 } from "@/lib/compound/event-provenance";
 import { flowsReconcile, type ChainTruthTowerData, type TowerLine } from "@/lib/shared/chain-truth-economics";
 import type { TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import type { ServedFolder } from "@/lib/shared/timeline-folder";
+import { folderFlows, mergeFlowBuckets } from "@/lib/shared/timeline-folder-reductions";
 
 // ── The receipts, as a seam ──────────────────────────────────────────────────
 // The arithmetic below is one implementation serving two lanes that make
@@ -390,8 +392,12 @@ export function compoundLifetimeWithOpening(
   events: BaseActivityEvent[],
   market: string,
   opening: TimelineOpeningBalance | null | undefined,
+  folders?: readonly ServedFolder[] | null,
 ): CompoundLifetimeFlows | undefined {
-  if (!opening) return undefined;
+  // Undefined = nothing outside `events`, so the reducer reads them as the
+  // whole history. On a grouped answer the folders hold members `events` does
+  // not, and their flows join the summary's (the third half of the partition).
+  if (!opening && (folders?.length ?? 0) === 0) return undefined;
 
   // The window's own half first, through the walk that already knows Comet's
   // zero-crossing base split — each loaded event still carries its replayed
@@ -410,7 +416,7 @@ export function compoundLifetimeWithOpening(
   // one scale, and a raw sum across two is not a quantity.
   const unscalable = new Set<string>();
 
-  for (const bucket of opening.flows ?? []) {
+  for (const bucket of mergeFlowBuckets(opening?.flows, folderFlows(folders))) {
     // `sourceKey` is set only where the index keyed the bucket by token
     // address, which for Comet means a collateral leg; a base leg is keyed by
     // the MARKET (the base asset is the market) and arrives with its slug

@@ -42,6 +42,8 @@ import {
 } from "@/lib/compound-v2/event-provenance";
 import { compoundV2LiveDebtProv } from "@/lib/compound-v2/position-provenance";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import type { ServedFolder } from "@/lib/shared/timeline-folder";
+import { folderFlows, mergeFlowBuckets } from "@/lib/shared/timeline-folder-reductions";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 
@@ -130,8 +132,13 @@ function replayCompoundV2Lifetime(events: BaseActivityEvent[]): Map<string, Mark
 export function compoundV2LifetimeWithOpening(
   events: BaseActivityEvent[],
   opening: TimelineOpeningBalance | null | undefined,
+  folders?: readonly ServedFolder[] | null,
 ): MarketFlows[] | undefined {
-  if (!opening) return undefined;
+  // Undefined = nothing outside `events`, so the reducer reads them as the
+  // whole history. On a grouped answer the folders hold members `events` does
+  // not, and their flows are the third half of the partition (the summary
+  // below the cut, the events and the folders above it).
+  if (!opening && (folders?.length ?? 0) === 0) return undefined;
   const merged = replayCompoundV2Lifetime(events);
   const get = (market: string): MarketFlows => {
     const cur = merged.get(market) ?? {
@@ -151,7 +158,7 @@ export function compoundV2LifetimeWithOpening(
   // rails-server's flowsSql exactly so the merge needs no translation table.
   const LEGS = ["supplied", "withdrawn", "borrowed", "repaid", "liquidatedDebt"] as const;
   const unscalable = new Set<string>();
-  for (const bucket of opening.flows ?? []) {
+  for (const bucket of mergeFlowBuckets(opening?.flows, folderFlows(folders))) {
     const scaled: Partial<Record<(typeof LEGS)[number], number>> = {};
     let scalable = true;
     for (const leg of LEGS) {

@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { loadCompoundV2PositionTail } from "@/lib/compound-v2/position-page-data";
+import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import CompoundV2PositionView from "./position-view";
 
 interface Props {
   params: Promise<{ wallet: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // The position's numbers are stated as current, so the route renders per request
@@ -32,23 +34,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function CompoundV2PositionPage({ params }: Props) {
+export default async function CompoundV2PositionPage({ params, searchParams }: Props) {
   const { wallet: raw } = await params;
   if (!ADDRESS.test(raw)) notFound();
   const wallet = raw.toLowerCase();
 
-  const tail = await loadCompoundV2PositionTail(wallet);
+  // Rows by default; `?folders=0` reads the flat window.
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = await loadCompoundV2PositionTail(wallet, grouped);
 
   return (
     <CompoundV2PositionView
       // Keyed on the wallet so a client-side navigation to another account
       // remounts with that account's server tail as its initial state.
-      key={wallet}
+      key={`${wallet}:${grouped ? "rows" : "events"}`}
       wallet={wallet}
       initialPosition={tail.position}
       initialEvents={tail.events}
       initialCutoffBlock={tail.cutoffBlock}
       initialOpening={tail.opening}
+      initialGrouped={tail.grouped}
     />
   );
 }

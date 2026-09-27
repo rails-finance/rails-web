@@ -33,7 +33,11 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
 import { fetchCompoundPositions } from "@/lib/api/fetch-compound-positions";
 import type { CompoundPositionSummary } from "@/lib/sources/api/compound-positions";
-import { fetchCompoundTimeline } from "@/lib/api/fetch-compound-timeline";
+import {
+  fetchCompoundTimeline,
+  fetchCompoundGroupedTimeline,
+  type CompoundGroupedTimelineResult,
+} from "@/lib/api/fetch-compound-timeline";
 import { fetchCompoundPosition, type CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
@@ -44,13 +48,15 @@ import {
   type TimelineWindow,
 } from "@/lib/shared/timeline-opening-balance";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { COMPOUND_LIQUIDATION_RUNS } from "@/lib/compound/timeline-runs";
+import { COMPOUND_FOLDER_REGISTER, COMPOUND_LIQUIDATION_RUNS } from "@/lib/compound/timeline-runs";
+import { interleaveRowPlan, servedFoldersEnabled, type ServedFolder } from "@/lib/shared/timeline-folder";
+import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
+import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { NAV_LINK } from "@/lib/shared/ui-grammar";
 import { shortAddr } from "@/lib/shared/format-event";
@@ -89,9 +95,14 @@ function Position({
   chain,
   historyWindow,
   viewHref,
+  folders,
 }: {
   view: CompoundPositionView;
   events: BaseActivityEvent[];
+  /** The folders the index served, whole and unfiltered: their flows and
+   *  actors are the third half of the partition, beside the opening balance
+   *  and `events`. Null on a flat page. */
+  folders: readonly ServedFolder[] | null;
   chain: CompoundMarketChainResponse | null;
   /** The window the page drew. `whole` on all but a handful of positions, and
    *  there every figure below is the plain whole-history reduction it has
@@ -110,8 +121,8 @@ function Position({
   // carve-outs are untouched by the merge: they run on its result, per market.
   const lifetimeEvents = lifetimeFiguresKnown(historyWindow) ? events : undefined;
   const precomputedLifetime = useMemo(
-    () => compoundLifetimeWithOpening(events, view.market, opening),
-    [events, view.market, opening],
+    () => compoundLifetimeWithOpening(events, view.market, opening, folders),
+    [events, view.market, opening, folders],
   );
   const towerData = useMemo(
     () => computeCompoundEconomics(view, lifetimeEvents, undefined, precomputedLifetime),
@@ -128,18 +139,21 @@ function Position({
   // halves judge on the same fact and neither counts an event the other did.
   const externalActivity = useMemo(
     () =>
-      withOpeningActors(
-        summariseExternalActors(
-          events.filter(isCompoundEvent).map((e) => ({
-            txFrom: e.context.data.txFrom,
-            poolCaller: e.context.data.funder,
-            wallet: e.wallet,
-          })),
+      withFolderActors(
+        withOpeningActors(
+          summariseExternalActors(
+            events.filter(isCompoundEvent).map((e) => ({
+              txFrom: e.context.data.txFrom,
+              poolCaller: e.context.data.funder,
+              wallet: e.wallet,
+            })),
+          ),
+          opening?.actors,
+          opening?.totalEvents ?? 0,
         ),
-        opening?.actors,
-        opening?.totalEvents ?? 0,
+        folders,
       ),
-    [events, opening],
+    [events, opening, folders],
   );
   return (
     <div className="space-y-6">
@@ -202,6 +216,10 @@ interface CompoundPositionViewProps {
   initialEvents: BaseActivityEvent[] | null;
   initialCutoffBlock: number | null;
   initialOpening: TimelineOpeningBalance | null;
+  /** The grouped answer WHOLE, when the load read its history as ROWS (the
+   *  default; `?folders=0` reads the flat window). Its row plan puts the
+   *  folders back between the ungrouped events. */
+  initialGrouped: CompoundGroupedTimelineResult | null;
 }
 
 export default function CompoundPositionView({
@@ -211,6 +229,7 @@ export default function CompoundPositionView({
   initialEvents,
   initialCutoffBlock,
   initialOpening,
+  initialGrouped,
 }: CompoundPositionViewProps) {
   const marketLabel = marketOf(market).label;
   // Keyed on the timeline, not the row: an account this Comet has never seen is
@@ -227,6 +246,11 @@ export default function CompoundPositionView({
     initialPosition ? viewFromSummary(initialPosition) : null,
   );
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);
+  // The same history as ROWS (decision 0019's evening amendment): the index
+  // groups this family, because every row carries its own replayed base and
+  // collateral, so a folder leaves nothing here to reconstruct. The grouped
+  // answer REPLACES the flat window, and the two move together.
+  const [groupedTail, setGroupedTail] = useState<CompoundGroupedTimelineResult | null>(initialGrouped);
   // The checkpoint model. The timeline fetch asks for a WINDOW of the most
   // recent events; on a position that needs one, the response names the block
   // the window opened at and everything below it arrives as a declared opening
@@ -255,16 +279,22 @@ export default function CompoundPositionView({
     (async () => {
       setLoading(true);
       try {
-        const [pData, tData] = await Promise.all([
+        // The same choice the server half made: ONE timeline read, in the
+        // shape the URL asked for.
+        const asked = servedFoldersEnabled();
+        const [pData, flat, grouped] = await Promise.all([
           // Both scoped to the one market — the backend filters on `market`, so
           // the position list is 0-or-1 row and the timeline is this market only.
           fetchCompoundPositions({ wallet, market, limit: 1 }),
-          fetchCompoundTimeline(wallet, { market, recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? null : fetchCompoundTimeline(wallet, { market, recent: TIMELINE_WINDOW_EVENTS }),
+          asked ? fetchCompoundGroupedTimeline(wallet, market) : null,
         ]);
         if (cancelled) return;
+        const tData = grouped ?? flat;
         setView(pData.data[0] ? viewFromSummary(pData.data[0]) : null);
-        setEvents(tData.events ?? []);
-        setCutoffBlock(tData.cutoffBlock ?? null);
+        setEvents(tData?.events ?? []);
+        setCutoffBlock(tData?.cutoffBlock ?? null);
+        setGroupedTail(grouped);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -349,10 +379,47 @@ export default function CompoundPositionView({
   // The tx-sibling seam: each card reaches its same-tx peers so an AbsorbCollateral
   // leg can cross-reference the AbsorbDebt narrator (the whole-account absorption).
   const siblingsByTx = useMemo(() => groupEventsByTx(compoundEvents), [compoundEvents]);
-  const tl = useTimelineEvents(compoundEvents, {
+  // The served list as ROWS, from the same answer as `compoundEvents`.
+  const servedRows = useMemo(
+    () => (groupedTail ? interleaveRowPlan(groupedTail.rowPlan, compoundEvents) : undefined),
+    [groupedTail, compoundEvents],
+  );
+  /** The folders the index served, whole and unfiltered: the third
+   *  contributor to the page's partition. */
+  const servedFolders = useMemo(
+    () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
+    [servedRows],
+  );
+  /** The oldest member any folder stands for, so a page whose oldest row is a
+   *  folder still dates the position from inside it. */
+  const oldestFolderAt = useMemo(
+    () =>
+      servedFolders?.reduce<number | undefined>(
+        (min, f) => (min == null || f.firstAt < min ? f.firstAt : min),
+        undefined,
+      ),
+    [servedFolders],
+  );
+
+  // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
+  // Decision 0019, amendments 2026-09-24 and 2026-09-25: a month the loaded
+  // rows do not hold is read from the index as its segment
+  // (hooks/useTimelineSegment.ts). The preload stays the page's whole-history
+  // record; the timeline alone swaps.
+  const { tl, segments, readFolderMembers } = useTimelineSegment({
+    events: compoundEvents,
+    groupedTail,
+    servedRows,
+    servedFolders,
+    opening,
+    historyWindow,
+    isEvent: isCompoundEvent,
+    readGrouped: (span, signal) => fetchCompoundGroupedTimeline(wallet, market, { span, signal }),
+    readFlat: (span) => fetchCompoundTimeline(wallet, { market, span }),
+    folderPath: "/api/compound/timeline/folder",
+    folderParams: { wallet, market },
     storageKey: `compound-${market}-${wallet}`,
     protocolKey: "compound",
-    window: historyWindow,
   });
 
   // The top row's price dropdown: the open market's base +
@@ -392,8 +459,13 @@ export default function CompoundPositionView({
               params: { wallet, market },
               totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
             }}
-            history={markdownHistoryScope(historyWindow, compoundEvents)}
-            scopeNote={exportScopeNote(historyWindow, compoundEvents, "this wallet's whole history in this market")}
+            history={markdownHistoryScope(historyWindow, compoundEvents, servedFolders)}
+            scopeNote={exportScopeNote(
+              historyWindow,
+              compoundEvents,
+              "this wallet's whole history in this market",
+              servedFolders,
+            )}
           />
         )}
       </DetailTopRow>
@@ -408,6 +480,7 @@ export default function CompoundPositionView({
             chain={chain}
             historyWindow={historyWindow}
             viewHref={tl.viewHref}
+            folders={servedFolders}
           />
           <ChainTruthTimeline
             // The queued export (rails-ops decision 0029) has no row cap: the
@@ -420,6 +493,9 @@ export default function CompoundPositionView({
             closed={view.status !== "open"}
             tl={tl}
             runs={COMPOUND_LIQUIDATION_RUNS}
+            folderRegister={COMPOUND_FOLDER_REGISTER}
+            readFolderMembers={readFolderMembers}
+            segments={segments}
             // Tenure-first header (the V4 spoke treatment): when the wallet's
             // activity in this market started, how long it has run, how fresh.
             toolbarLeading={
@@ -429,7 +505,7 @@ export default function CompoundPositionView({
                 // When the position actually opened, not when the window does —
                 // otherwise a wallet with ten thousand events reads as days old
                 // because its oldest loaded card is.
-                firstAt={opening?.firstTimestamp}
+                firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                 tenurePending={!lifetimeFiguresKnown(historyWindow)}
               />
             }

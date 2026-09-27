@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
+import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { marketOf } from "@/lib/compound/asset-catalog";
 import { loadCompoundPositionTail } from "@/lib/compound/position-page-data";
 import CompoundPositionPage from "../../page";
 
 interface Props {
   params: Promise<{ market: string; wallet: string; eventId: string }>;
+  /** The parent position page reads `?folders=` off this to choose which
+   *  timeline read its tail makes, so this segment carries it through. */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // Restated (not re-exported — see twitter-image.tsx's own header on why Next
@@ -18,12 +22,16 @@ export const dynamic = "force-dynamic";
 // `loadCompoundPositionTail` is the same `cache()`-wrapped read the parent
 // page and its own opengraph-image already call, so finding the event here
 // costs no second backend round trip within one request.
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { market: rawMarket, wallet: rawWallet, eventId } = await params;
   const wallet = rawWallet.toLowerCase();
   const market = rawMarket.toLowerCase();
   const decoded = decodeEventId(eventId);
-  const tail = await loadCompoundPositionTail(wallet, market);
+  // The same test the page decides on, so both reach one `cache()` entry. A
+  // grouped answer names only the ungrouped events, so an event inside a
+  // folder falls back to the generic metadata.
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = await loadCompoundPositionTail(wallet, market, grouped);
   const event = tail.events?.find((e) => e.id === decoded) ?? null;
   return eventMetadata({
     session: "compound",
@@ -43,6 +51,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // `eventId` key the parent's own `Props` type doesn't declare; passing the
 // same promise through is still structurally valid (the parent only reads
 // `market`/`wallet` off it).
-export default async function CompoundEventPage({ params }: Props) {
-  return CompoundPositionPage({ params });
+export default async function CompoundEventPage({ params, searchParams }: Props) {
+  return CompoundPositionPage({ params, searchParams });
 }
