@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { TIMELINE_WINDOW_ROWS } from "./_timeline-window.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const SPECIMENS = {
@@ -44,8 +45,6 @@ async function load(page, url) {
 // Each constant below is the web's own, named where it lives, because this
 // script replays the page's grouping over the page's own history.
 
-/** lib/shared/timeline-opening-balance.ts — the window the trove page asks for. */
-const TIMELINE_WINDOW_ROWS = 1000;
 /** lib/shared/timeline-chunks.ts — events one folder aims to hold. */
 const CHUNK_TARGET = 100;
 /** lib/shared/liquity-fork-timeline-runs.tsx — shorter stretches stay as cards. */

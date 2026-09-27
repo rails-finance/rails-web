@@ -38,7 +38,6 @@
 // wei-level break, which is what both existing vault verifiers say.
 
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
 import type { TimelineCutSummary } from "@/lib/shared/timeline-boundary";
 
 /** Where a receipt on this surface points. One shape for both chains, because
@@ -561,8 +560,14 @@ export const VAULT_TIMELINE_HORIZON = 5000;
  *  SERIALISED: the gate and the lifetime-flows tower are reduced over every
  *  row on the server before the slice is taken, and the store is offered
  *  every row. MEASURED 2026-09-09: a rendered position page costs 587.5 bytes
- *  of RSC payload per row, so 1,000 rows is ≈ 0.6 MB where 5,000 was ≈ 3.2. */
-export const VAULT_TIMELINE_DRAW_ROWS = TIMELINE_WINDOW_EVENTS;
+ *  of RSC payload per row, so 1,000 rows is ≈ 0.6 MB where 5,000 was ≈ 3.2.
+ *
+ *  Held at 1,000 when the shared preload (`TIMELINE_WINDOW_ROWS`) rose to
+ *  2,500 on 2026-09-27: the vault holder lives get the 2,500 preload and the
+ *  month read with the append-only tail store (rails-ops
+ *  TO-DO-infra-and-backend §5, item 6), and the vault verifiers restate this
+ *  figure. */
+export const VAULT_TIMELINE_DRAW_ROWS = 1000;
 
 /** TIER 1'S CEILING, PER CHAIN — the largest life Rails will build into a
  *  stored tail on that chain.

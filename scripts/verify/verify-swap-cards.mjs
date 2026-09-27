@@ -167,9 +167,9 @@ const FIXTURES = [
 ];
 
 /** Presses allowed before a transaction is called undrawable. The served window
- *  is TIMELINE_WINDOW_ROWS (1,000) and a press paints TIMELINE_PAGE_ROWS (50),
- *  so twenty reaches the bottom of it; the rest is slack. */
-const PRESSES_MAX = 30;
+ *  is TIMELINE_WINDOW_ROWS (2,500) and a press paints TIMELINE_PAGE_ROWS (50),
+ *  so fifty reaches the bottom of it; the rest is slack. */
+const PRESSES_MAX = 60;
 
 /** Is the fixture's transaction drawn? The row's `data-event-id` is Aave V3's
  *  own event key, `action:contract:txHash:logIndex`, so the hash is in it. */

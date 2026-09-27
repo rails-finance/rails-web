@@ -37,56 +37,39 @@
 // degraded to a truncated address on the other would silently split a bucket in
 // two, and nothing downstream could tell that from a real second asset.
 
-/** THE ONE CUT ON EVERY TIMELINE (rails-ops decision 0019, amended
- *  2026-09-10): a position or holder timeline draws its newest 1,000 rows and
- *  the boundary card after them, whichever arm serves it — the windowed
- *  mainnet pages ask the index for this many (`?recent=`), the Base replays
- *  trim their drawn list to it, the vault loaders' draw window is it, and the
- *  Liquity V2 trove page's `limit` is it. One number, one name, so the cut
+/** THE PRELOAD ON EVERY WEB-WINDOWED TIMELINE (rails-ops decision 0019, the
+ *  2026-09-10 amendments and the 2026-09-24 one, rule 2): a position timeline
+ *  preloads its newest 2,500 rows and the boundary card after them, whichever
+ *  arm serves it — the windowed mainnet pages ask the index for this many
+ *  (`?recent=`), the Base replays trim their drawn list to it, and the Liquity
+ *  V2 trove page's `limit` is it (rails-server clamps a `limit` to 1,000, so
+ *  that arm still reads at most 1,000). One number, one name, so the preload
  *  cannot drift between arms and so a break test is a single edit.
  *
- *  The cut is still a PARAMETER on every hop of the windowed request, because
- *  it is also the natural boundary if deep history is ever tiered — and as of
- *  2026-09-11 the index can be read by a SPAN OF TIME as well as by its newest
- *  end (`/timeline?from=&to=`, unix seconds), which is what a below-cut month
- *  on the activity map will eventually be fetched with.
+ *  2,500 since 2026-09-27 (row-cut batch 1, rails-ops TO-DO-infra-and-backend
+ *  §9), from 1,000. The server's constant of the same name
+ *  (`api/src/services/timeline-folders.ts`) has been 2,500 since 2026-09-24
+ *  and governs the families rails-server groups; the two now agree. Every
+ *  position up to 2,500 events loads whole. Page weight was measured on each
+ *  arm's deepest position before the raise and is recorded in that item.
  *
- *  1,000 keeps the deepest wallet in the product to ~1 MB and 1,002 rows where
- *  its whole history is 154 MB and 28.3 s, and leaves 837,290 of the index's
- *  838k positions entirely unaffected — they hold fewer events than this and
- *  get no cut at all.
+ *  The vault holder draw is NOT this number any more: `VAULT_TIMELINE_DRAW_ROWS`
+ *  in lib/shared/vault-holder-timeline.ts stays 1,000 until the vault tail
+ *  store (vault section item 6) gives those lives the month read.
  *
- *  ── ⚠️ WHETHER THIS NUMBER SHOULD BE 5,000 — MEASURED 2026-09-11, NOT TAKEN
+ *  The preload is still a PARAMETER on every hop of the windowed request, and
+ *  the index can be read by a SPAN OF TIME as well as by its newest end
+ *  (`/timeline?from=&to=`, unix seconds), which is how a month below the
+ *  preload is read once a family is on the shared month read.
  *
- *  Three things a windowed page says — "of 1,000 listed", the opening-balance
- *  caption, and an activity map whose older months refuse the click — are all
- *  true statements about this line, and all three stop being drawn on their
- *  own once a position has no opening balance. So where the line sits decides
- *  how many readers meet them, and a reader on an ordinary 4,333-event
- *  position meets all three today.
+ *  ── WHAT THE RAISE EMPTIES
  *
- *  COUNTED on the onboarding index over its 245,918 Aave V3 (wallet, market)
- *  positions: 426 hold more than 1,000 events, 199 more than 2,000, 82 more
- *  than 5,000, 36 more than 10,000; the largest holds 107,726. At 1,000 the
- *  cut bites 426 positions to protect against the 36 that need it.
- *
- *  MEASURED at 5,000, local dev against the onboarding box:
- *    • a 4,333-event position: whole history 3.76 MB and 1.31 s on the wire,
- *      against 0.87 MB and 1.99 s for the windowed fetch it would replace —
- *      the windowed read is not even faster, because it pays for a cutoff
- *      probe and a second request for the opening balance;
- *    • the deepest position (107,726 events): the window grows from 0.81 MB /
- *      1,000 rows to 4.08 MB / 5,003 rows, and the page's settle time from a
- *      steady 8.9-9.2 s to 9.3 s at best, ~12 s median. Its whole history
- *      stays 50.6 MB and 32.6 s, which is what the cut is for.
- *
- *  WHAT STOPPED IT BEING A ONE-LINE CHANGE, and why the number is Miles's:
- *  raising the line does not merely re-tune the checkpoint model, it EMPTIES
- *  it for whole families. At 5,000 the deepest Fluid position in the index
- *  holds 1,430 events, so no Fluid page windows at all and nothing exercises
- *  the boundary card, the opening balance or the below-cut refusal there. The
- *  same shape applies to several Base arms. That is a decision about decision
- *  0019's machinery, not a constant.
+ *  At 2,500 no Fluid, Liquity V1 or LlamaLend position windows (their deepest
+ *  hold 1,440, 1,482 and 1,035 events on 2026-09-27), so nothing exercises the
+ *  boundary card, the opening balance or a month below the preload on those
+ *  families. Decision 0019's rule 2 accepts that: every position up to the
+ *  preload loads whole. A 5,000 preload was measured on 2026-09-11 and not
+ *  taken (git history of this file).
  *
  *  ── ITS UNIT CHANGED, AND SO DID ITS NAME
  *
@@ -99,21 +82,21 @@
  *
  *  `TIMELINE_WINDOW_ROWS` is that name and is what new code takes.
  *  `TIMELINE_WINDOW_EVENTS` stays beside it, DEPRECATED, with its call sites
- *  untouched: the arms that still serve events read the same thousand, the
+ *  untouched: the arms that still serve events read the same number, the
  *  rollout is one family at a time, and renaming a hundred call sites is a
  *  cosmetic sweep that belongs in its own change. The two are tied at compile
  *  time — the second's type is the first's literal — so they cannot drift
  *  apart without failing to build. */
-export const TIMELINE_WINDOW_ROWS = 1000;
+export const TIMELINE_WINDOW_ROWS = 2500;
 
 /** @deprecated The cut counts ROWS — use `TIMELINE_WINDOW_ROWS`. Kept for the
  *  arms that still serve events, and tied to it above. */
-export const TIMELINE_WINDOW_EVENTS: typeof TIMELINE_WINDOW_ROWS = 1000;
+export const TIMELINE_WINDOW_EVENTS: typeof TIMELINE_WINDOW_ROWS = 2500;
 
-/** ONE PAGE OF ROWS — how many of the cut's thousand the list draws at a time.
+/** ONE PAGE OF ROWS — how many of the preloaded rows the list draws at a time.
  *
  *  It sits here beside the cut because the two are the same family of fact and
- *  the reader meets them as one thing: a thousand rows, fifty at a press.
+ *  the reader meets them as one thing: the preloaded rows, fifty at a press.
  *  ChainTruthTimeline's `WINDOW_CHUNK` is this constant.
  *
  *  It was halved on 2026-09-11 (Miles). The first paint is a LANDING, not a

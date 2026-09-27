@@ -1118,12 +1118,12 @@ for (const f of FIXTURES) {
         // it stands.
         //
         // ⚠️ NOT ON THE GROUPED ARM, AND THE REASON IS THE AMENDMENT. `CUT` is
-        // the WEB's `TIMELINE_WINDOW_ROWS`, 1,000, which binds the arms the web
-        // itself windows. A served family's preload is the SERVER's constant of
-        // the same name and has been 2,500 since 2026-09-24 (decision 0019,
-        // amendment rule 2, server `4a0d28b`) — this repo cannot read it, and
-        // the page may not state it, so a bound written here would be a third
-        // copy of a number two repos already disagree about. What the grouped
+        // the WEB's `TIMELINE_WINDOW_ROWS`, which binds the arms the web itself
+        // windows. A served family's preload is the SERVER's constant of the
+        // same name (decision 0019, amendment rule 2, server `4a0d28b`). Both
+        // are 2,500 since 2026-09-27, but this repo cannot read the server's,
+        // and the page may not state it, so a bound written here would be a
+        // third copy of the number. What the grouped
         // page owes is that it lists exactly the rows its own route served,
         // and check 3 below holds it to that, on the same run.
         if (f.arm === "grouped") {
