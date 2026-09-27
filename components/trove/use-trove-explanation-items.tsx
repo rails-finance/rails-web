@@ -150,8 +150,8 @@ function buildClosedItems(trove: TroveSummary): TroveExplanation {
   // (absorbs the old "closure" bullet).
   const lead = (
     <span key="closure" className="text-rb-500">
-      This trove has been closed with all debt repaid — any collateral above the liquidation reserve was returned to the
-      owner:
+      This trove has been closed with all debt repaid — all the collateral was returned to the owner, and the 0.0375 ETH
+      liquidation reserve was refunded on top:
     </span>
   );
   // Shared with ClosedSummaryCard's face stats — one receipt identity for the
