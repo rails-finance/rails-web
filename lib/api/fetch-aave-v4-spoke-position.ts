@@ -123,3 +123,18 @@ export function scaleChainBalance(raw: string, decimals: number): number {
   const frac = big % divisor;
   return Number(whole) + Number(frac) / Number(divisor);
 }
+
+/** The lifecycle rule every Aave V4 surface shares: a position is closed when
+ *  the spoke's own balances, read from the chain, hold nothing on either side.
+ *  The detail card applies it to its chain overlay and the listing card to the
+ *  row's chain reserves, so one position never reads OPEN in one place and
+ *  CLOSED in the other. Dust counts as held: a balance the chain states is a
+ *  balance. */
+export function holdsNothingOnChain(
+  reserves: readonly { supplyBalanceRaw: string; debtBalanceRaw: string; decimals: number }[],
+): boolean {
+  return reserves.every(
+    (r) =>
+      scaleChainBalance(r.supplyBalanceRaw, r.decimals) <= 0 && scaleChainBalance(r.debtBalanceRaw, r.decimals) <= 0,
+  );
+}

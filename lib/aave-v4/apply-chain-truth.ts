@@ -17,7 +17,7 @@
 
 import type { AaveSpokeCardInfo, ReserveStats } from "./spoke-cards";
 import type { AaveV4SpokePositionChainResponse } from "@/lib/api/fetch-aave-v4-spoke-position";
-import { scaleChainBalance } from "@/lib/api/fetch-aave-v4-spoke-position";
+import { holdsNothingOnChain, scaleChainBalance } from "@/lib/api/fetch-aave-v4-spoke-position";
 import { calculateAaveV4Position, computeSupplyBreakdown, type CalcPositionInputs } from "./utils/position-calculation";
 import { resolvePrice, type PriceEntry } from "@/lib/aave/prices";
 import { pricesHaveLoaded } from "@/lib/aave-v4/unpriced";
@@ -242,7 +242,7 @@ export function patchSpokeCardWithChain(
     assetLiqPrices,
     borrowingPowerUsd: calc.borrowCapacityUsd,
     supplyBreakdown: computeSupplyBreakdown(calcInputs.supplies),
-    // Closed-position heuristic: chain says no supply AND no debt.
-    isClosed: calcInputs.supplies.length === 0 && calcInputs.debts.length === 0,
+    // The shared lifecycle rule (holdsNothingOnChain): the listing card reads it too.
+    isClosed: holdsNothingOnChain(chain.reserves),
   };
 }

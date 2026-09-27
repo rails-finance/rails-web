@@ -36,7 +36,7 @@ import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { useMemo } from "react";
 import type { AaveV4SpokePositionRow } from "@/lib/api/fetch-aave-v4-spoke-positions";
-import { scaleChainBalance } from "@/lib/api/fetch-aave-v4-spoke-position";
+import { holdsNothingOnChain, scaleChainBalance } from "@/lib/api/fetch-aave-v4-spoke-position";
 import { SPOKE_HUB, HUB_TIER_LABEL } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
@@ -131,8 +131,26 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   // high-water mark — Peak Supplied / Peak Debt — matching the detail card.
   // Null-safe against a pre-057 API that omits `status`: that API only ever
   // returned open positions (closed ones were pruned), so absent ⇒ open.
-  const isOpen = row.status == null || row.status === "open";
-  const closedByLiquidation = row.status === "liquidated";
+  //
+  // Where the row's reserves are the chain's own read (the overlay answered),
+  // the detail card's rule decides instead of the wire status: closed when the
+  // chain holds nothing on either side (holdsNothingOnChain). The wire status
+  // can disagree with the chain both ways (a zeroed Base position served as
+  // open; an Ethereum position under $1 served as closed), and the reader
+  // opening the card must see the lifecycle word the card showed.
+  const wireOpen = row.status == null || row.status === "open";
+  const isOpen = row.chainHfStale ? wireOpen : !holdsNothingOnChain(row.reserves);
+  // A position the chain closed while the wire still calls it open carries no
+  // terminal cause on the wire: it ended by liquidation when a liquidation was
+  // its last act, the detail card's `lastAction === "liquidation"`.
+  const closedByLiquidation = wireOpen
+    ? row.lastLiquidationAt != null && row.lastLiquidationAt >= row.lastActivityAt
+    : row.status === "liquidated";
+  // The wire states no peak or closing date for a row it serves as open; the
+  // chain-closed card then leaves the peak figure out and dates the close by
+  // the last act, which is the one that emptied the position.
+  const peakKnown = row.peakSupplyUsd != null;
+  const closedAt = row.closedAt ?? (wireOpen ? row.lastActivityAt : undefined);
   // Peak-based supply-only test for the closed card: a position that never
   // carried real debt (peak debt < $1) drops the Peak Debt column, mirroring the
   // detail card's `spoke.peakDebtUsd < 1` rule. Distinct from the live
@@ -245,9 +263,10 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
           outcome={closedByLiquidation ? "liquidated" : "closed"}
           leadingIdentity={leadingIdentity}
           identity={metaIdentity}
-          closedAt={row.closedAt ?? undefined}
-          collateralLabel={peakSupplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral}
+          closedAt={closedAt}
+          collateralLabel={!peakKnown ? "" : peakSupplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral}
           collateral={(() => {
+            if (!peakKnown) return null;
             const v = fmtUsd(row.peakSupplyUsd ?? 0);
             return (
               <StatValue color="text-rb-500" title={v.title}>
