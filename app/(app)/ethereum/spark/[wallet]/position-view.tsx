@@ -45,9 +45,8 @@ import {
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { SPARK_FOLDER_REGISTER, SPARK_TIMELINE_RUNS } from "@/lib/spark/timeline-runs";
 import { fetchSparkGroupedTimeline, type SparkGroupedTimelineResult } from "@/lib/api/fetch-spark-timeline";
-import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
-import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { SparkEventCard } from "@/components/protocol/spark/spark-event-card";
 import {
   SparkPositionCard,
@@ -352,18 +351,26 @@ export default function SparkPositionDetail({
     };
   }, [view, sparkEvents, wallet, precomputedLifetime]);
 
-  const readFolderMembers = useCallback(
-    (ask: { event?: string; folder?: string }) =>
-      fetchTimelineFolderMembers({ path: "/api/spark/timeline/folder", params: { wallet }, ...ask }),
-    [wallet],
-  );
-
-  const tl = useTimelineEvents(sparkEvents, {
+  // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
+  //
+  // Decision 0019, amendments 2026-09-24 and 2026-09-25: a month the loaded
+  // rows do not hold is read from the index as its segment
+  // (hooks/useTimelineSegment.ts, shared with the Aave V3 page). The preload
+  // stays the page's whole-history record; the timeline alone swaps.
+  const { tl, segments, readFolderMembers } = useTimelineSegment({
+    events: sparkEvents,
+    groupedTail,
+    servedRows,
+    servedFolders,
+    opening,
+    historyWindow,
+    isEvent: isSparkEvent,
+    readGrouped: (span, signal) => fetchSparkGroupedTimeline(wallet, { span, signal }),
+    readFlat: (span) => fetchSparkTimeline(wallet, { span }),
+    folderPath: "/api/spark/timeline/folder",
+    folderParams: { wallet },
     storageKey: `spark-${wallet}`,
     protocolKey: "spark",
-    window: historyWindow,
-    servedRows,
-    eventsServed: groupedTail?.eventsServed,
   });
 
   // ── Market notes: the reserve's own rate across this position's own
@@ -638,6 +645,8 @@ export default function SparkPositionDetail({
             runs={SPARK_TIMELINE_RUNS}
             folderRegister={SPARK_FOLDER_REGISTER}
             readFolderMembers={readFolderMembers}
+            // The month grid in the Date panel, on a served page.
+            segments={segments}
             // The USD-values toggle joins the chain-state items: the detail
             // grid renders after-balance USD chips off the captured
             // oracle-at-block prices (mig 092).

@@ -63,6 +63,9 @@ interface TimelineRowsResponse {
    *  /summary twin with THIS number. Null (or absent, on a backend that
    *  predates it) means the rows ARE the whole history. */
   cutoffBlock?: number | null;
+  /** The span `?from=`/`?to=` asked for, echoed in unix seconds. Null (or
+   *  absent, on a backend that predates it) means no span was asked for. */
+  span?: { from: number; to: number } | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -78,6 +81,13 @@ export async function GET(request: NextRequest) {
   // `recent` and answers a bad one with its own 400. Re-validating it here
   // would be a second opinion about the same parameter, and the two would drift.
   const recent = request.nextUrl.searchParams.get("recent");
+  // `?from=`/`?to=`: a span of time in unix seconds in place of the newest
+  // window, passed straight through for the same reason. Each end is
+  // forwarded independently, so a half span reaches upstream and is refused
+  // there. Under `group` it names the segment.
+  const from = request.nextUrl.searchParams.get("from");
+  const to = request.nextUrl.searchParams.get("to");
+  const spanQs = (from ? `&from=${encodeURIComponent(from)}` : "") + (to ? `&to=${encodeURIComponent(to)}` : "");
   const grouped = request.nextUrl.searchParams.get("group") === "1";
 
   try {
@@ -86,7 +96,7 @@ export async function GET(request: NextRequest) {
       // two bounds are the route's own (a row cap and an event scan bound,
       // whichever binds first), because a caller cannot know how many events
       // fill a thousand rows on this particular position.
-      const url = `${RAILS_API_URL}/api/spark/timeline?wallet=${encodeURIComponent(wallet)}&group=1`;
+      const url = `${RAILS_API_URL}/api/spark/timeline?wallet=${encodeURIComponent(wallet)}${spanQs}&group=1`;
       const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));
       if (!response.ok) {
         console.error(`Backend API error: ${response.status} ${response.statusText}`);
@@ -134,6 +144,7 @@ export async function GET(request: NextRequest) {
         rowPlan,
         eventsServed: upstream.eventsServed,
         boundBy: upstream.boundBy,
+        span: upstream.span ?? null,
       };
       // A leg whose decimals did not load is left off its folder header; the
       // answer is then not kept, like a row carrying one.
@@ -146,18 +157,22 @@ export async function GET(request: NextRequest) {
     }
 
     const recentQs = recent ? `&recent=${encodeURIComponent(recent)}` : "";
-    const url = `${RAILS_API_URL}/api/spark/timeline?wallet=${encodeURIComponent(wallet)}${recentQs}`;
+    const url = `${RAILS_API_URL}/api/spark/timeline?wallet=${encodeURIComponent(wallet)}${recentQs}${spanQs}`;
     const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));
     if (!response.ok) {
       console.error(`Backend API error: ${response.status} ${response.statusText}`);
       return NextResponse.json({ error: `Backend error: ${response.statusText}` }, { status: response.status });
     }
-    const { rows, totalEvents, truncated, cutoffBlock } = (await response.json()) as TimelineRowsResponse;
+    const { rows, totalEvents, truncated, cutoffBlock, span } = (await response.json()) as TimelineRowsResponse;
     const data = await buildSparkTimeline(rows, wallet);
     // The ceiling and the window are different claims and both can be absent.
     // A windowed fetch is never truncated — it asked for a window and got one —
     // so `withRowCeiling` stays exactly as it was and simply never fires.
-    const windowed = { ...withRowCeiling(data, { totalEvents, truncated }), cutoffBlock: cutoffBlock ?? null };
+    const windowed = {
+      ...withRowCeiling(data, { totalEvents, truncated }),
+      cutoffBlock: cutoffBlock ?? null,
+      span: span ?? null,
+    };
     return NextResponse.json(toTimelineWire(windowed, MAINNET_CHAIN_ID), {
       headers: timelineCacheHeaders(data.events, proxyCacheControl(response, LISTING_CACHE_CONTROL)),
     });

@@ -1643,9 +1643,16 @@ for (const f of FIXTURES) {
 // of six beside 383 events, in 1.4 s. `grouped-deep` is the position `deep`
 // reads flat.
 const FOLDER_HEADER = '[role="button"][aria-expanded][aria-label*=" consecutive "]';
+//
+// `grouped-spark-deep` 0x1601…347e is SparkLend's deepest position (29,914
+// events on 2026-09-27, cut by rows at 2,500), on the shared month read
+// (hooks/useTimelineSegment.ts) since row-cut batch 2.
+const AAVE_V3 = { page: "/ethereum/aave-v3", api: "/api/aave-v3", q: "market=core&" };
+const SPARK = { page: "/ethereum/spark", api: "/api/spark", q: "" };
 const GROUPED_FIXTURES = [
-  { id: "grouped-deep", wallet: "0xee7ca610d896c53ffe716b801c05748efd902954" },
-  { id: "grouped-whole", wallet: "0x9984a1d407bc6ac53b404aabf66b80b99d96bb47" },
+  { id: "grouped-deep", wallet: "0xee7ca610d896c53ffe716b801c05748efd902954", ...AAVE_V3 },
+  { id: "grouped-whole", wallet: "0x9984a1d407bc6ac53b404aabf66b80b99d96bb47", ...AAVE_V3 },
+  { id: "grouped-spark-deep", wallet: "0x1601843c5e9bc251a3272907010afa41fa18347e", ...SPARK },
 ];
 
 /** The drawn list as rows: folder headers, and event rows. With every folder
@@ -1666,11 +1673,11 @@ const READ_GROUPED_LIST = (sel) => {
 
 for (const g of GROUPED_FIXTURES) {
   if (ONLY && !ONLY.has(g.id)) continue;
-  const path = `/ethereum/aave-v3/${g.wallet}`;
+  const path = `${g.page}/${g.wallet}`;
   const page = await ctx.newPage();
   page.setDefaultTimeout(300_000);
   try {
-    const route = await getJson(`/api/aave-v3/timeline?market=core&wallet=${g.wallet}&group=1`);
+    const route = await getJson(`${g.api}/timeline?${g.q}wallet=${g.wallet}&group=1`);
     const plan = route.rowPlan ?? [];
     const folders = plan.filter((r) => r.kind === "folder").map((r) => r.folder);
     const loose = route.events ?? [];
@@ -1790,7 +1797,7 @@ for (const g of GROUPED_FIXTURES) {
     // The whole life by month: the summary read past the tip IS the life, and
     // is what the page's own `lifeDays` sums to from the opening balance, the
     // folders' `byDay` and the loose events.
-    const life = await getJson(`/api/aave-v3/timeline/summary?market=core&wallet=${g.wallet}&cutoffBlock=99999999`);
+    const life = await getJson(`${g.api}/timeline/summary?${g.q}wallet=${g.wallet}&cutoffBlock=99999999`);
     const lifeMonths = new Map();
     for (const b of life?.byDay ?? []) {
       const i = monthIdxOf(Number(b.key));

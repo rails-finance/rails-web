@@ -14,7 +14,12 @@ import type { GroupedTimelineFields } from "@/lib/shared/timeline-folder";
 
 /** The grouped answer: the flat result plus the interleaving plan and the two
  *  figures a cut in ROWS has to state. See lib/shared/timeline-folder.ts. */
-export type SparkGroupedTimelineResult = SparkTimelineResult & GroupedTimelineFields;
+export type SparkGroupedTimelineResult = SparkTimelineResult &
+  GroupedTimelineFields & {
+    /** The span `?from=`/`?to=` asked for, echoed in unix seconds. Null (or
+     *  absent, on an api that predates the grouped span) on the newest window. */
+    span?: { from: number; to: number } | null;
+  };
 
 export interface FetchSparkTimelineOptions {
   baseUrl?: string;
@@ -27,6 +32,9 @@ export interface FetchSparkTimelineOptions {
    *  all but a handful of positions and the only one for a caller that reduces
    *  the array itself without seeding from a summary. */
   recent?: number;
+  /** A span of time in unix seconds, inclusive, in place of the newest window.
+   *  Never given with `recent`: the index refuses the pair. */
+  span?: [number, number];
 }
 
 export async function fetchSparkTimeline(
@@ -35,6 +43,10 @@ export async function fetchSparkTimeline(
 ): Promise<SparkTimelineResult> {
   const qs = new URLSearchParams({ wallet });
   if (opts.recent) qs.set("recent", String(opts.recent));
+  if (opts.span) {
+    qs.set("from", String(opts.span[0]));
+    qs.set("to", String(opts.span[1]));
+  }
   const url = `${opts.baseUrl ?? ""}/api/spark/timeline?${qs.toString()}`;
   const done = settleFetchMark("spark-timeline");
   const res = await fetch(url, { cache: "no-store", headers: opts.headers });
@@ -57,13 +69,19 @@ export async function fetchSparkTimeline(
  * no longer the served history, so a caller that reduces `events` and calls
  * the result a lifetime figure would be wrong in a way a boolean flag would
  * have hidden. `?recent` is not composed with it — under grouping the bounds
- * are the route's own.
+ * are the route's own. A `span` is: a month read is the segment grouped the
+ * same way (decision 0019, amendment 2026-09-25), and the answer echoes it as
+ * `span`.
  */
 export async function fetchSparkGroupedTimeline(
   wallet: string,
-  opts: { baseUrl?: string; signal?: AbortSignal; headers?: HeadersInit } = {},
+  opts: { baseUrl?: string; signal?: AbortSignal; headers?: HeadersInit; span?: [number, number] } = {},
 ): Promise<SparkGroupedTimelineResult> {
   const qs = new URLSearchParams({ wallet, group: "1" });
+  if (opts.span) {
+    qs.set("from", String(opts.span[0]));
+    qs.set("to", String(opts.span[1]));
+  }
   const url = `${opts.baseUrl ?? ""}/api/spark/timeline?${qs.toString()}`;
   const done = settleFetchMark("spark-timeline-grouped");
   const res = await fetch(url, { cache: "no-store", signal: opts.signal, headers: opts.headers });

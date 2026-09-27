@@ -40,7 +40,6 @@ import {
   type TimelineOpeningBalance,
   type TimelineWindow,
 } from "@/lib/shared/timeline-opening-balance";
-import { lifeDayCounts, lifeExtent, planSegmentAsk, segmentSpan, trimToNewest } from "@/lib/shared/timeline-segments";
 import {
   fetchAaveV3Position,
   fetchAaveV3OraclePrices,
@@ -51,10 +50,9 @@ import { V3PoolProvider } from "@/lib/aave-v3/pool-context";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { AAVE_V3_FOLDER_REGISTER, AAVE_V3_TIMELINE_RUNS } from "@/lib/aave-v3/timeline-runs";
 import { fetchAaveV3GroupedTimeline, type AaveV3GroupedTimelineResponse } from "@/lib/api/fetch-aave-v3-timeline";
-import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
 import {
   AaveV3PositionCard,
@@ -367,143 +365,24 @@ export default function AaveV3PositionDetail({
 
   // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
   //
-  // Decision 0019, amendment 2026-09-24. The preload above (the newest rows,
-  // their folders and the opening balance) stays the page's whole-history
-  // record: the tower, the export and the life the picker draws all read it.
-  // The TIMELINE alone swaps to a segment when a month outside the preload
-  // is picked; a segment brings no opening balance, so its lifetime figures
-  // are absent and the count line states its month in time. What the preload
-  // could carry is learned from the answer (`boundBy`) and never assumed.
-  const lifeDays = useMemo(
-    () => lifeDayCounts(aaveEvents, servedFolders, opening),
-    [aaveEvents, servedFolders, opening],
-  );
-  const preloadCap = groupedTail?.boundBy === "rows" ? groupedTail.rowPlan.length : null;
-  const [segment, setSegment] = useState<{
-    monthIdx: number;
-    asked: { from: number; to: number };
-    events: BaseActivityEvent[];
-    grouped: AaveV3GroupedTimelineResponse | null;
-    /** Where the served rows open when the ask was cut to the preload, by
-     *  the index (`boundBy: "rows"`) or by the page trimming a flat answer. */
-    cutAt: number | null;
-  } | null>(null);
-  const [segmentLoading, setSegmentLoading] = useState<number | null>(null);
-  const segmentRead = useRef<AbortController | null>(null);
-  // Whether the api groups a segment. Learned from the first answer: one that
-  // predates the grouped span answers the newest window with no `span` on it,
-  // and from then on the page reads segments flat.
-  const apiGroupsSpans = useRef<boolean | null>(null);
-  const loadSegment = useCallback(
-    async (monthIdx: number) => {
-      // Every month is read the same way, whether or not the preload already
-      // holds its rows: a click shows that month in place of the one on the
-      // page (Miles, 2026-09-24 evening — no scroll-to branch).
-      const ask = planSegmentAsk(monthIdx, lifeDays, preloadCap);
-      segmentRead.current?.abort();
-      const ac = new AbortController();
-      segmentRead.current = ac;
-      setSegmentLoading(monthIdx);
-      try {
-        const span: [number, number] = [ask.from, ask.to];
-        if (apiGroupsSpans.current !== false) {
-          const grouped = await fetchAaveV3GroupedTimeline({ wallet, market, span, signal: ac.signal });
-          if (grouped.span && grouped.span.from === ask.from && grouped.span.to === ask.to) {
-            apiGroupsSpans.current = true;
-            let cutAt: number | null = null;
-            if (grouped.cutoffBlock != null) {
-              cutAt = Infinity;
-              for (const e of grouped.events) if (e.timestamp < cutAt) cutAt = e.timestamp;
-              for (const r of grouped.rowPlan)
-                if (r.kind === "folder" && r.folder.firstAt < cutAt) cutAt = r.folder.firstAt;
-              if (!Number.isFinite(cutAt)) cutAt = null;
-            }
-            setSegment({ monthIdx, asked: ask, events: grouped.events, grouped, cutAt });
-            return;
-          }
-          apiGroupsSpans.current = false;
-        }
-        const flat = await fetchAaveV3Timeline({ wallet, market, span });
-        const kept = trimToNewest(flat.events, preloadCap);
-        const cutAt = kept.length < flat.events.length && kept.length > 0 ? kept[0].timestamp : null;
-        setSegment({ monthIdx, asked: ask, events: kept, grouped: null, cutAt });
-      } catch (err) {
-        if ((err as { name?: string })?.name === "AbortError") return;
-        // The rows the page holds stay; the month stays where it was.
-      } finally {
-        if (segmentRead.current === ac) {
-          segmentRead.current = null;
-          setSegmentLoading(null);
-        }
-      }
-    },
-    [wallet, market, lifeDays, preloadCap],
-  );
-  const segmentEvents = useMemo(() => (segment ? segment.events.filter(isAaveV3Event) : null), [segment]);
-  const segmentRows = useMemo(
-    () => (segment?.grouped && segmentEvents ? interleaveRowPlan(segment.grouped.rowPlan, segmentEvents) : undefined),
-    [segment, segmentEvents],
-  );
-  const segmentWindow = useMemo<TimelineWindow | null>(() => {
-    if (!segment) return null;
-    const span = segmentSpan(segment.monthIdx, segment.asked, segment.cutAt, lifeDays);
-    return span ? { state: "span", cutoffBlock: null, opening: null, span } : null;
-  }, [segment, lifeDays]);
-  const timelineWindow = segmentWindow ?? historyWindow;
-  const segmentSpanParams = segment?.grouped
-    ? { from: String(segment.asked.from), to: String(segment.asked.to) }
-    : undefined;
-
-  const readFolderMembers = useCallback(
-    (ask: { event?: string; folder?: string }) =>
-      fetchTimelineFolderMembers({
-        path: "/api/aave-v3/timeline/folder",
-        params: { wallet, market, ...(segmentSpanParams ?? {}) },
-        ...ask,
-      }),
-    // The two strings are the whole of the span's identity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [wallet, market, segmentSpanParams?.from, segmentSpanParams?.to],
-  );
-
-  const tl = useTimelineEvents(segmentEvents ?? aaveEvents, {
+  // Decision 0019, amendments 2026-09-24 and 2026-09-25: the month read the
+  // served pages share (hooks/useTimelineSegment.ts). The preload stays the
+  // page's whole-history record; the timeline alone swaps to a segment.
+  const { tl, segments, readFolderMembers } = useTimelineSegment({
+    events: aaveEvents,
+    groupedTail,
+    servedRows,
+    servedFolders,
+    opening,
+    historyWindow,
+    isEvent: isAaveV3Event,
+    readGrouped: (span, signal) => fetchAaveV3GroupedTimeline({ wallet, market, span, signal }),
+    readFlat: (span) => fetchAaveV3Timeline({ wallet, market, span }),
+    folderPath: "/api/aave-v3/timeline/folder",
+    folderParams: { wallet, market },
     storageKey: `aave-v3-${market}-${wallet}`,
     protocolKey: "aave-v3",
-    window: timelineWindow,
-    servedRows: segment ? segmentRows : servedRows,
-    eventsServed: segment ? (segment.grouped?.eventsServed ?? segment.events.length) : groupedTail?.eventsServed,
-    olderCount: segmentWindow?.state === "span" ? segmentWindow.span.eventsBefore : 0,
   });
-  const { setDateRange } = tl;
-  const pickMonth = useCallback(
-    (monthIdx: number) => {
-      // Picking a month replaces the segment; a date typed within the old
-      // one does not carry over.
-      setDateRange(null);
-      void loadSegment(monthIdx);
-    },
-    [setDateRange, loadSegment],
-  );
-  const resetSegment = useCallback(() => {
-    segmentRead.current?.abort();
-    setSegmentLoading(null);
-    setDateRange(null);
-    setSegment(null);
-  }, [setDateRange]);
-  const hasLife = useMemo(() => lifeExtent(lifeDays) != null, [lifeDays]);
-  const segments = useMemo(
-    () =>
-      groupedTail && hasLife
-        ? {
-            lifeDays,
-            month: segment?.monthIdx ?? null,
-            loading: segmentLoading,
-            onPick: pickMonth,
-            onReset: segment ? resetSegment : null,
-          }
-        : undefined,
-    [groupedTail, hasLife, lifeDays, segment, segmentLoading, pickMonth, resetSegment],
-  );
   /** The preload's own total, for the export: `tl.totalCount` counts the
    *  segment once one is loaded. */
   const preloadTotal = lifetimeFiguresKnown(historyWindow)

@@ -50,6 +50,10 @@ export async function GET(request: NextRequest) {
   if (!wallet) return NextResponse.json({ error: "wallet is required" }, { status: 400 });
   const event = request.nextUrl.searchParams.get("event");
   const folderId = request.nextUrl.searchParams.get("folder");
+  // A folder on a segment (`/timeline?group=1&from=&to=`) is cut from that
+  // segment's grouping, so the span rides the open too.
+  const from = request.nextUrl.searchParams.get("from");
+  const to = request.nextUrl.searchParams.get("to");
   // Both keys upstream is an explicit 400 there ("two keys can name two
   // different folders"); neither is one too. Passed through rather than
   // second-guessed, the same rule the `recent` parameter follows next door.
@@ -58,6 +62,8 @@ export async function GET(request: NextRequest) {
     const qs = new URLSearchParams({ wallet });
     if (event) qs.set("event", event);
     if (folderId) qs.set("folder", folderId);
+    if (from) qs.set("from", from);
+    if (to) qs.set("to", to);
     const url = `${RAILS_API_URL}/api/spark/timeline/folder?${qs.toString()}`;
     const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));
     if (!response.ok) {
