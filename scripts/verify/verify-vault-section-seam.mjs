@@ -588,7 +588,16 @@ for (const f of fixtures) {
   );
 
   // The header's own modal — the one surface that collects every scope.
-  await page.click('button[aria-label="Bookmarks"]');
+  // TWO `[aria-label="Bookmarks"]` buttons mount on an app page by design
+  // (root layout's HeaderBar, always mounted, and BrandRail on app/(app)
+  // routes — app/(app)/layout.tsx's own comment: "Below `md` the bar is
+  // still there"): each hides its own copy by breakpoint by CSS, so only one
+  // is ever on-screen. An unscoped click resolves the ambiguous locator to
+  // DOM order's first element, which is HeaderBar's — permanently
+  // `display:none` at this script's desktop-width viewport — and hangs on
+  // its own 30s actionability wait. `:visible` picks the one actually on
+  // screen.
+  await page.click('button[aria-label="Bookmarks"]:visible');
   await page.waitForSelector(`[data-bookmark-group="${scope}"]`, { timeout: 15_000 }).catch(() => {});
   const group = await page.evaluate((s) => {
     const g = document.querySelector(`[data-bookmark-group="${s}"]`);
@@ -636,7 +645,8 @@ for (const f of fixtures) {
     [key, f.holder],
   );
   await page.reload({ waitUntil: "networkidle", timeout: 180_000 });
-  await page.click('button[aria-label="Bookmarks"]');
+  // Same ambiguous-locator fix as above: two mount, one hidden by breakpoint.
+  await page.click('button[aria-label="Bookmarks"]:visible');
   await page.waitForSelector(`[data-bookmark-group="${scope}"]`, { timeout: 15_000 }).catch(() => {});
   const legacyRows = await page.evaluate(
     (sc) =>
