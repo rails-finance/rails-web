@@ -16,8 +16,9 @@ import {
   type AaveV4InterestPnl,
   liquidationBuffer,
   rateSymbolLabel,
+  yearlyDebtCost,
 } from "@/lib/aave-v4/spoke-cards";
-import { fmtUsd, hfLabel, fmtLiqPrice, fmtSignedUsd, fmtTokenAmount } from "@/lib/aave-v4/format";
+import { fmtUsd, hfLabelV4, fmtLiqPrice, fmtSignedUsd, fmtTokenAmount, fmtYearly } from "@/lib/aave-v4/format";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { fmtPrice } from "@/components/shared/price-pill";
@@ -135,7 +136,7 @@ function buildInterestItems(pnl: AaveV4InterestPnl): React.ReactNode[] {
       </>
     ) : null;
 
-  if (pnl.hasData) {
+  if (pnl.hasData && earnedSide && paidSide) {
     const net = fmtSignedUsd(pnl.netUsd);
     items.push(
       <span key="net-interest">
@@ -143,8 +144,10 @@ function buildInterestItems(pnl: AaveV4InterestPnl): React.ReactNode[] {
         {breakdown ? <> — {breakdown}</> : null}.
       </span>,
     );
-  } else if (breakdown) {
-    items.push(<span key="interest-breakdown">{breakdown}.</span>);
+  } else if (paidSide) {
+    items.push(<span key="interest-breakdown">Interest so far: {paidSide}, already part of the debt.</span>);
+  } else if (earnedSide) {
+    items.push(<span key="interest-breakdown">Interest so far: {earnedSide}, already part of the supply.</span>);
   }
   if (pnl.unattributed) {
     items.push(
@@ -249,10 +252,11 @@ function buildSpokePositionItems(spoke: AaveSpokeCardInfo): {
     if (spoke.blendedLt != null && spoke.weightedCollateralUsd > 0) {
       items.push(
         <span key="collateral-basis">
-          Borrowing and the health factor don&rsquo;t credit the full deposit — each asset counts only up to its
-          liquidation threshold (about <H>{Math.round(spoke.blendedLt * 100)}%</H> of its value here). So this
-          collateral can carry up to <Prov info={DEBT_CEILING_PROV}>{fmtUsd(spoke.weightedCollateralUsd).display}</Prov>{" "}
-          of debt before the position becomes liquidatable.
+          Aave V4 gives each collateral one collateral factor, about <H>{Math.round(spoke.blendedLt * 100)}%</H> of its
+          value here (the liquidation threshold on this card), and it is both the borrowing limit and the liquidation
+          line: a borrow or withdrawal goes through while the health factor stays at or above 1, and below 1 the
+          position can be liquidated. So this collateral can carry up to{" "}
+          <Prov info={DEBT_CEILING_PROV}>{fmtUsd(spoke.weightedCollateralUsd).display}</Prov> of debt.
         </span>,
       );
     }
@@ -262,14 +266,13 @@ function buildSpokePositionItems(spoke: AaveSpokeCardInfo): {
         <span key="hf">
           Health factor of{" "}
           <H>
-            <Prov info={healthFactorProv(spoke.healthFactorBasis)}>{hfLabel(spoke.healthFactor)}</Prov>
+            <Prov info={healthFactorProv(spoke.healthFactorBasis)}>{hfLabelV4(spoke.healthFactor)}</Prov>
           </H>
           {lt != null && lt > 0 ? (
             <>
               : the {fmtUsd(spoke.weightedCollateralUsd).display} of debt the collateral can carry, divided by the debt
-              owed; at 1.00 the position becomes liquidatable. The event cards show the collateral ratio (collateral ÷
-              debt) instead: times {Math.round(lt * 100)}% it gives the health factor, so a {Math.round(100 / lt)}%
-              ratio is a health factor of 1.00.
+              owed. The event cards show the collateral ratio (collateral ÷ debt) instead: times {Math.round(lt * 100)}%
+              it gives the health factor, so a {Math.round(100 / lt)}% ratio is a health factor of 1.
             </>
           ) : (
             <>
@@ -282,7 +285,40 @@ function buildSpokePositionItems(spoke: AaveSpokeCardInfo): {
     }
     {
       const buf = liquidationBuffer(spoke);
-      if (buf.dropPct != null && !buf.liquidatable) {
+      if (buf.atLine) {
+        items.push(
+          <span key="at-line">
+            <H>At the liquidation line</H>: the health factor is {hfLabelV4(spoke.healthFactor)}, so a small fall in{" "}
+            {buf.single ? (
+              <>{aaveV4DisplaySymbol(buf.single.symbol)}&rsquo;s price</>
+            ) : (
+              <>the collateral&rsquo;s value</>
+            )}
+            {buf.single?.against ? <> against {aaveV4DisplaySymbol(buf.single.against.symbol)}</> : null}, or interest
+            growing the debt faster than the collateral, takes it below 1, where the position can be liquidated.
+          </span>,
+        );
+      }
+      if (buf.dropPct != null && !buf.liquidatable && !buf.atLine && buf.single?.against) {
+        // Collateral and debt move together: read the runway against the debt
+        // asset, since a dollar move in both leaves the health factor where it is.
+        const a = buf.single.against;
+        const col = aaveV4DisplaySymbol(buf.single.symbol);
+        const debt = aaveV4DisplaySymbol(a.symbol);
+        items.push(
+          <span key="liq">
+            Liquidation tracks <span className="text-foreground/90 font-medium">{col}</span> against{" "}
+            <span className="text-foreground/90 font-medium">{debt}</span>, the asset the debt is in: the two move
+            together in dollars, so a fall in both leaves the health factor where it is. From today&rsquo;s{" "}
+            {a.ratio.toLocaleString("en-US", { maximumFractionDigits: 4 })} {debt} per {col}, it would have to fall
+            about <H>{Math.round(buf.dropPct)}%</H> (to{" "}
+            <H>
+              {a.liqRatio.toLocaleString("en-US", { maximumFractionDigits: 4 })} {debt}
+            </H>
+            ) to trigger one.
+          </span>,
+        );
+      } else if (buf.dropPct != null && !buf.liquidatable && !buf.atLine) {
         if (buf.single) {
           // Single collateral asset — pin the buffer to a concrete price
           // (currentPrice / HF, chain-state, no LT table). Today's spot price
@@ -333,12 +369,22 @@ function buildSpokePositionItems(spoke: AaveSpokeCardInfo): {
       items.push(...buildInterestItems(spoke.interestPnl));
     }
     if (spoke.latestBorrowRate != null) {
+      const yearly = yearlyDebtCost(spoke);
       items.push(
         <span key="rate">
           The most recent {rateSymbolLabel(spoke)}borrow rate recorded on this spoke was{" "}
           <H>
             <Prov info={borrowRateProv()}>{spoke.latestBorrowRate.toFixed(2)}%</Prov>
           </H>
+          {yearly && yearly.amount > 0 ? (
+            <>
+              : about{" "}
+              <H>
+                {fmtYearly(yearly.amount)} {aaveV4DisplaySymbol(yearly.symbol)}
+              </H>{" "}
+              a year on the debt as it stands, while the rate holds
+            </>
+          ) : null}
           .
         </span>,
       );

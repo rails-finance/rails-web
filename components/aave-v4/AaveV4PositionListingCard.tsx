@@ -13,7 +13,7 @@
 //     the same `calculateAaveV4Position` the detail's `patchSpokeCardWithChain`
 //     runs, so totals, liq prices, and borrowing power are derived from
 //     identical inputs.
-//   - Formatting: shared `fmtUsd` / `hfLabel` / `fmtLiqPrice` (`lib/aave-v4/format.ts`).
+//   - Formatting: shared `fmtUsd` / `hfLabelV4` / `fmtLiqPrice` (`lib/aave-v4/format.ts`).
 //
 // Listing-only additions (not on the detail card):
 //   - Wallet identity pill (facehash + short addr + copy) sits alongside
@@ -43,7 +43,7 @@ import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { fmtUsd, hfLabel } from "@/lib/aave-v4/format";
+import { fmtUsd, hfLabelV4 } from "@/lib/aave-v4/format";
 import {
   calculateAaveV4Position,
   computeSupplyBreakdown,
@@ -221,7 +221,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
     return (
       <StatValue color="text-foreground/80">
         {hfStale ? "~" : ""}
-        {hfLabel(healthFactor)}
+        {hfLabelV4(healthFactor)}
       </StatValue>
     );
   })();

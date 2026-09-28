@@ -62,7 +62,7 @@ import {
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { effectiveBorrowAPR, borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
 import { formatExact } from "@/lib/utils/format";
-import { hfLabel } from "@/lib/aave-v4/format";
+import { hfLabelV4, fmtV4Amount, AT_LINE_HF } from "@/lib/aave-v4/format";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { chainIdForSpokeAddress } from "@/lib/aave-v4/spoke-meta";
 
@@ -103,19 +103,9 @@ const SIBLING_VERB: Record<string, string> = {
 const ECON_KINDS = new Set<AaveV4EventType>(["supply", "withdraw", "borrow", "repay"]);
 const isEcon = (e: AaveV4Event): boolean => ECON_KINDS.has(e.context.data.eventType);
 
-/** The detail grid's own token formatter, reproduced so a prose after-balance
- *  reads (and keys) exactly as the grid's after-value does. */
-function fmt(v: string | number | undefined): string {
-  if (v == null || v === "") return "0";
-  const n = typeof v === "string" ? parseFloat(v) : v;
-  if (!isFinite(n)) return "0";
-  if (n === 0) return "0";
-  const abs = Math.abs(n);
-  if (abs >= 1_000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (abs >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
-  const decimals = Math.min(8, Math.ceil(-Math.log10(abs)) + 2);
-  return n.toLocaleString("en-US", { maximumFractionDigits: decimals });
-}
+/** The detail grid's token formatter, so a prose figure reads (and keys) as
+ *  the grid's does, and both match the timeline header. */
+const fmt = fmtV4Amount;
 
 /** USD value formatter for the liquidation bonus sentence — plain dollars, not a
  *  card figure (so it stays muted, never bold). */
@@ -297,9 +287,12 @@ function positionManagerLine(ctx: AaveV4Context): ClauseInput {
   const signedByOwner = ctx.txFrom?.toLowerCase() === owner;
   return clause(
     signedByOwner ? (
-      <>Sent by the owner through position manager {addressLink(ctx, caller)}.</>
+      <>
+        Sent by the owner through position manager {addressLink(ctx, caller)}, an approved contract acting for the
+        owner.
+      </>
     ) : (
-      <>Sent by position manager {addressLink(ctx, caller)}, acting on the owner&rsquo;s behalf.</>
+      <>Sent by position manager {addressLink(ctx, caller)}, an approved contract acting on the owner&rsquo;s behalf.</>
     ),
   );
 }
@@ -323,6 +316,8 @@ function addressLink(ctx: AaveV4Context, address: string): ReactNode {
 export interface AaveV4HfPair {
   before: number | null;
   after: number | null;
+  /** Whether the event's reserve counted as collateral either side of it. */
+  collateral?: { before: boolean; after: boolean };
 }
 
 export function aaveV4EventSlots(
@@ -331,8 +326,9 @@ export function aaveV4EventSlots(
   siblings: AaveV4Event[],
   self: AaveV4Event,
   hf?: AaveV4HfPair,
+  previousRate?: number,
 ): EventProseSlots {
-  const slots = aaveV4EventSlotsBase(ctx, coord, siblings, self, hf);
+  const slots = aaveV4EventSlotsBase(ctx, coord, siblings, self, hf, previousRate);
   const managed = positionManagerLine(ctx);
   if (!managed) return slots;
   return { ...slots, meansNow: [...(slots.meansNow ?? []), managed] };
@@ -344,9 +340,11 @@ function aaveV4EventSlotsBase(
   siblings: AaveV4Event[],
   self: AaveV4Event,
   hf?: AaveV4HfPair,
+  previousRate?: number,
 ): EventProseSlots {
   const rs = resultingState(ctx);
   const token = aaveV4DisplaySymbol(ctx.reserveSymbol) || "the asset";
+  const hfLine = (withdraw = false) => healthFactorMove(hf, withdraw);
   const market = ctx.spokeName;
   const marketPhrase = market ? <>the {market} market</> : <>this market</>;
   const sibling = siblingClause(siblings, self);
@@ -367,34 +365,54 @@ function aaveV4EventSlotsBase(
             rs.opensSupply ? (
               <>The position now holds {afterFig(coord, "supply", ctx)} on this reserve, its first here.</>
             ) : (
-              <>
-                Its {token} supply on this reserve is now {afterFig(coord, "supply", ctx)}.
-              </>
+              <>{reconcile(ctx, coord, "supply")}</>
             ),
           )
         : null;
-      const meansNow: ClauseInput[] = ctx.alsoToggledCollateral
-        ? [
-            clause(
+      // Whether this supply backs borrows: the reserve's collateral flag for
+      // this user at the event's block, read from the spoke with the health
+      // factor. Silent on it until the read lands.
+      const coll = hf?.collateral;
+      const enabledHere = ctx.alsoToggledCollateral || (coll?.after === true && coll.before === false);
+      const collateralLine: ClauseInput = enabledHere
+        ? clause(
+            <>
+              This {token} earns variable interest and now backs the position&rsquo;s borrows, so it can be seized in a
+              liquidation.
+            </>,
+          )
+        : coll?.after === true
+          ? clause(
               <>
-                This {token} earns variable interest and now backs the position&rsquo;s borrows, so it can be seized in
-                a liquidation.
+                It counts as collateral: {token} was already enabled as collateral here, so the new {token} backs the
+                borrows at once and can be seized in a liquidation.
               </>,
-            ),
-          ]
-        : [clause(<>This {token} earns variable interest, and can be enabled as collateral to back borrows.</>)];
-      return { happened: [clause(happened)], changed: changed ? [changed] : [], meansNow: [...meansNow, sibling] };
+            )
+          : coll?.after === false
+            ? clause(
+                <>
+                  It is not collateral: it earns variable interest but backs no borrow, and it leaves the health factor
+                  where it was until {token} is enabled as collateral.
+                </>,
+              )
+            : clause(<>This {token} earns variable interest.</>);
+      return {
+        happened: [clause(happened)],
+        changed: changed ? [changed] : [],
+        meansNow: [collateralLine, hfLine(), sibling],
+      };
     }
 
     case "withdraw": {
       const ending: ClauseInput = rs.supplyEmptied
         ? cont(<>, fully exiting the {token} supply on this market.</>)
-        : rs.supplyAfter != null
-          ? cont(<>, leaving {afterFig(coord, "supply", ctx)} supplied here.</>)
-          : cont(<>.</>);
+        : cont(<>.</>);
+      const changed: ClauseInput =
+        !rs.supplyEmptied && rs.supplyAfter != null ? clause(<>{reconcile(ctx, coord, "supply")}</>) : null;
       return {
         happened: [clause(<>Withdrew {amountFig(ctx, coord, true)} back to the wallet</>), ending],
-        meansNow: [sibling],
+        changed: changed ? [changed] : [],
+        meansNow: [hfLine(true), sibling],
       };
     }
 
@@ -406,25 +424,34 @@ function aaveV4EventSlotsBase(
       );
       const changed: ClauseInput = rs.debtAfter
         ? clause(
-            <>
-              Outstanding {token} debt is now {afterFig(coord, "debt", ctx)}.
-            </>,
+            rs.firstBorrow ? (
+              <>
+                Outstanding {token} debt is now {afterFig(coord, "debt", ctx)}.
+              </>
+            ) : (
+              <>{reconcile(ctx, coord, "debt")}</>
+            ),
           )
         : null;
       const rate = rateFig(ctx, coord);
       const meansNow: ClauseInput[] = [
-        rate ? clause(<>Interest accrues on it continuously, at a {rate} borrow rate.</>) : null,
+        hfLine(),
+        rateMove(ctx, token, previousRate) ??
+          (rate ? clause(<>Interest accrues on it continuously, at a {rate} borrow rate.</>) : null),
         sibling,
       ];
       return { happened: [clause(happened)], changed: changed ? [changed] : [], meansNow };
     }
 
     case "repay": {
+      const dust = (num(ctx.amount) ?? 0) > 0 && (num(ctx.amount) ?? 0) < 0.000001;
       const ending: ClauseInput = rs.debtCleared
         ? cont(<>, clearing the {token} debt on this market in full.</>)
-        : rs.debtAfter != null
-          ? cont(<>, leaving {afterFig(coord, "debt", ctx)} of debt.</>)
+        : dust
+          ? cont(<>, a dust amount that leaves the debt where it was.</>)
           : cont(<>.</>);
+      const changed: ClauseInput =
+        !rs.debtCleared && !dust && rs.debtAfter != null ? clause(<>{reconcile(ctx, coord, "debt")}</>) : null;
       const repayRate = rateFig(ctx, coord);
       const meansNow: ClauseInput[] = rs.debtCleared
         ? [
@@ -437,10 +464,18 @@ function aaveV4EventSlotsBase(
             sibling,
           ]
         : [
-            repayRate ? clause(<>The debt still outstanding accrues interest at a {repayRate} borrow rate.</>) : null,
+            hfLine(),
+            rateMove(ctx, token, previousRate) ??
+              (repayRate
+                ? clause(<>The debt still outstanding accrues interest at a {repayRate} borrow rate.</>)
+                : null),
             sibling,
           ];
-      return { happened: [clause(<>Repaid {amountFig(ctx, coord, true)}</>), ending], meansNow };
+      return {
+        happened: [clause(<>Repaid {amountFig(ctx, coord, true)}</>), ending],
+        changed: changed ? [changed] : [],
+        meansNow,
+      };
     }
 
     case "liquidation":
@@ -475,6 +510,100 @@ function aaveV4EventSlotsBase(
     default:
       return { happened: [] };
   }
+}
+
+/** The figures reconciled, Liquity-style: the balance at the previous event,
+ *  the interest since, the amount this event moved, and the balance after. */
+function reconcile(ctx: AaveV4Context, coord: EventProvDetail, side: "supply" | "debt"): ReactNode {
+  const before = num(side === "supply" ? ctx.supplyBefore : ctx.debtBefore);
+  const interest = num(side === "supply" ? ctx.supplyInterestSincePrevious : ctx.debtInterestSincePrevious) ?? 0;
+  const amount = num(ctx.amount) ?? 0;
+  const after = afterFig(coord, side, ctx);
+  const label = side === "supply" ? "Supply" : "Debt";
+  const verb = { supply: "supplied", withdraw: "withdrawn", borrow: "borrowed", repay: "repaid" }[
+    ctx.eventType as string
+  ];
+  const sign = ctx.eventType === "supply" || ctx.eventType === "borrow" ? "+" : "−";
+  if (before == null || !verb)
+    return (
+      <>
+        {label} is now {after}.
+      </>
+    );
+  return (
+    <>
+      {label}: <H>{fmt(before - interest)}</H> at the previous event
+      {interest > 0 ? (
+        <>
+          {" "}
+          + <H>{fmt(interest)}</H> interest since
+        </>
+      ) : null}{" "}
+      {sign} <H>{fmt(amount)}</H> {verb} = {after}.
+    </>
+  );
+}
+
+/** One sentence on how the health factor moved, as the opened card's grid
+ *  reads it; at the liquidation line it says so. Absent until the read lands,
+ *  and where the position held no debt either side. */
+function healthFactorMove(hf: AaveV4HfPair | undefined, withdraw: boolean): ClauseInput {
+  if (!hf || hf.after == null) return null;
+  const after = <H>{hfLabelV4(hf.after)}</H>;
+  const tail =
+    hf.after >= 1 && hf.after < AT_LINE_HF ? (
+      <>: the position is at the liquidation line, and any fall below 1 lets it be liquidated</>
+    ) : hf.after >= 1 && hf.after < 1.05 ? (
+      <>, close to the liquidation line at 1</>
+    ) : null;
+  const allowed = withdraw ? <>. Aave V4 allows a withdrawal while the health factor stays at or above 1</> : null;
+  if (hf.before == null) {
+    return clause(
+      <>
+        With this first debt the health factor is {after}
+        {tail}
+        {allowed}.
+      </>,
+    );
+  }
+  const d = hf.after - hf.before;
+  const verb = Math.abs(d) < 0.0005 ? "stayed at" : d > 0 ? "rose from" : "fell from";
+  return clause(
+    verb === "stayed at" ? (
+      <>
+        The health factor stayed at {after}
+        {tail}
+        {allowed}.
+      </>
+    ) : (
+      <>
+        The health factor {verb} <H>{hfLabelV4(hf.before)}</H> to {after}
+        {tail}
+        {allowed}.
+      </>
+    ),
+  );
+}
+
+const HUB_NAME: Record<string, string> = { core: "Core", plus: "Plus", prime: "Prime", paxos: "Global Dollar" };
+
+/** When this event's borrow rate differs markedly from the rate the previous
+ *  event recorded for the same asset, say so and why. */
+function rateMove(ctx: AaveV4Context, token: string, previousRate?: number): ClauseInput {
+  const now = num(borrowRatesByDebt(ctx).find((r) => r.symbol === ctx.reserveSymbol)?.apr);
+  if (now == null || previousRate == null || previousRate <= 0) return null;
+  const ratio = now / previousRate;
+  if (Math.abs(now - previousRate) < 0.005 || (ratio < 1.5 && ratio > 1 / 1.5)) return null;
+  const hub = ctx.hub ? HUB_NAME[ctx.hub] : undefined;
+  const pct = (r: number) => `${(r * 100).toFixed(2)}%`;
+  return clause(
+    <>
+      The {token} borrow rate moved from <H>{pct(previousRate)}</H> at the previous event to <H>{pct(now)}</H>, and it
+      applies to the whole {token} debt while it lasts. The {hub ? `${hub} hub` : "hub"} sets it from how much of its{" "}
+      {token} is borrowed: the rate rises gently up to a target share and steeply past it, and every borrower and
+      supplier on the hub moves that share.
+    </>,
+  );
 }
 
 /** A snapshot leg list read as prose: "175.8240 USDT", "1,591 USDG and 0.808 USDC".
@@ -558,7 +687,7 @@ function liquidationSlots(ctx: AaveV4Context, coord: EventProvDetail, hf?: AaveV
   const hfMove =
     hf && hf.before != null ? (
       <>
-        The health factor went from <H>{hfLabel(hf.before)}</H> to <H>{hfLabel(hf.after)}</H>
+        The health factor went from <H>{hfLabelV4(hf.before)}</H> to <H>{hfLabelV4(hf.after)}</H>
       </>
     ) : null;
   const why: ClauseInput = rs.debtCleared

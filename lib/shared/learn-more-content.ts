@@ -560,11 +560,11 @@ export function aaveV4BorrowContent(): LearnMoreContent {
     details: [
       {
         bold: "Borrowing power",
-        text: "how much can be borrowed depends on the collateral's value weighted by each asset's risk parameters.",
+        text: "each collateral counts at its collateral factor, one figure per asset that sets both how much can be borrowed and where liquidation starts, so a borrow can take the health factor down to 1.",
       },
       {
         bold: "Health factor",
-        text: "borrowing lowers the health factor; if it falls below 1.0 the position can be liquidated.",
+        text: "borrowing lowers the health factor; if it falls below 1 the position can be liquidated.",
       },
       {
         bold: "Borrow interest",
@@ -685,30 +685,37 @@ export function aaveV4PositionFallbackContent(): LearnMoreContent {
 // and never branches on live state (e.g. whether this wallet currently carries
 // debt). A supply-only position simply doesn't render the runway sub-section; the
 // modal still teaches what it shows. See learn-more-modal-grammar.md §1.
-export function aaveV4EconomicsContent(): LearnMoreContent {
+/** The Lifetime flows modal. Rows the panel can show only when the position
+ *  has them (supply interest, liquidations) are named only then. */
+export function aaveV4EconomicsContent(
+  has: { supplyInterest?: boolean; liquidations?: boolean } = {},
+): LearnMoreContent {
+  const details: LearnMoreContent["details"] = [
+    {
+      bold: "Collateral tower",
+      text: `what was deposited${has.supplyInterest ? " plus the interest it earned" : ""}, set against what left: withdrawals${has.liquidations ? " and collateral seized in liquidations" : ""}. What remains is the collateral held today.`,
+    },
+    {
+      bold: "Debt tower",
+      text: `what was borrowed plus the interest it accrued, set against what was repaid${has.liquidations ? " and what liquidators repaid" : ""}. What remains is the debt owed today.`,
+    },
+    {
+      bold: "Interest",
+      text: "no event moves it: balances grow every block, so interest is what a balance holds beyond the amounts its events moved.",
+    },
+  ];
+  if (has.liquidations) {
+    details.push({
+      bold: "Liquidation cost",
+      text: "a liquidator takes collateral worth more than the debt it repays. The difference is the liquidation bonus, and it is what a liquidation costs the borrower.",
+    });
+  }
   return {
     title: "About Lifetime Flows",
     intro:
       "This panel totals every token that has moved into and out of a position over its life, as two towers: collateral on one side, debt on the other.",
     detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Collateral tower",
-        text: "what was deposited plus the interest it earned, set against what left: withdrawals and collateral seized in liquidations. What remains is the collateral held today.",
-      },
-      {
-        bold: "Debt tower",
-        text: "what was borrowed plus the interest it accrued, set against what was repaid and what liquidators repaid. What remains is the debt owed today.",
-      },
-      {
-        bold: "Interest",
-        text: "no event moves it: balances grow every block, so interest is what a balance holds beyond the amounts its events moved.",
-      },
-      {
-        bold: "Liquidation cost",
-        text: "a liquidator takes collateral worth more than the debt it repays. The difference is the liquidation bonus, and it is what a liquidation costs the borrower.",
-      },
-    ],
+    details,
     links: [
       { label: "Aave V4 positions", url: AAVE_FAQ_URLS.V4_POSITIONS },
       { label: "Liquidations in Aave V4", url: "https://aave.com/docs/aave-v4/positions/liquidations" },

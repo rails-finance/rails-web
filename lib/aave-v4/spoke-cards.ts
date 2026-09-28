@@ -21,6 +21,8 @@ import {
   type SupplyBreakdown,
 } from "@/lib/aave-v4/utils/position-calculation";
 import { borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
+import { assetClass } from "@/lib/aave-v4/asset-class";
+import { AT_LINE_HF } from "@/lib/aave-v4/format";
 
 // ---- Types ----
 
@@ -198,6 +200,8 @@ export interface AaveSpokeCardInfo {
     headroomPct: number | null;
     usdShare: number;
   }[];
+  /** The debt held now, per asset, at the price the card values it. */
+  debtLegs?: { symbol: string; amount: number; price: number }[];
   /** Remaining USD that can be borrowed before HF=1. */
   borrowingPowerUsd: number;
   /** True when the wallet has ever been liquidated on this spoke. Drives the
@@ -901,6 +905,7 @@ export function buildSpokeCards(
       healthFactor: calcResult.healthFactor,
       liqPrice,
       assetLiqPrices,
+      debtLegs: calcDebts,
       borrowingPowerUsd: calcResult.borrowCapacityUsd,
       wasLiquidated,
       endedByLiquidation: g.result.lastAction === "liquidation",
@@ -925,10 +930,24 @@ export interface LiquidationBuffer {
   dropPct: number | null;
   /** HF ≤ 1 — already liquidatable. */
   liquidatable: boolean;
+  /** HF above 1 but under AT_LINE_HF: the runway rounds to nothing, and the
+   *  card says in words that the position is at the liquidation line. */
+  atLine: boolean;
   /** Present only when collateral is a SINGLE asset, where the buffer pins to a
    *  concrete liquidation price. Derived chain-state from HF (`currentPrice /
    *  HF`) — no LT table — so it can't disagree with the health factor. */
-  single: { symbol: string; currentPrice: number; liqPrice: number } | null;
+  single: {
+    symbol: string;
+    currentPrice: number;
+    liqPrice: number;
+    /** Set when the one debt asset moves with the collateral (wstETH against
+     *  WETH, one stablecoin against another): a dollar price runway would
+     *  assume the debt stays put in dollars while it moves with the
+     *  collateral, so the runway is read against the debt asset instead.
+     *  `ratio` is collateral priced in the debt asset, `liqRatio` that price
+     *  at liquidation (`ratio / HF`). */
+    against?: { symbol: string; ratio: number; liqRatio: number };
+  } | null;
 }
 
 /**
@@ -954,7 +973,7 @@ export interface LiquidationBuffer {
  * null `liqPrice` (the calculation returns null for assets that don't back debt).
  */
 export function liquidationBuffer(spoke: AaveSpokeCardInfo): LiquidationBuffer {
-  return liquidationBufferFrom(spoke.healthFactor, spoke.totalDebtUsd, spoke.assetLiqPrices);
+  return liquidationBufferFrom(spoke.healthFactor, spoke.totalDebtUsd, spoke.assetLiqPrices, spoke.debtLegs);
 }
 
 /**
@@ -967,9 +986,11 @@ export function liquidationBufferFrom(
   healthFactor: number | null,
   totalDebtUsd: number,
   assetLiqPrices: { symbol: string; currentPrice: number; liqPrice: number | null }[],
+  debtLegs?: { symbol: string; amount: number; price: number }[],
 ): LiquidationBuffer {
-  if (healthFactor == null || totalDebtUsd <= 0) return { dropPct: null, liquidatable: false, single: null };
-  if (healthFactor <= 1) return { dropPct: 0, liquidatable: true, single: null };
+  if (healthFactor == null || totalDebtUsd <= 0)
+    return { dropPct: null, liquidatable: false, atLine: false, single: null };
+  if (healthFactor <= 1) return { dropPct: 0, liquidatable: true, atLine: false, single: null };
 
   const dropPct = (1 - 1 / healthFactor) * 100;
   const collateral = assetLiqPrices.filter((a) => a.liqPrice != null && a.currentPrice > 0);
@@ -977,8 +998,25 @@ export function liquidationBufferFrom(
   if (collateral.length === 1) {
     const a = collateral[0];
     single = { symbol: a.symbol, currentPrice: a.currentPrice, liqPrice: a.currentPrice / healthFactor };
+    const debts = (debtLegs ?? []).filter((d) => d.amount > 0);
+    const d = debts.length === 1 ? debts[0] : null;
+    const cls = assetClass(a.symbol);
+    if (d && d.price > 0 && d.symbol !== a.symbol && cls !== "other" && assetClass(d.symbol) === cls) {
+      const ratio = a.currentPrice / d.price;
+      single.against = { symbol: d.symbol, ratio, liqRatio: ratio / healthFactor };
+    }
   }
-  return { dropPct, liquidatable: false, single };
+  return { dropPct, liquidatable: false, atLine: healthFactor < AT_LINE_HF, single };
+}
+
+/** The debt's yearly interest in the debt's token at the latest borrow rate, when
+ *  the position owes one asset and the rate is that asset's. */
+export function yearlyDebtCost(spoke: AaveSpokeCardInfo): { amount: number; symbol: string } | null {
+  const debts = (spoke.debtLegs ?? []).filter((d) => d.amount > 0);
+  if (debts.length !== 1 || spoke.latestBorrowRate == null) return null;
+  const d = debts[0];
+  if (spoke.latestBorrowRateSymbol && spoke.latestBorrowRateSymbol !== d.symbol) return null;
+  return { amount: (d.amount * spoke.latestBorrowRate) / 100, symbol: d.symbol };
 }
 
 /** "USDC " before "borrow rate" when the position has borrowed more than one

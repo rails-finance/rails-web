@@ -10,12 +10,13 @@ import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { type HubTier, hubChipLabel } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
-import { type AaveSpokeCardInfo, liquidationBuffer, rateSymbolLabel } from "@/lib/aave-v4/spoke-cards";
+import { type AaveSpokeCardInfo, liquidationBuffer, rateSymbolLabel, yearlyDebtCost } from "@/lib/aave-v4/spoke-cards";
+import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { AaveV4LiquidationFootnote } from "@/components/protocol/aave-v4/aave-v4-liquidation-footnote";
 import { bucketForHealth } from "@/lib/aave-v4/health-bucket";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { fmtUsd, hfLabel, hfColorClass } from "@/lib/aave-v4/format";
+import { fmtUsd, hfLabelV4, hfColorClass, fmtYearly } from "@/lib/aave-v4/format";
 import {
   AaveV4PositionExplanation,
   AaveV4ClosedExplanation,
@@ -181,29 +182,45 @@ function txCountTitle(spoke: AaveSpokeCardInfo): string {
     : tx;
 }
 
-/** Debt-stat footnote: the latest borrow rate plus, when non-dust, the accrued
- *  borrow interest. Accrued interest GREW the debt — it's already part of the
- *  debt balance shown above — so it reads as "incl. $X interest" with no sign. A
- *  leading minus here would misread as the debt being reduced (it isn't); the
- *  cost stays under Debt because that's the balance it accrued into. */
+const YEARLY_COST_PROV: Provenance = {
+  kind: "derived",
+  summary:
+    "What the debt costs in a year at the latest borrow rate — the debt as it stands now times that rate. The rate moves with the hub, so this is today's pace.",
+  via: "debt balance × latest borrow rate",
+  formula: "debt × borrowRate",
+};
+
+/** Debt-stat footnote: the accrued borrow interest (when non-dust), then the
+ *  latest borrow rate with what it costs a year at this debt. Accrued interest
+ *  GREW the debt, so it reads "incl. $X interest" directly under the
+ *  debt it is part of, with no sign; the rate sits on the next line, so
+ *  the two read as two figures. */
 function DebtFootnote({ spoke }: { spoke: AaveSpokeCardInfo }) {
   const rate = spoke.latestBorrowRate;
   const pnl = spoke.interestPnl;
   const paidUsd = pnl?.hasData ? pnl.assets.reduce((sum, a) => sum + a.borrowInterestUsd, 0) : 0;
   const interest = paidUsd >= 0.01 ? fmtUsd(paidUsd) : null;
+  const yearly = yearlyDebtCost(spoke);
   if (rate === null && !interest) return null;
   return (
     <div className="text-xs mt-0.5 text-rb-500 space-y-0.5">
-      {rate !== null && (
-        <div>
-          <Prov info={borrowRateProv()}>{rate.toFixed(2)}%</Prov> {rateSymbolLabel(spoke)}borrow rate
-        </div>
-      )}
       {interest && (
         <div
           title={`${interest.title} of the debt is accrued borrow interest to date — from on-chain balances vs. indexed deposits`}
         >
           incl. <Prov info={borrowInterestProv()}>{interest.display}</Prov> interest
+        </div>
+      )}
+      {rate !== null && (
+        <div>
+          <Prov info={borrowRateProv()}>{rate.toFixed(2)}%</Prov> {rateSymbolLabel(spoke)}borrow rate
+          {yearly && yearly.amount > 0 && (
+            <>
+              {" "}
+              · ~<Prov info={YEARLY_COST_PROV}>{fmtYearly(yearly.amount)}</Prov> {aaveV4DisplaySymbol(yearly.symbol)}
+              /year
+            </>
+          )}
         </div>
       )}
     </div>
@@ -483,7 +500,9 @@ function AaveV4SpokeCard({
                       value:
                         spoke.healthFactor !== null ? (
                           <StatValue color={hfColorClass(spoke.healthFactor)}>
-                            <Prov info={healthFactorProv(spoke.healthFactorBasis)}>{hfLabel(spoke.healthFactor)}</Prov>
+                            <Prov info={healthFactorProv(spoke.healthFactorBasis)}>
+                              {hfLabelV4(spoke.healthFactor)}
+                            </Prov>
                           </StatValue>
                         ) : (
                           <StatDash>{"∞"}</StatDash>

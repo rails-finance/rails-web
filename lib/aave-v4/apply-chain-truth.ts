@@ -251,6 +251,7 @@ export function patchSpokeCardWithChain(
     healthFactorBasis,
     liqPrice,
     assetLiqPrices,
+    debtLegs: calcInputs.debts,
     borrowingPowerUsd: calc.borrowCapacityUsd,
     supplyBreakdown: computeSupplyBreakdown(calcInputs.supplies),
     // The shared lifecycle rule (holdsNothingOnChain): the listing card reads it too.

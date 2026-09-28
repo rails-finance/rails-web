@@ -53,6 +53,7 @@ export function PositionRow({
   usd,
   trailing,
   dust,
+  formatAmount = fmtPositionAmount,
 }: {
   symbol: string;
   /** The token's address, where the caller has it: the chip resolves its mark
@@ -78,6 +79,9 @@ export function PositionRow({
    *  TO-DO-ui-jobs §52). Marked on the row itself so the verifier can assert
    *  it renders only once shown. */
   dust?: boolean;
+  /** The amount formatter; a protocol whose header uses another precision
+   *  passes one so T1 and T2 agree. */
+  formatAmount?: (v: string | number | undefined) => string;
 }) {
   const { showTickerLabels, showUsdValues } = useTimelineDisplay();
   const afterN = parseFloat(amount) || 0;
@@ -85,7 +89,7 @@ export function PositionRow({
   // `+delta =`, this asset's balance change in token units.
   const beforeN = before != null ? parseFloat(before) || 0 : 0;
   const delta = afterN - beforeN;
-  const deltaStr = deltaText ?? `${delta >= 0 ? "+" : "−"}${fmtPositionAmount(Math.abs(delta))}`;
+  const deltaStr = deltaText ?? `${delta >= 0 ? "+" : "−"}${formatAmount(Math.abs(delta))}`;
   return (
     <span className="inline-flex items-center gap-1.5 text-sm" data-dust-row={dust ? "" : undefined}>
       {isChanged && before != null ? (
@@ -93,7 +97,7 @@ export function PositionRow({
           <DeltaToggle
             before={
               <Prov info={beforeProv} value={exact?.before}>
-                {fmtPositionAmount(before)}
+                {formatAmount(before)}
               </Prov>
             }
             delta={
@@ -109,7 +113,7 @@ export function PositionRow({
               value={exact?.after}
               icon={<TokenChipIcon symbol={symbol} address={address} size={16} />}
             >
-              <ExactTip text={fmtPositionAmount(amount)} exact={exact?.after ?? amount} symbol={ticker} always={dust} />
+              <ExactTip text={formatAmount(amount)} exact={exact?.after ?? amount} symbol={ticker} always={dust} />
             </Prov>
           </span>
         </>
@@ -120,7 +124,7 @@ export function PositionRow({
             value={exact?.after}
             icon={<TokenChipIcon symbol={symbol} address={address} size={16} />}
           >
-            <ExactTip text={fmtPositionAmount(amount)} exact={exact?.after ?? amount} symbol={ticker} always={dust} />
+            <ExactTip text={formatAmount(amount)} exact={exact?.after ?? amount} symbol={ticker} always={dust} />
           </Prov>
         </span>
       )}

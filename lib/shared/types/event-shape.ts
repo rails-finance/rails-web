@@ -379,6 +379,8 @@ export interface AaveV4Context {
   spokeName?: string;
   /** Spoke contract address (lowercase). */
   spokeAddress?: string;
+  /** The hub the moved reserve draws on ("core", "plus", "prime", "paxos"). */
+  hub?: string;
   /** collateral_toggle: whether collateral was enabled. */
   enabled?: boolean;
   /** liquidation: collateral reserve symbol. */

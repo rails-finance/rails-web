@@ -42,6 +42,8 @@ export interface AaveV4EventExplainerProps {
   gas?: GasCost;
   /** The card shows the lead sentence as the teaser; render only the rest here. */
   skipLead?: boolean;
+  /** The previous event's borrow rate on this asset (decimal), to say when it moved. */
+  previousRate?: number;
 }
 
 /** Mechanic modal content for this event — never-empty floor: every event type
@@ -66,18 +68,23 @@ export function aaveV4LearnMoreContent(ctx: AaveV4Context): LearnMoreContent {
   }
 }
 
-export function AaveV4EventExplainer({ ctx, event, siblings, gas, skipLead }: AaveV4EventExplainerProps) {
+export function AaveV4EventExplainer({ ctx, event, siblings, gas, skipLead, previousRate }: AaveV4EventExplainerProps) {
   const coord = coordsFor(event);
   // The same read the opened grid's Health factor cell makes (one request,
-  // shared), so a liquidation's prose can say why the factor moved.
+  // shared, with the same arguments), so the prose can say how the factor
+  // moved and whether a supply counted as collateral.
   const hfRead = useHealthFactorAround(
-    ctx.eventType === "liquidation",
+    ctx.eventType !== "collateral_toggle",
     ctx.spokeAddress,
     ctx.owner ?? event.wallet,
     event.blockNumber,
+    ctx.reserveSymbol,
   );
-  const hf = hfRead.status === "ok" ? { before: hfOf(hfRead.before.wad), after: hfOf(hfRead.after.wad) } : undefined;
-  const clauses = eventClauses(aaveV4EventSlots(ctx, coord, siblings ?? [event], event, hf));
+  const hf =
+    hfRead.status === "ok"
+      ? { before: hfOf(hfRead.before.wad), after: hfOf(hfRead.after.wad), collateral: hfRead.collateral }
+      : undefined;
+  const clauses = eventClauses(aaveV4EventSlots(ctx, coord, siblings ?? [event], event, hf, previousRate));
   // Per-transaction gas as the closing clause (muted — not a header/grid value,
   // so it stays in the body tone). Appended after the arc so it always reads
   // last, regardless of the teaser/skipLead split.

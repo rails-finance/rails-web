@@ -72,6 +72,7 @@ import { AAVE_V4_FALLBACK_LT, isDollarRail } from "@/lib/aave-v4/liquidation-thr
 import { calculateAaveV4Position, type CalcPositionInputs } from "@/lib/aave-v4/utils/position-calculation";
 import { resolvePrice, type PriceEntry } from "@/lib/aave/prices";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
+import { borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
 import { fmtUsd, fmtSignedUsd, fmtTokenAmount } from "@/lib/aave-v4/format";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -432,6 +433,24 @@ function AaveV4SpokePageInner({
       }
     });
     return { txGroups, txSiblings: byTx };
+  }, [spokeScopedEvents]);
+
+  // Each event's previous borrow rate on the asset it moved: the rate the last
+  // earlier event on this spoke recorded for that asset. The event explanation
+  // says when the rate has moved markedly since then.
+  const previousRates = useMemo(() => {
+    const out = new Map<string, number>();
+    const last = new Map<string, number>();
+    for (const e of spokeScopedEvents) {
+      if (!isAaveV4Event(e)) continue;
+      const sym = e.context.data.reserveSymbol;
+      if (sym && last.has(sym)) out.set(e.id, last.get(sym)!);
+      for (const r of borrowRatesByDebt(e.context.data)) {
+        const apr = parseFloat(r.apr);
+        if (Number.isFinite(apr)) last.set(r.symbol, apr);
+      }
+    }
+    return out;
   }, [spokeScopedEvents]);
 
   // Events this spoke holds BELOW the oldest drawn row. The page draws a window
@@ -821,6 +840,7 @@ function AaveV4SpokePageInner({
                   isLast={meta.isLast}
                   txGroup={txGroups.get(event.id)}
                   siblings={txSiblings.get(event.txHash ?? "")}
+                  previousRate={previousRates.get(event.id)}
                   eventNumber={meta.eventNumber}
                 />
               ) : null
@@ -985,7 +1005,10 @@ function AaveV4SpokeTowerBlock({
               collateral story, then the debt story when this position ever
               held debt. */}
                 <p className="leading-relaxed">
-                  These figures total the position&apos;s lifetime flows across every event on this spoke.
+                  These figures total the position&apos;s lifetime flows across every event on this spoke. What left
+                  (withdrawals, repayments, liquidations) is valued at each event&apos;s price and what remains at
+                  today&apos;s; the deposited and borrowed figures make up the difference, so a price move between
+                  events shows in them.
                   {totals.unpricedSymbols.length > 0 && (
                     <>
                       {" "}
@@ -1051,7 +1074,12 @@ function AaveV4SpokeTowerBlock({
                     </span>
                   </div>
                 )}
-                <LearnMore content={aaveV4EconomicsContent()} />
+                <LearnMore
+                  content={aaveV4EconomicsContent({
+                    supplyInterest: totals.supplyInterestUsd > 0.01,
+                    liquidations: totals.liquidatedCollUsd > 0.01 || totals.liquidatedDebtUsd > 0.01,
+                  })}
+                />
               </div>
             }
           />

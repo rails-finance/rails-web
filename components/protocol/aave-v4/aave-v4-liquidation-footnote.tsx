@@ -3,6 +3,7 @@
 import type { LiquidationBuffer } from "@/lib/aave-v4/spoke-cards";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { fmtLiqPrice } from "@/lib/aave-v4/format";
+import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 
 /**
@@ -16,6 +17,31 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
  */
 export function AaveV4LiquidationFootnote({ buf }: { buf: LiquidationBuffer }) {
   if (buf.dropPct == null || buf.liquidatable) return null;
+
+  if (buf.atLine) {
+    return <div className="text-xs mt-0.5 font-semibold text-rb-500">At the liquidation line</div>;
+  }
+
+  // Collateral and debt move together (wstETH against WETH): the price that
+  // matters is the collateral's price in the debt asset.
+  if (buf.single?.against) {
+    const a = buf.single.against;
+    const liqRatioProv: Provenance = {
+      kind: "derived",
+      summary: `The ${aaveV4DisplaySymbol(buf.single.symbol)} price, in ${aaveV4DisplaySymbol(a.symbol)}, at which the position becomes liquidatable. The debt moves with the collateral, so the price between the two is the one that matters.`,
+      via: "collateral price ÷ debt price ÷ health factor",
+      formula: "(collateralPrice ÷ debtPrice) ÷ HF",
+    };
+    return (
+      <div className="text-xs mt-0.5 text-rb-500 inline-flex items-center gap-1">
+        Liquidates at
+        <TokenChipIcon symbol={buf.single.symbol} size={14} filterable={false} />
+        <Prov info={liqRatioProv}>
+          {a.liqRatio.toLocaleString("en-US", { maximumFractionDigits: 4 })} {aaveV4DisplaySymbol(a.symbol)}
+        </Prov>
+      </div>
+    );
+  }
 
   if (buf.single) {
     // The single-asset liquidation price is currentPrice ÷ HF, and currentPrice

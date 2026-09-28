@@ -15,7 +15,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { formatRatio, ratioLabel, ratioColorClass } from "@/lib/shared/ratio-format";
 import { StatCard, StatSubline, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
-import { hfLabel } from "@/lib/aave-v4/format";
+import { hfLabelV4, fmtV4Amount } from "@/lib/aave-v4/format";
 import { PositionRow, fmtPositionUsd } from "@/components/shared/position-row";
 import { resolvePrice } from "@/lib/aave/prices";
 import { usePrices } from "@/lib/shared/prices-context";
@@ -34,7 +34,7 @@ import {
   usdProv,
   type EventProvDetail,
 } from "@/lib/aave-v4/position-provenance";
-import { AmountText } from "@/components/shared/amount-text";
+import { ExactTip } from "@/components/shared/amount-text";
 import { useHealthFactorAround, hfOf } from "@/lib/aave-v4/use-health-factor-around";
 
 const SNAPSHOT_USD_PROV = usdProv("The after-balance", {
@@ -195,6 +195,7 @@ function V4PositionRow({
       }
       deltaProv={deltaProv(detail)}
       usd={afterUsd != null ? { value: afterUsd, prov: SNAPSHOT_USD_PROV } : undefined}
+      formatAmount={fmtV4Amount}
     />
   );
   if (!interest) return row;
@@ -204,9 +205,7 @@ function V4PositionRow({
       <StatSubline>
         Interest since previous event:{" "}
         <Prov info={interestSincePreviousProv(detail, side)} value={interest} symbol={aaveV4DisplaySymbol(symbol)}>
-          <span title={interest}>
-            <AmountText value={Number(interest)} />
-          </span>
+          <ExactTip text={fmtV4Amount(interest)} exact={interest} symbol={aaveV4DisplaySymbol(symbol)} />
         </Prov>{" "}
         {aaveV4DisplaySymbol(symbol)}
       </StatSubline>
@@ -232,7 +231,13 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber, wallet }: AaveV4Ev
   const isToggle = ctx.eventType === "collateral_toggle";
   // Every event that moves a balance shows the health factor either side of it,
   // read from the spoke; a collateral toggle moves none.
-  const hfAround = useHealthFactorAround(!isToggle, ctx.spokeAddress, ctx.owner ?? wallet, blockNumber);
+  const hfAround = useHealthFactorAround(
+    !isToggle,
+    ctx.spokeAddress,
+    ctx.owner ?? wallet,
+    blockNumber,
+    ctx.reserveSymbol,
+  );
 
   const isSupplySide = ctx.eventType === "supply" || ctx.eventType === "withdraw";
   const isDebtSide = ctx.eventType === "borrow" || ctx.eventType === "repay";
@@ -485,13 +490,13 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber, wallet }: AaveV4Ev
         <StateTransition>
           <span className="text-sm font-semibold tabular-nums text-rb-500">
             <Prov info={healthFactorAtBlockProv("before", coord, hfAround.before)}>
-              {hfLabel(hfOf(hfAround.before.wad))}
+              {hfLabelV4(hfOf(hfAround.before.wad))}
             </Prov>
           </span>
           <TransitionArrow size="sm" />
           <span className="text-sm font-semibold tabular-nums">
             <Prov info={healthFactorAtBlockProv("after", coord, hfAround.after)}>
-              {hfLabel(hfOf(hfAround.after.wad))}
+              {hfLabelV4(hfOf(hfAround.after.wad))}
             </Prov>
           </span>
         </StateTransition>
@@ -558,6 +563,7 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber, wallet }: AaveV4Ev
           sources lets the user tell pinned-$1 apart from market. */}
       {pricePills.length > 0 && (
         <div className="flex items-center justify-end gap-2 px-5 py-2">
+          <span className="text-xs text-rb-500">Prices at this block</span>
           {pricePills.map((p) => (
             <PricePill
               key={p.symbol}

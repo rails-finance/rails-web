@@ -30,9 +30,20 @@ export interface AaveV4EventCardProps {
   siblings?: AaveV4Event[];
   /** 1-based chronological position within the spoke's event list. */
   eventNumber?: number;
+  /** The borrow rate (decimal) the previous event on this spoke recorded for
+   *  this event's asset. */
+  previousRate?: number;
 }
 
-export function AaveV4EventCard({ event, isFirst, isLast, txGroup, siblings, eventNumber }: AaveV4EventCardProps) {
+export function AaveV4EventCard({
+  event,
+  isFirst,
+  isLast,
+  txGroup,
+  siblings,
+  eventNumber,
+  previousRate,
+}: AaveV4EventCardProps) {
   const ctx = event.context.data;
   const isLiquidation = ctx.eventType === "liquidation";
   const isCollateralToggle = ctx.eventType === "collateral_toggle";
@@ -135,7 +146,14 @@ export function AaveV4EventCard({ event, isFirst, isLast, txGroup, siblings, eve
       }
       detailLabel="Aave V4 Details"
       explainer={
-        <AaveV4EventExplainer ctx={ctx} event={event} siblings={siblings ?? [event]} gas={event.gas} skipLead />
+        <AaveV4EventExplainer
+          ctx={ctx}
+          event={event}
+          siblings={siblings ?? [event]}
+          gas={event.gas}
+          previousRate={previousRate}
+          skipLead
+        />
       }
       explainerLabel="Plain English"
       explainerTeaser={aaveV4ExplainerTeaser(ctx, coordsFor(event), siblings ?? [event], event)}

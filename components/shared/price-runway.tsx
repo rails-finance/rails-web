@@ -142,6 +142,9 @@ export interface PriceRunwayProps {
    *  gap between those two percentages. Left unset where the health factor
    *  covers a basket, which has no one price to name. */
   asset?: string;
+  /** Replaces the safe-side figure's wording (e.g. a runway read against the
+   *  debt asset, or "At the liquidation line"). */
+  label?: string;
 }
 
 export function PriceRunway({
@@ -151,6 +154,7 @@ export function PriceRunway({
   underwaterCaption,
   compact,
   asset,
+  label,
 }: PriceRunwayProps) {
   const hasLiq = liqPrice != null && liqPrice > 0;
   if (!hasLiq) return null; // no debt / fully covered — nothing to plot
@@ -170,7 +174,8 @@ export function PriceRunway({
   const markerPos = posFromPct(mPct); // live marker — left of liqPos when safe, right when underwater
 
   const pctFromLiq = Math.round(mPct);
-  const safeLabel = asset ? `${asset} can fall ${pctFromLiq}% before liquidation` : `${pctFromLiq}% from liquidation`;
+  const safeLabel =
+    label ?? (asset ? `${asset} can fall ${pctFromLiq}% before liquidation` : `${pctFromLiq}% from liquidation`);
   // Once underwater the runway is spent — the only figure that matters is how far
   // the value must RISE to clear liquidation, denominated in the live value.
   const recoverPct = underwater ? Math.round(((liqPrice! - currentPrice) / currentPrice) * 100) : 0;

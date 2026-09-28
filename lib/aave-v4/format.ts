@@ -44,6 +44,35 @@ export function hfLabel(hf: number | null): string {
   return hf.toFixed(2);
 }
 
+/** The Aave V4 health-factor label: a third decimal below 1.1, so a position
+ *  at 1.004 does not read as 1.00, the liquidation line. `hfLabel` stays two
+ *  decimals for the other explorers that import it. */
+export function hfLabelV4(hf: number | null): string {
+  if (hf == null || hf >= 100) return "∞";
+  // Below 1 round down, so a liquidatable 0.9997 never reads 1.000.
+  if (hf < 1) return (Math.floor(hf * 1000) / 1000).toFixed(3);
+  return hf < 1.1 ? hf.toFixed(3) : hf.toFixed(2);
+}
+
+/** A health factor this close above 1 (under 1% of collateral value to spare)
+ *  is at the liquidation line: the runway rounds to 0%. */
+export const AT_LINE_HF = 1.01;
+
+/** A token amount on an Aave V4 event (T2 rows and the T3 prose), at the
+ *  timeline header's precision: whole units from 1,000, four decimals from
+ *  0.0001 up, more below that down to 0.000001, and "<0.000001" under it,
+ *  never "0" for a non-zero amount. */
+export function fmtV4Amount(v: string | number | undefined): string {
+  if (v == null || v === "") return "0";
+  const n = typeof v === "string" ? parseFloat(v) : v;
+  if (!isFinite(n) || n === 0) return "0";
+  const abs = Math.abs(n);
+  if (abs < 0.000001) return n < 0 ? "−<0.000001" : "<0.000001";
+  if (abs >= 1_000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  const decimals = abs >= 0.0001 ? 4 : Math.min(6, Math.ceil(-Math.log10(abs)) + 1);
+  return n.toLocaleString("en-US", { maximumFractionDigits: decimals });
+}
+
 // Health-factor value color. Intentionally neutral at every level — Rails
 // doesn't color-code risk valence (green=safe / red=danger); the numeric HF
 // and the headroom readout carry the meaning. Kept as a function so call sites
@@ -61,4 +90,11 @@ export function fmtLiqPrice(p: number): string {
   if (p < 1_000) return "$" + p.toFixed(0);
   if (p < 1_000_000) return "$" + (p / 1000).toFixed(p < 10_000 ? 2 : 1) + "K";
   return "$" + (p / 1_000_000).toFixed(2) + "M";
+}
+
+/** A yearly interest cost in tokens: two decimals from 1 (Liquity V2's
+ *  "~282.08 BOLD/year"), the event amount's precision below. */
+export function fmtYearly(n: number): string {
+  if (Math.abs(n) >= 1) return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return fmtV4Amount(n);
 }

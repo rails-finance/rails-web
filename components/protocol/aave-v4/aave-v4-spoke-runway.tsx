@@ -36,13 +36,37 @@ export function AaveV4SpokeRunway({ spoke, compact }: { spoke: AaveSpokeCardInfo
 
   const buf = liquidationBuffer(spoke);
 
+  const atLineLabel = buf.atLine ? "At the liquidation line" : undefined;
+
   if (buf.single) {
-    const bar = (
+    // When the debt moves with the collateral, the runway is the collateral's
+    // price in the debt asset (wstETH in ETH), not in dollars.
+    const against = buf.single.against;
+    const sym = aaveV4DisplaySymbol(buf.single.symbol);
+    const bar = against ? (
+      <PriceRunway
+        compact={compact}
+        currentPrice={against.ratio}
+        liqPrice={against.liqRatio}
+        asset={sym}
+        label={
+          atLineLabel ??
+          `${sym} can fall ${Math.round(buf.dropPct ?? 0)}% against ${aaveV4DisplaySymbol(against.symbol)} before liquidation`
+        }
+        liqCaption={
+          <>
+            liquidation {against.liqRatio.toLocaleString("en-US", { maximumFractionDigits: 4 })}{" "}
+            {aaveV4DisplaySymbol(against.symbol)}
+          </>
+        }
+      />
+    ) : (
       <PriceRunway
         compact={compact}
         currentPrice={buf.single.currentPrice}
         liqPrice={buf.single.liqPrice}
-        asset={aaveV4DisplaySymbol(buf.single.symbol)}
+        asset={sym}
+        label={atLineLabel}
       />
     );
     if (compact) return bar;
@@ -61,6 +85,7 @@ export function AaveV4SpokeRunway({ spoke, compact }: { spoke: AaveSpokeCardInfo
       liqPrice={1}
       liqCaption="liquidation · HF 1.0"
       underwaterCaption="below HF 1.0"
+      label={atLineLabel}
     />
   );
   if (compact) return bar;
