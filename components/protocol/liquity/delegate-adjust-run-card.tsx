@@ -11,6 +11,8 @@ import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { useLinkedHover } from "@/hooks/useLinkedHover";
 import { UsersGlyph } from "./liquity-event-header";
+import { SpineSegment, useSpineView } from "@/components/shared/mobile-spine";
+import { formatDate } from "@/lib/date";
 
 /**
  * Delegate-adjust run card — one row standing in for a stretch of consecutive
@@ -69,6 +71,7 @@ export function DelegateAdjustRunCard({
   const toggle = () => setOpen((v) => !v);
   // Folder node + header hover as one control (see TimelineRunCard).
   const { lit, bind } = useLinkedHover<"header" | "folder">();
+  const spineView = useSpineView();
 
   const folderMark = <Percent size={10} strokeWidth={2.5} className="text-pink-500" />;
 
@@ -90,33 +93,45 @@ export function DelegateAdjustRunCard({
 
   const hasMovement = fromRate != null && toRate != null;
 
-  const header = (
+  // In the phone spine view (`spine`) the header is the opened card: not a
+  // control, and without the narrow-width stand-ins the segment draws.
+  const headerRow = (spine: boolean) => (
     <div
-      className={`group/run cursor-pointer rounded-xl transition-colors px-5 pt-4 pb-3${lit ? " bg-raised" : ""}`}
-      onClick={toggle}
-      {...bind("header")}
-      role="button"
-      tabIndex={0}
-      aria-expanded={open}
-      aria-label={`${count} consecutive delegate rate adjustments — ${open ? "collapse" : "expand"} the run`}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          toggle();
-        }
-      }}
+      className={
+        spine
+          ? "rounded-xl px-5 pt-4 pb-3"
+          : `group/run cursor-pointer rounded-xl transition-colors px-5 pt-4 pb-3${lit ? " bg-raised" : ""}`
+      }
+      {...(spine
+        ? {}
+        : {
+            onClick: toggle,
+            ...bind("header"),
+            role: "button",
+            tabIndex: 0,
+            "aria-expanded": open,
+            "aria-label": `${count} consecutive delegate rate adjustments — ${open ? "collapse" : "expand"} the run`,
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                toggle();
+              }
+            },
+          })}
     >
       <div className="flex items-center gap-1.5 flex-wrap">
         {/* On mobile the spine column is hidden, so the folder glyph moves
             into the header — the same hand-off TimelineRunCard's folder makes. */}
-        <span className="sm:hidden relative mr-0.5 inline-flex text-rb-500" aria-hidden>
-          {open ? <FolderOpen size={16} strokeWidth={1.75} /> : <Folder size={16} strokeWidth={1.75} />}
-          <span className="absolute -right-1.5 -bottom-1 inline-flex rounded-full bg-background p-px">
-            {folderMark}
+        {!spine && (
+          <span className="sm:hidden relative mr-0.5 inline-flex text-rb-500" aria-hidden>
+            {open ? <FolderOpen size={16} strokeWidth={1.75} /> : <Folder size={16} strokeWidth={1.75} />}
+            <span className="absolute -right-1.5 -bottom-1 inline-flex rounded-full bg-background p-px">
+              {folderMark}
+            </span>
           </span>
-        </span>
+        )}
         <span className="text-sm font-medium text-rb-500">
-          Adjusted<span className="sm:hidden"> ×{count.toLocaleString("en-US")}</span>
+          Adjusted{!spine && <span className="sm:hidden"> ×{count.toLocaleString("en-US")}</span>}
         </span>
         {hasMovement && (
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-700 dark:text-pink-400 text-xs font-bold">
@@ -131,13 +146,53 @@ export function DelegateAdjustRunCard({
           </span>
         )}
         {managerName && <span className="text-sm font-bold text-pink-500">{managerName}</span>}
-        <span className="ml-auto inline-flex items-center gap-2 whitespace-nowrap">
-          <span className="text-xs text-rb-500">{range}</span>
-          <ExpandChevron isOpen={open} group="run" />
-        </span>
+        {!spine && (
+          <span className="ml-auto inline-flex items-center gap-2 whitespace-nowrap">
+            <span className="text-xs text-rb-500">{range}</span>
+            <ExpandChevron isOpen={open} group="run" />
+          </span>
+        )}
       </div>
     </div>
   );
+
+  // ── The phone spine view: one segment captioned with the count and the
+  // span; a tap opens the header as the card and the members under it on
+  // the same line (see TimelineRunCard).
+  if (spineView) {
+    const countText = `${count.toLocaleString("en-US")} rate ${count === 1 ? "adjustment" : "adjustments"}`;
+    const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
+    const movement = hasMovement ? `: ${fromRate.toFixed(2)}% to ${toRate.toFixed(2)}%` : "";
+    const by = managerName ? ` by ${managerName}` : "";
+    return (
+      <div className="flex flex-col gap-2">
+        <SpineSegment
+          caption={
+            <>
+              {countText} &middot; {range}
+            </>
+          }
+          spokenCaption={`${countText}, ${spokenRange}`}
+          label={`${countText}${by}, ${spokenRange}${movement}`}
+          open={open}
+          onToggle={toggle}
+          iconColumn={
+            <SpineColumn
+              icon="folder"
+              folderOpen={open}
+              folderMark={folderMark}
+              folderCount={count}
+              spine="dotted"
+              isFirst={isFirst}
+              isLast={!!isLast && !open}
+            />
+          }
+          card={<div className="rounded-xl bg-raised">{headerRow(true)}</div>}
+        />
+        {open && children}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -157,7 +212,7 @@ export function DelegateAdjustRunCard({
             isLast={!!isLast && !open}
           />
         }
-        header={header}
+        header={headerRow(false)}
         hideDetailChevron
       />
       {open && (

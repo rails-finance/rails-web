@@ -116,6 +116,8 @@ import {
   marketNoteFigures,
   noteElapsedSeconds,
   notePriceFormat,
+  formatChange,
+  formatChangeMagnitude,
   formatPrice,
   priceDecimals,
   PRICE_DECIMALS_CAP,
@@ -259,8 +261,11 @@ export function MarketNoteRow({
   isFirst = false,
   isLast = false,
   datePrefix = null,
+  defaultOpen,
 }: {
   note: MarketNote;
+  /** Mount with the panel open (the phone spine view's opened marker). */
+  defaultOpen?: boolean;
   /** The day stamp the timeline gives this row on its day-stamp rule
    *  (`noteDatePrefixAfter` in ChainTruthTimeline). A live note reads "Now". */
   datePrefix?: string | null;
@@ -323,6 +328,7 @@ export function MarketNoteRow({
       isLast={isLast}
       label={body.label}
       marker={{ attr: "data-market-note", value: note.id }}
+      defaultOpen={defaultOpen}
       header={
         <>
           <MarkPair asset={note.marketSymbol} measure={body.measure} />
@@ -430,6 +436,26 @@ export function MarketNoteRow({
       </div>
     </NoteRowShell>
   );
+}
+
+/** A note as its spine marker states it: the tooltip and the open caption
+ *  ("WETH price −12.0%", the header's grain) and the words a screen reader
+ *  hears ("WETH price down 12.0%"). */
+export function noteMarkerText(note: MarketNote): { tip: string; spoken: string } {
+  const sym = note.marketSymbol;
+  if (note.kind === "price-gap") {
+    const dir = note.changePct < 0 ? "down" : "up";
+    return {
+      tip: `${sym} price ${formatChange(note.changePct)}`,
+      spoken: `${sym} price ${dir} ${formatChangeMagnitude(note.changePct)}`,
+    };
+  }
+  // The other kinds carry no one signed move on the price-gap's grain: the
+  // marker names the quantity and its direction, and the open row the figures.
+  const noun = note.kind === "rate-step" ? "rate" : note.kind === "share-rate-step" ? "share rate" : "terms";
+  if (note.kind === "vault-terms") return { tip: `${sym} ${noun}`, spoken: `${sym} ${noun}` };
+  const text = `${sym} ${noun} ${note.to.value >= note.from.value ? "up" : "down"}`;
+  return { tip: text, spoken: text };
 }
 
 /** The asset's mark with the measure's overlapping it — WETH under the dollar,

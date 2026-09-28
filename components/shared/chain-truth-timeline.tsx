@@ -88,6 +88,7 @@ import {
   type TimelineDisplayItem,
 } from "@/components/shared/timeline-toolbar";
 import { MarketNoteRow } from "@/components/shared/market-note-row";
+import { SpineNoteGap } from "@/components/shared/spine-note-markers";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { anchorMarketNotes, type MarketNote } from "@/lib/shared/market-note";
 import { TIMELINE_PAGE_ROWS } from "@/lib/shared/timeline-opening-balance";
@@ -1436,8 +1437,19 @@ function ChainTruthTimelineBody({
                   {liveWindow({ isFirst: !tipBoundaryAtTop })}
                 </SpineTipContext.Provider>
               )}
-              {liveSkeletonAtTop && <SkeletonBlock height={LIVE_NOTE_SKELETON_HEIGHT} />}
+              {/* The phone spine view draws the live notes as markers above the
+                newest event, under the tip's dot, and reserves nothing for
+                them while they load. */}
+              {liveSkeletonAtTop && !spineActive && <SkeletonBlock height={LIVE_NOTE_SKELETON_HEIGHT} />}
+              {liveSlotAtTop && spineActive && (
+                <SpineNoteGap
+                  notes={liveRowsShown}
+                  datePrefixFor={() => null}
+                  head={{ tip: liveWindowAtTop ? null : tipSide }}
+                />
+              )}
               {liveSlotAtTop &&
+                !spineActive &&
                 liveRowsShown.map((note, i) => (
                   <SpineTipContext.Provider
                     key={`live_${note.id}`}
@@ -1523,13 +1535,18 @@ function ChainTruthTimelineBody({
                 // have happened before. The row itself is untouched — this only
                 // wraps it.
                 const rowLastIdx = row.kind === "run" ? row.flatIdx + row.events.length - 1 : row.flatIdx;
-                const noteRows = rowNotes.map((note) => (
+                // The phone spine view draws them as markers in the gap below.
+                const noteRows = spineActive ? (
+                  <SpineNoteGap notes={rowNotes} datePrefixFor={(note) => noteDatePrefixAfter(note, rowLastIdx)} />
+                ) : (
+                  rowNotes.map((note) => (
                   <MarketNoteRow
                     key={`note_${note.id}`}
                     note={note}
                     datePrefix={noteDatePrefixAfter(note, rowLastIdx)}
                   />
-                ));
+                  ))
+                );
                 return (
                   <Fragment
                     key={

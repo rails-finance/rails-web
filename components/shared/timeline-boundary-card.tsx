@@ -31,6 +31,7 @@ import { useState } from "react";
 import { useTimelineScale } from "@/components/shared/activity-timeline";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
+import { SpineSegment, useSpineView } from "@/components/shared/mobile-spine";
 import { StatCard } from "@/components/shared/state-transition";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { FeedbackModal } from "@/components/shared/feedback-modal";
@@ -101,6 +102,13 @@ function longDate(unix: number): string {
  *
  *  `tip={null}` refuses the pulsing dot outright: a boundary is never the tip,
  *  whichever end of the list it stands at. */
+/** The boundary row's caption in the phone spine view, per end. */
+const BOUNDARY_CAPTION: Record<"cut" | "tip" | "view", string> = {
+  cut: "Earlier events not shown",
+  tip: "Newer events hidden by the filters",
+  view: "Earlier events hidden by the filters",
+};
+
 export function TimelineBoundaryRow({
   kind,
   isFirst,
@@ -111,6 +119,19 @@ export function TimelineBoundaryRow({
   isLast: boolean;
 }) {
   const scale = useTimelineScale();
+  // The phone spine view draws the glyph as a segment with a caption naming
+  // what lies past it. Nothing opens, so it is text, not a control.
+  const spineView = useSpineView();
+  if (spineView) {
+    return (
+      <SpineSegment
+        wrapperProps={{ "data-figure": "timeline-boundary-row", "data-boundary-row": kind }}
+        caption={BOUNDARY_CAPTION[kind]}
+        spokenCaption={BOUNDARY_CAPTION[kind]}
+        iconColumn={<SpineColumn icon="boundary" isFirst={isFirst} isLast={isLast} tip={null} />}
+      />
+    );
+  }
   return (
     <div
       data-figure="timeline-boundary-row"

@@ -20,6 +20,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -127,12 +128,184 @@ export const EventCaptionContext = createContext<EventCaption | null>(null);
 export interface SpineRowSlot {
   caption: ReactNode;
   setLegs: (legs: string | null) => void;
+  /** Where the column reports the line it draws down to the next segment
+   *  (`spineLineKey`), or null where it draws none, so an opened card can
+   *  carry the same line past itself. */
+  setLine?: (line: string | null) => void;
 }
 
 export const SpineRowContext = createContext<SpineRowSlot | null>(null);
 
 export function useSpineRow(): SpineRowSlot | null {
   return useContext(SpineRowContext);
+}
+
+// ── The line between segments ─────────────────────────────────────────────
+//
+// Each segment's column draws the line from its node down into the next
+// node's halo: `var(--card-pad) + 28px` past its own bottom, which is the list's
+// 8px gap, the next row's padding and its column's 16px top padding. Two
+// things lengthen it in the spine view, and both reach it without a prop:
+//
+//   - an opened card under the segment carries the same line behind itself,
+//     from where the column's line stops to the next segment (`SpineSegment`);
+//   - a gap holding market-note markers grows, and the line that ends in that
+//     gap is lengthened by the growth through `--mspine-extra`, set on the
+//     line element that precedes the gap (`useExtendLineAbove`).
+//
+// Every such line element carries `data-spine-line`, in the spine view only.
+
+/** The line a column draws, as a key that compares equal across renders:
+ *  "d|<colour>" dotted, "s|<colour>" solid. */
+export function spineLineKey(dotted: boolean, rgb: string): string {
+  return `${dotted ? "d" : "s"}|${rgb}`;
+}
+
+/** The inline style a `spineLineKey` stands for. */
+export function spineLineStyle(key: string): React.CSSProperties {
+  const [kind, rgb] = [key.slice(0, 1), key.slice(2)];
+  return kind === "d"
+    ? { backgroundImage: `linear-gradient(to bottom, ${rgb} 50%, transparent 50%)`, backgroundSize: "1px 6px" }
+    : { backgroundColor: rgb };
+}
+
+/** How far a line overshoots the bottom of the row it is drawn in, to reach
+ *  the next node's halo. */
+export const SPINE_LINE_OVERSHOOT = "calc(-1 * var(--card-pad) - 28px - var(--mspine-extra, 0px))";
+
+/** Lengthen the spine line that ends in this gap by `extra` px: the last
+ *  `[data-spine-line]` before `ref` in the timeline. Recomputed when the rows
+ *  around it change (a card or a folder opening above it). */
+export function useExtendLineAbove(ref: React.RefObject<HTMLElement | null>, extra: number, enabled = true) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !enabled) return;
+    const root = el.closest("[data-timeline-rows-drawn]") ?? document.body;
+    let target: HTMLElement | null = null;
+    const apply = () => {
+      let found: HTMLElement | null = null;
+      for (const line of root.querySelectorAll<HTMLElement>("[data-spine-line]")) {
+        if (el.contains(line)) break;
+        if (line.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) found = line;
+        else break;
+      }
+      if (found === target) return;
+      target?.style.removeProperty("--mspine-extra");
+      target = found;
+      target?.style.setProperty("--mspine-extra", `${extra}px`);
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      target?.style.removeProperty("--mspine-extra");
+    };
+  }, [ref, extra, enabled]);
+}
+
+/** One segment of the spine view: the column and its caption as one button,
+ *  and, while open, the card under it as a region labelled by the caption.
+ *  Event cards, run and folder rows draw through it. A segment with nothing to
+ *  open (the boundary row) passes no `onToggle` and draws as plain text. */
+export function SpineSegment({
+  caption,
+  spokenCaption,
+  label,
+  open = false,
+  onToggle,
+  iconColumn,
+  card,
+  cardKey,
+  captionFor,
+  wrapperProps,
+}: {
+  /** The caption drawn on the line: "Repay · 6 Feb '26". */
+  caption: ReactNode;
+  /** The caption as spoken: "Repay, 6 Feb 2026". */
+  spokenCaption: string;
+  /** The button's full name; unset, the spoken caption and the legs the
+   *  column reports. */
+  label?: string;
+  open?: boolean;
+  onToggle?: (anchor: HTMLElement) => void;
+  iconColumn: ReactNode;
+  /** The card drawn under the segment while it is open. */
+  card?: ReactNode;
+  /** `data-spine-card` on the open region, which the reveal scroll finds. */
+  cardKey?: string;
+  /** Colour the caption as the open card's. */
+  captionFor?: "open";
+  wrapperProps?: React.HTMLAttributes<HTMLDivElement> & Record<`data-${string}`, string | undefined>;
+}) {
+  const scale = useTimelineScale();
+  const reactId = useId();
+  const [legs, setLegs] = useState<string | null>(null);
+  const [line, setLine] = useState<string | null>(null);
+  const lit = open || captionFor === "open";
+  const labelId = `${reactId}-label`;
+  const regionId = `${reactId}-card`;
+  const captionNode = (
+    <span
+      aria-hidden={onToggle ? true : undefined}
+      className={`block max-w-full truncate px-2 text-xs leading-5 ${lit ? "text-foreground" : "text-rb-500"}`}
+      style={{ backgroundColor: "var(--background)" }}
+    >
+      {caption}
+    </span>
+  );
+  const column = <SpineRowContext.Provider value={{ caption: captionNode, setLegs, setLine }}>{iconColumn}</SpineRowContext.Provider>;
+  return (
+    <div
+      {...wrapperProps}
+      className={`relative flex w-full flex-col ${scale.cardRounded}`}
+      style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
+    >
+      {onToggle ? (
+        // The segment, its flank values and its caption are one button. The
+        // glyphs are hidden from screen readers and inert to the pointer.
+        <button
+          type="button"
+          data-spine-toggle=""
+          aria-expanded={open}
+          aria-controls={open && card ? regionId : undefined}
+          aria-label={label ?? (legs ? `${spokenCaption}: ${legs}` : spokenCaption)}
+          onClick={(e) => onToggle(e.currentTarget)}
+          className="hidden w-full min-h-11 cursor-pointer items-stretch mspine:max-sm:flex justify-center rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+        >
+          <span aria-hidden className="pointer-events-none flex w-full items-stretch justify-center">
+            {column}
+          </span>
+          <span id={labelId} hidden>
+            {spokenCaption}
+          </span>
+        </button>
+      ) : (
+        <div className="hidden w-full items-stretch justify-center mspine:max-sm:flex">{column}</div>
+      )}
+      {open && card && (
+        <div
+          role="region"
+          id={regionId}
+          aria-labelledby={labelId}
+          data-spine-card={cardKey}
+          // Its own stacking context, so the line below paints behind the
+          // card and shows only where the card does not cover it.
+          className="relative isolate mt-2 w-full"
+        >
+          {line && (
+            <div
+              aria-hidden
+              data-spine-line=""
+              className="absolute left-1/2 -z-10 w-px -translate-x-1/2"
+              style={{ top: "calc(var(--card-pad) + 20px)", bottom: SPINE_LINE_OVERSHOOT, ...spineLineStyle(line) }}
+            />
+          )}
+          {card}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** One row above the first event, under the two flanks: what a left arrow and

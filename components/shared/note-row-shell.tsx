@@ -51,6 +51,9 @@ export interface NoteRowShellProps {
   header: ReactNode;
   /** The body panel, mounted only while the row is open — like a card's. */
   children: ReactNode;
+  /** Mount with the body open: the phone spine view opens a note from its
+   *  marker straight to the row and its panel. */
+  defaultOpen?: boolean;
 }
 
 export function NoteRowShell({
@@ -62,10 +65,11 @@ export function NoteRowShell({
   marker,
   header,
   children,
+  defaultOpen = false,
 }: NoteRowShellProps) {
   const scale = useTimelineScale();
   const registry = useReceiptRegistry();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const toggle = () => setOpen((o) => !o);
 
   return (

@@ -1881,12 +1881,12 @@ const changeDigits = (n: number): string => {
 
 /** A signed change, with the typographic minus (U+2212) the rest of the site
  *  uses for a negative figure. */
-const formatChange = (n: number): string => `${n < 0 ? "−" : "+"}${changeDigits(n)}%`;
+export const formatChange = (n: number): string => `${n < 0 ? "−" : "+"}${changeDigits(n)}%`;
 
 /** The same change with no sign — for the header, where the direction glyph
  *  carries what the sign used to. `change` (signed) stays for the markdown
  *  export and the receipt's exact value. */
-const formatChangeMagnitude = (n: number): string => `${changeDigits(n)}%`;
+export const formatChangeMagnitude = (n: number): string => `${changeDigits(n)}%`;
 
 /** Seconds between the two ends' block timestamps, or null where either end
  *  is undated (a Moonwell step whose sample the endpoint did not date, and no

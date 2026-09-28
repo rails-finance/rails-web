@@ -17,6 +17,8 @@ import { fmtHeaderMagnitude } from "@/lib/shared/header-values";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { useLinkedHover } from "@/hooks/useLinkedHover";
+import { SpineSegment, spokenAmount, useSpineView } from "@/components/shared/mobile-spine";
+import { formatDate } from "@/lib/date";
 
 /**
  * Timeline run card — one row standing in for a stretch of consecutive
@@ -226,6 +228,7 @@ export function TimelineRunCard({
   // Folder node (spine flank) + header are one control in two EventCard
   // subtrees; this joins their hover so either surface lights both.
   const { lit, bind } = useLinkedHover<"header" | "folder">();
+  const spineView = useSpineView();
 
   const [fromTs, toTs] =
     firstTimestamp <= lastTimestamp ? [firstTimestamp, lastTimestamp] : [lastTimestamp, firstTimestamp];
@@ -270,28 +273,39 @@ export function TimelineRunCard({
   // run's members' tokens) states no sum.
   const unreadOf = useUnreadTokenOf();
 
-  const header = (
+  // In the phone spine view (`spine`) the header is the opened card: not a
+  // control (the segment above it is), and without the list view's
+  // narrow-width stand-ins for the spine, which the segment draws.
+  const headerRow = (spine: boolean) => (
     <div
-      className={`group/run cursor-pointer rounded-xl transition-colors px-5 pt-4 pb-3${lit ? " bg-raised" : ""}`}
-      onClick={toggle}
-      {...bind("header")}
-      role="button"
-      tabIndex={0}
-      aria-expanded={open}
-      aria-label={`${count} consecutive ${memberPlural} — ${open ? "collapse" : "expand"} the run`}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          toggle();
-        }
-      }}
+      className={
+        spine
+          ? "rounded-xl px-5 pt-4 pb-3"
+          : `group/run cursor-pointer rounded-xl transition-colors px-5 pt-4 pb-3${lit ? " bg-raised" : ""}`
+      }
+      {...(spine
+        ? {}
+        : {
+            onClick: toggle,
+            ...bind("header"),
+            role: "button",
+            tabIndex: 0,
+            "aria-expanded": open,
+            "aria-label": `${count} consecutive ${memberPlural} — ${open ? "collapse" : "expand"} the run`,
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                toggle();
+              }
+            },
+          })}
     >
       <div className="flex items-center gap-1.5 flex-wrap">
         {/* The dotted spine carries the pill on desktop; on mobile the badge
             moves into the header, matching the single passive card's hand-off.
             Folder rows never carry it — the corner mark + dot/connector tone
             already state the severity, at every width. */}
-        {!folder && warningLabel && (
+        {!spine && !folder && warningLabel && (
           <span
             className={`sm:hidden inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${PILL_CLASSES[tone]}`}
           >
@@ -303,7 +317,7 @@ export function TimelineRunCard({
             its Finder-style disclosure chevron comes with it: right while
             closed, down while open, to the folder's left (the spine node
             carries the same pair on sm+). */}
-        {folder && (
+        {!spine && folder && (
           <span
             className="sm:hidden mr-0.5 inline-flex items-center gap-1 text-rb-500 transition-colors group-hover/run:text-foreground"
             aria-hidden
@@ -332,7 +346,7 @@ export function TimelineRunCard({
         {folder && (
           <span data-prov-exempt="" className="inline-flex items-center gap-1 text-sm font-medium text-rb-500">
             <Calculator size={15} strokeWidth={2} aria-hidden />
-            <span className="sm:hidden">{count.toLocaleString("en-US")}</span>
+            {!spine && <span className="sm:hidden">{count.toLocaleString("en-US")}</span>}
           </span>
         )}
         {lead}
@@ -381,10 +395,12 @@ export function TimelineRunCard({
             glyph (spine node on sm+, header glyph below), so a second one
             here would say the same thing twice (Miles, 2026-09-02). A
             non-folder run row keeps the ▾. */}
-        <span className="evt-meta ml-auto inline-flex items-center gap-2 whitespace-nowrap">
-          <span className="text-xs text-rb-500">{range}</span>
-          {!folder && <ExpandChevron isOpen={open} group="run" />}
-        </span>
+        {!spine && (
+          <span className="evt-meta ml-auto inline-flex items-center gap-2 whitespace-nowrap">
+            <span className="text-xs text-rb-500">{range}</span>
+            {!folder && <ExpandChevron isOpen={open} group="run" />}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -422,6 +438,50 @@ export function TimelineRunCard({
     }
   }
 
+  // ── The phone spine view: the row is one segment, captioned with the count
+  // and the span. A tap opens the header's sums as the card, and the members
+  // under it as segments of their own on the same line (no rail and no
+  // indent: the open folder glyph on the flank says whose they are).
+  if (spineView) {
+    const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
+    const sums = (aggregates ?? [])
+      .filter((agg) => agg.value > 0 && !unreadOf(undefined, agg.symbol))
+      .map((agg) => `${agg.verb.toLowerCase()} ${spokenAmount(agg.value)} ${agg.symbol}`);
+    const countText = `${count.toLocaleString("en-US")} ${count === 1 ? memberNoun : memberPlural}`;
+    return (
+      <div className="flex flex-col gap-2">
+        <SpineSegment
+          caption={
+            <>
+              {countText} &middot; {range}
+            </>
+          }
+          spokenCaption={`${countText}, ${spokenRange}`}
+          label={`${countText}, ${spokenRange}${sums.length ? `: ${sums.join(", ")}` : ""}`}
+          open={open}
+          onToggle={() => {
+            if (!forceOpen) toggle();
+          }}
+          iconColumn={
+            <SpineColumn
+              icon={folder ? "folder" : spineIcon}
+              warningTone={tone === "danger" ? "critical" : tone === "external" ? "external" : "caution"}
+              warningLabel={warningLabel}
+              folderOpen={folder ? open : undefined}
+              folderMark={folder ? folderBadge : undefined}
+              folderCount={folder ? count : undefined}
+              spine="dotted"
+              isFirst={isFirst}
+              isLast={!!isLast && !open}
+            />
+          }
+          card={<div className="rounded-xl bg-raised">{headerRow(true)}</div>}
+        />
+        {open && body}
+      </div>
+    );
+  }
+
   return (
     <>
       <EventCard
@@ -442,7 +502,7 @@ export function TimelineRunCard({
             isLast={!!isLast && !open}
           />
         }
-        header={header}
+        header={headerRow(false)}
         hideDetailChevron
         muted={muted}
       />

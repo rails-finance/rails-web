@@ -11,7 +11,7 @@ import { Prov } from "@/components/shared/provenance";
 import { useTimelineScale, SpineVal, fmtSpine, type SpineValProv } from "@/components/shared/activity-timeline";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import type { LinkedHoverHandlers } from "@/hooks/useLinkedHover";
-import { spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
+import { SPINE_LINE_OVERSHOOT, spineLineKey, spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
 
 // ── Icon overrides ──────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ export type SpineColor = "default" | "caution" | "critical" | "external";
 /** The warning triangle's tones. */
 export type WarningTone = "caution" | "critical" | "external";
 
-const SPINE_COLORS: Record<SpineColor, string> = {
+export const SPINE_COLORS: Record<SpineColor, string> = {
   default: "rgb(101 115 140)", // rb-500
   caution: "var(--caution)", // routine adverse (color-grammar.md §5)
   critical: "rgb(239 68 68)", // red-500 — liquidation + critical
@@ -710,7 +710,7 @@ function CrossBadge({ size }: { size: number }) {
 }
 
 /** Pulsing dot for the newest event in an active timeline — color matches spine tint */
-function PulsingDot({ dotClass = "bg-green-400", side }: { dotClass?: string; side: SpineTip }) {
+export function PulsingDot({ dotClass = "bg-green-400", side }: { dotClass?: string; side: SpineTip }) {
   return (
     <div className="relative flex items-center justify-center" style={{ width: 10, height: 10 }} data-spine-tip={side}>
       <span className={`absolute inline-flex h-full w-full rounded-full ${dotClass} opacity-50 animate-ping`} />
@@ -892,6 +892,12 @@ export function SpineColumn({
     ? { backgroundImage: `linear-gradient(to bottom, ${spineRgb} 50%, transparent 50%)`, backgroundSize: "1px 6px" }
     : { backgroundColor: spineRgb };
   const spineClasses = "absolute left-1/2 -translate-x-1/2 w-px";
+  // The phone spine view: an opened card carries this line past itself.
+  const lineKey = !detached && !isLast ? spineLineKey(isDotted, spineRgb) : null;
+  const setLine = spineRow?.setLine;
+  useEffect(() => {
+    setLine?.(lineKey);
+  }, [setLine, lineKey]);
 
   const spineEl = detached ? (
     // Detached card: spine is bounded by the column itself, no overflow into neighbours.
@@ -906,7 +912,13 @@ export function SpineColumn({
       // a few px inside the halo for clean masking. Any further (the old
       // 100px) and the spine bleeds past the next card entirely, leaving a
       // bare tail visible below the bottom-most event.
-      <div className={spineClasses} style={{ top: 0, bottom: "calc(-1 * var(--card-pad) - 28px)", ...spineStyle }} />
+      // In the phone spine view the line is also what a marker gap below
+      // lengthens (`useExtendLineAbove`), so it is marked and reads the var.
+      <div
+        className={spineClasses}
+        data-spine-line={spineRow ? "" : undefined}
+        style={{ top: 0, bottom: spineRow ? SPINE_LINE_OVERSHOOT : "calc(-1 * var(--card-pad) - 28px)", ...spineStyle }}
+      />
     )
   );
 

@@ -6,6 +6,7 @@
 // identity, so a fresh one per render would recompute every row.
 
 import { useMemo, type ReactNode } from "react";
+import { SpineTipContext } from "@/components/shared/spine-column";
 import { isFluidEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { operatesIn, roundTripHops, type FluidEvent } from "@/lib/fluid/explainer-clauses";
@@ -156,8 +157,18 @@ function renderTxRow(run: BaseActivityEvent[], sibs: FluidEvent[], meta: { isFir
   }
   return (
     <div className="flex flex-col gap-2">
+      {/* The row is one transaction and the tip is its newest card: the ones
+          under it refuse the dot the timeline provides around the row. */}
       {cards.map((c, i) => (
-        <div key={c.key}>{c.node(meta.isFirst && i === 0, meta.isLast && i === cards.length - 1)}</div>
+        <div key={c.key}>
+          {i === 0 ? (
+            c.node(meta.isFirst, meta.isLast && cards.length === 1)
+          ) : (
+            <SpineTipContext.Provider value={null}>
+              {c.node(false, meta.isLast && i === cards.length - 1)}
+            </SpineTipContext.Provider>
+          )}
+        </div>
       ))}
     </div>
   );
