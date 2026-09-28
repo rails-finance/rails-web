@@ -30,6 +30,7 @@ import {
   liqDebtRepaidProv,
   supplyAfterProv,
   supplyBeforeProv,
+  supplyStoodDownProv,
   cTokensAfterProv,
   cTokensBeforeProv,
   liqAtBlockPriceProv,
@@ -139,18 +140,29 @@ export function CompoundV2EventDetail({ ctx, txHash, blockNumber, wallet }: Comp
   const stats: ChainTruthStat[] = [];
 
   if (ctx.eventType === "mint" || ctx.eventType === "redeem") {
-    stats.push({
-      label: "Supplied · principal",
-      value: fmt(ctx.supplyAfter),
-      symbol: ctx.marketSymbol,
-      prov: supplyAfterProv(ctx.marketSymbol, coords, ctx.raw?.supplyAfter),
-      transition: reconstructTransition({
-        after: ctx.supplyAfter,
-        change: ctx.assetsDelta,
-        changeProv: assetsDeltaProv(ctx.marketSymbol, ctx.eventType, coords, ctx.raw?.amount),
-        beforeProv: supplyBeforeProv(ctx.marketSymbol, coords),
-      }),
-    });
+    if (ctx.supplyStoodDown) {
+      stats.push({
+        label: "Supplied · principal",
+        value: "Not shown",
+        display: "Not shown — cTokens moved by transfer",
+        dimmed: true,
+        symbol: ctx.marketSymbol,
+        prov: supplyStoodDownProv(ctx.marketSymbol, coords),
+      });
+    } else {
+      stats.push({
+        label: "Supplied · principal",
+        value: fmt(ctx.supplyAfter),
+        symbol: ctx.marketSymbol,
+        prov: supplyAfterProv(ctx.marketSymbol, coords, ctx.raw?.supplyAfter),
+        transition: reconstructTransition({
+          after: ctx.supplyAfter,
+          change: ctx.assetsDelta,
+          changeProv: assetsDeltaProv(ctx.marketSymbol, ctx.eventType, coords, ctx.raw?.amount),
+          beforeProv: supplyBeforeProv(ctx.marketSymbol, coords),
+        }),
+      });
+    }
     stats.push({
       label: "cToken balance",
       value: fmt(ctx.cTokensAfter),

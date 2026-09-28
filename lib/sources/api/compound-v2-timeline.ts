@@ -157,13 +157,21 @@ function flowFor(token: string, symbol: string, decimals: number, raw: bigint, d
  * The replay lives in the MV; only chain-direct presentation (symbols, signs)
  * here. `totalEvents` defaults to rows.length; the proxy overrides it with the
  * backend's whole-history count when paging.
+ *
+ * `transferMarkets` — the wallet's markets with a cToken transfer or seize
+ * row (rails route, whole-wallet, TO-DO-infra-and-backend.md §9): the supply-
+ * principal lane (mig 244:608-613) never counted those moves, so a mint or
+ * redeem in one of these markets stands its `supplyBefore`/`supplyAfter`
+ * down rather than serve the undercounted (or clamped-to-zero) figure.
  */
 export function buildCompoundV2Timeline(
   rows: CompoundV2MvRow[],
   walletRaw: string,
   totalEvents?: number,
+  transferMarkets?: readonly string[],
 ): CompoundV2TimelineResult {
   const wallet = walletRaw.toLowerCase();
+  const standDownMarkets = new Set(transferMarkets ?? []);
   const fallbackMarket = (key: string): CompoundV2Market => ({
     key,
     symbol: key.toUpperCase(),
@@ -221,18 +229,22 @@ export function buildCompoundV2Timeline(
         const cSigned = kind === "mint" ? ctk : -ctk;
         ctx.assetsDelta = fmtUnits(signed, m.decimals);
         ctx.cTokensDelta = fmtUnits(cSigned, CTOKEN_DECIMALS);
-        ctx.supplyBefore = scaledStr(r.supply_before, m.decimals);
-        ctx.supplyAfter = scaledStr(r.supply_after, m.decimals);
         ctx.cTokensBefore = scaledStr(r.ctokens_before, CTOKEN_DECIMALS);
         ctx.cTokensAfter = scaledStr(r.ctokens_after, CTOKEN_DECIMALS);
+        const standDown = standDownMarkets.has(m.key);
+        ctx.supplyStoodDown = standDown;
         ctx.raw = {
           amount: rawVal(r.amount),
           cTokens: rawVal(r.ctokens),
-          supplyBefore: rawVal(r.supply_before),
-          supplyAfter: rawVal(r.supply_after),
           cTokensBefore: rawVal(r.ctokens_before),
           cTokensAfter: rawVal(r.ctokens_after),
         };
+        if (!standDown) {
+          ctx.supplyBefore = scaledStr(r.supply_before, m.decimals);
+          ctx.supplyAfter = scaledStr(r.supply_after, m.decimals);
+          ctx.raw.supplyBefore = rawVal(r.supply_before);
+          ctx.raw.supplyAfter = rawVal(r.supply_after);
+        }
         // Underlying moves toward the protocol on a mint, toward the wallet on a redeem.
         flows =
           amt !== ZERO ? [flowFor(underlyingToken, m.symbol, m.decimals, amt, kind === "mint" ? "out" : "in")] : [];

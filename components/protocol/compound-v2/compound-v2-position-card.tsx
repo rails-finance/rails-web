@@ -48,6 +48,7 @@ import {
   avgBorrowRateProv,
   peakSupplyProv,
   peakDebtProv,
+  peakSupplyStoodDownProv,
 } from "@/lib/compound-v2/event-provenance";
 import { compoundV2LiveDebtProv } from "@/lib/compound-v2/position-provenance";
 import type { CompoundV2CardCaptions } from "@/lib/compound-v2/economics";
@@ -274,13 +275,21 @@ function PeakStack({ lines, side }: { lines: CompoundV2PeakAmount[]; side: "supp
   if (lines.length === 0) return <StatDash />;
   return (
     <div className="flex flex-col gap-1">
-      {lines.map((r) => (
-        <StatValue key={r.market}>
-          <Prov info={side === "supply" ? peakSupplyProv(r.symbol) : peakDebtProv(r.symbol)}>
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
-          </Prov>
-        </StatValue>
-      ))}
+      {lines.map((r) =>
+        r.stoodDown ? (
+          <StatValue key={r.market}>
+            <Prov info={peakSupplyStoodDownProv(r.symbol)}>
+              <span className="text-sm text-rb-500">Not shown — {r.symbol} cTokens moved by transfer</span>
+            </Prov>
+          </StatValue>
+        ) : (
+          <StatValue key={r.market}>
+            <Prov info={side === "supply" ? peakSupplyProv(r.symbol) : peakDebtProv(r.symbol)}>
+              <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            </Prov>
+          </StatValue>
+        ),
+      )}
     </div>
   );
 }

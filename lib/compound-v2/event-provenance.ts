@@ -455,6 +455,34 @@ export const supplyBeforeProv = (sym: string, coords: CompoundV2Coords): Provena
   ]),
 });
 
+/** Supply PRINCIPAL stood down: this market moved a cToken by transfer or
+ *  seizure, which the principal lane (Σ mint − redeem) never counted — so the
+ *  figure understates the holding, or clamps to zero on a market redeemed
+ *  past what it minted. Short-term stand-down pending family 6 of the running-
+ *  balance plan (cTokens × exchange rate at the row); rails-ops
+ *  reference/chain-matching-running-balances.md, "Gaps that are not interest"
+ *  B; TO-DO-infra-and-backend.md §9. */
+export const supplyStoodDownProv = (sym: string, coords: CompoundV2Coords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `${sym} supply PRINCIPAL is not shown on this event — the position's cTokens in this market have moved by transfer or liquidation seizure at some point, and the principal lane (Σ mint − redeem) never counts those, so it would read below what the position holds (a market redeemed past what it minted reads zero). The cToken balance beside it is the exact, slot-verified figure.`,
+  contract: ctokenContract(coords),
+  via: `${COMPOUND_V2_VIA} · a Transfer or seize log moved this market's cTokens outside Mint/Redeem`,
+  verify: { kind: "none", text: "There is no figure to check" },
+  inputs: eventInputs(coords),
+});
+
+/** Closed/liquidated-card peak supply stood down — the same gap, over the
+ *  lane's lifetime max rather than one event's after-value. */
+export const peakSupplyStoodDownProv = (sym: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `The highest ${sym} supply PRINCIPAL this wallet recorded is not shown — this market's cTokens moved by transfer or liquidation seizure at some point in its history, which the principal lane (max of Σ mint − redeem) never counts, so the peak would read below what the position held (or zero, on a market redeemed past what it minted). No on-chain slot holds a lifetime-peak claim to read instead.`,
+  contract: { name: "cToken", address: "" },
+  via: `${COMPOUND_V2_VIA} · a Transfer or seize log moved this market's cTokens outside Mint/Redeem`,
+  verify: { kind: "none", text: "There is no figure to check" },
+});
+
 // ── identity ─────────────────────────────────────────────────────────────────
 
 /** Third-party action: the position owner neither signed the transaction nor

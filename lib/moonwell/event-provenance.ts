@@ -279,6 +279,35 @@ export const supplyBeforeProv = (sym: string, coords: MoonwellCoords): Provenanc
   ]),
 });
 
+/** Supply PRINCIPAL stood down: this market moved an mToken by transfer (a
+ *  liquidation seize included — a seize is a plain Transfer here), which the
+ *  principal lane (Σ mint − redeem) never counted — so the figure understates
+ *  the holding, or clamps to zero on a market redeemed past what it minted.
+ *  Short-term stand-down pending family 6 of the running-balance plan
+ *  (mTokens × exchange rate at the row); rails-ops
+ *  reference/chain-matching-running-balances.md, "Gaps that are not interest"
+ *  B; TO-DO-infra-and-backend.md §9. */
+export const supplyStoodDownProv = (sym: string, coords: MoonwellCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `${sym} supply PRINCIPAL is not shown on this event — the position's mTokens in this market have moved by transfer (a liquidation seize counts, since a seize is a plain Transfer here) at some point, and the principal lane (Σ mint − redeem) never counts those, so it would read below what the position holds (a market redeemed past what it minted reads zero). The mToken balance beside it is the exact, slot-verified figure.`,
+  contract: mtokenContract(coords),
+  via: `${captureVia(coords)} · a Transfer log moved this market's mTokens outside Mint/Redeem`,
+  verify: { kind: "none", text: "There is no figure to check" },
+  inputs: eventInputs(coords),
+});
+
+/** Closed/liquidated-card peak supply stood down — the same gap, over the
+ *  lane's lifetime max rather than one event's after-value. */
+export const peakSupplyStoodDownProv = (sym: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `The highest ${sym} supply PRINCIPAL this wallet recorded is not shown — this market's mTokens moved by transfer (a liquidation seize included) at some point in its history, which the principal lane (max of Σ mint − redeem) never counts, so the peak would read below what the position held (or zero, on a market redeemed past what it minted). No on-chain slot holds a lifetime-peak claim to read instead.`,
+  contract: { name: "mToken", address: "" },
+  via: `captured mToken events · a Transfer log moved this market's mTokens outside Mint/Redeem`,
+  verify: { kind: "none", text: "There is no figure to check" },
+});
+
 // ── identity ─────────────────────────────────────────────────────────────────
 
 /** Router-proxied mint/redeem: the emitted party is the WETH Router; the owner

@@ -813,8 +813,17 @@ export function replayMoonwellRows(p: MoonwellReplayInput): MoonwellChainTimelin
     }
     return out.length > 0 ? out : null;
   };
+  // Markets with a Transfer row in what this sweep read — the supply-
+  // principal lane never counts them (the same gap as the Ethereum index,
+  // TO-DO-infra-and-backend.md §9). Built from `rows`, so a (re)swept
+  // wallet's full history is covered. A cached seed's history predates
+  // `rows` and carries no transfer flag to merge in: a transfer that landed
+  // before the seed's boundary, with none since, stays a gap until the
+  // seed's summary gains a field for it.
+  const transferMarketKeys = new Set<string>();
   rows.forEach((d, i) => {
     const m = marketByMtoken.get(d.market)!;
+    if (d.kind === "transfer_in" || d.kind === "transfer_out") transferMarketKeys.add(d.market);
     if (i === cutoff && cutState === undefined) cutState = snapshotAtCut();
     // The anchor decision comes FIRST, because only an ELIDED row belongs in
     // the histograms. Until decision 0019 leg A every row below the cut was
@@ -936,6 +945,7 @@ export function replayMoonwellRows(p: MoonwellReplayInput): MoonwellChainTimelin
     marketOf: (key) => marketByMtoken.get(key),
     chainId,
     router,
+    transferMarkets: [...transferMarketKeys],
   });
 
   const positions: MoonwellReplayedPosition[] = [];

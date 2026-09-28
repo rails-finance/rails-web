@@ -27,6 +27,7 @@ import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
+import { peakSupplyStoodDownProv } from "@/lib/moonwell/event-provenance";
 import { moonwellPositionContent, type MoonwellPositionDeployment } from "@/lib/moonwell/position-content";
 import type { MoonwellCardCaptions } from "@/lib/moonwell/economics";
 import { formatUsd } from "@/lib/shared/format-event";
@@ -235,13 +236,21 @@ function PeakStack({ lines, side }: { lines: MoonwellPeakAmount[]; side: "supply
   if (lines.length === 0) return <StatDash />;
   return (
     <div className="flex flex-col gap-1">
-      {lines.map((r) => (
-        <StatValue key={r.address}>
-          <Prov info={side === "supply" ? dep.card.peakSupply(r.symbol) : dep.card.peakDebt(r.symbol)}>
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
-          </Prov>
-        </StatValue>
-      ))}
+      {lines.map((r) =>
+        r.stoodDown ? (
+          <StatValue key={r.address}>
+            <Prov info={peakSupplyStoodDownProv(r.symbol)}>
+              <span className="text-sm text-rb-500">Not shown — {r.symbol} mTokens moved by transfer</span>
+            </Prov>
+          </StatValue>
+        ) : (
+          <StatValue key={r.address}>
+            <Prov info={side === "supply" ? dep.card.peakSupply(r.symbol) : dep.card.peakDebt(r.symbol)}>
+              <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            </Prov>
+          </StatValue>
+        ),
+      )}
     </div>
   );
 }

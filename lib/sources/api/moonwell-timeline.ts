@@ -35,6 +35,12 @@ export interface MoonwellTimelineDeployment {
   /** The WETH Router whose emitted minter/redeemer means "routed, owner
    *  resolved from the same-tx transfer leg". */
   router?: string;
+  /** Markets this wallet ever moved an mToken on by transfer (a liquidation
+   *  seize included — a seize is a plain Transfer here) — the supply-
+   *  principal lane never counted them (mig 098's `supply_delta`, mint/redeem
+   *  only). A mint/redeem in one of these markets stands its
+   *  `supplyBefore`/`supplyAfter` down. TO-DO-infra-and-backend.md §9. */
+  transferMarkets?: readonly string[];
 }
 
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
@@ -174,6 +180,7 @@ export function buildMoonwellTimeline(
   const wallet = walletRaw.toLowerCase();
   const chainId = deployment.chainId ?? MAINNET_CHAIN_ID;
   const router = (deployment.router ?? MOONWELL_ADDRESSES.WETH_ROUTER).toLowerCase();
+  const standDownMarkets = new Set(deployment.transferMarkets ?? []);
   const fallbackMarket = (key: string): MoonwellMarket => ({
     key,
     symbol: key.toUpperCase(),
@@ -227,18 +234,22 @@ export function buildMoonwellTimeline(
         const mSigned = kind === "mint" ? mtk : -mtk;
         ctx.assetsDelta = fmtUnits(signed, m.decimals);
         ctx.mTokensDelta = fmtUnits(mSigned, MTOKEN_DECIMALS);
-        ctx.supplyBefore = scaledStr(r.supply_before, m.decimals);
-        ctx.supplyAfter = scaledStr(r.supply_after, m.decimals);
         ctx.mTokensBefore = scaledStr(r.mtokens_before, MTOKEN_DECIMALS);
         ctx.mTokensAfter = scaledStr(r.mtokens_after, MTOKEN_DECIMALS);
+        const standDown = standDownMarkets.has(m.key);
+        ctx.supplyStoodDown = standDown;
         ctx.raw = {
           amount: rawVal(r.amount),
           mTokens: rawVal(r.mtokens),
-          supplyBefore: rawVal(r.supply_before),
-          supplyAfter: rawVal(r.supply_after),
           mTokensBefore: rawVal(r.mtokens_before),
           mTokensAfter: rawVal(r.mtokens_after),
         };
+        if (!standDown) {
+          ctx.supplyBefore = scaledStr(r.supply_before, m.decimals);
+          ctx.supplyAfter = scaledStr(r.supply_after, m.decimals);
+          ctx.raw.supplyBefore = rawVal(r.supply_before);
+          ctx.raw.supplyAfter = rawVal(r.supply_after);
+        }
         // Underlying moves toward the protocol on a mint, toward the wallet on a redeem.
         flows = amt !== ZERO ? [flowFor(m.underlying, m.symbol, m.decimals, amt, kind === "mint" ? "out" : "in")] : [];
         break;

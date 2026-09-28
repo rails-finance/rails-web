@@ -78,6 +78,12 @@ export interface CompoundV2PeakAmount {
   decimals: number;
   amount: number;
   amountRaw: string;
+  /** True on a supply peak whose market ever moved a cToken by transfer or
+   *  seizure — the principal lane the peak is `max()`-ed over never counted
+   *  those (mig 244:608-613), so `amount` understates or reads zero. The card
+   *  states this instead of the figure. Never set on a debt peak (the
+   *  accountBorrows lane is chain-exact). */
+  stoodDown?: boolean;
 }
 
 export interface CompoundV2PositionSummary {
@@ -136,6 +142,10 @@ export interface RawCompoundV2WalletRow {
   txCount: number;
   liquidationCount: number;
   lastLiquidationAt: number | null;
+  /** Markets this wallet ever moved a cToken on by transfer or seizure — the
+   *  supply-principal lane never counted them. Gates `stoodDown` on the
+   *  matching peak-supply line. */
+  transferMarkets?: string[];
 }
 
 const ZERO = BigInt(0);
@@ -178,6 +188,7 @@ export async function buildCompoundV2PositionRows(raw: RawCompoundV2WalletRow[])
   return raw.map((w) => {
     const supplies: CompoundV2SupplyAmount[] = [];
     const borrows: CompoundV2BorrowAmount[] = [];
+    const transferMarkets = new Set(w.transferMarkets ?? []);
 
     for (const r of w.markets) {
       const m: CompoundV2Market | undefined = COMPOUND_V2_MARKET_BY_KEY[r.market];
@@ -217,13 +228,20 @@ export async function buildCompoundV2PositionRows(raw: RawCompoundV2WalletRow[])
       if (!m) continue;
       const sup = bigintOf(r.peakSupplyRaw);
       const dbt = bigintOf(r.peakDebtRaw);
-      if (sup > ZERO)
+      // A market this wallet ever moved a cToken on by transfer or seizure
+      // held a real supply position, even where the principal lane's clamp
+      // (mig 244:651-652) reads it at zero (e.g. DAI in the reference
+      // example) — so the stand-down row renders whether or not `sup` is
+      // positive; an unflagged market keeps the sup > 0 gate.
+      const flagged = transferMarkets.has(m.key);
+      if (sup > ZERO || flagged)
         peakSupplies.push({
           market: m.key,
           symbol: m.symbol,
           decimals: m.decimals,
           amount: scale(sup, m.decimals),
           amountRaw: sup.toString(),
+          stoodDown: flagged,
         });
       if (dbt > ZERO)
         peakBorrows.push({

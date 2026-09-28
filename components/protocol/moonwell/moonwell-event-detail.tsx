@@ -33,6 +33,7 @@ import {
   liqDebtRepaidProv,
   supplyAfterProv,
   supplyBeforeProv,
+  supplyStoodDownProv,
   mTokensAfterProv,
   mTokensBeforeProv,
   atBlockPriceProv,
@@ -138,18 +139,29 @@ export function MoonwellEventDetail({ ctx, txHash, blockNumber, wallet }: Moonwe
   const stats: ChainTruthStat[] = [];
 
   if (ctx.eventType === "mint" || ctx.eventType === "redeem") {
-    stats.push({
-      label: "Supplied · principal",
-      value: fmt(ctx.supplyAfter),
-      symbol: ctx.marketSymbol,
-      prov: supplyAfterProv(ctx.marketSymbol, coords, ctx.raw?.supplyAfter),
-      transition: reconstructTransition({
-        after: ctx.supplyAfter,
-        change: ctx.assetsDelta,
-        changeProv: assetsDeltaProv(ctx.marketSymbol, ctx.eventType, coords, ctx.raw?.amount),
-        beforeProv: supplyBeforeProv(ctx.marketSymbol, coords),
-      }),
-    });
+    if (ctx.supplyStoodDown) {
+      stats.push({
+        label: "Supplied · principal",
+        value: "Not shown",
+        display: "Not shown — mTokens moved by transfer",
+        dimmed: true,
+        symbol: ctx.marketSymbol,
+        prov: supplyStoodDownProv(ctx.marketSymbol, coords),
+      });
+    } else {
+      stats.push({
+        label: "Supplied · principal",
+        value: fmt(ctx.supplyAfter),
+        symbol: ctx.marketSymbol,
+        prov: supplyAfterProv(ctx.marketSymbol, coords, ctx.raw?.supplyAfter),
+        transition: reconstructTransition({
+          after: ctx.supplyAfter,
+          change: ctx.assetsDelta,
+          changeProv: assetsDeltaProv(ctx.marketSymbol, ctx.eventType, coords, ctx.raw?.amount),
+          beforeProv: supplyBeforeProv(ctx.marketSymbol, coords),
+        }),
+      });
+    }
     stats.push({
       label: "mToken balance",
       value: fmt(ctx.mTokensAfter),

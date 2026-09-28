@@ -52,8 +52,10 @@ export async function GET(request: NextRequest) {
         { status: response.status },
       );
     }
-    const upstream = (await response.json()) as UpstreamFolderMembers<CompoundV2MvRow>;
-    const data = buildCompoundV2Timeline(upstream.rows, wallet, upstream.rows.length);
+    const upstream = (await response.json()) as UpstreamFolderMembers<CompoundV2MvRow> & {
+      transferMarkets?: string[];
+    };
+    const data = buildCompoundV2Timeline(upstream.rows, wallet, upstream.rows.length, upstream.transferMarkets);
     const folder = compoundV2ServedFolder(upstream.folder);
     return NextResponse.json(toTimelineWire({ ...data, folder }, MAINNET_CHAIN_ID), {
       headers: proxyCacheControl(response, LISTING_CACHE_CONTROL),
