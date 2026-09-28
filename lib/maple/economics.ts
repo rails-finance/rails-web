@@ -214,12 +214,18 @@ export function mapleLifetimeWithOpening(
 /** Chain-faithful interest on the claim (the Spark legInterest gates):
  *  - no current figure / no gross inflow → can't attribute, bail;
  *  - interest < dust → zero (or negative: missed principal, bail);
- *  - interest > grossIn → >100% cumulative yield, physically implausible → bail. */
+ *  - interest > grossIn → >100% cumulative yield, physically implausible → bail;
+ *  - interest > current → more came out than went in, so part of the interest
+ *    has left with the withdrawals and the claim cannot include it. The tower
+ *    and the card say the interest is inside the claim ("incl. …"), which would
+ *    be false: wallet 0x1601…347e holds 0.000001 USDC and has earned 23.43M
+ *    over its life. Bail. */
 function legInterest(current: number | undefined | null, netPrincipal: number, grossIn: number): number {
   if (current == null || grossIn <= 0) return 0;
   const interest = current - netPrincipal;
   if (interest < DUST) return 0;
   if (interest > grossIn) return 0;
+  if (interest > current + DUST) return 0;
   return interest;
 }
 
@@ -389,6 +395,6 @@ export function computeMapleEconomics(
       "The claim column shows what the position would redeem for now: its pool shares valued at the pool's exit rate. The amount above what was put in is interest earned; shares received or sent by transfer count at the pool rate in their block. Amounts stay in the pool's own asset, USDC or USDT — pinning a stablecoin to a dollar would hide exactly the depeg the token amounts exist to reveal. One caveat rides the value: it rests on a loan book whose collateral is held off-chain, so it shows what Maple's books record rather than something the chain itself can prove." +
       (interest != null
         ? ""
-        : " The split between principal and interest earned appears only when a single pool's flows attribute cleanly, with every share transfer valued."),
+        : " The split between principal and interest earned appears only when a single pool's flows attribute cleanly, with every share transfer valued, and the interest is still inside the claim."),
   };
 }
