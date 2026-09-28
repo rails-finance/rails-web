@@ -90,7 +90,7 @@ export interface CompoundPositionView {
 
 /** The base figure to display: the live CURRENT value (incl. interest) when the
  *  chain overlay has it — authoritative for the current state — else the
- *  amounts-only principal from the event replay. */
+ *  balance at the last event (Ethereum) or the replayed principal (Base). */
 interface EffectiveBase {
   amount: number;
   side: "lend" | "borrow" | "flat";
@@ -354,9 +354,10 @@ export function CompoundPositionCard({
     const noPeaksNote = noPeaks ? (
       <div className="text-xs mt-0.5 text-rb-500">{notRecordedNote("position")}</div>
     ) : undefined;
-    // The peak is the base's replayed PRINCIPAL, not the interest-bearing
-    // current value — the footnote says so whenever the column shows a figure.
-    const principalNote = (
+    // On the Base sweep the peak is the base's replayed PRINCIPAL, and the
+    // footnote says so whenever the column shows a figure. On Ethereum each row
+    // is the chain's balance, interest included, and no footnote is needed.
+    const principalNote = vocab.baseAtLastEvent ? undefined : (
       <div className="text-xs mt-0.5 text-rb-500">principal only — accrued interest not included</div>
     );
     const supplyLines: ReactNode[] = [];
@@ -424,9 +425,14 @@ export function CompoundPositionCard({
       </PositionCardShell>
     );
   }
-  // Footnote: chain value already includes interest; the replay is principal-only.
+  // Footnote: chain value already includes interest; without it, Ethereum
+  // shows the balance at the last event and Base the replayed principal.
   const lentNote = eff.isChain ? "incl. interest" : "earns supply rate";
-  const borrowNote = eff.isChain ? "incl. interest" : "principal (ex-interest)";
+  const borrowNote = eff.isChain
+    ? "incl. interest"
+    : vocab.baseAtLastEvent
+      ? "at the last event"
+      : "principal (ex-interest)";
 
   // On-chain oracle USD per side (Comet's own getPrice). Supply side = the lent
   // base (net lender) plus the collateral assets; debt side = the borrowed base.

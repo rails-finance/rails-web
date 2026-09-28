@@ -125,4 +125,12 @@ export const COMPOUND_SWEPT_VOCABULARY: CompoundTowerVocabulary = {
     contract: cometContract(coords),
     via: `${SWEEP_VIA} · Σ (borrowed − repaid − absorbed) · first block → head`,
   }),
+  lendPrincipal: (sym, coords): Provenance => ({
+    kind: "chain-derived",
+    pclass: "emitted",
+    summary: `Lent ${sym} PRINCIPAL — the net of every supply and withdrawal the account's own Comet events moved, over every event the Comet has emitted for it since the market's first block. The interest earned on it is the separate segment above it (principal + interest = the Comet's own balanceOf).`,
+    contract: cometContract(coords),
+    via: `${SWEEP_VIA} · Σ (deposited − withdrawn) · first block → head`,
+  }),
+  baseAtLastEvent: false,
 };

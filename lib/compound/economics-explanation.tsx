@@ -83,6 +83,10 @@ export function compoundEconomicsExplanation(data: ChainTruthTowerData, opts?: C
   const repaidText = describeLines(data.debt.exited, valued);
   const interestText =
     data.debt.interest && data.debt.interest.amount > 0 ? describeLines([data.debt.interest], valued) : null;
+  const earnedText =
+    data.collateral.interest && data.collateral.interest.amount > 0
+      ? describeLines([data.collateral.interest], valued)
+      : null;
   const currentCollText = describeLines(data.collateral.current, valued);
   const currentDebtText = describeLines(data.debt.current, valued);
   const liquidatedCollText = describeLines(data.collateral.liquidated, valued);
@@ -94,6 +98,7 @@ export function compoundEconomicsExplanation(data: ChainTruthTowerData, opts?: C
     borrowedText ||
     repaidText ||
     interestText ||
+    earnedText ||
     currentCollText ||
     currentDebtText ||
     liquidatedCollText ||
@@ -117,9 +122,11 @@ export function compoundEconomicsExplanation(data: ChainTruthTowerData, opts?: C
   }
 
   if (interestText) {
-    bullets.push(
-      `About ${interestText} of the current debt is accrued interest built up since the last borrow or repayment.`,
-    );
+    bullets.push(`About ${interestText} of the current debt is interest charged over the position's life.`);
+  }
+
+  if (earnedText) {
+    bullets.push(`About ${earnedText} of the current lent balance is interest earned over the position's life.`);
   }
 
   if (currentCollText || currentDebtText) {

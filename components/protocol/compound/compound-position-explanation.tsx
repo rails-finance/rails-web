@@ -39,7 +39,15 @@ function joinSymbols(syms: string[]): string {
  *  record, when it wound down, the way back in) is in the replayed history the
  *  card itself renders. The bullets restate the card's own peak figures
  *  (charter §3 reverse-completeness). */
-export function CompoundClosedPositionExplanation({ v }: { v: CompoundPositionView }) {
+export function CompoundClosedPositionExplanation({
+  v,
+  principalOnly = false,
+}: {
+  v: CompoundPositionView;
+  /** The Base sweep's peaks are replayed principal; Ethereum's rows are the
+   *  chain's balance, interest included. */
+  principalOnly?: boolean;
+}) {
   const liquidated = v.status === "liquidated";
   const peakText = (rs: { amount: number; symbol: string }[]) =>
     rs.map((r, i) => (
@@ -61,7 +69,7 @@ export function CompoundClosedPositionExplanation({ v }: { v: CompoundPositionVi
   );
 
   // The card's own peak lines, joined: supply side (lent base and/or collateral
-  // assets), then the borrowed principal.
+  // assets), then the borrowed base.
   const supplyPeaks = [
     ...(v.peak.lentBase > 0 ? [{ amount: v.peak.lentBase, symbol: v.base.symbol }] : []),
     ...v.peak.collateral.map((c) => ({ amount: c.amount, symbol: c.symbol })),
@@ -80,8 +88,8 @@ export function CompoundClosedPositionExplanation({ v }: { v: CompoundPositionVi
             owed as much as{" "}
             <H>
               {formatNumber(v.peak.borrowedBase)} {v.base.symbol}
-            </H>{" "}
-            in principal
+            </H>
+            {principalOnly && <> in principal</>}
           </>
         )}
         {peakFigures > 1 ? (

@@ -276,6 +276,7 @@ const COMPOUND_V3_FAMILY: Column[] = [
   ),
   col<CompoundContext>(isCompoundEvent, "Value (USD)", (d) => d.usdValue),
   col<CompoundContext>(isCompoundEvent, "Base Balance After", (d) => d.baseAfter),
+  col<CompoundContext>(isCompoundEvent, "Interest Since Previous", (d) => d.baseInterest),
   col<CompoundContext>(
     isCompoundEvent,
     "Collateral After",

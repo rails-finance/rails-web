@@ -72,7 +72,7 @@ function marketSection(view: CompoundPositionView, chain: CompoundMarketChainRes
       lines.push(`- **Highest recorded collateral:** ${c.decimalsUnread ? "not loaded" : amt(c.amount)} ${c.symbol}`);
     }
     if (view.peak.borrowedBase > 0) {
-      lines.push(`- **Highest recorded borrowed principal:** ${amt(view.peak.borrowedBase)} ${view.base.symbol}`);
+      lines.push(`- **Highest recorded borrow:** ${amt(view.peak.borrowedBase)} ${view.base.symbol}`);
     }
     lines.push("");
     return lines;
@@ -168,8 +168,12 @@ function timelineTable(events: BaseActivityEvent[], history: MarkdownHistoryScop
     out.push("_No transaction history available._");
     return out;
   }
-  out.push("| # | Date | Action | Market | Asset | Amount | Base after | Collateral after | Transaction |");
-  out.push("|---|------|--------|--------|-------|--------|------------|------------------|-------------|");
+  out.push(
+    "| # | Date | Action | Market | Asset | Amount | Base after | Interest since previous | Collateral after | Transaction |",
+  );
+  out.push(
+    "|---|------|--------|--------|-------|--------|------------|-------------------------|------------------|-------------|",
+  );
   rows.forEach((e, i) => {
     if (!isCompoundEvent(e)) return;
     const d = e.context.data;
@@ -179,14 +183,15 @@ function timelineTable(events: BaseActivityEvent[], history: MarkdownHistoryScop
     const unread = !d.isBase && !!unreadToken(e, d.assetSymbol);
     const amount = unread ? NOT_LOADED_CELL : amt(Math.abs(parseFloat(d.assetsDelta)));
     const baseAfter = d.baseAfter != null ? amt(parseFloat(d.baseAfter)) : "—";
+    const interest = d.baseInterest != null ? amt(parseFloat(d.baseInterest)) : "—";
     const collAfter = d.collateralAfter != null ? (unread ? NOT_LOADED_CELL : amt(parseFloat(d.collateralAfter))) : "—";
     out.push(
-      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${d.marketLabel} | ${d.assetSymbol} | ${amount} | ${baseAfter} | ${collAfter} | ${txCell(e)} |`,
+      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${d.marketLabel} | ${d.assetSymbol} | ${amount} | ${baseAfter} | ${interest} | ${collAfter} | ${txCell(e)} |`,
     );
   });
   out.push("");
   out.push(
-    "_Base after is the SIGNED base balance (> 0 lending, < 0 borrowing); collateral after is the touched asset's balance._",
+    "_Base after is the SIGNED base balance (> 0 lending, < 0 borrowing). On Ethereum it is the balance on chain at the row's block, interest included, and interest since previous is what the base accrued since the account's previous row (> 0 earned, < 0 charged); on Base it is the running sum of the logged amounts. Collateral after is the touched asset's balance._",
   );
   out.push("");
   return out;

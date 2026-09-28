@@ -16,6 +16,7 @@ import {
 } from "@/components/shared/liquidation-forensics";
 import {
   baseAfterProv,
+  baseInterestProv,
   collateralAfterProv,
   baseDeltaProv,
   collateralDeltaProv,
@@ -107,6 +108,14 @@ export function CompoundEventDetail({ ctx, txHash, blockNumber }: CompoundEventD
     source: useCaptureSource(),
   };
   const stats: ChainTruthStat[] = [];
+  // Interest since the account's previous row (Ethereum rows carry it; the
+  // Base sweep's do not), stated under the base balance as a magnitude.
+  const interestSincePrevious = (sym: string): ChainTruthStat["interestSincePrevious"] => {
+    if (ctx.baseInterest == null) return undefined;
+    const signed = ctx.baseInterest;
+    const mag = signed.startsWith("-") ? signed.slice(1) : signed;
+    return { value: mag, prov: baseInterestProv(sym, signed.startsWith("-") ? "borrow" : "lend", coords) };
+  };
 
   if (ctx.isBase) {
     const n = Number(ctx.baseAfter ?? "0");
@@ -123,6 +132,7 @@ export function CompoundEventDetail({ ctx, txHash, blockNumber }: CompoundEventD
       value: fmt(ctx.baseAfter),
       symbol: ctx.assetSymbol,
       prov: baseAfterProv(ctx.assetSymbol, coords),
+      interestSincePrevious: interestSincePrevious(ctx.assetSymbol),
       transition: reconstructTransition({
         after: ctx.baseAfter,
         change: ctx.assetsDelta,
@@ -170,6 +180,7 @@ export function CompoundEventDetail({ ctx, txHash, blockNumber }: CompoundEventD
         value: fmt(ctx.baseAfter),
         symbol: m.baseSymbol,
         prov: baseAfterProv(m.baseSymbol, coords),
+        interestSincePrevious: interestSincePrevious(m.baseSymbol),
       });
     }
   }

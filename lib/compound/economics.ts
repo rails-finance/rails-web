@@ -40,6 +40,7 @@ import {
   currentBaseProv,
   accruedBaseProv,
   debtPrincipalProv,
+  lendPrincipalProv,
   lifetimeFlowProv,
   type CompoundCoords,
   type CompoundLifetimeFlow,
@@ -48,6 +49,7 @@ import { flowsReconcile, type ChainTruthTowerData, type TowerLine } from "@/lib/
 import type { TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { folderFlows, mergeFlowBuckets } from "@/lib/shared/timeline-folder-reductions";
+import { marketOf } from "@/lib/compound/asset-catalog";
 
 // ── The receipts, as a seam ──────────────────────────────────────────────────
 // The arithmetic below is one implementation serving two lanes that make
@@ -64,6 +66,11 @@ export interface CompoundTowerVocabulary {
   lifetimeFlow: (flow: CompoundLifetimeFlow, sym: string, coords: CompoundCoords) => Provenance;
   accruedBase: (sym: string, side: "lend" | "borrow", coords: CompoundCoords) => Provenance;
   debtPrincipal: (sym: string, coords: CompoundCoords) => Provenance;
+  lendPrincipal: (sym: string, coords: CompoundCoords) => Provenance;
+  /** True where the position's base figure is the chain's balance at its last
+   *  event (the Ethereum index, server mig 351); false where it is the running
+   *  sum of the logged amounts (the Base sweep). */
+  baseAtLastEvent: boolean;
 }
 
 export const COMPOUND_INDEXED_VOCABULARY: CompoundTowerVocabulary = {
@@ -73,6 +80,8 @@ export const COMPOUND_INDEXED_VOCABULARY: CompoundTowerVocabulary = {
   lifetimeFlow: lifetimeFlowProv,
   accruedBase: accruedBaseProv,
   debtPrincipal: debtPrincipalProv,
+  lendPrincipal: lendPrincipalProv,
+  baseAtLastEvent: true,
 };
 
 /** USD valuation is on: values come from Comet's on-chain oracle (chain-derived),
@@ -112,6 +121,12 @@ export interface CompoundLifetimeFlows {
   borrowed: number;
   repaid: number;
   absorbedDebt: number;
+  /** Interest the base earned (while lending) and was charged (while
+   *  borrowing) between rows, Σ each row's interest since the previous one.
+   *  Ethereum only (server mig 351); absent on the Base lane, whose rows carry
+   *  no interest. */
+  interestEarned?: number;
+  interestCharged?: number;
   /** Per collateral asset, keyed by lowercase address. */
   collateral: Record<string, CompoundCollateralFlows>;
 }
@@ -131,7 +146,15 @@ export interface CompoundLifetimeFlows {
 /** The base spine's legs and one collateral asset's, in the leg names the
  *  opening balance already uses — rails-server names them to match these fields
  *  exactly, so the merge below needs no translation table to drift out of date. */
-const BASE_LEGS = ["deposited", "withdrawn", "borrowed", "repaid", "absorbedDebt"] as const;
+const BASE_LEGS = [
+  "deposited",
+  "withdrawn",
+  "borrowed",
+  "repaid",
+  "absorbedDebt",
+  "interestEarned",
+  "interestCharged",
+] as const;
 const COLL_LEGS = ["supplied", "withdrawn", "absorbed", "received", "sent"] as const;
 type BaseLeg = (typeof BASE_LEGS)[number];
 type CollLeg = (typeof COLL_LEGS)[number];
@@ -188,7 +211,15 @@ export interface CompoundLifetimeRaw {
 
 export function newCompoundLifetimeRaw(baseDecimals: number | null = null): CompoundLifetimeRaw {
   return {
-    base: { deposited: ZERO, withdrawn: ZERO, borrowed: ZERO, repaid: ZERO, absorbedDebt: ZERO },
+    base: {
+      deposited: ZERO,
+      withdrawn: ZERO,
+      borrowed: ZERO,
+      repaid: ZERO,
+      absorbedDebt: ZERO,
+      interestEarned: ZERO,
+      interestCharged: ZERO,
+    },
     baseDecimals,
     collateral: {},
   };
@@ -265,6 +296,13 @@ export function scaleCompoundLifetime(raw: CompoundLifetimeRaw): CompoundLifetim
     borrowed: scaleUnits(raw.base.borrowed, dec),
     repaid: scaleUnits(raw.base.repaid, dec),
     absorbedDebt: scaleUnits(raw.base.absorbedDebt, dec),
+    // A raw built before the interest legs existed has none: zero.
+    ...((raw.base.interestEarned ?? ZERO) !== ZERO || (raw.base.interestCharged ?? ZERO) !== ZERO
+      ? {
+          interestEarned: scaleUnits(raw.base.interestEarned ?? ZERO, dec),
+          interestCharged: scaleUnits(raw.base.interestCharged ?? ZERO, dec),
+        }
+      : {}),
     collateral: {},
   };
   for (const [addr, c] of Object.entries(raw.collateral)) {
@@ -316,8 +354,9 @@ export function compoundLifetimeRawToWire(raw: CompoundLifetimeRaw): CompoundLif
 }
 
 /** The Ethereum page's walk: over the rendered events of one market, each
- *  carrying its replayed `baseAfter`, so before = after − delta and the split
- *  is exact on every row. The human strings are parsed back to raw at the
+ *  carrying its `baseAfter` (the chain balance at the row), so before = after −
+ *  delta and the split is exact on every row; each row's interest since the
+ *  previous one (`baseInterest`) adds to the earned or charged leg. The human strings are parsed back to raw at the
  *  token's own decimals (each event's flow states them), never accumulated as
  *  doubles. Null when no event of this market was seen, or one was malformed —
  *  a refusal, never a guess. */
@@ -330,6 +369,17 @@ export function replayCompoundLifetime(events: BaseActivityEvent[], market: stri
     if (ctx.market !== market) continue;
     sawAny = true;
     const flow = ev.flows[0];
+
+    // Interest rides base and collateral rows alike; it is in the base token.
+    if (ctx.baseInterest != null) {
+      const dec = marketOf(market).baseDecimals;
+      if (raw.baseDecimals != null && raw.baseDecimals !== dec) return null;
+      raw.baseDecimals = dec;
+      const v = parseUnits(ctx.baseInterest, dec);
+      if (v == null) return null;
+      if (v > ZERO) raw.base.interestEarned += v;
+      else raw.base.interestCharged -= v;
+    }
 
     if (ctx.isBase) {
       // A row that moved nothing carries no flow and so no decimals; it also
@@ -523,9 +573,13 @@ export function computeCompoundEconomics(
       ? replayCompoundLifetime(events, view.market)
       : null;
   const replayed = precomputedLifetime ?? (walked ? scaleCompoundLifetime(walked) : null);
-  const netBase = replayed
+  // The net of the moves the events made, and the net with the interest the
+  // rows accrued between them: the second is what the last row's balance is.
+  const netFlow = replayed
     ? replayed.deposited + replayed.repaid + replayed.absorbedDebt - replayed.withdrawn - replayed.borrowed
     : 0;
+  const netInterest = replayed ? (replayed.interestEarned ?? 0) - (replayed.interestCharged ?? 0) : 0;
+  const netBase = netFlow + netInterest;
   // Collateral assets whose decimals did not load (on the card or on any
   // event) are left out of every line, flow and total, and the tower names
   // them. The base token's decimals come from the market catalog.
@@ -549,7 +603,9 @@ export function computeCompoundEconomics(
         replayedKept.repaid +
         replayedKept.absorbedDebt +
         replayedKept.withdrawn +
-        replayedKept.borrowed,
+        replayedKept.borrowed +
+        (replayedKept.interestEarned ?? 0) +
+        (replayedKept.interestCharged ?? 0),
     ) &&
     Object.entries(replayedKept.collateral).every(([addr, c]) =>
       // supplied + received − withdrawn − absorbed − sent = current: transfers
@@ -659,7 +715,7 @@ export function computeCompoundEconomics(
   // includes the interest (principal + accrued = balanceOf).
   let interest: TowerLine | null = null;
   if (lifetime && chain && baseSide === "borrow" && debtLines.length === 1) {
-    const netPrincipal = -netBase; // borrower: net base is negative
+    const netPrincipal = -netFlow; // borrower: the net of its moves is negative
     const amt = legInterest(Math.abs(chain.amount), netPrincipal, lifetime.borrowed);
     if (amt > 0) {
       interest = {
@@ -678,6 +734,28 @@ export function computeCompoundEconomics(
     }
   }
 
+  // The lender's twin: supply interest earned over the position's life, the
+  // live balance less the net of its moves, on top of that net.
+  let earned: TowerLine | null = null;
+  if (lifetime && chain && baseSide === "lend" && collateralLines[0]?.key === `base:${view.base.address}`) {
+    const amt = legInterest(chain.amount, netFlow, lifetime.deposited);
+    if (amt > 0) {
+      earned = {
+        key: "supply-interest",
+        symbol: view.base.symbol,
+        amount: amt,
+        usd: usdOf(view.base.address, amt),
+        prov: vocab.accruedBase(view.base.symbol, "lend", baseCoords),
+      };
+      collateralLines[0] = {
+        ...collateralLines[0],
+        amount: netFlow,
+        usd: usdOf(view.base.address, netFlow),
+        prov: vocab.lendPrincipal(view.base.symbol, baseCoords),
+      };
+    }
+  }
+
   // Value the tower only when EVERY contributing line is oracle-priced — a strict
   // per-total guard (Aave's rule). A single unpriced leg drops it to the token
   // gated list, so a bar height is never a partial (misleading) USD figure.
@@ -690,6 +768,7 @@ export function computeCompoundEconomics(
     ...debtExited,
     ...debtLiquidated,
     ...(interest ? [interest] : []),
+    ...(earned ? [earned] : []),
   ].filter((l) => l.amount > 0);
   const allPriced = contributing.length > 0 && contributing.every((l) => l.usd != null);
   const valued = VALUED_USD && allPriced;
@@ -720,7 +799,7 @@ export function computeCompoundEconomics(
     priceKind: valued ? "chain-derived" : undefined,
     collateral: {
       current: collateralLines,
-      interest: null,
+      interest: earned,
       exited: collExited,
       received: collReceived,
       liquidated: collLiquidated,
@@ -735,14 +814,23 @@ export function computeCompoundEconomics(
     },
     // Gated-list headers reflect whether the amount is the current value (chain
     // overlay) or bare principal.
-    collateralListLabel: chain && baseSide === "lend" ? "Supplied · current" : "Collateral",
-    debtListLabel: chain && !interest ? "Debt · current" : "Debt · principal",
+    collateralListLabel: chain && baseSide === "lend" && !earned ? "Supplied · current" : "Collateral",
+    debtListLabel:
+      chain && !interest
+        ? "Debt · current"
+        : interest
+          ? "Debt · principal"
+          : vocab.baseAtLastEvent
+            ? "Debt · last event"
+            : "Debt · principal",
     interestNote:
-      interest != null
+      interest != null || earned != null
         ? undefined
         : chain
           ? "Base amounts are the current value, with interest included. Collateral does not accrue, so it is exact."
-          : "Base amounts are principal only — interest that has built up since each supply or borrow isn't included here. Collateral does not accrue, so it is exact.",
+          : vocab.baseAtLastEvent
+            ? "Base amounts are the balance at the position's last event, interest to then included; interest since then isn't. Collateral does not accrue, so it is exact."
+            : "Base amounts are principal only — interest that has built up since each supply or borrow isn't included here. Collateral does not accrue, so it is exact.",
     ...(notLoaded.length > 0 ? { notLoaded } : {}),
   };
 }

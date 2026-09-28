@@ -1437,8 +1437,8 @@ export interface BasedollarContext {
 // ON-CHAIN VALUES tier (chain-truth charter) — a LOCAL extension with no rails-server
 // transformer, like Aave V3 / Morpho / MakerDAO / Spark. Comet is single-base /
 // multi-collateral: ONE signed base balance per (market, account) + N non-earning
-// collateral assets. Chain-direct event fields + the replayed balances only. No
-// interest, no health factor, no USD — those are layers.
+// collateral assets. Chain-direct event fields + the balances at each row. No
+// health factor, no USD — those are layers.
 
 export type CompoundEventType =
   | "supply"
@@ -1473,8 +1473,18 @@ export interface CompoundContext {
   assetsDelta: string;
   /** SIGNED base balance after (human; > 0 lend, < 0 borrow). Present on every
    *  event the MV carries a base_after for — base events always, collateral
-   *  events too (the running base a collateral card's stack stands behind). */
+   *  events too (the running base a collateral card's stack stands behind).
+   *  Ethereum: the balance on chain at the row's block, interest included
+   *  (server mig 351). Base: the running sum of the logged amounts. */
   baseAfter?: string;
+  /** Ethereum only — interest the base balance accrued since the account's
+   *  previous row in this market (human, signed: > 0 earned on a supply,
+   *  < 0 charged on a borrow). Absent when zero. */
+  baseInterest?: string;
+  /** Ethereum only — a base move since the previous row that no captured event
+   *  states (human, signed): Comet logs no Transfer for the borrow side of a
+   *  base transfer. Absent when zero, which is almost every row. */
+  baseUnlogged?: string;
   /** Collateral events only — touched asset's collateral balance after (human, ≥ 0). */
   collateralAfter?: string;
   /** True for the wallet's first event. */

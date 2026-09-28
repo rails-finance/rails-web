@@ -285,7 +285,7 @@ function MarketSection({
         }
         explanation={
           view.status !== "open" ? (
-            <CompoundClosedPositionExplanation v={view} />
+            <CompoundClosedPositionExplanation v={view} principalOnly />
           ) : live ? (
             <CompoundPositionExplanation
               chain={live}

@@ -1,7 +1,8 @@
 // Compound V3 (Comet) timeline — the `api` arm's presentation transform.
 // ----------------------------------------------------------------------------
-// rails-server returns the raw replayed mv_compound_v3_events rows (signed base
-// + per-asset collateral running balances, replayed in the MV); this transform
+// rails-server returns the raw mv_compound_v3_events rows (the signed base
+// balance on chain at each row, interest included, and per-asset collateral
+// running balances); this transform
 // maps each to a BaseActivityEvent + CompoundContext the chain-state cards
 // consume — using the market's FIXED base symbol/decimals for base events and
 // resolving COLLATERAL ERC20 symbol/decimals (one multicall) for collateral
@@ -59,6 +60,10 @@ export interface MvRow {
   base_after: string | null;
   collateral_before: string | null;
   collateral_after: string | null;
+  /** Interest since the previous row (raw, signed), server mig 351. */
+  base_interest?: string | null;
+  /** A base move since the previous row no captured event states (raw, signed). */
+  base_unlogged?: string | null;
 }
 
 /** The action label per event type — shared with the swept Base reader
@@ -197,6 +202,12 @@ export async function buildCompoundTimeline(
             // can state the base debt its stack stands behind.
             ...(r.base_after != null ? { baseAfter: fmtUnits(bigintOf(r.base_after), m.baseDecimals) } : {}),
           }),
+      ...(bigintOf(r.base_interest ?? null) !== ZERO
+        ? { baseInterest: fmtUnits(bigintOf(r.base_interest ?? null), m.baseDecimals) }
+        : {}),
+      ...(bigintOf(r.base_unlogged ?? null) !== ZERO
+        ? { baseUnlogged: fmtUnits(bigintOf(r.base_unlogged ?? null), m.baseDecimals) }
+        : {}),
       isOpen: idx === 0, // rows are block ASC → idx 0 is the wallet's first event
       // The acting parties — ONLY where the MV's counterparty is a true party
       // param (the Supply/SupplyCollateral `from`, the funder). Withdraws'

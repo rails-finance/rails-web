@@ -66,7 +66,10 @@ export function compoundPositionContent(opts: {
       details: [
         {
           bold: "Highest recorded",
-          text: "each peak is the maximum of its running balance, replayed from the position's own events — a principal figure, not the interest-bearing current value.",
+          text:
+            opts.deployment === "compound-base"
+              ? "each peak is the maximum of its running balance, replayed from the position's own events — a principal figure, not the interest-bearing current value."
+              : "each peak is the highest balance the position held at any of its events, each the chain's balance at that block, interest included.",
         },
         {
           bold: "One signed base balance",

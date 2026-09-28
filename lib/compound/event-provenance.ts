@@ -348,13 +348,40 @@ export const absorbMarginProv = (
 
 // ── balances after an event (replay) ─────────────────────────────────────────
 
-/** Signed BASE balance AFTER this event = Σ signed base deltas up to this block. */
-export const baseAfterProv = (sym: string, coords: CompoundCoords): Provenance => ({
-  kind: "chain",
-  pclass: "indexed",
-  summary: `The SIGNED ${sym} base balance the position held AFTER this event — the position's running base, replayed from its own on-chain events (supplies add, withdrawals subtract, a liquidation's absorbed debt adds back) in log order up to this block${atBlock(coords)}. > 0 is net lending, < 0 is net borrowing. This is the nominal PRINCIPAL flow — interest the position earns/owes since each move is not added (that is a derived layer).`,
+/** Signed BASE balance AFTER this event. Ethereum (the index): the chain's
+ *  balance at the event's block, presentValue(principal, index) — the block's
+ *  end state less the account's later moves in the same block. Base (the
+ *  sweep): Σ signed base deltas up to this block. */
+export const baseAfterProv = (sym: string, coords: CompoundCoords): Provenance =>
+  coords.source === "sweep"
+    ? {
+        kind: "chain",
+        pclass: "indexed",
+        summary: `The SIGNED ${sym} base balance the position held AFTER this event — the position's running base, replayed from its own on-chain events (supplies add, withdrawals subtract, a liquidation's absorbed debt adds back) in log order up to this block${atBlock(coords)}. > 0 is net lending, < 0 is net borrowing. This is the nominal PRINCIPAL flow — interest the position earns/owes since each move is not added (that is a derived layer).`,
+        contract: cometContract(coords),
+        via: `${captureVia(coords)} · Σ ±amount across Supply/Withdraw/AbsorbDebt logs · in on-chain order`,
+        inputs: eventInputs(coords),
+      }
+    : {
+        kind: "chain",
+        pclass: "state",
+        verify: stateVerify("balanceOf − borrowBalanceOf", coords.blockNumber),
+        summary: `The SIGNED ${sym} base balance the position held AFTER this event${atBlock(coords)}, interest included — what balanceOf minus borrowBalanceOf returns there. Comet stores a principal per account and two indexes per market; the balance is the principal at the supply index (≥ 0) or the borrow index (< 0), each read at this block. Where the account moved again later in the same block, those moves are taken back off the block's end balance. > 0 is net lending, < 0 is net borrowing.`,
+        contract: cometContract(coords),
+        via: `Comet · userBasic(account).principal and totalsBasic() indexes at the block · principal × index ÷ 1e15`,
+        inputs: eventInputs(coords),
+      };
+
+/** Interest the base accrued since the account's previous row in this market:
+ *  the balance just before this event less the balance just after the previous
+ *  one, where no event moved it between. Ethereum only. */
+export const baseInterestProv = (sym: string, side: "lend" | "borrow", coords: CompoundCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `${side === "lend" ? "Interest the lent" : "Interest charged on the borrowed"} ${sym} since the account's previous event in this market — the previous event's principal at this block's ${side === "lend" ? "supply" : "borrow"} index, less the balance after the previous event${atBlock(coords)}. Comet accrues continuously and logs nothing for it, so it shows on the next event.`,
   contract: cometContract(coords),
-  via: `${captureVia(coords)} · Σ ±amount across Supply/Withdraw/AbsorbDebt logs · in on-chain order`,
+  via: "principal at the previous event × (index here − index there) ÷ 1e15",
+  formula: "before − previous after",
   inputs: eventInputs(coords),
 });
 
@@ -379,14 +406,17 @@ export const collateralAfterProv = (sym: string, coords: CompoundCoords): Proven
 export const baseBeforeProv = (sym: string, coords: CompoundCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `The SIGNED ${sym} base balance the position held BEFORE this event — the after-balance minus this event's own signed base amount (after − change), reconstructed in the browser from the replayed after and the logged delta. Nominal principal, same basis as the after (accrued interest is a separate layer).`,
+  summary:
+    coords.source === "sweep"
+      ? `The SIGNED ${sym} base balance the position held BEFORE this event — the after-balance minus this event's own signed base amount (after − change), reconstructed in the browser from the replayed after and the logged delta. Nominal principal, same basis as the after (accrued interest is a separate layer).`
+      : `The SIGNED ${sym} base balance the position held BEFORE this event — the after-balance minus this event's own signed base amount (after − change). The after is the chain's balance at the block, so this is too, interest to this block included.`,
   contract: cometContract(coords),
   via: "base after − signed amount",
   formula: "after − change",
   // Operand rows: the driver (reconstructTransition) fills the values it
   // actually subtracted; the vocabulary owns the labels + grain.
   inputs: eventInputs(coords, [
-    { label: "after", kind: "chain", pclass: "indexed", note: `replayed signed ${sym} base after this event` },
+    { label: "after", kind: "chain", pclass: "indexed", note: `signed ${sym} base after this event` },
     { label: "change", kind: "chain", pclass: "emitted", note: "this event's signed base amount" },
   ]),
 });
@@ -413,9 +443,9 @@ export const collateralBeforeProv = (sym: string, coords: CompoundCoords): Prove
 export const positionBaseProv = (sym: string, side: "lend" | "borrow", coords: CompoundCoords): Provenance => ({
   kind: "chain",
   pclass: "indexed",
-  summary: `Base ${side === "lend" ? "lent" : "borrowed"} (${sym}) — the position's net base principal, replayed from its own supplies, withdrawals and absorbed debt for this market. ${side === "lend" ? "Positive base: it earns the supply rate." : "Negative base: it pays the borrow rate."} Nominal principal (excludes accrued interest — a derived layer).`,
+  summary: `Base ${side === "lend" ? "lent" : "borrowed"} (${sym}) — the position's balance on chain at its last event, interest to then included (the last row of its timeline). ${side === "lend" ? "Positive base: it earns the supply rate." : "Negative base: it pays the borrow rate."}`,
   contract: cometContract(coords),
-  via: `${captureVia(coords)} · Σ ±amount across Supply/Withdraw/AbsorbDebt logs`,
+  via: `Comet · userBasic(account).principal × the index at the last event's block`,
   inputs: eventInputs(coords),
 });
 
@@ -476,8 +506,8 @@ export const peakBaseProv = (sym: string, side: "lend" | "borrow", coords: Compo
   pclass: "indexed",
   summary:
     side === "borrow"
-      ? `The highest ${sym} borrow principal this position ever recorded — the deepest point of its signed base lane, replayed from its own Supply/Withdraw/AbsorbDebt logs. Interest accrues between events with no log of its own, so the true peak debt can sit slightly above the largest replayed figure; a residue at or below the market's interest-dust threshold reads as zero rather than claim a phantom borrow.`
-      : `The highest ${sym} lent balance this position ever recorded — the highest point of its signed base lane, replayed from its own Supply/Withdraw/AbsorbDebt logs. Interest earned between events has no log of its own, so the peak including interest can sit slightly above; a residue at or below the market's interest-dust threshold reads as zero rather than claim a phantom lend.`,
+      ? `The highest ${sym} borrow this position ever recorded at an event — the deepest point of its signed base balance across its rows${coords.source === "sweep" ? ", replayed from its own Supply/Withdraw/AbsorbDebt logs (principal only: interest accrues with no log of its own, so the true peak debt can sit slightly above)" : ", each the chain's balance at its block, interest included"}. A residue at or below the market's dust threshold reads as zero.`
+      : `The highest ${sym} lent balance this position ever recorded at an event — the highest point of its signed base balance across its rows${coords.source === "sweep" ? ", replayed from its own Supply/Withdraw/AbsorbDebt logs (principal only: interest earned between events has no log of its own)" : ", each the chain's balance at its block, interest included"}. A residue at or below the market's dust threshold reads as zero.`,
   contract: cometContract(coords),
   via: `${captureVia(coords)} · ${side === "borrow" ? "floor(−min(base after))" : "floor(max(base after))"} across the replayed base lane · dust-clamped`,
   inputs: eventInputs(coords),
@@ -557,6 +587,18 @@ export const lifetimeFlowProv = (flow: CompoundLifetimeFlow, sym: string, coords
   summary: `Lifetime ${flow} (${sym}) — ${FLOW_STORY[flow]}, summed over the position's whole captured history. Base flows split at the running balance's zero crossings — Comet's own semantics (a supply repays debt first; a withdraw past the balance is a borrow). Shown only when the replayed net matches the current balance (a complete capture).`,
   contract: cometContract(coords),
   via: `${captureVia(coords)} · Σ amount across the position's own logs · split at zero crossings`,
+  inputs: eventInputs(coords),
+});
+
+/** Net lent PRINCIPAL — the tower's supply base line when the lender's
+ *  interest split renders: Σ (deposited − withdrawn) from the position's own
+ *  events; the earned segment sits on top (principal + interest = balanceOf). */
+export const lendPrincipalProv = (sym: string, coords: CompoundCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `Lent ${sym} PRINCIPAL — the net of every supply and withdrawal the position's own events moved, across its whole captured history. The interest earned on it is the separate segment above it (principal + interest = the live Comet balanceOf).`,
+  contract: cometContract(coords),
+  via: `${captureVia(coords)} · Σ (deposited − withdrawn) · genesis → head`,
   inputs: eventInputs(coords),
 });
 
