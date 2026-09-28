@@ -22,7 +22,7 @@
 // (lib/shared/oracle-usd-reasons.ts, the same string the coverage matrix's
 // `oracleUsd: { why }` cell shows) in place of the generic "not yet".
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, Coins } from "lucide-react";
 import { fmtNative, fmtPrice, PricePill } from "@/components/shared/price-pill";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -56,6 +56,22 @@ export function LatestPrices({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  // The panel hangs from the trigger's left edge, which on a phone sits a
+  // third of the way across: a 20rem panel then ran past the right edge and
+  // gave the page a sideways scroll. Once open, it moves left by whatever it
+  // overhangs the viewport's 1rem margin.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [shift, setShift] = useState(0);
+  useLayoutEffect(() => {
+    if (!open || !panelRef.current) {
+      setShift(0);
+      return;
+    }
+    const box = panelRef.current.getBoundingClientRect();
+    const over = box.right - (document.documentElement.clientWidth - 16);
+    setShift(over > 0 ? over : 0);
+  }, [open]);
 
   // Close on outside click / Escape — the same behaviour as the Tools menu
   // beside it and the listing's sort control.
@@ -136,6 +152,8 @@ export function LatestPrices({
           bottom of a short window. */}
       {open && (
         <div
+          ref={panelRef}
+          style={shift > 0 ? { transform: `translateX(-${shift}px)` } : undefined}
           className={`overlay-panel absolute left-0 top-full z-50 mt-2 max-h-[min(70vh,26rem)] max-w-[calc(100vw-2rem)] overflow-y-auto py-1 ${
             showReason ? "w-[20rem]" : "min-w-[200px]"
           }`}
