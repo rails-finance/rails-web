@@ -26,6 +26,7 @@
 //      it pairs with per-axis delta labels (each axis' own verb) so the CDP
 //      openers read the same as V2 — `Open  Deposit 6 ◊  Borrow 10K ♭`.
 
+import type { ReactNode } from "react";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { RatePillShell, DelegateRatePillShell } from "@/components/shared/rate-pill";
@@ -161,7 +162,15 @@ export interface ChainTruthRowSpec {
    *  the detail grid's rate receipt so pill and grid pulse as one identity. Not
    *  subject to the `hideClass` value hand-off — a rate is not a moved amount,
    *  and the spine never carries it. */
-  ratePill?: { pct: number; tone?: "delegate"; prov: Provenance };
+  ratePill?: {
+    pct: number;
+    tone?: "delegate";
+    prov: Provenance;
+    /** The rate before, where the row's point is the move (a batch manager's
+     *  change): drawn `3.20% → 3.60%` inside the one lozenge, as the Liquity V2
+     *  delegate run's header draws it. Only the after-rate echoes the receipt. */
+    fromPct?: number;
+  };
   /** Opening event: render the `label` as Liquity V2's green "Open" status pill
    *  instead of the plain text label. A status affordance on the label word, the
    *  same carve-out as the position-listing OPEN pill (pure-truth-status-pill-color.md)
@@ -245,6 +254,14 @@ export interface ChainTruthStat {
    *  since previous event: 12.40 DAI". `value` is the exact figure the receipt
    *  keys on. Omit where it is zero or unknown. */
   interestSincePrevious?: { value: string; prov: Provenance };
+  /** Show the USD chip whatever the timeline's USD-values flag says — the
+   *  Liquity V2 grid's rule for the collateral's value at the event's price,
+   *  which the fork cards follow. */
+  usdAlways?: boolean;
+  /** One line under the value, in the value's tone — the Liquity V2 grid's
+   *  sub-line ("incl. +0.36 interest", "12.40 USDaf / year"). Its figures carry
+   *  a <Prov> each. */
+  sub?: ReactNode;
 }
 
 /** The exact value string a ChainTruthRow delta registers with its receipt:
@@ -473,6 +490,18 @@ export function ChainTruthRow({
           const echoValue = `${rp.pct.toFixed(2)}%`;
           const display = rp.tone === "delegate" ? `${rp.pct.toFixed(2)}%` : `${rp.pct.toFixed(1)}%`;
           const Shell = rp.tone === "delegate" ? DelegateRatePillShell : RatePillShell;
+          if (rp.fromPct != null) {
+            const from = rp.tone === "delegate" ? `${rp.fromPct.toFixed(2)}%` : `${rp.fromPct.toFixed(1)}%`;
+            return (
+              <Shell>
+                <span>{from}</span>
+                <span aria-hidden="true">→</span>
+                <Prov echo info={rp.prov} value={echoValue}>
+                  <span>{display}</span>
+                </Prov>
+              </Shell>
+            );
+          }
           return (
             <Prov echo info={rp.prov} value={echoValue}>
               <Shell>{display}</Shell>
@@ -633,7 +662,7 @@ export function ChainTruthDetail({
                     {symbolText && s.symbol ? <span className="font-normal text-rb-500"> {s.symbol}</span> : null}
                   </span>
                 </Prov>
-                {showUsdValues && s.usd && (
+                {(showUsdValues || s.usdAlways) && s.usd && (
                   // The after-balance valued at the event-block oracle price —
                   // the bordered chip the Liquity V2 / Aave V4 details use
                   // (`3.0321 [ $7,062 ] ◊`). The exact 2-dp figure rides the
@@ -654,6 +683,7 @@ export function ChainTruthDetail({
                   {s.symbol}
                 </StatSubline>
               )}
+              {s.sub && <StatSubline changed={changed}>{s.sub}</StatSubline>}
             </StatCard>
           </div>
         );

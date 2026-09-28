@@ -11,11 +11,16 @@
 // lib/liquity/event-provenance.ts is that pill's receipt), so a price gap is
 // two fields of two rows on the page.
 //
+// The Liquity V2 forks' notes (`forkPriceGapNotesFor`, `note.protocol` names
+// the fork) take the same receipts with the fork's name and its price: the
+// branch PriceFeed's lastGoodPrice at the block, which the fork row carries as
+// `priceAtBlock`.
+//
 // Shaped after lib/moonwell/market-note-provenance.ts.
 
 import type { Provenance } from "@/components/shared/provenance";
 import type { MarketNotePoint, PriceGapNote } from "@/lib/shared/market-note";
-import { formatPrice, priceDecimals, priceGapEndLabel, priceGapReason } from "@/lib/shared/market-note";
+import { formatPrice, forkNoteHouse, priceDecimals, priceGapEndLabel, priceGapReason } from "@/lib/shared/market-note";
 
 /** How the oracle price on a Liquity V2 row is arrived at — the wording
  *  `eventPriceProv` uses for the same number on the event card itself. */
@@ -26,6 +31,15 @@ const DERIVATION =
 /** How a LIVE end (`note.to` on a note with `live: true`) is arrived at: the
  *  same feeds and rules, read at the latest block. The price and the block
  *  number that dates it are two reads, so they can land a block apart. */
+/** The same, on a Liquity V2 fork's row. */
+const FORK_DERIVATION =
+  "the price the branch's PriceFeed held at the end of that block (lastGoodPrice, which every operation " +
+  "updates before it acts), or on a redemption the price its Redemption log emitted";
+const FORK_LIVE_DERIVATION =
+  "the branch PriceFeed's fetchPrice simulated at the latest block; the price and the block number are read " +
+  "separately and can be one block apart";
+/** Whose price a note states: Liquity's, or the fork's. */
+const house = (note: PriceGapNote): string => forkNoteHouse(note) ?? "Liquity";
 const LIVE_DERIVATION =
   "the same feeds and rules read at the latest block; the price and the block number are read separately " +
   "and can be one block apart";
@@ -43,12 +57,14 @@ const liveEndClause = (p: MarketNotePoint): string => `the latest block when thi
 
 /** `decimals` is the note's own grain (`priceDecimals`), so a receipt states
  *  its end exactly as the stat card beside it does. */
-const priceLeaf = (p: MarketNotePoint, which: "earlier" | "later", decimals: number, live = false) => ({
+const priceLeaf = (p: MarketNotePoint, which: "earlier" | "later", decimals: number, live = false, fork = false) => ({
   label: `price ${which}`,
   value: formatPrice(p.value, decimals),
   kind: "chain-derived" as const,
   pclass: "oracle" as const,
-  note: live ? `${liveEndClause(p)} — ${LIVE_DERIVATION}` : `${endClause(p)} — ${DERIVATION}`,
+  note: live
+    ? `${liveEndClause(p)} — ${fork ? FORK_LIVE_DERIVATION : LIVE_DERIVATION}`
+    : `${endClause(p)} — ${fork ? FORK_DERIVATION : DERIVATION}`,
 });
 
 /** The branch's PriceFeed, where the note knows it. A note built without one
@@ -67,12 +83,12 @@ export const priceGapProv = (note: PriceGapNote, part: "price" | "change" | "blo
   if (part === "elapsed") return elapsedProv(note);
   const summary = note.live
     ? part === "price"
-      ? `The ${pair} at each end of the stretch — the earlier one is Liquity's ${note.marketSymbol} price at the block of this trove's last event that has a price. The later one is Liquity's price at the latest block.`
+      ? `The ${pair} at each end of the stretch — the earlier one is ${house(note)}'s ${note.marketSymbol} price at the block of this trove's last event that has a price. The later one is ${house(note)}'s price at the latest block.`
       : part === "change"
         ? `How far the ${pair} has moved since this trove's last event that has a price — the current price divided by the price at that event, minus one.`
         : `The block the stretch runs from and the block it runs to — the block of this trove's last event that has a price, and the latest block on the chain when this page loaded.`
     : part === "price"
-      ? `The ${pair} at each end of the stretch — Liquity's ${note.marketSymbol} price at the blocks of the two events of this trove that the stretch runs between.`
+      ? `The ${pair} at each end of the stretch — ${house(note)}'s ${note.marketSymbol} price at the blocks of the two events of this trove that the stretch runs between.`
       : part === "change"
         ? `How far the ${pair} moved across the stretch — the later price divided by the earlier price, minus one.`
         : `The two blocks the stretch runs between — the blocks of the two events of this trove that the prices come from.`;
@@ -87,9 +103,13 @@ export const priceGapProv = (note: PriceGapNote, part: "price" | "change" | "blo
     pclass: "oracle",
     summary,
     ...feed(note),
-    via: note.live
-      ? "Chainlink feeds combined by Liquity PriceFeed rules @ the earlier event's block and the latest block"
-      : "Chainlink feeds combined by Liquity PriceFeed rules @ each event's block",
+    via: forkNoteHouse(note)
+      ? note.live
+        ? "PriceFeed.lastGoodPrice @ the earlier event's block · fetchPrice simulated @ the latest block"
+        : "PriceFeed.lastGoodPrice @ each event's block"
+      : note.live
+        ? "Chainlink feeds combined by Liquity PriceFeed rules @ the earlier event's block and the latest block"
+        : "Chainlink feeds combined by Liquity PriceFeed rules @ each event's block",
     ...(part === "change" ? { formula: "later price ÷ earlier price − 1" } : {}),
     verify: {
       kind: "recompute",
@@ -98,8 +118,8 @@ export const priceGapProv = (note: PriceGapNote, part: "price" | "change" | "blo
         : `Open the two events on this page — ${endClause(note.from)} and ${endClause(note.to)} — and read the price on each card; they are the two figures here. Shown because ${priceGapReason(note)}.`,
     },
     inputs: [
-      priceLeaf(note.from, "earlier", priceDecimals(note)),
-      priceLeaf(note.to, "later", priceDecimals(note), note.live),
+      priceLeaf(note.from, "earlier", priceDecimals(note), false, !!forkNoteHouse(note)),
+      priceLeaf(note.to, "later", priceDecimals(note), note.live, !!forkNoteHouse(note)),
       {
         label: "blocks",
         value: `${note.from.block} → ${note.to.block}`,
@@ -151,11 +171,13 @@ export const priceGapPositionProv = (
   const ratioOf = (price: string) => `${logged}: the collateral valued at ${price}, divided by the debt`;
   const summary =
     part === "mcr"
-      ? `The branch minimum — the collateral ratio below which a ${note.marketSymbol} trove can be liquidated. It is fixed in the ${note.marketSymbol} branch's contracts and is the same for every trove in the branch.`
+      ? forkNoteHouse(note)
+        ? `The branch minimum in force at the earlier event's block — the collateral ratio below which a ${note.marketSymbol} Trove can be liquidated. ${forkNoteHouse(note)}'s governance can move it, so the note reads the one in force at that block.`
+        : `The branch minimum — the collateral ratio below which a ${note.marketSymbol} trove can be liquidated. It is fixed in the ${note.marketSymbol} branch's contracts and is the same for every trove in the branch.`
       : part === "state"
         ? `The block of the debt and collateral used for both ratios — the block of the earlier of the two events.`
         : part === "crBefore"
-          ? `This trove's collateral ratio at the earlier event — from ${ratioOf(`Liquity's ${note.marketSymbol} price at that block`)}.`
+          ? `This trove's collateral ratio at the earlier event — from ${ratioOf(`${house(note)}'s ${note.marketSymbol} price at that block`)}.`
           : note.live
             ? `The same debt and collateral at the current price — from ${ratioOf(`the current ${note.marketSymbol} price of ${formatPrice(note.to.value, priceDecimals(note))}`)}. Interest has kept adding to the debt since that block, so the ratio on the position card, which includes it, is lower.`
             : `The same debt and collateral at the later price — from ${ratioOf(`the later ${note.marketSymbol} price of ${formatPrice(note.to.value, priceDecimals(note))}`)}. Interest kept adding to the debt across the stretch, so the trove's ratio at the later block was lower than this.`;
@@ -175,7 +197,9 @@ export const priceGapPositionProv = (
       kind: "recompute",
       text:
         part === "mcr"
-          ? `Read MCR() on the branch's BorrowerOperations — the constant this trove would be liquidated against, unchanged since deployment.`
+          ? forkNoteHouse(note)
+            ? `Read MCR() on the branch's BorrowerOperations at block ${p?.atBlock} — the minimum this Trove would have been liquidated against then.`
+            : `Read MCR() on the branch's BorrowerOperations — the constant this trove would be liquidated against, unchanged since deployment.`
           : part === "state"
             ? `Open this trove's event at block ${p?.atBlock} on this page: the debt and collateral on its card are the two the ratios here are built from.`
             : `Take the debt and collateral on the card of the event at block ${p?.atBlock}, multiply the collateral by ${formatPrice(end.value, priceDecimals(note))} and divide by the debt. Shown because ${priceGapReason(note)}.`,
@@ -200,6 +224,7 @@ export const priceGapPositionProv = (
                 part === "crAfter" ? "later" : "earlier",
                 priceDecimals(note),
                 part === "crAfter" && note.live,
+                !!forkNoteHouse(note),
               ),
             ],
   };

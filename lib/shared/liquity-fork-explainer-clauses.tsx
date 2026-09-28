@@ -66,12 +66,19 @@
 //     beside the act rather than read back afterwards. Both figures now have
 //     chrome twins on the detail grid, so they are bold, not muted.
 //
+// FILLED where every row is priced (Ebisu: the filler prices each timeline
+// block, server mig 342):
+//   • §5.1 risk consequence on operate events — the collateral ratio before and
+//     after at the branch price for the block, restated from the card's ratio
+//     and price cells (`ratioClause`).
+//
+// FILLED for a batch manager's change (server mig 342's rows): the rate before
+// and after, the premature-adjustment fee the Trove carried, and a year's
+// interest at the new rate.
+//
 // STILL UNFILLED, and each a data fact rather than an authoring gap:
-//   • §5.1 risk consequence on operate events. Opens / adjusts / rate changes /
-//     closes carry no price, so no collateral ratio can be stated at event time.
-//     Only liquidate and redeem embed a price, and only for their own block — a
-//     per-event ratio needs a price at EVERY block, which is a capture job (a
-//     per-block PriceFeed filler), not a clause.
+//   • §5.1 on Asymmetry and Basedollar: only liquidate and redeem rows carry a
+//     price there, so an operate event states no ratio.
 //   • The liquidation price leg on a chain with no such filler. The contract does
 //     not emit the price on the Trove's own liquidation row the way it does on a
 //     redemption, so that lane still depends on the capture. Basedollar has had no
@@ -79,10 +86,11 @@
 //   • The fixed liquidation reserve is stated only where it was read
 //     (forkLiquidationReserve in lib/shared/liquity-fork-ops.ts): the fork
 //     context does not carry it, so a fork with no reading states none.
-//   • Gas. The MV carries tx_gas_used and tx_gas_price, but on an L2 their product
-//     is the execution fee ALONE and omits the L1 data fee, so a gas figure built
-//     from them would understate the true cost. Stating it would be worse than
-//     omitting it; it waits on capturing the receipt's l1Fee.
+//   • Gas on Basedollar. The MV carries tx_gas_used and tx_gas_price, but on an L2
+//     their product is the execution fee ALONE and omits the L1 data fee, so a gas
+//     figure built from them would understate the true cost. It waits on
+//     capturing the receipt's l1Fee. The mainnet forks state gas as the pane's
+//     last clause (liquity-fork-event-explainer.tsx), as Liquity V2 does.
 
 import type { ReactNode } from "react";
 import type { EbisuContext, AsymmetryContext, BasedollarContext, OriginEnvelope } from "@/lib/shared/types/event-shape";
@@ -100,6 +108,14 @@ import {
 import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots } from "@/lib/shared/explainer-prose";
 import { formatNumber, formatUsdValue, formatPrice, indefiniteArticle } from "@/lib/utils/format";
 import { forkLiquidationCleared } from "@/components/protocol/liquity-fork/liquity-fork-forensics";
+import {
+  liquityForkStateFigures,
+  forkCrText,
+  forkRateText,
+} from "@/components/protocol/liquity-fork/liquity-fork-state-stats";
+import { getForkBatchManagerName } from "@/lib/shared/fork-batch-managers";
+
+const shortAddress = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 /** The two fork contexts are structural twins; either drives the explainer. */
 export type LiquityForkEventContext = EbisuContext | AsymmetryContext | BasedollarContext;
@@ -144,6 +160,17 @@ export interface LiquityForkExplainerProvs {
   redemptionFeeKeptProv: (coords: LiquityForkCoords, vals: { fee: string }) => Provenance;
   redemptionActProv: (coords: LiquityForkCoords, vals: { actual: string; attempted: string }) => Provenance;
   emittedRedemptionPriceProv: (coords: LiquityForkCoords, priceUsd: number) => Provenance;
+  // The opened card's valued cells and a batch manager's change
+  // (liquity-fork-state-stats.tsx registers the primaries).
+  collRatioProv?: (
+    coords: LiquityForkCoords,
+    vals: { coll: string; debt: string; priceUsd: number; which: "before" | "after" },
+  ) => Provenance;
+  costPerYearProv?: (coords: LiquityForkCoords, vals: { debt: string; rate: string }) => Provenance;
+  batchFeeShareProv?: (
+    coords: LiquityForkCoords,
+    vals: { fee?: string; batchFee: string; shares?: string; totalShares: string },
+  ) => Provenance;
 }
 
 /** The fork blanks the copy reads — the display name and the minted stablecoin. */
@@ -185,6 +212,62 @@ const fmtNum = (h?: string): string => formatNumber(Number(h));
 // ── the variant table ────────────────────────────────────────────────────────
 
 export function liquityForkEventSlots(
+  ctx: LiquityForkEventContext,
+  coords: LiquityForkCoords,
+  fork: LiquityForkCopy,
+  b: LiquityForkExplainerProvs,
+): EventProseSlots {
+  const slots = eventSlots(ctx, coords, fork, b);
+  const ratio = ratioClause(ctx, coords, b);
+  return ratio ? { ...slots, meansNow: [...(slots.meansNow ?? []), ratio] } : slots;
+}
+
+/** The collateral ratio before and after at the branch price for the block —
+ *  the card's ratio and price cells restated (T3 of the Liquity V2 grid). Only
+ *  where the row is priced; a liquidation's forensics already state its ratio
+ *  at fire, and a batch change moves no balance. */
+function ratioClause(
+  ctx: LiquityForkEventContext,
+  coords: LiquityForkCoords,
+  b: LiquityForkExplainerProvs,
+): ClauseInput {
+  if (!b.collRatioProv || ctx.eventType === "liquidate") return null;
+  const f = liquityForkStateFigures(ctx);
+  if (f.price == null || f.crAfter == null) return null;
+  const emitted = ctx.priceAtBlock?.source === "redemption-event-price";
+  const priceFig = (
+    <Fig
+      info={emitted ? b.emittedRedemptionPriceProv(coords, f.price) : b.atBlockPriceProv(coords, f.price)}
+      value={formatUsdValue(f.price)}
+    >
+      {formatUsdValue(f.price)}
+    </Fig>
+  );
+  const after = (
+    <Fig
+      info={b.collRatioProv(coords, { coll: ctx.collAfter, debt: ctx.debtAfter, priceUsd: f.price, which: "after" })}
+      value={forkCrText(f.crAfter)}
+    >
+      {forkCrText(f.crAfter)}
+    </Fig>
+  );
+  const moved = f.crBefore != null && Math.abs(f.crBefore - f.crAfter) >= 0.005;
+  return clause(
+    moved ? (
+      <>
+        At the branch&rsquo;s {ctx.collateralSymbol} price of {priceFig} for this block, the collateral ratio went from{" "}
+        {forkCrText(f.crBefore!)} to {after}.
+      </>
+    ) : (
+      <>
+        At the branch&rsquo;s {ctx.collateralSymbol} price of {priceFig} for this block, the collateral ratio stands at{" "}
+        {after}.
+      </>
+    ),
+  );
+}
+
+function eventSlots(
   ctx: LiquityForkEventContext,
   coords: LiquityForkCoords,
   fork: LiquityForkCopy,
@@ -711,6 +794,77 @@ export function liquityForkEventSlots(
           ),
         ],
       };
+    }
+
+    case "setBatchManagerAnnualInterestRate":
+    case "lowerBatchManagerAnnualFee": {
+      const br = ctx.batchRate;
+      const manager = ctx.batchManager
+        ? (getForkBatchManagerName(ctx.batchManager) ?? shortAddress(ctx.batchManager))
+        : "The batch manager";
+      const f = liquityForkStateFigures(ctx);
+      const rateNow =
+        f.rate != null ? (
+          <Fig info={b.rateAtEventProv(coords)} value={forkRateText(f.rate)}>
+            {forkRateText(f.rate)}
+          </Fig>
+        ) : null;
+      const happened =
+        ctx.eventType === "lowerBatchManagerAnnualFee" && br ? (
+          <>
+            {manager}, the Trove&rsquo;s batch manager, lowered the batch&rsquo;s annual management fee
+            {br.managementFeeBefore != null ? <> from {forkRateText(Number(br.managementFeeBefore))}</> : null} to{" "}
+            {forkRateText(Number(br.managementFee))}.
+          </>
+        ) : (
+          <>
+            {manager}, the Trove&rsquo;s batch manager, changed the batch&rsquo;s annual interest rate
+            {f.rateBefore != null ? <> from {forkRateText(f.rateBefore)}</> : null}
+            {rateNow ? <> to {rateNow}</> : null}. The owner did not act: every Trove in the batch pays the rate its
+            manager sets.
+          </>
+        );
+      const troveFee = br?.troveFee != null ? Number(br.troveFee) : 0;
+      const changed: ClauseInput[] = [
+        br && troveFee > 0 && b.batchFeeShareProv
+          ? clause(
+              <>
+                The change came inside the cooldown after the manager&rsquo;s previous change, so {fork.protocolName}{" "}
+                added a premature-adjustment fee of {fmtNum(br.batchFee)} {debt} to the batch&rsquo;s debt. This Trove
+                carries{" "}
+                <Fig
+                  info={b.batchFeeShareProv(coords, {
+                    fee: br.troveFee,
+                    batchFee: br.batchFee,
+                    shares: br.troveShares,
+                    totalShares: br.totalShares,
+                  })}
+                  value={fmtNum(br.troveFee)}
+                >
+                  {fmtNum(br.troveFee)} {debt}
+                </Fig>{" "}
+                of it, in proportion to its shares of the batch.
+              </>,
+            )
+          : null,
+      ];
+      const meansNow: ClauseInput[] = [
+        f.costPerYear != null && f.costDebt != null && b.costPerYearProv
+          ? clause(
+              <>
+                On its {fmtNum(f.costDebt)} {debt} of debt, a year at this rate costs about{" "}
+                <Fig
+                  info={b.costPerYearProv(coords, { debt: f.costDebt, rate: String(f.rate) })}
+                  value={formatNumber(f.costPerYear)}
+                >
+                  {formatNumber(f.costPerYear)} {debt}
+                </Fig>
+                , before the manager&rsquo;s management fee.
+              </>,
+            )
+          : null,
+      ];
+      return { happened: [clause(happened)], changed, meansNow };
     }
 
     default:

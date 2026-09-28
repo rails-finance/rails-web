@@ -3020,7 +3020,14 @@ function marketNoteLead(noun: string): string {
 
 /** The protocols a price-gap note is built for; the modal is that protocol's
  *  price move, with that protocol's own docs. */
-export type PriceGapProtocol = "liquity-v2" | "polaris" | "aave-v4" | "aave-v3" | "spark" | "alchemix-v3";
+export type PriceGapProtocol =
+  | "liquity-v2"
+  | "liquity-fork"
+  | "polaris"
+  | "aave-v4"
+  | "aave-v3"
+  | "spark"
+  | "alchemix-v3";
 
 export function marketNotePriceGapContent(protocol: PriceGapProtocol): LearnMoreContent {
   switch (protocol) {
@@ -3156,6 +3163,38 @@ export function marketNotePriceGapContent(protocol: PriceGapProtocol): LearnMore
           },
         ],
         links: [ALCHEMIX_DOCS.liquidations, ALCHEMIX_DOCS.myt, ALCHEMIX_DOCS.selfRepayingLoans],
+      };
+    case "liquity-fork":
+      return {
+        title: "How a price move reaches a Trove",
+        intro: `${marketNoteLead("Trove")} This kind states how the branch's oracle price moved between two of the Trove's events, and what that move alone did to its collateral ratio.`,
+        detailsHeading: "Key concepts:",
+        details: [
+          {
+            bold: "Oracle price",
+            text: "each priced event on a Trove carries the price the branch's PriceFeed held at the end of that event's block, which every operation updates before it acts; a redemption carries the price its log emitted. The two ends of a note are two such events; no price is read for the note, and none is drawn between them.",
+          },
+          {
+            bold: "Collateral ratio",
+            text: "the collateral's value at that price divided by the debt. The same collateral at a lower price covers less of the debt, so a fall lowers the ratio with nothing else moving.",
+          },
+          {
+            bold: "The liquidation line",
+            text: "the branch's minimum collateral ratio. A Trove below it can be liquidated.",
+          },
+          {
+            bold: "Runway",
+            text: "how far the price could fall from the earlier event before the collateral ratio reached that minimum, at the debt and collateral the Trove's log recorded there.",
+          },
+          {
+            bold: "Which stretches are stated",
+            text: "a stretch is shown when the price move used at least a quarter of that runway, in either direction, and always when it ends in a liquidation or a redemption. A stretch with a folder of the Trove's rows inside it is not shown, since those rows are not on the page.",
+          },
+          {
+            bold: "A live note",
+            text: "the same idea, but the later end is the chain head: this Trove's newest priced event against the branch's price read right now. Shown on any open Trove whose move clears a small floor.",
+          },
+        ],
       };
     case "liquity-v2":
       return {

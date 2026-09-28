@@ -3,12 +3,11 @@
 // fork's own event guard and debt symbol so the three trove pages carry one
 // definition instead of three verbatim copies.
 //
-// Only the redemption run exists here. The V2 trove page also collapses
-// delegate rate adjusts (setBatchManagerAnnualInterestRate), but the fork
-// lanes carry no such row: a batched Trove's rate moves on its BATCH, and the
-// fork event MVs record per-Trove operations only — adjustTroveInterestRate and
-// removeFromBatch are never batched (see liquity-fork-event-header.tsx). There
-// is nothing to collapse until a fork lane captures BatchUpdated per Trove.
+// The flat answer (`?folders=0`) collapses redemptions here. A batch manager's
+// rate changes reach the fork timelines as rows since server mig 342 (one per
+// member Trove, the Liquity V2 batch_manager rule); the index groups three or
+// more back to back as the `batch_rate` folder, the V2 delegate-adjust run, and
+// the register below draws it.
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
@@ -17,6 +16,7 @@ import { renderRunFolders, CAUTION_FOLDER_BADGE } from "@/lib/shared/run-folders
 import { forkDebtMove } from "@/lib/shared/liquity-fork-ops";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
+import { Percent } from "lucide-react";
 
 /** Runs shorter than this stay as individual cards (the V2 trove threshold). */
 export const MIN_REDEMPTION_RUN = 4;
@@ -107,5 +107,18 @@ const OWNER_RUN_NOUN: Record<string, string> = {
   adjustTroveInterestRate: "rate change",
 };
 
+/** A batch manager's rate or fee changes (server mig 342), the V2 delegate
+ *  run's register: the pink percent mark its folder wears. Its one leg is the
+ *  premature-adjustment fees the Trove carried. */
+const BATCH_RATE_FOLDER: FolderRegisterEntry = {
+  memberNoun: "batch rate change",
+  tone: "neutral",
+  folderBadge: <Percent size={10} strokeWidth={2.5} className="text-pink-500" />,
+};
+
 export const LIQUITY_FORK_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry =>
-  folder.kind === OWNER_RUN_KIND ? ownerRunEntry(folder, (a) => OWNER_RUN_NOUN[a] ?? "event") : REDEMPTION_FOLDER;
+  folder.kind === OWNER_RUN_KIND
+    ? ownerRunEntry(folder, (a) => OWNER_RUN_NOUN[a] ?? "event")
+    : folder.kind === "batch_rate"
+      ? BATCH_RATE_FOLDER
+      : REDEMPTION_FOLDER;

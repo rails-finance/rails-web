@@ -200,6 +200,13 @@ export function LiquityForkPositionExplanation({
           Of that debt, {formatNumber(chain.accruedInterest)} {debtSymbol} is interest built up at its batch&rsquo;s{" "}
           <H>{chain.annualInterestRatePct.toFixed(2)}%</H> annual rate — the rate its interest-batch manager sets for
           every member.
+          {chain.accruedBatchManagementFee > 0 && (
+            <>
+              {" "}
+              Another {formatNumber(chain.accruedBatchManagementFee)} {debtSymbol} is the manager&rsquo;s management fee
+              built up over the same time, also part of the debt.
+            </>
+          )}
           {chain.status !== "zombie" && (
             <> The manager&rsquo;s rate also sets the batch&rsquo;s place in the redemption queue.</>
           )}

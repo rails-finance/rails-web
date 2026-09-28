@@ -38,6 +38,9 @@ import {
   liqClearedFaceProv,
   liqPremiumProv,
   liquidationLegProv,
+  collRatioProv,
+  costPerYearProv,
+  batchFeeShareProv,
   type BasedollarCoords,
 } from "@/lib/basedollar/event-provenance";
 import { DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
@@ -67,6 +70,9 @@ const BASEDOLLAR_EXPLAINER_PROVS = {
   liqClearedFaceProv,
   liqPremiumProv,
   liquidationLegProv,
+  collRatioProv,
+  costPerYearProv,
+  batchFeeShareProv,
 };
 
 export interface BasedollarEventCardProps {
@@ -188,7 +194,14 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
           txHash={event.txHash}
           blockNumber={event.blockNumber}
           eventNumber={eventNumber}
-          builders={{ debtSymbol: DEBT_SYMBOL, collDeltaProv, debtDeltaProv, rateAtEventProv, batchManagerProv }}
+          builders={{
+            debtSymbol: DEBT_SYMBOL,
+            collDeltaProv,
+            debtDeltaProv,
+            rateAtEventProv,
+            batchManagerProv,
+            batchFeeShareProv,
+          }}
           flows={event.flows}
         />
       }

@@ -90,6 +90,11 @@ export interface LiquityForkTroveChainResponse {
   /** The split getLatestTroveData states: interest accrued since the recorded
    *  debt, and redistribution gains from liquidations. */
   accruedInterest: number;
+  /** A batch member's share of the management fee its batch manager has built
+   *  up since the batch was last updated — getLatestTroveData's
+   *  accruedBatchManagementFee, part of entireDebt. 0 for a Trove outside a
+   *  batch. */
+  accruedBatchManagementFee: number;
   redistDebtGain: number;
   redistCollGain: number;
   recordedDebt: number;
@@ -142,6 +147,7 @@ function stub(cfg: LiquityForkConfig, b: LiquityForkBranchConfig, troveId: strin
     entireCollRaw: "0",
     entireColl: 0,
     accruedInterest: 0,
+    accruedBatchManagementFee: 0,
     redistDebtGain: 0,
     redistCollGain: 0,
     recordedDebt: 0,
@@ -216,6 +222,7 @@ export async function loadLiquityForkTroveFromChain(
       accruedInterest: bigint;
       recordedDebt: bigint;
       annualInterestRate: bigint;
+      accruedBatchManagementFee: bigint;
     } | null;
     const statusNum = r(3) as number | null;
     const branchDebtRaw = r(4) as bigint | null;
@@ -318,6 +325,7 @@ export async function loadLiquityForkTroveFromChain(
       entireCollRaw: data.entireColl.toString(),
       entireColl,
       accruedInterest: Number(data.accruedInterest) / debtScale,
+      accruedBatchManagementFee: Number(data.accruedBatchManagementFee ?? BigInt(0)) / debtScale,
       redistDebtGain: Number(data.redistBoldDebtGain) / debtScale,
       redistCollGain: Number(data.redistCollGain) / collScale,
       recordedDebt: Number(data.recordedDebt) / debtScale,

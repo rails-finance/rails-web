@@ -50,6 +50,11 @@ export interface LiquityForkHeaderBuilders {
   debtDeltaProv: (coords: LiquityForkCoords, ops?: DeltaOps, origin?: OriginEnvelope | null) => Provenance;
   rateAtEventProv: (coords?: LiquityForkCoords) => Provenance;
   batchManagerProv: (coords: LiquityForkCoords | undefined, address: string) => Provenance;
+  /** The Trove's share of a batch's premature-adjustment fee (server mig 342). */
+  batchFeeShareProv?: (
+    coords: LiquityForkCoords,
+    vals: { fee?: string; batchFee: string; shares?: string; totalShares: string },
+  ) => Provenance;
 }
 
 export interface LiquityForkEventHeaderProps {
@@ -100,6 +105,27 @@ export function LiquityForkEventHeader({
   // "Add + Borrow" verb. Verbs are the fork vocabulary's own (Add/Withdraw,
   // Borrow/Repay) — not standardized to Supply/Borrow.
   const isOpen = ctx.eventType === "openTrove" || ctx.eventType === "openTroveAndJoinBatch";
+  // A batch manager's change (server mig 342): the Liquity V2 delegate row —
+  // "Adjusted 3.20% → 3.60%" and the manager — with the fee it charged this
+  // Trove, where it charged one.
+  const isBatchChange = ctx.eventType === "setBatchManagerAnnualInterestRate";
+  const batchFee = ctx.batchRate?.troveFee != null ? Number(ctx.batchRate.troveFee) : 0;
+  if (ctx.batchRate && batchFee >= FORK_DEBT_DUST_FLOAT && builders.batchFeeShareProv)
+    deltas.push({
+      value: batchFee,
+      symbol: builders.debtSymbol,
+      address: soleFlowAddress(flows, builders.debtSymbol),
+      prov: builders.batchFeeShareProv(coords, {
+        fee: ctx.batchRate.troveFee,
+        batchFee: ctx.batchRate.batchFee,
+        shares: ctx.batchRate.troveShares,
+        totalShares: ctx.batchRate.totalShares,
+      }),
+      label: "Fee",
+      tone: "caution",
+      // A batch row moves no token, so the spine draws no row for the fee.
+      noSpineCounterpart: true,
+    });
   const isAdjust = ctx.eventType === "adjustTrove";
   const perAxis = isOpen || isAdjust;
 
@@ -149,7 +175,14 @@ export function LiquityForkEventHeader({
   const rate = ctx.interestRate != null ? Number(ctx.interestRate) : null;
   const ratePill =
     rate != null && Number.isFinite(rate) && FORK_RATE_PILL_EVENTS.has(ctx.eventType)
-      ? { pct: rate, tone: ctx.isBatched ? ("delegate" as const) : undefined, prov: builders.rateAtEventProv(coords) }
+      ? {
+          pct: rate,
+          tone: ctx.isBatched ? ("delegate" as const) : undefined,
+          prov: builders.rateAtEventProv(coords),
+          ...(isBatchChange && ctx.rateBefore != null && Number.isFinite(Number(ctx.rateBefore))
+            ? { fromPct: Number(ctx.rateBefore) }
+            : {}),
+        }
       : undefined;
 
   // Delegate chip — the batch manager behind that rate, on the same rows. The
@@ -177,7 +210,7 @@ export function LiquityForkEventHeader({
         // Open → the short pill word + green status; a combined/single owner
         // adjust drops the row verb (the per-axis delta labels carry it) but
         // keeps its label when nothing moved (a "No change" row has no deltas).
-        label: isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : actionLabel,
+        label: isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : isBatchChange ? "Adjusted" : actionLabel,
         status: isOpen ? "open" : undefined,
         critical: ctx.eventType === "liquidate",
         labelOnSpine: isRedemption,

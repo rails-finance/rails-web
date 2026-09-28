@@ -107,6 +107,7 @@ import {
   aaveV4EndLabel,
   alchemixEndLabel,
   formatShareRate,
+  forkNoteHouse,
   LIVE_GAP_MOVE_FLOOR,
   LIVE_GAP_RUNWAY_SHARE,
   isAaveFamilyPriceGap,
@@ -839,7 +840,10 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
   const isPolaris = note.measureKind === "protocol";
   const endLabel = isPolaris ? polarisEndLabel : priceGapEndLabel;
   const positionNoun = isPolaris ? "CDP" : "trove";
-  const feedNoun = isPolaris ? "the market's price feed" : "Liquity's PriceFeed";
+  // A Liquity V2 fork's note names the fork (lib/shared/market-note.ts,
+  // `forkPriceGapNotesFor`); its price is the branch PriceFeed's.
+  const fork = forkNoteHouse(note);
+  const feedNoun = isPolaris ? "the market's price feed" : fork ? `${fork}'s branch PriceFeed` : "Liquity's PriceFeed";
   const minimumLabel = isPolaris ? "the market's normal-mode minimum" : "branch minimum";
   const priceProv = isPolaris ? polarisPriceGapProv : priceGapProv;
   const positionProv = isPolaris ? polarisPriceGapPositionProv : priceGapPositionProv;
@@ -1060,7 +1064,7 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
       after: { text: f.toBlock, prov: priceProv(note, "blocks"), exact: String(note.to.block) },
     },
     stats,
-    learnMore: marketNotePriceGapContent(isPolaris ? "polaris" : "liquity-v2"),
+    learnMore: marketNotePriceGapContent(isPolaris ? "polaris" : fork ? "liquity-fork" : "liquity-v2"),
     derivation,
   };
 }

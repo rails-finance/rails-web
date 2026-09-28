@@ -38,6 +38,12 @@ export const {
   rateAtEventProv,
   batchManagerProv,
   lifetimeFlowProv,
+  collUsdProv,
+  collRatioProv,
+  rateBeforeProv,
+  costPerYearProv,
+  batchDebtShareProv,
+  batchFeeShareProv,
 } = makeLiquityForkVocabulary({
   protocolName: "Ebisu",
   stablecoin: "ebUSD",

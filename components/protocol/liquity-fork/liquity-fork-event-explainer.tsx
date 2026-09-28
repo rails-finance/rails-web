@@ -22,7 +22,9 @@ import {
   type LiquityForkLearnMoreParams,
 } from "@/lib/shared/learn-more-content";
 import type { LiquityForkCoords } from "@/lib/shared/liquity-fork-provenance";
-import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
+import { clause, composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
+import type { GasCost } from "@/lib/shared/types/event-shape";
+import { formatGasCost } from "@/lib/shared/format-event";
 import {
   liquityForkEventSlots,
   type LiquityForkEventContext,
@@ -41,6 +43,11 @@ export interface LiquityForkEventExplainerProps {
   blockNumber?: number;
   /** The card shows the lead sentence as the teaser; render only the rest here. */
   skipLead?: boolean;
+  /** This transaction's gas — the pane's last clause, as on Liquity V2. Passed
+   *  for the owner's events on a mainnet fork only: a redeemer, a liquidator
+   *  or a batch manager paid for theirs, and on Base the execution fee leaves
+   *  out the L1 data fee. */
+  gas?: GasCost;
 }
 
 /** Mechanic modal content for this event — never-empty floor: every event type
@@ -69,6 +76,8 @@ export function liquityForkLearnMoreContent(
     case "openTroveAndJoinBatch":
     case "setInterestBatchManager":
     case "removeFromBatch":
+    case "setBatchManagerAnnualInterestRate":
+    case "lowerBatchManagerAnnualFee":
       return liquityForkBatchContent(fork);
     default:
       return liquityForkEventFallbackContent(fork);
@@ -82,6 +91,7 @@ export function LiquityForkEventExplainer({
   txHash,
   blockNumber,
   skipLead,
+  gas,
 }: LiquityForkEventExplainerProps) {
   const coords: LiquityForkCoords = {
     txHash,
@@ -90,7 +100,11 @@ export function LiquityForkEventExplainer({
     isBatched: ctx.isBatched,
   };
   const clauses = eventClauses(liquityForkEventSlots(ctx, coords, fork, builders));
-  const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
+  // Gas rides last, after the arc — never the lead, so skipLead removes the
+  // teaser sentence alone and the gas clause always survives into the pane.
+  const withGas =
+    gas && gas.gasCostEth > 0 ? [...clauses, clause(<>Gas for this transaction: {formatGasCost(gas)}.</>)] : clauses;
+  const items = composeBullets(skipLead ? splitLead(withGas).rest : withGas);
 
   return <ProseExplainer items={items} />;
 }

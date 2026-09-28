@@ -38,6 +38,9 @@ import {
   liqClearedFaceProv,
   liqPremiumProv,
   liquidationLegProv,
+  collRatioProv,
+  costPerYearProv,
+  batchFeeShareProv,
   type AsymmetryCoords,
 } from "@/lib/asymmetry/event-provenance";
 import { DEBT_SYMBOL, ASYMMETRY_DOCS } from "@/lib/asymmetry/asset-catalog";
@@ -70,6 +73,9 @@ const ASYMMETRY_EXPLAINER_PROVS = {
   liqClearedFaceProv,
   liqPremiumProv,
   liquidationLegProv,
+  collRatioProv,
+  costPerYearProv,
+  batchFeeShareProv,
 };
 
 export interface AsymmetryEventCardProps {
@@ -192,7 +198,14 @@ export function AsymmetryEventCard({ event, isFirst, isLast, eventNumber }: Asym
           txHash={event.txHash}
           blockNumber={event.blockNumber}
           eventNumber={eventNumber}
-          builders={{ debtSymbol: DEBT_SYMBOL, collDeltaProv, debtDeltaProv, rateAtEventProv, batchManagerProv }}
+          builders={{
+            debtSymbol: DEBT_SYMBOL,
+            collDeltaProv,
+            debtDeltaProv,
+            rateAtEventProv,
+            batchManagerProv,
+            batchFeeShareProv,
+          }}
           flows={event.flows}
         />
       }
@@ -206,6 +219,9 @@ export function AsymmetryEventCard({ event, isFirst, isLast, eventNumber }: Asym
           txHash={event.txHash}
           blockNumber={event.blockNumber}
           skipLead
+          // The owner's transactions only: a redeemer, a liquidator or a
+          // batch manager paid for theirs.
+          gas={isWarning || ctx.batchRate ? undefined : event.gas}
         />
       }
       explainerLabel="Plain English"

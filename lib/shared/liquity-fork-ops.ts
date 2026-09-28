@@ -96,6 +96,9 @@ export const FORK_RATE_PILL_EVENTS: ReadonlySet<string> = new Set([
   "adjustTroveInterestRate",
   "setInterestBatchManager",
   "removeFromBatch",
+  // A batch manager's change (server mig 342): the rate is the row's point.
+  "setBatchManagerAnnualInterestRate",
+  "lowerBatchManagerAnnualFee",
 ]);
 
 // The imperative per-axis verbs, keyed by move direction. Exported so the header

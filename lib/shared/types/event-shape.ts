@@ -1010,6 +1010,34 @@ export interface LiquityForkPriceAtBlock {
   source: "pricefeed-lastgoodprice" | "redemption-event-price";
 }
 
+/** A batch manager's rate or fee change, on a row of each member Trove (server
+ *  mig 342: the batch's BatchUpdated with operation 1 or 2, attached to every
+ *  Trove whose latest operation left it in that batch). Human-readable decimal
+ *  strings; rates and fees in percent.
+ *
+ *  The Trove's own figures are the batch's times its shares over the batch's
+ *  total shares — the same division the TroveManager makes. */
+export interface LiquityForkBatchRateFacts {
+  /** The batch's annual interest rate after this change — `_annualInterestRate`. */
+  rateAfter: string;
+  /** The batch's rate on its previous BatchUpdated. Absent when the capture
+   *  holds none. */
+  rateBefore?: string;
+  /** The batch's annual management fee after and before. */
+  managementFee: string;
+  managementFeeBefore?: string;
+  /** The Trove's debt at this change: batch `_debt` × Trove shares ÷ total shares. */
+  troveDebt?: string;
+  /** The Trove's share of the batch's premature-adjustment fee: batch
+   *  `_debtIncreaseFromUpfrontFee` × Trove shares ÷ total shares. "0" when none. */
+  troveFee?: string;
+  /** The batch-wide figures the Trove's are read from. */
+  batchDebt: string;
+  batchFee: string;
+  troveShares?: string;
+  totalShares: string;
+}
+
 /** TroveOperation's own account of WHY the balances moved on this event.
  *
  *  The V2 TroveManager does not just emit the new balances — it emits the move
@@ -1110,7 +1138,9 @@ export type EbisuEventType =
   | "redeemCollateral"
   | "openTroveAndJoinBatch"
   | "setInterestBatchManager"
-  | "removeFromBatch";
+  | "removeFromBatch"
+  | "setBatchManagerAnnualInterestRate"
+  | "lowerBatchManagerAnnualFee";
 
 export interface EbisuContext {
   eventType: EbisuEventType;
@@ -1155,11 +1185,13 @@ export interface EbisuContext {
    *  Absent for the Trove's first event (before = synthetic 0) and on
    *  pre-was_batched responses. */
   originBefore?: TroveStateOrigin;
-  /** Liquidation/redemption rows only — the branch's OWN collateral price at
-   *  this event's block: PriceFeed.lastGoodPrice, the figure the TroveManager
-   *  itself acted on in that block (mig 113 capture; liquidate calls fetchPrice()
-   *  and redeem fetchRedemptionPrice() first, and both write it). Absent until the filler prices the block; the
-   *  forensics stay token-only meanwhile. */
+  /** The branch's OWN collateral price at this event's block:
+   *  PriceFeed.lastGoodPrice, the figure the TroveManager itself acted on in that
+   *  block (mig 113 capture; every operation calls fetchPrice() first, which
+   *  writes it), or on a redemption the price its Redemption log emitted.
+   *  Liquidation and redemption rows on every fork; every row on Ebisu, whose
+   *  filler prices each timeline block (server mig 342). Absent until the filler
+   *  prices the block; the row stays token-only meanwhile. */
   priceAtBlock?: LiquityForkPriceAtBlock;
   /** Why the balances moved on this event — TroveOperation's own decomposition
    *  (borrower's act / upfront fee / redistribution, with accrued interest as
@@ -1178,6 +1210,9 @@ export interface EbisuContext {
   /** liquidate rows only — the branch's minimum collateral ratio in force at
    *  this block (a ratio, 1.28 = 128%), which governance can move. */
   mcrAtEvent?: number;
+  /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
+   *  the batch manager's change this Trove carried (server mig 342). */
+  batchRate?: LiquityForkBatchRateFacts;
 }
 
 // ───────────────────────── Asymmetry (Liquity V2 fork) detail types ─────────────────────────
@@ -1200,7 +1235,9 @@ export type AsymmetryEventType =
   | "redeemCollateral"
   | "openTroveAndJoinBatch"
   | "setInterestBatchManager"
-  | "removeFromBatch";
+  | "removeFromBatch"
+  | "setBatchManagerAnnualInterestRate"
+  | "lowerBatchManagerAnnualFee";
 
 export interface AsymmetryContext {
   eventType: AsymmetryEventType;
@@ -1245,11 +1282,13 @@ export interface AsymmetryContext {
    *  Absent for the Trove's first event (before = synthetic 0) and on
    *  pre-was_batched responses. */
   originBefore?: TroveStateOrigin;
-  /** Liquidation/redemption rows only — the branch's OWN collateral price at
-   *  this event's block: PriceFeed.lastGoodPrice, the figure the TroveManager
-   *  itself acted on in that block (mig 113 capture; liquidate calls fetchPrice()
-   *  and redeem fetchRedemptionPrice() first, and both write it). Absent until the filler prices the block; the
-   *  forensics stay token-only meanwhile. */
+  /** The branch's OWN collateral price at this event's block:
+   *  PriceFeed.lastGoodPrice, the figure the TroveManager itself acted on in that
+   *  block (mig 113 capture; every operation calls fetchPrice() first, which
+   *  writes it), or on a redemption the price its Redemption log emitted.
+   *  Liquidation and redemption rows on every fork; every row on Ebisu, whose
+   *  filler prices each timeline block (server mig 342). Absent until the filler
+   *  prices the block; the row stays token-only meanwhile. */
   priceAtBlock?: LiquityForkPriceAtBlock;
   /** Why the balances moved on this event — TroveOperation's own decomposition
    *  (borrower's act / upfront fee / redistribution, with accrued interest as
@@ -1268,6 +1307,9 @@ export interface AsymmetryContext {
   /** liquidate rows only — the branch's minimum collateral ratio in force at
    *  this block (a ratio, 1.28 = 128%), which governance can move. */
   mcrAtEvent?: number;
+  /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
+   *  the batch manager's change this Trove carried (server mig 342). */
+  batchRate?: LiquityForkBatchRateFacts;
 }
 
 // ───────────────────────── Basedollar (Liquity V2 fork on Base) detail types ─────────────────────────
@@ -1292,7 +1334,9 @@ export type BasedollarEventType =
   | "redeemCollateral"
   | "openTroveAndJoinBatch"
   | "setInterestBatchManager"
-  | "removeFromBatch";
+  | "removeFromBatch"
+  | "setBatchManagerAnnualInterestRate"
+  | "lowerBatchManagerAnnualFee";
 
 export interface BasedollarContext {
   eventType: BasedollarEventType;
@@ -1361,6 +1405,9 @@ export interface BasedollarContext {
   /** liquidate rows only — the branch's minimum collateral ratio in force at
    *  this block (a ratio, 1.28 = 128%), which governance can move. */
   mcrAtEvent?: number;
+  /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
+   *  the batch manager's change this Trove carried (server mig 342). */
+  batchRate?: LiquityForkBatchRateFacts;
 }
 
 // ───────────────────────── Compound V3 (Comet) detail types ─────────────────────────

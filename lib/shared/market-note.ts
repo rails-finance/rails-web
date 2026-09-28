@@ -56,7 +56,10 @@
 // the foot of this file and its own provenance module.
 
 import type {
+  AsymmetryContext,
   BaseActivityEvent,
+  BasedollarContext,
+  EbisuContext,
   LiquityContext,
   MoonwellContext,
   PolarisContext,
@@ -1010,6 +1013,200 @@ export function livePriceGapNote(
     position: { crBefore, crAfter, mcrPct, debt, coll, atBlock: a.blockNumber, ...liquityPositionExtras(da) },
     live: true,
   };
+}
+
+// ── Phase 2a′: the Liquity V2 forks' price gap ──────────────────────────────
+// The Phase 2a rule on a fork Trove (Ebisu, Asymmetry, Basedollar), where the
+// price is the fork's `priceAtBlock`: the branch PriceFeed's lastGoodPrice
+// at the event's block, or on a redemption the price its log emitted. Ebisu
+// carries it on every row (server mig 342's every-event filler); the other two
+// on liquidations and redemptions only, which leaves them no stretch to state.
+// Two things differ from 2a because the fork page does: the ratio is worked
+// out here (a fork row states no ratio), and a stretch a served folder sits
+// inside is not a stretch — the Trove transacted in it, off the page.
+
+/** The fork contexts, narrowed by the same discriminant the fork guards read. */
+type ForkNoteContext = EbisuContext | AsymmetryContext | BasedollarContext;
+const FORK_NOTE_PROTOCOLS = new Set(["ebisu", "asymmetry", "basedollar"]);
+const forkNoteData = (e: BaseActivityEvent): ForkNoteContext | null =>
+  e.context && FORK_NOTE_PROTOCOLS.has(e.context.protocol) ? (e.context.data as ForkNoteContext) : null;
+
+/** Rows a stretch cannot start from: someone else's act, or the batch
+ *  manager's. The owner's operations only, as 2a's `trove` rows. */
+const FORK_NOT_OWN = new Set([
+  "redeemCollateral",
+  "liquidate",
+  "setBatchManagerAnnualInterestRate",
+  "lowerBatchManagerAnnualFee",
+]);
+
+export interface ForkPriceGapBranch extends PriceGapBranch {
+  /** "ebisu" | "asymmetry" | "basedollar" — the note's `protocol`, which the
+   *  row and the receipts read for the fork's name. */
+  protocol: string;
+  debtSymbol: string;
+  /** The served folders' block spans: a stretch with a folder inside it is
+   *  skipped, since the rows in the folder are not on the page. */
+  breaks?: readonly { firstBlock: number; lastBlock: number }[];
+  /** The minimum ratio in force at a block, where governance has moved it
+   *  (Ebisu's weETH branch went from 128% to 120%); `mcr` otherwise. */
+  mcrAt?: (block: number) => number;
+}
+
+const forkPrice = (d: ForkNoteContext): number => d.priceAtBlock?.usd ?? 0;
+
+function forkEventPoint(e: BaseActivityEvent, d: ForkNoteContext, value: number): MarketNotePoint {
+  return {
+    block: e.blockNumber,
+    timestamp: e.timestamp,
+    value,
+    eventId: e.id,
+    txHash: e.txHash.toLowerCase(),
+    logIndex: logIndexOf(e),
+    wallet: (e.wallet ?? "").toLowerCase(),
+    kind: d.eventType,
+  };
+}
+
+/** The earlier end's state, and the ratio it made at each price. Null where
+ *  the Trove owed nothing or held nothing. */
+function forkPosition(
+  a: BaseActivityEvent,
+  da: ForkNoteContext,
+  priceA: number,
+  priceB: number,
+  branch: ForkPriceGapBranch,
+): PriceGapPosition | null {
+  const debt = Number(da.debtAfter);
+  const coll = Number(da.collAfter);
+  if (!(debt > 0) || !(coll > 0)) return null;
+  const crBefore = ((coll * priceA) / debt) * 100;
+  const rate = da.interestRate != null ? Number(da.interestRate) : NaN;
+  const mcr = branch.mcrAt?.(a.blockNumber) ?? branch.mcr;
+  return {
+    crBefore,
+    crAfter: (crBefore * priceB) / priceA,
+    mcrPct: Math.round(mcr * 100_000) / 1000,
+    debt,
+    coll,
+    atBlock: a.blockNumber,
+    debtSymbol: branch.debtSymbol,
+    ...(Number.isFinite(rate) && rate > 0 ? { rate } : {}),
+  };
+}
+
+const forkEnds = (events: readonly BaseActivityEvent[]) =>
+  events
+    .filter((e) => {
+      const d = forkNoteData(e);
+      return d != null && forkPrice(d) > 0;
+    })
+    .sort(byChainOrder);
+
+/** Phase-2a′ selector: `priceGapNotesFor` on a fork Trove's events. */
+export function forkPriceGapNotesFor(events: readonly BaseActivityEvent[], branch: ForkPriceGapBranch): PriceGapNote[] {
+  const ends = forkEnds(events);
+  if (ends.length < 2) return [];
+  const collateralType = branch.collateralType;
+  const out: PriceGapNote[] = [];
+  for (let i = 0; i < ends.length - 1; i++) {
+    const a = ends[i];
+    const b = ends[i + 1];
+    const da = forkNoteData(a);
+    const db = forkNoteData(b);
+    if (!da || !db) continue;
+    if (FORK_NOT_OWN.has(da.eventType)) continue;
+    if (b.blockNumber <= a.blockNumber) continue;
+    if (branch.breaks?.some((f) => f.firstBlock >= a.blockNumber && f.lastBlock <= b.blockNumber)) continue;
+    const priceA = forkPrice(da);
+    const priceB = forkPrice(db);
+    if (priceA === priceB) continue;
+    const position = forkPosition(a, da, priceA, priceB, branch);
+    if (!position) continue;
+    const runway = 1 - position.mcrPct / position.crBefore;
+    const move = Math.abs(priceB / priceA - 1);
+    const consumed = runway > 0 ? move / runway : Infinity;
+    const endedBy: PriceGapNote["endedBy"] =
+      db.eventType === "liquidate" ? "liquidation" : db.eventType === "redeemCollateral" ? "redemption" : "adjustment";
+    if (endedBy === "adjustment" && !(consumed >= RUNWAY_SHARE)) continue;
+    out.push({
+      id: `price-gap:${branch.protocol}:${collateralType.toLowerCase()}:${a.blockNumber}-${b.blockNumber}`,
+      kind: "price-gap",
+      protocol: branch.protocol,
+      marketSymbol: collateralType,
+      marketAddress: branch.priceFeed ?? "",
+      unitLabel: `USD per ${collateralType}`,
+      from: forkEventPoint(a, da, priceA),
+      to: forkEventPoint(b, db, priceB),
+      changePct: (priceB / priceA - 1) * 100,
+      consumed,
+      runway,
+      endedBy,
+      position,
+    });
+  }
+  return out;
+}
+
+/** The live fork note: the Trove's newest priced row against the branch price
+ *  read at the chain head — `livePriceGapNote` on a fork Trove. */
+export function liveForkPriceGapNote(
+  events: readonly BaseActivityEvent[],
+  branch: ForkPriceGapBranch,
+  live: { price: number; block: number; timestamp?: number },
+): PriceGapNote | null {
+  if (!(live.price > 0)) return null;
+  const ends = forkEnds(events);
+  if (ends.length === 0) return null;
+  const a = ends[ends.length - 1];
+  const da = forkNoteData(a);
+  if (!da || live.block <= a.blockNumber) return null;
+  const priceA = forkPrice(da);
+  const position = forkPosition(a, da, priceA, live.price, branch);
+  if (!position) return null;
+  const runway = 1 - position.mcrPct / position.crBefore;
+  const move = Math.abs(live.price / priceA - 1);
+  const consumed = runway > 0 ? move / runway : Infinity;
+  if (!liveGapStatesAChange(move, consumed)) return null;
+  const collateralType = branch.collateralType;
+  return {
+    id: `price-gap:${branch.protocol}:${collateralType.toLowerCase()}:${a.blockNumber}-head`,
+    kind: "price-gap",
+    protocol: branch.protocol,
+    marketSymbol: collateralType,
+    marketAddress: branch.priceFeed ?? "",
+    unitLabel: `USD per ${collateralType}`,
+    from: forkEventPoint(a, da, priceA),
+    to: {
+      block: live.block,
+      timestamp: live.timestamp ?? 0,
+      value: live.price,
+      txHash: "",
+      logIndex: -1,
+      wallet: "",
+      kind: "head",
+    },
+    changePct: (live.price / priceA - 1) * 100,
+    consumed,
+    runway,
+    endedBy: "head",
+    position,
+    live: true,
+  };
+}
+
+/** The fork's display name for a fork note, or null for any other note. */
+export function forkNoteHouse(note: MarketNote): string | null {
+  switch (note.protocol) {
+    case "ebisu":
+      return "Ebisu";
+    case "asymmetry":
+      return "Asymmetry";
+    case "basedollar":
+      return "Basedollar";
+    default:
+      return null;
+  }
 }
 
 // ── Phase 2b: the Polaris price gap ─────────────────────────────────────────

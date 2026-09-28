@@ -131,6 +131,9 @@ const LABELS: Record<BasedollarEventType, string> = {
   openTroveAndJoinBatch: "Open Trove + Join Batch",
   setInterestBatchManager: "Set Batch Manager",
   removeFromBatch: "Remove From Batch",
+  // Basedollar has no batch (its batch tables are empty), so these never arrive.
+  setBatchManagerAnnualInterestRate: "Batch Rate Change",
+  lowerBatchManagerAnnualFee: "Batch Fee Cut",
 };
 
 const ZERO = BigInt(0);

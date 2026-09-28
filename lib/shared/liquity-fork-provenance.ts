@@ -812,6 +812,160 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     };
   };
 
+  // ── The opened card's valued figures (the Liquity V2 grid's four cells) ────
+  //
+  // Every one is arithmetic over two things the card already states: a logged
+  // balance and the branch price at the block (atBlockPriceProv). A row whose
+  // block the filler has not priced carries none of them.
+
+  const priceInput = (coords: LiquityForkCoords, priceUsd: number): ProvInput => ({
+    label: `${collSym(coords)} price`,
+    value: formatExact(priceUsd),
+    kind: "chain",
+    pclass: "oracle",
+    note: "PriceFeed.lastGoodPrice at this block",
+  });
+
+  /** The collateral valued at the branch price at the block. */
+  const collUsdProv = (
+    coords: LiquityForkCoords,
+    vals: { coll: string; priceUsd: number; which: "before" | "after" },
+  ): Provenance => ({
+    kind: "chain-derived",
+    pclass: "oracle",
+    summary: `Collateral value ${vals.which} this event in US dollars — the collateral ${vals.which} the event, times the price the branch's PriceFeed held for ${collSym(coords)} at this block.`,
+    contract: cfg.priceFeedContract(coords.collateralType),
+    formula: "collateral × price",
+    inputs: [
+      { label: "collateral", value: opVal(vals.coll), kind: "chain", pclass: "emitted", note: vals.which },
+      priceInput(coords, vals.priceUsd),
+      ...eventInputs(coords),
+    ],
+  });
+
+  /** The Trove's collateral ratio at the branch price at the block. The before
+   *  side is the previous balances at THIS block's price, so the two sides
+   *  differ only by what the event moved. */
+  const collRatioProv = (
+    coords: LiquityForkCoords,
+    vals: { coll: string; debt: string; priceUsd: number; which: "before" | "after" },
+  ): Provenance => ({
+    kind: "chain-derived",
+    pclass: "oracle",
+    summary:
+      vals.which === "after"
+        ? `Collateral ratio after this event — the collateral's dollar value at the branch price for this block, divided by the debt.`
+        : `Collateral ratio before this event — the Trove's previous collateral and debt, valued at the same price as the ratio after, so the two differ only by what this event moved.`,
+    contract: cfg.priceFeedContract(coords.collateralType),
+    formula: "collateral × price ÷ debt × 100",
+    inputs: [
+      { label: "collateral", value: opVal(vals.coll), kind: "chain", pclass: "emitted", note: vals.which },
+      priceInput(coords, vals.priceUsd),
+      { label: "debt", value: opVal(vals.debt), kind: "chain", note: `${cfg.stablecoin}, ${vals.which}` },
+      ...eventInputs(coords),
+    ],
+  });
+
+  /** The rate the Trove paid before this event. */
+  const rateBeforeProv = (coords: LiquityForkCoords, vals: { rate: string; batchRow?: boolean }): Provenance => ({
+    kind: "chain",
+    pclass: vals.batchRow ? "emitted" : "indexed",
+    summary: vals.batchRow
+      ? `Annual interest rate before this change — the rate the batch logged on its previous update.`
+      : `Annual interest rate before this event — the rate the contract logged for the Trove at its previous change.`,
+    contract: troveManagerContract(coords),
+    via: vals.batchRow
+      ? `${streamVia()} · the batch's previous BatchUpdated log · _annualInterestRate · ÷10^16`
+      : `${streamVia()} · the previous event's rate · ÷10^16`,
+    inputs: [
+      { label: "rate before", value: `${vals.rate}%`, kind: "chain", pclass: "emitted" },
+      ...eventInputs(coords),
+    ],
+  });
+
+  /** A year's interest at the rate after this event, on the debt after it. */
+  const costPerYearProv = (coords: LiquityForkCoords, vals: { debt: string; rate: string }): Provenance => ({
+    kind: "derived",
+    summary: `Interest cost per year — the debt after this event times the annual rate after it. A year's interest at this rate; the rate can change.`,
+    formula: "debt × rate ÷ 100",
+    inputs: [
+      { label: "debt", value: opVal(vals.debt), kind: "chain", note: `${cfg.stablecoin}, after` },
+      { label: "rate", value: `${vals.rate}%`, kind: "chain", note: "after" },
+    ],
+  });
+
+  // ── A batch manager's change (server mig 342) ──────────────────────────────
+  // The batch logs one BatchUpdated for all its members; a member's share is
+  // its batch debt shares over the batch's total, the division the
+  // TroveManager makes for its debt.
+
+  const shareInputs = (vals: { shares?: string; totalShares: string }): ProvInput[] => [
+    {
+      label: "Trove shares",
+      value: opVal(vals.shares),
+      kind: "chain",
+      pclass: "emitted",
+      note: "BatchedTroveUpdated._batchDebtShares at the Trove's last change",
+    },
+    {
+      label: "total shares",
+      value: opVal(vals.totalShares),
+      kind: "chain",
+      pclass: "emitted",
+      note: "BatchUpdated._totalDebtShares",
+    },
+  ];
+
+  /** The Trove's debt at the batch's change. */
+  const batchDebtShareProv = (
+    coords: LiquityForkCoords,
+    vals: { debt?: string; batchDebt: string; shares?: string; totalShares: string },
+  ): Provenance => ({
+    kind: "chain-derived",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary: `The Trove's debt at this change — its share of the batch's debt, which the batch logged with this change, interest and management fee included.`,
+    contract: troveManagerContract(coords),
+    via: `${streamVia()} · BatchUpdated log · _debt × shares ÷ _totalDebtShares · ÷10^18`,
+    formula: "batch debt × Trove shares ÷ total shares",
+    inputs: [
+      {
+        label: "batch debt",
+        value: opVal(vals.batchDebt),
+        kind: "chain",
+        pclass: "emitted",
+        note: "BatchUpdated._debt",
+      },
+      ...shareInputs(vals),
+      ...eventInputs(coords),
+    ],
+  });
+
+  /** The Trove's share of a premature-adjustment fee the batch paid. */
+  const batchFeeShareProv = (
+    coords: LiquityForkCoords,
+    vals: { fee?: string; batchFee: string; shares?: string; totalShares: string },
+  ): Provenance => ({
+    kind: "chain-derived",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary: `Premature-adjustment fee this Trove carried — the batch manager changed the rate inside the protocol's cooldown after its last change, so ${cfg.protocolName} added a fee to the batch's debt. Each member Trove carries it in proportion to its shares of the batch.`,
+    contract: troveManagerContract(coords),
+    via: `${streamVia()} · BatchUpdated log · _debtIncreaseFromUpfrontFee × shares ÷ _totalDebtShares · ÷10^18`,
+    formula: "batch fee × Trove shares ÷ total shares",
+    inputs: [
+      {
+        label: "batch fee",
+        value: opVal(vals.batchFee),
+        kind: "chain",
+        pclass: "emitted",
+        note: "BatchUpdated._debtIncreaseFromUpfrontFee",
+      },
+      ...shareInputs(vals),
+      ...eventInputs(coords),
+    ],
+  });
+
   // ── Event header: the interest-batch manager AT THIS event ─────────────────
   // A param of the Trove's BatchedTroveUpdated at this event — a claim about
   // THIS row, not a lookup of who manages the Trove today.
@@ -853,6 +1007,12 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     rateAtEventProv,
     batchManagerProv,
     lifetimeFlowProv,
+    collUsdProv,
+    collRatioProv,
+    rateBeforeProv,
+    costPerYearProv,
+    batchDebtShareProv,
+    batchFeeShareProv,
   };
 }
 

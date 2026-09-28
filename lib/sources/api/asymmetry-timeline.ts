@@ -18,6 +18,7 @@ import type {
   LiquityForkOperationFacts,
   LiquityForkRedemptionFacts,
   LiquityForkLiquidationFacts,
+  LiquityForkBatchRateFacts,
 } from "@/lib/shared/types/event-shape";
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import {
@@ -90,6 +91,21 @@ export interface MvRow {
    *  liquidation/redemption blocks; absent on pre-migration responses. */
   price_usd?: string | null;
   price_source?: string | null;
+  /** The transaction's gas (mig 083's gas columns); absent on older responses. */
+  tx_gas_used?: string | null;
+  tx_gas_price?: string | null;
+  /** A batch manager's rate or fee change (server mig 342) — set on
+   *  setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only.
+   *  Raw 1e18-scaled rates and 18-decimal amounts, as the index printed them. */
+  batch_rate_before?: string | null;
+  batch_management_fee?: string | null;
+  batch_management_fee_before?: string | null;
+  batch_debt?: string | null;
+  batch_total_shares?: string | null;
+  batch_upfront_fee?: string | null;
+  trove_batch_shares?: string | null;
+  trove_batch_debt?: string | null;
+  trove_batch_fee?: string | null;
   /** TroveOperation's account of WHY this event's balances moved — NULL where
    *  no operation row matched the event, absent on pre-migration responses (mig 169).
    *  The debt legs are USDaf (18); the collateral legs are in the branch's own
@@ -136,7 +152,40 @@ const LABELS: Record<AsymmetryEventType, string> = {
   openTroveAndJoinBatch: "Open Trove + Join Batch",
   setInterestBatchManager: "Set Batch Manager",
   removeFromBatch: "Remove From Batch",
+  setBatchManagerAnnualInterestRate: "Batch Rate Change",
+  lowerBatchManagerAnnualFee: "Batch Fee Cut",
 };
+
+const BATCH_RATE_KINDS = new Set<string>(["setBatchManagerAnnualInterestRate", "lowerBatchManagerAnnualFee"]);
+
+/** A batch manager's change → ctx shape, off a mig-342 batch row. Undefined on
+ *  the Trove's own events. */
+function batchRateOf(r: MvRow): LiquityForkBatchRateFacts | undefined {
+  if (!BATCH_RATE_KINDS.has(r.action) || r.batch_debt == null) return undefined;
+  const opt = (v: string | null | undefined, decimals: number) =>
+    v != null && v !== "" ? fmtUnits(bigintOf(v), decimals) : undefined;
+  return {
+    rateAfter: fmtUnits(bigintOf(r.annual_interest_rate), RATE_DECIMALS),
+    rateBefore: opt(r.batch_rate_before, RATE_DECIMALS),
+    managementFee: fmtUnits(bigintOf(r.batch_management_fee ?? null), RATE_DECIMALS),
+    managementFeeBefore: opt(r.batch_management_fee_before, RATE_DECIMALS),
+    troveDebt: opt(r.trove_batch_debt, DEBT_DECIMALS),
+    troveFee: opt(r.trove_batch_fee, DEBT_DECIMALS),
+    batchDebt: fmtUnits(bigintOf(r.batch_debt), DEBT_DECIMALS),
+    batchFee: fmtUnits(bigintOf(r.batch_upfront_fee ?? null), DEBT_DECIMALS),
+    troveShares: opt(r.trove_batch_shares, DEBT_DECIMALS),
+    totalShares: fmtUnits(bigintOf(r.batch_total_shares ?? null), DEBT_DECIMALS),
+  };
+}
+
+/** The transaction's gas in ETH. The USD leg stays 0: the fork lanes carry no
+ *  ETH price at the block, and the explainer states the ETH figure alone. */
+function gasOf(r: MvRow): { gasUsed: number; gasCostEth: number; gasCostUsd: number } | undefined {
+  const used = r.tx_gas_used != null ? Number(r.tx_gas_used) : NaN;
+  const price = r.tx_gas_price != null ? Number(r.tx_gas_price) : NaN;
+  if (!Number.isFinite(used) || !Number.isFinite(price) || used <= 0 || price <= 0) return undefined;
+  return { gasUsed: used, gasCostEth: (used * price) / 1e18, gasCostUsd: 0 };
+}
 
 const ZERO = BigInt(0);
 const RATE_DECIMALS = 16; // annual_interest_rate is 1e18-scaled ratio → 1e16 = 1%
@@ -316,8 +365,10 @@ export function buildAsymmetryTimeline(
     // because a row served beside a folder, or first in a window or a span,
     // has no neighbour here. An older response carries none, and the row
     // before it stands in.
-    const prevRate =
-      kind === "adjustTroveInterestRate" && r.rate_before !== undefined
+    const batchRate = batchRateOf(r);
+    const prevRate = batchRate
+      ? (r.batch_rate_before ?? null)
+      : kind === "adjustTroveInterestRate" && r.rate_before !== undefined
         ? r.rate_before
         : idx > 0
           ? rows[idx - 1].annual_interest_rate
@@ -339,7 +390,11 @@ export function buildAsymmetryTimeline(
       isBatched: r.is_batched,
       batchManager: r.batch_manager ?? undefined,
       isOpen: idx === 0,
-      ...(kind === "liquidate" || kind === "redeemCollateral" ? { priceAtBlock: forkPriceOf(r, collDec) } : {}),
+      // The branch price at the block wherever the index carries one: every
+      // liquidation and redemption, and every Ebisu timeline row (the filler's
+      // every-event lane, server mig 342), which the market notes read.
+      ...(forkPriceOf(r, collDec) ? { priceAtBlock: forkPriceOf(r, collDec) } : {}),
+      ...(batchRate ? { batchRate } : {}),
       // Why the balances moved, and — on a redemption — the branch-wide act
       // this Trove was a slice of. Both undefined where the read path does not
       // carry the columns, which is what a pre-migration response looks like.
@@ -352,16 +407,32 @@ export function buildAsymmetryTimeline(
       // own BatchedTroveUpdated, the rate off the batch's BatchUpdated, and
       // the debt is shares/total × batch debt — derived, so NO envelope.
       // Regular rows: all three are TroveUpdated params.
-      origin: r.is_batched
+      origin: batchRate
         ? {
-            coll: originVal("BatchedTroveUpdated", "_coll", collDec, r.coll_after),
+            // The Trove's balances on a batch row are its last own event's; the
+            // rate is this BatchUpdated's.
             annualInterestRate: originVal("BatchUpdated", "_annualInterestRate", RATE_DECIMALS, r.annual_interest_rate),
           }
-        : {
-            debt: originVal("TroveUpdated", "_debt", DEBT_DECIMALS, r.debt_after),
-            coll: originVal("TroveUpdated", "_coll", collDec, r.coll_after),
-            annualInterestRate: originVal("TroveUpdated", "_annualInterestRate", RATE_DECIMALS, r.annual_interest_rate),
-          },
+        : r.is_batched
+          ? {
+              coll: originVal("BatchedTroveUpdated", "_coll", collDec, r.coll_after),
+              annualInterestRate: originVal(
+                "BatchUpdated",
+                "_annualInterestRate",
+                RATE_DECIMALS,
+                r.annual_interest_rate,
+              ),
+            }
+          : {
+              debt: originVal("TroveUpdated", "_debt", DEBT_DECIMALS, r.debt_after),
+              coll: originVal("TroveUpdated", "_coll", collDec, r.coll_after),
+              annualInterestRate: originVal(
+                "TroveUpdated",
+                "_annualInterestRate",
+                RATE_DECIMALS,
+                r.annual_interest_rate,
+              ),
+            },
       // The same arms one event back, keyed on the PREVIOUS event's
       // batchedness (was_batched). NULL/absent (first event, or a
       // pre-migration response) = no claim at all. The before-rate has no
@@ -405,7 +476,7 @@ export function buildAsymmetryTimeline(
       ? "No change"
       : kind === "adjustTrove"
         ? (forkAdjustLabel(classifyTroveAdjust({ collDelta, debtDelta: debtMove })) ?? LABELS[kind])
-        : kind === "adjustTroveInterestRate"
+        : kind === "adjustTroveInterestRate" || kind === "setBatchManagerAnnualInterestRate"
           ? forkRateChangeLabel(rateBefore, ctx.interestRate, r.is_batched)
           : (LABELS[kind] ?? kind);
 
@@ -428,6 +499,7 @@ export function buildAsymmetryTimeline(
       actionType: isNoChange ? "adjustTrove_noChange" : kind,
       actionLabel,
       flows,
+      ...(gasOf(r) ? { gas: gasOf(r) } : {}),
       context: { protocol: "asymmetry", data: ctx },
     };
   });
