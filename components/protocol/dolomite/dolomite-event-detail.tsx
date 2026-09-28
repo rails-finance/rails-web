@@ -1,15 +1,12 @@
 "use client";
 
 // Dolomite event detail — adapter onto the shared ChainTruthDetail grid.
-// One lane per row (the row IS one balance leg): the PAR balance
-// before→after, labeled for what it is. ⚠️ Par is a SCALED balance — the
-// column heads say "· par" explicitly, never "principal": interest lives in
-// the per-market index, and par × index = tokens. The transition is built
-// from the row's own two emitted absolutes (newPar and its lag) — NOT
-// reconstructed from the wei delta, which sits on a different axis (tokens)
-// and differs from the par change by the index factor. The header's delta
-// carries the wei side; this grid carries the par side; each is traced to its
-// own class.
+// One lane per row (the row IS one balance leg): the token balance
+// before→after, par × the market's index at the block, which getAccountWei
+// reads there. The transition is built from the row's two emitted absolutes
+// (newPar and its lag) at that one index, and the line under it states the
+// interest accrued since the previous row. A payload without the index falls
+// back to the par axis, labelled "· par".
 //
 // The narrating liquidation legs additionally carry the forensics card: the
 // two legs of the SAME LogLiquidate (paired by log index — one tx can hold
@@ -32,6 +29,10 @@ import {
   parAfterProv,
   parBeforeProv,
   parDeltaProv,
+  balanceAfterProv,
+  balanceBeforeProv,
+  balanceChangeProv,
+  dolomiteInterestSincePreviousProv,
   dolomiteLiqAtBlockPriceProv,
   dolomiteLiqLegValueProv,
   dolomiteLiqPremiumProv,
@@ -255,29 +256,29 @@ export function DolomiteEventDetail({
   const forensics =
     bothLegs != null ? buildDolomiteLiqForensics(bothLegs.held, bothLegs.owed, coords, atBlock) : undefined;
 
-  // The lane's label states the axis (par) and the side of zero it sits on —
-  // a negative par IS debt, and "Debt · par" is set explicitly so no column
-  // ever reads as principal.
-  const label = ctx.side === "debt" ? "Debt · par" : "Balance · par";
+  // The lane states the token balance the core held: par × the market's index
+  // at the block (a negative balance IS debt). A payload without the index
+  // falls back to the par axis, labelled "· par".
+  const onChain = ctx.balanceAfter != null;
+  const label = ctx.side === "debt" ? (onChain ? "Debt" : "Debt · par") : onChain ? "Balance" : "Balance · par";
 
-  // Transition on the PAR axis: before = the lag lane (the previous emitted
-  // absolute), change = after − before (two emitted absolutes). Undefined
-  // when the backend had no prior row (the account's first touch of this
-  // market) — the card falls back to a plain after-value.
+  // Transition: before = the previous emitted absolute at this block's index
+  // (or the bare par), change = after − before. Undefined on a zero change.
   let transition: ChainTruthTransition | undefined;
-  const afterN = ctx.parAfter != null ? Number(ctx.parAfter) : null;
-  const beforeN = ctx.parBefore != null ? Number(ctx.parBefore) : null;
-  if (afterN != null && beforeN != null && Number.isFinite(afterN) && Number.isFinite(beforeN)) {
+  const afterN = Number(onChain ? ctx.balanceAfter : ctx.parAfter);
+  const beforeRaw = onChain ? ctx.balanceBefore : ctx.parBefore;
+  const beforeN = beforeRaw != null ? Number(beforeRaw) : null;
+  if ((onChain || ctx.parAfter != null) && beforeN != null && Number.isFinite(afterN) && Number.isFinite(beforeN)) {
     const changeN = afterN - beforeN;
     if (changeN !== 0) {
       const sign = changeN >= 0 ? "+" : "−";
       transition = {
         before: formatCompact(beforeN),
         beforeExact: formatExact(beforeN),
-        beforeProv: parBeforeProv(sym, coords, ctx.raw?.parBefore),
+        beforeProv: onChain ? balanceBeforeProv(sym, coords) : parBeforeProv(sym, coords, ctx.raw?.parBefore),
         change: `${sign}${formatCompact(Math.abs(changeN))}`,
         changeExact: `${sign}${formatExact(Math.abs(changeN))}`,
-        changeProv: parDeltaProv(sym, coords),
+        changeProv: onChain ? balanceChangeProv(sym, coords) : parDeltaProv(sym, coords),
       };
     }
   }
@@ -285,10 +286,18 @@ export function DolomiteEventDetail({
   const stats: ChainTruthStat[] = [
     {
       label,
-      value: fmt(ctx.parAfter),
+      value: fmt(onChain ? ctx.balanceAfter : ctx.parAfter),
       symbol: sym,
-      prov: parAfterProv(sym, coords, ctx.raw?.parAfter),
+      prov: onChain ? balanceAfterProv(sym, coords) : parAfterProv(sym, coords, ctx.raw?.parAfter),
       transition,
+      ...(ctx.interestSincePrevious
+        ? {
+            interestSincePrevious: {
+              value: ctx.interestSincePrevious,
+              prov: dolomiteInterestSincePreviousProv(sym, coords),
+            },
+          }
+        : {}),
     },
   ];
 

@@ -165,6 +165,65 @@ export const parDeltaProv = (sym: string, coords: DolomiteCoords): Provenance =>
   ]),
 });
 
+/** Token balance AFTER this event = par after × the market's index at the
+ *  block (the core's parToWei), what getAccountWei reads there. */
+export const balanceAfterProv = (sym: string, coords: DolomiteCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: {
+    kind: "recompute",
+    text:
+      coords.blockNumber != null
+        ? `Re-run the core's getAccountWei eth_call at block ${coords.blockNumber} against an archive node`
+        : "Re-run the core's getAccountWei eth_call at the event's block",
+  },
+  summary: `${sym} this account held AFTER this event${atBlock(coords)}, interest included — the emitted \`newPar\` times the market's index at the block (the supply index on a positive balance, the borrow index rounded up on a debt), from the block's LogIndexUpdate. That is the core's parToWei, so it equals getAccountWei read at the block; a negative balance IS debt.`,
+  contract: MARGIN,
+  via: `${DOLOMITE_VIA} · newPar × LogIndexUpdate index at the block`,
+  formula: "par after × index ÷ 10^18",
+  inputs: eventInputs(coords),
+});
+
+/** Token balance BEFORE this event = par before × the same block's index. */
+export const balanceBeforeProv = (sym: string, coords: DolomiteCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `${sym} this account held just BEFORE this event — the previous event's emitted \`newPar\` times this block's index. It includes the interest accrued since the previous row.`,
+  contract: MARGIN,
+  via: "previous newPar × LogIndexUpdate index at this block",
+  formula: "after − change",
+  inputs: eventInputs(coords, [
+    { label: "after", kind: "chain-derived", pclass: "state", note: "par after × index at this block" },
+    { label: "change", kind: "chain-derived", pclass: "state", note: "(par after − par before) × index" },
+  ]),
+});
+
+/** The change this event made to the token balance, at one index. */
+export const balanceChangeProv = (sym: string, coords: DolomiteCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: txVerify(coords),
+  summary: `The ${sym} balance change this event made — the balance after less the balance before, both at this block's index. It matches the leg's emitted \`deltaWei\` up to the core's rounding.`,
+  contract: MARGIN,
+  via: "(newPar − previous newPar) × index at the block",
+  formula: "after − before",
+  inputs: eventInputs(coords, [
+    { label: "after", kind: "chain-derived", pclass: "state", note: "par after × index" },
+    { label: "before", kind: "chain-derived", pclass: "state", note: "par before × index" },
+  ]),
+});
+
+/** Interest accrued between the position's previous row and this one. */
+export const dolomiteInterestSincePreviousProv = (sym: string, coords: DolomiteCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `${sym} interest this balance accrued since the account's previous event on this market, up to this one${atBlock(coords)} — the balance just before this event less the balance just after the previous one. Par did not move between them, so this is par × (the index at this block − the index at the previous row's block), both from LogIndexUpdate.`,
+  contract: MARGIN,
+  via: "par before × (index at this block − index at the previous row)",
+  formula: "par × (index − previous index) ÷ 10^18",
+  inputs: eventInputs(coords),
+});
+
 /** The header's per-leg receipt for whichever lane this eventType renders — the
  *  SAME switch the header used to inline, extracted so the card's spine echo
  *  can call the identical builder with the identical args (byte-identical

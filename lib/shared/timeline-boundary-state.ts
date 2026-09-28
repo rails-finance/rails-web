@@ -98,7 +98,13 @@ export function boundaryStateFromOldestRow(e: BaseActivityEvent | undefined): Bo
     }
     case "dolomite": {
       const d = c.data;
-      return lines(line(`${d.marketSymbol} ${d.side === "debt" ? "debt" : "supply"}`, d.parBefore, d.marketSymbol));
+      return lines(
+        line(
+          `${d.marketSymbol} ${d.side === "debt" ? "debt" : "supply"}`,
+          d.balanceBefore ?? d.parBefore,
+          d.marketSymbol,
+        ),
+      );
     }
     case "frankencoin": {
       const d = c.data;

@@ -10,10 +10,9 @@
 //
 // Figures render through <Prov echo>: the moved amount echoes the header /
 // spine delta receipt (movedDeltaProv + the same coords → the same entry key).
-// Par is a SCALED balance, never a real token amount — the detail grid carries
-// the par before→after under its own "· par" label, and this pane never
-// restates a par figure numerically (a bold "{par} {sym}" would misread as the
-// real balance). The resulting balance is narrated in words instead.
+// The detail grid carries the balance before→after (par × the market's index
+// at the block); this pane narrates the resulting balance in words and reads
+// only its sign, which par and the token balance share.
 //
 // ── Fill-standard notes (charter §5) ─────────────────────────────────────────
 // Checklist items Dolomite cannot fill per event, each a data fact of its

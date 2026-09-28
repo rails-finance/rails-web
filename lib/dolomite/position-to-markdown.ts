@@ -208,20 +208,26 @@ function timelineTable(events: BaseActivityEvent[], history: MarkdownHistoryScop
     out.push("_No transaction history available._");
     return out;
   }
-  out.push("| # | Date | Action | Market | Amount | Par after | Transaction |");
-  out.push("|---|------|--------|--------|--------|-----------|-------------|");
+  out.push(
+    "| # | Date | Action | Market | Amount | Balance after | Interest since previous | Par after | Transaction |",
+  );
+  out.push(
+    "|---|------|--------|--------|--------|---------------|-------------------------|-----------|-------------|",
+  );
   rows.forEach((e, i) => {
     if (!isDolomiteEvent(e)) return;
     const d = e.context.data;
     const amount = d.weiDelta != null ? `${amt(Math.abs(parseFloat(d.weiDelta)))} ${d.marketSymbol}` : "—";
     const parAfter = d.parAfter != null ? amt(parseFloat(d.parAfter)) : "—";
+    const balanceAfter = d.balanceAfter != null ? amt(parseFloat(d.balanceAfter)) : "—";
+    const interest = d.interestSincePrevious != null ? amt(parseFloat(d.interestSincePrevious)) : "";
     out.push(
-      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${e.actionLabel} | ${d.marketSymbol} | ${amount} | ${parAfter} | ${txCell(e)} |`,
+      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${e.actionLabel} | ${d.marketSymbol} | ${amount} | ${balanceAfter} | ${interest} | ${parAfter} | ${txCell(e)} |`,
     );
   });
   out.push("");
   out.push(
-    "_Amount is the leg's emitted deltaWei (token units). Par after is the core's own emitted absolute after-state — the SCALED balance (multiply by the market's interest index for tokens); a negative par IS debt. Liquidation and seizure rows are balances taken under the protocol's rules — not acts the account performed._",
+    "_Amount is the leg's emitted deltaWei (token units). Balance after is the token balance the core held after the row: par after × the market's index at the block (getAccountWei there); interest since previous is what it accrued since the account's previous row on that market. Par after is the core's emitted scaled balance; a negative balance IS debt. Liquidation and seizure rows are balances taken under the protocol's rules, not acts the account performed._",
   );
   out.push("");
   return out;

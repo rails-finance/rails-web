@@ -5,7 +5,8 @@
 // aaveV4EconomicsContent in lib/shared/learn-more-content.ts).
 
 import type { ReactNode } from "react";
-import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
+import type { TowerLine } from "@/lib/shared/chain-truth-economics";
+import type { DolomiteTowerData } from "@/lib/dolomite/economics";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { formatCompact } from "@/lib/utils/format";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
@@ -25,7 +26,7 @@ function fmt(n: number, valued: boolean, symbol: string | null): string {
   return valued ? formatCompactUsd(n) : symbol ? `${formatCompact(n)} ${symbol}` : formatCompact(n);
 }
 
-export function dolomiteEconomicsExplanation(data: ChainTruthTowerData): ReactNode {
+export function dolomiteEconomicsExplanation(data: DolomiteTowerData): ReactNode {
   const valued = data.valued;
   const bullets: string[] = [];
 
@@ -47,6 +48,15 @@ export function dolomiteEconomicsExplanation(data: ChainTruthTowerData): ReactNo
     if (borrowed > 0) parts.push(`${fmt(borrowed, valued, symbol)} borrowed`);
     if (repaid > 0) parts.push(`${fmt(repaid, valued, symbol)} repaid`);
     bullets.push(`It has also had ${parts.join(" and ")}.`);
+  }
+
+  if (data.lifetimeInterest && data.lifetimeInterest.length > 0) {
+    const parts = data.lifetimeInterest.map(
+      (r) => `${formatCompact(Math.abs(r.amount))} ${r.symbol} ${r.amount > 0 ? "earned" : "paid"}`,
+    );
+    bullets.push(
+      `Interest over its life: ${parts.join(", ")} — each market's balance now less the net of every move in and out.`,
+    );
   }
 
   if (sideTotal(data.collateral.liquidated, valued) > 0 || sideTotal(data.debt.liquidated, valued) > 0) {
@@ -80,7 +90,7 @@ export function dolomiteEconomicsExplanation(data: ChainTruthTowerData): ReactNo
         These figures total this sub-account&apos;s lifetime flows on Dolomite across every event in its captured
         history.
       </p>
-      {bullets.slice(0, 6).map((bullet, i) => (
+      {bullets.slice(0, 7).map((bullet, i) => (
         <div key={i} className="flex items-start gap-2 leading-relaxed">
           <span className="select-none text-rb-500">•</span>
           <span>{bullet}</span>

@@ -79,6 +79,13 @@ export interface DolomiteMvRow {
   new_par: string | null;
   /** SIGNED par before — lag(new_par); null = first touch = zero. */
   par_before: string | null;
+  /** The market's supply / borrow index (1e18) at this row's block and at the
+   *  position's previous row. Absent on a payload from before the route sent
+   *  them, and on a row without a market. */
+  supply_index?: string | null;
+  borrow_index?: string | null;
+  prev_supply_index?: string | null;
+  prev_borrow_index?: string | null;
   /** deposit `from` / withdraw `to` / the other account's owner. */
   counterparty: string | null;
   counterparty_number: string | null;
@@ -114,6 +121,18 @@ function bigintOf(raw: string | null): bigint {
     return ZERO;
   }
 }
+
+const INDEX_BASE = BigInt(10) ** BigInt(18);
+
+/** The core's Interest.parToWei: a positive par × the supply index, a
+ *  negative par × the borrow index, each rounded half up in magnitude. */
+function parToWei(par: bigint, supplyIndex: bigint, borrowIndex: bigint): bigint {
+  const half = INDEX_BASE / BigInt(2);
+  if (par >= ZERO) return (par * supplyIndex + half) / INDEX_BASE;
+  return -((-par * borrowIndex + half) / INDEX_BASE);
+}
+
+const absBig = (v: bigint): bigint => (v < ZERO ? -v : v);
 
 /** Exact raw → decimal string for the given decimals (trims trailing zeros). */
 function fmtUnits(raw: bigint, decimals: number): string {
@@ -238,6 +257,25 @@ export function buildDolomiteTimeline(
             ? "debt"
             : "supply";
 
+    // The balance the core held: par × the market's index at the row's block,
+    // which is what getAccountWei reads there. Before is the par before at the
+    // same index; the gap from the previous row's after (the same par at that
+    // row's index) is the interest accrued between the two.
+    const atRow =
+      r.supply_index != null && r.borrow_index != null
+        ? { s: bigintOf(r.supply_index), b: bigintOf(r.borrow_index) }
+        : null;
+    const prevIdx =
+      r.prev_supply_index != null && r.prev_borrow_index != null
+        ? { s: bigintOf(r.prev_supply_index), b: bigintOf(r.prev_borrow_index) }
+        : null;
+    const weiAfter = atRow && parAfter != null ? parToWei(parAfter, atRow.s, atRow.b) : null;
+    const weiBefore = atRow && parBefore != null ? parToWei(parBefore, atRow.s, atRow.b) : null;
+    const interestRaw =
+      atRow && prevIdx && parBefore != null && parBefore !== ZERO
+        ? absBig(parToWei(parBefore, atRow.s, atRow.b)) - absBig(parToWei(parBefore, prevIdx.s, prevIdx.b))
+        : null;
+
     const ctx: DolomiteContext = {
       eventType: kind,
       marketId: marketId ?? -1,
@@ -247,6 +285,11 @@ export function buildDolomiteTimeline(
       weiDelta: r.delta_wei != null ? fmtUnits(deltaWei, decimals) : undefined,
       parAfter: parAfter != null ? fmtUnits(parAfter, decimals) : undefined,
       parBefore: parBefore != null ? fmtUnits(parBefore, decimals) : undefined,
+      ...(weiAfter != null ? { balanceAfter: fmtUnits(weiAfter, decimals) } : {}),
+      ...(weiBefore != null ? { balanceBefore: fmtUnits(weiBefore, decimals) } : {}),
+      ...(interestRaw != null && interestRaw !== ZERO
+        ? { interestSincePrevious: fmtUnits(interestRaw, decimals) }
+        : {}),
       ...(r.counterparty ? { counterparty: r.counterparty.toLowerCase() } : {}),
       ...(r.counterparty_number != null ? { counterpartyAccountNumber: r.counterparty_number } : {}),
       ...(r.liquidator ? { liquidator: r.liquidator.toLowerCase() } : {}),

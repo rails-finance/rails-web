@@ -1855,6 +1855,16 @@ export interface DolomiteContext {
   parAfter?: string;
   /** Signed PAR balance before (lag of the emitted absolute). */
   parBefore?: string;
+  /** Signed token balance after this event (human): par after × the market's
+   *  index at the block, what getAccountWei reads there. Absent where the
+   *  answer carried no index. */
+  balanceAfter?: string;
+  /** Signed token balance just before this event: par before × the same index. */
+  balanceBefore?: string;
+  /** Interest the balance accrued since the position's previous row on this
+   *  market (human, a magnitude: earned on a supply, owed on a debt). Absent
+   *  when zero or unknown. */
+  interestSincePrevious?: string;
   /** transfer legs — the other Account.Info. liquidation legs — the other
    *  side's account (borrower ↔ liquidator). */
   counterparty?: string;

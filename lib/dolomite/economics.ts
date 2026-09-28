@@ -10,10 +10,10 @@
 // par zero-crossing — both pieces of one leg scale by the same index, so the
 // wei split is proportionally exact, not an estimate.
 //
-// There is deliberately NO principal-vs-accrued interest split here:
-// Dolomite's interest lives in the per-market index (par is the scaled
-// balance), so an exact split would need the index at each event — a lane the
-// chain overlay does not carry. Nothing is estimated in its place.
+// The tower draws no principal-vs-accrued split line; the explanation states
+// each market's lifetime interest instead: the balance the chain holds now
+// less the net of every leg's emitted deltaWei. Each timeline row states the
+// interest accrued since the previous row, from the index at both rows.
 //
 // USD is ON-CHAIN: each market valued at the core's own getMarketPrice,
 // threaded onto priceByMarket (keyed by MARKET ID — symbols collide on this
@@ -215,6 +215,15 @@ export function computeDolomiteCardCaptions(view: DolomitePositionView): Dolomit
   return { borrowRate };
 }
 
+/** The tower data plus each market's lifetime interest (token units, signed:
+ *  positive earned on a supply, negative paid on a debt): the balance the core
+ *  holds now (par × current index) less the net of the account's emitted
+ *  deltaWei on that market. Absent where the lifetime layer is, or where a
+ *  market's current balance is only its par. */
+export type DolomiteTowerData = ChainTruthTowerData & {
+  lifetimeInterest?: { marketId: number; symbol: string; amount: number }[];
+};
+
 export function computeDolomiteEconomics(
   view: DolomitePositionView,
   events?: BaseActivityEvent[],
@@ -225,7 +234,7 @@ export function computeDolomiteEconomics(
    *  NEITHER — the lifetime layer states nothing rather than a window's
    *  arithmetic. */
   precomputedLifetime?: MarketFlows[],
-): ChainTruthTowerData {
+): DolomiteTowerData {
   const usdOf = (marketId: number, amount: number): number | null => {
     const p = view.priceByMarket?.[String(marketId)];
     return typeof p === "number" && p > 0 ? amount * p : null;
@@ -295,7 +304,20 @@ export function computeDolomiteEconomics(
     return rows.length === 1 ? pick(rows[0]) : 0;
   };
 
+  let lifetimeInterest: DolomiteTowerData["lifetimeInterest"];
+  if (lifetime) {
+    const held = new Map<number, number | null>();
+    for (const r of view.supplies) held.set(r.marketId, (held.get(r.marketId) ?? 0) + (r.current ?? NaN));
+    for (const r of view.borrows) held.set(r.marketId, (held.get(r.marketId) ?? 0) - (r.current ?? NaN));
+    const rows = [...lifetime.values()].map((f) => {
+      const net = f.deposited - f.withdrawn + f.repaid - f.borrowed + f.liquidatedDebt - f.seizedCollateral;
+      return { marketId: f.marketId, symbol: f.symbol, amount: (held.get(f.marketId) ?? 0) - net };
+    });
+    if (rows.every((r) => Number.isFinite(r.amount))) lifetimeInterest = rows.filter((r) => Math.abs(r.amount) > DUST);
+  }
+
   return {
+    ...(lifetimeInterest ? { lifetimeInterest } : {}),
     valued,
     // The core's own oracle price → chain-derived, so the USD bars survive
     // the gate.
@@ -315,6 +337,6 @@ export function computeDolomiteEconomics(
       lifetimeInflow: inflow((r) => r.borrowed),
     },
     interestNote:
-      "Balances carry interest up to the most recent update; where the latest reading hasn't arrived they show the plain balance, a touch behind on interest. Interest here lives in each market's per-second rate rather than as its own line, so the tower shows no split between principal and accrued interest — an exact split would need the rate at every past event, and nothing is estimated in its place. Dolomite has no Borrow action: a negative balance IS the debt, so lifetime totals sort each move by which side of zero the balance sat on, splitting exactly where a balance crossed zero. USD figures use Dolomite's own oracle price.",
+      "Balances carry interest up to the most recent update; where the latest reading hasn't arrived they show the plain balance, a touch behind on interest. Interest lives in each market's index, so the tower draws no separate interest line; the explanation states each market's interest over the account's life, and each timeline row the interest since the previous row. Dolomite has no Borrow action: a negative balance IS the debt, so lifetime totals sort each move by which side of zero the balance sat on, splitting exactly where a balance crossed zero. USD figures use Dolomite's own oracle price.",
   };
 }
