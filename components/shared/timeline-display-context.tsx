@@ -45,7 +45,7 @@ export interface TimelineDisplayState {
    * auction slices, redemption touches) collapse into one expandable run row.
    * On by default — flip it off to flatten runs back to individual cards. */
   collapseRuns: boolean;
-  /** "Market-note markers" in Display. When true, receipted market notes
+  /** "Market notes" in Display. When true, receipted market notes
    * (facts about the market observed between two of the account's own events)
    * stand on the spine between the events they bracket, each as a marker that
    * opens its note (rails-ops TO-DO-ui-jobs item 118). Off hides every note;

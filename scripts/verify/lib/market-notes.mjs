@@ -12,7 +12,7 @@
 //                               A stored preference the page already holds for
 //                               the key wins, so a check that turns it off and
 //                               reloads reads what it set.
-//   setMarketNotes(page, on)    Display's "Market-note markers", ticked or not;
+//   setMarketNotes(page, on)    Display's "Market notes", ticked or not;
 //                               false when the page offers no such item.
 //   marketNoteCount(page)       every note the timeline places, drawn or not:
 //                               `data-market-notes` on the timeline root. The
@@ -41,7 +41,7 @@ export async function setMarketNotes(page, wantOn) {
   const trigger = displayTrigger(page);
   if ((await trigger.count()) === 0) return false;
   await trigger.click();
-  const item = page.locator("button.overlay-item", { hasText: /^Market-note Markers$/i }).first();
+  const item = page.locator("button.overlay-item", { hasText: /^Market Notes$/i }).first();
   const offered = await item
     .waitFor({ state: "visible", timeout: 3000 })
     .then(() => true)

@@ -5,7 +5,7 @@
 // ids) in the head slot, so "the note" below means the HISTORICAL one (`HIST`),
 // and a control that still holds a market is EXPECTED to show a live note —
 // what it must not show is a historical one or a switch without a note behind
-// it. The switch is Display's "Market-note markers" (rails-ops TO-DO-ui-jobs
+// it. The switch is Display's "Market notes" (rails-ops TO-DO-ui-jobs
 // item 118; a toolbar pill, `Market notes · N`, from 2026-09-06 until then).
 // On desktop a closed note is a marker on the spine; this script turns on
 // "Open all market notes" before load (lib/market-notes.mjs), so every note
@@ -291,7 +291,7 @@ async function waitForList(page) {
   await page.locator("[data-event-id]").first().waitFor({ state: "visible", timeout: 180_000 });
 }
 
-/** Display's "Market-note markers", ticked or not. Returns false when the
+/** Display's "Market notes", ticked or not. Returns false when the
  *  menu offers no such item. */
 async function setMarketNotesPill(page, wantOn) {
   const offered = await setMarketNotes(page, wantOn);
@@ -502,7 +502,7 @@ const withNotes = await readCounts(page);
 const toggled = await setMarketNotesPill(page, false);
 const pillLeft = await page.getByRole("button", { name: /^Market notes ·/i }).count();
 check(
-  '4a  Display offers "Market-note markers", and the toolbar carries no Market notes pill',
+  '4a  Display offers "Market notes", and the toolbar carries no Market notes pill',
   toggled && pillLeft === 0,
   `Display ${toggled ? "turned it off" : "does not offer it"}; pill ${pillLeft}`,
 );
@@ -648,9 +648,9 @@ check(
 // Display's switch must then be offered, and not when no note of any kind is —
 // never an inert switch either way.
 const ctlNotes = await ctlPage.locator("[data-market-note]").count();
-const ctlOffers = await displayMenuOffers(ctlPage, "Market-note Markers").catch((e) => String(e).split("\n")[0]);
+const ctlOffers = await displayMenuOffers(ctlPage, "Market Notes").catch((e) => String(e).split("\n")[0]);
 check(
-  '7d  the control page\'s Display offers "Market-note markers" exactly when a note (live) is',
+  '7d  the control page\'s Display offers "Market notes" exactly when a note (live) is',
   ctlUnread === 0 && ctlSteps === 0 && typeof ctlOffers === "boolean" && ctlOffers === ctlNotes > 0,
   `${ctlNotes} note(s), Display ${typeof ctlOffers === "string" ? ctlOffers : ctlOffers ? "offers it" : "does not"}`,
 );

@@ -346,7 +346,7 @@ try {
   const menu = (await readDisplayMenu(page8)).map((s) => s.toLowerCase());
   // usdp/8 has market notes, so the menu closes on their two items under a
   // rule (rails-ops TO-DO-ui-jobs item 118).
-  const NOTE_LABELS = ["market-note markers", "open all market notes"];
+  const NOTE_LABELS = ["market notes", "open all market notes"];
   check(
     "a. usdp/8's display menu offers exactly the six labels, then the two market-note items, and no collapse item",
     menu.length === 8 &&

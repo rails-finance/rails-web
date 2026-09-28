@@ -5,7 +5,7 @@
 // button) and takes no row height; a click or Enter/Space opens the note's row
 // and panel in place and moves focus to its header, and the open row's filled
 // diamond closes it and returns focus to the marker. Display carries
-// "Market-note markers" and "Open all market notes"; the toolbar's "Market
+// "Market notes" and "Open all market notes"; the toolbar's "Market
 // notes · N" pill is gone. A marker stays when a Types of event filter hides
 // every event. On a phone the list view keeps note rows, its Display offers the
 // switch alone, and the spine view (`?timeline=spine`) keeps its markers.
@@ -49,7 +49,7 @@ const displayTrigger = (page) =>
 const menuItem = (page, text) => page.locator("button.overlay-item", { hasText: new RegExp(`^${text}$`, "i") }).first();
 const isTicked = async (item) => (await item.locator(".bg-rb-500").count()) > 0;
 
-console.log(`Market-note markers — against ${BASE}\n`);
+console.log(`Market notes — against ${BASE}\n`);
 
 // ── Desktop ────────────────────────────────────────────────────────────────
 {
@@ -122,10 +122,10 @@ console.log(`Market-note markers — against ${BASE}\n`);
   await page.waitForTimeout(300);
 
   await displayTrigger(page).click();
-  const markersItem = menuItem(page, "Market-note Markers");
+  const markersItem = menuItem(page, "Market Notes");
   const openAllItem = menuItem(page, "Open All Market Notes");
   check(
-    '6. Display offers "Market-note markers", ticked, and "Open all market notes"',
+    '6. Display offers "Market notes", ticked, and "Open all market notes"',
     (await markersItem.count()) === 1 && (await isTicked(markersItem)) && (await openAllItem.count()) === 1,
   );
   await openAllItem.click();
@@ -147,7 +147,7 @@ console.log(`Market-note markers — against ${BASE}\n`);
   await markersItem.click();
   await page.waitForTimeout(400);
   check(
-    "8. Market-note markers off hides every note",
+    "8. Market notes off hides every note",
     (await page.locator("[data-note-marker], [data-market-note]").count()) === 0,
   );
   check("8b. Open all is greyed while markers are off", (await openAllItem.getAttribute("aria-disabled")) === "true");
@@ -189,7 +189,7 @@ console.log(`Market-note markers — against ${BASE}\n`);
   check("10c. the phone list view keeps note rows", rows > 0, `${rows} rows`);
   await displayTrigger(page).click();
   await page.waitForTimeout(400);
-  const mk = page.getByRole("button", { name: /^Market-note Markers$/i });
+  const mk = page.getByRole("button", { name: /^Market Notes$/i });
   const oa = page.getByRole("button", { name: /^Open All Market Notes$/i });
   check(
     "11. the phone's Display offers the markers switch alone",

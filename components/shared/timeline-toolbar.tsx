@@ -144,7 +144,7 @@ export const COLLAPSE_RUNS_ITEM: TimelineDisplayItem = { key: "collapseRuns", la
  *  notes as rows in the list view and as markers with one open at a time in
  *  the spine view, so it gets the first item only. */
 export const MARKET_NOTE_ITEMS: TimelineDisplayItem[] = [
-  { key: "showMarketNotes", label: "Market-note markers", separatorBefore: true },
+  { key: "showMarketNotes", label: "Market notes", separatorBefore: true },
   { key: "openAllMarketNotes", label: "Open all market notes" },
 ];
 
@@ -228,7 +228,7 @@ export function TimelineDisplayMenu({ items }: { items: TimelineDisplayItem[] })
             label: labelFor(it),
             separatorBefore: it.separatorBefore,
             disabled: !display.showMarketNotes,
-            title: display.showMarketNotes ? undefined : "Turn on market-note markers first",
+            title: display.showMarketNotes ? undefined : "Turn on market notes first",
           }
         : { key: it.key, label: labelFor(it), separatorBefore: it.separatorBefore },
   );

@@ -66,10 +66,10 @@ function Diamond({ filled }: { filled: boolean }) {
   return (
     <svg width={16} height={16} viewBox="0 0 16 16" aria-hidden="true" className="block shrink-0">
       <rect
-        x={3.5}
-        y={3.5}
-        width={9}
-        height={9}
+        x={3}
+        y={3}
+        width={10}
+        height={10}
         transform="rotate(45 8 8)"
         fill={filled ? "currentColor" : "var(--background)"}
         stroke="currentColor"

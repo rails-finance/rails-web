@@ -332,7 +332,7 @@ export interface ChainTruthTimelineProps {
    *  `eventNumberOf`, the toolbar's count line, the filter option counts, the
    *  heatmap, run counts and the export tables all read exactly what they read
    *  with the array empty. Passing at least one note also adds Display's
-   *  market-note items ("Market-note markers", "Open all market notes");
+   *  market-note items ("Market notes", "Open all market notes");
    *  passing none leaves the menu as it was.
    *
    *  Memoise it on the page: a fresh array identity per render recomputes the
