@@ -3,17 +3,21 @@
 // The phone spine view of a timeline (rails-ops TO-DO-mobile-timeline.md).
 //
 // On a phone the timeline draws each event as its spine segment with a
-// caption, and a tap opens the event's card inline, one at a time. It is
-// behind a flag while it is built: `?timeline=spine` switches it on, on a page
-// whose timeline passes `mobileSpine`. Without both, nothing here renders and
-// the list view is untouched.
+// caption, and a tap opens the event's card inline, one at a time. A page
+// opts in by passing `mobileSpine` to its timeline; there the toolbar's
+// "Timeline | List" switch picks the view (`SpineViewSwitch`), saved as
+// `mobileSpine` in the display preferences, and `?timeline=spine` or
+// `?timeline=list` overrides the saved choice for one page. List is the
+// default. On a page that has not opted in, nothing here renders.
 //
 // The view is a root attribute plus CSS. The timeline root carries
 // `data-mview="spine"` while the view is on, and every layout change is a
-// `mspine:max-sm:` class (the `mspine` variant is in app/globals.css). The flag
-// and the width are read after mount, so the server and the first client
-// render are the list view and hydrate alike. At ≥640px the view never turns
-// on, so desktop is unchanged with or without the flag.
+// `mspine:max-sm:` class (the `mspine` variant is in app/globals.css). The
+// choice and the width are read after mount, so the server and the first
+// client render are the list view and hydrate alike; an inline script in
+// app/layout.tsx marks `<html data-timeline-view="spine">` before first paint,
+// and CSS hides the opted-in list's rows until the spine view replaces them.
+// At ≥640px the view never turns on, so desktop is unchanged.
 
 import {
   createContext,
@@ -29,6 +33,8 @@ import {
 } from "react";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useTimelineScale } from "@/components/shared/activity-timeline";
+import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
+import { CTRL_GHOST } from "@/lib/shared/ui-grammar";
 
 /** What a family passes to turn the phone spine view on for its timeline. */
 export interface MobileSpineConfig {
@@ -38,19 +44,10 @@ export interface MobileSpineConfig {
   keyRight: string;
 }
 
-/** `?timeline=spine`, read after mount the way `?nav=1` is: no
- *  `useSearchParams`, so no Suspense boundary and no server read. */
-export function useSpineViewFlag(): boolean {
-  const [on, setOn] = useState(false);
-  useEffect(() => {
-    setOn(new URLSearchParams(window.location.search).get("timeline") === "spine");
-  }, []);
-  return on;
-}
-
-/** True when the page opted in, the flag is set and the viewport is a phone. */
+/** True when the page opted in, the reader chose the spine view (or the URL
+ *  did) and the viewport is a phone. */
 export function useSpineViewActive(config: MobileSpineConfig | undefined): boolean {
-  const flag = useSpineViewFlag();
+  const flag = useTimelineDisplay().spineView;
   const phone = useMediaQuery(PHONE_QUERY);
   return !!config && flag && phone;
 }
@@ -342,4 +339,42 @@ export function spokenAmount(v: number): string {
   const a = Math.abs(v);
   const digits = a >= 1000 ? 0 : a >= 1 ? 2 : 4;
   return a.toLocaleString("en-US", { maximumFractionDigits: digits });
+}
+
+/** The phone's "Timeline | List" switch (decision 4 of rails-ops
+ *  TO-DO-mobile-timeline.md), at the right end of the toolbar's count line.
+ *  Two buttons with `aria-pressed`, each a 44px-tall target around a smaller
+ *  pill. Hidden from `sm` up. The pressed look follows `<html
+ *  data-timeline-view>` in CSS, so a saved "Timeline" shows before hydration. */
+export function SpineViewSwitch() {
+  const { spineView, setSpineView } = useTimelineDisplay();
+  const option = (on: boolean, label: string) => (
+    <button
+      type="button"
+      aria-pressed={spineView === on}
+      onClick={() => setSpineView(on)}
+      className={`${CTRL_GHOST} group/seg -my-2.5 h-11 px-0.5 first:pl-0 last:pr-0`}
+    >
+      <span
+        className={`rounded-full px-3 py-1 text-xs font-medium group-hover/seg:text-foreground ${
+          on
+            ? "tlspine:bg-rb-100 tlspine:text-foreground dark:tlspine:bg-rb-800 tllist:text-rb-500"
+            : "tllist:bg-rb-100 tllist:text-foreground dark:tllist:bg-rb-800 tlspine:text-rb-500"
+        }`}
+      >
+        {label}
+      </span>
+    </button>
+  );
+  return (
+    <div
+      role="group"
+      aria-label="Show events as"
+      data-spine-switch=""
+      className="ml-auto inline-flex items-center rounded-full border border-rb-200 p-0.5 dark:border-rb-800 sm:hidden"
+    >
+      {option(true, "Timeline")}
+      {option(false, "List")}
+    </div>
+  );
 }

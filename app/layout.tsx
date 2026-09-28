@@ -151,6 +151,16 @@ export default function RootLayout({
         <meta name="theme-color" content="#eee7e9" media="(prefers-color-scheme: light)" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <ThemeScript />
+        {/* The phone timeline view (components/shared/mobile-spine.tsx):
+            `?timeline=spine|list`, else the saved "Timeline | List" choice,
+            marked before first paint so a saved Timeline never shows the list
+            first (app/globals.css). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var v=new URLSearchParams(location.search).get('timeline'),s=v==='spine'||(v!=='list'&&JSON.parse(localStorage.getItem('timeline-display-v3')||'{}').mobileSpine===true);if(s)document.documentElement.dataset.timelineView='spine'}catch(e){}})()",
+          }}
+        />
         {/* "Already-seen" animation flags — flipped before first paint so CSS
             in globals.css can disable the entrance animations on subsequent
             visits without a hydration flicker. The hero flag persists across

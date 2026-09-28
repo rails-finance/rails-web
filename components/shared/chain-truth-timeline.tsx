@@ -458,8 +458,9 @@ export interface ChainTruthTimelineProps {
    *  panel on 2026-09-25 (live's form with dev's reach) and
    *  `timeline-segment-picker.tsx` went with the ruling. */
   segments?: TimelineSegments;
-  /** Opts this timeline into the phone spine view, behind `?timeline=spine`
-   *  (components/shared/mobile-spine.tsx). Omit it and the flag does nothing
+  /** Opts this timeline into the phone spine view: the toolbar grows the
+   *  phone's "Timeline | List" switch and `?timeline=` overrides it
+   *  (components/shared/mobile-spine.tsx). Omit it and neither does anything
    *  here. Families are added one at a time after a 390px sweep. */
   mobileSpine?: MobileSpineConfig;
 }
@@ -741,7 +742,8 @@ function ChainTruthTimelineBody({
   const rawEventId = Array.isArray(routeParams?.eventId) ? routeParams.eventId[0] : routeParams?.eventId;
   const pinnedId = rawEventId != null ? decodeEventId(rawEventId) : null;
   // The phone spine view: never on a pinned page, which shows one card open.
-  const spineActive = useSpineViewActive(pinnedId ? undefined : mobileSpine);
+  const spineOptIn = !!mobileSpine && !pinnedId;
+  const spineActive = useSpineViewActive(spineOptIn ? mobileSpine : undefined);
   const chainId = useChainId();
   // The query params that are part of WHICH position this is, not view state:
   // Aave V3's `?market=` (Core vs Prime is a different account), Liquity V1's
@@ -1443,6 +1445,7 @@ function ChainTruthTimelineBody({
         data-timeline-rows-loaded={rows.length}
         data-market-notes={marketNoteCount || undefined}
         data-mview={spineActive ? "spine" : undefined}
+        data-mspine-opt={spineOptIn ? "" : undefined}
       >
         {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder). */}
         <div data-skel-section="detail-timeline-header">
@@ -1451,6 +1454,7 @@ function ChainTruthTimelineBody({
             displayItems={items}
             leading={toolbarLeading}
             countTooltip={countTooltip}
+            viewSwitch={spineOptIn}
             // The Date button's panel hangs from the toolbar; the second path a
             // month click can take travels to it here.
             monthReach={

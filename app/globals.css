@@ -6,6 +6,23 @@
    carries data-mview="spine" while it is on. Always paired with max-sm:. */
 @custom-variant mspine (&:where([data-mview="spine"] *));
 
+/* The reader's phone view, marked on <html> before first paint by the inline
+   script in app/layout.tsx and kept by TimelineDisplayProvider: the "Timeline |
+   List" switch draws its pressed option from these, so it shows the saved
+   choice before hydration. */
+@custom-variant tlspine (&:where([data-timeline-view="spine"] *));
+@custom-variant tllist (&:where(:root:not([data-timeline-view="spine"]) *));
+
+/* An opted-in timeline (data-mspine-opt) draws the list until its spine view
+   turns on after mount. With the spine view chosen, its rows stay hidden
+   until then, so a phone never shows the list first. The toolbar (the
+   first child) stays. */
+@media (max-width: 639.98px) {
+  :root[data-timeline-view="spine"] [data-mspine-opt]:not([data-mview="spine"]) > :not(:first-child) {
+    visibility: hidden;
+  }
+}
+
 @theme {
   /* Set default transition duration to 0 to prevent halo effect on theme switch */
   --default-transition-duration: 0s;

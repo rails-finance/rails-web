@@ -56,7 +56,7 @@ import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import type { Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
-/** The phone spine view's key row, behind `?timeline=spine`. */
+/** The phone spine view's key row. */
 const LIQUITY_MOBILE_SPINE: MobileSpineConfig = { keyLeft: "to wallet", keyRight: "into Trove" };
 
 export interface TroveViewProps {

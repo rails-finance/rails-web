@@ -18,6 +18,7 @@ import { CalendarRange, Clock, Coins, Layers, Wallet } from "lucide-react";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
+import { SpineViewSwitch } from "@/components/shared/mobile-spine";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   useTimelineDisplay,
@@ -263,6 +264,9 @@ export interface TimelineToolbarProps {
    *  surprising number (see ChainTruthTimelineProps.countTooltip). Unset
    *  renders identically to today. */
   countTooltip?: string;
+  /** The page opted into the phone spine view: the count line ends in the
+   *  "Timeline | List" switch below `sm`. */
+  viewSwitch?: boolean;
 }
 
 /**
@@ -441,7 +445,14 @@ const monthIdxOfTs = (ts: number): number => {
   return d.getUTCFullYear() * 12 + d.getUTCMonth();
 };
 
-export function TimelineToolbar({ tl, displayItems, leading, countTooltip, monthReach }: TimelineToolbarProps) {
+export function TimelineToolbar({
+  tl,
+  displayItems,
+  leading,
+  countTooltip,
+  monthReach,
+  viewSwitch,
+}: TimelineToolbarProps) {
   // One option is not an axis — a single-reserve wallet on a multi-asset roster
   // would get a control whose every state shows the same list.
   const assetOptions = tl.assetOptions.length > 1 ? tl.assetOptions : [];
@@ -567,6 +578,7 @@ export function TimelineToolbar({ tl, displayItems, leading, countTooltip, month
             <span className="text-xs text-rb-500 tabular-nums" title={countTooltip}>
               {countLine}
             </span>
+            {viewSwitch && <SpineViewSwitch />}
           </span>
           {tl.eventOptions.length > 1 && (
             <FilterDropdown
