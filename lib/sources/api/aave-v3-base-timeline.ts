@@ -70,6 +70,7 @@ import {
   replayAaveV3Rows,
   type AaveV3ChainTimelineResult,
   type AaveV3DecodedRow,
+  type AaveV3ReplayInput,
   type AaveV3ReplaySeed,
 } from "@/lib/sources/chain/aave-v3-events";
 import { resolveV3Tokens } from "@/lib/sources/chain/aave-v3-tokens";
@@ -229,6 +230,18 @@ export interface AaveV3IndexRead {
   peakWithheld: boolean;
 }
 
+/** The read and the decode behind `loadAaveV3EventsFromIndex`, stopping
+ *  short of the replay: what a caller needs to replay the rows itself, with a
+ *  render cut it chooses (lib/aave-v3-base/timeline-folders.ts
+ *  replays with the cut lifted and groups after). */
+export interface AaveV3IndexPrepared {
+  input: Omit<AaveV3ReplayInput, "maxRendered">;
+  whole: boolean;
+  heavy: boolean;
+  reason?: string;
+  peakWithheld: boolean;
+}
+
 /**
  * Read a wallet's history from the index. Resolves to null when the index is
  * not reachable at all (no RAILS_API_URL, or the API says it is not
@@ -239,6 +252,23 @@ export async function loadAaveV3EventsFromIndex(
   p: LoadAaveV3IndexParams,
   readerIp?: string,
 ): Promise<AaveV3IndexRead | null> {
+  const read = await readAaveV3Index(p, readerIp);
+  if (!read) return null;
+  return {
+    result: replayAaveV3Rows({ ...read.input, maxRendered: MAX_RENDERED_EVENTS }),
+    whole: read.whole,
+    heavy: read.heavy,
+    reason: read.reason,
+    peakWithheld: read.peakWithheld,
+  };
+}
+
+/** The read and the decode behind `loadAaveV3EventsFromIndex`. Same null and
+ *  same throw. */
+export async function readAaveV3Index(
+  p: LoadAaveV3IndexParams,
+  readerIp?: string,
+): Promise<AaveV3IndexPrepared | null> {
   const base = process.env.RAILS_API_URL;
   if (!base) return null;
   const wallet = p.wallet.toLowerCase();
@@ -374,14 +404,13 @@ export async function loadAaveV3EventsFromIndex(
   // is decided by the sender it carries and dated by the timestamp it carries,
   // never dropped as `undated` (rails-ops reference/timeline-attention-budget.md,
   // decision 0019 leg F).
-  const result = replayAaveV3Rows({
+  const input: Omit<AaveV3ReplayInput, "maxRendered"> = {
     wallet,
     chainId: p.chainId,
     rows,
     metas,
     timestamps,
     senders,
-    maxRendered: MAX_RENDERED_EVENTS,
     ...(seed ? { seed } : {}),
     peakWithheld: json.peakWithheld === "plumbing",
     coverage: {
@@ -393,7 +422,7 @@ export async function loadAaveV3EventsFromIndex(
       source: "index",
       fill: timelineFillFromApi(json.fill),
     },
-  });
+  };
 
   const reason = !cov
     ? "no coverage row"
@@ -411,7 +440,7 @@ export async function loadAaveV3EventsFromIndex(
                 : `heavy wallet — a tail from block ${heavy.cut.block}, no seed`
               : undefined;
   return {
-    result,
+    input,
     whole: reason === undefined,
     heavy: heavy != null,
     reason,

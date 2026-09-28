@@ -21,7 +21,8 @@
 //
 // THE CUT. Grouped, a position's whole replayed history is served as rows up to
 // the shared row cap (`TIMELINE_WINDOW_EVENTS`), trimmed from the oldest end at
-// a block boundary. Past the cap the replay runs a second time with the anchor
+// a block boundary; a month below it is sliced from the same replay
+// (`?from=&to=`, lib/shared/replay-grouped-answer.ts). Past the cap the replay runs a second time with the anchor
 // OFF and its render cut at the trim, so `coverage.omitted` — the boundary
 // card's count, breakdown and state — describes exactly the rows below the
 // trim, and nothing the page drew is also declared missing (the double count of
@@ -30,16 +31,15 @@
 
 import type { BaseActivityEvent, MoonwellContext } from "@/lib/shared/types/event-shape";
 import { isMoonwellEvent } from "@/lib/shared/types/event-shape";
-import type { ServedFolderLeg, TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
+import type { ServedFolderLeg } from "@/lib/shared/timeline-folder";
+import { baseUnitMagnitude, type GroupingAccess, type GroupingSpec } from "@/lib/shared/timeline-grouping";
 import {
-  baseUnitMagnitude,
-  groupIntoRows,
-  trimToRowCap,
-  type GroupedRows,
-  type GroupingAccess,
-  type GroupingSpec,
-  type TrimmedRows,
-} from "@/lib/shared/timeline-grouping";
+  answerStore,
+  groupReplayRest,
+  groupReplaySpan,
+  replayGroupedBody,
+  type ReplayGroupedAnswer,
+} from "@/lib/shared/replay-grouped-answer";
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
 import { externalActor } from "@/lib/shared/external-actor";
 import { getEventActionKey, getEventAssetKeys, getEventCounterpartyKeys } from "@/lib/shared/event-filter-helpers";
@@ -240,101 +240,88 @@ export function moonwellFolderSpecs(
   ];
 }
 
-export interface MoonwellGroupedAnswer {
-  /** The replay the page states its figures from — over every row, or at the
-   *  row cap's cut when the history is longer than the cap. Its `events` are
-   *  EVERY served event; `groupedTimelineBody` keeps only the ungrouped ones. */
-  result: MoonwellChainTimelineResponse;
-  grouped: GroupedRows<BaseActivityEvent>;
-  trimmed: TrimmedRows<BaseActivityEvent>;
-  /** Every event key the trimmed answer serves, in a row or in a folder. */
-  kept: Set<string>;
+export type MoonwellGroupedAnswer = ReplayGroupedAnswer<MoonwellChainTimelineResponse, BaseActivityEvent>;
+
+/** The replay the answers slice: every row, with the render cut lifted. */
+interface MoonwellReplayed {
+  prepared: MoonwellIndexPrepared;
+  full: MoonwellChainTimelineResponse;
+  specs: GroupingSpec<BaseActivityEvent>[];
+  /** Events of the whole history before `full.events[0]`: a seed's rows. */
+  eventsBefore: number;
 }
 
-/** Replay, group, trim — pure over a prepared index read. `cap` is the row cap
- *  and is the shared one everywhere but a verifier, which lowers it to reach the
- *  trim on a position that fits. */
-export function groupMoonwellReplay(
-  prepared: MoonwellIndexPrepared,
-  opts: { cap?: number } = {},
-): MoonwellGroupedAnswer {
-  const full = replayMoonwellRows({ ...prepared.input, maxRendered: Number.MAX_SAFE_INTEGER });
-  const events = full.events;
-  const specs = moonwellFolderSpecs((key) => prepared.input.marketByMtoken.get(key.toLowerCase()));
-  const grouped = groupIntoRows(events, specs, MOONWELL_ROW_ACCESS, {
-    // The first served event's place in the WHOLE history: after the seed's
-    // rows on a seeded heavy wallet, 1 everywhere else.
-    ordinalBase: full.totalEvents - events.length + 1,
+function replayWhole(prepared: MoonwellIndexPrepared): MoonwellReplayed {
+  // Nothing is below a lifted cut, so the anchor has nothing to draw; off, it
+  // states no `anchored` count on an answer the trim leaves whole.
+  const full = replayMoonwellRows({
+    ...prepared.input,
+    maxRendered: Number.MAX_SAFE_INTEGER,
+    anchorWalletRows: false,
   });
-  const trimmed = trimToRowCap(grouped, MOONWELL_ROW_ACCESS, opts.cap ?? TIMELINE_WINDOW_EVENTS);
-
-  const kept = new Set<string>();
-  let firstKept: string | null = null;
-  for (const row of trimmed.rows) {
-    const ids =
-      row.kind === "event" ? [row.event.id] : (grouped.members.get(row.folder.responseId) ?? []).map((e) => e.id);
-    for (const id of ids) {
-      if (firstKept == null) firstKept = id;
-      kept.add(id);
-    }
-  }
-
-  let result = full;
-  if (trimmed.cutoffBlock != null) {
-    // The replay's own cut at the trim, anchor off: `omitted` then counts,
-    // buckets and snapshots exactly the rows below it. The replay cuts by ROW
-    // index and the trim by event; they are the same cut only while every row
-    // became an event, which the index read guarantees (every row is dated) —
-    // checked rather than assumed, because a boundary card over a different cut
-    // would state a count the page contradicts.
-    const cut = replayMoonwellRows({ ...prepared.input, maxRendered: trimmed.eventsKept, anchorWalletRows: false });
-    if (cut.events.length !== trimmed.eventsKept || cut.events[0]?.id !== firstKept) {
-      throw new Error(
-        `Moonwell Base grouped cut disagrees with the replay's: ${cut.events.length} events from ${cut.events[0]?.id} against ${trimmed.eventsKept} from ${firstKept}`,
-      );
-    }
-    result = cut;
-  }
-  return { result, grouped, trimmed, kept };
-}
-
-/** The route's body: the replay's envelope with `events` narrowed to the
- *  ungrouped ones and the row plan beside them — the same fields the index arms'
- *  proxies add (`GroupedTimelineFields`). */
-export function groupedTimelineBody(answer: MoonwellGroupedAnswer) {
-  const rowPlan: TimelineRowPlanEntry[] = answer.trimmed.rows.map((row) =>
-    row.kind === "event" ? { kind: "event" } : { kind: "folder", folder: row.folder },
-  );
   return {
-    ...answer.result,
-    events: answer.trimmed.rows.flatMap((row) => (row.kind === "event" ? [row.event] : [])),
-    grouped: true as const,
-    rowPlan,
-    eventsServed: answer.trimmed.eventsKept,
-    boundBy: answer.trimmed.boundBy,
+    prepared,
+    full,
+    specs: moonwellFolderSpecs((key) => prepared.input.marketByMtoken.get(key.toLowerCase())),
+    eventsBefore: full.totalEvents - full.events.length,
   };
 }
+
+/** Replay, group, trim — pure over a prepared index read. The preload, or the
+ *  span asked for. `cap` is the row cap and is the shared one everywhere but
+ *  a verifier, which lowers it to reach the trim on a position that fits. */
+export function groupMoonwellReplay(
+  prepared: MoonwellIndexPrepared,
+  opts: { cap?: number; span?: { from: number; to: number } | null } = {},
+): MoonwellGroupedAnswer {
+  return groupReplayed(replayWhole(prepared), opts.span ?? null, opts.cap);
+}
+
+function groupReplayed(
+  r: MoonwellReplayed,
+  span: { from: number; to: number } | null,
+  cap: number = TIMELINE_WINDOW_EVENTS,
+): MoonwellGroupedAnswer {
+  if (span)
+    return groupReplaySpan({
+      full: r.full,
+      specs: r.specs,
+      access: MOONWELL_ROW_ACCESS,
+      eventsBefore: r.eventsBefore,
+      cap,
+      span,
+    });
+  const { input } = r.prepared;
+  return groupReplayRest({
+    full: r.full,
+    specs: r.specs,
+    access: MOONWELL_ROW_ACCESS,
+    // The first served event's place in the WHOLE history: after the seed's
+    // rows on a seeded heavy wallet, 1 everywhere else.
+    ordinalBase: r.eventsBefore + 1,
+    cap,
+    // The replay's cut at the trim, anchor off: `omitted` then counts,
+    // buckets and snapshots the rows below it.
+    recut: (cutoffBlock) =>
+      replayMoonwellRows({
+        ...input,
+        maxRendered: input.rows.filter((row) => row.blockNumber >= cutoffBlock).length,
+        anchorWalletRows: false,
+      }),
+    label: "Moonwell Base",
+  });
+}
+
+/** The route's body (`replayGroupedBody`). */
+export const groupedTimelineBody = (answer: MoonwellGroupedAnswer) => replayGroupedBody(answer);
 
 // ── The answer the members route opens against ─────────────────────────────
 //
 // Folders are computed on demand, never stored. An open follows a page load
-// within seconds, so the last grouping per wallet is kept in memory for a
-// minute and the members route answers from it — the index is not re-read and
-// the replay not re-run for each of a page's folders. Held on `globalThis`
-// because each route handler is its own bundle and a module-level map would be
-// one per route. A stale entry is never wrong about its own members; a page
-// that drew a newer grouping sees `stale` on the folder it opened
-// (`FolderMembersProvider`).
-
-const ANSWER_TTL_MS = 60_000;
-const ANSWER_ENTRIES = 16;
-const STORE = Symbol.for("rails.moonwellBase.groupedAnswers");
-
-function store(): Map<string, { at: number; answer: MoonwellGroupedAnswer }> {
-  const g = globalThis as unknown as Record<symbol, Map<string, { at: number; answer: MoonwellGroupedAnswer }>>;
-  if (!g[STORE]) g[STORE] = new Map();
-  return g[STORE];
-}
+// within seconds, so the last grouping per (wallet, span) is kept in memory
+// for a minute and the members route answers from it, and the replay is kept
+// beside it so a month read does not re-read the index
+// (lib/shared/replay-grouped-answer.ts `answerStore`).
 
 export type MoonwellGroupedRead =
   | { kind: "grouped"; answer: MoonwellGroupedAnswer }
@@ -345,23 +332,23 @@ export type MoonwellGroupedRead =
 export async function readGroupedMoonwellBase(
   p: LoadMoonwellIndexParams,
   readerIp: string | undefined,
-  opts: { preferRemembered?: boolean } = {},
+  opts: { preferRemembered?: boolean; span?: { from: number; to: number } | null } = {},
 ): Promise<MoonwellGroupedRead> {
-  const wallet = p.wallet.toLowerCase();
-  const answers = store();
+  const span = opts.span ?? null;
+  const answers = answerStore<MoonwellGroupedAnswer>("moonwellBase");
+  const replays = answerStore<MoonwellReplayed>("moonwellBase.replay", 6);
   if (opts.preferRemembered) {
-    const hit = answers.get(wallet);
-    if (hit && Date.now() - hit.at < ANSWER_TTL_MS) return { kind: "grouped", answer: hit.answer };
+    const hit = answers.get(p.wallet, span);
+    if (hit) return { kind: "grouped", answer: hit };
   }
-  const prepared = await readMoonwellIndex(p, readerIp);
-  if (!prepared || !(prepared.whole || prepared.heavy)) return { kind: "flat" };
-  const answer = groupMoonwellReplay(prepared);
-  answers.delete(wallet);
-  answers.set(wallet, { at: Date.now(), answer });
-  while (answers.size > ANSWER_ENTRIES) {
-    const oldest = answers.keys().next();
-    if (oldest.done) break;
-    answers.delete(oldest.value);
+  let replayed = span || opts.preferRemembered ? replays.get(p.wallet, null) : null;
+  if (!replayed) {
+    const prepared = await readMoonwellIndex(p, readerIp);
+    if (!prepared || !(prepared.whole || prepared.heavy)) return { kind: "flat" };
+    replayed = replayWhole(prepared);
+    replays.set(p.wallet, null, replayed);
   }
+  const answer = groupReplayed(replayed, span);
+  answers.set(p.wallet, span, answer);
   return { kind: "grouped", answer };
 }

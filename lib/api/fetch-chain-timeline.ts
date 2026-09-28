@@ -201,11 +201,13 @@ export async function fetchChainTimeline<T extends ChainTimelineEnvelope = Chain
   baseUrl?: string;
   /** Extra query params a particular route understands. */
   params?: Record<string, string>;
+  /** Aborts the read (a month read the reader replaced with another). */
+  signal?: AbortSignal;
 }): Promise<T> {
   const qs = new URLSearchParams({ wallet: p.wallet, ...p.params });
   const url = `${p.baseUrl ?? ""}${p.route}?${qs.toString()}`;
   const done = settleFetchMark(p.mark ?? "chain-timeline");
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, { cache: "no-store", signal: p.signal });
   if (!res.ok) {
     done(false);
     if (res.status === 503) throw new ChainTimelineUnavailable("The history endpoint did not answer.");

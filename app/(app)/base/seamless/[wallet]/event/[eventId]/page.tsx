@@ -50,5 +50,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // promise through is still structurally valid (the parent only reads
 // `wallet` off it).
 export default async function SeamlessEventPage({ params }: Props) {
-  return SeamlessPositionPage({ params });
+  // A pinned event page stays flat (rails-ops decision 0019, leg C note): a
+  // grouped answer serves a folder's members only when it is opened, and the
+  // pinned card must be among the served events.
+  return SeamlessPositionPage({ params, searchParams: Promise.resolve({ folders: "0" }) });
 }

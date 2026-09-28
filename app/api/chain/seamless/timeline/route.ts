@@ -6,6 +6,7 @@ import { loadAaveV3EventsFromIndex } from "@/lib/sources/api/aave-v3-base-timeli
 import { SEAMLESS_CHAIN_ID, SEAMLESS_POOL, SEAMLESS_DEPLOY_BLOCK } from "@/lib/seamless/asset-catalog";
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
+import { groupedAaveV3BaseTimeline, type AaveV3BaseLane } from "@/lib/aave-v3-base/grouped-routes";
 
 // A wallet's whole life on Seamless: from the INDEX when the index can vouch
 // for all of it, swept from the Pool's own logs otherwise.
@@ -32,6 +33,13 @@ export const dynamic = "force-dynamic";
  *  append-only either way. A minute fresh, then stale-while-revalidate. */
 const CACHE_CONTROL = "public, s-maxage=60, stale-while-revalidate=600";
 
+const LANE: AaveV3BaseLane = {
+  label: "Seamless",
+  chainId: SEAMLESS_CHAIN_ID,
+  apiPrefix: "/api/seamless",
+  deployBlock: SEAMLESS_DEPLOY_BLOCK,
+};
+
 export async function GET(request: NextRequest) {
   const readerIp = readerIpFromRequest(request);
   const wallet = request.nextUrl.searchParams.get("wallet");
@@ -40,6 +48,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "wallet must be an address" }, { status: 400 });
 
   try {
+    // `?group=1` — THE SAME HISTORY AS ROWS, and `&from=&to=` a month of it
+    // (batch 3 of the row cut, lib/aave-v3-base/timeline-folders.ts). Every
+    // row is replayed first and grouped after; a month is sliced from that
+    // replay. Only the index can be grouped: a history it cannot vouch for
+    // falls through to the flat answer below, which sweeps.
+    if (request.nextUrl.searchParams.get("group") === "1") {
+      const grouped = await groupedAaveV3BaseTimeline(
+        LANE,
+        wallet,
+        request.nextUrl.searchParams,
+        readerIp,
+        CACHE_CONTROL,
+      );
+      if (grouped) return grouped;
+    }
+
     const indexed = await loadAaveV3EventsFromIndex(
       {
         wallet,

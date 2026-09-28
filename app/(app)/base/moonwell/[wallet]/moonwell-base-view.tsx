@@ -63,7 +63,9 @@ import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { CaptureSourceProvider } from "@/lib/shared/capture-source";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
-import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { useTimelineSegment } from "@/hooks/useTimelineSegment";
+import { eventsBelowLife, replaySegmentReads, type ReplayGroupedFields } from "@/lib/api/fetch-replay-segment";
+import { WHOLE_HISTORY } from "@/lib/shared/timeline-opening-balance";
 import { computeMoonwellCardCaptions, computeMoonwellEconomics } from "@/lib/moonwell/economics";
 import { moonwellEconomicsExplanation, moonwellEconomicsContent } from "@/lib/moonwell/economics-explanation";
 import { MoonwellDeploymentProvider } from "@/lib/moonwell/deployment-context";
@@ -108,7 +110,7 @@ const COVERAGE_ROUTE = "/api/moonwell-base/coverage";
  *  ungrouped events and `rowPlan` puts the folders back between them
  *  (lib/moonwell-base/timeline-folders.ts). A history the index cannot vouch
  *  for is answered flat either way, and reads as flat here. */
-type MoonwellBaseTimeline = MoonwellChainTimelineResponse & Partial<GroupedTimelineFields>;
+type MoonwellBaseTimeline = MoonwellChainTimelineResponse & ReplayGroupedFields;
 
 /** What the coverage footer names as the thing that was swept. */
 const SOURCE_LABEL = "Moonwell's Base markets";
@@ -399,22 +401,45 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
     [data, timeline, sweptClean],
   );
 
-  const tl = useTimelineEvents(moonwellEvents, {
-    storageKey: `moonwell-base-${wallet}`,
-    protocolKey: "moonwell",
+  // The month read (hooks/useTimelineSegment.ts): a month the preload does
+  // not hold is sliced from the route's replay (`&from=&to=`), whose running
+  // figures are the whole replay's. Months below a seed's cut have no day
+  // counts, so the grid draws them and refuses the click; the boundary card
+  // states them.
+  const groupedTail = useMemo<GroupedTimelineFields | null>(
+    () =>
+      timeline?.grouped && timeline.rowPlan && timeline.eventsServed != null
+        ? {
+            grouped: true,
+            rowPlan: timeline.rowPlan,
+            eventsServed: timeline.eventsServed,
+            boundBy: timeline.boundBy ?? null,
+          }
+        : null,
+    [timeline],
+  );
+  const segmentReads = useMemo(() => replaySegmentReads(TIMELINE_ROUTE, wallet), [wallet]);
+  const { tl, segments, readFolderMembers } = useTimelineSegment({
+    events: moonwellEvents,
+    groupedTail,
+    servedRows,
+    servedFolders,
+    opening: null,
+    lifeBelow: timeline?.belowByDay,
+    eventsBelowLife: eventsBelowLife(timeline?.coverage.omitted?.count, timeline?.belowByDay),
     // The rows before the trim, so numbering runs over the whole history —
     // the newest row is numbered `totalEvents` — and the count line states
     // the real total beside the listed rows (rails-ops decision 0019).
     olderCount: timeline?.coverage.omitted?.count ?? 0,
-    servedRows,
-    eventsServed: servedRows ? timeline?.eventsServed : undefined,
+    historyWindow: WHOLE_HISTORY,
+    isEvent: isMoonwellEvent,
+    readGrouped: segmentReads.readGrouped,
+    readFlat: segmentReads.readFlat,
+    folderPath: FOLDER_ROUTE,
+    folderParams: { wallet },
+    storageKey: `moonwell-base-${wallet}`,
+    protocolKey: "moonwell",
   });
-
-  const readFolderMembers = useCallback(
-    (ask: { event?: string; folder?: string }) =>
-      fetchTimelineFolderMembers({ path: FOLDER_ROUTE, params: { wallet }, ...ask }),
-    [wallet],
-  );
 
   // The CSV on a grouped page: the rows in the order the route served them,
   // each folder opened for its members. `missing` is what no answer can list —
@@ -630,6 +655,7 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                     // Only one is in force on a load.
                     folderRegister={MOONWELL_FOLDER_REGISTER}
                     readFolderMembers={readFolderMembers}
+                    segments={segments}
                     persistKeyPrefix="moonwell"
                     closed={view?.status !== "open"}
                     // Receipted facts about the MARKETS this account supplied
@@ -657,10 +683,15 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                     footer={<TimelineCoverageFooter coverage={timeline.coverage} sourceLabel={SOURCE_LABEL} />}
                     // On a grouped answer the list covers `eventsServed` — the
                     // folder members are one tap away, not below the cut.
-                    boundary={boundaryFromChainCoverage(
-                      timeline.coverage,
-                      servedRows ? (timeline.eventsServed ?? timeline.events.length) : timeline.events.length,
-                    )}
+                    // A month read holds no card: the grid holds the other months.
+                    boundary={
+                      tl.historyWindow.state === "span"
+                        ? null
+                        : boundaryFromChainCoverage(
+                            timeline.coverage,
+                            servedRows ? (timeline.eventsServed ?? timeline.events.length) : timeline.events.length,
+                          )
+                    }
                     renderCard={(event, meta) =>
                       isMoonwellEvent(event) ? (
                         <MoonwellEventCard

@@ -11,6 +11,7 @@ import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { groupedTimelineBody, readGroupedMoonwellBase } from "@/lib/moonwell-base/timeline-folders";
+import { spanParam } from "@/lib/shared/replay-grouped-answer";
 
 // A wallet's whole life on Moonwell Base: from the INDEX when the index can
 // vouch for all of it, swept from the chain's own logs otherwise.
@@ -51,7 +52,10 @@ export async function GET(request: NextRequest) {
     // lib/moonwell-base/timeline-folders.ts. Only the index can be grouped: a
     // history the index cannot vouch for falls through to the flat answer
     // below, which sweeps, and the page reads a flat answer as flat.
+    // `&from=&to=` is a month of the same replay (lib/shared/replay-grouped-answer.ts).
     if (request.nextUrl.searchParams.get("group") === "1") {
+      const sp = spanParam(request.nextUrl.searchParams);
+      if (!sp.ok) return NextResponse.json({ error: sp.message }, { status: 400 });
       const read = await readGroupedMoonwellBase(
         {
           wallet,
@@ -61,6 +65,7 @@ export async function GET(request: NextRequest) {
           apiPrefix: "/api/moonwell-base",
         },
         readerIp,
+        { span: sp.span },
       ).catch((e: unknown) => {
         console.error("Moonwell Base grouped read failed, answering flat instead:", e);
         return null;

@@ -323,24 +323,28 @@ const FIXTURES = [
     path: "/ethereum/morpho/b8fc70e82bc5bb53e773626fcc6a23f7eefa036918d7ef216ecfb1950a94a85e-0xb8a451107a9f87fde481d4d686247d6e43ed715e",
     afterOnly: true,
   },
-  // Base gated (whole-life replay, newest rows drawn)
+  // Base gated (whole-life replay, newest rows drawn). The Aave-family pages
+  // PIN `folders=0` since row-cut batch 3 (2026-09-28) grouped them by
+  // default, as the Moonwell Base fixtures below do: the base arm is checked
+  // against the FLAT `route`, whose render cut draws the boundary.
   {
     id: "aave-v3-base",
     arm: "base",
     tail: true,
-    path: "/base/aave-v3/0x7ac2887e026e4239416aac6483c15df05a04a92e",
+    reach: true,
+    path: "/base/aave-v3/0x7ac2887e026e4239416aac6483c15df05a04a92e?folders=0",
     route: "/api/chain/aave-v3-base/timeline?wallet=0x7ac2887e026e4239416aac6483c15df05a04a92e",
   },
   {
     id: "aave-v3-base-2000",
     arm: "base",
-    path: "/base/aave-v3/0xe883426b4fc84a7f5cc86415cabbef43e73a4cc8",
+    path: "/base/aave-v3/0xe883426b4fc84a7f5cc86415cabbef43e73a4cc8?folders=0",
     route: "/api/chain/aave-v3-base/timeline?wallet=0xe883426b4fc84a7f5cc86415cabbef43e73a4cc8",
   },
   {
     id: "aave-v3-base-liquidated",
     arm: "base",
-    path: "/base/aave-v3/0x20172ec3d9cb14cb555aa5b612e50d30b97485dd",
+    path: "/base/aave-v3/0x20172ec3d9cb14cb555aa5b612e50d30b97485dd?folders=0",
     route: "/api/chain/aave-v3-base/timeline?wallet=0x20172ec3d9cb14cb555aa5b612e50d30b97485dd",
     liquidations: "/api/aave-v3-base/positions?wallet=0x20172ec3d9cb14cb555aa5b612e50d30b97485dd",
   },
@@ -352,6 +356,7 @@ const FIXTURES = [
     // of `0019` (2026-09-13), and the base arm is checked against the FLAT
     // `route`, whose render cut is what draws the boundary.
     tail: true,
+    reach: true,
     path: "/base/moonwell/0xbc8dd54d1ae1b738b40ffddccee1428b178fa80b?folders=0",
     route: "/api/chain/moonwell-base/timeline?wallet=0xbc8dd54d1ae1b738b40ffddccee1428b178fa80b",
   },
@@ -387,8 +392,29 @@ const FIXTURES = [
     id: "seamless",
     arm: "base",
     tail: true,
-    path: "/base/seamless/0x258730e23cf2f25887cb962d32bd10b878ea8a4e",
+    reach: true,
+    path: "/base/seamless/0x258730e23cf2f25887cb962d32bd10b878ea8a4e?folders=0",
     route: "/api/chain/seamless/timeline?wallet=0x258730e23cf2f25887cb962d32bd10b878ea8a4e",
+  },
+  {
+    // The Aave-family Base pages on their DEFAULT, grouped in the web route
+    // after the replay (row-cut batch 3): a seeded wallet, 72,360 events,
+    // 2,500 rows served of which 25 are folders (2026-09-28).
+    id: "aave-v3-base-grouped",
+    arm: "grouped",
+    path: "/base/aave-v3/0x19ceead7105607cd444f5ad10dd51356436095a1",
+    route: "/api/chain/aave-v3-base/timeline?wallet=0x19ceead7105607cd444f5ad10dd51356436095a1&group=1",
+  },
+  {
+    // Seeded (over 20,000 rows): the seed's rows below the cut, the newest
+    // 10,000 rows after it. None of Seamless's five seeded wallets holds a
+    // run of four transfers or liquidations in its preload, so this answer is
+    // grouped with no folder (`noFolders`).
+    id: "seamless-grouped",
+    arm: "grouped",
+    noFolders: true,
+    path: "/base/seamless/0x3fed901fc296096e125d7332fadba63303b7ddd6",
+    route: "/api/chain/seamless/timeline?wallet=0x3fed901fc296096e125d7332fadba63303b7ddd6&group=1",
   },
   {
     id: "compound-base",
@@ -1095,7 +1121,11 @@ for (const f of FIXTURES) {
       const anchor = f.arm === "base" && f.route ? await anchoredOf(f, said) : NO_ANCHOR;
       const anchoredRows = anchor.anchored ?? 0;
       const cut = cutOf(f);
-      if (f.tail && anchoredRows === 0) {
+      // `reach`: a lane whose seed leaves the wallet's newest 10,000 rows
+      // after its cut (rails-server SEED_TAIL_REACH, 2026-09-28: Aave V3 Base,
+      // Seamless, Moonwell Base). Its tail always reaches the cut, so it takes
+      // the bound below like an unseeded wallet.
+      if (f.tail && !f.reach && anchoredRows === 0) {
         check(
           `6  ${f.id}: a seeded tail shorter than the cut is drawn whole`,
           counts.listed < cut,
@@ -1378,8 +1408,12 @@ for (const f of FIXTURES) {
           `boundBy ${routeJson.boundBy}, ${n(plan.length)} rows of ${n(routeJson.totalEvents)} events; line "${r.line}"`,
       );
       check(
-        `3  ${f.id}: the rows are part folders, and the page draws them`,
-        folderCount > 0 && r.folderRows === folderCount && routeJson.eventsServed < routeJson.totalEvents,
+        f.noFolders
+          ? `3  ${f.id}: the rows hold no folder, the page draws none, and fewer events than the position has`
+          : `3  ${f.id}: the rows are part folders, and the page draws them`,
+        (f.noFolders ? folderCount === 0 : folderCount > 0) &&
+          r.folderRows === folderCount &&
+          routeJson.eventsServed < routeJson.totalEvents,
         `${folderCount} folder(s) in the answer, ${r.folderRows} folder row(s) drawn; ${n(routeJson.eventsServed ?? 0)} of ${n(routeJson.totalEvents ?? 0)} events listed`,
       );
     } else if (f.arm === "vault") {

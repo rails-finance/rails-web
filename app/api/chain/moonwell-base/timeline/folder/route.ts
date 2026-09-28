@@ -9,6 +9,7 @@ import { resolveFolder } from "@/lib/shared/timeline-grouping";
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
+import { spanParam } from "@/lib/shared/replay-grouped-answer";
 
 // Opening one Moonwell Base folder — the members behind a header on
 // `/api/chain/moonwell-base/timeline?group=1`. The same contract the index arms
@@ -31,6 +32,9 @@ export async function GET(request: NextRequest) {
   const event = request.nextUrl.searchParams.get("event");
   const folder = request.nextUrl.searchParams.get("folder");
   if (!event && !folder) return NextResponse.json({ error: "event or folder is required" }, { status: 400 });
+  // A folder on a month answer names the month it came in.
+  const sp = spanParam(request.nextUrl.searchParams);
+  if (!sp.ok) return NextResponse.json({ error: sp.message }, { status: 400 });
 
   try {
     const read = await readGroupedMoonwellBase(
@@ -42,7 +46,7 @@ export async function GET(request: NextRequest) {
         apiPrefix: "/api/moonwell-base",
       },
       readerIp,
-      { preferRemembered: true },
+      { preferRemembered: true, span: sp.span },
     );
     if (read.kind !== "grouped") {
       return NextResponse.json(
@@ -56,7 +60,7 @@ export async function GET(request: NextRequest) {
       );
     }
     const { answer } = read;
-    if (answer.result.totalEvents === 0) {
+    if (answer.result.totalEvents === 0 && answer.grouped.rows.length === 0) {
       return NextResponse.json(
         { error: "Not found", code: "NO_EVENTS", message: "This wallet has no Moonwell activity on Base." },
         { status: 404 },

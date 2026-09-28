@@ -38,7 +38,8 @@
 // so it is stated under the last event rather than on a coverage page — see
 // <TimelineCoverageFooter>.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 
 import { AaveV3PositionCard } from "@/components/protocol/aave-v3/aave-v3-position-card";
@@ -63,8 +64,15 @@ import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
 import { TimelineActivityHeader, CHAIN_TRUTH_USD_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { CaptureSourceProvider } from "@/lib/shared/capture-source";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
-import { useTimelineEvents } from "@/hooks/useTimelineEvents";
-import { AAVE_V3_TIMELINE_RUNS } from "@/lib/aave-v3/timeline-runs";
+import { useTimelineSegment } from "@/hooks/useTimelineSegment";
+import { eventsBelowLife, replaySegmentReads, type ReplayGroupedFields } from "@/lib/api/fetch-replay-segment";
+import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
+import { WHOLE_HISTORY } from "@/lib/shared/timeline-opening-balance";
+import { interleaveRowPlan, servedFoldersEnabled, type GroupedTimelineFields } from "@/lib/shared/timeline-folder";
+import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
+import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
+import type { WholeHistoryFetch } from "@/components/shared/export-menu";
+import { AAVE_V3_FOLDER_REGISTER, AAVE_V3_TIMELINE_RUNS } from "@/lib/aave-v3/timeline-runs";
 import {
   computeAaveV3CardCaptions,
   computeAaveV3Economics,
@@ -98,6 +106,14 @@ const AaveV3ExportMenu = dynamic(
 
 const POSITION_ROUTE = "/api/chain/aave-v3-base/position";
 const TIMELINE_ROUTE = "/api/chain/aave-v3-base/timeline";
+const FOLDER_ROUTE = "/api/chain/aave-v3-base/timeline/folder";
+
+/** The history as the route answers it: flat, or — asked `?group=1`, the
+ *  page default — as ROWS, where `events` holds only the ungrouped events and
+ *  `rowPlan` puts the folders back between them
+ *  (lib/aave-v3-base/timeline-folders.ts). A history the index cannot vouch
+ *  for is answered flat either way, and reads as flat here. */
+type BaseTimeline = ChainTimelineResponse & ReplayGroupedFields;
 const PRICES_ROUTE = "/api/chain/aave-v3-base/oracle-prices";
 
 /** The Pool, named for the coverage footer's "swept X from its first block". */
@@ -152,9 +168,13 @@ export default function AaveV3BasePositionView({
   // Rehydrated through the same function the fetch client runs on a response
   // body, so a seeded timeline and a fetched one are the same object.
   const timelineSeeded = initialTimeline != null;
-  const [timeline, setTimeline] = useState<ChainTimelineResponse | null>(() =>
-    initialTimeline != null ? (rehydrateChainTimelineWire(initialTimeline) as ChainTimelineResponse) : null,
+  const [timeline, setTimeline] = useState<BaseTimeline | null>(() =>
+    initialTimeline != null ? (rehydrateChainTimelineWire(initialTimeline) as BaseTimeline) : null,
   );
+  // The event route renders this same view, flat: pinned mode finds its card
+  // among the served events, and a folder's members arrive only when opened.
+  const routeParams = useParams<{ eventId?: string | string[] }>();
+  const pinnedRoute = routeParams?.eventId != null;
   const [timelineState, setTimelineState] = useState<"loading" | "ready" | "unavailable" | "failed">(
     timelineSeeded ? "ready" : "loading",
   );
@@ -192,7 +212,14 @@ export default function AaveV3BasePositionView({
     if (timelineSeeded || !wallet) return;
     let cancelled = false;
     setTimelineState("loading");
-    fetchChainTimeline({ wallet, route: TIMELINE_ROUTE, mark: "aave-v3-base-timeline" })
+    fetchChainTimeline<BaseTimeline>({
+      wallet,
+      route: TIMELINE_ROUTE,
+      mark: "aave-v3-base-timeline",
+      // `?folders=0` is the way back to the flat list, the test every grouped
+      // page shares.
+      params: servedFoldersEnabled() && !pinnedRoute ? { group: "1" } : undefined,
+    })
       .then((d) => {
         if (cancelled) return;
         setTimeline(d);
@@ -205,10 +232,46 @@ export default function AaveV3BasePositionView({
     return () => {
       cancelled = true;
     };
-  }, [wallet, timelineSeeded]);
+  }, [wallet, timelineSeeded, pinnedRoute]);
 
   const events = useMemo<BaseActivityEvent[]>(() => timeline?.events ?? [], [timeline]);
   const aaveEvents = useMemo(() => events.filter(isAaveV3Event), [events]);
+
+  // The served list as ROWS, when the route grouped it; the plan and the
+  // events it interleaves come from one answer.
+  const servedRows = useMemo(
+    () => (timeline?.grouped && timeline.rowPlan ? interleaveRowPlan(timeline.rowPlan, aaveEvents) : undefined),
+    [timeline, aaveEvents],
+  );
+  /** The folders, whole and unfiltered. Every whole-history claim below that
+   *  is reduced over `aaveEvents` adds them, or states nothing it cannot. The
+   *  tower, the card's counts and the peaks need nothing: the route replayed
+   *  every row before it grouped, and those figures ride the replay. */
+  const servedFolders = useMemo(
+    () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
+    [servedRows],
+  );
+  const groupedTail = useMemo<GroupedTimelineFields | null>(
+    () =>
+      timeline?.grouped && timeline.rowPlan && timeline.eventsServed != null
+        ? {
+            grouped: true,
+            rowPlan: timeline.rowPlan,
+            eventsServed: timeline.eventsServed,
+            boundBy: timeline.boundBy ?? null,
+          }
+        : null,
+    [timeline],
+  );
+  /** The stamps the activity header measures tenure and freshness from: the
+   *  events on the page and each folder's first and last member. */
+  const headerStamps = useMemo(
+    () =>
+      servedFolders && servedFolders.length > 0
+        ? [...aaveEvents, ...servedFolders.flatMap((f) => [{ timestamp: f.firstAt }, { timestamp: f.lastAt }])]
+        : aaveEvents,
+    [aaveEvents, servedFolders],
+  );
 
   // The tower's lifetime layer and the card's captions read THESE, not the
   // events above. The list is capped for a long history; these sums are not,
@@ -270,29 +333,78 @@ export default function AaveV3BasePositionView({
 
   // Debt the Pool wrote off that this history does not show (DeficitCreated
   // is not among the logs Base reads). Stated only where it left a remainder.
-  const writeOffLeftovers = useMemo(() => aaveV3BaseWriteOffLeftovers(events, data), [events, data]);
+  // The closing debt is read off the last debt-lane row; a liquidation folder
+  // holds rows the page has not opened, so beside one the note is withheld
+  // rather than read off an earlier row.
+  const writeOffLeftovers = useMemo(
+    () => (servedFolders?.some((f) => f.kind !== "transfer") ? [] : aaveV3BaseWriteOffLeftovers(events, data)),
+    [events, data, servedFolders],
+  );
 
-  const tl = useTimelineEvents(aaveEvents, {
-    storageKey: `aave-v3-base-${wallet}`,
-    protocolKey: "aave-v3",
+  // The month read (hooks/useTimelineSegment.ts): a month the preload does
+  // not hold is sliced from the route's replay (`&from=&to=`), whose running
+  // figures are the whole replay's. Months below a seed's cut have no day
+  // counts, so the grid draws them and refuses the click; the boundary card
+  // states them.
+  const segmentReads = useMemo(() => replaySegmentReads(TIMELINE_ROUTE, wallet), [wallet]);
+  const { tl, segments, readFolderMembers } = useTimelineSegment({
+    events: aaveEvents,
+    groupedTail,
+    servedRows,
+    servedFolders,
+    opening: null,
+    lifeBelow: timeline?.belowByDay,
+    eventsBelowLife: eventsBelowLife(timeline?.coverage.omitted?.count, timeline?.belowByDay),
     // The rows before the trim, so numbering runs over the whole history and
     // the count line states the real total (rails-ops decision 0019).
     olderCount: timeline?.coverage.omitted?.count ?? 0,
+    historyWindow: WHOLE_HISTORY,
+    isEvent: isAaveV3Event,
+    readGrouped: segmentReads.readGrouped,
+    readFlat: segmentReads.readFlat,
+    folderPath: FOLDER_ROUTE,
+    folderParams: { wallet },
+    storageKey: `aave-v3-base-${wallet}`,
+    protocolKey: "aave-v3",
   });
+
+  // The CSV on a grouped page: the rows in the order the route served them,
+  // each folder opened for its members. `missing` is what no answer lists —
+  // a seeded wallet's rows before its seed, or rows below the row cap — and a
+  // download short by any of them does not happen.
+  const fetchAllHistory = useCallback(async (): Promise<WholeHistoryFetch> => {
+    const all: BaseActivityEvent[] = [];
+    for (const row of servedRows ?? []) {
+      if (row.kind === "event") {
+        all.push(row.event);
+        continue;
+      }
+      const opened = await fetchTimelineFolderMembers({
+        path: FOLDER_ROUTE,
+        params: { wallet },
+        folder: row.folder.responseId,
+      });
+      all.push(...opened.events);
+    }
+    return { events: all, missing: timeline?.coverage.omitted?.count ?? 0 };
+  }, [servedRows, wallet, timeline]);
 
   // Who executed this position's events — the SAME externalActor() verdict each
   // event card renders on its spine, reduced over the whole history so the
   // Explanation can state it once.
   const externalActivity = useMemo(
     () =>
-      summariseExternalActors(
-        aaveEvents.map((e) => ({
-          txFrom: e.context.data.txFrom,
-          poolCaller: e.context.data.poolCaller,
-          wallet: e.wallet,
-        })),
+      withFolderActors(
+        summariseExternalActors(
+          aaveEvents.map((e) => ({
+            txFrom: e.context.data.txFrom,
+            poolCaller: e.context.data.poolCaller,
+            wallet: e.wallet,
+          })),
+        ),
+        servedFolders,
       ),
-    [aaveEvents],
+    [aaveEvents, servedFolders],
   );
 
   // Stat captions (accrued interest, borrow rate). The rate rides the Pool
@@ -318,7 +430,9 @@ export default function AaveV3BasePositionView({
     data.totalDebtUsd === 0 &&
     data.reserves.length === 0 &&
     sweptClean &&
-    events.length === 0 &&
+    // On a grouped answer the list covers `eventsServed`, folder members
+    // included; `events` holds only the ungrouped ones.
+    (timeline?.grouped ? (timeline.eventsServed ?? 0) : events.length) === 0 &&
     // A seeded heavy wallet can draw no rows at all — its whole life sits
     // before the seed's cut and travelled as state. That is not "never
     // touched": the boundary card states the count (rails-ops decision 0019).
@@ -387,6 +501,9 @@ export default function AaveV3BasePositionView({
                 chain={data}
                 captions={captions}
                 events={aaveEvents}
+                history={markdownHistoryScope(undefined, aaveEvents, servedFolders)}
+                scopeNote={exportScopeNote(undefined, aaveEvents, "this wallet's whole history", servedFolders)}
+                fetchAllEvents={servedFolders && servedFolders.length > 0 ? fetchAllHistory : undefined}
                 csvFilename={`aave-v3-base-${wallet.slice(0, 10)}-activity.csv`}
               />
             )}
@@ -481,11 +598,16 @@ export default function AaveV3BasePositionView({
                     persistKeyPrefix="aave-v3"
                     closed={view?.status !== "open"}
                     tl={tl}
+                    // Both grouping paths: the specs group a flat answer in the
+                    // browser, the register draws the folders the route served.
                     runs={AAVE_V3_TIMELINE_RUNS}
+                    folderRegister={AAVE_V3_FOLDER_REGISTER}
+                    readFolderMembers={readFolderMembers}
+                    segments={segments}
                     displayItems={CHAIN_TRUTH_USD_DISPLAY_ITEMS}
                     toolbarLeading={
                       <TimelineActivityHeader
-                        events={aaveEvents}
+                        events={headerStamps}
                         closed={view?.status !== "open"}
                         firstAt={timeline.coverage.firstEventAt}
                       />
@@ -503,7 +625,16 @@ export default function AaveV3BasePositionView({
                         <WriteOffGapNote leftovers={writeOffLeftovers} />
                       </>
                     }
-                    boundary={boundaryFromChainCoverage(timeline.coverage, timeline.events.length)}
+                    // On a grouped answer the list covers `eventsServed`; a month
+                    // read holds no card, the grid holding the other months.
+                    boundary={
+                      tl.historyWindow.state === "span"
+                        ? null
+                        : boundaryFromChainCoverage(
+                            timeline.coverage,
+                            servedRows ? (timeline.eventsServed ?? timeline.events.length) : timeline.events.length,
+                          )
+                    }
                     renderCard={(event, meta) =>
                       isAaveV3Event(event) ? (
                         <AaveV3CtEventCard

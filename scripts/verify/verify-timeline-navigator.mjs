@@ -1683,6 +1683,17 @@ const MAKER_19172 = {
 const MORPHO_DEEP_ID =
   "b8fc70e82bc5bb53e773626fcc6a23f7eefa036918d7ef216ecfb1950a94a85e-0xb8a451107a9f87fde481d4d686247d6e43ed715e";
 const MAPLE = { page: "/ethereum/maple", api: "/api/maple", q: "" };
+// Row-cut batch 3 (2026-09-28): the Base replay lanes. The route replays and
+// groups in the web's server half, a month is sliced from that replay, and
+// the life is the route's `belowByDay` beside its folders and loose events (a
+// seed's rows have no days and are not in it). `grouped-aave-v3-base-deep`
+// 0x065c…88ce (14,302 events, unseeded) and `grouped-seamless-seeded`
+// 0x2587…8a4e (22,648, seeded; the newest 10,000 rows ride after the seed)
+// hold no folder in their newest rows; `grouped-moonwell-base` 0xcb65…d6c1
+// (6,487) holds four.
+const AAVE_V3_BASE = { page: "/base/aave-v3", api: "/api/chain/aave-v3-base", q: "", replay: true };
+const SEAMLESS = { page: "/base/seamless", api: "/api/chain/seamless", q: "", replay: true };
+const MOONWELL_BASE = { page: "/base/moonwell", api: "/api/chain/moonwell-base", q: "", replay: true };
 // Row-cut batch 7 (2026-09-28) puts the three Liquity V2 forks on the same read,
 // grouped by rails-server (the redemption spec and the owner run).
 // `grouped-asym-deepest` is Asymmetry's deepest Trove, sUSDS 8309…2410 (4,731
@@ -1720,6 +1731,19 @@ const GROUPED_FIXTURES = [
     timeline: `/api/asymmetry/susds/${ASYM_SUSDS_DEEPEST}/timeline?group=1`,
     summary: `/api/asymmetry/susds/${ASYM_SUSDS_DEEPEST}/timeline/summary?cutoffBlock=99999999`,
   },
+  {
+    id: "grouped-aave-v3-base-deep",
+    wallet: "0x065c8c2cabf489b80634a16269df7a4935c788ce",
+    ...AAVE_V3_BASE,
+    folders: false,
+  },
+  {
+    id: "grouped-seamless-seeded",
+    wallet: "0x258730e23cf2f25887cb962d32bd10b878ea8a4e",
+    ...SEAMLESS,
+    folders: false,
+  },
+  { id: "grouped-moonwell-base", wallet: "0xcb6586874cc04b01cc4fdb777de502cea7b3d6c1", ...MOONWELL_BASE },
 ];
 
 /** The drawn list as rows: folder headers, and event rows. With every folder
@@ -1792,7 +1816,11 @@ for (const g of GROUPED_FIXTURES) {
     // 2025 to 24 Sept 2026" on a windowed page, "389 events" on a whole one.
     const oldestServed = Math.min(...loose.map((e) => e.timestamp), ...folders.map((f) => f.firstAt));
     const newestServed = Math.max(...loose.map((e) => e.timestamp), ...folders.map((f) => f.lastAt));
-    const loadedText = `${dateText(oldestServed)} to ${dateText(newestServed)}`;
+    // One day is stated once ("loaded 30 Aug 2024").
+    const loadedText =
+      dateText(oldestServed) === dateText(newestServed)
+        ? dateText(oldestServed)
+        : `${dateText(oldestServed)} to ${dateText(newestServed)}`;
     const wantRest = windowed
       ? `${n(route.totalEvents)} events · loaded ${loadedText}`
       : `${n(route.totalEvents)} events`;
@@ -1872,7 +1900,16 @@ for (const g of GROUPED_FIXTURES) {
     // The whole life by month: the summary read past the tip IS the life, and
     // is what the page's own `lifeDays` sums to from the opening balance, the
     // folders' `byDay` and the loose events.
-    const life = await getJson(g.summary ?? `${g.api}/timeline/summary?${g.q}wallet=${g.wallet}&cutoffBlock=99999999`);
+    const DAY_S = 86_400;
+    const life = g.replay
+      ? {
+          byDay: [
+            ...(route.belowByDay ?? []),
+            ...folders.flatMap((f) => f.byDay),
+            ...loose.map((e) => ({ key: String(Math.floor(e.timestamp / DAY_S) * DAY_S), count: 1 })),
+          ],
+        }
+      : await getJson(g.summary ?? `${g.api}/timeline/summary?${g.q}wallet=${g.wallet}&cutoffBlock=99999999`);
     const lifeMonths = new Map();
     for (const b of life?.byDay ?? []) {
       const i = monthIdxOf(Number(b.key));

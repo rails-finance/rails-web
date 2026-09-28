@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { loadAaveV3BaseTail } from "@/lib/aave-v3-base/position-page-data";
 import AaveV3BasePositionView from "./position-view";
 
 interface Props {
   params: Promise<{ wallet: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // Every figure on this page is read at the head — the Pool's verdict on this
@@ -33,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function AaveV3BasePositionPage({ params }: Props) {
+export default async function AaveV3BasePositionPage({ params, searchParams }: Props) {
   const { wallet: raw } = await params;
   if (!ADDRESS.test(raw)) notFound();
   const wallet = raw.toLowerCase();
@@ -41,7 +43,9 @@ export default async function AaveV3BasePositionPage({ params }: Props) {
   // The Pool, and the history when the index can vouch for the whole of it. A
   // history that has to be swept from the Pool's own logs measures in seconds
   // and stays in the client half — see lib/shared/swept-position-page-data.ts.
-  const tail = await loadAaveV3BaseTail(wallet);
+  // As rows unless the reader asked for `?folders=0`: the newest rows up to
+  // the row cap, the rest held by the route for a month read.
+  const tail = await loadAaveV3BaseTail(wallet, servedFoldersFromParam((await searchParams).folders));
 
   return (
     <AaveV3BasePositionView

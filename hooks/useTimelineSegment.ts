@@ -18,7 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import type { TimelineOpeningBalance, TimelineWindow } from "@/lib/shared/timeline-opening-balance";
+import type { OpeningBucket, TimelineOpeningBalance, TimelineWindow } from "@/lib/shared/timeline-opening-balance";
 import {
   interleaveRowPlan,
   type GroupedTimelineFields,
@@ -47,6 +47,17 @@ export interface TimelineSegmentOptions {
   servedRows: ServedTimelineRow<BaseActivityEvent>[] | undefined;
   servedFolders: readonly ServedFolder[] | null;
   opening: TimelineOpeningBalance | null;
+  /** A page with no opening balance (the Base replays): the served history
+   *  below the preload per UTC day, which the replay's route counts
+   *  (`belowByDay`), so the grid draws those months and a click reads them. */
+  lifeBelow?: readonly OpeningBucket[] | null;
+  /** Events of the life that no day count covers — a Base seed's rows, which
+   *  travel as state — numbered before every counted day. */
+  eventsBelowLife?: number;
+  /** At rest, the events below the preload on a page with no opening
+   *  balance (`coverage.omitted.count`), so numbering runs over the whole
+   *  history. */
+  olderCount?: number;
   historyWindow: TimelineWindow;
   /** The family's event guard; a segment's events pass through it as the
    *  preload's did. */
@@ -71,7 +82,15 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
     reads.current = { readGrouped: o.readGrouped, readFlat: o.readFlat };
   });
 
-  const lifeDays = useMemo(() => lifeDayCounts(events, servedFolders, opening), [events, servedFolders, opening]);
+  const { lifeBelow } = o;
+  const lifeDays = useMemo(() => {
+    const days = lifeDayCounts(events, servedFolders, opening);
+    for (const b of lifeBelow ?? []) {
+      const ts = Number(b.key);
+      if (Number.isFinite(ts)) days.set(ts, (days.get(ts) ?? 0) + b.count);
+    }
+    return days;
+  }, [events, servedFolders, opening, lifeBelow]);
   const preloadCap = groupedTail?.boundBy === "rows" ? groupedTail.rowPlan.length : null;
   const [segment, setSegment] = useState<{
     monthIdx: number;
@@ -166,7 +185,12 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
     window: timelineWindow,
     servedRows: segment ? segmentRows : servedRows,
     eventsServed: segment ? (segment.grouped?.eventsServed ?? segment.events.length) : groupedTail?.eventsServed,
-    olderCount: segmentWindow?.state === "span" ? segmentWindow.span.eventsBefore : 0,
+    olderCount:
+      segmentWindow?.state === "span"
+        ? segmentWindow.span.eventsBefore + (o.eventsBelowLife ?? 0)
+        : segment
+          ? 0
+          : (o.olderCount ?? 0),
   });
   const { setDateRange } = tl;
   const pickMonth = useCallback(

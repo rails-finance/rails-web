@@ -42,6 +42,8 @@ import { cache } from "react";
 import { loadAaveV3PositionFromChain } from "@/lib/sources/chain/aave-v3-position";
 import { loadAaveV3EventsFromIndex } from "@/lib/sources/api/aave-v3-base-timeline";
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
+import { replayGroupedBody } from "@/lib/shared/replay-grouped-answer";
+import { readGroupedAaveV3Base } from "@/lib/aave-v3-base/timeline-folders";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import type { AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
 import type { ChainId } from "@/lib/shared/chains";
@@ -127,6 +129,13 @@ export function sweptPositionLoader<Head>(opts: {
  * read per request. `wallet` must already be a well-formed address — the page
  * turns anything else away with a 404 rather than letting viem's `getAddress`
  * throw through the render.
+ *
+ * `grouped` asks for the history as ROWS — the preload the route answers
+ * `?group=1` with (lib/aave-v3-base/timeline-folders.ts): the newest rows up
+ * to the row cap and the envelope's whole-history figures, the rest of the
+ * replay held server-side for a month read. The position page passes it
+ * unless the reader asked for `?folders=0`; a pinned event page and the share
+ * card read the flat answer.
  */
 export function v3PoolPositionLoader(opts: {
   label: string;
@@ -138,7 +147,7 @@ export function v3PoolPositionLoader(opts: {
   /** The Pool's first block; the history's claim to being a whole life. */
   deployBlock: number;
 }) {
-  return cache(async (wallet: string): Promise<V3PoolPositionTail> => {
+  return cache(async (wallet: string, grouped: boolean = false): Promise<V3PoolPositionTail> => {
     try {
       const readerIp = await readerIpFromHeaders();
       const [position, timeline] = await Promise.all([
@@ -147,7 +156,7 @@ export function v3PoolPositionLoader(opts: {
           `${opts.label} position page: Pool read`,
         ),
         withTimeout(
-          readWholeIndexedHistory(opts, wallet, readerIp),
+          grouped ? readGroupedIndexedHistory(opts, wallet, readerIp) : readWholeIndexedHistory(opts, wallet, readerIp),
           `${opts.label} position page: indexed history read`,
         ),
       ]);
@@ -163,6 +172,25 @@ export function v3PoolPositionLoader(opts: {
       return EMPTY;
     }
   });
+}
+
+/** The history as the route's grouped answer, under the same condition as
+ *  the flat read below: null (the client sweeps) unless the index vouches
+ *  for the whole life or the wallet is heavy. */
+async function readGroupedIndexedHistory(
+  opts: { label: string; chainId: ChainId; apiPrefix: string; deployBlock: number },
+  wallet: string,
+  readerIp?: string,
+): Promise<unknown | null> {
+  const read = await readGroupedAaveV3Base(
+    { wallet, chainId: opts.chainId, apiPrefix: opts.apiPrefix, deployBlock: opts.deployBlock },
+    readerIp,
+  ).catch((e: unknown) => {
+    console.error(`${opts.label} position page: grouped index read failed`, e);
+    return null;
+  });
+  if (read?.kind !== "grouped") return null;
+  return toTimelineWire(replayGroupedBody(read.answer), opts.chainId);
 }
 
 /** The history, but ONLY when the index vouches for every block of it — or
