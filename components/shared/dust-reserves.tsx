@@ -48,7 +48,7 @@ export function DustToggle({ count, open, onToggle }: { count: number; open: boo
   return (
     <button
       type="button"
-      className="self-start text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700"
+      className="self-start text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
       data-dust-hidden={count}
       aria-expanded={open}
       onClick={onToggle}
