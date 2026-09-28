@@ -75,7 +75,7 @@ import { fmtUsd } from "@/lib/aave-v4/format";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
-import type { ReserveStats } from "@/lib/aave-v4/spoke-cards";
+import type { AaveV4InterestPnl, ReserveStats } from "@/lib/aave-v4/spoke-cards";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
@@ -780,6 +780,7 @@ function AaveV4SpokePageInner({
             oraclePrices={oraclePrices}
             gasEth={activeGroup.result.totalGasCostEth}
             gasUsd={activeGroup.result.totalGasCostUsd}
+            interest={activeCard?.interestPnl}
           />
         ) : null}
 
@@ -863,6 +864,7 @@ function AaveV4SpokeTowerBlock({
   oraclePrices,
   gasEth,
   gasUsd,
+  interest,
 }: {
   reserves: ReserveStats[];
   prices: Record<string, PriceEntry | number>;
@@ -871,6 +873,8 @@ function AaveV4SpokeTowerBlock({
   oraclePrices: OraclePriceMap | null;
   gasEth: number;
   gasUsd: number;
+  /** The position's interest to date, for the lifetime rows. */
+  interest?: AaveV4InterestPnl | null;
 }) {
   // Every <Prov> figure in the panel (the tower breakdown rows) reports into
   // this registry, which the page-level inspector reads.
@@ -932,6 +936,7 @@ function AaveV4SpokeTowerBlock({
             hideSurplus={hideSurplus}
             onToggleHideSurplus={() => setHideSurplus((v) => !v)}
             title={<span className={`${OVERLAY_HEADING} text-rb-500`}>Lifetime flows</span>}
+            interest={interest}
           />
 
           {/* The panel's info area: (i) Explanation — the tower legend narrated

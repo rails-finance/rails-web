@@ -14,9 +14,10 @@ import {
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { formatRatio, ratioLabel, ratioColorClass } from "@/lib/shared/ratio-format";
-import { StatCard, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
+import { StatCard, StatSubline, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
 import { hfLabel } from "@/lib/aave-v4/format";
 import { PositionRow, fmtPositionUsd } from "@/components/shared/position-row";
+import { formatNumber } from "@/lib/utils/format";
 import { resolvePrice } from "@/lib/aave/prices";
 import { usePrices } from "@/lib/shared/prices-context";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
@@ -27,6 +28,8 @@ import {
   healthFactorAtBlockProv,
   heldDebtRateProv,
   snapshotProv,
+  chainBalanceProv,
+  interestSincePreviousProv,
   deltaProv,
   pricePillProv,
   usdProv,
@@ -168,6 +171,8 @@ function V4PositionRow({
   side,
   rawBefore,
   rawAfter,
+  chain,
+  interest,
 }: {
   symbol: string;
   amount: string;
@@ -181,6 +186,11 @@ function V4PositionRow({
    *  shown on the receipt's via line. Only the changed row has them. */
   rawBefore?: string | null;
   rawAfter?: string | null;
+  /** The changed row's balances are chain figures (ctx.balanceBasis): the
+   *  shares and hub state behind them ride the receipt. */
+  chain?: { sharesBefore?: string; sharesAfter?: string; a?: string; b?: string };
+  /** Interest since the position's previous event on this reserve. */
+  interest?: string;
 }) {
   // "Balance after" is a running balance, not a single log field — so it gets
   // snapshotProv (replayed-balance framing), scoped to this row's reserve + leg.
@@ -188,18 +198,50 @@ function V4PositionRow({
   // is Prov-wrapped (deltaProv) like them.
   const afterN = parseFloat(amount) || 0;
   const afterUsd = priceUsd != null && afterN > 0 ? afterN * priceUsd : undefined;
-  return (
+  const detail = { ...coord, asset: symbol };
+  const row = (
     <PositionRow
       symbol={symbol}
       ticker={aaveV4DisplaySymbol(symbol)}
       amount={amount}
       before={before}
       isChanged={isChanged}
-      afterProv={snapshotProv("Balance after this event", { ...coord, asset: symbol, raw: rawAfter }, side)}
-      beforeProv={snapshotProv("Balance before this event", { ...coord, asset: symbol, raw: rawBefore }, side)}
-      deltaProv={deltaProv({ ...coord, asset: symbol })}
+      afterProv={
+        chain
+          ? chainBalanceProv("Balance after this event", detail, side, {
+              value: rawAfter,
+              shares: chain.sharesAfter,
+              a: chain.a,
+              b: chain.b,
+            })
+          : snapshotProv("Balance after this event", { ...detail, raw: rawAfter }, side)
+      }
+      beforeProv={
+        chain
+          ? chainBalanceProv("Balance before this event", detail, side, {
+              value: rawBefore,
+              shares: chain.sharesBefore,
+              a: chain.a,
+              b: chain.b,
+            })
+          : snapshotProv("Balance before this event", { ...detail, raw: rawBefore }, side)
+      }
+      deltaProv={deltaProv(detail)}
       usd={afterUsd != null ? { value: afterUsd, prov: SNAPSHOT_USD_PROV } : undefined}
     />
+  );
+  if (!interest) return row;
+  return (
+    <div className="flex flex-col">
+      {row}
+      <StatSubline>
+        Interest since previous event:{" "}
+        <Prov info={interestSincePreviousProv(detail, side)} value={interest} symbol={aaveV4DisplaySymbol(symbol)}>
+          <span title={interest}>{formatNumber(Number(interest))}</span>
+        </Prov>{" "}
+        {aaveV4DisplaySymbol(symbol)}
+      </StatSubline>
+    </div>
   );
 }
 
@@ -356,6 +398,17 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber, wallet }: AaveV4Ev
                 side="supply"
                 rawBefore={isThisChanged ? ctx.raw?.supplyBefore : undefined}
                 rawAfter={isThisChanged ? ctx.raw?.supplyAfter : undefined}
+                chain={
+                  isThisChanged && ctx.balanceBasis === "chain"
+                    ? {
+                        sharesBefore: ctx.raw?.supplySharesBefore,
+                        sharesAfter: ctx.raw?.supplySharesAfter,
+                        a: ctx.raw?.hubAddedAssets,
+                        b: ctx.raw?.hubAddedShares,
+                      }
+                    : undefined
+                }
+                interest={isThisChanged ? ctx.supplyInterestSincePrevious : undefined}
               />
             );
           })}
@@ -384,6 +437,16 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber, wallet }: AaveV4Ev
                 side="debt"
                 rawBefore={isThisChanged ? ctx.raw?.debtBefore : undefined}
                 rawAfter={isThisChanged ? ctx.raw?.debtAfter : undefined}
+                chain={
+                  isThisChanged && ctx.balanceBasis === "chain"
+                    ? {
+                        sharesBefore: ctx.raw?.drawnSharesBefore,
+                        sharesAfter: ctx.raw?.drawnSharesAfter,
+                        a: ctx.raw?.hubDrawnIndex,
+                      }
+                    : undefined
+                }
+                interest={isThisChanged ? ctx.debtInterestSincePrevious : undefined}
               />
             );
           })}

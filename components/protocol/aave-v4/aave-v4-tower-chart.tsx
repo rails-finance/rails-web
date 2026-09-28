@@ -22,7 +22,7 @@ import {
 } from "@/components/shared/economics-chart-primitives";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
 import { resolvePrice, type PriceEntry } from "@/lib/aave/prices";
-import type { ReserveStats } from "@/lib/aave-v4/spoke-cards";
+import type { AaveV4InterestPnl, ReserveStats } from "@/lib/aave-v4/spoke-cards";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { accumProv, chainTruthProv, livePriceInput } from "@/lib/aave-v4/position-provenance";
@@ -278,7 +278,25 @@ export interface AaveV4TowerChartProps {
    *  control — lets the host panel title the section without spending a row of
    *  its own row (the V2 trove treatment; the spoke page passes "Lifetime flows"). */
   title?: React.ReactNode;
+  /** The position's interest to date (computeAaveV4InterestPnl): the chain
+   *  balance less the net amount its events moved, per asset. Drawn as an
+   *  "Interest … (all time)" row on each side of the lifetime view. */
+  interest?: AaveV4InterestPnl | null;
 }
+
+/** Receipt for a lifetime interest row. */
+const lifetimeInterestProv = (side: "supply" | "debt"): Provenance =>
+  accumProv(side === "supply" ? "Interest the supply has earned to date" : "Interest the debt has accrued to date", {
+    formula:
+      side === "supply"
+        ? "Σ (supply balance now − supplied + withdrawn + liquidated) × price"
+        : "Σ (debt now − borrowed + repaid + liquidated) × price",
+    inputs: [
+      { label: "balance now", kind: "chain", note: "what the spoke answers for this position at the latest block" },
+      { label: "amounts moved", kind: "chain", pclass: "indexed", note: "the position's events, summed" },
+      { label: "price", kind: "offchain", note: HOLDING_PRICE_NOTE },
+    ],
+  });
 
 export function AaveV4TowerChart({
   reserves,
@@ -288,6 +306,7 @@ export function AaveV4TowerChart({
   hideSurplus,
   onToggleHideSurplus,
   title,
+  interest,
 }: AaveV4TowerChartProps) {
   const [hideHistorical, setHideHistorical] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
@@ -745,6 +764,20 @@ export function AaveV4TowerChart({
     ];
   };
 
+  // Lifetime interest per side, from the chain balance less the amounts moved.
+  // Hidden below a cent.
+  const interestRow = (side: "supply" | "debt"): BreakdownRow[] => {
+    if (!interest?.hasData) return [];
+    const usd = interest.assets.reduce(
+      (t, a) => t + (side === "supply" ? a.supplyInterestUsd : a.borrowInterestUsd),
+      0,
+    );
+    if (usd < 0.01) return [];
+    const label = side === "supply" ? "Interest earned (all time)" : "Interest accrued (all time)";
+    const v = fmtUsd(usd);
+    return [{ sign: "", label, amount: v.display, exact: v.title, indent: true, prov: lifetimeInterestProv(side) }];
+  };
+
   const collRows: BreakdownRow[] = [
     ...(!isLiveView
       ? [
@@ -760,6 +793,7 @@ export function AaveV4TowerChart({
       : []),
     ...(!isLiveView ? flowRows(withdrawnAssets, WITHDRAWN_PATTERN, "Withdrawn") : []),
     ...(!isLiveView ? flowRows(liquidatedCollAssets, LIQUIDATION_PATTERN, "Liquidated") : []),
+    ...(!isLiveView ? interestRow("supply") : []),
     ...withTotal(
       currentRows(
         supplyAssets,
@@ -798,6 +832,7 @@ export function AaveV4TowerChart({
       : []),
     ...(!isLiveView ? flowRows(repaidAssets, REPAID_PATTERN, "Repaid") : []),
     ...(!isLiveView ? flowRows(liquidatedDebtAssets, LIQUIDATION_PATTERN, "Liquidated") : []),
+    ...(!isLiveView ? interestRow("debt") : []),
     ...withTotal(
       currentRows(
         debtAssets,

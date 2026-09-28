@@ -336,12 +336,23 @@ export interface AaveV4ContextRaw {
   shares?: string;
   /** liquidation: raw collateral seized. */
   liquidatedCollateralAmount?: string;
-  /** Running sums from mv_aave_v4_events. On liquidation rows supply* is the
-   *  collateral side, debt* the debt side. */
+  /** The balances behind supplyBefore/After and debtBefore/After, as
+   *  integers: with `balanceBasis: "chain"` the spoke's shares valued at the
+   *  hub's state at this block, otherwise the running sums of event amounts.
+   *  On liquidation rows supply* is the collateral side, debt* the debt side. */
   supplyBefore?: string;
   supplyAfter?: string;
   debtBefore?: string;
   debtAfter?: string;
+  /** The spoke's running shares for the position (server migration 347). */
+  supplySharesBefore?: string;
+  supplySharesAfter?: string;
+  drawnSharesBefore?: string;
+  drawnSharesAfter?: string;
+  /** The hub's state at this block the chain balances were computed from. */
+  hubAddedAssets?: string;
+  hubAddedShares?: string;
+  hubDrawnIndex?: string;
 }
 
 /** Origin envelopes for the emitted AaveV4ContextRaw fields — which spoke log
@@ -398,6 +409,16 @@ export interface AaveV4Context {
   debtBefore?: string;
   /** Running debt balance after this event (human-readable). */
   debtAfter?: string;
+  /** "chain": the four balances above are the spoke's shares valued at the
+   *  hub's state at this block — what getUserSuppliedAssets / getUserDebt
+   *  answered there, interest included. Absent: running sums of event amounts
+   *  (a block the server's hub-state lane has not read yet). */
+  balanceBasis?: "chain";
+  /** Interest the moved reserve accrued since the position's previous event
+   *  on it (this row's before less that row's after, both chain figures), in
+   *  the reserve's token. Absent when zero or not both chain figures. */
+  supplyInterestSincePrevious?: string;
+  debtInterestSincePrevious?: string;
   /** All non-zero supply positions in this spoke after the event. Each item
    *  optionally carries the asset's USD price at the event block — populated
    *  when an `aave_v4_historic_prices` row exists for (asset_address,

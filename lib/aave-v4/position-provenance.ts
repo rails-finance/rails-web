@@ -262,6 +262,56 @@ export function snapshotProv(what: string, detail?: EventProvDetail, side?: "sup
   };
 }
 
+/** A balance the chain held at this event (server migration 347): the spoke's
+ *  running shares for the position, valued at the hub's state at the end of
+ *  this block — the figure getUserSuppliedAssets / getUserDebt answered there,
+ *  interest included. `raw` carries the integer, the shares and the hub state. */
+export function chainBalanceProv(
+  what: string,
+  detail: EventProvDetail | undefined,
+  side: "supply" | "debt",
+  raw?: { value?: string | null; shares?: string | null; a?: string | null; b?: string | null },
+): Provenance {
+  const asset = detail?.asset ? ` (${detail.asset})` : "";
+  const block = detail?.blockNumber != null ? ` at block ${detail.blockNumber}` : "";
+  const summary =
+    side === "supply"
+      ? `${what}${asset} — what the spoke held for this position on this reserve${block}: its supplied shares (the running sum of the shares its Supply, Withdraw and LiquidationCall logs moved) valued at the hub's share price there, interest included. It equals the spoke's getUserSuppliedAssets read at the block.`
+      : `${what}${asset} — what the position owed on this reserve${block}: its drawn shares (the running sum of the shares its Borrow, Repay and LiquidationCall logs moved) times the hub's drawn index there, interest included. It equals the spoke's getUserDebt read at the block; the premium debt is zero, since the risk premium is zero across the protocol.`;
+  const via =
+    side === "supply"
+      ? `shares × (hub addedAssets + 10^6) ÷ (addedShares + 10^6), rounded down${raw?.shares ? ` · ${raw.shares} shares` : ""}${raw?.a && raw?.b ? ` × (${raw.a} + 10^6) ÷ (${raw.b} + 10^6)` : ""}${raw?.value ? ` = ${raw.value}` : ""}`
+      : `drawn shares × hub drawnIndex ÷ 10^27, rounded up${raw?.shares ? ` · ${raw.shares} shares` : ""}${raw?.a ? ` × ${raw.a} ÷ 10^27` : ""}${raw?.value ? ` = ${raw.value}` : ""}`;
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary,
+    contract: { name: "Aave V4 hub" },
+    via,
+    formula: side === "supply" ? "shares × addedAssets ÷ addedShares" : "drawn shares × drawn index",
+    inputs: eventInputs(detail),
+  };
+}
+
+/** Interest the moved reserve accrued between the position's previous event on
+ *  it and this one: this event's before-balance less that event's after-balance,
+ *  both chain balances. No event moved the shares between them; the hub's
+ *  price did. */
+export function interestSincePreviousProv(detail: EventProvDetail | undefined, side: "supply" | "debt"): Provenance {
+  const asset = detail?.asset ? ` (${detail.asset})` : "";
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `Interest ${side === "supply" ? "earned on the supply" : "accrued on the debt"}${asset} since the position's previous event on this reserve, up to this one${
+      detail?.blockNumber != null ? ` at block ${detail.blockNumber}` : ""
+    } — the balance just before this event less the balance just after the previous one, both valued from the spoke's shares at the hub's state at their blocks.`,
+    contract: { name: "Aave V4 hub" },
+    via: "balance before this event − balance after the previous event",
+    formula: "before − previous after",
+    inputs: eventInputs(detail),
+  };
+}
+
 /** The single-number balance change surfaced by the before→after toggle — the
  *  position's balance after this event minus its balance before, in token
  *  units. Arithmetic over the two replayed balances, so chain-derived like
@@ -271,15 +321,15 @@ export function deltaProv(detail?: EventProvDetail): Provenance {
   const asset = detail?.asset ? ` (${detail.asset})` : "";
   return {
     kind: "chain-derived",
-    summary: `Balance change at this event${asset} — the balance after this event less the balance before, as one signed number. Both are replayed balances, so the change is what the position's events moved${
+    summary: `Balance change at this event${asset} — the balance after this event less the balance before, as one signed number. Both balances sit at this event's block, so the change is what this event moved${
       detail?.blockNumber != null ? ` at block ${detail.blockNumber}` : ""
     }.`,
     contract: spokeContract(detail),
     via: "balance after − balance before",
     formula: "after − before",
     inputs: [
-      { label: "balance before", kind: "chain-derived", pclass: "indexed", note: "replayed running balance" },
-      { label: "balance after", kind: "chain-derived", pclass: "indexed", note: "replayed running balance" },
+      { label: "balance before", kind: "chain-derived", pclass: "indexed", note: "the position's balance just before this event" },
+      { label: "balance after", kind: "chain-derived", pclass: "indexed", note: "the position's balance just after this event" },
       ...eventInputs(detail),
     ],
   };
