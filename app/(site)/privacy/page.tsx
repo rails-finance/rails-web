@@ -80,12 +80,17 @@ export default function PrivacyPage() {
         <section className="mb-8">
           <h2 className="text-2xl font-semibold text-rb-500 mb-4">Data Storage and Retention</h2>
           <p className="text-rb-500 mb-4">
-            We cache blockchain data temporarily to improve performance and reduce load on blockchain infrastructure.
-            This cached data is publicly available information from the chains Rails covers.
+            Rails indexes public blockchain data from the chains it covers and keeps it in its database. This is public
+            chain data and contains no personal information.
           </p>
           <p className="text-rb-500 mb-4">
-            We do not store personal information or maintain user accounts. Search queries and viewing history are not
-            permanently stored or associated with individual users.
+            We do not maintain user accounts or store personal information about your browsing. Search queries and
+            viewing history are not permanently stored or associated with individual users.
+          </p>
+          <p className="text-rb-500 mb-4">
+            If you send a message through the feedback form, we receive the message, any contact detail you choose to
+            give and the path of the page you sent it from. These are delivered to the Rails team through Telegram and
+            kept in that chat. Your IP address is read in memory to limit abuse and is not stored.
           </p>
         </section>
 
@@ -103,12 +108,23 @@ export default function PrivacyPage() {
               <strong>DeFi Protocols:</strong> To read the state and events of the protocols Rails covers
             </li>
             <li>
-              <strong>GitHub:</strong> For open-source code hosting
+              <strong>GitHub:</strong> For open-source code hosting, and as a source of token icons (Trust Wallet assets
+              on raw.githubusercontent.com)
+            </li>
+            <li>
+              <strong>DefiLlama:</strong> As a source of token icons (token-icons.llamao.fi)
+            </li>
+            <li>
+              <strong>Telegram:</strong> To deliver messages sent through the feedback form to the Rails team
             </li>
             <li>
               <strong>Vercel:</strong> For site hosting and cookieless, aggregate traffic analytics
             </li>
           </ul>
+          <p className="text-rb-500 mb-4">
+            Token icons load in your browser from DefiLlama and GitHub, so those services see your IP address and
+            browser details.
+          </p>
         </section>
 
         <section className="mb-8">
