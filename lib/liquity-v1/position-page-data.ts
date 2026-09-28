@@ -17,13 +17,21 @@
 // the index exactly one exceeds the 1,000-event window, and by 19 events —
 // Liquity V1 is immutable, so its depth ceiling rises on its own and that count
 // is worth re-measuring, at the LIFE grain, before the conclusion is reused.
+//
+// The three reads go to the BOX and run the proxy routes' shaping here, in the
+// render (lib/liquity-v1/proxy-reads.ts), in place of a fetch of each route.
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { fetchLiquityV1Positions } from "@/lib/api/fetch-liquity-v1-positions";
-import { fetchLiquityV1Timeline } from "@/lib/api/fetch-liquity-v1-timeline";
-import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { boxOnlyHop } from "@/lib/shared/listing-ssr";
+import { answerBody, answerEnvelope, answerTimeline } from "@/lib/shared/proxy-answer";
+import {
+  readLiquityV1OpeningBalance,
+  readLiquityV1Positions,
+  readLiquityV1Timeline,
+} from "@/lib/liquity-v1/proxy-reads";
+import type { LiquityV1TimelineResult } from "@/lib/sources/api/liquity-v1-timeline";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
 
 const EMPTY = {
@@ -36,17 +44,29 @@ const EMPTY = {
 export const loadLiquityV1PositionTail = cache(async (wallet: string) => {
   const tail = await loadPositionTail<{ data: LiquityV1PositionSummary[] }>({
     label: "liquity-v1",
-    readPositions: (baseUrl, headers) => fetchLiquityV1Positions({ wallet, limit: 100, baseUrl, headers }),
-    readTimeline: (baseUrl, headers) =>
-      fetchLiquityV1Timeline(wallet, { recent: TIMELINE_WINDOW_EVENTS, baseUrl, headers }),
-    readOpening: (baseUrl, cutoffBlock, headers) =>
-      fetchTimelineOpeningBalance({
-        path: "/api/liquity-v1/timeline/summary",
-        params: { wallet },
-        cutoffBlock,
-        baseUrl,
-        headers,
-      }),
+    readPositions: async (baseUrl, headers) =>
+      answerEnvelope<{ data: LiquityV1PositionSummary[] }["data"][number]>(
+        await readLiquityV1Positions(new URLSearchParams({ wallet, limit: "100" }), { baseUrl, headers }),
+        "readLiquityV1Positions",
+        100,
+      ),
+    readTimeline: async (baseUrl, headers) =>
+      answerTimeline<LiquityV1TimelineResult>(
+        await readLiquityV1Timeline(new URLSearchParams({ wallet, recent: String(TIMELINE_WINDOW_EVENTS) }), {
+          baseUrl,
+          headers,
+        }),
+        "readLiquityV1Timeline",
+      ),
+    readOpening: async (baseUrl, cutoffBlock, headers) =>
+      answerBody(
+        await readLiquityV1OpeningBalance(new URLSearchParams({ wallet, cutoffBlock: String(cutoffBlock) }), {
+          baseUrl,
+          headers,
+        }),
+        "readLiquityV1OpeningBalance",
+      ) as TimelineOpeningBalance,
+    hop: boxOnlyHop,
   });
   const summaries = tail.positions?.data ?? null;
   // The refusal above. Windowed AND multi-life means the seeded figures would be

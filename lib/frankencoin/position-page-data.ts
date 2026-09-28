@@ -13,27 +13,48 @@
 // PENDING state — the loader returning nothing puts the client back exactly
 // where it was, which is the state the page already knows how to render.
 //
+// The three reads go to the BOX and run the proxy routes' shaping here, in the
+// render (lib/frankencoin/proxy-reads.ts), in place of a fetch of each route.
+
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { fetchFrankencoinPositions, type FrankencoinPositionsResult } from "@/lib/api/fetch-frankencoin-positions";
-import { fetchFrankencoinTimeline } from "@/lib/api/fetch-frankencoin-timeline";
-import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { boxOnlyHop } from "@/lib/shared/listing-ssr";
+import { answerBody, answerEnvelope, answerTimeline } from "@/lib/shared/proxy-answer";
+import {
+  readFrankencoinOpeningBalance,
+  readFrankencoinPositions,
+  readFrankencoinTimeline,
+} from "@/lib/frankencoin/proxy-reads";
+import type { FrankencoinPositionsResult } from "@/lib/api/fetch-frankencoin-positions";
+import type { FrankencoinTimelineResult } from "@/lib/sources/api/frankencoin-timeline";
 
 export const loadFrankencoinPositionTail = cache(async (position: string) => {
   const tail = await loadPositionTail<FrankencoinPositionsResult>({
     label: "frankencoin",
-    readPositions: (baseUrl, headers) => fetchFrankencoinPositions({ position, limit: 1, baseUrl, headers }),
-    readTimeline: (baseUrl, headers) =>
-      fetchFrankencoinTimeline(position, { recent: TIMELINE_WINDOW_EVENTS, baseUrl, headers }),
-    readOpening: (baseUrl, cutoffBlock, headers) =>
-      fetchTimelineOpeningBalance({
-        path: "/api/frankencoin/timeline/summary",
-        params: { position },
-        cutoffBlock,
-        baseUrl,
-        headers,
-      }),
+    readPositions: async (baseUrl, headers) =>
+      answerEnvelope<FrankencoinPositionsResult["data"][number]>(
+        await readFrankencoinPositions(new URLSearchParams({ position, limit: "1" }), { baseUrl, headers }),
+        "readFrankencoinPositions",
+        1,
+      ),
+    readTimeline: async (baseUrl, headers) =>
+      answerTimeline<FrankencoinTimelineResult>(
+        await readFrankencoinTimeline(new URLSearchParams({ position, recent: String(TIMELINE_WINDOW_EVENTS) }), {
+          baseUrl,
+          headers,
+        }),
+        "readFrankencoinTimeline",
+      ),
+    readOpening: async (baseUrl, cutoffBlock, headers) =>
+      answerBody(
+        await readFrankencoinOpeningBalance(new URLSearchParams({ position, cutoffBlock: String(cutoffBlock) }), {
+          baseUrl,
+          headers,
+        }),
+        "readFrankencoinOpeningBalance",
+      ) as TimelineOpeningBalance,
+    hop: boxOnlyHop,
   });
   return { ...tail, position: tail.positions?.data[0] ?? null };
 });

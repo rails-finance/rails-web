@@ -16,13 +16,17 @@
 // otherwise, which is exactly the page it renders today. PWN's deepest wallet in
 // the index holds 77 events against a 1,000-event window, so no wallet takes
 // that branch today.
+//
+// The three reads go to the BOX and run the proxy routes' shaping here, in the
+// render (lib/pwn/proxy-reads.ts), in place of a fetch of each route.
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { fetchPwnPositions } from "@/lib/api/fetch-pwn-positions";
-import { fetchPwnTimeline } from "@/lib/api/fetch-pwn-timeline";
-import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { boxOnlyHop } from "@/lib/shared/listing-ssr";
+import { answerBody, answerEnvelope, answerTimeline } from "@/lib/shared/proxy-answer";
+import { readPwnOpeningBalance, readPwnPositions, readPwnTimeline } from "@/lib/pwn/proxy-reads";
+import type { FetchPwnTimelineResult } from "@/lib/api/fetch-pwn-timeline";
 import type { PwnPositionSummary } from "@/lib/sources/api/pwn-positions";
 
 const EMPTY = {
@@ -35,16 +39,29 @@ const EMPTY = {
 export const loadPwnPositionTail = cache(async (wallet: string) => {
   const tail = await loadPositionTail<{ data: PwnPositionSummary[] }>({
     label: "pwn",
-    readPositions: (baseUrl, headers) => fetchPwnPositions({ wallet, limit: 100, baseUrl, headers }),
-    readTimeline: (baseUrl, headers) => fetchPwnTimeline(wallet, { recent: TIMELINE_WINDOW_EVENTS, baseUrl, headers }),
-    readOpening: (baseUrl, cutoffBlock, headers) =>
-      fetchTimelineOpeningBalance({
-        path: "/api/pwn/timeline/summary",
-        params: { wallet },
-        cutoffBlock,
-        baseUrl,
-        headers,
-      }),
+    readPositions: async (baseUrl, headers) =>
+      answerEnvelope<{ data: PwnPositionSummary[] }["data"][number]>(
+        await readPwnPositions(new URLSearchParams({ wallet, limit: "100" }), { baseUrl, headers }),
+        "readPwnPositions",
+        100,
+      ),
+    readTimeline: async (baseUrl, headers) =>
+      answerTimeline<FetchPwnTimelineResult>(
+        await readPwnTimeline(new URLSearchParams({ wallet, recent: String(TIMELINE_WINDOW_EVENTS) }), {
+          baseUrl,
+          headers,
+        }),
+        "readPwnTimeline",
+      ),
+    readOpening: async (baseUrl, cutoffBlock, headers) =>
+      answerBody(
+        await readPwnOpeningBalance(new URLSearchParams({ wallet, cutoffBlock: String(cutoffBlock) }), {
+          baseUrl,
+          headers,
+        }),
+        "readPwnOpeningBalance",
+      ) as TimelineOpeningBalance,
+    hop: boxOnlyHop,
   });
   const summaries = tail.positions?.data ?? null;
   // The refusal above. Windowed AND multi-loan means the seeded figures would be
