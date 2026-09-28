@@ -2589,9 +2589,9 @@ export interface MapleContext {
    *  block. */
   valueBefore?: string;
   valueAfter?: string;
-  /** Interest the claim earned since the previous row in this pool: this row's
-   *  valueBefore less that row's valueAfter (signed). Absent on the first row
-   *  and where either row has no rate. */
+  /** Interest the claim earned since the previous row in this pool: that
+   *  row's shares + escrow after it at this block's rate, less its valueAfter
+   *  (signed). Absent on the first row and where either row has no rate. */
   interestSincePrev?: string;
   /** Where the block's rate came from: "chain" (an archive read of totalAssets
    *  and totalSupply) or the same-block log ("deposit" | "withdraw" |

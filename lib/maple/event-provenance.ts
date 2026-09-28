@@ -522,7 +522,7 @@ export const claimBeforeProv = (
 };
 
 /** Interest the claim earned between the previous row in this pool and this
- *  event: this row's claim before less the previous row's claim after. */
+ *  event: the previous holding at this block's rate less its value then. */
 export const interestSincePrevProv = (
   assetSym: string,
   poolSym: string,
@@ -531,17 +531,17 @@ export const interestSincePrevProv = (
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `${assetSym} the position's ${poolSym} earned between the previous event in this pool and this one: its claim just before this event less its claim just after the previous one. The shares held did not change in between, so the difference is the pool's rate rising on them: interest accrued by the loan book. A loss the pool delegate marked would read negative. ${CUSTODY_NOTE}`,
+  summary: `${assetSym} the position's ${poolSym} earned between the previous event in this pool and this one: the shares and escrow it held after the previous event, valued at the pool's rate in this block, less their value at the previous event's block rate. Every share movement is an event, so the holding did not change in between and the difference is the pool's rate rising on it: interest accrued by the loan book. A loss the pool delegate marked would read negative. ${CUSTODY_NOTE}`,
   contract: poolContract(coords),
-  via: `claim before this event − claim after the previous event${raw ? ` = ${raw}` : ""}`,
-  formula: "before − previous after",
+  via: `held after the previous event × (rate now − rate then)${raw ? ` = ${raw}` : ""}`,
+  formula: "held × rate now − held × rate then",
   inputs: eventInputs(coords, [
-    { label: "before", kind: "chain-derived", pclass: "state", note: "(shares + escrowed) × the rate in this block" },
+    { label: "held", kind: "chain", pclass: "state", note: "shares + escrowed after the previous event" },
     {
       label: "previous after",
       kind: "chain-derived",
       pclass: "state",
-      note: "(shares + escrowed) × the rate in the previous event's block",
+      note: "that holding × the rate in the previous event's block",
     },
   ]),
 });
