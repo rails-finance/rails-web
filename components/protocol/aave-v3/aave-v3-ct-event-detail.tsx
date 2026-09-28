@@ -15,8 +15,13 @@
 //     the same before/after/change receipts plus the collateral switch, and the
 //     event's own change keeps its receipt on the header. The block hides dust
 //     rows behind a count line (§52), but never the row the grid gave way for.
-//   • Base and Seamless keep the principal replayed from the per-reserve deltas,
-//     before → after.
+//     A row the index valued at the chain balance (ctx.balanceBasis "chain",
+//     decision 0033) states that balance from the row itself while the read is
+//     pending or unavailable, and the interest the lane accrued since the
+//     transaction that last moved it.
+//   • Base and Seamless state the row's balance, before → after: the chain
+//     balance where the replay valued it, else the principal replayed from the
+//     per-reserve deltas.
 // USD rides the oracle price at the event's block — the at-block read on the
 // Ethereum lane, the captured price (mig 092) on the principal lane — and the
 // captured price's footnote pill sits under the grid. A block with no price
@@ -51,8 +56,12 @@ import {
   liqBonusRefProv,
   exactBalanceProv,
   exactBalanceChangeProv,
+  rowChainBalanceProv,
+  rowInterestProv,
   type V3Coords,
 } from "@/lib/aave-v3/event-provenance";
+import { Prov } from "@/components/shared/provenance";
+import { StatSubline } from "@/components/shared/state-transition";
 import {
   LiquidationForensics,
   buildLiquidationForensics,
@@ -114,10 +123,14 @@ interface Axis {
   /** The event's own signed change on this axis, in token units. */
   change: string | null;
   changeProv: Provenance;
-  /** The principal lane: the replayed after-balance, its raw sum, and the
-   *  captured at-block price. */
+  /** The row's own balance after the event and its raw integer: the chain
+   *  balance when `chain` is set, else the principal replay. */
   principalAfter?: string;
   principalRawAfter?: string;
+  /** The row's figures are the chain balance (ctx.balanceBasis): the before
+   *  figure, the scaled balance and index behind the after figure, and the
+   *  interest since the lane's previous move. */
+  chain?: { rawBefore?: string; scaled?: string; index?: string; interest?: string };
   price?: { usd: number };
 }
 
@@ -137,30 +150,51 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
   // Reserves the block below always draws a row for, dust or not, because the
   // grid gives way to that row for the same balance (§47, §52).
   const touched: TouchedLeg[] = [];
+  // The interest line of a stat that gave way to the block's row: drawn under
+  // the grid, so the row still states it.
+  const interestLines: { symbol: string; side: "supply" | "debt"; value: string }[] = [];
+
+  const interestOf = (a: Axis): ChainTruthStat["interestSincePrevious"] =>
+    a.chain?.interest ? { value: a.chain.interest, prov: rowInterestProv(a.symbol, a.side, coords) } : undefined;
+
+  /** The row's own balance, before → after (the chain's where the index valued it). */
+  const rowStat = (a: Axis): ChainTruthStat => ({
+    label: a.label,
+    value: fmt(a.principalAfter),
+    symbol: a.symbol,
+    ...(a.chain ? { address: a.reserve } : {}),
+    prov: a.chain
+      ? rowChainBalanceProv(a.symbol, a.side, "after", coords, {
+          raw: a.principalRawAfter,
+          scaled: a.chain.scaled,
+          index: a.chain.index,
+        })
+      : a.side === "supply"
+        ? supplyAfterProv(a.symbol, coords, a.principalRawAfter)
+        : debtAfterProv(a.symbol, coords, a.principalRawAfter),
+    usd: usdOf(a.principalAfter, a.price, (amount, priceUsd) =>
+      snapshotUsdProv(a.symbol, a.side, coords, { amount, priceUsd }),
+    ),
+    transition: reconstructTransition({
+      after: a.principalAfter,
+      change: a.change,
+      changeProv: a.changeProv,
+      beforeProv: a.chain
+        ? rowChainBalanceProv(a.symbol, a.side, "before", coords, { raw: a.chain.rawBefore, index: a.chain.index })
+        : a.side === "supply"
+          ? supplyBeforeProv(a.symbol, coords)
+          : debtBeforeProv(a.symbol, coords),
+    }),
+    interestSincePrevious: interestOf(a),
+  });
 
   /** The axis' stat, or null where the position block below states the balance. */
   const statFor = (a: Axis): ChainTruthStat | null => {
-    if (!state) {
-      return {
-        label: a.label,
-        value: fmt(a.principalAfter),
-        symbol: a.symbol,
-        prov:
-          a.side === "supply"
-            ? supplyAfterProv(a.symbol, coords, a.principalRawAfter)
-            : debtAfterProv(a.symbol, coords, a.principalRawAfter),
-        usd: usdOf(a.principalAfter, a.price, (amount, priceUsd) =>
-          snapshotUsdProv(a.symbol, a.side, coords, { amount, priceUsd }),
-        ),
-        transition: reconstructTransition({
-          after: a.principalAfter,
-          change: a.change,
-          changeProv: a.changeProv,
-          beforeProv: a.side === "supply" ? supplyBeforeProv(a.symbol, coords) : debtBeforeProv(a.symbol, coords),
-        }),
-      };
-    }
+    if (!state) return rowStat(a);
     const r = ready ? findReserve(ready, a.reserve, a.symbol) : undefined;
+    // While the read is pending or where it failed, a row the index valued
+    // states its own chain balance.
+    if ((!ready || !r || r.decimals == null) && a.chain && a.principalAfter != null) return rowStat(a);
     if (!ready || !r || r.decimals == null) {
       // Loading, unavailable, or a reserve the answer does not list: the event's
       // own change, the same figure and receipt the header carries.
@@ -182,6 +216,7 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
     // rule never hides that row (§52).
     if (legHeld(leg)) {
       touched.push({ reserve: r.reserve, side: a.side });
+      if (a.chain?.interest) interestLines.push({ symbol: a.symbol, side: a.side, value: a.chain.interest });
       return null;
     }
     const before = humanOf(leg.before, r.decimals);
@@ -221,8 +256,27 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
                 after: groupExact(after),
               }),
             },
+      interestSincePrevious: interestOf(a),
     };
   };
+
+  /** The chain fields of the row's supply or debt lane. */
+  const chainOf = (side: "supply" | "debt"): Axis["chain"] =>
+    ctx.balanceBasis === "chain"
+      ? side === "supply"
+        ? {
+            rawBefore: ctx.raw?.supplyBefore,
+            scaled: ctx.raw?.supplyScaledAfter,
+            index: ctx.raw?.supplyIndex,
+            interest: ctx.supplyInterestSincePrevious,
+          }
+        : {
+            rawBefore: ctx.raw?.debtBefore,
+            scaled: ctx.raw?.debtScaledAfter,
+            index: ctx.raw?.debtIndex,
+            interest: ctx.debtInterestSincePrevious,
+          }
+      : undefined;
 
   const stats: ChainTruthStat[] = [];
   const push = (s: ChainTruthStat | null) => {
@@ -248,6 +302,7 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
         ),
         principalAfter: ctx.supplyAfter,
         principalRawAfter: ctx.raw?.supplyAfter,
+        chain: chainOf("supply"),
         price: ctx.collateralPrice,
       }),
     );
@@ -262,6 +317,7 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
         changeProv: debtRepaidProv(sym, coords, ctx.raw?.debtToCover, ctx.origin?.debtToCover),
         principalAfter: ctx.debtAfter,
         principalRawAfter: ctx.raw?.debtAfter,
+        chain: chainOf("debt"),
         price: ctx.debtPrice,
       }),
     );
@@ -373,6 +429,7 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
           : assetsDeltaProv(sym, "supply", coords, ctx.raw?.amount, ctx.origin?.amount),
         principalAfter: ctx.supplyAfter,
         principalRawAfter: ctx.raw?.supplyAfter,
+        chain: chainOf("supply"),
         price: ctx.price,
       }),
     );
@@ -393,6 +450,7 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
           : assetsDeltaProv(sym, "debt", coords, ctx.raw?.amount, ctx.origin?.amount),
         principalAfter: ctx.debtAfter,
         principalRawAfter: ctx.raw?.debtAfter,
+        chain: chainOf("debt"),
         price: ctx.price,
       }),
     );
@@ -447,6 +505,17 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
   return (
     <>
       {stats.length > 0 && <ChainTruthDetail stats={stats} />}
+      {interestLines.map((l) => (
+        <div key={`${l.side}:${l.symbol}`} className="px-5 pb-1">
+          <StatSubline>
+            Interest since previous event:{" "}
+            <Prov info={rowInterestProv(l.symbol, l.side, coords)} value={l.value} symbol={l.symbol}>
+              <span title={l.value}>{formatNumber(Number(l.value))}</span>
+            </Prov>{" "}
+            {l.symbol}
+          </StatSubline>
+        </div>
+      ))}
       {state?.status === "loading" && (
         <div className="px-5 pb-2 text-xs text-rb-500" data-position-state="loading">
           Reading the position at this block…

@@ -3,6 +3,7 @@
 // proxy's query and a hop to the box, and answers what the route answers; the
 // routes' header comments carry the argument for each shape. SERVER-ONLY.
 
+import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
 import { resolveEnsAddress } from "@/lib/ens/resolve-ens";
 import { buildAaveV3PositionRows, type RawV3WalletRow } from "@/lib/sources/api/aave-v3-positions";
@@ -159,7 +160,7 @@ export async function readAaveV3Timeline(sp: URLSearchParams, hop: SsrHop): Prom
       console.error(`Backend API error: ${response.status} ${response.statusText}`);
       return proxyFail(response.status, { error: `Backend error: ${response.statusText}` });
     }
-    const upstream = (await response.json()) as UpstreamGroupedTimeline<MvRow>;
+    const upstream = (await response.json()) as UpstreamGroupedTimeline<MvRow> & { laneInterest?: AaveLaneInterest[] };
     // A backend that predates the grouping answers `?group=1` with the FLAT
     // shape — same 200, rows of raw MV rows rather than wire rows. Saying so
     // is the whole point: a caller that cannot tell "not deployed yet" from
@@ -198,6 +199,9 @@ export async function readAaveV3Timeline(sp: URLSearchParams, hop: SsrHop): Prom
       eventsServed: upstream.eventsServed,
       boundBy: upstream.boundBy,
       span: upstream.span ?? null,
+      // The lifetime interest per lane (decision 0033); absent from an api
+      // that predates it.
+      laneInterest: upstream.laneInterest ?? null,
     };
     // A leg whose decimals did not load is left off its folder header; the
     // answer is then not kept, like a row carrying one.
@@ -222,7 +226,10 @@ export async function readAaveV3Timeline(sp: URLSearchParams, hop: SsrHop): Prom
     console.error(`Backend API error: ${response.status} ${response.statusText}`);
     return proxyFail(response.status, { error: `Backend error: ${response.statusText}` });
   }
-  const { rows, totalEvents, truncated, cutoffBlock, span } = (await response.json()) as TimelineRowsResponse;
+  const { rows, totalEvents, truncated, cutoffBlock, span, laneInterest } =
+    (await response.json()) as TimelineRowsResponse & {
+      laneInterest?: AaveLaneInterest[];
+    };
   const data = await buildAaveV3Timeline(rows, wallet);
   // The ceiling and the window are different claims and both can be absent.
   // A windowed fetch is never truncated — it asked for a window and got one —
@@ -231,6 +238,7 @@ export async function readAaveV3Timeline(sp: URLSearchParams, hop: SsrHop): Prom
     ...withRowCeiling(data, { totalEvents, truncated }),
     cutoffBlock: cutoffBlock ?? null,
     span: span ?? null,
+    laneInterest: laneInterest ?? null,
   };
   return proxyOk(
     toTimelineWire(windowed, MAINNET_CHAIN_ID),

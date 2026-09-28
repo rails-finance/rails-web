@@ -77,6 +77,7 @@ export default async function AaveV3PositionPage({ params, searchParams }: Props
       initialCutoffBlock={tail.cutoffBlock}
       initialOpening={tail.opening}
       initialGrouped={tail.grouped}
+      initialLaneInterest={tail.laneInterest}
     />
   );
 }

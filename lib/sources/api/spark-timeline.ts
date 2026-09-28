@@ -17,6 +17,7 @@
 //
 // SERVER-ONLY — imported from the /api/spark/* route handlers.
 
+import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import type {
   BaseActivityEvent,
   AssetFlow,
@@ -45,6 +46,9 @@ export interface SparkTimelineResult {
    *  whenever `recent` was not asked for, and also when the position holds
    *  fewer events than the window. The route attaches it. */
   cutoffBlock?: number | null;
+  /** Per lane the position ever moved: the net its events moved beside the
+   *  chain balance after its last move (decision 0033). Set by the proxy. */
+  laneInterest?: AaveLaneInterest[] | null;
 }
 
 /** One row of spark_events_served, exactly as the rails /api/spark/timeline route
@@ -81,6 +85,19 @@ export interface MvRow {
   supply_after: string | null;
   debt_before: string | null;
   debt_after: string | null;
+  /** The chain balance at the row (rails-server services/aave-family-chain-rows.ts,
+   *  decision 0033). Absent on a server that predates it and on a lane the row
+   *  does not draw. */
+  chain_supply_before?: string | null;
+  chain_supply_after?: string | null;
+  supply_scaled_after?: string | null;
+  supply_index?: string | null;
+  supply_interest?: string | null;
+  chain_debt_before?: string | null;
+  chain_debt_after?: string | null;
+  debt_scaled_after?: string | null;
+  debt_index?: string | null;
+  debt_interest?: string | null;
   /** msg.sender at the Pool (the raw event's own party param) — set for
    *  supply/borrow/repay, NULL for withdraw/liquidation. See the route. */
   pool_caller: string | null;
@@ -151,6 +168,15 @@ function scaledStr(raw: string | null, meta: Erc20Meta | undefined): string | un
 // Raw-integer passthrough for ctx.raw: the view's columns are pg NUMERIC(78,0) and
 // serialize as bare integer strings; null → undefined so the key drops out of
 // the JSON. Raws are the chain values — never rebuilt from the scaled floats.
+/** Interest since the previous move, scaled for display; undefined where it is
+ *  zero or a rounding unit below. */
+function interestOf(raw: string | null | undefined, m: Erc20Meta | undefined): string | undefined {
+  if (raw == null || m == null) return undefined;
+  const v = BigInt(String(raw).split(".")[0]);
+  if (v >= BigInt(-1) && v <= ZERO) return undefined;
+  return fmtUnits(v, m.decimals);
+}
+
 function rawVal(v: string | null): string | undefined {
   return v == null ? undefined : String(v).split(".")[0];
 }
@@ -240,7 +266,43 @@ export async function buildSparkTimeline(rows: MvRow[], walletRaw: string): Prom
     return e;
   });
 
-  function sparkEvent(r: MvRow, idx: number): BaseActivityEvent {
+  function sparkEvent(row: MvRow, idx: number): BaseActivityEvent {
+    // The lanes the row draws at the chain balance where the server sent them
+    // (a liquidation needs both), else the principal replay.
+    const liq = row.action === "liquidation";
+    const supplySide = liq || ["supply", "withdraw", "transfer_in", "transfer_out"].includes(row.action);
+    const debtSide = liq || !supplySide;
+    const chain = (!supplySide || row.chain_supply_after != null) && (!debtSide || row.chain_debt_after != null);
+    const r: MvRow = chain
+      ? {
+          ...row,
+          ...(supplySide
+            ? { supply_before: row.chain_supply_before ?? null, supply_after: row.chain_supply_after ?? null }
+            : {}),
+          ...(debtSide ? { debt_before: row.chain_debt_before ?? null, debt_after: row.chain_debt_after ?? null } : {}),
+        }
+      : row;
+    const chainFields = (sMeta: Erc20Meta | undefined, dMeta: Erc20Meta | undefined) =>
+      chain
+        ? {
+            balanceBasis: "chain" as const,
+            ...(supplySide ? { supplyInterestSincePrevious: interestOf(row.supply_interest, sMeta) } : {}),
+            ...(debtSide ? { debtInterestSincePrevious: interestOf(row.debt_interest, dMeta) } : {}),
+          }
+        : {};
+    const chainRaw = chain
+      ? {
+          ...(supplySide
+            ? {
+                supplyScaledAfter: rawVal(row.supply_scaled_after ?? null),
+                supplyIndex: rawVal(row.supply_index ?? null),
+              }
+            : {}),
+          ...(debtSide
+            ? { debtScaledAfter: rawVal(row.debt_scaled_after ?? null), debtIndex: rawVal(row.debt_index ?? null) }
+            : {}),
+        }
+      : {};
     const tx = hexFromBytea(r.tx_hash);
     const block = Number(r.block_number);
     const ts = Number(r.block_timestamp);
@@ -294,6 +356,7 @@ export async function buildSparkTimeline(rows: MvRow[], walletRaw: string): Prom
         supplyAfter: scaledStr(r.supply_after, collMeta),
         debtBefore: scaledStr(r.debt_before, debtMeta),
         debtAfter: scaledStr(r.debt_after, debtMeta),
+        ...chainFields(collMeta, debtMeta),
         allSupplies: snapshot(supplyBasket),
         allDebts: snapshot(debtBasket),
         raw: {
@@ -303,6 +366,7 @@ export async function buildSparkTimeline(rows: MvRow[], walletRaw: string): Prom
           supplyAfter: rawVal(r.supply_after),
           debtBefore: rawVal(r.debt_before),
           debtAfter: rawVal(r.debt_after),
+          ...chainRaw,
         },
         origin: {
           debtToCover: originVal("LiquidationCall", "debtToCover", debtMeta, r.amount),
@@ -376,6 +440,7 @@ export async function buildSparkTimeline(rows: MvRow[], walletRaw: string): Prom
       ...(isSupplySide
         ? { supplyBefore: scaledStr(r.supply_before, rMeta), supplyAfter: scaledStr(r.supply_after, rMeta) }
         : { debtBefore: scaledStr(r.debt_before, rMeta), debtAfter: scaledStr(r.debt_after, rMeta) }),
+      ...chainFields(rMeta, rMeta),
       allSupplies: snapshot(supplyBasket),
       allDebts: snapshot(debtBasket),
       raw: {
@@ -383,6 +448,7 @@ export async function buildSparkTimeline(rows: MvRow[], walletRaw: string): Prom
         ...(isSupplySide
           ? { supplyBefore: rawVal(r.supply_before), supplyAfter: rawVal(r.supply_after) }
           : { debtBefore: rawVal(r.debt_before), debtAfter: rawVal(r.debt_after) }),
+        ...chainRaw,
       },
       origin: {
         // Transfers get NO envelope: their amount is DERIVED (the transfer's

@@ -70,6 +70,21 @@ export interface MvRow {
   supply_after: string | null;
   debt_before: string | null;
   debt_after: string | null;
+  /** The chain balance at the row (rails-server services/aave-family-chain-rows.ts,
+   *  decision 0033): what the aToken / variable debt token held after and before
+   *  the row, the scaled balance and index behind it, and the interest the lane
+   *  accrued since the transaction that last moved it. Absent on a server that
+   *  predates it, and on a lane the row does not draw. */
+  chain_supply_before?: string | null;
+  chain_supply_after?: string | null;
+  supply_scaled_after?: string | null;
+  supply_index?: string | null;
+  supply_interest?: string | null;
+  chain_debt_before?: string | null;
+  chain_debt_after?: string | null;
+  debt_scaled_after?: string | null;
+  debt_index?: string | null;
+  debt_interest?: string | null;
   /** msg.sender at the Pool (the raw event's own party param) — set for
    *  supply/borrow/repay, NULL for withdraw/liquidation. See the route. */
   pool_caller: string | null;
@@ -131,6 +146,10 @@ export interface MvSwapReceived {
   /** Absent from a server older than mig 245's api change. */
   debt_before?: string | null;
   debt_after?: string | null;
+  chain_supply_before?: string | null;
+  chain_supply_after?: string | null;
+  chain_debt_before?: string | null;
+  chain_debt_after?: string | null;
   price_usd: string | null;
   price_source: string | null;
 }
@@ -167,6 +186,69 @@ function amt(raw: string | null, meta: V3TokenMeta | undefined): string | undefi
 // the JSON. Raws are the chain values — never rebuilt from the scaled floats.
 function rawVal(v: string | null): string | undefined {
   return v == null ? undefined : String(v).split(".")[0];
+}
+
+/** The row's balances on one lane: the chain's where the server sent them
+ *  (decision 0033), else the principal replay. */
+interface LaneFigures {
+  before: string | null;
+  after: string | null;
+  chain: boolean;
+  scaled?: string | null;
+  index?: string | null;
+  interest?: string | null;
+}
+
+function laneOf(
+  side: "supply" | "debt",
+  r: {
+    supply_before?: string | null;
+    supply_after?: string | null;
+    debt_before?: string | null;
+    debt_after?: string | null;
+    chain_supply_before?: string | null;
+    chain_supply_after?: string | null;
+    supply_scaled_after?: string | null;
+    supply_index?: string | null;
+    supply_interest?: string | null;
+    chain_debt_before?: string | null;
+    chain_debt_after?: string | null;
+    debt_scaled_after?: string | null;
+    debt_index?: string | null;
+    debt_interest?: string | null;
+  },
+): LaneFigures {
+  if (side === "supply") {
+    return r.chain_supply_after != null
+      ? {
+          before: r.chain_supply_before ?? null,
+          after: r.chain_supply_after,
+          chain: true,
+          scaled: r.supply_scaled_after,
+          index: r.supply_index,
+          interest: r.supply_interest,
+        }
+      : { before: r.supply_before ?? null, after: r.supply_after ?? null, chain: false };
+  }
+  return r.chain_debt_after != null
+    ? {
+        before: r.chain_debt_before ?? null,
+        after: r.chain_debt_after,
+        chain: true,
+        scaled: r.debt_scaled_after,
+        index: r.debt_index,
+        interest: r.debt_interest,
+      }
+    : { before: r.debt_before ?? null, after: r.debt_after ?? null, chain: false };
+}
+
+/** Interest since the previous move, scaled for display; undefined where it is
+ *  zero or a rounding unit below (a V3.5 rounding change can leave −1). */
+function interestOf(raw: string | null | undefined, meta: V3TokenMeta | undefined): string | undefined {
+  if (raw == null || meta == null) return undefined;
+  const v = BigInt(String(raw).split(".")[0]);
+  if (v >= BigInt(-1) && v <= BigInt(0)) return undefined;
+  return String(scaleV3(v, meta.decimals));
 }
 
 /** Origin envelope for a value that IS one decoded Pool log param: the
@@ -305,10 +387,13 @@ export async function buildAaveV3Timeline(rows: MvRow[], walletRaw: string): Pro
         ? {}
         : receivedDebt
           ? {
-              receivedDebtBefore: amt(x.debt_before ?? null, xMeta),
-              receivedDebtAfter: amt(x.debt_after ?? null, xMeta),
+              receivedDebtBefore: amt(laneOf("debt", x).before, xMeta),
+              receivedDebtAfter: amt(laneOf("debt", x).after, xMeta),
             }
-          : { receivedSupplyBefore: amt(x.supply_before, xMeta), receivedSupplyAfter: amt(x.supply_after, xMeta) }),
+          : {
+              receivedSupplyBefore: amt(laneOf("supply", x).before, xMeta),
+              receivedSupplyAfter: amt(laneOf("supply", x).after, xMeta),
+            }),
       receivedPrice: priceOf(x.price_usd, x.price_source),
       // A Pool log leg carries its own amount param; a transfer leg's is derived.
       receivedOrigin:
@@ -325,13 +410,21 @@ export async function buildAaveV3Timeline(rows: MvRow[], walletRaw: string): Pro
         ...(receivedTrade
           ? {}
           : receivedDebt
-            ? { receivedDebtBefore: rawVal(x.debt_before ?? null), receivedDebtAfter: rawVal(x.debt_after ?? null) }
-            : { receivedSupplyBefore: rawVal(x.supply_before), receivedSupplyAfter: rawVal(x.supply_after) }),
+            ? {
+                receivedDebtBefore: rawVal(laneOf("debt", x).before),
+                receivedDebtAfter: rawVal(laneOf("debt", x).after),
+              }
+            : {
+                receivedSupplyBefore: rawVal(laneOf("supply", x).before),
+                receivedSupplyAfter: rawVal(laneOf("supply", x).after),
+              }),
         tradeSellAmount: rawVal(leg.trade_sell_amount),
         tradeBuyAmount: rawVal(leg.trade_buy_amount),
         tradeFeeAmount: rawVal(leg.trade_fee_amount),
       },
     };
+    const gLane = laneOf(givenDebt ? "debt" : "supply", g);
+    const xLane = receivedTrade ? null : laneOf(receivedDebt ? "debt" : "supply", x);
     const ctx: AaveV3Context = {
       eventType: "swap",
       amount: amt(g.amount, gMeta),
@@ -341,13 +434,14 @@ export async function buildAaveV3Timeline(rows: MvRow[], walletRaw: string): Pro
       // No counterparty and no acting parties: on the adapter route both are
       // the order's one-use contract, which is never named as a party (§15).
       ...(givenDebt
-        ? { debtBefore: amt(g.debt_before, gMeta), debtAfter: amt(g.debt_after, gMeta) }
-        : { supplyBefore: amt(g.supply_before, gMeta), supplyAfter: amt(g.supply_after, gMeta) }),
+        ? { debtBefore: amt(gLane.before, gMeta), debtAfter: amt(gLane.after, gMeta) }
+        : { supplyBefore: amt(gLane.before, gMeta), supplyAfter: amt(gLane.after, gMeta) }),
+      ...(gLane.chain && (xLane == null || xLane.chain) ? { balanceBasis: "chain" as const } : {}),
       raw: {
         amount: rawVal(g.amount),
         ...(givenDebt
-          ? { debtBefore: rawVal(g.debt_before), debtAfter: rawVal(g.debt_after) }
-          : { supplyBefore: rawVal(g.supply_before), supplyAfter: rawVal(g.supply_after) }),
+          ? { debtBefore: rawVal(gLane.before), debtAfter: rawVal(gLane.after) }
+          : { supplyBefore: rawVal(gLane.before), supplyAfter: rawVal(gLane.after) }),
       },
       // A repay leg carries the Repay log's own amount; a transfer leg's is
       // derived, so no envelope.
@@ -401,6 +495,10 @@ export async function buildAaveV3Timeline(rows: MvRow[], walletRaw: string): Pro
     if (kind === "liquidation") {
       const collMeta = meta(r.collateral_asset);
       const debtMeta = meta(r.debt_asset) ?? rMeta;
+      // Both lanes at the chain balance, or both principal: one basis per card.
+      const chain = r.chain_supply_after != null && r.chain_debt_after != null;
+      const coll = chain ? laneOf("supply", r) : laneOf("supply", { ...r, chain_supply_after: null });
+      const debt = chain ? laneOf("debt", r) : laneOf("debt", { ...r, chain_debt_after: null });
       const ctx: AaveV3Context = {
         eventType: "liquidation",
         reserveSymbol: debtMeta?.symbol,
@@ -412,17 +510,32 @@ export async function buildAaveV3Timeline(rows: MvRow[], walletRaw: string): Pro
         liquidator: r.liquidator?.toLowerCase() ?? undefined,
         collateralPrice: priceOf(r.collateral_price_usd, r.collateral_price_source),
         debtPrice: priceOf(r.debt_price_usd, r.debt_price_source),
-        supplyBefore: amt(r.supply_before, collMeta),
-        supplyAfter: amt(r.supply_after, collMeta),
-        debtBefore: amt(r.debt_before, debtMeta),
-        debtAfter: amt(r.debt_after, debtMeta),
+        supplyBefore: amt(coll.before, collMeta),
+        supplyAfter: amt(coll.after, collMeta),
+        debtBefore: amt(debt.before, debtMeta),
+        debtAfter: amt(debt.after, debtMeta),
+        ...(chain
+          ? {
+              balanceBasis: "chain" as const,
+              supplyInterestSincePrevious: interestOf(coll.interest, collMeta),
+              debtInterestSincePrevious: interestOf(debt.interest, debtMeta),
+            }
+          : {}),
         raw: {
           debtToCover: rawVal(r.amount),
           liquidatedCollateralAmount: rawVal(r.liquidated_collateral_amount),
-          supplyBefore: rawVal(r.supply_before),
-          supplyAfter: rawVal(r.supply_after),
-          debtBefore: rawVal(r.debt_before),
-          debtAfter: rawVal(r.debt_after),
+          supplyBefore: rawVal(coll.before),
+          supplyAfter: rawVal(coll.after),
+          debtBefore: rawVal(debt.before),
+          debtAfter: rawVal(debt.after),
+          ...(chain
+            ? {
+                supplyScaledAfter: rawVal(coll.scaled ?? null),
+                supplyIndex: rawVal(coll.index ?? null),
+                debtScaledAfter: rawVal(debt.scaled ?? null),
+                debtIndex: rawVal(debt.index ?? null),
+              }
+            : {}),
         },
         origin: {
           debtToCover: originVal("LiquidationCall", "debtToCover", debtMeta, r.amount),
@@ -459,6 +572,7 @@ export async function buildAaveV3Timeline(rows: MvRow[], walletRaw: string): Pro
         ? "out"
         : "in";
     const flows = rMeta && r.amount != null ? [flowV3(rMeta, BigInt(r.amount), dir)] : [];
+    const lane = laneOf(isSupplySide ? "supply" : "debt", r);
 
     const ctx: AaveV3Context = {
       eventType: kind,
@@ -484,13 +598,26 @@ export async function buildAaveV3Timeline(rows: MvRow[], walletRaw: string): Pro
         ? { txFrom: r.tx_from.toLowerCase(), poolCaller: r.pool_caller.toLowerCase() }
         : {}),
       ...(isSupplySide
-        ? { supplyBefore: amt(r.supply_before, rMeta), supplyAfter: amt(r.supply_after, rMeta) }
-        : { debtBefore: amt(r.debt_before, rMeta), debtAfter: amt(r.debt_after, rMeta) }),
+        ? { supplyBefore: amt(lane.before, rMeta), supplyAfter: amt(lane.after, rMeta) }
+        : { debtBefore: amt(lane.before, rMeta), debtAfter: amt(lane.after, rMeta) }),
+      ...(lane.chain
+        ? {
+            balanceBasis: "chain" as const,
+            ...(isSupplySide
+              ? { supplyInterestSincePrevious: interestOf(lane.interest, rMeta) }
+              : { debtInterestSincePrevious: interestOf(lane.interest, rMeta) }),
+          }
+        : {}),
       raw: {
         amount: rawVal(r.amount),
         ...(isSupplySide
-          ? { supplyBefore: rawVal(r.supply_before), supplyAfter: rawVal(r.supply_after) }
-          : { debtBefore: rawVal(r.debt_before), debtAfter: rawVal(r.debt_after) }),
+          ? { supplyBefore: rawVal(lane.before), supplyAfter: rawVal(lane.after) }
+          : { debtBefore: rawVal(lane.before), debtAfter: rawVal(lane.after) }),
+        ...(lane.chain
+          ? isSupplySide
+            ? { supplyScaledAfter: rawVal(lane.scaled ?? null), supplyIndex: rawVal(lane.index ?? null) }
+            : { debtScaledAfter: rawVal(lane.scaled ?? null), debtIndex: rawVal(lane.index ?? null) }
+          : {}),
       },
       origin: {
         // Transfers get NO envelope: their amount is DERIVED (the transfer's

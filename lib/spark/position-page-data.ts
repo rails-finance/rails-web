@@ -6,6 +6,7 @@
 // The three reads go to the BOX and run the proxy routes' shaping here, in the
 // render (lib/spark/proxy-reads.ts), in place of a fetch of each route.
 
+import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
 import { boxOnlyHop } from "@/lib/shared/listing-ssr";
@@ -65,5 +66,7 @@ export const loadSparkPositionTail = cache(async (wallet: string, grouped: boole
     // The flag alone does not prove a grouped answer arrived — a backend that
     // predates the grouping answers the flat shape.
     grouped: tail.timeline && "grouped" in tail.timeline ? tail.timeline : null,
+    // The lifetime interest per lane (decision 0033), from either shape.
+    laneInterest: (tail.timeline as { laneInterest?: AaveLaneInterest[] | null } | null)?.laneInterest ?? null,
   };
 });

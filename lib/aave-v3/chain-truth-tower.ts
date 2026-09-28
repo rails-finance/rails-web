@@ -43,6 +43,8 @@ import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { folderFlows, mergeFlowBuckets } from "@/lib/shared/timeline-folder-reductions";
 import type { Provenance } from "@/components/shared/provenance";
 import { v3Brand, v3Possessive, type V3Protocol } from "./protocol-name";
+import { laneFor, splitHeld, type AaveLaneInterest } from "./lane-interest";
+import { laneInterestProv, laneNetProv } from "@/lib/aave-v3/event-provenance";
 
 /** The five receipts the tower attaches to its lines.
  *
@@ -513,6 +515,10 @@ export function computeAaveV3Economics(
    *  render a capped slice of a long history, and the totals must still be the
    *  whole of it. */
   precomputedLifetime?: ReserveFlows[],
+  /** Per lane: the net its events moved beside the chain balance (decision
+   *  0033). A side holding one reserve splits into that net and the interest
+   *  on top, transfers included, with no conservation gate. */
+  laneInterest?: readonly AaveLaneInterest[] | null,
 ): ChainTruthTowerData {
   const prices = view.priceByAddress;
   const usdOf = (address: string | undefined, amount: number): number | null => {
@@ -585,7 +591,28 @@ export function computeAaveV3Economics(
   // already includes the interest (principal + accrued = balanceOf, verified
   // against the variableDebtToken on-chain in the Spark uplift).
   let interest: TowerLine | null = null;
-  if (lifetime && debtLines.length === 1) {
+  let earned: TowerLine | null = null;
+  // The lanes' own nets first: exact, and a transfer-fed reserve splits too.
+  const laneSplit = (side: "supply" | "debt", lines: TowerLine[], held: typeof view.supplies): TowerLine | null => {
+    if (lines.length !== 1) return null;
+    const cur = lines[0];
+    const r = held.find((h) => h.address === cur.key);
+    const split = r ? splitHeld(r.amountRaw, r.decimals, laneFor(laneInterest, r.address, side)) : null;
+    if (!split) return null;
+    lines[0] = { ...cur, amount: split.net, usd: usdOf(cur.key, split.net), prov: laneNetProv(cur.symbol, side) };
+    return {
+      key: side === "supply" ? "supply-interest" : "debt-interest",
+      symbol: cur.symbol,
+      amount: split.interest,
+      usd: usdOf(cur.key, split.interest),
+      prov: laneInterestProv(cur.symbol, side),
+    };
+  };
+  if (laneInterest) {
+    interest = laneSplit("debt", debtLines, view.borrows);
+    earned = laneSplit("supply", supplyLines, view.supplies);
+  }
+  if (!interest && lifetime && debtLines.length === 1) {
     const cur = debtLines[0];
     const f = lifetime.get(cur.symbol);
     if (f) {
@@ -621,6 +648,7 @@ export function computeAaveV3Economics(
     ...debtLiquidated,
     ...debtWrittenOff,
     ...(interest ? [interest] : []),
+    ...(earned ? [earned] : []),
   ];
   const valued = contributing.length > 0 && contributing.every((l) => l.usd != null);
 
@@ -640,7 +668,7 @@ export function computeAaveV3Economics(
     priceKind: valued ? "chain-derived" : undefined,
     collateral: {
       current: supplyLines,
-      interest: null,
+      interest: earned,
       exited: collExited,
       liquidated: collLiquidated,
       lifetimeInflow: inflow((r) => r.supplied),

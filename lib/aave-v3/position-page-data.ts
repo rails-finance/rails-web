@@ -9,6 +9,7 @@
 // The three reads go to the BOX and run the proxy routes' shaping here, in the
 // render (lib/aave-v3/proxy-reads.ts), in place of a fetch of each route.
 
+import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
 import { boxOnlyHop } from "@/lib/shared/listing-ssr";
@@ -81,6 +82,8 @@ export const loadAaveV3PositionTail = cache(
       // prove one arrived — a backend that predates the grouping answers the
       // flat shape, which this narrowing refuses rather than half-reads.
       grouped: tail.timeline && "grouped" in tail.timeline ? tail.timeline : null,
+      // The lifetime interest per lane (decision 0033), from either shape.
+      laneInterest: (tail.timeline as { laneInterest?: AaveLaneInterest[] | null } | null)?.laneInterest ?? null,
     };
   },
 );

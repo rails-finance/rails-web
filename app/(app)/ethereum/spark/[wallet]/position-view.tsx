@@ -21,6 +21,7 @@
 // data in an effect. Seeded or not, the mount path still works: on an SSR miss
 // `initialPosition` is null and this component fetches the tail itself.
 
+import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
@@ -107,6 +108,9 @@ interface SparkPositionDetailProps {
    *  folders carry the arithmetic the page's whole-history reductions read.
    *  Null on an ordinary load, where `initialEvents` IS the history. */
   initialGrouped: SparkGroupedTimelineResult | null;
+  /** Per lane: the net its events moved beside the chain balance (decision
+   *  0033), from the server read; null on an SSR miss or an older api. */
+  initialLaneInterest?: AaveLaneInterest[] | null;
 }
 
 export default function SparkPositionDetail({
@@ -116,6 +120,7 @@ export default function SparkPositionDetail({
   initialCutoffBlock,
   initialOpening,
   initialGrouped,
+  initialLaneInterest,
 }: SparkPositionDetailProps) {
   // Keyed on the timeline, not the summary: a wallet with no SparkLend position
   // is a real answer the server can seed, and its `initialPosition` is null. The
@@ -149,6 +154,7 @@ export default function SparkPositionDetail({
   // comes back null, no second request is made and the page is byte-for-byte
   // what it was.
   const [cutoffBlock, setCutoffBlock] = useState<number | null>(initialCutoffBlock);
+  const [laneInterest, setLaneInterest] = useState<AaveLaneInterest[] | null>(initialLaneInterest ?? null);
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
@@ -187,6 +193,7 @@ export default function SparkPositionDetail({
         setView(summary ? viewFromSummary(summary) : null);
         setEvents(tData?.events ?? []);
         setCutoffBlock(tData?.cutoffBlock ?? null);
+        setLaneInterest(tData?.laneInterest ?? null);
         setGroupedTail(grouped);
       } finally {
         setLoading(false);
@@ -529,8 +536,8 @@ export default function SparkPositionDetail({
   // The tower's data feeds both the bars and their Explanation prose, so it's
   // computed once and shared rather than re-derived for each.
   const towerData = useMemo(
-    () => (view ? computeSparkEconomics(view, lifetimeEvents, precomputedLifetime) : null),
-    [view, lifetimeEvents, precomputedLifetime],
+    () => (view ? computeSparkEconomics(view, lifetimeEvents, precomputedLifetime, laneInterest) : null),
+    [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
   // The top row's price dropdown: the on-chain oracle

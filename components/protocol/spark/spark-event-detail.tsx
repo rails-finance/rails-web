@@ -11,7 +11,9 @@
 // IAaveOracle read at the EVENT's block, never today's price): the
 // after-balance USD chip on each priced stat, and the at-block price footnote
 // pill under the grid. A block the price walk hasn't reached keeps the card
-// token-only. Current debt WITH interest (needs the reserve index) is a layer.
+// token-only. Where the index valued the row (decision 0033) the balances are
+// the chain's, interest included, with the interest since the lane's previous
+// move under the value.
 
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import type { SparkContext, SparkSnapshotItem } from "@/lib/shared/types/event-shape";
@@ -30,6 +32,8 @@ import {
   snapshotUsdProv,
   liqLegUsdProv,
   liqPremiumProv,
+  rowChainBalanceProv,
+  rowInterestProv,
   type SparkCoords,
 } from "@/lib/spark/event-provenance";
 import {
@@ -108,6 +112,32 @@ function BasketList({
 export function SparkEventDetail({ ctx, txHash, blockNumber }: SparkEventDetailProps) {
   const coords: SparkCoords = { txHash, blockNumber };
   const stats: ChainTruthStat[] = [];
+  // A row the index valued at the chain balance (decision 0033) carries its
+  // own receipts and the interest since the lane's previous move.
+  const chain = ctx.balanceBasis === "chain";
+  const afterProv = (sym: string, side: "supply" | "debt"): Provenance =>
+    chain
+      ? rowChainBalanceProv(sym, side, "after", coords, {
+          raw: side === "supply" ? ctx.raw?.supplyAfter : ctx.raw?.debtAfter,
+          scaled: side === "supply" ? ctx.raw?.supplyScaledAfter : ctx.raw?.debtScaledAfter,
+          index: side === "supply" ? ctx.raw?.supplyIndex : ctx.raw?.debtIndex,
+        })
+      : side === "supply"
+        ? supplyAfterProv(sym, coords, ctx.raw?.supplyAfter)
+        : debtAfterProv(sym, coords, ctx.raw?.debtAfter);
+  const beforeProv = (sym: string, side: "supply" | "debt"): Provenance =>
+    chain
+      ? rowChainBalanceProv(sym, side, "before", coords, {
+          raw: side === "supply" ? ctx.raw?.supplyBefore : ctx.raw?.debtBefore,
+          index: side === "supply" ? ctx.raw?.supplyIndex : ctx.raw?.debtIndex,
+        })
+      : side === "supply"
+        ? supplyBeforeProv(sym, coords)
+        : debtBeforeProv(sym, coords);
+  const interestOf = (sym: string, side: "supply" | "debt"): ChainTruthStat["interestSincePrevious"] => {
+    const v = side === "supply" ? ctx.supplyInterestSincePrevious : ctx.debtInterestSincePrevious;
+    return v ? { value: v, prov: rowInterestProv(sym, side, coords) } : undefined;
+  };
 
   if (ctx.eventType === "liquidation") {
     const collSym = ctx.collateralSymbol ?? "—";
@@ -115,7 +145,7 @@ export function SparkEventDetail({ ctx, txHash, blockNumber }: SparkEventDetailP
       label: "Collateral",
       value: fmt(ctx.supplyAfter),
       symbol: collSym,
-      prov: supplyAfterProv(collSym, coords, ctx.raw?.supplyAfter),
+      prov: afterProv(collSym, "supply"),
       usd: usdOf(ctx.supplyAfter, ctx.collateralPrice, (a, p) =>
         snapshotUsdProv(collSym, "supply", coords, { amount: a, priceUsd: p }),
       ),
@@ -129,14 +159,15 @@ export function SparkEventDetail({ ctx, txHash, blockNumber }: SparkEventDetailP
           ctx.raw?.liquidatedCollateralAmount,
           ctx.origin?.liquidatedCollateralAmount,
         ),
-        beforeProv: supplyBeforeProv(collSym, coords),
+        beforeProv: beforeProv(collSym, "supply"),
       }),
+      interestSincePrevious: interestOf(collSym, "supply"),
     });
     stats.push({
       label: "Borrowed",
       value: fmt(ctx.debtAfter),
       symbol: ctx.reserveSymbol,
-      prov: debtAfterProv(ctx.reserveSymbol, coords, ctx.raw?.debtAfter),
+      prov: afterProv(ctx.reserveSymbol, "debt"),
       usd: usdOf(ctx.debtAfter, ctx.debtPrice, (a, p) =>
         snapshotUsdProv(ctx.reserveSymbol, "debt", coords, { amount: a, priceUsd: p }),
       ),
@@ -145,8 +176,9 @@ export function SparkEventDetail({ ctx, txHash, blockNumber }: SparkEventDetailP
         after: ctx.debtAfter,
         change: ctx.debtDelta,
         changeProv: debtRepaidProv(ctx.reserveSymbol, coords, ctx.raw?.debtToCover, ctx.origin?.debtToCover),
-        beforeProv: debtBeforeProv(ctx.reserveSymbol, coords),
+        beforeProv: beforeProv(ctx.reserveSymbol, "debt"),
       }),
+      interestSincePrevious: interestOf(ctx.reserveSymbol, "debt"),
     });
   } else if (ctx.side === "supply") {
     // A transfer's change traces to the BalanceTransfer derivation (value ×
@@ -157,7 +189,7 @@ export function SparkEventDetail({ ctx, txHash, blockNumber }: SparkEventDetailP
       label: "Supplied",
       value: fmt(ctx.supplyAfter),
       symbol: ctx.reserveSymbol,
-      prov: supplyAfterProv(ctx.reserveSymbol, coords, ctx.raw?.supplyAfter),
+      prov: afterProv(ctx.reserveSymbol, "supply"),
       usd: usdOf(ctx.supplyAfter, ctx.price, (a, p) =>
         snapshotUsdProv(ctx.reserveSymbol, "supply", coords, { amount: a, priceUsd: p }),
       ),
@@ -167,15 +199,16 @@ export function SparkEventDetail({ ctx, txHash, blockNumber }: SparkEventDetailP
         changeProv: isTransfer
           ? transferDeltaProv(ctx.reserveSymbol, ctx.eventType === "transfer_in" ? "in" : "out", coords)
           : assetsDeltaProv(ctx.reserveSymbol, "supply", coords, ctx.raw?.amount, ctx.origin?.amount),
-        beforeProv: supplyBeforeProv(ctx.reserveSymbol, coords),
+        beforeProv: beforeProv(ctx.reserveSymbol, "supply"),
       }),
+      interestSincePrevious: interestOf(ctx.reserveSymbol, "supply"),
     });
   } else {
     stats.push({
       label: "Borrowed",
       value: fmt(ctx.debtAfter),
       symbol: ctx.reserveSymbol,
-      prov: debtAfterProv(ctx.reserveSymbol, coords, ctx.raw?.debtAfter),
+      prov: afterProv(ctx.reserveSymbol, "debt"),
       usd: usdOf(ctx.debtAfter, ctx.price, (a, p) =>
         snapshotUsdProv(ctx.reserveSymbol, "debt", coords, { amount: a, priceUsd: p }),
       ),
@@ -183,8 +216,9 @@ export function SparkEventDetail({ ctx, txHash, blockNumber }: SparkEventDetailP
         after: ctx.debtAfter,
         change: ctx.assetsDelta,
         changeProv: assetsDeltaProv(ctx.reserveSymbol, "debt", coords, ctx.raw?.amount, ctx.origin?.amount),
-        beforeProv: debtBeforeProv(ctx.reserveSymbol, coords),
+        beforeProv: beforeProv(ctx.reserveSymbol, "debt"),
       }),
+      interestSincePrevious: interestOf(ctx.reserveSymbol, "debt"),
     });
   }
 

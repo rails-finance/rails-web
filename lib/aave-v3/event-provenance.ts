@@ -1263,3 +1263,99 @@ export const aaveV3DebtInterestProv = (sym: string): Provenance => ({
     { label: "net principal", kind: "chain-derived", pclass: "indexed", note: "Σ signed Pool event amounts" },
   ],
 });
+
+// ── Row balances at the chain's figure (decision 0033) ───────────────────────
+
+/** A row's balance where the index states what the token held: the scaled
+ *  balance (Σ the scaled amounts of the position's own logs on this reserve)
+ *  times the reserve's index at the event's transaction. `v` carries the
+ *  integers the receipt shows. */
+export const rowChainBalanceProv = (
+  sym: string,
+  side: "supply" | "debt",
+  when: "before" | "after",
+  coords: V3Coords,
+  v: { raw?: string | null; scaled?: string | null; index?: string | null } = {},
+): Provenance => {
+  const token = side === "supply" ? `a${sym}` : `the variable debt token of ${sym}`;
+  const index = side === "supply" ? "liquidity index" : "variable borrow index";
+  return {
+    kind: "chain-derived",
+    pclass: "indexed",
+    summary: `${side === "supply" ? "Supplied" : "Borrowed"} ${sym} ${when} this event — what ${token} held${
+      when === "after" ? " once this event's log had applied" : " just before this event's log"
+    }, interest included: the position's scaled balance on this reserve (the scaled amounts of its own Supply, Withdraw, Borrow, Repay, BalanceTransfer and LiquidationCall logs, summed in log order) times the reserve's ${index} at this transaction, which its ReserveDataUpdated log states. It equals balanceOf at that point.`,
+    contract: poolOf(coords),
+    via: `${captureVia(coords)} · scaled × ${index} ÷ 1e27${
+      v.scaled && v.index && when === "after" ? ` = ${v.scaled} × ${v.index} ÷ 1e27` : ""
+    }${v.raw ? ` = ${v.raw}` : ""}`,
+    formula: "scaled balance × index ÷ 1e27",
+    inputs: eventInputs(coords, [
+      {
+        label: "scaled balance",
+        kind: "chain",
+        pclass: "indexed",
+        value: when === "after" ? (v.scaled ?? undefined) : undefined,
+        note: "Σ the scaled amounts of the position's logs on this reserve",
+      },
+      {
+        label: index,
+        kind: "chain",
+        pclass: "emitted",
+        value: v.index ?? undefined,
+        note: "ReserveDataUpdated at or before this transaction, accrued to its block",
+      },
+    ]),
+  };
+};
+
+/** Interest a row's lane accrued between the transaction that last moved it
+ *  and this event. */
+export const rowInterestProv = (sym: string, side: "supply" | "debt", coords: V3Coords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `Interest the ${side === "supply" ? "supplied" : "borrowed"} ${sym} ${
+    side === "supply" ? "earned" : "accrued"
+  } since the last transaction that moved it: the scaled balance held over that time, valued at this transaction's ${
+    side === "supply" ? "liquidity" : "variable borrow"
+  } index, less the same balance at the index of that transaction. It is the gap between this event's balance before and the previous event's balance after.`,
+  contract: poolOf(coords),
+  via: `${captureVia(coords)} · scaled × (index now − index then) ÷ 1e27`,
+  formula: "scaled × index now ÷ 1e27 − scaled × index then ÷ 1e27",
+  inputs: eventInputs(coords),
+});
+
+/** The interest a held balance carries over the position's life: the balance
+ *  now less the net of every amount its events moved on the reserve, aToken
+ *  transfers included (decision 0033's lane figures). */
+export const laneInterestProv = (sym: string, side: "supply" | "debt"): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `Interest the ${sym} ${side === "supply" ? "supply has earned" : "debt has accrued"} over the position's life — the balance held now less the net of every amount the position's own logs moved on this reserve: ${
+    side === "supply"
+      ? "supplies and aToken transfers in, less withdrawals, transfers out, repayments made with aTokens and collateral seized"
+      : "borrows, less repayments, the debt liquidations covered and any the Pool wrote off"
+  }.`,
+  via: "balance now − Σ signed amounts of the position's logs on this reserve",
+  formula: "balance now − net moved",
+  inputs: [
+    { label: "balance now", kind: "chain", note: "the token's balanceOf for this position" },
+    { label: "net moved", kind: "chain", pclass: "indexed", note: "the position's own logs on this reserve, summed" },
+  ],
+});
+
+/** What the position's events moved into a held balance, net: the part of it
+ *  that is not interest. */
+export const laneNetProv = (sym: string, side: "supply" | "debt"): Provenance => ({
+  kind: "chain",
+  pclass: "indexed",
+  summary: `${side === "supply" ? "Supplied" : "Borrowed"} ${sym}, net of every amount the position's own logs moved on this reserve (${
+    side === "supply"
+      ? "aToken transfers and repayments made with aTokens included"
+      : "liquidation cover and write-offs included"
+  }). The balance held now is this plus the interest on top.`,
+  via: "Σ signed amounts of the position's logs on this reserve",
+  inputs: [
+    { label: "net moved", kind: "chain", pclass: "indexed", note: "the position's own logs on this reserve, summed" },
+  ],
+});

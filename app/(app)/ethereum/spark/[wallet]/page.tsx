@@ -65,6 +65,7 @@ export default async function SparkPositionPage({ params, searchParams }: Props)
       initialCutoffBlock={tail.cutoffBlock}
       initialOpening={tail.opening}
       initialGrouped={tail.grouped}
+      initialLaneInterest={tail.laneInterest}
     />
   );
 }

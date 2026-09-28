@@ -617,12 +617,21 @@ export interface AaveV3ContextRaw {
   debtToCover?: string;
   /** liquidation: raw collateral seized. */
   liquidatedCollateralAmount?: string;
-  /** Running sums from mv_aave_v3_events. On liquidation rows supply* is the
-   *  collateral side, debt* the debt side. */
+  /** The balances behind supplyBefore/After and debtBefore/After, as
+   *  integers: with `balanceBasis: "chain"` what the aToken / variable debt
+   *  token held (scaled × index), otherwise the running sums of event amounts.
+   *  On liquidation rows supply* is the collateral side, debt* the debt side. */
   supplyBefore?: string;
   supplyAfter?: string;
   debtBefore?: string;
   debtAfter?: string;
+  /** With `balanceBasis: "chain"`: the scaled balance after the event and the
+   *  index it was valued at (liquidity index for supply, variable borrow index
+   *  for debt, ray). */
+  supplyScaledAfter?: string;
+  supplyIndex?: string;
+  debtScaledAfter?: string;
+  debtIndex?: string;
 }
 
 /** Origin envelopes for the emitted AaveV3ContextRaw fields — which Pool log
@@ -681,6 +690,17 @@ export interface AaveV3Context {
   supplyAfter?: string;
   debtBefore?: string;
   debtAfter?: string;
+  /** "chain": the four balances above are what the aToken and variable debt
+   *  token held around this event — the scaled balance times the reserve's
+   *  index at its transaction, interest included (decision 0033). Absent: the
+   *  running sums of the amounts the logs carry. */
+  balanceBasis?: "chain";
+  /** Interest the moved lane accrued since the transaction that last moved it,
+   *  in the reserve's token (human-readable). Absent when zero or unknown. On a
+   *  liquidation the supply figure is the collateral's, the debt figure the
+   *  debt's. */
+  supplyInterestSincePrevious?: string;
+  debtInterestSincePrevious?: string;
   /** Historic USD price of the event's primary reserve at the event's block. */
   price?: { usd: number; source: AaveV3PriceSource };
   /** Liquidation rows only — collateral asset's USD price at event block. */
@@ -906,6 +926,12 @@ export interface SparkContextRaw {
   supplyAfter?: string;
   debtBefore?: string;
   debtAfter?: string;
+  /** With `balanceBasis: "chain"`: the scaled balance after the event and the
+   *  index it was valued at (ray). */
+  supplyScaledAfter?: string;
+  supplyIndex?: string;
+  debtScaledAfter?: string;
+  debtIndex?: string;
 }
 
 export interface SparkContextOrigin {
@@ -961,12 +987,23 @@ export interface SparkContext {
    *  true counterparty of the event, not a verdict about who acted (renders
    *  as the neutral to/from chip, not the external-actor pink). */
   counterparty?: string;
-  /** Touched reserve's SUPPLIED balance before/after this event = Σ supply deltas (human-readable). */
+  /** Touched reserve's SUPPLIED balance before/after this event (human-readable):
+   *  with `balanceBasis: "chain"` what the spToken held (scaled × liquidity
+   *  index), otherwise Σ supply deltas. */
   supplyBefore?: string;
   supplyAfter?: string;
-  /** Touched reserve's BORROWED balance before/after this event = Σ (borrow − repay) (human-readable). */
+  /** Touched reserve's BORROWED balance before/after this event (human-readable):
+   *  with `balanceBasis: "chain"` what the variable debt token held, otherwise
+   *  Σ (borrow − repay). */
   debtBefore?: string;
   debtAfter?: string;
+  /** "chain": the balances above are the tokens' balanceOf around this event,
+   *  interest included (decision 0033). */
+  balanceBasis?: "chain";
+  /** Interest the moved lane accrued since the transaction that last moved it
+   *  (human-readable). Absent when zero or unknown. */
+  supplyInterestSincePrevious?: string;
+  debtInterestSincePrevious?: string;
   /** Pooled-account basket AFTER this event — every reserve's running balance. */
   allSupplies?: SparkSnapshotItem[];
   allDebts?: SparkSnapshotItem[];

@@ -11,6 +11,7 @@ import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import { settleFetchMark } from "@/lib/perf/settle-marks";
 import { fromTimelineWire, type WireTimeline } from "@/lib/shared/timeline-wire";
 import type { GroupedTimelineFields } from "@/lib/shared/timeline-folder";
+import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 
 export interface AaveV3TimelineResponse {
   wallet: string;
@@ -33,6 +34,10 @@ export interface AaveV3TimelineResponse {
    *  can tell a span answer from a whole-history one without comparing its own
    *  request to the rows. Null means no span was asked for. */
   span?: { from: number; to: number } | null;
+  /** Per lane the position ever moved: the net its events moved beside the
+   *  chain balance after its last move (decision 0033). Null or absent on an
+   *  api that predates it. */
+  laneInterest?: AaveLaneInterest[] | null;
 }
 
 export interface FetchAaveV3TimelineParams {

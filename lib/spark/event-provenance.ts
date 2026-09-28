@@ -543,3 +543,62 @@ export const liqPremiumProv = (coords: SparkCoords, vals: { seizedUsd: string; c
     },
   ]),
 });
+
+// ── Row balances at the chain's figure (decision 0033) ───────────────────────
+
+/** A row's balance where the index states what the token held: the scaled
+ *  balance (Σ the scaled amounts of the position's own logs on this reserve)
+ *  times the reserve's index at the event's transaction. */
+export const rowChainBalanceProv = (
+  sym: string,
+  side: "supply" | "debt",
+  when: "before" | "after",
+  coords: SparkCoords,
+  v: { raw?: string | null; scaled?: string | null; index?: string | null } = {},
+): Provenance => {
+  const index = side === "supply" ? "liquidity index" : "variable borrow index";
+  return {
+    kind: "chain-derived",
+    pclass: "indexed",
+    summary: `${side === "supply" ? "Supplied" : "Borrowed"} ${sym} ${when} this event — what the ${
+      side === "supply" ? "spToken" : "variable debt token"
+    } held${when === "after" ? " once this event's log had applied" : " just before this event's log"}, interest included: the position's scaled balance on this reserve (the scaled amounts of its own Supply, Withdraw, Borrow, Repay, BalanceTransfer and LiquidationCall logs, summed in log order) times the reserve's ${index} at this transaction, which its ReserveDataUpdated log states${atBlock(coords)}. It equals balanceOf at that point.`,
+    contract: SPARK,
+    via: `${SPARK_VIA} · scaled × ${index} ÷ 1e27${
+      v.scaled && v.index && when === "after" ? ` = ${v.scaled} × ${v.index} ÷ 1e27` : ""
+    }${v.raw ? ` = ${v.raw}` : ""}`,
+    formula: "scaled balance × index ÷ 1e27",
+    inputs: eventInputs(coords, [
+      {
+        label: "scaled balance",
+        kind: "chain",
+        pclass: "indexed",
+        value: when === "after" ? (v.scaled ?? undefined) : undefined,
+        note: "Σ the scaled amounts of the position's logs on this reserve",
+      },
+      {
+        label: index,
+        kind: "chain",
+        pclass: "emitted",
+        value: v.index ?? undefined,
+        note: "ReserveDataUpdated at or before this transaction, accrued to its block",
+      },
+    ]),
+  };
+};
+
+/** Interest a row's lane accrued between the transaction that last moved it
+ *  and this event. */
+export const rowInterestProv = (sym: string, side: "supply" | "debt", coords: SparkCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `Interest the ${side === "supply" ? "supplied" : "borrowed"} ${sym} ${
+    side === "supply" ? "earned" : "accrued"
+  } since the last transaction that moved it: the scaled balance held over that time, valued at this transaction's ${
+    side === "supply" ? "liquidity" : "variable borrow"
+  } index, less the same balance at the index of that transaction. It is the gap between this event's balance before and the previous event's balance after.`,
+  contract: SPARK,
+  via: `${SPARK_VIA} · scaled × (index now − index then) ÷ 1e27`,
+  formula: "scaled × index now ÷ 1e27 − scaled × index then ÷ 1e27",
+  inputs: eventInputs(coords),
+});
