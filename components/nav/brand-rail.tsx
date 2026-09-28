@@ -58,10 +58,11 @@ function RailsGlyph() {
  *  centred in the rail. Under the glyph it read as part of the mark and pulled
  *  the eye to the top of the page; down here it is a standing note about the
  *  product. Same caution-500 anatomy the top bar uses, a size down to sit
- *  inside 56px. */
+ *  inside 56px, and rounded only at the top right since it meets the
+ *  window's left and bottom edges. */
 function BetaPill() {
   return (
-    <span className="self-start rounded-r bg-caution-500 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-white">
+    <span className="self-start rounded-tr bg-caution-500 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-white">
       Beta
     </span>
   );
@@ -102,14 +103,14 @@ export function BrandRail() {
   return (
     <>
       {/* Fixed, so the mark holds the top of the viewport and the foot cluster
-          the bottom however far the page scrolls. `py-4` is the same air the
-          top bar used to give the glyph, kept now that the bar is gone from
-          these widths. z-40 ties with the header; the rail is later in the
+          the bottom however far the page scrolls. `pt-4` is the same air the
+          top bar used to give the glyph; no bottom padding, so the pill sits
+          in the window's bottom-left corner. z-40 ties with the header; the rail is later in the
           document, so its glyph stays clickable under the header's full-width
           box. */}
       <aside
         aria-label="Rails"
-        className="fixed inset-y-0 left-0 z-40 hidden w-14 flex-col items-center justify-between bg-raised py-4 md:flex"
+        className="fixed inset-y-0 left-0 z-40 hidden w-14 flex-col items-center justify-between bg-raised pt-4 md:flex"
       >
         <RailsGlyph />
         {/* Toggle, bookmark, then the pill flush to the left edge. `w-full`
