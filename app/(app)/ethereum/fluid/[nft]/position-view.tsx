@@ -34,7 +34,7 @@ import {
   type TimelineWindow,
 } from "@/lib/shared/timeline-opening-balance";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { FLUID_LIQUIDATION_RUNS } from "@/lib/fluid/timeline-runs";
+import { useFluidTimelineRuns } from "@/lib/fluid/timeline-runs";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { FluidEventCard } from "@/components/protocol/fluid/fluid-event-card";
 import {
@@ -234,6 +234,9 @@ export default function FluidPositionView({
   // The tx-sibling seam: each card reaches its same-tx peers so the split-open
   // narrator (the mint card) can state the sibling deposit's figure.
   const siblingsByTx = useMemo(() => groupEventsByTx(fluidEvents), [fluidEvents]);
+  // One row per Open (mint + first operate) and per NFT round trip; the
+  // liquidation streak after them (lib/fluid/timeline-runs.tsx).
+  const timelineRuns = useFluidTimelineRuns(siblingsByTx);
 
   // Who executed this position's events — the SAME externalActor() verdict each
   // event card renders on its spine (txFrom vs the operate's initiator, judged
@@ -379,7 +382,8 @@ export default function FluidPositionView({
             persistKeyPrefix="fluid"
             closed={view ? view.status !== "open" : undefined}
             tl={tl}
-            runs={FLUID_LIQUIDATION_RUNS}
+            runs={timelineRuns}
+            countTooltip="Counts events, not rows: an Open row combines the mint and the first operation, and a round-trip row combines one transfer per hop."
             toolbarLeading={
               view ? (
                 <TimelineActivityHeader

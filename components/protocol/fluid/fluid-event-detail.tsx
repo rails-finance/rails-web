@@ -51,6 +51,9 @@ export interface FluidEventDetailProps {
   txHash?: string;
   blockNumber?: number;
   wallet?: string;
+  /** On an Open row: the holder the NFT was minted to, shown beside the
+   *  position's state after its first operation. */
+  mintedTo?: string;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
@@ -158,7 +161,7 @@ function buildFluidLiqForensics(ctx: FluidContext, coords: FluidCoords): Liquida
   };
 }
 
-export function FluidEventDetail({ ctx, txHash, blockNumber, wallet }: FluidEventDetailProps) {
+export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo }: FluidEventDetailProps) {
   const supplySym = ctx.supplySymbol ?? "DEX shares";
   const borrowSym = ctx.borrowSymbol ?? "DEX shares";
   const coords: FluidCoords = {
@@ -259,6 +262,15 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet }: FluidEven
         ...interest("debt", borrowSym),
       });
     }
+  }
+
+  if (mintedTo) {
+    stats.push({
+      label: "Minted to",
+      value: shortAddress(mintedTo),
+      symbol: "",
+      prov: ownerProv(coords, mintedTo),
+    });
   }
 
   const forensics =

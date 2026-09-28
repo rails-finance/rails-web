@@ -2429,7 +2429,7 @@ export function fluidMintContent(): LearnMoreContent {
       },
       {
         bold: "Funded in the same step",
-        text: "the vault factory mints the NFT in the same transaction as the position's first deposit or borrow, so the mint row marks where the position began.",
+        text: "the vault factory mints the NFT in the same transaction as the position's first deposit or borrow, and the timeline draws the two as one Open row.",
       },
       {
         bold: "What the holder controls",

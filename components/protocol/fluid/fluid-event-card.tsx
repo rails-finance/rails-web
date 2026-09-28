@@ -16,6 +16,7 @@ import { FluidEventHeader } from "./fluid-event-header";
 import { FluidEventDetail } from "./fluid-event-detail";
 import { FluidEventExplainer, fluidLearnMoreContent } from "./fluid-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import { fluidMintContent } from "@/lib/shared/learn-more-content";
 
 export interface FluidEventCardProps {
   event: FluidEvent;
@@ -24,6 +25,9 @@ export interface FluidEventCardProps {
   eventNumber?: number;
   /** Same-tx sibling events — the split-open seam (defaults to just this one). */
   siblings?: FluidEvent[];
+  /** The mint of the same transaction, when this card is the position's Open
+   *  row: the first operate and the mint drawn as one card. */
+  openedBy?: FluidEvent;
 }
 
 // direction "right" = token moves away from the wallet (deposit / repay),
@@ -44,7 +48,7 @@ const DIRECTION: Record<FluidContext["eventType"], "right" | "left"> = {
   transfer: "right",
 };
 
-export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings }: FluidEventCardProps) {
+export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings, openedBy }: FluidEventCardProps) {
   const ctx = event.context.data;
   const sibs = siblings ?? [event];
   const isLiq = ctx.eventType === "liquidated" || ctx.eventType === "absorbed";
@@ -143,9 +147,13 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings }
       header={
         <FluidEventHeader
           actionLabel={
-            // A hop of an NFT round trip inside one transaction says so at T1;
-            // the explainer states the holder it left and came back to.
-            transferRoundTrip(sibs, event) ? "Ownership transfer · round trip in this transaction" : event.actionLabel
+            openedBy
+              ? "Open"
+              : // A hop of an NFT round trip inside one transaction says so at T1;
+                // the explainer states the holder it left and came back to.
+                transferRoundTrip(sibs, event)
+                ? "Ownership transfer · round trip in this transaction"
+                : event.actionLabel
           }
           ctx={ctx}
           timestamp={event.timestamp}
@@ -158,7 +166,13 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings }
         />
       }
       detail={
-        <FluidEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} wallet={event.wallet} />
+        <FluidEventDetail
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          wallet={event.wallet}
+          mintedTo={openedBy?.context.data.transferTo}
+        />
       }
       detailLabel="Position state"
       explainer={
@@ -170,12 +184,13 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings }
           wallet={event.wallet}
           siblings={sibs}
           skipLead
+          openedBy={openedBy}
         />
       }
       explainerLabel="Plain English"
-      explainerTeaser={fluidExplainerTeaser(ctx, coords, sibs, event)}
+      explainerTeaser={fluidExplainerTeaser(ctx, coords, sibs, event, { openedBy })}
       txHash={event.txHash}
-      learnMore={<LearnMore inline content={fluidLearnMoreContent(ctx)} />}
+      learnMore={<LearnMore inline content={openedBy ? fluidMintContent() : fluidLearnMoreContent(ctx)} />}
       persistKey={`fluid:${event.id}`}
     />
   );

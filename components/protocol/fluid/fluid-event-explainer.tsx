@@ -33,6 +33,8 @@ export interface FluidEventExplainerProps {
   siblings?: FluidEvent[];
   /** The card shows the lead sentence as the teaser; render only the rest here. */
   skipLead?: boolean;
+  /** The mint an Open row absorbs (see FluidSlotOptions). */
+  openedBy?: FluidEvent;
 }
 
 /** Mechanic modal content for this event — never-empty floor: every event type
@@ -73,6 +75,7 @@ export function FluidEventExplainer({
   wallet,
   siblings,
   skipLead,
+  openedBy,
 }: FluidEventExplainerProps) {
   const coords: FluidCoords = {
     txHash,
@@ -82,7 +85,7 @@ export function FluidEventExplainer({
     nftId: ctx.nftId,
     owner: ctx.ownerAt ?? wallet,
   };
-  const clauses = eventClauses(fluidEventSlots(ctx, coords, siblings ?? [event], event));
+  const clauses = eventClauses(fluidEventSlots(ctx, coords, siblings ?? [event], event, { openedBy }));
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;

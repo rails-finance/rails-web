@@ -164,33 +164,67 @@ const logIndexOf = (e: FluidEvent): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-/** When this transfer is one hop of an NFT round trip inside its own
- *  transaction — the position's transfers in the tx close a loop, every address
- *  that sent it also received it, so the holder at the end is the holder at
- *  the start — the address it left and came back to. Null otherwise. Order-free
- *  for the verdict (multisets of senders and receivers match); the log index
- *  only picks which address to name, the sender of the first hop. */
-export function transferRoundTrip(siblings: FluidEvent[], self: FluidEvent): string | null {
-  const c = self.context.data;
-  if (c.eventType !== "transfer") return null;
+/** The position's NFT transfers in one transaction, in log order, when they
+ *  close a loop: every address that sent it also received it, so the holder at
+ *  the end is the holder at the start. Null when there are fewer than two or
+ *  they do not close. Order-free for the verdict (the multisets of senders and
+ *  receivers match); the log order is what the round-trip row lists. */
+export function roundTripHops(siblings: FluidEvent[], nftId: string): FluidEvent[] | null {
   const hops = siblings.filter(
     (s) =>
       s.context.data.eventType === "transfer" &&
-      s.context.data.nftId === c.nftId &&
+      s.context.data.nftId === nftId &&
       s.context.data.transferFrom &&
       s.context.data.transferTo,
   );
-  if (hops.length < 2 || !hops.includes(self)) return null;
+  if (hops.length < 2) return null;
   const norm = (xs: (string | undefined)[]) =>
     xs
       .map((x) => (x ?? "").toLowerCase())
       .sort()
       .join(",");
-  const froms = norm(hops.map((h) => h.context.data.transferFrom));
-  const tos = norm(hops.map((h) => h.context.data.transferTo));
-  if (froms !== tos) return null;
-  const first = [...hops].sort((a, b) => logIndexOf(a) - logIndexOf(b))[0];
-  return first.context.data.transferFrom?.toLowerCase() ?? null;
+  if (norm(hops.map((h) => h.context.data.transferFrom)) !== norm(hops.map((h) => h.context.data.transferTo)))
+    return null;
+  return [...hops].sort((a, b) => logIndexOf(a) - logIndexOf(b));
+}
+
+/** When this transfer is one hop of an NFT round trip inside its own
+ *  transaction, the address it left and came back to (the sender of the first
+ *  hop). Null otherwise. */
+export function transferRoundTrip(siblings: FluidEvent[], self: FluidEvent): string | null {
+  const c = self.context.data;
+  if (c.eventType !== "transfer") return null;
+  const hops = roundTripHops(siblings, c.nftId);
+  if (!hops || !hops.includes(self)) return null;
+  return hops[0].context.data.transferFrom?.toLowerCase() ?? null;
+}
+
+/** Who held the NFT when an operate ran inside a round trip: the receiver of
+ *  the last hop logged before it. Null before the first hop. */
+export function holderAtOperate(hops: FluidEvent[], operate: FluidEvent): string | null {
+  const at = logIndexOf(operate);
+  let holder: string | null = null;
+  for (const h of hops) if (logIndexOf(h) < at) holder = h.context.data.transferTo?.toLowerCase() ?? null;
+  return holder;
+}
+
+/** The legs of an operate that take value out, in words ("the borrow", "the
+ *  withdrawal and the borrow"); null when it only adds collateral or repays. */
+export function valueOutLegs(ctx: FluidContext): string | null {
+  if (!OPERATE_KINDS.has(ctx.eventType)) return null;
+  const withdraws = Number(ctx.colDelta ?? 0) < 0;
+  const borrows = Number(ctx.debtDelta ?? 0) > 0;
+  if (withdraws && borrows) return "the withdrawal and the borrow";
+  if (withdraws) return "the withdrawal";
+  if (borrows) return "the borrow";
+  return null;
+}
+
+/** The operates in a transaction, in log order. */
+export function operatesIn(siblings: FluidEvent[], nftId: string): FluidEvent[] {
+  return siblings
+    .filter((s) => s.context.data.nftId === nftId && isOperate(s))
+    .sort((a, b) => logIndexOf(a) - logIndexOf(b));
 }
 
 export function coordsFor(e: FluidEvent): FluidCoords {
@@ -275,7 +309,7 @@ function permissionlessActorMechanic(ctx: FluidContext): ClauseInput {
       <>
         A third-party address executed this on the owner&rsquo;s behalf, and on Fluid it needed no permission to. The
         vault asks who is calling only when value leaves a position — adding collateral or repaying debt against any
-        position is open to anyone — so this needed nothing from the owner, and nothing left the position in return.
+        position is open to anyone — so this needed nothing from the owner.
       </>,
     );
   return clause(
@@ -287,16 +321,120 @@ function permissionlessActorMechanic(ctx: FluidContext): ClauseInput {
   );
 }
 
+export interface FluidSlotOptions {
+  /** The mint this operate's row absorbs: the Open row, one card for the
+   *  position's opening transaction. */
+  openedBy?: FluidEvent;
+}
+
 export function fluidEventSlots(
   ctx: FluidContext,
   coords: FluidCoords,
   siblings: FluidEvent[],
   self: FluidEvent,
+  opts: FluidSlotOptions = {},
 ): EventProseSlots {
-  const slots = fluidEventSlotsBase(ctx, coords, siblings, self);
-  const actor = permissionlessActorMechanic(ctx);
-  if (!actor) return slots;
-  return { ...slots, meansNow: [...(slots.meansNow ?? []), actor] };
+  const slots = opts.openedBy
+    ? openSlots(ctx, coords, opts.openedBy)
+    : fluidEventSlotsBase(ctx, coords, siblings, self);
+  const extra = [permissionlessActorMechanic(ctx), roundTripBeside(ctx, coords, siblings, self)].filter(
+    (c) => c != null,
+  );
+  if (extra.length === 0) return slots;
+  return { ...slots, meansNow: [...(slots.meansNow ?? []), ...extra] };
+}
+
+/** An address as a traced figure that no tier above states (body tone). */
+const addrFig = (coords: FluidCoords, addr: string) => (
+  <Prov info={ownerProv(coords, addr)} value={shortAddress(addr)}>
+    {shortAddress(addr)}
+  </Prov>
+);
+
+/** On an operate whose transaction also carries an NFT round trip: one
+ *  sentence tying the ownership row beside it to this one. */
+function roundTripBeside(
+  ctx: FluidContext,
+  coords: FluidCoords,
+  siblings: FluidEvent[],
+  self: FluidEvent,
+): ClauseInput {
+  if (!OPERATE_KINDS.has(ctx.eventType)) return null;
+  const hops = roundTripHops(siblings, ctx.nftId);
+  if (!hops) return null;
+  const home = hops[0].context.data.transferFrom?.toLowerCase();
+  const holder = holderAtOperate(hops, self);
+  if (!home) return null;
+  const legs = valueOutLegs(ctx);
+  const ranIt = holder && holder !== home && ctx.initiator?.toLowerCase() === holder;
+  return clause(
+    <>
+      The ownership round trip beside this row is the position going out
+      {holder && holder !== home ? <> to {addrFig(coords, holder)}</> : null}
+      {ranIt ? <>, which ran this operation,</> : null} and back to {addrFig(coords, home)} in the same transaction
+      {legs ? <>, so {legs} could run</> : null}.
+    </>,
+  );
+}
+
+/** The Open row: the mint and the position's first operate, one card. */
+function openSlots(ctx: FluidContext, coords: FluidCoords, mint: FluidEvent): EventProseSlots {
+  const supplySym = ctx.supplySymbol ?? "DEX shares";
+  const borrowSym = ctx.borrowSymbol ?? "DEX shares";
+  const holder = mint.context.data.transferTo;
+  const col = Number(ctx.colDelta ?? 0);
+  const debt = Number(ctx.debtDelta ?? 0);
+  const colFig = (
+    <Fig
+      echo
+      info={colDeltaProv(supplySym, coords, ctx.raw?.colAmt)}
+      value={chainTruthDeltaValue(col, false)}
+      symbol={supplySym}
+    >
+      {fmtAbs(ctx.colDelta)} {supplySym}
+    </Fig>
+  );
+  const debtFig = (
+    <Fig
+      echo
+      info={debtDeltaProv(borrowSym, coords, ctx.raw?.debtAmt)}
+      value={chainTruthDeltaValue(debt, false)}
+      symbol={borrowSym}
+    >
+      {fmtAbs(ctx.debtDelta)} {borrowSym}
+    </Fig>
+  );
+  const funding =
+    col > 0 && debt > 0 ? (
+      <>
+        its first operation deposited {colFig} of collateral and borrowed {debtFig} against it
+      </>
+    ) : col > 0 ? (
+      <>its first deposit put {colFig} of collateral behind it</>
+    ) : debt > 0 ? (
+      <>its first borrow drew {debtFig} against it</>
+    ) : (
+      <>its first operation moved nothing</>
+    );
+  return {
+    happened: [
+      clause(
+        <>
+          The vault factory minted NFT <strong className="font-semibold text-foreground">#{ctx.nftId}</strong>
+          {holder ? (
+            <>
+              {" "}
+              to{" "}
+              <Fig echo info={ownerProv(coords, holder)} value={shortAddress(holder)}>
+                {shortAddress(holder)}
+              </Fig>
+            </>
+          ) : null}
+          , and {funding}.
+        </>,
+      ),
+    ],
+  };
 }
 
 function fluidEventSlotsBase(
@@ -811,6 +949,7 @@ export function fluidExplainerTeaser(
   coords: FluidCoords,
   siblings: FluidEvent[],
   self: FluidEvent,
+  opts: FluidSlotOptions = {},
 ): ReactNode | null {
-  return splitLead(eventClauses(fluidEventSlots(ctx, coords, siblings, self))).lead;
+  return splitLead(eventClauses(fluidEventSlots(ctx, coords, siblings, self, opts))).lead;
 }

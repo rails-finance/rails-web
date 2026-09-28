@@ -5,8 +5,12 @@
 // Module scope matters: ChainTruthTimeline memoises its rows on this array's
 // identity, so a fresh one per render would recompute every row.
 
-import { isFluidEvent } from "@/lib/shared/types/event-shape";
+import { useMemo, type ReactNode } from "react";
+import { isFluidEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
+import { operatesIn, roundTripHops, type FluidEvent } from "@/lib/fluid/explainer-clauses";
+import { FluidEventCard } from "@/components/protocol/fluid/fluid-event-card";
+import { FluidRoundTripCard } from "@/components/protocol/fluid/fluid-round-trip-card";
 import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline-run-card";
 import { renderRunFolders, DANGER_FOLDER_BADGE } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
@@ -75,3 +79,104 @@ export const FLUID_LIQUIDATION_RUNS: TimelineRunSpec[] = [
       }),
   },
 ];
+
+// ── One transaction, one or two rows ────────────────────────────────────────
+//
+// Two shapes of a Fluid transaction draw fewer rows than they have logs, both
+// through the runs seam's `asOneEvent` (the Alchemix opening's mechanism: the
+// rows are the transaction's, nothing is hidden behind a click, and "Collapse
+// like events" does not reach them):
+//   • the OPEN row — the mint and the position's first operate of the same
+//     transaction, one card (FluidEventCard with `openedBy`);
+//   • the ROUND TRIP row — the NFT transfers that leave the holder and bring
+//     it back within the transaction, one card (FluidRoundTripCard), beside
+//     the operate they wrap. The vault logs the operate between the hops, so
+//     the spec takes the whole transaction and draws the operate's card and
+//     the round trip's card in one row.
+// Anything else in such a transaction (a transfer that does not close a loop,
+// a second operate) keeps its own card inside the row. The timeline's count
+// line still counts events, every hop and the mint included.
+
+/** Does this transaction draw as a grouped row? */
+function groupedTx(sibs: FluidEvent[] | undefined): boolean {
+  if (!sibs || sibs.length < 2) return false;
+  const nft = sibs[0].context.data.nftId;
+  const minted = sibs.some((s) => s.context.data.eventType === "mint");
+  const operates = operatesIn(sibs, nft);
+  return (minted && operates.length > 0) || roundTripHops(sibs, nft) != null;
+}
+
+const logIndex = (e: BaseActivityEvent): number => {
+  const n = Number(e.id.split(":")[2]);
+  return Number.isFinite(n) ? n : 0;
+};
+
+function renderTxRow(run: BaseActivityEvent[], sibs: FluidEvent[], meta: { isFirst: boolean; isLast: boolean }) {
+  const members = run.filter(isFluidEvent).sort((a, b) => logIndex(b) - logIndex(a));
+  const nft = members[0].context.data.nftId;
+  const mint = members.find((m) => m.context.data.eventType === "mint") ?? null;
+  const operates = operatesIn(members, nft);
+  const openOperate = mint ? (operates[0] ?? null) : null;
+  // The verdict reads the whole transaction; the row draws the hops on screen.
+  const loop = roundTripHops(sibs, nft);
+  const hops = loop ? loop.filter((h) => members.includes(h)) : [];
+  const drawnAsRoundTrip = hops.length >= 2;
+
+  // Cards newest first, the list's order: operates (the Open row among them),
+  // then the round trip, then whatever else the transaction holds.
+  const cards: { key: string; node: (first: boolean, last: boolean) => ReactNode }[] = [];
+  for (const o of [...operates].reverse()) {
+    cards.push({
+      key: o.id,
+      node: (first, last) => (
+        <FluidEventCard
+          event={o}
+          siblings={sibs}
+          openedBy={o === openOperate ? (mint ?? undefined) : undefined}
+          isFirst={first}
+          isLast={last}
+        />
+      ),
+    });
+  }
+  if (drawnAsRoundTrip) {
+    cards.push({
+      key: `roundtrip_${hops[0].id}`,
+      node: (first, last) => (
+        <FluidRoundTripCard hops={hops} operates={operatesIn(sibs, nft)} isFirst={first} isLast={last} />
+      ),
+    });
+  }
+  for (const m of members) {
+    if (operates.includes(m) || (mint === m && openOperate) || (drawnAsRoundTrip && hops.includes(m))) continue;
+    cards.push({
+      key: m.id,
+      node: (first, last) => <FluidEventCard event={m} siblings={sibs} isFirst={first} isLast={last} />,
+    });
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      {cards.map((c, i) => (
+        <div key={c.key}>{c.node(meta.isFirst && i === 0, meta.isLast && i === cards.length - 1)}</div>
+      ))}
+    </div>
+  );
+}
+
+/** The Fluid position page's run specs: the transaction rows, then the
+ *  liquidation streak. Memoised on the page's same-tx map. */
+export function useFluidTimelineRuns(siblingsByTx: Map<string, FluidEvent[]>): TimelineRunSpec[] {
+  return useMemo(
+    () => [
+      {
+        asOneEvent: true,
+        match: (e: BaseActivityEvent) => isFluidEvent(e) && groupedTx(siblingsByTx.get(e.txHash)),
+        min: 2,
+        sameRun: (prev: BaseActivityEvent, next: BaseActivityEvent) => prev.txHash === next.txHash,
+        render: (run, meta) => renderTxRow(run, siblingsByTx.get(run[0].txHash) ?? [], meta),
+      },
+      ...FLUID_LIQUIDATION_RUNS,
+    ],
+    [siblingsByTx],
+  );
+}
