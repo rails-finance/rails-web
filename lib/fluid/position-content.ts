@@ -15,7 +15,7 @@ export function fluidPositionContent(opts: {
   wasLiquidated?: boolean;
   hasDebt?: boolean;
   /** Where the closed card's peaks come from (FluidPositionSummary.peakBasis). */
-  peakBasis?: "chain" | "replay";
+  peakBasis?: "chain" | "events";
 }): LearnMoreContent {
   if (opts.status === "closed") {
     return {

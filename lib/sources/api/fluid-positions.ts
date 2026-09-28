@@ -54,9 +54,9 @@ export interface FluidPositionSummary {
   peakCol: string;
   peakDebt: string;
   /** "chain": the peaks are the highest settled balance any row stood at,
-   *  interest included; "replay": the Σ replay's maximum (interest-blind),
+   *  interest included; "events": the Σ replay's maximum (interest-blind),
    *  served while a row of the position is not yet read. */
-  peakBasis: "chain" | "replay";
+  peakBasis: "chain" | "events";
 }
 
 /** Raw /api/fluid/positions row (pg numerics as strings). */
@@ -93,7 +93,7 @@ export interface RawFluidPositionRow {
   peak_col: string | null;
   peak_debt: string | null;
   /** Optional while the API deploys; absent reads as the replay. */
-  peak_basis?: "chain" | "replay";
+  peak_basis?: "chain" | "events";
   chain: {
     nft_id: string;
     supply: string;
@@ -169,7 +169,7 @@ export function buildFluidPositionRows(rows: RawFluidPositionRow[]): FluidPositi
       lastTxHash: r.last_tx_hash,
       peakCol: fmtUnits(r.peak_col, supplyDec),
       peakDebt: fmtUnits(r.peak_debt, borrowDec),
-      peakBasis: r.peak_basis === "chain" ? "chain" : "replay",
+      peakBasis: r.peak_basis === "chain" ? "chain" : "events",
     };
   });
 }

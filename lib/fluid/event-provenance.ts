@@ -538,13 +538,13 @@ export const accruedInterestProv = (side: "supply" | "borrow", sym: string): Pro
 /** Closed-card peak figure. On the "chain" basis: the highest settled
  *  balance the leg stood at across the position's rows, before or after each
  *  event, interest included (server /positions over mig 344's reads). On the
- *  "replay" basis, served while a row is unread: the Σ replay's maximum,
+ *  "events" basis, served while a row is unread: the Σ replay's maximum,
  *  which misses the interest accrued between events. */
 export const peakLegProv = (
   side: "supply" | "borrow",
   sym: string,
   coords: FluidCoords,
-  basis: "chain" | "replay" = "replay",
+  basis: "chain" | "events" = "events",
 ): Provenance => {
   const leg = side === "supply" ? "collateral" : "debt";
   return basis === "chain"

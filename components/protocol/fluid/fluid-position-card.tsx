@@ -66,7 +66,7 @@ export interface FluidPositionView {
   peakCol: string;
   peakDebt: string;
   /** Which lane the peaks come from — see FluidPositionSummary.peakBasis. */
-  peakBasis: "chain" | "replay";
+  peakBasis: "chain" | "events";
   lastActivityAt: number | null;
 }
 
