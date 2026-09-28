@@ -58,9 +58,9 @@ export function PwnEventDetail({ ctx, txHash, blockNumber }: PwnEventDetailProps
       value: fmt(ctx.loanRepayAmount),
       symbol: ctx.creditSymbol,
       prov: repayAmountProv(ctx.creditSymbol, coords),
-      // Dim on a defaulted claim — the borrower never paid; the lender took the
-      // collateral instead of this repayment.
-      dimmed: seized,
+      // Muted on a defaulted claim — the borrower never paid; the lender took
+      // the collateral instead of this repayment.
+      changed: !seized,
     });
   }
 

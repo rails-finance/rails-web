@@ -158,7 +158,7 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet }: Llama
       value: fmt(ctx.collateralAfter),
       symbol: ctx.collateralSymbol,
       prov: afterImageProv(ctx.collateralSymbol, "collateral", coords, ctx.raw?.collateralAfter),
-      dimmed: !ctx.collateralDelta || Number(ctx.collateralDelta) === 0,
+      changed: Boolean(ctx.collateralDelta) && Number(ctx.collateralDelta) !== 0,
     });
   }
   if (ctx.debtAfter != null) {
@@ -167,7 +167,7 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet }: Llama
       value: fmt(ctx.debtAfter),
       symbol: ctx.borrowedSymbol,
       prov: afterImageProv(ctx.borrowedSymbol, "debt", coords, ctx.raw?.debtAfter),
-      dimmed: !ctx.debtDelta || Number(ctx.debtDelta) === 0,
+      changed: Boolean(ctx.debtDelta) && Number(ctx.debtDelta) !== 0,
     });
   }
   if (ctx.n1 != null && ctx.n2 != null) {

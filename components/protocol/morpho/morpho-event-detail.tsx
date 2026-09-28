@@ -5,7 +5,7 @@
 // from the deltas, and its debt: the borrow shares at the market's totals at the
 // row where the answer carries it (Ethereum, and the Base index), the borrowed
 // principal otherwise (the Base sweep). On Base the supply likewise. Each value traces via <Prov>. The side this event
-// didn't touch is dimmed.
+// didn't touch is muted.
 
 import type { AssetFlow, MorphoContext } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
@@ -116,7 +116,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
   // single-match rule (soleFlowAddress): a symbol two flows share resolves to
   // nothing rather than to whichever contract happened to come first. Only the
   // side this event actually moved has a flow to name, so the untouched axis —
-  // dimmed here anyway — keeps whatever the house table can make of its symbol.
+  // muted here anyway — keeps whatever the house table can make of its symbol.
   const collAddr = soleFlowAddress(flows, ctx.collateralSymbol);
   const loanAddr = soleFlowAddress(flows, ctx.loanSymbol);
   const collActive = ctx.side === "collateral" || ctx.eventType === "liquidation";
@@ -132,7 +132,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
       symbol: ctx.collateralSymbol,
       address: collAddr,
       prov: collateralAfterProv(ctx.collateralSymbol, coords),
-      dimmed: !collActive,
+      changed: collActive,
       transition:
         ctx.side === "collateral"
           ? reconstructTransition({
@@ -153,7 +153,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
           symbol: ctx.loanSymbol,
           address: loanAddr,
           prov: debtAfterProv(ctx.loanSymbol, coords),
-          dimmed: !borrActive && !ctx.interestSincePrevious,
+          changed: borrActive || Boolean(ctx.interestSincePrevious),
           transition: borrActive
             ? reconstructTransition({
                 after: ctx.debtAfter,
@@ -177,7 +177,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
           symbol: ctx.loanSymbol,
           address: loanAddr,
           prov: borrowedAfterProv(ctx.loanSymbol, coords),
-          dimmed: !borrActive,
+          changed: borrActive,
           // Gated on the debt axis actually moving: a lender-side supply or
           // withdraw also rides `side: "loan"`, and its delta belongs to the
           // supplied axis below, not to the borrowed one.
@@ -207,7 +207,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
       symbol: ctx.loanSymbol,
       address: loanAddr,
       prov: supplyAfterProv(ctx.loanSymbol, coords),
-      dimmed: !lenderActive && !gap,
+      changed: lenderActive || Boolean(gap),
       transition: lenderActive
         ? reconstructTransition({
             after: ctx.suppliedAfter,
@@ -233,7 +233,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
       symbol: ctx.loanSymbol,
       address: loanAddr,
       prov: suppliedAfterProv(ctx.loanSymbol, coords),
-      dimmed: false,
+      changed: true,
       transition: reconstructTransition({
         after: ctx.suppliedAfter,
         change: ctx.assetsDelta,

@@ -173,7 +173,7 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
       address: PETH.address,
       prov: ledgerFieldProv("newColl", coords, ctx.raw?.newColl),
       transition: transitionOf(ctx.newColl, ctx.collBefore, "coll", coords, ctx.raw?.collBefore),
-      dimmed: ctx.newColl === ctx.collBefore,
+      changed: ctx.newColl !== ctx.collBefore,
     });
   if (ctx.newDebt != null)
     stats.push({
@@ -183,7 +183,7 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
       address: stableAddr,
       prov: ledgerFieldProv("newDebt", coords, ctx.raw?.newDebt),
       transition: transitionOf(ctx.newDebt, ctx.debtBefore, "debt", coords, ctx.raw?.debtBefore),
-      dimmed: ctx.newDebt === ctx.debtBefore,
+      changed: ctx.newDebt !== ctx.debtBefore,
     });
 
   // The collateral ratio at this event, always on (as Liquity V2's metric is):
@@ -202,7 +202,7 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
         symbol: "",
         prov: r.info,
         transition: crTransitionOf(ctx, cr, coords),
-        dimmed: cr.source === "formula" && ctx.newColl === ctx.collBefore && ctx.newDebt === ctx.debtBefore,
+        changed: cr.source !== "formula" || ctx.newColl !== ctx.collBefore || ctx.newDebt !== ctx.debtBefore,
       });
     } else {
       stats.push({
@@ -215,7 +215,7 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
           newDebt: ctx.newDebt != null ? `${formatExact(num(ctx.newDebt))} ${stable}` : "—",
           mcrPct: POLARIS_LIQ_CONSTANTS.mcr.label,
         }),
-        dimmed: true,
+        changed: false,
       });
     }
   }

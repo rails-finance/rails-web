@@ -231,12 +231,10 @@ export interface ChainTruthStat {
    *  a plain amount — a signed change shown while the balance it moved is still
    *  being read. `value` stays the receipt's exact figure. */
   display?: string;
-  /** Dim the card when this side wasn't touched by the event. */
-  dimmed?: boolean;
   /** Whether this event changed the value (the T2 change-colour rule: changed
-   *  renders foreground, unchanged muted). Defaults from the stat's own shape:
-   *  a transition means changed, `dimmed` means untouched, and a bare value
-   *  with neither keeps the foreground it always had. */
+   *  renders foreground, unchanged muted text — no opacity, no before→after).
+   *  Defaults to true (foreground); set `false` for a side this event didn't
+   *  touch. */
   changed?: boolean;
   /** When the event moved this axis, its before→after transition, rendered as a
    *  DeltaToggle. Omit for untouched axes — they stay a plain after-value. */
@@ -624,11 +622,11 @@ export function ChainTruthDetail({
     // sits inset from the shared bg-raised detail surface, not flush to its edge.
     <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:auto-rows-fr sm:grid-cols-2">
       {stats.map((s, i) => {
-        const changed = s.changed ?? (s.transition ? true : !s.dimmed);
+        const changed = s.changed ?? true;
         const unread = s.symbol ? unreadOf(s.address, s.symbol) : undefined;
         if (unread)
           return (
-            <div key={i} className={`h-full ${s.dimmed ? "opacity-50" : ""}`} data-not-loaded="">
+            <div key={i} className="h-full" data-not-loaded="">
               <StatCard label={s.label}>
                 <span className="text-sm font-semibold">
                   <TokenAmountNotLoaded address={unread.address} label={unread.label} />
@@ -637,7 +635,7 @@ export function ChainTruthDetail({
             </div>
           );
         return (
-          <div key={i} className={`h-full ${s.dimmed ? "opacity-50" : ""}`}>
+          <div key={i} className="h-full">
             <StatCard label={s.label}>
               <StateTransition>
                 {s.transition && (

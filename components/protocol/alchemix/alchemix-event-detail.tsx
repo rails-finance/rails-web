@@ -114,7 +114,7 @@ function legStats(
         value: credit != null ? formatExact(scaled(credit) ?? 0) : "Not stated",
         symbol: sym,
         display: credit != null ? undefined : "Not stated",
-        dimmed: credit == null,
+        changed: credit != null,
         prov: resolvedAtCaptureProv("debt credit", sym, credit, coords),
       });
       const fee = ctx.resolvedAtCapture?.collateralFee ?? null;
@@ -260,7 +260,7 @@ function legStats(
             label: "Net for this position",
             value: "Not stated",
             display: "No share price read at this block",
-            dimmed: true,
+            changed: false,
             symbol: "",
             prov: redemptionNetUnavailableProv(net.atBlock, coords),
           });
