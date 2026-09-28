@@ -234,9 +234,11 @@ export function EventCard({
       </div>
 
       {/* ── Detail panel — opens and closes instantly (no height
-            animation); mounted only while open. ──────────────────────── */}
+            animation); mounted only while open. flow-root keeps a first
+            child's top margin inside the panel: let through, it opens a seam
+            of page background under the header. ─────────────────────── */}
       {showDetail && (
-        <div className="rounded-b-xl bg-raised">
+        <div className="flow-root rounded-b-xl bg-raised">
           {detailLoading && (
             <div className="flex items-center justify-center gap-2 py-8 text-sm ">
               <span className="relative flex size-2">

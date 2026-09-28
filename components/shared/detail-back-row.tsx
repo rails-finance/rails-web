@@ -102,7 +102,8 @@ export function closingPricesAt<E extends { blockNumber: number; timestamp: numb
  *  RailHeader draws no tabs at the `position` venue.
  *
  *  `showStamp={false}` is for routes with no chain overlay (PWN) — rendering a
- *  stamp there would assert a freshness the page doesn't have.
+ *  stamp there would assert a freshness the page doesn't have. A closed
+ *  position hides it too: the chain head's age says nothing about it.
  *
  *  `assets` is what the dock used to be handed, and every position view passes
  *  what it holds (ui-jobs 56) — priced, or named with no figure where the
@@ -143,7 +144,7 @@ export function DetailTopRow({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <DetailBackButton session={session} wallet={wallet} compact />
-          {showStamp && <RecencyStamp />}
+          {showStamp && !closed && <RecencyStamp />}
           {!closed ? (
             <LatestPrices assets={assets} reason={priceReason} />
           ) : (
