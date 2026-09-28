@@ -1260,8 +1260,8 @@ export interface EbisuContext {
    *  PriceFeed.lastGoodPrice, the figure the TroveManager itself acted on in that
    *  block (mig 113 capture; every operation calls fetchPrice() first, which
    *  writes it), or on a redemption the price its Redemption log emitted.
-   *  Liquidation and redemption rows on every fork; every row on Ebisu, whose
-   *  filler prices each timeline block (server mig 342). Absent until the filler
+   *  Every row on Ebisu and Asymmetry, whose filler prices each timeline block
+   *  (server mig 342); liquidation and redemption rows on Basedollar. Absent until the filler
    *  prices the block; the row stays token-only meanwhile. */
   priceAtBlock?: LiquityForkPriceAtBlock;
   /** Why the balances moved on this event — TroveOperation's own decomposition
@@ -1357,8 +1357,8 @@ export interface AsymmetryContext {
    *  PriceFeed.lastGoodPrice, the figure the TroveManager itself acted on in that
    *  block (mig 113 capture; every operation calls fetchPrice() first, which
    *  writes it), or on a redemption the price its Redemption log emitted.
-   *  Liquidation and redemption rows on every fork; every row on Ebisu, whose
-   *  filler prices each timeline block (server mig 342). Absent until the filler
+   *  Every row on Ebisu and Asymmetry, whose filler prices each timeline block
+   *  (server mig 342); liquidation and redemption rows on Basedollar. Absent until the filler
    *  prices the block; the row stays token-only meanwhile. */
   priceAtBlock?: LiquityForkPriceAtBlock;
   /** Why the balances moved on this event — TroveOperation's own decomposition

@@ -72,7 +72,9 @@ import {
   liquityForkEconomicsContent,
   liquityForkRedemptionOutcome,
 } from "@/lib/shared/liquity-fork-economics-explanation";
-import { DEBT_SYMBOL, ASYMMETRY_DOCS } from "@/lib/asymmetry/asset-catalog";
+import { DEBT_SYMBOL, ASYMMETRY_DOCS, resolveBranch } from "@/lib/asymmetry/asset-catalog";
+import { forkMcrAt } from "@/lib/shared/liquity-fork-ops";
+import { forkPriceGapNotesFor, liveForkPriceGapNote, type ForkPriceGapBranch } from "@/lib/shared/market-note";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -138,6 +140,9 @@ export default function AsymmetryTroveDetail({
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
   const [chain, setChain] = useState<LiquityForkTroveChainResponse | null>(null);
+  // The live read has answered, landed or not — the live note's slot is held
+  // only until then.
+  const [chainSettled, setChainSettled] = useState(false);
   // Standing display framing (risk view) — a global preference, so the reader's
   // choice on one trove carries to the next.
 
@@ -218,6 +223,8 @@ export default function AsymmetryTroveDetail({
         if (!cancelled && !data.chainStale) setChain(data);
       } catch {
         // Index-derived surfaces already render; the risk layer just stays off.
+      } finally {
+        if (!cancelled) setChainSettled(true);
       }
     })();
     return () => {
@@ -297,6 +304,37 @@ export default function AsymmetryTroveDetail({
   }, [collateralType, troveId]);
 
   const liveRisk = chain != null && view?.status === "open";
+
+  // Market notes, as on the Ebisu Trove page: every Asymmetry row carries the
+  // branch price at its block (the fork filler's every-event lane), so a note
+  // is a reduction of the rows on the page. A stretch with a served folder
+  // inside it is skipped: the Trove transacted in it, off the page.
+  const noteBranch = useMemo<ForkPriceGapBranch | null>(() => {
+    const b = resolveBranch(collateralType);
+    if (!b) return null;
+    const folders = [
+      ...(servedFolders ?? []),
+      ...(tl.displayedRows ?? []).flatMap((r) => (r.kind === "folder" ? [r.folder] : [])),
+    ];
+    return {
+      protocol: "asymmetry",
+      collateralType: b.symbol,
+      mcr: b.mcr,
+      priceFeed: b.priceFeed,
+      debtSymbol: DEBT_SYMBOL,
+      mcrAt: (block) => forkMcrAt(b, { block }),
+      breaks: folders.map((f) => ({ firstBlock: f.firstBlock, lastBlock: f.lastBlock })),
+    };
+  }, [collateralType, servedFolders, tl.displayedRows]);
+  const notes = useMemo(
+    () => (noteBranch ? forkPriceGapNotesFor(tl.sortedEvents, noteBranch) : []),
+    [tl.sortedEvents, noteBranch],
+  );
+  const liveNotes = useMemo(() => {
+    if (!noteBranch || !liveRisk || !chain || chain.priceUsd == null) return [];
+    const n = liveForkPriceGapNote(tl.sortedEvents, noteBranch, { price: chain.priceUsd, block: chain.blockNumber });
+    return n ? [n] : [];
+  }, [noteBranch, liveRisk, chain, tl.sortedEvents]);
 
   // The top row's price dropdown: the branch's own oracle
   // price for the collateral — the live chain read when it landed, else the
@@ -414,6 +452,9 @@ export default function AsymmetryTroveDetail({
             persistKeyPrefix="asymmetry"
             closed={view ? view.status !== "open" : undefined}
             tl={tl}
+            notes={notes}
+            liveNotes={liveNotes}
+            liveNotesPending={view?.status === "open" && !chainSettled}
             runs={FORK_RUNS}
             folderRegister={LIQUITY_FORK_FOLDER_REGISTER}
             readFolderMembers={readFolderMembers}

@@ -1019,8 +1019,8 @@ export function livePriceGapNote(
 // The Phase 2a rule on a fork Trove (Ebisu, Asymmetry, Basedollar), where the
 // price is the fork's `priceAtBlock`: the branch PriceFeed's lastGoodPrice
 // at the event's block, or on a redemption the price its log emitted. Ebisu
-// carries it on every row (server mig 342's every-event filler); the other two
-// on liquidations and redemptions only, which leaves them no stretch to state.
+// and Asymmetry carry it on every row (server mig 342's every-event filler);
+// Basedollar on redemptions only, which leaves it no stretch to state.
 // Two things differ from 2a because the fork page does: the ratio is worked
 // out here (a fork row states no ratio), and a stretch a served folder sits
 // inside is not a stretch — the Trove transacted in it, off the page.

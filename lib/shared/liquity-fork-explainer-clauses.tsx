@@ -66,8 +66,8 @@
 //     beside the act rather than read back afterwards. Both figures now have
 //     chrome twins on the detail grid, so they are bold, not muted.
 //
-// FILLED where every row is priced (Ebisu: the filler prices each timeline
-// block, server mig 342):
+// FILLED where every row is priced (Ebisu and Asymmetry: the filler prices
+// each timeline block, server mig 342):
 //   • §5.1 risk consequence on operate events — the collateral ratio before and
 //     after at the branch price for the block, restated from the card's ratio
 //     and price cells (`ratioClause`).
@@ -77,8 +77,8 @@
 // interest at the new rate.
 //
 // STILL UNFILLED, and each a data fact rather than an authoring gap:
-//   • §5.1 on Asymmetry and Basedollar: only liquidate and redeem rows carry a
-//     price there, so an operate event states no ratio.
+//   • §5.1 on Basedollar: only its redemption rows carry a price, so an operate
+//     event states no ratio.
 //   • The liquidation price leg on a chain with no such filler. The contract does
 //     not emit the price on the Trove's own liquidation row the way it does on a
 //     redemption, so that lane still depends on the capture. Basedollar has had no
