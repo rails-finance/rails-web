@@ -1068,6 +1068,11 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     const delta = d.kind === "supply" || d.kind === "borrow" || d.kind === "transfer_in" ? d.amount : -d.amount;
     const run = bump(isSupplySide ? supplyRaw : debtRaw, d.reserve, delta);
     notePeak(isSupplySide ? "supply" : "debt", rMeta, run.after);
+    // repayWithATokens burns the wallet's aTokens for the debt it clears: the
+    // Repay says so (`useATokens`, `amount` = the aTokens burned), so the
+    // supply lane falls by the same amount. The row draws its debt lane, as
+    // the Ethereum route's repay does.
+    if (d.kind === "repay" && d.useATokens) bump(supplyRaw, d.reserve, -d.amount);
     // Pool flows only — a transfer is a custody move, deliberately neither a
     // deposit nor a withdrawal (the tower's provenance says so, and a
     // transfer-fed reserve then fails its conservation gates rather than
