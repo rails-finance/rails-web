@@ -128,6 +128,11 @@ interface IndexResponse {
   /** Markets where the server flags this account as a router/relay; the
    *  replay states no peak there. Absent from a server before the flag. */
   peakWithheldMarkets?: string[];
+  /** The chain's index and the wallet's principal at the rows' blocks (and
+   *  each seed's last block), where read — api/src/routes/baseComet.ts
+   *  TimelineBlockState. Absent from a server before it, or when the read
+   *  failed: the replay then sums the amounts. */
+  blockState?: Array<{ market: string; block: number; supplyIndex: string; borrowIndex: string; principal: string }>;
 }
 
 /** One market's replay state at the cut, as the API sends it (api/src/routes/
@@ -425,6 +430,16 @@ export async function readCometIndex(p: LoadCometIndexParams, readerIp?: string)
     timestamps,
     senders,
     ...(seeds ? { seeds } : {}),
+    ...(json.blockState
+      ? {
+          blockState: new Map(
+            json.blockState.map((b) => [
+              `${b.market}:${b.block}`,
+              { supplyIndex: BigInt(b.supplyIndex), borrowIndex: BigInt(b.borrowIndex), principal: BigInt(b.principal) },
+            ]),
+          ),
+        }
+      : {}),
     peakWithheldMarkets: json.peakWithheldMarkets ?? [],
     coverage: {
       fromBlock: horizon ? heavy.cut.block : p.deployBlock,

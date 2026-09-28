@@ -176,8 +176,14 @@ export interface CometMarketReplay {
     anchoredComplete?: boolean;
     summary?: TimelineCutSummary;
   };
-  /** Signed base PRINCIPAL at the head of the sweep (> 0 lent, < 0 borrowed). */
+  /** Signed base after the market's last row (> 0 lent, < 0 borrowed): the
+   *  chain's balance at that row where its block was read (`baseAtChain`),
+   *  else the running sum of the logged amounts. */
   base: { amount: number; amountRaw: string };
+  /** True when the market's last row sits in a block whose index and
+   *  principal were read (CometReplayInput.blockState), so `base` and every
+   *  row's balance are the chain's (rails-ops decision 0033). */
+  baseAtChain: boolean;
   /** Replayed collateral per asset, > 0 only. Exact when the sweep was whole. */
   collateral: CompoundAssetAmount[];
   /** Highest recorded amounts, dust-clamped the way mig 054 clamps them. */
@@ -676,7 +682,37 @@ export interface CometReplayInput {
    *  and `rows` is the tail after the cut. Absent — a sweep, or an index
    *  read that answered in full — the replay is exactly as it was. */
   seeds?: CometReplaySeed[];
+  /** The chain's state at the rows' blocks, keyed `${market}:${block}` — the
+   *  Comet's accrued base indexes and the wallet's signed principal at the end
+   *  of the block (rails-server /api/compound-base/timeline `blockState`, read
+   *  from compound_v3_block_index / _principal). With it each row's base is
+   *  Comet's presentValue(principal, index) less the wallet's later moves in
+   *  the same block, and the change since the previous row splits into
+   *  interest and a move no event logs, as mig 351 does on Ethereum. A row in
+   *  a block not read carries the last balance plus its amounts; absent (the
+   *  sweep), every row is the running sum of the logged amounts. */
+  blockState?: Map<string, CometBlockState>;
   coverage: Pick<ChainTimelineCoverage, "fromBlock" | "toBlock" | "fromDeployment" | "deployBlock" | "gaps" | "source">;
+}
+
+/** The chain's state at one (market, block): what `blockState` holds. */
+export interface CometBlockState {
+  supplyIndex: bigint;
+  borrowIndex: bigint;
+  /** userBasic(wallet).principal at the end of the block, signed. */
+  principal: bigint;
+}
+
+const BASE_INDEX_SCALE = BigInt(1e15);
+// Comet rounds a principal down on each move, so up to two units between
+// rows are its rounding and count as interest (server mig 351).
+const TWO = BigInt(2);
+/** Comet's presentValue: the principal at the supply (≥ 0) or borrow (< 0)
+ *  index, ÷ 1e15 rounded down on the magnitude (server mig 348). */
+export function cometPresentValue(principal: bigint, supplyIndex: bigint, borrowIndex: bigint): bigint {
+  return principal >= ZERO
+    ? (principal * supplyIndex) / BASE_INDEX_SCALE
+    : -((-principal * borrowIndex) / BASE_INDEX_SCALE);
 }
 
 /** One market's replay state at a cut, raw and exact — what the API sends a
@@ -783,6 +819,13 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
     lifetime: CompoundLifetimeRaw;
     /** The boundary card's facts for THIS market (rails-ops decision 0019). */
     cutState?: BoundaryStateLine[] | null;
+    /** The previous row's base after, and whether its block was read (with
+     *  the principal read there): what the next row's interest is measured
+     *  from. Null before the market's first row. */
+    prevAfter: bigint | null;
+    prevRead: boolean;
+    prevPrincipal: bigint | null;
+    prevBlock: number;
     cutTypes: Map<string, number>;
     cutAssets: Map<string, number>;
     elided: number;
@@ -808,6 +851,10 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
         last: null,
         seed: null,
         lifetime: newCompoundLifetimeRaw(m.baseDecimals),
+        prevAfter: null,
+        prevRead: false,
+        prevPrincipal: null,
+        prevBlock: 0,
         cutTypes: new Map(),
         cutAssets: new Map(),
         elided: 0,
@@ -825,6 +872,20 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
   // list's walk would have it at the cut. Nothing downstream knows the
   // difference: the positions, the peaks, the counts and the flows read the
   // same fields either way.
+  const stateAt = p.blockState;
+  // What the wallet's LATER rows in the same (market, block) move on the base:
+  // a read is the block's end state, so a row's balance is it less these.
+  // `inBlock` is left holding each (market, block)'s whole sum, which is what
+  // a seed's last block needs when the cut splits it.
+  const laterInBlock: bigint[] = new Array(rows.length);
+  const inBlock = new Map<string, bigint>();
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const d = rows[i];
+    const k = `${d.market.key}:${d.blockNumber}`;
+    laterInBlock[i] = inBlock.get(k) ?? ZERO;
+    if (BASE_KINDS.has(d.kind)) inBlock.set(k, laterInBlock[i] + d.delta);
+  }
+
   const seeds = p.seeds ?? [];
   for (const seed of seeds) {
     const s = stateOf(seed.market);
@@ -835,6 +896,20 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
       s.coll.set(addr, c.balance < ZERO ? ZERO : c.balance);
       s.peakColl.set(addr, c.peak < ZERO ? ZERO : c.peak);
     }
+    // The balance the last row before the cut left: the chain's at its block
+    // where read (less the tail's rows in that block, when the cut splits it).
+    const at = stateAt?.get(`${seed.market.key}:${seed.lastBlock}`);
+    if (at) {
+      s.prevAfter =
+        cometPresentValue(at.principal, at.supplyIndex, at.borrowIndex) -
+        (inBlock.get(`${seed.market.key}:${seed.lastBlock}`) ?? ZERO);
+      s.prevRead = true;
+      s.prevPrincipal = at.principal;
+    } else {
+      s.prevAfter = seed.base;
+    }
+    s.prevBlock = seed.lastBlock;
+    s.base = s.prevAfter;
     s.absorbs = seed.absorbs;
     s.seededTxs = seed.txCount;
     s.seed = seed;
@@ -951,14 +1026,41 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
       s.cutState = lines.length > 0 ? lines : null;
     }
 
+    // The base after this row: the chain's balance where the block was read
+    // (presentValue at the block's end, less the wallet's later moves in it),
+    // else the previous row's balance plus this row's amount. The change
+    // since the previous row that no amount explains is the interest the
+    // previous principal earned or was charged (Comet's 1–2 units of
+    // principal rounding counted in), and past that a base move no event
+    // logs — server mig 351's split, row for row.
+    const baseDelta = isBase ? d.delta : ZERO;
+    const at = stateAt?.get(`${m.key}:${d.blockNumber}`);
+    const baseAfter = at
+      ? cometPresentValue(at.principal, at.supplyIndex, at.borrowIndex) - laterInBlock[i]
+      : (s.prevAfter ?? ZERO) + baseDelta;
+    const baseBefore = baseAfter - baseDelta;
+    const gap = baseBefore - (s.prevAfter ?? ZERO);
+    const pure =
+      at && s.prevRead && s.prevPrincipal != null && s.prevBlock < d.blockNumber && s.prevAfter != null
+        ? cometPresentValue(s.prevPrincipal, at.supplyIndex, at.borrowIndex) - s.prevAfter
+        : null;
+    const off = gap - (pure ?? ZERO);
+    const baseInterest =
+      off >= -TWO && off <= TWO ? gap : pure != null ? pure : s.prevAfter == null ? ZERO : gap;
+    const baseUnlogged = gap - baseInterest;
+    s.prevAfter = baseAfter;
+    s.prevRead = at != null;
+    s.prevPrincipal = at ? at.principal : null;
+    s.prevBlock = d.blockNumber;
+    s.base = baseAfter;
+    if (baseInterest > ZERO) s.lifetime.base.interestEarned += baseInterest;
+    else if (baseInterest < ZERO) s.lifetime.base.interestCharged -= baseInterest;
+
     // Advance the axis this row touches. Base is signed and unclamped;
     // collateral is clamped — the MV's GREATEST(…, 0).
-    let baseAfter: bigint;
     let collAfter: bigint | undefined;
     if (isBase) {
-      const before = s.base;
-      baseAfter = before + d.delta;
-      s.base = baseAfter;
+      const before = baseBefore;
       // Lifetime base flows, split at the zero crossings — Comet's own
       // semantics (a supply into a negative balance repays first; a withdraw
       // past the balance is a borrow) — in raw units, so the split is exact
@@ -971,7 +1073,6 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
       const raw = before + d.delta;
       collAfter = raw < ZERO ? ZERO : raw;
       s.coll.set(d.asset, collAfter);
-      baseAfter = s.base;
       addCompoundCollateralFlow(
         compoundCollateralFlowsOf(s.lifetime, d.asset, meta.symbol, meta.decimals),
         d.kind,
@@ -1013,6 +1114,8 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
       // does in the MV, so a collateral card can state the debt its stack
       // stands behind.
       baseAfter: fmtUnits(baseAfter, m.baseDecimals),
+      ...(baseInterest !== ZERO ? { baseInterest: fmtUnits(baseInterest, m.baseDecimals) } : {}),
+      ...(baseUnlogged !== ZERO ? { baseUnlogged: fmtUnits(baseUnlogged, m.baseDecimals) } : {}),
       ...(collAfter != null ? { collateralAfter: fmtUnits(collAfter, meta.decimals) } : {}),
       // The wallet's opening row. With a seed the opening row sits before
       // the cut, and no row of the tail is it.
@@ -1130,6 +1233,7 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
             }
           : {}),
         base: { amount: scaleRaw(s.base, m.baseDecimals), amountRaw: s.base.toString() },
+        baseAtChain: s.prevRead,
         collateral: [...s.coll.entries()].filter(([, v]) => v > ZERO).map(([a, v]) => assetLine(a, v)),
         peak: {
           lentBase: scaleRaw(peakLend, m.baseDecimals),

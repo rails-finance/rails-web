@@ -74,7 +74,7 @@ import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
 import { computeCompoundEconomics } from "@/lib/compound/economics";
 import { compoundEconomicsExplanation, compoundEconomicsContent } from "@/lib/compound/economics-explanation";
-import { COMPOUND_SWEPT_VOCABULARY } from "@/lib/compound/swept-tower-provenance";
+import { COMPOUND_BASE_READ_VOCABULARY, COMPOUND_SWEPT_VOCABULARY } from "@/lib/compound/swept-tower-provenance";
 import { cometViewFromChain } from "@/lib/compound/chain-position-view";
 import { CometDeploymentProvider } from "@/lib/compound/deployment-context";
 import type { CometMarket } from "@/lib/compound/asset-catalog";
@@ -251,11 +251,14 @@ function MarketSection({
   // the flows; an index read is served only when whole, so it never lands
   // here. The sums come from the SERVER's replay over every row, never from
   // the capped list on this page.
+  // Rows read at their blocks state the chain's balance (decision 0033); a
+  // market whose last row is not read yet keeps the running-sum wording.
+  const vocab = replay?.baseAtChain ? COMPOUND_BASE_READ_VOCABULARY : COMPOUND_SWEPT_VOCABULARY;
   const towerData = useMemo(() => {
     const built = computeCompoundEconomics(
       view,
       undefined,
-      COMPOUND_SWEPT_VOCABULARY,
+      vocab,
       sweptClean && replay ? replay.lifetime : undefined,
     );
     return sweptClean
@@ -265,7 +268,7 @@ function MarketSection({
           flowsNote:
             "Lifetime flows are hidden because the history sweep did not read every block of this market's life — see the note under the timeline for where it stopped or what it missed. Summing what did arrive would label a partial history “all time”. The current balances above are unaffected: they are read from the Comet.",
         };
-  }, [view, replay, sweptClean]);
+  }, [view, replay, sweptClean, vocab]);
 
   const live = chain && !chain.chainStale ? chain : null;
   const holds = holdsSomething(live);
@@ -276,7 +279,7 @@ function MarketSection({
         v={view}
         receipts
         viewHref={tl.viewHref}
-        vocab={COMPOUND_SWEPT_VOCABULARY}
+        vocab={vocab}
         session="compound-base"
         rowExtra={
           live && view.status === "open" && live.healthFactor != null && live.healthFactor > 0 ? (
@@ -285,7 +288,7 @@ function MarketSection({
         }
         explanation={
           view.status !== "open" ? (
-            <CompoundClosedPositionExplanation v={view} principalOnly />
+            <CompoundClosedPositionExplanation v={view} principalOnly={!replay?.baseAtChain} />
           ) : live ? (
             <CompoundPositionExplanation
               chain={live}

@@ -134,3 +134,20 @@ export const COMPOUND_SWEPT_VOCABULARY: CompoundTowerVocabulary = {
   }),
   baseAtLastEvent: false,
 };
+
+/** The Base index lane once its rows carry the chain's state (rails-server
+ *  /api/compound-base/timeline `blockState`; rails-ops decision 0033): the
+ *  position's base is the Comet's balance at its last event, so it takes
+ *  the balance receipt and the Ethereum wording. Used where the market's
+ *  last row was read (CometMarketReplay.baseAtChain). */
+export const COMPOUND_BASE_READ_VOCABULARY: CompoundTowerVocabulary = {
+  ...COMPOUND_SWEPT_VOCABULARY,
+  positionBase: (sym, side, coords): Provenance => ({
+    kind: "chain",
+    pclass: "state",
+    summary: `Base ${side === "lend" ? "lent" : "borrowed"} (${sym}) at the account's last event — the Comet's presentValue of \`userBasic(account).principal\` at the base ${side === "lend" ? "supply" : "borrow"} index of that block, read once at every block the account has a row in. ${side === "lend" ? "Positive base: it earns the supply rate." : "Negative base: it pays the borrow rate."} Interest since that event is in the live balance above.`,
+    contract: cometContract(coords),
+    via: "Comet · userBasic × totalsBasic index at the last event's block",
+  }),
+  baseAtLastEvent: true,
+};
