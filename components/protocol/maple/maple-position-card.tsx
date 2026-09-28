@@ -127,8 +127,13 @@ function ClaimFootnoteLines({ v }: { v: MaplePositionView }) {
   );
 }
 
-/** "incl. X interest" — earned interest already included in the claim above. */
+/** "incl. X interest" — earned interest already included in the claim above —
+ *  or, where the claim holds none of it, "all interest withdrawn". */
 function InterestCaption({ captions }: { captions?: MapleCardCaptions }) {
+  // The claim holds none of what the position earned: the figure lives in
+  // Lifetime flows, and the card points there.
+  if (captions?.interestWithdrawn)
+    return <div className="text-xs mt-0.5 text-rb-500">all interest withdrawn · total in Lifetime flows</div>;
   const it = captions?.interestEarned;
   if (!it || it.amount < 0.01) return null;
   return (

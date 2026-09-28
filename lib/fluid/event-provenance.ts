@@ -435,6 +435,30 @@ export const liqPremiumProv = (
   ]),
 });
 
+/** What the liquidation cost the position's owner — the seized collateral's
+ *  value at the at-block oracle price less the debt it cleared, debt-token
+ *  terms. The same two legs the premium divides, subtracted instead. */
+export const liqOwnerCostProv = (
+  debtSym: string,
+  coords: FluidCoords,
+  vals: { seized: string; cleared: string },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  formula: "seized collateral value − debt cleared",
+  verify: {
+    kind: "recompute",
+    text: "Re-run the vault's fetchLatestPosition at B−1 and B and the vault oracle's rate at B against an archive node; value the collateral difference at that rate and subtract the debt difference",
+  },
+  summary: `The penalty the owner paid on this liquidation — the seized collateral valued at the vault oracle's price this block, in ${debtSym}, less the debt the sweep cleared. The owner gave up collateral worth the first figure to be relieved of the second.`,
+  contract: vaultContract(coords),
+  via: "seized value − cleared · both legs in the vault's debt token",
+  inputs: eventInputs(coords, [
+    { label: "seized", value: vals.seized, kind: "chain", note: "settled impact × price at block" },
+    { label: "cleared", value: vals.cleared, kind: "chain", note: "settled impact, B−1 → B" },
+  ]),
+});
+
 /** The vault's own liquidation penalty at the event's block — the constant the
  *  realized premium above should reproduce. */
 export const liqPenaltyAtBlockProv = (coords: FluidCoords, pct: number): Provenance => ({
@@ -496,6 +520,19 @@ export const positionSigmaProv = (side: "supply" | "borrow", sym: string): Prove
   summary: `${sym} ${side === "supply" ? "collateral" : "debt"} at the indexed head — the running Σ of the position's operate deltas plus the liquidation-attribution deltas, across its whole captured history. Exact at liquidation boundaries, but it EXCLUDES interest accrued since each event; no chain slot holds this number. The settled resolver read is the lane that carries interest — absent here, so the replay is what is asserted.`,
   contract: { name: "Fluid vault", address: "" },
   via: `${FLUID_VIA} · Σ ${side === "supply" ? "colAmt_" : "debtAmt_"} across LogOperate logs + liquidation attributions · mint → head`,
+});
+
+/** Position-card interest line — the settled headline less the Σ replay
+ *  beneath it. The replay carries every operate and liquidation amount and no
+ *  interest, so the gap between the two lanes is the interest the leg accrued
+ *  over the position's life. */
+export const accruedInterestProv = (side: "supply" | "borrow", sym: string): Provenance => ({
+  kind: "derived",
+  pclass: "indexed",
+  formula: "settled figure − sum of events",
+  summary: `${side === "supply" ? "Interest the collateral earned" : "Interest the debt accrued"} over the position's life — the settled ${sym} figure above less the sum of the position's deposits, ${side === "supply" ? "withdrawals and seized collateral" : "borrows, repays and cleared debt"}. No event moves this amount; the vault's exchange price adds it between events.`,
+  contract: RESOLVER_CONTRACT,
+  via: `settled ${side} (resolver) − Σ ${side === "supply" ? "colAmt_" : "debtAmt_"} across LogOperate logs + liquidation attributions`,
 });
 
 /** Closed-card peak figure — the highest the leg's Σ replay ever stood.

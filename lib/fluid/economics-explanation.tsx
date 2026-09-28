@@ -157,7 +157,7 @@ export function fluidEconomicsContent(): LearnMoreContent {
   return {
     title: "About the Economics",
     intro:
-      "This section traces a vault position's collateral and debt flows over its lifetime, replayed from the vault's own operate and liquidation events.",
+      "Lifetime flows add up everything that has moved into and out of the position: deposits, withdrawals, borrows, repays and liquidations, each side in its own token.",
     stepsHeading: "How it's built:",
     steps: [
       "Flows are replayed from every deposit, withdraw, borrow and repay the position's own LogOperate events recorded — a single composite operation can move both legs at once.",

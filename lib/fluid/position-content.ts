@@ -19,8 +19,8 @@ export function fluidPositionContent(opts: {
     return {
       title: "About This Position",
       intro: opts.wasLiquidated
-        ? "This position was liquidated and then closed out. The panel above shows its lifetime peaks — the highest recorded collateral and debt it ever held."
-        : "This position has been closed — its debt repaid and its collateral withdrawn. The panel above shows its lifetime peaks — the highest recorded collateral and debt it ever held.",
+        ? "A Fluid position is an NFT holding collateral and debt in one vault; this one was liquidated and then closed out. The panel above shows the most collateral and debt it ever held."
+        : "A Fluid position is an NFT holding collateral and debt in one vault; this one is closed, its debt repaid and its collateral withdrawn. The panel above shows the most collateral and debt it ever held.",
       detailsHeading: "Key concepts:",
       details: [
         {
@@ -67,7 +67,7 @@ export function fluidPositionContent(opts: {
   return {
     title: "About This Position",
     intro:
-      "This panel explains the position's live state in plain language — the collateral and debt this vault NFT holds, and how a price-band liquidation would affect it.",
+      "A Fluid position is an NFT that holds collateral in one vault and can borrow that vault's debt token against it. Interest accrues on both sides, and the position is liquidated if its debt grows too large against its collateral.",
     detailsHeading: "Key concepts:",
     details,
     links: LINKS,

@@ -223,12 +223,13 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet }: FluidEven
     }
   } else {
     // Operate: each leg's balance — a composite touches both. A leg this event
-    // didn't move keeps its plain after-value (dimmed).
+    // didn't move keeps its plain after-value (dimmed), and its label says so,
+    // so the lone muted figure reads as a balance rather than a placeholder.
     const colMoved = (Number(ctx.colDelta ?? "0") || 0) !== 0;
     const debtMoved = (Number(ctx.debtDelta ?? "0") || 0) !== 0;
     if (ctx.colAfter != null) {
       stats.push({
-        label: "Collateral",
+        label: colMoved ? "Collateral" : "Collateral · unchanged",
         value: fmt(ctx.colAfter),
         symbol: supplySym,
         prov: colAfterProv(supplySym, coords, ctx.raw?.colAfter, chain),
@@ -244,7 +245,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet }: FluidEven
     }
     if (ctx.debtAfter != null) {
       stats.push({
-        label: "Debt",
+        label: debtMoved ? "Debt" : "Debt · unchanged",
         value: fmt(ctx.debtAfter),
         symbol: borrowSym,
         prov: debtAfterProv(borrowSym, coords, ctx.raw?.debtAfter, chain),

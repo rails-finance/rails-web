@@ -52,6 +52,7 @@ import {
   liqSettledProv,
   liqSeizedValueProv,
   liqClearedValueProv,
+  liqOwnerCostProv,
   ownerProv,
   type FluidCoords,
 } from "@/lib/fluid/event-provenance";
@@ -155,6 +156,41 @@ export function isOpeningTx(siblings: FluidEvent[], self: FluidEvent): boolean {
  *  cross-reference back to it. */
 export function fundedSameTx(siblings: FluidEvent[], self: FluidEvent): boolean {
   return isOperate(self) && isOpeningTx(siblings, self);
+}
+
+/** The log index an event carries in its key (`kind:tx:logIndex:nft`). */
+const logIndexOf = (e: FluidEvent): number => {
+  const n = Number(e.id.split(":")[2]);
+  return Number.isFinite(n) ? n : 0;
+};
+
+/** When this transfer is one hop of an NFT round trip inside its own
+ *  transaction — the position's transfers in the tx close a loop, every address
+ *  that sent it also received it, so the holder at the end is the holder at
+ *  the start — the address it left and came back to. Null otherwise. Order-free
+ *  for the verdict (multisets of senders and receivers match); the log index
+ *  only picks which address to name, the sender of the first hop. */
+export function transferRoundTrip(siblings: FluidEvent[], self: FluidEvent): string | null {
+  const c = self.context.data;
+  if (c.eventType !== "transfer") return null;
+  const hops = siblings.filter(
+    (s) =>
+      s.context.data.eventType === "transfer" &&
+      s.context.data.nftId === c.nftId &&
+      s.context.data.transferFrom &&
+      s.context.data.transferTo,
+  );
+  if (hops.length < 2 || !hops.includes(self)) return null;
+  const norm = (xs: (string | undefined)[]) =>
+    xs
+      .map((x) => (x ?? "").toLowerCase())
+      .sort()
+      .join(",");
+  const froms = norm(hops.map((h) => h.context.data.transferFrom));
+  const tos = norm(hops.map((h) => h.context.data.transferTo));
+  if (froms !== tos) return null;
+  const first = [...hops].sort((a, b) => logIndexOf(a) - logIndexOf(b))[0];
+  return first.context.data.transferFrom?.toLowerCase() ?? null;
 }
 
 export function coordsFor(e: FluidEvent): FluidCoords {
@@ -518,6 +554,33 @@ function fluidEventSlotsBase(
             </Fig>
           </>
         ) : null;
+      // A hop of a round trip inside one transaction: the NFT came back to the
+      // address it left before the transaction ended. The intermediate
+      // addresses stay unnamed — nothing on chain says what they are.
+      const home = transferRoundTrip(siblings, self);
+      if (home) {
+        const shown = home === from?.toLowerCase() || home === to?.toLowerCase();
+        return {
+          happened: [clause(<>The position NFT moved{move}.</>)],
+          meansNow: [
+            clause(
+              <>
+                It left{" "}
+                {shown ? (
+                  <Fig echo info={ownerProv(coords, home)} value={shortAddress(home)}>
+                    {shortAddress(home)}
+                  </Fig>
+                ) : (
+                  <Prov info={ownerProv(coords, home)} value={shortAddress(home)}>
+                    {shortAddress(home)}
+                  </Prov>
+                )}{" "}
+                and came back to it in this transaction, so the position&rsquo;s ownership did not change.
+              </>,
+            ),
+          ],
+        };
+      }
       return {
         happened: [clause(<>The position NFT moved wallets{move}.</>)],
         meansNow: [
@@ -645,13 +708,33 @@ function valuedSentence(
   );
   const premium = (seizedValue / clearedAmt - 1) * 100;
   const premiumStr = `${premium >= 0 ? "+" : "−"}${Math.abs(premium).toFixed(2)}%`;
+  // The owner's side of the same two figures: collateral worth `seizedValue`
+  // left the position to clear `clearedAmt` of debt, and the difference is the
+  // penalty paid. Stated on a liquidation only (an absorb's margin is the
+  // vault's book, and its legs can run the other way), and only when positive.
+  const cost = seizedValue - clearedAmt;
+  const costSentence =
+    !isAbsorb && cost > 0 && formatNumber(cost) !== "0" ? (
+      <>
+        {" "}
+        The owner paid {/* Stated only here, so it keeps the body tone (T3 colour rule). */}
+        <Prov
+          info={liqOwnerCostProv(debtSym, coords, { seized: inDebt(seizedValue), cleared: inDebt(clearedAmt) })}
+          value={inDebt(cost)}
+          symbol={debtSym}
+        >
+          {inDebt(cost)}
+        </Prov>{" "}
+        for this liquidation, the difference between the two.
+      </>
+    ) : null;
   return clause(
     <>
       At the vault&rsquo;s oracle price at the time, the {isAbsorb ? "absorbed" : "seized"} collateral was worth{" "}
       {seizedFig} against {clearedFig} cleared — a{" "}
       <strong className="font-semibold text-foreground">{premiumStr}</strong>{" "}
-      {isAbsorb ? "margin kept by the vault" : "premium to the liquidator"}. Fluid quotes everything in the debt token —
-      it uses no dollar prices.
+      {isAbsorb ? "margin kept by the vault" : "premium to the liquidator"}.{costSentence} Fluid quotes everything in
+      the debt token — it uses no dollar prices.
     </>,
   );
 }

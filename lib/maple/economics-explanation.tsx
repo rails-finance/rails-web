@@ -21,7 +21,7 @@ function claimSymbol(data: ChainTruthTowerData): string | null {
       ...data.collateral.current,
       ...data.collateral.exited,
       ...(data.collateral.received ?? []),
-      ...(data.collateral.interest ? [data.collateral.interest] : []),
+      ...(data.collateral.earned ?? []),
     ]
       .filter((l) => l.amount > 0)
       .map((l) => l.symbol),
@@ -44,7 +44,6 @@ export function mapleEconomicsExplanation(data: ChainTruthTowerData): ReactNode 
   const withdrawn = sumAmount(data.collateral.exited.filter((l) => !l.key.startsWith("sent-")));
   const sent = sumAmount(data.collateral.exited.filter((l) => l.key.startsWith("sent-")));
   const received = sumAmount(data.collateral.received ?? []);
-  const interest = data.collateral.interest && data.collateral.interest.amount > 0 ? data.collateral.interest : null;
   const currentClaim = sumAmount(data.collateral.current);
 
   const items: ReactNode[] = [];
@@ -81,19 +80,19 @@ export function mapleEconomicsExplanation(data: ChainTruthTowerData): ReactNode 
       </span>,
     );
   }
-  if (interest) {
-    items.push(
-      <span key="interest">
-        <Fig>{fmt(interest.amount, sym)}</Fig> in interest has been earned on the claim, included in the current value
-        below.
-      </span>,
-    );
-  }
-  for (const { line, heldNow } of data.collateral.interestLeft ?? []) {
+  // lib/maple/economics.ts keys the claim lines by pool and the lifetime
+  // interest `earned-<pool>`.
+  for (const line of data.collateral.earned ?? []) {
+    // Below a cent the claim reads as empty, as on the card's caption.
+    const held = sumAmount(data.collateral.current.filter((l) => `earned-${l.key}` === line.key));
     items.push(
       <span key={line.key}>
-        <Fig>{fmt(line.amount, line.symbol)}</Fig> in interest was earned over the position&apos;s life and has left
-        with its withdrawals; <Fig>{fmt(heldNow, line.symbol)}</Fig> is held now.
+        Earned <Fig>{fmt(line.amount, line.symbol)}</Fig> in interest over the position&apos;s life
+        {line.amount <= held
+          ? ", all of it still inside the current claim."
+          : held >= 0.01
+            ? ", more than the claim holds now: withdrawals have taken the rest out."
+            : "; withdrawals have taken all of it out."}
       </span>,
     );
   }
@@ -146,6 +145,7 @@ export function mapleEconomicsContent(): LearnMoreContent {
     steps: [
       "Flows are replayed from every deposit and processed withdrawal the position's own pool events recorded.",
       "The current claim is the position's shares valued at the pool's own exit rate at the block the page reads.",
+      "Interest earned over the position's life is what the claim holds now plus everything withdrawn or sent, less everything deposited or received. It adds up the interest each timeline row states since the previous event, so it stays on the page after withdrawals have taken it out of the claim.",
       "No dollar price is applied — the funds asset is already a stablecoin, and pinning it to $1 would erase a depeg rather than show it.",
     ],
     detailsHeading: "Key concepts:",

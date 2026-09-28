@@ -266,6 +266,14 @@ export function MaplePositionExplanation({
         </span>,
       );
     }
+    if (captions?.interestWithdrawn) {
+      bullets.push(
+        <span key="interest-withdrawn">
+          The claim holds none of the interest the position earned: withdrawals have taken all of it out. Lifetime flows
+          states the total.
+        </span>,
+      );
+    }
   }
 
   // ── pool-wide context: the queue, the liquid/deployed split, impairment ───

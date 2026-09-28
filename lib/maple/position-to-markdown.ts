@@ -183,6 +183,12 @@ export function maplePositionToMarkdown(args: MaplePositionMarkdownArgs): string
       );
       lines.push("");
     }
+    if (captions?.interestWithdrawn) {
+      lines.push(
+        "**All interest withdrawn** — the claim holds none of the interest the position earned; Lifetime flows states the total.",
+      );
+      lines.push("");
+    }
   }
 
   // ── Pool access — Maple's distinctive question ──
