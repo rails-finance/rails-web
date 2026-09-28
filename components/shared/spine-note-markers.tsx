@@ -287,8 +287,11 @@ const LIST_FIRST_CENTRE = 12;
 const LIST_SPINE_X = "calc(var(--card-pad) + (100% - 2 * var(--card-pad)) * 0.2)";
 const LIST_MARKER_CLASS =
   "group/mk absolute z-20 flex w-16 items-center gap-0.5 rounded-lg pl-[14px] text-rb-500 hover:text-foreground focus-visible:outline-2 focus-visible:outline-teal-500";
+/** The tooltip, drawn from `data-tip` as generated content so it adds no text
+ *  to the page: the open row's diamond sits inside the note row, and a text
+ *  node there would read as part of the row's header. */
 const LIST_TIP_CLASS =
-  "pointer-events-none absolute left-full top-1/2 ml-1.5 -translate-y-1/2 whitespace-nowrap rounded-md border border-rb-200 bg-raised px-2 py-1 text-xs font-medium text-foreground opacity-0 shadow-md transition-opacity group-hover/mk:opacity-100 group-focus-visible/mk:opacity-100 dark:border-rb-700";
+  "after:content-[attr(data-tip)] after:pointer-events-none after:absolute after:left-full after:top-1/2 after:ml-1.5 after:-translate-y-1/2 after:whitespace-nowrap after:rounded-md after:border after:border-rb-200 after:bg-raised after:px-2 after:py-1 after:text-xs after:font-medium after:text-foreground after:opacity-0 after:shadow-md after:transition-opacity hover:after:opacity-100 focus-visible:after:opacity-100 dark:after:border-rb-700";
 
 /** One closed desktop marker. */
 function ListMarker({ note, top, onOpen }: { note: MarketNote; top: number; onOpen: () => void }) {
@@ -299,14 +302,12 @@ function ListMarker({ note, top, onOpen }: { note: MarketNote; top: number; onOp
       aria-expanded={false}
       aria-label={markerLabel(note)}
       onClick={onOpen}
-      className={LIST_MARKER_CLASS}
+      data-tip={noteMarkerText(note).tip}
+      className={`${LIST_MARKER_CLASS} ${LIST_TIP_CLASS}`}
       style={{ left: `calc(${LIST_SPINE_X} - 22px)`, top, height: LIST_TARGET }}
     >
       <Diamond filled={false} />
       <Direction note={note} />
-      <span aria-hidden className={LIST_TIP_CLASS}>
-        {noteMarkerText(note).tip}
-      </span>
     </button>
   );
 }
@@ -322,14 +323,12 @@ function ListNodeControl({ note, openAll, onClose }: { note: MarketNote; openAll
       aria-disabled={openAll || undefined}
       aria-label={markerLabel(note)}
       onClick={openAll ? undefined : onClose}
-      className={`${LIST_MARKER_CLASS} ${openAll ? "cursor-default" : ""}`}
+      data-tip={noteMarkerText(note).tip}
+      className={`${LIST_MARKER_CLASS} ${LIST_TIP_CLASS} ${openAll ? "cursor-default" : ""}`}
       // The column's node is centred 16px + half a glyph below its top.
       style={{ left: "calc(50% - 22px)", top: 32 - LIST_TARGET / 2, height: LIST_TARGET }}
     >
       <span aria-hidden className="block h-4 w-4 shrink-0" />
-      <span aria-hidden className={LIST_TIP_CLASS}>
-        {noteMarkerText(note).tip}
-      </span>
     </button>
   );
 }

@@ -84,12 +84,16 @@ console.log(`Market-note markers — against ${BASE}\n`);
   check("2. a marker is a button with a full label", /^Market note, .+: .+ (up|down) /.test(label), label);
   await first.hover();
   await page.waitForTimeout(300);
-  const tip = first.locator("span").last();
-  const tipShown = (await tip.evaluate((el) => getComputedStyle(el).opacity)) === "1";
+  // The tooltip is the marker's ::after, drawn from `data-tip`, so it adds no
+  // text to the page.
+  const tip = await first.evaluate((el) => {
+    const s = getComputedStyle(el, "::after");
+    return { shown: s.opacity === "1", text: el.getAttribute("data-tip") ?? "", content: s.content };
+  });
   check(
     "2b. hover shows the tooltip in the header's form",
-    tipShown && /price [−+]/.test((await tip.textContent()) ?? ""),
-    (await tip.textContent()) ?? "",
+    tip.shown && tip.content.includes(tip.text) && /price [−+]/.test(tip.text),
+    tip.text,
   );
 
   await first.focus();
