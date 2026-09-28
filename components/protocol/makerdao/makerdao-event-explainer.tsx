@@ -6,8 +6,8 @@
 // paragraph's LEAD sentence as its teaser; this pane renders the REST (skipLead),
 // so the first sentence is never duplicated. Every figure here is the card's own
 // face value, Prov-traced (an echo of the header delta / detail grid / forensics
-// receipt); the debt is quoted in DAI (or USDS), muted, because the chrome
-// carries the vault's normalized figure, not this valued one.
+// receipt); the debt is quoted in DAI (or USDS), dart × the rate at the block,
+// the figure the header draws.
 //
 // A frob is ONE vault operation carrying two signed deltas — collateral and
 // debt — so the narration decomposes the pair: deposit, withdraw, draw, repay,

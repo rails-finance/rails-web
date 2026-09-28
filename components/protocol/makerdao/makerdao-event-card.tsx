@@ -11,7 +11,7 @@ import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
-import { dinkProv, dartProv, type MakerCoords } from "@/lib/makerdao/event-provenance";
+import { dinkProv, debtDeltaOf, type MakerCoords } from "@/lib/makerdao/event-provenance";
 import { makerdaoExplainerTeaser } from "@/lib/makerdao/explainer-clauses";
 import { MakerDAOEventHeader } from "./makerdao-event-header";
 import { MakerDAOEventDetail } from "./makerdao-event-detail";
@@ -45,13 +45,15 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
   const extBy = externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.txTo }, ctx.ownerAt ?? event.wallet);
 
   // Echo: the header registers dinkProv/dartProv on every frob/fork/grab with
-  // a nonzero delta (makerdao-event-header.tsx pushes unconditionally), bare
+  // a nonzero delta (makerdao-event-header.tsx pushes unconditionally; the debt
+  // leg through debtDeltaOf, as here), bare
   // ONLY on a frob (perAxis there collapses to `eventType === "frob"` — isOpen
   // and its negation cover the whole frob domain) and signed otherwise. The
   // spine itself only ever shows dink+dart tokens for frob/fork (isGrab hides
   // both, isFork hides dart) — echo exactly the legs actually rendered below.
   const coords: MakerCoords = { txHash: event.txHash, blockNumber: event.blockNumber, urn: ctx.urn, ilk: ctx.ilk };
   const labeled = ctx.eventType === "frob";
+  const debt = debtDeltaOf(ctx, ilkDebtSymbol(ctx.ilk), coords);
 
   // Token chips: collateral (dink) + debt (dart; DAI, or USDS on LockStake
   // urns). direction "right" = toward the protocol (deposit / repay), "left" =
@@ -89,10 +91,10 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
                 // what draws that chip today and continues to.
                 address: soleFlowAddress(event.flows, ilkDebtSymbol(ctx.ilk)),
                 direction: (dart > 0 ? "left" : "right") as "right" | "left",
-                value: Math.abs(dart),
+                value: Math.abs(debt.value),
                 prov: {
-                  info: dartProv(coords),
-                  value: chainTruthDeltaValue(dart, labeled),
+                  info: debt.prov,
+                  value: chainTruthDeltaValue(debt.value, labeled),
                   symbol: ilkDebtSymbol(ctx.ilk),
                 },
               },

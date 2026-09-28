@@ -60,6 +60,10 @@ export interface RawMakerTimelineRow {
    *  events-MV `rate_at_block` column (`1e27 + Σ maker_fold.rate_delta`). Absent
    *  on older payloads / before the column lands; passed straight through. */
   rate_at_block?: string | null;
+  /** The rate accumulator at the urn's previous row (ray): the route reads it
+   *  from the row above, or for a read's first row from the urn's last row
+   *  below the read. Null on the urn's first row and on older payloads. */
+  prev_rate_at_block?: string | null;
   /** Third-party-action facts (the tx signer + the tx entry contract), set
    *  ONLY on two-fact external frobs — the route ships them exactly when both
    *  differ from the owner (and tx_to from the vault's proxy); NULL otherwise. */
@@ -108,6 +112,39 @@ function fmtWad(bi: bigint): string {
 }
 
 const numWad = (bi: bigint): number => Number(bi) / 1e18;
+
+const RAY = BigInt(10) ** BigInt(27);
+
+/** What the Vat says the vault owes: art (wad) × rate (ray) ÷ 1e27, in wad. */
+const owed = (art: bigint, rate: bigint): bigint => (art * rate) / RAY;
+
+/** The row's debt in the debt token (DAI, or USDS on a LockStake urn): after
+ *  the event, the change it made, and the stability fee accrued since the
+ *  urn's previous row. Every figure is art × rate at a block, so it matches
+ *  `Vat.urns(ilk, urn).art × Vat.ilks(ilk).rate` read there. `interest` is
+ *  the debt just before this event (art before × this block's rate) less the
+ *  debt just after the previous row (the same art × that row's rate); it is
+ *  absent where the previous rate is unknown or no fee accrued. */
+function debtFigures(
+  artAfter: bigint | null,
+  dart: bigint,
+  rateRay: string | null | undefined,
+  prevRateRay: string | null | undefined,
+): { debtAfter?: string; debtChange?: string; interestSincePrevious?: string } {
+  if (artAfter == null || rateRay == null) return {};
+  const rate = BigInt(rateRay);
+  if (rate <= ZERO) return {};
+  const artBefore = artAfter - dart;
+  const out: { debtAfter?: string; debtChange?: string; interestSincePrevious?: string } = {
+    debtAfter: fmtWad(owed(artAfter, rate)),
+    debtChange: fmtWad(owed(artAfter, rate) - owed(artBefore, rate)),
+  };
+  if (prevRateRay != null && artBefore > ZERO) {
+    const interest = owed(artBefore, rate) - owed(artBefore, BigInt(prevRateRay));
+    if (interest !== ZERO) out.interestSincePrevious = fmtWad(interest);
+  }
+  return out;
+}
 
 function labelFor(
   eventType: MakerDAOEventType,
@@ -231,6 +268,7 @@ export function buildMakerTimeline(resp: RawMakerTimelineResponse): MakerTimelin
       inkAfter: r.ink_after != null ? fmtWad(BigInt(r.ink_after)) : undefined,
       artAfter: r.art_after != null ? fmtWad(BigInt(r.art_after)) : undefined,
       rateAtBlock: r.rate_at_block ?? undefined,
+      ...debtFigures(r.art_after != null ? BigInt(r.art_after) : null, dart, r.rate_at_block, r.prev_rate_at_block),
       isOpen,
       // The acting parties, present only on two-fact external frobs (the
       // route pre-filters). The card derives third-party marking from these.

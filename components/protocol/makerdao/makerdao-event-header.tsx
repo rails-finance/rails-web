@@ -1,8 +1,8 @@
 "use client";
 
 // MakerDAO event header (chain-state tier) — adapter onto the shared ChainTruthRow
-// grammar. Maps the frob/grab deltas (signed dink collateral + dart normalized
-// debt) into the shared row spec; each value traces via <Prov>. No collateral
+// grammar. Maps the frob/grab deltas (signed dink collateral, and the debt
+// dart × rate at the block) into the shared row spec; each value traces via <Prov>. No collateral
 // ratio, no APR — those are layers, absent from the baseline.
 
 import type { AssetFlow, MakerDAOContext } from "@/lib/shared/types/event-shape";
@@ -11,7 +11,7 @@ import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-t
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import {
   dinkProv,
-  dartProv,
+  debtDeltaOf,
   externalActorProv,
   giveDstProv,
   giveOwnerProv,
@@ -76,12 +76,13 @@ export function MakerDAOEventHeader({
   }
   if (dart !== 0) {
     // DAI on CdpManager vaults, USDS on LockStake urns (same Vat art unit).
+    const debt = debtDeltaOf(ctx, ilkDebtSymbol(ctx.ilk), coords);
     deltas.push({
-      value: dart,
+      value: debt.value,
       symbol: ilkDebtSymbol(ctx.ilk),
       address: soleFlowAddress(flows, ilkDebtSymbol(ctx.ilk)),
-      prov: dartProv(coords),
-      suffix: "art",
+      prov: debt.prov,
+      ...(debt.suffix ? { suffix: debt.suffix } : {}),
       // A fork moves the debt WITH the collateral — nothing is minted or burned
       // — so the card draws only the collateral chip and leaves this figure to
       // the header. Say so, or the ≥sm hand-off hides it into a spine row that

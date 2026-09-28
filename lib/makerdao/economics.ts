@@ -176,6 +176,14 @@ export function makerLifetimeWithOpening(
   return f;
 }
 
+/** The tower data plus the stability fee the vault accrued over its life: the
+ *  debt owed now (art × the live rate) less the net debt drawn (generated and
+ *  moved in, less repaid, cleared and moved out, each at its block's rate). It
+ *  equals the sum of every row's interest since the previous event plus the
+ *  accrual since the last event. Undefined where the debt flows do not
+ *  reconcile or the live rate is missing. */
+export type MakerTowerData = ChainTruthTowerData & { lifetimeInterest?: number };
+
 /** Build the USD dual-tower data for a Maker vault from its (chain-state) view.
  *  All three headline numbers — ink, art, art × rate — are already on the view
  *  (the detail page reads them via eth_call on the Vat). Passing the timeline
@@ -195,7 +203,7 @@ export function computeMakerEconomics(
    *  windowed page whose opening balance has not arrived passes NEITHER — the
    *  lifetime layer states nothing rather than a window's arithmetic. */
   precomputedLifetime?: MakerLifetimeFlows,
-): ChainTruthTowerData {
+): MakerTowerData {
   const ink = Math.max(0, view.ink);
   const art = Math.max(0, view.art);
   // A terminal vault below the status rule's dust line can still carry a
@@ -293,7 +301,13 @@ export function computeMakerEconomics(
         ]
       : [];
 
+  const lifetimeInterest =
+    debtComplete && view.debtDai != null
+      ? view.debtDai - (daiGenerated + daiMovedIn - daiRepaid - daiLiquidated - daiMovedOut)
+      : undefined;
+
   return {
+    ...(lifetimeInterest != null ? { lifetimeInterest } : {}),
     valued: true,
     // The USD scale is the on-chain OSM price (Spotter spot × mat), so the valued
     // bars are chain-derived and survive On-chain-values mode.

@@ -14,12 +14,11 @@
 // → the forensics block; the new owner → the header party chip). A figure with
 // no on-card twin stays muted, unwrapped body text (the highlight rule).
 //
-// The debt is quoted in DAI (or USDS on LockStake urns) — the meaningful unit,
-// muted, because the card's chrome carries the vault's normalized figure, not
-// this valued one, so bolding it would break the cognitive link the highlight
-// rule protects. The DAI figure is available only once the event carries its
-// block's rate, so a draw/repay states its amount when it can and states the
-// action alone when it can't (the never-empty floor).
+// The debt is quoted in DAI (or USDS on LockStake urns): dart × the rate at the
+// block, the figure the header draws, so it echoes the header's receipt. It is
+// available only once the event carries its block's rate, so a draw/repay
+// states its amount when it can and states the action alone when it can't (the
+// never-empty floor).
 //
 // ── Fill-standard notes (charter §5) ─────────────────────────────────────────
 // Checklist items Maker cannot fill on ordinary vault operations, each a data
@@ -58,6 +57,7 @@ import {
   grabCushionProv,
   giveDstProv,
   giveOwnerProv,
+  debtDeltaOf,
   type MakerCoords,
 } from "@/lib/makerdao/event-provenance";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
@@ -199,10 +199,6 @@ function makerdaoEventSlotsBase(ctx: MakerDAOContext, coords: MakerCoords): Even
   const dink = Number(ctx.dink) || 0;
   const dart = Number(ctx.dart) || 0;
   const rate = ctx.rateAtBlock != null ? Number(ctx.rateAtBlock) / 1e27 : null;
-  // The DAI actually minted / burned by this draw or repay — the debt delta
-  // valued at this event's own rate. Muted (the chrome carries the vault's
-  // normalized figure, not this one); null until the event carries a rate.
-  const dartDai = rate != null && rate > 0 && dart !== 0 ? Math.abs(dart) * rate : null;
   const rs = resultingState(ctx);
 
   // Collateral delta echoes the header delta / detail-grid transition (same prov
@@ -223,9 +219,16 @@ function makerdaoEventSlotsBase(ctx: MakerDAOContext, coords: MakerCoords): Even
     </Fig>
   );
 
-  // The DAI amount a draw or repay moved — muted, unwrapped body text (no
-  // on-chrome twin). Null-safe: falls back to naming the action alone.
-  const daiAmount = dartDai != null ? `${formatNumber(dartDai)} ${dsym}` : null;
+  // The DAI amount a draw or repay moved (dart × rate at the block) echoes the
+  // header's debt delta: same prov, same exact value. Null where the row has no
+  // rate; the clause then names the action alone.
+  const debt = debtDeltaOf(ctx, dsym, coords);
+  const daiAmount: ReactNode | null =
+    ctx.debtChange != null && dart !== 0 ? (
+      <Fig echo info={debt.prov} value={chainTruthDeltaValue(debt.value, labeled)} symbol={dsym}>
+        {formatNumber(Math.abs(debt.value))} {dsym}
+      </Fig>
+    ) : null;
 
   switch (ctx.eventType) {
     case "frob":
@@ -253,7 +256,7 @@ function frobSlots(
   rs: MakerResultingState,
   dink: number,
   dart: number,
-  daiAmount: string | null,
+  daiAmount: ReactNode | null,
   colDeltaFig: () => ReactNode,
   colAfterFig: () => ReactNode,
 ): EventProseSlots {
@@ -345,7 +348,7 @@ function grabSlots(
   dsym: string,
   dink: number,
   dart: number,
-  daiAmount: string | null,
+  daiAmount: ReactNode | null,
   rate: number | null,
   colDeltaFig: () => ReactNode,
 ): EventProseSlots {
@@ -488,7 +491,7 @@ function forkSlots(
   ctx: MakerDAOContext,
   dink: number,
   dart: number,
-  daiAmount: string | null,
+  daiAmount: ReactNode | null,
   colDeltaFig: () => ReactNode,
   colAfterFig: () => ReactNode,
   rs: MakerResultingState,

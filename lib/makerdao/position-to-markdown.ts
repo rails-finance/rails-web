@@ -163,7 +163,7 @@ export function makerVaultToMarkdown(args: MakerVaultMarkdownArgs): string {
   lines.push("");
 
   lines.push(...marketNotesSection(allNotes));
-  lines.push(...timelineTable(events, sym, args.history, anchoredNotes));
+  lines.push(...timelineTable(events, sym, ilkDebtSymbol(view.ilk), args.history, anchoredNotes));
   return lines.join("\n");
 }
 
@@ -206,6 +206,7 @@ function marketNotesSection(notes: MarketNote[]): string[] {
 function timelineTable(
   events: BaseActivityEvent[],
   sym: string,
+  dsym: string,
   history: MarkdownHistoryScope | undefined,
   /** The notes anchored to a row here, keyed by that row's event id — they
    *  annotate the row's last cell and change nothing else: the numbering, the
@@ -220,8 +221,12 @@ function timelineTable(
     out.push("_No transaction history available._");
     return out;
   }
-  out.push(`| # | Date | Action | ${sym} Δ | Norm. debt Δ | ${sym} after | Norm. debt after | Transaction |`);
-  out.push("|---|------|--------|---------|--------------|--------------|------------------|-------------|");
+  out.push(
+    `| # | Date | Action | ${sym} Δ | ${dsym} debt Δ | ${sym} after | ${dsym} debt after | Interest since previous | Transaction |`,
+  );
+  out.push(
+    "|---|------|--------|---------|---------|--------------|------------------|-------------------------|-------------|",
+  );
   rows.forEach((e, i) => {
     if (!isMakerDAOEvent(e)) return;
     const d = e.context.data;
@@ -244,12 +249,12 @@ function timelineTable(
     // A running balance the answer did not carry reads "not loaded".
     const after = (v: string | undefined) => (v == null ? NOT_LOADED_CELL : amt(parseFloat(v)));
     out.push(
-      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${amt(parseFloat(d.dink))} | ${amt(parseFloat(d.dart))} | ${after(d.inkAfter)} | ${after(d.artAfter)} | ${txCell(e)}${noted ? ` — ${noted}` : ""} |`,
+      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${amt(parseFloat(d.dink))} | ${d.debtChange != null ? amt(parseFloat(d.debtChange)) : NOT_LOADED_CELL} | ${after(d.inkAfter)} | ${after(d.debtAfter)} | ${d.interestSincePrevious != null ? amt(parseFloat(d.interestSincePrevious)) : ""} | ${txCell(e)}${noted ? ` — ${noted}` : ""} |`,
     );
   });
   out.push("");
   out.push(
-    "_Debt columns are NORMALIZED art (multiply by the ilk's rate accumulator at that block for the DAI/USDS figure); deltas are signed._",
+    `_Debt columns are ${dsym} owed: the vault's art × the ilk's rate accumulator at the row's block, stability fee included. Interest since previous is the fee accrued between the previous row and this one. Deltas are signed._`,
   );
   out.push("");
   return out;

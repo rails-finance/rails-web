@@ -5,7 +5,8 @@
 
 import type { ReactNode } from "react";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import type { ChainTruthTowerData, TowerSideData } from "@/lib/shared/chain-truth-economics";
+import type { TowerSideData } from "@/lib/shared/chain-truth-economics";
+import type { MakerTowerData } from "@/lib/makerdao/economics";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
 
 const DUST = 1e-9;
@@ -20,7 +21,7 @@ const exitedTotal = (side: TowerSideData): number => side.exited.reduce((sum, l)
 
 /** Explanation body for the MakerDAO tower — a lead sentence plus bullets
  *  derived from `data`. Returns null when there's nothing to narrate. */
-export function makerdaoEconomicsExplanation(data: ChainTruthTowerData): ReactNode {
+export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
   const { collateral, debt } = data;
   const collSym = sideSymbol(collateral, "collateral");
   const debtSym = sideSymbol(debt, "DAI");
@@ -83,8 +84,19 @@ export function makerdaoEconomicsExplanation(data: ChainTruthTowerData): ReactNo
     );
   }
 
+  if (data.lifetimeInterest != null && data.lifetimeInterest > DUST) {
+    bullets.push(
+      <span key="interest-accrued">
+        {fig(data.lifetimeInterest)} of stability fee accrued over the vault&apos;s life: the {debtSym} owed now less
+        the net {debtSym} drawn, each draw and repayment valued at its block&apos;s rate.
+      </span>,
+    );
+  }
+
   const fee = debt.interest;
-  if (fee && fee.amount > DUST) {
+  if (data.lifetimeInterest != null && data.lifetimeInterest > DUST) {
+    // The vault's own accrual is stated above.
+  } else if (fee && fee.amount > DUST) {
     bullets.push(
       <span key="fee">
         An accrued stability fee of {fig(fee.usd ?? 0)} sits on top of the {fig(debt.current[0]?.usd ?? 0)} DAI

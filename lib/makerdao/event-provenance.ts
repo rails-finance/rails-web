@@ -103,17 +103,6 @@ export const inkAfterProv = (collSym: string, coords: MakerCoords): Provenance =
   inputs: eventInputs(coords),
 });
 
-/** Normalized debt `art` after this event = Σ dart. */
-export const artAfterProv = (coords: MakerCoords): Provenance => ({
-  kind: "chain",
-  pclass: "indexed",
-  verify: stateVerify(coords),
-  summary: `Normalized debt (art) the vault held AFTER this event — the vault's running normalized debt, replayed by summing the signed dart of its own frob/grab/fork operations in log order up to this block${atBlock(coords)}. A replay of the urn.art slot — it matches when the captured history is complete.`,
-  contract: VAT,
-  via: `${MAKER_VIA} · Σ ±dart → urn.art · in on-chain order`,
-  inputs: eventInputs(coords),
-});
-
 /** Collateral `ink` BEFORE this event = ink after − dink. A derived quantity —
  *  arithmetic over two chain-direct figures (the replayed ink and the LogNote
  *  dink) — both inputs are on-chain, so it is chain-derived and shows in the
@@ -134,21 +123,66 @@ export const inkBeforeProv = (collSym: string, coords: MakerCoords): Provenance 
   ]),
 });
 
-/** Normalized debt `art` BEFORE this event = art after − dart. Arithmetic over
- *  two on-chain figures (the replayed art and the LogNote dart), so chain-derived;
- *  art is normalized (interest lives in the ilk rate accumulator, not in art), so
- *  the reconstruction is exact at the art level. */
-export const artBeforeProv = (coords: MakerCoords): Provenance => ({
+/** Debt owed AFTER this event = urn.art after × the ilk's rate at the block. */
+export const debtAfterProv = (symbol: string, coords: MakerCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Normalized debt (art) the vault held BEFORE this event — the urn.art after minus the signed dart this frob/grab/fork applied (after − change), reconstructed in the browser from the replayed art and the LogNote dart. Exact at the art level (interest lives in the ilk rate accumulator, not in art); multiply by rate for the DAI figure.`,
+  verify: stateVerify(coords),
+  summary: `${symbol} the vault owed AFTER this event${atBlock(coords)} — the urn's normalized debt (art) after this frob/grab/fork times the ilk's rate accumulator at the block, the Vat's debt figure. Equals Vat.urns(ilk, urn).art × Vat.ilks(ilk).rate ÷ 10^27 read at the block; the stability fee accrued up to the block is in it.`,
   contract: VAT,
-  via: "urn.art after − dart",
+  via: `${MAKER_VIA} · Σ ±dart → urn.art × rate at the block (Σ captured fold deltas)`,
+  formula: "art after × rate ÷ 10^27",
+  inputs: eventInputs(coords),
+});
+
+/** Debt owed BEFORE this event = debt after − the change. */
+export const debtBeforeProv = (symbol: string, coords: MakerCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `${symbol} the vault owed just BEFORE this event — the art before it (art after − dart) times the same block's rate accumulator. It includes the stability fee accrued since the previous row.`,
+  contract: VAT,
+  via: "(urn.art after − dart) × rate at the block",
   formula: "after − change",
   inputs: eventInputs(coords, [
-    { label: "after", kind: "chain", pclass: "indexed", note: "replayed urn.art after this event" },
-    { label: "change", kind: "chain", pclass: "emitted", note: "the LogNote dart (signed)" },
+    { label: "after", kind: "chain-derived", pclass: "indexed", note: `${symbol} owed after this event (art × rate)` },
+    { label: "change", kind: "chain-derived", pclass: "emitted", note: "dart × rate at the block (signed)" },
   ]),
+});
+
+/** The debt this event added or removed = dart × the rate at the block. */
+export const debtChangeProv = (symbol: string, coords: MakerCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "emitted",
+  verify: txVerify(coords),
+  summary: `${symbol} of debt this operation added or cleared${atBlock(coords)} — the signed normalized-debt change (dart) from the Vat LogNote times the ilk's rate accumulator at the block: the ${symbol} the Vat credited or debited for it.`,
+  contract: VAT,
+  via: `${MAKER_VIA} · frob/grab/fork LogNote · dart × rate at the block`,
+  formula: "dart × rate ÷ 10^27",
+  inputs: eventInputs(coords),
+});
+
+/** The debt figure a row's header, spine and explainer draw for this event:
+ *  dart × rate (the debt token minted or burned) where the row carries its
+ *  block's rate, the bare dart with an "art" tag where it does not. One source,
+ *  so the three receipts key on the same value. */
+export function debtDeltaOf(
+  ctx: { dart: string; debtChange?: string },
+  symbol: string,
+  coords: MakerCoords,
+): { value: number; prov: Provenance; suffix?: string } {
+  if (ctx.debtChange != null) return { value: Number(ctx.debtChange) || 0, prov: debtChangeProv(symbol, coords) };
+  return { value: Number(ctx.dart) || 0, prov: dartProv(coords), suffix: "art" };
+}
+
+/** Stability fee accrued between the previous row and this one. */
+export const interestSincePreviousProv = (symbol: string, coords: MakerCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `Stability fee the debt accrued since the vault's previous event, up to this one${atBlock(coords)} — the debt just before this event less the debt just after the previous one. Art did not move between them, so this is art × (the rate at this block − the rate at the previous row's block) ÷ 10^27.`,
+  contract: VAT,
+  via: "urn.art before × (rate at this block − rate at the previous row)",
+  formula: "art before × (rate − previous rate) ÷ 10^27",
+  inputs: eventInputs(coords),
 });
 
 /** Current debt = art × rate — the one §2 multiply, both operands chain reads.

@@ -718,6 +718,15 @@ export interface MakerDAOContext {
    *  until the events-MV `rate_at_block` column lands; when present, values each
    *  historic `dart` as DAI minted/burned at that block. */
   rateAtBlock?: string;
+  /** Debt owed after this event (human, DAI or USDS): art after × rateAtBlock,
+   *  the Vat's figure at the block. Absent where art or the rate is. */
+  debtAfter?: string;
+  /** Signed change this event made to the debt owed (human): dart × rateAtBlock,
+   *  the debt token minted or burned. */
+  debtChange?: string;
+  /** Stability fee accrued since the urn's previous row (human): art before ×
+   *  (rateAtBlock − the previous row's rate). Absent when zero or unknown. */
+  interestSincePrevious?: string;
   /** True for a vault's first frob (open). */
   isOpen?: boolean;
   /** The transaction sender (signer), lowercased. Present ONLY on two-fact

@@ -33,10 +33,17 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { EventTime } from "@/components/shared/event-time";
 import { ExternalActorChip } from "@/components/shared/external-actor-chip";
 import { useEnsName } from "@/lib/ens/use-ens-names";
-import { DeltaToggle, StatCard, StateTransition, ValuePill, changeTone } from "@/components/shared/state-transition";
+import {
+  DeltaToggle,
+  StatCard,
+  StatSubline,
+  StateTransition,
+  ValuePill,
+  changeTone,
+} from "@/components/shared/state-transition";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
-import { formatCompact, formatExact, formatUsdValue } from "@/lib/utils/format";
+import { formatCompact, formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 
@@ -232,6 +239,12 @@ export interface ChainTruthStat {
    *  USD-values display flag. Omit where no captured price exists — the stat
    *  stays token-only (partial fill is a safe state). */
   usd?: { value: number; prov: Provenance };
+  /** Interest the balance accrued between the previous row on this asset and
+   *  this one: the balance just before this event less the balance just after
+   *  the previous row, both chain figures. Drawn under the value as "Interest
+   *  since previous event: 12.40 DAI". `value` is the exact figure the receipt
+   *  keys on. Omit where it is zero or unknown. */
+  interestSincePrevious?: { value: string; prov: Provenance };
 }
 
 /** The exact value string a ChainTruthRow delta registers with its receipt:
@@ -630,6 +643,17 @@ export function ChainTruthDetail({
                   </Prov>
                 )}
               </StateTransition>
+              {s.interestSincePrevious && (
+                <StatSubline>
+                  Interest since previous event:{" "}
+                  <Prov info={s.interestSincePrevious.prov} value={s.interestSincePrevious.value} symbol={s.symbol}>
+                    <span title={s.interestSincePrevious.value}>
+                      {formatNumber(Number(s.interestSincePrevious.value))}
+                    </span>
+                  </Prov>{" "}
+                  {s.symbol}
+                </StatSubline>
+              )}
             </StatCard>
           </div>
         );

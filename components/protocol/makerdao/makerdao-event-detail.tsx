@@ -1,21 +1,22 @@
 "use client";
 
 // MakerDAO event detail (chain-state tier) — adapter onto the shared
-// ChainTruthDetail grid. Human labels (Collateral / Debt) over the raw Vat
-// fields, showing the resulting on-chain state after this event; each value is
-// the exact Vat slot (ink, and normalized debt art) and traces via <Prov>. The
-// art→DAI scaling (art × rate) and any USD live on the position summary.
+// ChainTruthDetail grid. Human labels (Collateral / Debt) over the Vat state
+// after this event: the collateral is urn.ink, the debt urn.art × the ilk's
+// rate at the block — what the vault owed there, stability fee included. Each
+// traces via <Prov>; any USD lives on the position summary.
 
 import type { MakerDAOContext } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
 import {
   inkAfterProv,
-  artAfterProv,
   dinkProv,
-  dartProv,
   inkBeforeProv,
-  artBeforeProv,
+  debtAfterProv,
+  debtBeforeProv,
+  debtChangeProv,
+  interestSincePreviousProv,
   atBlockPriceProv,
   grabSeizedUsdProv,
   grabClearedDaiProv,
@@ -87,6 +88,7 @@ function buildGrabForensics(ctx: MakerDAOContext, coords: MakerCoords): Liquidat
 
 export function MakerDAOEventDetail({ ctx, txHash, blockNumber }: MakerDAOEventDetailProps) {
   const coords: MakerCoords = { txHash, blockNumber, urn: ctx.urn, ilk: ctx.ilk };
+  const debtSym = ilkDebtSymbol(ctx.ilk);
 
   const stats: ChainTruthStat[] = [
     {
@@ -101,20 +103,28 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber }: MakerDAOEventD
         beforeProv: inkBeforeProv(ctx.collateralSymbol, coords),
       }),
     },
-    // `artAfter` is normalized debt (Vat art); the debt glyph mirrors the
-    // header/summary unit (DAI, or USDS on LockStake urns). Rate-scaled debt
-    // is a layer on the summary.
+    // The debt owed: art × the rate at the block (DAI, or USDS on LockStake
+    // urns). Before = after − dart × rate; the gap from the previous row's
+    // after is the stability fee accrued between them.
     {
       label: "Debt",
-      value: fmtAfter(ctx.artAfter),
-      symbol: ilkDebtSymbol(ctx.ilk),
-      prov: artAfterProv(coords),
+      value: fmtAfter(ctx.debtAfter),
+      symbol: debtSym,
+      prov: debtAfterProv(debtSym, coords),
       transition: reconstructTransition({
-        after: ctx.artAfter,
-        change: ctx.dart,
-        changeProv: dartProv(coords),
-        beforeProv: artBeforeProv(coords),
+        after: ctx.debtAfter,
+        change: ctx.debtChange,
+        changeProv: debtChangeProv(debtSym, coords),
+        beforeProv: debtBeforeProv(debtSym, coords),
       }),
+      ...(ctx.interestSincePrevious
+        ? {
+            interestSincePrevious: {
+              value: ctx.interestSincePrevious,
+              prov: interestSincePreviousProv(debtSym, coords),
+            },
+          }
+        : {}),
     },
   ];
 
