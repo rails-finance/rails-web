@@ -57,14 +57,29 @@ export function transmuterEmittedProv(
   };
 }
 
+/** The date a maturing position's maturity block is estimated to land: the
+ *  blocks still to go past the block the line is indexed to, at the chain's
+ *  block time, counted from when the page was read. */
+export interface TransmuterMaturityEstimate {
+  referenceBlock: number;
+  blocksRemaining: number;
+  secondsPerBlock: number;
+  /** Unix milliseconds the count starts from: the time the page was read. */
+  fromMs: number;
+  /** Unix milliseconds of the estimated maturity. */
+  atMs: number;
+}
+
 /** The maturity block: the start block plus the `timeToTransmute` in force at
- *  that block, settled when the stake was replayed. */
+ *  that block, settled when the stake was replayed. With an estimate, the
+ *  receipt also carries the arithmetic behind the date the figure headlines. */
 export function transmuterMaturityProv(
   startBlock: number,
   maturationBlock: number,
   coords: AlchemixCoords,
+  estimate?: TransmuterMaturityEstimate | null,
 ): Provenance {
-  return {
+  const block: Provenance = {
     kind: "chain-derived",
     pclass: "indexed",
     summary:
@@ -81,6 +96,37 @@ export function transmuterMaturityProv(
         note: "the last TransmutationTimeUpdated at or before the start block",
       },
     ]),
+  };
+  if (!estimate) return block;
+  const e = estimate;
+  const seconds = e.blocksRemaining * e.secondsPerBlock;
+  return {
+    ...block,
+    summary:
+      "Estimated maturity date — the maturity block (the start block plus the timeToTransmute in force when the stake was made) less the block the line is indexed to, at the chain's block time, counted from when this page was read",
+    via: `${block.via} · (maturity block − indexed block) × seconds per block`,
+    formula: `${block.formula}; (${maturationBlock} − ${e.referenceBlock}) × ${e.secondsPerBlock} s = ${seconds} s after ${new Date(e.fromMs).toISOString()} ≈ ${new Date(e.atMs).toISOString().slice(0, 10)}`,
+    inputs: [
+      ...(block.inputs ?? []),
+      {
+        label: "indexed block",
+        value: String(e.referenceBlock),
+        kind: "offchain",
+        note: "how far the indexer has read the line",
+      },
+      {
+        label: "blocks to go",
+        value: String(e.blocksRemaining),
+        kind: "offchain",
+        note: "maturity block − indexed block",
+      },
+      {
+        label: "seconds per block",
+        value: String(e.secondsPerBlock),
+        kind: "offchain",
+        note: "the chain's slot time; a missed slot moves the date later",
+      },
+    ],
   };
 }
 

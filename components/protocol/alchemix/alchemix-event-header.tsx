@@ -434,8 +434,21 @@ export function AlchemixEventHeader({
   eventNumber,
   coordsFor,
 }: AlchemixEventHeaderProps) {
-  const combined = legs.length > 1;
   const before = useReadingBefore(legs[0].context.data.stateAtBlockFromReading?.blockNumber);
+  const spec = alchemixHeaderSpec(legs, siblings, mytSymbol, coordsFor, before);
+  return <ChainTruthRow spec={spec} timestamp={timestamp} eventNumber={eventNumber} />;
+}
+
+/** The row the header draws, for a card that echoes a header figure onto its
+ *  spine flank and must name the same receipt with the same value. */
+export function alchemixHeaderSpec(
+  legs: AlchemistEvent[],
+  siblings: AlchemistEvent[],
+  mytSymbol: string,
+  coordsFor: (leg: AlchemistEvent) => AlchemixCoords,
+  before: AlchemixReading | null,
+): ChainTruthRowSpec {
+  const combined = legs.length > 1;
   const specs = legs.map((leg) => legSpec(leg, mytSymbol, coordsFor(leg), siblings, combined, before));
   const tokenId = legTokenId(legs);
   let spec = combined
@@ -460,6 +473,5 @@ export function AlchemixEventHeader({
       deltas: axisLegs.flatMap((l) => legSpec(l, mytSymbol, coordsFor(l), siblings, false, before).deltas),
     };
   }
-
-  return <ChainTruthRow spec={spec} timestamp={timestamp} eventNumber={eventNumber} />;
+  return spec;
 }

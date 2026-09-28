@@ -23,9 +23,9 @@ export default function IntroducingRailsFinance() {
         : a redemption that cleared 27,802 BOLD of debt.
       </p>
       <p>
-        On Rails, you see this transaction with an orange "REDEMPTION" badge. The position's debt dropped from 96,131
-        BOLD to 68,329 BOLD. Collateral went from 61.28 wstETH to 55.7 wstETH. The collateral ratio actually improved
-        from 301% to 385%.
+        On Rails, you see this transaction with a pink "REDEMPTION" badge. The position's debt dropped from 96,131 BOLD
+        to 68,329 BOLD. Collateral went from 61.28 wstETH to 55.7 wstETH. The collateral ratio actually improved from
+        301% to 385%.
       </p>
 
       <figure>
