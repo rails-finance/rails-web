@@ -2430,6 +2430,9 @@ export interface MapleContextRaw {
   escrowAfter?: string;
   principalBefore?: string;
   principalAfter?: string;
+  /** transfer_in / transfer_out: the shares valued at the pool rate in the
+   *  transfer's block, funds-asset base units. */
+  transferAssets?: string;
 }
 
 export interface MapleContext {
@@ -2469,6 +2472,14 @@ export interface MapleContext {
   caller?: string;
   /** transfer_in/out only — the other wallet. */
   counterparty?: string;
+  /** transfer_in/out only — the shares valued at the pool's rate in the
+   *  transfer's block (human-readable funds asset, unsigned). Absent where the
+   *  index holds no rate for that block. */
+  transferValue?: string;
+  /** Where that rate came from: "chain" (an archive read of the pool's
+   *  totalAssets and totalSupply at the block) or the same-block log it was
+   *  taken from ("deposit" | "withdraw" | "request_processed"). */
+  transferRateSource?: string;
   /** Exact uint256 twins of the scaled fields above. */
   raw?: MapleContextRaw;
   /** True for the wallet's first event. */

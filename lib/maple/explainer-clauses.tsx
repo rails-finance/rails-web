@@ -43,6 +43,7 @@ import {
   requestSharesProv,
   requestCancelSharesProv,
   transferAmountProv,
+  transferValueProv,
   eventRateProv,
   sharesAfterProv,
   escrowAfterProv,
@@ -228,6 +229,20 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
       {fmtAbs(ctx.sharesDelta)} {poolSym}
     </Fig>
   );
+  // What a transfer's shares were worth at the pool rate in its block (rails-
+  // server mig 339). Absent where the index holds no rate for the block.
+  const transferValueClause = (): ClauseInput =>
+    ctx.transferValue != null
+      ? clause(
+          <>
+            The shares were worth{" "}
+            <Fig info={transferValueProv(asset, poolSym, ctx.transferRateSource, coords, ctx.raw?.transferAssets)}>
+              {fmtAbs(ctx.transferValue)} {asset}
+            </Fig>{" "}
+            at the pool rate in this block.
+          </>,
+        )
+      : null;
   // The shares a fill redeemed — echoes the detail's escrow transition (a queue
   // fill's own shares field is 0, so the escrow leg carries this figure). The
   // detail's DeltaToggle registers it signed-negative and WITHOUT a symbol.
@@ -411,6 +426,7 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
       const bridge = Boolean(getCcipEscrow(ctx.counterparty));
       return bridge
         ? {
+            changed: [transferValueClause()],
             happened: [
               clause(
                 <>
@@ -430,6 +446,7 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
           }
         : {
             happened: [clause(<>Received {transferShareFig("in")} from another wallet.</>)],
+            changed: [transferValueClause()],
             meansNow: [
               clause(
                 <>
@@ -445,6 +462,7 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
       const bridge = Boolean(getCcipEscrow(ctx.counterparty));
       return bridge
         ? {
+            changed: [transferValueClause()],
             happened: [
               clause(
                 <>
@@ -464,6 +482,7 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
           }
         : {
             happened: [clause(<>Sent {transferShareFig("out")} to another wallet.</>)],
+            changed: [transferValueClause()],
             meansNow: [
               clause(
                 <>

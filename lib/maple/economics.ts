@@ -18,6 +18,15 @@
 // lifetime-inflow bar. The interest split renders only when a single pool
 // contributes and its event principal attributes cleanly (the Spark
 // legInterest gates) — a cross-pool token sum would mix USDC and USDT.
+//
+// Pool shares also move wallet to wallet with no pool event. Each such transfer
+// is valued at the pool's rate in its block (rails-server mig 339: an archive
+// read of totalAssets ÷ totalSupply, or the same-block Deposit / Withdraw log
+// that priced the pool at that moment), so shares received count into the
+// principal and shares sent come out of it at what they were worth then.
+// Checked on five positions on 2026-09-28: deposits + received − withdrawn −
+// sent + Σ (shares held × the rate's rise) lands on convertToAssets at head
+// within 0.0001 of the funds asset.
 
 import type { MaplePositionView } from "@/components/protocol/maple/maple-position-card";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -27,6 +36,7 @@ import {
   positionPrincipalProv,
   interestEarnedProv,
   mapleLifetimeFlowProv,
+  mapleTransferFlowProv,
 } from "@/lib/maple/event-provenance";
 import { maplePoolOf } from "@/lib/maple/asset-catalog";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
@@ -42,27 +52,52 @@ export interface PoolFlows {
   assetSymbol: string;
   deposited: number;
   withdrawn: number;
-  /** Pool shares entered or left the wallet as plain transfers (transfer_in /
-   *  transfer_out). Those shares carry no asset flow, so deposited − withdrawn
-   *  no longer brackets the claim: a transferred-in share redeemed later reads
-   *  as a withdrawal with no deposit behind it, and the spread would pass for
-   *  interest. The interest split and the lifetime segments stand down. */
+  /** Shares received / sent by plain transfer, valued at the pool's rate in
+   *  each transfer's block. */
+  transferredIn: number;
+  transferredOut: number;
+  /** A share transfer in this pool has no value: the index holds no rate for
+   *  its block (or the answer predates the rate). Without it the principal does
+   *  not bracket the claim — a received share redeemed later reads as a
+   *  withdrawal with nothing put in behind it, and the spread would pass for
+   *  interest — so the interest split and the lifetime segments stand down. */
   sharesMoved: boolean;
 }
 
 const SHARE_TRANSFERS: ReadonlySet<string> = new Set(["transfer_in", "transfer_out"]);
 
+const emptyFlows = (pool: string, assetSymbol: string): PoolFlows => ({
+  pool,
+  assetSymbol,
+  deposited: 0,
+  withdrawn: 0,
+  transferredIn: 0,
+  transferredOut: 0,
+  sharesMoved: false,
+});
+
+/** What went in and what came out, transfers at their block's rate. */
+const grossIn = (f: PoolFlows): number => f.deposited + f.transferredIn;
+const netPrincipal = (f: PoolFlows): number => f.deposited + f.transferredIn - f.withdrawn - f.transferredOut;
+
 function replayMapleLifetime(events: BaseActivityEvent[]): Map<string, PoolFlows> {
   const flows = new Map<string, PoolFlows>();
   const get = (pool: string, assetSymbol: string): PoolFlows => {
-    const cur = flows.get(pool) ?? { pool, assetSymbol, deposited: 0, withdrawn: 0, sharesMoved: false };
+    const cur = flows.get(pool) ?? emptyFlows(pool, assetSymbol);
     flows.set(pool, cur);
     return cur;
   };
   for (const ev of events) {
     if (!isMapleEvent(ev)) continue;
     const ctx = ev.context.data;
-    if (SHARE_TRANSFERS.has(ctx.eventType)) get(ctx.pool, ctx.assetSymbol).sharesMoved = true;
+    if (SHARE_TRANSFERS.has(ctx.eventType)) {
+      const f = get(ctx.pool, ctx.assetSymbol);
+      const value = ctx.transferValue == null ? NaN : Number(ctx.transferValue);
+      if (!Number.isFinite(value)) f.sharesMoved = true;
+      else if (ctx.eventType === "transfer_in") f.transferredIn += value;
+      else f.transferredOut += value;
+      continue;
+    }
     const mag = Math.abs(Number(ctx.assetsDelta ?? "0"));
     if (!Number.isFinite(mag) || mag === 0) continue;
     const f = get(ctx.pool, ctx.assetSymbol);
@@ -114,7 +149,7 @@ export function mapleLifetimeWithOpening(
   if (!opening && (folders?.length ?? 0) === 0) return undefined;
   const merged = new Map<string, PoolFlows>();
   const get = (pool: string, assetSymbol: string): PoolFlows => {
-    const cur = merged.get(pool) ?? { pool, assetSymbol, deposited: 0, withdrawn: 0, sharesMoved: false };
+    const cur = merged.get(pool) ?? emptyFlows(pool, assetSymbol);
     merged.set(pool, cur);
     return cur;
   };
@@ -124,11 +159,18 @@ export function mapleLifetimeWithOpening(
 
   // The leg names are the field names above, chosen on the rails-server side to
   // be exactly that so the merge needs no translation table to drift out of
-  // date. Only deposit / withdraw / request_fill carry a flow at all; the
-  // request, decrease, cancel and share-transfer events move pool shares, not
-  // assets, and the tower states assets.
-  const LEGS = ["deposited", "withdrawn"] as const;
-  for (const bucket of mergeFlowBuckets(opening?.flows, folderFlows(folders))) {
+  // date. Deposit / withdraw / request_fill carry their assets; a share transfer
+  // carries its shares at the pool's rate in its block, and one with no rate
+  // counts into `unvaluedTransfers` (a count, read as a flag). The request,
+  // decrease and cancel events move shares within the position.
+  const LEGS = ["deposited", "withdrawn", "transferredIn", "transferredOut"] as const;
+  const buckets = mergeFlowBuckets(opening?.flows, folderFlows(folders));
+  // An answer from before the transfer legs existed counts transfers below the
+  // cut in `byAction` and values none of them.
+  const transferLegsServed = buckets.some((b) =>
+    ["transferredIn", "transferredOut", "unvaluedTransfers"].some((leg) => b.legs[leg] !== undefined),
+  );
+  for (const bucket of buckets) {
     const scaled: Partial<Record<(typeof LEGS)[number], number>> = {};
     let scalable = true;
     for (const leg of LEGS) {
@@ -147,6 +189,8 @@ export function mapleLifetimeWithOpening(
     }
     const f = get(bucket.key, maplePoolOf(bucket.key).assetSymbol);
     for (const leg of LEGS) f[leg] += scaled[leg] ?? 0;
+    const unvalued = bucket.legs.unvaluedTransfers;
+    if (unvalued !== undefined && unvalued !== "0") f.sharesMoved = true;
   }
 
   for (const [pool, windowFlows] of replayMapleLifetime(events)) {
@@ -156,10 +200,11 @@ export function mapleLifetimeWithOpening(
     f.sharesMoved ||= windowFlows.sharesMoved;
   }
 
-  // The opening balance counts actions for the whole wallet, not per pool, so a
-  // share transfer below the cut marks every pool. Folders never hold one: the
-  // served kinds are queue fills and owner deposit/withdraw runs.
-  if (opening?.byAction.some((b) => SHARE_TRANSFERS.has(b.key) && b.count > 0)) {
+  // Folders never hold a transfer: the served kinds are queue fills and owner
+  // deposit/withdraw runs. An opening balance that counts transfers but serves
+  // no transfer legs values none of them, and its action counts are for the
+  // whole wallet, so every pool stands down.
+  if (!transferLegsServed && opening?.byAction.some((b) => SHARE_TRANSFERS.has(b.key) && b.count > 0)) {
     for (const f of merged.values()) f.sharesMoved = true;
   }
 
@@ -200,8 +245,7 @@ export function computeMapleCardCaptions(
     const cur = live[0];
     const f = lifetime.get(cur.pool);
     if (f && !f.sharesMoved) {
-      const net = f.deposited - f.withdrawn;
-      const amt = legInterest(cur.currentValue, net, f.deposited);
+      const amt = legInterest(cur.currentValue, netPrincipal(f), grossIn(f));
       if (amt > 0) interestEarned = { amount: amt, symbol: cur.assetSymbol };
     }
   }
@@ -235,31 +279,53 @@ export function computeMapleEconomics(
   // ── Lifetime layer (needs the event stream) ────────────────────────────────
   const lifetime = precomputedLifetime ?? (events && events.length > 0 ? replayMapleLifetime(events) : null);
   // A pool's flows render only when they're PLAUSIBLE against its claim: a
-  // claim may exceed net deposits by earned interest alone (the legInterest
-  // bounds). Pool shares also move as plain transfers — a wallet that received
-  // or sent shares outside deposit/redeem breaks that conservation, and its
-  // "all time" story would not sum — so it stays off the tower. The residue
-  // test alone misses a transfer in that was later redeemed: the claim returns
-  // to zero and the redemption sits inside the interest ceiling, so
-  // `sharesMoved` gates it as well.
+  // claim may exceed net principal by earned interest alone (the legInterest
+  // bounds). Shares received and sent count at the pool's rate in their block;
+  // a pool with a transfer the index could not value stays off the tower, since
+  // its "all time" story would not sum (a transfer in that was later redeemed
+  // passes the residue test with the claim back at zero, so `sharesMoved` gates
+  // it as well).
   const claimByPool = new Map(view.pools.map((p) => [p.pool, p.currentValue ?? p.depositedPrincipal]));
   const poolOk = (f: PoolFlows): boolean => {
     if (f.sharesMoved) return false;
-    const residue = (claimByPool.get(f.pool) ?? 0) - (f.deposited - f.withdrawn);
-    const eps = f.deposited * 1e-9 + 1e-9;
-    return residue >= -eps && residue <= f.deposited + eps;
+    const residue = (claimByPool.get(f.pool) ?? 0) - netPrincipal(f);
+    const eps = grossIn(f) * 1e-9 + 1e-9;
+    return residue >= -eps && residue <= grossIn(f) + eps;
   };
-  const exited: TowerLine[] = lifetime
-    ? [...lifetime.values()]
-        .filter((f) => f.withdrawn > DUST && poolOk(f))
-        .map((f) => ({
-          key: `withdrawn-${f.pool}`,
-          symbol: f.assetSymbol,
-          amount: f.withdrawn,
-          usd: null,
-          prov: mapleLifetimeFlowProv("withdrawn", f.assetSymbol),
-        }))
-    : [];
+  const okFlows = lifetime ? [...lifetime.values()].filter(poolOk) : [];
+  const exited: TowerLine[] = [
+    ...okFlows
+      .filter((f) => f.withdrawn > DUST)
+      .map((f) => ({
+        key: `withdrawn-${f.pool}`,
+        symbol: f.assetSymbol,
+        amount: f.withdrawn,
+        usd: null,
+        prov: mapleLifetimeFlowProv("withdrawn", f.assetSymbol),
+      })),
+    ...okFlows
+      .filter((f) => f.transferredOut > DUST)
+      .map((f) => ({
+        key: `sent-${f.pool}`,
+        symbol: f.assetSymbol,
+        amount: f.transferredOut,
+        usd: null,
+        flowLabel: "Transferred out",
+        prov: mapleTransferFlowProv("out", f.assetSymbol),
+      })),
+  ];
+  // Shares received by transfer: inflow that is not a deposit, drawn as the
+  // tower's "+ Received by transfer" row beside the all-time deposits.
+  const received: TowerLine[] = okFlows
+    .filter((f) => f.transferredIn > DUST)
+    .map((f) => ({
+      key: `received-${f.pool}`,
+      symbol: f.assetSymbol,
+      amount: f.transferredIn,
+      usd: null,
+      flowLabel: "Received by transfer",
+      prov: mapleTransferFlowProv("in", f.assetSymbol),
+    }));
 
   // Interest segment — only on a SINGLE-pool claim (one asset symbol; a
   // cross-pool token sum would mix USDC and USDT). The claim line KEEPS the
@@ -274,8 +340,7 @@ export function computeMapleEconomics(
     const cur = claimLines[0];
     const f = lifetime.get(cur.key);
     if (f && !f.sharesMoved) {
-      const net = f.deposited - f.withdrawn;
-      const amt = legInterest(cur.amount, net, f.deposited);
+      const amt = legInterest(cur.amount, netPrincipal(f), grossIn(f));
       if (amt > 0) {
         interest = {
           key: "claim-interest",
@@ -289,10 +354,10 @@ export function computeMapleEconomics(
   }
 
   // Lifetime inflow (the faded side bar) — a token amount is only meaningful
-  // when one pool flowed, else suppressed.
+  // when one pool flowed, else suppressed. Shares received ride `received`,
+  // which the tower adds to the bar.
   const inflow = ((): number => {
-    if (!lifetime) return 0;
-    const rows = [...lifetime.values()].filter((f) => f.deposited > DUST && poolOk(f));
+    const rows = okFlows.filter((f) => f.deposited > DUST);
     return rows.length === 1 ? rows[0].deposited : 0;
   })();
 
@@ -304,6 +369,7 @@ export function computeMapleEconomics(
       current: claimLines,
       interest,
       exited,
+      received,
       liquidated: [],
       lifetimeInflow: inflow,
     },
@@ -320,9 +386,9 @@ export function computeMapleEconomics(
     collateralListLabel: "Pool claim",
     debtAxisAbsent: true,
     interestNote:
-      "The claim column shows what the position would redeem for now: its pool shares valued at the pool's exit rate. The amount above what was deposited is interest earned. Amounts stay in the pool's own asset, USDC or USDT — pinning a stablecoin to a dollar would hide exactly the depeg the token amounts exist to reveal. One caveat rides the value: it rests on a loan book whose collateral is held off-chain, so it shows what Maple's books record rather than something the chain itself can prove." +
+      "The claim column shows what the position would redeem for now: its pool shares valued at the pool's exit rate. The amount above what was put in is interest earned; shares received or sent by transfer count at the pool rate in their block. Amounts stay in the pool's own asset, USDC or USDT — pinning a stablecoin to a dollar would hide exactly the depeg the token amounts exist to reveal. One caveat rides the value: it rests on a loan book whose collateral is held off-chain, so it shows what Maple's books record rather than something the chain itself can prove." +
       (interest != null
         ? ""
-        : " The split between deposited principal and interest earned appears only when a single pool's deposits attribute cleanly."),
+        : " The split between principal and interest earned appears only when a single pool's flows attribute cleanly, with every share transfer valued."),
   };
 }

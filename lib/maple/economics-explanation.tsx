@@ -20,6 +20,7 @@ function claimSymbol(data: ChainTruthTowerData): string | null {
     [
       ...data.collateral.current,
       ...data.collateral.exited,
+      ...(data.collateral.received ?? []),
       ...(data.collateral.interest ? [data.collateral.interest] : []),
     ]
       .filter((l) => l.amount > 0)
@@ -39,7 +40,10 @@ function Fig({ children }: { children: ReactNode }) {
 export function mapleEconomicsExplanation(data: ChainTruthTowerData): ReactNode {
   const sym = claimSymbol(data);
   const deposited = data.collateral.lifetimeInflow;
-  const withdrawn = sumAmount(data.collateral.exited);
+  // lib/maple/economics.ts keys the exits `withdrawn-<pool>` and `sent-<pool>`.
+  const withdrawn = sumAmount(data.collateral.exited.filter((l) => !l.key.startsWith("sent-")));
+  const sent = sumAmount(data.collateral.exited.filter((l) => l.key.startsWith("sent-")));
+  const received = sumAmount(data.collateral.received ?? []);
   const interest = data.collateral.interest && data.collateral.interest.amount > 0 ? data.collateral.interest : null;
   const currentClaim = sumAmount(data.collateral.current);
 
@@ -55,6 +59,25 @@ export function mapleEconomicsExplanation(data: ChainTruthTowerData): ReactNode 
           </>
         )}
         .
+      </span>,
+    );
+  }
+  if (received > 0 || sent > 0) {
+    items.push(
+      <span key="transfers">
+        {received > 0 && (
+          <>
+            Received <Fig>{fmt(received, sym)}</Fig> in pool shares from other wallets
+          </>
+        )}
+        {received > 0 && sent > 0 ? " and sent " : sent > 0 ? "Sent " : ""}
+        {sent > 0 && (
+          <>
+            <Fig>{fmt(sent, sym)}</Fig>
+            {received > 0 ? "" : " in pool shares"} to other wallets
+          </>
+        )}
+        , each transfer valued at the pool rate in its block.
       </span>,
     );
   }
@@ -89,7 +112,7 @@ export function mapleEconomicsExplanation(data: ChainTruthTowerData): ReactNode 
     </span>,
   );
 
-  if (deposited === 0 && currentClaim === 0) return null;
+  if (deposited === 0 && received === 0 && currentClaim === 0) return null;
 
   return (
     <div className="space-y-2 text-sm text-rb-500">

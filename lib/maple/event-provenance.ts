@@ -228,6 +228,40 @@ export const transferAmountProv = (
   inputs: eventInputs(coords),
 });
 
+/** A transfer's shares valued at the pool's rate in its block. The rate is the
+ *  same-block log that priced the pool (assets ÷ shares of a Deposit, Withdraw
+ *  or RequestProcessed in that block) or, where the block has none, an archive
+ *  read of totalAssets ÷ totalSupply — what convertToAssets divides by. */
+export const transferValueProv = (
+  assetSym: string,
+  poolSym: string,
+  source: string | undefined,
+  coords: MapleCoords,
+  raw?: string | null,
+): Provenance => {
+  const fromChain = source === "chain";
+  const log = source === "withdraw" ? "Withdraw" : source === "request_processed" ? "RequestProcessed" : "Deposit";
+  return {
+    kind: "chain-derived",
+    pclass: fromChain ? "state" : "emitted",
+    verify: fromChain ? stateVerify("totalAssets() and totalSupply()", coords.blockNumber) : txVerify(coords),
+    summary: `What the ${poolSym} moved were worth in ${assetSym}${atBlock(coords)}: the shares times the pool's rate in that block. ${
+      fromChain
+        ? `The rate is the pool's totalAssets() ÷ totalSupply() read at the block, the division convertToAssets makes.`
+        : `The rate is the ${log} another lender made in the same block — its own assets ÷ shares, the pool pricing a share at that moment.`
+    } A transfer moves the claim with no pool event, so this is the value the index puts on it; the principal and interest split counts it as put in (received) or taken out (sent).`,
+    contract: poolContract(coords),
+    via: `shares × ${fromChain ? "totalAssets ÷ totalSupply (archive read)" : `assets ÷ shares (same-block ${log} log)`}${raw ? ` = ${raw}` : ""}`,
+    formula: fromChain ? "shares × totalAssets ÷ totalSupply" : "shares × assets ÷ shares",
+    inputs: eventInputs(coords, [
+      { label: "shares", kind: "chain", pclass: "emitted", note: "the Transfer log's value" },
+      fromChain
+        ? { label: "rate", kind: "chain", pclass: "state", note: "totalAssets() ÷ totalSupply() at the block" }
+        : { label: "rate", kind: "chain", pclass: "emitted", note: `a same-block ${log} log's assets ÷ shares` },
+    ]),
+  };
+};
+
 /** The share leg that rides beside the asset leg on a deposit / withdraw —
  *  the pool tokens minted or burned against the assets moved. Extracted for
  *  the same reason as `flankedLegProv`: the header registers it and the card's
@@ -489,14 +523,24 @@ export const positionPrincipalProv = (sym: string): Provenance => ({
 export const interestEarnedProv = (sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Interest earned on the ${sym} position — what the position redeems for now ((shares + escrowed) × the exit rate at head) minus the net deposited principal replayed from the wallet's own events. Exact arithmetic over the position's own logs and the pool's own rate — "worth now minus put in", not an annualized-rate estimate. The exit rate leg carries the loan-book caveat: the accrued side is Maple's on-chain bookkeeping of off-chain-collateralized loans.`,
+  summary: `Interest earned on the ${sym} position — what the position redeems for now ((shares + escrowed) × the exit rate at head) minus the net principal replayed from the wallet's own events: deposits and shares received, less withdrawals and shares sent, each transfer valued at the pool's rate in its block. Arithmetic over the position's own logs and the pool's own rate: "worth now minus put in". The exit rate leg carries the loan-book caveat: the accrued side is Maple's on-chain bookkeeping of off-chain-collateralized loans.`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
   via: "(shares + escrowed) × exit rate − Σ net deposited",
   formula: "current − net principal",
   inputs: [
     { label: "current", kind: "chain-derived", pclass: "state", note: "(shares + escrowed) × convertToExitAssets" },
-    { label: "net principal", kind: "chain-derived", pclass: "indexed", note: "Σ signed event assets" },
+    { label: "net principal", kind: "chain-derived", pclass: "indexed", note: "Σ deposits + received − withdrawn − sent" },
   ],
+});
+
+/** Lifetime shares received / sent by transfer, valued at the pool rate. */
+export const mapleTransferFlowProv = (direction: "in" | "out", sym: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `Lifetime ${sym} value of the pool shares this wallet ${direction === "in" ? "received from" : "sent to"} other wallets: each Transfer's shares times the pool's rate in its block (a same-block Deposit or Withdraw log's assets ÷ shares, or an archive read of totalAssets ÷ totalSupply where the block has none), added up across the captured history.`,
+  contract: { name: "Maple pool (ERC-4626)", address: "" },
+  via: `${MAPLE_VIA} · Σ Transfer shares × pool rate at the block · deploy → head`,
+  formula: "Σ shares × rate",
 });
 
 /** Closed-card peak: the highest share balance the wallet ever held. */
@@ -521,7 +565,7 @@ export const peakDepositedProv = (sym: string): Provenance => ({
 export const mapleLifetimeFlowProv = (flow: "deposited" | "withdrawn", sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Lifetime ${flow} (${sym}) — the sum of every ${sym} amount this wallet's own events ${flow === "deposited" ? "deposited into" : "took out of"} the pool across its whole captured history (complete from the pool's deploy block). Pool events only — wallet↔wallet share transfers move the claim without a Deposit/Withdraw log and are not in this sum (they live on the share lane).`,
+  summary: `Lifetime ${flow} (${sym}) — the sum of every ${sym} amount this wallet's own events ${flow === "deposited" ? "deposited into" : "took out of"} the pool across its whole captured history (complete from the pool's deploy block). Pool events only: shares moved wallet to wallet have no Deposit/Withdraw log and are summed on their own rows, valued at the pool rate in their block.`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
   via: `${MAPLE_VIA} · Σ assets across the wallet's own logs · deploy → head`,
 });

@@ -59,6 +59,12 @@ export interface MvRow {
   escrow_after: string;
   principal_before: string;
   principal_after: string;
+  /** transfer_in / transfer_out: the shares valued at the pool's rate in the
+   *  transfer's block, funds-asset base units (rails-server mig 339). Absent
+   *  where the index holds no rate for that block, and on a response from
+   *  before it. */
+  transfer_assets?: string;
+  transfer_rate_source?: string;
   /** On a grouped or span answer: whether this is the wallet's first row. The
    *  route states it, since a grouped answer's first event row need not be. */
   is_open?: boolean;
@@ -218,6 +224,12 @@ export function buildMapleTimeline(rows: MvRow[], walletRaw: string): MapleTimel
         const signed = kind === "transfer_in" ? shares : -shares;
         ctx.sharesDelta = fmtUnits(signed, MAPLE_SHARE_DECIMALS);
         ctx.counterparty = caller;
+        const valued = bigintOf(r.transfer_assets ?? null);
+        if (r.transfer_assets != null && valued >= ZERO) {
+          ctx.transferValue = fmtUnits(valued, p.decimals);
+          ctx.transferRateSource = r.transfer_rate_source;
+          ctx.raw!.transferAssets = rawVal(r.transfer_assets);
+        }
         flows =
           shares !== ZERO
             ? [flowFor(p.pool, p.symbol, MAPLE_SHARE_DECIMALS, shares, kind === "transfer_in" ? "in" : "out")]
