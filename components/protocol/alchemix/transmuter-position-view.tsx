@@ -42,6 +42,7 @@ import { logIndexOf, splitRidingTransfers, withRiders } from "@/lib/alchemix/rid
 import {
   claimColumn,
   maturityColumn,
+  transmuterMaturityEstimate,
   stakedColumn,
   transmuterState,
 } from "@/components/protocol/alchemix/transmuter-position-card";
@@ -67,6 +68,7 @@ export function TransmuterPositionView({
   const mytSymbol = p.claim?.claimed?.symbol ?? p.mytSymbol ?? "vault shares";
   const state = transmuterState(p);
   const holder = p.owner ?? p.claim?.claimer ?? null;
+  const maturity = transmuterMaturityEstimate(p);
 
   const { setWallets } = useWalletContext();
   useEffect(() => {
@@ -168,7 +170,11 @@ export function TransmuterPositionView({
             }
             columns={[
               stakedColumn(p, transmuterEmittedProv("amount_staked", p.staked.symbol, p.staked.raw, stakeCoords)),
-              maturityColumn(p, transmuterMaturityProv(p.maturity.startBlock, p.maturity.maturationBlock, stakeCoords)),
+              maturityColumn(
+                p,
+                transmuterMaturityProv(p.maturity.startBlock, p.maturity.maturationBlock, stakeCoords, maturity),
+                maturity,
+              ),
               claimColumn(
                 p,
                 claimCoords && p.claim

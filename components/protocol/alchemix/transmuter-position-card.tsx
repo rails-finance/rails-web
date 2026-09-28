@@ -11,7 +11,10 @@
 // force when the position was created (never the parameter read at head, which
 // has moved six times per mainnet line). Whether it has matured is said against
 // the block the line is indexed to. The days are an estimate at the chain's
-// block time and say so.
+// block time and say so. A maturing position headlines the date that estimate
+// lands on, marked "≈", with the block under it and the arithmetic on hover and
+// in the receipt. A matured or claimed one keeps the block: the data carries no
+// timestamp for the block it matured at.
 //
 // THE CLAIM IS TWO AMOUNTS IN TWO UNITS: the converted part, paid out in vault
 // shares, and the rest of the stake handed back as the synthetic. Neither is
@@ -21,6 +24,7 @@
 // OpenPositionStats, WalletPill, StatValue.
 
 import type { ReactNode } from "react";
+import { Clock } from "lucide-react";
 import { OpenPositionStats, type OpenPositionStatsColumn } from "@/components/shared/open-position-stats";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -28,6 +32,8 @@ import { StatValue, StatFootnote } from "@/components/shared/stat-value";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { formatUnitsExact } from "@/lib/utils/format";
+import { formatDate } from "@/lib/date";
+import type { TransmuterMaturityEstimate } from "@/lib/alchemix/transmuter-provenance";
 import { alchemixPositionName } from "@/lib/alchemix/naming";
 import type { AlchemixAmount, AlchemixTransmuterPositionSummary } from "@/types/api/alchemix";
 import { transmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
@@ -119,26 +125,64 @@ export function stakedColumn(p: AlchemixTransmuterPositionSummary, prov?: Proven
   };
 }
 
-export function maturityColumn(p: AlchemixTransmuterPositionSummary, prov?: Provenance): OpenPositionStatsColumn {
+/** The date a maturing position is estimated to mature, from the blocks still
+ *  to go at the chain's block time, counted from now. Null once matured or
+ *  claimed, or on a chain with no block time here. */
+export function transmuterMaturityEstimate(p: AlchemixTransmuterPositionSummary): TransmuterMaturityEstimate | null {
   const m = p.maturity;
-  const figure = <span className="tabular-nums">block {block(m.maturationBlock)}</span>;
+  const spb = SECONDS_PER_BLOCK[p.chainId];
+  if (p.status === "claimed" || m.matured !== false || m.referenceBlock == null || m.blocksRemaining == null || !spb) {
+    return null;
+  }
+  const fromMs = Date.now();
+  return {
+    referenceBlock: m.referenceBlock,
+    blocksRemaining: m.blocksRemaining,
+    secondsPerBlock: spb,
+    fromMs,
+    atMs: fromMs + m.blocksRemaining * spb * 1000,
+  };
+}
+
+export function maturityColumn(
+  p: AlchemixTransmuterPositionSummary,
+  prov?: Provenance,
+  estimate: TransmuterMaturityEstimate | null = transmuterMaturityEstimate(p),
+): OpenPositionStatsColumn {
+  const m = p.maturity;
+  let figure: ReactNode = <span className="tabular-nums">block {block(m.maturationBlock)}</span>;
+  let title: string | undefined;
   let note: ReactNode = null;
-  if (p.status !== "claimed" && m.referenceBlock != null) {
-    if (m.matured) {
-      note = <>matured; the line is indexed to block {block(m.referenceBlock)}</>;
-    } else if (m.blocksRemaining != null) {
-      const about = aboutDuration(m.blocksRemaining, p.chainId);
-      note = (
-        <>
-          {block(m.blocksRemaining)} blocks to go from block {block(m.referenceBlock)}
-          {about ? `, ${about}` : ""}
-        </>
-      );
-    }
+  if (estimate) {
+    const about = aboutDuration(estimate.blocksRemaining, p.chainId);
+    figure = (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums">
+        <Clock className="size-4 shrink-0 text-rb-500" aria-hidden />≈ {formatDate(new Date(estimate.atMs))}
+      </span>
+    );
+    title =
+      `Estimated: block ${block(m.maturationBlock)} is ${block(estimate.blocksRemaining)} blocks past block ` +
+      `${block(estimate.referenceBlock)}, the block the line is indexed to. At ${estimate.secondsPerBlock} seconds a block ` +
+      `that is ${about ?? `${block(estimate.blocksRemaining * estimate.secondsPerBlock)} seconds`} from now.`;
+    note = (
+      <>
+        block {block(m.maturationBlock)}
+        {about ? ` · ${about}` : ""}
+      </>
+    );
+  } else if (p.status !== "claimed" && m.referenceBlock != null && m.matured) {
+    note = <>matured; the line is indexed to block {block(m.referenceBlock)}</>;
   }
   return {
     label: "Matures at",
-    value: <StatValue>{prov ? <Prov info={prov}>{figure}</Prov> : figure}</StatValue>,
+    // The date is wider than a block-count figure; a size down on a phone
+    // keeps it on one line in its half-width column.
+    value: (
+      <StatValue title={title} className={estimate ? "max-sm:text-lg" : undefined}>
+        {" "}
+        {prov ? <Prov info={prov}>{figure}</Prov> : figure}
+      </StatValue>
+    ),
     footnote: note ? (
       <StatFootnote>
         <span className="tabular-nums">{note}</span>
