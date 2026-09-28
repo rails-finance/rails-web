@@ -42,18 +42,27 @@ export interface PoolFlows {
   assetSymbol: string;
   deposited: number;
   withdrawn: number;
+  /** Pool shares entered or left the wallet as plain transfers (transfer_in /
+   *  transfer_out). Those shares carry no asset flow, so deposited − withdrawn
+   *  no longer brackets the claim: a transferred-in share redeemed later reads
+   *  as a withdrawal with no deposit behind it, and the spread would pass for
+   *  interest. The interest split and the lifetime segments stand down. */
+  sharesMoved: boolean;
 }
+
+const SHARE_TRANSFERS: ReadonlySet<string> = new Set(["transfer_in", "transfer_out"]);
 
 function replayMapleLifetime(events: BaseActivityEvent[]): Map<string, PoolFlows> {
   const flows = new Map<string, PoolFlows>();
   const get = (pool: string, assetSymbol: string): PoolFlows => {
-    const cur = flows.get(pool) ?? { pool, assetSymbol, deposited: 0, withdrawn: 0 };
+    const cur = flows.get(pool) ?? { pool, assetSymbol, deposited: 0, withdrawn: 0, sharesMoved: false };
     flows.set(pool, cur);
     return cur;
   };
   for (const ev of events) {
     if (!isMapleEvent(ev)) continue;
     const ctx = ev.context.data;
+    if (SHARE_TRANSFERS.has(ctx.eventType)) get(ctx.pool, ctx.assetSymbol).sharesMoved = true;
     const mag = Math.abs(Number(ctx.assetsDelta ?? "0"));
     if (!Number.isFinite(mag) || mag === 0) continue;
     const f = get(ctx.pool, ctx.assetSymbol);
@@ -105,7 +114,7 @@ export function mapleLifetimeWithOpening(
   if (!opening && (folders?.length ?? 0) === 0) return undefined;
   const merged = new Map<string, PoolFlows>();
   const get = (pool: string, assetSymbol: string): PoolFlows => {
-    const cur = merged.get(pool) ?? { pool, assetSymbol, deposited: 0, withdrawn: 0 };
+    const cur = merged.get(pool) ?? { pool, assetSymbol, deposited: 0, withdrawn: 0, sharesMoved: false };
     merged.set(pool, cur);
     return cur;
   };
@@ -144,6 +153,14 @@ export function mapleLifetimeWithOpening(
     if (unscalable.has(pool)) continue;
     const f = get(pool, windowFlows.assetSymbol);
     for (const leg of LEGS) f[leg] += windowFlows[leg];
+    f.sharesMoved ||= windowFlows.sharesMoved;
+  }
+
+  // The opening balance counts actions for the whole wallet, not per pool, so a
+  // share transfer below the cut marks every pool. Folders never hold one: the
+  // served kinds are queue fills and owner deposit/withdraw runs.
+  if (opening?.byAction.some((b) => SHARE_TRANSFERS.has(b.key) && b.count > 0)) {
+    for (const f of merged.values()) f.sharesMoved = true;
   }
 
   return merged;
@@ -182,7 +199,7 @@ export function computeMapleCardCaptions(
   if (lifetime && live.length === 1) {
     const cur = live[0];
     const f = lifetime.get(cur.pool);
-    if (f) {
+    if (f && !f.sharesMoved) {
       const net = f.deposited - f.withdrawn;
       const amt = legInterest(cur.currentValue, net, f.deposited);
       if (amt > 0) interestEarned = { amount: amt, symbol: cur.assetSymbol };
@@ -219,12 +236,15 @@ export function computeMapleEconomics(
   const lifetime = precomputedLifetime ?? (events && events.length > 0 ? replayMapleLifetime(events) : null);
   // A pool's flows render only when they're PLAUSIBLE against its claim: a
   // claim may exceed net deposits by earned interest alone (the legInterest
-  // bounds). Pool shares also move as plain transfers — a custodian that
-  // received or sent shares outside deposit/redeem breaks that conservation
-  // by whole positions, and its "all time" story (a mountain of inflow with
-  // no outflow) would not sum — so it stays off the tower.
+  // bounds). Pool shares also move as plain transfers — a wallet that received
+  // or sent shares outside deposit/redeem breaks that conservation, and its
+  // "all time" story would not sum — so it stays off the tower. The residue
+  // test alone misses a transfer in that was later redeemed: the claim returns
+  // to zero and the redemption sits inside the interest ceiling, so
+  // `sharesMoved` gates it as well.
   const claimByPool = new Map(view.pools.map((p) => [p.pool, p.currentValue ?? p.depositedPrincipal]));
-  const poolOk = (f: { pool: string; deposited: number; withdrawn: number }): boolean => {
+  const poolOk = (f: PoolFlows): boolean => {
+    if (f.sharesMoved) return false;
     const residue = (claimByPool.get(f.pool) ?? 0) - (f.deposited - f.withdrawn);
     const eps = f.deposited * 1e-9 + 1e-9;
     return residue >= -eps && residue <= f.deposited + eps;
@@ -253,7 +273,7 @@ export function computeMapleEconomics(
   if (lifetime && claimLines.length === 1) {
     const cur = claimLines[0];
     const f = lifetime.get(cur.key);
-    if (f) {
+    if (f && !f.sharesMoved) {
       const net = f.deposited - f.withdrawn;
       const amt = legInterest(cur.amount, net, f.deposited);
       if (amt > 0) {

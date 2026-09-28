@@ -392,7 +392,9 @@ export default function CompoundV2PositionView({
             chain={chain}
             events={v2Events}
             csvFilename={`compound-v2-${wallet.slice(0, 10)}-activity.csv`}
-            fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
+            // A folder's members are not in the page's events, so a grouped page
+            // reads the whole history for the CSV as a windowed one does.
+            fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
             queued={{
               protocol: "compound-v2",
               params: { wallet },

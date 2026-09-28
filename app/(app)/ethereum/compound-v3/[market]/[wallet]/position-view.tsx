@@ -453,7 +453,9 @@ export default function CompoundPositionView({
             chainByMarket={chain ? { [market]: chain } : {}}
             events={compoundEvents}
             csvFilename={`compound-${market}-${wallet.slice(0, 10)}-activity.csv`}
-            fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
+            // A folder's members are not in the page's events, so a grouped page
+            // reads the whole history for the CSV as a windowed one does.
+            fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
             queued={{
               protocol: "compound-v3",
               params: { wallet, market },
