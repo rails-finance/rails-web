@@ -1457,6 +1457,15 @@ label[for] {
     color: inherit;
   }
 }
+/* a RevealTip bubble opened inside a traced or hovered value sits on its own
+   tooltip ground, so it keeps the tooltip's text colour rather than the
+   inverted value's */
+[data-prov-active] [role="tooltip"],
+[data-prov-active] [role="tooltip"] *,
+[data-prov-pickable] [role="tooltip"],
+[data-prov-pickable] [role="tooltip"] * {
+  color: var(--color-foreground);
+}
 [data-prov-pickable]:focus-visible {
   outline: 2px solid rgb(13 148 136); /* teal-600 */
   outline-offset: 1px;
