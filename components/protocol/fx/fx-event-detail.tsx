@@ -27,6 +27,10 @@ import {
   liqDebtRepaidProv,
   liqDebtTotalProv,
   impliedDebtAfterProv,
+  chainAfterProv,
+  chainBeforeProv,
+  chainChangeProv,
+  debtSincePreviousProv,
   snapOraclePriceProv,
   transferPartyProv,
   tickRebalanceHitProv,
@@ -185,8 +189,51 @@ export function FxEventDetail({ ctx, txHash, blockNumber, normalizedSymbol, drif
     });
   }
 
-  // The replay lane, on every event — labeled event-implied so it is never
-  // read as the position's current debt.
+  // The position on chain after the event (getPosition at the block): the
+  // collateral, and the debt with its before → after and what moved it since
+  // the previous event. A row without the read (the earlier of two events in
+  // one block, or not read yet) keeps the event-implied lane.
+  if (ctx.debtAfter != null && ctx.collAfter != null) {
+    const collChange = ctx.collBefore != null ? String(Number(ctx.collAfter) - Number(ctx.collBefore)) : undefined;
+    stats.push({
+      label: "Collateral",
+      value: fmt(ctx.collAfter),
+      symbol: normalizedSymbol,
+      prov: chainAfterProv("coll", normalizedSymbol, coords),
+      transition: reconstructTransition({
+        after: ctx.collAfter,
+        change: collChange,
+        changeProv: chainChangeProv("coll", normalizedSymbol, coords),
+        beforeProv: chainBeforeProv("coll", normalizedSymbol, coords, true),
+      }),
+    });
+    stats.push({
+      label: "Debt",
+      value: fmt(ctx.debtAfter),
+      symbol: "fxUSD",
+      prov: chainAfterProv("debt", normalizedSymbol, coords),
+      transition: reconstructTransition({
+        after: ctx.debtAfter,
+        change: ctx.debtBefore != null ? String(Number(ctx.debtAfter) - Number(ctx.debtBefore)) : undefined,
+        changeProv:
+          ctx.eventType === "liquidation" ? chainChangeProv("debt", normalizedSymbol, coords) : debtDeltaProv(coords),
+        beforeProv: chainBeforeProv("debt", normalizedSymbol, coords, ctx.eventType === "liquidation"),
+      }),
+      ...(ctx.debtSincePrevious
+        ? {
+            interestSincePrevious: {
+              value: ctx.debtSincePrevious,
+              prov: debtSincePreviousProv(coords),
+              label: "Moved since previous event (funding, rebalances)",
+            },
+          }
+        : {}),
+    });
+    return <ChainTruthDetail stats={withPrice(stats)} />;
+  }
+
+  // The replay lane — labeled event-implied so it is never read as the
+  // position's current debt.
   stats.push({
     label: "Debt after · event-implied",
     value: fmt(ctx.impliedDebtAfter),
@@ -200,16 +247,20 @@ export function FxEventDetail({ ctx, txHash, blockNumber, normalizedSymbol, drif
     }),
   });
 
+  return <ChainTruthDetail stats={withPrice(stats)} />;
+
   // The same-tx PositionSnapshot's oracle price — USD per NORMALIZED unit at
   // this event's block; a real chain read at a named block.
-  if (ctx.oraclePrice != null) {
-    stats.push({
-      label: `Oracle price · USD per ${normalizedSymbol}`,
-      value: fmt(ctx.oraclePrice),
-      symbol: "USD",
-      prov: snapOraclePriceProv(normalizedSymbol, coords),
-    });
+  function withPrice(list: ChainTruthStat[]): ChainTruthStat[] {
+    if (ctx.oraclePrice == null) return list;
+    return [
+      ...list,
+      {
+        label: `Oracle price · USD per ${normalizedSymbol}`,
+        value: fmt(ctx.oraclePrice),
+        symbol: "USD",
+        prov: snapOraclePriceProv(normalizedSymbol, coords),
+      },
+    ];
   }
-
-  return <ChainTruthDetail stats={stats} />;
 }

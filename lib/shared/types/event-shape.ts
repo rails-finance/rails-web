@@ -2341,6 +2341,20 @@ export interface FxContext {
    *  Event-implied — deliberately NOT the position's true debt; the gap vs the
    *  settled debt is the socialized lane. */
   impliedDebtAfter: string;
+  /** The position on chain after this event (getPosition at the block, human):
+   *  collateral in NORMALIZED units, debt in fxUSD. Absent on an earlier row of
+   *  a block holding two of the position's events, and where not read yet. */
+  collAfter?: string;
+  debtAfter?: string;
+  /** Collateral just before this event (getPosition at block − 1), on a
+   *  liquidation only. */
+  collBefore?: string;
+  /** fxUSD debt just before this event: the read at block − 1 on a
+   *  liquidation, else debtAfter less this event's own debt delta. */
+  debtBefore?: string;
+  /** Signed fxUSD the debt moved between the previous event and this one
+   *  (funding, rebalances, a bad-debt share). Absent when zero or unknown. */
+  debtSincePrevious?: string;
   /** True for the position's first event (open). */
   isOpen?: boolean;
   /** True when the same-tx snapshot shows zero collateral shares — this touch

@@ -291,6 +291,56 @@ export const impliedDebtAfterProv = (coords: FxCoords): Provenance => ({
   inputs: eventInputs(coords),
 });
 
+/** The position on chain after this event: getPosition at the block. */
+export const chainAfterProv = (side: "coll" | "debt", sym: string, coords: FxCoords): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  verify: stateVerify("getPosition", coords.blockNumber),
+  summary: `${side === "coll" ? `Collateral (${sym}, rate-normalized)` : "fxUSD debt"} the position held AFTER this event${atBlock(coords)} — the pool's getPosition(${coords.positionId ?? "id"}) read at the block, ${side === "coll" ? "rawColls" : "rawDebts"}. Funding, rebalances and any bad-debt share up to the block are in it.`,
+  contract: poolContract(coords),
+  via: `archive eth_call · getPosition · ${side === "coll" ? "rawColls" : "rawDebts"} ÷ 10^18 (stored in fx_position_boundary)`,
+  inputs: eventInputs(coords),
+});
+
+/** The position just before this event: the read at block − 1 on a
+ *  liquidation; on an operate the after less the event's own delta. */
+export const chainBeforeProv = (side: "coll" | "debt", sym: string, coords: FxCoords, read: boolean): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: read
+    ? `${side === "coll" ? `Collateral (${sym}, rate-normalized)` : "fxUSD debt"} the position held just BEFORE this event — getPosition read at the block before${coords.blockNumber != null ? ` (${coords.blockNumber - 1})` : ""}.`
+    : "fxUSD debt the position held just BEFORE this event — the getPosition debt after it less the event's own debt delta. The pool's stored reads at both blocks match this to within share rounding.",
+  contract: poolContract(coords),
+  via: read ? "archive eth_call · getPosition at block − 1" : "getPosition rawDebts after − Operate deltaDebts",
+  formula: "after − change",
+  inputs: eventInputs(coords, [
+    { label: "after", kind: "chain", pclass: "state", note: "getPosition at the event block" },
+    { label: "change", kind: "chain-derived", pclass: "state", note: "after − before" },
+  ]),
+});
+
+/** A liquidation's change to the position: getPosition after less before. */
+export const chainChangeProv = (side: "coll" | "debt", sym: string, coords: FxCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `${side === "coll" ? `Collateral (${sym}, rate-normalized)` : "fxUSD debt"} this liquidation moved — getPosition at the block less getPosition at the block before. It can differ from the log's own figures where the pool wrote off a share of bad debt in the same block.`,
+  contract: poolContract(coords),
+  via: "getPosition at the block − getPosition at block − 1",
+  formula: "after − before",
+  inputs: eventInputs(coords),
+});
+
+/** What moved the debt between the previous event and this one. */
+export const debtSincePreviousProv = (coords: FxCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `fxUSD the position's debt moved between its previous event and this one${atBlock(coords)} — the debt just before this event less getPosition's debt at the previous event's block. No event of the position's own moved it: funding, tick rebalances and any socialized bad debt did.`,
+  contract: poolContract(coords),
+  via: "debt before this event − getPosition rawDebts at the previous event block",
+  formula: "debt before − previous debt after",
+  inputs: eventInputs(coords),
+});
+
 /** Position-level event-implied debt — the indexed lane at the head of the
  *  captured history. */
 export const impliedDebtProv = (): Provenance => ({

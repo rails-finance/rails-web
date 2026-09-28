@@ -34,6 +34,29 @@ export interface FxTimelineResult {
   cutoffBlock?: number | null;
 }
 
+/** The row's position on chain (getPosition at its block): collateral and
+ *  debt after; the debt before (the read at block − 1 on a liquidation, else
+ *  the after less the event's own debt delta, which the stored pairs match to
+ *  within share rounding); and the debt's change since the previous event
+ *  block's read — funding, rebalances and any bad-debt share, which carry no
+ *  event of the position's own. */
+function chainFigures(
+  r: RawFxTimelineRow,
+  debtDelta: bigint,
+): Pick<FxContext, "collAfter" | "collBefore" | "debtAfter" | "debtBefore" | "debtSincePrevious"> {
+  if (r.chain_debts_after == null || r.chain_colls_after == null) return {};
+  const after = BigInt(r.chain_debts_after);
+  const before = r.chain_debts_before != null ? BigInt(r.chain_debts_before) : after - debtDelta;
+  const since = r.chain_prev_debts_after != null && !r.is_open_event ? before - BigInt(r.chain_prev_debts_after) : null;
+  return {
+    collAfter: fmtUnits(r.chain_colls_after, 18),
+    ...(r.chain_colls_before != null ? { collBefore: fmtUnits(r.chain_colls_before, 18) } : {}),
+    debtAfter: fmtUnits(after.toString(), 18),
+    debtBefore: fmtUnits(before.toString(), 18),
+    ...(since != null && since !== ZERO ? { debtSincePrevious: fmtUnits(since.toString(), 18) } : {}),
+  };
+}
+
 /** One raw event row from the rails timeline route. */
 export interface RawFxTimelineRow {
   action: "operate" | "liquidate";
@@ -58,6 +81,16 @@ export interface RawFxTimelineRow {
   is_open_event: boolean;
   empties_position: boolean;
   implied_debt_after: string;
+  /** getPosition at the row's block (NORMALIZED collateral, fxUSD debt, 1e18):
+   *  the position after the block's last event for it, so null on an earlier
+   *  row of a block with two. `_before` is the read at block − 1, served on a
+   *  liquidation; `chain_prev_debts_after` the read at the position's previous
+   *  event block. All absent on a payload from before the route sent them. */
+  chain_colls_after?: string | null;
+  chain_debts_after?: string | null;
+  chain_colls_before?: string | null;
+  chain_debts_before?: string | null;
+  chain_prev_debts_after?: string | null;
 }
 
 /** One ownership-lane row (pool ERC721 Transfer; fx_v2_transfer). */
@@ -284,6 +317,7 @@ export function buildFxTimeline(resp: RawFxTimelineResponse): FxTimelineResult {
       ...(r.snap_debt_shares != null ? { debtShares: r.snap_debt_shares } : {}),
       ...(r.snap_price != null ? { oraclePrice: fmtUnits(r.snap_price, 18) } : {}),
       impliedDebtAfter: fmtUnits(r.implied_debt_after, 18),
+      ...chainFigures(r, debtDelta),
       isOpen: r.is_open_event || undefined,
       emptiesPosition: r.empties_position || undefined,
       ...(r.tx_from ? { txFrom: r.tx_from.toLowerCase() } : {}),

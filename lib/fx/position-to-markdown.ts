@@ -347,8 +347,12 @@ function timelineTable(
     const n = Number(v ?? 0) || 0;
     return n === 0 ? "—" : `${n > 0 ? "+" : "−"}${amt(Math.abs(n))}`;
   };
-  out.push(`| # | Date | Action | Collateral Δ | fxUSD Δ | Implied debt after | Transaction |`);
-  out.push("|---|------|--------|--------------|---------|--------------------|-------------|");
+  out.push(
+    `| # | Date | Action | Collateral Δ | fxUSD Δ | Collateral after (${colSym}) | Debt after (fxUSD) | Moved since previous | Implied debt after | Transaction |`,
+  );
+  out.push(
+    "|---|------|--------|--------------|---------|-----------------------|--------------------|----------------------|--------------------|-------------|",
+  );
   rows.forEach((e, i) => {
     if (!isFxEvent(e)) return;
     const d = e.context.data;
@@ -399,7 +403,7 @@ function timelineTable(
       }
     }
     out.push(
-      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${action} | ${colD} | ${debtD} | ${impliedCell} | ${txCell(e)} |`,
+      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${action} | ${colD} | ${debtD} | ${d.collAfter != null ? amt(Number(d.collAfter)) : "—"} | ${d.debtAfter != null ? amt(Number(d.debtAfter)) : "—"} | ${d.debtSincePrevious != null ? sign(d.debtSincePrevious) : ""} | ${impliedCell} | ${txCell(e)} |`,
     );
   });
   out.push("");
@@ -411,7 +415,9 @@ function timelineTable(
       `WHOLE TICK gave up while this position's shares sat in it; the per-position slice is not provable from those logs — ` +
       `where a row also says "this position … over its stretch", that is the pool's own getPosition drift across the ` +
       `quiet stretch holding the rebalance (see the drift table above), and the settled reconciliation carries the ` +
-      `lifetime total. "Implied debt after" is the running Σ of this position's own deltas: deliberately NOT its true debt._`,
+      `lifetime total. "Collateral after" and "Debt after" are the pool's getPosition at the row's block; "Moved since ` +
+      `previous" is what the debt moved between the previous event and this one with no event of the position's own ` +
+      `(funding, rebalances). "Implied debt after" is the running Σ of this position's own deltas._`,
   );
   out.push("");
   return out;

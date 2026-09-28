@@ -52,6 +52,7 @@ import {
   liqCollsProv,
   liqDebtRepaidProv,
   impliedDebtAfterProv,
+  chainAfterProv,
   snapOraclePriceProv,
   tickRebalanceHitProv,
   tickRebAmountProv,
@@ -190,18 +191,31 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords): EventProseSlots {
         )
       : null;
 
-  // The event-implied debt caveat — the misleading-figure exception in plain
-  // words (§2): the figure on the card is what the events add up to, not the
-  // position's live debt.
-  const impliedClauses = (): ClauseInput[] => [
-    clause(<>The events so far imply {impliedFig()} of fxUSD debt.</>),
-    clause(
-      <>
-        That is the running total of this position&rsquo;s own events, not its live debt: rebalances and socialized bad
-        debt move the real debt between events with no per-position record.
-      </>,
-    ),
-  ];
+  // The debt after the event: the chain's figure where the row carries its
+  // getPosition read; otherwise the event-implied total, with its caveat in
+  // plain words (§2).
+  const impliedClauses = (): ClauseInput[] =>
+    ctx.debtAfter != null
+      ? [
+          clause(
+            <>
+              After it the position owed{" "}
+              <Fig info={chainAfterProv("debt", normSym, coords)} value={fmtVal(ctx.debtAfter)}>
+                {fmtVal(ctx.debtAfter)} fxUSD
+              </Fig>
+              .
+            </>,
+          ),
+        ]
+      : [
+          clause(<>The events so far imply {impliedFig()} of fxUSD debt.</>),
+          clause(
+            <>
+              That is the running total of this position&rsquo;s own events, not its live debt: rebalances and
+              socialized bad debt move the real debt between events with no per-position record.
+            </>,
+          ),
+        ];
 
   switch (ctx.eventType) {
     case "operate": {

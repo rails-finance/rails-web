@@ -253,7 +253,13 @@ export interface ChainTruthStat {
    *  the previous row, both chain figures. Drawn under the value as "Interest
    *  since previous event: 12.40 DAI". `value` is the exact figure the receipt
    *  keys on. Omit where it is zero or unknown. */
-  interestSincePrevious?: { value: string; prov: Provenance };
+  interestSincePrevious?: {
+    value: string;
+    prov: Provenance;
+    /** The line's words where the gap is not interest alone (f(x): funding,
+     *  rebalances). Default "Interest since previous event". */
+    label?: string;
+  };
   /** Show the USD chip whatever the timeline's USD-values flag says — the
    *  Liquity V2 grid's rule for the collateral's value at the event's price,
    *  which the fork cards follow. */
@@ -674,7 +680,7 @@ export function ChainTruthDetail({
               </StateTransition>
               {s.interestSincePrevious && (
                 <StatSubline>
-                  Interest since previous event:{" "}
+                  {s.interestSincePrevious.label ?? "Interest since previous event"}:{" "}
                   <Prov info={s.interestSincePrevious.prov} value={s.interestSincePrevious.value} symbol={s.symbol}>
                     <span title={s.interestSincePrevious.value}>
                       {formatNumber(Number(s.interestSincePrevious.value))}
