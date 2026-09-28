@@ -23,6 +23,56 @@ export const HUB_TIER_LABEL: Record<HubTier, string> = {
   Equities: "Equities",
 };
 
+// The lowercase hub keys the API sends on each reserve (`hub`: the hub that
+// reserve draws from, live from aave_v4_hub_spoke_credit).
+const HUB_TIER_BY_KEY: Record<string, HubTier> = {
+  core: "Core",
+  plus: "Plus",
+  prime: "Prime",
+  paxos: "Paxos",
+  equities: "Equities",
+};
+const HUB_ORDER: HubTier[] = ["Core", "Plus", "Prime", "Paxos", "Equities"];
+
+/** The hubs a position borrows from: one entry per hub behind a reserve with
+ *  debt, in hub order. A reserve whose hub the API has not resolved adds none. */
+export function debtHubsOf(reserves: readonly { hub?: string | null; hasDebt: boolean }[]): HubTier[] {
+  const hubs = new Set<HubTier>();
+  for (const r of reserves) {
+    const tier = r.hasDebt && r.hub ? HUB_TIER_BY_KEY[r.hub.toLowerCase()] : undefined;
+    if (tier) hubs.add(tier);
+  }
+  return HUB_ORDER.filter((h) => hubs.has(h));
+}
+
+/** The hub chip's two parts (Miles 2026-09-28, TO-DO-ui-jobs item 102): the
+ *  spoke's collateral hub, and the hubs the position borrows from when those
+ *  are anything other than that one hub. A spoke lists some assets on more than
+ *  one hub (Bluechip borrows USDC from Prime and from Core), so a Bluechip
+ *  position with all its debt on Core reads "Prime · debt on Core". No debt, or
+ *  all of it on the collateral hub, keeps the one name. */
+export function hubChipParts(
+  collateralHub: HubTier,
+  debtHubs: readonly HubTier[],
+): {
+  collateral: string;
+  debt: string | null;
+} {
+  const collateral = HUB_TIER_LABEL[collateralHub];
+  if (debtHubs.length === 0 || (debtHubs.length === 1 && debtHubs[0] === collateralHub)) {
+    return { collateral, debt: null };
+  }
+  // The collateral hub leads when the position borrows from it too.
+  const ordered = [...debtHubs].sort((a, b) => Number(b === collateralHub) - Number(a === collateralHub));
+  return { collateral, debt: ordered.map((h) => HUB_TIER_LABEL[h]).join(" and ") };
+}
+
+/** The chip text: "Prime", or "Prime · debt on Core". */
+export function hubChipLabel(collateralHub: HubTier, debtHubs: readonly HubTier[]): string {
+  const { collateral, debt } = hubChipParts(collateralHub, debtHubs);
+  return debt ? `${collateral} · debt on ${debt}` : collateral;
+}
+
 export const SPOKE_HUB: Record<string, HubTier> = {
   Main: "Core",
   Forex: "Core",

@@ -53,6 +53,9 @@ export interface AaveV4SpokeReserveSummary {
    *  `pendle-twap`) vs off-chain (`defillama` / `stablecoin`); null when the
    *  reserve is unpriced. Lets the card tag the USD figure's provenance. */
   priceSource: AaveV4PriceSource | null;
+  /** The hub this reserve draws from ("core", "prime", …); null when the
+   *  server has not resolved it. */
+  hub?: string | null;
 }
 
 export interface AaveV4SpokePositionRow {

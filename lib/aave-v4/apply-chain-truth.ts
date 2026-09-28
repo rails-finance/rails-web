@@ -21,6 +21,7 @@ import { holdsNothingOnChain, scaleChainBalance } from "@/lib/api/fetch-aave-v4-
 import { calculateAaveV4Position, computeSupplyBreakdown, type CalcPositionInputs } from "./utils/position-calculation";
 import { resolvePrice, type PriceEntry } from "@/lib/aave/prices";
 import { pricesHaveLoaded } from "@/lib/aave-v4/unpriced";
+import { debtHubsOf } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 
 /** Patch a ReserveStats[] so each row carries the chain-state current
  *  balance alongside the event-derived lifetime fields. Lifetime
@@ -235,6 +236,9 @@ export function patchSpokeCardWithChain(
 
   return {
     ...card,
+    debtHubs: debtHubsOf(
+      chain.reserves.map((r) => ({ hub: r.hub, hasDebt: scaleChainBalance(r.debtBalanceRaw, r.decimals) > 0 })),
+    ),
     unpricedSymbols,
     totalSupplyUsd: calc.totalCollateralUsd,
     weightedCollateralUsd: calc.weightedCollateralUsd,

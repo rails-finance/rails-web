@@ -27,6 +27,10 @@ export interface AaveV4SpokeChainReserve {
    *  but not chain-fetched yet; switch to on-chain `getReserveConfig` if/when
    *  governance LT updates drift past acceptable tolerance. */
   lt: number | null;
+  /** The hub this reserve draws from ("core", "prime", …); null when the
+   *  server has not resolved it. A spoke can list one asset on two hubs, so
+   *  this is what tells those reserves apart. */
+  hub?: string | null;
 }
 
 export interface AaveV4SpokePositionChainResponse {

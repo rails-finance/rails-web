@@ -9,7 +9,7 @@ import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
-import { type HubTier, HUB_TIER_LABEL } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
+import { type HubTier, hubChipLabel } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { type AaveSpokeCardInfo, liquidationBuffer } from "@/lib/aave-v4/spoke-cards";
 import { AaveV4LiquidationFootnote } from "@/components/protocol/aave-v4/aave-v4-liquidation-footnote";
 import { bucketForHealth } from "@/lib/aave-v4/health-bucket";
@@ -140,11 +140,11 @@ function UnpricedFootnote({ spoke, onchainUsd }: { spoke: AaveSpokeCardInfo; onc
 
 export type { AaveSpokeCardInfo };
 
-function SpokeIdentity({ name, hub }: { name: string; hub: HubTier }) {
+function SpokeIdentity({ name, hub, debtHubs }: { name: string; hub: HubTier; debtHubs: HubTier[] }) {
   return (
     <span className="flex items-center gap-1.5 leading-none text-foreground">
       <span className="text-xs font-semibold">{name}</span>
-      <span className="text-xs font-bold uppercase tracking-wide">{HUB_TIER_LABEL[hub]}</span>
+      <span className="text-xs font-bold uppercase tracking-wide">{hubChipLabel(hub, debtHubs)}</span>
     </span>
   );
 }
@@ -327,7 +327,7 @@ function AaveV4SpokeCard({
             leadingIdentity={
               <>
                 {walletPill}
-                <SpokeIdentity name={spoke.name} hub={spoke.hub} />
+                <SpokeIdentity name={spoke.name} hub={spoke.hub} debtHubs={spoke.debtHubs} />
               </>
             }
             collateralLabel={supplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral}
@@ -360,7 +360,7 @@ function AaveV4SpokeCard({
             leadingIdentity={
               <>
                 {walletPill}
-                <SpokeIdentity name={spoke.name} hub={spoke.hub} />
+                <SpokeIdentity name={spoke.name} hub={spoke.hub} debtHubs={spoke.debtHubs} />
               </>
             }
             identity={

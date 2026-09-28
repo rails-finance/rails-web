@@ -34,6 +34,15 @@ export const SPOKES: Record<string, { name: string; address: `0x${string}` }> = 
   lombard: { name: "Lombard BTC", address: "0x7ec68b5695e803e98a21a9a05d744f28b0a7753d" },
 };
 
+// Hub contract (lowercased) → the hub key the server sends on each reserve.
+// Addresses from rails-server-onboarding sieve/sieve.toml AaveV4Hub_*.
+const HUB_KEY_BY_ADDR: Record<string, string> = {
+  "0xcca852bc40e560adc3b1cc58ca5b55638ce826c9": "core",
+  "0x06002e9c4412cb7814a791ea3666d905871e536a": "plus",
+  "0x943827dca022d0f354a8a8c332da1e5eb9f9f931": "prime",
+  "0x62d63197660c080236193ca60b70e49a08e90368": "paxos",
+};
+
 const SPOKE_ABI = parseAbi([
   "function getUserAccountData(address user) view returns (uint256 riskPremium, uint256 avgCollateralFactor, uint256 healthFactor, uint256 totalCollateralValue, uint256 totalDebtValueRay, uint256 activeCollateralCount, uint256 borrowCount)",
   "function getReserveCount() view returns (uint256)",
@@ -125,7 +134,7 @@ export async function loadAaveV4SpokePositionFromChain(
   const ltTargets: { reserveId: number; key: number; idx: number }[] = [];
 
   for (let i = 0; i < count; i++) {
-    const r = meta[i * 4] as { underlying: string; decimals: bigint; dynamicConfigKey: number };
+    const r = meta[i * 4] as { underlying: string; hub: string; decimals: bigint; dynamicConfigKey: number };
     const supplied = meta[i * 4 + 1] as bigint;
     const debt = meta[i * 4 + 2] as bigint;
     const status = meta[i * 4 + 3] as readonly [boolean, boolean];
@@ -147,6 +156,7 @@ export async function loadAaveV4SpokePositionFromChain(
       isCollateral: status[0],
       hasBorrow,
       lt: null, // filled in phase 2
+      hub: HUB_KEY_BY_ADDR[r.hub.toLowerCase()] ?? null,
     });
     ltTargets.push({ reserveId: i, key: Number(r.dynamicConfigKey), idx: reserves.length - 1 });
   }

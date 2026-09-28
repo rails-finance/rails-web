@@ -22,6 +22,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV4Event } from "@/lib/shared/types/event-shape";
 import { type PriceEntry, resolvePrice } from "@/lib/aave/prices";
 import { liquidationBuffer, type AaveSpokeCardInfo, type ReserveStats } from "@/lib/aave-v4/spoke-cards";
+import { hubChipParts } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { actionLabel, getEventActionKey } from "@/lib/shared/event-filter-helpers";
 import {
   anchorMarketNotes,
@@ -133,7 +134,10 @@ export function spokeToMarkdown(args: AaveV4SpokeMarkdownArgs): string {
 
   lines.push(`- **Status:** ${statusLabel}`);
   lines.push(`- **Wallet:** ${wallet}`);
-  lines.push(`- **Spoke:** ${spokeName} (${card.hub} hub)`);
+  const hubChip = hubChipParts(card.hub, card.debtHubs);
+  lines.push(
+    `- **Spoke:** ${spokeName} (${hubChip.collateral} hub${hubChip.debt ? ` · debt on ${hubChip.debt}` : ""})`,
+  );
   if (card.liquidationCount > 0) {
     lines.push(`- **Liquidations:** ${card.liquidationCount} on this spoke`);
   }

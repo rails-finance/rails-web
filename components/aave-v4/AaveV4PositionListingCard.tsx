@@ -37,7 +37,7 @@ import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { useMemo } from "react";
 import type { AaveV4SpokePositionRow } from "@/lib/api/fetch-aave-v4-spoke-positions";
 import { holdsNothingOnChain, scaleChainBalance } from "@/lib/api/fetch-aave-v4-spoke-position";
-import { SPOKE_HUB, HUB_TIER_LABEL } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
+import { SPOKE_HUB, debtHubsOf, hubChipLabel } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
@@ -118,6 +118,9 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   const hfStale = hasDebt && row.chainHfStale;
   const { session } = useAaveV4Deployment();
   const hubTier = SPOKE_HUB[row.spokeName] ?? "Core";
+  const debtHubs = debtHubsOf(
+    row.reserves.map((r) => ({ hub: r.hub, hasDebt: scaleChainBalance(r.debtBalanceRaw, r.decimals) > 0 })),
+  );
 
   // Lifecycle (two-axis model). Status is structural: open vs closed (no live
   // balance). A closed position renders through the shared terminal frame
@@ -234,7 +237,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
       <WalletPill wallet={row.wallet} ensName={row.ensName} filterProtocol={session} bookmarkProtocol={session} />
       <span className="flex items-center gap-1.5 leading-none text-foreground">
         <span className="text-xs font-semibold">{row.spokeName}</span>
-        <span className="text-xs font-bold uppercase tracking-wide">{HUB_TIER_LABEL[hubTier]}</span>
+        <span className="text-xs font-bold uppercase tracking-wide">{hubChipLabel(hubTier, debtHubs)}</span>
       </span>
     </>
   );

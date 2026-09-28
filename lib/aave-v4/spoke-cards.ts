@@ -131,7 +131,12 @@ export interface SpokeGroup {
 
 export interface AaveSpokeCardInfo {
   name: string;
+  /** The spoke's collateral hub. */
   hub: HubTier;
+  /** The hubs the position's live debt draws from, from the chain read's
+   *  per-reserve hub. Empty without a chain read, and when there is no debt;
+   *  the header chip then names the collateral hub only. */
+  debtHubs: HubTier[];
   totalSupplyUsd: number;
   /** Assets held here that no price source covers — missing from every USD
    *  figure on the card. See `SpokeGroup.unpricedSymbols`. */
@@ -864,6 +869,7 @@ export function buildSpokeCards(
     return {
       name: g.name,
       hub: g.hub,
+      debtHubs: [],
       totalSupplyUsd: g.totalSupplyUsd,
       unpricedSymbols: g.unpricedSymbols,
       weightedCollateralUsd: calcResult.weightedCollateralUsd,
