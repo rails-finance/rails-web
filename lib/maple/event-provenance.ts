@@ -546,12 +546,12 @@ export const interestSincePrevProv = (
   ]),
 });
 
-/** Interest earned over the position's life that has left with its
- *  withdrawals: more came out than went in. */
+/** Interest earned over the position's life, whether the claim still holds it
+ *  or withdrawals have taken it out. */
 export const interestEarnedLifetimeProv = (sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Interest earned on the ${sym} position over its life: what it holds now ((shares + escrowed) × the exit rate at head, zero once closed) plus everything that came out (withdrawals and shares sent), less everything that went in (deposits and shares received), each transfer valued at the pool's rate in its block. More came out than went in, so this interest has left with the withdrawals and the claim held now does not include it. The exit rate leg carries the loan-book caveat: the accrued side is Maple's on-chain bookkeeping of off-chain-collateralized loans.`,
+  summary: `Interest earned on the ${sym} position over its life: what it holds now ((shares + escrowed) × the exit rate at head, zero once closed) plus everything that came out (withdrawals and shares sent), less everything that went in (deposits and shares received), each transfer valued at the pool's rate in its block. It equals the interest the timeline rows state since each previous event in the pool, added up, with the rise since the last event. The exit rate leg carries the loan-book caveat: the accrued side is Maple's on-chain bookkeeping of off-chain-collateralized loans.`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
   via: "held now + withdrawn + sent − deposited − received",
   formula: "held now − net principal",

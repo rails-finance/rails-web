@@ -1,5 +1,5 @@
 // Maple economics reduction — the lender tower with lifetime flows and the
-// principal/interest split.
+// interest earned.
 // ----------------------------------------------------------------------------
 // A Maple lender has ONE side: the pool claim. The tower's collateral column
 // carries it — the CURRENT redeemable value when the chain read landed
@@ -14,10 +14,11 @@
 // is a later layer if wanted.
 //
 // With the wallet's event stream (optional second arg) the tower gains the
-// lifetime layer: hatched withdrawn segments per pool and the faded
-// lifetime-inflow bar. The interest split renders only when a single pool
-// contributes and its event principal attributes cleanly (the Spark
-// legInterest gates) — a cross-pool token sum would mix USDC and USDT.
+// lifetime layer: hatched withdrawn segments per pool, the faded
+// lifetime-inflow bar, and the interest each pool earned over its life. The
+// card's "incl." caption renders only when a single pool holds shares and its
+// interest is still inside the claim (the Spark legInterest gates) — a
+// cross-pool token sum would mix USDC and USDT.
 //
 // Pool shares also move wallet to wallet with no pool event. Each such transfer
 // is valued at the pool's rate in its block (rails-server mig 339: an archive
@@ -34,7 +35,6 @@ import { isMapleEvent } from "@/lib/shared/types/event-shape";
 import {
   positionCurrentValueProv,
   positionPrincipalProv,
-  interestEarnedProv,
   interestEarnedLifetimeProv,
   mapleLifetimeFlowProv,
   mapleTransferFlowProv,
@@ -133,7 +133,7 @@ function replayMapleLifetime(events: BaseActivityEvent[]): Map<string, PoolFlows
  * for the summarised part would state a lifetime deposited/withdrawn short by
  * whatever sat below the cut, and the gates downstream cannot detect that: a
  * short `deposited` widens `legInterest`'s ceiling and slides the interest
- * split, and `poolOk`'s residue test would be measuring against a number that
+ * split, and `poolReconciles`'s residue test would be measuring against a number that
  * is not the position's. Refusing the pool is the same choice the reducer
  * already makes for a pool whose flows do not reconcile — state nothing rather
  * than something partial.
@@ -217,10 +217,10 @@ export function mapleLifetimeWithOpening(
  *  - interest < dust → zero (or negative: missed principal, bail);
  *  - interest > grossIn → >100% cumulative yield, physically implausible → bail;
  *  - interest > current → more came out than went in, so part of the interest
- *    has left with the withdrawals and the claim cannot include it. The tower
- *    and the card say the interest is inside the claim ("incl. …"), which would
- *    be false: wallet 0x1601…347e holds 0.000001 USDC and has earned 23.43M
- *    over its life. Bail. */
+ *    has left with the withdrawals and the claim cannot include it. The card
+ *    says the interest is inside the claim ("incl. …"), which would be false:
+ *    wallet 0x1601…347e holds 0.000001 USDC and has earned 23.43M over its
+ *    life. Bail; the tower's lifetime line states that figure. */
 function legInterest(current: number | undefined | null, netPrincipal: number, grossIn: number): number {
   if (current == null || grossIn <= 0) return 0;
   const interest = current - netPrincipal;
@@ -230,11 +230,65 @@ function legInterest(current: number | undefined | null, netPrincipal: number, g
   return interest;
 }
 
+/** What a pool's claim holds now: its chain read where one landed, the replayed
+ *  principal otherwise, and zero once it holds no shares and nothing escrowed,
+ *  whatever its replayed principal reads. */
+function heldIn(view: MaplePositionView, pool: string): number {
+  const p = view.pools.find((x) => x.pool === pool && x.shares + x.escrowedShares > 0);
+  return p ? (p.currentValue ?? p.depositedPrincipal) : 0;
+}
+
+/** A pool's flows render only when they're PLAUSIBLE against its claim: a
+ *  claim may exceed net principal by earned interest alone (the legInterest
+ *  bounds). Shares received and sent count at the pool's rate in their block;
+ *  a pool with a transfer the index could not value stays off the tower, since
+ *  its "all time" story would not sum (a transfer in that was later redeemed
+ *  passes the residue test with the claim back at zero, so `sharesMoved` gates
+ *  it as well). */
+function poolReconciles(view: MaplePositionView, f: PoolFlows): boolean {
+  if (f.sharesMoved) return false;
+  const residue = heldIn(view, f.pool) - netPrincipal(f);
+  const eps = grossIn(f) * 1e-9 + 1e-9;
+  return residue >= -eps && residue <= grossIn(f) + eps;
+}
+
+/** Interest each pool earned over the position's life: held now + withdrawn +
+ *  sent − deposited − received, the same figure as the interest the pool's
+ *  timeline rows state one gap at a time, added up (each row's interest since
+ *  the previous one, plus the rise since the last). It stands whether the claim
+ *  still holds it or withdrawals have taken it out (wallet 0x1601…347e: 23.43M
+ *  USDC earned, 0.000001 held). Only pools whose flows reconcile and, when
+ *  live, whose claim is a chain read. */
+function lifetimeInterest(
+  view: MaplePositionView,
+  lifetime: Map<string, PoolFlows>,
+): { pool: string; symbol: string; earned: number; held: number }[] {
+  const out: { pool: string; symbol: string; earned: number; held: number }[] = [];
+  for (const f of lifetime.values()) {
+    if (!poolReconciles(view, f)) continue;
+    const p = view.pools.find((x) => x.pool === f.pool && x.shares + x.escrowedShares > 0);
+    if (p && p.currentValue == null) continue;
+    const held = heldIn(view, f.pool);
+    const earned = held - netPrincipal(f);
+    if (earned < DUST) continue;
+    out.push({ pool: f.pool, symbol: f.assetSymbol, earned, held });
+  }
+  return out;
+}
+
+/** Below this a caption's figure reads as zero on the card. */
+const CAPTION_FLOOR = 0.01;
+
 /** Position-card stat captions. null = the gate failed and the caption simply
  *  doesn't render. */
 export interface MapleCardCaptions {
   /** Interest earned, in the pool's own asset (single-pool positions only). */
   interestEarned: { amount: number; symbol: string } | null;
+  /** The position earned interest and its claim holds none of it: every pool
+   *  it earned in holds less than a cent now (wallet 0x1601…347e). The card
+   *  says so and leaves the figure to the Lifetime flows panel. Never set
+   *  beside `interestEarned`. */
+  interestWithdrawn: boolean;
 }
 
 export function computeMapleCardCaptions(
@@ -256,7 +310,12 @@ export function computeMapleCardCaptions(
       if (amt > 0) interestEarned = { amount: amt, symbol: cur.assetSymbol };
     }
   }
-  return { interestEarned };
+  const interestWithdrawn =
+    interestEarned == null &&
+    lifetime != null &&
+    lifetimeInterest(view, lifetime).some((i) => i.earned >= CAPTION_FLOOR) &&
+    live.every((p) => p.currentValue != null && p.currentValue < CAPTION_FLOOR);
+  return { interestEarned, interestWithdrawn };
 }
 
 export function computeMapleEconomics(
@@ -285,21 +344,7 @@ export function computeMapleEconomics(
 
   // ── Lifetime layer (needs the event stream) ────────────────────────────────
   const lifetime = precomputedLifetime ?? (events && events.length > 0 ? replayMapleLifetime(events) : null);
-  // A pool's flows render only when they're PLAUSIBLE against its claim: a
-  // claim may exceed net principal by earned interest alone (the legInterest
-  // bounds). Shares received and sent count at the pool's rate in their block;
-  // a pool with a transfer the index could not value stays off the tower, since
-  // its "all time" story would not sum (a transfer in that was later redeemed
-  // passes the residue test with the claim back at zero, so `sharesMoved` gates
-  // it as well).
-  const claimByPool = new Map(view.pools.map((p) => [p.pool, p.currentValue ?? p.depositedPrincipal]));
-  const poolOk = (f: PoolFlows): boolean => {
-    if (f.sharesMoved) return false;
-    const residue = (claimByPool.get(f.pool) ?? 0) - netPrincipal(f);
-    const eps = grossIn(f) * 1e-9 + 1e-9;
-    return residue >= -eps && residue <= grossIn(f) + eps;
-  };
-  const okFlows = lifetime ? [...lifetime.values()].filter(poolOk) : [];
+  const okFlows = lifetime ? [...lifetime.values()].filter((f) => poolReconciles(view, f)) : [];
   const exited: TowerLine[] = [
     ...okFlows
       .filter((f) => f.withdrawn > DUST)
@@ -334,60 +379,19 @@ export function computeMapleEconomics(
       prov: mapleTransferFlowProv("in", f.assetSymbol),
     }));
 
-  // Interest segment — only on a SINGLE-pool claim (one asset symbol; a
-  // cross-pool token sum would mix USDC and USDT). The claim line KEEPS the
-  // full current value: maple never reaches the tower's stacked-bar mode
-  // (showBars keys on valued/debt-side interest, and maple is neither), so
-  // the gated list renders the claim line alone and the interest rides the
-  // "incl. … interest earned" annotation row — the card caption's grammar.
-  // Dropping the claim to net principal here would understate the position
-  // by exactly the interest (it did, on every split-engaging wallet).
-  let interest: TowerLine | null = null;
-  if (lifetime && claimLines.length === 1) {
-    const cur = claimLines[0];
-    const f = lifetime.get(cur.key);
-    if (f && !f.sharesMoved) {
-      const amt = legInterest(cur.amount, netPrincipal(f), grossIn(f));
-      if (amt > 0) {
-        interest = {
-          key: "claim-interest",
-          symbol: cur.symbol,
-          amount: amt,
-          usd: null,
-          prov: interestEarnedProv(cur.symbol),
-        };
-      }
-    }
-  }
-
-  // Interest that has left with the withdrawals: a pool whose interest over
-  // its life exceeds what it holds now. "incl. … interest earned" would say
-  // the holding contains it, so the figure is stated beside what is held now
-  // (wallet 0x1601…347e: 23.43M USDC earned, 0.000001 held). The other gates
-  // stand: every transfer valued, a chain read for a live claim, and interest
-  // no more than the gross inflow. A pool with nothing held reads zero: its
-  // share and escrow lanes equal balanceOf and lockedShares.
-  const interestLeft: { line: TowerLine; heldNow: number }[] = [];
-  if (lifetime) {
-    for (const f of lifetime.values()) {
-      if (f.sharesMoved) continue;
-      const p = view.pools.find((x) => x.pool === f.pool && x.shares + x.escrowedShares > 0);
-      if (p && p.currentValue == null) continue;
-      const held = p?.currentValue ?? 0;
-      const earned = held - netPrincipal(f);
-      if (earned < DUST || earned > grossIn(f) || earned <= held + DUST) continue;
-      interestLeft.push({
-        line: {
-          key: `interest-left-${f.pool}`,
-          symbol: f.assetSymbol,
-          amount: earned,
-          usd: null,
-          prov: interestEarnedLifetimeProv(f.assetSymbol),
-        },
-        heldNow: held,
-      });
-    }
-  }
+  // Interest earned over the position's life, one line per pool. The card's
+  // "incl." caption keeps to interest inside the claim and, wherever it shows,
+  // states this same figure.
+  const earned: TowerLine[] = lifetime
+    ? lifetimeInterest(view, lifetime).map((i) => ({
+        key: `earned-${i.pool}`,
+        symbol: i.symbol,
+        amount: i.earned,
+        usd: null,
+        flowLabel: "Interest earned",
+        prov: interestEarnedLifetimeProv(i.symbol),
+      }))
+    : [];
 
   // Lifetime inflow (the faded side bar) — a token amount is only meaningful
   // when one pool flowed, else suppressed. Shares received ride `received`,
@@ -403,8 +407,8 @@ export function computeMapleEconomics(
     valued: false,
     collateral: {
       current: claimLines,
-      interest,
-      interestLeft,
+      interest: null,
+      earned,
       exited,
       received,
       liquidated: [],
@@ -424,8 +428,8 @@ export function computeMapleEconomics(
     debtAxisAbsent: true,
     interestNote:
       "The claim column shows what the position would redeem for now: its pool shares valued at the pool's exit rate. The amount above what was put in is interest earned; shares received or sent by transfer count at the pool rate in their block. Amounts stay in the pool's own asset, USDC or USDT — pinning a stablecoin to a dollar would hide exactly the depeg the token amounts exist to reveal. One caveat rides the value: it rests on a loan book whose collateral is held off-chain, so it shows what Maple's books record rather than something the chain itself can prove." +
-      (interest != null || interestLeft.length > 0
+      (earned.length > 0
         ? ""
-        : " The split between principal and interest earned appears only when a single pool's flows attribute cleanly and every share transfer is valued."),
+        : " Interest earned appears when a pool's flows reconcile with its claim and every share transfer is valued."),
   };
 }

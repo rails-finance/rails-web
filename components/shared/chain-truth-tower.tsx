@@ -345,7 +345,10 @@ function sideScalars(side: TowerSideData, valued: boolean) {
   // + exited + liquidated), but it never joins the stacked segments (its value
   // is already inside `current`).
   const received = (side.received ?? []).reduce((s, l) => s + sc(l), 0);
-  const inflow = side.lifetimeInflow + received;
+  // Interest earned over the life follows the same rule: it is inside
+  // `current` or `exited`, so it grows the reference bar only.
+  const earned = (side.earned ?? []).reduce((s, l) => s + sc(l), 0);
+  const inflow = side.lifetimeInflow + received + earned;
   return { stack, inflow, base: Math.max(stack, inflow) };
 }
 
@@ -394,11 +397,18 @@ function buildSide(
   const interestLine = withInterest && side.interest && side.interest.amount > 0 ? side.interest : null;
   const receivedLines = side.received ?? [];
   const receivedTotal = receivedLines.reduce((s, l) => s + sc(l), 0);
-  // The faded inflow bar spans real deposits + custody received by transfer.
-  const totalInflow = side.lifetimeInflow + receivedTotal;
+  const earnedLines = side.earned ?? [];
+  const earnedTotal = earnedLines.reduce((s, l) => s + sc(l), 0);
+  // The faded inflow bar spans real deposits + custody received by transfer +
+  // interest earned over the life.
+  const totalInflow = side.lifetimeInflow + receivedTotal + earnedTotal;
   const hasFlows =
     !hideHistorical &&
-    (side.exited.length > 0 || side.liquidated.length > 0 || side.lifetimeInflow > 0 || receivedLines.length > 0);
+    (side.exited.length > 0 ||
+      side.liquidated.length > 0 ||
+      side.lifetimeInflow > 0 ||
+      receivedLines.length > 0 ||
+      earnedLines.length > 0);
 
   // A row's displayed denomination decides its token chip (the design-grammar
   // rule): token-denominated rows carry the chip; USD-sum and cross-symbol
@@ -504,6 +514,7 @@ function buildSide(
   const sideLines = [
     ...side.current,
     ...(side.received ?? []),
+    ...earnedLines,
     ...side.exited,
     ...side.liquidated,
     ...gainLines,
@@ -556,6 +567,21 @@ function buildSide(
         exact: fmtExact(l),
         icon: flowIcon(l),
         swatchStyle: flowPattern(l, { backgroundColor: flowColor }),
+        prov: l.prov,
+        indent: true,
+      }),
+    );
+  // "+ Interest earned" — what the side gained over its life, part of the
+  // same faded reference bar, so it wears the flow swatch like `received`.
+  if (hasFlows)
+    earnedLines.forEach((l) =>
+      rows.push({
+        sign: "+",
+        label: l.flowLabel ?? "Interest earned",
+        amount: fmt(l),
+        exact: fmtExact(l),
+        icon: flowIcon(l),
+        swatchStyle: { backgroundColor: flowColor },
         prov: l.prov,
         indent: true,
       }),
@@ -894,18 +920,14 @@ function GatedEconomics({ data }: { data: ChainTruthTowerData }) {
               interest earned
             </div>
           )}
-          {(data.collateral.interestLeft ?? []).map(({ line, heldNow }) => (
+          {(data.collateral.earned ?? []).map((line) => (
             <div key={line.key} className="text-[11px] text-rb-500">
               <Prov info={line.prov}>
                 <span className="tabular-nums">
                   {formatCompact(line.amount)} {line.symbol}
                 </span>
               </Prov>{" "}
-              interest earned;{" "}
-              <span className="tabular-nums">
-                {formatCompact(heldNow)} {line.symbol}
-              </span>{" "}
-              held now
+              interest earned (all time)
             </div>
           ))}
         </div>
@@ -937,7 +959,8 @@ function EmptyTower({ label }: { label: string }) {
 
 /** Whether any side carries a chain-state lifetime history worth a toggle. */
 function hasLifetime(data: ChainTruthTowerData): boolean {
-  const any = (s: TowerSideData) => s.exited.length > 0 || s.liquidated.length > 0 || s.lifetimeInflow > 0;
+  const any = (s: TowerSideData) =>
+    s.exited.length > 0 || s.liquidated.length > 0 || s.lifetimeInflow > 0 || (s.earned ?? []).length > 0;
   return sideParts(data.collateral).some(any) || sideParts(data.debt).some(any);
 }
 
@@ -952,6 +975,7 @@ function sideMonoSymbol(s: TowerSideData): boolean {
     [
       ...s.current,
       ...(s.received ?? []),
+      ...(s.earned ?? []),
       ...s.exited,
       ...s.liquidated,
       ...(s.eventlessGains ?? []),
