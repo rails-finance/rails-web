@@ -290,7 +290,13 @@ function FallbackTokenIcon({
       alt={symbol}
       width={size}
       height={size}
-      className={`block shrink-0 rounded-full ${clickClass}`}
+      // shrink-0 from sm up only: a headline figure's flex row (number + this
+      // icon, no wrap) has room at every width check-in tests target, but a
+      // long exact figure at 390px can leave less than the icon's own width —
+      // shrinking the icon a few px there keeps the row inside the viewport
+      // instead of running past it. Aspect ratio holds (the width/height
+      // attributes above set it), so the mark stays round, just smaller.
+      className={`block shrink sm:shrink-0 rounded-full ${clickClass}`}
       onError={advance}
       {...(clickProps as React.HTMLAttributes<HTMLImageElement>)}
     />
