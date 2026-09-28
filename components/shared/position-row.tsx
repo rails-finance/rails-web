@@ -11,10 +11,12 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { DeltaToggle } from "@/components/shared/state-transition";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
+import { ExactTip } from "@/components/shared/amount-text";
+import { formatTinyNonZero } from "@/lib/utils/format";
 
 /** A token amount on a position line: whole units from 1,000, four decimals from
- *  1, and below 1 enough decimals that a BTC-family or wei-fractional amount
- *  never reads "0". */
+ *  1, and below 1 up to eight decimals; an amount smaller than that reads
+ *  "<0.000001", never "0". */
 export function fmtPositionAmount(v: string | number | undefined): string {
   if (!v) return "0";
   const n = typeof v === "string" ? parseFloat(v) : v;
@@ -24,7 +26,8 @@ export function fmtPositionAmount(v: string | number | undefined): string {
   if (abs >= 1_000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
   if (abs >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
   const decimals = Math.min(8, Math.ceil(-Math.log10(abs)) + 2);
-  return n.toLocaleString("en-US", { maximumFractionDigits: decimals });
+  const s = n.toLocaleString("en-US", { maximumFractionDigits: decimals });
+  return parseFloat(s) === 0 ? formatTinyNonZero(n) : s;
 }
 
 /** USD on a position line, Liquity V2's detail-row style: `< $0.01` for
@@ -106,7 +109,7 @@ export function PositionRow({
               value={exact?.after}
               icon={<TokenChipIcon symbol={symbol} address={address} size={16} />}
             >
-              {fmtPositionAmount(amount)}
+              <ExactTip text={fmtPositionAmount(amount)} exact={exact?.after ?? amount} symbol={ticker} always={dust} />
             </Prov>
           </span>
         </>
@@ -117,7 +120,7 @@ export function PositionRow({
             value={exact?.after}
             icon={<TokenChipIcon symbol={symbol} address={address} size={16} />}
           >
-            {fmtPositionAmount(amount)}
+            <ExactTip text={fmtPositionAmount(amount)} exact={exact?.after ?? amount} symbol={ticker} always={dust} />
           </Prov>
         </span>
       )}
