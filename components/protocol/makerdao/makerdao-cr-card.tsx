@@ -21,10 +21,11 @@ import {
 } from "@/lib/makerdao/event-provenance";
 import { pct } from "@/components/shared/ratio-bar";
 import { RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
-import { formatCompact, formatNumber } from "@/lib/utils/format";
+import { formatNumber } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import type { MakerVaultView } from "./makerdao-vault-card";
+import { AmountText } from "@/components/shared/amount-text";
 
 export function MakerdaoCrCard({ v }: { v: MakerVaultView }) {
   // Meaningful only for an open vault with debt and the live overlay landed
@@ -62,7 +63,7 @@ export function MakerdaoCrCard({ v }: { v: MakerVaultView }) {
       </RiskFigure>
       <RiskFigure>
         <Prov info={borrowHeadroomProv(pct(v.matRatio))}>
-          {formatCompact(headroomDai)} {dsym}
+          <AmountText value={headroomDai} format="compact" /> {dsym}
         </Prov>{" "}
         more to the {pct(v.matRatio)} minimum
         {v.dustDai != null && v.dustDai > 0 ? (
@@ -70,7 +71,7 @@ export function MakerdaoCrCard({ v }: { v: MakerVaultView }) {
             {" "}
             · min debt{" "}
             <Prov info={dustProv(v.ilk)}>
-              {formatCompact(v.dustDai)} {dsym}
+              <AmountText value={v.dustDai} format="compact" /> {dsym}
             </Prov>
           </>
         ) : null}
@@ -79,7 +80,8 @@ export function MakerdaoCrCard({ v }: { v: MakerVaultView }) {
         <RiskFigure>
           {v.ilk} ceiling{" "}
           <Prov info={ilkCeilingProv(v.ilk)}>
-            {formatCompact(v.ilkDebtDai)} of {formatCompact(v.lineDai)} {dsym}
+            <AmountText value={v.ilkDebtDai} format="compact" /> of <AmountText value={v.lineDai} format="compact" />{" "}
+            {dsym}
           </Prov>
         </RiskFigure>
       ) : null}

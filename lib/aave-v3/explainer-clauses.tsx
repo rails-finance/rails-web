@@ -51,6 +51,7 @@ import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { v3Brand, v3Possessive, v3Protocol, type V3Protocol } from "./protocol-name";
 import { AAVE_V3_SWAP_LABELS } from "./swap-kinds";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** The signed reserve delta this event moved — supply/borrow/transfer_in raise
  *  their side (+), withdraw/repay/transfer_out lower it (−). Mirrors the
@@ -625,7 +626,7 @@ function liquidationSlots(ctx: AaveV3Context, coords: V3Coords, debtSym: string)
       value={chainTruthDeltaValue(-Number(ctx.liquidatedCollateralAmount), false)}
       symbol={collSym}
     >
-      {formatNumber(Number(ctx.liquidatedCollateralAmount))} {collSym}
+      <AmountText value={Number(ctx.liquidatedCollateralAmount)} /> {collSym}
     </Fig>
   );
   const clearedFig = (
@@ -634,7 +635,7 @@ function liquidationSlots(ctx: AaveV3Context, coords: V3Coords, debtSym: string)
       value={chainTruthDeltaValue(-Number(ctx.debtToCover), false)}
       symbol={debtSym}
     >
-      {formatNumber(Number(ctx.debtToCover))} {debtSym}
+      <AmountText value={Number(ctx.debtToCover)} /> {debtSym}
     </Fig>
   );
 

@@ -48,6 +48,7 @@ import {
 } from "@/lib/pwn/event-provenance";
 import { shortTokenId } from "@/lib/pwn/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
+import { AmountText } from "@/components/shared/amount-text";
 
 export type PwnEvent = BaseActivityEvent & { context: { protocol: "pwn"; data: PwnContext } };
 
@@ -165,8 +166,8 @@ export function pwnEventSlots(
         ? clause(
             interest != null && interest > 0 ? (
               <>
-                The borrower owes a fixed {repayFig(ctx, coords)} back — the principal plus {formatNumber(interest)}{" "}
-                {creditSym} of interest.
+                The borrower owes a fixed {repayFig(ctx, coords)} back — the principal plus{" "}
+                <AmountText value={interest} /> {creditSym} of interest.
               </>
             ) : (
               <>The borrower owes a fixed {repayFig(ctx, coords)} back.</>
@@ -178,7 +179,11 @@ export function pwnEventSlots(
         : null;
       const dueClause: ClauseInput = ctx.dueValue
         ? ctx.dueKind === "duration"
-          ? clause(<>The loan runs {formatNumber(Number(ctx.dueValue) / 86400)} days from origination.</>)
+          ? clause(
+              <>
+                The loan runs <AmountText value={Number(ctx.dueValue) / 86400} /> days from origination.
+              </>,
+            )
           : clause(<>The loan is due by {fmtTs(ctx.dueValue)}.</>)
         : null;
       const defaultDoor: ClauseInput = ctx.dueValue
@@ -204,8 +209,8 @@ export function pwnEventSlots(
         ctx.creditSymbol && interest != null && interest > 0
           ? clause(
               <>
-                That total was {creditFig(ctx, coords)} of principal and {formatNumber(interest)} {creditSym} of fixed
-                interest.
+                That total was {creditFig(ctx, coords)} of principal and <AmountText value={interest} /> {creditSym} of
+                fixed interest.
               </>,
             )
           : null;

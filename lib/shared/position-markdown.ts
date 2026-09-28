@@ -3,9 +3,13 @@
 // (no compact "60K" notation) because an LLM reasons better over exact values
 // than over rounded display strings.
 
+import { formatExact } from "@/lib/utils/format";
+
 export function num(n: number, maxDecimals = 2): string {
   if (!Number.isFinite(n)) return "—";
-  return n.toLocaleString("en-US", { maximumFractionDigits: maxDecimals });
+  const s = n.toLocaleString("en-US", { maximumFractionDigits: maxDecimals });
+  // A non-zero amount below the rounding states every digit, never a false 0.
+  return n !== 0 && parseFloat(s.replace(/,/g, "")) === 0 ? formatExact(n) : s;
 }
 
 export function amt(n: number): string {

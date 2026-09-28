@@ -12,9 +12,9 @@ import { Prov } from "@/components/shared/provenance";
 import { pct } from "@/components/shared/ratio-bar";
 import { RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
 import { vaultConfigProv, fluidLiqPriceProv, liveBorrowRateProv } from "@/lib/fluid/live-provenance";
-import { formatCompact } from "@/lib/utils/format";
 import { poolShareLabel } from "@/lib/fluid/asset-catalog";
 import type { FluidPositionChainResponse } from "@/lib/api/fetch-fluid-position";
+import { AmountText } from "@/components/shared/amount-text";
 
 export function FluidRiskView({ chain, pair }: { chain: FluidPositionChainResponse; pair: string }) {
   // Meaningful only for a live borrowing position with a live oracle price.
@@ -47,7 +47,7 @@ export function FluidRiskView({ chain, pair }: { chain: FluidPositionChainRespon
     <>
       <RiskFigure>
         <Prov info={fluidLiqPriceProv(colSym, debtSym, chain.vault, pair)}>
-          {formatCompact(headroom)} {debtSym}
+          <AmountText value={headroom} format="compact" /> {debtSym}
         </Prov>{" "}
         more to the{" "}
         <Prov info={vaultConfigProv("Collateral factor (borrow gate)", "collateralFactor", chain.vault, pair)}>

@@ -1,5 +1,7 @@
 "use client";
 
+import { formatExact } from "@/lib/utils/format";
+import { ExactTip } from "@/components/shared/amount-text";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useEffect, useRef, useState } from "react";
@@ -348,7 +350,13 @@ export function TimelineRunCard({
               <span key={`${agg.verb}_${agg.symbol}_${i}`} className="inline-flex items-center gap-1.5 text-sm">
                 <span className={VERB_CLASSES[tone]}>{agg.verb}</span>
                 <Prov value={fullNum(agg.value)} symbol={agg.symbol} info={runProv(agg.provWhat)}>
-                  <span className="font-bold text-foreground">{fmtHeaderMagnitude(agg.value)}</span>
+                  <span className="font-bold text-foreground">
+                    <ExactTip
+                      text={fmtHeaderMagnitude(agg.value, agg.symbol)}
+                      exact={formatExact(agg.value)}
+                      symbol={agg.symbol}
+                    />
+                  </span>
                 </Prov>
                 <TokenChipIcon symbol={agg.symbol} iconOverride={agg.iconSymbol} size={16} />
                 {agg.count != null && (

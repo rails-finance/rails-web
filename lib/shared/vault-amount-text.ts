@@ -14,7 +14,7 @@
 // So the rules moved HERE, where both runtimes can read them, and the client
 // module re-exports them. Nothing about the rules changed in the move.
 
-import { formatUnitsExact } from "@/lib/utils/format";
+import { TINY_AMOUNT_FLOOR, TINY_AMOUNT_FLOOR_TEXT, formatUnitsExact } from "@/lib/utils/format";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 
 /** An amount of a vault's asset. Two decimal places for a six-decimal asset
@@ -40,8 +40,14 @@ export const shareText = (a: RawAmount, decimals: number) => {
 };
 
 /** A percentage to four significant figures. Only ever called above the dust
- *  threshold, where four figures is a real reading rather than a row of zeroes. */
-export const pctText = (fraction: number) => `${(fraction * 100).toPrecision(4)}%`;
+ *  threshold, where four figures is a real reading rather than a row of zeroes.
+ *  Below 0.000001% toPrecision would switch to exponent form, so that reads
+ *  as the floor. */
+export const pctText = (fraction: number) => {
+  const p = fraction * 100;
+  if (p !== 0 && Math.abs(p) < TINY_AMOUNT_FLOOR) return `${TINY_AMOUNT_FLOOR_TEXT}%`;
+  return `${p.toPrecision(4)}%`; // exponent-safe: |p| ≥ 1e-6 here
+};
 
 export const shortId = (id: string) => `${id.slice(0, 10)}…${id.slice(-6)}`;
 

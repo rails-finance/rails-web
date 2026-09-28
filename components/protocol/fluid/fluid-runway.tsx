@@ -3,8 +3,8 @@
 import { PriceRunway } from "@/components/shared/price-runway";
 import { Prov } from "@/components/shared/provenance";
 import { fluidLiqPriceProv, vaultOraclePriceProv } from "@/lib/fluid/live-provenance";
-import { formatNumber } from "@/lib/utils/format";
 import type { FluidPositionChainResponse } from "@/lib/api/fetch-fluid-position";
+import { AmountText } from "@/components/shared/amount-text";
 
 /**
  * Liquidation runway for a Fluid position — the shared bar in its PRICE mode,
@@ -51,17 +51,17 @@ export function FluidRunway({ chain, compact = false }: { chain: FluidPositionCh
           <>
             liquidation{" "}
             <Prov info={fluidLiqPriceProv(colSym, debtSym, chain.vault, pair)}>
-              {formatNumber(chain.liqPriceDebtPerCol)}
+              <AmountText value={chain.liqPriceDebtPerCol} />
             </Prov>{" "}
             · {colSym}{" "}
             <Prov info={vaultOraclePriceProv(colSym, debtSym, chain.oracle, "liquidate")}>
-              {formatNumber(chain.oraclePriceLiquidateDebtPerCol)} {debtSym}
+              <AmountText value={chain.oraclePriceLiquidateDebtPerCol} /> {debtSym}
             </Prov>
           </>
         }
         underwaterCaption={
           <>
-            recovers at {formatNumber(chain.liqPriceDebtPerCol)} {debtSym} per {colSym}
+            recovers at <AmountText value={chain.liqPriceDebtPerCol} /> {debtSym} per {colSym}
           </>
         }
       />

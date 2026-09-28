@@ -30,6 +30,7 @@ import {
   type ChainTruthTransition,
 } from "@/components/shared/chain-truth-event";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** The fork vocabulary's builders the cells read (lib/<fork>/event-provenance.ts). */
 export interface LiquityForkStateProvs {
@@ -188,7 +189,7 @@ export function liquityForkStateStats(
                   info={p.costPerYearProv(coords, { debt: f.costDebt, rate: String(f.rate) })}
                   value={formatNumber(f.costPerYear)}
                 >
-                  {formatNumber(f.costPerYear)}
+                  <AmountText value={f.costPerYear} />
                 </Figure>{" "}
                 {debtSymbol} / year
               </>

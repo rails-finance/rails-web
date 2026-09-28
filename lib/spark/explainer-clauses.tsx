@@ -51,6 +51,7 @@ import {
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { MAINNET_CHAIN_ID, explorerUrl } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** A leg reads as cleared when its replayed after-balance sits at or below this
  *  — the interest-blind residual a full repay or a full seizure can leave. */
@@ -177,12 +178,12 @@ function sparkEventSlotsBase(ctx: SparkContext, coords: SparkCoords): EventProse
   // formatted exactly as the grid formats it (formatNumber over the string).
   const supplyAfterFig = () => (
     <Fig info={supplyAfterProv(sym, coords, ctx.raw?.supplyAfter)} value={formatNumber(Number(ctx.supplyAfter))}>
-      {formatNumber(Number(ctx.supplyAfter))} {sym}
+      <AmountText value={Number(ctx.supplyAfter)} /> {sym}
     </Fig>
   );
   const debtAfterFig = () => (
     <Fig info={debtAfterProv(sym, coords, ctx.raw?.debtAfter)} value={formatNumber(Number(ctx.debtAfter))}>
-      {formatNumber(Number(ctx.debtAfter))} {sym}
+      <AmountText value={Number(ctx.debtAfter)} /> {sym}
     </Fig>
   );
 
@@ -384,7 +385,7 @@ function liquidationSlots(
       value={chainTruthDeltaValue(Number(ctx.assetsDelta), false)}
       symbol={collSym}
     >
-      {formatNumber(Number(ctx.liquidatedCollateralAmount ?? Math.abs(Number(ctx.assetsDelta))))} {collSym}
+      <AmountText value={Number(ctx.liquidatedCollateralAmount ?? Math.abs(Number(ctx.assetsDelta)))} /> {collSym}
     </Fig>
   );
   const clearedFig = (
@@ -393,7 +394,7 @@ function liquidationSlots(
       value={chainTruthDeltaValue(Number(ctx.debtDelta), false)}
       symbol={debtSym}
     >
-      {formatNumber(Number(ctx.debtToCover ?? Math.abs(Number(ctx.debtDelta))))} {debtSym}
+      <AmountText value={Number(ctx.debtToCover ?? Math.abs(Number(ctx.debtDelta)))} /> {debtSym}
     </Fig>
   );
 
@@ -408,12 +409,12 @@ function liquidationSlots(
   // values (rendered only when both after-fields survive).
   const afterSupplyFig = (
     <Fig info={supplyAfterProv(collSym, coords, ctx.raw?.supplyAfter)} value={formatNumber(Number(ctx.supplyAfter))}>
-      {formatNumber(Number(ctx.supplyAfter))} {collSym}
+      <AmountText value={Number(ctx.supplyAfter)} /> {collSym}
     </Fig>
   );
   const afterDebtFig = (
     <Fig info={debtAfterProv(debtSym, coords, ctx.raw?.debtAfter)} value={formatNumber(Number(ctx.debtAfter))}>
-      {formatNumber(Number(ctx.debtAfter))} {debtSym}
+      <AmountText value={Number(ctx.debtAfter)} /> {debtSym}
     </Fig>
   );
   const changed: ClauseInput =

@@ -27,10 +27,11 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { StatValue, StatFootnote } from "@/components/shared/stat-value";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import type { SessionProtocol } from "@/lib/shared/sessions";
-import { formatHeadlineAmount, formatUnitsExact } from "@/lib/utils/format";
+import { formatUnitsExact } from "@/lib/utils/format";
 import { alchemixPositionName } from "@/lib/alchemix/naming";
 import type { AlchemixAmount, AlchemixTransmuterPositionSummary } from "@/types/api/alchemix";
 import { transmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
+import { AmountText } from "@/components/shared/amount-text";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -75,7 +76,7 @@ function amountValue(a: AlchemixAmount, symbol: string, prov?: Provenance): Reac
   const n = Number(a.raw.split(".")[0]) / 10 ** WAD_DECIMALS;
   const figure = (
     <>
-      {formatHeadlineAmount(n)} {symbol}
+      <AmountText value={n} format="headline" symbol={symbol} /> {symbol}
     </>
   );
   return (
@@ -165,11 +166,13 @@ export function claimColumn(
               value={formatUnitsExact(c.unclaimed.raw, WAD_DECIMALS)}
               symbol={c.unclaimed.symbol}
             >
-              {formatHeadlineAmount(Number(c.unclaimed.raw) / 1e18)} {c.unclaimed.symbol}
+              <AmountText value={Number(c.unclaimed.raw) / 1e18} format="headline" symbol={c.unclaimed.symbol} />{" "}
+              {c.unclaimed.symbol}
             </Prov>
           ) : (
             <>
-              {formatHeadlineAmount(Number(c.unclaimed.raw) / 1e18)} {c.unclaimed.symbol}
+              <AmountText value={Number(c.unclaimed.raw) / 1e18} format="headline" symbol={c.unclaimed.symbol} />{" "}
+              {c.unclaimed.symbol}
             </>
           )}
         </span>{" "}

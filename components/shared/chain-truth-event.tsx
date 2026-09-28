@@ -44,7 +44,8 @@ import {
 } from "@/components/shared/state-transition";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
-import { formatCompact, formatExact, formatHeadlineAmount, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatCompact, formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { ExactTip } from "@/components/shared/amount-text";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 
@@ -53,15 +54,15 @@ import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
  *  non-numeric placeholders ("—") and sub-1000 values through unchanged. */
 function compactAmount(full: string): string {
   const n = Number(full.replace(/,/g, ""));
-  return Number.isFinite(n) && full.trim() !== "" ? formatHeadlineAmount(n) : full;
+  return Number.isFinite(n) && full.trim() !== "" ? formatCompact(n) : full;
 }
 
-/** A stat's before, change or interest figure as shown: a nonzero magnitude
- *  below 0.01 reads "<0.01" (formatHeadlineAmount's convention), signed where
- *  the figure is a change. Judged on the exact string, which every builder
- *  supplies, so each family's compact form is covered here and scientific
- *  notation never reaches the face. The exact figure stays in the tooltip and
- *  the receipt. */
+/** A stat's before, change or interest figure as shown. Below 0.01 it is
+ *  rewritten from the exact string with formatNumber (three significant
+ *  digits, "<0.000001" below that), so no family's own compact form can reach
+ *  the face in exponent notation. A change keeps its sign, with a space before
+ *  a "<" ("+ <0.000001"); a before carries none. The exact figure stays in the
+ *  tooltip and the receipt. */
 function transitionFigure(shown: string, exact: string, signed = true): string {
   const m = /^([+\u2212-]?)(.*)$/.exec(exact.trim());
   if (!m) return shown;
@@ -70,7 +71,8 @@ function transitionFigure(shown: string, exact: string, signed = true): string {
   // A balance carries no sign: a before below zero is a rounding residue of
   // the after − change inverse, and reads as the dust it is.
   const sign = !signed ? "" : m[1] === "-" ? "\u2212" : m[1];
-  return `${sign}<0.01`;
+  const body = formatNumber(Math.abs(n));
+  return sign && body.startsWith("<") ? `${sign} ${body}` : `${sign}${body}`;
 }
 
 /** USD chip formatter — the Liquity V2 / Aave V4 detail-chip style: `< $0.01`
@@ -458,10 +460,10 @@ export function ChainTruthRow({
         // Labeled deltas (redemption's Cleared/Reduced) show a bare magnitude —
         // the label carries the direction; unlabeled ones keep the ± sign. A
         // custody row is bare too: the to/from chip is its direction.
-        // A dust magnitude reads "<0.01"; a space keeps the sign from running
-        // into the "<" ("− <0.01", not "−<0.01").
+        // A dust magnitude reads "<0.01" (see fmtHeaderMagnitude); a space
+        // keeps the sign from running into the "<" ("− <0.01").
         const bare = Boolean(d.label) || Boolean(spec.custody);
-        const magnitude = fmtHeaderMagnitude(Math.abs(d.value));
+        const magnitude = fmtHeaderMagnitude(Math.abs(d.value), d.symbol);
         const text = bare ? magnitude : `${d.value < 0 ? "−" : "+"}${magnitude.startsWith("<") ? " " : ""}${magnitude}`;
         const toneClass = d.tone === "caution" ? "text-caution-600 dark:text-caution-400" : "text-rb-500";
         // A token whose decimals did not load states no amount, at any width:
@@ -497,7 +499,9 @@ export function ChainTruthRow({
             <span key={i} className="inline-flex items-center gap-1.5 text-sm">
               {d.label && <span className={toneClass}>{d.label}</span>}
               <Prov info={d.prov} value={exact} symbol={d.symbol} className={deltaHide || undefined}>
-                <span className="font-semibold tabular-nums text-foreground">{text}</span>
+                <span className="font-semibold tabular-nums text-foreground">
+                  <ExactTip text={text} exact={exact} symbol={d.symbol} />
+                </span>
               </Prov>
               <TokenChipIcon symbol={d.symbol} address={d.address} size={16} />
               {d.suffix && <span className="text-[10px] font-normal text-rb-500">{d.suffix}</span>}
@@ -508,7 +512,9 @@ export function ChainTruthRow({
           <Prov key={i} info={d.prov} value={exact} symbol={d.symbol} className={deltaHide || undefined}>
             <span className="inline-flex items-center gap-1.5 text-sm">
               {d.label && <span className={toneClass}>{d.label}</span>}
-              <span className="font-semibold tabular-nums text-foreground">{text}</span>
+              <span className="font-semibold tabular-nums text-foreground">
+                <ExactTip text={text} exact={exact} symbol={d.symbol} />
+              </span>
               <TokenChipIcon symbol={d.symbol} address={d.address} size={16} />
               {d.suffix && <span className="text-[10px] font-normal text-rb-500">{d.suffix}</span>}
             </span>
@@ -676,16 +682,22 @@ export function ChainTruthDetail({
                   <DeltaToggle
                     before={
                       <Prov info={s.transition.beforeProv} value={s.transition.beforeExact}>
-                        <span title={s.transition.beforeExact}>
-                          {transitionFigure(s.transition.before, s.transition.beforeExact, false)}
-                        </span>
+                        <ExactTip
+                          always
+                          text={transitionFigure(s.transition.before, s.transition.beforeExact, false)}
+                          exact={s.transition.beforeExact}
+                          symbol={s.symbol}
+                        />
                       </Prov>
                     }
                     delta={
                       <Prov info={s.transition.changeProv} value={s.transition.changeExact}>
-                        <span title={s.transition.changeExact}>
-                          {transitionFigure(s.transition.change, s.transition.changeExact)}
-                        </span>
+                        <ExactTip
+                          always
+                          text={transitionFigure(s.transition.change, s.transition.changeExact)}
+                          exact={s.transition.changeExact}
+                          symbol={s.symbol}
+                        />
                       </Prov>
                     }
                     size="sm"
@@ -696,11 +708,8 @@ export function ChainTruthDetail({
                   value={s.value}
                   icon={s.symbol ? <TokenChipIcon symbol={s.symbol} address={s.address} size={16} /> : undefined}
                 >
-                  <span
-                    title={s.symbol ? `${s.value} ${s.symbol}` : s.value}
-                    className={`text-sm font-semibold tabular-nums ${changeTone(changed)}`}
-                  >
-                    {s.display ?? compactAmount(s.value)}
+                  <span className={`text-sm font-semibold tabular-nums ${changeTone(changed)}`}>
+                    <ExactTip always text={s.display ?? compactAmount(s.value)} exact={s.value} symbol={s.symbol} />
                     {symbolText && s.symbol ? <span className="font-normal text-rb-500"> {s.symbol}</span> : null}
                   </span>
                 </Prov>
@@ -718,12 +727,15 @@ export function ChainTruthDetail({
                 <StatSubline>
                   {s.interestSincePrevious.label ?? "Interest since previous event"}:{" "}
                   <Prov info={s.interestSincePrevious.prov} value={s.interestSincePrevious.value} symbol={s.symbol}>
-                    <span title={s.interestSincePrevious.value}>
-                      {transitionFigure(
+                    <ExactTip
+                      always
+                      text={transitionFigure(
                         formatNumber(Number(s.interestSincePrevious.value)),
                         s.interestSincePrevious.value,
                       )}
-                    </span>
+                      exact={s.interestSincePrevious.value}
+                      symbol={s.symbol}
+                    />
                   </Prov>{" "}
                   {s.symbol}
                 </StatSubline>

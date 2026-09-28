@@ -17,13 +17,13 @@
 import type { MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
 import type { MoonwellPositionView } from "@/components/protocol/moonwell/moonwell-position-card";
 import type { MoonwellCardCaptions } from "@/lib/moonwell/economics";
-import { formatNumber } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { capacityShare } from "@/lib/shared/capacity-share";
 import { formatDate } from "@/lib/date";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** Oxford-join asset symbols ("WETH, USDC and cbBTC"). */
 function joinSymbols(syms: string[]): string {
@@ -105,7 +105,7 @@ export function MoonwellPositionExplanation({
       <span key={`supply-${m.market}`}>
         The{" "}
         <H>
-          {formatNumber(m.supplyUnderlying)} {m.symbol}
+          <AmountText value={m.supplyUnderlying} /> {m.symbol}
         </H>{" "}
         supply{m.priceUsd != null ? <> (worth {formatUsd(m.supplyUnderlying * m.priceUsd)})</> : null} earns the market
         rate ({m.supplyApr != null ? (m.supplyApr * 100).toFixed(2) : "—"}% APR).
@@ -130,7 +130,7 @@ export function MoonwellPositionExplanation({
           <span key={m.market}>
             {i > 0 ? " and " : ""}
             <H>
-              {formatNumber(m.borrowUnderlying)} {m.symbol}
+              <AmountText value={m.borrowUnderlying} /> {m.symbol}
             </H>
             {m.borrowApr != null ? <> at {(m.borrowApr * 100).toFixed(2)}% APR</> : null}
           </span>
@@ -322,7 +322,7 @@ export function MoonwellClosedPositionExplanation({ v }: { v: MoonwellPositionVi
       <span key={r.symbol + i}>
         {i > 0 ? (i === rs.length - 1 ? " and " : ", ") : ""}
         <H>
-          {formatNumber(r.amount)} {r.symbol}
+          <AmountText value={r.amount} /> {r.symbol}
         </H>
       </span>
     ));

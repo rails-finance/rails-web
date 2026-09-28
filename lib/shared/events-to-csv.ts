@@ -32,6 +32,7 @@ import {
 } from "./types/event-shape";
 import type { QueuedExportProtocol } from "./queued-export";
 import { compoundV2LiquidationValues } from "@/lib/compound-v2/liquidation-values";
+import { toPlainDecimal } from "@/lib/utils/format";
 import { NOT_LOADED_CELL, unreadToken } from "./decimals-unread";
 
 type Column = {
@@ -43,7 +44,7 @@ type Column = {
  *  the value contains a comma, quote, or newline. */
 function escapeCsv(value: string | number | undefined | null): string {
   if (value == null) return "";
-  const s = typeof value === "number" ? String(value) : value;
+  const s = typeof value === "number" ? toPlainDecimal(value) : value;
   if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }

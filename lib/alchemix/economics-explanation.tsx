@@ -13,8 +13,8 @@
 
 import type { ReactNode } from "react";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { formatCompact, formatNumber } from "@/lib/utils/format";
 import type { AlchemixEconomicsFigures } from "@/lib/alchemix/economics";
+import { AmountText } from "@/components/shared/amount-text";
 
 export interface AlchemixFlowsRedemptions {
   count: number;
@@ -49,13 +49,13 @@ export function alchemixFlowsExplanation(opts: {
   // "Colour points back to T2").
   const n = (v: number, unit: string) => (
     <span className="tabular-nums">
-      {formatNumber(v)} {unit}
+      <AmountText value={v} /> {unit}
     </span>
   );
   const h = (v: number, unit: string) => (
     <H>
       <span className="tabular-nums">
-        {formatCompact(v)} {unit}
+        <AmountText value={v} format="compact" /> {unit}
       </span>
     </H>
   );

@@ -40,6 +40,7 @@ import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { morphoPositionContent, type MorphoPositionDeployment } from "@/lib/morpho/position-content";
 import { morphoHasDebt } from "@/lib/morpho/position-legs";
+import { AmountText } from "@/components/shared/amount-text";
 
 export interface MorphoPositionView {
   positionId: string;
@@ -271,7 +272,7 @@ export function MorphoPositionCard({
                 hasColl && L.collateralValue != null && !v.loanDecimalsUnread ? (
                   <StatFootnote>
                     <Prov info={R.collateralValue(collSym, v.loanSymbol, L.block)}>
-                      worth {formatNumber(L.collateralValue)} {v.loanSymbol} at the market&rsquo;s oracle
+                      worth <AmountText value={L.collateralValue} /> {v.loanSymbol} at the market&rsquo;s oracle
                     </Prov>
                   </StatFootnote>
                 ) : hasColl ? (
@@ -468,7 +469,7 @@ export function MorphoPositionCard({
               v.currentDebt && !v.loanDecimalsUnread ? (
                 <StatFootnote>
                   <Prov info={morphoAccruedProv(v.loanSymbol)}>
-                    +{formatNumber(v.currentDebt.accruedAmount)} accrued
+                    +<AmountText value={v.currentDebt.accruedAmount} /> accrued
                   </Prov>
                   {v.currentDebt.index?.stale && (
                     <div>

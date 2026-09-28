@@ -54,6 +54,7 @@
 // plus its own provenance module, never a branch in the layout.
 
 import { type ReactNode } from "react";
+import { formatTinyNonZero } from "@/lib/utils/format";
 import { usePathname } from "next/navigation";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 
@@ -138,11 +139,11 @@ const grouped = (n: number, decimals: number): string =>
   n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 /** An amount the way a regular card's grid writes one: whole units from a
- *  thousand up, two places below. */
+ *  thousand up, two places down to 0.01, formatTinyNonZero below. */
 const amountText = (n: number): string => {
   if (n === 0) return "0";
   if (Math.abs(n) >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (Math.abs(n) < 0.01) return "<0.01";
+  if (Math.abs(n) < 0.01) return formatTinyNonZero(n);
   return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 };
 

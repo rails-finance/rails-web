@@ -2,6 +2,7 @@
 
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { fmtSpine } from "@/components/shared/activity-timeline";
+import { isHighValueUnit } from "@/lib/utils/format";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 // Event-card headers hide their value spans at ≥sm (640px) so the SpineColumn
@@ -36,12 +37,14 @@ export function useHeaderValueHideClass(opts?: { isPassive?: boolean }): string 
  *  exact, byte-precise figure rides the provenance trace, not the header).
  *  Callers pass the magnitude (`Math.abs(...)`) and add their own +/− sign.
  *
- *  Below 0.01 this reads "<0.01" instead of `fmtSpine`'s scientific fallback
- *  (e.g. "1.94e-12") — the same headline threshold as `formatHeadlineAmount`
- *  in lib/utils/format.ts, kept as its own guard rather than a call to that
- *  helper: `fmtSpine`'s own compact rounding (1dp above 1M) stays intact for
- *  every other magnitude, so the header still never disagrees with the spine
- *  it mirrors. The exact figure still rides the provenance trace.
+ *  Below 0.01 this reads "<0.01" instead of `fmtSpine`'s digits — the same
+ *  headline rule as `formatHeadlineAmount` in lib/utils/format.ts, kept as its
+ *  own guard rather than a call to that helper: `fmtSpine`'s own compact
+ *  rounding (1dp above 1M) stays intact for every other magnitude, so the
+ *  header still never disagrees with the spine it mirrors. A BTC-class or gold
+ *  `symbol` (`isHighValueUnit`) keeps `fmtSpine`'s digits below 0.01, since
+ *  "<0.01" there could hide hundreds of dollars. The exact figure rides the
+ *  tooltip (<ExactTip>) and the provenance trace.
  *
  *  A genuine zero states "0" rather than `fmtSpine`'s empty string: `fmtSpine`
  *  is written for the spine's flanking cells, where a blank cell is right,
@@ -50,10 +53,10 @@ export function useHeaderValueHideClass(opts?: { isPassive?: boolean }): string 
  *  surface cannot afford (rails-ops TO-DO-ui-jobs item 74). An unmeasurable
  *  value (`NaN`) still falls through to `fmtSpine` and reads blank, so that
  *  distinction is kept. */
-export function fmtHeaderMagnitude(n: number): string {
+export function fmtHeaderMagnitude(n: number, symbol?: string | null): string {
   if (n === 0) return "0";
   const abs = Math.abs(n);
-  if (abs > 0 && abs < 0.01) return "<0.01";
+  if (abs > 0 && abs < 0.01 && !isHighValueUnit(symbol)) return "<0.01";
   return fmtSpine(n);
 }
 

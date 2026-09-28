@@ -42,9 +42,10 @@ import {
   bookTermLengthProv,
   bookInterestShareProv,
 } from "@/lib/pwn/event-provenance";
-import { formatCompact, formatExact } from "@/lib/utils/format";
+import { formatExact } from "@/lib/utils/format";
 import type { PwnLoanBook } from "@/lib/pwn/loan-book";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { AmountText } from "@/components/shared/amount-text";
 
 const pct = (f: number): string => `${(f * 100).toFixed(1)}%`;
 const days = (d: number): string => (d < 1 ? `${(d * 24).toFixed(0)} h` : `${Math.round(d)} d`);
@@ -217,13 +218,15 @@ function CreditSection({ book }: { book: PwnLoanBook }) {
               </div>
               <div className="text-xs tabular-nums text-foreground sm:text-right">
                 <Prov info={bookPrincipalProv(t.symbol, "advanced")} value={formatExact(t.principalAdvanced)}>
-                  {formatCompact(t.principalAdvanced)}
+                  <AmountText value={t.principalAdvanced} format="compact" />
                 </Prov>
               </div>
               <div className="text-xs tabular-nums sm:text-right">
                 {t.open > 0 ? (
                   <Prov info={bookPrincipalProv(t.symbol, "outstanding")} value={formatExact(t.principalOutstanding)}>
-                    <span className="text-foreground">{formatCompact(t.principalOutstanding)}</span>
+                    <span className="text-foreground">
+                      <AmountText value={t.principalOutstanding} format="compact" />
+                    </span>
                   </Prov>
                 ) : (
                   <span className="text-rb-500">—</span>
@@ -232,7 +235,9 @@ function CreditSection({ book }: { book: PwnLoanBook }) {
               <div className="text-xs tabular-nums sm:text-right">
                 {t.repayOwed != null ? (
                   <Prov info={bookRepayOwedProv(t.symbol)} value={formatExact(t.repayOwed)}>
-                    <span className="text-foreground">{formatCompact(t.repayOwed)}</span>
+                    <span className="text-foreground">
+                      <AmountText value={t.repayOwed} format="compact" />
+                    </span>
                   </Prov>
                 ) : (
                   <span className="text-rb-500">—</span>

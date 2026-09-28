@@ -36,7 +36,8 @@ import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { aaveVaultFlowsContent } from "@/lib/shared/learn-more-content";
 import type { VaultPositionEconomics, VaultPositionFlows } from "@/lib/aave-vaults/position-economics";
 import type { ChainTruthTowerData } from "@/lib/shared/chain-truth-economics";
-import { formatCompact, formatNumber } from "@/lib/utils/format";
+import { formatCompact } from "@/lib/utils/format";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** The figures behind the bars, as the bars have them: token units, summed
  *  after the feeder's bucketing. */
@@ -147,11 +148,12 @@ function vaultPositionEconomicsExplanation(
   items.push(
     <span key="assets">
       The vault&rsquo;s own events record <Fig>{amountText(deposited, assetSym)}</Fig> deposited across{" "}
-      {formatNumber(flows.counts.mints)} mint{flows.counts.mints === 1 ? "" : "s"}
+      <AmountText value={flows.counts.mints} /> mint{flows.counts.mints === 1 ? "" : "s"}
       {withdrawn > 0 && (
         <>
           {" "}
-          and <Fig>{amountText(withdrawn, assetSym)}</Fig> withdrawn across {formatNumber(flows.counts.burns)} burn
+          and <Fig>{amountText(withdrawn, assetSym)}</Fig> withdrawn across <AmountText value={flows.counts.burns} />{" "}
+          burn
           {flows.counts.burns === 1 ? "" : "s"}
         </>
       )}
@@ -193,7 +195,7 @@ function vaultPositionEconomicsExplanation(
   if (flows.counts.assetlessTransfers > 0)
     items.push(
       <span key="assetless">
-        {formatNumber(flows.counts.assetlessTransfers)} row
+        <AmountText value={flows.counts.assetlessTransfers} /> row
         {flows.counts.assetlessTransfers === 1 ? " moved" : "s moved"} shares only; no asset word was emitted for{" "}
         {flows.counts.assetlessTransfers === 1 ? "it" : "them"}, so nothing on the asset side counts{" "}
         {flows.counts.assetlessTransfers === 1 ? "it" : "them"} and no share of it is converted.
@@ -203,8 +205,8 @@ function vaultPositionEconomicsExplanation(
   if (flows.counts.legless > 0)
     items.push(
       <span key="legless">
-        {formatNumber(flows.counts.legless)} mint or burn carried no ERC-4626 event naming this address, so its shares
-        are in the share totals and its assets are in no total at all.
+        <AmountText value={flows.counts.legless} /> mint or burn carried no ERC-4626 event naming this address, so its
+        shares are in the share totals and its assets are in no total at all.
       </span>,
     );
 
@@ -224,7 +226,7 @@ function vaultPositionEconomicsExplanation(
           over. The set is this address's whole history in the vault, and the
           sentence says exactly that. */}
       <p className="leading-relaxed">
-        These totals are summed over all {formatNumber(total)} share movement{total === 1 ? "" : "s"} in this
+        These totals are summed over all <AmountText value={total} /> share movement{total === 1 ? "" : "s"} in this
         address&rsquo;s history in the vault, each in its own token&rsquo;s units. The two sides are different tokens,
         so their heights are not comparable.
       </p>

@@ -33,7 +33,7 @@ import { StatValue, StatFootnote } from "@/components/shared/stat-value";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
-import { formatHeadlineAmount, formatUnitsExact } from "@/lib/utils/format";
+import { formatUnitsExact } from "@/lib/utils/format";
 import { isAlchemixV2Event, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { alchemixV2PositionName } from "@/lib/alchemix/naming";
 import { v3PositionPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
@@ -48,6 +48,7 @@ import {
 } from "@/components/protocol/alchemix/v2-position-card";
 import { AlchemixV2EventCard, type AlchemixV2Event } from "@/components/protocol/alchemix/v2-event-card";
 import type { AlchemixV2PositionData } from "@/types/api/alchemix";
+import { AmountText } from "@/components/shared/amount-text";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -175,11 +176,12 @@ export function AlchemixV2PositionView({
                         value={formatUnitsExact(c.shares.raw, c.yieldToken.decimals)}
                         symbol={c.yieldToken.symbol}
                       >
-                        {formatHeadlineAmount(c.shares.formatted)} {c.yieldToken.symbol} shares
+                        <AmountText value={c.shares.formatted} format="headline" symbol={c.yieldToken.symbol} />{" "}
+                        {c.yieldToken.symbol} shares
                       </Prov>
                       , worth{" "}
                       <Prov info={underlyingProvAt(i)!} value={formatUnitsExact(u.raw, u.decimals)} symbol={u.symbol}>
-                        {formatHeadlineAmount(u.formatted)} {u.symbol}
+                        <AmountText value={u.formatted} format="headline" symbol={u.symbol} /> {u.symbol}
                       </Prov>
                     </li>
                   );

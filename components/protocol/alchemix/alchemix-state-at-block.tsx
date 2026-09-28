@@ -53,7 +53,7 @@ import {
   type ChainTruthStat,
   type ChainTruthTransition,
 } from "@/components/shared/chain-truth-event";
-import { formatUnitsExact } from "@/lib/utils/format";
+import { formatTinyNonZero, formatUnitsExact } from "@/lib/utils/format";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
   carriedReadingProv,
@@ -80,12 +80,12 @@ const DECIMALS = 18;
 
 /** The grid's figure: whole units from a thousand up, so a small move on a
  *  large balance still shows between before and after (Liquity V2's
- *  `36,887 → 35,899`); two places below that. */
+ *  `36,887 → 35,899`); two places down to 0.01, formatTinyNonZero below. */
 const gridFigure = (raw: string): string => {
   const n = Number(raw) / 10 ** DECIMALS;
   if (n === 0) return "0";
   if (Math.abs(n) >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (Math.abs(n) < 0.01) return "<0.01";
+  if (Math.abs(n) < 0.01) return formatTinyNonZero(n);
   return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 };
 

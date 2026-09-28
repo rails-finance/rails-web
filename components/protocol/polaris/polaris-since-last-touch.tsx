@@ -34,13 +34,14 @@ import { formatCompact, formatExact } from "@/lib/utils/format";
 import { formatPethPrice } from "@/components/protocol/polaris/polaris-position-card";
 import { formatDuration } from "@/lib/date";
 import { polarisProtocolLegNames, signedFigure, type PolarisSinceLastTouch } from "@/lib/polaris/since-last-touch";
+import { AmountText } from "@/components/shared/amount-text";
 
 const DUST = 1e-9;
 
 const Signed = ({ value, unit }: { value: number; unit: string }) => (
   <span className="font-semibold text-foreground tabular-nums">
     {value >= 0 ? "+" : "−"}
-    {formatCompact(Math.abs(value))} {unit}
+    <AmountText value={Math.abs(value)} format="compact" /> {unit}
   </span>
 );
 

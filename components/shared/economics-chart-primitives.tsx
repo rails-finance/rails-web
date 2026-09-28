@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { formatTinyNonZero } from "@/lib/utils/format";
+import { formatTinyNonZero, isFloorText } from "@/lib/utils/format";
+import { ExactTip } from "@/components/shared/amount-text";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,13 @@ export const REDEMPTION_PATTERN = checkerPattern("rgba(244, 114, 182, 0.6)");
 export const LIQUIDATION_PATTERN = checkerPattern("rgba(248, 113, 113, 0.6)");
 export const REPAID_PATTERN = reverseDiagonalPattern("rgba(74, 222, 128, 0.5)");
 export const WITHDRAWN_PATTERN = reverseDiagonalPattern("rgba(96, 165, 250, 0.5)");
+
+/** A flank row's amount: a floor ("<0.000001") opens the exact figure in a
+ *  tooltip; any other figure keeps it in the title. */
+function RowAmount({ amount, exact }: { amount: string; exact?: string }) {
+  if (exact && isFloorText(amount)) return <ExactTip text={amount} exact={exact} />;
+  return <span title={exact}>{amount}</span>;
+}
 
 // ── Compact number formatter ──────────────────────────────────────────────
 
@@ -367,10 +375,10 @@ export function BreakdownTable({ rows }: { rows: BreakdownRow[] }) {
               <td className={`py-1 pl-3 text-right tabular-nums whitespace-nowrap ${cellBorder}`}>
                 {row.prov ? (
                   <Prov info={row.prov} value={row.exact}>
-                    <span title={row.exact}>{row.amount}</span>
+                    <RowAmount amount={row.amount} exact={row.exact} />
                   </Prov>
                 ) : (
-                  <span title={row.exact}>{row.amount}</span>
+                  <RowAmount amount={row.amount} exact={row.exact} />
                 )}
                 {row.usdHint &&
                   (row.usdProv ? (

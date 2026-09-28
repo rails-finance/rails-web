@@ -33,6 +33,7 @@ import { formatNumber } from "@/lib/utils/format";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
 import type { FluidPositionChainResponse } from "@/lib/api/fetch-fluid-position";
+import { AmountText } from "@/components/shared/amount-text";
 
 export interface FluidPositionView {
   nftId: string;
@@ -164,7 +165,7 @@ function SigmaFootnote({
   const showGap = Number.isFinite(gap) && gap > 0 && formatNumber(gap) !== "0";
   const sigmaFig = (
     <Prov info={positionSigmaProv(side, sym)}>
-      {formatNumber(n)} {sym}
+      <AmountText value={n} /> {sym}
     </Prov>
   );
   if (!showGap) return <StatFootnote>events add up to {sigmaFig}</StatFootnote>;
@@ -172,7 +173,7 @@ function SigmaFootnote({
     <StatFootnote>
       {sigmaFig} from events +{" "}
       <Prov info={accruedInterestProv(side, sym)}>
-        {formatNumber(gap)} {sym}
+        <AmountText value={gap} /> {sym}
       </Prov>{" "}
       interest
     </StatFootnote>

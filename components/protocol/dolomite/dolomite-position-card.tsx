@@ -53,6 +53,7 @@ import type {
   DolomiteBalanceAmount,
   DolomitePeakAmount,
 } from "@/lib/sources/api/dolomite-positions";
+import { ExactSpan } from "@/components/shared/amount-text";
 
 export interface DolomitePositionView {
   owner: string;
@@ -127,9 +128,9 @@ function FootnoteLines({ v, side }: { v: DolomitePositionView; side: "supply" | 
             <TokenAmountNotLoaded label={r.symbol} />
           ) : (
             <Prov info={legProv(r, side)}>
-              <span title={legExact(r)} data-prov-exact={legExact(r)} data-prov-symbol={r.symbol}>
+              <ExactSpan exact={legExact(r)} symbol={r.symbol}>
                 {formatCompact(legAmount(r))} {r.symbol}
-              </span>
+              </ExactSpan>
             </Prov>
           )}
         </div>

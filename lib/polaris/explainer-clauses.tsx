@@ -49,6 +49,7 @@ import { explorerUrl } from "@/lib/shared/chains";
 import { PETH, POLARIS_CHAIN_ID, shortAddress } from "@/lib/polaris/asset-catalog";
 import { formatExact, formatNumber } from "@/lib/utils/format";
 import { formatGasCost } from "@/lib/shared/format-event";
+import { AmountText } from "@/components/shared/amount-text";
 
 const EPS = 1e-9;
 
@@ -113,7 +114,7 @@ function valuedLiquidationClauses(ctx: PolarisContext, coords: PolarisCoords, st
   const holder = f.path === "sp" ? "stability pool" : "market's other CDPs";
   const legFigure = (
     <Fig info={polarisPoolLegProv(ctx, coords)} value={formatNumber(f.leg)} symbol={PETH.symbol}>
-      {formatNumber(f.leg)} pETH
+      <AmountText value={f.leg} /> pETH
     </Fig>
   );
   const legValueFigure = (
@@ -203,7 +204,7 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
       value={chainTruthDeltaValue(value, labeled)}
       symbol="pETH"
     >
-      {formatNumber(Math.abs(value))} pETH
+      <AmountText value={Math.abs(value)} /> pETH
     </Fig>
   );
   const debtFig = (value: number, labeled: boolean) => (
@@ -212,7 +213,7 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
       value={chainTruthDeltaValue(value, labeled)}
       symbol={stable}
     >
-      {formatNumber(Math.abs(value))} {stable}
+      <AmountText value={Math.abs(value)} /> {stable}
     </Fig>
   );
   // Grid echoes: the after-values and the protocol's legs, no symbol.
@@ -403,7 +404,7 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
           value={chainTruthDeltaValue(seized, true)}
           symbol="pETH"
         >
-          {formatNumber(seized)} pETH
+          <AmountText value={seized} /> pETH
         </Fig>
       );
       const clearedFig = (
@@ -412,7 +413,7 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
           value={chainTruthDeltaValue(cleared, true)}
           symbol={stable}
         >
-          {formatNumber(cleared)} {stable}
+          <AmountText value={cleared} /> {stable}
         </Fig>
       );
       return {
@@ -441,20 +442,30 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
             : clause(
                 <>
                   The stability pool absorbed {clearedFig} of its debt and took {seizedFig} of its collateral; the rest
-                  — {formatNumber(redistDebt)} {stable} of debt with {formatNumber(redistColl)} pETH — was redistributed
-                  across the market&rsquo;s other CDPs.
+                  — <AmountText value={redistDebt} /> {stable} of debt with <AmountText value={redistColl} /> pETH — was
+                  redistributed across the market&rsquo;s other CDPs.
                 </>,
               ),
           flat > EPS || collComp > EPS
             ? clause(
                 <>
-                  The liquidator received the escrowed gas compensation of {formatNumber(flat)} pETH
-                  {collComp > EPS ? <> plus {formatNumber(collComp)} pETH of the collateral</> : null}.
+                  The liquidator received the escrowed gas compensation of <AmountText value={flat} /> pETH
+                  {collComp > EPS ? (
+                    <>
+                      {" "}
+                      plus <AmountText value={collComp} /> pETH of the collateral
+                    </>
+                  ) : null}
+                  .
                 </>,
               )
             : null,
           surplus > EPS
-            ? clause(<>{formatNumber(surplus)} pETH of collateral was left over for its owner to claim.</>)
+            ? clause(
+                <>
+                  <AmountText value={surplus} /> pETH of collateral was left over for its owner to claim.
+                </>,
+              )
             : null,
           ...valuedLiquidationClauses(ctx, coords, stable),
           ...protocolLegs(),

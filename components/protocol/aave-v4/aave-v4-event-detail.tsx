@@ -17,7 +17,6 @@ import { formatRatio, ratioLabel, ratioColorClass } from "@/lib/shared/ratio-for
 import { StatCard, StatSubline, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
 import { hfLabel } from "@/lib/aave-v4/format";
 import { PositionRow, fmtPositionUsd } from "@/components/shared/position-row";
-import { formatNumber } from "@/lib/utils/format";
 import { resolvePrice } from "@/lib/aave/prices";
 import { usePrices } from "@/lib/shared/prices-context";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
@@ -35,6 +34,7 @@ import {
   usdProv,
   type EventProvDetail,
 } from "@/lib/aave-v4/position-provenance";
+import { AmountText } from "@/components/shared/amount-text";
 
 const SNAPSHOT_USD_PROV = usdProv("The after-balance", {
   amountLabel: "balance after event",
@@ -237,7 +237,9 @@ function V4PositionRow({
       <StatSubline>
         Interest since previous event:{" "}
         <Prov info={interestSincePreviousProv(detail, side)} value={interest} symbol={aaveV4DisplaySymbol(symbol)}>
-          <span title={interest}>{formatNumber(Number(interest))}</span>
+          <span title={interest}>
+            <AmountText value={Number(interest)} />
+          </span>
         </Prov>{" "}
         {aaveV4DisplaySymbol(symbol)}
       </StatSubline>

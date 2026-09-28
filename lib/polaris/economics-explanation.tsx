@@ -9,6 +9,7 @@ import type { ChainTruthTowerData, TowerLine, TowerSideData } from "@/lib/shared
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatCompact, formatExact } from "@/lib/utils/format";
 import type { PolarisLifetime } from "./economics";
+import { AmountText } from "@/components/shared/amount-text";
 
 const DUST = 1e-9;
 
@@ -267,7 +268,7 @@ export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pet
   const signed = (n: number) => (
     <span className="font-semibold text-foreground tabular-nums">
       {n >= 0 ? "+" : "−"}
-      {formatCompact(Math.abs(n))} {stable}
+      <AmountText value={Math.abs(n)} format="compact" /> {stable}
     </span>
   );
 

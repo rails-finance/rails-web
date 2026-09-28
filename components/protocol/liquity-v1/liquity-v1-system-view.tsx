@@ -68,9 +68,10 @@ import {
 } from "@/lib/liquity-v1/position-provenance";
 import { Stat } from "@/components/shared/stat";
 import { DEBT_SYMBOL, COLLATERAL_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
-import { formatCompact, formatExact, formatUsdValue, formatTinyNonZero } from "@/lib/utils/format";
+import { formatExact, formatUsdValue, formatTinyNonZero } from "@/lib/utils/format";
 import type { LiquityV1SystemChainResponse } from "@/lib/api/fetch-liquity-v1-system";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { AmountText } from "@/components/shared/amount-text";
 
 const LINK = "text-blue-500 hover:underline";
 
@@ -135,7 +136,7 @@ function SystemCard({ data }: { data: LiquityV1SystemChainResponse }) {
             info={systemLaneProv("The entire system's LUSD debt", "getEntireSystemDebt()")}
             value={formatExact(data.systemDebt)}
           >
-            {formatCompact(data.systemDebt)} {DEBT_SYMBOL}
+            <AmountText value={data.systemDebt} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
         <Stat label="System collateral">
@@ -143,7 +144,7 @@ function SystemCard({ data }: { data: LiquityV1SystemChainResponse }) {
             info={systemLaneProv("The entire system's ETH collateral", "getEntireSystemColl()")}
             value={formatExact(data.systemColl)}
           >
-            {formatCompact(data.systemColl)} {COLLATERAL_SYMBOL}
+            <AmountText value={data.systemColl} format="compact" /> {COLLATERAL_SYMBOL}
           </Prov>
           <span className="ml-1 text-rb-500">· {formatUsdValue(data.systemCollUsd)}</span>
         </Stat>
@@ -196,7 +197,7 @@ function StabilityPoolCard({ data }: { data: LiquityV1SystemChainResponse }) {
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
         <Stat label="LUSD in the pool">
           <Prov info={stabilityPoolProv()} value={formatExact(data.spDeposits)}>
-            {formatCompact(data.spDeposits)} {DEBT_SYMBOL}
+            <AmountText value={data.spDeposits} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
         <Stat label="Against system debt">
@@ -298,7 +299,7 @@ function QueueCard({ data }: { data: LiquityV1SystemChainResponse }) {
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
         <Stat label={`${DEBT_SYMBOL} in the queue`}>
           <Prov info={queueDebtTotalProv()} value={formatExact(data.queueDebtTotal)}>
-            {formatCompact(data.queueDebtTotal)} {DEBT_SYMBOL}
+            <AmountText value={data.queueDebtTotal} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
         <Stat label="Front of the queue">
@@ -351,7 +352,8 @@ export function LiquityV1SystemView({ data }: { data: LiquityV1SystemChainRespon
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read Liquity V1&apos;s system state from chain.</p>
         <p className="text-sm">
-          This view is a live contract read with no cached fallback, so when the read fails it shows nothing. Try again shortly.
+          This view is a live contract read with no cached fallback, so when the read fails it shows nothing. Try again
+          shortly.
         </p>
       </div>
     );
@@ -412,8 +414,8 @@ export function LiquityV1SystemStamp({ data }: { data: LiquityV1SystemChainRespo
         {data.blockNumber.toLocaleString("en-US")}
       </a>
       {" · "}
-      {formatCompact(data.systemDebt)} {DEBT_SYMBOL} outstanding against {formatUsdValue(data.systemCollUsd)} of{" "}
-      {COLLATERAL_SYMBOL}
+      <AmountText value={data.systemDebt} format="compact" /> {DEBT_SYMBOL} outstanding against{" "}
+      {formatUsdValue(data.systemCollUsd)} of {COLLATERAL_SYMBOL}
     </p>
   );
 }

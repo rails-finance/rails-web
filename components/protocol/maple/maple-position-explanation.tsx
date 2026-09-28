@@ -26,6 +26,7 @@ import { formatCompact as bandCompact } from "@/lib/shared/format-event";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** The figure the card's claim line asserts — the current redeemable value
  *  when the chain read landed, the recorded net deposits otherwise (the same
@@ -121,14 +122,14 @@ export function MaplePositionExplanation({
         <span key={`peak-${p.pool}`}>
           {peaks.length > 1 ? <>In the {p.assetSymbol} pool its holdings</> : <>Its holdings</>} peaked at{" "}
           <H>
-            {formatCompact(p.peakShares)} {p.symbol}
+            <AmountText value={p.peakShares} format="compact" /> {p.symbol}
           </H>
           , the highest balance its own history records
           {p.peakDeposited > 0 ? (
             <>
               , with{" "}
               <H>
-                {formatCompact(p.peakDeposited)} {p.assetSymbol}
+                <AmountText value={p.peakDeposited} format="compact" /> {p.assetSymbol}
               </H>{" "}
               of deposited principal recorded at its height.
             </>
@@ -176,11 +177,11 @@ export function MaplePositionExplanation({
     <>
       This position holds{" "}
       <H>
-        {formatCompact(one.shares)} {one.symbol}
+        <AmountText value={one.shares} format="compact" /> {one.symbol}
       </H>
       , shares in Maple&rsquo;s {one.assetSymbol} lending pool, with a claim on{" "}
       <H>
-        {formatCompact(one.currentValue)} {one.assetSymbol}
+        <AmountText value={one.currentValue} format="compact" /> {one.assetSymbol}
       </H>
       :
     </>
@@ -188,11 +189,11 @@ export function MaplePositionExplanation({
     <>
       This position holds{" "}
       <H>
-        {formatCompact(one.shares)} {one.symbol}
+        <AmountText value={one.shares} format="compact" /> {one.symbol}
       </H>
       , shares in Maple&rsquo;s {one.assetSymbol} lending pool, with{" "}
       <H>
-        {formatCompact(one.depositedPrincipal)} {one.assetSymbol}
+        <AmountText value={one.depositedPrincipal} format="compact" /> {one.assetSymbol}
       </H>{" "}
       of net deposits recorded:
     </>
@@ -207,11 +208,11 @@ export function MaplePositionExplanation({
         <span key={`claim-${p.pool}`}>
           In the {p.assetSymbol} pool it holds{" "}
           <H>
-            {formatCompact(p.shares)} {p.symbol}
+            <AmountText value={p.shares} format="compact" /> {p.symbol}
           </H>{" "}
           with a claim on{" "}
           <H>
-            {formatCompact(claimAmount(p))} {p.assetSymbol}
+            <AmountText value={claimAmount(p)} format="compact" /> {p.assetSymbol}
           </H>
           .
         </span>,
@@ -235,14 +236,14 @@ export function MaplePositionExplanation({
           {escrowValue != null ? (
             <>
               <H>
-                {formatCompact(escrowValue)} {p.assetSymbol}
+                <AmountText value={escrowValue} format="compact" /> {p.assetSymbol}
               </H>{" "}
               of the claim sits escrowed in the withdrawal queue.
             </>
           ) : (
             <>
               <H>
-                {formatCompact(p.escrowedShares)} {p.symbol}
+                <AmountText value={p.escrowedShares} format="compact" /> {p.symbol}
               </H>{" "}
               of the shares sit escrowed in the withdrawal queue.
             </>
@@ -260,7 +261,7 @@ export function MaplePositionExplanation({
       bullets.push(
         <span key="interest">
           <H>
-            {formatCompact(it.amount)} {it.symbol}
+            <AmountText value={it.amount} format="compact" /> {it.symbol}
           </H>{" "}
           of that claim is interest earned to date, already included in the figure above.
         </span>,

@@ -20,10 +20,11 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { StatValue, StatFootnote } from "@/components/shared/stat-value";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import type { SessionProtocol } from "@/lib/shared/sessions";
-import { formatHeadlineAmount, formatUnitsExact } from "@/lib/utils/format";
+import { formatUnitsExact } from "@/lib/utils/format";
 import { alchemixPositionName, alchemixV2PositionName } from "@/lib/alchemix/naming";
 import type { AlchemixV2PositionSummary } from "@/types/api/alchemix";
 import { NotLoaded } from "@/components/shared/not-loaded";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** alUSD and alETH are 18 decimals each, read from the tokens. */
 const SYNTHETIC_DECIMALS = 18;
@@ -60,7 +61,7 @@ export function v2DebtColumn(p: AlchemixV2PositionSummary, prov?: Provenance): O
   const magnitude = d.raw.replace(/^-/, "");
   const figure = (
     <>
-      {formatHeadlineAmount(Math.abs(d.formatted))} {p.syntheticSymbol}
+      <AmountText value={Math.abs(d.formatted)} format="headline" symbol={p.syntheticSymbol} /> {p.syntheticSymbol}
     </>
   );
   return {
@@ -97,7 +98,7 @@ export function v2CollateralColumn(
   const u = lead.underlying!;
   const figure = (
     <>
-      {formatHeadlineAmount(u.formatted)} {u.symbol}
+      <AmountText value={u.formatted} format="headline" symbol={u.symbol} /> {u.symbol}
     </>
   );
   const prov = provFor?.(p.collateral.indexOf(lead));

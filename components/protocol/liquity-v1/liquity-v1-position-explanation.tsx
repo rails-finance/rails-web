@@ -16,10 +16,10 @@ import type { LiquityV1PositionView } from "@/components/protocol/liquity-v1/liq
 import { Prov } from "@/components/shared/provenance";
 import { peakCollateralProv, peakDebtProv } from "@/lib/liquity-v1/event-provenance";
 import { fmtUsd } from "@/lib/aave-v4/format";
-import { formatNumber, formatCompact } from "@/lib/utils/format";
 import { formatDate, formatDuration } from "@/lib/date";
 import { pct } from "@/components/shared/ratio-bar";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
+import { AmountText } from "@/components/shared/amount-text";
 
 const DUST = 1e-9;
 
@@ -42,11 +42,19 @@ export function LiquityV1PositionExplanation({
   // carry the highlight.
   const lead = (
     <>
-      The Trove holds <H>{formatNumber(chain.coll)} ETH</H> of collateral
+      The Trove holds{" "}
+      <H>
+        <AmountText value={chain.coll} /> ETH
+      </H>{" "}
+      of collateral
       {hasDebt ? (
         <>
           {" "}
-          against <H>{formatNumber(chain.debt)} LUSD</H> of debt:
+          against{" "}
+          <H>
+            <AmountText value={chain.debt} /> LUSD
+          </H>{" "}
+          of debt:
         </>
       ) : (
         <> and owes nothing:</>
@@ -111,8 +119,11 @@ export function LiquityV1PositionExplanation({
       if (chain.icr != null && headroomLusd > 0) {
         bullets.push(
           <span key="headroom">
-            About <H>{formatCompact(headroomLusd)} LUSD</H> more could be borrowed before the Trove reaches the{" "}
-            {(activeRatio * 100).toFixed(0)}% minimum.
+            About{" "}
+            <H>
+              <AmountText value={headroomLusd} format="compact" /> LUSD
+            </H>{" "}
+            more could be borrowed before the Trove reaches the {(activeRatio * 100).toFixed(0)}% minimum.
           </span>,
         );
       }
@@ -120,8 +131,8 @@ export function LiquityV1PositionExplanation({
     if (chain.debtInFront != null && chain.trovesAhead != null) {
       bullets.push(
         <span key="queue">
-          Redemptions repay the lowest-ratio Troves first: {formatCompact(chain.debtInFront)} LUSD across{" "}
-          {chain.trovesAhead} Trove
+          Redemptions repay the lowest-ratio Troves first: <AmountText value={chain.debtInFront} format="compact" />{" "}
+          LUSD across {chain.trovesAhead} Trove
           {chain.trovesAhead === 1 ? "" : "s"} would be redeemed before this one.
           {chain.queueDebtTotal != null && chain.queueDebtTotal > 0 && (
             <>
@@ -139,8 +150,8 @@ export function LiquityV1PositionExplanation({
     bullets.push(
       <span key="pending">
         Redistribution from past liquidations has not yet been applied to the recorded Trove:{" "}
-        {formatNumber(chain.pendingEthReward)} ETH and {formatNumber(chain.pendingLusdReward)} LUSD are pending, applied
-        on the Trove&rsquo;s next operation.
+        <AmountText value={chain.pendingEthReward} /> ETH and <AmountText value={chain.pendingLusdReward} /> LUSD are
+        pending, applied on the Trove&rsquo;s next operation.
       </span>,
     );
   }
@@ -292,11 +303,15 @@ export function LiquityV1ClosedEpochExplanation({
       <span key="peaks">
         At its height it held{" "}
         <Prov info={peakCollateralProv()}>
-          <H>{formatNumber(v.peakCollateral)} ETH</H>
+          <H>
+            <AmountText value={v.peakCollateral} /> ETH
+          </H>
         </Prov>{" "}
         against{" "}
         <Prov info={peakDebtProv()}>
-          <H>{formatNumber(v.peakDebt)} LUSD</H>
+          <H>
+            <AmountText value={v.peakDebt} /> LUSD
+          </H>
         </Prov>{" "}
         of debt — the highest figures this life recorded, each its own lifetime maximum.
       </span>,

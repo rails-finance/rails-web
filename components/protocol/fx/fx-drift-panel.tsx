@@ -23,6 +23,7 @@ import { formatNumber } from "@/lib/utils/format";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { driftIntervalProv, driftValueProv } from "@/lib/fx/event-provenance";
 import type { FxDriftInterval, FxDriftResult } from "@/lib/sources/api/fx-drift";
+import { AmountText } from "@/components/shared/amount-text";
 
 const DUST = 1e-9;
 
@@ -32,7 +33,7 @@ function DriftCell({ value, symbol, prov }: { value: number; symbol: string; pro
     <Prov info={prov} value={`${value > 0 ? "+" : "−"}${formatNumber(Math.abs(value))} ${symbol}`}>
       <span className="tabular-nums text-foreground/80">
         {value > 0 ? "+" : "−"}
-        {formatNumber(Math.abs(value))} {symbol}
+        <AmountText value={Math.abs(value)} /> {symbol}
       </span>
     </Prov>
   );

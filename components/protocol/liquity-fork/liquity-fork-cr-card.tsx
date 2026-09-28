@@ -15,8 +15,8 @@ import { Prov } from "@/components/shared/provenance";
 import { pct } from "@/components/shared/ratio-bar";
 import { RiskFigure } from "@/components/shared/risk-footer-strip";
 import { forkLiveVocab, FORK_DEBT_SYMBOL } from "@/lib/shared/liquity-fork-live-provenance";
-import { formatCompact } from "@/lib/utils/format";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
+import { AmountText } from "@/components/shared/amount-text";
 
 export function LiquityForkCrCard({ chain }: { chain: LiquityForkTroveChainResponse }) {
   // Meaningful only for a trove with live debt and a live price.
@@ -42,7 +42,7 @@ export function LiquityForkCrCard({ chain }: { chain: LiquityForkTroveChainRespo
     <>
       <RiskFigure>
         <Prov info={vocab.liqPriceProv(chain.symbol)}>
-          {formatCompact(headroom)} {debtSymbol}
+          <AmountText value={headroom} format="compact" /> {debtSymbol}
         </Prov>{" "}
         more to the {pct(chain.mcr)} minimum
       </RiskFigure>

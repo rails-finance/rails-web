@@ -114,6 +114,7 @@ import {
   forkRateText,
 } from "@/components/protocol/liquity-fork/liquity-fork-state-stats";
 import { getForkBatchManagerName } from "@/lib/shared/fork-batch-managers";
+import { AmountText } from "@/components/shared/amount-text";
 
 const shortAddress = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -307,7 +308,7 @@ function eventSlots(
       value={chainTruthDeltaValue(debtMove, deltaLabeled)}
       symbol={debt}
     >
-      {formatNumber(Math.abs(debtMove))} {debt}
+      <AmountText value={Math.abs(debtMove)} /> {debt}
     </Fig>
   );
 
@@ -857,7 +858,7 @@ function eventSlots(
                   info={b.costPerYearProv(coords, { debt: f.costDebt, rate: String(f.rate) })}
                   value={formatNumber(f.costPerYear)}
                 >
-                  {formatNumber(f.costPerYear)} {debt}
+                  <AmountText value={f.costPerYear} /> {debt}
                 </Fig>
                 , before the manager&rsquo;s management fee.
               </>,

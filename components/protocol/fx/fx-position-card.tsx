@@ -43,6 +43,7 @@ import { formatUsd } from "@/lib/shared/format-event";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import type { FxPositionSummary } from "@/lib/sources/api/fx-positions";
 import { summariseFxDrift, type FxDriftResult } from "@/lib/sources/api/fx-drift";
+import { AmountText } from "@/components/shared/amount-text";
 
 const DUST = 1e-9;
 
@@ -91,7 +92,7 @@ function SocializedLine({ v }: { v: FxPositionView }) {
       events imply <Prov info={impliedDebtProv()}>{impliedHuman} fxUSD</Prov>
       {" · "}
       <Prov info={socializedDebtProv(diff >= 0 ? "cleared" : "accrued", v.settled.block)}>
-        {formatNumber(diff)} fxUSD
+        <AmountText value={diff} /> fxUSD
       </Prov>{" "}
       socialized (rebalances, write-offs, bad debt from other positions)
     </div>
@@ -124,7 +125,7 @@ function CollateralDriftLine({ v, drift }: { v: FxPositionView; drift: FxDriftRe
     <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
       funding &amp; rebalances {s.collsDrift < 0 ? "took" : "added"}{" "}
       <Prov info={prov}>
-        {formatNumber(Math.abs(s.collsDrift))} {v.normalizedSymbol}
+        <AmountText value={Math.abs(s.collsDrift)} /> {v.normalizedSymbol}
       </Prov>{" "}
       {scope}
     </div>

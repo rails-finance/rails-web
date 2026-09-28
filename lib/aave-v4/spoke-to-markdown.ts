@@ -18,6 +18,7 @@
 // we parseFloat only here at serialization time (the render boundary), never at
 // the data boundary.
 
+import { formatExact } from "@/lib/utils/format";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV4Event } from "@/lib/shared/types/event-shape";
 import { type PriceEntry, resolvePrice } from "@/lib/aave/prices";
@@ -65,7 +66,9 @@ export interface AaveV4SpokeMarkdownArgs {
 
 function num(n: number, maxDecimals = 2): string {
   if (!Number.isFinite(n)) return "—";
-  return n.toLocaleString("en-US", { maximumFractionDigits: maxDecimals });
+  const s = n.toLocaleString("en-US", { maximumFractionDigits: maxDecimals });
+  // A non-zero amount below the rounding states every digit, never a false 0.
+  return n !== 0 && parseFloat(s.replace(/,/g, "")) === 0 ? formatExact(n) : s;
 }
 
 /** Token amount — a few more decimals than money. */

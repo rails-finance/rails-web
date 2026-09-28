@@ -49,11 +49,12 @@ import type {
 import type { ReactNode } from "react";
 import { clause, cont, H, type ClauseInput } from "@/lib/shared/explainer-prose";
 import { shortAddr } from "@/lib/shared/format-event";
-import { formatCompact, formatNumber } from "@/lib/utils/format";
+import { formatNumber } from "@/lib/utils/format";
 import type { RedemptionNet } from "@/lib/alchemix/redemption-net";
 import { isLineRouter } from "@/lib/alchemix/lines";
 import type { AlchemixReading } from "@/lib/alchemix/readings-before";
 import { selfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
+import { AmountText } from "@/components/shared/amount-text";
 
 // The synthetic and every MYT carry 18 decimals on every line, so every figure
 // an Alchemist log emits in one of those two is scaled here (see the note on
@@ -90,7 +91,7 @@ const shown = (raw: string | null | undefined, unit: string): ReactNode => {
   if (!Number.isFinite(n)) return null;
   return (
     <H>
-      {formatCompact(n / WAD)} {unit}
+      <AmountText value={n / WAD} format="compact" /> {unit}
     </H>
   );
 };

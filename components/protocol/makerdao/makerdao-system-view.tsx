@@ -61,9 +61,10 @@ import {
 } from "@/lib/makerdao/system-provenance";
 import { Stat } from "@/components/shared/stat";
 import type { MakerIlkGroup } from "@/lib/makerdao/asset-catalog";
-import { formatCompact, formatExact, formatNumber, formatTinyNonZero, formatUsdValue } from "@/lib/utils/format";
+import { formatExact, formatNumber, formatTinyNonZero, formatUsdValue } from "@/lib/utils/format";
 import type { MakerIlkRow, MakerSystemChainResponse, MakerCeilingState } from "@/lib/sources/chain/makerdao-system";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { AmountText } from "@/components/shared/amount-text";
 
 const DEBT_SYMBOL = "DAI";
 
@@ -166,12 +167,12 @@ function VatCard({ data }: { data: MakerSystemChainResponse }) {
             it. `value` still carries the exact figure behind the compact one. */}
         <Stat label="DAI in existence">
           <Prov info={systemDebtProv()} value={formatExact(data.debtDai)}>
-            {formatCompact(data.debtDai)} {DEBT_SYMBOL}
+            <AmountText value={data.debtDai} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
         <Stat label="Global ceiling">
           <Prov info={globalLineProv()} value={formatExact(data.lineDai)}>
-            {formatCompact(data.lineDai)} {DEBT_SYMBOL}
+            <AmountText value={data.lineDai} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
       </div>
@@ -218,19 +219,19 @@ function ReconcileCard({ data }: { data: MakerSystemChainResponse }) {
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-rb-500">every ilk&apos;s debt, added up</span>
           <Prov info={ilkDebtTotalProv(data.ilks.length)} value={formatExact(data.ilkDebtTotalDai)}>
-            {formatCompact(data.ilkDebtTotalDai)}
+            <AmountText value={data.ilkDebtTotalDai} format="compact" />
           </Prov>
         </div>
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-rb-500">+ uncollateralized</span>
           <Prov info={viceProv()} value={formatExact(data.viceDai)}>
-            {formatCompact(data.viceDai)}
+            <AmountText value={data.viceDai} format="compact" />
           </Prov>
         </div>
         <div className="flex items-baseline justify-between gap-2 border-t border-rb-200 pt-1.5 dark:border-rb-700">
           <span className="text-foreground">= DAI in existence</span>
           <Prov info={systemDebtProv()} value={formatExact(data.debtDai)} echo>
-            {formatCompact(data.debtDai)}
+            <AmountText value={data.debtDai} format="compact" />
           </Prov>
         </div>
       </div>
@@ -244,8 +245,8 @@ function ReconcileCard({ data }: { data: MakerSystemChainResponse }) {
             </span>
           ) : (
             <span className="text-red-500">
-              Does not reconcile — {formatNumber(Math.abs(data.residualDai))} {DEBT_SYMBOL} of the Vat&apos;s total is
-              unaccounted for below. An ilk carrying debt is missing from this read.
+              Does not reconcile — <AmountText value={Math.abs(data.residualDai)} /> {DEBT_SYMBOL} of the Vat&apos;s
+              total is unaccounted for below. An ilk carrying debt is missing from this read.
             </span>
           )}
         </Prov>
@@ -263,12 +264,12 @@ function VowCard({ data }: { data: MakerSystemChainResponse }) {
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
         <Stat label="Surplus buffer">
           <Prov info={vowSurplusProv()} value={formatExact(data.vowSurplusDai)}>
-            {formatCompact(data.vowSurplusDai)} {DEBT_SYMBOL}
+            <AmountText value={data.vowSurplusDai} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
         <Stat label="Sin charged">
           <Prov info={vowSinProv()} value={formatExact(data.vowSinDai)}>
-            {formatCompact(data.vowSinDai)} {DEBT_SYMBOL}
+            <AmountText value={data.vowSinDai} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
       </div>
@@ -345,7 +346,7 @@ function IlkRow({ row }: { row: MakerIlkRow }) {
       <div>
         <div className="text-xs tabular-nums text-foreground">
           <Prov info={ilkDebtProv(row.ilk, formatExact(row.art), row.rate)} value={formatExact(row.debtDai)}>
-            {formatCompact(row.debtDai)}
+            <AmountText value={row.debtDai} format="compact" />
           </Prov>
         </div>
         {row.debtShare != null && row.debtShare > 0 && (
@@ -363,14 +364,16 @@ function IlkRow({ row }: { row: MakerIlkRow }) {
         {row.ceilingState !== "dormant" && row.ceilingState !== "closed" && (
           <div className="mt-0.5 text-[11px] tabular-nums text-rb-500">
             <Prov info={availableProv(row.ilk, formatExact(row.lineDai), formatExact(row.debtDai))}>
-              {formatCompact(row.availableDai)}
+              <AmountText value={row.availableDai} format="compact" />
             </Prov>{" "}
             drawable
             {row.maxLineDai != null && (
               <>
                 {" · "}
                 <Prov info={ceilingProv(row.ilk, "auto")} echo>
-                  <span>up to {formatCompact(row.maxLineDai)}</span>
+                  <span>
+                    up to <AmountText value={row.maxLineDai} format="compact" />
+                  </span>
                 </Prov>
               </>
             )}
@@ -411,7 +414,7 @@ function IlkRow({ row }: { row: MakerIlkRow }) {
         {row.dustDai > 0 && (
           <div className="mt-0.5 text-[11px] tabular-nums text-rb-500">
             <Prov info={systemDustProv(row.ilk)} value={formatExact(row.dustDai)}>
-              {formatCompact(row.dustDai)}
+              <AmountText value={row.dustDai} format="compact" />
             </Prov>{" "}
             floor
           </div>
@@ -434,7 +437,7 @@ function GroupSection({ data, group }: { data: MakerSystemChainResponse; group: 
           <span className="text-xs font-semibold text-foreground">{meta.label}</span>
           <span className="text-[11px] tabular-nums text-rb-500">
             <Prov info={groupTotalProv(meta.label.toLowerCase(), total.ilkCount)} value={formatExact(total.debtDai)}>
-              {formatCompact(total.debtDai)} {DEBT_SYMBOL}
+              <AmountText value={total.debtDai} format="compact" /> {DEBT_SYMBOL}
             </Prov>
             {total.share != null && (
               <span className="ml-1.5 text-rb-400">
@@ -480,7 +483,8 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read MakerDAO&apos;s system state from chain.</p>
         <p className="text-sm">
-          This view is a live contract read with no cached fallback, so when the read fails it shows nothing. Try again shortly.
+          This view is a live contract read with no cached fallback, so when the read fails it shows nothing. Try again
+          shortly.
         </p>
       </div>
     );
@@ -521,7 +525,7 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
             </span>
             <span className="text-[11px] tabular-nums text-rb-500">
               <Prov info={groupTotalProv("vault types", vaultIlkCount)} value={formatExact(data.userVaultDebtDai)} echo>
-                {formatCompact(data.userVaultDebtDai)} {DEBT_SYMBOL}
+                <AmountText value={data.userVaultDebtDai} format="compact" /> {DEBT_SYMBOL}
               </Prov>
             </span>
           </div>

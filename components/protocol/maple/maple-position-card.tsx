@@ -44,6 +44,7 @@ import {
 } from "@/components/shared/reserve-disclosure";
 import type { MaplePositionSummary, MaplePoolAmount, MaplePeakAmount } from "@/lib/sources/api/maple-positions";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
+import { AmountText, ExactSpan } from "@/components/shared/amount-text";
 
 export interface MaplePositionView {
   wallet: string;
@@ -108,9 +109,9 @@ function ClaimFootnoteLines({ v }: { v: MaplePositionView }) {
         return (
           <div key={p.pool}>
             <Prov info={positionSharesProv(p.symbol)}>
-              <span title={exact} data-prov-exact={exact} data-prov-symbol={p.symbol}>
+              <ExactSpan exact={exact} symbol={p.symbol}>
                 {formatCompact(p.shares)} {p.symbol}
-              </span>
+              </ExactSpan>
             </Prov>
             {p.currentValue != null && v.poolState?.[p.pool] != null && (
               <>
@@ -141,7 +142,7 @@ function InterestCaption({ captions }: { captions?: MapleCardCaptions }) {
       incl.{" "}
       <Prov info={interestEarnedProv(it.symbol)}>
         <span>
-          {formatCompact(it.amount)} {it.symbol}
+          <AmountText value={it.amount} format="compact" /> {it.symbol}
         </span>
       </Prov>{" "}
       interest earned
@@ -197,7 +198,7 @@ function PeakStack({ lines }: { lines: MaplePeakAmount[] }) {
             <div className="text-xs mt-0.5 text-rb-500">
               <Prov info={peakDepositedProv(p.assetSymbol)}>
                 <span>
-                  peak deposited {formatCompact(p.peakDeposited)} {p.assetSymbol}
+                  peak deposited <AmountText value={p.peakDeposited} format="compact" /> {p.assetSymbol}
                 </span>
               </Prov>
             </div>

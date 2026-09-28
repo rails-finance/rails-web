@@ -21,7 +21,7 @@ import { publishedText, ageText } from "@/lib/morpho/oracle-age";
 import { useAaveV4OracleRead } from "@/lib/aave-v4/use-oracle-prices";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import type { AaveV4SpokeChainReserve } from "@/lib/api/fetch-aave-v4-spoke-position";
-import { formatNumber } from "@/lib/utils/format";
+import { AmountText } from "@/components/shared/amount-text";
 
 interface ReserveFlags {
   reserveId: number;
@@ -74,7 +74,7 @@ export function AaveV4BaseReserveNotice({ reserves }: { reserves: AaveV4SpokeCha
     return [
       <li key={r.reserveId}>
         <Prov info={prov}>
-          {r.symbol} {formatNumber(p.usd)} USD
+          {r.symbol} <AmountText value={p.usd} /> USD
         </Prov>
         , published {publishedText(p.updatedAt, readTs)} ({ageText(readTs - p.updatedAt)} before this read)
       </li>,

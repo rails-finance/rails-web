@@ -16,6 +16,7 @@ import type { RedemptionNetTotal } from "@/lib/alchemix/redemption-net";
 import { formatCompact } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
 import type { AlchemixLiveState } from "@/types/api/alchemix";
+import { AmountText } from "@/components/shared/amount-text";
 
 const compact = (n: number) => formatCompact(n).display;
 /** A signed figure that keeps its sign and size however small: a lifetime net
@@ -215,14 +216,14 @@ export function AlchemixPositionExplanation({
           </H>
         ) : (
           <>
-            {formatNumber(redemptions.cleared)} {sym}
+            <AmountText value={redemptions.cleared} /> {sym}
           </>
         )}{" "}
         of this position&rsquo;s debt
         {redemptions.taken != null ? (
           <>
             {" "}
-            and took {formatNumber(redemptions.taken)} {mytSymbol} of its collateral
+            and took <AmountText value={redemptions.taken} /> {mytSymbol} of its collateral
           </>
         ) : null}
         .
@@ -242,7 +243,8 @@ export function AlchemixPositionExplanation({
                 {" "}
                 The line&rsquo;s {(net.total.fee.bps / 100).toLocaleString("en-US")}% redemption fee, paid to
                 Alchemix&rsquo;s fee receiver, is {signed(-Number(net.total.fee.valueRaw) / 1e18)}{" "}
-                {net.underlyingSymbol} of it ({formatNumber(Number(net.total.fee.sharesRaw) / 1e18)} {mytSymbol}).
+                {net.underlyingSymbol} of it (<AmountText value={Number(net.total.fee.sharesRaw) / 1e18} /> {mytSymbol}
+                ).
                 {Math.abs(Number(net.total.restRaw) / 1e18) >=
                 Math.abs(Number(net.total.fee.valueRaw) / 1e18) * 0.01 ? (
                   <>

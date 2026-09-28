@@ -62,6 +62,7 @@ import {
 } from "@/lib/makerdao/event-provenance";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** Sub-wei magnitudes read as zero — the exact-history replay lands on clean
  *  zeros, but a defensive epsilon keeps a stray residual from reading as a
@@ -215,7 +216,7 @@ function makerdaoEventSlotsBase(ctx: MakerDAOContext, coords: MakerCoords): Even
   // Collateral stat (formatNumber, same symbol → same entry key).
   const colAfterFig = () => (
     <Fig echo info={inkAfterProv(sym, coords)} value={formatNumber(rs.inkAfter)} symbol={sym}>
-      {formatNumber(rs.inkAfter)} {sym}
+      <AmountText value={rs.inkAfter} /> {sym}
     </Fig>
   );
 
@@ -226,7 +227,7 @@ function makerdaoEventSlotsBase(ctx: MakerDAOContext, coords: MakerCoords): Even
   const daiAmount: ReactNode | null =
     ctx.debtChange != null && dart !== 0 ? (
       <Fig echo info={debt.prov} value={chainTruthDeltaValue(debt.value, labeled)} symbol={dsym}>
-        {formatNumber(Math.abs(debt.value))} {dsym}
+        <AmountText value={Math.abs(debt.value)} /> {dsym}
       </Fig>
     ) : null;
 

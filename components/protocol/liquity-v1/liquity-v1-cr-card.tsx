@@ -16,9 +16,9 @@ import { Prov } from "@/components/shared/provenance";
 import { pct } from "@/components/shared/ratio-bar";
 import { RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
 import { icrProv, ratioConstantProv, borrowHeadroomProv, systemStateProv } from "@/lib/liquity-v1/position-provenance";
-import { formatCompact } from "@/lib/utils/format";
 import type { LiquityV1PositionChainResponse } from "@/lib/api/fetch-liquity-v1-position";
 import { DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
+import { AmountText } from "@/components/shared/amount-text";
 
 export function LiquityV1CrCard({ chain }: { chain: LiquityV1PositionChainResponse }) {
   // Meaningful only for an active Trove with debt and a live ratio.
@@ -55,7 +55,7 @@ export function LiquityV1CrCard({ chain }: { chain: LiquityV1PositionChainRespon
       </RiskFigure>
       <RiskFigure>
         <Prov info={borrowHeadroomProv(activeLabel)}>
-          {formatCompact(headroomLusd)} {DEBT_SYMBOL}
+          <AmountText value={headroomLusd} format="compact" /> {DEBT_SYMBOL}
         </Prov>{" "}
         more to the {activeLabel} minimum
       </RiskFigure>

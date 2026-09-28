@@ -42,6 +42,7 @@ import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { makerdaoPositionContent } from "@/lib/makerdao/position-content";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
+import { AmountText } from "@/components/shared/amount-text";
 
 export interface MakerVaultView {
   cdpId: string | null;
@@ -301,7 +302,7 @@ export function MakerVaultCard({
                   <>
                     {" · incl. "}
                     <Prov info={stabilityFeeProv(artHuman, v.rate)}>
-                      {formatNumber(accruedFee)} {debtSym}
+                      <AmountText value={accruedFee} /> {debtSym}
                     </Prov>{" "}
                     fee
                   </>

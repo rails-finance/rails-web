@@ -39,6 +39,7 @@
 // per-figure read — Comet exposes no market enumerator (the stamp says so) — so
 // they carry data-prov-exempt rather than a receipt that would overclaim.
 
+import { formatTinyNonZero } from "@/lib/utils/format";
 import type { ReactNode } from "react";
 
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
@@ -76,7 +77,7 @@ const qty = (v: number): string => {
   if (a >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
   if (a >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
   if (a >= 1e3) return `${(v / 1e3).toFixed(1)}k`;
-  if (a > 0 && a < 0.001) return v.toExponential(1);
+  if (a > 0 && a < 0.001) return formatTinyNonZero(v);
   return v.toLocaleString("en-US", { maximumFractionDigits: a < 1 ? 4 : 2 });
 };
 

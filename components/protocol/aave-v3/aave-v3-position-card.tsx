@@ -46,6 +46,7 @@ import {
   ReserveDisclosureList,
 } from "@/components/shared/reserve-disclosure";
 import type { AaveV3PositionRow, AaveV3ReserveSummary } from "@/lib/api/fetch-aave-v3-positions";
+import { ExactSpan } from "@/components/shared/amount-text";
 
 /** One reserve the wallet holds on a given side, scaled to display units. The
  *  `amountRaw` integer wei string backs the exact reveal (the raw chain figure). */
@@ -157,9 +158,9 @@ function ReserveFootnoteLines({
         return (
           <div key={r.address}>
             <Prov info={side === "supply" ? dep.supply(r.symbol, atBlock) : dep.debt(r.symbol, atBlock)}>
-              <span title={`${exact} ${r.symbol}`} data-prov-exact={exact} data-prov-symbol={r.symbol}>
+              <ExactSpan exact={exact} symbol={r.symbol}>
                 {formatCompact(r.amount)} {r.symbol}
-              </span>
+              </ExactSpan>
             </Prov>
           </div>
         );

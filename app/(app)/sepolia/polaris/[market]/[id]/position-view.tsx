@@ -64,6 +64,7 @@ import {
 } from "@/lib/shared/market-note";
 import { livePendingProv, polarisAnnualCostProv } from "@/lib/polaris/live-provenance";
 import { usePolarisUiState } from "@/hooks/usePolarisUiState";
+import { AmountText } from "@/components/shared/amount-text";
 
 // Signed figure for the pending-PSM-share strip — U+2212 minus, never a plain
 // hyphen (the receipt's own convention, e.g. netChangeProv's formulas).
@@ -338,7 +339,9 @@ export default function PolarisPositionView({
         {annualCost != null && (
           <RiskFigure label="Costs">
             <Prov info={polarisAnnualCostProv(market)} value={String(annualCost)} symbol={stable}>
-              <RiskStrong>~{formatNumber(annualCost)}</RiskStrong>
+              <RiskStrong>
+                ~<AmountText value={annualCost} />
+              </RiskStrong>
             </Prov>{" "}
             {stable} / year
           </RiskFigure>
@@ -353,7 +356,9 @@ export default function PolarisPositionView({
             {chain.accruedInterest > 0 && (
               <>
                 <Prov info={livePendingProv("accruedInterest", market)} value={String(chain.accruedInterest)}>
-                  <span>{formatNumber(chain.accruedInterest)}</span>
+                  <span>
+                    <AmountText value={chain.accruedInterest} />
+                  </span>
                 </Prov>{" "}
                 {stable} interest
               </>

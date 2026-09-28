@@ -43,11 +43,12 @@ import {
 } from "@/lib/frankencoin/system-provenance";
 import { ppmToPct } from "@/lib/frankencoin/asset-catalog";
 import { Stat } from "@/components/shared/stat";
-import { formatCompact, formatExact, formatNumber } from "@/lib/utils/format";
+import { formatExact } from "@/lib/utils/format";
 import type { FrankencoinSystemChainResponse } from "@/lib/sources/chain/frankencoin-system";
 import type { FrankencoinBook } from "@/lib/sources/api/frankencoin-system-book";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
+import { AmountText } from "@/components/shared/amount-text";
 
 const dateOf = (unix: number): string => formatDate(unix);
 
@@ -60,17 +61,17 @@ function FrancCard({ data }: { data: FrankencoinSystemChainResponse }) {
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
         <Stat label="ZCHF in existence">
           <Prov info={zchfSupplyProv()} value={formatExact(data.zchfSupply)}>
-            {formatCompact(data.zchfSupply)} ZCHF
+            <AmountText value={data.zchfSupply} format="compact" /> ZCHF
           </Prov>
         </Stat>
         <Stat label="FPS outstanding">
           <Prov info={fpsSupplyProv(data.reserveAddress)} value={formatExact(data.fpsSupply)}>
-            {formatCompact(data.fpsSupply)} FPS
+            <AmountText value={data.fpsSupply} format="compact" /> FPS
           </Prov>
         </Stat>
         <Stat label="FPS price">
           <Prov info={fpsPriceProv(data.reserveAddress)} value={formatExact(data.fpsPrice)}>
-            {formatNumber(data.fpsPrice)} ZCHF
+            <AmountText value={data.fpsPrice} /> ZCHF
           </Prov>
         </Stat>
       </div>
@@ -96,17 +97,17 @@ function CapitalCard({ data }: { data: FrankencoinSystemChainResponse }) {
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
         <Stat label="Equity (FPS holders)">
           <Prov info={equityProv()} value={formatExact(data.equity)}>
-            {formatCompact(data.equity)} ZCHF
+            <AmountText value={data.equity} format="compact" /> ZCHF
           </Prov>
         </Stat>
         <Stat label="Borrowers' reserve">
           <Prov info={minterReserveProv()} value={formatExact(data.minterReserve)}>
-            {formatCompact(data.minterReserve)} ZCHF
+            <AmountText value={data.minterReserve} format="compact" /> ZCHF
           </Prov>
         </Stat>
         <Stat label="Reserve pool, total">
           <Prov info={reserveIdentityProv(data.reserveAddress)} value={formatExact(total)}>
-            {formatCompact(total)} ZCHF
+            <AmountText value={total} format="compact" /> ZCHF
           </Prov>
         </Stat>
       </div>
@@ -156,7 +157,7 @@ function RatesCard({ data }: { data: FrankencoinSystemChainResponse }) {
         <Stat label="Opening fee">
           {data.openingFeeZchf != null ? (
             <Prov info={openingFeeProv()} value={formatExact(data.openingFeeZchf)}>
-              {formatCompact(data.openingFeeZchf)} ZCHF
+              <AmountText value={data.openingFeeZchf} format="compact" /> ZCHF
             </Prov>
           ) : (
             "—"
@@ -215,7 +216,7 @@ function BookCard({ book }: { book: FrankencoinBook }) {
             </Stat>
             <Stat label="Minted by the open book">
               <Prov info={openMintedProv()} value={formatExact(book.openMintedZchf)}>
-                {formatCompact(book.openMintedZchf)} ZCHF
+                <AmountText value={book.openMintedZchf} format="compact" /> ZCHF
               </Prov>
             </Stat>
             <Stat label="Collateral tokens">
@@ -317,7 +318,8 @@ export function FrankencoinSystemView({ data, book }: { data: FrankencoinSystemC
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read Frankencoin&apos;s system state from chain.</p>
         <p className="text-sm">
-          This view is a live contract read with no cached fallback, so when the read fails it shows nothing. Try again shortly.
+          This view is a live contract read with no cached fallback, so when the read fails it shows nothing. Try again
+          shortly.
         </p>
       </div>
     );
@@ -362,8 +364,8 @@ export function FrankencoinSystemStamp({ data }: { data: FrankencoinSystemChainR
         {data.blockNumber.toLocaleString("en-US")}
       </a>
       {" · "}
-      {formatCompact(data.zchfSupply)} ZCHF outstanding against {formatCompact(data.reserveBalance)} ZCHF of reserve
-      capital
+      <AmountText value={data.zchfSupply} format="compact" /> ZCHF outstanding against{" "}
+      <AmountText value={data.reserveBalance} format="compact" /> ZCHF of reserve capital
     </p>
   );
 }

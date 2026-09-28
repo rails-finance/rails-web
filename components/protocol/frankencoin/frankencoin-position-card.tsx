@@ -30,7 +30,7 @@ import { StatValue, StatDash, StatFootnote } from "@/components/shared/stat-valu
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Icon } from "@/components/icons/icon";
-import { formatUnitsExact, formatNumber } from "@/lib/utils/format";
+import { formatUnitsExact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
@@ -46,6 +46,7 @@ import { frankencoinPositionContent } from "@/lib/frankencoin/position-content";
 import type { Provenance } from "@/components/shared/provenance";
 import type { FrankencoinPositionSummary, FrankencoinPositionStatus } from "@/lib/sources/api/frankencoin-positions";
 import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-position";
+import { AmountText } from "@/components/shared/amount-text";
 
 export interface FrankencoinPositionView {
   /** Lowercased Position contract address — the identity. */
@@ -307,7 +308,7 @@ export function FrankencoinPositionCard({
                 <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
                   <Prov info={liqPriceProv(v)}>
                     <span>
-                      liq. price {formatNumber(v.liqPrice)} ZCHF/{v.collateralSymbol}
+                      liq. price <AmountText value={v.liqPrice} /> ZCHF/{v.collateralSymbol}
                     </span>
                   </Prov>{" "}
                   <span className="text-rb-400">(owner-declared)</span>

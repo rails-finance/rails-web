@@ -14,10 +14,10 @@
 // none are shown.
 
 import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-position";
-import { formatNumber } from "@/lib/utils/format";
 import { ppmToPct } from "@/lib/frankencoin/asset-catalog";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { formatDate } from "@/lib/date";
+import { AmountText } from "@/components/shared/amount-text";
 
 const dateOf = (unix: number): string => formatDate(unix);
 
@@ -57,21 +57,29 @@ export function FrankencoinPositionExplanation({
     <>
       This position holds{" "}
       <H>
-        {formatNumber(chain.collateral!)} {sym}
+        <AmountText value={chain.collateral!} /> {sym}
       </H>{" "}
-      of collateral and owes <H>{formatNumber(chain.minted!)} ZCHF</H>:
+      of collateral and owes{" "}
+      <H>
+        <AmountText value={chain.minted!} /> ZCHF
+      </H>
+      :
     </>
   ) : hasColl ? (
     <>
       This position holds{" "}
       <H>
-        {formatNumber(chain.collateral!)} {sym}
+        <AmountText value={chain.collateral!} /> {sym}
       </H>{" "}
       of collateral and has no debt:
     </>
   ) : hasMint ? (
     <>
-      This position owes <H>{formatNumber(chain.minted!)} ZCHF</H>:
+      This position owes{" "}
+      <H>
+        <AmountText value={chain.minted!} /> ZCHF
+      </H>
+      :
     </>
   ) : null;
 
@@ -80,10 +88,17 @@ export function FrankencoinPositionExplanation({
   if (chain.liqPrice != null && chain.liqPrice > 0) {
     bullets.push(
       <span key="price">
-        The liquidation price is <H>{formatNumber(chain.liqPrice)} ZCHF</H> per {sym} — <H>declared by the owner</H>,
-        not an oracle: Frankencoin runs no price feed, and a declared price stands until someone challenges it.
+        The liquidation price is{" "}
+        <H>
+          <AmountText value={chain.liqPrice} /> ZCHF
+        </H>{" "}
+        per {sym} — <H>declared by the owner</H>, not an oracle: Frankencoin runs no price feed, and a declared price
+        stands until someone challenges it.
         {chain.mintCeiling != null && chain.mintCeiling > 0 ? (
-          <> At this price the posted collateral covers up to {formatNumber(chain.mintCeiling)} ZCHF of minting.</>
+          <>
+            {" "}
+            At this price the posted collateral covers up to <AmountText value={chain.mintCeiling} /> ZCHF of minting.
+          </>
         ) : null}
       </span>,
     );
@@ -92,7 +107,7 @@ export function FrankencoinPositionExplanation({
   if (hasMint && chain.reserveHeld != null && chain.reserveContributionPPM != null) {
     bullets.push(
       <span key="reserve">
-        The system reserve holds back {formatNumber(chain.reserveHeld)} ZCHF (
+        The system reserve holds back <AmountText value={chain.reserveHeld} /> ZCHF (
         {ppmToPct(chain.reserveContributionPPM).toFixed(0)}%) of that minted total, returned on repayment.
       </span>,
     );
@@ -117,9 +132,9 @@ export function FrankencoinPositionExplanation({
   if (chain.challengedAmount != null && chain.challengedAmount > 0) {
     bullets.push(
       <span key="challenged">
-        {formatNumber(chain.challengedAmount)} {sym} of the collateral is <H>under challenge right now</H> — an auction
-        is testing the declared price. Phase 1 offers the challenger&rsquo;s own posted collateral at that price; only
-        if nobody buys does the position&rsquo;s collateral go to the declining phase-2 auction.
+        <AmountText value={chain.challengedAmount} /> {sym} of the collateral is <H>under challenge right now</H> — an
+        auction is testing the declared price. Phase 1 offers the challenger&rsquo;s own posted collateral at that
+        price; only if nobody buys does the position&rsquo;s collateral go to the declining phase-2 auction.
       </span>,
     );
   }
@@ -177,8 +192,9 @@ export function FrankencoinPositionExplanation({
     const vetoDays = (chain.start - openedAt) / 86400;
     bullets.push(
       <span key="veto">
-        As an original position it waited a {formatNumber(Math.round(vetoDays * 10) / 10)}-day veto window before it
-        could mint — at least three days, chosen by the owner — the window in which FPS holders could have denied it.
+        As an original position it waited a <AmountText value={Math.round(vetoDays * 10) / 10} />
+        -day veto window before it could mint — at least three days, chosen by the owner — the window in which FPS
+        holders could have denied it.
       </span>,
     );
   }

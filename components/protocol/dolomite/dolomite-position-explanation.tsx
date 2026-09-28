@@ -12,12 +12,12 @@
 // Third person throughout; only the mode present is described.
 
 import type { DolomiteChainResponse } from "@/lib/api/fetch-dolomite-position";
-import { formatNumber } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
 import { pct } from "@/components/shared/ratio-bar";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** Oxford-join asset symbols ("wstETH and WETH"). */
 function joinSymbols(syms: string[]): string {
@@ -77,7 +77,7 @@ export function DolomitePositionExplanation({
       <span key={`supply-${b.marketId}`}>
         The {b.symbol} balance holds{" "}
         <H>
-          {formatNumber(b.wei)} {b.symbol}
+          <AmountText value={b.wei} /> {b.symbol}
         </H>
         {b.priceUsd != null ? <> (worth {formatUsd(Math.abs(b.wei) * b.priceUsd)})</> : null}
         {b.supplyAprPct != null ? <>, earning {b.supplyAprPct.toFixed(2)}% APR</> : null}.
@@ -90,7 +90,7 @@ export function DolomitePositionExplanation({
       <span key={`borrow-${b.marketId}`}>
         The {b.symbol} balance owes{" "}
         <H>
-          {formatNumber(Math.abs(b.wei))} {b.symbol}
+          <AmountText value={Math.abs(b.wei)} /> {b.symbol}
         </H>
         {b.priceUsd != null ? <> (worth {formatUsd(Math.abs(b.wei) * b.priceUsd)})</> : null}
         {b.borrowAprPct != null ? <> at {b.borrowAprPct.toFixed(2)}% APR</> : null}.

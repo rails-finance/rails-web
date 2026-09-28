@@ -58,6 +58,7 @@ import {
 } from "@/lib/compound/event-provenance";
 import { marketOf, type CometMarket } from "@/lib/compound/asset-catalog";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** Below this magnitude a leg reads as zero — the sub-precision residual a
  *  crossed base balance or a fully spent balance leaves behind. */
@@ -197,13 +198,13 @@ function compoundEventSlotsBase(
   const baseAfterFig = () =>
     ctx.baseAfter != null ? (
       <Fig echo info={baseAfterProv(sym, coords)} value={formatNumber(Number(ctx.baseAfter))} symbol={sym}>
-        {formatNumber(Math.abs(Number(ctx.baseAfter)))} {sym}
+        <AmountText value={Math.abs(Number(ctx.baseAfter))} /> {sym}
       </Fig>
     ) : null;
   const collAfterFig = () =>
     ctx.collateralAfter != null ? (
       <Fig echo info={collateralAfterProv(sym, coords)} value={formatNumber(Number(ctx.collateralAfter))} symbol={sym}>
-        {formatNumber(Number(ctx.collateralAfter))} {sym}
+        <AmountText value={Number(ctx.collateralAfter)} /> {sym}
       </Fig>
     ) : null;
 
@@ -229,7 +230,7 @@ function compoundEventSlotsBase(
         <>
           The account now holds {collAfterFig()} as collateral, backing{" "}
           <Fig echo info={baseAfterProv(baseSym, coords)} value={formatNumber(Number(ctx.baseAfter))} symbol={baseSym}>
-            {formatNumber(Math.abs(base))} {baseSym}
+            <AmountText value={Math.abs(base)} /> {baseSym}
           </Fig>{" "}
           of base debt.
         </>,
@@ -362,8 +363,8 @@ function compoundEventSlotsBase(
         repay > COMPOUND_EPS && lent > COMPOUND_EPS
           ? clause(
               <>
-                {formatNumber(repay)} {sym} cleared the outstanding base debt, and the remaining {formatNumber(lent)}{" "}
-                {sym} is lent out to earn the supply rate.
+                <AmountText value={repay} /> {sym} cleared the outstanding base debt, and the remaining{" "}
+                <AmountText value={lent} /> {sym} is lent out to earn the supply rate.
               </>,
             )
           : repay > COMPOUND_EPS
@@ -395,8 +396,8 @@ function compoundEventSlotsBase(
         borrowed > COMPOUND_EPS && fromSavings > COMPOUND_EPS
           ? clause(
               <>
-                {formatNumber(fromSavings)} {sym} came from the account&rsquo;s own lent balance, and{" "}
-                {formatNumber(borrowed)} {sym} was borrowed past it against the collateral stack.
+                <AmountText value={fromSavings} /> {sym} came from the account&rsquo;s own lent balance, and{" "}
+                <AmountText value={borrowed} /> {sym} was borrowed past it against the collateral stack.
               </>,
             )
           : borrowed > COMPOUND_EPS

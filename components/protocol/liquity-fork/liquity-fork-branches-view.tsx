@@ -44,10 +44,11 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { liquityForkRedemptionContent, type LiquityForkLearnMoreParams } from "@/lib/shared/learn-more-content";
 import { forkLiveVocab } from "@/lib/shared/liquity-fork-live-provenance";
-import { formatCompact, formatExact, formatUsdValue } from "@/lib/utils/format";
+import { formatExact, formatUsdValue } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl } from "@/lib/shared/chains";
 import type { LiquityForkBranchesResponse, LiquityForkBranchState } from "@/lib/api/fetch-liquity-fork-branches";
+import { AmountText } from "@/components/shared/amount-text";
 
 const LINK = "text-blue-500 hover:underline";
 
@@ -172,7 +173,7 @@ function BranchCard({
                 info={vocab.branchAggregateProv("The branch's entire debt", "getEntireBranchDebt", sym)}
                 value={formatExact(branch.branchDebt)}
               >
-                {formatCompact(branch.branchDebt)} {data.debtSymbol}
+                <AmountText value={branch.branchDebt} format="compact" /> {data.debtSymbol}
               </Prov>
             ) : (
               "—"
@@ -188,7 +189,7 @@ function BranchCard({
                   info={vocab.branchAggregateProv("The branch's entire collateral", "getEntireBranchColl", sym)}
                   value={formatExact(branch.branchColl)}
                 >
-                  {formatCompact(branch.branchColl)} {sym}
+                  <AmountText value={branch.branchColl} format="compact" /> {sym}
                 </Prov>
                 {branch.branchCollUsd != null && (
                   <span className="ml-1 text-rb-500">
@@ -346,7 +347,8 @@ export function LiquityForkBranchesView({
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read {protocolName}&apos;s branches from chain.</p>
         <p className="text-sm">
-          This view is a live contract read with no cached fallback, so when the read fails it shows nothing. Try again shortly.
+          This view is a live contract read with no cached fallback, so when the read fails it shows nothing. Try again
+          shortly.
         </p>
       </div>
     );
@@ -427,7 +429,7 @@ export function LiquityForkBranchesStamp({ data }: { data: LiquityForkBranchesRe
         {data.blockNumber.toLocaleString("en-US")}
       </a>
       {" · "}
-      {formatCompact(data.totalDebt)} {data.debtSymbol} outstanding
+      <AmountText value={data.totalDebt} format="compact" /> {data.debtSymbol} outstanding
       {data.totalCollUsd != null && ` against ${formatUsdValue(data.totalCollUsd)} of collateral`}
       {!data.totalCollUsdComplete && data.branches.some((b) => !b.stale) && (
         <span className="text-rb-400"> · a collateral total is withheld: not every branch priced on this read</span>

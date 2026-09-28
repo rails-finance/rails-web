@@ -52,6 +52,7 @@ import type {
   CompoundBaseAmount,
   CompoundCurrentBase,
 } from "@/lib/sources/api/compound-positions";
+import { ExactSpan } from "@/components/shared/amount-text";
 
 /** Highest-recorded amounts over a position's life (closed/liquidated cards). */
 interface CompoundPeak {
@@ -182,9 +183,9 @@ function LegFootnoteLine({
   return (
     <div>
       <Prov info={info}>
-        <span title={`${exact} ${symbol}`} data-prov-exact={exact} data-prov-symbol={symbol}>
+        <ExactSpan exact={exact} symbol={symbol}>
           {formatCompact(amount)} {symbol}
-        </span>
+        </ExactSpan>
       </Prov>
     </div>
   );

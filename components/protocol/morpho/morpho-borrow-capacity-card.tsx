@@ -19,9 +19,9 @@ import { Prov } from "@/components/shared/provenance";
 import { pct } from "@/components/shared/ratio-bar";
 import { capacityShare } from "@/lib/shared/capacity-share";
 import { RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
-import { formatNumber } from "@/lib/utils/format";
 import { capacityProv, lltvProv, type MorphoChainCoords } from "@/lib/morpho/position-provenance";
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
+import { AmountText } from "@/components/shared/amount-text";
 
 export function MorphoBorrowCapacityView({ chain }: { chain: MorphoChainPositionResponse }) {
   // Meaningful only with live debt and priced collateral — otherwise the
@@ -50,14 +50,14 @@ export function MorphoBorrowCapacityView({ chain }: { chain: MorphoChainPosition
       </RiskFigure>
       <RiskFigure>
         <Prov info={capacityProv("Available to borrow", "collateral value × lltv − live debt", coords)}>
-          {formatNumber(headroom)} {chain.loanSymbol}
+          <AmountText value={headroom} /> {chain.loanSymbol}
         </Prov>{" "}
         more to borrow
       </RiskFigure>
       <RiskFigure>
         liquidation at{" "}
         <Prov info={capacityProv("Liquidation line", "collateral value × lltv", coords)}>
-          {formatNumber(chain.maxBorrow)} {chain.loanSymbol}
+          <AmountText value={chain.maxBorrow} /> {chain.loanSymbol}
         </Prov>{" "}
         debt
       </RiskFigure>

@@ -24,6 +24,7 @@ import { pct } from "@/components/shared/ratio-bar";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** Oxford-join asset symbols ("wstETH, WBTC and USDC"). */
 function joinSymbols(syms: string[]): string {
@@ -261,7 +262,6 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import type { AaveV3ReserveAmount } from "@/components/protocol/aave-v3/aave-v3-position-card";
 import { MARKET_NAME } from "@/lib/aave-v3/asset-catalog";
-import { formatNumber } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
@@ -282,7 +282,7 @@ function peakPhrase(reserves: AaveV3ReserveAmount[]): React.ReactNode {
         <span key={r.address}>
           {i > 0 && (i === named.length - 1 && more === 0 ? " and " : ", ")}
           <H>
-            {formatNumber(r.amount)} {r.symbol}
+            <AmountText value={r.amount} /> {r.symbol}
           </H>
         </span>
       ))}

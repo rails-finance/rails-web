@@ -42,7 +42,7 @@ export function AssetAmount({ value, symbol, exact, iconSize = 28, address, sign
   const full = signed ? withRealMinus(exact ?? formatExact(value)) : (exact ?? formatExact(value));
   const compact = signed ? withRealMinus(formatCompact(value)) : formatCompact(value);
   return (
-    <RevealTip tip={`${full} ${symbol}`} className="gap-2">
+    <RevealTip tip={`${full} ${symbol}`} label={`${full} ${symbol}`} className="gap-2">
       {/* data-prov-exact: the provenance inspector reads the exact figure from
           here when this cell is clicked, so its receipt can headline the compact
           form and anchor the trace to the full one (number only — the ticker

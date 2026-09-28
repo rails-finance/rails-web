@@ -33,6 +33,7 @@ import {
 import { FLUID_EPS as EPS, fluidLegHolds } from "@/lib/fluid/explainer-clauses";
 import { formatDate } from "@/lib/date";
 import { pct } from "@/components/shared/ratio-bar";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** Terminal pane — a closed position narrates its RECORD from the index alone
  *  (its live read answers zeros): the card's peak figures, the liquidation
@@ -83,7 +84,7 @@ function FluidClosedPositionExplanation({
             {" "}
             held as much as{" "}
             <H>
-              {formatNumber(peakCol)} {colSym}
+              <AmountText value={peakCol} /> {colSym}
             </H>{" "}
             of collateral
           </>
@@ -94,7 +95,7 @@ function FluidClosedPositionExplanation({
             {" "}
             owed as much as{" "}
             <H>
-              {formatNumber(peakDebt)} {debtSym}
+              <AmountText value={peakDebt} /> {debtSym}
             </H>
           </>
         )}
@@ -219,7 +220,7 @@ export function FluidPositionExplanation({
         symbol={sym}
       >
         <H>
-          {formatNumber(n)} {sym}
+          <AmountText value={n} /> {sym}
         </H>
       </Prov>
     );
@@ -235,7 +236,7 @@ export function FluidPositionExplanation({
     return (
       <Prov echo info={liveSettledProv(side, sym, live.blockNumber)} value={exact} symbol={sym}>
         <H>
-          {formatNumber(n)} {sym}
+          <AmountText value={n} /> {sym}
         </H>
       </Prov>
     );
@@ -256,7 +257,7 @@ export function FluidPositionExplanation({
             <>
               . The{" "}
               <H>
-                {formatNumber(dustLeg.n)} {dustLeg.sym}
+                <AmountText value={dustLeg.n} /> {dustLeg.sym}
               </H>{" "}
               still showing is rounding dust — a leftover from the vault&rsquo;s internal arithmetic, not a real
               balance.
@@ -300,7 +301,7 @@ export function FluidPositionExplanation({
   if (hasDebt && live && live.colValueInDebt != null) {
     list.push(
       <>
-        At the vault&rsquo;s own oracle, that collateral is worth {formatNumber(live.colValueInDebt)} {debtSym}.
+        At the vault&rsquo;s own oracle, that collateral is worth <AmountText value={live.colValueInDebt} /> {debtSym}.
       </>,
     );
   } else if (live && !hasDebt && !empty) {
@@ -352,7 +353,7 @@ export function FluidPositionExplanation({
     if (dropPct != null && dropPct > 0 && live.liqPriceDebtPerCol != null) {
       list.push(
         <>
-          {colSym} can fall about <H>{dropPct}%</H> against {debtSym} (to {formatNumber(live.liqPriceDebtPerCol)}{" "}
+          {colSym} can fall about <H>{dropPct}%</H> against {debtSym} (to <AmountText value={live.liqPriceDebtPerCol} />{" "}
           {debtSym}) before liquidation begins. A Fluid liquidation is partial by design — it clears just enough to make
           the position healthy again.
         </>,
@@ -396,8 +397,8 @@ export function FluidPositionExplanation({
         {live.vaultTotalSupply != null && live.vaultTotalBorrow != null ? (
           <>
             {" "}
-            ({formatNumber(live.vaultTotalSupply)} {colSym} supplied, {formatNumber(live.vaultTotalBorrow)} {debtSym}{" "}
-            borrowed across the vault)
+            (<AmountText value={live.vaultTotalSupply} /> {colSym} supplied,{" "}
+            <AmountText value={live.vaultTotalBorrow} /> {debtSym} borrowed across the vault)
           </>
         ) : null}
         .

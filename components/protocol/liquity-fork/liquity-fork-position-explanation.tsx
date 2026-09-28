@@ -15,7 +15,6 @@
 // plain words: a figure that includes pending interest, a price that didn't
 // refresh this load.
 
-import { formatNumber, formatCompact } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
 // The position card's own formatter for this figure, so a $1.18 line reads
 // $1.18 in both places.
@@ -24,6 +23,7 @@ import { FORK_DEBT_SYMBOL } from "@/lib/shared/liquity-fork-live-provenance";
 import { forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** Past-tense narration for a closed or liquidated fork Trove — the card's own
  *  terminal figures (the recorded peaks), with the ending mechanism derived
@@ -75,8 +75,8 @@ export function LiquityForkClosedExplanation({
       <span key="seized">
         {seizure ? (
           <>
-            The liquidation seized its last {formatNumber(seizure.coll)} {collateralSymbol} of collateral and cleared
-            the {formatNumber(seizure.debt)} {debtSymbol} it still owed —{" "}
+            The liquidation seized its last <AmountText value={seizure.coll} /> {collateralSymbol} of collateral and
+            cleared the <AmountText value={seizure.debt} /> {debtSymbol} it still owed —{" "}
           </>
         ) : (
           <>The liquidation seized the Trove&rsquo;s remaining collateral and cleared its remaining debt — </>
@@ -97,11 +97,11 @@ export function LiquityForkClosedExplanation({
       <span key="peaks">
         At its height it held{" "}
         <H>
-          {formatNumber(peakCollateral)} {collateralSymbol}
+          <AmountText value={peakCollateral} /> {collateralSymbol}
         </H>{" "}
         against{" "}
         <H>
-          {formatNumber(peakDebt)} {debtSymbol}
+          <AmountText value={peakDebt} /> {debtSymbol}
         </H>{" "}
         of debt — the highest balances in its record, each its own lifetime maximum.
       </span>,
@@ -155,11 +155,11 @@ export function LiquityForkPositionExplanation({
     <>
       This Trove holds{" "}
       <H>
-        {formatNumber(chain.entireColl)} {chain.symbol}
+        <AmountText value={chain.entireColl} /> {chain.symbol}
       </H>{" "}
       against{" "}
       <H>
-        {formatNumber(chain.entireDebt)} {debtSymbol}
+        <AmountText value={chain.entireDebt} /> {debtSymbol}
       </H>{" "}
       of debt:
     </>
@@ -167,7 +167,7 @@ export function LiquityForkPositionExplanation({
     <>
       This Trove holds{" "}
       <H>
-        {formatNumber(chain.entireColl)} {chain.symbol}
+        <AmountText value={chain.entireColl} /> {chain.symbol}
       </H>{" "}
       and carries no debt:
     </>
@@ -197,14 +197,14 @@ export function LiquityForkPositionExplanation({
     bullets.push(
       isBatched ? (
         <span key="interest">
-          Of that debt, {formatNumber(chain.accruedInterest)} {debtSymbol} is interest built up at its batch&rsquo;s{" "}
-          <H>{chain.annualInterestRatePct.toFixed(2)}%</H> annual rate — the rate its interest-batch manager sets for
-          every member.
+          Of that debt, <AmountText value={chain.accruedInterest} /> {debtSymbol} is interest built up at its
+          batch&rsquo;s <H>{chain.annualInterestRatePct.toFixed(2)}%</H> annual rate — the rate its interest-batch
+          manager sets for every member.
           {chain.accruedBatchManagementFee > 0 && (
             <>
               {" "}
-              Another {formatNumber(chain.accruedBatchManagementFee)} {debtSymbol} is the manager&rsquo;s management fee
-              built up over the same time, also part of the debt.
+              Another <AmountText value={chain.accruedBatchManagementFee} /> {debtSymbol} is the manager&rsquo;s
+              management fee built up over the same time, also part of the debt.
             </>
           )}
           {chain.status !== "zombie" && (
@@ -213,8 +213,8 @@ export function LiquityForkPositionExplanation({
         </span>
       ) : (
         <span key="interest">
-          Of that debt, {formatNumber(chain.accruedInterest)} {debtSymbol} is interest built up at the Trove&rsquo;s own{" "}
-          <H>{chain.annualInterestRatePct.toFixed(2)}%</H> annual rate.
+          Of that debt, <AmountText value={chain.accruedInterest} /> {debtSymbol} is interest built up at the
+          Trove&rsquo;s own <H>{chain.annualInterestRatePct.toFixed(2)}%</H> annual rate.
           {chain.status !== "zombie" && <> A higher rate also buys a later place in the redemption queue.</>}
         </span>
       ),
@@ -223,8 +223,9 @@ export function LiquityForkPositionExplanation({
   if (chain.redistCollGain > 0 || chain.redistDebtGain > 0.01) {
     bullets.push(
       <span key="redist">
-        It has picked up redistribution from liquidated neighbours: {formatNumber(chain.redistCollGain)} {chain.symbol}{" "}
-        of collateral and {formatNumber(chain.redistDebtGain)} {debtSymbol} of debt, pending until the next change.
+        It has picked up redistribution from liquidated neighbours: <AmountText value={chain.redistCollGain} />{" "}
+        {chain.symbol} of collateral and <AmountText value={chain.redistDebtGain} /> {debtSymbol} of debt, pending until
+        the next change.
       </span>,
     );
   }
@@ -251,8 +252,11 @@ export function LiquityForkPositionExplanation({
       if (headroom > 0) {
         bullets.push(
           <span key="headroom">
-            About <H>{formatCompact(headroom)}</H> {debtSymbol} more could be borrowed before the Trove reaches the{" "}
-            {(chain.mcr * 100).toFixed(0)}% minimum.
+            About{" "}
+            <H>
+              <AmountText value={headroom} format="compact" />
+            </H>{" "}
+            {debtSymbol} more could be borrowed before the Trove reaches the {(chain.mcr * 100).toFixed(0)}% minimum.
           </span>,
         );
       }
@@ -273,7 +277,7 @@ export function LiquityForkPositionExplanation({
           Redemption cancelled all of its debt, which leaves it a <H>zombie</H>: outside the redemption queue, with
           nothing left to redeem. Closing the Trove returns the{" "}
           <H>
-            {formatNumber(chain.entireColl)} {chain.symbol}
+            <AmountText value={chain.entireColl} /> {chain.symbol}
           </H>
           {reserve ? <> and the {reserve} liquidation reserve</> : null} to the owner.
         </span>
@@ -282,8 +286,8 @@ export function LiquityForkPositionExplanation({
   } else if (hasDebt && chain.debtInFront != null) {
     bullets.push(
       <span key="queue">
-        {formatNumber(chain.debtInFront)} {debtSymbol} of this branch&rsquo;s debt sits at the same or lower interest
-        rate, redeemed before this Trove when {debtSymbol} holders redeem at $1 face.
+        <AmountText value={chain.debtInFront} /> {debtSymbol} of this branch&rsquo;s debt sits at the same or lower
+        interest rate, redeemed before this Trove when {debtSymbol} holders redeem at $1 face.
       </span>,
     );
   }

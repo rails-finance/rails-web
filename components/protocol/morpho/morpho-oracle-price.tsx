@@ -15,7 +15,6 @@
 
 import { Prov } from "@/components/shared/provenance";
 import { RiskFigure } from "@/components/shared/risk-footer-strip";
-import { formatNumber } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
 import { oracleAge } from "@/lib/morpho/oracle-age";
 import {
@@ -25,6 +24,7 @@ import {
   type MorphoChainCoords,
 } from "@/lib/morpho/position-provenance";
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** The fields the price and its age are drawn from — a position's read has
  *  them, and so does a market's. */
@@ -77,7 +77,7 @@ export function MorphoOraclePrice({
           coords,
         )}
       >
-        {formatNumber(chain.oraclePrice)} {chain.loanSymbol}
+        <AmountText value={chain.oraclePrice} /> {chain.loanSymbol}
       </Prov>
       {age && chain.oracleFeeds && chain.oraclePublishedAt != null && (
         <>

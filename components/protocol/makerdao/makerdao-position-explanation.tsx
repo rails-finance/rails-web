@@ -14,12 +14,12 @@
 // explanation-copy charter: what each number MEANS, never how we know it.
 
 import type { MakerVaultView } from "./makerdao-vault-card";
-import { formatNumber } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
 import { ilkDebtSymbol, MAKER_STATUS_DUST } from "@/lib/makerdao/asset-catalog";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
+import { AmountText } from "@/components/shared/amount-text";
 
 export function MakerdaoPositionExplanation({
   v,
@@ -56,7 +56,7 @@ export function MakerdaoPositionExplanation({
     <>
       This vault holds{" "}
       <H>
-        {formatNumber(v.ink)} {v.collateralSymbol}
+        <AmountText value={v.ink} /> {v.collateralSymbol}
       </H>{" "}
       of collateral
       {hasDebt ? (
@@ -64,7 +64,7 @@ export function MakerdaoPositionExplanation({
           {" "}
           against{" "}
           <H>
-            {formatNumber(v.debtDai as number)} {dsym}
+            <AmountText value={v.debtDai as number} /> {dsym}
           </H>{" "}
           of debt:
         </>
@@ -101,7 +101,7 @@ export function MakerdaoPositionExplanation({
               {" "}
               —{" "}
               <H>
-                {formatNumber(accruedFee)} {dsym}
+                <AmountText value={accruedFee} /> {dsym}
               </H>{" "}
               of fee has built up on the outstanding draw so far
             </>
@@ -129,8 +129,8 @@ export function MakerdaoPositionExplanation({
     if (v.dustDai != null && v.dustDai > 0) {
       bullets.push(
         <span key="dust">
-          {v.ilk} enforces a minimum debt of {formatNumber(v.dustDai)} {dsym} per vault — a repayment may not leave a
-          smaller remainder (only exactly zero).
+          {v.ilk} enforces a minimum debt of <AmountText value={v.dustDai} /> {dsym} per vault — a repayment may not
+          leave a smaller remainder (only exactly zero).
         </span>,
       );
     }
@@ -270,13 +270,13 @@ export function MakerdaoClosedPositionExplanation({
         At its height it held as much as{" "}
         {hasPeakInk ? (
           <H>
-            {formatNumber(v.peakInk)} {v.collateralSymbol}
+            <AmountText value={v.peakInk} /> {v.collateralSymbol}
           </H>
         ) : null}
         {hasPeakInk && hasPeakDebt ? <> of collateral and owed as much as </> : null}
         {hasPeakDebt ? (
           <H>
-            {formatNumber(v.peakDebtDai as number)} {dsym}
+            <AmountText value={v.peakDebtDai as number} /> {dsym}
           </H>
         ) : null}
         {hasPeakInk && hasPeakDebt ? (
@@ -335,13 +335,13 @@ export function MakerdaoClosedPositionExplanation({
         The Vat still records a trace on this urn —{" "}
         {inkResidue ? (
           <H>
-            {formatNumber(v.ink)} {v.collateralSymbol}
+            <AmountText value={v.ink} /> {v.collateralSymbol}
           </H>
         ) : null}
         {inkResidue && artResidue ? <> of collateral and </> : null}
         {artResidue ? (
           <H>
-            {formatNumber(v.art)} {dsym}
+            <AmountText value={v.art} /> {dsym}
           </H>
         ) : null}
         {inkResidue && !artResidue ? <> of collateral</> : artResidue && !inkResidue ? <> of debt</> : null} — the

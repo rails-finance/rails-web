@@ -566,6 +566,7 @@ function NotationModal({ display, exact, onClose }: { display: string; exact: st
     // Compare magnitudes: "down" = the compact form understates the figure.
     // toPrecision(12) clears float noise from the subtraction (43,041.84 −
     // 43,000 must read 41.84, not 41.84000000000015).
+    // exponent-safe: parsed straight back into a number.
     const diff = parseFloat((Math.abs(exactN) - Math.abs(displayN)).toPrecision(12));
     if (diff === 0) {
       adjustment = <>No adjustment — the compact form is this value exactly.</>;

@@ -4,6 +4,10 @@
 // form on demand". Wraps any inline content; the `tip` shows on hover (pointer
 // devices) and on tap (touch devices). Used for both compact numbers (tip = the
 // exact value) and token glyphs (tip = the ticker) so the two read the same.
+// The bubble: rounded-2xl, p-3, medium-weight text on the tooltip tokens
+// (--rb-tooltip-bg / --rb-tooltip-border), with an arrow to the value.
+// `label` is the accessible name: screen readers get it in place of the
+// visible children (an amount's exact figure behind "<0.000001").
 //
 // Two collisions to respect on these cards:
 //   • the whole card is a <Link> — a touch tap must NOT navigate, so on touch
@@ -13,7 +17,7 @@
 //     inspector is on — that's pointer-click, which we leave untouched (we only
 //     intercept clicks on touch devices, where Prov tracing isn't the gesture).
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 function useHasHover(): boolean {
   const [hasHover, setHasHover] = useState(true);
@@ -28,10 +32,32 @@ function useHasHover(): boolean {
   return hasHover;
 }
 
-export function RevealTip({ tip, children, className }: { tip: ReactNode; children: ReactNode; className?: string }) {
+export function RevealTip({
+  tip,
+  children,
+  className,
+  label,
+}: {
+  tip: ReactNode;
+  children: ReactNode;
+  className?: string;
+  label?: string;
+}) {
   const [open, setOpen] = useState(false);
   const hasHover = useHasHover();
   const ref = useRef<HTMLSpanElement>(null);
+  const bubbleRef = useRef<HTMLSpanElement>(null);
+  // Shift left by however far the bubble would run past the viewport's right
+  // edge (a right-aligned cell at 390px), keeping the arrow on the value.
+  const [shift, setShift] = useState(0);
+  useLayoutEffect(() => {
+    if (!open) return setShift(0);
+    const b = bubbleRef.current;
+    if (!b) return;
+    const over = b.getBoundingClientRect().right - (window.innerWidth - 8);
+    const room = ref.current ? ref.current.getBoundingClientRect().left - 8 : 0;
+    setShift(over > 0 ? Math.min(over, Math.max(room, 0)) : 0);
+  }, [open]);
 
   // Touch: dismiss when tapping elsewhere.
   useEffect(() => {
@@ -62,17 +88,42 @@ export function RevealTip({ tip, children, className }: { tip: ReactNode; childr
             }
       }
     >
-      {children}
+      {label ? (
+        <>
+          <span aria-hidden="true">{children}</span>
+          {/* data-prov-hidden: the capture reads the visible figure only. */}
+          <span className="sr-only" data-prov-hidden="">
+            {label}
+          </span>
+        </>
+      ) : (
+        children
+      )}
       {open && (
         /* data-prov-hidden: the tip is open mid-hover when a <Prov> click-to-
            trace lands, so the provenance capture must not read it as part of
            the displayed value. */
         <span
+          ref={bubbleRef}
           role="tooltip"
           data-prov-hidden=""
-          className="pointer-events-none absolute bottom-full left-0 z-50 mb-1.5 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-medium tabular-nums text-background shadow-lg"
+          className="pointer-events-none absolute bottom-full left-0 z-50 mb-2.5 whitespace-nowrap rounded-2xl border p-3 text-xs font-medium tabular-nums text-foreground shadow-lg"
+          style={{
+            background: "var(--rb-tooltip-bg)",
+            borderColor: "var(--rb-tooltip-border)",
+            transform: shift ? `translateX(-${shift}px)` : undefined,
+          }}
         >
           {tip}
+          <span
+            aria-hidden="true"
+            className="absolute top-full -mt-[5px] size-2.5 rotate-45 border-b border-r"
+            style={{
+              left: 12 + shift,
+              background: "var(--rb-tooltip-bg)",
+              borderColor: "var(--rb-tooltip-border)",
+            }}
+          />
         </span>
       )}
     </span>

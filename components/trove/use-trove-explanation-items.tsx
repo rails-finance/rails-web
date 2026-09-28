@@ -6,7 +6,7 @@ import { Link2 } from "lucide-react";
 import { TroveSummary } from "@/types/api/trove";
 import { TroveStateData } from "@/types/api/troveState";
 import { OraclePricesData } from "@/types/api/oracle";
-import { formatPrice, formatUsdValue, formatApproximate, formatCompact, formatExact } from "@/lib/utils/format";
+import { formatPrice, formatUsdValue, formatApproximate, formatExact } from "@/lib/utils/format";
 import { formatDateRange, formatDuration } from "@/lib/date";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 import { getLiquidationThreshold, troveLiquidationPrice, formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
@@ -25,6 +25,7 @@ import { HighlightableValue } from "@/components/transaction-timeline/explanatio
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { H } from "@/lib/shared/explainer-prose";
 import { stateOriginVia, stateOriginSummary } from "@/lib/shared/trove-state-origin";
+import { AmountText } from "@/components/shared/amount-text";
 
 // V2 TroveManager per branch — the contract the chain values are read from.
 const TROVE_MANAGER: Record<string, string> = {
@@ -609,7 +610,7 @@ function buildOpenItems({
         <span key="branch-debt" className="text-rb-500">
           The whole {trove.collateralType} redemption queue holds{" "}
           <Prov info={troveBranchDebtProv(trove.collateralType)} value={formatExact(queueDebtTotal)} symbol="BOLD">
-            {formatCompact(queueDebtTotal)} BOLD
+            <AmountText value={queueDebtTotal} format="compact" /> BOLD
           </Prov>{" "}
           of branch debt
         </span>,

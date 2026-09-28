@@ -17,13 +17,13 @@
 import type { CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
 import type { CompoundV2PositionView } from "@/components/protocol/compound-v2/compound-v2-position-card";
 import type { CompoundV2CardCaptions } from "@/lib/compound-v2/economics";
-import { formatNumber } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { capacityShare } from "@/lib/shared/capacity-share";
 import { formatDate } from "@/lib/date";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** Oxford-join asset symbols ("ETH, USDC and WBTC"). */
 function joinSymbols(syms: string[]): string {
@@ -123,7 +123,7 @@ export function CompoundV2PositionExplanation({
       <>
         Supplies{" "}
         <H>
-          {formatNumber(m.supplyUnderlying)} {m.symbol}
+          <AmountText value={m.supplyUnderlying} /> {m.symbol}
         </H>
         {m.priceUsd != null ? <> (worth {formatUsd(m.supplyUnderlying * m.priceUsd)})</> : null}, earning the
         market&rsquo;s supply rate ({m.supplyApr != null ? (m.supplyApr * 100).toFixed(2) : "—"}% APR).
@@ -171,7 +171,7 @@ export function CompoundV2PositionExplanation({
           <span key={m.market}>
             {i > 0 ? " and " : ""}
             <H>
-              {formatNumber(m.borrowUnderlying)} {m.symbol}
+              <AmountText value={m.borrowUnderlying} /> {m.symbol}
             </H>
             {m.borrowApr != null ? <> at {(m.borrowApr * 100).toFixed(2)}% APR</> : null}
           </span>
@@ -351,7 +351,7 @@ export function CompoundV2ClosedPositionExplanation({ v }: { v: CompoundV2Positi
       <span key={r.symbol + i}>
         {i > 0 ? (i === rs.length - 1 ? " and " : ", ") : ""}
         <H>
-          {formatNumber(r.amount)} {r.symbol}
+          <AmountText value={r.amount} /> {r.symbol}
         </H>
       </span>
     ));

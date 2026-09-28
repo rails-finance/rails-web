@@ -1,5 +1,7 @@
 "use client";
 
+import { formatExact } from "@/lib/utils/format";
+import { ExactTip } from "@/components/shared/amount-text";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { EventTime } from "@/components/shared/event-time";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
@@ -306,7 +308,13 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                 <span className="inline-flex items-center gap-1.5 text-sm">
                   <span className="text-rb-500">Supply</span>
                   {wrapColl(
-                    <span className="font-bold text-foreground">{fmtHeaderMagnitude(Math.abs(collChange))}</span>,
+                    <span className="font-bold text-foreground">
+                      <ExactTip
+                        text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
+                        exact={formatExact(Math.abs(collChange))}
+                        symbol={ctx.collateralType}
+                      />
+                    </span>,
                   )}
                   <TokenChipIcon symbol={ctx.collateralType} size={16} />
                 </span>
@@ -315,7 +323,13 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                 <span className="inline-flex items-center gap-1.5 text-sm">
                   <span className="text-rb-500">Borrow</span>
                   {wrapDebt(
-                    <span className="font-bold text-foreground">{fmtHeaderMagnitude(Math.abs(debtChange))}</span>,
+                    <span className="font-bold text-foreground">
+                      <ExactTip
+                        text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
+                        exact={formatExact(Math.abs(debtChange))}
+                        symbol={ctx.assetType ?? "BOLD"}
+                      />
+                    </span>,
                   )}
                   <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
                 </span>
@@ -342,7 +356,13 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                 <span className="inline-flex items-center gap-1.5 text-sm">
                   <span className="text-caution-600 dark:text-caution-400">Cleared</span>
                   {wrapColl(
-                    <span className="font-bold text-foreground">{fmtHeaderMagnitude(Math.abs(collChange))}</span>,
+                    <span className="font-bold text-foreground">
+                      <ExactTip
+                        text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
+                        exact={formatExact(Math.abs(collChange))}
+                        symbol={ctx.collateralType}
+                      />
+                    </span>,
                   )}
                   <TokenChipIcon symbol={ctx.collateralType} size={16} />
                 </span>
@@ -351,7 +371,13 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                 <span className="inline-flex items-center gap-1.5 text-sm">
                   <span className="text-caution-600 dark:text-caution-400">Reduced</span>
                   {wrapDebt(
-                    <span className="font-bold text-foreground">{fmtHeaderMagnitude(Math.abs(debtChange))}</span>,
+                    <span className="font-bold text-foreground">
+                      <ExactTip
+                        text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
+                        exact={formatExact(Math.abs(debtChange))}
+                        symbol={ctx.assetType ?? "BOLD"}
+                      />
+                    </span>,
                   )}
                   <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
                 </span>
@@ -373,7 +399,13 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                 <span className="inline-flex items-center gap-1.5 text-sm">
                   <span className="text-rb-500">Liquidated</span>
                   {wrapColl(
-                    <span className="font-bold text-foreground">{fmtHeaderMagnitude(Math.abs(collChange))}</span>,
+                    <span className="font-bold text-foreground">
+                      <ExactTip
+                        text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
+                        exact={formatExact(Math.abs(collChange))}
+                        symbol={ctx.collateralType}
+                      />
+                    </span>,
                   )}
                   <TokenChipIcon symbol={ctx.collateralType} size={16} />
                 </span>
@@ -382,7 +414,13 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                 <span className="inline-flex items-center gap-1.5 text-sm">
                   <span className="text-rb-500">Cleared</span>
                   {wrapDebt(
-                    <span className="font-bold text-foreground">{fmtHeaderMagnitude(Math.abs(debtChange))}</span>,
+                    <span className="font-bold text-foreground">
+                      <ExactTip
+                        text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
+                        exact={formatExact(Math.abs(debtChange))}
+                        symbol={ctx.assetType ?? "BOLD"}
+                      />
+                    </span>,
                   )}
                   <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
                 </span>
@@ -404,13 +442,25 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                     <span className="text-rb-500">{collAction}</span>
                     {hasCollChange &&
                       wrapColl(
-                        <span className="font-bold text-foreground">{fmtHeaderMagnitude(Math.abs(collChange))}</span>,
+                        <span className="font-bold text-foreground">
+                          <ExactTip
+                            text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
+                            exact={formatExact(Math.abs(collChange))}
+                            symbol={ctx.collateralType}
+                          />
+                        </span>,
                       )}
                     <TokenChipIcon symbol={ctx.collateralType} size={16} />
                     <span className="text-rb-500">{debtAction}</span>
                     {hasDebtChange &&
                       wrapDebt(
-                        <span className="font-bold text-foreground">{fmtHeaderMagnitude(Math.abs(debtChange))}</span>,
+                        <span className="font-bold text-foreground">
+                          <ExactTip
+                            text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
+                            exact={formatExact(Math.abs(debtChange))}
+                            symbol={ctx.assetType ?? "BOLD"}
+                          />
+                        </span>,
                       )}
                     <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
                   </span>
@@ -435,7 +485,13 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
             ctx.operation !== "setInterestBatchManager" && (
               <span className="inline-flex items-center gap-1.5 text-sm">
                 {wrapDebt(
-                  <span className="font-bold text-foreground">{fmtHeaderMagnitude(Math.abs(debtChange))}</span>,
+                  <span className="font-bold text-foreground">
+                    <ExactTip
+                      text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
+                      exact={formatExact(Math.abs(debtChange))}
+                      symbol={ctx.assetType ?? "BOLD"}
+                    />
+                  </span>,
                 )}
                 <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
               </span>
@@ -452,7 +508,13 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
             ctx.operation !== "setInterestBatchManager" && (
               <span className="inline-flex items-center gap-1.5 text-sm">
                 {wrapColl(
-                  <span className="font-bold text-foreground">{fmtHeaderMagnitude(Math.abs(collChange))}</span>,
+                  <span className="font-bold text-foreground">
+                    <ExactTip
+                      text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
+                      exact={formatExact(Math.abs(collChange))}
+                      symbol={ctx.collateralType}
+                    />
+                  </span>,
                 )}
                 <TokenChipIcon symbol={ctx.collateralType} size={16} />
               </span>

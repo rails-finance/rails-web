@@ -32,7 +32,7 @@ import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
+import { formatUnitsExact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { positionStateProv, positionIndexProv, llamalendUsdProv } from "@/lib/llamalend/event-provenance";
@@ -42,6 +42,7 @@ import { type LlamalendVersion } from "@/lib/llamalend/asset-catalog";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
 import type { LlamalendPositionSummary } from "@/lib/sources/api/llamalend-positions";
+import { AmountText } from "@/components/shared/amount-text";
 
 export interface LlamalendPositionView {
   /** The isolated market's key. */
@@ -190,7 +191,7 @@ export function LlamalendPositionCard({
       <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
         <Prov info={stateProv(v, v.collateralSymbol, "collateral")}>
           <span title={v.collateralRaw != null ? formatUnitsExact(v.collateralRaw, v.collateralDecimals) : undefined}>
-            {formatCompact(v.collateral)} {v.collateralSymbol}
+            <AmountText value={v.collateral} format="compact" /> {v.collateralSymbol}
           </span>
         </Prov>
       </div>
@@ -268,7 +269,7 @@ export function LlamalendPositionCard({
           <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
             <Prov info={stateProv(v, v.borrowedSymbol, "debt")}>
               <span title={formatUnitsExact(v.debtRaw, v.borrowedDecimals)}>
-                {formatCompact(v.debt)} {v.borrowedSymbol}
+                <AmountText value={v.debt} format="compact" /> {v.borrowedSymbol}
               </span>
             </Prov>
           </div>

@@ -13,10 +13,10 @@
 
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
-import { formatNumber } from "@/lib/utils/format";
 import { oracleAge } from "@/lib/morpho/oracle-age";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
+import { AmountText } from "@/components/shared/amount-text";
 
 export function MorphoPositionExplanation({
   chain,
@@ -55,11 +55,11 @@ export function MorphoPositionExplanation({
       <>
         This position owes{" "}
         <H>
-          {formatNumber(chain.currentDebt)} {chain.loanSymbol}
+          <AmountText value={chain.currentDebt} /> {chain.loanSymbol}
         </H>{" "}
         against{" "}
         <H>
-          {formatNumber(chain.collateral)} {chain.collateralSymbol}
+          <AmountText value={chain.collateral} /> {chain.collateralSymbol}
         </H>{" "}
         of collateral:
       </>
@@ -69,7 +69,7 @@ export function MorphoPositionExplanation({
       <>
         This position holds{" "}
         <H>
-          {formatNumber(chain.collateral)} {chain.collateralSymbol}
+          <AmountText value={chain.collateral} /> {chain.collateralSymbol}
         </H>{" "}
         as collateral with nothing borrowed against it:
       </>
@@ -84,7 +84,7 @@ export function MorphoPositionExplanation({
     // muted; the health verdict is the market's own read.
     bullets.push(
       <span key="oracle-value">
-        At the market&rsquo;s own oracle that collateral is worth about {formatNumber(chain.collateralValue)}{" "}
+        At the market&rsquo;s own oracle that collateral is worth about <AmountText value={chain.collateralValue} />{" "}
         {chain.loanSymbol}
         {chain.healthy != null && (
           <>
@@ -106,7 +106,7 @@ export function MorphoPositionExplanation({
   if (age) {
     bullets.push(
       <span key="oracle-age">
-        The market&rsquo;s oracle price, {formatNumber(chain.oraclePrice)} {chain.loanSymbol} per{" "}
+        The market&rsquo;s oracle price, <AmountText value={chain.oraclePrice} /> {chain.loanSymbol} per{" "}
         {chain.collateralSymbol},{" "}
         {age.feedCount > 1 ? (
           <>
@@ -131,7 +131,7 @@ export function MorphoPositionExplanation({
   if (hasColl && !hasDebt && chain.maxBorrow > 0) {
     bullets.push(
       <span key="idle-capacity">
-        At the market&rsquo;s own oracle price this collateral could back up to {formatNumber(chain.maxBorrow)}{" "}
+        At the market&rsquo;s own oracle price this collateral could back up to <AmountText value={chain.maxBorrow} />{" "}
         {chain.loanSymbol} of borrowing.
       </span>,
     );
@@ -159,8 +159,8 @@ export function MorphoPositionExplanation({
     if (chain.maxBorrow > chain.currentDebt) {
       bullets.push(
         <span key="power">
-          About {formatNumber(chain.maxBorrow - chain.currentDebt)} {chain.loanSymbol} more could be borrowed at the
-          current price; Morpho allows borrowing right up to the LLTV line.
+          About <AmountText value={chain.maxBorrow - chain.currentDebt} /> {chain.loanSymbol} more could be borrowed at
+          the current price; Morpho allows borrowing right up to the LLTV line.
         </span>,
       );
     }
@@ -295,13 +295,13 @@ export function MorphoClosedPositionExplanation({
         At its height it held as much as{" "}
         {hasPeakColl ? (
           <H>
-            {formatNumber(v.peakCollateral)} {v.collateralSymbol}
+            <AmountText value={v.peakCollateral} /> {v.collateralSymbol}
           </H>
         ) : null}
         {hasPeakColl && hasPeakBorr ? <> of collateral and had drawn as much as </> : null}
         {hasPeakBorr ? (
           <H>
-            {formatNumber(v.peakBorrowed)} {v.loanSymbol}
+            <AmountText value={v.peakBorrowed} /> {v.loanSymbol}
           </H>
         ) : null}
         {hasPeakColl && hasPeakBorr ? (
@@ -351,8 +351,8 @@ export function MorphoClosedPositionExplanation({
     if (v.badDebt > 0 && !v.loanDecimalsUnread) {
       bullets.push(
         <span key="bad-debt">
-          The seizures did not cover everything: {formatNumber(v.badDebt)} {v.loanSymbol} of the debt had no collateral
-          left to claim and was written off — socialized to this market&rsquo;s lenders, not repaid.
+          The seizures did not cover everything: <AmountText value={v.badDebt} /> {v.loanSymbol} of the debt had no
+          collateral left to claim and was written off — socialized to this market&rsquo;s lenders, not repaid.
         </span>,
       );
     }

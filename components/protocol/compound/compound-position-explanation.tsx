@@ -16,7 +16,6 @@
 
 import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import { scaleCompoundChainBalance } from "@/lib/api/fetch-compound-position";
-import { formatNumber } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
@@ -24,6 +23,7 @@ import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-a
 import type { CompoundPositionView } from "@/components/protocol/compound/compound-position-card";
 import { capacityShare } from "@/lib/shared/capacity-share";
 import { formatDate } from "@/lib/date";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** Oxford-join asset symbols ("wstETH, WBTC and cbBTC"). */
 function joinSymbols(syms: string[]): string {
@@ -54,7 +54,7 @@ export function CompoundClosedPositionExplanation({
       <span key={r.symbol + i}>
         {i > 0 ? (i === rs.length - 1 ? " and " : ", ") : ""}
         <H>
-          {formatNumber(r.amount)} {r.symbol}
+          <AmountText value={r.amount} /> {r.symbol}
         </H>
       </span>
     ));
@@ -87,7 +87,7 @@ export function CompoundClosedPositionExplanation({
             {" "}
             owed as much as{" "}
             <H>
-              {formatNumber(v.peak.borrowedBase)} {v.base.symbol}
+              <AmountText value={v.peak.borrowedBase} /> {v.base.symbol}
             </H>
             {principalOnly && <> in principal</>}
           </>
@@ -172,9 +172,9 @@ export function CompoundPositionExplanation({
       <>
         This position borrows{" "}
         <H>
-          {formatNumber(borrowBase)} {chain.baseSymbol}
+          <AmountText value={borrowBase} /> {chain.baseSymbol}
         </H>{" "}
-        against collateral in {joinSymbols(collateralSyms)}, worth about {formatNumber(toBase(collateralValue))}{" "}
+        against collateral in {joinSymbols(collateralSyms)}, worth about <AmountText value={toBase(collateralValue)} />{" "}
         {chain.baseSymbol} at the market&rsquo;s oracle prices:
       </>
     );
@@ -225,7 +225,7 @@ export function CompoundPositionExplanation({
           Debt sits at <H>{share.text}</H> {share.ofThe} liquidation line — collateral weighted by each asset&rsquo;s
           liquidate factor covers up to{" "}
           <H>
-            {formatNumber(toBase(chain.liquidationCapacity))} {chain.baseSymbol}
+            <AmountText value={toBase(chain.liquidationCapacity)} /> {chain.baseSymbol}
           </H>{" "}
           of debt, and Comet absorbs the account the moment debt reaches that line.
         </span>,
@@ -244,7 +244,7 @@ export function CompoundPositionExplanation({
         <span key="power">
           The account could borrow about{" "}
           <H>
-            {formatNumber(toBase(chain.borrowCapacity - chain.debtValue))} {chain.baseSymbol}
+            <AmountText value={toBase(chain.borrowCapacity - chain.debtValue)} /> {chain.baseSymbol}
           </H>{" "}
           more at current prices.
         </span>,
@@ -255,7 +255,7 @@ export function CompoundPositionExplanation({
       <>
         This position lends{" "}
         <H>
-          {formatNumber(supplyBase)} {chain.baseSymbol}
+          <AmountText value={supplyBase} /> {chain.baseSymbol}
         </H>{" "}
         to the {chain.baseSymbol} market, earning the supply rate ({(chain.supplyApr * 100).toFixed(2)}% APR):
       </>
@@ -284,8 +284,8 @@ export function CompoundPositionExplanation({
       // the capacity stays muted here.
       bullets.push(
         <span key="idle-capacity">
-          At current oracle prices it could back up to {formatNumber(toBase(chain.borrowCapacity))} {chain.baseSymbol}{" "}
-          of borrowing (each asset counts up to its borrow factor).
+          At current oracle prices it could back up to <AmountText value={toBase(chain.borrowCapacity)} />{" "}
+          {chain.baseSymbol} of borrowing (each asset counts up to its borrow factor).
         </span>,
       );
     }

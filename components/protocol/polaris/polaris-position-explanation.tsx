@@ -27,6 +27,7 @@ import { PETH } from "@/lib/polaris/asset-catalog";
 import { Prov } from "@/components/shared/provenance";
 import { formatExact, formatNumber, formatUnitsExact, withRealMinus } from "@/lib/utils/format";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
+import { AmountText } from "@/components/shared/amount-text";
 
 const pct = (f: number): string => `${(f * 100).toFixed(1)}%`;
 const signedNum = (n: number): string => (n < 0 ? `−${formatNumber(-n)}` : formatNumber(n));
@@ -74,15 +75,23 @@ export function PolarisPositionExplanation({
     )
   ) : hasColl && hasDebt ? (
     <>
-      This CDP holds <H>{formatNumber(chain.entireColl)} pETH</H> of collateral and owes{" "}
+      This CDP holds{" "}
       <H>
-        {formatNumber(chain.entireDebt)} {stableSymbol}
+        <AmountText value={chain.entireColl} /> pETH
+      </H>{" "}
+      of collateral and owes{" "}
+      <H>
+        <AmountText value={chain.entireDebt} /> {stableSymbol}
       </H>
       :
     </>
   ) : hasColl ? (
     <>
-      This CDP holds <H>{formatNumber(chain.entireColl)} pETH</H> of collateral and has no debt:
+      This CDP holds{" "}
+      <H>
+        <AmountText value={chain.entireColl} /> pETH
+      </H>{" "}
+      of collateral and has no debt:
     </>
   ) : null;
 
@@ -111,7 +120,7 @@ export function PolarisPositionExplanation({
         At the feed&rsquo;s price of{" "}
         <Prov info={livePethInDebtProv(chain.market)} value={formatExact(pethInDebt)} symbol={stableSymbol}>
           <H>
-            {formatNumber(pethInDebt)} {stableSymbol}
+            <AmountText value={pethInDebt} /> {stableSymbol}
           </H>
         </Prov>{" "}
         per pETH, the CDP&rsquo;s{" "}
@@ -121,11 +130,13 @@ export function PolarisPositionExplanation({
           value={formatUnitsExact(chain.entireCollRaw, 18)}
           symbol={PETH.symbol}
         >
-          <H>{formatNumber(chain.entireColl)} pETH</H>
+          <H>
+            <AmountText value={chain.entireColl} /> pETH
+          </H>
         </Prov>{" "}
         is worth{" "}
         <H>
-          {formatNumber(collWorth)} {stableSymbol}
+          <AmountText value={collWorth} /> {stableSymbol}
         </H>{" "}
         against{" "}
         <Prov
@@ -135,7 +146,7 @@ export function PolarisPositionExplanation({
           symbol={stableSymbol}
         >
           <H>
-            {formatNumber(chain.entireDebt)} {stableSymbol}
+            <AmountText value={chain.entireDebt} /> {stableSymbol}
           </H>
         </Prov>{" "}
         owed, an equity of{" "}
@@ -157,7 +168,7 @@ export function PolarisPositionExplanation({
     const legMoney = (leg: PolarisLifetimeLeg, unit: string, value: number): ReactNode => (
       <Prov info={lifetimeLegProv(leg, unit, chain.market)} value={formatExact(value)} symbol={unit}>
         <H>
-          {formatNumber(value)} {unit}
+          <AmountText value={value} /> {unit}
         </H>
       </Prov>
     );
@@ -276,7 +287,10 @@ export function PolarisPositionExplanation({
         {chain.recordedDebt > 0 ? (
           <>
             {" — about "}
-            <H>{formatNumber(chain.recordedDebt * chain.interestRate)}</H> {stableSymbol} a year on the debt as recorded
+            <H>
+              <AmountText value={chain.recordedDebt * chain.interestRate} />
+            </H>{" "}
+            {stableSymbol} a year on the debt as recorded
           </>
         ) : null}
         .

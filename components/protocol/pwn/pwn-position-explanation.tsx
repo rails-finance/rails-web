@@ -25,6 +25,7 @@ import { shortAddress, shortTokenId } from "@/lib/pwn/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { formatDate } from "@/lib/date";
+import { AmountText } from "@/components/shared/amount-text";
 
 const dateOf = (unix: number): string => formatDate(unix);
 
@@ -63,7 +64,7 @@ export function PwnPositionExplanation({
         <>
           This loan is running: <H>{coll}</H> sits in the loan contract&rsquo;s own escrow against a fixed repayment of{" "}
           <H>
-            {formatNumber(v.repayAmount!)} {creditSym}
+            <AmountText value={v.repayAmount!} /> {creditSym}
           </H>
           :
         </>
@@ -77,7 +78,7 @@ export function PwnPositionExplanation({
         <>
           This loan settled by repayment: the borrower paid the fixed{" "}
           <H>
-            {formatNumber(v.repayAmount!)} {creditSym}
+            <AmountText value={v.repayAmount!} /> {creditSym}
           </H>{" "}
           and the escrow released <H>{coll}</H> back:
         </>
@@ -102,7 +103,7 @@ export function PwnPositionExplanation({
       <span key="parties">
         The lender {shortAddress(v.lender)} advanced{" "}
         <H>
-          {formatNumber(v.credit.amount)} {creditSym}
+          <AmountText value={v.credit.amount} /> {creditSym}
         </H>{" "}
         to the borrower {shortAddress(v.borrower)} — a private agreement between exactly these two wallets
         {side ? <>; this page reads the loan from the {side} side</> : null}.
@@ -117,31 +118,31 @@ export function PwnPositionExplanation({
       <span key="interest">
         {v.status === "repaid" ? (
           <>
-            Of the amount repaid, {formatNumber(v.fixedInterest)} {creditSym} was the fixed interest — the loan&rsquo;s
-            whole cost, agreed between the parties at origination and unchanged for its life.
+            Of the amount repaid, <AmountText value={v.fixedInterest} /> {creditSym} was the fixed interest — the
+            loan&rsquo;s whole cost, agreed between the parties at origination and unchanged for its life.
           </>
         ) : v.status === "defaulted" ? (
           <>
             The unpaid total was{" "}
             <H>
-              {formatNumber(v.repayAmount!)} {creditSym}
+              <AmountText value={v.repayAmount!} /> {creditSym}
             </H>{" "}
-            — {formatNumber(v.fixedInterest)} {creditSym} of it fixed interest over the principal; the collateral stood
-            in its place when the loan lapsed.
+            — <AmountText value={v.fixedInterest} /> {creditSym} of it fixed interest over the principal; the collateral
+            stood in its place when the loan lapsed.
           </>
         ) : pastDue ? (
           <>
             The unpaid repayment stands at{" "}
             <H>
-              {formatNumber(v.repayAmount!)} {creditSym}
+              <AmountText value={v.repayAmount!} /> {creditSym}
             </H>{" "}
-            — {formatNumber(v.fixedInterest)} {creditSym} of it fixed interest, the loan&rsquo;s whole cost agreed at
-            origination.
+            — <AmountText value={v.fixedInterest} /> {creditSym} of it fixed interest, the loan&rsquo;s whole cost
+            agreed at origination.
           </>
         ) : (
           <>
-            Of the repayment, {formatNumber(v.fixedInterest)} {creditSym} is fixed interest — the loan&rsquo;s whole
-            cost, agreed between the parties at origination and unchanged for its life.
+            Of the repayment, <AmountText value={v.fixedInterest} /> {creditSym} is fixed interest — the loan&rsquo;s
+            whole cost, agreed between the parties at origination and unchanged for its life.
           </>
         )}
       </span>,

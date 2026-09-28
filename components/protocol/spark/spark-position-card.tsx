@@ -47,6 +47,7 @@ import {
   ReserveDisclosureList,
 } from "@/components/shared/reserve-disclosure";
 import type { SparkPositionSummary, SparkReserveAmount } from "@/lib/sources/api/spark-positions";
+import { ExactSpan } from "@/components/shared/amount-text";
 
 export interface SparkPositionView {
   wallet: string;
@@ -142,9 +143,9 @@ function ReserveFootnoteLines({
             <Prov
               info={side === "supply" ? positionSupplyProv(r.symbol, atBlock) : positionDebtProv(r.symbol, atBlock)}
             >
-              <span title={`${exact} ${r.symbol}`} data-prov-exact={exact} data-prov-symbol={r.symbol}>
+              <ExactSpan exact={exact} symbol={r.symbol}>
                 {formatCompact(r.amount)} {r.symbol}
-              </span>
+              </ExactSpan>
             </Prov>
           </div>
         );

@@ -59,6 +59,7 @@ import {
 import { shortAddress } from "@/lib/frankencoin/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** The dust epsilon — a balance below this is treated as zero. */
 const FC_EPS = 1e-9;
@@ -152,12 +153,12 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
   // on a close's unlabeled deltas).
   const mintDeltaFig = (value: number, labeled: boolean) => (
     <Fig info={changeProv("minted", sym, coords)} value={chainTruthDeltaValue(value, labeled)} symbol="ZCHF">
-      {formatNumber(Math.abs(value))} ZCHF
+      <AmountText value={Math.abs(value)} /> ZCHF
     </Fig>
   );
   const collDeltaFig = (value: number, labeled: boolean) => (
     <Fig info={changeProv("collateral", sym, coords)} value={chainTruthDeltaValue(value, labeled)} symbol={sym}>
-      {formatNumber(Math.abs(value))} {sym}
+      <AmountText value={Math.abs(value)} /> {sym}
     </Fig>
   );
   // After-absolutes echo the detail grid's after-value receipt. The grid's own
@@ -341,7 +342,7 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
         ctx.liqPriceBefore != null ? (
           <>
             {" "}
-            from {formatNumber(Math.abs(Number(ctx.liqPriceBefore)))} ZCHF/{sym}
+            from <AmountText value={Math.abs(Number(ctx.liqPriceBefore))} /> ZCHF/{sym}
           </>
         ) : null;
       const happened = (
@@ -453,7 +454,7 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
             value={chainTruthDeltaValue(size, true)}
             symbol={sym}
           >
-            {formatNumber(size)} {sym}
+            <AmountText value={size} /> {sym}
           </Fig>{" "}
           of this position&rsquo;s collateral.
         </>
@@ -485,7 +486,7 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
             value={chainTruthDeltaValue(size, true)}
             symbol={sym}
           >
-            {formatNumber(size)} {sym}
+            <AmountText value={size} /> {sym}
           </Fig>{" "}
           was averted.
         </>
@@ -513,7 +514,7 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
           value={chainTruthDeltaValue(bid, true)}
           symbol="ZCHF"
         >
-          {formatNumber(bid)} ZCHF
+          <AmountText value={bid} /> ZCHF
         </Fig>
       );
       const acquiredFig = (
@@ -522,7 +523,7 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
           value={chainTruthDeltaValue(acquired, true)}
           symbol={sym}
         >
-          {formatNumber(acquired)} {sym}
+          <AmountText value={acquired} /> {sym}
         </Fig>
       );
       // §5.4 derived net-outcome: the effective price the slice cleared at (ZCHF
@@ -532,7 +533,7 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
         bid > 0 && acquired > FC_EPS
           ? clause(
               <>
-                That is an effective {formatNumber(bid / acquired)} ZCHF per {sym}.
+                That is an effective <AmountText value={bid / acquired} /> ZCHF per {sym}.
               </>,
             )
           : null;
@@ -571,7 +572,7 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
       const happened = (
         <>
           <Fig info={forcedSaleProv(sym, coords, ctx.raw?.size)} value={chainTruthDeltaValue(amt, true)} symbol={sym}>
-            {formatNumber(amt)} {sym}
+            <AmountText value={amt} /> {sym}
           </Fig>{" "}
           of the position&rsquo;s collateral was sold in a forced sale.
         </>

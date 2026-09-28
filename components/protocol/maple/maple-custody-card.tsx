@@ -19,7 +19,7 @@ import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { Prov } from "@/components/shared/provenance";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { formatCompact, formatUnitsExact } from "@/lib/utils/format";
+import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
 import {
   custodySharesProv,
   custodySupplyShareProv,
@@ -28,6 +28,7 @@ import {
 } from "@/lib/maple/event-provenance";
 import type { CcipEscrow } from "@/lib/shared/known-infrastructure";
 import type { MapleCustodyHolding } from "@/lib/sources/chain/maple-custody";
+import { AmountText, ExactSpan } from "@/components/shared/amount-text";
 
 /** The headline stack: what the locked shares redeem for, in the pool's own
  *  asset — shares alone when the value derivation degraded. */
@@ -68,9 +69,9 @@ function CustodyFootnoteLines({ holdings }: { holdings: MapleCustodyHolding[] })
         return (
           <div key={h.pool}>
             <Prov info={custodySharesProv(h.symbol, h.blockNumber)}>
-              <span title={exact} data-prov-exact={exact} data-prov-symbol={h.symbol}>
+              <ExactSpan exact={exact} symbol={h.symbol}>
                 {formatCompact(h.shares)} {h.symbol}
-              </span>
+              </ExactSpan>
             </Prov>
             {h.exitValue != null && (
               <>
@@ -111,10 +112,18 @@ function SupplyShareStack({ holdings }: { holdings: MapleCustodyHolding[] }) {
 function CustodyExplanation({ infra, holdings }: { infra: CcipEscrow; holdings: MapleCustodyHolding[] }) {
   const bullets: React.ReactNode[] = holdings.map((h) => (
     <span key={h.pool}>
-      The contract holds <H>{formatCompact(h.shares)}</H> {h.symbol}
+      The contract holds{" "}
+      <H>
+        <AmountText value={h.shares} format="compact" />
+      </H>{" "}
+      {h.symbol}
       {h.exitValue != null && (
         <>
-          , worth <H>{formatCompact(h.exitValue)}</H> {h.assetSymbol} at the pool&rsquo;s current exit price
+          , worth{" "}
+          <H>
+            <AmountText value={h.exitValue} format="compact" />
+          </H>{" "}
+          {h.assetSymbol} at the pool&rsquo;s current exit price
         </>
       )}
       {h.supplyShare != null && (

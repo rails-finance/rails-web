@@ -76,6 +76,7 @@ import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
 import { findReserve, groupExact, humanOf, legChange, legHeld } from "@/lib/aave-v3/position-state";
+import { AmountText } from "@/components/shared/amount-text";
 
 export interface AaveV3CtEventDetailProps {
   ctx: AaveV3Context;
@@ -510,7 +511,9 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
           <StatSubline>
             Interest since previous event:{" "}
             <Prov info={rowInterestProv(l.symbol, l.side, coords)} value={l.value} symbol={l.symbol}>
-              <span title={l.value}>{formatNumber(Number(l.value))}</span>
+              <span title={l.value}>
+                <AmountText value={Number(l.value)} />
+              </span>
             </Prov>{" "}
             {l.symbol}
           </StatSubline>

@@ -57,6 +57,7 @@ import {
   type MorphoCoords,
 } from "@/lib/morpho/event-provenance";
 import { formatNumber } from "@/lib/utils/format";
+import { AmountText } from "@/components/shared/amount-text";
 
 /** A magnitude below this is a rounding leftover, not a real balance.
  *
@@ -167,7 +168,7 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
   // entry key is label|value|"" on both sides, and the locator link resolves.
   const collAfterFig = () => (
     <Fig echo info={collateralAfterProv(collSym, coords)} value={formatNumber(Number(ctx.collateralAfter))}>
-      {formatNumber(Number(ctx.collateralAfter))} {collSym}
+      <AmountText value={Number(ctx.collateralAfter)} /> {collSym}
     </Fig>
   );
   const borrowedAfterFig = () => (
@@ -176,7 +177,7 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
       info={rs.debtIsChain ? debtAfterProv(loanSym, coords) : borrowedAfterProv(loanSym, coords)}
       value={formatNumber(rs.borrowedAfter)}
     >
-      {formatNumber(rs.borrowedAfter)} {loanSym}
+      <AmountText value={rs.borrowedAfter} /> {loanSym}
     </Fig>
   );
 

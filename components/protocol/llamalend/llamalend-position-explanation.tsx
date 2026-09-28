@@ -15,6 +15,7 @@
 import type { LlamalendChainResponse } from "@/lib/api/fetch-llamalend-position";
 import { formatNumber } from "@/lib/utils/format";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
+import { AmountText } from "@/components/shared/amount-text";
 
 export function LlamalendPositionExplanation({
   chain,
@@ -48,9 +49,15 @@ export function LlamalendPositionExplanation({
   if (chain.pUp != null && chain.pDown != null) {
     bullets.push(
       <span key="band">
-        The collateral spreads across <H>{chain.bands}</H> price bands, from <H>{formatNumber(chain.pUp)}</H> down to{" "}
-        <H>{formatNumber(chain.pDown)}</H> {unit}. Soft-liquidation begins at the top of that range and completes at its
-        bottom.
+        The collateral spreads across <H>{chain.bands}</H> price bands, from{" "}
+        <H>
+          <AmountText value={chain.pUp} />
+        </H>{" "}
+        down to{" "}
+        <H>
+          <AmountText value={chain.pDown} />
+        </H>{" "}
+        {unit}. Soft-liquidation begins at the top of that range and completes at its bottom.
       </span>,
     );
   }
@@ -77,7 +84,7 @@ export function LlamalendPositionExplanation({
       <span key="softliq">
         The AMM has already converted{" "}
         <H>
-          {formatNumber(chain.converted)} {chain.borrowedSymbol}
+          <AmountText value={chain.converted} /> {chain.borrowedSymbol}
         </H>{" "}
         of this position&rsquo;s collateral.{" "}
         {chain.fullyConverted ? (
@@ -101,7 +108,7 @@ export function LlamalendPositionExplanation({
       <span key="no-softliq">
         The AMM has converted{" "}
         <H>
-          {formatNumber(chain.converted ?? 0)} {chain.borrowedSymbol}
+          <AmountText value={chain.converted ?? 0} /> {chain.borrowedSymbol}
         </H>{" "}
         of this position&rsquo;s collateral{aboveBand ? ", because the price sits above the band" : ""}. The collateral
         is intact, and only interest accrues, second by second.

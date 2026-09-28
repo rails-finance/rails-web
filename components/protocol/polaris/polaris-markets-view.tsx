@@ -32,13 +32,14 @@ import {
 import { POLARIS_BASE_PATH } from "@/lib/polaris/routes";
 import { bookCountProv, openBookProv } from "@/lib/polaris/book-provenance";
 import { POLARIS_MARKET_CONFIG, POLARIS_MARKETS, type PolarisMarket } from "@/lib/polaris/asset-catalog";
-import { formatCompact, formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatExact, formatUsdValue } from "@/lib/utils/format";
 import { explorerUrl } from "@/lib/shared/chains";
 import { POLARIS_CHAIN_ID } from "@/lib/polaris/asset-catalog";
 import { Stat } from "@/components/shared/stat";
 import type { PolarisMarketsChainResponse, PolarisMarketChainState } from "@/lib/sources/chain/polaris-position";
 import type { PolarisBook } from "@/lib/sources/api/polaris-book";
 import type { PolarisMarketBook } from "@/lib/sources/api/polaris-positions";
+import { AmountText } from "@/components/shared/amount-text";
 
 const pct = (f: number, dp = 2): string => `${(f * 100).toFixed(dp)}%`;
 
@@ -102,12 +103,12 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
               }
             >
               <Prov info={liveTotalProv("coll", market)} value={formatExact(chain.totalColl)}>
-                {formatCompact(chain.totalColl)} pETH
+                <AmountText value={chain.totalColl} format="compact" /> pETH
               </Prov>
             </Stat>
             <Stat label="Debt across CDPs">
               <Prov info={liveTotalProv("debt", market)} value={formatExact(chain.totalDebt)}>
-                {formatCompact(chain.totalDebt)} {stable}
+                <AmountText value={chain.totalDebt} format="compact" /> {stable}
               </Prov>
             </Stat>
             <Stat
@@ -160,7 +161,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
               }
             >
               <Prov info={liveSpDepositsProv(market)} value={formatExact(chain.spDeposits)}>
-                {formatCompact(chain.spDeposits)} {stable}
+                <AmountText value={chain.spDeposits} format="compact" /> {stable}
               </Prov>
             </Stat>
           </div>
@@ -168,7 +169,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
             <Stat label={`pETH in ${stable}`}>
               <Prov info={livePethInDebtProv(market, true)} value={formatExact(chain.price.pethInDebt)}>
-                {formatNumber(chain.price.pethInDebt)} {unit}
+                <AmountText value={chain.price.pethInDebt} /> {unit}
               </Prov>
             </Stat>
             <Stat label="pETH in ETH">
@@ -220,11 +221,11 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
             </Stat>
             <Stat label="Open book">
               <Prov info={openBookProv("coll", market)} value={formatExact(book.openColl)}>
-                {formatCompact(book.openColl)} pETH
+                <AmountText value={book.openColl} format="compact" /> pETH
               </Prov>
               <span className="mx-1 text-rb-400">·</span>
               <Prov info={openBookProv("debt", market)} value={formatExact(book.openDebt)}>
-                {formatCompact(book.openDebt)} {stable}
+                <AmountText value={book.openDebt} format="compact" /> {stable}
               </Prov>
             </Stat>
             {book.psmMintCount != null && (

@@ -18,6 +18,8 @@
 // protocol's timeline may be added across a run, and an earmarked figure never
 // may — it is stateable at the block it was read at and nowhere else.
 
+import { formatExact } from "@/lib/utils/format";
+import { ExactTip } from "@/components/shared/amount-text";
 import type { ReactNode } from "react";
 
 import { TimelineRunCard } from "@/components/shared/timeline-run-card";
@@ -73,7 +75,13 @@ export function AlchemixRedemptionRunCard({
   // `fmtHeaderMagnitude` now states a genuine zero as "0" (rails-ops
   // TO-DO-ui-jobs item 74), so this reads a run of stated zeros correctly
   // without a local zero check.
-  const shown = fmtHeaderMagnitude(totalCleared);
+  const shown = (
+    <ExactTip
+      text={fmtHeaderMagnitude(totalCleared, syntheticSymbol)}
+      exact={formatExact(totalCleared)}
+      symbol={syntheticSymbol}
+    />
+  );
 
   const figure =
     statedCount > 0 ? (
@@ -87,7 +95,13 @@ export function AlchemixRedemptionRunCard({
           <>
             <span className="ml-1 text-caution-600 dark:text-caution-400">Took</span>
             <Prov value={taken.exact} symbol={mytSymbol} info={taken.prov}>
-              <span className="font-bold text-foreground">{fmtHeaderMagnitude(taken.value)}</span>
+              <span className="font-bold text-foreground">
+                <ExactTip
+                  text={fmtHeaderMagnitude(taken.value, mytSymbol)}
+                  exact={formatExact(taken.value)}
+                  symbol={mytSymbol}
+                />
+              </span>
             </Prov>
             <TokenChipIcon symbol={mytSymbol} size={16} />
           </>

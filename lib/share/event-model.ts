@@ -51,7 +51,7 @@ export function eventCardModel(
         ? { sign: "" as const, amount: "Not loaded", symbol: f.tokenSymbol }
         : {
             sign: f.direction === "in" ? ("+" as const) : ("−" as const),
-            amount: formatHeadlineAmount(Math.abs(f.amountFormatted)),
+            amount: formatHeadlineAmount(Math.abs(f.amountFormatted), f.tokenSymbol),
             symbol: f.tokenSymbol,
           },
     ),

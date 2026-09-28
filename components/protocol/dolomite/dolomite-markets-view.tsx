@@ -42,6 +42,7 @@
 //
 // No animation: framer nodes per row are what froze the listing shells.
 
+import { formatTinyNonZero } from "@/lib/utils/format";
 import { useMemo, useState } from "react";
 import { ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -75,7 +76,7 @@ const tokenAmount = (v: number, symbol: string): string => {
     v === 0
       ? "0"
       : Math.abs(v) < 0.001
-        ? v.toExponential(2)
+        ? formatTinyNonZero(v)
         : v.toLocaleString("en-US", { maximumFractionDigits: v < 1 ? 6 : 2 });
   return `${n} ${symbol}`;
 };

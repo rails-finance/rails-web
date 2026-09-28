@@ -43,6 +43,7 @@ import type {
   MoonwellBorrowAmount,
   MoonwellPeakAmount,
 } from "@/lib/sources/api/moonwell-positions";
+import { ExactSpan } from "@/components/shared/amount-text";
 
 export interface MoonwellPositionView {
   wallet: string;
@@ -123,9 +124,9 @@ function SupplyFootnoteLines({ v }: { v: MoonwellPositionView }) {
         return (
           <div key={r.address}>
             <Prov info={supplyProv(r)}>
-              <span title={exact} data-prov-exact={exact} data-prov-symbol={r.symbol}>
+              <ExactSpan exact={exact} symbol={r.symbol}>
                 {formatCompact(supplyAmount(r))} {r.symbol}
-              </span>
+              </ExactSpan>
             </Prov>
           </div>
         );
@@ -144,9 +145,9 @@ function BorrowFootnoteLines({ v }: { v: MoonwellPositionView }) {
         return (
           <div key={r.address}>
             <Prov info={borrowProv(r)}>
-              <span title={`${exact} ${r.symbol}`} data-prov-exact={exact} data-prov-symbol={r.symbol}>
+              <ExactSpan exact={exact} symbol={r.symbol}>
                 {formatCompact(r.amount)} {r.symbol}
-              </span>
+              </ExactSpan>
             </Prov>
           </div>
         );

@@ -19,10 +19,10 @@
 import { Prov } from "@/components/shared/provenance";
 import { capacityShare } from "@/lib/shared/capacity-share";
 import { RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
-import { formatNumber } from "@/lib/utils/format";
 import { capacityProv, contractVerdictProv } from "@/lib/compound/position-provenance";
 import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import type { CompoundCoords } from "@/lib/compound/event-provenance";
+import { AmountText } from "@/components/shared/amount-text";
 
 export function CompoundBorrowCapacityView({ chain }: { chain: CompoundMarketChainResponse }) {
   // Meaningful only with both debt and liquidation-weighted collateral —
@@ -59,14 +59,14 @@ export function CompoundBorrowCapacityView({ chain }: { chain: CompoundMarketCha
             coords,
           )}
         >
-          {formatNumber(headroomBase)} {chain.baseSymbol}
+          <AmountText value={headroomBase} /> {chain.baseSymbol}
         </Prov>{" "}
         more to borrow
       </RiskFigure>
       <RiskFigure>
         liquidation at{" "}
         <Prov info={capacityProv("Liquidation line", "Σ collateral × price × liquidate factor ÷ base price", coords)}>
-          {formatNumber(liqAtBase)} {chain.baseSymbol}
+          <AmountText value={liqAtBase} /> {chain.baseSymbol}
         </Prov>{" "}
         debt
       </RiskFigure>

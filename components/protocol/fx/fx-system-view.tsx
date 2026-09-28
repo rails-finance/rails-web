@@ -67,6 +67,7 @@ import {
   dustTicksProv,
 } from "@/lib/fx/system-provenance";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { AmountText } from "@/components/shared/amount-text";
 
 // A percentage with the false-zero guard: a tick holding 1e-12 fxUSD of the
 // pool must never render as "0.0%" — holding something is why it is listed.
@@ -133,7 +134,7 @@ function PoolStateCard({ p }: { p: FxPoolSystem }) {
                 info={capacityProv("collateral", label, p.tokenSymbol)}
                 value={formatExact(p.collateralBalanceToken)}
               >
-                {formatCompact(p.collateralBalanceToken)}
+                <AmountText value={p.collateralBalanceToken} format="compact" />
               </Prov>{" "}
               of{" "}
               <Prov
@@ -141,14 +142,14 @@ function PoolStateCard({ p }: { p: FxPoolSystem }) {
                 value={formatExact(p.collateralCapacityToken)}
                 echo
               >
-                {formatCompact(p.collateralCapacityToken)}
+                <AmountText value={p.collateralCapacityToken} format="compact" />
               </Prov>{" "}
               {p.tokenSymbol} cap (token units)
             </>
           }
         >
           <Prov info={poolCollateralProv(label, p.address, p.normalizedSymbol)} value={formatExact(p.totalRawColl)}>
-            {formatCompact(p.totalRawColl)} {p.normalizedSymbol}
+            <AmountText value={p.totalRawColl} format="compact" /> {p.normalizedSymbol}
           </Prov>
         </Stat>
         <Stat
@@ -157,14 +158,14 @@ function PoolStateCard({ p }: { p: FxPoolSystem }) {
             <>
               cap{" "}
               <Prov info={capacityProv("debt", label, p.tokenSymbol)} value={formatExact(p.debtCapacity)}>
-                {formatCompact(p.debtCapacity)}
+                <AmountText value={p.debtCapacity} format="compact" />
               </Prov>{" "}
               fxUSD
             </>
           }
         >
           <Prov info={poolDebtProv(label, p.address)} value={formatExact(p.totalRawDebt)}>
-            {formatCompact(p.totalRawDebt)} fxUSD
+            <AmountText value={p.totalRawDebt} format="compact" /> fxUSD
           </Prov>
         </Stat>
         <Stat label="Positions minted">
@@ -658,7 +659,8 @@ export function FxSystemView({ data }: { data: FxSystemChainResponse }) {
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read f(x)&apos;s pool state from chain.</p>
         <p className="text-sm">
-          This view is a live contract read with no cached fallback, so when the read fails it shows nothing. Try again shortly.
+          This view is a live contract read with no cached fallback, so when the read fails it shows nothing. Try again
+          shortly.
         </p>
       </div>
     );
@@ -690,7 +692,7 @@ export function FxSystemView({ data }: { data: FxSystemChainResponse }) {
             label: "Debt",
             value: (
               <Prov info={totalDebtAllPoolsProv()} value={formatExact(data.totalDebtAllPools)}>
-                {formatCompact(data.totalDebtAllPools)} fxUSD
+                <AmountText value={data.totalDebtAllPools} format="compact" /> fxUSD
               </Prov>
             ),
           },

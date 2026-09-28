@@ -34,6 +34,7 @@
 // is different: it is the length of one getAllMarkets() enumerator read, so it
 // carries a receipt.
 
+import { formatTinyNonZero } from "@/lib/utils/format";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
 import { shortAddress } from "@/lib/compound-v2/asset-catalog";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
@@ -65,7 +66,7 @@ const tokenAmount = (v: number, symbol: string): string => {
     v === 0
       ? "0"
       : Math.abs(v) < 0.001
-        ? v.toExponential(2)
+        ? formatTinyNonZero(v)
         : v.toLocaleString("en-US", { maximumFractionDigits: v < 1 ? 6 : 2 });
   return `${n} ${symbol}`;
 };

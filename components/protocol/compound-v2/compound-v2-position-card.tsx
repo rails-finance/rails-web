@@ -67,6 +67,7 @@ import type {
   CompoundV2BorrowAmount,
   CompoundV2PeakAmount,
 } from "@/lib/sources/api/compound-v2-positions";
+import { ExactSpan } from "@/components/shared/amount-text";
 
 export interface CompoundV2PositionView {
   wallet: string;
@@ -166,9 +167,9 @@ function SupplyFootnoteLines({ v }: { v: CompoundV2PositionView }) {
         return (
           <div key={r.market}>
             <Prov info={supplyProv(r)}>
-              <span title={exact} data-prov-exact={exact} data-prov-symbol={r.symbol}>
+              <ExactSpan exact={exact} symbol={r.symbol}>
                 {formatCompact(supplyAmount(r))} {r.symbol}
-              </span>
+              </ExactSpan>
             </Prov>
             {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} />}
           </div>
@@ -187,9 +188,9 @@ function BorrowFootnoteLines({ v }: { v: CompoundV2PositionView }) {
         return (
           <div key={r.market}>
             <Prov info={borrowProv(r)}>
-              <span title={`${exact} ${r.symbol}`} data-prov-exact={exact} data-prov-symbol={r.symbol}>
+              <ExactSpan exact={exact} symbol={r.symbol}>
                 {formatCompact(r.amount)} {r.symbol}
-              </span>
+              </ExactSpan>
             </Prov>
             {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} />}
           </div>

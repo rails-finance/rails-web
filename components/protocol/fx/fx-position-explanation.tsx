@@ -18,11 +18,11 @@
 // reader can walk each one back to the card (charter §3 reverse-completeness).
 
 import type { FxPositionView } from "@/components/protocol/fx/fx-position-card";
-import { formatCompact, formatNumber } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
+import { AmountText } from "@/components/shared/amount-text";
 
 export function FxPositionExplanation({
   v,
@@ -72,17 +72,31 @@ export function FxPositionExplanation({
       if (implied < 0) {
         bullets.push(
           <span key="socialized">
-            Its own events net to <H>{formatNumber(implied)} fxUSD</H> — the timeline recorded more debt leaving than
-            arriving, because bad debt socialized from other positions&rsquo; liquidations raised its debt with no event
-            of the position&rsquo;s own and the recorded repayments and liquidation clears removed that too. The{" "}
-            <H>{formatNumber(diff)} fxUSD</H> marked socialized is all of that silent movement at once.
+            Its own events net to{" "}
+            <H>
+              <AmountText value={implied} /> fxUSD
+            </H>{" "}
+            — the timeline recorded more debt leaving than arriving, because bad debt socialized from other
+            positions&rsquo; liquidations raised its debt with no event of the position&rsquo;s own and the recorded
+            repayments and liquidation clears removed that too. The{" "}
+            <H>
+              <AmountText value={diff} /> fxUSD
+            </H>{" "}
+            marked socialized is all of that silent movement at once.
           </span>,
         );
       } else if (Math.abs(diff) > 1e-9) {
         bullets.push(
           <span key="socialized">
-            Its own events still add up to <H>{formatNumber(implied)} fxUSD</H> of debt. The{" "}
-            <H>{formatNumber(diff)} fxUSD</H> marked socialized cleared with no event of the position&rsquo;s own —
+            Its own events still add up to{" "}
+            <H>
+              <AmountText value={implied} /> fxUSD
+            </H>{" "}
+            of debt. The{" "}
+            <H>
+              <AmountText value={diff} /> fxUSD
+            </H>{" "}
+            marked socialized cleared with no event of the position&rsquo;s own —
             {v.everLiquidated ? " tick rebalances and the bad-debt write-off at liquidation" : " tick rebalances"} that
             f(x) applies pool-wide — which is how the event record and the empty settled figures reconcile.
           </span>,
@@ -124,8 +138,11 @@ export function FxPositionExplanation({
     if (implied > 0) {
       bullets.push(
         <span key="implied">
-          Its own events add up to <H>{formatNumber(implied)} fxUSD</H> of debt — a running total of what it borrowed
-          and repaid, not the exact amount owed now.
+          Its own events add up to{" "}
+          <H>
+            <AmountText value={implied} /> fxUSD
+          </H>{" "}
+          of debt — a running total of what it borrowed and repaid, not the exact amount owed now.
         </span>,
       );
     }
@@ -147,21 +164,29 @@ export function FxPositionExplanation({
         <>
           This position holds{" "}
           <H>
-            {formatCompact(colls)} {v.normalizedSymbol}
+            <AmountText value={colls} format="compact" /> {v.normalizedSymbol}
           </H>{" "}
-          of collateral against <H>{formatCompact(debts)} fxUSD</H> of debt:
+          of collateral against{" "}
+          <H>
+            <AmountText value={debts} format="compact" /> fxUSD
+          </H>{" "}
+          of debt:
         </>
       ) : colls != null ? (
         <>
           This position holds{" "}
           <H>
-            {formatCompact(colls)} {v.normalizedSymbol}
+            <AmountText value={colls} format="compact" /> {v.normalizedSymbol}
           </H>{" "}
           of collateral and owes nothing:
         </>
       ) : (
         <>
-          This position owes <H>{formatCompact(debts)} fxUSD</H>:
+          This position owes{" "}
+          <H>
+            <AmountText value={debts} format="compact" /> fxUSD
+          </H>
+          :
         </>
       );
 
@@ -197,21 +222,34 @@ export function FxPositionExplanation({
       const diff = v.socializedDebt ?? implied - debts;
       bullets.push(
         <span key="socialized">
-          The position&rsquo;s own events net to <H>{formatNumber(implied)} fxUSD</H> — the timeline recorded more debt
-          leaving than arriving, because bad debt socialized from other positions&rsquo; liquidations raised its debt
-          with no event of the position&rsquo;s own and the recorded repayments and liquidation clears removed that too.
-          The <H>{formatNumber(diff)} fxUSD</H> marked socialized is all of that silent movement at once: the gap
-          between the event record and the settled debt above.
+          The position&rsquo;s own events net to{" "}
+          <H>
+            <AmountText value={implied} /> fxUSD
+          </H>{" "}
+          — the timeline recorded more debt leaving than arriving, because bad debt socialized from other
+          positions&rsquo; liquidations raised its debt with no event of the position&rsquo;s own and the recorded
+          repayments and liquidation clears removed that too. The{" "}
+          <H>
+            <AmountText value={diff} /> fxUSD
+          </H>{" "}
+          marked socialized is all of that silent movement at once: the gap between the event record and the settled
+          debt above.
         </span>,
       );
     } else if (hasEvents) {
       const diff = v.socializedDebt ?? implied - debts;
       bullets.push(
         <span key="socialized">
-          The position&rsquo;s own events add up to <H>{formatNumber(implied)} fxUSD</H> of debt. The{" "}
-          <H>{formatNumber(diff)} fxUSD</H> marked socialized is the difference — tick rebalances, bad-debt write-offs
-          and bad debt socialized from other positions&rsquo; liquidations that f(x) applies pool-wide, with no event of
-          the position&rsquo;s own.
+          The position&rsquo;s own events add up to{" "}
+          <H>
+            <AmountText value={implied} /> fxUSD
+          </H>{" "}
+          of debt. The{" "}
+          <H>
+            <AmountText value={diff} /> fxUSD
+          </H>{" "}
+          marked socialized is the difference — tick rebalances, bad-debt write-offs and bad debt socialized from other
+          positions&rsquo; liquidations that f(x) applies pool-wide, with no event of the position&rsquo;s own.
           {diff < 0 ? (
             <>
               {" "}

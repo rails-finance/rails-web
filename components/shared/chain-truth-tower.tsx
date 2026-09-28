@@ -76,6 +76,7 @@ import {
   type TowerSideData,
   lineScalar,
 } from "@/lib/shared/chain-truth-economics";
+import { AmountText } from "@/components/shared/amount-text";
 
 // ── Colour grammar (shared with the Aave reference tower) ────────────────────
 const COLL_SOLID = "bg-blue-500"; // collateral held
@@ -882,7 +883,9 @@ function ReserveList({ lines }: { lines: TowerLine[] }) {
             {l.symbol}
           </span>
           <Prov info={l.prov}>
-            <span className="text-sm tabular-nums text-foreground">{formatCompact(l.amount)}</span>
+            <span className="text-sm tabular-nums text-foreground">
+              <AmountText value={l.amount} format="compact" />
+            </span>
           </Prov>
         </div>
       ))}
@@ -914,7 +917,7 @@ function GatedEconomics({ data }: { data: ChainTruthTowerData }) {
               incl.{" "}
               <Prov info={collInterest.prov}>
                 <span className="tabular-nums">
-                  {formatCompact(collInterest.amount)} {collInterest.symbol}
+                  <AmountText value={collInterest.amount} format="compact" /> {collInterest.symbol}
                 </span>
               </Prov>{" "}
               interest earned
@@ -924,7 +927,7 @@ function GatedEconomics({ data }: { data: ChainTruthTowerData }) {
             <div key={line.key} className="text-[11px] text-rb-500">
               <Prov info={line.prov}>
                 <span className="tabular-nums">
-                  {formatCompact(line.amount)} {line.symbol}
+                  <AmountText value={line.amount} format="compact" /> {line.symbol}
                 </span>
               </Prov>{" "}
               interest earned (all time)

@@ -41,7 +41,7 @@ import { StatValue, StatDash, StatFootnote } from "@/components/shared/stat-valu
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { formatUnitsExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
@@ -67,6 +67,7 @@ import type { PolarisChainResponse } from "@/lib/api/fetch-polaris-position";
 // Type-only — lib/sources/chain/* is server-only, and an `import type` is
 // erased before the client bundle is built (the markets view does the same).
 import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
+import { AmountText } from "@/components/shared/amount-text";
 
 export interface PolarisPositionView {
   market: PolarisMarket;
@@ -380,7 +381,9 @@ export function PolarisPositionCard({
               ) : v.pendingReward != null && v.pendingReward > 0 ? (
                 <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
                   <Prov info={livePendingProv("bcTokenGain", v.market)}>
-                    <span>{formatNumber(v.pendingReward)} pETH</span>
+                    <span>
+                      <AmountText value={v.pendingReward} /> pETH
+                    </span>
                   </Prov>{" "}
                   reward pending
                 </div>
@@ -417,7 +420,7 @@ export function PolarisPositionCard({
                   <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
                     <Prov info={livePendingProv("accruedInterest", v.market)}>
                       <span>
-                        {formatNumber(v.pendingInterest)} {stable}
+                        <AmountText value={v.pendingInterest} /> {stable}
                       </span>
                     </Prov>{" "}
                     interest pending

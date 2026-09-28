@@ -43,6 +43,7 @@
 // config reads, not a single figure, so they carry data-prov-exempt rather than
 // a receipt that would overclaim.
 
+import { formatTinyNonZero } from "@/lib/utils/format";
 import { useMemo, useState } from "react";
 import { ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
@@ -81,7 +82,7 @@ function amount(value: number, label: string): string {
     value === 0
       ? "0"
       : Math.abs(value) < 0.001
-        ? value.toExponential(2)
+        ? formatTinyNonZero(value)
         : value.toLocaleString("en-US", { maximumFractionDigits: value < 1 ? 6 : 2 });
   return `${n} ${label}`;
 }

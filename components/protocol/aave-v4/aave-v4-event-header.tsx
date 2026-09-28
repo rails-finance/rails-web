@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactTip } from "@/components/shared/amount-text";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { formatExact } from "@/lib/utils/format";
 import { useHeaderValueHideClass, fmtHeaderMagnitude } from "@/lib/shared/header-values";
@@ -209,7 +210,11 @@ export function AaveV4EventHeader({
                       "LiquidationCall",
                     )}
                   >
-                    {fmtHeaderMagnitude(Number(ctx.liquidatedCollateralAmount))}
+                    <ExactTip
+                      text={fmtHeaderMagnitude(Number(ctx.liquidatedCollateralAmount), ctx.collateralSymbol)}
+                      exact={formatExact(Number(ctx.liquidatedCollateralAmount))}
+                      symbol={ctx.collateralSymbol ?? undefined}
+                    />
                   </Prov>
                 </span>
                 <TokenChipIcon symbol={ctx.collateralSymbol} size={16} />
@@ -229,7 +234,11 @@ export function AaveV4EventHeader({
                       "LiquidationCall",
                     )}
                   >
-                    {fmtHeaderMagnitude(Number(ctx.debtToCover))}
+                    <ExactTip
+                      text={fmtHeaderMagnitude(Number(ctx.debtToCover), ctx.reserveSymbol)}
+                      exact={formatExact(Number(ctx.debtToCover))}
+                      symbol={ctx.reserveSymbol ?? undefined}
+                    />
                   </Prov>
                 </span>
                 <TokenChipIcon symbol={ctx.reserveSymbol ?? "???"} size={16} />
@@ -241,7 +250,13 @@ export function AaveV4EventHeader({
             {amount > 0 && (
               <span className="inline-flex items-center gap-1.5 text-sm">
                 <span className={`font-bold text-foreground ${hideVal}`}>
-                  <Prov {...aaveV4AmountProv(ctx, coord)}>{fmtHeaderMagnitude(amount)}</Prov>
+                  <Prov {...aaveV4AmountProv(ctx, coord)}>
+                    <ExactTip
+                      text={fmtHeaderMagnitude(amount, ctx.reserveSymbol)}
+                      exact={formatExact(amount)}
+                      symbol={ctx.reserveSymbol ?? undefined}
+                    />
+                  </Prov>
                 </span>
                 <TokenChipIcon symbol={ctx.reserveSymbol ?? "???"} size={16} />
               </span>
