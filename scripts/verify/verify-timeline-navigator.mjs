@@ -55,7 +55,7 @@
 //      map's figure, and a stated shortfall whenever it is less;
 //   3  ⚠️ THE SPREAD IS GONE, 2026-09-25 (picker-inline): the two date inputs
 //      above the grid were removed, the month grid being the only filter now.
-//      With nothing picked the Date button reads "Date", and no Reset stands
+//      With nothing picked the Date button reads "Dates", and no Reset stands
 //      anywhere in the panel — ui-jobs 60 took the panel's last one, the tick
 //      being the way back — which is the "nothing selected" state a spread
 //      with two blank fields used to show, translated to a control with no
@@ -862,7 +862,7 @@ const READ_CONTROLS = () => ({
     document.querySelector("[data-date-control] [data-date-chevron]")?.getAttribute("class") ?? ""
   ).includes("rotate-180"),
   // The Date button's own state (picker-inline, 2026-09-25): it names the
-  // picked month or span while a filter or a segment is active, "Date"
+  // picked month or span while a filter or a segment is active, "Dates"
   // otherwise, and takes the toolbar's own accent treatment for an active
   // filter chip (`CTRL_ON_ACCENT`, `bg-teal-500/15`) while it does.
   dateLabel: document.querySelector("[data-date-control]")?.textContent?.trim() ?? null,
@@ -1131,12 +1131,12 @@ for (const f of FIXTURES) {
     // 3 — REWRITTEN, 2026-09-25 (picker-inline): the spread this asserted is
     // gone, the month grid being the only filter now. What "nothing selected"
     // means for a control with no field to sit blank or full is that the Date
-    // button reads "Date" rather than a picked month, wears none of the
+    // button reads "Dates" rather than a picked month, wears none of the
     // active-filter accent, and offers no Reset — the three things a filter
     // being ON would turn on.
     check(
-      `3  ${f.id}: with nothing selected the Date button reads "Date" and offers no Reset`,
-      openControls.dateLabel === "Date" && !openControls.dateAccent && rest?.reset === false,
+      `3  ${f.id}: with nothing selected the Date button reads "Dates" and offers no Reset`,
+      openControls.dateLabel === "Dates" && !openControls.dateAccent && rest?.reset === false,
       `button "${openControls.dateLabel}" (accent ${openControls.dateAccent}); Reset offered ${rest?.reset}`,
     );
     check(
@@ -1317,7 +1317,7 @@ for (const f of FIXTURES) {
         `4  ${f.id}: the same month again clears the selection rather than extending it`,
         !/[?&](from|to)=/.test(search(page)) &&
           (await page.evaluate(COUNT_LINE)) === restLine &&
-          afterClearControls.dateLabel === "Date" &&
+          afterClearControls.dateLabel === "Dates" &&
           !afterClearControls.dateAccent &&
           afterClearControls.navigators === 1,
         `url "${search(page)}", count line "${await page.evaluate(COUNT_LINE)}" (want "${restLine}"); button "${afterClearControls.dateLabel}"; panel still open (${afterClearControls.navigators})`,
@@ -2175,8 +2175,8 @@ for (const g of GROUPED_FIXTURES) {
       );
       const afterResetControls = await page.evaluate(READ_CONTROLS);
       check(
-        `S3 ${g.id}: ...and gives the Date button back "Date"`,
-        afterResetControls.dateLabel === "Date" && !afterResetControls.dateAccent,
+        `S3 ${g.id}: ...and gives the Date button back "Dates"`,
+        afterResetControls.dateLabel === "Dates" && !afterResetControls.dateAccent,
         `button "${afterResetControls.dateLabel}", accent ${afterResetControls.dateAccent}`,
       );
     }

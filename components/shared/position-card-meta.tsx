@@ -27,6 +27,9 @@ export interface PositionCardMetaProps {
    *  share-token transfers naming the address, and has no liquidations to
    *  exclude) states its own. Omitted, nothing changes for any caller. */
   eventCountTitle?: string;
+  /** A word printed after the count ("transactions"), for a page whose
+   *  timeline counts a different unit beside it. Omitted, the count stands alone. */
+  eventCountUnit?: string;
   /** Exact liquidation count, when known (Aave, Compound). */
   liquidationCount?: number | null;
   /** Boolean-only liquidation history, when no count exists (Morpho, MakerDAO). */
@@ -46,6 +49,7 @@ export function PositionCardMeta({
   lastActivityAt,
   eventCount,
   eventCountTitle,
+  eventCountUnit,
   liquidationCount,
   liquidated,
   redemptionCount,
@@ -97,7 +101,10 @@ export function PositionCardMeta({
               tabIndex={0}
             >
               <Icon name="arrow-left-right" size={12} />
-              <span className="ml-1">{eventCount}</span>
+              <span className="ml-1">
+                {eventCount}
+                {eventCountUnit ? ` ${eventCountUnit}` : null}
+              </span>
             </span>
           );
         })()}

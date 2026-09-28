@@ -35,6 +35,7 @@ import type { ReactNode } from "react";
 import type { BaseActivityEvent, FluidContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
+import { externalActor } from "@/lib/shared/external-actor";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import {
   clause,
@@ -270,9 +271,8 @@ const fmtVal = (h?: string): string => formatNumber(Number(h));
  *  renders when the position's owner AT this event was neither the signer nor
  *  the operate's initiator.
  *
- *  `txFrom`/`initiator` ship exactly where the two-fact verdict is decidable,
- *  so their presence IS the verdict — which is what lets this stay a pure
- *  function with no owner in hand, matching the card's own gate.
+ *  rails-server ships `txFrom` and `initiator` on every operate, so the verdict
+ *  is the card's `externalActor()` against the owner at this event.
  *
  *  The authority is protocol-specific and the obvious answer is WRONG here.
  *  Fluid's single entry point is
@@ -301,8 +301,8 @@ const fmtVal = (h?: string): string => formatNumber(Number(h));
  *  incapable of marking, leaving `deposit`, `payback` and `deposit_payback` as
  *  the reachable kinds. The second branch states the rule rather than a verdict
  *  about the sender, so it stays true if one ever turns up. */
-function permissionlessActorMechanic(ctx: FluidContext): ClauseInput {
-  if (!ctx.txFrom || !ctx.initiator) return null;
+function permissionlessActorMechanic(ctx: FluidContext, owner?: string): ClauseInput {
+  if (!owner || !externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.initiator }, owner)) return null;
   const addsOnly = ctx.eventType === "deposit" || ctx.eventType === "payback" || ctx.eventType === "deposit_payback";
   if (addsOnly)
     return clause(
@@ -337,7 +337,7 @@ export function fluidEventSlots(
   const slots = opts.openedBy
     ? openSlots(ctx, coords, opts.openedBy)
     : fluidEventSlotsBase(ctx, coords, siblings, self);
-  const extra = [permissionlessActorMechanic(ctx), roundTripBeside(ctx, coords, siblings, self)].filter(
+  const extra = [permissionlessActorMechanic(ctx, coords.owner), roundTripBeside(ctx, coords, siblings, self)].filter(
     (c) => c != null,
   );
   if (extra.length === 0) return slots;

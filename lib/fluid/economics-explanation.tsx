@@ -141,7 +141,7 @@ export function fluidEconomicsExplanation(data: FluidTowerData): ReactNode {
   return (
     <div className="space-y-2 text-sm text-rb-500">
       <p className="leading-relaxed">
-        These figures total this vault&apos;s lifetime flows on Fluid across every event in its captured history.
+        These figures total this position&apos;s lifetime flows across every event in its captured history.
       </p>
       {items.map((item, i) => (
         <div key={i} className="flex items-start gap-2 leading-relaxed">

@@ -194,7 +194,7 @@ async function hideFirstOption(page, label) {
     `from=${p.from} to=${p.to}`,
   );
   const dateLabelSender = await dateButton(page).innerText();
-  check("Date button carries the range", dateLabelSender !== "Date", dateLabelSender);
+  check("Date button carries the range", dateLabelSender !== "Dates", dateLabelSender);
 
   // ── 3. The link carries the whole view and round-trips ────────────────
   const link2 = await copyLink(page);
@@ -244,10 +244,10 @@ async function hideFirstOption(page, label) {
 // ── 4. Malformed dates are ignored ──────────────────────────────────────
 {
   const { ctx, page } = await open(1280, `${BASE}${PAGE}?from=2025-02-30&to=2025-03-01`);
-  check("impossible day → no range", (await dateButton(page).innerText()) === "Date");
+  check("impossible day → no range", (await dateButton(page).innerText()) === "Dates");
   await ctx.close();
   const b = await open(1280, `${BASE}${PAGE}?from=2025-03-01&to=2025-01-01`);
-  check("from after to → no range", (await dateButton(b.page).innerText()) === "Date");
+  check("from after to → no range", (await dateButton(b.page).innerText()) === "Dates");
   await b.ctx.close();
   const c = await open(1280, `${BASE}${PAGE}?from=2025-01-01&to=2025-01-31`);
   check(

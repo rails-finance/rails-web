@@ -106,6 +106,11 @@ interface FilterDropdownProps {
   align?: "left" | "right";
   /** Override the default list-filter icon shown in minimal/multi mode. */
   triggerIcon?: React.ReactNode;
+  /** Minimal mode: print `label` beside the icon, and give the trigger a
+   *  hover tooltip. For a control whose icon alone does not say what it does. */
+  showLabel?: boolean;
+  /** Hover tooltip on the trigger. */
+  triggerTitle?: string;
   /** Visual variant. `'ghost'` (default) is the compact text-only trigger. `'button'` is a larger trigger with a dark surface — for top-of-section toolbars. */
   variant?: "ghost" | "button";
   /** Render option labels exactly as given, skipping the per-word title-casing
@@ -134,6 +139,8 @@ export function FilterDropdown({
   trigger,
   align = "left",
   triggerIcon,
+  showLabel = false,
+  triggerTitle,
   variant = "ghost",
   verbatimLabels = false,
   sheetStatus,
@@ -224,11 +231,13 @@ export function FilterDropdown({
             aria-label={label}
             aria-expanded={open}
             aria-haspopup="listbox"
+            title={triggerTitle}
             className={`${CTRL_GHOST} ${open || (!isAll && !minimal) ? CTRL_ON : CTRL_OFF} ${
               variant === "button" ? "h-7 gap-2 px-2.5 rounded-md text-xs" : "gap-1.5 px-2 py-1 rounded text-xs"
             }`}
           >
             {(minimal || multi) && (triggerIcon ?? <ListFilterIcon size={12} />)}
+            {minimal && showLabel && <span>{label}</span>}
             {!minimal &&
               !isAll &&
               !multi &&
@@ -353,7 +362,9 @@ export function FilterDropdown({
                   ? opt.label
                   : opt.label
                       .split(/(\s+)/)
-                      .map((w) => (/^[A-Z]{2,}$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+                      .map((w) =>
+                        /^\(?[A-Z]{2,}\)?$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
+                      )
                       .join("")}
                 {opt.suffix && <span className="inline-flex ml-1.5 align-middle">{opt.suffix}</span>}
               </span>

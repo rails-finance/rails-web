@@ -14,7 +14,7 @@
 // in `provenance-info-tabs.tsx`.
 
 import { useEffect, useRef } from "react";
-import { Clock, Coins, Layers, Wallet } from "lucide-react";
+import { CalendarRange, Clock, Coins, Layers, Wallet } from "lucide-react";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
@@ -210,6 +210,8 @@ export function TimelineDisplayMenu({ items }: { items: TimelineDisplayItem[] })
       onSelect={() => {}}
       multi
       minimal
+      showLabel
+      triggerTitle="Choose what each timeline row shows"
       align="right"
       variant="button"
       triggerIcon={<DisplaySettingsIcon size={16} />}
@@ -476,7 +478,7 @@ export function TimelineToolbar({
         ? monthLabel(segmentMonth)
         : dateActive
           ? `${formatDayMonth(tl.dateRange![0])} – ${formatDayMonth(tl.dateRange![1])}`
-          : "Date";
+          : "Dates";
   const countLine = eventCountLine(tl);
   const countState = eventCountState(tl);
   // Inert until this strip's handlers are attached. A detail page is the widest
@@ -647,6 +649,7 @@ export function TimelineToolbar({
             }`}
             title={datePanelOpen ? "Hide the date span" : "Filter by a span of dates"}
           >
+            <CalendarRange size={12} aria-hidden />
             {dateLabel}
             {/* The same chevron the event-type, asset and address triggers
                 carry, turning over when the panel is open. Without it a button
