@@ -551,6 +551,42 @@ export function aaveV4SupplyContent(): LearnMoreContent {
   };
 }
 
+export function aaveV4WithdrawContent(): LearnMoreContent {
+  return {
+    title: "How Withdrawing Works",
+    intro:
+      "Withdrawing takes supplied assets, with the interest they have earned, out of a spoke and back to the wallet. A withdrawal can name an amount or take the whole balance.",
+    detailsHeading: "Key concepts:",
+    details: [
+      {
+        bold: "Health factor",
+        text: "with a borrow open, withdrawing collateral lowers the health factor. The spoke allows it while the factor stays at or above 1; a factor close to 1 leaves the position near liquidation.",
+      },
+      {
+        bold: "Supply with no debt against it",
+        text: "a supply that backs no borrow, or one not enabled as collateral, can be withdrawn in full.",
+      },
+      {
+        bold: "Risk premium",
+        text: "withdrawing collateral while a borrow is open is a risk-increasing action, so the spoke recalculates the position's risk premium.",
+      },
+      {
+        bold: "Paused reserves",
+        text: "a reserve that governance has paused cannot be withdrawn from until it is unpaused.",
+      },
+      {
+        bold: "Position managers",
+        text: "a manager the owner has approved can withdraw for them; because the tokens go to the manager, it also needs an allowance the owner grants for that asset.",
+      },
+    ],
+    links: [
+      { label: "Withdrawing on Aave V4", url: "https://aave.com/docs/aave-v4/positions/withdraw" },
+      { label: "Position managers", url: "https://aave.com/docs/aave-v4/positions/managers" },
+      { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
+    ],
+  };
+}
+
 export function aaveV4BorrowContent(): LearnMoreContent {
   return {
     title: "How Borrowing Works",
@@ -569,6 +605,10 @@ export function aaveV4BorrowContent(): LearnMoreContent {
       {
         bold: "Borrow interest",
         text: "debt accrues interest continuously at the asset's borrow rate until it's repaid.",
+      },
+      {
+        bold: "What moves the rate",
+        text: "the hub that lends the asset sets its borrow rate from how much of its supply is borrowed: the rate rises slowly up to a target share and steeply past it, so every borrow, repay, supply and withdrawal on that hub moves it. Aave V4 can add a per-user risk premium on top, scaled by the quality of the collateral, recalculated on each borrow and withdrawal; every position Rails has read carries a zero premium.",
       },
       {
         bold: "Position managers",

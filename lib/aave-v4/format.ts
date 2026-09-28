@@ -44,14 +44,34 @@ export function hfLabel(hf: number | null): string {
   return hf.toFixed(2);
 }
 
+/** A health factor at or above this reads as a capped figure (">100"). */
+export const HF_CAP = 100;
+
 /** The Aave V4 health-factor label: a third decimal below 1.1, so a position
  *  at 1.004 does not read as 1.00, the liquidation line. `hfLabel` stays two
- *  decimals for the other explorers that import it. */
+ *  decimals for the other explorers that import it. RULE: "∞" only where no
+ *  debt remains (null); a finite factor however large is capped at ">100". */
 export function hfLabelV4(hf: number | null): string {
-  if (hf == null || hf >= 100) return "∞";
+  if (hf == null) return "∞";
+  if (hf >= HF_CAP) return `>${HF_CAP}`;
   // Below 1 round down, so a liquidatable 0.9997 never reads 1.000.
   if (hf < 1) return (Math.floor(hf * 1000) / 1000).toFixed(3);
   return hf < 1.1 ? hf.toFixed(3) : hf.toFixed(2);
+}
+
+/** The health factor in a sentence: "over 100" where the label reads ">100". */
+export function hfProseV4(hf: number | null): string {
+  return hf != null && hf >= HF_CAP ? `over ${HF_CAP}` : hfLabelV4(hf);
+}
+
+/** A per-unit asset price at the precision its value needs: four decimals
+ *  below $10 (sUSDe at $1.2437, USDT at $0.9997), whole dollars from $100. */
+export function fmtUnitPrice(p: number): string {
+  if (!isFinite(p) || p <= 0) return "–";
+  if (p < 0.0001) return "< $0.0001";
+  if (p < 10) return "$" + p.toFixed(4);
+  if (p < 100) return "$" + p.toFixed(2);
+  return "$" + p.toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
 /** A health factor this close above 1 (under 1% of collateral value to spare)

@@ -7,6 +7,10 @@ import { useEffect, useState } from "react";
 export interface HealthFactorRead {
   block: number;
   wad: string | null;
+  /** The collateral factor of the position's collateral at that block (value-
+   *  weighted over more than one), null with none; absent on an older answer. */
+  collateralFactor?: number | null;
+  collateralCount?: number;
 }
 
 export type HealthFactorAround =

@@ -170,6 +170,8 @@ export interface AaveSpokeCardInfo {
    *  matching Liquity's transactionCount and the timeline's per-tx grouping. */
   txCount: number;
   supplyingSymbols: string[];
+  /** Every reserve this position has ever supplied, oldest listing order. */
+  suppliedSymbolsEver: string[];
   borrowingSymbols: string[];
   latestBorrowRate: number | null;
   /** The debt asset `latestBorrowRate` belongs to. */
@@ -899,6 +901,7 @@ export function buildSpokeCards(
       borrowingSymbols,
       latestBorrowRate: spokeBorrowRate,
       latestBorrowRateSymbol: spokeBorrowRateSymbol,
+      suppliedSymbolsEver: g.result.reserves.filter((r) => r.supplied > 0).map((r) => r.symbol),
       debtReserveHistory: g.result.reserves
         .filter((r) => r.borrowed > 0)
         .map((r) => ({ symbol: r.symbol, borrowed: r.borrowed, repaid: r.repaid, liquidated: r.liquidatedDebt })),

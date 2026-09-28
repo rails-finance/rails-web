@@ -33,6 +33,8 @@ export interface AaveV4EventCardProps {
   /** The borrow rate (decimal) the previous event on this spoke recorded for
    *  this event's asset. */
   previousRate?: number;
+  /** For a repay that clears its debt: the interest that debt accrued over its life. */
+  debtLifeInterest?: number;
 }
 
 export function AaveV4EventCard({
@@ -43,6 +45,7 @@ export function AaveV4EventCard({
   siblings,
   eventNumber,
   previousRate,
+  debtLifeInterest,
 }: AaveV4EventCardProps) {
   const ctx = event.context.data;
   const isLiquidation = ctx.eventType === "liquidation";
@@ -152,6 +155,7 @@ export function AaveV4EventCard({
           siblings={siblings ?? [event]}
           gas={event.gas}
           previousRate={previousRate}
+          debtLifeInterest={debtLifeInterest}
           skipLead
         />
       }

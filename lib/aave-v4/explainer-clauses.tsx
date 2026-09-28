@@ -62,9 +62,9 @@ import {
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { effectiveBorrowAPR, borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
 import { formatExact } from "@/lib/utils/format";
-import { hfLabelV4, fmtV4Amount, AT_LINE_HF } from "@/lib/aave-v4/format";
+import { hfLabelV4, hfProseV4, fmtV4Amount, AT_LINE_HF, HF_CAP } from "@/lib/aave-v4/format";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { chainIdForSpokeAddress } from "@/lib/aave-v4/spoke-meta";
+import { chainIdForSpokeAddress, getSpokeMeta } from "@/lib/aave-v4/spoke-meta";
 
 export type AaveV4Event = BaseActivityEvent & { context: { protocol: "aave-v4"; data: AaveV4Context } };
 
@@ -154,6 +154,14 @@ export function resultingState(ctx: AaveV4Context): AaveV4ResultingState {
     opensSupply: supplyAfter != null && supplyAfter > EPS && (supplyBefore ?? 0) <= EPS,
     firstBorrow: debtAfter != null && debtAfter > EPS && (debtBefore ?? 0) <= EPS,
   };
+}
+
+/** This event leaves nothing supplied and nothing owed on the spoke. */
+function closesPosition(ctx: AaveV4Context, rs: AaveV4ResultingState): boolean {
+  if (!(rs.supplyEmptied || rs.debtCleared)) return false;
+  if (ctx.allSupplies == null || ctx.allDebts == null) return false;
+  const live = (rows: { amount: string }[]) => rows.some((r) => (num(r.amount) ?? 0) > EPS);
+  return !live(ctx.allSupplies) && !live(ctx.allDebts);
 }
 
 // ── sibling helpers (the same-transaction seam) ──────────────────────────────
@@ -318,6 +326,10 @@ export interface AaveV4HfPair {
   after: number | null;
   /** Whether the event's reserve counted as collateral either side of it. */
   collateral?: { before: boolean; after: boolean };
+  /** The collateral factor after the event (value-weighted over more than one
+   *  collateral), and how many reserves counted as collateral. */
+  collateralFactor?: number | null;
+  collateralCount?: number;
 }
 
 export function aaveV4EventSlots(
@@ -327,8 +339,9 @@ export function aaveV4EventSlots(
   self: AaveV4Event,
   hf?: AaveV4HfPair,
   previousRate?: number,
+  debtLifeInterest?: number,
 ): EventProseSlots {
-  const slots = aaveV4EventSlotsBase(ctx, coord, siblings, self, hf, previousRate);
+  const slots = aaveV4EventSlotsBase(ctx, coord, siblings, self, hf, previousRate, debtLifeInterest);
   const managed = positionManagerLine(ctx);
   if (!managed) return slots;
   return { ...slots, meansNow: [...(slots.meansNow ?? []), managed] };
@@ -341,8 +354,10 @@ function aaveV4EventSlotsBase(
   self: AaveV4Event,
   hf?: AaveV4HfPair,
   previousRate?: number,
+  debtLifeInterest?: number,
 ): EventProseSlots {
   const rs = resultingState(ctx);
+  const closes = closesPosition(ctx, rs);
   const token = aaveV4DisplaySymbol(ctx.reserveSymbol) || "the asset";
   const hfLine = (withdraw = false) => healthFactorMove(hf, withdraw);
   const market = ctx.spokeName;
@@ -404,15 +419,19 @@ function aaveV4EventSlotsBase(
     }
 
     case "withdraw": {
-      const ending: ClauseInput = rs.supplyEmptied
-        ? cont(<>, fully exiting the {token} supply on this market.</>)
-        : cont(<>.</>);
+      const ending: ClauseInput = closes
+        ? cont(
+            <>, emptying the {token} supply and closing the position: nothing is supplied or owed on this spoke now.</>,
+          )
+        : rs.supplyEmptied
+          ? cont(<>, fully exiting the {token} supply on this market.</>)
+          : cont(<>.</>);
       const changed: ClauseInput =
         !rs.supplyEmptied && rs.supplyAfter != null ? clause(<>{reconcile(ctx, coord, "supply")}</>) : null;
       return {
         happened: [clause(<>Withdrew {amountFig(ctx, coord, true)} back to the wallet</>), ending],
         changed: changed ? [changed] : [],
-        meansNow: [hfLine(true), sibling],
+        meansNow: [hfLine(true), collateralFactorLine(ctx, hf), sibling],
       };
     }
 
@@ -435,7 +454,9 @@ function aaveV4EventSlotsBase(
         : null;
       const rate = rateFig(ctx, coord);
       const meansNow: ClauseInput[] = [
+        hubLine(ctx, token),
         hfLine(),
+        collateralFactorLine(ctx, hf),
         rateMove(ctx, token, previousRate) ??
           (rate ? clause(<>Interest accrues on it continuously, at a {rate} borrow rate.</>) : null),
         sibling,
@@ -446,24 +467,51 @@ function aaveV4EventSlotsBase(
     case "repay": {
       const dust = (num(ctx.amount) ?? 0) > 0 && (num(ctx.amount) ?? 0) < 0.000001;
       const ending: ClauseInput = rs.debtCleared
-        ? cont(<>, clearing the {token} debt on this market in full.</>)
+        ? cont(
+            closes ? (
+              <>
+                , clearing the {token} debt in full and closing the position: nothing is supplied or owed on this spoke
+                now.
+              </>
+            ) : (
+              <>, clearing the {token} debt on this market in full.</>
+            ),
+          )
         : dust
           ? cont(<>, a dust amount that leaves the debt where it was.</>)
           : cont(<>.</>);
       const changed: ClauseInput =
         !rs.debtCleared && !dust && rs.debtAfter != null ? clause(<>{reconcile(ctx, coord, "debt")}</>) : null;
       const repayRate = rateFig(ctx, coord);
+      const otherDebts = (ctx.allDebts ?? []).filter(
+        (d) => d.symbol !== ctx.reserveSymbol && (num(d.amount) ?? 0) > EPS,
+      );
+      const lifeInterest =
+        rs.debtCleared && debtLifeInterest != null && debtLifeInterest > 0 ? (
+          <>
+            Over its life this {token} debt accrued {fmt(debtLifeInterest)} {token} in interest, paid as part of the
+            repayments.
+          </>
+        ) : null;
       const meansNow: ClauseInput[] = rs.debtCleared
         ? [
-            clause(
-              <>
-                With this debt cleared, the collateral that backed it can be withdrawn or left to support a future
-                borrow.
-              </>,
-            ),
+            hubLine(ctx, token),
+            lifeInterest ? clause(lifeInterest) : null,
+            otherDebts.length > 0 || closes ? hfLine() : null,
+            otherDebts.length > 0
+              ? clause(<>The {legList(otherDebts)} debt remains and keeps accruing interest.</>)
+              : closes
+                ? null
+                : clause(
+                    <>
+                      With no debt left, the position has no health factor and cannot be liquidated; the collateral can
+                      be withdrawn or left to support a future borrow.
+                    </>,
+                  ),
             sibling,
           ]
         : [
+            hubLine(ctx, token),
             hfLine(),
             rateMove(ctx, token, previousRate) ??
               (repayRate
@@ -546,10 +594,17 @@ function reconcile(ctx: AaveV4Context, coord: EventProvDetail, side: "supply" | 
 
 /** One sentence on how the health factor moved, as the opened card's grid
  *  reads it; at the liquidation line it says so. Absent until the read lands,
- *  and where the position held no debt either side. */
+ *  and where the position held no debt either side. A factor of 100 or more
+ *  reads "over 100" (the grid's ">100"); "no debt" is said only when none
+ *  remains. */
 function healthFactorMove(hf: AaveV4HfPair | undefined, withdraw: boolean): ClauseInput {
-  if (!hf || hf.after == null) return null;
-  const after = <H>{hfLabelV4(hf.after)}</H>;
+  if (!hf) return null;
+  if (hf.after == null) {
+    return hf.before == null
+      ? null
+      : clause(<>With no debt left, the position has no health factor and cannot be liquidated.</>);
+  }
+  const after = <H>{hfProseV4(hf.after)}</H>;
   const tail =
     hf.after >= 1 && hf.after < AT_LINE_HF ? (
       <>: the position is at the liquidation line, and any fall below 1 lets it be liquidated</>
@@ -566,6 +621,14 @@ function healthFactorMove(hf: AaveV4HfPair | undefined, withdraw: boolean): Clau
       </>,
     );
   }
+  if (hf.before >= HF_CAP && hf.after >= HF_CAP) {
+    return clause(
+      <>
+        The health factor stayed <H>over {HF_CAP}</H>: the debt is small against the collateral, far from the
+        liquidation line at 1{allowed}.
+      </>,
+    );
+  }
   const d = hf.after - hf.before;
   const verb = Math.abs(d) < 0.0005 ? "stayed at" : d > 0 ? "rose from" : "fell from";
   return clause(
@@ -577,9 +640,57 @@ function healthFactorMove(hf: AaveV4HfPair | undefined, withdraw: boolean): Clau
       </>
     ) : (
       <>
-        The health factor {verb} <H>{hfLabelV4(hf.before)}</H> to {after}
+        The health factor {verb} <H>{hfProseV4(hf.before)}</H> to {after}
         {tail}
         {allowed}.
+      </>
+    ),
+  );
+}
+
+/** Near the liquidation line, why the factor sits where it does: the collateral
+ *  counts at its collateral factor, so the collateral ratio times that factor
+ *  is the health factor. Only within ~5% of 1, and only once the read lands. */
+function collateralFactorLine(ctx: AaveV4Context, hf: AaveV4HfPair | undefined): ClauseInput {
+  const cf = hf?.collateralFactor;
+  if (!hf || hf.after == null || hf.after < 1 || hf.after >= 1.05 || cf == null || cf <= 0) return null;
+  const pct = `${Math.round(cf * 100)}%`;
+  const ratio = `${Math.round((hf.after / cf) * 100)}%`;
+  const linePct = `${Math.round(100 / cf)}%`;
+  const lineTail = linePct === ratio ? <>, the liquidation line</> : <>; at about {linePct} it would be 1</>;
+  const collateral = (ctx.allSupplies ?? []).filter((r) => (num(r.amount) ?? 0) > EPS);
+  const single = hf.collateralCount === 1 && collateral.length === 1 ? aaveV4DisplaySymbol(collateral[0].symbol) : null;
+  return clause(
+    single ? (
+      <>
+        On this spoke {single} counts at {pct} of its value, its collateral factor, so collateral worth {ratio} of the
+        debt gives a health factor of {hfLabelV4(hf.after)}
+        {lineTail}.
+      </>
+    ) : (
+      <>
+        On this spoke the collateral counts at {pct} of its value on average, its collateral factor, so collateral worth{" "}
+        {ratio} of the debt gives a health factor of {hfLabelV4(hf.after)}
+        {lineTail}.
+      </>
+    ),
+  );
+}
+
+/** On a spoke that borrows from more than one hub, which hub this asset came
+ *  from (a borrow) or went back to (a repay). */
+function hubLine(ctx: AaveV4Context, token: string): ClauseInput {
+  const meta = ctx.spokeName ? getSpokeMeta(ctx.spokeName) : null;
+  const hub = ctx.hub ? HUB_NAME[ctx.hub] : undefined;
+  if (!meta || meta.borrowHubs.length < 2 || !hub) return null;
+  return clause(
+    ctx.eventType === "repay" ? (
+      <>
+        This {token} debt is owed to the {hub} hub.
+      </>
+    ) : (
+      <>
+        This {token} came from the {hub} hub.
       </>
     ),
   );

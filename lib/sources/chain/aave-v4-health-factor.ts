@@ -35,6 +35,12 @@ export interface AaveV4HealthFactorAt {
   block: number;
   /** The raw 18-decimal figure, as a decimal string; null when the account had no debt. */
   wad: string | null;
+  /** getUserAccountData.avgCollateralFactor as a fraction (0.92): the
+   *  collateral factor of the position's collateral, value-weighted when it
+   *  holds more than one. Null where it held no collateral. */
+  collateralFactor?: number | null;
+  /** How many reserves counted as collateral (activeCollateralCount). */
+  collateralCount?: number;
 }
 
 export interface AaveV4HealthFactorResponse {
@@ -65,8 +71,13 @@ export async function loadAaveV4HealthFactorAround(
       args: [wallet],
       blockNumber: BigInt(at),
     })) as readonly bigint[];
-    const [, , healthFactor, , , , borrowCount] = data;
-    return { block: at, wad: borrowCount === BigInt(0) || healthFactor >= UINT_MAX ? null : healthFactor.toString() };
+    const [, avgCollateralFactor, healthFactor, , , activeCollateralCount, borrowCount] = data;
+    return {
+      block: at,
+      wad: borrowCount === BigInt(0) || healthFactor >= UINT_MAX ? null : healthFactor.toString(),
+      collateralFactor: activeCollateralCount === BigInt(0) ? null : Number(avgCollateralFactor) / 1e18,
+      collateralCount: Number(activeCollateralCount),
+    };
   };
   const findReserve = async (): Promise<number | null> => {
     const underlying = assetSymbol ? TOKEN_ADDR[assetSymbol]?.toLowerCase() : undefined;

@@ -453,6 +453,33 @@ function AaveV4SpokePageInner({
     return out;
   }, [spokeScopedEvents]);
 
+  // For a repay that clears its reserve's debt: the interest that debt accrued
+  // over its life, the repayments less the borrows since the debt was last
+  // zero. Only where the page holds the whole history (a window may start
+  // mid-life).
+  const debtLifeInterest = useMemo(() => {
+    const out = new Map<string, number>();
+    const life = new Map<string, { borrowed: number; repaid: number }>();
+    for (const e of spokeScopedEvents) {
+      if (!isAaveV4Event(e)) continue;
+      const c = e.context.data;
+      const sym = c.reserveSymbol;
+      if (!sym || (c.eventType !== "borrow" && c.eventType !== "repay")) continue;
+      const amt = parseFloat(c.amount ?? "");
+      if (!Number.isFinite(amt)) continue;
+      const cur = life.get(sym) ?? { borrowed: 0, repaid: 0 };
+      if (c.eventType === "borrow") cur.borrowed += amt;
+      else cur.repaid += amt;
+      life.set(sym, cur);
+      const after = parseFloat(c.debtAfter ?? "");
+      if (c.eventType === "repay" && Number.isFinite(after) && after <= 1e-4) {
+        if (cur.borrowed > 0) out.set(e.id, Math.max(0, cur.repaid - cur.borrowed));
+        life.delete(sym);
+      }
+    }
+    return out;
+  }, [spokeScopedEvents]);
+
   // Events this spoke holds BELOW the oldest drawn row. The page draws a window
   // of the wallet's newest events and then filters to one spoke, so its own
   // count is not `totalEvents − events.length`; the route answers per spoke
@@ -841,6 +868,7 @@ function AaveV4SpokePageInner({
                   txGroup={txGroups.get(event.id)}
                   siblings={txSiblings.get(event.txHash ?? "")}
                   previousRate={previousRates.get(event.id)}
+                  debtLifeInterest={olderCount === 0 ? debtLifeInterest.get(event.id) : undefined}
                   eventNumber={meta.eventNumber}
                 />
               ) : null
@@ -1005,10 +1033,10 @@ function AaveV4SpokeTowerBlock({
               collateral story, then the debt story when this position ever
               held debt. */}
                 <p className="leading-relaxed">
-                  These figures total the position&apos;s lifetime flows across every event on this spoke. What left
-                  (withdrawals, repayments, liquidations) is valued at each event&apos;s price and what remains at
-                  today&apos;s; the deposited and borrowed figures make up the difference, so a price move between
-                  events shows in them.
+                  These figures add up every event on this spoke. What left the position (withdrawals, repayments,
+                  liquidations) is valued at its price when it left, and what is still held at today&apos;s price.
+                  Deposited and Borrowed are set so each side balances, so a price change while a token was held shows
+                  in them.
                   {totals.unpricedSymbols.length > 0 && (
                     <>
                       {" "}

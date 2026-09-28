@@ -18,7 +18,16 @@ import {
   rateSymbolLabel,
   yearlyDebtCost,
 } from "@/lib/aave-v4/spoke-cards";
-import { fmtUsd, hfLabelV4, fmtLiqPrice, fmtSignedUsd, fmtTokenAmount, fmtYearly } from "@/lib/aave-v4/format";
+import {
+  fmtUsd,
+  hfLabelV4,
+  hfProseV4,
+  fmtLiqPrice,
+  fmtSignedUsd,
+  fmtTokenAmount,
+  fmtYearly,
+} from "@/lib/aave-v4/format";
+import { useSpokeCollateralFactors } from "@/lib/aave-v4/use-spoke-collateral-factors";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { fmtPrice } from "@/components/shared/price-pill";
@@ -63,6 +72,16 @@ function joinSymbols(syms: string[]): string {
   if (names.length === 1) return names[0];
   if (names.length === 2) return `${names[0]} and ${names[1]}`;
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** The collateral factors of the given assets on this spoke, as prose:
+ *  "sUSDe at 92%", "sUSDe at 92% and USDe at 93%". Null when none is known. */
+function cfList(symbols: string[], cfs: Map<string, number>): { text: string; single: number | null } | null {
+  const known = symbols.filter((sym) => cfs.has(sym));
+  if (known.length === 0) return null;
+  const parts = known.map((sym) => `${aaveV4DisplaySymbol(sym)} at ${Math.round(cfs.get(sym)! * 100)}%`);
+  const text = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return { text, single: known.length === 1 && symbols.length === 1 ? cfs.get(known[0])! : null };
 }
 
 /**
@@ -177,7 +196,10 @@ function buildInterestItems(pnl: AaveV4InterestPnl): React.ReactNode[] {
  * runs BOTH ways (reverse-completeness): every figure on the card's chrome
  * must also appear, bold, somewhere in this pane.
  */
-function buildSpokePositionItems(spoke: AaveSpokeCardInfo): {
+function buildSpokePositionItems(
+  spoke: AaveSpokeCardInfo,
+  cfs: Map<string, number>,
+): {
   lead: React.ReactNode | null;
   items: React.ReactNode[];
 } {
@@ -250,13 +272,29 @@ function buildSpokePositionItems(spoke: AaveSpokeCardInfo): {
       </span>
     );
     if (spoke.blendedLt != null && spoke.weightedCollateralUsd > 0) {
+      const perAsset = cfList(spoke.supplyBreakdown.collateralSymbols, cfs);
       items.push(
         <span key="collateral-basis">
-          Aave V4 gives each collateral one collateral factor, about <H>{Math.round(spoke.blendedLt * 100)}%</H> of its
-          value here (the liquidation threshold on this card), and it is both the borrowing limit and the liquidation
-          line: a borrow or withdrawal goes through while the health factor stays at or above 1, and below 1 the
-          position can be liquidated. So this collateral can carry up to{" "}
-          <Prov info={DEBT_CEILING_PROV}>{fmtUsd(spoke.weightedCollateralUsd).display}</Prov> of debt.
+          Aave V4 counts each collateral at its collateral factor, the share of its value that backs debt
+          {perAsset && perAsset.single == null ? (
+            <>
+              : on this spoke {perAsset.text}, about <H>{Math.round(spoke.blendedLt * 100)}%</H> blended (the
+              liquidation threshold on this card)
+            </>
+          ) : perAsset ? (
+            <>
+              : on this spoke {joinSymbols(spoke.supplyBreakdown.collateralSymbols)} at{" "}
+              <H>{Math.round(spoke.blendedLt * 100)}%</H> (the liquidation threshold on this card)
+            </>
+          ) : (
+            <>
+              , about <H>{Math.round(spoke.blendedLt * 100)}%</H> of its value here (the liquidation threshold on this
+              card)
+            </>
+          )}
+          . That factor is both the borrowing limit and the liquidation line: a borrow or withdrawal goes through while
+          the health factor stays at or above 1, and below 1 the position can be liquidated. So this collateral can
+          carry up to <Prov info={DEBT_CEILING_PROV}>{fmtUsd(spoke.weightedCollateralUsd).display}</Prov> of debt.
         </span>,
       );
     }
@@ -266,7 +304,7 @@ function buildSpokePositionItems(spoke: AaveSpokeCardInfo): {
         <span key="hf">
           Health factor of{" "}
           <H>
-            <Prov info={healthFactorProv(spoke.healthFactorBasis)}>{hfLabelV4(spoke.healthFactor)}</Prov>
+            <Prov info={healthFactorProv(spoke.healthFactorBasis)}>{hfProseV4(spoke.healthFactor)}</Prov>
           </H>
           {lt != null && lt > 0 ? (
             <>
@@ -510,7 +548,8 @@ export function AaveV4PositionExplanation({
   // the only ones the bullet can name without turning into a list.
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
-  const { lead, items } = buildSpokePositionItems(spoke);
+  const cfs = useSpokeCollateralFactors(spoke.name);
+  const { lead, items } = buildSpokePositionItems(spoke, cfs);
 
   // The position managers that sent events on this spoke: the spoke's
   // `caller` against the owner, reduced over the spoke's history by the page
@@ -586,6 +625,8 @@ export function AaveV4PositionExplanation({
  *  what mark the outcome; a life never liquidated "was closed by its owner". */
 export function AaveV4ClosedExplanation({ spoke, embedded = false }: { spoke: AaveSpokeCardInfo; embedded?: boolean }) {
   const supplyOnly = spoke.peakDebtUsd < 1;
+  const cfs = useSpokeCollateralFactors(spoke.name);
+  const perAsset = supplyOnly ? null : cfList(spoke.suppliedSymbolsEver, cfs);
   const lead = spoke.endedByLiquidation ? (
     <>
       This position on the {spoke.name} spoke <H>ended in liquidation</H> — no balances remain on it:
@@ -644,10 +685,30 @@ export function AaveV4ClosedExplanation({ spoke, embedded = false }: { spoke: Aa
       </span>,
     );
   }
+  if (perAsset) {
+    items.push(
+      <span key="collateral-factor">
+        {perAsset.single != null ? (
+          <>
+            On this spoke {aaveV4DisplaySymbol(spoke.suppliedSymbolsEver[0])} counts at{" "}
+            {Math.round(perAsset.single * 100)}% of its value, its collateral factor: the health factor is the
+            collateral ratio times {Math.round(perAsset.single * 100)}%, so it reaches 1, the liquidation line, when the
+            collateral is worth about {Math.round(100 / perAsset.single)}% of the debt.
+          </>
+        ) : (
+          <>
+            On this spoke each collateral counts at its collateral factor, {perAsset.text} of its value: the health
+            factor is the collateral counted that way divided by the debt, and at 1 the position can be liquidated.
+          </>
+        )}
+      </span>,
+    );
+  }
   items.push(
     <span key="record">
-      The timeline below is the life&rsquo;s complete record — every supply, borrow, repayment, withdrawal
-      {spoke.wasLiquidated ? " and seizure" : ""} this spoke&rsquo;s indexed history holds for the wallet.
+      The timeline below lists every supply, borrow, repayment, withdrawal
+      {spoke.wasLiquidated ? " and seizure" : ""} for this wallet on the {spoke.name} spoke. Its positions on other
+      spokes have their own pages.
     </span>,
   );
 

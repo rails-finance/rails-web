@@ -15,6 +15,7 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import {
   aaveV4LiquidationContent,
   aaveV4SupplyContent,
+  aaveV4WithdrawContent,
   aaveV4BorrowContent,
   aaveV4RepayContent,
   aaveV4CollateralToggleContent,
@@ -44,6 +45,8 @@ export interface AaveV4EventExplainerProps {
   skipLead?: boolean;
   /** The previous event's borrow rate on this asset (decimal), to say when it moved. */
   previousRate?: number;
+  /** For a repay that clears its debt: the interest that debt accrued over its life. */
+  debtLifeInterest?: number;
 }
 
 /** Mechanic modal content for this event — never-empty floor: every event type
@@ -55,8 +58,9 @@ export function aaveV4LearnMoreContent(ctx: AaveV4Context): LearnMoreContent {
     case "liquidation":
       return aaveV4LiquidationContent(ctx.spokeName);
     case "supply":
-    case "withdraw":
       return aaveV4SupplyContent();
+    case "withdraw":
+      return aaveV4WithdrawContent();
     case "borrow":
       return aaveV4BorrowContent();
     case "repay":
@@ -68,7 +72,15 @@ export function aaveV4LearnMoreContent(ctx: AaveV4Context): LearnMoreContent {
   }
 }
 
-export function AaveV4EventExplainer({ ctx, event, siblings, gas, skipLead, previousRate }: AaveV4EventExplainerProps) {
+export function AaveV4EventExplainer({
+  ctx,
+  event,
+  siblings,
+  gas,
+  skipLead,
+  previousRate,
+  debtLifeInterest,
+}: AaveV4EventExplainerProps) {
   const coord = coordsFor(event);
   // The same read the opened grid's Health factor cell makes (one request,
   // shared, with the same arguments), so the prose can say how the factor
@@ -82,9 +94,17 @@ export function AaveV4EventExplainer({ ctx, event, siblings, gas, skipLead, prev
   );
   const hf =
     hfRead.status === "ok"
-      ? { before: hfOf(hfRead.before.wad), after: hfOf(hfRead.after.wad), collateral: hfRead.collateral }
+      ? {
+          before: hfOf(hfRead.before.wad),
+          after: hfOf(hfRead.after.wad),
+          collateral: hfRead.collateral,
+          collateralFactor: hfRead.after.collateralFactor ?? hfRead.before.collateralFactor ?? null,
+          collateralCount: hfRead.after.collateralCount ?? hfRead.before.collateralCount,
+        }
       : undefined;
-  const clauses = eventClauses(aaveV4EventSlots(ctx, coord, siblings ?? [event], event, hf, previousRate));
+  const clauses = eventClauses(
+    aaveV4EventSlots(ctx, coord, siblings ?? [event], event, hf, previousRate, debtLifeInterest),
+  );
   // Per-transaction gas as the closing clause (muted — not a header/grid value,
   // so it stays in the body tone). Appended after the arc so it always reads
   // last, regardless of the teaser/skipLead split.

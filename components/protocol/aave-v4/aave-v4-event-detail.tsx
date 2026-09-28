@@ -15,8 +15,8 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { formatRatio, ratioLabel, ratioColorClass } from "@/lib/shared/ratio-format";
 import { StatCard, StatSubline, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
-import { hfLabelV4, fmtV4Amount } from "@/lib/aave-v4/format";
-import { PositionRow, fmtPositionUsd } from "@/components/shared/position-row";
+import { hfLabelV4, fmtV4Amount, fmtUnitPrice } from "@/lib/aave-v4/format";
+import { PositionRow } from "@/components/shared/position-row";
 import { resolvePrice } from "@/lib/aave/prices";
 import { usePrices } from "@/lib/shared/prices-context";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
@@ -92,7 +92,7 @@ function PricePill({
     >
       <Prov info={pricePillProv(symbol, source, block, eventBlock)} icon={<TokenChipIcon symbol={symbol} size={14} />}>
         {source === "stablecoin" ? "≈" : ""}
-        {fmtPositionUsd(usd)}
+        {fmtUnitPrice(usd)}
       </Prov>
     </span>
   );
