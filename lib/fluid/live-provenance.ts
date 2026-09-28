@@ -108,3 +108,17 @@ export const fluidLiqPriceProv = (colSym: string, debtSym: string, vault: string
     { label: "liquidation threshold", kind: "chain", pclass: "state", note: "configs.liquidationThreshold" },
   ],
 });
+
+/** The vault's current borrow rate, from the same live read as the position:
+ *  the resolver's rates block (exchangePricesAndRates.borrowRateVault, a
+ *  1e2-precision percent). Null on a smart debt leg, where the figure is only
+ *  the vault's own component. */
+export const liveBorrowRateProv = (vault: string, pair?: string): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  verify: recompute("Re-run VaultResolver.positionByNftId and read vaultData.exchangePricesAndRates.borrowRateVault"),
+  summary:
+    "The vault's current borrow rate, annual: the resolver's rates block (exchangePricesAndRates.borrowRateVault), the liquidity layer's rate with the vault's magnifier applied. It floats with how heavily the vault is used; this is the rate at the head block.",
+  contract: vaultContract(vault, pair),
+  via: `${LANE_VIA} · VaultResolver.positionByNftId @ head · exchangePricesAndRates.borrowRateVault`,
+});

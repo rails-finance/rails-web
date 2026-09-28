@@ -24,7 +24,9 @@ import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { settledNowProv, positionSigmaProv, peakLegProv, accruedInterestProv } from "@/lib/fluid/event-provenance";
 import { fluidLegHolds } from "@/lib/fluid/explainer-clauses";
-import { liveSettledProv } from "@/lib/fluid/live-provenance";
+import { fluidRatioProv, liveSettledProv, vaultConfigProv } from "@/lib/fluid/live-provenance";
+import { FluidRunway } from "@/components/protocol/fluid/fluid-runway";
+import { pct } from "@/components/shared/ratio-bar";
 import { fluidPositionContent } from "@/lib/fluid/position-content";
 import { pairLabel, poolShareLabel, vaultKindLabel, shortAddress } from "@/lib/fluid/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
@@ -297,6 +299,47 @@ export function FluidPositionCard({
       ? fluidLegHolds(live.borrow, "chain")
       : fluidLegHolds(v.settled?.borrow ?? v.debtNet, v.settled ? "chain" : "flows");
 
+  // Position ratio: debt ÷ (collateral × the vault oracle's liquidate price),
+  // the engine's own figure. Only with live debt against live collateral.
+  const ratioColumn =
+    live != null &&
+    !live.isEmpty &&
+    live.ratio != null &&
+    live.borrow > 0 &&
+    live.supply > 0 &&
+    live.oraclePriceLiquidateDebtPerCol != null
+      ? {
+          label: "Position ratio",
+          value: (
+            <StatValue>
+              <Prov
+                info={fluidRatioProv(
+                  fluidLegName(v, "supply", chain),
+                  fluidLegName(v, "borrow", chain),
+                  live.vault,
+                  pairText,
+                )}
+              >
+                {pct(live.ratio)}
+              </Prov>
+            </StatValue>
+          ),
+          footnote: (
+            <>
+              <StatFootnote>
+                liquidates above{" "}
+                <Prov info={vaultConfigProv("Liquidation threshold", "liquidationThreshold", live.vault, pairText)}>
+                  {pct(live.liquidationThreshold)}
+                </Prov>
+              </StatFootnote>
+              <div className="mt-2 w-64 max-w-full">
+                <FluidRunway compact chain={live} />
+              </div>
+            </>
+          ),
+        }
+      : null;
+
   return (
     <PositionCardShell
       receipts={receipts}
@@ -330,9 +373,10 @@ export function FluidPositionCard({
             value: <LegValue v={v} side="borrow" chain={chain} />,
             footnote: <SigmaFootnote v={v} side="borrow" chain={chain} />,
           },
-          // No health/ratio COLUMN even with the live read: the ratio gets its
-          // own strip (FluidRiskCard) + the runway on the heading row — the
-          // two-figure card stays two figures.
+          // The third column, on the live read only (Liquity V2's ratio
+          // column is the model): the position ratio, the vault's
+          // liquidation line under it, and the runway to it.
+          ...(ratioColumn ? [ratioColumn] : []),
         ]}
       />
     </PositionCardShell>

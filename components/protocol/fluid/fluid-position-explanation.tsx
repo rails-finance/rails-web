@@ -32,6 +32,7 @@ import {
 
 import { FLUID_EPS as EPS, fluidLegHolds } from "@/lib/fluid/explainer-clauses";
 import { formatDate } from "@/lib/date";
+import { pct } from "@/components/shared/ratio-bar";
 
 /** Terminal pane — a closed position narrates its RECORD from the index alone
  *  (its live read answers zeros): the card's peak figures, the liquidation
@@ -336,11 +337,10 @@ export function FluidPositionExplanation({
     }
     list.push(
       <>
-        Debt is <H>{(live.ratio * 100).toFixed(1)}%</H> of the collateral&rsquo;s value at that price. Borrowing stops
-        at <H>{(live.collateralFactor * 100).toFixed(0)}%</H>; above{" "}
-        <H>{(live.liquidationThreshold * 100).toFixed(0)}%</H> anyone can liquidate the position (with a{" "}
-        {(live.liquidationPenalty * 100).toFixed(1)}% penalty), and above {(live.liquidationMaxLimit * 100).toFixed(0)}%
-        it can be absorbed entirely.
+        The position ratio is the debt as a share of the collateral&rsquo;s value at the vault&rsquo;s liquidation
+        price, a loan-to-value: <H>{pct(live.ratio)}</H>. Borrowing stops at <H>{pct(live.collateralFactor)}</H>; above{" "}
+        <H>{pct(live.liquidationThreshold)}</H> anyone can liquidate the position (with a {pct(live.liquidationPenalty)}{" "}
+        penalty), and above {pct(live.liquidationMaxLimit)} it can be absorbed entirely.
       </>,
     );
     const dropPct =

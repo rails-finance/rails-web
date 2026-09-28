@@ -1,25 +1,17 @@
 "use client";
 
-// Stated position-ratio readout for the Fluid position card — the text
-// companion to the always-on liquidation runway in the card's risk slot. In
-// the engine's OWN space: Fluid judges a position by ratio = debt ÷
-// (collateral × the vault oracle's liquidate price), where the oracle prices
-// the collateral IN THE DEBT TOKEN (the protocol has no USD feed). The vault's
-// lines are stated alongside:
-//
-//   • collateralFactor — the borrow gate (operate reverts past it).
-//   • liquidationThreshold — above it anyone can liquidate (partially — Fluid
-//     sweeps only enough to restore health).
-//   • liquidationMaxLimit — above it the position can be fully absorbed.
-//
-// Every figure is a same-block resolver read (or arithmetic over them), each
-// wrapped in the provenance that names its basis. Rendered ON the card face
-// (the risk slot), so its receipts are the card's own figures.
+// The Fluid position card's footer figures, in the engine's own space (the
+// vault oracle prices the collateral IN THE DEBT TOKEN; no USD feed): the
+// headroom to the vault's borrow limit (collateralFactor, where operate stops
+// lending) and the vault's current borrow rate. The ratio and the liquidation
+// line are the card's third column; the penalty and the full-absorption limit
+// are in the card's Explanation. Every figure is a same-block resolver read or
+// arithmetic over them, each in the provenance that names its basis.
 
 import { Prov } from "@/components/shared/provenance";
 import { pct } from "@/components/shared/ratio-bar";
 import { RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
-import { fluidRatioProv, vaultConfigProv, fluidLiqPriceProv } from "@/lib/fluid/live-provenance";
+import { vaultConfigProv, fluidLiqPriceProv, liveBorrowRateProv } from "@/lib/fluid/live-provenance";
 import { formatCompact } from "@/lib/utils/format";
 import { poolShareLabel } from "@/lib/fluid/asset-catalog";
 import type { FluidPositionChainResponse } from "@/lib/api/fetch-fluid-position";
@@ -48,22 +40,11 @@ export function FluidRiskView({ chain, pair }: { chain: FluidPositionChainRespon
     chain.supply * chain.oraclePriceLiquidateDebtPerCol * chain.collateralFactor - chain.borrow,
   );
 
-  // Three label-led clusters on the shared risk footer strip (design-grammar
-  // rule) — ratio/threshold · headroom/borrow-limit · penalty/absorbable,
-  // every <Prov> moved verbatim from the stacked layout: same info builder,
-  // same format call, same value text. A long composition wraps BETWEEN
-  // clusters — still the grammar.
+  // Label-led clusters on the shared risk footer strip (design-grammar rule):
+  // headroom to the borrow limit, then the borrow rate where the vault states
+  // one for this leg.
   return (
     <>
-      <RiskFigure label="Position ratio">
-        <Prov info={fluidRatioProv(colSym, debtSym, chain.vault, pair)}>
-          <RiskStrong>{pct(chain.ratio)}</RiskStrong>
-        </Prov>{" "}
-        · liquidation above{" "}
-        <Prov info={vaultConfigProv("Liquidation threshold", "liquidationThreshold", chain.vault, pair)}>
-          {pct(chain.liquidationThreshold)}
-        </Prov>
-      </RiskFigure>
       <RiskFigure>
         <Prov info={fluidLiqPriceProv(colSym, debtSym, chain.vault, pair)}>
           {formatCompact(headroom)} {debtSym}
@@ -74,15 +55,13 @@ export function FluidRiskView({ chain, pair }: { chain: FluidPositionChainRespon
         </Prov>{" "}
         borrow limit
       </RiskFigure>
-      <RiskFigure>
-        <Prov info={vaultConfigProv("Liquidation penalty", "liquidationPenalty", chain.vault, pair)}>
-          {pct(chain.liquidationPenalty)}
-        </Prov>{" "}
-        penalty · fully absorbable above{" "}
-        <Prov info={vaultConfigProv("Liquidation max limit", "liquidationMaxLimit", chain.vault, pair)}>
-          {pct(chain.liquidationMaxLimit)}
-        </Prov>
-      </RiskFigure>
+      {chain.borrowRatePct != null && (
+        <RiskFigure label="Borrow rate">
+          <Prov info={liveBorrowRateProv(chain.vault, pair)}>
+            <RiskStrong>{chain.borrowRatePct.toFixed(2)}%</RiskStrong>
+          </Prov>
+        </RiskFigure>
+      )}
     </>
   );
 }
