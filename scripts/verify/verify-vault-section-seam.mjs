@@ -46,13 +46,19 @@
 //       with a body over 10 KB. `twitter:image` likewise.
 //   S4  BOOKMARKS. The card's own bookmark toggle writes the holder into the
 //       RAIL's namespace — `morpho-base-sessions` on Base, `aave-vaults-
-//       sessions` on Ethereum — together with the listing it was taken on. The
-//       header's bookmarks modal then shows that rail's group, whose row points
-//       back at `<vault root>/positions?q=<holder>`: the listing the reader
-//       bookmarked from, not whichever listing the rail happens to own first.
-//       That listing's matching row reads `aria-pressed="true"`, a row stored
-//       without a recorded listing still opens a live page, and toggling the
-//       bookmark off removes the key entirely.
+//       sessions` on Ethereum — together with the listing it was taken on
+//       (S4a/b, always). Whether the header's bookmarks modal then SHOWS that
+//       rail's group is read off `lib/shared/protocols.ts` (`LAUNCHED_
+//       SESSIONS` below, mirroring `LAUNCHED_PROTOCOLS`) rather than assumed:
+//       a launched rail's group row points back at `<vault root>/positions?
+//       q=<holder>` — the listing the reader bookmarked from, not whichever
+//       listing the rail happens to own first — and that listing's matching
+//       row reads `aria-pressed="true"`; an unlaunched rail (Aave's vault
+//       layer today) carries no group in the modal at all, though its
+//       bookmark still writes and still shows on the vault listing itself
+//       (S4e–g, both cases). A row stored without a recorded listing still
+//       opens a live page when launched, and toggling the bookmark off
+//       removes the key entirely either way.
 //   S5  THE SECTION RAIL. A position page draws the section's own header row
 //       (`nav[aria-label="Section surfaces"]`), whose four tabs are that
 //       chain's listing, roster page, find door and about page — and NO tab is
@@ -233,6 +239,29 @@ const assetText = (raw, decimals) => {
  *  under the protocol whose factory deployed it: Base's MetaMorpho vaults are
  *  Morpho Blue's, Ethereum's are Aave's vault layer's. */
 const vaultRoot = (chain) => (chain === 8453 ? "/base/morpho/vaults" : "/ethereum/aave/vaults");
+
+// ── which explorer sessions the header's bookmarks modal groups, read from
+//    the roster itself ──────────────────────────────────────────────────────
+// lib/shared/protocols.ts exports `LAUNCHED_PROTOCOLS = PROTOCOLS.filter((p)
+// => !p.unlaunched)`, and components/nav/bookmarks-modal.tsx draws every group
+// from THAT array alone (its own comment: "EVERY GROUP IS A ROSTER ENTRY NOW
+// ... this reads the roster and nothing else"). An unlaunched protocol's
+// bookmark still writes and still shows on that protocol's own listing (S4e–g
+// below), but the modal carries no group for it. Restated here as a source
+// parse rather than imported (this script runs as plain Node, not through the
+// Next/TS toolchain that resolves the `@/` alias — the same reason
+// verify-coverage-note-rows.mjs and verify-ethereum-vaults.mjs read this file
+// as text): a hardcoded "aave-vaults is absent" would go stale the day the
+// flag comes off. Whichever sessions this parse calls launched decide S4c,
+// S4d and S4d2 below, so those checks flip to expecting a group — no edit
+// here — the day `unlaunched` leaves Aave's vault-layer entry.
+const protocolsSrc = fs.readFileSync(path.join(ROOT, "lib/shared/protocols.ts"), "utf8");
+const PROTOCOL_BLOCKS = protocolsSrc.split(/^ {4}id: "/gm).slice(1);
+const LAUNCHED_SESSIONS = new Set(
+  PROTOCOL_BLOCKS.filter((b) => !/^ {4}unlaunched: true,$/m.test(b))
+    .map((b) => b.match(/^ {4}session: "([^"]+)",$/m)?.[1])
+    .filter(Boolean),
+);
 
 /** components/vaults/aave-vault-format.ts `utcInstant` — en-GB, UTC, stated. */
 const utcInstant = (unixSeconds) =>
@@ -570,6 +599,11 @@ for (const f of fixtures) {
   const scope = isBase ? "morpho-base" : "aave-vaults";
   const key = `${scope}-sessions`;
   const listingPath = `${vaultRoot(f.chain)}/positions`;
+  // Whether the header's bookmarks modal groups THIS scope at all — read off
+  // the roster above, not assumed per chain. Today that's true for Base
+  // (`morpho-base`, launched) and false for Ethereum (`aave-vaults`, still
+  // `unlaunched: true`); S4c/S4d/S4d2 below assert accordingly.
+  const shouldGroup = LAUNCHED_SESSIONS.has(scope);
   const { context, page } = await openFixture(f);
 
   const toggle = page.locator('[data-position-card] button[aria-label="Bookmark this wallet"]').first();
@@ -607,8 +641,8 @@ for (const f of fixtures) {
     return { heading: (heading?.textContent || "").trim(), headingHref: heading?.getAttribute("href"), rows };
   }, scope);
   check(
-    `S4c·${f.label} the modal shows this vault's own explorer as the group`,
-    group != null && /\S/.test(group.heading),
+    `S4c·${f.label} the modal ${shouldGroup ? "shows this vault's own explorer as the group" : "carries no group — this vault's explorer is unlaunched"}`,
+    shouldGroup ? group != null && /\S/.test(group.heading) : group == null,
     JSON.stringify(group),
   );
   // The bookmarks modal forms a rail's href through `bookmarkHref`, and since
@@ -625,8 +659,8 @@ for (const f of fixtures) {
   // exercises the new one. Break test D below is run on Base for that reason.
   const wantedHref = `${vaultRoot(f.chain)}/positions?q=${f.holder.toLowerCase()}`;
   check(
-    `S4d·${f.label} the group's row opens the listing the bookmark was taken on`,
-    !!group && group.rows.includes(wantedHref),
+    `S4d·${f.label} ${shouldGroup ? "the group's row opens the listing the bookmark was taken on" : "there is no group, so no row to open"}`,
+    shouldGroup ? !!group && group.rows.includes(wantedHref) : group == null,
     JSON.stringify({ rows: group?.rows, wanted: wantedHref }),
   );
 
@@ -660,8 +694,8 @@ for (const f of fixtures) {
     ? await hostFetch(`${BASE_URL}${legacyWant}`).then((r) => r.status)
     : 0;
   check(
-    `S4d2·${f.label} a bookmark stored with no listing still opens the explorer's own listing, and it answers 200`,
-    legacyRows.includes(legacyWant) && legacyStatus === 200,
+    `S4d2·${f.label} ${shouldGroup ? "a bookmark stored with no listing still opens the explorer's own listing, and it answers 200" : "a bookmark stored with no listing still shows no group — the explorer is unlaunched"}`,
+    shouldGroup ? legacyRows.includes(legacyWant) && legacyStatus === 200 : legacyRows.length === 0,
     JSON.stringify({ rows: legacyRows, wanted: legacyWant, status: legacyStatus }),
   );
 
