@@ -38,6 +38,7 @@
 // so it is stated under the last event rather than on a coverage page — see
 // <TimelineCoverageFooter>.
 
+import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -277,6 +278,7 @@ export default function AaveV3BasePositionView({
   // events above. The list is capped for a long history; these sums are not,
   // so "all time" and "incl. interest" stay true.
   const lifetime = timeline?.lifetime;
+  const laneInterest = (timeline as { laneInterest?: AaveLaneInterest[] } | null)?.laneInterest;
 
   // "The sweep read every block of this Pool's life." Both conditions are
   // needed: no holes inside the span, AND the span reaching the Pool's own
@@ -461,6 +463,9 @@ export default function AaveV3BasePositionView({
       undefined,
       AAVE_V3_BASE_TOWER_VOCABULARY,
       sweptClean ? lifetime : undefined,
+      // Each lane's net moved beside its chain balance (decision 0033): a side
+      // holding one reserve splits into that net and the interest on top.
+      sweptClean ? laneInterest : undefined,
     );
     return sweptClean
       ? built
@@ -469,7 +474,7 @@ export default function AaveV3BasePositionView({
           flowsNote:
             "Lifetime flows are hidden because the history sweep did not read every block of this position's life — see the note under the timeline for where it stopped or what it missed. Summing what did arrive would label a partial history “all time”. The current balances above are unaffected: they are read from the Pool, not replayed from the events.",
         };
-  }, [view, lifetime, sweptClean]);
+  }, [view, lifetime, sweptClean, laneInterest]);
 
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
     if (!view) return [];

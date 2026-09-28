@@ -60,6 +60,8 @@ import type {
 import { pairParaswapSwaps, type ParaswapSwapGroup } from "@/lib/aave-v3/paraswap-pairing";
 import { AAVE_V3_SWAP_LABELS } from "@/lib/aave-v3/swap-kinds";
 import type { AaveV3Context, AaveV3EventType, AaveV3PriceSource } from "@/lib/shared/types/protocols/aave-v3";
+import { ChainLanes, type HalfUpThrough, type LaneMove } from "@/lib/aave-v3/chain-lanes";
+import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 
 const POOL_EVENTS_ABI = parseAbi([
   "event Supply(address indexed reserve, address user, address indexed onBehalfOf, uint256 amount, uint16 indexed referralCode)",
@@ -261,6 +263,10 @@ export interface AaveV3ChainTimelineResult {
   /** Unix seconds of the newest row, when its block could be dated. */
   lastActivityAt: number | null;
   coverage: ChainTimelineCoverage;
+  /** Per lane the replay could value (input `chain`): the balance after its
+   *  last move and the net its rows moved — the lifetime interest is the
+   *  difference (decision 0033). Absent without `chain`. */
+  laneInterest?: AaveLaneInterest[];
 }
 
 /** One event the replay takes — what a decoded log reduces to, whichever
@@ -291,6 +297,17 @@ export interface AaveV3DecodedRow {
   collateralPrice?: { usd: number; source: AaveV3PriceSource };
   debtPrice?: { usd: number; source: AaveV3PriceSource };
   liquidationBonusAtBlock?: { bonusBps: number; protocolFeeBps: number };
+  /** The index the Pool applied to this row, where the store holds it
+   *  (rails-server services/aave-base-row-indexes.ts): the liquidity index on
+   *  the supply lane (a liquidation's collateral, a transfer's own emitted
+   *  index), the variable borrow index on the debt lane. */
+  supplyIndex?: bigint;
+  debtIndex?: bigint;
+  /** A transfer's emitted scaled value. */
+  scaledValue?: bigint;
+  /** A liquidation whose liquidator took the aTokens: the Pool burned none,
+   *  the transfer out carries them. */
+  receiveAToken?: boolean;
 }
 
 /** Raw log → the fields the context needs, or null when the log is one this
@@ -631,6 +648,10 @@ export interface AaveV3ReplayInput {
    *  — a sweep, or an index read that answered in full — the replay is
    *  exactly as it was. */
   seed?: AaveV3ReplaySeed;
+  /** Value every row at the chain balance: the rows carry the index they were
+   *  applied at, and the Pool's V3.5 upgrade sets the rounding (decision 0033).
+   *  Absent — the sweep, whose logs carry no index — the rows state principal. */
+  chain?: { halfUpThrough: HalfUpThrough };
   /** The span the rows are a complete record of; the replay adds what it
    *  learns (first event's date, what was omitted or undated). */
   coverage: Pick<
@@ -674,6 +695,16 @@ export interface AaveV3ReplaySeedReserve {
   peakSupply: bigint;
   peakDebt: bigint;
   lifetime: AaveV3LifetimeRaw;
+  /** Each lane's scaled state at the cut: per axis the state, null where the
+   *  seed cannot state it, no key where the lane had no row before the cut.
+   *  Absent on a seed that predates it: no lane is stated. */
+  chain?: { supply?: AaveV3ChainSeedLane | null; debt?: AaveV3ChainSeedLane | null };
+}
+
+export interface AaveV3ChainSeedLane {
+  scaled: bigint;
+  net: bigint;
+  index: bigint;
 }
 
 const newLifetimeRaw = (): AaveV3LifetimeRaw => ({
@@ -720,6 +751,13 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     decimalsUnreadField(unreadTokensOf(ms.flatMap((m) => (m ? [{ address: m.address, meta: m }] : []))));
   const amt = (raw: bigint | undefined, m: V3TokenMeta | undefined): string | undefined =>
     raw == null || m == null ? undefined : String(scaleV3(raw, m.decimals));
+
+  /** A row's interest since the lane's previous move, for display; undefined
+   *  where there was none or it is a rounding unit or less. */
+  const interestOf = (m: LaneMove, meta: V3TokenMeta | undefined): string | undefined =>
+    m.interest == null || m.interest <= BigInt(1) || meta == null
+      ? undefined
+      : String(scaleV3(m.interest, meta.decimals));
 
   const originVal = (event: string, param: string, m: V3TokenMeta | undefined, raw: bigint | undefined) =>
     raw == null || m == null ? undefined : ({ event, param, raw: raw.toString(), scale: m.decimals } as OriginEnvelope);
@@ -812,6 +850,25 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     }
   }
 
+  // ── The chain balance at each row (decision 0033) ─────────────────────────
+  // Where the rows carry the index each was applied at, every lane is also
+  // walked as the token's scaled balance: a row then states what the aToken or
+  // variable debt token held around it. A history that does not start at the
+  // Pool's first block opens every lane unknown, a seed opens the lanes it
+  // states.
+  const lanes = p.chain
+    ? new ChainLanes(p.chain.halfUpThrough, p.coverage.fromDeployment && p.coverage.gaps.length === 0)
+    : null;
+  if (lanes && seed) {
+    const cut = seed.wallet.lastBlock + 1;
+    for (const r of seed.reserves) {
+      for (const axis of ["supply", "debt"] as const) {
+        if (!r.chain) lanes.seed(axis, r.reserve, null, cut);
+        else if (r.chain[axis] !== undefined) lanes.seed(axis, r.reserve, r.chain[axis] ?? null, cut);
+      }
+    }
+  }
+
   // ── The cut, for the boundary card (rails-ops decision 0019) ─────────────
   // The position AFTER the newest elided row — read once, the moment the walk
   // reaches the first drawn row and before that row moves anything — and the
@@ -824,12 +881,15 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
   let cutState: BoundaryStateLine[] | null | undefined;
   const snapshotAtCut = (): BoundaryStateLine[] | null => {
     const out: BoundaryStateLine[] = [];
-    for (const [reserve, v] of supplyRaw) {
+    // The chain balance where the lane is valued, else the principal.
+    for (const [reserve, p0] of supplyRaw) {
       const m = meta(reserve);
+      const v = lanes?.balance("supply", reserve) ?? p0;
       if (v > ZERO && m) out.push({ label: `${m.symbol} supply`, value: stated(v, m), unit: m.symbol });
     }
-    for (const [reserve, v] of debtRaw) {
+    for (const [reserve, p0] of debtRaw) {
       const m = meta(reserve);
+      const v = lanes?.balance("debt", reserve) ?? p0;
       if (v > ZERO && m) out.push({ label: `${m.symbol} debt`, value: stated(v, m), unit: m.symbol });
     }
     return out.length > 0 ? out : null;
@@ -850,6 +910,8 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       meta: V3TokenMeta | undefined;
       before: bigint;
       after: bigint;
+      /** before/after are the chain balance (decision 0033). */
+      chain: boolean;
       render: boolean;
       base: Omit<BaseActivityEvent, "actionType" | "actionLabel" | "flows" | "context">;
     }
@@ -941,6 +1003,7 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       },
       // A repay leg carries the Repay log's own amount; a transfer leg's is derived.
       origin: givenDebt && !netted("given") ? { amount: originVal("Repay", "amount", gMeta, given.d.amount) } : {},
+      ...(g.rows.every((i) => swapWalked.get(i)?.chain) ? { balanceBasis: "chain" as const } : {}),
       swap,
     };
     return {
@@ -1009,6 +1072,21 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       const collMeta = meta(d.collateralAsset);
       const coll = bump(supplyRaw, d.collateralAsset ?? "", -(d.liquidatedCollateralAmount ?? ZERO));
       const debt = bump(debtRaw, d.reserve, -d.amount);
+      // A liquidator who takes the aTokens moves them by the transfer out;
+      // the Pool burns none.
+      const cm = lanes?.move("supply", d.collateralAsset ?? "", {
+        nominal: d.receiveAToken ? ZERO : -(d.liquidatedCollateralAmount ?? ZERO),
+        index: d.supplyIndex,
+        block: d.blockNumber,
+        txIndex: d.txIndex,
+      });
+      const dm = lanes?.move("debt", d.reserve, {
+        nominal: -d.amount,
+        index: d.debtIndex,
+        block: d.blockNumber,
+        txIndex: d.txIndex,
+      });
+      const lc = cm && dm ? { coll: cm, debt: dm } : null;
       notePeak("supply", collMeta, coll.after);
       notePeak("debt", rMeta, debt.after);
       // One liquidation, two lanes on two reserves — the collateral seized on
@@ -1026,17 +1104,32 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
         ...(d.collateralPrice ? { collateralPrice: d.collateralPrice } : {}),
         ...(d.debtPrice ? { debtPrice: d.debtPrice } : {}),
         ...(d.liquidationBonusAtBlock ? { liquidationBonusAtBlock: d.liquidationBonusAtBlock } : {}),
-        supplyBefore: amt(coll.before, collMeta),
-        supplyAfter: amt(coll.after, collMeta),
-        debtBefore: amt(debt.before, rMeta),
-        debtAfter: amt(debt.after, rMeta),
+        supplyBefore: amt(lc ? lc.coll.before : coll.before, collMeta),
+        supplyAfter: amt(lc ? lc.coll.after : coll.after, collMeta),
+        debtBefore: amt(lc ? lc.debt.before : debt.before, rMeta),
+        debtAfter: amt(lc ? lc.debt.after : debt.after, rMeta),
+        ...(lc
+          ? {
+              balanceBasis: "chain" as const,
+              supplyInterestSincePrevious: interestOf(lc.coll, collMeta),
+              debtInterestSincePrevious: interestOf(lc.debt, rMeta),
+            }
+          : {}),
         raw: {
           debtToCover: d.amount.toString(),
           liquidatedCollateralAmount: d.liquidatedCollateralAmount?.toString(),
-          supplyBefore: coll.before.toString(),
-          supplyAfter: coll.after.toString(),
-          debtBefore: debt.before.toString(),
-          debtAfter: debt.after.toString(),
+          supplyBefore: (lc ? lc.coll.before : coll.before).toString(),
+          supplyAfter: (lc ? lc.coll.after : coll.after).toString(),
+          debtBefore: (lc ? lc.debt.before : debt.before).toString(),
+          debtAfter: (lc ? lc.debt.after : debt.after).toString(),
+          ...(lc
+            ? {
+                supplyScaledAfter: lc.coll.scaled.toString(),
+                supplyIndex: lc.coll.index.toString(),
+                debtScaledAfter: lc.debt.scaled.toString(),
+                debtIndex: lc.debt.index.toString(),
+              }
+            : {}),
         },
         origin: {
           debtToCover: originVal("LiquidationCall", "debtToCover", rMeta, d.amount),
@@ -1068,6 +1161,24 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     const delta = d.kind === "supply" || d.kind === "borrow" || d.kind === "transfer_in" ? d.amount : -d.amount;
     const run = bump(isSupplySide ? supplyRaw : debtRaw, d.reserve, delta);
     notePeak(isSupplySide ? "supply" : "debt", rMeta, run.after);
+    const mv: LaneMove | null | undefined = lanes?.move(isSupplySide ? "supply" : "debt", d.reserve, {
+      nominal: delta,
+      ...(isTransfer && d.scaledValue != null
+        ? { direct: d.kind === "transfer_in" ? d.scaledValue : -d.scaledValue }
+        : {}),
+      index: isSupplySide ? d.supplyIndex : d.debtIndex,
+      block: d.blockNumber,
+      txIndex: d.txIndex,
+    });
+    if (d.kind === "repay" && d.useATokens)
+      lanes?.move("supply", d.reserve, {
+        nominal: -d.amount,
+        index: d.supplyIndex,
+        block: d.blockNumber,
+        txIndex: d.txIndex,
+      });
+    // The row's own figures: the chain's where the lane is valued.
+    const fig = mv ? { before: mv.before, after: mv.after } : run;
     // repayWithATokens burns the wallet's aTokens for the debt it clears: the
     // Repay says so (`useATokens`, `amount` = the aTokens burned), so the
     // supply lane falls by the same amount. The row draws its debt lane, as
@@ -1101,13 +1212,26 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       ...(isTransfer && d.counterparty ? { counterparty: d.counterparty } : {}),
       ...(txFrom && d.poolCaller ? { txFrom, poolCaller: d.poolCaller } : {}),
       ...(isSupplySide
-        ? { supplyBefore: amt(run.before, rMeta), supplyAfter: amt(run.after, rMeta) }
-        : { debtBefore: amt(run.before, rMeta), debtAfter: amt(run.after, rMeta) }),
+        ? { supplyBefore: amt(fig.before, rMeta), supplyAfter: amt(fig.after, rMeta) }
+        : { debtBefore: amt(fig.before, rMeta), debtAfter: amt(fig.after, rMeta) }),
+      ...(mv
+        ? {
+            balanceBasis: "chain" as const,
+            ...(isSupplySide
+              ? { supplyInterestSincePrevious: interestOf(mv, rMeta) }
+              : { debtInterestSincePrevious: interestOf(mv, rMeta) }),
+          }
+        : {}),
       raw: {
         amount: d.amount.toString(),
         ...(isSupplySide
-          ? { supplyBefore: run.before.toString(), supplyAfter: run.after.toString() }
-          : { debtBefore: run.before.toString(), debtAfter: run.after.toString() }),
+          ? { supplyBefore: fig.before.toString(), supplyAfter: fig.after.toString() }
+          : { debtBefore: fig.before.toString(), debtAfter: fig.after.toString() }),
+        ...(mv
+          ? isSupplySide
+            ? { supplyScaledAfter: mv.scaled.toString(), supplyIndex: mv.index.toString() }
+            : { debtScaledAfter: mv.scaled.toString(), debtIndex: mv.index.toString() }
+          : {}),
       },
       origin: {
         // A transfer's amount is DERIVED (scaled value × the emitted index),
@@ -1120,7 +1244,7 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     // where the given row would have been.
     const swap = swaps.get(i);
     if (swap) {
-      swapWalked.set(i, { d, meta: rMeta, before: run.before, after: run.after, render, base });
+      swapWalked.set(i, { d, meta: rMeta, before: fig.before, after: fig.after, chain: mv != null, render, base });
       if (i === swap.rows[swap.rows.length - 1]) {
         const e = swapEventOf(swap);
         if (e) events.push(e);
@@ -1224,6 +1348,19 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
         : seeded
           ? seed.wallet.lastTimestamp
           : null,
+    ...(lanes
+      ? {
+          laneInterest: lanes.totals().map((t) => ({
+            market: "base",
+            reserve: t.reserve,
+            axis: t.axis,
+            balance: t.balance.toString(),
+            net: t.net.toString(),
+            interest: (t.balance - t.net).toString(),
+            block: t.block,
+          })),
+        }
+      : {}),
     coverage: {
       ...p.coverage,
       firstEventAt: seeded

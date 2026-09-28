@@ -28,6 +28,7 @@
 // history's completeness is a property of the request rather than of the
 // explorer, so it is stated under the last event.
 
+import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -270,6 +271,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   // events above. The list is capped for a long history; these sums are not,
   // so "all time" and "incl. interest" stay true.
   const lifetime = timeline?.lifetime;
+  const laneInterest = (timeline as { laneInterest?: AaveLaneInterest[] } | null)?.laneInterest;
 
   // "The sweep read every block of this Pool's life." Both conditions are
   // needed: no holes inside the span, AND the span reaching the Pool's own
@@ -445,7 +447,15 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   // current state comes from the Pool, not the logs) and drops the flows.
   const towerData = useMemo(() => {
     if (!view) return null;
-    const built = computeAaveV3Economics(view, undefined, SEAMLESS_TOWER_VOCABULARY, sweptClean ? lifetime : undefined);
+    const built = computeAaveV3Economics(
+      view,
+      undefined,
+      SEAMLESS_TOWER_VOCABULARY,
+      sweptClean ? lifetime : undefined,
+      // Each lane's net moved beside its chain balance (decision 0033): a side
+      // holding one reserve splits into that net and the interest on top.
+      sweptClean ? laneInterest : undefined,
+    );
     return sweptClean
       ? built
       : {
@@ -453,7 +463,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
           flowsNote:
             "Lifetime flows are hidden because the history sweep did not read every block of this position's life — see the note under the timeline for where it stopped or what it missed. Summing what did arrive would label a partial history “all time”. The current balances above are unaffected: they are read from the Pool, not replayed from the events.",
         };
-  }, [view, lifetime, sweptClean]);
+  }, [view, lifetime, sweptClean, laneInterest]);
 
   return (
     <CaptureSourceProvider value={captureSource}>

@@ -99,6 +99,13 @@ interface IndexRow {
   atoken: string | null;
   /** The liquidity index the BalanceTransfer emitted (transfer rows only). */
   index_raw: string | null;
+  /** The index the Pool applied to this row, from its transaction's
+   *  ReserveDataUpdated (rails-server services/aave-base-row-indexes.ts):
+   *  liquidity index on the supply lane, variable borrow index on the debt
+   *  lane; and a liquidation's receiveAToken. Absent from an older api. */
+  sup_index?: string | null;
+  var_index?: string | null;
+  receive_a_token?: boolean | null;
   /** At-block USD from the lane's oracle-at-block table (rails-server mig
    *  197): the Pool's own IAaveOracle read at the event's block by the
    *  roster filler, on mig 092's wire names. Absent until the filler has
@@ -185,8 +192,24 @@ interface IndexSeed {
       liquidatedCollateral: string;
       liquidatedDebt: string;
     };
+    /** Each lane's scaled state at the cut (decision 0033): null where the
+     *  seed cannot state it, no key where the lane had no row before the cut.
+     *  Absent on a seed written before the field. */
+    chain?: {
+      supply?: { scaled: string; net: string; index: string } | null;
+      debt?: { scaled: string; net: string; index: string } | null;
+    };
   }[];
 }
+
+/** The Pool's V3.5 upgrade, per lane: events at or before it round half up,
+ *  later ones floor/ceiling (rails-server routes/baseLending.ts
+ *  `halfUpThrough`, read from the Pool's Upgraded logs). Seamless never took
+ *  V3.5. */
+const HALF_UP_THROUGH: Record<string, readonly [number, number] | null> = {
+  "/api/aave-v3-base": [33885416, 141],
+  "/api/seamless": null,
+};
 
 /** The one seed grammar this reader understands. */
 const SEED_VERSION = 1;
@@ -312,6 +335,17 @@ export async function readAaveV3Index(
       ...(r.interest_rate_mode != null ? { interestRateMode: Number(r.interest_rate_mode) } : {}),
       ...(r.borrow_rate != null ? { borrowRate: r.borrow_rate } : {}),
       ...(r.use_a_tokens != null ? { useATokens: r.use_a_tokens } : {}),
+      // The index each lane was applied at: a transfer's own, a Pool row's
+      // from its transaction's reserve update.
+      ...(isTransfer
+        ? r.index_raw != null
+          ? { supplyIndex: BigInt(r.index_raw), scaledValue: BigInt(r.amount) }
+          : {}
+        : {
+            ...(r.sup_index != null ? { supplyIndex: BigInt(r.sup_index) } : {}),
+            ...(r.var_index != null ? { debtIndex: BigInt(r.var_index) } : {}),
+          }),
+      ...(r.receive_a_token != null ? { receiveAToken: r.receive_a_token } : {}),
       ...(r.kind === "liquidation"
         ? {
             collateralPrice: priceOf(r.collateral_price_usd, r.collateral_price_source),
@@ -364,6 +398,21 @@ export async function readAaveV3Index(
                   liquidatedCollateral: BigInt(r.lifetime.liquidatedCollateral),
                   liquidatedDebt: BigInt(r.lifetime.liquidatedDebt),
                 },
+                ...(r.chain
+                  ? {
+                      chain: Object.fromEntries(
+                        (["supply", "debt"] as const)
+                          .filter((axis) => r.chain![axis] !== undefined)
+                          .map((axis) => {
+                            const v = r.chain![axis];
+                            return [
+                              axis,
+                              v ? { scaled: BigInt(v.scaled), net: BigInt(v.net), index: BigInt(v.index) } : null,
+                            ];
+                          }),
+                      ),
+                    }
+                  : {}),
               },
             ];
           }),
@@ -412,6 +461,8 @@ export async function readAaveV3Index(
     timestamps,
     senders,
     ...(seed ? { seed } : {}),
+    // Rows at the chain balance where the api sends each row's index.
+    ...(p.apiPrefix in HALF_UP_THROUGH ? { chain: { halfUpThrough: HALF_UP_THROUGH[p.apiPrefix] } } : {}),
     peakWithheld: json.peakWithheld === "plumbing",
     coverage: {
       fromBlock: horizon ? heavy.cut.block : p.deployBlock,
