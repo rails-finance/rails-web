@@ -749,9 +749,6 @@ export function AlchemistPositionView({
                       prov: liveFigureProv("Debt", sym, live.debt?.raw ?? null, live.asOfBlock, coords),
                       note: eventsAloneNote,
                       hideBlock: true,
-                      // Headline card: figure + chip, no ticker text — Liquity
-                      // V2's card grammar. The chip still carries the symbol.
-                      hideUnit: true,
                     }),
                     // The asset underneath leads; the share count is what the
                     // position holds and stays beside it.
@@ -793,9 +790,8 @@ export function AlchemistPositionView({
                       },
                       // Headline card: figure + chip, no ticker text (matches
                       // Debt/Set-aside above); the "held as … mixUSDC" and
-                      // "1 mixUSDC = …" sublines keep their ticker text — the
-                      // note above is untouched by this flag.
-                      { hideBlock: true, hideUnit: true },
+                      // "1 mixUSDC = …" sublines keep their ticker text.
+                      { hideBlock: true },
                     ),
                     // Rule 1. Its own slot, its own block, added to nothing.
                     amountColumn(
@@ -811,7 +807,6 @@ export function AlchemistPositionView({
                           coords,
                         ),
                         hideBlock: true,
-                        hideUnit: true,
                       },
                     ),
                     live.health ? healthColumn(live.health, live.debt?.raw ?? null, coords) : null,

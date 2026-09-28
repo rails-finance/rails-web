@@ -25,6 +25,7 @@ import { alchemixPositionName, alchemixV2PositionName } from "@/lib/alchemix/nam
 import type { AlchemixV2PositionSummary } from "@/types/api/alchemix";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import { AmountText } from "@/components/shared/amount-text";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 
 /** alUSD and alETH are 18 decimals each, read from the tokens. */
 const SYNTHETIC_DECIMALS = 18;
@@ -60,9 +61,10 @@ export function v2DebtColumn(p: AlchemixV2PositionSummary, prov?: Provenance): O
   }
   const magnitude = d.raw.replace(/^-/, "");
   const figure = (
-    <>
-      <AmountText value={Math.abs(d.formatted)} format="headline" symbol={p.syntheticSymbol} /> {p.syntheticSymbol}
-    </>
+    <span className="inline-flex items-center gap-1.5">
+      <AmountText value={Math.abs(d.formatted)} format="headline" symbol={p.syntheticSymbol} />
+      <TokenChipIcon symbol={p.syntheticSymbol} size={20} filterable={false} />
+    </span>
   );
   return {
     label: d.sign === "credit" ? "Credit at close" : "Debt at close",
@@ -97,9 +99,10 @@ export function v2CollateralColumn(
   const lead = held[0];
   const u = lead.underlying!;
   const figure = (
-    <>
-      <AmountText value={u.formatted} format="headline" symbol={u.symbol} /> {u.symbol}
-    </>
+    <span className="inline-flex items-center gap-1.5">
+      <AmountText value={u.formatted} format="headline" symbol={u.symbol} />
+      <TokenChipIcon symbol={u.symbol} size={20} filterable={false} />
+    </span>
   );
   const prov = provFor?.(p.collateral.indexOf(lead));
   const rest = held.length - 1;

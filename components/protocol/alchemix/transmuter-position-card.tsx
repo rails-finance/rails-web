@@ -32,6 +32,7 @@ import { alchemixPositionName } from "@/lib/alchemix/naming";
 import type { AlchemixAmount, AlchemixTransmuterPositionSummary } from "@/types/api/alchemix";
 import { transmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
 import { AmountText } from "@/components/shared/amount-text";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -71,13 +72,17 @@ export function TransmuterStatePill({ state }: { state: TransmuterState }) {
   );
 }
 
-/** An amount from a log: the headline form, the exact figure on hover. */
+/** An amount from a log: the headline form, the exact figure on hover. Number
+ *  + chip only, no ticker text after it — the chip carries the symbol on
+ *  hover, the grammar every other protocol's headline figures use
+ *  (`components/shared/asset-amount.tsx`). */
 function amountValue(a: AlchemixAmount, symbol: string, prov?: Provenance): ReactNode {
   const n = Number(a.raw.split(".")[0]) / 10 ** WAD_DECIMALS;
   const figure = (
-    <>
-      <AmountText value={n} format="headline" symbol={symbol} /> {symbol}
-    </>
+    <span className="inline-flex items-center gap-1.5">
+      <AmountText value={n} format="headline" symbol={symbol} />
+      <TokenChipIcon symbol={symbol} size={20} filterable={false} />
+    </span>
   );
   return (
     <StatValue title={`${formatUnitsExact(a.raw, WAD_DECIMALS)} ${symbol}`}>
@@ -159,20 +164,20 @@ export function claimColumn(
     c.unclaimed && c.unclaimed.raw !== "0" ? (
       <div className="mt-0.5 leading-snug">
         and{" "}
-        <span className="tabular-nums">
+        <span className="inline-flex items-center gap-1 tabular-nums">
           {prov?.returned ? (
             <Prov
               info={prov.returned}
               value={formatUnitsExact(c.unclaimed.raw, WAD_DECIMALS)}
               symbol={c.unclaimed.symbol}
             >
-              <AmountText value={Number(c.unclaimed.raw) / 1e18} format="headline" symbol={c.unclaimed.symbol} />{" "}
-              {c.unclaimed.symbol}
+              <AmountText value={Number(c.unclaimed.raw) / 1e18} format="headline" symbol={c.unclaimed.symbol} />
+              <TokenChipIcon symbol={c.unclaimed.symbol} size={16} filterable={false} />
             </Prov>
           ) : (
             <>
-              <AmountText value={Number(c.unclaimed.raw) / 1e18} format="headline" symbol={c.unclaimed.symbol} />{" "}
-              {c.unclaimed.symbol}
+              <AmountText value={Number(c.unclaimed.raw) / 1e18} format="headline" symbol={c.unclaimed.symbol} />
+              <TokenChipIcon symbol={c.unclaimed.symbol} size={16} filterable={false} />
             </>
           )}
         </span>{" "}
