@@ -56,9 +56,9 @@ export interface ReserveStats {
   /** Lifetime OUTFLOW value in USD at PRICE-AT-THE-TIME — each event valued at
    *  its own block price (ctx.price / ctx.debtPrice / ctx.collateralPrice),
    *  falling back to current only where no historic price exists. The inflow
-   *  "Deposited/Borrowed (all time)" totals are derived downstream as current
-   *  holding + these outflows, so a settled position's flow totals stay fixed
-   *  while Deposited − Withdrawn = In Protocol still reconciles. */
+   *  "Deposited/Borrowed (all time)" totals are derived downstream from the
+   *  current holding, these outflows and the interest (lib/aave-v4/
+   *  lifetime-totals.ts), so a settled position's flow totals stay fixed. */
   withdrawnUsd: number;
   repaidUsd: number;
   liquidatedDebtUsd: number;

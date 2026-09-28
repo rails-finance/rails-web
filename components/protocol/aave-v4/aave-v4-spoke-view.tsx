@@ -75,7 +75,7 @@ import { fmtUsd } from "@/lib/aave-v4/format";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
-import type { AaveV4InterestPnl, ReserveStats } from "@/lib/aave-v4/spoke-cards";
+import type { ReserveStats } from "@/lib/aave-v4/spoke-cards";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
@@ -780,7 +780,7 @@ function AaveV4SpokePageInner({
             oraclePrices={oraclePrices}
             gasEth={activeGroup.result.totalGasCostEth}
             gasUsd={activeGroup.result.totalGasCostUsd}
-            interest={activeCard?.interestPnl}
+            historyComplete={olderCount === 0}
           />
         ) : null}
 
@@ -864,7 +864,7 @@ function AaveV4SpokeTowerBlock({
   oraclePrices,
   gasEth,
   gasUsd,
-  interest,
+  historyComplete,
 }: {
   reserves: ReserveStats[];
   prices: Record<string, PriceEntry | number>;
@@ -873,8 +873,8 @@ function AaveV4SpokeTowerBlock({
   oraclePrices: OraclePriceMap | null;
   gasEth: number;
   gasUsd: number;
-  /** The position's interest to date, for the lifetime rows. */
-  interest?: AaveV4InterestPnl | null;
+  /** False when the page holds a window of the timeline (lib/aave-v4/lifetime-totals.ts). */
+  historyComplete: boolean;
 }) {
   // Every <Prov> figure in the panel (the tower breakdown rows) reports into
   // this registry, which the page-level inspector reads.
@@ -916,7 +916,10 @@ function AaveV4SpokeTowerBlock({
   const [surplusSymbols, hideSurplus, setHideSurplus] = useSurplusState(calcBase);
 
   // Lifetime totals that mirror the tower legend, narrated in the footnote.
-  const totals = useMemo(() => computeAaveLifetimeTotals(reserves, prices), [reserves, prices]);
+  const totals = useMemo(
+    () => computeAaveLifetimeTotals(reserves, prices, historyComplete),
+    [reserves, prices, historyComplete],
+  );
   // Figures mirrored in the breakdown legend render foreground-bold; the rest of
   // the prose stays muted (same grammar as the Liquity economics footnote).
   const fig = (n: number) => <span className="font-semibold text-foreground tabular-nums">{fmtUsd(n).title}</span>;
@@ -936,7 +939,7 @@ function AaveV4SpokeTowerBlock({
             hideSurplus={hideSurplus}
             onToggleHideSurplus={() => setHideSurplus((v) => !v)}
             title={<span className={`${OVERLAY_HEADING} text-rb-500`}>Lifetime flows</span>}
-            interest={interest}
+            historyComplete={historyComplete}
           />
 
           {/* The panel's info area: (i) Explanation — the tower legend narrated
@@ -964,11 +967,12 @@ function AaveV4SpokeTowerBlock({
                 <div className="flex items-start gap-2 leading-relaxed">
                   <span className="select-none text-rb-500">•</span>
                   <span>
-                    {fig(totals.depositedUsd)} of collateral has moved through this position over its life
-                    {totals.withdrawnUsd > 0.01 && <>: {fig(totals.withdrawnUsd)} withdrawn</>}
+                    {fig(totals.depositedUsd)} of collateral deposited over the position&apos;s life
+                    {totals.supplyInterestUsd > 0.01 && <> and {fig(totals.supplyInterestUsd)} earned in interest</>}
+                    {totals.withdrawnUsd > 0.01 && <>, then {fig(totals.withdrawnUsd)} withdrawn</>}
                     {totals.liquidatedCollUsd > 0.01 && (
                       <>
-                        {totals.withdrawnUsd > 0.01 ? " and " : ": "}
+                        {totals.withdrawnUsd > 0.01 ? " and " : ", then "}
                         {fig(totals.liquidatedCollUsd)} liquidated
                       </>
                     )}
@@ -980,6 +984,9 @@ function AaveV4SpokeTowerBlock({
                     <span className="select-none text-rb-500">•</span>
                     <span>
                       {fig(totals.borrowedUsd)} borrowed over the position&apos;s life
+                      {totals.debtInterestUsd > 0.01 && (
+                        <> and {fig(totals.debtInterestUsd)} of interest accrued on it</>
+                      )}
                       {totals.repaidUsd > 0.01 && <>, then {fig(totals.repaidUsd)} repaid</>}
                       {totals.liquidatedDebtUsd > 0.01 && (
                         <>

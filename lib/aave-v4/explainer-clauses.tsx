@@ -52,7 +52,13 @@ import {
   type ClauseInput,
   type EventProseSlots,
 } from "@/lib/shared/explainer-prose";
-import { eventLogProv, snapshotProv, heldDebtRateProv, type EventProvDetail } from "@/lib/aave-v4/position-provenance";
+import {
+  chainBalanceProv,
+  eventLogProv,
+  snapshotProv,
+  heldDebtRateProv,
+  type EventProvDetail,
+} from "@/lib/aave-v4/position-provenance";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { effectiveBorrowAPR, borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
 import { formatExact } from "@/lib/utils/format";
@@ -226,16 +232,28 @@ function amountFig(ctx: AaveV4Context, coord: EventProvDetail, own: boolean): Re
 /** A running after-balance — echoes the detail grid's after-value receipt.
  *  Symbol is intentionally omitted (the grid's after Prov carries only an icon),
  *  so the entry key matches. */
-function afterFig(
-  coord: EventProvDetail,
-  side: "supply" | "debt",
-  asset: string | undefined,
-  after: string | undefined,
-  raw: string | null | undefined,
-): ReactNode {
+function afterFig(coord: EventProvDetail, side: "supply" | "debt", ctx: AaveV4Context): ReactNode {
+  const asset = ctx.reserveSymbol;
+  const after = side === "supply" ? ctx.supplyAfter : ctx.debtAfter;
+  const raw = side === "supply" ? ctx.raw?.supplyAfter : ctx.raw?.debtAfter;
   const display = aaveV4DisplaySymbol(asset) || "tokens";
+  // The same receipt the detail grid gives the figure: the chain balance at
+  // the block (interest included) where the row carries its shares, else the
+  // replayed event sum.
+  const detail = { ...coord, asset, raw };
+  const info =
+    ctx.balanceBasis === "chain"
+      ? chainBalanceProv(
+          "Balance after this event",
+          detail,
+          side,
+          side === "supply"
+            ? { value: raw, shares: ctx.raw?.supplySharesAfter, a: ctx.raw?.hubAddedAssets, b: ctx.raw?.hubAddedShares }
+            : { value: raw, shares: ctx.raw?.drawnSharesAfter, a: ctx.raw?.hubDrawnIndex },
+        )
+      : snapshotProv("Balance after this event", detail, side);
   return (
-    <Fig echo info={snapshotProv("Balance after this event", { ...coord, asset, raw }, side)} value={fmt(after)}>
+    <Fig echo info={info} value={fmt(after)}>
       {fmt(after)} {display}
     </Fig>
   );
@@ -365,15 +383,10 @@ function aaveV4EventSlotsBase(
       const changed: ClauseInput = rs.supplyAfter
         ? clause(
             rs.opensSupply ? (
-              <>
-                The position now holds{" "}
-                {afterFig(coord, "supply", ctx.reserveSymbol, ctx.supplyAfter, ctx.raw?.supplyAfter)} on this reserve,
-                its first here.
-              </>
+              <>The position now holds {afterFig(coord, "supply", ctx)} on this reserve, its first here.</>
             ) : (
               <>
-                Its {token} supply on this reserve is now{" "}
-                {afterFig(coord, "supply", ctx.reserveSymbol, ctx.supplyAfter, ctx.raw?.supplyAfter)}.
+                Its {token} supply on this reserve is now {afterFig(coord, "supply", ctx)}.
               </>
             ),
           )
@@ -395,12 +408,7 @@ function aaveV4EventSlotsBase(
       const ending: ClauseInput = rs.supplyEmptied
         ? cont(<>, fully exiting the {token} supply on this market.</>)
         : rs.supplyAfter != null
-          ? cont(
-              <>
-                , leaving {afterFig(coord, "supply", ctx.reserveSymbol, ctx.supplyAfter, ctx.raw?.supplyAfter)} supplied
-                here.
-              </>,
-            )
+          ? cont(<>, leaving {afterFig(coord, "supply", ctx)} supplied here.</>)
           : cont(<>.</>);
       return {
         happened: [clause(<>Withdrew {amountFig(ctx, coord, true)} back to the wallet</>), ending],
@@ -417,8 +425,7 @@ function aaveV4EventSlotsBase(
       const changed: ClauseInput = rs.debtAfter
         ? clause(
             <>
-              Outstanding {token} debt is now{" "}
-              {afterFig(coord, "debt", ctx.reserveSymbol, ctx.debtAfter, ctx.raw?.debtAfter)}.
+              Outstanding {token} debt is now {afterFig(coord, "debt", ctx)}.
             </>,
           )
         : null;
@@ -436,8 +443,7 @@ function aaveV4EventSlotsBase(
         : rs.debtAfter != null
           ? cont(
               <>
-                , leaving {afterFig(coord, "debt", ctx.reserveSymbol, ctx.debtAfter, ctx.raw?.debtAfter)} of {token}{" "}
-                debt.
+                , leaving {afterFig(coord, "debt", ctx)} of {token} debt.
               </>,
             )
           : cont(<>.</>);
@@ -557,8 +563,8 @@ function liquidationSlots(ctx: AaveV4Context, coord: EventProvDetail, token: str
     rs.debtAfter != null && rs.debtAfter > EPS
       ? clause(
           <>
-            The position still owes {afterFig(coord, "debt", ctx.reserveSymbol, ctx.debtAfter, ctx.raw?.debtAfter)},
-            which keeps accruing interest and can be liquidated again while the health factor stays below 1.0.
+            The position still owes {afterFig(coord, "debt", ctx)}, which keeps accruing interest and can be liquidated
+            again while the health factor stays below 1.0.
           </>,
         )
       : null,

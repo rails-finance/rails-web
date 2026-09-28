@@ -22,7 +22,8 @@ import {
 } from "@/components/shared/economics-chart-primitives";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
 import { resolvePrice, type PriceEntry } from "@/lib/aave/prices";
-import type { AaveV4InterestPnl, ReserveStats } from "@/lib/aave-v4/spoke-cards";
+import type { ReserveStats } from "@/lib/aave-v4/spoke-cards";
+import { reserveLifetime } from "@/lib/aave-v4/lifetime-totals";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { accumProv, chainTruthProv, livePriceInput } from "@/lib/aave-v4/position-provenance";
@@ -62,32 +63,35 @@ const HOLDING_PRICE_NOTE =
 const OUTFLOW_PRICE_NOTE =
   "each outflow at the price stored for its block — what Aave's oracle answered there, so the figure stays at the value the tokens left at";
 
-const depositedProv = () =>
-  accumProv("Total collateral deposited over the position's life", {
-    formula: "collateral × holding price + Σ(outflow × outflow price)",
-    inputs: [
-      {
-        label: "collateral",
-        kind: "chain",
-        note: "the balance the spoke reports, plus each withdrawn or liquidated outflow",
-      },
-      { label: "holding price", kind: "offchain", note: HOLDING_PRICE_NOTE },
-      { label: "outflow price", kind: "chain", pclass: "oracle", note: OUTFLOW_PRICE_NOTE },
-    ],
-  });
-const borrowedProv = () =>
-  accumProv("Total borrowed over the position's life", {
-    formula: "debt × holding price + Σ(outflow × outflow price)",
-    inputs: [
-      {
-        label: "debt",
-        kind: "chain",
-        note: "the balance the spoke reports, plus each repaid or liquidated outflow",
-      },
-      { label: "holding price", kind: "offchain", note: HOLDING_PRICE_NOTE },
-      { label: "outflow price", kind: "chain", pclass: "oracle", note: OUTFLOW_PRICE_NOTE },
-    ],
-  });
+// Deposited and Borrowed: what the side holds and what has left it, less the
+// interest (lib/aave-v4/lifetime-totals.ts), so in each token they are the sums
+// of the position's supply and borrow events and the tower reconciles in USD.
+const inflowProv = (side: "supply" | "debt") =>
+  accumProv(
+    side === "supply"
+      ? "Total collateral deposited over the position's life"
+      : "Total borrowed over the position's life",
+    {
+      formula:
+        side === "supply"
+          ? "collateral × holding price + Σ(outflow × outflow price) − interest earned"
+          : "debt × holding price + Σ(outflow × outflow price) − accrued interest",
+      inputs: [
+        {
+          label: side === "supply" ? "collateral" : "debt",
+          kind: "chain",
+          note:
+            side === "supply"
+              ? "the balance the spoke reports, plus each withdrawn or liquidated outflow, less the interest it has earned: in the token's units, the position's supplies added up"
+              : "the debt the spoke reports, plus each repaid or liquidated outflow, less the interest it has accrued: in the token's units, the position's borrows added up",
+        },
+        { label: "holding price", kind: "offchain", note: HOLDING_PRICE_NOTE },
+        { label: "outflow price", kind: "chain", pclass: "oracle", note: OUTFLOW_PRICE_NOTE },
+      ],
+    },
+  );
+const depositedProv = () => inflowProv("supply");
+const borrowedProv = () => inflowProv("debt");
 // The current rows: the spoke's read where the chain overlay answered, and the
 // position's replayed net where it did not (see `netSupply` / `netDebt`
 // below) — the receipt says both, so a row is never claimed to be a live read
@@ -189,6 +193,17 @@ interface AssetRow {
   // derived from lifetime fields.
   netSupply: number;
   netDebt: number;
+  /** Deposited / Borrowed (all time) for this asset, and the interest its
+   *  balance carries beyond the events (reserveLifetime). */
+  suppliedInflowUsd: number;
+  borrowedInflowUsd: number;
+  supplyInterest: number;
+  supplyInterestUsd: number;
+  debtInterest: number;
+  debtInterestUsd: number;
+  /** The part of the current debt that is interest, in USD: the debt less the
+   *  net the events leave, never below zero or above the debt. */
+  heldDebtInterestUsd: number;
   /** null when no source prices this asset — the row then has no USD leg. */
   price: number | null;
   /** Which feed answered for the asset, for the row's USD receipt. */
@@ -278,11 +293,14 @@ export interface AaveV4TowerChartProps {
    *  control — lets the host panel title the section without spending a row of
    *  its own row (the V2 trove treatment; the spoke page passes "Lifetime flows"). */
   title?: React.ReactNode;
-  /** The position's interest to date (computeAaveV4InterestPnl): the chain
-   *  balance less the net amount its events moved, per asset. Drawn as an
-   *  "Interest … (all time)" row on each side of the lifetime view. */
-  interest?: AaveV4InterestPnl | null;
+  /** False when the page holds a window of the timeline: the lifetime sums
+   *  then miss the older events, so no interest leg is split out. */
+  historyComplete?: boolean;
 }
+
+/** The accrued-interest swatch and segment of the shared tower vocabulary
+ *  (components/shared/chain-truth-tower.tsx FEE_SOLID). */
+const FEE_SOLID = "bg-green-400/55";
 
 /** Receipt for a lifetime interest row. */
 const lifetimeInterestProv = (side: "supply" | "debt"): Provenance =>
@@ -294,7 +312,11 @@ const lifetimeInterestProv = (side: "supply" | "debt"): Provenance =>
     inputs: [
       { label: "balance now", kind: "chain", note: "what the spoke answers for this position at the latest block" },
       { label: "amounts moved", kind: "chain", pclass: "indexed", note: "the position's events, summed" },
-      { label: "price", kind: "offchain", note: HOLDING_PRICE_NOTE },
+      {
+        label: "price",
+        kind: "offchain",
+        note: `${HOLDING_PRICE_NOTE}; for a reserve the position has left, the average price its outflows left at`,
+      },
     ],
   });
 
@@ -306,7 +328,7 @@ export function AaveV4TowerChart({
   hideSurplus,
   onToggleHideSurplus,
   title,
-  interest,
+  historyComplete = true,
 }: AaveV4TowerChartProps) {
   const [hideHistorical, setHideHistorical] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
@@ -331,6 +353,7 @@ export function AaveV4TowerChart({
       const netDebt = r.currentBorrowed ?? Math.max(0, r.borrowed - r.repaid - r.liquidatedDebt);
       // No source, no price — and no dollar figure anywhere downstream of it.
       const price = resolvePrice(r.symbol, prices);
+      const life = reserveLifetime(r, price, historyComplete);
       const hasHistoricActivity =
         r.supplied > 0 ||
         r.borrowed > 0 ||
@@ -352,6 +375,13 @@ export function AaveV4TowerChart({
         liquidatedCollateralUsd: r.liquidatedCollateralUsd,
         netSupply,
         netDebt,
+        suppliedInflowUsd: life.supply.inflowUsd,
+        borrowedInflowUsd: life.debt.inflowUsd,
+        supplyInterest: life.supply.interest,
+        supplyInterestUsd: life.supply.interestUsd,
+        debtInterest: life.debt.interest,
+        debtInterestUsd: life.debt.interestUsd,
+        heldDebtInterestUsd: price == null ? 0 : Math.min(netDebt, life.debt.interest) * price,
         price,
         priceSource: oraclePriceSource(r.symbol, oraclePrices),
         netSupplyUsd: price == null ? null : netSupply * price,
@@ -421,11 +451,16 @@ export function AaveV4TowerChart({
   // is valued at what it was worth when it left, not today.
   // The lifetime aggregate ignores the hide-surplus toggle, so its own missing
   // list is the surplus-included one.
-  const totalDepositedUsd = allRows.reduce(
-    (s, r) => s + (r.netSupplyUsd ?? 0) + r.withdrawnUsd + r.liquidatedCollateralUsd,
-    0,
-  );
-  const totalBorrowedUsd = allRows.reduce((s, r) => s + (r.netDebtUsd ?? 0) + r.repaidUsd + r.liquidatedDebtUsd, 0);
+  // RULE (TO-DO-ui-jobs §98): Deposited / Borrowed are the event sums and the
+  // interest is its own leg (reserveLifetime), so deposited + earned and
+  // borrowed + accrued each meet the tower. The supply side's earned interest
+  // grows the faded reference bar; the debt side's held interest is the
+  // lighter "Accrued" segment on top of the debt — the shared tower grammar.
+  const totalDepositedUsd = allRows.reduce((s, r) => s + r.suppliedInflowUsd, 0);
+  const totalBorrowedUsd = allRows.reduce((s, r) => s + r.borrowedInflowUsd, 0);
+  const totalSupplyInterestUsd = allRows.reduce((s, r) => s + r.supplyInterestUsd, 0);
+  const totalDebtInterestUsd = allRows.reduce((s, r) => s + r.debtInterestUsd, 0);
+  const heldDebtInterestUsd = debtAssets.reduce((s, r) => s + r.heldDebtInterestUsd, 0);
   const depositedExcluded = unpricedSupplyAll.map((r) => r.symbol);
   const borrowedExcluded = unpricedDebtSymbols;
 
@@ -614,7 +649,23 @@ export function AaveV4TowerChart({
   ];
 
   const debtSegments: TowerSegment[] = [
-    ...activeSegs(debtAssets, (r) => r.netDebtUsd, "bg-green-400", "debt", "Debt", "out"),
+    ...activeSegs(debtAssets, (r) => r.netDebtUsd - r.heldDebtInterestUsd, "bg-green-400", "debt", "Debt", "out"),
+    ...(heldDebtInterestUsd > LIFETIME_DUST_USD
+      ? [
+          {
+            key: "debt-interest",
+            label: "Accrued",
+            value: heldDebtInterestUsd,
+            colorClass: FEE_SOLID,
+            tooltip: (
+              <div className="flex items-center gap-1.5">
+                <span>Accrued interest in the debt</span>
+                <span className="ml-auto tabular-nums">{fmtUsd(heldDebtInterestUsd).title}</span>
+              </div>
+            ),
+          },
+        ]
+      : []),
     ...markHidden(flowSegs(liquidatedDebtAssets, LIQUIDATION_PATTERN, "debt-liquidated", "Liquidated", "in")),
     ...markHidden(flowSegs(repaidAssets, REPAID_PATTERN, "debt-repaid", "Repaid", "in")),
   ];
@@ -629,12 +680,13 @@ export function AaveV4TowerChart({
   // Side-bar max is merged in regardless of view so the tower scale is frozen
   // across the toggle; the bars themselves render `hidden` in live view (column
   // width still reserved → no horizontal shift of the tower).
-  const sideBarMax = Math.max(totalDepositedUsd, totalBorrowedUsd);
+  const depositedBarUsd = totalDepositedUsd + totalSupplyInterestUsd;
+  const sideBarMax = Math.max(depositedBarUsd, totalBorrowedUsd);
   const towerMax = Math.max(collPeak, debtPeak, sideBarMax) * 1.08;
 
   const collSideBar =
-    totalDepositedUsd > 0
-      ? { heightPct: (totalDepositedUsd / towerMax) * CHART_HEIGHT, color: COLLATERAL_FADED, hidden: isLiveView }
+    depositedBarUsd > 0
+      ? { heightPct: (depositedBarUsd / towerMax) * CHART_HEIGHT, color: COLLATERAL_FADED, hidden: isLiveView }
       : undefined;
   const debtSideBar =
     totalBorrowedUsd > 0
@@ -764,18 +816,38 @@ export function AaveV4TowerChart({
     ];
   };
 
-  // Lifetime interest per side, from the chain balance less the amounts moved.
-  // Hidden below a cent.
+  // Lifetime interest per side, from the chain balance less the amounts moved:
+  // "+ Interest earned" on the supply side (the faded inflow swatch, as it
+  // grows the reference bar) and "+ Accrued interest" on the debt side (the
+  // accrued swatch). Hidden below a cent.
   const interestRow = (side: "supply" | "debt"): BreakdownRow[] => {
-    if (!interest?.hasData) return [];
-    const usd = interest.assets.reduce(
-      (t, a) => t + (side === "supply" ? a.supplyInterestUsd : a.borrowInterestUsd),
-      0,
-    );
-    if (usd < 0.01) return [];
-    const label = side === "supply" ? "Interest earned (all time)" : "Interest accrued (all time)";
+    const usd = side === "supply" ? totalSupplyInterestUsd : totalDebtInterestUsd;
+    if (usd < LIFETIME_DUST_USD) return [];
+    const earning = allRows.filter((r) => (side === "supply" ? r.supplyInterestUsd : r.debtInterestUsd) > 0);
+    const one = earning.length === 1 ? earning[0] : null;
+    const label = side === "supply" ? "Interest earned" : "Accrued interest";
     const v = fmtUsd(usd);
-    return [{ sign: "", label, amount: v.display, exact: v.title, indent: true, prov: lifetimeInterestProv(side) }];
+    return [
+      {
+        sign: "+",
+        label,
+        amount: v.display,
+        exact: v.title,
+        indent: true,
+        ...(side === "supply" ? { swatchStyle: { backgroundColor: COLLATERAL_FADED } } : { swatchClass: FEE_SOLID }),
+        ...(one
+          ? {
+              icon: <TokenChipIcon symbol={one.symbol} size={14} filterable={false} />,
+              ...tokenHint(
+                side === "supply" ? one.supplyInterest : one.debtInterest,
+                one.symbol,
+                lifetimeInterestProv(side),
+              ),
+            }
+          : {}),
+        prov: lifetimeInterestProv(side),
+      },
+    ];
   };
 
   const collRows: BreakdownRow[] = [
@@ -791,9 +863,9 @@ export function AaveV4TowerChart({
           } as BreakdownRow,
         ]
       : []),
+    ...(!isLiveView ? interestRow("supply") : []),
     ...(!isLiveView ? flowRows(withdrawnAssets, WITHDRAWN_PATTERN, "Withdrawn") : []),
     ...(!isLiveView ? flowRows(liquidatedCollAssets, LIQUIDATION_PATTERN, "Liquidated") : []),
-    ...(!isLiveView ? interestRow("supply") : []),
     ...withTotal(
       currentRows(
         supplyAssets,
@@ -830,9 +902,9 @@ export function AaveV4TowerChart({
           } as BreakdownRow,
         ]
       : []),
+    ...(!isLiveView ? interestRow("debt") : []),
     ...(!isLiveView ? flowRows(repaidAssets, REPAID_PATTERN, "Repaid") : []),
     ...(!isLiveView ? flowRows(liquidatedDebtAssets, LIQUIDATION_PATTERN, "Liquidated") : []),
-    ...(!isLiveView ? interestRow("debt") : []),
     ...withTotal(
       currentRows(
         debtAssets,
@@ -912,9 +984,9 @@ export function AaveV4TowerChart({
           placeholder: collPlaceholder,
           sideBarTooltip: collSideBar ? (
             <div className="flex items-center gap-1.5">
-              <span>Deposited (all time)</span>
+              <span>Deposited + interest earned</span>
               {dirArrow("in")}
-              <span className="ml-auto tabular-nums">{fmtUsd(totalDepositedUsd).title}</span>
+              <span className="ml-auto tabular-nums">{fmtUsd(depositedBarUsd).title}</span>
             </div>
           ) : undefined,
         }}

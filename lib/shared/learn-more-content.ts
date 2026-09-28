@@ -657,6 +657,10 @@ export function aaveV4EconomicsContent(): LearnMoreContent {
         text: "the towers show every supply, withdrawal, borrow, and repayment over the position's life.",
       },
       {
+        bold: "Accrued interest",
+        text: "what a balance holds beyond the amounts its events moved. Borrowed plus accrued interest is what the position has repaid, lost to liquidation and still owes; deposited plus interest earned is what it has withdrawn, lost to liquidation and still holds.",
+      },
+      {
         bold: "Price runway",
         text: "for a borrowing position, how far each collateral asset's price can fall before it reaches the liquidation price.",
       },
