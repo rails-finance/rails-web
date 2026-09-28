@@ -14,6 +14,7 @@ import { RedemptionRunway } from "@/components/shared/redemption-runway";
 import { RiskFooterStrip, RiskMeter } from "@/components/shared/risk-footer-strip";
 import { troveLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import { formatDate } from "@/lib/date";
+import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/types";
 
 /**
  * V2's adapter onto the shared Liquity-family position card: builds the
@@ -37,6 +38,7 @@ export function TroveSummaryStack({
   onToggleSummaryExplanation,
   loadingStatus,
   viewHref,
+  surplus,
 }: {
   trove: TroveSummary;
   liveState?: TroveStateData;
@@ -55,6 +57,8 @@ export function TroveSummaryStack({
    *  — the trove page's `useTimelineEvents().viewHref`. Absent on the home
    *  hero's server-fed embed, which draws no timeline at all. */
   viewHref?: () => string;
+  /** A liquidated trove's collateral surplus, read at the head. */
+  surplus?: LiquityTroveSurplus | null;
 }) {
   const { lead, items } = useTroveExplanationItems({
     trove,
@@ -63,6 +67,7 @@ export function TroveSummaryStack({
     debtInFront,
     trovesAhead,
     queueDebtTotal,
+    surplus,
   });
   const showBand = trove.status === "open";
 
@@ -135,6 +140,7 @@ export function TroveSummaryStack({
       explanation={items.length > 0 || lead != null ? <ProseExplainer paragraph={lead} items={items} /> : undefined}
       rowExtra={rowExtra}
       viewHref={viewHref}
+      surplus={surplus}
       explanationDefaultOpen={summaryExplanationOpen}
       onExplanationToggle={onToggleSummaryExplanation}
       footer={

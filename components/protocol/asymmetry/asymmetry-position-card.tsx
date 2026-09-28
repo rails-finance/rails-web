@@ -11,7 +11,7 @@ import {
   viewFromForkSummary,
   liveFromForkChain,
 } from "@/components/protocol/liquity-family/liquity-position-card";
-import type { LiquityTroveView } from "@/components/protocol/liquity-family/types";
+import type { LiquityTroveSurplus, LiquityTroveView } from "@/components/protocol/liquity-family/types";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import type { AsymmetryTroveSummary } from "@/lib/sources/api/asymmetry-troves";
 
@@ -25,6 +25,7 @@ export function AsymmetryPositionCard({
   viewHref,
   live,
   compact,
+  surplus,
 }: {
   v: AsymmetryTroveView;
   receipts?: boolean;
@@ -40,6 +41,8 @@ export function AsymmetryPositionCard({
   live?: LiquityForkTroveChainResponse | null;
   /** Listing render: debt headline in approximate notation ("48.1k"). */
   compact?: boolean;
+  /** A liquidated Trove's collateral surplus, read at the head. */
+  surplus?: LiquityTroveSurplus | null;
 }) {
   return (
     <LiquityPositionCard
@@ -51,6 +54,7 @@ export function AsymmetryPositionCard({
       viewHref={viewHref}
       live={live ? liveFromForkChain(live) : live}
       compact={compact}
+      surplus={surplus}
     />
   );
 }

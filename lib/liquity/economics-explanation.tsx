@@ -34,6 +34,8 @@ export function liquityEconomicsExplanation(
   economics: TroveEconomicsType,
   meta: TroveMeta,
   currentPrice?: number,
+  /** The owner has claimed the liquidation surplus (a head read). */
+  surplusClaimed = false,
 ): ReactNode {
   const { position, costs, redemption, liquidation, gas } = economics;
   const stableSymbol = meta.stablecoinSymbol;
@@ -142,8 +144,14 @@ export function liquityEconomicsExplanation(
           </>
         )}
         {feesReceivedColl > 0 && <>, with {collFig(feesReceivedColl, 4)} received in fees</>}
-        {claimableSurplus > 0 && <> and {collFig(claimableSurplus, 4)} claimable as liquidation surplus</>}, leaving{" "}
-        {collFig(meta.collateralAmount)} {meta.isZombie ? "claimable" : "held"} today.
+        {claimableSurplus > 0 && (
+          <>
+            {" "}
+            and {collFig(claimableSurplus, 4)} {surplusClaimed ? "claimed by the owner" : "claimable"} as liquidation
+            surplus
+          </>
+        )}
+        , leaving {collFig(meta.collateralAmount)} {meta.isZombie ? "claimable" : "held"} today.
       </span>,
     );
   }

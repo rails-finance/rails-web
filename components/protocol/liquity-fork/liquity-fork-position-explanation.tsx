@@ -15,6 +15,8 @@
 // plain words: a figure that includes pending interest, a price that didn't
 // refresh this load.
 
+import { SurplusBullet } from "@/components/protocol/liquity-family/surplus-bullet";
+import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/types";
 import { formatUsd } from "@/lib/shared/format-event";
 // The position card's own formatter for this figure, so a $1.18 line reads
 // $1.18 in both places.
@@ -39,6 +41,7 @@ export function LiquityForkClosedExplanation({
   peakDebt,
   seizure,
   redemptionSource,
+  surplus,
 }: {
   status: "closed" | "liquidated";
   collateralSymbol: string;
@@ -56,6 +59,8 @@ export function LiquityForkClosedExplanation({
    *  not its TroveManager (server sql/migrations 291/292); Asymmetry and
    *  Basedollar redeem through the TroveManager itself, so they omit this. */
   redemptionSource?: string;
+  /** The liquidation's collateral surplus, read at the head. */
+  surplus?: LiquityTroveSurplus | null;
 }) {
   const liquidated = status === "liquidated";
 
@@ -84,6 +89,7 @@ export function LiquityForkClosedExplanation({
         the branch liquidates a Trove whose collateral ratio falls below its minimum, in one whole-Trove seizure.
       </span>,
     );
+    if (surplus) bullets.push(<SurplusBullet key="surplus" surplus={surplus} symbol={collateralSymbol} />);
   } else {
     bullets.push(
       <span key="owner">

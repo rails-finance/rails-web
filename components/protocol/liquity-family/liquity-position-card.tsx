@@ -93,7 +93,14 @@ import {
   BASEDOLLAR_BRANCHES,
 } from "@/lib/basedollar/asset-catalog";
 import { TroveIdentityRow } from "./trove-identity-row";
-import type { LiquityFamilyId, LiquityFaceProvContext, LiquityTroveLive, LiquityTroveView } from "./types";
+import { collSurplusClaimableProv, collSurplusUsdProv } from "@/lib/shared/liquity-coll-surplus-provenance";
+import type {
+  LiquityFamilyId,
+  LiquityFaceProvContext,
+  LiquityTroveLive,
+  LiquityTroveSurplus,
+  LiquityTroveView,
+} from "./types";
 
 // PositionCardShell renders this card inside Link-wrapped rows on
 // listing/umbrella pages, so an inner <a> would nest anchors (invalid HTML,
@@ -419,6 +426,7 @@ export function LiquityPositionCard({
   footer,
   explanationDefaultOpen,
   onExplanationToggle,
+  surplus,
 }: {
   protocol: LiquityFamilyId;
   v: LiquityTroveView;
@@ -441,6 +449,10 @@ export function LiquityPositionCard({
   footer?: ReactNode;
   explanationDefaultOpen?: boolean;
   onExplanationToggle?: (open: boolean) => void;
+  /** Detail page, liquidated Trove: the collateral surplus read at the head.
+   *  While some is claimable the terminal card leads with it in place of the
+   *  two lifetime maxima. */
+  surplus?: LiquityTroveSurplus | null;
 }) {
   const cfg = LIQUITY_FORK_CARD_CONFIGS[protocol];
   const ops = OPS[protocol];
@@ -517,6 +529,55 @@ export function LiquityPositionCard({
   // narration); rowExtra deliberately does not — the live risk strips
   // describe the chain NOW and never ride a past life.
   if (v.status === "closed" || v.status === "liquidated") {
+    // A liquidation's surplus the owner has not claimed leads the card: what
+    // can still be claimed says more to the owner than the life's maxima.
+    const claimable = surplus && surplus.claimable > 1e-9 ? surplus : null;
+    const claimableUsd = claimable && priceUsd != null && priceUsd > 0 ? claimable.claimable * priceUsd : null;
+    const peakCollateralStat =
+      v.peakCollateral > 0 ? (
+        <StatValue>
+          <Prov info={ops.peakCollateralProv(v)}>
+            <HighlightableValue
+              type="peakCollateral"
+              state="after"
+              value={v.peakCollateral}
+              variant="card"
+              className="text-rb-500"
+            >
+              {formatPrice(v.peakCollateral)}
+            </HighlightableValue>
+          </Prov>
+        </StatValue>
+      ) : (
+        <StatDash />
+      );
+    const peakDebtStat =
+      v.peakDebt > 0 ? (
+        <StatValue>
+          <Prov info={ops.peakDebtProv(v)}>
+            <HighlightableValue type="peakDebt" state="after" value={v.peakDebt} variant="card" className="text-rb-500">
+              {compact ? formatApproximate(v.peakDebt) : formatPrice(v.peakDebt)}
+            </HighlightableValue>
+          </Prov>
+        </StatValue>
+      ) : (
+        <StatDash />
+      );
+    const claimableStat = claimable ? (
+      <StatValue>
+        <Prov info={collSurplusClaimableProv(claimable, ct)}>
+          <span className="text-foreground/80">{formatPrice(claimable.claimable)}</span>
+        </Prov>
+      </StatValue>
+    ) : null;
+    const claimableFootnote =
+      claimableUsd != null && claimable ? (
+        <div className="text-xs mt-0.5 min-h-[1rem]">
+          <span className="inline-flex items-center font-bold text-green-400 border-l-2 border-r-2 border-green-400 rounded-sm px-1 py-0">
+            <Prov info={collSurplusUsdProv(claimable, ct, priceUsd as number)}>{formatUsdValue(claimableUsd)}</Prov>
+          </span>
+        </div>
+      ) : undefined;
     return (
       <PositionCardShell
         receipts={receipts}
@@ -550,44 +611,12 @@ export function LiquityPositionCard({
           identity={meta}
           collateralIcon={<TokenChipIcon symbol={ct} size={28} filterable={false} />}
           debtIcon={<TokenChipIcon symbol={cfg.debtSymbol} size={28} filterable={false} />}
-          collateral={
-            v.peakCollateral > 0 ? (
-              <StatValue>
-                <Prov info={ops.peakCollateralProv(v)}>
-                  <HighlightableValue
-                    type="peakCollateral"
-                    state="after"
-                    value={v.peakCollateral}
-                    variant="card"
-                    className="text-rb-500"
-                  >
-                    {formatPrice(v.peakCollateral)}
-                  </HighlightableValue>
-                </Prov>
-              </StatValue>
-            ) : (
-              <StatDash />
-            )
-          }
-          debt={
-            v.peakDebt > 0 ? (
-              <StatValue>
-                <Prov info={ops.peakDebtProv(v)}>
-                  <HighlightableValue
-                    type="peakDebt"
-                    state="after"
-                    value={v.peakDebt}
-                    variant="card"
-                    className="text-rb-500"
-                  >
-                    {compact ? formatApproximate(v.peakDebt) : formatPrice(v.peakDebt)}
-                  </HighlightableValue>
-                </Prov>
-              </StatValue>
-            ) : (
-              <StatDash />
-            )
-          }
+          collateralLabel={claimable ? "Claimable collateral" : undefined}
+          collateral={claimable ? claimableStat : peakCollateralStat}
+          collateralFootnote={claimable ? claimableFootnote : undefined}
+          // The debt the liquidation cleared is not the owner's to act on, so
+          // it stands down while the surplus is claimable.
+          debt={claimable ? undefined : peakDebtStat}
         />
         {footer}
       </PositionCardShell>

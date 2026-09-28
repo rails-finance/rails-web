@@ -26,6 +26,8 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { H } from "@/lib/shared/explainer-prose";
 import { stateOriginVia, stateOriginSummary } from "@/lib/shared/trove-state-origin";
 import { AmountText } from "@/components/shared/amount-text";
+import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/types";
+import { SurplusBullet } from "@/components/protocol/liquity-family/surplus-bullet";
 
 // V2 TroveManager per branch — the contract the chain values are read from.
 const TROVE_MANAGER: Record<string, string> = {
@@ -44,6 +46,8 @@ interface UseTroveExplanationItemsArgs {
    *  and branch-debt bullets read (the same live figure the compact
    *  RedemptionRunway's fill divides by). */
   queueDebtTotal?: number | null;
+  /** A liquidated trove's collateral surplus, read at the head. */
+  surplus?: LiquityTroveSurplus | null;
 }
 
 /** The trove pane's content: a subject-first, colon-terminated status lead
@@ -67,15 +71,16 @@ export function useTroveExplanationItems({
   debtInFront,
   trovesAhead,
   queueDebtTotal,
+  surplus,
 }: UseTroveExplanationItemsArgs): TroveExplanation {
   return useMemo(() => {
-    if (trove.status === "liquidated") return buildLiquidatedItems(trove);
+    if (trove.status === "liquidated") return buildLiquidatedItems(trove, surplus ?? null);
     if (trove.status === "closed") return buildClosedItems(trove);
     return buildOpenItems({ trove, liveState, prices, debtInFront, trovesAhead, queueDebtTotal });
-  }, [trove, liveState, prices, debtInFront, trovesAhead, queueDebtTotal]);
+  }, [trove, liveState, prices, debtInFront, trovesAhead, queueDebtTotal, surplus]);
 }
 
-function buildLiquidatedItems(trove: TroveSummary): TroveExplanation {
+function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus | null): TroveExplanation {
   const items: React.ReactNode[] = [];
   const liquidationThreshold = getLiquidationThreshold(trove.collateralType);
   const truncatedTroveId = trove.id.length > 10 ? `${trove.id.slice(0, 6)}...${trove.id.slice(-4)}` : trove.id;
@@ -137,6 +142,7 @@ function buildLiquidatedItems(trove: TroveSummary): TroveExplanation {
       </span>,
     );
   }
+  if (surplus) items.push(<SurplusBullet key="surplus" surplus={surplus} symbol={trove.collateralType} />);
   // No owner-linked NFT bullet without a lastOwner — the generic "ownership is
   // an NFT" rule is Layer-2 material, covered by the "?" modal's Trove NFT
   // concept (the 2026-07-25 Layer-2-in-Layer-1 audit).
