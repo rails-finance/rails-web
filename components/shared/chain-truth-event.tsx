@@ -103,9 +103,10 @@ export interface ChainTruthDelta {
    *  direction, so no +/− sign is shown. Mirrors the Liquity V2 redemption /
    *  liquidation header grammar. */
   label?: string;
-  /** Tint for the label. "caution" = the orange redemption/adverse tone
-   *  (color-grammar.md §5); default is the neutral rb-500. */
-  tone?: "caution";
+  /** Tint for the label. "caution" = the orange adverse tone (color-grammar.md
+   *  §5); "external" = the pink of another party's act on the position, a
+   *  Liquity-family redemption (§4b); default is the neutral rb-500. */
+  tone?: "caution" | "external";
   /** This label is a per-axis ACTION VERB (an open/adjust's Deposit/Borrow/…),
    *  so it follows Liquity V2's combined-header grammar: the verb word + token
    *  glyph stay visible at ≥sm and only the NUMERIC value hands off to the spine
@@ -137,6 +138,10 @@ export interface ChainTruthRowSpec {
    *  only as a mobile-only badge. Like `critical`, it also keeps the moved
    *  amounts visible at ≥sm — the warning spine carries no flanking numbers. */
   labelOnSpine?: boolean;
+  /** The mobile badge's tone for a `labelOnSpine` row: the spine pill's tone.
+   *  "external" = a Liquity-family redemption (pink, color-grammar.md §4b);
+   *  default caution. */
+  labelTone?: "caution" | "external";
   /** Third-party action: someone other than the position owner executed this
    *  event (the spine shows the pink external-party glyph). The chip renders
    *  "by 0x12…34" in the party pink beside the deltas, with the receipt
@@ -431,9 +436,11 @@ export function ChainTruthRow({
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 pt-4 pb-3">
       {spec.labelOnSpine ? (
-        // The spine's caution pill carries "Redemption" on desktop; here it's a
+        // The spine's pill carries "Redemption" on desktop; here it's a
         // mobile-only badge (the spine is hidden below sm), mirroring V2.
-        <span className="sm:hidden inline-block shrink-0 rounded-full bg-caution-500/15 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-caution-600 dark:text-caution-400">
+        <span
+          className={`sm:hidden inline-block shrink-0 rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide ${spec.labelTone === "external" ? "bg-pink-500/15 text-pink-600 dark:text-pink-400" : "bg-caution-500/15 text-caution-600 dark:text-caution-400"}`}
+        >
           {spec.label}
         </span>
       ) : spec.status === "open" && !spec.critical ? (
@@ -465,7 +472,12 @@ export function ChainTruthRow({
         const bare = Boolean(d.label) || Boolean(spec.custody);
         const magnitude = fmtHeaderMagnitude(Math.abs(d.value), d.symbol);
         const text = bare ? magnitude : `${d.value < 0 ? "−" : "+"}${magnitude.startsWith("<") ? " " : ""}${magnitude}`;
-        const toneClass = d.tone === "caution" ? "text-caution-600 dark:text-caution-400" : "text-rb-500";
+        const toneClass =
+          d.tone === "caution"
+            ? "text-caution-600 dark:text-caution-400"
+            : d.tone === "external"
+              ? "text-pink-500 dark:text-pink-400"
+              : "text-rb-500";
         // A token whose decimals did not load states no amount, at any width:
         // the spine draws no flank for it either.
         const unread = unreadOf(d.address, d.symbol);

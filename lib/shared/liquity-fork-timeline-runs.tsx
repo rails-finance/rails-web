@@ -12,7 +12,7 @@
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { RedemptionRunCard } from "@/components/shared/redemption-run-card";
-import { renderRunFolders, CAUTION_FOLDER_BADGE } from "@/lib/shared/run-folders";
+import { renderRunFolders, EXTERNAL_FOLDER_BADGE } from "@/lib/shared/run-folders";
 import { forkDebtMove } from "@/lib/shared/liquity-fork-ops";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
@@ -95,9 +95,9 @@ export function liquityForkTimelineRuns<E extends ForkRunEvent>(opts: {
 /** The redemption card's register (`RedemptionRunCard`), for a served folder. */
 const REDEMPTION_FOLDER: FolderRegisterEntry = {
   memberNoun: "redemption",
-  tone: "caution",
+  tone: "external",
   warningLabel: "Redemptions",
-  folderBadge: CAUTION_FOLDER_BADGE,
+  folderBadge: EXTERNAL_FOLDER_BADGE,
 };
 
 /** One member of an owner run, by the action it repeats. */

@@ -89,7 +89,8 @@ function getOperationStyle(operation: string, ctx?: LiquityContext): OperationSt
     case "applyPendingDebt":
       return { label: "Apply debt", color: "text-pink-700 dark:text-pink-400", bg: "bg-pink-500/20", badge: true };
     case "redeemCollateral":
-      return { label: "Redemption", color: "text-white", bg: "bg-caution-500", badge: true };
+      // Another party's act on the Trove: the §4b external-party pink.
+      return { label: "Redemption", color: "text-white", bg: "bg-pink-500", badge: true };
     case "adjustZombieTrove":
     case "adjustUnredeemableZombieTrove":
       return { label: "Redeemed", color: "text-foreground", bg: "bg-rb-200 dark:bg-rb-800", badge: true };
@@ -142,7 +143,10 @@ export interface LiquityEventHeaderProps {
 export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventNumber }: LiquityEventHeaderProps) {
   const style = getOperationStyle(ctx.operation, ctx);
   const { stateBefore, stateAfter, troveOperation } = ctx;
-  const { showTimestamps, showEventNumbers, showCollateralRatio } = useTimelineDisplay();
+  const { showTimestamps, showEventNumbers, showCollateralRatio, showTimelineValues } = useTimelineDisplay();
+  // A redemption's lozenges move onto the spine node's flanks in the phone
+  // spine view (SpineColumn's `warningLegs`); the opened card drops them.
+  const spineFlankHide = showTimelineValues ? "mspine:max-sm:hidden" : "";
   const { prefs } = usePreferences();
   const ratioMode = prefs.ratioMode;
   const crColor = useLiquityRatioColorClass();
@@ -351,7 +355,9 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
             // The dotted spine carries a "REDEMPTION" pill on desktop, so the
             // header badge is mobile-only here. The freed space lets the two
             // facts that matter read with labels — collateral cleared, debt
-            // reduced — mirroring the Aave liquidation header grammar.
+            // reduced — mirroring the Aave liquidation header grammar. The
+            // phone spine view draws both lozenges on the node's flanks, so
+            // its opened card drops them while timeline values are on.
             <>
               <span
                 className={`sm:hidden mspine:max-sm:hidden inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
@@ -359,8 +365,8 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                 {style.label}
               </span>
               {hasCollChange && (
-                <span className="inline-flex items-center gap-1.5 text-sm">
-                  <span className="text-caution-600 dark:text-caution-400">Cleared</span>
+                <span className={`inline-flex items-center gap-1.5 text-sm ${spineFlankHide}`}>
+                  <span className="text-pink-500 dark:text-pink-400">Cleared</span>
                   {wrapColl(
                     <span className="font-bold text-foreground">
                       <ExactTip
@@ -374,8 +380,8 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                 </span>
               )}
               {hasDebtChange && (
-                <span className="inline-flex items-center gap-1.5 text-sm">
-                  <span className="text-caution-600 dark:text-caution-400">Reduced</span>
+                <span className={`inline-flex items-center gap-1.5 text-sm ${spineFlankHide}`}>
+                  <span className="text-pink-500 dark:text-pink-400">Reduced</span>
                   {wrapDebt(
                     <span className="font-bold text-foreground">
                       <ExactTip

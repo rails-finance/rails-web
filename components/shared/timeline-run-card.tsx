@@ -89,11 +89,13 @@ export interface TimelineRunCardProps {
   /** Summed header pairs. Omit for a count-only row. */
   aggregates?: RunAggregate[];
   /** Verb color + pill tone. Match the protocol's own single-event card:
-   *  "caution" for routine adverse events (redemption), "danger" for terminal
+   *  "external" for a Liquity-family redemption (another party's act on the
+   *  position, color-grammar.md §4b), "caution" for other routine adverse
+   *  events (tick rebalances), "danger" for terminal
    *  ones (liquidation, auction settlement), "neutral" for runs that carry no
    *  adverse signal at all (custody transfers) — neutral rb verbs, and pair it
    *  with spineIcon="custody" so no warning triangle renders. */
-  tone?: "caution" | "danger" | "neutral";
+  tone?: "caution" | "danger" | "neutral" | "external";
   /** Spine glyph — "warning" for adverse runs, "external" for third-party
    *  actions that aren't a loss (keeper queue fills). */
   spineIcon?: SpineIcon;
@@ -171,17 +173,19 @@ export interface TimelineRunCardProps {
 const MEMBERS_SKELETON_HEIGHT = 200;
 
 /** Verb color per tone — the amount itself stays foreground-bold. */
-const VERB_CLASSES: Record<"caution" | "danger" | "neutral", string> = {
+const VERB_CLASSES: Record<"caution" | "danger" | "neutral" | "external", string> = {
   caution: "text-caution-600 dark:text-caution-400",
   danger: "text-red-600 dark:text-red-400",
   neutral: "text-rb-500",
+  external: "text-pink-500 dark:text-pink-400",
 };
 
 /** Mobile header pill per tone (the desktop pill lives on the spine). */
-const PILL_CLASSES: Record<"caution" | "danger" | "neutral", string> = {
+const PILL_CLASSES: Record<"caution" | "danger" | "neutral" | "external", string> = {
   caution: "bg-caution-500 text-white",
   danger: "bg-red-500 text-white",
   neutral: "bg-rb-500 text-white",
+  external: "bg-pink-500 text-white",
 };
 
 export function TimelineRunCard({
@@ -425,7 +429,7 @@ export function TimelineRunCard({
         iconColumn={
           <SpineColumn
             icon={folder ? "folder" : spineIcon}
-            warningTone={tone === "danger" ? "critical" : "caution"}
+            warningTone={tone === "danger" ? "critical" : tone === "external" ? "external" : "caution"}
             warningLabel={warningLabel}
             folderOpen={folder ? open : undefined}
             folderMark={folder ? folderBadge : undefined}

@@ -104,13 +104,48 @@ export function LiquityEventCard({
     : false;
   const isJoin = isDelegate ? ctx.operation === "setInterestBatchManager" : false;
 
+  const isRedemption = ctx.operation === "redeemCollateral";
+  // A redemption's amounts, worded as the header words them, for the phone
+  // spine view's flanks: collateral "Cleared", debt "Reduced". The same
+  // change receipts the header's figures trace.
+  const redemptionLegs = (() => {
+    if (!isRedemption) return undefined;
+    const coords = { txHash: event.txHash, blockNumber: event.blockNumber };
+    const collCp = collChangeProv(ctx, coords);
+    const debtCp = debtChangeProv(ctx, coords);
+    const debtSym = ctx.assetType ?? "BOLD";
+    return {
+      left:
+        collCp && Math.abs(collCp.change) >= 0.01
+          ? {
+              label: "Cleared",
+              value: Math.abs(collCp.change),
+              symbol: ctx.collateralType,
+              address: soleFlowAddress(event.flows, ctx.collateralType),
+              prov: collCp,
+            }
+          : undefined,
+      right:
+        debtCp && Math.abs(debtCp.change) >= 0.01
+          ? {
+              label: "Reduced",
+              value: Math.abs(debtCp.change),
+              symbol: debtSym,
+              address: soleFlowAddress(event.flows, debtSym),
+              prov: debtCp,
+            }
+          : undefined,
+    };
+  })();
+
   const iconSlot = isPassive ? (
+    // A redemption is another party's act on the Trove: the §4b external-party
+    // pink (color-grammar.md). Liquidation stays critical red.
     <SpineColumn
       icon="warning"
-      warningTone={ctx.operation === "liquidate" ? "critical" : "caution"}
-      warningLabel={
-        ctx.operation === "liquidate" ? "Liquidation" : ctx.operation === "redeemCollateral" ? "Redemption" : undefined
-      }
+      warningTone={ctx.operation === "liquidate" ? "critical" : isRedemption ? "external" : "caution"}
+      warningLabel={ctx.operation === "liquidate" ? "Liquidation" : isRedemption ? "Redemption" : undefined}
+      warningLegs={redemptionLegs}
       spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}

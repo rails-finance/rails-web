@@ -115,7 +115,7 @@ export function liquityV1EventSlots(ctx: LiquityV1Context, coords: LiquityV1Coor
   const coll = Number(ctx.collDelta) || 0;
   const debt = Number(ctx.debtDelta) || 0;
   // The header shows a BARE magnitude on opens, owner adjusts and redemptions
-  // (each axis or the caution pill carries the direction) and a SIGNED figure on
+  // (each axis or the redemption pill carries the direction) and a SIGNED figure on
   // liquidations and closes — so the delta echo must key its value the same way,
   // or it lands on no receipt.
   const labeled = ctx.eventType === "openTrove" || ctx.eventType === "adjustTrove" || ctx.eventType === "redemption";

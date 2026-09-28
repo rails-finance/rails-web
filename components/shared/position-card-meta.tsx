@@ -34,7 +34,7 @@ export interface PositionCardMetaProps {
   liquidationCount?: number | null;
   /** Boolean-only liquidation history, when no count exists (Morpho, MakerDAO). */
   liquidated?: boolean;
-  /** Liquity-only redemption count (caution-tier triangle). */
+  /** Liquity-only redemption count (triangle in the external-party pink). */
   redemptionCount?: number | null;
 }
 
@@ -113,7 +113,7 @@ export function PositionCardMeta({
           const label = `Redeemed against ${redemptionCount} time${redemptionCount === 1 ? "" : "s"}`;
           return (
             <span
-              className="inline-flex items-center text-caution-400 focus-ring header-badge-tip rounded-sm"
+              className="inline-flex items-center text-pink-500 dark:text-pink-400 focus-ring header-badge-tip rounded-sm"
               title={label}
               data-tooltip={label}
               aria-label={label}

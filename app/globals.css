@@ -182,6 +182,10 @@
   --text-link: var(--color-blue-500);
   --text-external: var(--color-pink-500);
   --text-external-hover: var(--color-pink-400);
+  /* An external party's act on the position drawn on the spine — a redemption
+     (the warning triangle and its dotted line). pink-500 here, pink-400 in dark,
+     the §4b party text pair. See color-grammar.md §4b. */
+  --external-party: var(--color-pink-500);
   /* Marketing accent — one global hue for decorative/brand emphasis on
      marketing pages. Tuned to match the functional "positive" green (green-500,
      #22c55e — the P&L-positive / Open / check hue), but deliberately kept as its
@@ -281,6 +285,8 @@
      rule so the panel reads against the dark canvas. */
   --notice-caution-bg: color-mix(in srgb, var(--color-caution-900) 20%, transparent);
   --notice-caution-border: var(--color-caution-500);
+
+  --external-party: var(--color-pink-400);
 }
 
 @theme inline {

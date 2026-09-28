@@ -116,7 +116,7 @@ export function ctrlWaking(hydrated: boolean): Record<string, string> {
  * Colour: teal — the brand's dedicated "utility action / in-place interaction"
  * hue. Its remaining uses are the New pill, active nav, CTRL_ON_ACCENT, and the
  * activity heatmap. Deliberately NOT blue (navigation), pink (external/party),
- * green (marketing brand + positive sign), orange (redemption) or red
+ * green (marketing brand + positive sign), orange (caution) or red
  * (negative/liquidation), so per the one-meaning-per-colour rule teal always
  * reads as "utility/in-place interaction", never a status or a nav target.
  * (amber is mid-review — see color-grammar.md §7.)

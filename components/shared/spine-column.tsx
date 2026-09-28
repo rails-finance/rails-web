@@ -17,7 +17,7 @@ import { spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
 
 /** Semantic icon that replaces token icons when the event isn't about token flow */
 export type SpineIcon =
-  | "warning" // Passive loss: liquidation, redemption (caution/critical tone via warningTone)
+  | "warning" // Passive loss: liquidation, redemption (external/caution/critical tone via warningTone)
   | "rate-change" // Interest rate / parameter change (% with up/down arrow)
   | "delegate" // Delegation change (users icon with +/- badge)
   | "external" // Third-party action with nothing to draw (pink users icon) — the FALLBACK for `externalParty`; cards pass the flag, not this
@@ -38,18 +38,23 @@ export type SpineIcon =
 export type SpineVariant = "solid" | "dotted";
 
 /** Spine color tint. The spine line itself carries NO decorative/subsystem
- *  tint — it stays neutral. The only tints are the two §5 adverse tones, which
- *  are the warningTone values (caution = redemption + routine adverse, critical
- *  = liquidation). External-party events (delegation) signal via the pink glyph
- *  badge (color-grammar.md §4b), not the spine line. (The former blue/green/
+ *  tint — it stays neutral. The only tints are the warningTone values: the two
+ *  §5 adverse tones (caution = routine adverse, critical = liquidation) and
+ *  the §4b external-party pink for a Liquity-family redemption, another
+ *  party's act on the position. Delegation signals via the pink glyph badge
+ *  (color-grammar.md §4b), not the spine line. (The former blue/green/
  *  violet/purple subsystem tints were retired — color variation doesn't belong
  *  on the spine.) */
-export type SpineColor = "default" | "caution" | "critical";
+export type SpineColor = "default" | "caution" | "critical" | "external";
+
+/** The warning triangle's tones. */
+export type WarningTone = "caution" | "critical" | "external";
 
 const SPINE_COLORS: Record<SpineColor, string> = {
   default: "rgb(101 115 140)", // rb-500
-  caution: "var(--caution)", // redemption + all caution (color-grammar.md §5)
+  caution: "var(--caution)", // routine adverse (color-grammar.md §5)
   critical: "rgb(239 68 68)", // red-500 — liquidation + critical
+  external: "var(--external-party)", // pink-500 / dark pink-400 — a Liquity-family redemption (color-grammar.md §4b)
 };
 
 /** Pulsing dot color matching spine tint */
@@ -57,12 +62,22 @@ const DOT_COLORS: Record<SpineColor, string> = {
   default: "bg-green-400",
   caution: "bg-caution-400",
   critical: "bg-red-400",
+  external: "bg-pink-400",
 };
 
 /** Pill classes for the warning label, keyed by warning tone */
-const WARNING_PILL_CLASSES: Record<"caution" | "critical", string> = {
+const WARNING_PILL_CLASSES: Record<WarningTone, string> = {
   caution: "bg-caution-500/15 text-caution-600 dark:text-caution-400",
   critical: "bg-red-500/15 text-red-600 dark:text-red-400",
+  external: "bg-pink-500/15 text-pink-600 dark:text-pink-400",
+};
+
+/** Label classes for a warning leg's word ("Cleared"), keyed by warning tone —
+ *  the same pair the event header's labels use. */
+const WARNING_LEG_LABEL_CLASSES: Record<WarningTone, string> = {
+  caution: "text-caution-600 dark:text-caution-400",
+  critical: "text-rb-500",
+  external: "text-pink-500 dark:text-pink-400",
 };
 
 // ── Token row descriptor ────────────────────────────────────────────────────
@@ -125,6 +140,17 @@ export type SpineSwapAxis = "supply" | "debt" | "mixed";
 
 // ── Props ───────────────────────────────────────────────────────────────────
 
+/** One flank of a warning node in the phone spine view: the header's word, the
+ *  magnitude and the token ("Cleared 0.631 ◆"). */
+export interface SpineWarningLeg {
+  label: string;
+  value: number;
+  symbol: string;
+  address?: string;
+  /** Echo the figure into the receipt the header's figure traces. */
+  prov?: SpineValProv;
+}
+
 export interface SpineColumnProps {
   /** icon="swap" only — the legs, drawn beside the node while Timeline values
    *  are on (the header keeps them otherwise). */
@@ -145,16 +171,21 @@ export interface SpineColumnProps {
    *  explicit check/cross IS that event's meaning, and the dotted spine still
    *  carries the external signal. */
   externalParty?: boolean;
-  /** Tone for the "warning" triangle — "caution" (orange) for redemption and
-   *  every routine adverse event, "critical" (red) for terminal events
-   *  (liquidation). The dotted spine + lead-in dot inherit this tone too.
-   *  Defaults to "caution". See color-grammar.md §5. */
-  warningTone?: "caution" | "critical";
+  /** Tone for the "warning" triangle — "external" (pink) for a Liquity-family
+   *  redemption, another party's act on the position (color-grammar.md §4b);
+   *  "caution" (orange) for every routine adverse event; "critical" (red) for
+   *  terminal events (liquidation). The dotted spine + lead-in dot inherit this
+   *  tone too. Defaults to "caution". See color-grammar.md §5. */
+  warningTone?: WarningTone;
   /** Optional short label rendered in a tinted pill beneath the warning
    *  triangle (e.g. "Redemption", "Liquidation"). Used with icon="warning",
    *  and with icon="folder" for a one-kind folder that keeps its kind's pill
    *  (a liquidations-only chunk). */
   warningLabel?: string;
+  /** icon="warning" only, drawn in the phone spine view: the amounts the
+   *  event moved, worded as the desktop header words them ("Cleared" left,
+   *  "Reduced" right). The opened card's header then drops them. */
+  warningLegs?: { left?: SpineWarningLeg; right?: SpineWarningLeg };
   /** icon="folder" only — draw the open-folder glyph (the chunk is expanded). */
   folderOpen?: boolean;
   /** icon="folder" only — small glyph on the folder's corner: a chunk whose
@@ -727,6 +758,53 @@ function spokenLegs(rows: SpineTokenRow[], unreadOf: ReturnType<typeof useUnread
   return legs.length ? legs.join(", ") : null;
 }
 
+/** The spine view's spoken legs for a warning node: "cleared 0.631 WETH,
+ *  reduced 1,177 BOLD". */
+function spokenWarningLegs(
+  legs: { left?: SpineWarningLeg; right?: SpineWarningLeg },
+  unreadOf: ReturnType<typeof useUnreadTokenOf>,
+): string | null {
+  const said = [legs.left, legs.right].flatMap((l) =>
+    l && !unreadOf(l.address, l.symbol) && isFinite(l.value) && l.value !== 0
+      ? [`${l.label.toLowerCase()} ${spokenAmount(l.value)} ${l.symbol}`]
+      : [],
+  );
+  return said.length ? said.join(", ") : null;
+}
+
+/** A warning node's flank in the phone spine view — the header's lozenge
+ *  ("Cleared 0.631 ◆") beside the triangle. */
+function WarningLegCell({
+  leg,
+  side,
+  tone,
+}: {
+  leg: SpineWarningLeg | undefined;
+  side: "left" | "right";
+  tone: WarningTone;
+}) {
+  const unreadOf = useUnreadTokenOf();
+  if (!leg || !isFinite(leg.value) || leg.value === 0 || unreadOf(leg.address, leg.symbol)) return <span />;
+  const txt = fmtSpine(Math.abs(leg.value));
+  return (
+    <span
+      className={`inline-flex items-center gap-1 whitespace-nowrap text-sm ${side === "left" ? "justify-self-end pr-3" : "justify-self-start pl-3"}`}
+    >
+      <span className={WARNING_LEG_LABEL_CLASSES[tone]}>{leg.label}</span>
+      <span className="font-semibold text-foreground">
+        {leg.prov ? (
+          <Prov echo info={leg.prov.info} value={leg.prov.value} symbol={leg.prov.symbol}>
+            {txt}
+          </Prov>
+        ) : (
+          txt
+        )}
+      </span>
+      <TokenChipIcon symbol={leg.symbol} address={leg.address} size={16} filterable={false} />
+    </span>
+  );
+}
+
 // ── SpineColumn ─────────────────────────────────────────────────────────────
 
 export function SpineColumn({
@@ -737,6 +815,7 @@ export function SpineColumn({
   externalParty,
   warningTone = "caution",
   warningLabel,
+  warningLegs,
   folderOpen,
   folderMark,
   folderCount,
@@ -760,7 +839,13 @@ export function SpineColumn({
   // and the card's segment button is the only control: the chips drop their
   // filter, and the card stops the pointer reaching the flank values.
   const spineRow = useSpineRow();
-  const legs = spineRow && !icon && tokens?.length ? spokenLegs(tokens, unreadOf) : null;
+  const legs = !spineRow
+    ? null
+    : !icon && tokens?.length
+      ? spokenLegs(tokens, unreadOf)
+      : icon === "warning" && warningLegs
+        ? spokenWarningLegs(warningLegs, unreadOf)
+        : null;
   const setLegs = spineRow?.setLegs;
   useEffect(() => {
     setLegs?.(legs);
@@ -790,6 +875,9 @@ export function SpineColumn({
   // still rides the provenance trace). The ≥sm / <sm hand-off to the card header
   // is owned by the layout (the `hidden sm:flex` spine column), not this flag.
   const spineValues = showTimelineValues;
+  // A warning node draws its amounts on the flanks in the phone spine view
+  // only; on desktop the header beside the spine carries them.
+  const showWarningLegs = !!spineRow && spineValues && !!warningLegs;
 
   // For warning events the spine + lead-in dot inherit the warning tone so the
   // whole dotted segment reads as caution (orange) / critical (red, liquidation).
@@ -858,13 +946,19 @@ export function SpineColumn({
                 className="grid grid-rows-1 items-center justify-items-center"
                 style={{ gridTemplateColumns: scale.gridCols }}
               >
-                <span />
+                {showWarningLegs ? <WarningLegCell leg={warningLegs.left} side="left" tone={warningTone} /> : <span />}
                 <span />
                 <WarningIcon size={scale.tokenSize} color={SPINE_COLORS[warningTone]} />
                 <span />
-                <span />
+                {showWarningLegs ? (
+                  <WarningLegCell leg={warningLegs.right} side="right" tone={warningTone} />
+                ) : (
+                  <span />
+                )}
               </div>
-              {warningLabel && (
+              {/* The phone spine view's caption names the kind below the node,
+                  so the pill stays on desktop only. */}
+              {warningLabel && !spineRow && (
                 <span
                   className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide leading-none whitespace-nowrap ${WARNING_PILL_CLASSES[warningTone]}`}
                 >
