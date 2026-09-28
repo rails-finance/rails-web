@@ -728,7 +728,9 @@ export function AlchemistPositionView({
               <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 <span className={`${OVERLAY_HEADING} text-rb-500`}>Now</span>
                 {live ? (
-                  <span className="text-[11px] tabular-nums text-rb-500">
+                  // data-prov-exempt: the block the reading was taken at, a
+                  // coordinate linked to the explorer, not a figure.
+                  <span className="text-[11px] tabular-nums text-rb-500" data-prov-exempt="">
                     one reading at block{" "}
                     <a
                       href={explorerUrl(chainId as ChainId, "block", live.asOfBlock)}

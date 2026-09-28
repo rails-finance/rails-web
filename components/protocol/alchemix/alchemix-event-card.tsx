@@ -37,7 +37,8 @@ import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-colum
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
-import { AlchemixEventHeader, ALCHEMIX_CAUTION } from "./alchemix-event-header";
+import { AlchemixEventHeader, ALCHEMIX_CAUTION, alchemixHeaderSpec } from "./alchemix-event-header";
+import { chainTruthDeltaValue, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
 import { AlchemixEventDetail } from "./alchemix-event-detail";
 import {
   AlchemixEventExplainer,
@@ -166,7 +167,25 @@ export function AlchemixEventCard({
   const cautioned = closed ? undefined : legs.find((l) => ALCHEMIX_CAUTION.has(l.context.data.eventType));
   const custodyOnly = legs.every((l) => l.context.data.eventType === "transfer");
 
-  const tokens = adverse || cautioned || closed ? [] : legs.flatMap((leg) => legTokens(leg, mytSymbol));
+  // Each flank echoes the header figure it redraws: the delta built from the
+  // same leg's `amount`, with the value string the header registers, so the
+  // flank joins that receipt.
+  const header = alchemixHeaderSpec(legs, sibs, mytSymbol, coordsFor, before);
+  const echoed = new Set<ChainTruthDelta>();
+  const withEcho = (leg: AlchemistEvent, row: SpineTokenRow): SpineTokenRow => {
+    const raw = leg.context.data.raw.amount;
+    const d = header.deltas.find(
+      (x) => !echoed.has(x) && x.prov && x.symbol === row.symbol && x.prov.scaling?.raw === raw,
+    );
+    if (!d?.prov) return row;
+    echoed.add(d);
+    const bare = Boolean(d.label) || Boolean(header.custody);
+    return { ...row, prov: { info: d.prov, value: chainTruthDeltaValue(d.value, bare), symbol: d.symbol } };
+  };
+  const tokens =
+    adverse || cautioned || closed
+      ? []
+      : legs.flatMap((leg) => legTokens(leg, mytSymbol).map((row) => withEcho(leg, row)));
 
   const iconSlot = custodyOnly ? (
     <SpineColumn

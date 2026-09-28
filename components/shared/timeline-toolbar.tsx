@@ -104,7 +104,11 @@ export function TimelineActivityHeader({
           <span className="text-foreground">
             {closed ? "Opened" : "Active since"} {formatDate(first)}
           </span>
-          <span className={PILL_META}>{formatDuration(first, closed ? last : now)}</span>
+          {/* data-prov-exempt: a span between two event timestamps ("40 days"),
+              timeline chrome the coverage tripwire reads as a figure. */}
+          <span className={PILL_META} data-prov-exempt="">
+            {formatDuration(first, closed ? last : now)}
+          </span>
         </>
       )}
       <span className={PILL_META}>
