@@ -141,10 +141,10 @@ export function DetailTopRow({
       <div className="mb-2.5">
         <RailHeader session={session} venue="position" />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2">
+        <div className="flex min-w-0 items-center gap-1 sm:gap-2">
           <DetailBackButton session={session} wallet={wallet} compact />
-          {showStamp && !closed && <RecencyStamp />}
+          {showStamp && !closed && <RecencyStamp compact />}
           {!closed ? (
             <LatestPrices assets={assets} reason={priceReason} />
           ) : (

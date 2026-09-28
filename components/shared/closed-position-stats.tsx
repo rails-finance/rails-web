@@ -92,7 +92,9 @@ export function ClosedPositionStats({
   return (
     <div>
       <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
-        <span className="flex items-center gap-2">
+        {/* Wraps between pieces: at 390px the owner address used to break in
+            two beside a squeezed pair label. */}
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
           <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>CLOSED</span>
           {leadingIdentity}
         </span>

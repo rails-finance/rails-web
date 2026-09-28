@@ -28,7 +28,7 @@ export function MorphoRiskSlot({ chain }: { chain: MorphoChainPositionResponse }
       <MorphoBorrowCapacityView chain={chain} />
       <MorphoOraclePriceFigure chain={chain} />
       <RiskMeter>
-        <MorphoRunway compact healthFactor={chain.healthFactor} />
+        <MorphoRunway compact healthFactor={chain.healthFactor} collateralSymbol={chain.collateralSymbol} />
       </RiskMeter>
     </RiskFooterStrip>
   );

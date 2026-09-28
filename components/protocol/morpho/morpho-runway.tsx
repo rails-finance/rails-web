@@ -22,7 +22,17 @@ import { PriceRunway } from "@/components/shared/price-runway";
  * caption — for riding the position card's heading-button row. The full
  * section form remains for hosts that give the runway its own row.
  */
-export function MorphoRunway({ healthFactor, compact }: { healthFactor: number | null; compact?: boolean }) {
+export function MorphoRunway({
+  healthFactor,
+  compact,
+  collateralSymbol,
+}: {
+  healthFactor: number | null;
+  compact?: boolean;
+  /** The market's one collateral: with a single collateral priced in the loan
+   *  token, the runway's figure is how far that price can fall. */
+  collateralSymbol?: string;
+}) {
   if (healthFactor == null || healthFactor <= 0) return null;
 
   const bar = (
@@ -30,6 +40,7 @@ export function MorphoRunway({ healthFactor, compact }: { healthFactor: number |
       compact={compact}
       currentPrice={healthFactor}
       liqPrice={1}
+      asset={collateralSymbol}
       liqCaption="liquidation · HF 1.0"
       underwaterCaption="below HF 1.0"
     />

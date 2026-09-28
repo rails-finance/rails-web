@@ -40,6 +40,11 @@ export interface LiquidationForensicsLeg {
   usdProv: Provenance;
   /** The leg's asset, when it is a single asset. */
   symbol?: string;
+  /** The leg's amount in its own token ("0.1947 ETH"), for a leg whose value
+   *  is in another unit. The card then leads with it and gives the value after
+   *  an ≈, so the token figure on the closed card and the valued one here read
+   *  as one amount. */
+  amount?: string;
 }
 
 /** One at-block price the figures above derive from — the footnote pills. */
@@ -171,7 +176,14 @@ function LegStat({
     <StatCard label={label}>
       <StateTransition>
         <Prov info={leg.usdProv} value={formatValue(leg.usd)} symbol={leg.symbol}>
-          <span className="text-sm font-semibold tabular-nums">{formatValue(leg.usd)}</span>
+          {leg.amount ? (
+            <span className="text-sm tabular-nums">
+              <span className="font-semibold">{leg.amount}</span>{" "}
+              <span className="text-rb-500">≈ {formatValue(leg.usd)}</span>
+            </span>
+          ) : (
+            <span className="text-sm font-semibold tabular-nums">{formatValue(leg.usd)}</span>
+          )}
         </Prov>
       </StateTransition>
     </StatCard>

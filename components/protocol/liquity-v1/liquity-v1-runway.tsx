@@ -42,7 +42,7 @@ export function LiquityV1Runway({
   if (slot) {
     return (
       <div className="w-full">
-        <PriceRunway compact currentPrice={chain.price} liqPrice={liqPrice} />
+        <PriceRunway compact currentPrice={chain.price} liqPrice={liqPrice} asset="ETH" />
         <div className="mt-1.5 flex items-baseline justify-end gap-1 text-[11px] tabular-nums text-rb-500">
           <span>
             liquidation{" "}
@@ -55,13 +55,14 @@ export function LiquityV1Runway({
   }
 
   if (compact) {
-    return <PriceRunway compact currentPrice={chain.price} liqPrice={liqPrice} />;
+    return <PriceRunway compact currentPrice={chain.price} liqPrice={liqPrice} asset="ETH" />;
   }
 
   return (
     <div className="mt-2">
       <div className="mb-3 text-[11px] uppercase tracking-wider text-rb-500">Liquidation runway</div>
       <PriceRunway
+        asset="ETH"
         currentPrice={chain.price}
         liqPrice={liqPrice}
         liqCaption={

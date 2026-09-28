@@ -17,7 +17,7 @@
 //     non-modal sheet Apple and Material both reserve for filters that apply
 //     as you go, as opposed to the Apply-button modal a commerce filter uses.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { OVERLAY_HEADING, RESET_LINK } from "@/lib/shared/ui-grammar";
 
@@ -72,18 +72,24 @@ export function MobileSheetFilterHeader({
 /** Slide-up bottom sheet: fixed to the viewport bottom, rounded top corners,
  *  a backdrop that closes on tap. Mounted only while the caller keeps it
  *  rendered — the two-step mount-then-transition below is what makes the
- *  slide actually animate rather than snapping into place: the panel first
- *  paints off-screen (translate-y-full), then a rAF flips `visible` so the
- *  transform transition has a starting frame to run from. */
+ *  slide animate rather than snap into place: the panel first lays out
+ *  off-screen (translate-y-full), then `visible` flips so the transform
+ *  transition has a starting style to run from. */
 export function MobileSheet({ label, onClose, mode = "modal", header, children }: MobileSheetProps) {
   const [visible, setVisible] = useState(false);
   const closingRef = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const live = mode === "live";
 
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setVisible(true));
-    return () => cancelAnimationFrame(id);
+  // Reading the panel's box makes the browser settle its off-screen starting
+  // style before `visible` flips, so the transition has a frame to run from
+  // without waiting on requestAnimationFrame. A page the browser counts as
+  // hidden (a background tab, an automated browser) never runs rAF, and the
+  // sheet used to stay parked below the viewport there: a newcomer review
+  // (2026-09-28) pressed Display twice and saw nothing open.
+  useLayoutEffect(() => {
+    panelRef.current?.getBoundingClientRect();
+    setVisible(true);
   }, []);
 
   // Closing plays the same transition in reverse, then unmounts — a bare

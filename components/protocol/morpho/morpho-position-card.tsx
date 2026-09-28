@@ -177,7 +177,7 @@ export function MorphoPositionCard({
   const positionDeployment: MorphoPositionDeployment = session === "morpho-base" ? "morpho-base" : "morpho";
 
   const leadingIdentity = (
-    <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
+    <span className="contents text-xs font-semibold text-rb-500">
       <WalletPill
         wallet={v.owner}
         ensName={null}
