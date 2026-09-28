@@ -82,7 +82,9 @@ const check = (name, cond, detail = "") => {
 async function api(path, tries = 4) {
   let last;
   for (let i = 0; i < tries; i += 1) {
-    const res = await hostFetch(`${BASE}${path}`).catch((e) => {
+    // AbortSignal.timeout: a stalled connection otherwise hangs `fetch`
+    // forever — Node sets no default socket timeout of its own.
+    const res = await hostFetch(`${BASE}${path}`, { signal: AbortSignal.timeout(20_000) }).catch((e) => {
       last = e;
       return null;
     });
@@ -91,6 +93,53 @@ async function api(path, tries = 4) {
     await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
   }
   throw last ?? new Error(`failed ${path}`);
+}
+
+const data0 = (e) => e.context?.data ?? {};
+
+/** A wallet with an unpriced ordinary row — a block the historic backfill
+ *  walk has not reached. As it advances, an older fixture eventually gets
+ *  fully priced; rather than pin a wallet that goes stale each time the walk
+ *  moves, one is discovered from recent accounts here. Several candidates are
+ *  gathered and the OLDEST unpriced specimen wins: the newest unpriced block
+ *  on a wallet is the forward tick's own frontier and can price itself
+ *  mid-run; an old one sits behind the slower historic walk and stays
+ *  token-only for the run's length. */
+async function discoverUnpriced() {
+  const candidates = [];
+  for (const offset of [0, 100, 200, 300, 400]) {
+    let listing;
+    try {
+      listing = await api(`/api/${EXPLORER}/positions?limit=100&offset=${offset}`);
+    } catch (e) {
+      console.log(`  (positions page @${offset} unavailable: ${e.message})`);
+      continue;
+    }
+    // `/api/<explorer>/positions` answers `{ rows }` on the Aave family and
+    // `{ success, data }` on Moonwell — read either.
+    const rows = listing.rows ?? listing.data ?? [];
+    if (!rows.length) break;
+    console.log(`      scanning ${rows.length} wallets @${offset} for an unpriced ordinary row…`);
+    for (const row of rows) {
+      let tl;
+      try {
+        tl = await api(X.timeline(row.wallet));
+      } catch {
+        continue;
+      }
+      const events = tl.events ?? [];
+      if (!events.length || events.length > 300 || tl.coverage?.source !== "index") continue;
+      const oldest = events
+        .map((e, i) => ({ n: i + 1, e, d: data0(e) }))
+        .find(({ d }) => d.eventType !== "liquidation" && d.priceAtBlock == null);
+      if (oldest) candidates.push({ wallet: row.wallet, events, block: oldest.e.blockNumber });
+      if (candidates.length >= 3) break;
+    }
+    if (candidates.length >= 3) break;
+  }
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => a.block - b.block);
+  return candidates[0];
 }
 
 /** Parse the first number in a pill's text ("MAMO $0.0479 · oracle at block"). */
@@ -206,7 +255,25 @@ const pricedLiq = newestFirst.find(
     d.seizedUnderlyingAtBlock != null &&
     d.incentiveAtBlock != null,
 );
-const unpriced = newestFirst.find(({ d }) => d.eventType !== "liquidation" && d.priceAtBlock == null);
+// Oldest first: the newest unpriced block is the forward tick's own frontier
+// and can price itself mid-run (discoverUnpriced's comment); the oldest sits
+// behind the slower historic walk and stays stable.
+let unpriced = numbered.find(({ d }) => d.eventType !== "liquidation" && d.priceAtBlock == null);
+let unpricedWallet = WALLET;
+let unpricedEvents = events;
+if (!unpriced && !X.complete) {
+  const found = await discoverUnpriced();
+  if (found) {
+    unpricedWallet = found.wallet;
+    unpricedEvents = found.events;
+    unpriced = found.events
+      .map((e, i) => ({ n: i + 1, e, d: data(e) }))
+      .find(({ d }) => d.eventType !== "liquidation" && d.priceAtBlock == null);
+    console.log(
+      `      unpriced ordinary row discovered on ${unpricedWallet} (${found.events.length} events, block ${unpriced?.e.blockNumber})`,
+    );
+  }
+}
 check(
   "API: a priced ordinary row exists",
   !!pricedOrdinary,
@@ -231,29 +298,38 @@ else console.log("      NO EVIDENCE for the token-only arm on this wallet (every
 
 const browser = await chromium.launch();
 const pageErrors = [];
-const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
-page.on("pageerror", (e) => pageErrors.push(String(e)));
-// `?folders=0` PINNED. The badges below are read card by card, so the page must
-// be flat. The default page is answered in folders (leg C of 0019), and since
-// rails-ops decision 0021 a served page neither offers "Collapse like events"
-// nor opens its folders when the flag is off. The flat answer groups in the
-// browser, so the toggle below still expands its runs.
-await page.goto(`${BASE}${X.page(WALLET)}?folders=0`, { waitUntil: "domcontentloaded", timeout: 240000 });
-await page.getByText(COUNT_RE).first().waitFor({ state: "visible", timeout: 120000 });
-await setDisplayFlag(page, "Event Numbers", true);
-// A collapsed ×N run renders no individual badge — the MAMO cascade is
-// hundreds of like liquidations in a row, so runs stay expanded here.
-await setDisplayFlag(page, "Collapse like events", false);
-await showAll(page, 25);
-// Chronological numbering runs over the WHOLE history (an elided older
-// window offsets it), so the DOM number of API index i is offset + i + 1,
-// with the offset read off the newest badge rather than assumed.
-const badgeNumbers = await page
-  .locator('[aria-label^="Event "]')
-  .evaluateAll((els) => els.map((e) => Number((e.getAttribute("aria-label") ?? "").slice(6))).filter(Number.isFinite));
-const offset = badgeNumbers.length ? Math.max(...badgeNumbers) - events.length : 0;
-console.log(`      ${badgeNumbers.length} numbered cards in the DOM; numbering offset ${offset}`);
-const domN = (n) => offset + n;
+
+/** Open a wallet's page with numbers on and runs expanded; returns the page
+ *  and the API-index → DOM-number map. */
+async function openWalletPage(w, evts) {
+  const p = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
+  p.on("pageerror", (e) => pageErrors.push(String(e)));
+  // `?folders=0` PINNED. The badges below are read card by card, so the page must
+  // be flat. The default page is answered in folders (leg C of 0019), and since
+  // rails-ops decision 0021 a served page neither offers "Collapse like events"
+  // nor opens its folders when the flag is off. The flat answer groups in the
+  // browser, so the toggle below still expands its runs.
+  await p.goto(`${BASE}${X.page(w)}?folders=0`, { waitUntil: "domcontentloaded", timeout: 240000 });
+  await p.getByText(COUNT_RE).first().waitFor({ state: "visible", timeout: 120000 });
+  await setDisplayFlag(p, "Event Numbers", true);
+  // A collapsed ×N run renders no individual badge — the MAMO cascade is
+  // hundreds of like liquidations in a row, so runs stay expanded here.
+  await setDisplayFlag(p, "Collapse like events", false);
+  await showAll(p, 25);
+  // Chronological numbering runs over the WHOLE history (an elided older
+  // window offsets it), so the DOM number of API index i is offset + i + 1,
+  // with the offset read off the newest badge rather than assumed.
+  const badgeNumbers = await p
+    .locator('[aria-label^="Event "]')
+    .evaluateAll((els) =>
+      els.map((e) => Number((e.getAttribute("aria-label") ?? "").slice(6))).filter(Number.isFinite),
+    );
+  const off = badgeNumbers.length ? Math.max(...badgeNumbers) - evts.length : 0;
+  console.log(`      ${badgeNumbers.length} numbered cards in the DOM; numbering offset ${off}`);
+  return { page: p, domN: (n) => off + n };
+}
+
+const { page, domN } = await openWalletPage(WALLET, events);
 
 if (pricedOrdinary) {
   const { n, d } = pricedOrdinary;
@@ -342,12 +418,14 @@ if (X.complete) {
 }
 if (unpriced) {
   const { n } = unpriced;
-  await expandCard(page, domN(n));
-  const card = cardFor(page, domN(n));
+  const own = unpricedWallet === WALLET ? { page, domN } : await openWalletPage(unpricedWallet, unpricedEvents);
+  await expandCard(own.page, own.domN(n));
+  const card = cardFor(own.page, own.domN(n));
   check(
     `unpriced #${n}: renders token-only (no "oracle at block" pill)`,
     (await card.getByText(/oracle at block/).count()) === 0,
   );
+  if (own.page !== page) await own.page.close();
 } else if (!X.complete) {
   check(
     "token-only arm: NO EVIDENCE — no unpriced ordinary row on this wallet",

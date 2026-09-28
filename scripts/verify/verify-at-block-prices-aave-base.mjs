@@ -63,7 +63,9 @@ const check = (name, cond, detail = "") => {
 async function api(path, tries = 4) {
   let last;
   for (let i = 0; i < tries; i += 1) {
-    const res = await hostFetch(`${BASE}${path}`).catch((e) => {
+    // AbortSignal.timeout: a stalled connection otherwise hangs `fetch`
+    // forever — Node sets no default socket timeout of its own.
+    const res = await hostFetch(`${BASE}${path}`, { signal: AbortSignal.timeout(20_000) }).catch((e) => {
       last = e;
       return null;
     });
@@ -144,6 +146,18 @@ async function expandCard(page, n) {
   await page.waitForTimeout(250);
 }
 
+/** The forensics grid's own StatCard for one leg ("Seized, at fire" /
+ *  "Cleared, at fire") — scopes a "$" search to that leg alone. Needed
+ *  because the snapshot grid above the forensics grid carries its own
+ *  after-balance USD chip (lib/aave-v3/event-provenance.ts's
+ *  snapshotUsdProv), so an unscoped "$" search on the whole card finds that
+ *  chip first, not the leg. */
+function legStatFor(card, label) {
+  return card
+    .getByText(label, { exact: true })
+    .locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " rounded-xl ")][1]');
+}
+
 async function openReceiptFor(page, card, valueText) {
   // The toggle rides in the Tools menu on a position view and in the dock on
   // a Market-type page; armInspector reads either, and is a no-op once armed
@@ -196,12 +210,66 @@ async function discoverPricedOrdinary(x) {
   return null;
 }
 
+/** A wallet with an unpriced ordinary row — a block the historic backfill
+ *  walk has not reached. As it advances, an older fixture eventually gets
+ *  fully priced (the fixture wallets below did, once item 87's Base RPC
+ *  misdirect was fixed); rather than pin a wallet that goes stale each time
+ *  the walk moves, one is discovered from recent accounts here, the same way
+ *  discoverPricedOrdinary finds its. Several candidates are gathered and the
+ *  OLDEST unpriced specimen wins: the newest unpriced block on a wallet is
+ *  the forward tick's own frontier — it prices "within minutes"
+ *  (discoverPricedOrdinary's comment) and can flip mid-run; an old one sits
+ *  behind the slower historic walk and stays token-only for the run's length. */
+async function discoverUnpriced(x) {
+  const candidates = [];
+  for (const offset of [0, 100, 200, 300, 400]) {
+    let listing;
+    try {
+      listing = await api(`/api/${x.key}/positions?limit=100&offset=${offset}`);
+    } catch (e) {
+      console.log(`  (positions page @${offset} unavailable: ${e.message})`);
+      continue;
+    }
+    const rows = listing.rows ?? listing.data ?? [];
+    if (!rows.length) break;
+    console.log(`      scanning ${rows.length} wallets @${offset} for an unpriced ordinary row…`);
+    for (const row of rows) {
+      let tl;
+      try {
+        tl = await api(x.timeline(row.wallet));
+      } catch {
+        continue;
+      }
+      const events = tl.events ?? [];
+      // Sweep-sourced coverage carries no prices at all (every event reads
+      // unpriced), which is a different state from "the walk hasn't reached
+      // this block yet" — restrict to the index, as discoverPricedOrdinary does.
+      if (!events.length || events.length > 300 || tl.coverage?.source !== "index") continue;
+      // Oldest first: `events` is chronological, so the first match is this
+      // wallet's own oldest unpriced ordinary row.
+      const oldest = events
+        .map((e, i) => ({ n: i + 1, e, d: data(e) }))
+        .find(({ d }) => d.eventType !== "liquidation" && d.price == null);
+      if (oldest) candidates.push({ wallet: row.wallet, events, block: oldest.e.blockNumber });
+      if (candidates.length >= 3) break;
+    }
+    if (candidates.length >= 3) break;
+  }
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => a.block - b.block);
+  return candidates[0];
+}
+
 /** Open a wallet's page with numbers on and runs expanded; returns the page
  *  and the API-index → DOM-number map. */
 async function openPage(x, wallet, events) {
   const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   page.on("pageerror", (e) => pageErrors.push(`${x.key}/${wallet}: ${e}`));
-  await page.goto(`${BASE}${x.page(wallet)}`, { waitUntil: "domcontentloaded", timeout: 240000 });
+  // `?folders=0` PINNED (rails-ops decision 0021): since the Aave-family
+  // rollout of server-side grouping, a served page answers in folders and
+  // does not offer "Collapse like events" — the flat answer is what
+  // `?folders=0` is for, and the browser's own toggle still applies to it.
+  await page.goto(`${BASE}${x.page(wallet)}?folders=0`, { waitUntil: "domcontentloaded", timeout: 240000 });
   await page.getByText(COUNT_RE).first().waitFor({ state: "visible", timeout: 120000 });
   await setDisplayFlag(page, "Event Numbers", true);
   await setDisplayFlag(page, "Collapse like events", false);
@@ -256,7 +324,25 @@ async function runExplorer(x) {
       d.debtPrice?.usd > 0 &&
       d.liquidationBonusAtBlock?.bonusBps > 10000,
   );
-  const unpriced = newestFirst.find(({ d }) => d.eventType !== "liquidation" && d.price == null);
+  // Oldest first: the newest unpriced block is the forward tick's own
+  // frontier and can price itself mid-run (discoverUnpriced's comment); the
+  // oldest sits behind the slower historic walk and stays stable.
+  let unpriced = numbered.find(({ d }) => d.eventType !== "liquidation" && d.price == null);
+  let unpricedWallet = wallet;
+  let unpricedEvents = events;
+  if (!unpriced) {
+    const found = await discoverUnpriced(x);
+    if (found) {
+      unpricedWallet = found.wallet;
+      unpricedEvents = found.events;
+      unpriced = found.events
+        .map((e, i) => ({ n: i + 1, e, d: data(e) }))
+        .find(({ d }) => d.eventType !== "liquidation" && d.price == null);
+      console.log(
+        `      unpriced ordinary row discovered on ${unpricedWallet} (${found.events.length} events, block ${unpriced?.e.blockNumber})`,
+      );
+    }
+  }
   check(
     `${x.key} API: a priced ordinary row exists (fixture wallet or a discovered recent account)`,
     !!pricedOrdinary,
@@ -367,9 +453,9 @@ async function runExplorer(x) {
       (await pills.count()) === 2,
       `${await pills.count()} pill(s)`,
     );
-    const receipt = await openReceiptFor(page, card, "$");
+    const receipt = await openReceiptFor(page, legStatFor(card, "Seized, at fire"), "$");
     check(
-      `${x.key} liquidation #${n}: a leg's receipt is amount × price at block, no untraced input`,
+      `${x.key} liquidation #${n}: the seized leg's receipt is amount × price at block, no untraced input`,
       !!receipt && /amount × price at block/.test(receipt) && !/Untraced input/.test(receipt),
       receipt ? receipt.replace(/\s+/g, " ").slice(0, 300) : "no receipt",
     );
@@ -385,12 +471,14 @@ async function runExplorer(x) {
 
   if (unpriced) {
     const { n } = unpriced;
-    await expandCard(page, domN(n));
-    const card = cardFor(page, domN(n));
+    const own = unpricedWallet === wallet ? { page, domN } : await openPage(x, unpricedWallet, unpricedEvents);
+    await expandCard(own.page, own.domN(n));
+    const card = cardFor(own.page, own.domN(n));
     check(
       `${x.key} unpriced #${n}: renders token-only (no "oracle at block" pill)`,
       (await card.getByText(/oracle at block/).count()) === 0,
     );
+    if (own.page !== page) await own.page.close();
   } else {
     check(
       `${x.key} token-only arm: NO EVIDENCE — no unpriced ordinary row on this wallet`,
