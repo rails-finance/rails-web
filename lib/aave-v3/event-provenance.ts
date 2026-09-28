@@ -1284,7 +1284,7 @@ export const rowChainBalanceProv = (
     pclass: "indexed",
     summary: `${side === "supply" ? "Supplied" : "Borrowed"} ${sym} ${when} this event — what ${token} held${
       when === "after" ? " once this event's log had applied" : " just before this event's log"
-    }, interest included: the position's scaled balance on this reserve (the scaled amounts of its own Supply, Withdraw, Borrow, Repay, BalanceTransfer and LiquidationCall logs, summed in log order) times the reserve's ${index} at this transaction, which its ReserveDataUpdated log states. It equals balanceOf at that point.`,
+    }, interest included: the position's scaled balance on this reserve (the scaled amounts of its Supply, Withdraw, Borrow, Repay, BalanceTransfer and LiquidationCall logs, summed in log order) times the reserve's ${index} at this transaction, which its ReserveDataUpdated log states. It equals balanceOf at that point.`,
     contract: poolOf(coords),
     via: `${captureVia(coords)} · scaled × ${index} ÷ 1e27${
       v.scaled && v.index && when === "after" ? ` = ${v.scaled} × ${v.index} ÷ 1e27` : ""
@@ -1331,7 +1331,7 @@ export const rowInterestProv = (sym: string, side: "supply" | "debt", coords: V3
 export const laneInterestProv = (sym: string, side: "supply" | "debt"): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Interest the ${sym} ${side === "supply" ? "supply has earned" : "debt has accrued"} over the position's life — the balance held now less the net of every amount the position's own logs moved on this reserve: ${
+  summary: `Interest the ${sym} ${side === "supply" ? "supply has earned" : "debt has accrued"} over the position's life — the balance held now less the net of every amount the position's logs moved on this reserve: ${
     side === "supply"
       ? "supplies and aToken transfers in, less withdrawals, transfers out, repayments made with aTokens and collateral seized"
       : "borrows, less repayments, the debt liquidations covered and any the Pool wrote off"
@@ -1349,7 +1349,7 @@ export const laneInterestProv = (sym: string, side: "supply" | "debt"): Provenan
 export const laneNetProv = (sym: string, side: "supply" | "debt"): Provenance => ({
   kind: "chain",
   pclass: "indexed",
-  summary: `${side === "supply" ? "Supplied" : "Borrowed"} ${sym}, net of every amount the position's own logs moved on this reserve (${
+  summary: `${side === "supply" ? "Supplied" : "Borrowed"} ${sym}, net of every amount the position's logs moved on this reserve (${
     side === "supply"
       ? "aToken transfers and repayments made with aTokens included"
       : "liquidation cover and write-offs included"

@@ -24,7 +24,13 @@ const env = Object.fromEntries(
   readFileSync(new URL("../../.env.local", import.meta.url), "utf8")
     .split("\n")
     .filter((l) => l.includes("=") && !l.trim().startsWith("#"))
-    .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim().replace(/^"|"$/g, "")]),
+    .map((l) => [
+      l.slice(0, l.indexOf("=")).trim(),
+      l
+        .slice(l.indexOf("=") + 1)
+        .trim()
+        .replace(/^"|"$/g, ""),
+    ]),
 );
 for (const k of ["ALCHEMY_URL", "RAILS_API_URL", "API_BEARER_TOKEN"]) {
   if (!env[k]) throw new Error(`${k} missing from .env.local`);
@@ -33,11 +39,41 @@ for (const k of ["ALCHEMY_URL", "RAILS_API_URL", "API_BEARER_TOKEN"]) {
 const USDC = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
 const WETH = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
 const SAMPLES = [
-  { slug: "aave-v3", market: "core", wallet: "0xee7ca610d896c53ffe716b801c05748efd902954", reserve: USDC, atoken: "0x98c23e9d8f34fefb1b7bd6a91b7ff122f4e16f5c" },
-  { slug: "aave-v3", market: "core", wallet: "0x299188475f29ef2984e020cba55ec02c522a9087", reserve: WETH, atoken: "0x4d5f47fa6a74757f35c14fd3a6ef8e3c9bc514e8" },
-  { slug: "aave-v3", market: "core", wallet: "0x843c0486030646cb1e95fff8a3d3208ed1d33917", reserve: WETH, atoken: "0x4d5f47fa6a74757f35c14fd3a6ef8e3c9bc514e8" },
-  { slug: "aave-v3", market: "core", wallet: "0x47e0a8622f0d343afa2aa5e1a3100c1cdc56bd50", reserve: USDC, atoken: "0x98c23e9d8f34fefb1b7bd6a91b7ff122f4e16f5c" },
-  { slug: "spark", market: null, wallet: "0x398d328e7a6a71763a7ff59822564154d42b64a9", reserve: WETH, atoken: "0x59cd1c87501baa753d0b5b5ab5d8416a45cd71db" },
+  {
+    slug: "aave-v3",
+    market: "core",
+    wallet: "0xee7ca610d896c53ffe716b801c05748efd902954",
+    reserve: USDC,
+    atoken: "0x98c23e9d8f34fefb1b7bd6a91b7ff122f4e16f5c",
+  },
+  {
+    slug: "aave-v3",
+    market: "core",
+    wallet: "0x299188475f29ef2984e020cba55ec02c522a9087",
+    reserve: WETH,
+    atoken: "0x4d5f47fa6a74757f35c14fd3a6ef8e3c9bc514e8",
+  },
+  {
+    slug: "aave-v3",
+    market: "core",
+    wallet: "0x843c0486030646cb1e95fff8a3d3208ed1d33917",
+    reserve: WETH,
+    atoken: "0x4d5f47fa6a74757f35c14fd3a6ef8e3c9bc514e8",
+  },
+  {
+    slug: "aave-v3",
+    market: "core",
+    wallet: "0x47e0a8622f0d343afa2aa5e1a3100c1cdc56bd50",
+    reserve: USDC,
+    atoken: "0x98c23e9d8f34fefb1b7bd6a91b7ff122f4e16f5c",
+  },
+  {
+    slug: "spark",
+    market: null,
+    wallet: "0x398d328e7a6a71763a7ff59822564154d42b64a9",
+    reserve: WETH,
+    atoken: "0x59cd1c87501baa753d0b5b5ab5d8416a45cd71db",
+  },
 ];
 
 const client = createPublicClient({ chain: mainnet, transport: http(env.ALCHEMY_URL) });
@@ -59,7 +95,13 @@ for (const s of SAMPLES) {
     .sort(cmp);
   const last = rows.at(-1);
   const aRepays = rows.filter((r) => r.action === "repay" && r.use_a_tokens).length;
-  const balance = await client.readContract({ address: s.atoken, abi: ERC20, functionName: "balanceOf", args: [s.wallet], blockNumber: head });
+  const balance = await client.readContract({
+    address: s.atoken,
+    abi: ERC20,
+    functionName: "balanceOf",
+    args: [s.wallet],
+    blockNumber: head,
+  });
   const row = last ? BigInt(last.supply_after) : null;
   const tol = balance / 1_000_000n + 10n;
   const ok = row != null && row >= 0n && row <= balance + tol && aRepays > 0;

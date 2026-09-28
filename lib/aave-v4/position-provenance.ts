@@ -328,8 +328,18 @@ export function deltaProv(detail?: EventProvDetail): Provenance {
     via: "balance after − balance before",
     formula: "after − before",
     inputs: [
-      { label: "balance before", kind: "chain-derived", pclass: "indexed", note: "the position's balance just before this event" },
-      { label: "balance after", kind: "chain-derived", pclass: "indexed", note: "the position's balance just after this event" },
+      {
+        label: "balance before",
+        kind: "chain-derived",
+        pclass: "indexed",
+        note: "the position's balance just before this event",
+      },
+      {
+        label: "balance after",
+        kind: "chain-derived",
+        pclass: "indexed",
+        note: "the position's balance just after this event",
+      },
       ...eventInputs(detail),
     ],
   };

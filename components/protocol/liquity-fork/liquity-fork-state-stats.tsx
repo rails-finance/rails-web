@@ -214,7 +214,7 @@ export function liquityForkStateStats(
         prov: {
           kind: "chain",
           pclass: "emitted",
-          summary: "The batch manager's annual management fee after this change, as the batch logged it.",
+          summary: "Management fee after this change — as the batch logged it.",
           via: "BatchUpdated log · _annualManagementFee · ÷10^16",
           inputs: [{ label: "fee", value: `${br.managementFee}%`, kind: "chain", pclass: "emitted" }],
         },
@@ -226,8 +226,7 @@ export function liquityForkStateStats(
                 {
                   kind: "chain",
                   pclass: "emitted",
-                  summary:
-                    "The batch manager's annual management fee before this change, from the batch's previous update.",
+                  summary: "Management fee before this change — from the batch's previous update.",
                   via: "the batch's previous BatchUpdated log · _annualManagementFee · ÷10^16",
                   inputs: [{ label: "fee", value: `${before}%`, kind: "chain", pclass: "emitted" }],
                 },

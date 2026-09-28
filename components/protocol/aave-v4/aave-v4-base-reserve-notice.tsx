@@ -108,8 +108,8 @@ export function AaveV4BaseReserveNotice({ reserves }: { reserves: AaveV4SpokeCha
       {registryPaused.map((r) => (
         <p key={`r${r.reserveId}`}>
           Coinbase has paused {r.symbol} at its token registry, which holds the stock&rsquo;s price feed at its last
-          value during a corporate action. The Mag7 spoke does not read that flag, so the {r.symbol} reserve stays
-          open, valued at the held price.
+          value during a corporate action. The Mag7 spoke does not read that flag, so the {r.symbol} reserve stays open,
+          valued at the held price.
         </p>
       ))}
     </div>
