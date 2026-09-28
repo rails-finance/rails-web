@@ -2499,6 +2499,14 @@ export interface MapleContextRaw {
   /** transfer_in / transfer_out: the shares valued at the pool rate in the
    *  transfer's block, funds-asset base units. */
   transferAssets?: string;
+  /** The claim before / after the event and the interest since the previous
+   *  row, funds-asset base units (see MapleContext.valueAfter). */
+  valueBefore?: string;
+  valueAfter?: string;
+  interestSincePrev?: string;
+  /** The pool's rate in the row's block as assets ÷ shares. */
+  rateAssets?: string;
+  rateShares?: string;
 }
 
 export interface MapleContext {
@@ -2546,6 +2554,21 @@ export interface MapleContext {
    *  totalAssets and totalSupply at the block) or the same-block log it was
    *  taken from ("deposit" | "withdraw" | "request_processed"). */
   transferRateSource?: string;
+  /** The position's claim in this pool just before and just after the event:
+   *  (shares + escrowed) at the pool's rate in the row's block, the figure
+   *  convertToAssets returned there (rails-server caca476, decision 0033).
+   *  Human-readable funds asset. Absent where the index holds no rate for the
+   *  block. */
+  valueBefore?: string;
+  valueAfter?: string;
+  /** Interest the claim earned since the previous row in this pool: this row's
+   *  valueBefore less that row's valueAfter (signed). Absent on the first row
+   *  and where either row has no rate. */
+  interestSincePrev?: string;
+  /** Where the block's rate came from: "chain" (an archive read of totalAssets
+   *  and totalSupply) or the same-block log ("deposit" | "withdraw" |
+   *  "request_processed"). */
+  rateSource?: string;
   /** Exact uint256 twins of the scaled fields above. */
   raw?: MapleContextRaw;
   /** True for the wallet's first event. */

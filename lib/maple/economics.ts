@@ -35,6 +35,7 @@ import {
   positionCurrentValueProv,
   positionPrincipalProv,
   interestEarnedProv,
+  interestEarnedLifetimeProv,
   mapleLifetimeFlowProv,
   mapleTransferFlowProv,
 } from "@/lib/maple/event-provenance";
@@ -359,6 +360,35 @@ export function computeMapleEconomics(
     }
   }
 
+  // Interest that has left with the withdrawals: a pool whose interest over
+  // its life exceeds what it holds now. "incl. … interest earned" would say
+  // the holding contains it, so the figure is stated beside what is held now
+  // (wallet 0x1601…347e: 23.43M USDC earned, 0.000001 held). The other gates
+  // stand: every transfer valued, a chain read for a live claim, and interest
+  // no more than the gross inflow. A pool with nothing held reads zero: its
+  // share and escrow lanes equal balanceOf and lockedShares.
+  const interestLeft: { line: TowerLine; heldNow: number }[] = [];
+  if (lifetime) {
+    for (const f of lifetime.values()) {
+      if (f.sharesMoved) continue;
+      const p = view.pools.find((x) => x.pool === f.pool && x.shares + x.escrowedShares > 0);
+      if (p && p.currentValue == null) continue;
+      const held = p?.currentValue ?? 0;
+      const earned = held - netPrincipal(f);
+      if (earned < DUST || earned > grossIn(f) || earned <= held + DUST) continue;
+      interestLeft.push({
+        line: {
+          key: `interest-left-${f.pool}`,
+          symbol: f.assetSymbol,
+          amount: earned,
+          usd: null,
+          prov: interestEarnedLifetimeProv(f.assetSymbol),
+        },
+        heldNow: held,
+      });
+    }
+  }
+
   // Lifetime inflow (the faded side bar) — a token amount is only meaningful
   // when one pool flowed, else suppressed. Shares received ride `received`,
   // which the tower adds to the bar.
@@ -374,6 +404,7 @@ export function computeMapleEconomics(
     collateral: {
       current: claimLines,
       interest,
+      interestLeft,
       exited,
       received,
       liquidated: [],
@@ -393,8 +424,8 @@ export function computeMapleEconomics(
     debtAxisAbsent: true,
     interestNote:
       "The claim column shows what the position would redeem for now: its pool shares valued at the pool's exit rate. The amount above what was put in is interest earned; shares received or sent by transfer count at the pool rate in their block. Amounts stay in the pool's own asset, USDC or USDT — pinning a stablecoin to a dollar would hide exactly the depeg the token amounts exist to reveal. One caveat rides the value: it rests on a loan book whose collateral is held off-chain, so it shows what Maple's books record rather than something the chain itself can prove." +
-      (interest != null
+      (interest != null || interestLeft.length > 0
         ? ""
-        : " The split between principal and interest earned appears only when a single pool's flows attribute cleanly, with every share transfer valued, and the interest is still inside the claim."),
+        : " The split between principal and interest earned appears only when a single pool's flows attribute cleanly and every share transfer is valued."),
   };
 }

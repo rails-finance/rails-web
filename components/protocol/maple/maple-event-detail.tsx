@@ -1,10 +1,12 @@
 "use client";
 
-// Maple event detail — adapter onto the shared ChainTruthDetail grid. The
-// lanes an event touches, with before→after transitions:
-//   deposit / withdraw / fill — the deposited-PRINCIPAL lane (replayed,
-//     amounts-only) AND the share lane (slot-exact transfer replay) side by
-//     side; the two bases are the point, each traced to its own class.
+// Maple event detail — adapter onto the shared ChainTruthDetail grid. Every
+// row leads with the position's claim in the pool's asset, before → after
+// ((shares + escrowed) × the pool's rate in the row's block, the chain's
+// convertToAssets there; decision 0033) and the interest it earned since the
+// previous row in the pool. Then the lanes an event touches:
+//   deposit / withdraw / fill — the net-deposited lane (a running sum of the
+//     flows) AND the share lane (slot-exact transfer replay) side by side.
 //   queue events — the escrow lane (shares waiting in the queue) beside the
 //     share lane (escrowing moves shares out of the wallet's balance).
 //   transfers — the share lane (a position can arrive or leave by transfer).
@@ -24,6 +26,9 @@ import {
   principalAfterProv,
   principalBeforeProv,
   eventRateProv,
+  claimAfterProv,
+  claimBeforeProv,
+  interestSincePrevProv,
   type MapleCoords,
 } from "@/lib/maple/event-provenance";
 import { formatNumber } from "@/lib/utils/format";
@@ -41,9 +46,38 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet }: MapleEven
   const coords: MapleCoords = { txHash, blockNumber, pool: ctx.pool, account: wallet };
   const stats: ChainTruthStat[] = [];
 
+  // The claim at the block rate, where the index holds one for this block.
+  if (ctx.valueAfter != null && ctx.valueBefore != null) {
+    const change = String(Number(ctx.valueAfter) - Number(ctx.valueBefore));
+    const transition = reconstructTransition({
+      after: ctx.valueAfter,
+      change,
+      changeProv: claimAfterProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords, ctx.raw?.valueAfter),
+      beforeProv: claimBeforeProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords),
+    });
+    stats.push({
+      label: "Pool claim",
+      value: fmt(ctx.valueAfter),
+      symbol: ctx.assetSymbol,
+      prov: claimAfterProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords, ctx.raw?.valueAfter),
+      transition,
+      changed: transition != null,
+    });
+    const interest = Number(ctx.interestSincePrev ?? "0");
+    if (ctx.interestSincePrev != null && interest !== 0) {
+      stats.push({
+        label: "Interest since previous event",
+        value: interest < 0 ? `−${fmt(String(-interest))}` : fmt(ctx.interestSincePrev),
+        symbol: ctx.assetSymbol,
+        prov: interestSincePrevProv(ctx.assetSymbol, ctx.poolSymbol, coords, ctx.raw?.interestSincePrev),
+        changed: false,
+      });
+    }
+  }
+
   if (ctx.eventType === "deposit" || ctx.eventType === "withdraw" || ctx.eventType === "request_fill") {
     stats.push({
-      label: "Deposited · principal",
+      label: "Net deposited",
       value: fmt(ctx.principalAfter),
       symbol: ctx.assetSymbol,
       prov: principalAfterProv(ctx.assetSymbol, coords, ctx.raw?.principalAfter),

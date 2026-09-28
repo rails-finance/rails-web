@@ -65,6 +65,16 @@ export interface MvRow {
    *  before it. */
   transfer_assets?: string;
   transfer_rate_source?: string;
+  /** Every row (rails-server caca476): the pool rate in the row's block, the
+   *  claim before / after the event at that rate, and the interest since the
+   *  previous row in the pool, funds-asset base units. Absent where the index
+   *  holds no rate for the block. */
+  rate_assets?: string;
+  rate_shares?: string;
+  rate_source?: string;
+  value_before?: string;
+  value_after?: string;
+  interest_since_prev?: string;
   /** On a grouped or span answer: whether this is the wallet's first row. The
    *  route states it, since a grouped answer's first event row need not be. */
   is_open?: boolean;
@@ -182,6 +192,19 @@ export function buildMapleTimeline(rows: MvRow[], walletRaw: string): MapleTimel
       },
     };
     if (r.request_id != null) ctx.requestId = String(r.request_id).split(".")[0];
+    if (r.value_after != null && r.value_before != null) {
+      ctx.valueBefore = scaledStr(r.value_before, p.decimals);
+      ctx.valueAfter = scaledStr(r.value_after, p.decimals);
+      ctx.rateSource = r.rate_source;
+      ctx.raw!.valueBefore = rawVal(r.value_before);
+      ctx.raw!.valueAfter = rawVal(r.value_after);
+      ctx.raw!.rateAssets = rawVal(r.rate_assets ?? null);
+      ctx.raw!.rateShares = rawVal(r.rate_shares ?? null);
+      if (r.interest_since_prev != null) {
+        ctx.interestSincePrev = scaledStr(r.interest_since_prev, p.decimals);
+        ctx.raw!.interestSincePrev = rawVal(r.interest_since_prev);
+      }
+    }
 
     let flows: AssetFlow[] = [];
 

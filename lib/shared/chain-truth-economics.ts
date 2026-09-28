@@ -65,6 +65,14 @@ export interface TowerSideData {
    *  current debt was available and the principal/interest split is real;
    *  null/absent → gated, the component shows `interestNote` instead. */
   interest?: TowerLine | null;
+  /** COLLATERAL SIDE, GATED LIST ONLY: interest earned over the position's
+   *  life that has left with its withdrawals (more came out than went in), one
+   *  line per asset, with what the side holds now in that asset. The list
+   *  states "X interest earned; Y held now" beneath the current lines, where
+   *  `interest`'s "incl. X" would claim the holding contains it (Maple wallet
+   *  0x1601…347e: 23.43M USDC earned, 0.000001 held). Feeders that never set
+   *  this render identically to today. */
+  interestLeft?: { line: TowerLine; heldNow: number }[];
   /** Hatched reverse-diagonal (╲) — voluntary exits (withdrawn / repaid). */
   exited: TowerLine[];
   /** Inflow that is NOT a fresh deposit — an account-to-account position move

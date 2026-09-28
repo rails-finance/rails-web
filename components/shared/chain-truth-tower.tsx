@@ -894,6 +894,20 @@ function GatedEconomics({ data }: { data: ChainTruthTowerData }) {
               interest earned
             </div>
           )}
+          {(data.collateral.interestLeft ?? []).map(({ line, heldNow }) => (
+            <div key={line.key} className="text-[11px] text-rb-500">
+              <Prov info={line.prov}>
+                <span className="tabular-nums">
+                  {formatCompact(line.amount)} {line.symbol}
+                </span>
+              </Prov>{" "}
+              interest earned;{" "}
+              <span className="tabular-nums">
+                {formatCompact(heldNow)} {line.symbol}
+              </span>{" "}
+              held now
+            </div>
+          ))}
         </div>
         {showDebtColumn && (
           <div className="space-y-2">

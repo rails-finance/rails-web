@@ -411,11 +411,11 @@ export const escrowBeforeProv = (poolSym: string, coords: MapleCoords): Provenan
   ]),
 });
 
-/** Deposited PRINCIPAL after this event = Σ(deposit − withdraw − fill). */
+/** Net deposited after this event = Σ(deposit − withdraw − fill), a flow. */
 export const principalAfterProv = (sym: string, coords: MapleCoords, raw?: string | null): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `${sym} deposited PRINCIPAL after this event — replayed by summing the asset amounts of the wallet's own deposits, withdrawals and queue fills, in log order up to this block${atBlock(coords)}. No on-chain slot holds this figure (the chain stores shares, not deposited principal): it is the index's replay, clamped at zero — a full exit nets negative by exactly the interest earned. The share lane beside it is the slot-exact reading.`,
+  summary: `${sym} net deposited after this event, a running sum of flows: the asset amounts of the wallet's own deposits, less its withdrawals and queue fills, in log order up to this block${atBlock(coords)}. No on-chain slot holds this figure (the chain stores shares): it is the index's replay, clamped at zero, and a full exit nets negative by the interest earned. The pool claim beside it is the chain's value of the position at this block.`,
   contract: poolContract(coords),
   via: `${MAPLE_VIA} · Σ ±assets across Deposit/Withdraw/RequestProcessed logs${raw ? ` = ${raw}` : ""}`,
   inputs: eventInputs(coords),
@@ -425,14 +425,145 @@ export const principalAfterProv = (sym: string, coords: MapleCoords, raw?: strin
 export const principalBeforeProv = (sym: string, coords: MapleCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `${sym} deposited PRINCIPAL before this event — the after-value minus this event's own asset amount (after − change), reconstructed in the browser. Same amounts-only basis as the after (no on-chain slot holds principal).`,
+  summary: `${sym} net deposited before this event — the after-value minus this event's own asset amount (after − change), reconstructed in the browser. The same running sum of flows as the after.`,
   contract: poolContract(coords),
-  via: "deposited principal after − assets",
+  via: "net deposited after − assets",
   formula: "after − change",
   inputs: eventInputs(coords, [
-    { label: "after", kind: "chain-derived", pclass: "indexed", note: `replayed ${sym} principal after this event` },
+    {
+      label: "after",
+      kind: "chain-derived",
+      pclass: "indexed",
+      note: `replayed ${sym} net deposited after this event`,
+    },
     { label: "change", kind: "chain", pclass: "emitted", note: "this event's own `assets` (signed)" },
   ]),
+});
+
+/** Where a row's block rate came from, in words, and its receipt parts. */
+function rateBasis(source: string | undefined, coords: MapleCoords) {
+  const fromChain = source === "chain";
+  const log = source === "withdraw" ? "Withdraw" : source === "request_processed" ? "RequestProcessed" : "Deposit";
+  return {
+    fromChain,
+    words: fromChain
+      ? "the pool's totalAssets() ÷ totalSupply() read at the block, the division convertToAssets makes"
+      : `the ${log} in the same block, its own assets ÷ shares: the pool pricing a share at that moment`,
+    verify: fromChain ? stateVerify("totalAssets() and totalSupply()", coords.blockNumber) : txVerify(coords),
+    input: fromChain
+      ? ({
+          label: "rate",
+          kind: "chain",
+          pclass: "state",
+          note: "totalAssets() ÷ totalSupply() at the block",
+        } as ProvInput)
+      : ({
+          label: "rate",
+          kind: "chain",
+          pclass: "emitted",
+          note: `a same-block ${log} log's assets ÷ shares`,
+        } as ProvInput),
+  };
+}
+
+/** The position's claim AFTER this event: (shares + escrowed) × the pool's rate
+ *  in this block — what convertToAssets(balanceOf + escrowed) returned there. */
+export const claimAfterProv = (
+  assetSym: string,
+  poolSym: string,
+  source: string | undefined,
+  coords: MapleCoords,
+  raw?: string | null,
+): Provenance => {
+  const b = rateBasis(source, coords);
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    verify:
+      coords.blockNumber != null
+        ? {
+            kind: "recompute",
+            text: `Re-run the pool's convertToAssets eth_call on the wallet's balanceOf plus its escrowed shares at block ${coords.blockNumber} against an archive node`,
+          }
+        : b.verify,
+    summary: `${assetSym} the position's ${poolSym} were worth after this event${atBlock(coords)}: the shares held plus any escrowed in the withdrawal queue, times the pool's rate in this block (${b.words}). Interest accrued before this event is inside the figure. ${CUSTODY_NOTE}`,
+    contract: poolContract(coords),
+    via: `(shares + escrowed) × ${b.fromChain ? "totalAssets ÷ totalSupply (archive read)" : "assets ÷ shares (same-block log)"}${raw ? ` = ${raw}` : ""}`,
+    formula: "(shares + escrowed) × rate",
+    inputs: eventInputs(coords, [
+      { label: "shares", kind: "chain", pclass: "state", note: "replayed balance after this event (= balanceOf)" },
+      { label: "escrowed", kind: "chain-derived", pclass: "state", note: "queue escrow lane after this event" },
+      b.input,
+    ]),
+  };
+};
+
+/** The claim BEFORE this event, at the same block rate. */
+export const claimBeforeProv = (
+  assetSym: string,
+  poolSym: string,
+  source: string | undefined,
+  coords: MapleCoords,
+): Provenance => {
+  const b = rateBasis(source, coords);
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    verify: b.verify,
+    summary: `${assetSym} the position's ${poolSym} were worth just before this event: the shares and escrow it held before, times the same block rate (${b.words}).`,
+    contract: poolContract(coords),
+    via: "(shares + escrowed) before × rate",
+    formula: "(shares + escrowed) × rate",
+    inputs: eventInputs(coords, [
+      { label: "shares + escrowed", kind: "chain", pclass: "state", note: "held before this event" },
+      b.input,
+    ]),
+  };
+};
+
+/** Interest the claim earned between the previous row in this pool and this
+ *  event: this row's claim before less the previous row's claim after. */
+export const interestSincePrevProv = (
+  assetSym: string,
+  poolSym: string,
+  coords: MapleCoords,
+  raw?: string | null,
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `${assetSym} the position's ${poolSym} earned between the previous event in this pool and this one: its claim just before this event less its claim just after the previous one. The shares held did not change in between, so the difference is the pool's rate rising on them: interest accrued by the loan book. A loss the pool delegate marked would read negative. ${CUSTODY_NOTE}`,
+  contract: poolContract(coords),
+  via: `claim before this event − claim after the previous event${raw ? ` = ${raw}` : ""}`,
+  formula: "before − previous after",
+  inputs: eventInputs(coords, [
+    { label: "before", kind: "chain-derived", pclass: "state", note: "(shares + escrowed) × the rate in this block" },
+    {
+      label: "previous after",
+      kind: "chain-derived",
+      pclass: "state",
+      note: "(shares + escrowed) × the rate in the previous event's block",
+    },
+  ]),
+});
+
+/** Interest earned over the position's life that has left with its
+ *  withdrawals: more came out than went in. */
+export const interestEarnedLifetimeProv = (sym: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `Interest earned on the ${sym} position over its life: what it holds now ((shares + escrowed) × the exit rate at head, zero once closed) plus everything that came out (withdrawals and shares sent), less everything that went in (deposits and shares received), each transfer valued at the pool's rate in its block. More came out than went in, so this interest has left with the withdrawals and the claim held now does not include it. The exit rate leg carries the loan-book caveat: the accrued side is Maple's on-chain bookkeeping of off-chain-collateralized loans.`,
+  contract: { name: "Maple pool (ERC-4626)", address: "" },
+  via: "held now + withdrawn + sent − deposited − received",
+  formula: "held now − net principal",
+  inputs: [
+    { label: "held now", kind: "chain-derived", pclass: "state", note: "(shares + escrowed) × convertToExitAssets" },
+    {
+      label: "net principal",
+      kind: "chain-derived",
+      pclass: "indexed",
+      note: "Σ deposits + received − withdrawn − sent",
+    },
+  ],
 });
 
 // ── identity ─────────────────────────────────────────────────────────────────
@@ -529,7 +660,12 @@ export const interestEarnedProv = (sym: string): Provenance => ({
   formula: "current − net principal",
   inputs: [
     { label: "current", kind: "chain-derived", pclass: "state", note: "(shares + escrowed) × convertToExitAssets" },
-    { label: "net principal", kind: "chain-derived", pclass: "indexed", note: "Σ deposits + received − withdrawn − sent" },
+    {
+      label: "net principal",
+      kind: "chain-derived",
+      pclass: "indexed",
+      note: "Σ deposits + received − withdrawn − sent",
+    },
   ],
 });
 

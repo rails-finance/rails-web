@@ -89,6 +89,14 @@ export function mapleEconomicsExplanation(data: ChainTruthTowerData): ReactNode 
       </span>,
     );
   }
+  for (const { line, heldNow } of data.collateral.interestLeft ?? []) {
+    items.push(
+      <span key={line.key}>
+        <Fig>{fmt(line.amount, line.symbol)}</Fig> in interest was earned over the position&apos;s life and has left
+        with its withdrawals; <Fig>{fmt(heldNow, line.symbol)}</Fig> is held now.
+      </span>,
+    );
+  }
   if (currentClaim > 0) {
     items.push(
       <span key="current">
