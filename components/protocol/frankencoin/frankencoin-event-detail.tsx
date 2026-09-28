@@ -132,7 +132,7 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber }: Frankencoin
             coords,
             ctx.raw?.collateralBefore,
           ),
-          dimmed: ctx.collateral === ctx.collateralBefore,
+          changed: ctx.collateral !== ctx.collateralBefore,
         });
       if (ctx.minted != null)
         stats.push({
@@ -141,7 +141,7 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber }: Frankencoin
           symbol: "ZCHF",
           prov: mintedAfterProv(coords, ctx.raw?.minted),
           transition: transitionOf(ctx.minted, ctx.mintedBefore, "minted", sym, coords, ctx.raw?.mintedBefore),
-          dimmed: ctx.minted === ctx.mintedBefore,
+          changed: ctx.minted !== ctx.mintedBefore,
         });
       if (ctx.liqPrice != null)
         stats.push({
@@ -150,7 +150,7 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber }: Frankencoin
           symbol: `ZCHF/${sym}`,
           prov: liqPriceAfterProv(sym, dec, coords, ctx.raw?.price),
           transition: transitionOf(ctx.liqPrice, ctx.liqPriceBefore, "price", sym, coords, ctx.raw?.priceBefore),
-          dimmed: ctx.liqPrice === ctx.liqPriceBefore,
+          changed: ctx.liqPrice !== ctx.liqPriceBefore,
         });
       break;
     }

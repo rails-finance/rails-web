@@ -24,7 +24,7 @@
 // 3. AN ABSENT READING IS NOT A ZERO. A custody Transfer moves neither axis, so
 //    it is not a block the sweep stops at: 1,867 of production's 4,988 position
 //    Transfers have no reading. Those draw debt and collateral from the reading
-//    in force at that block, greyed as unchanged, and never set-aside, which
+//    in force at that block, muted as unchanged, and never set-aside, which
 //    grows every block (decisions/0032 point 6); with no earlier reading on the
 //    timeline they draw one sentence. A measured
 //    zero draws the grid with "0" in it via the grid's own `formatCompact`,
@@ -157,7 +157,7 @@ export function AlchemixStateAtBlock({
       );
     }
     // A custody move: neither axis moved. The figures in force are shown
-    // greyed, the way an untouched axis is, and set-aside is left out because
+    // muted, the way an untouched axis is, and set-aside is left out because
     // it grows every block and a reading holds it at its own block alone.
     if (inForce && eventBlock != null && inForce.debtRaw != null && inForce.collateralRaw != null) {
       const carried = (label: string, raw: string, symbol: string): ChainTruthStat => ({
@@ -165,7 +165,7 @@ export function AlchemixStateAtBlock({
         value: formatUnitsExact(raw, DECIMALS),
         symbol,
         display: gridFigure(raw),
-        dimmed: true,
+        changed: false,
         prov: carriedReadingProv(label, symbol, raw, inForce.blockNumber, eventBlock, coords),
       });
       return (
