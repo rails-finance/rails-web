@@ -51,7 +51,7 @@ export const viewport: Viewport = {
 // pages (/coverage/<chain>, off lib/shared/coverage.ts) are the one place that
 // states it, so the share copy points there rather than flattening the
 // difference into a blanket claim.
-// The card itself: `scripts/generate-og-home.mjs` → public/og/home.png.
+// The card itself: `scripts/generate-og.mjs` → public/og/home.png.
 //
 // LAUNCHED explorers only, and launched chains only. This copy is the site's
 // own coverage claim: a count that included an explorer nothing links, or a
@@ -107,7 +107,12 @@ export const metadata: Metadata = {
     siteName: "Rails",
     images: [
       {
-        url: "/og/home.png",
+        // Content-hashed: Discord/X/Telegram/Slack cache a link preview by
+        // image URL, so a regenerated card needs a new URL to be fetched
+        // fresh rather than served stale from their cache. Bump the hash
+        // (`shasum -a 256 public/og/home.png | cut -c1-8`) whenever
+        // `node scripts/generate-og.mjs` changes this file's bytes.
+        url: "/og/home-c9f0b163.png",
         width: 1200,
         height: 630,
         alt: `Explore ${EXPLORER_COUNT} DeFi protocols on Rails`,
@@ -118,7 +123,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: OG_DESCRIPTION,
-    images: ["/og/home.png"],
+    images: ["/og/home-c9f0b163.png"],
     creator: TWITTER_HANDLE,
     site: TWITTER_HANDLE,
   },

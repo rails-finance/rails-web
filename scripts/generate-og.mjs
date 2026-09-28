@@ -45,11 +45,12 @@ const cardOut = (id) => join(OG_DIR, `explore-${id}.png`);
 
 // ── The roster ───────────────────────────────────────────────────────────────
 // Read from the source module rather than re-listed here: this script is a
-// renderer, not a second place that decides what Rails covers. The regex wants
-// `id: "…"` followed (within the same object literal) by `label: "…"`, which is
-// the shape every SPECS entry has (PROTOCOLS is derived from SPECS, so the
-// written-down literal is the one to read). A silently-wrong roster is the exact
-// failure this script exists to end, so the shape is asserted, not trusted.
+// renderer, not a second place that decides what Rails covers. Each SPECS
+// entry is read as a whole object literal (rather than three fields matched
+// loose across the array) specifically so an `unlaunched: true` sitting
+// anywhere in that entry — not just right after chainId — is seen. A
+// silently-wrong roster is the exact failure this script exists to end, so
+// the shape is asserted, not trusted.
 function readRoster() {
   const src = readFileSync(join(ROOT, "lib/shared/protocols.ts"), "utf8");
   const start = src.indexOf("const SPECS: ProtocolSpec[] = [");
@@ -63,14 +64,26 @@ function readRoster() {
   // protocol name. The chain's NAME is read from lib/shared/chains.ts rather
   // than restated here, so a third chain (Sepolia) needs no edit in this file.
   const chainNames = readChainNames();
-  const entries = [
-    ...src.slice(start, end).matchAll(/id:\s*"([^"]+)",[\s\S]*?label:\s*"([^"]+)",[\s\S]*?chainId:\s*(\d+)/g),
-  ].map((m) => {
-    const chainId = Number(m[3]);
-    const chainName = chainNames.get(chainId);
+  // Each entry is its own two-space-indented object literal (`  { … },`),
+  // mirroring how every SPECS entry in lib/shared/protocols.ts is written.
+  const objects = [...src.slice(start, end).matchAll(/^ {2}\{([\s\S]*?)\n {2}\},/gm)].map((m) => m[1]);
+  const entries = objects.map((obj) => {
+    const id = obj.match(/id:\s*"([^"]+)"/);
+    const label = obj.match(/label:\s*"([^"]+)"/);
+    const chainId = obj.match(/chainId:\s*(\d+)/);
+    if (!id || !label || !chainId) {
+      throw new Error("a SPECS entry is missing id/label/chainId — has ProtocolSpec's shape changed?");
+    }
+    const chain = Number(chainId[1]);
+    const chainName = chainNames.get(chain);
     if (!chainName)
-      throw new Error(`roster entry "${m[1]}" is on chain ${chainId}, which lib/shared/chains.ts does not name`);
-    return { id: m[1], label: chainId === 1 ? m[2] : `${m[2]} on ${chainName}` };
+      throw new Error(`roster entry "${id[1]}" is on chain ${chain}, which lib/shared/chains.ts does not name`);
+    return {
+      id: id[1],
+      label: chain === 1 ? label[1] : `${label[1]} on ${chainName}`,
+      // Omitted means launched (see ProtocolSpec.unlaunched in protocols.ts).
+      unlaunched: /unlaunched:\s*true/.test(obj),
+    };
   });
   if (entries.length < 2) throw new Error("roster parse found <2 protocols — has PROTOCOLS' shape changed?");
   return entries;
@@ -201,7 +214,7 @@ function assertMarqueeInRoster(protocols) {
   const missing = MARQUEE.filter((id) => !ids.has(id));
   if (missing.length > 0) {
     throw new Error(
-      `MARQUEE names id(s) not in the roster: ${missing.join(", ")} — rename or remove it from MARQUEE in scripts/generate-og-home.mjs`,
+      `MARQUEE names id(s) not in the roster: ${missing.join(", ")} — rename or remove it from MARQUEE in scripts/generate-og.mjs`,
     );
   }
 }
@@ -362,6 +375,11 @@ function shellHtml(body) {
 </html>`;
 }
 
+// `protocols` here is the LAUNCHED roster only — the same set app/layout.tsx
+// counts for EXPLORER_COUNT and the same set a reader can reach from the nav.
+// An unlaunched row (the vault layer — see ProtocolSpec.unlaunched)
+// still gets its own explore-<id>.png (below), but doesn't inflate the home
+// card's coverage claim with a door that isn't open yet.
 function homeHtml(protocols, glyphs) {
   const byId = new Map(protocols.map((p) => [p.id, p]));
   const shown = MARQUEE.map((id) => byId.get(id));
@@ -418,6 +436,7 @@ async function render(html, out) {
   console.log(`wrote ${out.slice(ROOT.length + 1)} (${(shot.length / 1024).toFixed(1)} kB)`);
 }
 
-await render(homeHtml(protocols, glyphs), HOME_OUT);
+const launchedProtocols = protocols.filter((p) => !p.unlaunched);
+await render(homeHtml(launchedProtocols, glyphs), HOME_OUT);
 for (const p of protocols) await render(explorerHtml(p, glyphs), cardOut(p.id));
 await browser.close();
