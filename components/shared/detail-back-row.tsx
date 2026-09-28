@@ -18,6 +18,7 @@ import { RailHeader } from "@/components/shared/rail-header";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { LatestPrices, type LatestPriceAsset, type PricesAt } from "@/components/shared/latest-prices";
 import { ToolsMenu } from "@/components/shared/tools-menu";
+import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 
 /** The one back affordance on every detail page. NAV_BUTTON pill + ArrowLeft(14)
  *  + "Back". Smart-back: returns to the listing the viewer actually came from
@@ -136,6 +137,11 @@ export function DetailTopRow({
   children?: ReactNode;
 }) {
   const closingPriced = closing != null && closing.assets.some((a) => typeof a.price === "number" && a.price > 0);
+  // Its own scope (the towers' and panels' convention): the row sits ahead of
+  // — a sibling of — the position card, so a route whose card is the only
+  // opened scope leaves this trigger's price tracing nothing (rails-ops
+  // provenance-receipts-grammar.md §7, the unscoped-sibling gap).
+  const registry = useReceiptRegistry();
   return (
     <div>
       <div className="mb-2.5">
@@ -145,17 +151,19 @@ export function DetailTopRow({
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
           <DetailBackButton session={session} wallet={wallet} compact />
           {showStamp && !closed && <RecencyStamp compact />}
-          {!closed ? (
-            <LatestPrices assets={assets} reason={priceReason} />
-          ) : (
-            closingPriced && (
-              <LatestPrices
-                assets={closing.assets}
-                reason={priceReason}
-                at={{ block: closing.block, timestamp: closing.timestamp }}
-              />
-            )
-          )}
+          <ProvReceiptsScope registry={registry}>
+            {!closed ? (
+              <LatestPrices assets={assets} reason={priceReason} />
+            ) : (
+              closingPriced && (
+                <LatestPrices
+                  assets={closing.assets}
+                  reason={priceReason}
+                  at={{ block: closing.block, timestamp: closing.timestamp }}
+                />
+              )
+            )}
+          </ProvReceiptsScope>
         </div>
         {/* Tools is part of the row, not of the export menu that usually fills
             it: a caller renders its shapes only once the view has loaded

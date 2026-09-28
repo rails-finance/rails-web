@@ -29,12 +29,18 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { formatDate } from "@/lib/date";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 
 /** A dropdown row. `price` absent means the protocol states none for this
  *  asset: the row names what is held and `reason` says why no figure follows
  *  it. A `PriceStripAsset` (the bottom dock's shape, always priced) is
- *  assignable here, so the priced views pass through unchanged. */
-export type LatestPriceAsset = Omit<PriceStripAsset, "price"> & { price?: number };
+ *  assignable here, so the priced views pass through unchanged.
+ *
+ *  `info` is the asset's oracle receipt — the same one the view builds for
+ *  this price elsewhere on the page. Absent on a view not yet wired for it;
+ *  present, it traces the trigger's leading figure (the dropdown's own rows
+ *  stay their own surface). */
+export type LatestPriceAsset = Omit<PriceStripAsset, "price"> & { price?: number; info?: Provenance };
 
 /** The block a closed position's prices were read at: its closing row. */
 export interface PricesAt {
@@ -142,14 +148,30 @@ export function LatestPrices({
                 show with no price next to it was the odd half of the row. */}
             {/* An unpriced first asset puts its symbol where the figure would
                 be, so the trigger still names what the position holds. */}
-            <span className={`tabular-nums ${priced(first) ? "font-bold text-green-400" : "font-medium text-rb-500"}`}>
-              {priced(first)
-                ? first.unit
-                  ? fmtNative(first.price as number, first.unit)
-                  : fmtPrice(first.price as number)
-                : first.symbol}
-            </span>
-            {more > 0 && <span className="tabular-nums text-rb-500">+{more}</span>}
+            {priced(first) && first.info ? (
+              <Prov info={first.info} value={String(first.price)} symbol={first.symbol}>
+                <span className="tabular-nums font-bold text-green-400">
+                  {first.unit ? fmtNative(first.price as number, first.unit) : fmtPrice(first.price as number)}
+                </span>
+              </Prov>
+            ) : (
+              <span
+                className={`tabular-nums ${priced(first) ? "font-bold text-green-400" : "font-medium text-rb-500"}`}
+              >
+                {priced(first)
+                  ? first.unit
+                    ? fmtNative(first.price as number, first.unit)
+                    : fmtPrice(first.price as number)
+                  : first.symbol}
+              </span>
+            )}
+            {/* The count is chrome naming how many more rows the dropdown
+                holds, not a value of its own — exempt rather than traced. */}
+            {more > 0 && (
+              <span className="tabular-nums text-rb-500" data-prov-exempt>
+                +{more}
+              </span>
+            )}
           </>
         ) : (
           <>

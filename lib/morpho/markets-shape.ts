@@ -67,6 +67,10 @@ export interface MorphoMarketFamily {
  *  were born with are all they have, so N of them on the same pair are one
  *  line with a count, not N chips. */
 export interface MorphoEmptyRun {
+  /** The address every market in the run shares — null for the idle run.
+   *  Two token contracts can carry the same symbol, so a list key needs this,
+   *  not `collateralSymbol`. */
+  collateralToken: string | null;
   collateralSymbol: string | null;
   collateralNamed: boolean;
   lltv: number;
@@ -99,6 +103,7 @@ function shapeLoanGroup(g: MorphoLoanGroup): MorphoLoanGroupShape {
     if (run) run.count++;
     else
       runs.set(key, {
+        collateralToken: m.isIdle ? null : m.collateralToken,
         collateralSymbol: m.collateralSymbol,
         collateralNamed: m.collateralNamed,
         lltv: m.lltv,

@@ -1058,7 +1058,16 @@ export function ChainTruthTower({
     setCollapsed(isFlowsCollapsed(collapseKey));
     setSettled(true);
   }, [collapseKey]);
-  const bodyId = useId();
+  // A tree-position id (bare useId()) can drift between the server and the
+  // browser when a sibling elsewhere on the page mounts client-only (an
+  // export menu's dynamic(ssr:false) import, say): its absence during SSR
+  // shifts everything rendered after it. collapseKey is a plain string
+  // (the route's protocol id), identical on both renders, so it anchors the
+  // id instead. useId still backs the rare case with no collapseKey — where
+  // the id names nothing else, so tree drift there has no aria-controls to
+  // break.
+  const reactId = useId();
+  const bodyId = collapseKey ? `flows-body-${collapseKey}` : reactId;
   const registry = useReceiptRegistry();
   const holds = (s: TowerSideData) =>
     s.current.some((l) => l.amount > 0) || (s.eventlessGains ?? []).some((l) => l.amount > 0);
