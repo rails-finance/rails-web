@@ -16,6 +16,7 @@ import {
   fluidOperateContent,
   fluidLiquidationContent,
   fluidTransferContent,
+  fluidMintContent,
   fluidEventFallbackContent,
 } from "@/lib/shared/learn-more-content";
 import { pairLabel } from "@/lib/fluid/asset-catalog";
@@ -56,6 +57,7 @@ export function fluidLearnMoreContent(ctx: FluidContext): LearnMoreContent {
     case "absorbed":
       return fluidLiquidationContent(true);
     case "mint":
+      return fluidMintContent();
     case "transfer":
       return fluidTransferContent();
     default:

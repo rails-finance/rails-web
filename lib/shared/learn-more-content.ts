@@ -2360,10 +2360,10 @@ const FLUID_DOC_URL = "https://docs.fluid.io";
 export function fluidOperateContent(kind: "deposit" | "borrow" | "composite"): LearnMoreContent {
   const intro =
     kind === "deposit"
-      ? "Deposits and withdrawals move the position's collateral leg. Fluid routes every token through its central Liquidity layer, but the vault's LogOperate event carries the exact signed amount for this position."
+      ? "A deposit adds collateral to a Fluid position and a withdrawal takes it out; the collateral is what the position borrows against. Anyone can add collateral to any position, but only the holder of the position's NFT can withdraw."
       : kind === "borrow"
-        ? "Borrows and repays move the position's debt leg. The emitted amount is the resolved actual token amount — a max-repay sentinel is resolved to the true figure before the event fires."
-        : "One Fluid operation can move BOTH legs — deposit-and-borrow in a single transaction is the protocol's native shape. The event carries one signed amount per leg.";
+        ? "A borrow draws the vault's debt token against the position's collateral and a repay pays it back; the debt grows with interest until it is repaid. Anyone can repay a position's debt, but only the holder of its NFT can borrow more."
+        : "One Fluid operation can move a position's collateral and its debt together, such as depositing and borrowing in a single step. Each side is recorded as its own signed amount.";
   return {
     title:
       kind === "deposit"
@@ -2395,8 +2395,8 @@ export function fluidLiquidationContent(absorbed: boolean): LearnMoreContent {
   return {
     title: absorbed ? "How Absorption Works" : "How Fluid Liquidations Work",
     intro: absorbed
-      ? "When a position falls beyond the maximum liquidation limit, Fluid absorbs its remaining debt and collateral into vault-level reserves — the position is zeroed without its own on-chain event."
-      : "Fluid liquidates price-band 'ticks', not individual positions — one liquidation sweeps every position in the affected band at once, and the on-chain event names no position.",
+      ? "When a position sinks past the vault's maximum liquidation limit, the vault takes over its remaining debt and collateral, leaving the position empty. No event of the position's own records it."
+      : "When a position's debt grows too large against its collateral, a liquidator repays part of the debt and takes collateral worth a little more in return. Fluid does this for a whole price band of positions at once, so the on-chain event names no single position.",
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -2416,20 +2416,44 @@ export function fluidLiquidationContent(absorbed: boolean): LearnMoreContent {
   };
 }
 
+export function fluidMintContent(): LearnMoreContent {
+  return {
+    title: "How Opening a Position Works",
+    intro:
+      "Opening a Fluid position mints an NFT that is the position: it holds one vault's collateral and debt, and whoever holds the NFT controls them.",
+    detailsHeading: "Key concepts:",
+    details: [
+      {
+        bold: "One vault, one pair",
+        text: "each vault lends one debt token against one collateral token, and a position lives in exactly one vault.",
+      },
+      {
+        bold: "Funded in the same step",
+        text: "the vault factory mints the NFT in the same transaction as the position's first deposit or borrow, so the mint row marks where the position began.",
+      },
+      {
+        bold: "What the holder controls",
+        text: "only the NFT's holder can withdraw collateral or borrow more; anyone can add collateral or repay debt.",
+      },
+    ],
+    links: [{ label: "Fluid docs", url: FLUID_DOC_URL }],
+  };
+}
+
 export function fluidTransferContent(): LearnMoreContent {
   return {
     title: "How Ownership Transfers Work",
     intro:
-      "Fluid positions are ERC-721 NFTs — the position itself can change wallets. A transfer moves the whole position (collateral, debt, liquidation exposure) to the new owner; balances are untouched.",
+      "A Fluid position is an NFT, and transferring the NFT hands the whole position, collateral, debt and liquidation exposure, to the new holder. The balances stay as they were.",
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "Mint = position created",
-        text: "the factory mints the NFT in the same transaction as the position's first operate; the mint row marks where the position began.",
-      },
-      {
         bold: "Era ownership",
         text: "each timeline event shows the owner AT that event — a position sold mid-life shows its history under the owner who lived it.",
+      },
+      {
+        bold: "Round trips",
+        text: "an NFT can leave its holder and come back within one transaction; when it does, the holder at the end is the holder at the start.",
       },
     ],
     links: [{ label: "Fluid docs", url: FLUID_DOC_URL }],
@@ -2440,7 +2464,7 @@ export function fluidEventFallbackContent(): LearnMoreContent {
   return {
     title: "About This Event",
     intro:
-      "An on-chain action on a Fluid vault position, decoded from the vault's own events and replayed into the position's running balances.",
+      "Every change to a Fluid position is an operation on its vault that moves the collateral, the debt, or both.",
     detailsHeading: "Key concepts:",
     details: [
       {

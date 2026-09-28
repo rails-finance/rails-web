@@ -22,7 +22,7 @@ import { AssetAmount } from "@/components/shared/asset-amount";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { settledNowProv, positionSigmaProv, peakLegProv } from "@/lib/fluid/event-provenance";
+import { settledNowProv, positionSigmaProv, peakLegProv, accruedInterestProv } from "@/lib/fluid/event-provenance";
 import { fluidLegHolds } from "@/lib/fluid/explainer-clauses";
 import { liveSettledProv } from "@/lib/fluid/live-provenance";
 import { fluidPositionContent } from "@/lib/fluid/position-content";
@@ -125,9 +125,13 @@ function LegValue({
   );
 }
 
-/** Beneath a settled figure, the Σ replay rides as a traced footnote — the
- *  gap between the two lanes is the accrued interest (and any sweep) the
- *  replay deliberately excludes. */
+/** Beneath a settled figure, the Σ replay rides as a traced footnote, and the
+ *  gap between the two lanes is stated beside it as the interest it is: the
+ *  replay carries every operate and liquidation amount and no interest, so
+ *  "from events + interest" reconciles to the headline above. The gap is read
+ *  off the same two figures the card shows; it drops when it rounds to nothing
+ *  at the displayed precision (a smart leg's share count accrues none) or runs
+ *  negative. */
 function SigmaFootnote({
   v,
   side,
@@ -137,17 +141,36 @@ function SigmaFootnote({
   side: "supply" | "borrow";
   chain?: FluidPositionChainResponse | null;
 }) {
-  if (!v.settled && !(chain && chain.found && !chain.chainStale)) return null;
+  const live = chain && chain.found && !chain.chainStale ? chain : null;
+  if (!v.settled && !live) return null;
   const sym = fluidLegName(v, side, chain);
   const sigma = side === "supply" ? v.colNet : v.debtNet;
   const n = Number(sigma);
   if (!Number.isFinite(n) || n <= 0) return null;
+  const headline = Number(
+    live != null
+      ? side === "supply"
+        ? live.supplyExact
+        : live.borrowExact
+      : side === "supply"
+        ? v.settled?.supply
+        : v.settled?.borrow,
+  );
+  const gap = Number.isFinite(headline) ? headline - n : NaN;
+  const showGap = Number.isFinite(gap) && gap > 0 && formatNumber(gap) !== "0";
+  const sigmaFig = (
+    <Prov info={positionSigmaProv(side, sym)}>
+      {formatNumber(n)} {sym}
+    </Prov>
+  );
+  if (!showGap) return <StatFootnote>events add up to {sigmaFig}</StatFootnote>;
   return (
     <StatFootnote>
-      events add up to{" "}
-      <Prov info={positionSigmaProv(side, sym)}>
-        {formatNumber(n)} {sym}
-      </Prov>
+      {sigmaFig} from events +{" "}
+      <Prov info={accruedInterestProv(side, sym)}>
+        {formatNumber(gap)} {sym}
+      </Prov>{" "}
+      interest
     </StatFootnote>
   );
 }
@@ -175,7 +198,12 @@ export function FluidPositionCard({
 }) {
   const pairText = fluidPairText(v, chain);
   const identityMeta = (
-    <PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} liquidationCount={v.liquidationCount} />
+    <PositionCardMeta
+      lastActivityAt={v.lastActivityAt}
+      eventCount={v.txCount}
+      eventCountTitle={`${v.txCount} transaction${v.txCount === 1 ? "" : "s"} on this position, liquidations excluded`}
+      liquidationCount={v.liquidationCount}
+    />
   );
 
   // The owner pill (facehash + copy + bookmark) leads; the pair rides

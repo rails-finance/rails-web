@@ -11,7 +11,7 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { colDeltaProv, debtDeltaProv, type FluidCoords } from "@/lib/fluid/event-provenance";
 import { pairLabel } from "@/lib/fluid/asset-catalog";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
-import { fluidExplainerTeaser, type FluidEvent } from "@/lib/fluid/explainer-clauses";
+import { fluidExplainerTeaser, transferRoundTrip, type FluidEvent } from "@/lib/fluid/explainer-clauses";
 import { FluidEventHeader } from "./fluid-event-header";
 import { FluidEventDetail } from "./fluid-event-detail";
 import { FluidEventExplainer, fluidLearnMoreContent } from "./fluid-event-explainer";
@@ -142,7 +142,11 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings }
       iconColumn={iconSlot}
       header={
         <FluidEventHeader
-          actionLabel={event.actionLabel}
+          actionLabel={
+            // A hop of an NFT round trip inside one transaction says so at T1;
+            // the explainer states the holder it left and came back to.
+            transferRoundTrip(sibs, event) ? "Ownership transfer · round trip in this transaction" : event.actionLabel
+          }
           ctx={ctx}
           timestamp={event.timestamp}
           txHash={event.txHash}
