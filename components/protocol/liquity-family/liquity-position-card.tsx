@@ -272,7 +272,7 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
           const mcr = v.status === "liquidated" ? forkMcrAt(branch, { timestamp: v.lastActivityAt }) : branch.mcr;
           return `${Math.round(mcr * 100)}%`;
         })(),
-        docsLink: cfg.docsLink,
+        docsLinks: cfg.positionDocsLinks ?? [cfg.docsLink],
       }),
   };
 }

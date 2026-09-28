@@ -19,8 +19,10 @@ export interface LiquityForkEconomicsParams {
   name: string;
   /** The fork's stablecoin symbol ("USDaf" | "ebUSD" | "BD"). */
   debtSymbol: string;
-  /** One live-verified docs/site link for the FAQ. */
-  docsLink?: LearnMoreLink;
+  /** Live-verified docs/site link(s) for the FAQ — question-level where the
+   *  fork's docs were read (Ebisu, Asymmetry, 2026-09-28), else the single
+   *  general link. */
+  docsLinks?: LearnMoreLink[];
 }
 
 /** The Trove's redemptions as Liquity V2 states them: the debt they cleared at
@@ -283,7 +285,7 @@ export function liquityForkRedemptionOutcome(
 export function liquityForkEconomicsContent({
   name,
   debtSymbol,
-  docsLink,
+  docsLinks,
 }: LiquityForkEconomicsParams): LearnMoreContent {
   return {
     title: "About the Economics",
@@ -307,6 +309,6 @@ export function liquityForkEconomicsContent({
         text: `${debtSymbol} holders can redeem at $1 face against the branch's lowest-rate troves first — a peg mechanism, not a penalty.`,
       },
     ],
-    links: docsLink ? [docsLink] : undefined,
+    links: docsLinks && docsLinks.length > 0 ? docsLinks : undefined,
   };
 }

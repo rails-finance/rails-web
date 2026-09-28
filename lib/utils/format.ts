@@ -134,3 +134,10 @@ export const formatApproximate = (value: number): string => {
   }
   return formatPrice(value);
 };
+
+// "A" vs "An" for a display name or symbol dropped into a sentence. Read by
+// spelling, with named exceptions for an acronym that spells with a vowel but
+// SOUNDS like a consonant (USDaf reads "you-ess-dee-af", so "a", not "an").
+const CONSONANT_SOUND_VOWEL_SPELLING = new Set(["USDaf"]);
+export const indefiniteArticle = (word: string): "A" | "An" =>
+  CONSONANT_SOUND_VOWEL_SPELLING.has(word) || !/^[aeiou]/i.test(word) ? "A" : "An";

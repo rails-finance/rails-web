@@ -23,14 +23,16 @@ export interface LiquityForkPositionContentParams {
   isZombie?: boolean;
   /** This branch's minimum collateral ratio, e.g. "115%" — omit rather than guess. */
   minCR?: string;
-  /** One live-verified docs/site link. */
-  docsLink?: LearnMoreLink;
+  /** Live-verified docs/site link(s) — one or more question-level links where
+   *  the fork's docs were read (Ebisu, Asymmetry, 2026-09-28), else the single
+   *  general link. */
+  docsLinks?: LearnMoreLink[];
 }
 
 export function liquityForkPositionContent(opts: LiquityForkPositionContentParams): LearnMoreContent {
-  const { name, debtSymbol, status, isBatched, isZombie, minCR, docsLink } = opts;
+  const { name, debtSymbol, status, isBatched, isZombie, minCR, docsLinks } = opts;
   const reserve = forkLiquidationReserve(name);
-  const links = docsLink ? [docsLink] : undefined;
+  const links = docsLinks && docsLinks.length > 0 ? docsLinks : undefined;
   const minCRText = minCR ? `below ${minCR}` : "below its branch's minimum";
 
   if (status === "liquidated") {

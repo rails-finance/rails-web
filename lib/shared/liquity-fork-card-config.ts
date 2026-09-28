@@ -9,6 +9,9 @@
 // card file's own OPS lookup, keyed by the same id.
 
 import type { LiquityFamilyId } from "@/components/protocol/liquity-family/types";
+import type { LearnMoreLink } from "@/components/shared/learn-more-modal";
+import { EBISU_DOCS } from "@/lib/ebisu/asset-catalog";
+import { ASYMMETRY_DOCS } from "@/lib/asymmetry/asset-catalog";
 
 export interface LiquityForkCardConfig {
   id: LiquityFamilyId;
@@ -18,6 +21,10 @@ export interface LiquityForkCardConfig {
   debtSymbol: string;
   /** One live-verified docs/site link, threaded into the learn-more content. */
   docsLink: { label: string; url: string };
+  /** Question-level docs links for the position + lifetime-flows T4s (Ebisu,
+   *  Asymmetry only — their docs were read and verified 2026-09-28). Falls
+   *  back to [docsLink] where unset. */
+  positionDocsLinks?: LearnMoreLink[];
   /** The delegate-deprecation announcement link — set ONLY on the reference
    *  deployment (its ARM delegate wind-down); the forks carry no such notice. */
   delegateDeprecationAnnouncement?: string;
@@ -37,12 +44,14 @@ export const LIQUITY_FORK_CARD_CONFIGS: Record<LiquityFamilyId, LiquityForkCardC
     name: "Asymmetry",
     debtSymbol: "USDaf",
     docsLink: { label: "Asymmetry docs", url: "https://docs.asymmetry.finance" },
+    positionDocsLinks: [...ASYMMETRY_DOCS.trove, ...ASYMMETRY_DOCS.redemption],
   },
   ebisu: {
     id: "ebisu",
     name: "Ebisu",
     debtSymbol: "ebUSD",
     docsLink: { label: "Ebisu", url: "https://ebisu.money" },
+    positionDocsLinks: [...EBISU_DOCS.trove, ...EBISU_DOCS.redemption],
   },
   basedollar: {
     id: "basedollar",

@@ -38,6 +38,7 @@ export function LiquityForkClosedExplanation({
   peakCollateral,
   peakDebt,
   seizure,
+  redemptionSource,
 }: {
   status: "closed" | "liquidated";
   collateralSymbol: string;
@@ -49,6 +50,12 @@ export function LiquityForkClosedExplanation({
   /** The final liquidation's last recorded balances (the seizure legs) —
    *  from the life's own liquidate event; null while the timeline streams. */
   seizure?: { coll: number; debt: number } | null;
+  /** Named only where a branch's redemption balances are emitted by a
+   *  DIFFERENT contract than the one that emits its opens/adjusts/closes/
+   *  liquidations. Ebisu redeems through each branch's EbisuBranchManager,
+   *  not its TroveManager (server sql/migrations 291/292); Asymmetry and
+   *  Basedollar redeem through the TroveManager itself, so they omit this. */
+  redemptionSource?: string;
 }) {
   const liquidated = status === "liquidated";
 
@@ -102,8 +109,18 @@ export function LiquityForkClosedExplanation({
   }
   bullets.push(
     <span key="record">
-      The timeline below is the life&rsquo;s complete record: every balance the branch&rsquo;s TroveManager emitted for
-      this Trove, from its opening to this ending.
+      {redemptionSource ? (
+        <>
+          The timeline below is the life&rsquo;s complete record: every balance the branch emitted for this Trove
+          &mdash; its TroveManager for opens, adjusts, closes and liquidations, its {redemptionSource} for redemptions
+          &mdash; from its opening to this ending.
+        </>
+      ) : (
+        <>
+          The timeline below is the life&rsquo;s complete record: every balance the branch&rsquo;s TroveManager emitted
+          for this Trove, from its opening to this ending.
+        </>
+      )}
     </span>,
   );
 

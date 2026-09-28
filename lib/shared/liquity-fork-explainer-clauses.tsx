@@ -98,7 +98,7 @@ import {
   forkLiquidationReserve,
 } from "@/lib/shared/liquity-fork-ops";
 import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots } from "@/lib/shared/explainer-prose";
-import { formatNumber, formatUsdValue, formatPrice } from "@/lib/utils/format";
+import { formatNumber, formatUsdValue, formatPrice, indefiniteArticle } from "@/lib/utils/format";
 import { forkLiquidationCleared } from "@/components/protocol/liquity-fork/liquity-fork-forensics";
 
 /** The two fork contexts are structural twins; either drives the explainer. */
@@ -609,9 +609,9 @@ export function liquityForkEventSlots(
     case "redeemCollateral": {
       const happened = (
         <>
-          A {debt} holder redeemed against the branch, and this Trove — among the branch&rsquo;s lowest interest rates
-          at the time — gave up {collDeltaFig()} of collateral while {debtDeltaFig()} of its debt was cancelled at $1
-          face
+          {indefiniteArticle(debt)} {debt} holder redeemed against the branch, and this Trove — among the branch&rsquo;s
+          lowest interest rates at the time — gave up {collDeltaFig()} of collateral while {debtDeltaFig()} of its debt
+          was cancelled at $1 face
           {emittedPrice != null ? (
             <>
               , with {coll} priced at {redPriceFig()} — the figure the branch emitted with the redemption itself

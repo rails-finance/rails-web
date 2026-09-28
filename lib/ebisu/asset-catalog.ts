@@ -145,6 +145,31 @@ export const MIN_DEBT = 2000;
 export const DEBT_ADDRESS = "0x09fd37d9aa613789c517e76df1c53aece2b60df4";
 export const DEBT_DECIMALS = 18;
 
+/** Question-level docs links for the T4 "?" modals (learn-more-content.ts's
+ *  `docsByTopic`) — read and verified against Ebisu's own docs,
+ *  ebisu.gitbook.io/ebisu-money (docs.ebisu.money does not resolve), 2026-09-28
+ *  (Miles's OK, read-only); every URL below resolves. */
+const HOW_IT_WORKS = "https://ebisu.gitbook.io/ebisu-money/protocol-mechanics/how-it-works";
+const BORROWING = "https://ebisu.gitbook.io/ebisu-money/using-ebisu/borrowing-ebusd";
+const MANAGING = "https://ebisu.gitbook.io/ebisu-money/managing-your-ebusd-loan";
+const DELEGATION = "https://ebisu.gitbook.io/ebisu-money/using-ebisu/borrowing-ebusd/managed-interest-rates";
+export const EBISU_DOCS = {
+  trove: [{ label: "How Troves work", url: HOW_IT_WORKS }],
+  open: [{ label: "How to open a Trove", url: BORROWING }],
+  adjust: [{ label: "How to adjust a Trove", url: MANAGING }],
+  close: [{ label: "How to close a Trove", url: MANAGING }],
+  rate: [
+    { label: "How the user-set rate works", url: BORROWING },
+    { label: "How rate delegation works", url: DELEGATION },
+  ],
+  redemption: [{ label: "How redemptions work", url: HOW_IT_WORKS }],
+  liquidation: [
+    { label: "How liquidations work", url: HOW_IT_WORKS },
+    { label: "How the Stability Pool works", url: "https://ebisu.gitbook.io/ebisu-money/earning-ebusd-yield" },
+  ],
+  batch: [{ label: "How rate delegation works", url: DELEGATION }],
+};
+
 /** The index derivation of the zombie state, for surfaces with no per-row
  *  chain read (listing pills, filter buckets): an OPEN Trove below the
  *  MIN_DEBT floor. The detail page's live getTroveStatus wins where it runs.

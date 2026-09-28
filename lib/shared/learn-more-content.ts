@@ -8,6 +8,7 @@ import { SEAMLESS_DOCS_URL, v3Brand, v3Possessive, type V3Protocol } from "@/lib
 import { FAQ_URLS, AAVE_FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { ALCHEMIX_DOCS } from "@/lib/alchemix/learn-more";
 import type { VaultPositionFamily } from "@/lib/aave-vaults/vault-position";
+import { indefiniteArticle } from "@/lib/utils/format";
 
 // ── CoW Protocol ─────────────────────────────────────────────────────────────
 
@@ -2556,41 +2557,89 @@ export function mapleEventFallbackContent(): LearnMoreContent {
 // Shared, parameterized content for the fork explorers: the mechanics are the
 // V2 architecture's (user-set interest, rate-ordered redemptions, per-branch
 // MCR, batch delegation); what differs — the protocol name, the stablecoin,
-// the one live-verified docs link — is passed in. Only the root URLs verify
-// live from this machine (deep doc paths 404), so each protocol carries a
-// single link.
-
+// the docs links — is passed in.
+//
+// Quick Links, as Liquity V2's own modals carry them (liquityRedemptionContent
+// etc., above): one link per QUESTION the card raises, not one link for the
+// whole protocol. `docsByTopic` carries those, read and verified against
+// Ebisu's (ebisu.gitbook.io/ebisu-money) and Asymmetry's (docs.asymmetry.finance)
+// own docs sites 2026-09-28 (Miles's OK; read-only) — every URL below resolves.
+// A fork with no topic set for a card (Basedollar, whose docs are unread) falls
+// back to `docsLink`, the one general link every fork still carries.
 export interface LiquityForkLearnMoreParams {
   /** Display name ("Ebisu" | "Asymmetry"). */
   protocolName: string;
   /** The fork's stablecoin ("ebUSD" | "USDaf"). */
   stablecoin: string;
-  /** One live-verified link (site or docs root); omit rather than guess. */
+  /** One live-verified link (site or docs root) — the fallback below. */
   docsLink?: { label: string; url: string };
+  /** Question-level docs links, keyed by the card topic that wants them. */
+  docsByTopic?: {
+    trove?: { label: string; url: string }[];
+    open?: { label: string; url: string }[];
+    adjust?: { label: string; url: string }[];
+    close?: { label: string; url: string }[];
+    rate?: { label: string; url: string }[];
+    redemption?: { label: string; url: string }[];
+    liquidation?: { label: string; url: string }[];
+    batch?: { label: string; url: string }[];
+  };
 }
 
-const forkLinks = (p: LiquityForkLearnMoreParams) => (p.docsLink ? [p.docsLink] : undefined);
+const forkLinks = (
+  p: LiquityForkLearnMoreParams,
+  topic?: keyof NonNullable<LiquityForkLearnMoreParams["docsByTopic"]>,
+) => {
+  const byTopic = topic ? p.docsByTopic?.[topic] : undefined;
+  if (byTopic && byTopic.length > 0) return byTopic;
+  return p.docsLink ? [p.docsLink] : undefined;
+};
 
 export function liquityForkBorrowingContent(
   p: LiquityForkLearnMoreParams,
   eventType: "openTrove" | "adjustTrove" | "closeTrove" = "adjustTrove",
 ): LearnMoreContent {
-  const title =
-    eventType === "openTrove"
-      ? "How Opening a Trove Works"
-      : eventType === "closeTrove"
-        ? "How Closing a Trove Works"
-        : "How Trove Adjustments Work";
+  const Art = indefiniteArticle(p.protocolName);
+  const art = Art === "An" ? "an" : "a";
+
+  if (eventType === "openTrove") {
+    return {
+      title: "How Opening a Trove Works",
+      intro: `${Art} ${p.protocolName} Trove holds one branch's collateral and mints ${p.stablecoin} against it, at an interest rate the borrower sets themselves — the Liquity V2 architecture. Interest accrues continuously into the debt from the moment the Trove opens.`,
+      stepsHeading: "The mechanics:",
+      steps: [
+        "Each collateral branch is its own market with its own minimum collateral ratio — below it, anyone can liquidate the Trove.",
+        `The chosen interest rate is also the Trove's place in the redemption queue: redemptions sweep the LOWEST rates first, so a higher rate buys ${p.stablecoin} peg protection at a carrying cost.`,
+        `Drawing ${p.stablecoin} pays an upfront fee (a week of average branch interest) added straight to the debt, and a fixed liquidation reserve is set aside apart from the collateral.`,
+      ],
+      links: forkLinks(p, "open"),
+    };
+  }
+
+  if (eventType === "closeTrove") {
+    return {
+      title: "How Closing a Trove Works",
+      intro: `Closing ${art} ${p.protocolName} Trove repays its debt in full and hands the collateral back to the owner — the Trove's last act.`,
+      stepsHeading: "The mechanics:",
+      steps: [
+        "The owner repays the entire outstanding debt, interest included — there is no partial close.",
+        "All remaining collateral, plus the liquidation reserve set aside when the Trove opened, returns to the owner.",
+        "The Trove NFT is burned: the position stops accruing interest and drops out of the redemption queue for good.",
+      ],
+      links: forkLinks(p, "close"),
+    };
+  }
+
   return {
-    title,
-    intro: `A ${p.protocolName} Trove holds one branch's collateral and mints ${p.stablecoin} against it, at an interest rate the borrower sets themselves — the Liquity V2 architecture. Interest accrues continuously into the debt; the rate can be changed at any time.`,
+    title: "How Trove Adjustments Work",
+    intro: `An adjustment changes ${art} ${p.protocolName} Trove's collateral or debt without closing it — adding or withdrawing collateral, drawing more ${p.stablecoin}, or repaying some of what's owed.`,
     stepsHeading: "The mechanics:",
     steps: [
-      `Each collateral branch is its own market with its own minimum collateral ratio — below it, anyone can liquidate the Trove.`,
-      `The chosen interest rate is also the Trove's place in the redemption queue: redemptions sweep the LOWEST rates first, so a higher rate buys ${p.stablecoin} peg protection at a carrying cost.`,
-      `Drawing ${p.stablecoin} pays an upfront fee (a week of average branch interest) added to the debt; closing repays the remaining debt, interest included, and returns all collateral.`,
+      "The collateral ratio moves with whichever side changed; it must stay above the branch's minimum or the adjustment reverts.",
+      `Drawing new ${p.stablecoin} pays the same upfront fee opening one does (a week of average branch interest); repaying does not.`,
+      "The interest rate itself is untouched by an adjustment — changing it is its own, separate action.",
     ],
-    links: forkLinks(p),
+    links: forkLinks(p, "adjust"),
   };
 }
 
@@ -2604,7 +2653,7 @@ export function liquityForkRateContent(p: LiquityForkLearnMoreParams): LearnMore
       `Redemption order: when ${p.stablecoin} trades below $1, holders redeem it against the system at face value, sweeping the lowest-rate Troves first. A higher rate pushes the Trove later in that queue.`,
       "Adjusting the rate shortly after the last adjustment pays an upfront fee (rate-change spam protection); otherwise it is free.",
     ],
-    links: forkLinks(p),
+    links: forkLinks(p, "rate"),
   };
 }
 
@@ -2618,7 +2667,7 @@ export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams): Lea
       "Its collateral ratio RISES as a result.",
       `A partial redemption that leaves the Trove below the minimum debt makes it a "zombie": outside the rate-ordered queue, redeemed first the next time redemptions route through the branch.`,
     ],
-    links: forkLinks(p),
+    links: forkLinks(p, "redemption"),
   };
 }
 
@@ -2633,7 +2682,7 @@ export function liquityForkLiquidationContent(p: LiquityForkLearnMoreParams): Le
       "The Stability Pool and the other Troves take collateral worth at most the debt plus the branch's liquidation penalty. Any collateral above that is the owner's surplus, credited to them in the branch's CollSurplusPool to claim.",
       "Each branch sets its own minimum ratio, so the same price move can liquidate one branch's Troves and not another's.",
     ],
-    links: forkLinks(p),
+    links: forkLinks(p, "liquidation"),
   };
 }
 
@@ -2647,7 +2696,7 @@ export function liquityForkBatchContent(p: LiquityForkLearnMoreParams): LearnMor
       `A batched Trove's debt is tracked as a share of the batch total, so the exact ${p.stablecoin} figure is derived from batch shares.`,
       "Leaving the batch returns the rate to self-management.",
     ],
-    links: forkLinks(p),
+    links: forkLinks(p, "batch"),
   };
 }
 
@@ -2674,7 +2723,7 @@ export function liquityForkEventFallbackContent(p: LiquityForkLearnMoreParams): 
         text: `${p.stablecoin} holders can redeem at $1 face against the lowest-rate Troves — a peg mechanism, not a penalty.`,
       },
     ],
-    links: forkLinks(p),
+    links: forkLinks(p, "trove"),
   };
 }
 

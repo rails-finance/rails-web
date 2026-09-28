@@ -40,13 +40,16 @@ import {
   liquidationLegProv,
   type AsymmetryCoords,
 } from "@/lib/asymmetry/event-provenance";
-import { DEBT_SYMBOL } from "@/lib/asymmetry/asset-catalog";
+import { DEBT_SYMBOL, ASYMMETRY_DOCS } from "@/lib/asymmetry/asset-catalog";
 
-// The one live-verified Asymmetry link.
+// The general Asymmetry docs link plus the question-level docs links per card
+// topic (ASYMMETRY_DOCS — read and verified against docs.asymmetry.finance,
+// 2026-09-28, Miles's OK).
 const ASYMMETRY_FORK = {
   protocolName: "Asymmetry",
   stablecoin: DEBT_SYMBOL,
   docsLink: { label: "Asymmetry docs", url: "https://docs.asymmetry.finance" },
+  docsByTopic: ASYMMETRY_DOCS,
 };
 
 // The fork explainer's provenance builders — the figures in the prose echo

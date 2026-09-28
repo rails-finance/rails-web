@@ -17,14 +17,22 @@ const intro = (
       at a dollar by paying off the lowest-rate loans first.
     </p>
     <p>
-      Each branch sets a minimum collateral ratio, below which anyone can liquidate a Trove. Ebisu&apos;s governance can
-      change it: weETH&apos;s was 128% and WBTC&apos;s 132% until 4 January 2026, when both became 120%. A past
-      liquidation is shown against the minimum in force at its block.
+      Each branch sets its own minimum collateral ratio, below which anyone can liquidate a Trove: 120% for weETH and
+      WBTC, 115% for sUSDe and stcUSD, 135% for LBTC. Ebisu&apos;s governance can move it — weETH&apos;s was 128% and
+      WBTC&apos;s 132% until 4 January 2026. A past liquidation is shown against the minimum in force at its block.
     </p>
     <p>
-      Each row of the listing is one Trove: its collateral, its ebUSD debt, the rate its owner chose, and its status.
-      Collateral ratios and dollar values are off by default — Ebisu states amounts in each Trove&apos;s own tokens, and
-      those extra figures are conversions layered on top. Or{" "}
+      A liquidated Trove&apos;s debt is offset first by its branch&apos;s Stability Pool — ebUSD deposited by other
+      users, who receive the seized collateral at a discount — and redistributed across the branch&apos;s other Troves
+      for whatever the pool can&apos;t cover.
+    </p>
+    <p>
+      Drawing new ebUSD, whether at open or on a later adjustment, pays a one-time upfront fee — about a week of the
+      Trove&apos;s own interest — added straight to the debt.
+    </p>
+    <p>
+      Each row of the listing is one Trove: its collateral, its ebUSD debt, its collateral ratio, its dollar value, the
+      rate its owner chose, and its status. Or{" "}
       <Link href="/ethereum/ebisu/branches" className="text-blue-500 hover:underline">
         compare the branches and their redemption queues
       </Link>

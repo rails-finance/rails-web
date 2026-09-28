@@ -72,7 +72,7 @@ import {
   liquityForkEconomicsContent,
   liquityForkRedemptionOutcome,
 } from "@/lib/shared/liquity-fork-economics-explanation";
-import { DEBT_SYMBOL } from "@/lib/ebisu/asset-catalog";
+import { DEBT_SYMBOL, EBISU_DOCS } from "@/lib/ebisu/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -332,6 +332,7 @@ export default function EbisuTroveDetail({
               }
             : null
         }
+        redemptionSource="EbisuBranchManager"
       />
     ) : null;
 
@@ -392,7 +393,7 @@ export default function EbisuTroveDetail({
               const forkOpts = {
                 name: "Ebisu",
                 debtSymbol: DEBT_SYMBOL,
-                docsLink: { label: "Ebisu", url: "https://ebisu.money" },
+                docsLinks: [...EBISU_DOCS.trove, ...EBISU_DOCS.redemption],
               };
               return (
                 <ChainTruthTower

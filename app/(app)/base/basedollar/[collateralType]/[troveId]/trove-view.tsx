@@ -394,7 +394,7 @@ export default function BasedollarTroveDetail({
               const forkOpts = {
                 name: "Base Dollar",
                 debtSymbol: DEBT_SYMBOL,
-                docsLink: { label: "Basedollar", url: "https://basedollar.money" },
+                docsLinks: [{ label: "Basedollar", url: "https://basedollar.money" }],
               };
               return (
                 <ChainTruthTower

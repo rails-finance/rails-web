@@ -153,6 +153,36 @@ export const MIN_DEBT = 2000;
 export const DEBT_ADDRESS = "0x9cf12ccd6020b6888e4d4c4e4c7aca33c1eb91f8";
 export const DEBT_DECIMALS = 18;
 
+/** Question-level docs links for the T4 "?" modals (learn-more-content.ts's
+ *  `docsByTopic`) — read and verified against docs.asymmetry.finance
+ *  2026-09-28 (Miles's OK, read-only); every URL below resolves. Asymmetry's
+ *  docs don't split opening/adjusting/closing into separate pages, so all
+ *  three point at the one borrowing page that covers them. */
+const BORROWING = "https://docs.asymmetry.finance/usdaf-stablecoin/borrowing";
+export const ASYMMETRY_DOCS = {
+  trove: [{ label: "How borrowing works", url: BORROWING }],
+  open: [{ label: "How to open a Trove", url: BORROWING }],
+  adjust: [{ label: "How to adjust a Trove", url: BORROWING }],
+  close: [{ label: "How to close a Trove", url: BORROWING }],
+  rate: [
+    {
+      label: "How the user-set rate works",
+      url: "https://docs.asymmetry.finance/usdaf-stablecoin/what-are-customizable-fixed-interest-rates",
+    },
+  ],
+  redemption: [{ label: "How redemptions work", url: "https://docs.asymmetry.finance/usdaf-stablecoin/redemptions" }],
+  liquidation: [
+    { label: "How liquidations work", url: "https://docs.asymmetry.finance/usdaf-stablecoin/liquidations" },
+    { label: "How the Stability Pool works", url: "https://docs.asymmetry.finance/usdaf-stablecoin/earn" },
+  ],
+  batch: [
+    {
+      label: "How rate delegation works",
+      url: "https://docs.asymmetry.finance/usdaf-stablecoin/what-are-customizable-fixed-interest-rates",
+    },
+  ],
+};
+
 /** The index derivation of the zombie state, for surfaces with no per-row
  *  chain read (listing pills, filter buckets): an OPEN Trove below the
  *  MIN_DEBT floor. The detail page's live getTroveStatus wins where it runs.

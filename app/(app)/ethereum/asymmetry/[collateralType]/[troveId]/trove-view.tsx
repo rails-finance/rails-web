@@ -72,7 +72,7 @@ import {
   liquityForkEconomicsContent,
   liquityForkRedemptionOutcome,
 } from "@/lib/shared/liquity-fork-economics-explanation";
-import { DEBT_SYMBOL } from "@/lib/asymmetry/asset-catalog";
+import { DEBT_SYMBOL, ASYMMETRY_DOCS } from "@/lib/asymmetry/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -394,7 +394,7 @@ export default function AsymmetryTroveDetail({
               const forkOpts = {
                 name: "Asymmetry",
                 debtSymbol: DEBT_SYMBOL,
-                docsLink: { label: "Asymmetry docs", url: "https://docs.asymmetry.finance" },
+                docsLinks: [...ASYMMETRY_DOCS.trove, ...ASYMMETRY_DOCS.redemption],
               };
               return (
                 <ChainTruthTower
