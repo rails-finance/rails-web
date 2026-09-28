@@ -181,7 +181,9 @@ export async function readMorphoIndex(
   const base = process.env.RAILS_API_URL;
   if (!base) return null;
   const wallet = p.wallet.toLowerCase();
-  const res = await fetch(`${base}/api/morpho-base/timeline?wallet=${wallet}`, {
+  // `reach=1`: a heavy wallet's tail is 10,000 rows, the reach the grouped
+  // preload and the month read slice. Without it the route sends 2,000.
+  const res = await fetch(`${base}/api/morpho-base/timeline?wallet=${wallet}&reach=1`, {
     ...createAuthFetchOptions(undefined, readerIp),
     cache: "no-store",
   });

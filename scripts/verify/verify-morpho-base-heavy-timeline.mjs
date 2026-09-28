@@ -223,7 +223,7 @@ if (!base) {
 }
 
 const t0 = Date.now();
-const heavy = await get(`${base}/api/morpho-base/timeline?wallet=${WALLET}`);
+const heavy = await get(`${base}/api/morpho-base/timeline?wallet=${WALLET}&reach=1`);
 const tHeavy = Date.now() - t0;
 const t1 = Date.now();
 const full = await get(`${base}/api/morpho-base/timeline?wallet=${WALLET}&full=1`);

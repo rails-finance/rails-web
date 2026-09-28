@@ -199,7 +199,7 @@ async function get(url) {
 }
 
 const timeline = (wallet, full = false) =>
-  get(`${base}${API_PREFIX}/timeline?wallet=${wallet}${full ? "&full=1" : ""}`);
+  get(`${base}${API_PREFIX}/timeline?wallet=${wallet}&reach=1${full ? "&full=1" : ""}`);
 
 /** A response's rows → the replay's rows, the reader's own decoding applied
  *  (lib/sources/api/compound-base-timeline.ts). Written out here rather than
