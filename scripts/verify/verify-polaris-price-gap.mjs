@@ -26,6 +26,7 @@ import { chromium } from "playwright";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { showNoteRows } from "./lib/market-notes.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -82,6 +83,8 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 1600 },
   permissions: ["clipboard-read", "clipboard-write"],
 });
+// Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
+await showNoteRows(context);
 
 // ── 1. usdp/8: exactly 6 price-gap notes ────────────────────────────────────
 // Pinned §1b stretches (psql over the raw tables, 2026-09-06).
@@ -265,6 +268,7 @@ for (const sib of chromeVerifiers) {
 // siblings above assert placement/counts rather than the new word.
 const browser2 = await chromium.launch();
 const context2 = await browser2.newContext({ viewport: { width: 1440, height: 1400 } });
+await showNoteRows(context2);
 
 const TROVE_A = "78653451855876984404200224290704233324607545013117117463168140077362570442915";
 const pageV2 = await open(context2, `${BASE}/ethereum/liquity-v2/trove/WETH/${TROVE_A}`);

@@ -807,7 +807,9 @@ async function readPage(page) {
     }).length;
     const firstRow = root.querySelector("[data-event-id]");
     const tipDots = [...root.querySelectorAll("[data-spine-tip]")];
-    const tipRows = [...root.querySelectorAll("[data-event-id], [data-market-note]")];
+    // A note gap in the head slot (item 118's markers) draws the tip's dot
+    // itself, so it counts as the list's first row.
+    const tipRows = [...root.querySelectorAll("[data-event-id], [data-market-note], [data-note-gap]")];
     const tip = {
       dots: tipDots.length,
       rows: tipRows.length,

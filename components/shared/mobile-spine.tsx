@@ -175,8 +175,15 @@ export const SPINE_LINE_OVERSHOOT = "calc(-1 * var(--card-pad) - 28px - var(--ms
 
 /** Lengthen the spine line that ends in this gap by `extra` px: the last
  *  `[data-spine-line]` before `ref` in the timeline. Recomputed when the rows
- *  around it change (a card or a folder opening above it). */
-export function useExtendLineAbove(ref: React.RefObject<HTMLElement | null>, extra: number, enabled = true) {
+ *  around it change (a card or a folder opening above it). The desktop list
+ *  view's stacked note markers pass `[data-list-line]`, which `SpineColumn`
+ *  sets on its line outside the spine view. */
+export function useExtendLineAbove(
+  ref: React.RefObject<HTMLElement | null>,
+  extra: number,
+  enabled = true,
+  selector = "[data-spine-line]",
+) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el || !enabled) return;
@@ -184,7 +191,7 @@ export function useExtendLineAbove(ref: React.RefObject<HTMLElement | null>, ext
     let target: HTMLElement | null = null;
     const apply = () => {
       let found: HTMLElement | null = null;
-      for (const line of root.querySelectorAll<HTMLElement>("[data-spine-line]")) {
+      for (const line of root.querySelectorAll<HTMLElement>(selector)) {
         if (el.contains(line)) break;
         if (line.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) found = line;
         else break;
@@ -201,7 +208,7 @@ export function useExtendLineAbove(ref: React.RefObject<HTMLElement | null>, ext
       observer.disconnect();
       target?.style.removeProperty("--mspine-extra");
     };
-  }, [ref, extra, enabled]);
+  }, [ref, extra, enabled, selector]);
 }
 
 /** One segment of the spine view: the column and its caption as one button,
@@ -254,7 +261,9 @@ export function SpineSegment({
       {caption}
     </span>
   );
-  const column = <SpineRowContext.Provider value={{ caption: captionNode, setLegs, setLine }}>{iconColumn}</SpineRowContext.Provider>;
+  const column = (
+    <SpineRowContext.Provider value={{ caption: captionNode, setLegs, setLine }}>{iconColumn}</SpineRowContext.Provider>
+  );
   return (
     <div
       {...wrapperProps}

@@ -50,6 +50,7 @@
 import { readFileSync } from "node:fs";
 import { chromium } from "playwright";
 import { RECENT_QS } from "./_timeline-window.mjs";
+import { marketNoteCount, setMarketNotes, showNoteRows } from "./lib/market-notes.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const FLOOR_STUBBED = process.env.FLOOR_STUBBED === "1";
@@ -383,12 +384,13 @@ async function open(context, url) {
     .waitFor({ state: "visible", timeout: 180000 })
     .catch(() => {});
   // The notes ride a POST the page issues after the rows land — a 400KB
-  // question on the deepest wallet — so poll for the toolbar pill rather than
-  // waiting a fixed time. The pill is the page's own signal that the notes
+  // question on the deepest wallet — so poll for the timeline's note count
+  // (`data-market-notes`; the toolbar pill until item 118) rather than
+  // waiting a fixed time. It is the page's own signal that the notes
   // computation RAN; without it every count below would be a silent zero, so
   // its absence is reported as a failure rather than read as "no notes".
   for (let i = 0; i < 180; i += 1) {
-    if (await page.getByRole("button", { name: /^Market notes/i }).count()) break;
+    if ((await marketNoteCount(page)) > 0) break;
     await page.waitForTimeout(1000);
   }
   await page.waitForTimeout(600);
@@ -622,6 +624,8 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 1600 },
   permissions: ["clipboard-read", "clipboard-write"],
 });
+// Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
+await showNoteRows(context);
 
 // ── 2–4. each fixture page ─────────────────────────────────────────────────
 
@@ -664,18 +668,18 @@ for (const p of PAGES) {
   // `p.pill` is the count at the pin, kept as the record; the page is held to
   // the replay's.
   const pillWanted = exp.historical.length + wantHead;
-  const pill = page.getByRole("button", { name: /^Market notes/i }).first();
-  const hasPill = (await pill.count()) > 0;
+  const noteCount = await marketNoteCount(page);
   check(
-    `2c0. ${p.wallet.slice(0, 10)}… — the toolbar pill is on the page (the notes computation ran at all)`,
-    hasPill,
-    hasPill ? "" : "no pill after 180s — the reserve-rates fetch never landed, so every count above is a silent zero",
+    `2c0. ${p.wallet.slice(0, 10)}… — the timeline states a note count (the notes computation ran at all)`,
+    noteCount > 0,
+    noteCount > 0
+      ? ""
+      : "no count after 180s — the reserve-rates fetch never landed, so every count above is a silent zero",
   );
-  const pillText = hasPill ? (await pill.textContent())?.trim() : null;
   check(
-    `2c. ${p.wallet.slice(0, 10)}… — the pill reads "Market notes · ${pillWanted}"`,
-    pillText === `Market notes · ${pillWanted}`,
-    pillText ?? "(no pill)",
+    `2c. ${p.wallet.slice(0, 10)}… — the timeline's note count is ${pillWanted}`,
+    noteCount === pillWanted,
+    `data-market-notes ${noteCount}`,
   );
   // Each head row's earlier rate is a past log — the pin's where that end has
   // not moved (1b2), the replay's where a later touch re-anchored it. Its LATER
@@ -868,7 +872,7 @@ for (const p of PAGES) {
   }
 }
 
-// ── 7. the pill, the eye menu, and the counts ──────────────────────────────
+// ── 7. Display's switch, and the counts ────────────────────────────────────
 {
   const whale = PAGES[0];
   const page = pages[whale.key];
@@ -879,12 +883,9 @@ for (const p of PAGES) {
       .first()
       .textContent()
   )?.trim();
-  const togglePill = page.getByRole("button", { name: /^Market notes/i }).first();
-  const pressedBefore = await togglePill.getAttribute("aria-pressed");
-  await togglePill.click();
+  const offered = await setMarketNotes(page, false);
   await page.waitForTimeout(400);
-  const pressedAfter = await togglePill.getAttribute("aria-pressed");
-  const notesAfter = await page.locator("[data-market-note]").count();
+  const notesAfter = await page.locator("[data-market-note], [data-note-marker]").count();
   const rowsAfter = await page.locator("[data-event-id]").count();
   const countAfter = (
     await page
@@ -893,28 +894,19 @@ for (const p of PAGES) {
       .textContent()
   )?.trim();
   check(
-    "7. pressing the pill hides every note row and flips aria-pressed",
-    pressedBefore === "true" && pressedAfter === "false" && notesAfter === 0,
-    `aria-pressed ${pressedBefore} → ${pressedAfter}, ${notesAfter} note(s) left`,
+    '7. Display\'s "Market-note markers" off hides every note, row and marker',
+    offered && notesAfter === 0,
+    `${offered ? "offered" : "not offered"}, ${notesAfter} note(s) left`,
   );
   check(
     "7a. every count on the page is identical with notes on and off (a note is never counted)",
     rowsBefore === rowsAfter && countBefore === countAfter,
     `${rowsBefore}/${countBefore} → ${rowsAfter}/${countAfter}`,
   );
-  await togglePill.click();
+  await setMarketNotes(page, true);
   await page.waitForTimeout(400);
-
-  const countSpan = page.getByText(/^(?:Showing )?[\d,]+(?: of [\d,]+)? (?:events?|listed)/).first();
-  const row = countSpan.locator(
-    'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " gap-2 ") and contains(concat(" ", normalize-space(@class), " "), " items-center ")][1]',
-  );
-  const eye = row.locator("div.relative.inline-flex.items-center > button").last();
-  await eye.click().catch(() => {});
-  await page.waitForTimeout(400);
-  const eyeItem = await page.getByRole("button", { name: /^Market notes$/i }).count();
-  check('7b. the eye menu has no "Market notes" item', eyeItem === 0, `${eyeItem} found`);
-  await page.keyboard.press("Escape").catch(() => {});
+  const pillLeft = await page.getByRole("button", { name: /^Market notes ·/i }).count();
+  check('7b. the toolbar carries no "Market notes · N" pill', pillLeft === 0, `${pillLeft} found`);
 }
 
 // ── 8. the markdown export ─────────────────────────────────────────────────

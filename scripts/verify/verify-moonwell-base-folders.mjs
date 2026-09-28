@@ -96,6 +96,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve as resolvePath } from "node:path";
 import { readFileSync, existsSync } from "node:fs";
 import { BASE, hostFetch, bypassHeaders, reserveTimeline } from "./lib/host.mjs";
+import { showNoteRows } from "./lib/market-notes.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolvePath(HERE, "../..");
@@ -684,6 +685,8 @@ async function runPage(f, got, noteIds) {
   const browser = await chromium.launch();
   const id = (s) => `${s} [${f.id}]`;
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1400 }, extraHTTPHeaders: bypassHeaders() });
+  // Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
+  await showNoteRows(ctx);
   const countLine = async (page) =>
     page
       .waitForFunction(

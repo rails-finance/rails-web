@@ -13,7 +13,8 @@ export type TimelineDisplayKey =
   | "showInterestRates"
   | "showCollateralRatio"
   | "collapseRuns"
-  | "showMarketNotes";
+  | "showMarketNotes"
+  | "openAllMarketNotes";
 
 export interface TimelineDisplayState {
   showTimestamps: boolean;
@@ -44,10 +45,15 @@ export interface TimelineDisplayState {
    * auction slices, redemption touches) collapse into one expandable run row.
    * On by default — flip it off to flatten runs back to individual cards. */
   collapseRuns: boolean;
-  /** When true, receipted market notes (facts about the market observed
-   * between two of the account's own events) render between the events they
-   * bracket. Off hides every note; nothing else changes. */
+  /** "Market-note markers" in Display. When true, receipted market notes
+   * (facts about the market observed between two of the account's own events)
+   * stand on the spine between the events they bracket, each as a marker that
+   * opens its note (rails-ops TO-DO-ui-jobs item 118). Off hides every note;
+   * nothing else changes. */
   showMarketNotes: boolean;
+  /** "Open all market notes" in Display: every note shows its header row in
+   * place of its marker. No effect while `showMarketNotes` is off. */
+  openAllMarketNotes: boolean;
   toggle: (key: TimelineDisplayKey) => void;
 }
 
@@ -63,6 +69,7 @@ const DEFAULTS = {
   showCollateralRatio: false,
   collapseRuns: true,
   showMarketNotes: true,
+  openAllMarketNotes: false,
 };
 // A NEW key with a default needs no bump: the provider restores by spreading
 // the stored object over DEFAULTS, so a reader whose stored preferences

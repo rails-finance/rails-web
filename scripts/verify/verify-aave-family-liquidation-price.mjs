@@ -29,6 +29,7 @@
 // Run:  BASE=https://rails.finance node scripts/verify/verify-aave-family-liquidation-price.mjs
 
 import { chromium } from "playwright";
+import { setMarketNotes, showNoteRows } from "./lib/market-notes.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 
@@ -297,6 +298,8 @@ console.log(`BASE ${BASE}\n`);
 
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+// Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
+await showNoteRows(context);
 let sawAnyRow = false;
 
 for (const fx of FIXTURES) {
@@ -424,11 +427,10 @@ for (const fx of FIXTURES) {
 
   // 5. Putting notes away removes the rows and leaves every event row.
   if (fx.notes.length > 0) {
-    const pill = page.getByRole("button", { name: /^Market notes/i }).first();
     const events = await page.locator("[data-event-id]").count();
-    if (await pill.count()) {
-      const before = await page.locator(PRICE_ROWS).count();
-      await pill.click();
+    const before = await page.locator(PRICE_ROWS).count();
+    // Display's "Market-note markers" (the toolbar pill until item 118).
+    if (await setMarketNotes(page, false)) {
       await page.waitForTimeout(400);
       const after = await page.locator(PRICE_ROWS).count();
       const eventsAfter = await page.locator("[data-event-id]").count();
@@ -437,9 +439,9 @@ for (const fx of FIXTURES) {
         before > 0 && after === 0 && eventsAfter === events,
         `${before} → ${after} price rows, ${events} → ${eventsAfter} event rows`,
       );
-      await pill.click();
+      await setMarketNotes(page, true);
     } else {
-      check("5. the page offers the Market notes pill", false, "no pill");
+      check('5. Display offers "Market-note markers"', false, "not offered");
     }
   }
   await page.close();

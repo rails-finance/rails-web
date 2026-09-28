@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // The market note as a Moonwell Base position page actually renders it.
 //
-// 2026-09-06: the toggle moved out of the Display (eye) menu onto the toolbar
-// as a `Market notes · N` pill, and every entered market the account still
-// holds carries a LIVE note (`…-head` ids) in the head slot. So "the note"
-// below means the HISTORICAL one (`HIST`), the toggle is the pill, and a
-// control that still holds a market is EXPECTED to show a live note — what it
-// must not show is a historical one or a pill without a note behind it.
+// Every entered market the account still holds carries a LIVE note (`…-head`
+// ids) in the head slot, so "the note" below means the HISTORICAL one (`HIST`),
+// and a control that still holds a market is EXPECTED to show a live note —
+// what it must not show is a historical one or a switch without a note behind
+// it. The switch is Display's "Market-note markers" (rails-ops TO-DO-ui-jobs
+// item 118; a toolbar pill, `Market notes · N`, from 2026-09-06 until then).
+// On desktop a closed note is a marker on the spine; this script turns on
+// "Open all market notes" before load (lib/market-notes.mjs), so every note
+// draws its row as it did at rest before the markers.
 // ----------------------------------------------------------------------------
 // A market note is a receipted fact about the MARKET the account was in, placed
 // between the two of the account's own events that bracket it — phase 1 is the
@@ -83,6 +86,7 @@
 //   BASE=https://rails-web.vercel.app node scripts/verify/verify-market-note-row.mjs
 
 import { chromium } from "playwright";
+import { setMarketNotes, showNoteRows } from "./lib/market-notes.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 
@@ -287,19 +291,12 @@ async function waitForList(page) {
   await page.locator("[data-event-id]").first().waitFor({ state: "visible", timeout: 180_000 });
 }
 
-/** Press the toolbar's `Market notes · N` pill until `aria-pressed` reads
- *  `wantOn`. Pre-hydration clicks are lost, so the state is re-read after each
- *  press. Returns false when the pill is not on the page at all. */
+/** Display's "Market-note markers", ticked or not. Returns false when the
+ *  menu offers no such item. */
 async function setMarketNotesPill(page, wantOn) {
-  const pill = page.getByRole("button", { name: /^Market notes/i }).first();
-  if ((await pill.count()) === 0) return false;
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const on = (await pill.getAttribute("aria-pressed")) === "true";
-    if (on === wantOn) return true;
-    await pill.click();
-    await page.waitForTimeout(400);
-  }
-  return (await pill.getAttribute("aria-pressed")) === "true" ? wantOn : !wantOn;
+  const offered = await setMarketNotes(page, wantOn);
+  await page.waitForTimeout(400);
+  return offered;
 }
 
 /** Whether the Display menu offers an item at all — the "no inert toggle" rule.
@@ -343,7 +340,10 @@ async function neighbourEventId(page, direction) {
   return page
     .locator('[data-market-note]:not([data-market-note$="-head"])')
     .first()
-    .evaluate((el, dir) => {
+    .evaluate((row, dir) => {
+      // A note row stands inside its gap's wrapper (`data-note-gap`), which
+      // is the list's child; its neighbours are the wrapper's.
+      const el = row.closest("[data-note-gap]") ?? row;
       let n = dir === "next" ? el.nextElementSibling : el.previousElementSibling;
       while (n) {
         const own = n.getAttribute("data-event-id");
@@ -418,6 +418,7 @@ const ctx = await browser.newContext({
   viewport: { width: 1440, height: 1400 },
   permissions: ["clipboard-read", "clipboard-write"],
 });
+await showNoteRows(ctx);
 const page = await ctx.newPage();
 page.on("pageerror", (e) => pageErrors.push(String(e)));
 await page.goto(PAGE(WALLET), { waitUntil: "domcontentloaded", timeout: 300_000 });
@@ -499,11 +500,11 @@ check(
 // never mean "nothing was there to count".
 const withNotes = await readCounts(page);
 const toggled = await setMarketNotesPill(page, false);
-const eyeOffers = await displayMenuOffers(page, "Market notes").catch((e) => String(e).split("\n")[0]);
+const pillLeft = await page.getByRole("button", { name: /^Market notes ·/i }).count();
 check(
-  "4a  the toolbar offers the Market notes pill, and the Display menu no longer does",
-  toggled && eyeOffers === false,
-  `pill ${toggled ? "pressed off" : "absent"}; eye menu ${typeof eyeOffers === "string" ? eyeOffers : eyeOffers ? "still offers it" : "does not"}`,
+  '4a  Display offers "Market-note markers", and the toolbar carries no Market notes pill',
+  toggled && pillLeft === 0,
+  `Display ${toggled ? "turned it off" : "does not offer it"}; pill ${pillLeft}`,
 );
 await page.waitForTimeout(300);
 const noteGone = (await page.locator("[data-market-note]").count()) === 0;
@@ -533,6 +534,7 @@ check(
 await page.close();
 
 const fresh = await ctx.browser().newContext({ viewport: { width: 1440, height: 1400 } });
+await showNoteRows(fresh);
 const freshPage = await fresh.newPage();
 freshPage.on("pageerror", (e) => pageErrors.push(String(e)));
 await freshPage.goto(PAGE(WALLET), { waitUntil: "domcontentloaded", timeout: 300_000 });
@@ -564,6 +566,7 @@ const exportCtx = await browser.newContext({
   viewport: { width: 1440, height: 1400 },
   permissions: ["clipboard-read", "clipboard-write"],
 });
+await showNoteRows(exportCtx);
 const exportPage = await exportCtx.newPage();
 exportPage.on("pageerror", (e) => pageErrors.push(String(e)));
 await exportPage.goto(PAGE(WALLET), { waitUntil: "domcontentloaded", timeout: 300_000 });
@@ -641,16 +644,15 @@ check(
   "7c  the control page renders no HISTORICAL note",
   ctlUnread === 0 && ctlSteps === 0 && (await ctlPage.locator(HIST).count()) === 0,
 );
-// A live note is expected on a control that still holds an entered market; the
-// pill must then be present, and absent when no note of any kind is — never an
-// inert toggle either way. The eye menu offers nothing on any page.
+// A live note is expected on a control that still holds an entered market;
+// Display's switch must then be offered, and not when no note of any kind is —
+// never an inert switch either way.
 const ctlNotes = await ctlPage.locator("[data-market-note]").count();
-const ctlPill = await ctlPage.getByRole("button", { name: /^Market notes/i }).count();
-const ctlOffers = await displayMenuOffers(ctlPage, "Market notes").catch((e) => String(e).split("\n")[0]);
+const ctlOffers = await displayMenuOffers(ctlPage, "Market-note Markers").catch((e) => String(e).split("\n")[0]);
 check(
-  "7d  the control page's pill is present exactly when a note (live) is, and the Display menu offers none",
-  ctlUnread === 0 && ctlSteps === 0 && ctlPill > 0 === ctlNotes > 0 && ctlOffers === false,
-  `${ctlNotes} note(s), pill ${ctlPill}, eye menu ${typeof ctlOffers === "string" ? ctlOffers : ctlOffers ? "offers it" : "does not"}`,
+  '7d  the control page\'s Display offers "Market-note markers" exactly when a note (live) is',
+  ctlUnread === 0 && ctlSteps === 0 && typeof ctlOffers === "boolean" && ctlOffers === ctlNotes > 0,
+  `${ctlNotes} note(s), Display ${typeof ctlOffers === "string" ? ctlOffers : ctlOffers ? "offers it" : "does not"}`,
 );
 
 check("10  no page errors", pageErrors.length === 0, pageErrors.slice(0, 2).join(" | "));

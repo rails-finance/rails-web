@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { Fragment, useState, useRef, useEffect } from "react";
 import { Check } from "lucide-react";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, COUNT_BADGE, RESET_LINK, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
@@ -84,6 +84,9 @@ export interface FilterOption {
   disabled?: boolean;
   /** Tooltip shown on hover — used to explain why a disabled option is greyed. */
   title?: string;
+  /** Draw a rule above this option, opening a group of its own (the Display
+   *  menu's market-note items). */
+  separatorBefore?: boolean;
 }
 
 interface FilterDropdownProps {
@@ -336,40 +339,44 @@ export function FilterDropdown({
               ? isAll || selectedSet.has(opt.key)
               : selectedSet.has(opt.key);
           return (
-            <button
-              key={opt.key}
-              onClick={() => {
-                if (!opt.disabled) handleItemClick(opt.key);
-              }}
-              aria-disabled={opt.disabled || undefined}
-              title={opt.title}
-              className={`overlay-item ${opt.disabled ? "opacity-50 cursor-not-allowed" : ""} ${
-                !multi && checked ? "overlay-item-active text-foreground" : opt.demoted && !checked ? "" : ""
-              }`}
-            >
-              {multi && (
-                <span
-                  className={`inline-flex items-center justify-center w-5 h-5 rounded-full transition-colors shrink-0 ${
-                    checked ? "bg-rb-500" : "border-2 border-rb-400 dark:border-rb-600"
-                  }`}
-                >
-                  {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                </span>
+            <Fragment key={opt.key}>
+              {opt.separatorBefore && !narrowed && (
+                <div role="separator" className="my-1 mx-3 border-t border-rb-300 dark:border-rb-700" />
               )}
-              {opt.icon && <span className="shrink-0">{opt.icon}</span>}
-              <span className="flex-1 truncate">
-                {verbatimLabels
-                  ? opt.label
-                  : opt.label
-                      .split(/(\s+)/)
-                      .map((w) =>
-                        /^\(?[A-Z]{2,}\)?$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
-                      )
-                      .join("")}
-                {opt.suffix && <span className="inline-flex ml-1.5 align-middle">{opt.suffix}</span>}
-              </span>
-              {opt.count != null && <span className="">{opt.count}</span>}
-            </button>
+              <button
+                onClick={() => {
+                  if (!opt.disabled) handleItemClick(opt.key);
+                }}
+                aria-disabled={opt.disabled || undefined}
+                title={opt.title}
+                className={`overlay-item ${opt.disabled ? "opacity-50 cursor-not-allowed" : ""} ${
+                  !multi && checked ? "overlay-item-active text-foreground" : opt.demoted && !checked ? "" : ""
+                }`}
+              >
+                {multi && (
+                  <span
+                    className={`inline-flex items-center justify-center w-5 h-5 rounded-full transition-colors shrink-0 ${
+                      checked ? "bg-rb-500" : "border-2 border-rb-400 dark:border-rb-600"
+                    }`}
+                  >
+                    {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                  </span>
+                )}
+                {opt.icon && <span className="shrink-0">{opt.icon}</span>}
+                <span className="flex-1 truncate">
+                  {verbatimLabels
+                    ? opt.label
+                    : opt.label
+                        .split(/(\s+)/)
+                        .map((w) =>
+                          /^\(?[A-Z]{2,}\)?$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
+                        )
+                        .join("")}
+                  {opt.suffix && <span className="inline-flex ml-1.5 align-middle">{opt.suffix}</span>}
+                </span>
+                {opt.count != null && <span className="">{opt.count}</span>}
+              </button>
+            </Fragment>
           );
         })}
         {narrowed && shownOptions.length === 0 && <OptionSearchNote>No options match.</OptionSearchNote>}

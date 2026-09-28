@@ -178,6 +178,7 @@ import { mainnet } from "viem/chains";
 import fs from "node:fs";
 import path from "node:path";
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
+import { setMarketNotes, showNoteRows } from "./lib/market-notes.mjs";
 
 let failures = 0;
 let checked = 0;
@@ -1132,6 +1133,8 @@ const context = await browser.newContext({
   permissions: ["clipboard-read", "clipboard-write"],
   extraHTTPHeaders: bypassHeaders(),
 });
+// Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
+await showNoteRows(context);
 
 const urlFor = (f) => `${BASE}/ethereum/aave-v4/spoke/${f.spoke}/${f.wallet}`;
 
@@ -1176,12 +1179,16 @@ async function openNote(row) {
   return (await row.innerText()).replace(/\s+/g, " ");
 }
 
+/** Every note the timeline places, drawn or not: `data-market-notes` on its
+ *  root (the toolbar's "Market notes · N" pill until item 118). Null where the
+ *  page has no note, as the pill was absent there. */
 async function pillCount(page) {
-  const pill = page.getByRole("button", { name: /^Market notes/i }).first();
-  if ((await pill.count()) === 0) return null;
-  const text = (await pill.innerText()).replace(/\s+/g, " ");
-  const m = /Market notes\s*·\s*([\d,]+)/.exec(text);
-  return m ? Number(m[1].replace(/,/g, "")) : null;
+  const v = await page
+    .locator("[data-timeline-rows-drawn]")
+    .first()
+    .getAttribute("data-market-notes")
+    .catch(() => null);
+  return v == null ? null : Number(v);
 }
 
 /** The historical ids the page should carry, newest-first: the replica's, by
@@ -1545,18 +1552,14 @@ const beforeCounts = await readCounts(pageA);
 // is that the toggle restores what it hid; a number written here instead would
 // have to be re-pinned every time the render window grew.
 const noteRowsBeforeToggle = await pageA.locator("[data-market-note]").count();
-const pillA = pageA.getByRole("button", { name: /^Market notes/i }).first();
-const pillPresent = (await pillA.count()) > 0;
-const pressed = async () => (pillPresent ? await pillA.getAttribute("aria-pressed") : "ABSENT");
-check("6a. the pill starts pressed", (await pressed()) === "true", `aria-pressed ${await pressed()}`);
-if (pillPresent) {
-  await pillA.click();
-  await pageA.waitForTimeout(500);
-}
+// Display's "Market-note markers" (the toolbar pill until item 118).
+const pillPresent = await setMarketNotes(pageA, false);
+await pageA.waitForTimeout(500);
+check('6a. Display offers "Market-note markers"', pillPresent);
 check(
-  "6b. pressing it hides every note row and flips aria-pressed",
-  pillPresent && (await pageA.locator("[data-market-note]").count()) === 0 && (await pressed()) === "false",
-  `${await pageA.locator("[data-market-note]").count()} row(s) left, aria-pressed ${await pressed()}`,
+  "6b. turning it off hides every note, row and marker",
+  pillPresent && (await pageA.locator("[data-market-note], [data-note-marker]").count()) === 0,
+  `${await pageA.locator("[data-market-note], [data-note-marker]").count()} note(s) left`,
 );
 const afterCounts = await readCounts(pageA);
 check(
@@ -1565,7 +1568,7 @@ check(
   `${JSON.stringify(beforeCounts)} vs ${JSON.stringify(afterCounts)}`,
 );
 if (pillPresent) {
-  await pillA.click();
+  await setMarketNotes(pageA, true);
   await pageA.waitForTimeout(500);
 }
 check(

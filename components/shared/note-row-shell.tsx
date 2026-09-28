@@ -51,9 +51,13 @@ export interface NoteRowShellProps {
   header: ReactNode;
   /** The body panel, mounted only while the row is open — like a card's. */
   children: ReactNode;
-  /** Mount with the body open: the phone spine view opens a note from its
-   *  marker straight to the row and its panel. */
+  /** Mount with the body open: a note opened from its spine marker opens
+   *  straight to the row and its panel. */
   defaultOpen?: boolean;
+  /** A control laid over the node in the spine column (desktop only, like the
+   *  column): an opened market note's filled diamond, which puts the note back
+   *  to its marker. The column still draws the glyph and the line. */
+  nodeControl?: ReactNode;
 }
 
 export function NoteRowShell({
@@ -66,6 +70,7 @@ export function NoteRowShell({
   header,
   children,
   defaultOpen = false,
+  nodeControl,
 }: NoteRowShellProps) {
   const scale = useTimelineScale();
   const registry = useReceiptRegistry();
@@ -79,14 +84,15 @@ export function NoteRowShell({
         className={`flex w-full items-start relative ${scale.cardRounded}`}
         style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
       >
-        <div className="hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center">
+        <div className="relative hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center">
           <SpineColumn icon={icon} spine={spine} isFirst={isFirst} isLast={isLast} />
+          {nodeControl}
         </div>
         <div className="min-w-0 grow">
           {/* ── Header panel — what the row states at rest ──────────────── */}
           <div className={`overflow-visible rounded-xl bg-note ${open ? "rounded-b-none" : ""}`}>
             <div
-              className="group/evt cursor-pointer"
+              className="group/evt cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500"
               role="button"
               tabIndex={0}
               aria-expanded={open}

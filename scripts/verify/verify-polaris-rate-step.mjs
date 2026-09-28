@@ -45,6 +45,7 @@
 //       BASE=https://rails-web.vercel.app node scripts/verify/verify-polaris-rate-step.mjs
 
 import { chromium } from "playwright";
+import { showNoteRows } from "./lib/market-notes.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const RATE_STEP_MIN_PP = 1;
@@ -369,6 +370,8 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 1400 },
   permissions: ["clipboard-read", "clipboard-write"],
 });
+// Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
+await showNoteRows(context);
 
 // ── 1. counts on each fixture page ──────────────────────────────────────────
 

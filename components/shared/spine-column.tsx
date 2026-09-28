@@ -29,6 +29,7 @@ export type SpineIcon =
   | "no-change" // Operation that moved nothing (zero-delta adjust) — equals-in-circle
   | "custody" // Position moved between accounts (a receipt-token transfer run) — the paper plane in a neutral disc, the same custody mark a single row wears as `badge: "send"`
   | "swap" // A position swap: one asset became another under an order the owner signed, both legs staying in the position (rails-ops TO-DO-ui-jobs §15, §19) — a bare arrow-down-up at 45° in its axis hues, the legs stacked on the right flank (`swapLegs`)
+  | "market-open" // A market note opened from its spine marker (item 118): the same diamond, filled in the same neutral ink, so the open note is marked on the spine
   | "market" // A market note — a receipted fact about the MARKET between two of the account's own events (components/shared/market-note-row.tsx): hollow diamond, neutral ink, never a party colour
   | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: the same hollow outline in the same neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts — turned square where the note's is a diamond, so the two classes are told apart by shape
   | "folder" // A chronological chunk of a longer third-party stretch (lib/shared/timeline-chunks.ts) — disclosure chevron + folder in the LEFT flank, dot on the spine, bare count pill right
@@ -296,7 +297,7 @@ function RateIcon({ size, color = "var(--color-rb-500)" }: { size: number; color
  *  same centre as every other glyph, with the diamond itself small enough that
  *  the row reads as an annotation beside the timeline rather than a row of it.
  *  The stroke is pinned in absolute pixels (the folder glyph's rule). */
-function MarketNoteIcon({ size, color }: { size: number; color: string }) {
+function MarketNoteIcon({ size, color, filled = false }: { size: number; color: string; filled?: boolean }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <rect
@@ -305,6 +306,7 @@ function MarketNoteIcon({ size, color }: { size: number; color: string }) {
         width={10}
         height={10}
         transform="rotate(45 16 16)"
+        fill={filled ? color : "none"}
         stroke={color}
         strokeWidth={1}
         vectorEffect="non-scaling-stroke"
@@ -912,12 +914,15 @@ export function SpineColumn({
       // a few px inside the halo for clean masking. Any further (the old
       // 100px) and the spine bleeds past the next card entirely, leaving a
       // bare tail visible below the bottom-most event.
-      // In the phone spine view the line is also what a marker gap below
-      // lengthens (`useExtendLineAbove`), so it is marked and reads the var.
+      // The line is also what a market-note marker gap below lengthens
+      // (`useExtendLineAbove`), so it is marked and reads the var: in the
+      // phone spine view as `data-spine-line`, in the list view as
+      // `data-list-line` (item 118's stacked desktop markers).
       <div
         className={spineClasses}
         data-spine-line={spineRow ? "" : undefined}
-        style={{ top: 0, bottom: spineRow ? SPINE_LINE_OVERSHOOT : "calc(-1 * var(--card-pad) - 28px)", ...spineStyle }}
+        data-list-line={spineRow ? undefined : ""}
+        style={{ top: 0, bottom: SPINE_LINE_OVERSHOOT, ...spineStyle }}
       />
     )
   );
@@ -1116,13 +1121,15 @@ export function SpineColumn({
             </div>
           );
         case "market":
+        case "market-open":
           // A market note's own node. It sits ON the spine like an event's
           // glyph — a note is placed between two of the account's events and
           // the reader has to see which two — but it is deliberately among the
           // quietest marks on the column: a small hollow diamond in the spine's
           // neutral ink, no fill, no party colour and no pulse. Nothing
           // happened to the ACCOUNT here, so nothing on the node may read as an
-          // action of its own.
+          // action of its own. A note opened from its marker fills the diamond
+          // in the same ink, which marks the open note on the spine.
           return (
             <div
               className="grid grid-rows-1 items-center justify-items-center"
@@ -1130,7 +1137,11 @@ export function SpineColumn({
             >
               <span />
               <span />
-              <MarketNoteIcon size={scale.tokenSize} color={SPINE_COLORS.default} />
+              <MarketNoteIcon
+                size={scale.tokenSize}
+                color={SPINE_COLORS.default}
+                filled={effectiveIcon === "market-open"}
+              />
               <span />
               <span />
             </div>

@@ -67,6 +67,7 @@
 //       BASE=https://rails-web.vercel.app node scripts/verify/verify-market-note-row-liquity-v2.mjs
 
 import { chromium } from "playwright";
+import { setMarketNotes, showNoteRows } from "./lib/market-notes.mjs";
 
 // 2026-09-04 (657eb889, the mark is the header): checks 1r and 1o added. Proved
 // to fail first against the still-deployed old shape — 2 of 19 red (1r: the
@@ -227,22 +228,14 @@ const rowSequence = (page) =>
       .filter((r) => r.note !== null || r.events.length > 0);
   });
 
-/** The market-notes toggle, on the toolbar's own pill (2026-09-06: moved off
- *  the Display/eye menu — see market-notes-toolbar-and-live-note.md §2A).
- *  "Market notes · N" beside the eye menu, `aria-pressed` for its state.
- *  Returns false when the page offers no pill (no notes of any kind), which
- *  is a fact worth reporting rather than an exception. */
+/** The market-notes switch: Display's "Market-note markers" (rails-ops
+ *  TO-DO-ui-jobs item 118; a toolbar pill, "Market notes · N", before it).
+ *  Returns false when the page offers no such item (no notes of any kind),
+ *  which is a fact worth reporting rather than an exception. */
 async function setDisplayFlag(page, _label, wantOn) {
-  const pill = page.getByRole("button", { name: /^Market notes/i }).first();
-  const offered = await pill
-    .waitFor({ state: "visible", timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!offered) return false;
-  const isOn = (await pill.getAttribute("aria-pressed")) === "true";
-  if (isOn !== wantOn) await pill.click();
+  const offered = await setMarketNotes(page, wantOn);
   await page.waitForTimeout(400);
-  return true;
+  return offered;
 }
 
 async function readCounts(page) {
@@ -397,6 +390,8 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 1400 },
   permissions: ["clipboard-read", "clipboard-write"],
 });
+// Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
+await showNoteRows(context);
 
 // ── 1–3. the note renders, and states what the route says ──────────────────
 
@@ -509,7 +504,7 @@ const offered = await setDisplayFlag(pageA, "Market notes", false);
 const afterOff = await readCounts(pageA);
 const notesOff = await pageA.locator("[data-market-note]").count();
 check(
-  '7. the Display menu offers "Market notes", and turning it off changes no count',
+  '7. the Display menu offers "Market-note markers", and turning it off changes no count',
   offered && notesOff === 0 && afterOff.rows === before.rows && afterOff.label === before.label,
   offered
     ? `${notesOff} note(s) left · rows ${before.rows} → ${afterOff.rows} · label "${before.label}" → "${afterOff.label}"`
@@ -528,6 +523,7 @@ await pageA.getByText(COUNT_RE).first().waitFor({ state: "visible", timeout: 120
 await pageA.waitForTimeout(1500);
 const afterReload = await pageA.locator("[data-market-note]").count();
 const fresh = await browser.newContext({ viewport: { width: 1440, height: 1400 } });
+await showNoteRows(fresh);
 const freshPage = await open(fresh, troveUrl(TROVE_A));
 const freshNotes = await freshPage.locator("[data-market-note]").count();
 check(
@@ -540,12 +536,14 @@ await fresh.close();
 await pageA.close();
 
 // ── 9. the SSR markup already carries it ───────────────────────────────────
+// As its marker since item 118: a closed note is a `data-note-marker` button
+// whose label states the move ("WETH price down 29.4%").
 
 const ssr = await fetch(troveUrl(TROVE_A)).then((r) => r.text());
 check(
   "9. the note is in the SSR markup, before any JavaScript runs",
-  ssr.includes("data-market-note") && wantGap != null && ssr.includes(wantGap.changeMagnitude),
-  `document ${ssr.length.toLocaleString("en-US")} bytes; data-market-note ${ssr.includes("data-market-note") ? "present" : "absent"}`,
+  ssr.includes("data-note-marker") && wantGap != null && ssr.includes(wantGap.changeMagnitude),
+  `document ${ssr.length.toLocaleString("en-US")} bytes; data-note-marker ${ssr.includes("data-note-marker") ? "present" : "absent"}`,
 );
 
 // ── 10. the markdown export ────────────────────────────────────────────────
@@ -584,13 +582,17 @@ if (control) {
   const controlNotes = await controlPage.locator("[data-market-note]").count();
   const controlOffered = await setDisplayFlag(controlPage, "Market notes", false);
   check(
-    '11. the control trove shows no note and no "Market notes" toggle',
+    '11. the control trove shows no note and no "Market-note markers" item',
     controlNotes === 0 && controlOffered === false,
     `${controlNotes} note(s); menu ${controlOffered ? "OFFERED the item" : "did not offer it"}`,
   );
   await controlPage.close();
 } else {
-  check('11. the control trove shows no note and no "Market notes" toggle', false, "NO EVIDENCE — no control found");
+  check(
+    '11. the control trove shows no note and no "Market-note markers" item',
+    false,
+    "NO EVIDENCE — no control found",
+  );
 }
 
 if (wantGap) {

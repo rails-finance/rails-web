@@ -344,10 +344,14 @@ try {
   // ── (a) the menu ──────────────────────────────────────────────────────────
   const page8 = await open(context, polarisUrl("usdp", "8"));
   const menu = (await readDisplayMenu(page8)).map((s) => s.toLowerCase());
+  // usdp/8 has market notes, so the menu closes on their two items under a
+  // rule (rails-ops TO-DO-ui-jobs item 118).
+  const NOTE_LABELS = ["market-note markers", "open all market notes"];
   check(
-    "a. usdp/8's display menu offers exactly the six labels and no collapse item",
-    menu.length === 6 &&
+    "a. usdp/8's display menu offers exactly the six labels, then the two market-note items, and no collapse item",
+    menu.length === 8 &&
       MENU_LABELS.every((l, i) => menu[i] === l.toLowerCase()) &&
+      NOTE_LABELS.every((l, i) => menu[6 + i] === l) &&
       !menu.includes("collapse like events"),
     JSON.stringify(menu),
   );

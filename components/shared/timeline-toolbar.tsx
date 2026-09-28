@@ -127,12 +127,25 @@ export interface TimelineDisplayItem {
    *  label (the reader's CR/LTV preference, for Liquity V2); an explorer whose
    *  chip states CR only sets this so its menu says what its chip says. */
   fixedLabel?: boolean;
+  /** Open a group of its own under a rule. */
+  separatorBefore?: boolean;
 }
 
 /** The run-collapse toggle. Not part of any shared preset — ChainTruthTimeline
  *  appends it only on a page that groups in the browser (defines `runs`, and
  *  was not answered in folders — rails-ops decision 0021). */
 export const COLLAPSE_RUNS_ITEM: TimelineDisplayItem = { key: "collapseRuns", label: "Collapse like events" };
+
+/** The market-note items, under a rule after the rest (rails-ops TO-DO-ui-jobs
+ *  item 118). ChainTruthTimeline appends them on a page that has notes. Notes
+ *  are not events, so they stay out of Types of event, the count and the
+ *  exports; this is their only switch. "Open all" is desktop's: a phone draws
+ *  notes as rows in the list view and as markers with one open at a time in
+ *  the spine view, so it gets the first item only. */
+export const MARKET_NOTE_ITEMS: TimelineDisplayItem[] = [
+  { key: "showMarketNotes", label: "Market-note markers", separatorBefore: true },
+  { key: "openAllMarketNotes", label: "Open all market notes" },
+];
 
 /** Display flags the chain-state timeline (Morpho + MakerDAO) exposes — only the
  *  ones with a render path on these pared-down cards (no change/balance bars, no
@@ -200,11 +213,23 @@ export function TimelineDisplayMenu({ items }: { items: TimelineDisplayItem[] })
   const { prefs } = usePreferences();
   const labelFor = (it: TimelineDisplayItem) =>
     it.key === "showCollateralRatio" && !it.fixedLabel ? ratioLabel(prefs.ratioMode) : it.label;
-  const selected = new Set(items.filter((it) => display[it.key]).map((it) => it.key));
+  // "Open all market notes" reads ticked only while the markers are on, and
+  // is greyed while they are off: there is nothing for it to open.
+  const isOn = (key: TimelineDisplayKey) =>
+    key === "openAllMarketNotes" ? display.showMarketNotes && display.openAllMarketNotes : display[key];
+  const selected = new Set(items.filter((it) => isOn(it.key)).map((it) => it.key));
   const options: FilterOption[] = items.map((it) =>
     it.key === "showTimelineValues"
       ? { key: it.key, label: labelFor(it), disabled: tvDisabled.disabled, title: tvDisabled.reason }
-      : { key: it.key, label: labelFor(it) },
+      : it.key === "openAllMarketNotes"
+        ? {
+            key: it.key,
+            label: labelFor(it),
+            separatorBefore: it.separatorBefore,
+            disabled: !display.showMarketNotes,
+            title: display.showMarketNotes ? undefined : "Turn on market-note markers first",
+          }
+        : { key: it.key, label: labelFor(it), separatorBefore: it.separatorBefore },
   );
   return (
     <FilterDropdown
@@ -238,22 +263,6 @@ export interface TimelineToolbarProps {
    *  surprising number (see ChainTruthTimelineProps.countTooltip). Unset
    *  renders identically to today. */
   countTooltip?: string;
-  /** Market notes: a pressed-state pill beside the eye menu, reading
-   *  "Market notes · N" — N the count of note rows the page would show
-   *  (historical anchored + live), whatever `marketNotesOn` currently is. Not
-   *  rendered when 0 or undefined — a page with no notes gets no inert pill.
-   *  Same visual grammar as the heatmap's Date button below: CTRL_GHOST at
-   *  rest, CTRL_ON pressed, aria-pressed for the state. */
-  marketNoteCount?: number;
-  /** Whether note rows are currently shown — `showMarketNotes` in
-   *  timeline-display-context.tsx. Ignored when `marketNoteCount` is 0. */
-  marketNotesOn?: boolean;
-  /** Flips `marketNotesOn`. Required together with `marketNoteCount` for the
-   *  pill to render at all — a count with nothing to toggle would be inert. */
-  onToggleMarketNotes?: () => void;
-  /** The notes the page is showing, for the navigator panel's marks. Reduced
-   *  in ChainTruthTimeline, where they are anchored, and passed here because
-   *  the panel hangs off this strip's Date button. */
 }
 
 /**
@@ -432,16 +441,7 @@ const monthIdxOfTs = (ts: number): number => {
   return d.getUTCFullYear() * 12 + d.getUTCMonth();
 };
 
-export function TimelineToolbar({
-  tl,
-  displayItems,
-  leading,
-  countTooltip,
-  marketNoteCount,
-  marketNotesOn,
-  onToggleMarketNotes,
-  monthReach,
-}: TimelineToolbarProps) {
+export function TimelineToolbar({ tl, displayItems, leading, countTooltip, monthReach }: TimelineToolbarProps) {
   // One option is not an axis — a single-reserve wallet on a multi-asset roster
   // would get a control whose every state shows the same list.
   const assetOptions = tl.assetOptions.length > 1 ? tl.assetOptions : [];
@@ -675,17 +675,6 @@ export function TimelineToolbar({
               <path d="M6 9l6 6 6-6" />
             </svg>
           </button>
-          {marketNoteCount != null && marketNoteCount > 0 && onToggleMarketNotes && (
-            <button
-              type="button"
-              onClick={onToggleMarketNotes}
-              aria-pressed={marketNotesOn}
-              className={`${CTRL_GHOST} h-7 px-2.5 rounded-md text-xs ${marketNotesOn ? CTRL_ON : CTRL_OFF}`}
-              title={marketNotesOn ? "Hide market notes" : "Show market notes"}
-            >
-              Market notes · {marketNoteCount.toLocaleString("en-US")}
-            </button>
-          )}
           <TimelineDisplayMenu items={displayItems} />
         </div>
       </div>

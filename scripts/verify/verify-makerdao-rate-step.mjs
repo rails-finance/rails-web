@@ -81,6 +81,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { marketNoteCount, setMarketNotes, showNoteRows } from "./lib/market-notes.mjs";
 import { createPublicClient, http, parseAbi, stringToHex } from "viem";
 import { mainnet } from "viem/chains";
 
@@ -729,6 +730,8 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 1400 },
   permissions: ["clipboard-read", "clipboard-write"],
 });
+// Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
+await showNoteRows(context);
 
 // ── 3. vault 28699 — the fixture with the flat live note ───────────────────
 
@@ -878,45 +881,40 @@ check(
     ? (soloText.match(/Stated over.{0,40}|of th\w+ vault.s touches/)?.[0] ?? "silent, as it must be")
     : "note not found",
 );
-/** The toolbar pill's text, or "" where the page shows no pill at all — a
- *  missing pill is a RED check, never a thrown run. */
-const pillText = async (p) => {
-  const l = p.getByRole("button", { name: /^Market notes/i }).first();
-  return (await l.count()) ? ((await l.textContent()) ?? "").trim() : "";
-};
-const pill = page.getByRole("button", { name: /^Market notes/i }).first();
+/** Every note the timeline places, drawn or not (`data-market-notes`; the
+ *  toolbar's "Market notes · N" pill until item 118), or 0 where the page has
+ *  none — a missing count is a RED check, never a thrown run. */
+const pillText = (p) => marketNoteCount(p);
 check(
-  '3h. the toolbar pill reads "Market notes · 6" — the 5 merged rows and the live one',
-  (await pillText(page)) === "Market notes · 6",
-  `"${await pillText(page)}"`,
+  "3h. the timeline's note count is 6 — the 5 merged rows and the live one",
+  (await pillText(page)) === 6,
+  `${await pillText(page)}`,
 );
 
-// ── 6. the pill hides every note, and no count moves ───────────────────────
+// ── 6. Display's switch hides every note, and no count moves ───────────────
 
 const notesBefore = await page.locator("[data-market-note]").count();
 const rowsBefore = await page.locator("[data-event-id]").count();
 let afterHidden = -1;
 let rowsAfter = -1;
-let pressed = null;
 let restored = -1;
-if (await pill.count()) {
-  await pill.click();
+const offered = await setMarketNotes(page, false);
+if (offered) {
   await page.waitForTimeout(600);
-  afterHidden = await page.locator("[data-market-note]").count();
+  afterHidden = await page.locator("[data-market-note], [data-note-marker]").count();
   rowsAfter = await page.locator("[data-event-id]").count();
-  pressed = await pill.getAttribute("aria-pressed");
-  await pill.click();
+  await setMarketNotes(page, true);
   await page.waitForTimeout(600);
   restored = await page.locator("[data-market-note]").count();
 }
 check(
-  "6. toggling the pill hides every note row, flips aria-pressed, and moves no event count",
-  notesBefore === 6 && afterHidden === 0 && rowsBefore === rowsAfter && pressed === "false",
-  `${notesBefore} notes before, ${afterHidden} after, rows ${rowsBefore} → ${rowsAfter}, aria-pressed ${pressed}`,
+  '6. Display\'s "Market-note markers" off hides every note, row and marker, and moves no event count',
+  offered && notesBefore === 6 && afterHidden === 0 && rowsBefore === rowsAfter,
+  `${notesBefore} notes before, ${afterHidden} after, rows ${rowsBefore} → ${rowsAfter}`,
 );
-check("6a. toggling back restores all 6", restored === 6, `${restored}`);
-const eyeItem = await page.getByRole("button", { name: /^Market notes$/i }).count();
-check('6b. the eye menu has no "Market notes" item (the pill owns it)', eyeItem === 0, `${eyeItem} found`);
+check("6a. turning it back on restores all 6", restored === 6, `${restored}`);
+const pillLeft = await page.getByRole("button", { name: /^Market notes ·/i }).count();
+check('6b. the toolbar carries no "Market notes · N" pill', pillLeft === 0, `${pillLeft} found`);
 
 // ── 7. Copy for LLM ────────────────────────────────────────────────────────
 
@@ -995,15 +993,11 @@ check(
   `${hist16745.length} historical, ${ids16745.length - hist16745.length} live: ${hist16745.join(", ")}`,
 );
 check(
-  "4a1. before the window is grown the page draws only 4 of those 6 rows while the pill already states 6 — the pill counts the timeline, the DOM counts the window",
-  windowedNotes16745 === 4 && windowedPill16745 === "Market notes · 6",
-  `${windowedNotes16745} row(s) drawn against pill "${windowedPill16745}"`,
+  "4a1. before the window is grown the page draws only 4 of those 6 rows while the count already states 6 — the count is the timeline's, the DOM is the window's",
+  windowedNotes16745 === 4 && windowedPill16745 === 6,
+  `${windowedNotes16745} row(s) drawn against count ${windowedPill16745}`,
 );
-check(
-  '4a. its pill reads "Market notes · 6"',
-  (await pillText(page16745)) === "Market notes · 6",
-  `"${await pillText(page16745)}"`,
-);
+check("4a. its note count is 6", (await pillText(page16745)) === 6, `${await pillText(page16745)}`);
 // The 25,547,112 → 25,634,095 stretch is now the LAST member of the run that
 // ends at 25,634,095, so it is no longer a row of its own: the page states the
 // run, and the stretch has to be recoverable from it rather than visible.

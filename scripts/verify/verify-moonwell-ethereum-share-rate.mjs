@@ -33,6 +33,7 @@
 //       BASE=https://rails-web.vercel.app node scripts/verify/verify-moonwell-ethereum-share-rate.mjs
 
 import { chromium } from "playwright";
+import { marketNoteCount, setMarketNotes, showNoteRows } from "./lib/market-notes.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 
@@ -242,6 +243,8 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 1600 },
   permissions: ["clipboard-read", "clipboard-write"],
 });
+// Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
+await showNoteRows(context);
 
 async function open(url, waitForNoteMs = 15000) {
   const page = await context.newPage();
@@ -354,45 +357,33 @@ async function checkWallet(label, wallet, fixtures) {
     );
   }
 
-  // ── 5. Pill, toggle, eye menu — and (8) counting invariance ──────────────
-  // Guarded rather than a bare locator await: with zero notes (the fail-first
-  // stub) the pill does not render at all, and that absence must read as a
-  // failed check here, never as an uncaught timeout that kills the run.
-  const pillCandidate = page.getByRole("button", { name: /^Market notes/i }).first();
-  const pillPresent = await pillCandidate
-    .waitFor({ state: "visible", timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!pillPresent) {
-    check(`5.${label} pill reads "Market notes · ${fixtures.length}"`, false, "pill not found on the page");
+  // ── 5. The count, Display's switch — and (8) counting invariance ─────────
+  // The switch is Display's "Market-note markers" and the count is
+  // `data-market-notes` (the toolbar's "Market notes · N" pill until item
+  // 118). With zero notes (the fail-first stub) neither is on the page, and
+  // that absence reads as a failed check here, never as an uncaught timeout.
+  const noteCount = await marketNoteCount(page);
+  check(`5.${label} the timeline's note count is ${fixtures.length}`, noteCount === fixtures.length, `${noteCount}`);
+  const countText = page.getByText(COUNT_RE).first();
+  const before = await countText.innerText();
+  const offered = await setMarketNotes(page, false);
+  if (!offered) {
     check(
-      `5/8.${label} pressing the pill hides every note row, flips aria-pressed, and every count on the page is unchanged`,
+      `5/8.${label} "Market-note markers" off hides every note and every count on the page is unchanged`,
       false,
-      "no pill to press",
+      "Display does not offer the item",
     );
-    check(`8.${label} the count is unchanged again once the notes are shown`, false, "no pill to press");
+    check(`8.${label} the count is unchanged again once the notes are shown`, false, "no switch to turn");
   } else {
-    const pill = pillCandidate;
-    check(
-      `5.${label} pill reads "Market notes · ${fixtures.length}"`,
-      (await pill.textContent())?.trim() === `Market notes · ${fixtures.length}`,
-      await pill.textContent(),
-    );
-
-    const countText = page.getByText(COUNT_RE).first();
-    const before = await countText.innerText();
-    const pressedBefore = await pill.getAttribute("aria-pressed");
-    await pill.click();
     await page.waitForTimeout(300);
-    const pressedAfter = await pill.getAttribute("aria-pressed");
-    const notesHidden = await page.locator("[data-market-note]").count();
+    const notesHidden = await page.locator("[data-market-note], [data-note-marker]").count();
     const afterHide = await countText.innerText();
     check(
-      `5/8.${label} pressing the pill hides every note row, flips aria-pressed, and every count on the page is unchanged`,
-      pressedBefore === "true" && pressedAfter === "false" && notesHidden === 0 && afterHide === before,
-      `aria-pressed ${pressedBefore} → ${pressedAfter}, ${notesHidden} note(s) left, count "${before}" → "${afterHide}"`,
+      `5/8.${label} "Market-note markers" off hides every note and every count on the page is unchanged`,
+      notesHidden === 0 && afterHide === before,
+      `${notesHidden} note(s) left, count "${before}" → "${afterHide}"`,
     );
-    await pill.click();
+    await setMarketNotes(page, true);
     await page.waitForTimeout(300);
     const afterShow = await countText.innerText();
     check(
@@ -403,16 +394,8 @@ async function checkWallet(label, wallet, fixtures) {
   }
 
   if (label === "Wallet A") {
-    const countText = page.getByText(COUNT_RE).first();
-    const row = countText.locator(
-      'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " gap-2 ") and contains(concat(" ", normalize-space(@class), " "), " items-center ")][1]',
-    );
-    const eyeTrigger = row.locator("div.relative.inline-flex.items-center > button").last();
-    await eyeTrigger.click();
-    await page.waitForTimeout(400);
-    const eyeHasItem = await page.getByRole("button", { name: /^Market notes$/i }).count();
-    check('7c. the eye menu has no "Market notes" item', eyeHasItem === 0, `${eyeHasItem} found`);
-    await page.keyboard.press("Escape").catch(() => {});
+    const pillLeft = await page.getByRole("button", { name: /^Market notes ·/i }).count();
+    check('7c. the toolbar carries no "Market notes · N" pill', pillLeft === 0, `${pillLeft} found`);
   }
 
   return page;
@@ -428,12 +411,12 @@ for (const [name, wallet] of [
   ["the no-Mint wallet (no own Mint/Redeem)", NO_MINT_WALLET],
 ]) {
   const p = await open(`${BASE}/ethereum/moonwell/${wallet}`, 3000);
-  const notes = await p.locator("[data-market-note]").count();
-  const pillCount = await p.getByRole("button", { name: /^Market notes/i }).count();
+  const notes = await p.locator("[data-market-note], [data-note-marker]").count();
+  const offered = await setMarketNotes(p, true);
   check(
-    `6. ${name} shows no note row and no pill`,
-    notes === 0 && pillCount === 0,
-    `${notes} note(s), pill ${pillCount}`,
+    `6. ${name} shows no note and Display offers no notes item`,
+    notes === 0 && !offered,
+    `${notes} note(s), Display ${offered ? "offers" : "does not offer"} the item`,
   );
   await p.close();
 }

@@ -70,7 +70,7 @@
 
 import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { SingleWalletProvider } from "@/components/shared/activity-timeline";
@@ -85,10 +85,12 @@ import {
   TimelineToolbar,
   CHAIN_TRUTH_DISPLAY_ITEMS,
   COLLAPSE_RUNS_ITEM,
+  MARKET_NOTE_ITEMS,
   type TimelineDisplayItem,
 } from "@/components/shared/timeline-toolbar";
 import { MarketNoteRow } from "@/components/shared/market-note-row";
-import { SpineNoteGap } from "@/components/shared/spine-note-markers";
+import { ListNoteGap, SpineNoteGap } from "@/components/shared/spine-note-markers";
+import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { anchorMarketNotes, type MarketNote } from "@/lib/shared/market-note";
 import { TIMELINE_PAGE_ROWS } from "@/lib/shared/timeline-opening-balance";
@@ -230,6 +232,7 @@ const LIVE_NOTE_SKELETON_HEIGHT = 64;
  *  no more than it did before notes existed. */
 const NO_ANCHORS: ReadonlyMap<string, MarketNote[]> = new Map();
 const NO_NOTES: MarketNote[] = [];
+const NO_OPEN_NOTES: ReadonlySet<string> = new Set();
 
 /** One closed event card's height, the unit the segment skeleton stacks. */
 const SEGMENT_SKELETON_ROW = 72;
@@ -328,9 +331,9 @@ export interface ChainTruthTimelineProps {
    *  `tl.displayedEvents`, `rows`, `windowSize`, `hasMore`, `isFirst`/`isLast`,
    *  `eventNumberOf`, the toolbar's count line, the filter option counts, the
    *  heatmap, run counts and the export tables all read exactly what they read
-   *  with the array empty. Passing at least one anchored note also shows the
-   *  toolbar's own "Market notes · N" pill (beside the eye menu, not inside
-   *  it); passing none leaves the toolbar as it was.
+   *  with the array empty. Passing at least one note also adds Display's
+   *  market-note items ("Market-note markers", "Open all market notes");
+   *  passing none leaves the menu as it was.
    *
    *  Memoise it on the page: a fresh array identity per render recomputes the
    *  anchoring. */
@@ -342,8 +345,8 @@ export interface ChainTruthTimelineProps {
    *  sit between) and never in `rows`/`tl.displayedEvents` — the same
    *  never-counted guarantee `notes` carries, just via a dedicated slot
    *  instead of an anchor: above the newest row, which is the top. Hidden
-   *  by the same `showMarketNotes` flag as `notes`, and counted into the
-   *  toolbar's "Market notes · N" pill alongside them. Pass `[]` once the
+   *  by the same `showMarketNotes` flag as `notes`, and drawn as markers the
+   *  same way (under the tip's dot on desktop). Pass `[]` once the
    *  position's live reads have settled and found none (closed/liquidated,
    *  or no live quantity exists); see `liveNotesPending` for the in-flight
    *  state. */
@@ -363,9 +366,9 @@ export interface ChainTruthTimelineProps {
    *  rules. A note happened to every holder at once, so it can be put away as
    *  a category; this window is this position's own, so:
    *
-   *    - it is NOT counted in `marketNoteCount` — the toolbar's notes pill
-   *      states the note rows and this is not one;
-   *    - the notes toggle does NOT reach it — `showMarketNotes` off leaves it
+   *    - it is NOT counted in `marketNoteCount` — it is not a note, and it
+   *      never becomes a marker;
+   *    - the notes switch does NOT reach it — `showMarketNotes` off leaves it
    *      standing;
    *    - it keeps every note EXCLUSION all the same: out of `eventOptions`,
    *      out of the type/asset/address filters, out of the boundary card's
@@ -636,7 +639,27 @@ function ChainTruthTimelineBody({
   // Run-collapse is a display preference: flag off ⇒ no run specs reach the
   // rows memo, so it maps events straight to lone cards (the plain
   // renderEventRow path already handles date prefixes and spine flags).
-  const { collapseRuns, showMarketNotes, toggle: toggleDisplay } = useTimelineDisplay();
+  const { collapseRuns, showMarketNotes, openAllMarketNotes } = useTimelineDisplay();
+  // Desktop list view: the notes opened from their markers (item 118). Each
+  // opens on its own; turning "Open all market notes" off puts every note
+  // back to its marker.
+  const openAll = showMarketNotes && openAllMarketNotes;
+  const [openNoteIds, setOpenNoteIds] = useState<ReadonlySet<string>>(NO_OPEN_NOTES);
+  useEffect(() => {
+    if (!openAll) setOpenNoteIds(NO_OPEN_NOTES);
+  }, [openAll]);
+  const toggleNote = useCallback((note: MarketNote) => {
+    setOpenNoteIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(note.id)) next.delete(note.id);
+      else next.add(note.id);
+      return next;
+    });
+  }, []);
+  // Below 640px the list view hides the spine column, so notes there stay
+  // rows. Read after mount; the server draws the desktop markers, which are
+  // hidden below 640px by class.
+  const phone = useMediaQuery(PHONE_QUERY);
   // Turning the collapse off leaves the `asOneEvent` specs standing: they draw
   // one transaction as one card and hide nothing, so there is nothing for the
   // choice to give back.
@@ -903,25 +926,48 @@ function ChainTruthTimelineBody({
   // account's. Instead the notes stay in their own map and are rendered
   // alongside the row they anchor to, at the point of render.
   //
-  // Computed regardless of `showMarketNotes`: the toolbar pill states how
-  // many note rows the page WOULD show even while the flag is off — turning
-  // notes off hides the rows (see `notesFor`), not the count.
+  // Computed regardless of `showMarketNotes`: Display offers the notes'
+  // switch on a page that has any, whether they are showing or not.
   // "desc" is the page's one order now. The parameter stays on the function
   // because the MARKDOWN EXPORTS still render a life ascending, and a note has
   // to be placed the way the list around it reads.
+  //
+  // A date range keeps the notes that end inside it: a note from outside the
+  // range would otherwise anchor to the nearest row in it.
+  const notesInView = useMemo(() => {
+    if (!notes?.length) return NO_NOTES;
+    const range = tl.dateRange;
+    return range
+      ? notes.filter((n) => !(n.to.timestamp > 0) || (n.to.timestamp >= range[0] && n.to.timestamp <= range[1]))
+      : notes;
+  }, [notes, tl.dateRange]);
   const anchored = useMemo(
-    () => (notes?.length ? anchorMarketNotes(notes, events, "desc") : NO_ANCHORS),
-    [notes, events],
+    () => (notesInView.length ? anchorMarketNotes(notesInView, events, "desc") : NO_ANCHORS),
+    [notesInView, events],
   );
+  /** The notes newer than every row a filter left standing, or every note
+   *  when the filter left none. A marker stays when a filter hides the
+   *  events either side of it (item 118), so these stand in the head slot,
+   *  above the newest row, newest first. Bounded by the newest event the page
+   *  holds, so a note past the loaded rows never lands here. */
+  const headNotes = useMemo(() => {
+    if (!notesInView.length) return NO_NOTES;
+    const placed = new Set<string>();
+    for (const list of anchored.values()) for (const n of list) placed.add(n.id);
+    const newest = tl.sortedEvents.length ? tl.sortedEvents[tl.sortedEvents.length - 1].blockNumber : -Infinity;
+    const out = notesInView.filter((n) => !placed.has(n.id) && n.to.block <= newest);
+    return out.length ? out.sort((a, b) => b.to.block - a.to.block) : NO_NOTES;
+  }, [notesInView, anchored, tl.sortedEvents]);
 
-  /** The toolbar pill's own count: every anchored historical note, plus every
-   *  live one (always in the head slot, no anchor needed) — the count of
-   *  note rows the page would actually render. */
+  /** How many notes the page places: every anchored note, every head note
+   *  and every live one. Stated on the root for a machine
+   *  (`data-market-notes`); Display offers the notes' items when it is not
+   *  zero. */
   const marketNoteCount = useMemo(() => {
-    let n = liveNotes?.length ?? 0;
+    let n = (liveNotes?.length ?? 0) + headNotes.length;
     for (const list of anchored.values()) n += list.length;
     return n;
-  }, [anchored, liveNotes]);
+  }, [anchored, headNotes, liveNotes]);
 
   // The head slot: rendered above the newest row, which is the top of the
   // list. It holds two classes of pinned row — the live WINDOW (`liveWindow`,
@@ -930,8 +976,14 @@ function ChainTruthTimelineBody({
   // in flight) so the two never show at once. Whatever stands highest there
   // takes the spine's lead-in dot and the `isFirst` flag, and every other
   // claim on them is suppressed below, so no two rows draw either.
-  const liveRowsShown = showMarketNotes ? (liveNotes ?? []) : [];
-  const liveSlotAtTop = liveRowsShown.length > 0;
+  const liveRowsShown = showMarketNotes ? (liveNotes ?? NO_NOTES) : NO_NOTES;
+  /** Everything in the head slot's note stack: the live notes, then the
+   *  historical notes a filter left above the newest row. */
+  const topNotes = useMemo(
+    () => (!showMarketNotes || headNotes.length === 0 ? liveRowsShown : [...liveRowsShown, ...headNotes]),
+    [showMarketNotes, headNotes, liveRowsShown],
+  );
+  const liveSlotAtTop = topNotes.length > 0;
   /** The live WINDOW's own occupancy of the head slot — read off the prop, not
    *  off `showMarketNotes`: it is not a market note, so putting the notes away
    *  leaves it standing (see the prop). It draws above the live notes, so when
@@ -1190,6 +1242,12 @@ function ChainTruthTimelineBody({
     const showDate = !prev || !next || dayKey(ts) !== dayKey(prev.timestamp) || dayKey(ts) !== dayKey(next.timestamp);
     return showDate ? `${shortDate(ts)} ${shortDateYear(ts)}` : null;
   };
+  /** The head slot's notes: a live note reads "Now" on its own; a historical
+   *  one there has no row above it, so it always carries its date. */
+  const headDatePrefix = (note: MarketNote): string | null =>
+    note.live || !(note.to.timestamp > 0)
+      ? null
+      : `${shortDate(note.to.timestamp)} ${shortDateYear(note.to.timestamp)}`;
 
   // Every event row's own share href — right on the position page and on the
   // event page itself, since `positionPath` above already strips the latter's
@@ -1337,14 +1395,18 @@ function ChainTruthTimelineBody({
 
   // Auto-append the collapse toggle only when this page defines runs — a page
   // with none has nothing to collapse and must not show an inert toggle.
-  // Market notes left the eye menu for the toolbar's own pill (below) — see
-  // `marketNoteCount` and the toolbar's `onToggleMarketNotes`.
+  // The market-note items follow under a rule on a page with notes (item 118;
+  // they were a toolbar pill, "Market notes · N", until then). A phone gets
+  // the switch alone: see MARKET_NOTE_ITEMS.
   // Never on a served page: its folders are not a reader's choice (decision
   // 0021). `?folders=0` answers flat, so that page groups in the browser and
   // keeps the toggle.
   // An `asOneEvent` spec is not a collapse and does not earn the toggle on its
   // own: a page with only those would show one that changes nothing.
-  const items = runs?.some((r) => !r.asOneEvent) && !servedRows ? [...displayItems, COLLAPSE_RUNS_ITEM] : displayItems;
+  const baseItems =
+    runs?.some((r) => !r.asOneEvent) && !servedRows ? [...displayItems, COLLAPSE_RUNS_ITEM] : displayItems;
+  const items =
+    marketNoteCount > 0 ? [...baseItems, ...(phone ? MARKET_NOTE_ITEMS.slice(0, 1) : MARKET_NOTE_ITEMS)] : baseItems;
 
   /** The notes that sit beside one row: an event row's own, or the union over
    *  a collapsed run's members — a note whose anchor is inside a folder
@@ -1379,6 +1441,7 @@ function ChainTruthTimelineBody({
         className="space-y-3"
         data-timeline-rows-drawn={Math.min(windowSize, rows.length)}
         data-timeline-rows-loaded={rows.length}
+        data-market-notes={marketNoteCount || undefined}
         data-mview={spineActive ? "spine" : undefined}
       >
         {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder). */}
@@ -1388,13 +1451,8 @@ function ChainTruthTimelineBody({
             displayItems={items}
             leading={toolbarLeading}
             countTooltip={countTooltip}
-            marketNoteCount={marketNoteCount}
-            marketNotesOn={showMarketNotes}
-            onToggleMarketNotes={() => toggleDisplay("showMarketNotes")}
-            // The navigator prototype's marks (`?nav=1`). Reduced here — this is
-            // where the notes it marks are anchored — and handed to the toolbar,
-            // which owns the Date button the panel now hangs from. The panel
-            // used to stand as a sibling of the rows; it floats over them now.
+            // The Date button's panel hangs from the toolbar; the second path a
+            // month click can take travels to it here.
             monthReach={
               segments
                 ? {
@@ -1440,23 +1498,43 @@ function ChainTruthTimelineBody({
               {/* The phone spine view draws the live notes as markers above the
                 newest event, under the tip's dot, and reserves nothing for
                 them while they load. */}
-              {liveSkeletonAtTop && !spineActive && <SkeletonBlock height={LIVE_NOTE_SKELETON_HEIGHT} />}
+              {liveSkeletonAtTop && !spineActive && phone && <SkeletonBlock height={LIVE_NOTE_SKELETON_HEIGHT} />}
+              {/* The desktop markers reserve one target for the live notes. */}
+              {liveSkeletonAtTop && !spineActive && !phone && !liveSlotAtTop && (
+                <div aria-hidden className="hidden sm:block" style={{ height: 28 }} />
+              )}
               {liveSlotAtTop && spineActive && (
                 <SpineNoteGap
-                  notes={liveRowsShown}
-                  datePrefixFor={() => null}
+                  notes={topNotes}
+                  datePrefixFor={headDatePrefix}
                   head={{ tip: liveWindowAtTop ? null : tipSide }}
+                />
+              )}
+              {liveSlotAtTop && !spineActive && !phone && (
+                <ListNoteGap
+                  notes={topNotes}
+                  datePrefixFor={headDatePrefix}
+                  openIds={openNoteIds}
+                  openAll={openAll}
+                  onToggle={toggleNote}
+                  head={{
+                    tip: liveWindowAtTop ? null : tipSide,
+                    above: tipBoundaryAtTop || liveWindowAtTop,
+                    below: true,
+                  }}
                 />
               )}
               {liveSlotAtTop &&
                 !spineActive &&
-                liveRowsShown.map((note, i) => (
+                phone &&
+                topNotes.map((note, i) => (
                   <SpineTipContext.Provider
                     key={`live_${note.id}`}
                     value={i === 0 && !liveWindowAtTop ? tipSide : null}
                   >
                     <MarketNoteRow
                       note={note}
+                      datePrefix={headDatePrefix(note)}
                       isFirst={i === 0 && !tipBoundaryAtTop && !liveWindowAtTop}
                       isLast={false}
                     />
@@ -1535,16 +1613,26 @@ function ChainTruthTimelineBody({
                 // have happened before. The row itself is untouched — this only
                 // wraps it.
                 const rowLastIdx = row.kind === "run" ? row.flatIdx + row.events.length - 1 : row.flatIdx;
-                // The phone spine view draws them as markers in the gap below.
+                // Markers in the gap below: the phone spine view's, or the
+                // desktop list view's. The phone list view has no spine column
+                // to put them on, so its notes stay rows.
                 const noteRows = spineActive ? (
                   <SpineNoteGap notes={rowNotes} datePrefixFor={(note) => noteDatePrefixAfter(note, rowLastIdx)} />
+                ) : !phone ? (
+                  <ListNoteGap
+                    notes={rowNotes}
+                    datePrefixFor={(note) => noteDatePrefixAfter(note, rowLastIdx)}
+                    openIds={openNoteIds}
+                    openAll={openAll}
+                    onToggle={toggleNote}
+                  />
                 ) : (
                   rowNotes.map((note) => (
-                  <MarketNoteRow
-                    key={`note_${note.id}`}
-                    note={note}
-                    datePrefix={noteDatePrefixAfter(note, rowLastIdx)}
-                  />
+                    <MarketNoteRow
+                      key={`note_${note.id}`}
+                      note={note}
+                      datePrefix={noteDatePrefixAfter(note, rowLastIdx)}
+                    />
                   ))
                 );
                 return (
@@ -1620,9 +1708,33 @@ function ChainTruthTimelineBody({
                 />
               </div>
             ) : (
-              <div className="py-8 text-center text-sm text-rb-500">
-                {tl.isFiltered ? "All events filtered out — adjust the filters above to show some." : emptyLabel}
-              </div>
+              <>
+                {/* The markers stay when a filter hides every event (item
+                    118): notes describe the market, not the account. */}
+                {tl.isFiltered && topNotes.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {spineActive ? (
+                      <SpineNoteGap notes={topNotes} datePrefixFor={headDatePrefix} head={{ tip: null }} />
+                    ) : !phone ? (
+                      <ListNoteGap
+                        notes={topNotes}
+                        datePrefixFor={headDatePrefix}
+                        openIds={openNoteIds}
+                        openAll={openAll}
+                        onToggle={toggleNote}
+                        head={{ tip: null, above: false, below: false }}
+                      />
+                    ) : (
+                      topNotes.map((note) => (
+                        <MarketNoteRow key={`note_${note.id}`} note={note} datePrefix={headDatePrefix(note)} />
+                      ))
+                    )}
+                  </div>
+                )}
+                <div className="py-8 text-center text-sm text-rb-500">
+                  {tl.isFiltered ? "All events filtered out — adjust the filters above to show some." : emptyLabel}
+                </div>
+              </>
             )}
             {footer && !tl.isFiltered && footer}
           </>

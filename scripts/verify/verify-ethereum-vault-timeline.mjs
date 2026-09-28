@@ -260,6 +260,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { enGb } from "./lib/date.mjs";
+import { showNoteRows } from "./lib/market-notes.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3741";
@@ -693,6 +694,8 @@ async function ownTimeline(vault, holder, blockNumber) {
 
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1280, height: 2000 } });
+// Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
+await showNoteRows(context);
 
 async function readPage(vault, holder, { expandRows = false } = {}) {
   const page = await context.newPage();
@@ -744,9 +747,12 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
   // "at its block position" means on screen.
   const noteRows = await page.locator("[data-vault-timeline-rows] [data-market-note]").evaluateAll((els) =>
     els.map((e) => {
-      let prev = e.previousElementSibling;
-      while (prev && !prev.querySelector("[data-event-id]")) prev = prev.previousElementSibling;
-      const anchor = prev?.querySelector("[data-event-id]") ?? e.parentElement?.querySelector("[data-event-id]");
+      // A note row stands inside its gap's wrapper (`data-note-gap`); the
+      // row it sits under is the wrapper's neighbour.
+      let prev = (e.closest("[data-note-gap]") ?? e).previousElementSibling;
+      const eventIn = (el) => (el.matches("[data-event-id]") ? el : el.querySelector("[data-event-id]"));
+      while (prev && !eventIn(prev)) prev = prev.previousElementSibling;
+      const anchor = (prev && eventIn(prev)) ?? e.parentElement?.querySelector("[data-event-id]");
       return {
         id: e.getAttribute("data-market-note") ?? "",
         text: e.innerText.replace(/\s+/g, " ").trim(),

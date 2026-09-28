@@ -262,10 +262,14 @@ export function MarketNoteRow({
   isLast = false,
   datePrefix = null,
   defaultOpen,
+  nodeControl,
 }: {
   note: MarketNote;
-  /** Mount with the panel open (the phone spine view's opened marker). */
+  /** Mount with the panel open (a note opened from its spine marker). */
   defaultOpen?: boolean;
+  /** The desktop marker's close control, laid over the node, which is then
+   *  drawn filled (spine-note-markers.tsx). */
+  nodeControl?: ReactNode;
   /** The day stamp the timeline gives this row on its day-stamp rule
    *  (`noteDatePrefixAfter` in ChainTruthTimeline). A live note reads "Now". */
   datePrefix?: string | null;
@@ -323,7 +327,8 @@ export function MarketNoteRow({
 
   return (
     <NoteRowShell
-      icon="market"
+      icon={nodeControl ? "market-open" : "market"}
+      nodeControl={nodeControl}
       isFirst={isFirst}
       isLast={isLast}
       label={body.label}

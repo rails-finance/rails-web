@@ -1,13 +1,15 @@
-// The market-notes toolbar pill, and the LIVE note at the head of the
-// timeline — the position's own quantity read at the chain head against its
-// newest event that carries it.
+// The market-notes switch, and the LIVE note at the head of the timeline —
+// the position's own quantity read at the chain head against its newest event
+// that carries it.
 // ---------------------------------------------------------------------------
-// The change moves the
-// "Market notes" toggle off the eye menu onto its own pressed-state pill
-// beside it, reading "Market notes · N", and adds a live note in a dedicated
-// head slot (above the newest row newest-first, below it oldest-first) for
-// any OPEN position whose live read exists — unthresholded, because "nothing
-// has moved" is itself the fact.
+// A live note sits in a dedicated head slot above the newest row for any OPEN
+// position whose live read exists — unthresholded, because "nothing has moved"
+// is itself the fact. The switch was a toolbar pill, "Market notes · N", until
+// rails-ops TO-DO-ui-jobs item 118 moved it into Display as "Market-note
+// markers" and made each closed note a marker on the spine; the count the pill
+// stated is `data-market-notes` on the timeline root. This script turns on
+// "Open all market notes" before load (lib/market-notes.mjs), so every note
+// draws its row as it did at rest before the markers.
 //
 // Every EARLIER end below is a historical fact, read from the position's own
 // timeline route and safe to pin (it does not move). Every LATER end is a
@@ -21,6 +23,7 @@
 
 import { chromium } from "playwright";
 import { drawnRows, drawWholeList } from "../lib/timeline-draw.mjs";
+import { marketNoteCount, setMarketNotes, showNoteRows } from "./lib/market-notes.mjs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -116,7 +119,7 @@ function lastArrowPair(text) {
   return all.length ? Number(all[all.length - 1][2].replace(/,/g, "")) : null;
 }
 
-console.log("Market notes — the toolbar pill and the live note\n");
+console.log("Market notes — the Display switch and the live note\n");
 console.log(`BASE ${BASE}\n`);
 
 const browser = await chromium.launch();
@@ -124,6 +127,7 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 1600 },
   permissions: ["clipboard-read", "clipboard-write"],
 });
+await showNoteRows(context);
 
 async function open(url, waitForNoteMs = 15000) {
   const page = await context.newPage();
@@ -163,7 +167,7 @@ const ids8 = await page8
   .evaluateAll((els) => els.map((e) => e.getAttribute("data-market-note")));
 // ⚠️ THE COUNT IS READ, NOT PINNED — and the three surfaces are then held to
 // each other. It was pinned at 29 until 2026-09-20 and the page drew 22, with
-// the pill and the markdown export BOTH saying 22 as well, so the page is
+// the count and the markdown export BOTH saying 22 as well, so the page is
 // internally consistent and the pin is what moved. Nobody can say which figure
 // is right: no baseline exists from before the plain-words commit, and a
 // Sepolia CDP's note count moves with whoever touches it (TO-DO-ui-jobs §38 —
@@ -171,10 +175,10 @@ const ids8 = await page8
 // adds an endpoint, and it is recorded there rather than pinned over).
 //
 // So what this run asserts is the claim a pinned number could never make: the
-// row count, the toolbar pill and the export all state ONE number (checks 7a
-// and 9a), and the two live notes are the pinned ones by id (1b). A pill that
-// drifted from its own rows is the defect this pair is for, and it survives a
-// count that moves.
+// row count, the timeline's `data-market-notes` and the export all state ONE
+// number (checks 7a and 9a), and the two live notes are the pinned ones by id
+// (1b). A count that drifted from its own rows is the defect this pair is for,
+// and it survives a count that moves.
 const NOTE_COUNT_8 = ids8.length;
 check("1a. usdp/8 draws its live notes and some history", NOTE_COUNT_8 >= 3, `${NOTE_COUNT_8} note rows`);
 check(
@@ -418,22 +422,18 @@ check(
   idsB.filter((i) => i.startsWith("price-gap:") && !i.endsWith("-head")).length === troveHistoricalCount,
   `wanted ${troveHistoricalCount}, got ${idsB.filter((i) => i.startsWith("price-gap:") && !i.endsWith("-head")).length}`,
 );
-// 4c — THE INVARIANT THAT WOULD HAVE ENDED THIS IN A MINUTE. The pill counts
-// every note the rule found, whatever the list has drawn; the drawn notes are
-// the ones a reader can see. On a whole list the two are the same number, and
-// where they are not, one of them is wrong. Four troves were recorded as
-// disagreeing with their own arithmetic on 2026-09-20 because the page drew 50
-// of 70 rows: the pill said 10 throughout and nothing was reading it.
-const pillTextB = await pageB
-  .getByRole("button", { name: /^Market notes/i })
-  .first()
-  .textContent()
-  .catch(() => null);
-const pillCountB = Number((pillTextB ?? "").replace(/[^\d]/g, ""));
+// 4c — THE INVARIANT THAT WOULD HAVE ENDED THIS IN A MINUTE. The count
+// (`data-market-notes`, the toolbar pill until item 118) covers every note the
+// rule found, whatever the list has drawn; the drawn notes are the ones a
+// reader can see. On a whole list the two are the same number, and where they
+// are not, one of them is wrong. Four troves were recorded as disagreeing with
+// their own arithmetic on 2026-09-20 because the page drew 50 of 70 rows: the
+// pill said 10 throughout and nothing was reading it.
+const countB = await marketNoteCount(pageB);
 check(
-  "4c. the toolbar pill's count is the count of notes on the drawn list",
-  drawnB.complete && Number.isFinite(pillCountB) && pillCountB === idsB.length,
-  `pill ${pillTextB?.trim() ?? "absent"} vs ${idsB.length} drawn`,
+  "4c. the timeline's note count is the count of notes on the drawn list",
+  drawnB.complete && countB === idsB.length,
+  `count ${countB} vs ${idsB.length} drawn`,
 );
 
 // ── 4d/4e — THE TRAP ITSELF, on a subject DISCOVERED at run time ───────────
@@ -441,16 +441,8 @@ check(
 // without the window ever binding — an invariant nothing exercises is the
 // vacuous pass in its other costume. A trove with more rows than the window
 // is the only subject that proves it: undrawn, its notes are FEWER than the
-// pill states; drawn whole, the two agree. Where the roster holds no such
+// count states; drawn whole, the two agree. Where the roster holds no such
 // trove today that is SAID, not passed.
-const notePill = async (p) => {
-  const t = await p
-    .getByRole("button", { name: /^Market notes/i })
-    .first()
-    .textContent()
-    .catch(() => null);
-  return Number((t ?? "").replace(/[^\d]/g, ""));
-};
 const wideRoster = await api("/api/troves?collateralType=WETH&status=open&limit=200");
 let windowed = null;
 for (const t of (wideRoster.data ?? []).filter((r) => Number(r.activity?.transactionCount ?? 0) > 60).slice(0, 4)) {
@@ -471,18 +463,18 @@ if (
       : "NO EVIDENCE — no open WETH trove in the first 200 draws short of its loaded rows, so 4c is unexercised",
   )
 ) {
-  const pillBefore = await notePill(windowed.page);
+  const countBefore = await marketNoteCount(windowed.page);
   const drawnBefore = await windowed.page.locator("[data-market-note]").count();
   check(
-    "4e. undrawn, it shows FEWER notes than the pill states — the trap §38 recorded",
-    pillBefore > drawnBefore,
-    `pill ${pillBefore} vs ${drawnBefore} drawn, ${windowed.rows.drawn} of ${windowed.rows.loaded} rows`,
+    "4e. undrawn, it shows FEWER notes than the count states — the trap §38 recorded",
+    countBefore > drawnBefore,
+    `count ${countBefore} vs ${drawnBefore} drawn, ${windowed.rows.drawn} of ${windowed.rows.loaded} rows`,
   );
   const whole = await drawWholeList(windowed.page);
   const drawnAfter = await windowed.page.locator("[data-market-note]").count();
   check(
-    "4f. drawn whole, the pill and the list agree",
-    whole.complete && (await notePill(windowed.page)) === drawnAfter && drawnAfter === pillBefore,
+    "4f. drawn whole, the count and the list agree",
+    whole.complete && (await marketNoteCount(windowed.page)) === drawnAfter && drawnAfter === countBefore,
     `${drawnBefore} → ${drawnAfter} notes over ${whole.drawn} of ${whole.loaded} rows, ${whole.presses} press(es)`,
   );
   await windowed.page.close();
@@ -589,38 +581,26 @@ check(
 );
 check('6f. the note names the quantity "share rate"', mamoText.includes("share rate"), mamoText.slice(0, 80));
 
-// ── 5. Toolbar — the pill, the toggle, the eye menu, the no-notes page ─────
+// ── 5. The switch — Display's item, the count, the no-notes page ──────────
 
-const pill8 = page8.getByRole("button", { name: /^Market notes/i }).first();
+const count8 = await marketNoteCount(page8);
 check(
-  `7a. usdp/8's pill states the same count as the rows it governs, ${NOTE_COUNT_8}`,
-  (await pill8.textContent())?.trim() === `Market notes \u00b7 ${NOTE_COUNT_8}`,
-  await pill8.textContent(),
+  `7a. usdp/8's timeline states the same note count as the rows it draws, ${NOTE_COUNT_8}`,
+  count8 === NOTE_COUNT_8,
+  `data-market-notes ${count8}`,
 );
-const pressedBefore = await pill8.getAttribute("aria-pressed");
-await pill8.click();
+const offered8 = await setMarketNotes(page8, false);
 await page8.waitForTimeout(300);
-const pressedAfter = await pill8.getAttribute("aria-pressed");
-const notesAfterToggle = await page8.locator("[data-market-note]").count();
+const notesAfterToggle = await page8.locator("[data-market-note], [data-note-marker]").count();
 check(
-  "7b. pressing the pill hides every note row (historical and live) and flips aria-pressed",
-  pressedBefore === "true" && pressedAfter === "false" && notesAfterToggle === 0,
-  `aria-pressed ${pressedBefore} → ${pressedAfter}, ${notesAfterToggle} note(s) left`,
+  '7b. Display\'s "Market-note markers" off hides every note (historical and live), row and marker',
+  offered8 && notesAfterToggle === 0,
+  `${offered8 ? "offered" : "not offered"}, ${notesAfterToggle} note(s) left`,
 );
-await pill8.click();
+await setMarketNotes(page8, true);
 await page8.waitForTimeout(300);
-
-// The eye/Display menu — same trigger-finding handle the sibling verifiers use.
-const countSpan8 = page8.getByText(/^(?:Showing )?[\d,]+(?: of [\d,]+)? (?:events?|listed)/).first();
-const row8 = countSpan8.locator(
-  'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " gap-2 ") and contains(concat(" ", normalize-space(@class), " "), " items-center ")][1]',
-);
-const eyeTrigger8 = row8.locator("div.relative.inline-flex.items-center > button").last();
-await eyeTrigger8.click();
-await page8.waitForTimeout(400);
-const eyeHasItem = await page8.getByRole("button", { name: /^Market notes$/i }).count();
-check('7c. the eye menu has no "Market notes" item', eyeHasItem === 0, `${eyeHasItem} found`);
-await page8.keyboard.press("Escape").catch(() => {});
+const pill8 = await page8.getByRole("button", { name: /^Market notes ·/i }).count();
+check('7c. the toolbar carries no "Market notes · N" pill', pill8 === 0, `${pill8} found`);
 await page8.close();
 
 // The no-notes page — a Liquity V1 trove: no note kind exists there at all.
@@ -629,16 +609,20 @@ const v1Wallet = v1Roster.data?.[0]?.wallet;
 check("8a. a Liquity V1 wallet with an open trove was found for the control", !!v1Wallet, v1Wallet ?? "NO EVIDENCE");
 if (v1Wallet) {
   const v1Page = await open(`${BASE}/ethereum/liquity-v1/${v1Wallet}`, 3000);
-  const v1Notes = await v1Page.locator("[data-market-note]").count();
-  const v1Pill = await v1Page.getByRole("button", { name: /^Market notes/i }).count();
+  const v1Notes = await v1Page.locator("[data-market-note], [data-note-marker]").count();
+  const v1Offered = await setMarketNotes(v1Page, false);
   check(
-    "8b. the no-notes page (Liquity V1 trove) shows no note and no pill",
-    v1Notes === 0 && v1Pill === 0,
-    `${v1Notes} note(s), pill ${v1Pill}`,
+    "8b. the no-notes page (Liquity V1 trove) shows no note and Display offers no notes item",
+    v1Notes === 0 && !v1Offered,
+    `${v1Notes} note(s), Display ${v1Offered ? "offers" : "does not offer"} the item`,
   );
   await v1Page.close();
 } else {
-  check("8b. the no-notes page (Liquity V1 trove) shows no note and no pill", false, "NO EVIDENCE — no fixture found");
+  check(
+    "8b. the no-notes page (Liquity V1 trove) shows no note and Display offers no notes item",
+    false,
+    "NO EVIDENCE — no fixture found",
+  );
 }
 
 // ── 6. Markdown export on usdp/8 carries both live sentences ───────────────
