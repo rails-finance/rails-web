@@ -72,8 +72,14 @@ const QUEUE_FILL_FOLDER: FolderRegisterEntry = {
   folderBadge: PAID_OUT_FOLDER_BADGE,
 };
 
-/** One member of an owner run, by the action it repeats. */
-const OWNER_RUN_NOUN: Record<string, string> = { deposit: "deposit", withdraw: "withdrawal" };
+/** One member of an owner run, by its action; the transfers name a shape
+ *  run's members beside the owner's own act. */
+const OWNER_RUN_NOUN: Record<string, string> = {
+  deposit: "deposit",
+  withdraw: "withdrawal",
+  transfer_in: "share receipt",
+  transfer_out: "share transfer",
+};
 
 export const MAPLE_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry =>
   folder.kind === OWNER_RUN_KIND ? ownerRunEntry(folder, (a) => OWNER_RUN_NOUN[a] ?? "event") : QUEUE_FILL_FOLDER;

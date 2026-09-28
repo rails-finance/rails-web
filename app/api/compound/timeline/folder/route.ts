@@ -9,6 +9,7 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
 import type { UpstreamFolderMembers } from "@/lib/sources/api/timeline-folder-wire";
 import { compoundFolderTokenAddresses, compoundServedFolder } from "@/lib/sources/api/compound-folder-wire";
+import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
 
 // Opening one Compound V3 folder — the members behind a header on
 // `/timeline?group=1` for one (market, account). The SparkLend twin
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
       const v = sp.get(k);
       if (v) qs.set(k, v);
     }
+    qs.set(SHAPE_RUNS_PARAM, "1");
     const response = await fetch(
       `${RAILS_API_URL}/api/compound/timeline/folder?${qs.toString()}`,
       createAuthFetchOptions(undefined, readerIp),

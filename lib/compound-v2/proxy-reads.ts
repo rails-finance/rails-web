@@ -16,6 +16,7 @@ import type { TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
 import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
 import { proxyFail, proxyOk, type ProxyAnswer } from "@/lib/shared/proxy-answer";
 import type { SsrHop } from "@/lib/shared/listing-ssr";
+import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
 
 // The filter chips are underlying SYMBOLS; the rails route filters by market
 // KEY. One symbol can name SEVERAL markets — WBTC is two (wbtc, wbtc2) — so
@@ -111,7 +112,7 @@ export async function readCompoundV2Timeline(sp: URLSearchParams, hop: SsrHop): 
   const to = sp.get("to");
 
   if (sp.get("group") === "1") {
-    const qs = new URLSearchParams({ wallet, group: "1" });
+    const qs = new URLSearchParams({ wallet, group: "1", [SHAPE_RUNS_PARAM]: "1" });
     if (from) qs.set("from", from);
     if (to) qs.set("to", to);
     const response = await fetch(`${hop.baseUrl}/api/compound-v2/timeline?${qs.toString()}`, {

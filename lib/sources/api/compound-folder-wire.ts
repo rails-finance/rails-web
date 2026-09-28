@@ -17,7 +17,8 @@
 // the client run spec draw (`lib/compound-v2/timeline-runs.tsx`). It is keyed
 // by the market like every V2 leg, so its verb is what says so: it scales at
 // cToken decimals and draws the cToken's symbol, filed under the market's for
-// the asset filter.
+// the asset filter. A shape run's cToken transfer legs ("Sent", "Received",
+// and their net forms) are in cTokens too.
 
 import { COMPOUND_V2_MARKET_BY_KEY, CTOKEN_DECIMALS } from "@/lib/compound-v2/asset-catalog";
 import { COMPOUND_MARKETS } from "@/lib/compound/asset-catalog";
@@ -25,8 +26,10 @@ import type { Erc20Meta } from "@/lib/sources/chain/erc20-meta";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { toServedFolder, type FolderAssetResolver, type UpstreamFolder } from "@/lib/sources/api/timeline-folder-wire";
 
-/** The V2 header verb whose amount is the collateral market's cTokens. */
-const V2_CTOKEN_VERB = "Seized";
+/** The V2 header verbs whose amount is the market's cTokens: the seize legs,
+ *  and a shape run's cToken transfer legs (rails-server `netLegOf` on
+ *  `COMPOUND_V2_SHAPE_FOLDER_SPECS`). */
+const V2_CTOKEN_VERBS: ReadonlySet<string> = new Set(["Seized", "Sent", "Received", "Net sent", "Net received"]);
 
 const V2_RESOLVER: FolderAssetResolver = {
   symbol: (key) => COMPOUND_V2_MARKET_BY_KEY[key]?.symbol,
@@ -42,7 +45,7 @@ export function compoundV2ServedFolder(folder: UpstreamFolder): ServedFolder {
     legs: served.legs.map((leg) => {
       const m = COMPOUND_V2_MARKET_BY_KEY[leg.asset];
       if (!m) return { ...leg, symbol: null };
-      return leg.verb === V2_CTOKEN_VERB
+      return V2_CTOKEN_VERBS.has(leg.verb)
         ? { ...leg, symbol: m.symbol, displaySymbol: m.cSymbol, decimals: CTOKEN_DECIMALS }
         : { ...leg, symbol: m.symbol, decimals: m.decimals };
     }),

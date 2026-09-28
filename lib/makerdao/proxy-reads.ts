@@ -15,6 +15,7 @@ import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { resolveOpeningAssetKeys, type UpstreamOpeningBalance } from "@/lib/shared/timeline-opening-balance-wire";
 import { proxyFail, proxyOk, type ProxyAnswer } from "@/lib/shared/proxy-answer";
 import type { SsrHop } from "@/lib/shared/listing-ssr";
+import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
 
 interface VaultsRawResponse {
   rows: RawMakerVaultRow[];
@@ -101,6 +102,7 @@ export async function readMakerTimeline(
   if (sp.get("group") === "1") {
     qs.delete("recent");
     qs.set("group", "1");
+    qs.set(SHAPE_RUNS_PARAM, "1");
     const response = await fetch(`${base}?${qs.toString()}`, { headers: hop.headers });
     if (!response.ok) {
       console.error(`Backend API error: ${response.status} ${response.statusText}`);

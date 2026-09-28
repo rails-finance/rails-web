@@ -103,6 +103,8 @@ const OWNER_RUN_NOUN: Record<string, string> = {
   redeem: "withdrawal",
   borrow: "borrow",
   repay: "repayment",
+  transfer_in: "cToken receipt",
+  transfer_out: "cToken transfer",
 };
 
 export const COMPOUND_V2_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry =>

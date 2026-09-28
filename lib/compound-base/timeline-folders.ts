@@ -16,7 +16,9 @@
 // absorption rows (`absorb_debt` and its `absorb_collateral` legs), and an
 // owner run of five or more of the owner's own supplies or withdrawals of one
 // asset back to back (decision 0021, 2026-09-24), the owner judged as the
-// summary's `actorsSql` judges it. The page draws both with the family's
+// summary's `actorsSql` judges it, or of five or more transactions of one
+// shape (the amendment of 2026-09-28: the same owner actions and transfers,
+// per asset, in each; COMPOUND_V3_SHAPE_FOLDER_SPECS). The page draws both with the family's
 // register (`COMPOUND_FOLDER_REGISTER`). Two things are not carried over: the
 // state faces (no page reads a folder's `stateBefore`/`stateAfter`) and the
 // flows (the replay reduces the lifetime flows over every row before this pass
@@ -41,6 +43,7 @@ import {
   type GroupedRows,
   type GroupingAccess,
   type GroupingLegEntry,
+  type GroupingNetLegEntry,
   type GroupingSpec,
   type TrimmedRows,
 } from "@/lib/shared/timeline-grouping";
@@ -91,8 +94,16 @@ const OWNER_VERB: Record<string, string> = {
   withdraw_collateral: "Withdrawn",
 };
 const has = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
+/** Base and collateral moves between accounts: custody, which may sit in an
+ *  owner shape beside the owner's own act. */
+const TRANSFER_AXIS: Record<string, true> = {
+  transfer_in: true,
+  transfer_out: true,
+  transfer_collateral_in: true,
+  transfer_collateral_out: true,
+};
 
-/** The two specs, in the order the index declares them. `rowOf` finds the
+/** The specs, in the order the index declares them. `rowOf` finds the
  *  decoded row behind an event (its raw delta and asset); `metaOf` names a
  *  collateral token. */
 export function compoundBaseFolderSpecs(
@@ -185,6 +196,61 @@ export function compoundBaseFolderSpecs(
       },
       actorOf,
       cellOf,
+    },
+    {
+      kind: OWNER_RUN_KIND,
+      match: () => false,
+      min: MIN_OWNER_RUN,
+      kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
+      actorOf,
+      cellOf,
+      shape: {
+        keyOf: (e) => {
+          const d = dataOf(e);
+          const r = rowOf(e);
+          if (!d || !r) return null;
+          const owner = has(OWNER_VERB, d.eventType) && actorOf(e) === null;
+          return owner || has(TRANSFER_AXIS, d.eventType) ? `${d.eventType}:${r.market.key}:${r.asset}` : null;
+        },
+        anchor: (e) => has(OWNER_VERB, dataOf(e)?.eventType ?? ""),
+        netLegOf: (e): GroupingNetLegEntry[] => {
+          const d = dataOf(e);
+          const r = rowOf(e);
+          if (!d || !r) return [];
+          const transfer = has(TRANSFER_AXIS, d.eventType);
+          if (!transfer && !has(OWNER_VERB, d.eventType)) return [];
+          const axis = transfer ? "transfer" : d.isBase ? "base" : "collateral";
+          const [up, down] = transfer ? ["Received", "Sent"] : ["Supplied", "Withdrawn"];
+          if (d.isBase) {
+            const m: CometMarket = r.market;
+            return [
+              {
+                axis,
+                asset: m.key,
+                assetKeyKind: "marketKey",
+                amount: r.delta,
+                up,
+                down,
+                symbol: m.baseSymbol,
+                decimals: m.baseDecimals,
+              },
+            ];
+          }
+          const meta = metaOf(r.asset);
+          return [
+            {
+              axis,
+              asset: r.asset,
+              assetKeyKind: "tokenAddress",
+              amount: r.delta,
+              up,
+              down,
+              symbol: meta && !meta.unresolved ? meta.symbol : null,
+              decimals: meta && !meta.unresolved ? meta.decimals : null,
+            },
+          ];
+        },
+      },
     },
   ];
 }

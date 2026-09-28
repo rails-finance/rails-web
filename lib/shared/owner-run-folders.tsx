@@ -12,6 +12,13 @@
 // An owner run is the holder's own activity, so it wears no severity: neutral
 // tone, not muted, and a repeat mark in the corner. Its header sums one asset
 // under one verb, which is the whole of what the run did.
+//
+// Since 2026-09-28 (the amendment's question C) an owner run is also five or
+// more transactions of one SHAPE back to back: the same owner actions and
+// token transfers in each (a Maple deposit and its share transfer). The
+// index sends the shape (`ServedFolder.shape`, the member kinds of one
+// transaction) and legs netted per asset; the header names the shape before
+// the sums, "12 × deposit + share transfer".
 
 import type { ReactNode } from "react";
 import { Repeat } from "lucide-react";
@@ -29,9 +36,23 @@ export const OWNER_RUN_FOLDER_BADGE: ReactNode = <Repeat size={10} strokeWidth={
  * the card pluralises it with an "s", so a noun is chosen that takes one.
  */
 export function ownerRunEntry(folder: ServedFolder, nounOf: (action: string) => string): FolderRegisterEntry {
+  if (folder.shape && folder.shape.length > 0) {
+    return {
+      memberNoun: "event",
+      tone: "neutral",
+      folderBadge: OWNER_RUN_FOLDER_BADGE,
+      shapeLabel: ownerShapeLabel(folder.txCount, folder.shape, nounOf),
+    };
+  }
   return {
     memberNoun: nounOf(folder.counts[0]?.key ?? ""),
     tone: "neutral",
     folderBadge: OWNER_RUN_FOLDER_BADGE,
   };
+}
+
+/** A shape run's summary: how many transactions, and one noun per member kind
+ *  of one of them, in their order — "12 × deposit + share transfer". */
+export function ownerShapeLabel(txCount: number, shape: string[], nounOf: (action: string) => string): string {
+  return `${txCount.toLocaleString("en-US")} × ${shape.map(nounOf).join(" + ")}`;
 }

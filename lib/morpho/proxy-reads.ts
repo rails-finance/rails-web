@@ -23,6 +23,7 @@ import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
 import { resolveOpeningAssetKeys, type UpstreamOpeningBalance } from "@/lib/shared/timeline-opening-balance-wire";
 import { proxyFail, proxyOk, type ProxyAnswer } from "@/lib/shared/proxy-answer";
 import type { SsrHop } from "@/lib/shared/listing-ssr";
+import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
 
 interface PositionsRawResponse {
   rows: RawMorphoPositionRow[];
@@ -86,6 +87,7 @@ export async function readMorphoTimeline(
   if (sp.get("group") === "1") {
     qs.delete("recent");
     qs.set("group", "1");
+    qs.set(SHAPE_RUNS_PARAM, "1");
     const response = await fetch(`${base}?${qs.toString()}`, { headers: hop.headers });
     if (!response.ok) {
       console.error(`Backend API error: ${response.status} ${response.statusText}`);

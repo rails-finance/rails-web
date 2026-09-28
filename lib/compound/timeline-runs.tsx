@@ -102,6 +102,10 @@ const OWNER_RUN_NOUN: Record<string, string> = {
   withdraw: "withdrawal",
   supply_collateral: "collateral deposit",
   withdraw_collateral: "collateral withdrawal",
+  transfer_in: "receipt",
+  transfer_out: "transfer",
+  transfer_collateral_in: "collateral receipt",
+  transfer_collateral_out: "collateral transfer",
 };
 
 export const COMPOUND_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry =>

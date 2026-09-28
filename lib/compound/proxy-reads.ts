@@ -19,6 +19,7 @@ import type { CompoundProxyTarget } from "@/lib/api/compound-positions-proxy";
 import { COMPOUND_DEPLOYMENT } from "@/lib/compound/asset-catalog";
 import { proxyFail, proxyOk, type ProxyAnswer } from "@/lib/shared/proxy-answer";
 import type { SsrHop } from "@/lib/shared/listing-ssr";
+import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
 
 /** The Ethereum listing target, read by `/api/compound/positions` and the
  *  position page's loader through `readCompoundPositions`. */
@@ -71,7 +72,7 @@ export async function readCompoundTimeline(sp: URLSearchParams, hop: SsrHop): Pr
   // rows as a plan, as on the SparkLend route, which carries the argument.
   if (sp.get("group") === "1") {
     if (!market) return proxyFail(400, { error: "market is required" });
-    const gqs = new URLSearchParams({ wallet, market, group: "1" });
+    const gqs = new URLSearchParams({ wallet, market, group: "1", [SHAPE_RUNS_PARAM]: "1" });
     if (from) gqs.set("from", from);
     if (to) gqs.set("to", to);
     const response = await fetch(`${hop.baseUrl}/api/compound/timeline?${gqs.toString()}`, { headers: hop.headers });

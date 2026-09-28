@@ -40,6 +40,7 @@ import {
   trimToRowCap,
   type GroupingAccess,
   type GroupingLegEntry,
+  type GroupingNetLegEntry,
   type GroupingSpec,
 } from "@/lib/shared/timeline-grouping";
 import { getEventActionKey, getEventAssetKeys, getEventCounterpartyKeys } from "@/lib/shared/event-filter-helpers";
@@ -88,7 +89,7 @@ const OWNER_ACTIONS: Record<string, { verb: string; side: "collateral" | "loan";
 };
 const has = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
 
-/** The two specs, in the order the index declares them, for one position.
+/** The specs, in the order the index declares them, for one position.
  *  `rowOf` finds the decoded row behind an event (its raw amounts). */
 export function morphoBaseFolderSpecs(
   pos: MorphoSweptPosition,
@@ -162,6 +163,47 @@ export function morphoBaseFolderSpecs(
       },
       actorOf,
       cellOf,
+    },
+    // The owner run over transactions of one shape (decision 0021, amendment
+    // 2026-09-28; the index's MORPHO_SHAPE_FOLDER_SPECS): collateral added and
+    // a borrow in each, say, netted per side.
+    {
+      kind: OWNER_RUN_KIND,
+      match: () => false,
+      min: MIN_OWNER_RUN,
+      kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
+      actorOf,
+      cellOf,
+      shape: {
+        keyOf: (e) => {
+          const d = dataOf(e);
+          return d != null && has(OWNER_ACTIONS, d.eventType) && !d.isOpen && actorOf(e) === null ? d.eventType : null;
+        },
+        anchor: () => true,
+        netLegOf: (e): GroupingNetLegEntry[] => {
+          const d = dataOf(e);
+          const r = rowOf(e);
+          if (!d || !r || !has(OWNER_ACTIONS, d.eventType)) return [];
+          const a = OWNER_ACTIONS[d.eventType];
+          const collateral = a.side === "collateral";
+          const raw = collateral ? r.collateral : r.assets;
+          const magnitude = raw < BigInt(0) ? -raw : raw;
+          const into = d.eventType === "supply_collateral" || d.eventType === "borrow";
+          const base = leg(a.verb, a.side, raw, a.prov);
+          return [
+            {
+              axis: a.side,
+              asset: base.asset,
+              assetKeyKind: base.assetKeyKind,
+              amount: into ? magnitude : -magnitude,
+              up: collateral ? "Supplied" : "Borrowed",
+              down: collateral ? "Withdrawn" : "Repaid",
+              symbol: base.symbol,
+              decimals: base.decimals,
+            },
+          ];
+        },
+      },
     },
   ];
 }

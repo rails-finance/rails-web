@@ -9,6 +9,7 @@ import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import type { UpstreamGroupedTimeline } from "@/lib/sources/api/timeline-folder-wire";
 import type { TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
 import { basedollarServedFolder } from "@/lib/sources/api/basedollar-folder";
+import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
 
 // api arm of a single Basedollar Trove's timeline — the LIVE rails-server index.
 // rails-server returns the raw mv_basedollar_events rows for one (branch, troveId); we run
@@ -65,6 +66,7 @@ export async function GET(
       const v = sp.get(k);
       if (v) qs.set(k, v);
     }
+    if (sp.get("group") === "1") qs.set(SHAPE_RUNS_PARAM, "1");
     const q = qs.toString();
     const url = `${RAILS_API_URL}/api/basedollar/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}/timeline${q ? `?${q}` : ""}`;
     const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));

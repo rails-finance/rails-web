@@ -116,6 +116,8 @@ export interface TimelineRunCardProps {
    *  kind wears that kind's mark (a liquidations-only folder carries the
    *  warning triangle). Only rendered with `folder`. */
   folderBadge?: ReactNode;
+  /** Header content drawn before the aggregate pairs: a shape run's summary. */
+  lead?: ReactNode;
   /** Extra header content, rendered after the aggregate pairs. */
   extraHeader?: ReactNode;
   /** Chronological bounds of the run (either display order). */
@@ -189,6 +191,7 @@ export function TimelineRunCard({
   warningLabel,
   folder,
   folderBadge,
+  lead,
   extraHeader,
   firstTimestamp,
   lastTimestamp,
@@ -326,6 +329,7 @@ export function TimelineRunCard({
             <span className="sm:hidden">{count.toLocaleString("en-US")}</span>
           </span>
         )}
+        {lead}
         {aggregates?.map((agg, i) => {
           const unread = unreadOf(undefined, agg.symbol);
           if (unread)

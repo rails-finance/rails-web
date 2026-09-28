@@ -16,6 +16,7 @@ import type { TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
 import { resolveOpeningAssetKeys, type UpstreamOpeningBalance } from "@/lib/shared/timeline-opening-balance-wire";
 import { proxyFail, proxyOk, type ProxyAnswer } from "@/lib/shared/proxy-answer";
 import type { SsrHop } from "@/lib/shared/listing-ssr";
+import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
 
 // The filter chips are share-token SYMBOLS; the rails route filters by pool
 // KEY. Map off the same catalog the chips are populated from; raw keys pass
@@ -108,7 +109,7 @@ export async function readMapleTimeline(sp: URLSearchParams, hop: SsrHop): Promi
   const to = sp.get("to");
 
   if (sp.get("group") === "1") {
-    const qs = new URLSearchParams({ wallet, group: "1" });
+    const qs = new URLSearchParams({ wallet, group: "1", [SHAPE_RUNS_PARAM]: "1" });
     if (from) qs.set("from", from);
     if (to) qs.set("to", to);
     const response = await fetch(`${hop.baseUrl}/api/maple/timeline?${qs.toString()}`, { headers: hop.headers });

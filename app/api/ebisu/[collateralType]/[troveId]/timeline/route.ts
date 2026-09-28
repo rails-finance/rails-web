@@ -9,6 +9,7 @@ import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { UpstreamGroupedTimeline } from "@/lib/sources/api/timeline-folder-wire";
 import type { TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
 import { ebisuServedFolder } from "@/lib/sources/api/ebisu-folder";
+import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
 
 // api arm of a single Ebisu Trove's timeline — the LIVE rails-server index.
 // rails-server returns the raw mv_ebisu_events rows for one (branch, troveId); we run
@@ -65,6 +66,7 @@ export async function GET(
       const v = sp.get(k);
       if (v) qs.set(k, v);
     }
+    if (sp.get("group") === "1") qs.set(SHAPE_RUNS_PARAM, "1");
     const q = qs.toString();
     const url = `${RAILS_API_URL}/api/ebisu/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}/timeline${q ? `?${q}` : ""}`;
     const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));

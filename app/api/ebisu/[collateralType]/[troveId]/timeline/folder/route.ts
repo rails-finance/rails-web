@@ -7,6 +7,7 @@ import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { UpstreamFolder } from "@/lib/sources/api/timeline-folder-wire";
 import { ebisuServedFolder } from "@/lib/sources/api/ebisu-folder";
+import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
 
 // Opening one Ebisu folder — the members behind a header on
 // `/timeline?group=1`. The SparkLend twin (app/api/spark/timeline/folder)
@@ -41,6 +42,7 @@ export async function GET(
       const v = sp.get(k);
       if (v) qs.set(k, v);
     }
+    qs.set(SHAPE_RUNS_PARAM, "1");
     const response = await fetch(
       `${RAILS_API_URL}/api/ebisu/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}/timeline/folder?${qs.toString()}`,
       createAuthFetchOptions(undefined, readerIp),

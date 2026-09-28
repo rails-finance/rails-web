@@ -11,6 +11,7 @@ import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { UpstreamFolder } from "@/lib/sources/api/timeline-folder-wire";
 import { morphoServedFolder } from "@/lib/sources/api/lender-folder-wire";
+import { SHAPE_RUNS_PARAM } from "@/lib/shared/timeline-folder";
 
 // Opening one Morpho folder — the members behind a header on
 // `/timeline?group=1`. The SparkLend twin (app/api/spark/timeline/folder)
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pos
       const v = sp.get(k);
       if (v) qs.set(k, v);
     }
+    qs.set(SHAPE_RUNS_PARAM, "1");
     const response = await fetch(
       `${RAILS_API_URL}/api/morpho/position/${encodeURIComponent(positionId)}/timeline/folder?${qs.toString()}`,
       createAuthFetchOptions(undefined, readerIp),

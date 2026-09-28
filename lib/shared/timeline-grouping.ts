@@ -95,6 +95,76 @@ export interface GroupingSpec<R> {
    *  the page's events, so this is `getEventActionKey` / `getEventAssetKeys` /
    *  `getEventCounterpartyKeys` over each one. ABSENT serves `cells: null`. */
   cellOf?: (row: R) => { kind: string; assets: string[]; counterparties: string[] };
+  /** Present on an owner run over transactions of one SHAPE — the server's
+   *  `TimelineShapeRun` (rails-ops decision 0021, amendment 2026-09-28). The
+   *  spec groups whole transactions ahead of every row spec, `min` counts
+   *  transactions, and `match`, `sameRun` and the leg accessors are not read. */
+  shape?: GroupingShapeRun<R>;
+}
+
+/** Which rows may sit in an owner shape and what its header nets — see the
+ *  server's `TimelineShapeRun`. A transaction qualifies when every row has a
+ *  key, one row is an `anchor`, and its keys number two or more. */
+export interface GroupingShapeRun<R> {
+  keyOf: (row: R) => string | null;
+  anchor: (row: R) => boolean;
+  netLegOf: (row: R) => GroupingNetLegEntry[];
+}
+
+/** One signed, resolved addend of a shape folder's header, summed per (axis,
+ *  asset): the net takes `up` at zero or above and `down` below, and a net over
+ *  both directions reads "Net …". */
+export interface GroupingNetLegEntry {
+  axis: string;
+  asset: string | null;
+  assetKeyKind: FolderAssetKeyKind;
+  /** Base units, positive into the position; NULL skips the entry. */
+  amount: bigint | null;
+  up: string;
+  down: string;
+  symbol: string | null;
+  decimals: number | null;
+}
+
+/** Signed entries to one leg per (axis, asset), first-seen order. */
+export function sumNetLegEntries(entries: GroupingNetLegEntry[]): ServedFolderLeg[] {
+  const out: ServedFolderLeg[] = [];
+  const zero = BigInt(0);
+  const at = new Map<
+    string,
+    { leg: ServedFolderLeg; net: bigint; ups: boolean; downs: boolean; e: GroupingNetLegEntry }
+  >();
+  for (const e of entries) {
+    if (!e.asset || e.amount == null) continue;
+    const id = `${e.axis} ${e.assetKeyKind} ${e.asset}`;
+    let slot = at.get(id);
+    if (!slot) {
+      const leg: ServedFolderLeg = {
+        verb: e.up,
+        asset: e.asset,
+        assetKeyKind: e.assetKeyKind,
+        amount: "0",
+        count: 0,
+        provWhat: e.up,
+        symbol: e.symbol,
+        decimals: e.decimals,
+      };
+      slot = { leg, net: zero, ups: false, downs: false, e };
+      at.set(id, slot);
+      out.push(leg);
+    }
+    slot.net += e.amount;
+    if (e.amount > zero) slot.ups = true;
+    if (e.amount < zero) slot.downs = true;
+    slot.leg.count += 1;
+  }
+  for (const { leg, net, ups, downs, e } of at.values()) {
+    const verb = net < zero ? e.down : e.up;
+    leg.verb = ups && downs ? `Net ${verb.toLowerCase()}` : verb;
+    leg.provWhat = leg.verb;
+    leg.amount = (net < zero ? -net : net).toString();
+  }
+  return out;
 }
 
 export interface GroupedRows<R> {
@@ -274,6 +344,7 @@ function folderOf<R>(
   spec: GroupingSpec<R>,
   access: GroupingAccess<R>,
   ordinalBase: number,
+  shape?: string[],
 ): ServedFolder {
   const txs = new Set<string>();
   const kindCount = new Map<string, number>();
@@ -291,9 +362,11 @@ function folderOf<R>(
     counts.push({ key, count: c });
     namedTotal += c;
   }
-  const legs = spec.legsFor
-    ? spec.legsFor(members)
-    : sumLegEntries(spec.legsOf ? members.flatMap((row) => spec.legsOf!(row)) : []);
+  const legs = spec.shape
+    ? sumNetLegEntries(members.flatMap((row) => spec.shape!.netLegOf(row)))
+    : spec.legsFor
+      ? spec.legsFor(members)
+      : sumLegEntries(spec.legsOf ? members.flatMap((row) => spec.legsOf!(row)) : []);
   const mixed = isMixed(members, spec, access);
   const state = spec.stateOf ? spec.stateOf(members) : { before: null, after: null };
   const first = members[0];
@@ -318,7 +391,73 @@ function folderOf<R>(
     actors: spec.actorOf ? countActors(members, spec.actorOf) : null,
     byDay: countByDay(members, access.timestamp),
     cells: spec.cellOf ? countCells(members, spec.cellOf, access.timestamp) : null,
+    ...(shape ? { shape } : {}),
   };
+}
+
+/** A shape run's rows `[start, end)`, its spec and its member kinds. */
+interface ShapeStretch {
+  start: number;
+  end: number;
+  spec: number;
+  kinds: string[];
+  keys: number;
+}
+
+/** Every shape run in `rows` — the server's `findShapeStretches`. */
+function findShapeStretches<R>(
+  rows: R[],
+  specs: readonly GroupingSpec<R>[],
+  access: GroupingAccess<R>,
+): ShapeStretch[] {
+  const shaped = specs.map((s, i) => ({ s, i })).filter(({ s }) => s.shape);
+  if (shaped.length === 0) return [];
+  type Tx = { start: number; end: number; spec: number; sig: string; kinds: string[]; keys: number };
+  const txs: Tx[] = [];
+  let i = 0;
+  while (i < rows.length) {
+    const hash = access.txHash(rows[i]);
+    let j = i + 1;
+    while (j < rows.length && access.txHash(rows[j]) === hash) j++;
+    let hit: Tx = { start: i, end: j, spec: -1, sig: "", kinds: [], keys: 0 };
+    for (const { s, i: si } of shaped) {
+      const shape = s.shape as GroupingShapeRun<R>;
+      const keys: string[] = [];
+      const kinds: string[] = [];
+      let anchored = false;
+      let ok = true;
+      for (let k = i; k < j; k++) {
+        const key = shape.keyOf(rows[k]);
+        if (key == null) {
+          ok = false;
+          break;
+        }
+        if (shape.anchor(rows[k])) anchored = true;
+        if (!keys.includes(key)) {
+          keys.push(key);
+          kinds.push(s.kindOf(rows[k]));
+        }
+      }
+      if (ok && anchored && keys.length >= 2) {
+        hit = { start: i, end: j, spec: si, sig: keys.join("\u0000"), kinds, keys: keys.length };
+        break;
+      }
+    }
+    txs.push(hit);
+    i = j;
+  }
+  const out: ShapeStretch[] = [];
+  let a = 0;
+  while (a < txs.length) {
+    const t = txs[a];
+    let b = a + 1;
+    if (t.spec >= 0) while (b < txs.length && txs[b].spec === t.spec && txs[b].sig === t.sig) b++;
+    if (t.spec >= 0 && b - a >= specs[t.spec].min) {
+      out.push({ start: t.start, end: txs[b - 1].end, spec: t.spec, kinds: t.kinds, keys: t.keys });
+    }
+    a = b;
+  }
+  return out;
 }
 
 /**
@@ -342,10 +481,39 @@ export function groupIntoRows<R>(
   const served = new Set<string>();
   for (const row of rows) served.add(access.eventKey(row));
 
-  const specOf = (row: R): number => specs.findIndex((s) => s.match(row));
+  // Shape runs first, as barriers for the row specs (the server's order).
+  const shapeAt = new Map<number, ShapeStretch>();
+  for (const st of findShapeStretches(rows, specs, access)) shapeAt.set(st.start, st);
+
+  const specOf = (row: R): number => specs.findIndex((s) => !s.shape && s.match(row));
+
+  const emit = (chunks: R[][], at: number, spec: GroupingSpec<R>, shape?: string[]) => {
+    let offset = 0;
+    for (const chunk of chunks) {
+      const folder = folderOf(chunk, at + offset, spec, access, opts.ordinalBase, shape);
+      out.push({ kind: "folder", folder });
+      folders.set(folder.responseId, folder);
+      members.set(folder.responseId, chunk);
+      for (const row of chunk) folderByEvent.set(access.eventKey(row), folder.responseId);
+      offset += chunk.length;
+    }
+  };
 
   let i = 0;
   while (i < rows.length) {
+    const shaped = shapeAt.get(i);
+    if (shaped) {
+      const spec = specs[shaped.spec];
+      const minTail = spec.min * shaped.keys;
+      emit(
+        chunkByTransaction(rows.slice(shaped.start, shaped.end), access.txHash, target, minTail),
+        i,
+        spec,
+        shaped.kinds,
+      );
+      i = shaped.end;
+      continue;
+    }
     const si = specOf(rows[i]);
     if (si < 0) {
       out.push({ kind: "event", event: rows[i] });
@@ -354,20 +522,18 @@ export function groupIntoRows<R>(
     }
     const spec = specs[si];
     let j = i + 1;
-    while (j < rows.length && specOf(rows[j]) === si && (!spec.sameRun || spec.sameRun(rows[j - 1], rows[j]))) j++;
+    while (
+      j < rows.length &&
+      !shapeAt.has(j) &&
+      specOf(rows[j]) === si &&
+      (!spec.sameRun || spec.sameRun(rows[j - 1], rows[j]))
+    )
+      j++;
     const stretch = rows.slice(i, j);
     if (stretch.length < spec.min) {
       for (const row of stretch) out.push({ kind: "event", event: row });
     } else {
-      let offset = 0;
-      for (const chunk of chunkByTransaction(stretch, access.txHash, target, spec.min)) {
-        const folder = folderOf(chunk, i + offset, spec, access, opts.ordinalBase);
-        out.push({ kind: "folder", folder });
-        folders.set(folder.responseId, folder);
-        members.set(folder.responseId, chunk);
-        for (const row of chunk) folderByEvent.set(access.eventKey(row), folder.responseId);
-        offset += chunk.length;
-      }
+      emit(chunkByTransaction(stretch, access.txHash, target, spec.min), i, spec);
     }
     i = j;
   }

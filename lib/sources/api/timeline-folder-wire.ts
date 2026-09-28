@@ -78,6 +78,9 @@ export interface UpstreamFolder {
    *  Absent from a server older than the cells, NULL where the family serves
    *  none — both read as "count from the members". */
   cells?: UpstreamFolderCell[] | null;
+  /** On an owner run of one transaction shape, the member kinds of one
+   *  transaction in order. Absent on every other folder. */
+  shape?: string[];
 }
 
 /** One cell exactly as rails-server sends it — assets as token addresses, and
@@ -263,5 +266,6 @@ export function toServedFolder(folder: UpstreamFolder, resolve: FolderAssetResol
     actors: folder.actors,
     byDay: folder.byDay,
     cells: folder.cells ? resolveCells(folder.cells, resolve) : null,
+    ...(folder.shape ? { shape: folder.shape } : {}),
   };
 }

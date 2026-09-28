@@ -10,7 +10,9 @@
 //   Morpho   — `collateral` and `loan`, named from the market params the rows
 //              resolve through;
 //   Maple    — the pool key, filed under the pool's funds asset (USDC, USDT),
-//              which is the key `getEventAssetKeys` gives the same event.
+//              which is the key `getEventAssetKeys` gives the same event; and
+//              on a shape run's share transfer leg, `shares:<pool>`, named as
+//              the pool's share token (syrupUSDC) at share decimals.
 //
 // `toServedFolder` keeps a key that is not a token address as it came, which
 // is right for the flows (each economics reducer merges them by the summary's
@@ -19,7 +21,7 @@
 // its folders through here.
 
 import { ilkDebtMeta, ilkToCollateralSymbol } from "@/lib/makerdao/asset-catalog";
-import { maplePoolOf } from "@/lib/maple/asset-catalog";
+import { MAPLE_SHARE_DECIMALS, maplePoolOf } from "@/lib/maple/asset-catalog";
 import type { Erc20Meta } from "@/lib/sources/chain/erc20-meta";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { toServedFolder, type FolderAssetResolver, type UpstreamFolder } from "@/lib/sources/api/timeline-folder-wire";
@@ -76,12 +78,19 @@ export function morphoServedFolder(
   return withLegs(folder, resolve);
 }
 
+/** The key prefix of a Maple shape run's share leg. */
+const SHARES_PREFIX = "shares:";
+
 /** A Maple folder as the page reads it: a pool key is filed under its funds
  *  asset, at the asset's decimals. */
 export function mapleServedFolder(folder: UpstreamFolder): ServedFolder {
+  const shares = (key: string) => (key.startsWith(SHARES_PREFIX) ? key.slice(SHARES_PREFIX.length) : null);
   const resolve: FolderAssetResolver = {
-    symbol: (key) => maplePoolOf(key).assetSymbol,
-    decimals: (key) => maplePoolOf(key).decimals,
+    symbol: (key) => {
+      const pool = shares(key);
+      return pool != null ? maplePoolOf(pool).symbol : maplePoolOf(key).assetSymbol;
+    },
+    decimals: (key) => (shares(key) != null ? MAPLE_SHARE_DECIMALS : maplePoolOf(key).decimals),
   };
   return withLegs(folder, resolve);
 }

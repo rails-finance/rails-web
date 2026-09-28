@@ -179,7 +179,20 @@ export interface ServedFolder {
    *  a cell's asset did not resolve to the symbol its members would carry —
    *  the page then reads the members to count. */
   cells: ServedFolderCell[] | null;
+
+  /** On an owner run formed from transactions of one SHAPE (rails-ops decision
+   *  0021, amendment 2026-09-28): the member kinds of one transaction, in the
+   *  order they occur in it, repeated `txCount` times. Its legs are net per
+   *  asset. Absent on every other folder. */
+  shape?: string[];
 }
+
+/** The query parameter a grouped read and a folder open send upstream to ask
+ *  rails-server for shape runs (`shapesAsked`, rails-server
+ *  `api/src/services/timeline-folders.ts`). The server serves them only when
+ *  asked, because a web without this module's naming would scale their cToken
+ *  and share legs as underlying. */
+export const SHAPE_RUNS_PARAM = "shapes";
 
 /** One cell of a folder's cross-tab: `count` members of action `kind` on the
  *  UTC `day` (the `byDay` key), touching exactly `assets` and naming exactly
@@ -326,6 +339,9 @@ export interface FolderRegisterEntry {
   /** The corner mark on the folder's glyph — the kind's severity at a glance,
    *  before anything is expanded. */
   folderBadge?: ReactNode;
+  /** A shape run's summary, drawn before its sums: "12 × deposit + share
+   *  transfer". */
+  shapeLabel?: string;
 }
 
 /** One family's whole folder register: served kind → how it draws. */
