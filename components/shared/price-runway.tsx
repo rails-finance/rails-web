@@ -135,9 +135,23 @@ export interface PriceRunwayProps {
    *  stats carry the liquidation price). For a runway sharing a stat line
    *  rather than owning a full-width section. */
   compact?: boolean;
+  /** The one collateral whose price the figure measures: the price axis, or a
+   *  health factor over a single collateral (Morpho). The figure then reads as
+   *  a price fall ("ETH can fall 61% before liquidation"): beside a ratio and
+   *  its liquidation threshold, a bare "61% from liquidation" was read as the
+   *  gap between those two percentages. Left unset where the health factor
+   *  covers a basket, which has no one price to name. */
+  asset?: string;
 }
 
-export function PriceRunway({ currentPrice, liqPrice, liqCaption, underwaterCaption, compact }: PriceRunwayProps) {
+export function PriceRunway({
+  currentPrice,
+  liqPrice,
+  liqCaption,
+  underwaterCaption,
+  compact,
+  asset,
+}: PriceRunwayProps) {
   const hasLiq = liqPrice != null && liqPrice > 0;
   if (!hasLiq) return null; // no debt / fully covered — nothing to plot
 
@@ -156,6 +170,7 @@ export function PriceRunway({ currentPrice, liqPrice, liqCaption, underwaterCapt
   const markerPos = posFromPct(mPct); // live marker — left of liqPos when safe, right when underwater
 
   const pctFromLiq = Math.round(mPct);
+  const safeLabel = asset ? `${asset} can fall ${pctFromLiq}% before liquidation` : `${pctFromLiq}% from liquidation`;
   // Once underwater the runway is spent — the only figure that matters is how far
   // the value must RISE to clear liquidation, denominated in the live value.
   const recoverPct = underwater ? Math.round(((liqPrice! - currentPrice) / currentPrice) * 100) : 0;
@@ -223,11 +238,14 @@ export function PriceRunway({ currentPrice, liqPrice, liqCaption, underwaterCapt
     // threshold caption; underwater collapses to the factual state.
     return (
       <div className="flex w-full items-center gap-2.5">
-        <span className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-rb-500">
+        {/* The price-fall wording is twice the length of the bare figure, so
+            it may wrap onto a second line on a phone rather than squeeze the
+            bar below its minimum. */}
+        <span className={`text-[11px] tabular-nums text-rb-500 ${asset ? "min-w-0" : "shrink-0 whitespace-nowrap"}`}>
           {underwater ? (
             <span className="font-semibold text-red-600 dark:text-red-400">Liquidatable now</span>
           ) : (
-            <>{pctFromLiq}% from liquidation</>
+            safeLabel
           )}
         </span>
         <div className="min-w-24 flex-1" style={{ height: H_BAR_COMPACT }}>
@@ -264,7 +282,7 @@ export function PriceRunway({ currentPrice, liqPrice, liqCaption, underwaterCapt
           </>
         ) : (
           <>
-            <span className="absolute left-0">{pctFromLiq}% from liquidation</span>
+            <span className="absolute left-0">{safeLabel}</span>
             <span className="absolute right-0">{liqCaption ?? <>liquidation {fmtPrice(liqPrice!)}</>}</span>
             {/* Ruler ticks are the gauge's scale, not stats — exempt from the
                 dev provenance-coverage tripwire. */}

@@ -260,7 +260,8 @@ function InspectorPopover({ pin }: { pin: ProvInspectorPin }) {
         <span className="prov-inspect-label">{receiptLabel(e.info)}</span>
         <span className="prov-inspect-value">
           {e.display}
-          {e.symbol ? ` ${e.symbol}` : ""}
+          {/* a value that renders its own ticker (ExactSpan) already reads "… UNI" */}
+          {e.symbol && !e.display.endsWith(` ${e.symbol}`) ? ` ${e.symbol}` : ""}
         </span>
         <button type="button" className="prov-inspect-close" onClick={() => provInspector.unpin()} aria-label="Close">
           <X aria-hidden />

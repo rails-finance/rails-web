@@ -216,7 +216,7 @@ export function FluidPositionCard({
   // alongside with the NFT id + vault kind, on both surfaces (buttons, not
   // anchors, so it lives safely inside the listing card's <Link>).
   const leadingIdentity = (
-    <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
+    <span className="contents text-xs font-semibold text-rb-500">
       {v.owner ? (
         <WalletPill wallet={v.owner} ensName={null} filterProtocol="fluid" bookmarkProtocol="fluid" />
       ) : (

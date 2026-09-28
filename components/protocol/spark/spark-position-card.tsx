@@ -48,6 +48,7 @@ import {
 } from "@/components/shared/reserve-disclosure";
 import type { SparkPositionSummary, SparkReserveAmount } from "@/lib/sources/api/spark-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
+import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 
 export interface SparkPositionView {
   wallet: string;
@@ -115,6 +116,13 @@ function rankByValue(v: SparkPositionView, reserves: SparkReserveAmount[]): Spar
   return [...reserves].sort((a, b) => (usd.get(b.address) ?? 0) - (usd.get(a.address) ?? 0));
 }
 
+/** One reserve's oracle USD for the dust rule; null (held) when unpriced or
+ *  its decimals were not read. */
+const dustUsdOf =
+  (v: SparkPositionView) =>
+  (r: SparkReserveAmount): number | null =>
+    r.decimalsUnread ? null : reserveUsd(v, r.address, r.amount);
+
 /** Per-reserve token amounts, demoted beneath the USD headline — still the
  *  strict chain reads (each line traced, exact figure on hover), just no longer
  *  giving dust equal billing with the aggregate. */
@@ -122,15 +130,19 @@ function ReserveFootnoteLines({
   reserves,
   side,
   atBlock,
+  usdOf,
 }: {
   reserves: SparkReserveAmount[];
   side: "supply" | "debt";
   atBlock?: number;
+  /** Prices each line for the dust rule (components/shared/dust-reserves). */
+  usdOf: (r: SparkReserveAmount) => number | null;
 }) {
+  const { lines, control } = useDustLines(reserves, usdOf);
   if (reserves.length === 0) return null;
   return (
     <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
-      {reserves.map((r) => {
+      {lines.map((r) => {
         if (r.decimalsUnread)
           return (
             <div key={r.address}>
@@ -150,6 +162,7 @@ function ReserveFootnoteLines({
           </div>
         );
       })}
+      {control}
     </div>
   );
 }
@@ -220,15 +233,19 @@ function ReserveStack({
   reserves,
   side,
   atBlock,
+  usdOf,
 }: {
   reserves: SparkReserveAmount[];
   side: "supply" | "debt";
   atBlock?: number;
+  /** Prices each line for the dust rule (components/shared/dust-reserves). */
+  usdOf: (r: SparkReserveAmount) => number | null;
 }) {
+  const { lines, control } = useDustLines(reserves, usdOf);
   if (reserves.length === 0) return <StatDash />;
   return (
     <div className="flex flex-col gap-1">
-      {reserves.map((r) => (
+      {lines.map((r) => (
         <StatValue key={r.address}>
           <Prov info={side === "supply" ? positionSupplyProv(r.symbol, atBlock) : positionDebtProv(r.symbol, atBlock)}>
             {r.decimalsUnread ? (
@@ -239,6 +256,7 @@ function ReserveStack({
           </Prov>
         </StatValue>
       ))}
+      {control}
     </div>
   );
 }
@@ -301,8 +319,16 @@ export function SparkPositionCard({
   // detail page (the footnote lines); an unpriced side's list is the
   // headline itself and collapses on every surface.
   const isDetail = receipts;
-  const supplyListCount = collUsd == null ? v.supplies.length : isDetail ? v.supplies.length : 0;
-  const debtListCount = debtUsd == null ? v.borrows.length : isDetail ? v.borrows.length : 0;
+  // Value order for the cluster and the leg lines. Dust reserves (under a
+  // cent) leave the icon stack, its "+N" and the list count; the lines put
+  // them behind the "N dust reserves hidden" control.
+  const usdOf = dustUsdOf(v);
+  const suppliesRanked = rankByValue(v, v.supplies);
+  const borrowsRanked = rankByValue(v, v.borrows);
+  const suppliesShown = splitDust(suppliesRanked, usdOf).shown;
+  const borrowsShown = splitDust(borrowsRanked, usdOf).shown;
+  const supplyListCount = collUsd == null ? suppliesShown.length : isDetail ? suppliesShown.length : 0;
+  const debtListCount = debtUsd == null ? borrowsShown.length : isDetail ? borrowsShown.length : 0;
   const supplyDisclosure = useReserveDisclosure(supplyListCount);
   const debtDisclosure = useReserveDisclosure(debtListCount);
 
@@ -353,10 +379,6 @@ export function SparkPositionCard({
   // `isDetail` (== `receipts`) doubles as the surface discriminator: the
   // listing omits the per-leg lines (V4 spoke-card parity — USD headline +
   // capped cluster only), the detail page keeps the full traced list.
-  // Value order for the cluster and the leg lines — the three visible icons
-  // are the three largest by oracle USD, and the detail legs match.
-  const suppliesRanked = rankByValue(v, v.supplies);
-  const borrowsRanked = rankByValue(v, v.borrows);
 
   return (
     <PositionCardShell
@@ -402,26 +424,26 @@ export function SparkPositionCard({
             assetIcons:
               v.supplies.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={loadedSymbols(suppliesRanked)} />
-                  <ReserveDisclosureToggle disclosure={supplyDisclosure} count={v.supplies.length} />
+                  <InlineAssetCluster symbols={loadedSymbols(suppliesShown)} />
+                  <ReserveDisclosureToggle disclosure={supplyDisclosure} count={suppliesShown.length} />
                 </span>
               ) : undefined,
             value:
               collUsd != null ? (
                 <UsdHeadline usd={collUsd} info={sparkUsdProvOnchain("Collateral")} />
               ) : supplyDisclosure.collapsible ? null : (
-                <ReserveStack reserves={v.supplies} side="supply" atBlock={v.atBlock} />
+                <ReserveStack reserves={v.supplies} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
               ),
             footnote: (
               <>
                 {collUsd == null && supplyDisclosure.collapsible && (
                   <ReserveDisclosureList disclosure={supplyDisclosure}>
-                    <ReserveStack reserves={v.supplies} side="supply" atBlock={v.atBlock} />
+                    <ReserveStack reserves={v.supplies} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
                   </ReserveDisclosureList>
                 )}
                 {isDetail && collUsd != null && (
                   <ReserveDisclosureList disclosure={supplyDisclosure}>
-                    <ReserveFootnoteLines reserves={suppliesRanked} side="supply" atBlock={v.atBlock} />
+                    <ReserveFootnoteLines reserves={suppliesRanked} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
                   </ReserveDisclosureList>
                 )}
                 <InterestCaption side="supply" usd={captions?.supplyInterestUsd} />
@@ -433,26 +455,26 @@ export function SparkPositionCard({
             assetIcons:
               v.borrows.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={loadedSymbols(borrowsRanked)} />
-                  <ReserveDisclosureToggle disclosure={debtDisclosure} count={v.borrows.length} />
+                  <InlineAssetCluster symbols={loadedSymbols(borrowsShown)} />
+                  <ReserveDisclosureToggle disclosure={debtDisclosure} count={borrowsShown.length} />
                 </span>
               ) : undefined,
             value:
               debtUsd != null ? (
                 <UsdHeadline usd={debtUsd} info={sparkUsdProvOnchain("Borrowed")} />
               ) : debtDisclosure.collapsible ? null : (
-                <ReserveStack reserves={v.borrows} side="debt" atBlock={v.atBlock} />
+                <ReserveStack reserves={v.borrows} side="debt" atBlock={v.atBlock} usdOf={usdOf} />
               ),
             footnote: (
               <>
                 {debtUsd == null && debtDisclosure.collapsible && (
                   <ReserveDisclosureList disclosure={debtDisclosure}>
-                    <ReserveStack reserves={v.borrows} side="debt" atBlock={v.atBlock} />
+                    <ReserveStack reserves={v.borrows} side="debt" atBlock={v.atBlock} usdOf={usdOf} />
                   </ReserveDisclosureList>
                 )}
                 {isDetail && debtUsd != null && (
                   <ReserveDisclosureList disclosure={debtDisclosure}>
-                    <ReserveFootnoteLines reserves={borrowsRanked} side="debt" atBlock={v.atBlock} />
+                    <ReserveFootnoteLines reserves={borrowsRanked} side="debt" atBlock={v.atBlock} usdOf={usdOf} />
                   </ReserveDisclosureList>
                 )}
                 <BorrowRateCaption rate={captions?.borrowRate} />

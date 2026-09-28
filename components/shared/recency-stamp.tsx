@@ -43,7 +43,10 @@ function formatCompactAge(elapsedMs: number): string {
   return `${Math.floor(hr / 24)} d`;
 }
 
-export function RecencyStamp({ className }: { className?: string }) {
+/** `compact` drops the cube below sm, for the detail pages' top row, which
+ *  carries back, this stamp, the labelled prices trigger and Tools across
+ *  390px. */
+export function RecencyStamp({ className, compact = false }: { className?: string; compact?: boolean }) {
   const head = useChainHead();
   // The head itself was already per-chain (useChainHead reads the route's
   // chain); only this label was not, so a Base page showed a Base block number
@@ -81,7 +84,7 @@ export function RecencyStamp({ className }: { className?: string }) {
       // height and radius as the price trigger beside it, one type size down.
       className={className ?? `${CTRL_GHOST} ${CTRL_OFF} h-7 gap-1.5 rounded-md px-1.5 text-[11px] tabular-nums`}
     >
-      <Box size={12} aria-hidden />
+      <Box size={12} aria-hidden className={compact ? "hidden sm:block" : undefined} />
       <span aria-hidden>{showBlock ? block : `${age} ago`}</span>
     </button>
   );

@@ -28,7 +28,7 @@ import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { StatValue, StatFootnote, StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
-import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
+import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { WalletPill } from "@/components/shared/wallet-pill";
@@ -53,6 +53,7 @@ import type {
   CompoundCurrentBase,
 } from "@/lib/sources/api/compound-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
+import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 
 /** Highest-recorded amounts over a position's life (closed/liquidated cards). */
 interface CompoundPeak {
@@ -217,6 +218,39 @@ function ReserveLine({
   );
 }
 
+/** One line on the supply side: the lent base (a net LENDER only) or one
+ *  collateral asset. */
+interface SupplyLeg {
+  key: string;
+  symbol: string;
+  address: string;
+  amount: number;
+  /** Set on a collateral line; absent on the lent base. */
+  collateral?: CompoundAssetAmount;
+}
+
+function supplyLegs(v: CompoundPositionView, eff: EffectiveBase): SupplyLeg[] {
+  return [
+    ...(eff.side === "lend"
+      ? [{ key: `base:${v.base.address}`, symbol: v.base.symbol, address: v.base.address, amount: eff.amount }]
+      : []),
+    ...v.collateral.map((c) => ({
+      key: c.address,
+      symbol: c.symbol,
+      address: c.address,
+      amount: c.amount,
+      collateral: c,
+    })),
+  ];
+}
+
+/** A supply line's oracle USD for the dust rule (components/shared/dust-reserves);
+ *  null (held) where unpriced or its decimals were not read. */
+const legUsdOf =
+  (v: CompoundPositionView) =>
+  (l: SupplyLeg): number | null =>
+    l.collateral?.decimalsUnread ? null : assetUsd(v, l.address, l.amount);
+
 /** Supply side (left column): the lent base when the position is a net LENDER,
  *  then the non-earning collateral assets. Dash when there's nothing supplied. */
 function SuppliedStack({
@@ -231,30 +265,77 @@ function SuppliedStack({
   lane: CompoundCardLane;
 }) {
   const coords: CompoundCoords = { ...lane, comet: v.comet, marketLabel: v.marketLabel, blockNumber: v.atBlock };
-  const lines: ReactNode[] = [];
-  if (eff.side === "lend") {
-    lines.push(
-      <ReserveLine
-        key={`base:${v.base.address}`}
-        symbol={v.base.symbol}
-        amount={eff.amount}
-        info={baseProv(v, eff, "lend", vocab, lane)}
-      />,
-    );
-  }
-  for (const c of v.collateral) {
-    lines.push(
-      <ReserveLine
-        key={c.address}
-        symbol={c.symbol}
-        amount={c.amount}
-        info={vocab.positionCollateral(c.symbol, { ...coords, asset: c.address })}
-        unreadAddress={c.decimalsUnread ? c.address : undefined}
-      />,
-    );
-  }
-  if (lines.length === 0) return <StatDash />;
-  return <div className="flex flex-col gap-1">{lines}</div>;
+  const legs = supplyLegs(v, eff);
+  const { lines, control } = useDustLines(legs, legUsdOf(v));
+  if (legs.length === 0) return <StatDash />;
+  return (
+    <div className="flex flex-col gap-1">
+      {lines.map((l) =>
+        l.collateral ? (
+          <ReserveLine
+            key={l.key}
+            symbol={l.symbol}
+            amount={l.amount}
+            info={vocab.positionCollateral(l.symbol, { ...coords, asset: l.address })}
+            unreadAddress={l.collateral.decimalsUnread ? l.address : undefined}
+          />
+        ) : (
+          <ReserveLine key={l.key} symbol={l.symbol} amount={l.amount} info={baseProv(v, eff, "lend", vocab, lane)} />
+        ),
+      )}
+      {control}
+    </div>
+  );
+}
+
+/** The supply side's per-leg token amounts beneath its USD headline. */
+function SuppliedFootnoteLines({
+  v,
+  eff,
+  vocab,
+  lane,
+  coords,
+  baseExact,
+}: {
+  v: CompoundPositionView;
+  eff: EffectiveBase;
+  vocab: CompoundTowerVocabulary;
+  lane: CompoundCardLane;
+  coords: CompoundCoords;
+  baseExact: string;
+}) {
+  const { lines, control } = useDustLines(supplyLegs(v, eff), legUsdOf(v));
+  return (
+    <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
+      {lines.map((l) => {
+        const c = l.collateral;
+        if (!c)
+          return (
+            <LegFootnoteLine
+              key={l.key}
+              symbol={l.symbol}
+              amount={l.amount}
+              exact={baseExact}
+              info={baseProv(v, eff, "lend", vocab, lane)}
+            />
+          );
+        return c.decimalsUnread ? (
+          <div key={l.key}>
+            <TokenAmountNotLoaded address={c.address} label={c.symbol} />
+          </div>
+        ) : (
+          <LegFootnoteLine
+            key={l.key}
+            symbol={c.symbol}
+            amount={c.amount}
+            exact={formatUnitsExact(c.amountRaw, c.decimals)}
+            info={vocab.positionCollateral(c.symbol, { ...coords, asset: c.address })}
+          />
+        );
+      })}
+      {control}
+    </div>
+  );
 }
 
 /** Debt side (right column): the borrowed base as a POSITIVE magnitude (the
@@ -461,7 +542,11 @@ export function CompoundPositionCard({
     /^-/,
     "",
   );
-  const supplySymbols = [...(eff.side === "lend" ? [v.base.symbol] : []), ...loadedSymbols(v.collateral)];
+  // Dust lines (under a cent) leave the icon stack and its "+N"; the lines
+  // put them behind the "N dust reserves hidden" control.
+  const supplySymbols = splitDust(supplyLegs(v, eff), legUsdOf(v))
+    .shown.filter((l) => !l.collateral?.decimalsUnread)
+    .map((l) => l.symbol);
 
   return (
     <PositionCardShell
@@ -517,31 +602,14 @@ export function CompoundPositionCard({
             footnote: (
               <>
                 {supplyUsd != null && (
-                  <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
-                    {eff.side === "lend" && (
-                      <LegFootnoteLine
-                        symbol={v.base.symbol}
-                        amount={eff.amount}
-                        exact={baseExact}
-                        info={baseProv(v, eff, "lend", vocab, lane)}
-                      />
-                    )}
-                    {v.collateral.map((c) =>
-                      c.decimalsUnread ? (
-                        <div key={c.address}>
-                          <TokenAmountNotLoaded address={c.address} label={c.symbol} />
-                        </div>
-                      ) : (
-                        <LegFootnoteLine
-                          key={c.address}
-                          symbol={c.symbol}
-                          amount={c.amount}
-                          exact={formatUnitsExact(c.amountRaw, c.decimals)}
-                          info={vocab.positionCollateral(c.symbol, { ...coords, asset: c.address })}
-                        />
-                      ),
-                    )}
-                  </div>
+                  <SuppliedFootnoteLines
+                    v={v}
+                    eff={eff}
+                    vocab={vocab}
+                    lane={lane}
+                    coords={coords}
+                    baseExact={baseExact}
+                  />
                 )}
                 {eff.side === "lend" && <StatFootnote>{lentNote}</StatFootnote>}
               </>

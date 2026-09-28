@@ -29,7 +29,8 @@
 // (see `withFlagNote` below) rather than a new per-heading receipt, since
 // `collateralFlagProv` names one reserve and a heading can list several.
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { DustToggle, isDustUsd, useDustOpen } from "@/components/shared/dust-reserves";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { StatCard, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
 import { PositionRow, fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
@@ -208,11 +209,9 @@ function reserveUsdAfter(r: AaveV3PositionStateReserve, side: Side): number | nu
   return rawToUsd(leg.after, r.priceBase, r.decimals);
 }
 
-/** Under a cent, priced, whatever the collateral flag (§52). */
-const isDustRow = (r: AaveV3PositionStateReserve, side: Side): boolean => {
-  const usd = reserveUsdAfter(r, side);
-  return usd != null && usd < 0.01;
-};
+/** Under a cent, priced, whatever the collateral flag (§52): the shared rule
+ *  the position cards use (components/shared/dust-reserves.tsx). */
+const isDustRow = (r: AaveV3PositionStateReserve, side: Side): boolean => isDustUsd(reserveUsdAfter(r, side));
 
 function ReserveLine({
   state,
@@ -306,7 +305,7 @@ function ReserveList({
   coords: V3Coords;
   touched: Set<string>;
 }) {
-  const [showDust, setShowDust] = useState(false);
+  const { open: showDust, toggle: toggleDust } = useDustOpen();
   const rows = state.reserves.filter((r) => r.decimals != null && legHeld(side === "supply" ? r.supply : r.debt));
   if (rows.length === 0) return <span className="text-sm text-rb-500">None</span>;
 
@@ -350,16 +349,7 @@ function ReserveList({
   return (
     <div className="flex flex-col gap-1" data-position-reserves={side}>
       {body}
-      {dustCount > 0 && (
-        <button
-          type="button"
-          className="self-start text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700"
-          data-dust-hidden={dustCount}
-          onClick={() => setShowDust((v) => !v)}
-        >
-          {showDust ? "Hide dust" : `${dustCount} dust reserve${dustCount === 1 ? "" : "s"} hidden`}
-        </button>
-      )}
+      <DustToggle count={dustCount} open={showDust} onToggle={toggleDust} />
     </div>
   );
 }

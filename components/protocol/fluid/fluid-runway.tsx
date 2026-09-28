@@ -37,7 +37,12 @@ export function FluidRunway({ chain, compact = false }: { chain: FluidPositionCh
 
   if (compact) {
     return (
-      <PriceRunway compact currentPrice={chain.oraclePriceLiquidateDebtPerCol} liqPrice={chain.liqPriceDebtPerCol} />
+      <PriceRunway
+        compact
+        currentPrice={chain.oraclePriceLiquidateDebtPerCol}
+        liqPrice={chain.liqPriceDebtPerCol}
+        asset={chain.supplySymbol ?? undefined}
+      />
     );
   }
 
@@ -45,6 +50,7 @@ export function FluidRunway({ chain, compact = false }: { chain: FluidPositionCh
     <div className="mt-2">
       <div className="mb-3 text-[11px] uppercase tracking-wider text-rb-500">Liquidation runway</div>
       <PriceRunway
+        asset={chain.supplySymbol ?? undefined}
         currentPrice={chain.oraclePriceLiquidateDebtPerCol}
         liqPrice={chain.liqPriceDebtPerCol}
         liqCaption={

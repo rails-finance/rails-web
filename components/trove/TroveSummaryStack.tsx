@@ -119,7 +119,7 @@ export function TroveSummaryStack({
         )}
         {showRunway && liqPrice && collPrice && (
           <RiskMeter>
-            <PriceRunway compact currentPrice={collPrice} liqPrice={liqPrice} />
+            <PriceRunway compact currentPrice={collPrice} liqPrice={liqPrice} asset={trove.collateralType} />
           </RiskMeter>
         )}
       </RiskFooterStrip>

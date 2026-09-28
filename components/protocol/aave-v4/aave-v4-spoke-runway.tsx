@@ -2,6 +2,7 @@
 
 import { type AaveSpokeCardInfo, liquidationBuffer } from "@/lib/aave-v4/spoke-cards";
 import { PriceRunway } from "@/components/shared/price-runway";
+import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 
 /**
  * Liquidation runway for the active Aave V4 spoke — one bar answering "how close
@@ -36,7 +37,14 @@ export function AaveV4SpokeRunway({ spoke, compact }: { spoke: AaveSpokeCardInfo
   const buf = liquidationBuffer(spoke);
 
   if (buf.single) {
-    const bar = <PriceRunway compact={compact} currentPrice={buf.single.currentPrice} liqPrice={buf.single.liqPrice} />;
+    const bar = (
+      <PriceRunway
+        compact={compact}
+        currentPrice={buf.single.currentPrice}
+        liqPrice={buf.single.liqPrice}
+        asset={aaveV4DisplaySymbol(buf.single.symbol)}
+      />
+    );
     if (compact) return bar;
     return (
       <div className="mt-2">

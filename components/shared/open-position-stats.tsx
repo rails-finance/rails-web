@@ -61,7 +61,9 @@ export function OpenPositionStats({ columns, icons, identity, leadingIdentity, s
   return (
     <div>
       <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
-        <span className="flex items-center gap-2">
+        {/* Wraps between pieces: at 390px the owner address used to break in
+            two beside a squeezed pair label. */}
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
           {statusPill}
           {leadingIdentity}
         </span>

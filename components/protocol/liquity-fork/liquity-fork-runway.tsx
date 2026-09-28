@@ -30,5 +30,5 @@ export function LiquityForkRunway({ chain }: { chain: LiquityForkTroveChainRespo
     chain.liqPriceUsd == null
   )
     return null;
-  return <PriceRunway compact currentPrice={chain.priceUsd} liqPrice={chain.liqPriceUsd} />;
+  return <PriceRunway compact currentPrice={chain.priceUsd} liqPrice={chain.liqPriceUsd} asset={chain.symbol} />;
 }

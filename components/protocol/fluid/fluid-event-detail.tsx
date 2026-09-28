@@ -45,6 +45,7 @@ import {
 } from "@/lib/fluid/event-provenance";
 import { pairLabel, shortAddress } from "@/lib/fluid/asset-catalog";
 import { formatNumber, formatCompact, formatExact } from "@/lib/utils/format";
+import { fmtHeaderMagnitude } from "@/lib/shared/header-values";
 
 export interface FluidEventDetailProps {
   ctx: FluidContext;
@@ -128,6 +129,9 @@ function buildFluidLiqForensics(ctx: FluidContext, coords: FluidCoords): Liquida
   return {
     seized: {
       symbol: colSym,
+      // In the closed card's compact form, so "Seized 0.1947 ETH" there and
+      // "0.1947 ETH ≈ 719.649 USDC" here read as one amount.
+      amount: `${fmtHeaderMagnitude(seizedAmt, colSym)} ${colSym}`,
       usd: seizedValue,
       usdProv: liqSeizedValueProv(colSym, debtSym, coords, { amount: exactCol, price: price.debtPerCol }),
     },

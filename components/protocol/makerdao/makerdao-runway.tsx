@@ -56,7 +56,7 @@ export function MakerdaoRunway({
         : null;
     return (
       <div className="w-full">
-        <PriceRunway compact currentPrice={v.priceUsd} liqPrice={v.liquidationPriceUsd} />
+        <PriceRunway compact currentPrice={v.priceUsd} liqPrice={v.liquidationPriceUsd} asset={v.collateralSymbol} />
         <div className="mt-1.5 flex items-baseline justify-end gap-1 text-[11px] tabular-nums text-rb-500">
           <span>
             liquidation{" "}
@@ -68,5 +68,12 @@ export function MakerdaoRunway({
     );
   }
 
-  return <PriceRunway compact={compact} currentPrice={v.priceUsd} liqPrice={v.liquidationPriceUsd} />;
+  return (
+    <PriceRunway
+      compact={compact}
+      currentPrice={v.priceUsd}
+      liqPrice={v.liquidationPriceUsd}
+      asset={v.collateralSymbol}
+    />
+  );
 }

@@ -100,6 +100,21 @@ export function LatestPrices({
   // sentence when there is no list.
   const showReason = reason != null && !assets.every((a) => priced(a) && !a.unit);
 
+  // What the trigger shows, said in words (a newcomer review, 2026-09-28:
+  // "< 1 min ago · ETH 2,656 USDC +1" read as an unlabelled ticker, and the
+  // +1 as a mystery). The visible "Prices" label names the control; this
+  // tooltip says whose price it is and at which block, and what the count means.
+  const anyPriced = assets.some(priced);
+  const moreNote =
+    more > 0
+      ? ` +${more} means ${more} more ${anyPriced ? "price" : "asset"}${more === 1 ? "" : "s"} in the list.`
+      : "";
+  const tip = !first
+    ? "Prices for this position."
+    : priced(first)
+      ? `${first.symbol}'s oracle price at the ${at ? "closing" : "latest"} block.${moreNote}`
+      : `${first.symbol}, held with no price stated by the protocol.${moreNote}`;
+
   return (
     <div ref={ref} className="relative" data-latest-prices>
       <button
@@ -110,12 +125,14 @@ export function LatestPrices({
         aria-label={
           assets.length === 0
             ? "Prices for this position"
-            : `${assets.some(priced) ? (at ? "Prices at closing for" : "Prices for") : "Assets in"} this position: ${assets.length} ${assets.length === 1 ? "asset" : "assets"}`
+            : `${anyPriced ? (at ? "Prices at closing for" : "Prices for") : "Assets in"} this position: ${assets.length} ${assets.length === 1 ? "asset" : "assets"}. ${tip}`
         }
-        className={`${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} h-7 gap-1.5 rounded-md px-2 text-xs`}
+        title={tip}
+        className={`${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} h-7 gap-1 rounded-md px-1.5 text-xs sm:gap-1.5 sm:px-2`}
       >
         {first ? (
           <>
+            <span className="text-[11px] text-rb-500 sm:text-xs">{anyPriced ? "Prices" : "Assets"}</span>
             <TokenChipIcon symbol={first.symbol} address={first.address} size={14} filterable={false} />
             {/* The figure shows at every width (ui-jobs 59). It used to be
                 withheld below sm because the row carried back, the block

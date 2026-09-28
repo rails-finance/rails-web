@@ -54,6 +54,7 @@ import type {
   DolomitePeakAmount,
 } from "@/lib/sources/api/dolomite-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
+import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 
 export interface DolomitePositionView {
   owner: string;
@@ -88,6 +89,13 @@ function lineUsd(v: DolomitePositionView, marketId: number, amount: number): num
   return typeof p === "number" && p > 0 ? amount * p : null;
 }
 
+/** A line's oracle USD for the dust rule (components/shared/dust-reserves);
+ *  null (held) where unpriced or its decimals were not read. */
+const dustUsdOf =
+  (v: DolomitePositionView) =>
+  (r: DolomiteBalanceAmount): number | null =>
+    r.decimalsUnread ? null : lineUsd(v, r.marketId, legAmount(r));
+
 /** Total USD across one side, with the STRICT guard: null the moment any
  *  contributing market is unpriced, so a partial total is never asserted. */
 function totalUsd(v: DolomitePositionView, lines: DolomiteBalanceAmount[]): number | null {
@@ -118,8 +126,9 @@ const legExact = (r: DolomiteBalanceAmount): string =>
  *  strict chain reads (each line traced, exact figure on hover). Keyed by MARKET ID
  *  (symbols collide on this roster: rUSD/srUSD/wsrUSD/cUSD/stcUSD). */
 function FootnoteLines({ v, side }: { v: DolomitePositionView; side: "supply" | "debt" }) {
-  const lines = side === "supply" ? v.supplies : v.borrows;
-  if (lines.length === 0) return null;
+  const all = side === "supply" ? v.supplies : v.borrows;
+  const { lines, control } = useDustLines(all, dustUsdOf(v));
+  if (all.length === 0) return null;
   return (
     <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
       {lines.map((r) => (
@@ -135,6 +144,7 @@ function FootnoteLines({ v, side }: { v: DolomitePositionView; side: "supply" | 
           )}
         </div>
       ))}
+      {control}
     </div>
   );
 }
@@ -153,8 +163,9 @@ function BorrowRateCaption({ rate }: { rate: DolomiteCardCaptions["borrowRate"] 
 
 /** A vertical stack of one side's balances, each traced. */
 function LegStack({ v, side }: { v: DolomitePositionView; side: "supply" | "debt" }) {
-  const lines = side === "supply" ? v.supplies : v.borrows;
-  if (lines.length === 0) return <StatDash />;
+  const all = side === "supply" ? v.supplies : v.borrows;
+  const { lines, control } = useDustLines(all, dustUsdOf(v));
+  if (all.length === 0) return <StatDash />;
   return (
     <div className="flex flex-col gap-1">
       {lines.map((r) => (
@@ -168,6 +179,7 @@ function LegStack({ v, side }: { v: DolomitePositionView; side: "supply" | "debt
           </Prov>
         </StatValue>
       ))}
+      {control}
     </div>
   );
 }
@@ -232,6 +244,10 @@ export function DolomitePositionCard({
 }) {
   const collUsd = totalUsd(v, v.supplies);
   const debtUsd = totalUsd(v, v.borrows);
+  // Dust lines (under a cent) leave the icon stack and its "+N"; the lines
+  // put them behind the "N dust reserves hidden" control.
+  const suppliesShown = splitDust(v.supplies, dustUsdOf(v)).shown;
+  const borrowsShown = splitDust(v.borrows, dustUsdOf(v)).shown;
 
   // Closed / liquidated: every par is back at zero, so the headline is what
   // each market lane held at its height — the highest recorded par (no USD:
@@ -307,7 +323,8 @@ export function DolomitePositionCard({
           // USD total is never asserted.
           {
             label: CARD_VOCAB.collateral,
-            assetIcons: v.supplies.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(v.supplies)} /> : undefined,
+            assetIcons:
+              v.supplies.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(suppliesShown)} /> : undefined,
             value:
               collUsd != null ? (
                 <UsdHeadline usd={collUsd} info={dolomiteUsdProv("Collateral")} />
@@ -318,7 +335,7 @@ export function DolomitePositionCard({
           },
           {
             label: CARD_VOCAB.debt,
-            assetIcons: v.borrows.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(v.borrows)} /> : undefined,
+            assetIcons: v.borrows.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(borrowsShown)} /> : undefined,
             value:
               debtUsd != null ? (
                 <UsdHeadline usd={debtUsd} info={dolomiteUsdProv("Borrowed")} />
