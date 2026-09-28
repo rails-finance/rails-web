@@ -2406,6 +2406,8 @@ export interface FluidContextRaw {
   liqSupplyAfter?: string;
   liqBorrowBefore?: string;
   liqBorrowAfter?: string;
+  colInterestSincePrevious?: string;
+  debtInterestSincePrevious?: string;
 }
 
 export interface FluidContext {
@@ -2426,11 +2428,22 @@ export interface FluidContext {
   colDelta?: string;
   /** Signed debt delta in borrow-token units (human-readable). */
   debtDelta?: string;
-  /** Σ continuity lane before/after (human-readable; see the header note). */
+  /** The leg's balance just before / after this event (human-readable): the
+   *  vault's settled figure at the block where `balanceBasis` is "chain",
+   *  otherwise the Σ continuity lane (see the header note). */
   colBefore?: string;
   colAfter?: string;
   debtBefore?: string;
   debtAfter?: string;
+  /** "chain" when the before/after above are the vault's settled figures read
+   *  at the row's block (server mig 344); absent while the row carries the Σ
+   *  lane. */
+  balanceBasis?: "chain";
+  /** Interest each leg accrued since the position's previous row (human):
+   *  this row's before less the previous row's after, both chain figures.
+   *  Absent when zero or when either row lacks the read. */
+  colInterestSincePrevious?: string;
+  debtInterestSincePrevious?: string;
   /** liquidated/absorbed only — the vault's OWN settled before/after across
    *  the liquidation block (exact; includes partial liquidation math). */
   liqSupplyBefore?: string;

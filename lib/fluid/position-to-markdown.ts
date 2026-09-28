@@ -52,9 +52,8 @@ export function fluidPositionToMarkdown(args: FluidPositionMarkdownArgs): string
   lines.push(
     `> Point-in-time snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
       `Balances are the VaultResolver's live SETTLED read where taken (the vault's own fetchLatestPosition ` +
-      `settlement math — every liquidation sweep and interest accrued to the block applied); the Σ replay of the ` +
-      `captured operate events + per-position liquidation attributions is the fallback lane and is interest-blind ` +
-      `between events. Fluid liquidates price-band ticks whose events name NO position — the attribution rows are ` +
+      `settlement math — every liquidation sweep and interest accrued to the block applied). Each timeline row's ` +
+      `balance is the same settled figure read at that row's block. Fluid liquidates price-band ticks whose events name NO position — the attribution rows are ` +
       `settled boundary reads, exact including partial liquidations. Fluid runs NO USD feed: the vault's own oracle ` +
       `prices the collateral in the debt token, so every valuation and risk figure below is in the vault's own ` +
       `two-token space. Everything drifts as the market and position change. Not financial advice.`,
@@ -230,8 +229,11 @@ function timelineTable(
     out.push("_No transaction history available._");
     return out;
   }
-  out.push(`| # | Date | Action | ${colSym} Δ | ${debtSym} Δ | Transaction |`);
-  out.push("|---|------|--------|-------------|--------------|-------------|");
+  out.push(
+    `| # | Date | Action | ${colSym} Δ | ${debtSym} Δ | ${colSym} after | ${debtSym} after | ${colSym} interest since previous | ${debtSym} interest since previous | Transaction |`,
+  );
+  out.push("|---|------|--------|-------------|--------------|------|------|------|------|-------------|");
+  const bal = (v: string | undefined) => (v == null ? "—" : amt(Number(v) || 0));
   const sign = (v: string | undefined) => {
     const n = Number(v ?? 0) || 0;
     return n === 0 ? "—" : `${n > 0 ? "+" : "−"}${amt(Math.abs(n))}`;
@@ -253,11 +255,17 @@ function timelineTable(
       colD = sign(d.colDelta);
       debtD = sign(d.debtDelta);
     }
-    out.push(`| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${action} | ${colD} | ${debtD} | ${txCell(e)} |`);
+    const bears = d.eventType !== "mint" && d.eventType !== "transfer";
+    const colAfter = bears ? bal(d.colAfter) : "—";
+    const debtAfter = bears ? bal(d.debtAfter) : "—";
+    out.push(
+      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${action} | ${colD} | ${debtD} | ${colAfter} | ${debtAfter} | ` +
+        `${sign(d.colInterestSincePrevious)} | ${sign(d.debtInterestSincePrevious)} | ${txCell(e)} |`,
+    );
   });
   out.push("");
   out.push(
-    "_Operate deltas are the LogOperate events' own signed amounts. Liquidation rows are per-position attributions: Fluid's LogLiquidate sweeps price-band ticks and names no position, so each row is the vault's own settlement math read at the boundary blocks (before − after; exact, partial liquidations included). Interest accrued between events is real and appears only in the settled figures above._",
+    "_Operate deltas are the LogOperate events' own signed amounts. Liquidation rows are per-position attributions: Fluid's LogLiquidate sweeps price-band ticks and names no position, so each row is the vault's own settlement math read at the boundary blocks (before − after; exact, partial liquidations included). Each row's after is the vault's settled balance at its block, read from VaultPositionsResolver there, interest included; the interest columns are that row's balance just before it less the previous row's after._",
   );
   out.push("");
   return out;

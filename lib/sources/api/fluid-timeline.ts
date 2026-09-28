@@ -9,8 +9,12 @@
 //
 // The `liquidated`/`absorbed` rows are COMPUTED attribution rows (Fluid's
 // LogLiquidate carries no position id): their before/after are the vault's
-// own settled math read across the liquidation block — exact — while the
-// col/debt running lane is the Σ of deltas (impacts included). Smart-vault
+// own settled math read across the liquidation block — exact. Every row's
+// col/debt before/after is the vault's settled balance at the row's block
+// (server mig 344: the resolver read, interest included) where the index holds
+// that read, else the Σ of deltas (impacts included); `balanceBasis` says
+// which. Between two chain rows, before(n) − after(n−1) is the interest the
+// leg accrued with no event of its own. Smart-vault
 // legs (vault_type > 10000) have no ERC20 symbol; they render as DEX shares
 // at 18 dp.
 //
@@ -75,6 +79,12 @@ export interface FluidMvRow {
   price_raw: string | null;
   price_source: string | null;
   liquidation_penalty: number | null;
+  /** The vault's settled balance just before / after this row (server mig
+   *  344), base units; null until the index has read the row's block. */
+  col_chain_before?: string | null;
+  col_chain_after?: string | null;
+  debt_chain_before?: string | null;
+  debt_chain_after?: string | null;
 }
 
 const LABELS: Record<FluidEventType, string> = {
@@ -171,8 +181,27 @@ function flowFor(symbol: string, decimals: number, raw: bigint, direction: "in" 
   };
 }
 
+/** A gap this small is the vault's rounding between an event's amount and its
+ *  raw units, not interest: a few base units, or a trillionth of the balance. */
+const ROUNDING_UNITS = BigInt(3);
+const ROUNDING_SHARE = BigInt(1_000_000_000_000);
+
+/** before(n) − after(prev), both chain figures; undefined when either is
+ *  missing or the gap is rounding. */
+function interestGap(before: string | null | undefined, prevAfter: string | null | undefined): bigint | undefined {
+  if (before == null || prevAfter == null) return undefined;
+  const prevN = bigintOf(prevAfter);
+  const gap = bigintOf(before) - prevN;
+  const mag = gap < ZERO ? -gap : gap;
+  const tolerance = prevN / ROUNDING_SHARE > ROUNDING_UNITS ? prevN / ROUNDING_SHARE : ROUNDING_UNITS;
+  return mag <= tolerance ? undefined : gap;
+}
+
 /** Transform raw mv_fluid_events rows → { nftId, events, totalEvents }. */
 export function buildFluidTimeline(rows: FluidMvRow[], nftId: string): FluidTimelineResult {
+  // The previous balance-bearing row (an ownership move states no balance, so
+  // the interest across it lands on the next row that does).
+  let prev: FluidMvRow | null = null;
   const events: BaseActivityEvent[] = rows.map((r, idx) => {
     const tx = r.tx_hash ? (r.tx_hash.startsWith("0x") ? r.tx_hash : `0x${r.tx_hash}`) : "";
     const kind = r.action as FluidEventType;
@@ -182,6 +211,16 @@ export function buildFluidTimeline(rows: FluidMvRow[], nftId: string): FluidTime
     const borrowDec = r.borrow_decimals ?? SHARES_DECIMALS;
     const colAmt = bigintOf(r.col_amt);
     const debtAmt = bigintOf(r.debt_amt);
+    // The row's balances: the chain read where the index holds it.
+    const chain = r.col_chain_after != null && r.debt_chain_after != null;
+    const colBefore = chain ? (r.col_chain_before ?? null) : r.col_before;
+    const colAfter = chain ? (r.col_chain_after ?? null) : r.col_after;
+    const debtBefore = chain ? (r.debt_chain_before ?? null) : r.debt_before;
+    const debtAfter = chain ? (r.debt_chain_after ?? null) : r.debt_after;
+    const bearsBalance = kind !== "mint" && kind !== "transfer";
+    const colGap = chain && bearsBalance && prev ? interestGap(colBefore, prev.col_chain_after) : undefined;
+    const debtGap = chain && bearsBalance && prev ? interestGap(debtBefore, prev.debt_chain_after) : undefined;
+    if (bearsBalance) prev = r;
 
     const base = {
       id: `${r.event_key}`,
@@ -201,20 +240,25 @@ export function buildFluidTimeline(rows: FluidMvRow[], nftId: string): FluidTime
       borrowSymbol: r.borrow_symbol,
       nftId: r.nft_id,
       isOpen: idx === 0,
-      colBefore: scaledStr(r.col_before, supplyDec),
-      colAfter: scaledStr(r.col_after, supplyDec),
-      debtBefore: scaledStr(r.debt_before, borrowDec),
-      debtAfter: scaledStr(r.debt_after, borrowDec),
+      colBefore: scaledStr(colBefore, supplyDec),
+      colAfter: scaledStr(colAfter, supplyDec),
+      debtBefore: scaledStr(debtBefore, borrowDec),
+      debtAfter: scaledStr(debtAfter, borrowDec),
+      ...(chain ? { balanceBasis: "chain" as const } : {}),
+      ...(colGap != null ? { colInterestSincePrevious: fmtUnits(colGap, supplyDec) } : {}),
+      ...(debtGap != null ? { debtInterestSincePrevious: fmtUnits(debtGap, borrowDec) } : {}),
       ...(r.owner_at ? { ownerAt: r.owner_at.toLowerCase() } : {}),
       ...(r.initiator ? { initiator: r.initiator.toLowerCase() } : {}),
       ...(r.tx_from ? { txFrom: r.tx_from.toLowerCase() } : {}),
       raw: {
         colAmt: rawVal(r.col_amt),
         debtAmt: rawVal(r.debt_amt),
-        colBefore: rawVal(r.col_before),
-        colAfter: rawVal(r.col_after),
-        debtBefore: rawVal(r.debt_before),
-        debtAfter: rawVal(r.debt_after),
+        colBefore: rawVal(colBefore),
+        colAfter: rawVal(colAfter),
+        debtBefore: rawVal(debtBefore),
+        debtAfter: rawVal(debtAfter),
+        ...(colGap != null ? { colInterestSincePrevious: colGap.toString() } : {}),
+        ...(debtGap != null ? { debtInterestSincePrevious: debtGap.toString() } : {}),
       },
     };
 

@@ -10,10 +10,12 @@
 //     the contract's settlement math read as a view (fetchLatestPosition at
 //     the boundary blocks) — a computed read, never an emitted field. The
 //     position card's current figures are the VaultPositionsResolver sweep at
-//     a stamped block, the same class.
+//     a stamped block, the same class. So is each row's balance: the resolver
+//     read at the row's block (fluid_position_at_block), interest included.
 //   • indexed — the Σ continuity lane: running sum of the position's operate
 //     deltas plus the liquidation-attribution deltas. Exact at liquidation
-//     boundaries, interest-blind between events; no chain slot holds it.
+//     boundaries, interest-blind between events; no chain slot holds it. A row
+//     carries it only until its block's read lands.
 //
 // Values replay the captured fluid_* events. The `contract` is the position's
 // vault (passed in as `coords.vault`) — each (collateral, debt) pair is its
@@ -105,57 +107,117 @@ export const debtDeltaProv = (sym: string, coords: FluidCoords, raw?: string | n
   inputs: eventInputs(coords),
 });
 
-// ── the Σ continuity lane (indexed) ──────────────────────────────────────────
+// ── the row's balance ────────────────────────────────────────────────────────
+// Where the index holds the read (fluid_position_at_block), a row's balance is
+// the vault's settled figure at the row's block: interest and liquidations
+// included, what VaultPositionsResolver answers there. Until the read lands the
+// row carries the Σ continuity lane, which misses interest between events.
 
 const SIGMA_SUMMARY = (side: "collateral" | "debt", sym: string, when: string): string =>
   `${sym} ${side} ${when} — the running Σ of the position's operate deltas plus the liquidation-attribution deltas. Exact at liquidation boundaries (the attribution rows carry the vault's own settlement math), but it EXCLUDES interest accrued between events; no chain slot holds this number — it is the index's replay.`;
 
-/** Σ-lane collateral AFTER this event. */
-export const colAfterProv = (sym: string, coords: FluidCoords, raw?: string | null): Provenance => ({
-  kind: "derived",
-  pclass: "indexed",
-  summary: SIGMA_SUMMARY("collateral", sym, `after this event${atBlock(coords)}`),
-  contract: vaultContract(coords),
-  via: `${FLUID_VIA} · Σ colAmt_ across LogOperate logs + liquidation attributions${raw ? ` = ${raw}` : ""}`,
+const CHAIN_SUMMARY = (side: "collateral" | "debt", sym: string, when: string): string =>
+  `${sym} ${side} ${when} — the vault's settled figure: the position's raw ${side === "collateral" ? "supply" : "debt"} times the vault's exchange price at the block, with any liquidation settled, so the interest accrued up to the block is in it. Read as VaultPositionsResolver.getVaultPositionsForNftIds([nftId], vault) at the end of the block, less the position's later events in the same block.`;
+
+const RESOLVER_VIA = (field: "supply" | "borrow", raw?: string | null): string =>
+  `${FLUID_VIA} · VaultPositionsResolver.getVaultPositionsForNftIds at the block → ${field}${raw ? ` = ${raw}` : ""}`;
+
+const resolverContract = { name: "Fluid VaultPositionsResolver", address: FLUID_ADDRESSES.VAULT_POSITIONS_RESOLVER };
+
+/** Collateral AFTER this event: the chain figure where read, else the Σ lane. */
+export const colAfterProv = (sym: string, coords: FluidCoords, raw?: string | null, chain = false): Provenance =>
+  chain
+    ? {
+        kind: "chain",
+        pclass: "state",
+        summary: CHAIN_SUMMARY("collateral", sym, `after this event${atBlock(coords)}`),
+        contract: resolverContract,
+        via: RESOLVER_VIA("supply", raw),
+        inputs: eventInputs(coords),
+      }
+    : {
+        kind: "derived",
+        pclass: "indexed",
+        summary: SIGMA_SUMMARY("collateral", sym, `after this event${atBlock(coords)}`),
+        contract: vaultContract(coords),
+        via: `${FLUID_VIA} · Σ colAmt_ across LogOperate logs + liquidation attributions${raw ? ` = ${raw}` : ""}`,
+        inputs: eventInputs(coords),
+      };
+
+/** Debt AFTER this event: the chain figure where read, else the Σ lane. */
+export const debtAfterProv = (sym: string, coords: FluidCoords, raw?: string | null, chain = false): Provenance =>
+  chain
+    ? {
+        kind: "chain",
+        pclass: "state",
+        summary: CHAIN_SUMMARY("debt", sym, `after this event${atBlock(coords)}`),
+        contract: resolverContract,
+        via: RESOLVER_VIA("borrow", raw),
+        inputs: eventInputs(coords),
+      }
+    : {
+        kind: "derived",
+        pclass: "indexed",
+        summary: SIGMA_SUMMARY("debt", sym, `after this event${atBlock(coords)}`),
+        contract: vaultContract(coords),
+        via: `${FLUID_VIA} · Σ debtAmt_ across LogOperate logs + liquidation attributions${raw ? ` = ${raw}` : ""}`,
+        inputs: eventInputs(coords),
+      };
+
+/** A leg's balance BEFORE this event = after − this event's own delta. */
+const beforeProv = (side: "collateral" | "debt", sym: string, coords: FluidCoords, chain: boolean): Provenance => {
+  const field = side === "collateral" ? "colAmt_" : "debtAmt_";
+  return chain
+    ? {
+        kind: "chain-derived",
+        pclass: "state",
+        summary: `${sym} ${side} just before this event — the vault's settled figure after it less this event's own ${field}, both at the same block and exchange price. It includes the interest accrued since the previous event.`,
+        contract: resolverContract,
+        via: `settled ${side} after − ${field}`,
+        formula: "after − change",
+        inputs: eventInputs(coords, [
+          {
+            label: "after",
+            kind: "chain",
+            pclass: "state",
+            note: `${sym} ${side} after this event, read at the block`,
+          },
+          { label: "change", kind: "chain", pclass: "emitted", note: `this event's own ${field} (signed)` },
+        ]),
+      }
+    : {
+        kind: "derived",
+        pclass: "indexed",
+        summary: `${SIGMA_SUMMARY(side, sym, "before this event")} Reconstructed in the browser as the after-value minus this event's own ${field} (after − change).`,
+        contract: vaultContract(coords),
+        via: `Σ-lane ${side} after − ${field}`,
+        formula: "after − change",
+        inputs: eventInputs(coords, [
+          { label: "after", kind: "derived", pclass: "indexed", note: `Σ-lane ${sym} ${side} after this event` },
+          { label: "change", kind: "chain", pclass: "emitted", note: `this event's own ${field} (signed)` },
+        ]),
+      };
+};
+
+export const colBeforeProv = (sym: string, coords: FluidCoords, chain = false): Provenance =>
+  beforeProv("collateral", sym, coords, chain);
+
+export const debtBeforeProv = (sym: string, coords: FluidCoords, chain = false): Provenance =>
+  beforeProv("debt", sym, coords, chain);
+
+/** Interest a leg accrued between the position's previous row and this one. */
+export const interestSincePreviousProv = (
+  side: "collateral" | "debt",
+  sym: string,
+  coords: FluidCoords,
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `Interest the ${side} ${side === "collateral" ? "earned" : "accrued"} since the position's previous event, up to this one${atBlock(coords)} — the ${side} just before this event less the ${side} just after the previous one, both the vault's settled figures. No event moved the raw balance between them; the vault's exchange price did.`,
+  contract: resolverContract,
+  via: `${side} before this event − ${side} after the previous event`,
+  formula: "before − previous after",
   inputs: eventInputs(coords),
-});
-
-/** Σ-lane debt AFTER this event. */
-export const debtAfterProv = (sym: string, coords: FluidCoords, raw?: string | null): Provenance => ({
-  kind: "derived",
-  pclass: "indexed",
-  summary: SIGMA_SUMMARY("debt", sym, `after this event${atBlock(coords)}`),
-  contract: vaultContract(coords),
-  via: `${FLUID_VIA} · Σ debtAmt_ across LogOperate logs + liquidation attributions${raw ? ` = ${raw}` : ""}`,
-  inputs: eventInputs(coords),
-});
-
-/** Σ-lane collateral BEFORE this event = after − this event's own delta. */
-export const colBeforeProv = (sym: string, coords: FluidCoords): Provenance => ({
-  kind: "derived",
-  pclass: "indexed",
-  summary: `${SIGMA_SUMMARY("collateral", sym, "before this event")} Reconstructed in the browser as the after-value minus this event's own colAmt_ (after − change).`,
-  contract: vaultContract(coords),
-  via: "Σ-lane collateral after − colAmt_",
-  formula: "after − change",
-  inputs: eventInputs(coords, [
-    { label: "after", kind: "derived", pclass: "indexed", note: `Σ-lane ${sym} collateral after this event` },
-    { label: "change", kind: "chain", pclass: "emitted", note: "this event's own colAmt_ (signed)" },
-  ]),
-});
-
-/** Σ-lane debt BEFORE this event = after − this event's own delta. */
-export const debtBeforeProv = (sym: string, coords: FluidCoords): Provenance => ({
-  kind: "derived",
-  pclass: "indexed",
-  summary: `${SIGMA_SUMMARY("debt", sym, "before this event")} Reconstructed in the browser as the after-value minus this event's own debtAmt_ (after − change).`,
-  contract: vaultContract(coords),
-  via: "Σ-lane debt after − debtAmt_",
-  formula: "after − change",
-  inputs: eventInputs(coords, [
-    { label: "after", kind: "derived", pclass: "indexed", note: `Σ-lane ${sym} debt after this event` },
-    { label: "change", kind: "chain", pclass: "emitted", note: "this event's own debtAmt_ (signed)" },
-  ]),
 });
 
 // ── liquidation attribution (the settled reads) ──────────────────────────────

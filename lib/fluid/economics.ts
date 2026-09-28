@@ -14,11 +14,12 @@
 // lifetime-inflow bar from the operate deltas (composites contribute both
 // legs), plus the liquidated buckets from the attribution rows — seized
 // collateral and cleared debt as the difference of each row's settled
-// boundary reads (exact, partial-liquidation math included). The
-// principal-vs-accrued interest split is NOT asserted: the Σ lane is
-// interest-blind between events, so an "interest" segment would be the
-// settled−Σ gap, which also carries liquidation dust — `interestNote` says so
-// instead.
+// boundary reads (exact, partial-liquidation math included). With a chain
+// current figure and a complete lifetime, each leg also states the interest it
+// accrued over its life: the current figure less the net flows (in − out −
+// liquidated). That equals the sum of every row's interest since the previous
+// event plus the accrual since the last one, because each row's balance is the
+// vault's settled figure at its block (server mig 344).
 //
 // On a WINDOWED page the event stream is only the most recent slice, so the
 // lifetime layer arrives pre-merged instead: `fluidLifetimeWithOpening` seeds
@@ -162,6 +163,12 @@ export function fluidLifetimeWithOpening(
   return merged;
 }
 
+/** The tower data plus the interest each leg accrued over the position's life,
+ *  where it can be stated: a chain current figure and a complete lifetime. */
+export type FluidTowerData = ChainTruthTowerData & {
+  lifetimeInterest?: { collateral?: number; debt?: number };
+};
+
 export function computeFluidEconomics(
   view: FluidPositionView,
   events?: BaseActivityEvent[],
@@ -170,7 +177,7 @@ export function computeFluidEconomics(
    *  `fluidLifetimeWithOpening`. Omitted, the replay over `events` stands, which
    *  is what every unwindowed position does and did. */
   precomputedLifetime?: FluidLifetimeFlows,
-): ChainTruthTowerData {
+): FluidTowerData {
   const live = chain && chain.found && !chain.chainStale ? chain : null;
   // Leg names by lane: the index's symbol, the chain read's (it names token
   // legs the index left blank), the pool pair a smart leg is shares OF —
@@ -213,6 +220,14 @@ export function computeFluidEconomics(
     ];
   };
 
+  // The chain current figure alone (the Σ fallback cannot carry interest).
+  const chainCurrent = (side: "supply" | "borrow"): number | null => {
+    const liveExact = live != null ? (side === "supply" ? live.supplyExact : live.borrowExact) : null;
+    const settled = view.settled ? (side === "supply" ? view.settled.supply : view.settled.borrow) : null;
+    const n = Number(liveExact ?? settled ?? NaN);
+    return Number.isFinite(n) ? n : null;
+  };
+
   const supplyLines = currentLine("supply");
   const debtLines = currentLine("borrow");
 
@@ -234,7 +249,36 @@ export function computeFluidEconomics(
   const debtExited = flowLine(lifetime?.repaid ?? null, "repaid", borrowSym, "debt-repaid");
   const debtLiquidated = flowLine(lifetime?.liquidatedDebt ?? null, "liquidated debt", borrowSym, "debt-liq");
 
+  // Interest over the life: current − (in − out − liquidated). A leg whose
+  // lifetime cannot be stated states none, nor does a gap at or below dust.
+  const legInterest = (current: number | null, ...flows: (number | null | undefined)[]): number | undefined => {
+    if (current == null || !lifetime || flows.some((f) => f == null)) return undefined;
+    const [inflow, out, liq] = flows as number[];
+    const gap = current - (inflow - out - liq);
+    return gap > DUST ? gap : undefined;
+  };
+  const collInterest = legInterest(
+    chainCurrent("supply"),
+    lifetime?.deposited,
+    lifetime?.withdrawn,
+    lifetime?.seizedCollateral,
+  );
+  const debtInterest = legInterest(
+    chainCurrent("borrow"),
+    lifetime?.borrowed,
+    lifetime?.repaid,
+    lifetime?.liquidatedDebt,
+  );
+  const lifetimeInterest =
+    collInterest != null || debtInterest != null
+      ? {
+          ...(collInterest != null ? { collateral: collInterest } : {}),
+          ...(debtInterest != null ? { debt: debtInterest } : {}),
+        }
+      : undefined;
+
   return {
+    ...(lifetimeInterest ? { lifetimeInterest } : {}),
     valued: false, // no oracle at this depth — token amounts only, per side
     collateral: {
       current: supplyLines,
@@ -261,9 +305,9 @@ export function computeFluidEconomics(
     collateralListLabel: view.settled || live ? "Collateral · current" : undefined,
     debtListLabel: view.settled || live ? "Debt · current" : undefined,
     interestNote: live
-      ? "Current figures are read live from the vault — every liquidation and all interest accrued so far is included. The lifetime flows add up the position's own transactions, so interest that built up between events isn't counted there — that's why no principal-vs-interest split is shown. Fluid uses no dollar prices: each side is shown in its own token, and the vault's oracle prices the pair in the debt token."
+      ? "Current figures are read live from the vault — every liquidation and all interest accrued so far is included. The lifetime flows add up the position's own transactions; the interest the vault added between them is stated beside them. Fluid uses no dollar prices: each side is shown in its own token, and the vault's oracle prices the pair in the debt token."
       : view.settled
-        ? "Current figures are the vault's own totals as of the stamped time, liquidations and accrued interest included. The lifetime flows add up the position's own transactions, so interest that built up between events isn't counted there — that's why no principal-vs-interest split is shown. Fluid uses no dollar prices: each side is shown in its own token."
+        ? "Current figures are the vault's own totals as of the stamped time, liquidations and accrued interest included. The lifetime flows add up the position's own transactions; the interest the vault added between them is stated beside them. Fluid uses no dollar prices: each side is shown in its own token."
         : "Figures add up the position's own transactions, including liquidations. Interest that builds up between events isn't counted, so totals can run slightly behind the vault's own books. Fluid uses no dollar prices: each side is shown in its own token.",
   };
 }

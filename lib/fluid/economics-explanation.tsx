@@ -7,7 +7,8 @@
 // names explicitly.
 
 import type { ReactNode } from "react";
-import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
+import type { TowerLine } from "@/lib/shared/chain-truth-economics";
+import type { FluidTowerData } from "@/lib/fluid/economics";
 import { formatCompact } from "@/lib/utils/format";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 
@@ -23,7 +24,7 @@ function Fig({ children }: { children: ReactNode }) {
   return <span className="font-semibold text-foreground tabular-nums">{children}</span>;
 }
 
-export function fluidEconomicsExplanation(data: ChainTruthTowerData): ReactNode {
+export function fluidEconomicsExplanation(data: FluidTowerData): ReactNode {
   const collUnit = data.collateralUnit ?? "";
   const debtUnit = data.debtUnit ?? "";
   const isSmartLeg = (unit: string) => unit.includes("shares");
@@ -83,6 +84,23 @@ export function fluidEconomicsExplanation(data: ChainTruthTowerData): ReactNode 
         ) : (
           ", with no debt outstanding."
         )}
+      </span>,
+    );
+  }
+  const interest = data.lifetimeInterest;
+  if (interest?.collateral != null) {
+    items.push(
+      <span key="coll-interest">
+        The collateral earned <Fig>{fmt(interest.collateral, collUnit)}</Fig> in interest over the vault&apos;s life:
+        what it holds now less what was deposited, withdrawn and seized.
+      </span>,
+    );
+  }
+  if (interest?.debt != null) {
+    items.push(
+      <span key="debt-interest">
+        The debt accrued <Fig>{fmt(interest.debt, debtUnit)}</Fig> of interest over the vault&apos;s life: what it owes
+        now less what was borrowed, repaid and cleared by liquidation.
       </span>,
     );
   }
@@ -154,7 +172,7 @@ export function fluidEconomicsContent(): LearnMoreContent {
       },
       {
         bold: "Interest between events",
-        text: "the replayed lifetime totals exclude interest accrued since the position's last touch; the current-state figures come from the vault's own resolver instead, so no principal-versus-interest split is shown.",
+        text: "the vault adds interest continuously with no event of its own. Each timeline row reads the position's balance from the vault's resolver at its block, so the gap from the previous row's balance is the interest accrued between them, and the lifetime interest is the current balance less the lifetime flows.",
       },
     ],
     links: [{ label: "Fluid docs", url: FLUID_DOC_URL }],

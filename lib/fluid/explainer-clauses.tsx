@@ -298,14 +298,19 @@ function fluidEventSlotsBase(
   );
   // After-balance figures echo the detail grid's after-value receipt.
   const colAfterFig = () => (
-    <Fig echo info={colAfterProv(supplySym, coords, ctx.raw?.colAfter)} value={fmtVal(ctx.colAfter)} symbol={supplySym}>
+    <Fig
+      echo
+      info={colAfterProv(supplySym, coords, ctx.raw?.colAfter, ctx.balanceBasis === "chain")}
+      value={fmtVal(ctx.colAfter)}
+      symbol={supplySym}
+    >
       {fmtVal(ctx.colAfter)} {supplySym}
     </Fig>
   );
   const debtAfterFig = () => (
     <Fig
       echo
-      info={debtAfterProv(borrowSym, coords, ctx.raw?.debtAfter)}
+      info={debtAfterProv(borrowSym, coords, ctx.raw?.debtAfter, ctx.balanceBasis === "chain")}
       value={fmtVal(ctx.debtAfter)}
       symbol={borrowSym}
     >

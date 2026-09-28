@@ -2,9 +2,12 @@
 
 // Fluid event detail — adapter onto the shared ChainTruthDetail grid. The
 // lanes an event touches, with before→after transitions:
-//   operate      — the Σ continuity lane per moved leg (running replay of the
-//                  position's own deltas + liquidation attributions; indexed,
-//                  interest-blind between events — the provenance says so).
+//   operate      — each leg's balance after the event: the vault's settled
+//                  figure read at the block (interest included), with the
+//                  interest accrued since the previous event beneath it. A row
+//                  whose block the index has not read yet carries the Σ lane
+//                  (the position's own deltas + liquidation attributions,
+//                  interest-blind between events) and its provenance says so.
 //   liquidated / — the SETTLED before→after on both legs: the vault's own
 //   absorbed       fetchLatestPosition read at the boundary blocks. These are
 //                  the exact numbers (LogLiquidate names no position), plus
@@ -37,6 +40,7 @@ import {
   liqClearedValueProv,
   liqPremiumProv,
   liqPenaltyAtBlockProv,
+  interestSincePreviousProv,
   type FluidCoords,
 } from "@/lib/fluid/event-provenance";
 import { pairLabel, shortAddress } from "@/lib/fluid/asset-catalog";
@@ -166,6 +170,13 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet }: FluidEven
     owner: ctx.ownerAt ?? wallet,
   };
   const stats: ChainTruthStat[] = [];
+  const chain = ctx.balanceBasis === "chain";
+  const interest = (side: "collateral" | "debt", sym: string): Pick<ChainTruthStat, "interestSincePrevious"> => {
+    const value = side === "collateral" ? ctx.colInterestSincePrevious : ctx.debtInterestSincePrevious;
+    return value != null
+      ? { interestSincePrevious: { value, prov: interestSincePreviousProv(side, sym, coords) } }
+      : {};
+  };
 
   if (ctx.eventType === "liquidated" || ctx.eventType === "absorbed") {
     // The settled lane: both boundaries are the vault's own fetchLatestPosition
@@ -176,6 +187,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet }: FluidEven
       symbol: supplySym,
       prov: liqSettledProv("collateral", "after", supplySym, coords),
       transition: settledTransition("collateral", supplySym, ctx.liqSupplyBefore, ctx.liqSupplyAfter, coords),
+      ...interest("collateral", supplySym),
     });
     stats.push({
       label: "Debt",
@@ -183,6 +195,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet }: FluidEven
       symbol: borrowSym,
       prov: liqSettledProv("debt", "after", borrowSym, coords),
       transition: settledTransition("debt", borrowSym, ctx.liqBorrowBefore, ctx.liqBorrowAfter, coords),
+      ...interest("debt", borrowSym),
     });
     stats.push({
       label: "Outcome",
@@ -209,8 +222,8 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet }: FluidEven
       });
     }
   } else {
-    // Operate: the Σ continuity lane per leg — a composite touches both. A leg
-    // this event didn't move keeps its plain after-value (dimmed).
+    // Operate: each leg's balance — a composite touches both. A leg this event
+    // didn't move keeps its plain after-value (dimmed).
     const colMoved = (Number(ctx.colDelta ?? "0") || 0) !== 0;
     const debtMoved = (Number(ctx.debtDelta ?? "0") || 0) !== 0;
     if (ctx.colAfter != null) {
@@ -218,14 +231,15 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet }: FluidEven
         label: "Collateral",
         value: fmt(ctx.colAfter),
         symbol: supplySym,
-        prov: colAfterProv(supplySym, coords, ctx.raw?.colAfter),
+        prov: colAfterProv(supplySym, coords, ctx.raw?.colAfter, chain),
         dimmed: !colMoved,
         transition: reconstructTransition({
           after: ctx.colAfter,
           change: ctx.colDelta,
           changeProv: colDeltaProv(supplySym, coords, ctx.raw?.colAmt),
-          beforeProv: colBeforeProv(supplySym, coords),
+          beforeProv: colBeforeProv(supplySym, coords, chain),
         }),
+        ...interest("collateral", supplySym),
       });
     }
     if (ctx.debtAfter != null) {
@@ -233,14 +247,15 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet }: FluidEven
         label: "Debt",
         value: fmt(ctx.debtAfter),
         symbol: borrowSym,
-        prov: debtAfterProv(borrowSym, coords, ctx.raw?.debtAfter),
+        prov: debtAfterProv(borrowSym, coords, ctx.raw?.debtAfter, chain),
         dimmed: !debtMoved,
         transition: reconstructTransition({
           after: ctx.debtAfter,
           change: ctx.debtDelta,
           changeProv: debtDeltaProv(borrowSym, coords, ctx.raw?.debtAmt),
-          beforeProv: debtBeforeProv(borrowSym, coords),
+          beforeProv: debtBeforeProv(borrowSym, coords, chain),
         }),
+        ...interest("debt", borrowSym),
       });
     }
   }
