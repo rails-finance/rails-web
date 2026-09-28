@@ -86,12 +86,16 @@ export interface LaneMove {
 
 export class ChainLanes {
   private lanes = new Map<string, LaneState>();
-  constructor(
-    private readonly h: HalfUpThrough,
-    /** A lane never seen opens at zero and known (a whole history), or
-     *  unknown (a history that starts after the Pool's first block). */
-    private readonly openKnown: boolean,
-  ) {}
+  private readonly h: HalfUpThrough;
+  /** A lane never seen opens at zero and known (a whole history), or unknown
+   *  (a history that starts after the Pool's first block). */
+  private readonly openKnown: boolean;
+  // Plain fields, not parameter properties: the verifiers load this file with
+  // Node's type stripping, which has no parameter properties.
+  constructor(h: HalfUpThrough, openKnown: boolean) {
+    this.h = h;
+    this.openKnown = openKnown;
+  }
 
   private key(axis: Axis, reserve: string) {
     return `${axis}:${reserve}`;
