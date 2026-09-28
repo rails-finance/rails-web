@@ -68,6 +68,7 @@ import type {
   CompoundV2PeakAmount,
 } from "@/lib/sources/api/compound-v2-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
+import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 
 export interface CompoundV2PositionView {
   wallet: string;
@@ -104,6 +105,13 @@ function lineUsd(v: CompoundV2PositionView, market: string, amount: number): num
   const p = v.priceByMarket?.[market];
   return typeof p === "number" && p > 0 ? amount * p : null;
 }
+
+/** Each line's oracle USD for the dust rule (components/shared/dust-reserves);
+ *  null (held) where the oracle didn't price it. */
+const supplyLineUsd = (v: CompoundV2PositionView) => (r: CompoundV2PositionView["supplies"][number]) =>
+  lineUsd(v, r.market, supplyAmount(r));
+const borrowLineUsd = (v: CompoundV2PositionView) => (r: CompoundV2PositionView["borrows"][number]) =>
+  lineUsd(v, r.market, r.amount);
 
 function isFixed(v: CompoundV2PositionView, market: string): boolean {
   return v.priceFixedByMarket?.[market] === true;
@@ -158,10 +166,11 @@ function FixedPriceFlag({ symbol }: { symbol: string }) {
  *  a current-value line, the raw principal on a principal line. Lines are
  *  keyed by MARKET (two markets share WBTC's underlying address). */
 function SupplyFootnoteLines({ v }: { v: CompoundV2PositionView }) {
+  const { lines, control } = useDustLines(v.supplies, supplyLineUsd(v));
   if (v.supplies.length === 0) return null;
   return (
     <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
-      {v.supplies.map((r) => {
+      {lines.map((r) => {
         const exact =
           r.current != null ? `${formatUnitsExact(r.cTokensRaw, 8)} ${r.cSymbol}` : `${r.principal} ${r.symbol}`;
         return (
@@ -175,15 +184,17 @@ function SupplyFootnoteLines({ v }: { v: CompoundV2PositionView }) {
           </div>
         );
       })}
+      {control}
     </div>
   );
 }
 
 function BorrowFootnoteLines({ v }: { v: CompoundV2PositionView }) {
+  const { lines, control } = useDustLines(v.borrows, borrowLineUsd(v));
   if (v.borrows.length === 0) return null;
   return (
     <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
-      {v.borrows.map((r) => {
+      {lines.map((r) => {
         const exact = formatUnitsExact(r.amountRaw, r.decimals);
         return (
           <div key={r.market}>
@@ -196,6 +207,7 @@ function BorrowFootnoteLines({ v }: { v: CompoundV2PositionView }) {
           </div>
         );
       })}
+      {control}
     </div>
   );
 }
@@ -235,10 +247,11 @@ function BorrowRateCaption({ rate }: { rate: CompoundV2CardCaptions["borrowRate"
 
 /** A vertical stack of the wallet's supplied markets, each traced. */
 function SupplyStack({ v }: { v: CompoundV2PositionView }) {
+  const { lines, control } = useDustLines(v.supplies, supplyLineUsd(v));
   if (v.supplies.length === 0) return <StatDash />;
   return (
     <div className="flex flex-col gap-1">
-      {v.supplies.map((r) => (
+      {lines.map((r) => (
         <StatValue key={r.market}>
           <Prov info={supplyProv(r)}>
             <AssetAmount
@@ -249,21 +262,24 @@ function SupplyStack({ v }: { v: CompoundV2PositionView }) {
           </Prov>
         </StatValue>
       ))}
+      {control}
     </div>
   );
 }
 
 function BorrowStack({ v }: { v: CompoundV2PositionView }) {
+  const { lines, control } = useDustLines(v.borrows, borrowLineUsd(v));
   if (v.borrows.length === 0) return <StatDash />;
   return (
     <div className="flex flex-col gap-1">
-      {v.borrows.map((r) => (
+      {lines.map((r) => (
         <StatValue key={r.market}>
           <Prov info={borrowProv(r)}>
             <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
           </Prov>
         </StatValue>
       ))}
+      {control}
     </div>
   );
 }
@@ -323,8 +339,12 @@ export function CompoundV2PositionCard({
   // detail page (the footnote lines); an unpriced side's list is the
   // headline itself and collapses on every surface.
   const isDetail = receipts;
-  const supplyListCount = collUsd == null ? v.supplies.length : isDetail ? v.supplies.length : 0;
-  const debtListCount = debtUsd == null ? v.borrows.length : isDetail ? v.borrows.length : 0;
+  // Dust lines (under a cent) leave the icon stack, its "+N" and the list
+  // count; the lines put them behind the "N dust reserves hidden" control.
+  const suppliesShown = splitDust(v.supplies, supplyLineUsd(v)).shown;
+  const borrowsShown = splitDust(v.borrows, borrowLineUsd(v)).shown;
+  const supplyListCount = collUsd == null ? suppliesShown.length : isDetail ? suppliesShown.length : 0;
+  const debtListCount = debtUsd == null ? borrowsShown.length : isDetail ? borrowsShown.length : 0;
   const supplyDisclosure = useReserveDisclosure(supplyListCount);
   const debtDisclosure = useReserveDisclosure(debtListCount);
 
@@ -407,8 +427,8 @@ export function CompoundV2PositionCard({
             assetIcons:
               v.supplies.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={v.supplies.map((r) => r.symbol)} />
-                  <ReserveDisclosureToggle disclosure={supplyDisclosure} count={v.supplies.length} />
+                  <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} />
+                  <ReserveDisclosureToggle disclosure={supplyDisclosure} count={suppliesShown.length} />
                 </span>
               ) : undefined,
             value:
@@ -438,8 +458,8 @@ export function CompoundV2PositionCard({
             assetIcons:
               v.borrows.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={v.borrows.map((r) => r.symbol)} />
-                  <ReserveDisclosureToggle disclosure={debtDisclosure} count={v.borrows.length} />
+                  <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} />
+                  <ReserveDisclosureToggle disclosure={debtDisclosure} count={borrowsShown.length} />
                 </span>
               ) : undefined,
             value:

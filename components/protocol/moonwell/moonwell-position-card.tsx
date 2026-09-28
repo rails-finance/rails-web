@@ -44,6 +44,7 @@ import type {
   MoonwellPeakAmount,
 } from "@/lib/sources/api/moonwell-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
+import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 
 export interface MoonwellPositionView {
   wallet: string;
@@ -77,6 +78,13 @@ function lineUsd(v: MoonwellPositionView, address: string, amount: number): numb
   const p = v.priceByAddress?.[address.toLowerCase()];
   return typeof p === "number" && p > 0 ? amount * p : null;
 }
+
+/** Each line's oracle USD for the dust rule (components/shared/dust-reserves);
+ *  null (held) where the oracle didn't price it. */
+const supplyLineUsd = (v: MoonwellPositionView) => (r: MoonwellPositionView["supplies"][number]) =>
+  lineUsd(v, r.address, supplyAmount(r));
+const borrowLineUsd = (v: MoonwellPositionView) => (r: MoonwellPositionView["borrows"][number]) =>
+  lineUsd(v, r.address, r.amount);
 
 /** Total USD across one side, with the STRICT guard: null the moment any
  *  contributing market is unpriced, so a partial total is never asserted (it
@@ -115,10 +123,11 @@ function useLineReceipts() {
  *  a current-value line, the raw principal on a principal line. */
 function SupplyFootnoteLines({ v }: { v: MoonwellPositionView }) {
   const { supplyProv, mSymbolOf } = useLineReceipts();
+  const { lines, control } = useDustLines(v.supplies, supplyLineUsd(v));
   if (v.supplies.length === 0) return null;
   return (
     <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
-      {v.supplies.map((r) => {
+      {lines.map((r) => {
         const exact =
           r.current != null ? `${formatUnitsExact(r.mTokensRaw, 8)} ${mSymbolOf(r)}` : `${r.principal} ${r.symbol}`;
         return (
@@ -131,16 +140,18 @@ function SupplyFootnoteLines({ v }: { v: MoonwellPositionView }) {
           </div>
         );
       })}
+      {control}
     </div>
   );
 }
 
 function BorrowFootnoteLines({ v }: { v: MoonwellPositionView }) {
   const { borrowProv } = useLineReceipts();
+  const { lines, control } = useDustLines(v.borrows, borrowLineUsd(v));
   if (v.borrows.length === 0) return null;
   return (
     <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
-      {v.borrows.map((r) => {
+      {lines.map((r) => {
         const exact = formatUnitsExact(r.amountRaw, r.decimals);
         return (
           <div key={r.address}>
@@ -152,6 +163,7 @@ function BorrowFootnoteLines({ v }: { v: MoonwellPositionView }) {
           </div>
         );
       })}
+      {control}
     </div>
   );
 }
@@ -194,10 +206,11 @@ function BorrowRateCaption({ rate }: { rate: MoonwellCardCaptions["borrowRate"] 
 /** A vertical stack of the wallet's supplied markets, each traced. */
 function SupplyStack({ v }: { v: MoonwellPositionView }) {
   const { supplyProv, mSymbolOf } = useLineReceipts();
+  const { lines, control } = useDustLines(v.supplies, supplyLineUsd(v));
   if (v.supplies.length === 0) return <StatDash />;
   return (
     <div className="flex flex-col gap-1">
-      {v.supplies.map((r) => (
+      {lines.map((r) => (
         <StatValue key={r.address}>
           <Prov info={supplyProv(r)}>
             <AssetAmount
@@ -208,22 +221,25 @@ function SupplyStack({ v }: { v: MoonwellPositionView }) {
           </Prov>
         </StatValue>
       ))}
+      {control}
     </div>
   );
 }
 
 function BorrowStack({ v }: { v: MoonwellPositionView }) {
   const { borrowProv } = useLineReceipts();
+  const { lines, control } = useDustLines(v.borrows, borrowLineUsd(v));
   if (v.borrows.length === 0) return <StatDash />;
   return (
     <div className="flex flex-col gap-1">
-      {v.borrows.map((r) => (
+      {lines.map((r) => (
         <StatValue key={r.address}>
           <Prov info={borrowProv(r)}>
             <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
           </Prov>
         </StatValue>
       ))}
+      {control}
     </div>
   );
 }
@@ -296,8 +312,12 @@ export function MoonwellPositionCard({
   // detail page (the footnote lines); an unpriced side's list is the
   // headline itself and collapses on every surface.
   const isDetail = receipts;
-  const supplyListCount = collUsd == null ? v.supplies.length : isDetail ? v.supplies.length : 0;
-  const debtListCount = debtUsd == null ? v.borrows.length : isDetail ? v.borrows.length : 0;
+  // Dust lines (under a cent) leave the icon stack, its "+N" and the list
+  // count; the lines put them behind the "N dust reserves hidden" control.
+  const suppliesShown = splitDust(v.supplies, supplyLineUsd(v)).shown;
+  const borrowsShown = splitDust(v.borrows, borrowLineUsd(v)).shown;
+  const supplyListCount = collUsd == null ? suppliesShown.length : isDetail ? suppliesShown.length : 0;
+  const debtListCount = debtUsd == null ? borrowsShown.length : isDetail ? borrowsShown.length : 0;
   const supplyDisclosure = useReserveDisclosure(supplyListCount);
   const debtDisclosure = useReserveDisclosure(debtListCount);
 
@@ -387,8 +407,8 @@ export function MoonwellPositionCard({
             assetIcons:
               v.supplies.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={v.supplies.map((r) => r.symbol)} />
-                  <ReserveDisclosureToggle disclosure={supplyDisclosure} count={v.supplies.length} />
+                  <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} />
+                  <ReserveDisclosureToggle disclosure={supplyDisclosure} count={suppliesShown.length} />
                 </span>
               ) : undefined,
             value:
@@ -418,8 +438,8 @@ export function MoonwellPositionCard({
             assetIcons:
               v.borrows.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={v.borrows.map((r) => r.symbol)} />
-                  <ReserveDisclosureToggle disclosure={debtDisclosure} count={v.borrows.length} />
+                  <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} />
+                  <ReserveDisclosureToggle disclosure={debtDisclosure} count={borrowsShown.length} />
                 </span>
               ) : undefined,
             value:
