@@ -49,7 +49,7 @@ import { FluidPositionExplanation } from "@/components/protocol/fluid/fluid-posi
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { computeFluidEconomics, fluidLifetimeWithOpening } from "@/lib/fluid/economics";
 import { fluidEconomicsExplanation, fluidEconomicsContent } from "@/lib/fluid/economics-explanation";
-import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -315,9 +315,36 @@ export default function FluidPositionView({
     ];
   }, [view, chain]);
 
+  // A closed position's prices: the vault oracle at the closing block, which
+  // the index carries on liquidation rows only. A position closed by its
+  // owner has no read there, and the dropdown is left out.
+  const closing = useMemo(() => {
+    if (!view || view.status === "open") return undefined;
+    const supply = fluidLegName(view, "supply", chain);
+    const borrow = fluidLegName(view, "borrow", chain);
+    return closingPricesAt(
+      fluidEvents,
+      (row) => {
+        const debtPerCol = row.context.data.oraclePriceAtBlock?.debtPerCol;
+        if (debtPerCol == null || !(debtPerCol > 0)) return undefined;
+        return [
+          { symbol: supply, price: debtPerCol, unit: borrow, label: `${supply} in ${borrow} (the vault's own oracle)` },
+          { symbol: borrow, label: `${borrow}, the vault's debt token` },
+        ];
+      },
+      (row) => row.context.data.eventType !== "transfer" && row.context.data.eventType !== "mint",
+    );
+  }, [view, chain, fluidEvents]);
+
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="fluid" assets={stripAssets} priceReason={ORACLE_USD_REASON.fluid}>
+      <DetailTopRow
+        session="fluid"
+        assets={stripAssets}
+        priceReason={ORACLE_USD_REASON.fluid}
+        closed={view != null && view.status !== "open"}
+        closing={closing}
+      >
         {view && (
           <FluidExportMenu
             view={view}

@@ -623,6 +623,7 @@ export function AlchemistPositionView({
           wallet={position.owner}
           assets={priceAssets}
           priceReason={priceReason}
+          closed={position.status === "closed"}
         />
 
         {/* ── The position card: the current figures, one reading, one block ── */}

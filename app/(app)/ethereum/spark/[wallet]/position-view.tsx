@@ -558,7 +558,12 @@ export default function SparkPositionDetail({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="spark" wallet={wallet} assets={stripAssets}>
+      <DetailTopRow
+        session="spark"
+        wallet={wallet}
+        assets={stripAssets}
+        closed={view != null && view.status !== "open"}
+      >
         {view && (
           <SparkExportMenu
             wallet={wallet}

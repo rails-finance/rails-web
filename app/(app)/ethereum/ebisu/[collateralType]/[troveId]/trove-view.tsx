@@ -75,7 +75,7 @@ import {
 import { DEBT_SYMBOL, EBISU_DOCS, resolveBranch } from "@/lib/ebisu/asset-catalog";
 import { forkMcrAt } from "@/lib/shared/liquity-fork-ops";
 import { forkPriceGapNotesFor, liveForkPriceGapNote, type ForkPriceGapBranch } from "@/lib/shared/market-note";
-import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
@@ -354,6 +354,21 @@ export default function EbisuTroveDetail({
     ];
   }, [view, chain]);
 
+  // A closed Trove's prices: the branch's lastGoodPrice its closing row
+  // carries. A row the filler has not priced leaves the dropdown out.
+  const closing = useMemo(() => {
+    if (!view || view.status === "open") return undefined;
+    return closingPricesAt(ebisuEvents, (row) => {
+      const usd = row.context.data.priceAtBlock?.usd;
+      return usd != null && usd > 0
+        ? [
+            { symbol: view.collateralType, price: usd },
+            { symbol: DEBT_SYMBOL, price: 1 },
+          ]
+        : undefined;
+    });
+  }, [view, ebisuEvents]);
+
   // Terminal narration: the ending mechanism is exact on this fork (closed =
   // the owner's closeTrove; liquidated = the liquidation), and the seizure legs
   // come from the life's own liquidate event once the timeline lands.
@@ -380,7 +395,13 @@ export default function EbisuTroveDetail({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="ebisu" wallet={view?.owner ?? view?.lastOwner ?? null} assets={stripAssets}>
+      <DetailTopRow
+        session="ebisu"
+        wallet={view?.owner ?? view?.lastOwner ?? null}
+        assets={stripAssets}
+        closed={view != null && view.status !== "open"}
+        closing={closing}
+      >
         {view && (
           <LiquityForkExportMenu
             protocolLabel="Ebisu"

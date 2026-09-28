@@ -47,7 +47,8 @@ import {
   polarisPsmOutcome,
 } from "@/lib/polaris/economics-explanation";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
-import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { TimelineActivityHeader, POLARIS_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { RiskFooterStrip, RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
@@ -277,6 +278,32 @@ export default function PolarisPositionView({
     return out;
   }, [chain, market, stable]);
 
+  // A closed CDP's prices: the same legs, read at the closing row's block by
+  // the oracle-at-block lane. A row the lane has not priced leaves the
+  // dropdown out.
+  const closing = useMemo(() => {
+    if (!view || view.status === "open") return undefined;
+    const cfg = POLARIS_MARKET_CONFIG[market];
+    return closingPricesAt(polarisEvents, (row) => {
+      const p = row.context.data.priceAtBlock;
+      if (!p || p.curve == null || !(p.curve > 0)) return undefined;
+      const out: LatestPriceAsset[] = [
+        {
+          symbol: PETH.symbol,
+          address: PETH.address,
+          price: p.curve,
+          unit: "ETH",
+          label: `${PETH.symbol} — bonding curve, native`,
+        },
+      ];
+      if (p.ethUsd != null && p.ethUsd > 0)
+        out.push({ symbol: PETH.symbol, address: PETH.address, price: p.curve * p.ethUsd });
+      const stableUsd = market === "usdp" ? 1 : p.xauUsd;
+      if (stableUsd != null) out.push({ symbol: stable, address: cfg.stable.address, price: stableUsd });
+      return out;
+    });
+  }, [view, market, stable, polarisEvents]);
+
   const loading = !chainSettled && view == null;
 
   // ── The card's risk footer strip ────────────────────────────────────────
@@ -355,7 +382,13 @@ export default function PolarisPositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="polaris" wallet={view?.owner ?? null} assets={stripAssets}>
+      <DetailTopRow
+        session="polaris"
+        wallet={view?.owner ?? null}
+        assets={stripAssets}
+        closed={view != null && view.status !== "open"}
+        closing={closing}
+      >
         {view && (
           <PolarisExportMenu
             view={view}

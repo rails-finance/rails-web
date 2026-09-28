@@ -44,7 +44,7 @@ import {
 } from "@/components/shared/state-transition";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
-import { formatCompact, formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatCompact, formatExact, formatHeadlineAmount, formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 
@@ -53,7 +53,24 @@ import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
  *  non-numeric placeholders ("—") and sub-1000 values through unchanged. */
 function compactAmount(full: string): string {
   const n = Number(full.replace(/,/g, ""));
-  return Number.isFinite(n) && full.trim() !== "" ? formatCompact(n) : full;
+  return Number.isFinite(n) && full.trim() !== "" ? formatHeadlineAmount(n) : full;
+}
+
+/** A stat's before, change or interest figure as shown: a nonzero magnitude
+ *  below 0.01 reads "<0.01" (formatHeadlineAmount's convention), signed where
+ *  the figure is a change. Judged on the exact string, which every builder
+ *  supplies, so each family's compact form is covered here and scientific
+ *  notation never reaches the face. The exact figure stays in the tooltip and
+ *  the receipt. */
+function transitionFigure(shown: string, exact: string, signed = true): string {
+  const m = /^([+\u2212-]?)(.*)$/.exec(exact.trim());
+  if (!m) return shown;
+  const n = Number(m[2].replace(/,/g, ""));
+  if (!Number.isFinite(n) || n === 0 || Math.abs(n) >= 0.01) return shown;
+  // A balance carries no sign: a before below zero is a rounding residue of
+  // the after − change inverse, and reads as the dust it is.
+  const sign = !signed ? "" : m[1] === "-" ? "\u2212" : m[1];
+  return `${sign}<0.01`;
 }
 
 /** USD chip formatter — the Liquity V2 / Aave V4 detail-chip style: `< $0.01`
@@ -325,6 +342,19 @@ function fillFormulaOperands(p: Provenance, vals: { after: string; before: strin
   return touched ? { ...p, inputs } : p;
 }
 
+/** The receipt for an opening row's "before": the position did not exist
+ *  before this transaction, so it held nothing. */
+function openingBeforeProv(derived: Provenance): Provenance {
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    summary: "Balance before the opening row — 0: the position is created in this transaction.",
+    contract: derived.contract,
+    via: "opening row",
+    verify: { kind: "none", text: "a position holds nothing before it exists" },
+  };
+}
+
 /** Build a before→after transition for a touched axis: before = after − change,
  *  the exact inverse of the logged delta. Returns undefined when there's no
  *  usable change (missing after, non-finite, or a zero move), so the card falls
@@ -338,13 +368,17 @@ export function reconstructTransition(args: {
   change: string | null | undefined;
   changeProv: Provenance;
   beforeProv: Provenance;
+  /** This row opens the position, so "before" is 0. The after − change
+   *  inverse would otherwise carry the protocol's rounding on the opening
+   *  amount into "before" (Fluid #7003 read 0.000744 USDT there). */
+  opening?: boolean;
 }): ChainTruthTransition | undefined {
-  const { after, change, changeProv, beforeProv } = args;
+  const { after, change, changeProv, beforeProv, opening = false } = args;
   if (after == null || change == null) return undefined;
   const changeN = Number(change);
   const afterN = Number(after);
   if (!Number.isFinite(changeN) || !Number.isFinite(afterN) || changeN === 0) return undefined;
-  const beforeN = afterN - changeN;
+  const beforeN = opening ? 0 : afterN - changeN;
   const sign = changeN >= 0 ? "+" : "−";
   const vals = {
     after: formatExact(afterN),
@@ -354,7 +388,7 @@ export function reconstructTransition(args: {
   return {
     before: formatCompact(beforeN),
     beforeExact: formatExact(beforeN),
-    beforeProv: fillFormulaOperands(beforeProv, vals),
+    beforeProv: opening ? openingBeforeProv(beforeProv) : fillFormulaOperands(beforeProv, vals),
     change: `${sign}${formatCompact(Math.abs(changeN))}`,
     changeExact: `${sign}${formatExact(Math.abs(changeN))}`,
     changeProv: fillFormulaOperands(changeProv, vals),
@@ -642,12 +676,16 @@ export function ChainTruthDetail({
                   <DeltaToggle
                     before={
                       <Prov info={s.transition.beforeProv} value={s.transition.beforeExact}>
-                        <span title={s.transition.beforeExact}>{s.transition.before}</span>
+                        <span title={s.transition.beforeExact}>
+                          {transitionFigure(s.transition.before, s.transition.beforeExact, false)}
+                        </span>
                       </Prov>
                     }
                     delta={
                       <Prov info={s.transition.changeProv} value={s.transition.changeExact}>
-                        <span title={s.transition.changeExact}>{s.transition.change}</span>
+                        <span title={s.transition.changeExact}>
+                          {transitionFigure(s.transition.change, s.transition.changeExact)}
+                        </span>
                       </Prov>
                     }
                     size="sm"
@@ -681,7 +719,10 @@ export function ChainTruthDetail({
                   {s.interestSincePrevious.label ?? "Interest since previous event"}:{" "}
                   <Prov info={s.interestSincePrevious.prov} value={s.interestSincePrevious.value} symbol={s.symbol}>
                     <span title={s.interestSincePrevious.value}>
-                      {formatNumber(Number(s.interestSincePrevious.value))}
+                      {transitionFigure(
+                        formatNumber(Number(s.interestSincePrevious.value)),
+                        s.interestSincePrevious.value,
+                      )}
                     </span>
                   </Prov>{" "}
                   {s.symbol}

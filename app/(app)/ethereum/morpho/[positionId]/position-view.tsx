@@ -43,7 +43,7 @@ import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { MORPHO_FOLDER_REGISTER, MORPHO_LIQUIDATION_RUNS } from "@/lib/morpho/timeline-runs";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
-import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { MorphoEventCard } from "@/components/protocol/morpho/morpho-event-card";
@@ -344,9 +344,38 @@ export default function MorphoPositionView({
     return out;
   }, [liveView, chain]);
 
+  // A closed position's prices: the market oracle at the closing block, which
+  // the index carries on liquidation rows only. A position its owner closed
+  // has no read there, and the dropdown is left out.
+  const closing = useMemo(() => {
+    const v = liveView;
+    if (!v || v.status === "open" || !v.collateralSymbol) return undefined;
+    const collateralSymbol = v.collateralSymbol;
+    return closingPricesAt(morphoEvents, (row) => {
+      const price = row.context.data.oraclePriceAtBlock?.loanPerCollateral;
+      if (price == null || !(price > 0)) return undefined;
+      return [
+        {
+          symbol: collateralSymbol,
+          address: v.collateralToken,
+          price,
+          unit: v.loanSymbol,
+          label: `${collateralSymbol} in ${v.loanSymbol} (the market's own oracle)`,
+        },
+        { symbol: v.loanSymbol, address: v.loanToken, label: `${v.loanSymbol}, the market's loan token` },
+      ];
+    });
+  }, [liveView, morphoEvents]);
+
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="morpho" assets={stripAssets} priceReason={ORACLE_USD_REASON.morpho}>
+      <DetailTopRow
+        session="morpho"
+        assets={stripAssets}
+        priceReason={ORACLE_USD_REASON.morpho}
+        closed={liveView != null && liveView.status !== "open"}
+        closing={closing}
+      >
         {liveView && (
           <MorphoExportMenu
             view={liveView}

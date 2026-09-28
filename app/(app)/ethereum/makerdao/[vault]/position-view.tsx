@@ -41,7 +41,7 @@ import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { MAKERDAO_FOLDER_REGISTER, MAKERDAO_LIQUIDATION_RUNS } from "@/lib/makerdao/timeline-runs";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
-import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { MakerDAOEventCard } from "@/components/protocol/makerdao/makerdao-event-card";
 import {
@@ -409,15 +409,28 @@ export default function MakerVaultDetailView({
   // not as a fee that has only just started existing.
   const liveNotesPending = vaultOpen && (!chainSettled || (ilk != null && rateLog == null));
 
+  // A closed vault's prices: the ilk's OSM price at the closing block, which
+  // the index carries on grab rows only. A vault its owner closed has no read
+  // there, and the dropdown is left out.
+  const closing = useMemo(() => {
+    if (!view || view.status === "open") return undefined;
+    return closingPricesAt(makerEvents, (row) => {
+      const usd = row.context.data.priceAtBlock?.usd;
+      return usd != null && usd > 0 ? [{ symbol: view.collateralSymbol, price: usd }] : undefined;
+    });
+  }, [view, makerEvents]);
+
   return (
     <div className="py-8 space-y-6">
       <DetailTopRow
         session="makerdao"
         assets={
-          view && view.status === "open" && view.priceUsd != null && view.priceUsd > 0
+          view && view.priceUsd != null && view.priceUsd > 0
             ? [{ symbol: view.collateralSymbol, price: view.priceUsd }]
             : []
         }
+        closed={view != null && view.status !== "open"}
+        closing={closing}
       >
         {view && (
           <MakerdaoExportMenu

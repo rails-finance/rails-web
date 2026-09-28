@@ -20,7 +20,7 @@ import { MorphoBasePositionSection, MorphoLenderOpenCard } from "@/components/pr
 import { MorphoPositionCard } from "@/components/protocol/morpho/morpho-position-card";
 import { MorphoRiskSlot } from "@/components/protocol/morpho/morpho-risk-slot";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -188,6 +188,32 @@ export default function MorphoBasePositionView({
     return out;
   }, [pos, live, liveClean]);
 
+  // A closed position's prices: the market oracle at the closing block, which
+  // the sweep carries on liquidation rows only; otherwise the dropdown is left
+  // out.
+  const closed = useMemo(
+    () => (pos ? morphoViewFromSweep(pos, wallet, live).status !== "open" : false),
+    [pos, wallet, live],
+  );
+  const closing = useMemo(() => {
+    if (!closed || !pos?.collateralSymbol || !pos.loanSymbol) return undefined;
+    const { collateralSymbol, loanSymbol } = pos;
+    return closingPricesAt(exportEvents, (row) => {
+      const price = row.context.data.oraclePriceAtBlock?.loanPerCollateral;
+      if (price == null || !(price > 0)) return undefined;
+      return [
+        {
+          symbol: collateralSymbol,
+          address: pos.collateralToken,
+          price,
+          unit: loanSymbol,
+          label: `${collateralSymbol} in ${loanSymbol} (the market's own oracle)`,
+        },
+        { symbol: loanSymbol, address: pos.loanToken, label: `${loanSymbol}, the market's loan token` },
+      ];
+    });
+  }, [closed, pos, exportEvents]);
+
   return (
     // Every event card's custody line names whichever source answered — the
     // index once it vouches for the whole life, the live sweep until then.
@@ -198,6 +224,8 @@ export default function MorphoBasePositionView({
           wallet={wallet}
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON["morpho-base"]}
+          closed={closed}
+          closing={closing}
         >
           {exportView && (
             <MorphoExportMenu

@@ -412,7 +412,12 @@ export default function MoonwellPositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="moonwell" wallet={wallet} assets={stripAssets}>
+      <DetailTopRow
+        session="moonwell"
+        wallet={wallet}
+        assets={stripAssets}
+        closed={liveView != null && liveView.status !== "open"}
+      >
         {liveView && (
           <MoonwellExportMenu
             wallet={wallet}

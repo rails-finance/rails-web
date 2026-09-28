@@ -255,12 +255,7 @@ function MarketSection({
   // market whose last row is not read yet keeps the running-sum wording.
   const vocab = replay?.baseAtChain ? COMPOUND_BASE_READ_VOCABULARY : COMPOUND_SWEPT_VOCABULARY;
   const towerData = useMemo(() => {
-    const built = computeCompoundEconomics(
-      view,
-      undefined,
-      vocab,
-      sweptClean && replay ? replay.lifetime : undefined,
-    );
+    const built = computeCompoundEconomics(view, undefined, vocab, sweptClean && replay ? replay.lifetime : undefined);
     return sweptClean
       ? built
       : {
@@ -652,7 +647,12 @@ export default function CompoundBaseWalletView({
     <CaptureSourceProvider value={captureSource}>
       <CometDeploymentProvider deployment={COMPOUND_BASE_DEPLOYMENT}>
         <div className="py-8 space-y-6">
-          <DetailTopRow session="compound-base" wallet={wallet} assets={stripAssets}>
+          <DetailTopRow
+            session="compound-base"
+            wallet={wallet}
+            assets={stripAssets}
+            closed={views.length > 0 && views.every((v) => v.status !== "open")}
+          >
             {views.length > 0 && (
               <CompoundExportMenu
                 wallet={wallet}

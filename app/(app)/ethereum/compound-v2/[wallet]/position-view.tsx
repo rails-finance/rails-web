@@ -384,7 +384,12 @@ export default function CompoundV2PositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="compound-v2" wallet={wallet} assets={stripAssets}>
+      <DetailTopRow
+        session="compound-v2"
+        wallet={wallet}
+        assets={stripAssets}
+        closed={liveView != null && liveView.status !== "open"}
+      >
         {liveView && (
           <CompoundV2ExportMenu
             wallet={wallet}

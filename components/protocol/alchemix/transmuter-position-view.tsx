@@ -137,7 +137,7 @@ export function TransmuterPositionView({
   return (
     <ProvReceiptsScope registry={registry}>
       <div className="space-y-6 py-8">
-        <DetailTopRow session={deployment.session} wallet={holder} />
+        <DetailTopRow session={deployment.session} wallet={holder} closed={p.status === "claimed"} />
 
         {/* ── The position card ──────────────────────────────────────────── */}
         <PositionCardShell receipts>

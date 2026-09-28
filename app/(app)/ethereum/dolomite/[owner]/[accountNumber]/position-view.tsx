@@ -307,7 +307,12 @@ export default function DolomitePositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="dolomite" wallet={owner} assets={stripAssets}>
+      <DetailTopRow
+        session="dolomite"
+        wallet={owner}
+        assets={stripAssets}
+        closed={liveView != null && liveView.status !== "open"}
+      >
         {liveView && (
           <DolomiteExportMenu
             owner={owner}

@@ -28,6 +28,7 @@ import { fmtNative, fmtPrice, PricePill } from "@/components/shared/price-pill";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import { formatDate } from "@/lib/date";
 
 /** A dropdown row. `price` absent means the protocol states none for this
  *  asset: the row names what is held and `reason` says why no figure follows
@@ -35,7 +36,24 @@ import { CTRL_GHOST, CTRL_OFF, CTRL_ON, OVERLAY_HEADING } from "@/lib/shared/ui-
  *  assignable here, so the priced views pass through unchanged. */
 export type LatestPriceAsset = Omit<PriceStripAsset, "price"> & { price?: number };
 
-export function LatestPrices({ assets, reason }: { assets: LatestPriceAsset[]; reason?: string }) {
+/** The block a closed position's prices were read at: its closing row. */
+export interface PricesAt {
+  block: number;
+  /** Unix seconds. */
+  timestamp: number;
+}
+
+export function LatestPrices({
+  assets,
+  reason,
+  at,
+}: {
+  assets: LatestPriceAsset[];
+  reason?: string;
+  /** Set on a closed position: the prices are the closing block's, and the
+   *  panel says so under its heading. */
+  at?: PricesAt;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -76,7 +94,7 @@ export function LatestPrices({ assets, reason }: { assets: LatestPriceAsset[]; r
         aria-label={
           assets.length === 0
             ? "Prices for this position"
-            : `${assets.some(priced) ? "Prices for" : "Assets in"} this position: ${assets.length} ${assets.length === 1 ? "asset" : "assets"}`
+            : `${assets.some(priced) ? (at ? "Prices at closing for" : "Prices for") : "Assets in"} this position: ${assets.length} ${assets.length === 1 ? "asset" : "assets"}`
         }
         className={`${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} h-7 gap-1.5 rounded-md px-2 text-xs`}
       >
@@ -127,6 +145,13 @@ export function LatestPrices({ assets, reason }: { assets: LatestPriceAsset[]; r
             <span className={`${OVERLAY_HEADING} text-rb-500`}>
               {assets.length > 0 && !assets.some(priced) ? "Assets held" : "Prices"}
             </span>
+            {at && (
+              <p className="mt-1 text-xs tabular-nums text-rb-500" data-prices-at-block={at.block}>
+                at closing · {formatDate(at.timestamp)}
+                <br />
+                block {at.block.toLocaleString("en-US")}
+              </p>
+            )}
           </div>
           <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />
           {assets.length > 0 && (

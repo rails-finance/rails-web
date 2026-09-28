@@ -49,7 +49,7 @@ import { boundaryStateFromOldestRow } from "@/lib/shared/timeline-boundary-state
 const TroveExportMenu = dynamic(() => import("@/components/trove/TroveExportMenu").then((m) => m.TroveExportMenu), {
   loading: () => null,
 });
-import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
+import { closingPricesAt, DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import { LiquityTroveBarsProvider } from "@/lib/liquity/use-trove-bars";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -411,11 +411,30 @@ export default function TroveView({
     ...(collateralPrice ? [{ symbol: troveData.collateralType, price: collateralPrice }] : []),
     { symbol: "BOLD", price: 1 },
   ];
+  // A closed trove's prices: the collateral price its closing row carries.
+  const closing =
+    troveData.status !== "open"
+      ? closingPricesAt(liquityEvents, (row) => {
+          const price = row.context.data.collateralPrice;
+          return price > 0
+            ? [
+                { symbol: troveData.collateralType, price },
+                { symbol: "BOLD", price: 1 },
+              ]
+            : undefined;
+        })
+      : undefined;
 
   return (
     <>
       <div className="py-8 space-y-6">
-        <DetailTopRow session="liquity-v2" wallet={effectiveOwner} assets={stripAssets}>
+        <DetailTopRow
+          session="liquity-v2"
+          wallet={effectiveOwner}
+          assets={stripAssets}
+          closed={troveData.status !== "open"}
+          closing={closing}
+        >
           <TroveExportMenu
             trove={troveData}
             liveState={liveState}

@@ -556,7 +556,12 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
     <CaptureSourceProvider value={captureSource}>
       <MoonwellDeploymentProvider value={DEPLOYMENT}>
         <div className="py-8 space-y-6">
-          <DetailTopRow session="moonwell-base" wallet={wallet} assets={stripAssets}>
+          <DetailTopRow
+            session="moonwell-base"
+            wallet={wallet}
+            assets={stripAssets}
+            closed={view != null && view.status !== "open"}
+          >
             {view && (
               <MoonwellExportMenu
                 wallet={wallet}

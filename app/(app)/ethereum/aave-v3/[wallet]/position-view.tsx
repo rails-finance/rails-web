@@ -592,7 +592,12 @@ export default function AaveV3PositionDetail({
   return (
     <V3PoolProvider pool={poolIdentity}>
       <div className="py-8 space-y-6">
-        <DetailTopRow session="aave-v3" wallet={wallet} assets={stripAssets}>
+        <DetailTopRow
+          session="aave-v3"
+          wallet={wallet}
+          assets={stripAssets}
+          closed={view != null && view.status !== "open"}
+        >
           {view && (
             <AaveV3ExportMenu
               wallet={wallet}

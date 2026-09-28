@@ -712,7 +712,7 @@ function AaveV4SpokePageInner({
   return (
     <>
       <div className="py-8 space-y-6">
-        <DetailTopRow session={session} wallet={wallet} assets={stripAssets}>
+        <DetailTopRow session={session} wallet={wallet} assets={stripAssets} closed={positionClosed}>
           {activeCard && (
             <AaveV4ExportMenu
               spokeName={spokeName}

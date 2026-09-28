@@ -48,7 +48,7 @@ import {
 } from "@/lib/sources/api/fx-drift";
 import { computeFxEconomics, fxDebtFlowsWithOpening } from "@/lib/fx/economics";
 import { fxEconomicsExplanation, fxEconomicsContent } from "@/lib/fx/economics-explanation";
-import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -251,9 +251,19 @@ export default function FxPositionView({
     return [{ symbol: view.normalizedSymbol, price: view.oracle.priceUsd }];
   }, [view]);
 
+  // A closed position's price: the oracle read its closing row's snapshot
+  // carries.
+  const closing = useMemo(() => {
+    if (!view || view.status === "open") return undefined;
+    return closingPricesAt(fxEvents, (row) => {
+      const usd = Number(row.context.data.oraclePrice);
+      return Number.isFinite(usd) && usd > 0 ? [{ symbol: view.normalizedSymbol, price: usd }] : undefined;
+    });
+  }, [view, fxEvents]);
+
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="fx" assets={stripAssets}>
+      <DetailTopRow session="fx" assets={stripAssets} closed={view != null && view.status !== "open"} closing={closing}>
         {view && (
           <FxExportMenu
             view={view}

@@ -384,7 +384,13 @@ export default function MaplePositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="maple" wallet={wallet} assets={stripAssets} priceReason={ORACLE_USD_REASON.maple}>
+      <DetailTopRow
+        session="maple"
+        wallet={wallet}
+        assets={stripAssets}
+        priceReason={ORACLE_USD_REASON.maple}
+        closed={view != null && view.status !== "open"}
+      >
         {view && (
           <MapleExportMenu
             view={view}

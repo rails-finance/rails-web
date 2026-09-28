@@ -16,7 +16,7 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 import { listingHrefForWallet, protocolForSession } from "@/lib/shared/protocols";
 import { RailHeader } from "@/components/shared/rail-header";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
-import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
+import { LatestPrices, type LatestPriceAsset, type PricesAt } from "@/components/shared/latest-prices";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 
 /** The one back affordance on every detail page. NAV_BUTTON pill + ArrowLeft(14)
@@ -68,6 +68,27 @@ export function DetailBackButton({
   );
 }
 
+/** A closed position's prices at its closing row's block. */
+export interface ClosingPrices extends PricesAt {
+  assets: LatestPriceAsset[];
+}
+
+/** The closing row, the newest of `events` that `isClosing` accepts (every row
+ *  by default; a family passes a test where rows can follow the close, such
+ *  as an NFT transfer), and the prices `price` reads off it. Undefined when
+ *  the row carries no price, which leaves the dropdown out. */
+export function closingPricesAt<E extends { blockNumber: number; timestamp: number }>(
+  events: readonly E[],
+  price: (row: E) => LatestPriceAsset[] | undefined,
+  isClosing: (row: E) => boolean = () => true,
+): ClosingPrices | undefined {
+  let row: E | undefined;
+  for (const e of events) if (isClosing(e) && (!row || e.blockNumber >= row.blockNumber)) row = e;
+  if (!row) return undefined;
+  const assets = price(row);
+  return assets && assets.length > 0 ? { block: row.blockNumber, timestamp: row.timestamp, assets } : undefined;
+}
+
 /** The protocol's title, then one thin row of everything a position view says
  *  about "latest": back, the chain head and its age, and the position's assets
  *  at their current prices behind a dropdown — with the Tools menu (`children`)
@@ -96,6 +117,8 @@ export function DetailTopRow({
   showStamp = true,
   assets = [],
   priceReason,
+  closed = false,
+  closing,
   children,
 }: {
   session: SessionProtocol;
@@ -103,8 +126,15 @@ export function DetailTopRow({
   showStamp?: boolean;
   assets?: LatestPriceAsset[];
   priceReason?: string;
+  /** The position is closed. Today's prices say nothing about it, so the
+   *  dropdown shows `closing` in their place, or is left out when the family
+   *  has no price at the closing block. */
+  closed?: boolean;
+  /** The prices at the closing row's block (`closingPricesAt`). */
+  closing?: ClosingPrices;
   children?: ReactNode;
 }) {
+  const closingPriced = closing != null && closing.assets.some((a) => typeof a.price === "number" && a.price > 0);
   return (
     <div>
       <div className="mb-2.5">
@@ -114,7 +144,17 @@ export function DetailTopRow({
         <div className="flex min-w-0 items-center gap-2">
           <DetailBackButton session={session} wallet={wallet} compact />
           {showStamp && <RecencyStamp />}
-          <LatestPrices assets={assets} reason={priceReason} />
+          {!closed ? (
+            <LatestPrices assets={assets} reason={priceReason} />
+          ) : (
+            closingPriced && (
+              <LatestPrices
+                assets={closing.assets}
+                reason={priceReason}
+                at={{ block: closing.block, timestamp: closing.timestamp }}
+              />
+            )
+          )}
         </div>
         {/* Tools is part of the row, not of the export menu that usually fills
             it: a caller renders its shapes only once the view has loaded

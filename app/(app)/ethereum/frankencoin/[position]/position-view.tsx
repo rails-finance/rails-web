@@ -273,7 +273,12 @@ export default function FrankencoinPositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="frankencoin" assets={stripAssets} priceReason={ORACLE_USD_REASON.frankencoin}>
+      <DetailTopRow
+        session="frankencoin"
+        assets={stripAssets}
+        priceReason={ORACLE_USD_REASON.frankencoin}
+        closed={view != null && view.status !== "open"}
+      >
         {view && (
           <FrankencoinExportMenu
             position={position}
@@ -312,9 +317,7 @@ export default function FrankencoinPositionView({
                     </RiskFigure>
                   )}
                   {chain.cooldownActive && chain.cooldownUntil != null && (
-                    <RiskFigure>
-                      minting cooldown until {formatDayMonth(chain.cooldownUntil)}
-                    </RiskFigure>
+                    <RiskFigure>minting cooldown until {formatDayMonth(chain.cooldownUntil)}</RiskFigure>
                   )}
                 </RiskFooterStrip>
               ) : undefined

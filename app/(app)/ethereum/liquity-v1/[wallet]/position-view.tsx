@@ -35,7 +35,7 @@ import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-posi
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LIQUITY_V1_REDEMPTION_RUNS } from "@/lib/liquity-v1/timeline-runs";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { LiquityV1EventCard } from "@/components/protocol/liquity-v1/liquity-v1-event-card";
@@ -290,6 +290,17 @@ export default function LiquityV1TroveView({
         session="liquity-v1"
         wallet={wallet}
         assets={chain && view?.status === "open" && chain.price > 0 ? [{ symbol: "ETH", price: chain.price }] : []}
+        closed={view != null && view.status !== "open"}
+        closing={
+          // The PriceFeed's lastGoodPrice at the closing block, carried on
+          // liquidation and redemption rows only.
+          view && view.status !== "open"
+            ? closingPricesAt(v1Events, (row) => {
+                const usd = row.context.data.priceAtBlock?.usd;
+                return usd != null && usd > 0 ? [{ symbol: "ETH", price: usd }] : undefined;
+              })
+            : undefined
+        }
       >
         {view && (
           <LiquityV1ExportMenu

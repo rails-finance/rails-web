@@ -73,7 +73,7 @@ import {
   liquityForkRedemptionOutcome,
 } from "@/lib/shared/liquity-fork-economics-explanation";
 import { DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
-import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
@@ -314,6 +314,21 @@ export default function BasedollarTroveDetail({
     ];
   }, [view, chain]);
 
+  // A closed Trove's prices: the branch's lastGoodPrice its closing row
+  // carries. A row the filler has not priced leaves the dropdown out.
+  const closing = useMemo(() => {
+    if (!view || view.status === "open") return undefined;
+    return closingPricesAt(basedollarEvents, (row) => {
+      const usd = row.context.data.priceAtBlock?.usd;
+      return usd != null && usd > 0
+        ? [
+            { symbol: view.collateralType, price: usd },
+            { symbol: DEBT_SYMBOL, price: 1 },
+          ]
+        : undefined;
+    });
+  }, [view, basedollarEvents]);
+
   // Terminal narration: the ending mechanism is exact on this fork (closed =
   // the owner's closeTrove; liquidated = the liquidation), and the seizure legs
   // come from the life's own liquidate event once the timeline lands.
@@ -339,7 +354,13 @@ export default function BasedollarTroveDetail({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="basedollar" wallet={view?.owner ?? view?.lastOwner ?? null} assets={stripAssets}>
+      <DetailTopRow
+        session="basedollar"
+        wallet={view?.owner ?? view?.lastOwner ?? null}
+        assets={stripAssets}
+        closed={view != null && view.status !== "open"}
+        closing={closing}
+      >
         {view && (
           <LiquityForkExportMenu
             protocolLabel="Basedollar"

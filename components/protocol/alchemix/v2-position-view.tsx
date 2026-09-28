@@ -110,7 +110,7 @@ export function AlchemixV2PositionView({
   return (
     <ProvReceiptsScope registry={registry}>
       <div className="space-y-6 py-8">
-        <DetailTopRow session={deployment.session} wallet={p.account} />
+        <DetailTopRow session={deployment.session} wallet={p.account} closed />
 
         {/* ── The position card ──────────────────────────────────────────── */}
         <PositionCardShell receipts>

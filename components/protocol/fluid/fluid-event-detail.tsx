@@ -54,6 +54,9 @@ export interface FluidEventDetailProps {
   /** On an Open row: the holder the NFT was minted to, shown beside the
    *  position's state after its first operation. */
   mintedTo?: string;
+  /** The row opens the position (the operate shares its transaction with the
+   *  mint), so each leg's "before" is 0. */
+  opening?: boolean;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
@@ -161,7 +164,7 @@ function buildFluidLiqForensics(ctx: FluidContext, coords: FluidCoords): Liquida
   };
 }
 
-export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo }: FluidEventDetailProps) {
+export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, opening }: FluidEventDetailProps) {
   const supplySym = ctx.supplySymbol ?? "DEX shares";
   const borrowSym = ctx.borrowSymbol ?? "DEX shares";
   const coords: FluidCoords = {
@@ -241,6 +244,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo }:
           change: ctx.colDelta,
           changeProv: colDeltaProv(supplySym, coords, ctx.raw?.colAmt),
           beforeProv: colBeforeProv(supplySym, coords, chain),
+          opening,
         }),
         ...interest("collateral", supplySym),
       });
@@ -257,6 +261,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo }:
           change: ctx.debtDelta,
           changeProv: debtDeltaProv(borrowSym, coords, ctx.raw?.debtAmt),
           beforeProv: debtBeforeProv(borrowSym, coords, chain),
+          opening,
         }),
         ...interest("debt", borrowSym),
       });

@@ -11,7 +11,7 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { colDeltaProv, debtDeltaProv, type FluidCoords } from "@/lib/fluid/event-provenance";
 import { pairLabel } from "@/lib/fluid/asset-catalog";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
-import { fluidExplainerTeaser, transferRoundTrip, type FluidEvent } from "@/lib/fluid/explainer-clauses";
+import { fluidExplainerTeaser, fundedSameTx, transferRoundTrip, type FluidEvent } from "@/lib/fluid/explainer-clauses";
 import { FluidEventHeader } from "./fluid-event-header";
 import { FluidEventDetail } from "./fluid-event-detail";
 import { FluidEventExplainer, fluidLearnMoreContent } from "./fluid-event-explainer";
@@ -172,6 +172,7 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings, 
           blockNumber={event.blockNumber}
           wallet={event.wallet}
           mintedTo={openedBy?.context.data.transferTo}
+          opening={openedBy != null || fundedSameTx(sibs, event)}
         />
       }
       detailLabel="Position state"

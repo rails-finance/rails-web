@@ -288,6 +288,7 @@ export default function PwnLoanView({
         showStamp={false}
         assets={stripAssets}
         priceReason={ORACLE_USD_REASON.pwn}
+        closed={view != null && view.status !== "open"}
       >
         {/* A window survives here only on a single-loan wallet: with more loans
             the page refetches the whole history, because PWN's timeline route

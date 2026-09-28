@@ -469,7 +469,12 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     <CaptureSourceProvider value={captureSource}>
       <V3PoolProvider pool={POOL_IDENTITY}>
         <div className="py-8 space-y-6">
-          <DetailTopRow session="seamless" wallet={wallet} assets={stripAssets}>
+          <DetailTopRow
+            session="seamless"
+            wallet={wallet}
+            assets={stripAssets}
+            closed={view != null && view.status !== "open"}
+          >
             {view && (
               <AaveV3ExportMenu
                 wallet={wallet}

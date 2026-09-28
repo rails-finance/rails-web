@@ -277,7 +277,12 @@ export default function LlamalendPositionView({
 
   return (
     <div className="py-8 space-y-6">
-      <DetailTopRow session="llamalend" wallet={user} assets={stripAssets}>
+      <DetailTopRow
+        session="llamalend"
+        wallet={user}
+        assets={stripAssets}
+        closed={liveView != null && liveView.status !== "open"}
+      >
         {liveView && (
           <LlamalendExportMenu
             controller={controller}
