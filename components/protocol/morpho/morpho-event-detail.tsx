@@ -3,8 +3,8 @@
 // Morpho event detail (chain-state tier) — adapter onto the shared
 // ChainTruthDetail grid. The position's collateral after this event, replayed
 // from the deltas, and its debt: the borrow shares at the market's totals at the
-// row where the answer carries it (Ethereum), the borrowed principal otherwise
-// (the swept Base lane). Each value traces via <Prov>. The side this event
+// row where the answer carries it (Ethereum, and the Base index), the borrowed
+// principal otherwise (the Base sweep). On Base the supply likewise. Each value traces via <Prov>. The side this event
 // didn't touch is dimmed.
 
 import type { AssetFlow, MorphoContext } from "@/lib/shared/types/event-shape";
@@ -22,6 +22,10 @@ import {
   interestSincePreviousProv,
   suppliedAfterProv,
   suppliedBeforeProv,
+  supplyAfterProv,
+  supplyBeforeProv,
+  supplyChangeProv,
+  supplyGapSincePreviousProv,
   atBlockOraclePriceProv,
   liqSeizedValueProv,
   liqClearedValueProv,
@@ -189,10 +193,40 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
         },
   ];
 
-  // The lender axis — present only where the feeding lane replays it (the
-  // swept Base reader sets `suppliedAfter` on supply/withdraw rows; the index
-  // carries no lender rows and never does). The Ethereum grid is unchanged.
-  if (ctx.suppliedAfter != null) {
+  // The lender axis — Base only, whose rows include Supply and Withdraw; the
+  // Ethereum index carries no lender rows. The Ethereum grid is unchanged.
+  const lenderActive = ctx.eventType === "supply" || ctx.eventType === "withdraw";
+  if (ctx.suppliedAfter != null && ctx.supplyBefore != null) {
+    // The chain's supply: shares × the market's totals at the row (Base index).
+    // The gap from the previous row's after is the interest earned, net of any
+    // bad debt socialised between; a loss is named as a change.
+    const gap = ctx.supplyGapSincePrevious;
+    stats.push({
+      label: "Supplied",
+      value: fmt(ctx.suppliedAfter),
+      symbol: ctx.loanSymbol,
+      address: loanAddr,
+      prov: supplyAfterProv(ctx.loanSymbol, coords),
+      dimmed: !lenderActive && !gap,
+      transition: lenderActive
+        ? reconstructTransition({
+            after: ctx.suppliedAfter,
+            change: ctx.supplyChange,
+            changeProv: supplyChangeProv(ctx.loanSymbol, coords),
+            beforeProv: supplyBeforeProv(ctx.loanSymbol, coords),
+          })
+        : undefined,
+      ...(gap
+        ? {
+            interestSincePrevious: {
+              value: gap,
+              prov: supplyGapSincePreviousProv(ctx.loanSymbol, coords),
+              ...(Number(gap) < 0 ? { label: "Change since previous event" } : {}),
+            },
+          }
+        : {}),
+    });
+  } else if (ctx.suppliedAfter != null) {
     stats.push({
       label: "Supplied",
       value: fmt(ctx.suppliedAfter),

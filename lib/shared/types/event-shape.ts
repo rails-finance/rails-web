@@ -854,11 +854,25 @@ export interface MorphoContext {
    *  this row's debtBefore less that row's debtAfter. Absent on the first row
    *  and where it is zero. */
   interestSincePrevious?: string;
-  /** Net supplied PRINCIPAL after, on the LENDER side = Σ (supply − withdraw)
-   *  assets (human-readable loan token). Set only by the swept Base lane —
-   *  the index carries no lender rows — and only on supply/withdraw rows, so
-   *  its presence is what tells the detail grid to draw the supplied axis. */
+  /** The lender axis after this event (human-readable loan token), set only on
+   *  the Base lane, whose rows include Supply and Withdraw; its presence is
+   *  what tells the detail grid to draw the supplied axis. Where the row
+   *  carries the market's totals (the index, rails-server mig 357) it is the
+   *  supply shares at totalSupplyAssets ÷ totalSupplyShares (toAssetsDown),
+   *  what Morpho.position × Morpho.market give, on every row of a position
+   *  that holds supply shares, with `supplyBefore` beside it. The sweep sets
+   *  the net supplied PRINCIPAL, Σ (supply − withdraw), on supply/withdraw
+   *  rows only. */
   suppliedAfter?: string;
+  /** The supply just before this event on the same basis, and the exact
+   *  change between the two. Absent where `suppliedAfter` is principal. */
+  supplyBefore?: string;
+  supplyChange?: string;
+  /** The supply's move between the previous row and this one: this row's
+   *  supplyBefore less that row's suppliedAfter — the interest earned, less
+   *  any bad debt the market socialised in between. Absent where it is within
+   *  one base unit of zero. */
+  supplyGapSincePrevious?: string;
   /** True for the position's first event. */
   isOpen?: boolean;
   /** The transaction sender (signer), lowercased. Present ONLY on two-fact

@@ -68,6 +68,7 @@ import { resolveErc20Meta, scaleRaw, type Erc20Meta } from "./erc20-meta";
 import { bucketsOf, type BoundaryStateLine, type TimelineCutSummary } from "@/lib/shared/timeline-boundary";
 import type { MorphoDeployment } from "./morpho-deployments";
 import { fmtUnits, MORPHO_EVENT_LABEL } from "@/lib/sources/api/morpho-timeline";
+import { morphoBorrowAssetsUp, morphoSupplyAssetsDown, type MorphoMarketTotals } from "@/lib/morpho/market-totals";
 import { marketLabel } from "@/lib/morpho/asset-catalog";
 import { explorerUrl } from "@/lib/shared/chains";
 import type { ChainTimelineCoverage } from "@/lib/api/fetch-chain-timeline";
@@ -156,6 +157,14 @@ export interface MorphoLifetimeFlows {
   repaid: number;
   supplied: number;
   withdrawn: number;
+  /** Interest the debt accrued over the rows (Σ each row's interest since the
+   *  previous one, a seed's accrued part included), where every row carried
+   *  the market's totals (the index, rails-server mig 357). Undefined on the
+   *  sweep, which replays principal. */
+  interest?: number;
+  /** The debt the newest row states after it, on the same condition: the head
+   *  read less this is the interest since the last event. */
+  lastDebtAfter?: number;
 }
 
 /** One (market, wallet) position as the sweep replayed it. */
@@ -274,6 +283,11 @@ export interface MorphoReplaySeed {
   /** Whether the peaks are unknown before the cut. Always true today; the
    *  replay reads the reason off the seed rather than off the caller. */
   peaksPartial: boolean;
+  /** The market's totals just after the wallet's last row before the cut
+   *  (rails-server mig 357): the seeded shares are priced there, which is the
+   *  debt and supply the first tail row's interest is measured from. Absent,
+   *  the tail states principal. */
+  totalsAtLast?: MorphoMarketTotals;
 }
 
 export interface MorphoChainTimelineResult {
@@ -307,6 +321,10 @@ export interface MorphoDecodedRow {
   /** The event's own msg.sender param. Absent on a liquidation, whose actor is
    *  the liquidator. */
   caller?: string;
+  /** The market's totals just before and just after this row's log (the
+   *  index, rails-server mig 357). With them the row states the chain debt and
+   *  supply; the sweep has none and states principal. */
+  totals?: { before: MorphoMarketTotals; after: MorphoMarketTotals };
 }
 
 function decodeBlueLog(log: RawLog, wallet: string): MorphoDecodedRow | null {
@@ -766,6 +784,14 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
     /** Whether this position's peaks are a floor rather than the lifetime
      *  highs (see MorphoSweptPosition.peaksPartial). */
     peaksPartial: boolean;
+    /** Whether every row so far (and the seed) carried the market's totals, so
+     *  the rows state the chain debt and supply. */
+    chain: boolean;
+    /** The chain debt and supply after the previous row, raw. */
+    debtPrev?: bigint;
+    supplyPrev?: bigint;
+    /** Σ interest since the previous row, raw — the seed's accrued part in it. */
+    debtInterest: bigint;
     lifetime: MorphoLifetimeFlows;
     events: BaseActivityEvent[];
   }
@@ -792,6 +818,8 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
         anchoredDrawn: 0,
         undated: 0,
         peaksPartial: false,
+        chain: true,
+        debtInterest: ZERO,
         lifetime: {
           deposited: 0,
           collateralWithdrawn: 0,
@@ -832,6 +860,15 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
     r.omitted = s.events;
     r.omittedUpTo = s.lastBlock;
     r.peaksPartial = s.peaksPartial;
+    // The seeded shares at the market's totals after the last seeded row. The
+    // debt less the net principal borrowed is the interest the debt accrued
+    // before the cut (bad debt is in the principal's liquidation term).
+    if (s.totalsAtLast) {
+      const t = s.totalsAtLast;
+      r.debtPrev = morphoBorrowAssetsUp(s.borrowShares, t.totalBorrowAssets, t.totalBorrowShares);
+      r.supplyPrev = morphoSupplyAssetsDown(s.supplyShares, t.totalSupplyAssets, t.totalSupplyShares);
+      r.debtInterest = r.debtPrev - s.borrowed;
+    } else r.chain = false;
     r.lifetime = {
       deposited: scaleRaw(s.lifetime.deposited, collDec),
       collateralWithdrawn: scaleRaw(s.lifetime.collateralWithdrawn, collDec),
@@ -870,8 +907,12 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
       const collVal = m?.collateral?.unresolved ? "Not loaded" : String(scaleRaw(r.coll, collDec));
       const loanVal = (v: bigint) => (m?.loan.unresolved ? "Not loaded" : String(scaleRaw(v, loanDec)));
       if (r.coll > ZERO && collSym) out.push({ label: `${collSym} collateral`, value: collVal, unit: collSym });
-      if (r.borr > ZERO) out.push({ label: `${loanSym} debt`, value: loanVal(r.borr), unit: loanSym });
-      if (r.sup > ZERO) out.push({ label: `${loanSym} supplied`, value: loanVal(r.sup), unit: loanSym });
+      // The chain debt and supply after the newest elided row where the rows
+      // carry the market's totals; the replayed principal otherwise.
+      const debtAtCut = r.chain && r.debtPrev != null ? r.debtPrev : r.borr;
+      const supplyAtCut = r.chain && r.supplyPrev != null ? r.supplyPrev : r.sup;
+      if (debtAtCut > ZERO) out.push({ label: `${loanSym} debt`, value: loanVal(debtAtCut), unit: loanSym });
+      if (supplyAtCut > ZERO) out.push({ label: `${loanSym} supplied`, value: loanVal(supplyAtCut), unit: loanSym });
       r.cutState = out.length > 0 ? out : null;
     }
     if (elided) r.cutTypes.set(d.kind, (r.cutTypes.get(d.kind) ?? 0) + 1);
@@ -922,12 +963,45 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
         r.lifetime.collateralLiquidated += scaleRaw(d.collateral, collDec);
         break;
     }
+    const bshBefore = r.bsh;
+    const sshBefore = r.ssh;
     r.coll += coll;
     if (r.coll < ZERO) r.coll = ZERO; // the MV clamps collateral, and only collateral
     r.borr += borr;
     r.bsh += bsh;
     r.sup += sup;
     r.ssh += ssh;
+
+    // The chain debt and supply at the row: the shares before and after the
+    // event priced at the market's totals before and after its log, as
+    // Morpho.position × Morpho.market read there. The gap from the previous
+    // row's after is the interest between them (on the supply side, less any
+    // bad debt socialised in between). A row without totals ends the chain
+    // figures for this position; the rows from it state principal.
+    let chainRow: {
+      debtBefore: bigint;
+      debtAfter: bigint;
+      debtGap: bigint;
+      supplyBefore: bigint;
+      supplyAfter: bigint;
+      supplyGap: bigint;
+    } | null = null;
+    if (r.chain && d.totals) {
+      const { before: tb, after: ta } = d.totals;
+      const debtBefore = morphoBorrowAssetsUp(bshBefore, tb.totalBorrowAssets, tb.totalBorrowShares);
+      const debtAfter = morphoBorrowAssetsUp(r.bsh, ta.totalBorrowAssets, ta.totalBorrowShares);
+      const supplyBefore = morphoSupplyAssetsDown(sshBefore, tb.totalSupplyAssets, tb.totalSupplyShares);
+      const supplyAfter = morphoSupplyAssetsDown(r.ssh, ta.totalSupplyAssets, ta.totalSupplyShares);
+      const debtGap = r.debtPrev != null ? debtBefore - r.debtPrev : ZERO;
+      const supplyGap = r.supplyPrev != null ? supplyBefore - r.supplyPrev : ZERO;
+      r.debtInterest += debtGap;
+      r.debtPrev = debtAfter;
+      r.supplyPrev = supplyAfter;
+      chainRow = { debtBefore, debtAfter, debtGap, supplyBefore, supplyAfter, supplyGap };
+    } else if (r.chain) {
+      r.chain = false;
+      r.debtPrev = r.supplyPrev = undefined;
+    }
     if (r.coll > r.peakColl) r.peakColl = r.coll;
     if (r.borr > r.peakBorr) r.peakBorr = r.borr;
 
@@ -982,7 +1056,28 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
       collateralAfter: fmtUnits(r.coll, collDec),
       borrowedAfter: fmtUnits(r.borr, loanDec),
       isOpen,
-      ...(isLender ? { suppliedAfter: fmtUnits(r.sup, loanDec) } : {}),
+      ...(chainRow
+        ? {
+            debtBefore: fmtUnits(chainRow.debtBefore, loanDec),
+            debtAfter: fmtUnits(chainRow.debtAfter, loanDec),
+            debtChange: fmtUnits(chainRow.debtAfter - chainRow.debtBefore, loanDec),
+            // One base unit is the rounding of toAssetsUp on two reads.
+            ...(chainRow.debtGap > BigInt(1) ? { interestSincePrevious: fmtUnits(chainRow.debtGap, loanDec) } : {}),
+            // The lender axis wherever the position holds supply shares.
+            ...(isLender || sshBefore > ZERO || r.ssh > ZERO
+              ? {
+                  suppliedAfter: fmtUnits(chainRow.supplyAfter, loanDec),
+                  supplyBefore: fmtUnits(chainRow.supplyBefore, loanDec),
+                  supplyChange: fmtUnits(chainRow.supplyAfter - chainRow.supplyBefore, loanDec),
+                  ...(chainRow.supplyGap > BigInt(1) || chainRow.supplyGap < BigInt(-1)
+                    ? { supplyGapSincePrevious: fmtUnits(chainRow.supplyGap, loanDec) }
+                    : {}),
+                }
+              : {}),
+          }
+        : isLender
+          ? { suppliedAfter: fmtUnits(r.sup, loanDec) }
+          : {}),
       ...(external ? { txFrom, caller: d.caller } : {}),
       ...(isLiq ? { loanRepaid: fmtUnits(d.assets, loanDec), oraclePriceAtBlock } : {}),
     };
@@ -1087,7 +1182,13 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
       lastBlock: last?.blockNumber ?? seed?.lastBlock ?? 0,
       lastTs: last ? (tsOf.get(last.blockNumber) ?? null) : (seed?.lastTimestamp ?? null),
       firstEventAt: seed ? seed.firstTimestamp : first ? (tsOf.get(first.blockNumber) ?? null) : null,
-      lifetime: r.lifetime,
+      lifetime: r.chain
+        ? {
+            ...r.lifetime,
+            interest: scaleRaw(r.debtInterest, loanDec),
+            ...(r.debtPrev != null ? { lastDebtAfter: scaleRaw(r.debtPrev, loanDec) } : {}),
+          }
+        : r.lifetime,
       events: r.events,
       ...(r.omitted > 0
         ? {

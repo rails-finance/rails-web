@@ -1,14 +1,11 @@
-// A Morpho Blue market's borrow totals, replayed from its logs — and the debt
-// a position's shares stand for at them.
+// A Morpho Blue position's debt and supply at its market's totals.
 // ----------------------------------------------------------------------------
-// The same arithmetic server mig 352 runs for Ethereum, in TypeScript for a lane
-// that replays in the web (Morpho Base, `replayMorphoRows`). totalBorrowShares
-// moves only on Borrow (+shares), Repay (−shares) and Liquidate (−repaid and
-// bad-debt shares); totalBorrowAssets on the same three and AccrueInterest
-// (+interest). Morpho accrues a market once per block, at its first touch and
-// before that touch's own log, so an AccrueInterest sorts before the market's
-// other logs of its block. A lane feeds every such log of the market from its
-// creation and reads the totals after any one of them.
+// SharesMathLib's conversions: borrow shares to assets rounded up, supply
+// shares to assets rounded down, with the virtual asset and shares. The Base
+// lane (`replayMorphoRows`) takes each row's totals from rails-server mig 357,
+// which replays them from the market's Borrow, Repay, Liquidate, Supply,
+// Withdraw and AccrueInterest logs as mig 352 does on Ethereum, and prices the
+// position's shares here.
 
 /** SharesMathLib's virtual shares and asset. */
 const VIRTUAL_SHARES = BigInt(1_000_000);
@@ -22,49 +19,27 @@ export function morphoBorrowAssetsUp(shares: bigint, totalBorrowAssets: bigint, 
   return (shares * (totalBorrowAssets + VIRTUAL_ASSETS) + d - BigInt(1)) / d;
 }
 
-/** One log that moves a market's borrow totals. `assets`/`shares` are signed:
- *  a borrow adds, a repay or liquidation (repaid plus bad debt) subtracts, an
- *  accrual adds its interest and no shares. */
-export interface MorphoTotalsLog {
-  kind: "borrow" | "repay" | "liquidation" | "accrue";
-  blockNumber: number;
-  transactionIndex: number;
-  logIndex: number;
-  assets: bigint;
-  shares: bigint;
+/** Supply a position's supply shares stand for: toAssetsDown, as Morpho
+ *  rounds a lender's claim (MorphoBalancesLib.expectedSupplyAssets). */
+export function morphoSupplyAssetsDown(shares: bigint, totalSupplyAssets: bigint, totalSupplyShares: bigint): bigint {
+  if (shares <= BigInt(0)) return BigInt(0);
+  return (shares * (totalSupplyAssets + VIRTUAL_ASSETS)) / (totalSupplyShares + VIRTUAL_SHARES);
 }
 
-export interface MorphoTotalsAt {
-  log: MorphoTotalsLog;
+/** A market's four totals at one point in its log order, raw. */
+export interface MorphoMarketTotals {
   totalBorrowAssets: bigint;
   totalBorrowShares: bigint;
+  totalSupplyAssets: bigint;
+  totalSupplyShares: bigint;
 }
 
-/** The chain's order for a market's totals: block, the accrual first, then
- *  the transaction and the log. */
-export function morphoTotalsOrder(a: MorphoTotalsLog, b: MorphoTotalsLog): number {
-  return (
-    a.blockNumber - b.blockNumber ||
-    (a.kind === "accrue" ? 0 : 1) - (b.kind === "accrue" ? 0 : 1) ||
-    a.transactionIndex - b.transactionIndex ||
-    a.logIndex - b.logIndex
-  );
-}
-
-/** Replay one market's logs from `seed` (the totals before the first of them,
- *  zero from the market's creation) into the totals after each log. */
-export function replayMorphoMarketTotals(
-  logs: MorphoTotalsLog[],
-  seed: { totalBorrowAssets: bigint; totalBorrowShares: bigint } = {
-    totalBorrowAssets: BigInt(0),
-    totalBorrowShares: BigInt(0),
-  },
-): MorphoTotalsAt[] {
-  let tba = seed.totalBorrowAssets;
-  let tbs = seed.totalBorrowShares;
-  return [...logs].sort(morphoTotalsOrder).map((log) => {
-    tba += log.assets;
-    tbs += log.shares;
-    return { log, totalBorrowAssets: tba, totalBorrowShares: tbs };
-  });
+/** The totals from the wire's [tba, tbs, tsa, tss] decimal strings. */
+export function morphoTotalsOf(v: readonly string[]): MorphoMarketTotals {
+  return {
+    totalBorrowAssets: BigInt(v[0]),
+    totalBorrowShares: BigInt(v[1]),
+    totalSupplyAssets: BigInt(v[2]),
+    totalSupplyShares: BigInt(v[3]),
+  };
 }

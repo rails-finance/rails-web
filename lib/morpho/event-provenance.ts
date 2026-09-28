@@ -199,7 +199,12 @@ export const debtBeforeProv = (sym: string, coords: MorphoCoords): Provenance =>
   formula: "after − change",
   inputs: eventInputs(coords, [
     { label: "after", kind: "chain-derived", pclass: "indexed", note: `${sym} owed after this event` },
-    { label: "change", kind: "chain-derived", pclass: "indexed", note: "the debt this event added or cleared (signed)" },
+    {
+      label: "change",
+      kind: "chain-derived",
+      pclass: "indexed",
+      note: "the debt this event added or cleared (signed)",
+    },
   ]),
 });
 
@@ -251,6 +256,60 @@ export const suppliedBeforeProv = (sym: string, coords: MorphoCoords): Provenanc
     { label: "after", kind: "chain", pclass: "indexed", note: `replayed supplied ${sym} principal after this event` },
     { label: "change", kind: "chain", pclass: "emitted", note: "the amount this event itself moved (signed)" },
   ]),
+});
+
+/** Supply AFTER this event = supply shares after × the market's totals at the
+ *  row (toAssetsDown), rails-server mig 357 on the Base lane. */
+export const supplyAfterProv = (sym: string, coords: MorphoCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  verify: stateVerify(coords),
+  summary: `${sym} the position's supply stood at AFTER this event${atBlock(coords)}: its supply shares after the event priced at the market's totalSupplyAssets ÷ totalSupplyShares there, rounded down as Morpho rounds a lender's claim. Equals Morpho.position(id, user).supplyShares converted at Morpho.market(id) read at the block; the interest earned up to the block is in it.`,
+  contract: MORPHO,
+  via: `${captureVia(coords)} · supply shares × market totals replayed from Supply/Withdraw/Liquidate/AccrueInterest logs`,
+  formula: "floor(shares × (totalSupplyAssets + 1) ÷ (totalSupplyShares + 10^6))",
+  inputs: eventInputs(coords),
+});
+
+/** Supply BEFORE this event, on the same basis. */
+export const supplyBeforeProv = (sym: string, coords: MorphoCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `${sym} the position's supply stood at just BEFORE this event: its supply shares before the event priced at the market's totals just before it. It includes the interest earned since the previous row.`,
+  contract: MORPHO,
+  via: "supply shares before × market totals before this event",
+  formula: "after − change",
+  inputs: eventInputs(coords, [
+    { label: "after", kind: "chain-derived", pclass: "indexed", note: `${sym} supplied after this event` },
+    {
+      label: "change",
+      kind: "chain-derived",
+      pclass: "indexed",
+      note: "the supply this event added or took out (signed)",
+    },
+  ]),
+});
+
+/** The supply this event added or took out = supply after − supply before. */
+export const supplyChangeProv = (sym: string, coords: MorphoCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  verify: txVerify(coords),
+  summary: `${sym} of supply this event added or took out${atBlock(coords)}: the supply after less the supply before, both at the market's totals. It matches the event's own assets to within the one-unit rounding of the share conversion.`,
+  contract: MORPHO,
+  via: "supply after − supply before",
+  inputs: eventInputs(coords),
+});
+
+/** The supply's move between the previous row and this one. */
+export const supplyGapSincePreviousProv = (sym: string, coords: MorphoCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `${sym} the supply moved between the position's previous event and this one${atBlock(coords)}: the supply just before this event less the supply just after the previous one. The shares did not move between them, so this is the shares × the change in the market's totalSupplyAssets ÷ totalSupplyShares: the interest earned, less any bad debt a liquidation socialised in between.`,
+  contract: MORPHO,
+  via: "supply before this event − supply after the previous event",
+  formula: "shares × (ratio now − ratio at the previous row)",
+  inputs: eventInputs(coords),
 });
 
 /** Collateral BEFORE this event = collateral after − the moved amount. Arithmetic

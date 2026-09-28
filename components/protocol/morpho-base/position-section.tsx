@@ -182,6 +182,10 @@ export function MorphoBasePositionSection({
             collateralLiquidated: pos.lifetime.collateralLiquidated,
             borrowed: pos.lifetime.borrowed,
             repaid: pos.lifetime.repaid,
+            // Set where every row carried the market's totals (the index):
+            // T3 then states the interest the debt accrued over its life.
+            interest: pos.lifetime.interest,
+            lastDebtAfter: pos.lifetime.lastDebtAfter,
           })
         : null,
     [borrowerSide, view, pos.lifetime],

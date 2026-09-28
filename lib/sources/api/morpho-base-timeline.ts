@@ -46,6 +46,7 @@ import {
   type MorphoReplayInput,
   type MorphoReplaySeed,
 } from "@/lib/sources/chain/morpho-blue-events";
+import { morphoTotalsOf } from "@/lib/morpho/market-totals";
 import type { MorphoDeployment } from "@/lib/sources/chain/morpho-deployments";
 
 /** One row as rails-server's /api/morpho-base/timeline returns it (api/src/
@@ -68,6 +69,11 @@ interface IndexRow {
   seized_assets: string | null;
   bad_debt_assets: string | null;
   bad_debt_shares: string | null;
+  /** The market's totals just before and just after this row's log,
+   *  [totalBorrowAssets, totalBorrowShares, totalSupplyAssets,
+   *  totalSupplyShares] (rails-server mig 357). Null above the replay's
+   *  watermark; absent from a route that predates them. */
+  totals?: { before: string[]; after: string[] } | null;
 }
 
 /** One market's replay state at the cut, as the API sends it (api/src/routes/
@@ -97,6 +103,8 @@ interface IndexSeed {
     withdrawn: string;
   };
   peaksPartial: boolean;
+  /** The market's totals after the wallet's last row before the cut. */
+  totalsAtLast?: string[] | null;
 }
 
 interface IndexResponse {
@@ -209,6 +217,9 @@ export async function readMorphoIndex(
       txHash,
       kind: r.kind,
       marketId: `0x${r.market.toLowerCase()}`,
+      ...(r.totals
+        ? { totals: { before: morphoTotalsOf(r.totals.before), after: morphoTotalsOf(r.totals.after) } }
+        : {}),
     };
     const caller = r.caller ? r.caller.toLowerCase() : undefined;
     switch (r.kind) {
@@ -273,6 +284,7 @@ export async function readMorphoIndex(
       withdrawn: BigInt(s.lifetime.withdrawn),
     },
     peaksPartial: s.peaksPartial,
+    ...(s.totalsAtLast ? { totalsAtLast: morphoTotalsOf(s.totalsAtLast) } : {}),
   }));
 
   const input: MorphoIndexPrepared["input"] = {
