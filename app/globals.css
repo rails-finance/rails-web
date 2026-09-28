@@ -662,6 +662,49 @@ body {
   }
 }
 
+/* Header-badge tooltip (2026-09-28, header-badge accessibility pass) —
+   position-card-meta.tsx's transaction/redemption badges, liquidated-badge.tsx,
+   and frankencoin-position-card.tsx's challenge marker. A native `title`
+   attribute shows on mouse hover but not on keyboard focus in Chrome/Safari,
+   so a badge reachable only by its `title` is silent for a keyboard user —
+   this repaints the same text as a small popover on BOTH :hover and
+   :focus-visible, from a `data-tooltip` attribute (the accessible name still
+   comes from `aria-label`, read by assistive tech regardless of this CSS).
+   Right-anchored, not centered: every consumer sits at the right edge of its
+   card, so centering would push the bubble off the card (or the viewport) on
+   the side that matters; right-anchoring keeps it inside every card width
+   the position-card grid uses. */
+.header-badge-tip {
+  position: relative;
+}
+.header-badge-tip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  max-width: 240px;
+  width: max-content;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--rb-tooltip-bg);
+  border: 1px solid var(--rb-tooltip-border);
+  color: var(--foreground);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: normal;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease;
+  z-index: 30;
+}
+.header-badge-tip:hover::after,
+.header-badge-tip:focus-visible::after {
+  opacity: 1;
+}
+
 /* Input focus */
 .input-focus {
   &:focus {

@@ -18,7 +18,19 @@ export function LiquidatedBadge({ count }: { count?: number }) {
     // data-prov-exempt: an index tally (activity-meta chrome), not a
     // chain-state figure — some cards (Aave V4, Fluid) mount this badge
     // outside PositionCardMeta's exempted cluster, so it declares itself.
-    <span data-prov-exempt="" className="inline-flex items-center text-red-500" title={label} aria-label={label}>
+    // role="img" + tabIndex + focus-ring: the icon and count read as one
+    // named figure, reachable by Tab; header-badge-tip (globals.css) shows
+    // the tooltip on focus too, not just hover (2026-09-28, header-badge
+    // accessibility pass).
+    <span
+      data-prov-exempt=""
+      className="inline-flex items-center text-red-500 focus-ring header-badge-tip rounded-sm"
+      title={label}
+      data-tooltip={label}
+      aria-label={label}
+      role="img"
+      tabIndex={0}
+    >
       <Icon name="triangle" size={12} />
       {hasCount && <span className="ml-1 text-xs font-semibold">{count}</span>}
     </span>

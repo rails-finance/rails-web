@@ -70,33 +70,54 @@ export function PositionCardMeta({
           {formatDuration(toSeconds(lastActivityAt as number), new Date())} ago
         </span>
       )}
-      {showEvents && (
-        // A protocol that supplies redemptionCount (the Liquity family) also
-        // excludes redemptions from its transaction count — they are not the
-        // owner's transactions — so the title names both exclusions there.
-        <span
-          className="inline-flex items-center"
-          title={
+      {showEvents &&
+        (() => {
+          // A protocol that supplies redemptionCount (the Liquity family) also
+          // excludes redemptions from its transaction count — they are not the
+          // owner's transactions — so the title names both exclusions there.
+          const label =
             eventCountTitle ??
             (redemptionCount != null
-              ? "Transactions (excludes liquidations and redemptions)"
-              : "Transactions (excludes liquidations)")
-          }
-        >
-          <Icon name="arrow-left-right" size={12} />
-          <span className="ml-1">{eventCount}</span>
-        </span>
-      )}
-      {showRedemption && (
-        <span
-          className="inline-flex items-center text-caution-400"
-          title={`Redeemed against ${redemptionCount} time${redemptionCount === 1 ? "" : "s"}`}
-          aria-label={`Redeemed against ${redemptionCount} time${redemptionCount === 1 ? "" : "s"}`}
-        >
-          <Icon name="triangle" size={12} />
-          <span className="ml-1 font-semibold">{redemptionCount}</span>
-        </span>
-      )}
+              ? `${eventCount} transaction${eventCount === 1 ? "" : "s"} on this position (excludes liquidations and redemptions)`
+              : `${eventCount} transaction${eventCount === 1 ? "" : "s"} on this position (excludes liquidations)`);
+          return (
+            // role="img": the icon + count read as one figure with one name,
+            // not two children a screen reader would step through separately.
+            // tabIndex + focus-ring (control-affordances.md's focus utility)
+            // put the badge in the tab order; header-badge-tip (globals.css)
+            // repaints `data-tooltip` as a popover on :focus-visible too, since
+            // the native title-on-hover tooltip alone never reaches a
+            // keyboard-only reader.
+            <span
+              className="inline-flex items-center focus-ring header-badge-tip rounded-sm"
+              title={label}
+              data-tooltip={label}
+              aria-label={label}
+              role="img"
+              tabIndex={0}
+            >
+              <Icon name="arrow-left-right" size={12} />
+              <span className="ml-1">{eventCount}</span>
+            </span>
+          );
+        })()}
+      {showRedemption &&
+        (() => {
+          const label = `Redeemed against ${redemptionCount} time${redemptionCount === 1 ? "" : "s"}`;
+          return (
+            <span
+              className="inline-flex items-center text-caution-400 focus-ring header-badge-tip rounded-sm"
+              title={label}
+              data-tooltip={label}
+              aria-label={label}
+              role="img"
+              tabIndex={0}
+            >
+              <Icon name="triangle" size={12} />
+              <span className="ml-1 font-semibold">{redemptionCount}</span>
+            </span>
+          );
+        })()}
       {showLiquidation && <LiquidatedBadge count={hasLiqCount ? (liquidationCount as number) : undefined} />}
     </span>
   );

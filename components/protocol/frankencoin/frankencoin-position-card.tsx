@@ -129,7 +129,19 @@ function ChallengeMarker({ count }: { count: number }) {
   if (count <= 0) return null;
   const title = `Challenged ${count} time${count === 1 ? "" : "s"} — a challenged position can survive its auction`;
   return (
-    <span className="inline-flex items-center text-caution-400" title={title} aria-label={title}>
+    // role="img" + tabIndex + focus-ring + header-badge-tip: mounted outside
+    // PositionCardMeta's cluster (Frankencoin's own vocabulary — never
+    // "liquidations"), so it needs the same keyboard reach and focus tooltip
+    // that cluster's own badges get (2026-09-28, header-badge accessibility
+    // pass).
+    <span
+      className="inline-flex items-center text-caution-400 focus-ring header-badge-tip rounded-sm"
+      title={title}
+      data-tooltip={title}
+      aria-label={title}
+      role="img"
+      tabIndex={0}
+    >
       <Icon name="triangle" size={12} />
       <span className="ml-1 font-semibold text-xs">{count}</span>
     </span>
