@@ -40,7 +40,7 @@ export type SpineVariant = "solid" | "dotted";
 /** Spine color tint. The spine line itself carries NO decorative/subsystem
  *  tint — it stays neutral. The only tints are the warningTone values: the two
  *  §5 adverse tones (caution = routine adverse, critical = liquidation) and
- *  the §4b external-party pink for a Liquity-family redemption, another
+ *  the §4b external-party pink for a redemption, another
  *  party's act on the position. Delegation signals via the pink glyph badge
  *  (color-grammar.md §4b), not the spine line. (The former blue/green/
  *  violet/purple subsystem tints were retired — color variation doesn't belong
@@ -54,7 +54,7 @@ const SPINE_COLORS: Record<SpineColor, string> = {
   default: "rgb(101 115 140)", // rb-500
   caution: "var(--caution)", // routine adverse (color-grammar.md §5)
   critical: "rgb(239 68 68)", // red-500 — liquidation + critical
-  external: "var(--external-party)", // pink-500 / dark pink-400 — a Liquity-family redemption (color-grammar.md §4b)
+  external: "var(--external-party)", // pink-500 / dark pink-400 — a redemption (color-grammar.md §4b)
 };
 
 /** Pulsing dot color matching spine tint */
@@ -171,8 +171,8 @@ export interface SpineColumnProps {
    *  explicit check/cross IS that event's meaning, and the dotted spine still
    *  carries the external signal. */
   externalParty?: boolean;
-  /** Tone for the "warning" triangle — "external" (pink) for a Liquity-family
-   *  redemption, another party's act on the position (color-grammar.md §4b);
+  /** Tone for the "warning" triangle — "external" (pink) for a redemption,
+   *  another party's act on the position (color-grammar.md §4b);
    *  "caution" (orange) for every routine adverse event; "critical" (red) for
    *  terminal events (liquidation). The dotted spine + lead-in dot inherit this
    *  tone too. Defaults to "caution". See color-grammar.md §5. */

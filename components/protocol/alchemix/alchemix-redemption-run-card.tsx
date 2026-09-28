@@ -11,7 +11,7 @@
 // still draw, and a total that must say when it covers part of the run — are
 // the card, so the vocabulary is its own and the mechanics stay shared
 // (`TimelineRunCard`: folder register, date range, in-place expansion, dotted
-// caution spine).
+// pink spine, the external-party tone of color-grammar.md §4b).
 //
 // THE TOTAL IS A SUM OF FLOWS, which is what makes it summable at all: each
 // member's figure is debt cleared between two blocks. Nothing else on this
@@ -25,7 +25,7 @@ import type { ReactNode } from "react";
 import { TimelineRunCard } from "@/components/shared/timeline-run-card";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { CAUTION_FOLDER_BADGE } from "@/lib/shared/run-folders";
+import { EXTERNAL_FOLDER_BADGE } from "@/lib/shared/run-folders";
 import { fmtHeaderMagnitude } from "@/lib/shared/header-values";
 
 export interface AlchemixRedemptionRunCardProps {
@@ -86,14 +86,14 @@ export function AlchemixRedemptionRunCard({
   const figure =
     statedCount > 0 ? (
       <span className="inline-flex items-center gap-1.5 text-sm">
-        <span className="text-caution-600 dark:text-caution-400">Cleared</span>
+        <span className="text-pink-500 dark:text-pink-400">Cleared</span>
         <Prov value={totalClearedExact} symbol={syntheticSymbol} info={prov}>
           <span className="font-bold text-foreground">{shown}</span>
         </Prov>
         <TokenChipIcon symbol={syntheticSymbol} size={16} />
         {taken && taken.value > 0 ? (
           <>
-            <span className="ml-1 text-caution-600 dark:text-caution-400">Took</span>
+            <span className="ml-1 text-pink-500 dark:text-pink-400">Took</span>
             <Prov value={taken.exact} symbol={mytSymbol} info={taken.prov}>
               <span className="font-bold text-foreground">
                 <ExactTip
@@ -122,10 +122,10 @@ export function AlchemixRedemptionRunCard({
     <TimelineRunCard
       count={count}
       memberNoun="redemption"
-      tone="caution"
+      tone="external"
       warningLabel="Redemptions"
       folder
-      folderBadge={CAUTION_FOLDER_BADGE}
+      folderBadge={EXTERNAL_FOLDER_BADGE}
       extraHeader={
         figure || shortfall ? (
           <span className="inline-flex items-center gap-2 flex-wrap">

@@ -105,7 +105,7 @@ export interface ChainTruthDelta {
   label?: string;
   /** Tint for the label. "caution" = the orange adverse tone (color-grammar.md
    *  §5); "external" = the pink of another party's act on the position, a
-   *  Liquity-family redemption (§4b); default is the neutral rb-500. */
+   *  redemption (§4b); default is the neutral rb-500. */
   tone?: "caution" | "external";
   /** This label is a per-axis ACTION VERB (an open/adjust's Deposit/Borrow/…),
    *  so it follows Liquity V2's combined-header grammar: the verb word + token
@@ -139,7 +139,7 @@ export interface ChainTruthRowSpec {
    *  amounts visible at ≥sm — the warning spine carries no flanking numbers. */
   labelOnSpine?: boolean;
   /** The mobile badge's tone for a `labelOnSpine` row: the spine pill's tone.
-   *  "external" = a Liquity-family redemption (pink, color-grammar.md §4b);
+   *  "external" = a redemption (pink, color-grammar.md §4b);
    *  default caution. */
   labelTone?: "caution" | "external";
   /** Third-party action: someone other than the position owner executed this

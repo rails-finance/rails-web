@@ -50,7 +50,7 @@ export function RedemptionRunway({
   /** Receipt for the share figure — pass the SAME queue-share builder the
    *  protocol's full redemption card uses, so both trace identically. */
   shareProv: Provenance;
-  /** Hover caption on the amber position marker. */
+  /** Hover caption on the pink position marker. */
   markerTitle?: string;
 }) {
   if (!(queueDebtTotal > 0) || debtInFront < 0) return null;

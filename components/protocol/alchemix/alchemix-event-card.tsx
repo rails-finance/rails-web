@@ -180,7 +180,10 @@ export function AlchemixEventCard({
   ) : adverse || cautioned ? (
     <SpineColumn
       icon="warning"
-      warningTone={adverse ? "critical" : "caution"}
+      // A redemption is another party's act on the position: the §4b
+      // external-party pink (color-grammar.md). The other chosen-for-you legs
+      // stay caution; a liquidation stays critical.
+      warningTone={adverse ? "critical" : cautioned?.context.data.eventType === "redemption" ? "external" : "caution"}
       warningLabel={WARNING_LABEL[(adverse ?? cautioned)!.context.data.eventType]}
       spine="dotted"
       isFirst={isFirst}

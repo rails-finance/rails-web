@@ -331,7 +331,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
                 label: ratioLabel("pooled"),
                 headerIcon: hfStale ? (
                   // Approximate-value flag, NOT an adverse-event warning — the
-                  // caution triangle is reserved for liquidations/redemptions, so
+                  // warning triangle is reserved for liquidations/redemptions, so
                   // a derived HF uses the neutral calculator glyph ("computed, not
                   // read live") and no valence colour. The leading `~` on the value
                   // carries "approximate"; this says why (source unavailable).

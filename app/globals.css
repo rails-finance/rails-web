@@ -33,7 +33,7 @@
 
   /* Informational · caution (color-grammar.md §5) — the single "adverse, needs
      attention, NOT terminal" hue (orange). Defined here as a full scale so the
-     whole caution tier (redemption + zombie + deprecation glyphs, badges, spine
+     whole caution tier (zombie + deprecation + rebalance glyphs, badges, spine
      bars, and the left-border notice panels) is retunable from ONE place: edit
      these eleven values and every `*-caution-*` utility + the `--caution` token
      and `notice-caution` panel move together. Values are Tailwind's orange-*. */

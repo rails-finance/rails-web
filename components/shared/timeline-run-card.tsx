@@ -89,7 +89,7 @@ export interface TimelineRunCardProps {
   /** Summed header pairs. Omit for a count-only row. */
   aggregates?: RunAggregate[];
   /** Verb color + pill tone. Match the protocol's own single-event card:
-   *  "external" for a Liquity-family redemption (another party's act on the
+   *  "external" for a redemption (another party's act on the
    *  position, color-grammar.md §4b), "caution" for other routine adverse
    *  events (tick rebalances), "danger" for terminal
    *  ones (liquidation, auction settlement), "neutral" for runs that carry no
