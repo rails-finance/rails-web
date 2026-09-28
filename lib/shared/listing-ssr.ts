@@ -121,9 +121,15 @@ export async function boxOnlyHop(): Promise<SsrHop | null> {
 
 /** The self-hop for a route handler: its own origin, and the reader of the
  *  request it is answering, signed. `ssrHop()` reads the reader through
- *  `next/headers`; a route handler has the request in hand. */
+ *  `next/headers`; a route handler has the request in hand. It carries the
+ *  bypass header too: without it a route's self-hop on dev.rails.finance got
+ *  the login redirect, so the vault routes read no stored tail and every PUT
+ *  they queued never reached the store. */
 export function routeHop(request: Pick<NextRequest, "nextUrl" | "headers">): SsrHop {
-  return { baseUrl: request.nextUrl.origin, headers: readerHopHeaders(readerIpFromRequest(request)) };
+  return {
+    baseUrl: request.nextUrl.origin,
+    headers: { ...readerHopHeaders(readerIpFromRequest(request)), ...vercelBypassHeaders() },
+  };
 }
 
 export interface SsrInitial<T> {
