@@ -60,7 +60,7 @@ import { StatFootnote, StatValue } from "@/components/shared/stat-value";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
-import { ProvReceiptsScope, useReceiptRegistry, Prov } from "@/components/shared/provenance";
+import { ProvReceiptsScope, useReceiptRegistry, Prov, type Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
@@ -523,7 +523,27 @@ export function AlchemistPositionView({
     const u = priceView?.underlying;
     const out: LatestPriceAsset[] = [];
     if (u?.symbol && priceView?.usd)
-      out.push({ symbol: u.symbol, address: u.address, price: priceView.usd.pricePerUnit });
+      out.push({
+        symbol: u.symbol,
+        address: u.address,
+        price: priceView.usd.pricePerUnit,
+        info: {
+          kind: "offchain",
+          pclass: "offchain",
+          summary: `${u.symbol}'s price — the dollar figure this asset is quoted at now.`,
+          via: `${priceView.usd.priceSource} · ${priceView.usd.pricedAt}`,
+          verify: { kind: "none", text: "An off-chain price, with no on-chain anchor" },
+          inputs: [
+            {
+              label: "price",
+              value: String(priceView.usd.pricePerUnit),
+              kind: "offchain",
+              note: priceView.usd.priceSource,
+            },
+            { label: "priced at", value: priceView.usd.pricedAt, kind: "offchain" },
+          ],
+        },
+      });
     if (u?.symbol && priceView && priceView.formatted > 0)
       out.push({
         symbol: mytSymbol,

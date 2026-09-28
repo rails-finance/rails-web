@@ -52,7 +52,8 @@ const TroveExportMenu = dynamic(() => import("@/components/trove/TroveExportMenu
 });
 import { closingPricesAt, DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import { LiquityTroveBarsProvider } from "@/lib/liquity/use-trove-bars";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import type { Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 /** The phone spine view's key row, behind `?timeline=spine`. */
@@ -411,8 +412,18 @@ export default function TroveView({
   // debt asset — hard-pegged to $1 by the protocol's redemption mechanism, so
   // there's no separate price source for it.
   const collateralPrice = prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData];
-  const stripAssets: PriceStripAsset[] = [
-    ...(collateralPrice ? [{ symbol: troveData.collateralType, price: collateralPrice }] : []),
+  const collateralPriceInfo: Provenance | undefined = collateralPrice
+    ? {
+        kind: "chain-derived",
+        pclass: "oracle",
+        summary: `${troveData.collateralType}'s price — Liquity's on-chain oracle, read now.`,
+        via: "Liquity's on-chain oracle (Chainlink feed + LST canonical rate, the MIN/MAX rule)",
+      }
+    : undefined;
+  const stripAssets: LatestPriceAsset[] = [
+    ...(collateralPrice
+      ? [{ symbol: troveData.collateralType, price: collateralPrice, info: collateralPriceInfo }]
+      : []),
     { symbol: "BOLD", price: 1 },
   ];
   // A closed trove's prices: the collateral price its closing row carries.

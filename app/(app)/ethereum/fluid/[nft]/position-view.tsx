@@ -51,6 +51,7 @@ import { computeFluidEconomics, fluidLifetimeWithOpening } from "@/lib/fluid/eco
 import { fluidEconomicsExplanation, fluidEconomicsContent } from "@/lib/fluid/economics-explanation";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import type { Provenance } from "@/components/shared/provenance";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -304,12 +305,31 @@ export default function FluidPositionView({
       chain.oraclePriceDebtPerCol > 0
         ? chain.oraclePriceDebtPerCol
         : undefined;
+    const priceInfo: Provenance | undefined =
+      debtPerCol != null && chain
+        ? {
+            kind: "chain",
+            pclass: "oracle",
+            summary: `${supply} priced in ${borrow} — what the vault's oracle reports at this block.`,
+            contract: { name: "Fluid oracle", address: chain.oracle },
+            via: `VaultResolver.positionByNftId(${chain.nftId}) at block ${chain.blockNumber}`,
+            source: { block: chain.blockNumber },
+            verify: { kind: "recompute", text: `Call VaultResolver.positionByNftId(${chain.nftId}) yourself` },
+            scaling: {
+              raw: chain.oraclePriceOperateRaw,
+              from: "call",
+              places: 27 + chain.borrowDecimals - chain.supplyDecimals,
+              why: `The oracle states a fixed-point price scaled by 10^27, adjusted for ${supply}'s ${chain.supplyDecimals} decimals and ${borrow}'s ${chain.borrowDecimals} decimals`,
+            },
+          }
+        : undefined;
     return [
       {
         symbol: supply,
         price: debtPerCol,
         unit: debtPerCol ? borrow : undefined,
         label: `${supply} in ${borrow} (the vault's own oracle)`,
+        info: priceInfo,
       },
       { symbol: borrow, label: `${borrow}, the vault's debt token` },
     ];
