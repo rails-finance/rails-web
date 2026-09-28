@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { SITE_URL } from "@/lib/shared/page-metadata";
-import { formatMonthDayYear } from "@/lib/date";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -25,10 +24,10 @@ export default function TermsPage() {
         <h1 className="font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,48px)] mb-2">
           Terms of Service
         </h1>
-        <p className="text-sm text-rb-500 mb-8">
-          Last updated:{" "}
-          {formatMonthDayYear(new Date())}
-        </p>
+        {/* Hardcoded on purpose: this must name the date the Terms last
+            changed, not the date the page was built. Bump it by hand whenever
+            the wording below is revised. */}
+        <p className="text-sm text-rb-500 mb-8">Last updated: September 28, 2026</p>
 
         <div className="notice-caution p-4 mb-8">
           <h3 className="text-lg font-bold text-caution-800 dark:text-caution-300 mb-2">Important Notice</h3>
@@ -51,8 +50,8 @@ export default function TermsPage() {
         <section className="mb-8">
           <h2 className="text-2xl font-semibold text-rb-500 mb-4">2. Description of Service</h2>
           <p className="text-rb-500 mb-4">
-            Rails is a blockchain analytics and visualization platform that displays publicly available data from the
-            Ethereum blockchain, with a focus on the Liquity V2 protocol. The Service:
+            Rails is a blockchain analytics and visualization platform. It displays publicly available data from lending
+            and CDP protocols on Ethereum, Base and other EVM chains. The Service:
           </p>
           <ul className="list-disc pl-6 mb-4 text-rb-500">
             <li>Displays transaction history and protocol interactions</li>
@@ -96,8 +95,8 @@ export default function TermsPage() {
               <strong>No Custody:</strong> Rails does not custody or control any digital assets
             </li>
             <li>
-              <strong>Protocol Independence:</strong> Rails is independent from the Liquity protocol and has no control
-              over its operations
+              <strong>Protocol Independence:</strong> Rails is independent from the protocols it displays and has no
+              control over their operations
             </li>
             <li>
               <strong>Data Accuracy:</strong> While we strive for accuracy, blockchain data may be delayed or incorrect
@@ -163,9 +162,8 @@ export default function TermsPage() {
         <section className="mb-8">
           <h2 className="text-2xl font-semibold text-rb-500 mb-4">10. Third-Party Services</h2>
           <p className="text-rb-500 mb-4">
-            Rails may display information from or link to third-party services (including the Liquity protocol, Ethereum
-            network, and other DeFi protocols). We are not responsible for the content, accuracy, or practices of these
-            third parties.
+            Rails may display information from or link to third-party services, including DeFi protocols and blockchain
+            networks. We are not responsible for the content, accuracy, or practices of these third parties.
           </p>
         </section>
 

@@ -27,7 +27,7 @@ export default function PrivacyPage() {
         {/* Hardcoded on purpose: this must name the date the policy text last
             changed, not the date the page was built. Bump it by hand whenever
             the wording below is revised. */}
-        <p className="text-sm text-rb-500 mb-8">Last updated: August 28, 2026</p>
+        <p className="text-sm text-rb-500 mb-8">Last updated: September 28, 2026</p>
 
         <section className="mb-8">
           <h2 className="text-2xl font-semibold text-rb-500 mb-4">Overview</h2>
@@ -47,13 +47,13 @@ export default function PrivacyPage() {
           <h3 className="text-xl font-semibold text-rb-500 mb-3">Blockchain Data</h3>
           <ul className="list-disc pl-6 mb-4 text-rb-500">
             <li>Publicly available wallet addresses and ENS names you search for</li>
-            <li>Publicly available Trove IDs and transaction hashes you view</li>
-            <li>Publicly available transaction history from the Ethereum blockchain</li>
-            <li>Publicly available Liquity V2 protocol interactions and events</li>
+            <li>Publicly available position IDs and transaction hashes you view</li>
+            <li>Publicly available transaction history from Ethereum, Base and other EVM chains</li>
+            <li>Publicly available events from the lending and CDP protocols Rails covers</li>
           </ul>
           <p className="text-rb-500 mb-4">
-            All blockchain data we display is publicly available on the Ethereum network. We do not have access to your
-            private keys or the ability to execute transactions on your behalf.
+            All blockchain data we display is publicly available on the chains it comes from. We do not have access to
+            your private keys or the ability to execute transactions on your behalf.
           </p>
 
           <h3 className="text-xl font-semibold text-rb-500 mb-3">Technical Information</h3>
@@ -81,7 +81,7 @@ export default function PrivacyPage() {
           <h2 className="text-2xl font-semibold text-rb-500 mb-4">Data Storage and Retention</h2>
           <p className="text-rb-500 mb-4">
             We cache blockchain data temporarily to improve performance and reduce load on blockchain infrastructure.
-            This cached data is publicly available information from the Ethereum blockchain.
+            This cached data is publicly available information from the chains Rails covers.
           </p>
           <p className="text-rb-500 mb-4">
             We do not store personal information or maintain user accounts. Search queries and viewing history are not
@@ -94,13 +94,13 @@ export default function PrivacyPage() {
           <p className="text-rb-500 mb-4">Rails interacts with the following third-party services:</p>
           <ul className="list-disc pl-6 mb-4 text-rb-500">
             <li>
-              <strong>Ethereum RPC Providers:</strong> To fetch blockchain data
+              <strong>RPC Providers:</strong> To fetch blockchain data from each chain
             </li>
             <li>
               <strong>ENS (Ethereum Name Service):</strong> To resolve human-readable names
             </li>
             <li>
-              <strong>Liquity V2 Protocol:</strong> To read protocol state and events
+              <strong>DeFi Protocols:</strong> To read the state and events of the protocols Rails covers
             </li>
             <li>
               <strong>GitHub:</strong> For open-source code hosting
