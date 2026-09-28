@@ -219,10 +219,10 @@ export function stringLiterals(src) {
 
 /** Run a target's mode-appropriate extraction. Modes:
  *  - "full":    comments stripped, otherwise raw (the legacy explainer scan);
- *  - "strings": string literals only (economics.ts);
+ *  - "strings": string literals only (economics.ts), import paths excluded;
  *  - "prose":   the full pipeline (intro surfaces — whole file, normalized). */
 export function extractText(raw, mode) {
-  if (mode === "strings") return normalizeWhitespace(decodeEntities(stringLiterals(stripComments(raw))));
+  if (mode === "strings") return normalizeWhitespace(decodeEntities(stringLiterals(stripImports(stripComments(raw)))));
   if (mode === "prose") return prosePipeline(raw);
   return prosePipeline(raw); // "full" gets the hardened pipeline too
 }
