@@ -34,6 +34,8 @@ export interface FxTimelineResult {
   cutoffBlock?: number | null;
 }
 
+const SHARE_ROUNDING_WEI = BigInt(100_000);
+
 /** The row's position on chain (getPosition at its block): collateral and
  *  debt after; the debt before (the read at block − 1 on a liquidation, else
  *  the after less the event's own debt delta, which the stored pairs match to
@@ -53,7 +55,11 @@ function chainFigures(
     ...(r.chain_colls_before != null ? { collBefore: fmtUnits(r.chain_colls_before, 18) } : {}),
     debtAfter: fmtUnits(after.toString(), 18),
     debtBefore: fmtUnits(before.toString(), 18),
-    ...(since != null && since !== ZERO ? { debtSincePrevious: fmtUnits(since.toString(), 18) } : {}),
+    // An operate's before carries the pool's share rounding (up to 16,799 wei
+    // over the stored pairs), so a move inside that is not stated.
+    ...(since != null && (since < ZERO ? -since : since) > SHARE_ROUNDING_WEI
+      ? { debtSincePrevious: fmtUnits(since.toString(), 18) }
+      : {}),
   };
 }
 
