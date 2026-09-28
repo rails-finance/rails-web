@@ -444,7 +444,7 @@ export function ChainTruthRow({
         </span>
       ) : spec.label && !spec.custody ? (
         <span
-          className={`shrink-0 text-sm font-medium ${spec.critical ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}
+          className={`max-w-full shrink-0 text-sm font-medium ${spec.critical ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}
         >
           {spec.label}
         </span>
