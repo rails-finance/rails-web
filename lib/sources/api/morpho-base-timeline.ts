@@ -43,6 +43,7 @@ import {
   replayMorphoRows,
   type MorphoChainTimelineResult,
   type MorphoDecodedRow,
+  type MorphoReplayInput,
   type MorphoReplaySeed,
 } from "@/lib/sources/chain/morpho-blue-events";
 import type { MorphoDeployment } from "@/lib/sources/chain/morpho-deployments";
@@ -144,6 +145,15 @@ export interface MorphoIndexRead {
   reason?: string;
 }
 
+/** The index's answer decoded, before the replay: what `replayMorphoRows`
+ *  takes but its render budget, so a caller can replay it with the cut it
+ *  needs (the grouped route, lib/morpho-base/timeline-folders.ts, lifts it). */
+export interface MorphoIndexPrepared {
+  input: Omit<MorphoReplayInput, "maxRendered">;
+  whole: boolean;
+  reason?: string;
+}
+
 /**
  * Read a wallet's history from the index. Resolves to null when the index is
  * not reachable at all (no RAILS_API_URL, or the API says it is not
@@ -154,6 +164,20 @@ export async function loadMorphoEventsFromIndex(
   p: LoadMorphoIndexParams,
   readerIp?: string,
 ): Promise<MorphoIndexRead | null> {
+  const read = await readMorphoIndex(p, readerIp);
+  if (!read) return null;
+  return {
+    result: await replayMorphoRows({ ...read.input, maxRendered: MAX_RENDERED_EVENTS }),
+    whole: read.whole,
+    reason: read.reason,
+  };
+}
+
+/** The read and the decode behind `loadMorphoEventsFromIndex`. Same null. */
+export async function readMorphoIndex(
+  p: LoadMorphoIndexParams,
+  readerIp?: string,
+): Promise<MorphoIndexPrepared | null> {
   const base = process.env.RAILS_API_URL;
   if (!base) return null;
   const wallet = p.wallet.toLowerCase();
@@ -249,12 +273,11 @@ export async function loadMorphoEventsFromIndex(
     peaksPartial: s.peaksPartial,
   }));
 
-  const result = await replayMorphoRows({
+  const input: MorphoIndexPrepared["input"] = {
     wallet,
     deployment: p.deployment,
     rows,
     ...(seeds ? { seeds } : {}),
-    maxRendered: MAX_RENDERED_EVENTS,
     // Every row came with its block's timestamp and its sender, whatever the
     // replay asks for — so its anchor is ON by default: a wallet-signed row
     // below a position's cut is decided by the sender it carries and dated by
@@ -269,7 +292,7 @@ export async function loadMorphoEventsFromIndex(
       gaps,
       source: "index",
     },
-  });
+  };
 
   const reason = !cov
     ? "no coverage row"
@@ -282,5 +305,5 @@ export async function loadMorphoEventsFromIndex(
           : toBlock == null
             ? "no Sieve checkpoint"
             : undefined;
-  return { result, whole: reason === undefined, reason };
+  return { input, whole: reason === undefined, reason };
 }

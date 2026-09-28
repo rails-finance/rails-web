@@ -73,6 +73,7 @@ import {
   replayCometRows,
   type CometChainTimelineResult,
   type CometDecodedRow,
+  type CometReplayInput,
   type CometReplaySeed,
 } from "@/lib/sources/chain/compound-v3-events";
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
@@ -197,6 +198,17 @@ export interface CometIndexRead {
   peakWithheldMarkets: string[];
 }
 
+/** The index's answer decoded, before the replay: what `replayCometRows` takes
+ *  but its render cut, so a caller can replay it with the cut it needs (the
+ *  grouped route, lib/compound-base/timeline-folders.ts, lifts it). */
+export interface CometIndexPrepared {
+  input: Omit<CometReplayInput, "maxRendered">;
+  whole: boolean;
+  heavy: boolean;
+  reason?: string;
+  peakWithheldMarkets: string[];
+}
+
 /**
  * Read a wallet's history from the index. Resolves to null when the index is
  * not reachable at all (no RAILS_API_URL, or the API says it is not
@@ -207,6 +219,19 @@ export async function loadCometEventsFromIndex(
   p: LoadCometIndexParams,
   readerIp?: string,
 ): Promise<CometIndexRead | null> {
+  const read = await readCometIndex(p, readerIp);
+  if (!read) return null;
+  return {
+    result: replayCometRows({ ...read.input, maxRendered: MAX_RENDERED_EVENTS }),
+    whole: read.whole,
+    heavy: read.heavy,
+    reason: read.reason,
+    peakWithheldMarkets: read.peakWithheldMarkets,
+  };
+}
+
+/** The read and the decode behind `loadCometEventsFromIndex`. Same null. */
+export async function readCometIndex(p: LoadCometIndexParams, readerIp?: string): Promise<CometIndexPrepared | null> {
   const base = process.env.RAILS_API_URL;
   if (!base) return null;
   const wallet = p.wallet.toLowerCase();
@@ -389,7 +414,7 @@ export async function loadCometEventsFromIndex(
   // is decided by the sender it carries and dated by the timestamp it carries,
   // never dropped as `undated` (rails-ops reference/timeline-attention-budget.md,
   // decision 0019 leg F).
-  const result = replayCometRows({
+  const input: CometIndexPrepared["input"] = {
     wallet,
     chainId: p.deployment.chainId,
     deployment: p.deployment,
@@ -397,7 +422,6 @@ export async function loadCometEventsFromIndex(
     metas,
     timestamps,
     senders,
-    maxRendered: MAX_RENDERED_EVENTS,
     ...(seeds ? { seeds } : {}),
     peakWithheldMarkets: json.peakWithheldMarkets ?? [],
     coverage: {
@@ -408,7 +432,7 @@ export async function loadCometEventsFromIndex(
       gaps,
       source: "index",
     },
-  });
+  };
 
   const reason = !cov
     ? "no coverage row"
@@ -422,7 +446,7 @@ export async function loadCometEventsFromIndex(
             ? `heavy wallet — a tail from block ${heavy.cut.block}, no seeds`
             : undefined;
   return {
-    result,
+    input,
     whole: reason === undefined,
     heavy: heavy != null,
     reason,

@@ -16,10 +16,12 @@ export type ReplayGroupedFields = Partial<GroupedTimelineFields> & {
   cutoffBlock?: number | null;
 };
 
-/** The two reads for `useTimelineSegment`. The route groups every span it
- *  reads, so there is no flat span read: a history the index cannot vouch for
- *  is swept and answered flat, and the rows the page holds stay. */
-export function replaySegmentReads(route: string, wallet: string) {
+/** The two reads for `useTimelineSegment`; `params` names the position where
+ *  the wallet alone does not (a Comet market, a Morpho market). The route
+ *  groups every span it reads, so there is no flat span read: a history the
+ *  index cannot vouch for is swept and answered flat, and the rows the page
+ *  holds stay. */
+export function replaySegmentReads(route: string, wallet: string, params: Record<string, string> = {}) {
   return {
     // A span answer carries its rows and the span, not the replay's envelope
     // (lib/shared/replay-grouped-answer.ts `replayGroupedBody`).
@@ -28,7 +30,7 @@ export function replaySegmentReads(route: string, wallet: string) {
         wallet,
         route,
         mark: "replay-segment",
-        params: { group: "1", from: String(span[0]), to: String(span[1]) },
+        params: { ...params, group: "1", from: String(span[0]), to: String(span[1]) },
         signal,
       })) as unknown as SegmentGroupedAnswer,
     readFlat: (): Promise<{ events: BaseActivityEvent[] }> =>

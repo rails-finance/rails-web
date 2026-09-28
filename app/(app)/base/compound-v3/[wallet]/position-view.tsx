@@ -30,7 +30,7 @@
 // The history's completeness is a property of the request rather than of the
 // explorer, so it is stated under every timeline.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 
@@ -46,7 +46,7 @@ import {
 } from "@/components/protocol/compound/compound-position-explanation";
 import { CompoundRiskSlot } from "@/components/protocol/compound/compound-risk-slot";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { COMPOUND_LIQUIDATION_RUNS } from "@/lib/compound/timeline-runs";
+import { COMPOUND_FOLDER_REGISTER, COMPOUND_LIQUIDATION_RUNS } from "@/lib/compound/timeline-runs";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
@@ -56,7 +56,20 @@ import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-fo
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { CaptureSourceProvider, type CaptureSource } from "@/lib/shared/capture-source";
-import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { useTimelineSegment } from "@/hooks/useTimelineSegment";
+import { eventsBelowLife, replaySegmentReads } from "@/lib/api/fetch-replay-segment";
+import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
+import { TIMELINE_WINDOW_EVENTS, WHOLE_HISTORY } from "@/lib/shared/timeline-opening-balance";
+import {
+  interleaveRowPlan,
+  servedFoldersEnabled,
+  type GroupedTimelineFields,
+  type ServedFolder,
+} from "@/lib/shared/timeline-folder";
+import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
+import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
+import type { WholeHistoryFetch } from "@/components/shared/export-menu";
+import type { CompoundBaseMarketRows } from "@/lib/compound-base/timeline-folders";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
 import { computeCompoundEconomics } from "@/lib/compound/economics";
@@ -84,6 +97,20 @@ const CompoundExportMenu = dynamic(
 );
 
 const TIMELINE_ROUTE = "/api/chain/compound-base/timeline";
+const FOLDER_ROUTE = "/api/chain/compound-base/timeline/folder";
+
+/** The history as the route answers it: flat, or — asked `?group=1`, the
+ *  page default — as ROWS, where `events` holds only the ungrouped events of
+ *  every market and `marketRows` puts each market's folders back between its
+ *  own (lib/compound-base/timeline-folders.ts). A history the index cannot
+ *  vouch for is answered flat either way, and reads as flat here. */
+type CompoundBaseTimeline = CometChainTimelineResult & {
+  grouped?: true;
+  eventsServed?: number;
+  boundBy?: GroupedTimelineFields["boundBy"];
+  cutoffBlock?: number | null;
+  marketRows?: Record<string, CompoundBaseMarketRows> | null;
+};
 const PRICES_ROUTE = "/api/chain/compound-base/oracle-prices";
 
 /** What the coverage footer says was read. */
@@ -120,6 +147,7 @@ const holdsSomething = (live: CompoundMarketChainResponse | null): boolean =>
 /** One market's position: card + risk slot, tower, and its own timeline. */
 function MarketSection({
   section,
+  wallet,
   view,
   events,
   timeline,
@@ -128,10 +156,11 @@ function MarketSection({
   captureSource,
 }: {
   section: Section;
+  wallet: string;
   view: CompoundPositionView;
   /** This market's events only. */
   events: BaseActivityEvent[];
-  timeline: CometChainTimelineResult | null;
+  timeline: CompoundBaseTimeline | null;
   timelineState: TimelineState;
   sweptClean: boolean;
   /** Which capture answered — the index or the sweep. Words below differ. */
@@ -140,14 +169,62 @@ function MarketSection({
   const { market, chain, replay } = section;
   const compoundEvents = useMemo(() => events.filter(isCompoundEvent), [events]);
   const siblingsByTx = useMemo(() => groupEventsByTx(compoundEvents), [compoundEvents]);
-  const tl = useTimelineEvents(compoundEvents, {
-    storageKey: `compound-base-${market.key}-${view.account}`,
-    protocolKey: "compound",
+
+  // This market's share of a grouped answer: its rows, interleaving its
+  // folders with its own ungrouped events.
+  const rows = timeline?.grouped ? (timeline.marketRows?.[market.key] ?? null) : null;
+  const servedRows = useMemo(
+    () => (rows ? interleaveRowPlan(rows.rowPlan, compoundEvents) : undefined),
+    [rows, compoundEvents],
+  );
+  /** The folders, whole and unfiltered. The tower, the card's counts and the
+   *  peaks need nothing from them: the route replayed every row before it
+   *  grouped, and those figures ride the replay. */
+  const servedFolders = useMemo(
+    () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
+    [servedRows],
+  );
+  const groupedTail = useMemo<GroupedTimelineFields | null>(
+    () =>
+      rows
+        ? { grouped: true, rowPlan: rows.rowPlan, eventsServed: rows.eventsServed, boundBy: timeline?.boundBy ?? null }
+        : null,
+    [rows, timeline?.boundBy],
+  );
+
+  // The month read (hooks/useTimelineSegment.ts): a month of THIS market the
+  // preload does not hold is sliced from the route's replay
+  // (`&market=&from=&to=`), whose running figures are the whole replay's. The
+  // preload's row cap is the page's, shared by every market, so a month read
+  // carries the whole cap (`spanCap`) however few rows this market kept.
+  // Months below a seed's cut have no day counts, so the grid draws them and
+  // refuses the click; the boundary card states them.
+  const segmentReads = useMemo(
+    () => replaySegmentReads(TIMELINE_ROUTE, wallet, { market: market.key }),
+    [wallet, market.key],
+  );
+  const { tl, segments, readFolderMembers } = useTimelineSegment({
+    events: compoundEvents,
+    groupedTail,
+    servedRows,
+    servedFolders,
+    opening: null,
+    lifeBelow: rows?.belowByDay,
+    eventsBelowLife: eventsBelowLife(replay?.omitted?.count, rows?.belowByDay),
     // THIS market's rows before the trim (the replay's per-market count, not
     // the wallet-wide one — the page draws one timeline per market), so
     // numbering runs over the market's whole history and the count line
     // states its real total (rails-ops decision 0019).
     olderCount: replay?.omitted?.count ?? 0,
+    historyWindow: WHOLE_HISTORY,
+    spanCap: rows ? TIMELINE_WINDOW_EVENTS : null,
+    isEvent: isCompoundEvent,
+    readGrouped: segmentReads.readGrouped,
+    readFlat: segmentReads.readFlat,
+    folderPath: FOLDER_ROUTE,
+    folderParams: { wallet, market: market.key },
+    storageKey: `compound-base-${market.key}-${view.account}`,
+    protocolKey: "compound",
   });
   const sideUsd = cardSideUsd(view);
 
@@ -155,14 +232,17 @@ function MarketSection({
   // event card renders on its spine, reduced over the market's timeline.
   const externalActivity = useMemo(
     () =>
-      summariseExternalActors(
-        compoundEvents.map((e) => ({
-          txFrom: e.context.data.txFrom,
-          poolCaller: e.context.data.funder,
-          wallet: e.wallet,
-        })),
+      withFolderActors(
+        summariseExternalActors(
+          compoundEvents.map((e) => ({
+            txFrom: e.context.data.txFrom,
+            poolCaller: e.context.data.funder,
+            wallet: e.wallet,
+          })),
+        ),
+        servedFolders,
       ),
-    [compoundEvents],
+    [compoundEvents, servedFolders],
   );
 
   // The tower's lifetime layer is labelled "all time" and is only entitled to
@@ -236,7 +316,12 @@ function MarketSection({
           persistKeyPrefix="compound"
           closed={view.status !== "open"}
           tl={tl}
+          // Both grouping paths: the spec groups a flat answer in the browser,
+          // the register draws the folders the route served.
           runs={COMPOUND_LIQUIDATION_RUNS}
+          folderRegister={COMPOUND_FOLDER_REGISTER}
+          readFolderMembers={readFolderMembers}
+          segments={segments}
           // Tenure-first header: when the wallet's activity in THIS market
           // started — the replay's own first-event date, resolved from the
           // market's oldest row even when the drawn list is a capped slice
@@ -246,6 +331,7 @@ function MarketSection({
           toolbarLeading={
             <TimelineActivityHeader
               events={compoundEvents}
+              folders={servedFolders}
               closed={view.status !== "open"}
               firstAt={replay?.firstEventAt ?? null}
             />
@@ -260,10 +346,16 @@ function MarketSection({
                 : "This wallet has no Compound V3 activity in this market."
           }
           footer={<TimelineCoverageFooter coverage={timeline.coverage} sourceLabel={SOURCE_LABEL} />}
-          boundary={boundaryFromChainCoverage(
-            { ...timeline.coverage, omitted: replay?.omitted },
-            compoundEvents.length,
-          )}
+          // On a grouped answer the list covers the market's `eventsServed`; a
+          // month read holds no card, the grid holding the other months.
+          boundary={
+            tl.historyWindow.state === "span"
+              ? null
+              : boundaryFromChainCoverage(
+                  { ...timeline.coverage, omitted: replay?.omitted },
+                  rows ? rows.eventsServed : compoundEvents.length,
+                )
+          }
           renderCard={(event, meta) =>
             isCompoundEvent(event) ? (
               <CompoundEventCard
@@ -322,10 +414,14 @@ export default function CompoundBaseWalletView({
   const [loading, setLoading] = useState(!seeded);
   const [error, setError] = useState<string | null>(null);
 
-  const [timeline, setTimeline] = useState<CometChainTimelineResult | null>(() =>
-    initialTimeline != null ? (rehydrateChainTimelineWire(initialTimeline) as CometChainTimelineResult) : null,
+  const [timeline, setTimeline] = useState<CompoundBaseTimeline | null>(() =>
+    initialTimeline != null ? (rehydrateChainTimelineWire(initialTimeline) as CompoundBaseTimeline) : null,
   );
   const [timelineState, setTimelineState] = useState<TimelineState>(timelineSeeded ? "ready" : "loading");
+  // The event route renders this same view, flat: pinned mode finds its card
+  // among the served events, and a folder's members arrive only when opened.
+  const pinnedRouteParams = useParams<{ eventId?: string | string[] }>();
+  const pinnedRoute = pinnedRouteParams?.eventId != null;
   const [prices, setPrices] = useState<Record<string, number>>({});
 
   // Only when the server could not answer. A seeded view has every Comet's
@@ -357,7 +453,14 @@ export default function CompoundBaseWalletView({
     if (timelineSeeded || !wallet) return;
     let cancelled = false;
     setTimelineState("loading");
-    fetchChainTimeline<CometChainTimelineResult>({ wallet, route: TIMELINE_ROUTE, mark: "compound-base-timeline" })
+    fetchChainTimeline<CompoundBaseTimeline>({
+      wallet,
+      route: TIMELINE_ROUTE,
+      mark: "compound-base-timeline",
+      // `?folders=0` is the way back to the flat list, the test every grouped
+      // page shares; the event route reads flat, its card among the events.
+      params: servedFoldersEnabled() && !pinnedRoute ? { group: "1" } : undefined,
+    })
       .then((d) => {
         if (cancelled) return;
         setTimeline(d);
@@ -370,7 +473,7 @@ export default function CompoundBaseWalletView({
     return () => {
       cancelled = true;
     };
-  }, [wallet, timelineSeeded]);
+  }, [wallet, timelineSeeded, pinnedRoute]);
 
   const events = useMemo<BaseActivityEvent[]>(() => timeline?.events ?? [], [timeline]);
   const compoundEvents = useMemo(() => events.filter(isCompoundEvent), [events]);
@@ -463,7 +566,6 @@ export default function CompoundBaseWalletView({
   // single-section family. An id this page cannot place (fabricated, or
   // older than the served window) falls through to every section unfiltered,
   // each stating its own "not found" — the pre-existing behaviour.
-  const pinnedRouteParams = useParams<{ eventId?: string | string[] }>();
   const rawPinnedEventId = Array.isArray(pinnedRouteParams.eventId)
     ? pinnedRouteParams.eventId[0]
     : pinnedRouteParams.eventId;
@@ -480,7 +582,39 @@ export default function CompoundBaseWalletView({
   // Silence is only evidence of absence when someone actually listened: a
   // sweep that could not read the chain also comes back with no events, and a
   // Comet read that failed also holds nothing.
-  const untouched = data != null && !data.chainStale && data.positionsFound === 0 && sweptClean && events.length === 0;
+  // On a grouped answer the lists cover `eventsServed`, folder members
+  // included; `events` holds only the ungrouped ones.
+  const untouched =
+    data != null &&
+    !data.chainStale &&
+    data.positionsFound === 0 &&
+    sweptClean &&
+    (timeline?.grouped ? (timeline.eventsServed ?? 0) : events.length) === 0 &&
+    (timeline?.coverage.omitted?.count ?? 0) === 0;
+
+  // Every market's folders, whole: the export states and fetches what they
+  // hold, since their members are not among `events`.
+  const allFolders = useMemo<ServedFolder[] | null>(() => {
+    if (!timeline?.grouped || !timeline.marketRows) return null;
+    const out: ServedFolder[] = [];
+    for (const m of Object.values(timeline.marketRows))
+      for (const r of m.rowPlan) if (r.kind === "folder") out.push(r.folder);
+    return out;
+  }, [timeline]);
+
+  // The CSV on a grouped page: the rows in chain order, each folder opened for
+  // its members. `missing` is what no answer lists — a seeded wallet's rows
+  // before its seed, or rows below the row cap — and a download short by any
+  // of them does not happen.
+  const fetchAllHistory = useCallback(async (): Promise<WholeHistoryFetch> => {
+    const all: BaseActivityEvent[] = [...compoundEvents];
+    for (const f of allFolders ?? []) {
+      const opened = await fetchTimelineFolderMembers({ path: FOLDER_ROUTE, params: { wallet }, folder: f.responseId });
+      all.push(...opened.events);
+    }
+    all.sort((a, b) => a.blockNumber - b.blockNumber || a.id.localeCompare(b.id));
+    return { events: all, missing: timeline?.coverage.omitted?.count ?? 0 };
+  }, [compoundEvents, allFolders, wallet, timeline]);
 
   const chainByMarket = useMemo(
     () => Object.fromEntries(sections.flatMap((s) => (s.chain ? [[s.market.key, s.chain] as const] : []))),
@@ -522,6 +656,9 @@ export default function CompoundBaseWalletView({
                 views={views}
                 chainByMarket={chainByMarket}
                 events={compoundEvents}
+                history={markdownHistoryScope(undefined, compoundEvents, allFolders)}
+                scopeNote={exportScopeNote(undefined, compoundEvents, "this wallet's whole history", allFolders)}
+                fetchAllEvents={allFolders && allFolders.length > 0 ? fetchAllHistory : undefined}
                 csvFilename={`compound-base-${wallet.slice(0, 10)}-activity.csv`}
               />
             )}
@@ -572,6 +709,7 @@ export default function CompoundBaseWalletView({
                 <MarketSection
                   key={s.market.key}
                   section={s}
+                  wallet={wallet}
                   view={view}
                   events={compoundEvents.filter((e) => e.context.data.market === s.market.key)}
                   timeline={timeline}

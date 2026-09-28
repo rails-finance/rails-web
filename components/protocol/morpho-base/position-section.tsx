@@ -27,12 +27,17 @@ import {
 } from "@/components/protocol/morpho/morpho-position-explanation";
 import { MorphoRiskSlot } from "@/components/protocol/morpho/morpho-risk-slot";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { MORPHO_LIQUIDATION_RUNS } from "@/lib/morpho/timeline-runs";
+import { MORPHO_FOLDER_REGISTER, MORPHO_LIQUIDATION_RUNS } from "@/lib/morpho/timeline-runs";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { useTimelineSegment } from "@/hooks/useTimelineSegment";
+import { eventsBelowLife, replaySegmentReads } from "@/lib/api/fetch-replay-segment";
+import { WHOLE_HISTORY } from "@/lib/shared/timeline-opening-balance";
+import { interleaveRowPlan, type GroupedTimelineFields } from "@/lib/shared/timeline-folder";
+import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
+import type { MorphoChainTimelineResponse } from "@/lib/api/fetch-morpho-base-timeline";
 import type { ChainTimelineCoverage } from "@/lib/api/fetch-chain-timeline";
 import type { MorphoSweptPosition } from "@/lib/api/fetch-morpho-base-timeline";
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
@@ -56,6 +61,9 @@ import { marketLabel } from "@/lib/morpho/asset-catalog";
 /** The contract the sweep read, for the footer's "from its first block" claim. */
 const SOURCE_LABEL = "the Morpho Blue singleton on Base";
 
+const TIMELINE_ROUTE = "/api/chain/morpho-base/timeline";
+const FOLDER_ROUTE = "/api/chain/morpho-base/timeline/folder";
+
 export interface MorphoBasePositionSectionProps {
   wallet: string;
   pos: MorphoSweptPosition;
@@ -73,6 +81,11 @@ export interface MorphoBasePositionSectionProps {
    *  its own exposure page, resolved once on the server and threaded into the
    *  card below so this same address never falls back to bare hex here. */
   vaultOwner?: { name: string; href: string } | null;
+  /** The route's answer for THIS position as ROWS (`?group=1&market=`,
+   *  lib/morpho-base/timeline-folders.ts): `pos.events` are then the
+   *  ungrouped ones and `rowPlan` puts the folders back between them. Null
+   *  on a flat answer. */
+  grouped?: MorphoChainTimelineResponse | null;
 }
 
 export function MorphoBasePositionSection({
@@ -82,14 +95,62 @@ export function MorphoBasePositionSection({
   coverage,
   sweptClean,
   vaultOwner = null,
+  grouped = null,
 }: MorphoBasePositionSectionProps) {
   const events = useMemo(() => pos.events.filter(isMorphoEvent), [pos.events]);
-  const tl = useTimelineEvents(events, {
-    storageKey: `morpho-base-${pos.marketId}-${wallet}`,
-    protocolKey: "morpho",
+
+  const servedRows = useMemo(
+    () => (grouped?.grouped && grouped.rowPlan ? interleaveRowPlan(grouped.rowPlan, events) : undefined),
+    [grouped, events],
+  );
+  /** The folders, whole and unfiltered. The tower, the card's counts and the
+   *  peaks need nothing from them: the route replayed every row before it
+   *  grouped, and those figures ride the replay. */
+  const servedFolders = useMemo(
+    () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
+    [servedRows],
+  );
+  const groupedTail = useMemo<GroupedTimelineFields | null>(
+    () =>
+      grouped?.grouped && grouped.rowPlan && grouped.eventsServed != null
+        ? {
+            grouped: true,
+            rowPlan: grouped.rowPlan,
+            eventsServed: grouped.eventsServed,
+            boundBy: grouped.boundBy ?? null,
+          }
+        : null,
+    [grouped],
+  );
+
+  // The month read (hooks/useTimelineSegment.ts): a month the preload does
+  // not hold is sliced from the route's replay (`&market=&from=&to=`), whose
+  // running figures are the whole replay's. Months below a seed's cut have no
+  // day counts, so the grid draws them and refuses the click; the boundary
+  // card states them.
+  const segmentReads = useMemo(
+    () => replaySegmentReads(TIMELINE_ROUTE, wallet, { market: pos.marketId }),
+    [wallet, pos.marketId],
+  );
+  const { tl, segments, readFolderMembers } = useTimelineSegment({
+    events,
+    groupedTail,
+    servedRows,
+    servedFolders,
+    opening: null,
+    lifeBelow: grouped?.belowByDay,
+    eventsBelowLife: eventsBelowLife(pos.omitted?.count, grouped?.belowByDay),
     // This position's rows before the trim, so numbering runs over its whole
     // history (rails-ops decision 0019).
     olderCount: pos.omitted?.count ?? 0,
+    historyWindow: WHOLE_HISTORY,
+    isEvent: isMorphoEvent,
+    readGrouped: segmentReads.readGrouped,
+    readFlat: segmentReads.readFlat,
+    folderPath: FOLDER_ROUTE,
+    folderParams: { wallet, market: pos.marketId },
+    storageKey: `morpho-base-${pos.marketId}-${wallet}`,
+    protocolKey: "morpho",
   });
 
   const view = useMemo(() => morphoViewFromSweep(pos, wallet, chain), [pos, wallet, chain]);
@@ -98,10 +159,13 @@ export function MorphoBasePositionSection({
   // each card renders on its spine, reduced over the drawn history.
   const externalActivity = useMemo(
     () =>
-      summariseExternalActors(
-        events.map((e) => ({ txFrom: e.context.data.txFrom, poolCaller: e.context.data.caller, wallet: e.wallet })),
+      withFolderActors(
+        summariseExternalActors(
+          events.map((e) => ({ txFrom: e.context.data.txFrom, poolCaller: e.context.data.caller, wallet: e.wallet })),
+        ),
+        servedFolders,
       ),
-    [events],
+    [events, servedFolders],
   );
 
   // The tower is borrower-scoped, as on Ethereum: collateral against debt. A
@@ -164,7 +228,7 @@ export function MorphoBasePositionSection({
           }
           explanation={
             view.status !== "open" ? (
-              <MorphoClosedPositionExplanation v={view} events={events} />
+              <MorphoClosedPositionExplanation v={view} events={events} folders={servedFolders} />
             ) : live ? (
               <MorphoPositionExplanation
                 chain={live}
@@ -187,11 +251,21 @@ export function MorphoBasePositionSection({
 
       <ChainTruthTimeline
         tl={tl}
+        // Both grouping paths: the spec groups a flat answer in the browser,
+        // the register draws the folders the route served.
         runs={MORPHO_LIQUIDATION_RUNS}
+        folderRegister={MORPHO_FOLDER_REGISTER}
+        readFolderMembers={readFolderMembers}
+        segments={segments}
         persistKeyPrefix="morpho"
         closed={view.status !== "open"}
         toolbarLeading={
-          <TimelineActivityHeader events={events} closed={view.status !== "open"} firstAt={pos.firstEventAt} />
+          <TimelineActivityHeader
+            events={events}
+            folders={servedFolders}
+            closed={view.status !== "open"}
+            firstAt={pos.firstEventAt}
+          />
         }
         emptyLabel={
           sweptClean
@@ -199,7 +273,13 @@ export function MorphoBasePositionSection({
             : "No events to show — the sweep could not read this wallet's history."
         }
         footer={<TimelineCoverageFooter coverage={ownCoverage} sourceLabel={SOURCE_LABEL} />}
-        boundary={boundaryFromChainCoverage(ownCoverage, events.length)}
+        // On a grouped answer the list covers `eventsServed`; a month read
+        // holds no card, the grid holding the other months.
+        boundary={
+          tl.historyWindow.state === "span"
+            ? null
+            : boundaryFromChainCoverage(ownCoverage, groupedTail ? groupedTail.eventsServed : events.length)
+        }
         renderCard={(event, meta) =>
           isMorphoEvent(event) ? (
             <MorphoEventCard event={event} eventNumber={meta.eventNumber} isFirst={meta.isFirst} isLast={meta.isLast} />

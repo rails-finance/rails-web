@@ -627,6 +627,12 @@ export interface MorphoReplayInput {
    *  reference/timeline-attention-budget.md, adjustment 1; ported from the
    *  Moonwell replay under decision 0019 leg F). */
   maxRendered: number;
+  /** Per market (lowercase id), the block a position's drawn rows start at, in
+   *  place of its share of `maxRendered`: every row at or after it is drawn,
+   *  every row before it elided. The grouped route passes the cut its row trim
+   *  landed on (lib/morpho-base/timeline-folders.ts), with the anchor off. A
+   *  market not named keeps its share. */
+  renderFromBlock?: ReadonlyMap<string, number>;
   /** False turns the anchor OFF: every position's cut is a plain depth cut,
    *  every row below it is elided and neither `omitted.anchored` nor
    *  `omitted.anchoredComplete` rides. For a
@@ -680,6 +686,8 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
   const render: boolean[] = rows.map((d) => {
     const k = ordinal.get(d.marketId) ?? 0;
     ordinal.set(d.marketId, k + 1);
+    const from = p.renderFromBlock?.get(d.marketId);
+    if (from != null) return d.blockNumber >= from;
     return k >= Math.max(0, (countOf.get(d.marketId) ?? 0) - perPositionCap);
   });
   const shown = rows.filter((_, i) => render[i]);

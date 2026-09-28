@@ -59,6 +59,11 @@ export interface TimelineSegmentOptions {
    *  history. */
   olderCount?: number;
   historyWindow: TimelineWindow;
+  /** The rows one month read carries, where the preload's own row count is
+   *  not it: a page whose timelines share one preload (Compound V3 Base's
+   *  markets) trims each below the cap its month read answers with. Absent,
+   *  the preload's `boundBy` teaches it. */
+  spanCap?: number | null;
   /** The family's event guard; a segment's events pass through it as the
    *  preload's did. */
   isEvent: (e: BaseActivityEvent) => boolean;
@@ -91,7 +96,7 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
     }
     return days;
   }, [events, servedFolders, opening, lifeBelow]);
-  const preloadCap = groupedTail?.boundBy === "rows" ? groupedTail.rowPlan.length : null;
+  const preloadCap = o.spanCap ?? (groupedTail?.boundBy === "rows" ? groupedTail.rowPlan.length : null);
   const [segment, setSegment] = useState<{
     monthIdx: number;
     asked: { from: number; to: number };

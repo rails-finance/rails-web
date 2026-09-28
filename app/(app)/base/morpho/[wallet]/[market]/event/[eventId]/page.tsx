@@ -66,5 +66,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // (`notFound()`) runs unchanged, so a malformed subject 404s the same way
 // here.
 export default async function MorphoBaseEventPage({ params }: Props) {
-  return MorphoBasePositionPage({ params });
+  // A pinned event page stays flat (rails-ops decision 0019, leg C note): a
+  // grouped answer serves a folder's members only when it is opened, and the
+  // pinned card must be among the served events.
+  return MorphoBasePositionPage({ params, searchParams: Promise.resolve({ folders: "0" }) });
 }

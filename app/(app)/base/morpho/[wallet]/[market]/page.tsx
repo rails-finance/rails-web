@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { isMorphoBaseMarketSegment } from "@/lib/morpho-base/routes";
-import { loadMorphoBaseTail } from "@/lib/morpho-base/position-page-data";
+import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
+import { loadMorphoBaseGroupedTail, loadMorphoBaseTail } from "@/lib/morpho-base/position-page-data";
 import { morphoBaseVaultOwnerNote } from "@/lib/morpho-base/vault-owner-note";
 import MorphoBasePositionView from "./position-view";
 
 interface Props {
   params: Promise<{ wallet: string; market: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // Every figure here is read at the head — the singleton's own slots for this
@@ -34,7 +36,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function MorphoBasePositionPage({ params }: Props) {
+export default async function MorphoBasePositionPage({ params, searchParams }: Props) {
   const { wallet: rawWallet, market: rawMarket } = await params;
   if (!ADDRESS.test(rawWallet)) notFound();
   const market = rawMarket?.toLowerCase();
@@ -49,7 +51,10 @@ export default async function MorphoBasePositionPage({ params }: Props) {
   // this position's history is a slice of the wallet's. The history is seeded
   // only when the index vouched for the whole life; otherwise the client
   // half fetches it and the route sweeps. See the loader.
-  const tail = await loadMorphoBaseTail(wallet);
+  // As rows unless the reader asked for `?folders=0`: this position's newest
+  // rows up to the row cap, the rest held by the route for a month read.
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = grouped ? await loadMorphoBaseGroupedTail(`${wallet}|${market}`) : await loadMorphoBaseTail(wallet);
 
   // Some of these addresses are not accounts at all — they are MetaMorpho
   // vaults; see the wallet page above this one for the full note. Resolved
@@ -66,6 +71,7 @@ export default async function MorphoBasePositionPage({ params }: Props) {
       market={market}
       initialSlots={tail.head}
       initialTimeline={tail.timeline}
+      grouped={grouped}
       vaultOwner={vaultOwner}
     />
   );

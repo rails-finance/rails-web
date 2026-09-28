@@ -81,6 +81,9 @@ export function useMorphoBaseWalletReads(
   wallet: string | undefined,
   seedSlots?: MorphoWalletChainResponse | null,
   seedTimeline?: unknown | null,
+  /** The position page's market, when it reads that position as ROWS
+   *  (`fetchMorphoBaseTimeline`); absent, the wallet's history flat. */
+  groupedMarket?: string,
 ): MorphoBaseWalletReads {
   const slotsSeeded = seedSlots != null;
   const [data, setData] = useState<MorphoWalletChainResponse | null>(seedSlots ?? null);
@@ -126,7 +129,7 @@ export function useMorphoBaseWalletReads(
     if (timelineSeeded || !wallet) return;
     let cancelled = false;
     setTimelineState("loading");
-    fetchMorphoBaseTimeline(wallet)
+    fetchMorphoBaseTimeline(wallet, groupedMarket)
       .then((d) => {
         if (cancelled) return;
         setTimeline(d);
@@ -139,7 +142,7 @@ export function useMorphoBaseWalletReads(
     return () => {
       cancelled = true;
     };
-  }, [wallet, timelineSeeded]);
+  }, [wallet, timelineSeeded, groupedMarket]);
 
   // "The sweep read every block of the singleton's life." Both conditions are
   // needed: no holes inside the span, AND the span reaching the contract's own

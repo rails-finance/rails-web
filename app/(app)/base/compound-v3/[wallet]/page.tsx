@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
-import { loadCompoundBaseTail } from "@/lib/compound-base/position-page-data";
+import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
+import { loadCompoundBaseGroupedTail, loadCompoundBaseTail } from "@/lib/compound-base/position-page-data";
 import CompoundBaseWalletView from "./position-view";
 
 interface Props {
   params: Promise<{ wallet: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // Every figure here is read at the head — each Comet's verdict on this account.
@@ -32,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function CompoundBaseWalletPage({ params }: Props) {
+export default async function CompoundBaseWalletPage({ params, searchParams }: Props) {
   const { wallet: raw } = await params;
   if (!ADDRESS.test(raw)) notFound();
   const wallet = raw.toLowerCase();
@@ -41,7 +43,10 @@ export default async function CompoundBaseWalletPage({ params }: Props) {
   // it. A history that has to be swept from the Comets' own logs measures in
   // seconds and stays in the client half — see
   // lib/shared/swept-position-page-data.ts.
-  const tail = await loadCompoundBaseTail(wallet);
+  // As rows unless the reader asked for `?folders=0`: the newest rows up to
+  // the row cap, the rest held by the route for a month read.
+  const grouped = servedFoldersFromParam((await searchParams).folders);
+  const tail = grouped ? await loadCompoundBaseGroupedTail(wallet) : await loadCompoundBaseTail(wallet);
 
   return (
     <CompoundBaseWalletView

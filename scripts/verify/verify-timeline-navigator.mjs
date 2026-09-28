@@ -1694,6 +1694,41 @@ const MAPLE = { page: "/ethereum/maple", api: "/api/maple", q: "" };
 const AAVE_V3_BASE = { page: "/base/aave-v3", api: "/api/chain/aave-v3-base", q: "", replay: true };
 const SEAMLESS = { page: "/base/seamless", api: "/api/chain/seamless", q: "", replay: true };
 const MOONWELL_BASE = { page: "/base/moonwell", api: "/api/chain/moonwell-base", q: "", replay: true };
+// Row-cut batch 5 (2026-09-28) puts Compound V3 Base and Morpho Base on the
+// same replay lane. Compound V3 Base's page draws one timeline per Comet
+// market from one answer (`marketRows`), and a Morpho Base position is one
+// market of the wallet's answer (`positions`), so each fixture names the
+// market its page draws and `view` narrows the route's answer to it.
+// `grouped-cv3-base-deepest` 0x2b4e…f40f (usdc, 15,720 events, unseeded) and
+// `grouped-cv3-base-seeded` 0xd10a…b8d8 (weth, 86,132, seeded; the newest
+// 10,000 rows ride after the seed) are cut by rows with owner-run folders in
+// their newest 2,500; `grouped-morpho-base-deepest` 0xc4c0…68ec in market
+// 3a40…01ba (15,825 events, seeded) holds no folder in its newest rows
+// (interleaved collateral moves, borrows and repays); `grouped-morpho-base`
+// 0xc047…7437 in market 9103…1836 holds owner-run folders.
+const COMPOUND_BASE = { page: "/base/compound-v3", api: "/api/chain/compound-base", q: "", replay: true };
+/** One Comet market of a Compound V3 Base answer, shaped as a one-timeline
+ *  answer: its rows, its loose events, its days below the cut and its count. */
+const compoundBaseView = (market) => (route) => {
+  const m = route.marketRows?.[market];
+  if (!m) return route;
+  const omitted = route.markets?.find((x) => x.market === market)?.omitted?.count ?? 0;
+  return {
+    ...route,
+    rowPlan: m.rowPlan,
+    eventsServed: m.eventsServed,
+    belowByDay: m.belowByDay,
+    events: (route.events ?? []).filter((e) => e.context?.data?.market === market),
+    totalEvents: omitted + m.eventsServed,
+  };
+};
+/** One Morpho Base position of the wallet's grouped answer. */
+const morphoBaseView = (market) => (route) => {
+  const p = route.positions?.find((x) => x.marketId === market);
+  return { ...route, events: p?.events ?? [], totalEvents: (p?.omitted?.count ?? 0) + (route.eventsServed ?? 0) };
+};
+const MORPHO_BASE_DEEPEST_MARKET = "0x3a4048c64ba1b375330d376b1ce40e4047d03b47ab4d48af484edec9fec801ba";
+const MORPHO_BASE_WETH_MARKET = "0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836";
 // Row-cut batch 7 (2026-09-28) puts the three Liquity V2 forks on the same read,
 // grouped by rails-server (the redemption spec and the owner run).
 // `grouped-asym-deepest` is Asymmetry's deepest Trove, sUSDS 8309…2410 (4,731
@@ -1744,6 +1779,35 @@ const GROUPED_FIXTURES = [
     folders: false,
   },
   { id: "grouped-moonwell-base", wallet: "0xcb6586874cc04b01cc4fdb777de502cea7b3d6c1", ...MOONWELL_BASE },
+  {
+    id: "grouped-cv3-base-deepest",
+    wallet: "0x2b4ef83aee6bb3dd5253daa7d0756ef5bd95f40f",
+    ...COMPOUND_BASE,
+    view: compoundBaseView("usdc"),
+  },
+  {
+    id: "grouped-cv3-base-seeded",
+    wallet: "0xd10a6d98868122fea0f629bf1468530ed8efb8d8",
+    ...COMPOUND_BASE,
+    view: compoundBaseView("weth"),
+  },
+  {
+    id: "grouped-morpho-base-deepest",
+    wallet: `0xc4c00d8b323f37527eeda27c87412378be9f68ec/${MORPHO_BASE_DEEPEST_MARKET}`,
+    page: "/base/morpho",
+    timeline: `/api/chain/morpho-base/timeline?wallet=0xc4c00d8b323f37527eeda27c87412378be9f68ec&group=1&market=${MORPHO_BASE_DEEPEST_MARKET}`,
+    replay: true,
+    view: morphoBaseView(MORPHO_BASE_DEEPEST_MARKET),
+    folders: false,
+  },
+  {
+    id: "grouped-morpho-base",
+    wallet: `0xc047a11b00ec9fae2355b4506d17e3c84d7f9437/${MORPHO_BASE_WETH_MARKET}`,
+    page: "/base/morpho",
+    timeline: `/api/chain/morpho-base/timeline?wallet=0xc047a11b00ec9fae2355b4506d17e3c84d7f9437&group=1&market=${MORPHO_BASE_WETH_MARKET}`,
+    replay: true,
+    view: morphoBaseView(MORPHO_BASE_WETH_MARKET),
+  },
 ];
 
 /** The drawn list as rows: folder headers, and event rows. With every folder
@@ -1768,7 +1832,8 @@ for (const g of GROUPED_FIXTURES) {
   const page = await ctx.newPage();
   page.setDefaultTimeout(300_000);
   try {
-    const route = await getJson(g.timeline ?? `${g.api}/timeline?${g.q}wallet=${g.wallet}&group=1`);
+    const answered = await getJson(g.timeline ?? `${g.api}/timeline?${g.q}wallet=${g.wallet}&group=1`);
+    const route = g.view && answered && !answered.error ? g.view(answered) : answered;
     const plan = route.rowPlan ?? [];
     const folders = plan.filter((r) => r.kind === "folder").map((r) => r.folder);
     const loose = route.events ?? [];

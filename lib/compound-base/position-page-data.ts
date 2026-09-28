@@ -17,6 +17,7 @@ import {
   COMPOUND_BASE_DEPLOY_BLOCK,
 } from "@/lib/compound-base/asset-catalog";
 import type { CompoundWalletChainResponse } from "@/lib/api/fetch-compound-wallet";
+import { compoundBaseGroupedBody, readGroupedCompoundBase } from "@/lib/compound-base/timeline-folders";
 
 export const loadCompoundBaseTail = sweptPositionLoader<CompoundWalletChainResponse>({
   label: "compound-v3-base",
@@ -54,5 +55,37 @@ export const loadCompoundBaseTail = sweptPositionLoader<CompoundWalletChainRespo
     if (indexed.heavy && !indexed.whole)
       console.warn(`compound-v3-base position page: heavy wallet ${wallet} (${indexed.reason})`);
     return toTimelineWire(indexed.result, COMPOUND_BASE_CHAIN_ID);
+  },
+});
+
+/**
+ * The same page's history as ROWS — the preload the route answers `?group=1`
+ * with (lib/compound-base/timeline-folders.ts): the newest rows of every
+ * market up to the row cap and the envelope's whole-history figures, the rest
+ * of the replay held server-side for a month read. The position page reads
+ * it unless the reader asked for `?folders=0`; a pinned event page and the
+ * share cards read the flat answer above.
+ */
+export const loadCompoundBaseGroupedTail = sweptPositionLoader<CompoundWalletChainResponse>({
+  label: "compound-v3-base",
+  readHead: async (wallet) => {
+    const data = await loadCompoundWalletFromChain(wallet, COMPOUND_BASE_DEPLOYMENT);
+    return data && !data.chainStale ? data : null;
+  },
+  readWholeIndexedHistory: async (wallet, readerIp) => {
+    const read = await readGroupedCompoundBase(
+      {
+        wallet,
+        deployment: COMPOUND_BASE_DEPLOYMENT,
+        apiPrefix: "/api/compound-base",
+        deployBlock: COMPOUND_BASE_DEPLOY_BLOCK,
+      },
+      readerIp,
+    ).catch((e: unknown) => {
+      console.error("compound-v3-base position page: grouped index read failed", e);
+      return null;
+    });
+    if (read?.kind !== "grouped") return null;
+    return toTimelineWire(compoundBaseGroupedBody(read.answer), COMPOUND_BASE_CHAIN_ID);
   },
 });

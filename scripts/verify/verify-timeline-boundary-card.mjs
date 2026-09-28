@@ -416,20 +416,57 @@ const FIXTURES = [
     path: "/base/seamless/0x3fed901fc296096e125d7332fadba63303b7ddd6",
     route: "/api/chain/seamless/timeline?wallet=0x3fed901fc296096e125d7332fadba63303b7ddd6&group=1",
   },
+  // PINNED to `folders=0` since row-cut batch 5 (2026-09-28) grouped both
+  // pages by default; the grouped defaults are the two fixtures after these.
+  // Compound V3 Base's heavy tail has been the seed reach, 10,000 rows, since
+  // server 8a17cd6 (it was 2,000), but the section read here is this wallet's
+  // aero market, whose whole life sits in its seed, so it is no `reach` lane.
   {
     id: "compound-base",
     arm: "base",
     tail: true,
-    path: "/base/compound-v3/0x5c38a0ab51ac64d93203247eefbc5b6b3ee7f4f6",
+    path: "/base/compound-v3/0x5c38a0ab51ac64d93203247eefbc5b6b3ee7f4f6?folders=0",
     route: "/api/chain/compound-base/timeline?wallet=0x5c38a0ab51ac64d93203247eefbc5b6b3ee7f4f6",
   },
   {
     id: "morpho-base",
     arm: "base",
     // The wallet page is a roster; the timeline is the (wallet, market) page.
-    path: "/base/morpho/0xc047a11b00ec9fae2355b4506d17e3c84d7f9437/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
+    path: "/base/morpho/0xc047a11b00ec9fae2355b4506d17e3c84d7f9437/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836?folders=0",
     route: "/api/chain/morpho-base/timeline?wallet=0xc047a11b00ec9fae2355b4506d17e3c84d7f9437",
     grouped: true,
+  },
+  {
+    // The Compound V3 Base page on its DEFAULT, grouped in the web route after
+    // the replay (row-cut batch 5): one Comet market, 15,720 events, 2,500
+    // rows served with owner-run folders among them (2026-09-28). The answer
+    // carries each market's rows under `marketRows`; `view` reads usdc's.
+    id: "compound-base-grouped",
+    arm: "grouped",
+    path: "/base/compound-v3/0x2b4ef83aee6bb3dd5253daa7d0756ef5bd95f40f",
+    route: "/api/chain/compound-base/timeline?wallet=0x2b4ef83aee6bb3dd5253daa7d0756ef5bd95f40f&group=1",
+    view: (j) => {
+      const m = j.marketRows?.usdc;
+      const omitted = j.markets?.find((x) => x.market === "usdc")?.omitted?.count ?? 0;
+      return m ? { ...j, rowPlan: m.rowPlan, eventsServed: m.eventsServed, totalEvents: omitted + m.eventsServed } : j;
+    },
+  },
+  {
+    // The Morpho Base position page on its DEFAULT, grouped the same way: one
+    // position of the wallet's answer (`positions`), 3,933 events, 2,500 rows
+    // served with owner-run folders among them and an event as the newest row,
+    // which checks 2 and 10 read (2026-09-28).
+    id: "morpho-base-grouped",
+    arm: "grouped",
+    path: "/base/morpho/0xd13de0ab683e6b1eef10532759d9717b65d8a8bd/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
+    route:
+      "/api/chain/morpho-base/timeline?wallet=0xd13de0ab683e6b1eef10532759d9717b65d8a8bd&group=1&market=0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
+    view: (j) => {
+      const p = j.positions?.find(
+        (x) => x.marketId === "0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
+      );
+      return { ...j, totalEvents: (p?.omitted?.count ?? 0) + (j.eventsServed ?? 0) };
+    },
   },
   // vault (the loader's draw window)
   {
@@ -1394,7 +1431,8 @@ for (const f of FIXTURES) {
       // The grouped answer the page drew, read on the same run: cut by ROWS,
       // as many rows as the line names, folders among them, and fewer events
       // listed than the position has — the shortfall the boundary stands for.
-      routeJson = await getJson(f.route);
+      const answered = await getJson(f.route);
+      routeJson = f.view && !answered.error ? f.view(answered) : answered;
       const plan = routeJson.rowPlan ?? [];
       const folderCount = plan.filter((x) => x.kind === "folder").length;
       check(

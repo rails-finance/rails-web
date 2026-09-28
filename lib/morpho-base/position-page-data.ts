@@ -29,6 +29,7 @@ import { MORPHO_BASE_DEPLOY_BLOCK } from "@/lib/morpho-base/asset-catalog";
 import { toGroupedTimelineWire } from "@/lib/shared/timeline-wire";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import type { MorphoWalletChainResponse } from "@/lib/api/fetch-morpho-wallet";
+import { morphoBaseGroupedBody, readGroupedMorphoBase } from "@/lib/morpho-base/timeline-folders";
 
 export const loadMorphoBaseTail = sweptPositionLoader<MorphoWalletChainResponse>({
   label: "morpho-base",
@@ -56,5 +57,37 @@ export const loadMorphoBaseTail = sweptPositionLoader<MorphoWalletChainResponse>
     // The GROUPED wire shape — one list per (market, wallet) pair — which is
     // what the route sends and what the client's rehydrator expects.
     return toGroupedTimelineWire(indexed.result, BASE_CHAIN_ID);
+  },
+});
+
+/**
+ * The position page's history as ROWS — the preload the route answers
+ * `?group=1&market=` with (lib/morpho-base/timeline-folders.ts): that
+ * position's newest rows up to the row cap and the envelope's whole-history
+ * figures, the rest of the replay held server-side for a month read. The
+ * subject is `<wallet>|<market>`; the slot read is the wallet's, as above.
+ * The position page reads it unless the reader asked for `?folders=0`; a
+ * pinned event page, the wallet page and the share cards read the flat
+ * answer above.
+ */
+export const loadMorphoBaseGroupedTail = sweptPositionLoader<MorphoWalletChainResponse>({
+  label: "morpho-base",
+  readHead: async (subject) => {
+    const data = await loadMorphoWalletFromChain(subject.split("|")[0], MORPHO_BASE_DEPLOYMENT);
+    return data && !data.chainStale ? data : null;
+  },
+  readWholeIndexedHistory: async (subject, readerIp) => {
+    const [wallet, market] = subject.split("|");
+    const read = await readGroupedMorphoBase(
+      { wallet, deployment: MORPHO_BASE_DEPLOYMENT, deployBlock: MORPHO_BASE_DEPLOY_BLOCK },
+      market,
+      readerIp,
+    ).catch((e: unknown) => {
+      console.error("morpho-base position page: grouped index read failed", e);
+      return null;
+    });
+    if (read?.kind !== "grouped") return null;
+    const body = morphoBaseGroupedBody(read.answer);
+    return "positions" in body ? toGroupedTimelineWire(body, BASE_CHAIN_ID) : null;
   },
 });

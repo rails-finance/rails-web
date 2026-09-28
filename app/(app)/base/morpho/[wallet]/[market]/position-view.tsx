@@ -12,8 +12,9 @@
 // former per-market block, unchanged: the same cards, tower and footer, with
 // the same rules about what a partial sweep may and may not claim.
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
+import { useParams } from "next/navigation";
 
 import { MorphoBasePositionSection, MorphoLenderOpenCard } from "@/components/protocol/morpho-base/position-section";
 import { MorphoPositionCard } from "@/components/protocol/morpho/morpho-position-card";
@@ -35,6 +36,11 @@ import { morphoHasCollateralRaw, morphoHasDebt } from "@/lib/morpho/position-leg
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
 import { CaptureSourceProvider } from "@/lib/shared/capture-source";
 import { SweepInFlight } from "@/components/shared/sweep-in-flight";
+import type { WholeHistoryFetch } from "@/components/shared/export-menu";
+import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
+import type { ServedFolder } from "@/lib/shared/timeline-folder";
+import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
+import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle, as on the Ethereum position page. The
@@ -73,6 +79,9 @@ interface MorphoBasePositionViewProps {
    *  server (lib/morpho-base/vault-owner-note.ts) and threaded into every
    *  card below so this address never falls back to bare hex on this page. */
   vaultOwner: { name: string; href: string } | null;
+  /** The server read this position as ROWS (`?folders=0` absent); the
+   *  client's own read, when the server could not seed one, asks the same. */
+  grouped?: boolean;
 }
 
 export default function MorphoBasePositionView({
@@ -81,9 +90,14 @@ export default function MorphoBasePositionView({
   initialSlots,
   initialTimeline,
   vaultOwner,
+  grouped = false,
 }: MorphoBasePositionViewProps) {
+  // The event route renders this same view, flat: pinned mode finds its card
+  // among the served events, and a folder's members arrive only when opened.
+  const routeParams = useParams<{ eventId?: string | string[] }>();
+  const pinnedRoute = routeParams?.eventId != null;
   const { data, loading, error, timeline, timelineState, sweptClean, captureSource, chainByMarket } =
-    useMorphoBaseWalletReads(wallet, initialSlots, initialTimeline);
+    useMorphoBaseWalletReads(wallet, initialSlots, initialTimeline, grouped && !pinnedRoute ? market : undefined);
 
   const live = chainByMarket.get(market) ?? null;
   const liveClean = live && !live.chainStale ? live : null;
@@ -122,6 +136,29 @@ export default function MorphoBasePositionView({
     [sweptClean, pos, wallet, live],
   );
   const exportEvents = useMemo(() => (pos ? pos.events.filter(isMorphoEvent) : []), [pos]);
+  // On a grouped answer the folders' members are not among the events: the
+  // export states them, and the CSV opens each folder for its members.
+  // `missing` is what no answer lists — a seed's rows, or rows below the cap.
+  const folders = useMemo<ServedFolder[] | null>(
+    () =>
+      timeline?.grouped && timeline.market === market && timeline.rowPlan
+        ? timeline.rowPlan.flatMap((r) => (r.kind === "folder" ? [r.folder] : []))
+        : null,
+    [timeline, market],
+  );
+  const fetchAllHistory = useCallback(async (): Promise<WholeHistoryFetch> => {
+    const all: BaseActivityEvent[] = [...exportEvents];
+    for (const f of folders ?? []) {
+      const opened = await fetchTimelineFolderMembers({
+        path: "/api/chain/morpho-base/timeline/folder",
+        params: { wallet, market },
+        folder: f.responseId,
+      });
+      all.push(...opened.events);
+    }
+    all.sort((a, b) => a.blockNumber - b.blockNumber || a.id.localeCompare(b.id));
+    return { events: all, missing: pos?.omitted?.count ?? 0 };
+  }, [exportEvents, folders, wallet, market, pos]);
 
   // The top row's price dropdown — the Ethereum page's treatment on the Base
   // singleton: the market's own oracle prices the collateral in the market's
@@ -167,6 +204,9 @@ export default function MorphoBasePositionView({
               view={exportView}
               chain={live}
               events={exportEvents}
+              history={markdownHistoryScope(undefined, exportEvents, folders)}
+              scopeNote={exportScopeNote(undefined, exportEvents, "this position's whole history", folders)}
+              fetchAllEvents={folders && folders.length > 0 ? fetchAllHistory : undefined}
               csvFilename={`morpho-base-${market.slice(0, 10)}-${wallet.slice(0, 10)}-activity.csv`}
             />
           )}
@@ -207,6 +247,8 @@ export default function MorphoBasePositionView({
                     coverage={timeline.coverage}
                     sweptClean={sweptClean}
                     vaultOwner={vaultOwner}
+                    // Rows only when the answer is this position's grouping.
+                    grouped={timeline.grouped && timeline.market === market ? timeline : null}
                   />
                 </div>
               ) : liveClean ? (

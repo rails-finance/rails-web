@@ -7,6 +7,7 @@ import { COMPOUND_BASE_DEPLOYMENT, COMPOUND_BASE_DEPLOY_BLOCK } from "@/lib/comp
 import { toTimelineWire } from "@/lib/shared/timeline-wire";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
+import { groupedCompoundBaseTimeline } from "@/lib/compound-base/grouped-routes";
 
 // A wallet's whole life on Compound V3 Base: from the INDEX when the index
 // can vouch for all of it, swept from the five Comets' own logs otherwise.
@@ -52,6 +53,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "wallet must be an address" }, { status: 400 });
 
   try {
+    // `?group=1` — THE SAME HISTORY AS ROWS, and `&market=&from=&to=` a month
+    // of one market (batch 5 of the row cut, lib/compound-base/
+    // timeline-folders.ts). Every row is replayed first and grouped after; a
+    // month is sliced from that replay. Only the index can be grouped: a
+    // history it cannot vouch for falls through to the flat answer below,
+    // which sweeps.
+    if (request.nextUrl.searchParams.get("group") === "1") {
+      const grouped = await groupedCompoundBaseTimeline(wallet, request.nextUrl.searchParams, readerIp, CACHE_CONTROL);
+      if (grouped) return grouped;
+    }
+
     const indexed = await loadCometEventsFromIndex(
       {
         wallet,
