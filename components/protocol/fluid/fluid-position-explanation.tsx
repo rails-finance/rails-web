@@ -97,10 +97,10 @@ function FluidClosedPositionExplanation({
             </H>
           </>
         )}
+        {v.peakBasis === "chain" && <>, interest included</>}
         {peakFigures > 1 ? (
           <>
-            {" "}
-            — each figure its own highest point across the position&rsquo;s life, so they need not have stood together.
+            . Each is its own highest point across the position&rsquo;s life, so the two can come from different dates.
           </>
         ) : (
           <> — its highest point across the position&rsquo;s life.</>

@@ -535,18 +535,36 @@ export const accruedInterestProv = (side: "supply" | "borrow", sym: string): Pro
   via: `settled ${side} (resolver) − Σ ${side === "supply" ? "colAmt_" : "debtAmt_"} across LogOperate logs + liquidation attributions`,
 });
 
-/** Closed-card peak figure — the highest the leg's Σ replay ever stood.
- *  Interest accrues between events with no log of its own on BOTH Fluid legs
- *  (collateral earns too), so the replayed peak can sit slightly under the
- *  true settled peak — the receipt says so rather than claim exactness. */
-export const peakLegProv = (side: "supply" | "borrow", sym: string, coords: FluidCoords): Provenance => ({
-  kind: "derived",
-  pclass: "indexed",
-  summary: `The highest ${sym} ${side === "supply" ? "collateral" : "debt"} this position ever recorded — the maximum of the leg's running balance after each captured event, the operate deltas plus every liquidation-attribution row, from mint to close. The replay is exact at liquidation boundaries, but interest accrues between events with no log of its own (a Fluid ${side === "supply" ? "collateral leg earns" : "debt leg pays"} continuously), so the true peak can sit slightly above this figure. A token amount in the vault's own leg — Fluid runs no USD feed, so no dollar value is asserted.`,
-  contract: vaultContract(coords),
-  via: `${FLUID_VIA} · max(${side === "supply" ? "col" : "debt"}_after) across the position's captured events · mint → close`,
-  inputs: eventInputs(coords),
-});
+/** Closed-card peak figure. On the "chain" basis: the highest settled
+ *  balance the leg stood at across the position's rows, before or after each
+ *  event, interest included (server /positions over mig 344's reads). On the
+ *  "replay" basis, served while a row is unread: the Σ replay's maximum,
+ *  which misses the interest accrued between events. */
+export const peakLegProv = (
+  side: "supply" | "borrow",
+  sym: string,
+  coords: FluidCoords,
+  basis: "chain" | "replay" = "replay",
+): Provenance => {
+  const leg = side === "supply" ? "collateral" : "debt";
+  return basis === "chain"
+    ? {
+        kind: "derived",
+        pclass: "state",
+        summary: `The highest ${sym} ${leg} this position ever held: the largest of the vault's settled balances just before and just after each of its rows, from mint to close. Each is the resolver's figure at the row's block, interest included, so a ${side === "supply" ? "peak reached as the collateral earned" : "peak reached as interest built up before a repay"} counts. The collateral and debt peaks can fall on different dates. A token amount in the vault's leg; Fluid runs no USD feed.`,
+        contract: RESOLVER_CONTRACT,
+        via: `max over the position's rows of the settled ${side} before and after (VaultPositionsResolver at each row's block, less later same-block deltas) · mint → close`,
+        inputs: eventInputs(coords),
+      }
+    : {
+        kind: "derived",
+        pclass: "indexed",
+        summary: `The highest ${sym} ${leg} this position ever recorded: the maximum of the leg's running balance after each captured event, the operate deltas plus every liquidation-attribution row, from mint to close. Interest accrues between events with no log of its own (a Fluid ${side === "supply" ? "collateral leg earns" : "debt leg pays"} continuously), so the true peak can sit above this figure; the settled figures replace it once every row has been read at its block. A token amount in the vault's leg; Fluid runs no USD feed.`,
+        contract: vaultContract(coords),
+        via: `${FLUID_VIA} · max(${side === "supply" ? "col" : "debt"}_after) across the position's captured events · mint → close`,
+        inputs: eventInputs(coords),
+      };
+};
 
 // ── identity ─────────────────────────────────────────────────────────────────
 

@@ -65,6 +65,8 @@ export interface FluidPositionView {
   /** Highest recorded per-leg amounts (closed cards). */
   peakCol: string;
   peakDebt: string;
+  /** Which lane the peaks come from — see FluidPositionSummary.peakBasis. */
+  peakBasis: "chain" | "replay";
   lastActivityAt: number | null;
 }
 
@@ -226,7 +228,8 @@ export function FluidPositionCard({
   );
 
   // Closed: the settled figures have gone to zero, so the headline is what
-  // each leg held at its height — the replayed per-leg MAX (no USD). The
+  // each leg held at its height — the per-leg MAX of the rows' settled
+  // balances (the replay's while a row is unread; no USD). The
   // Explanation threads through: a terminal position narrates from the index
   // alone, and its pane is the peaks/record/closure story.
   if (v.status === "closed") {
@@ -240,7 +243,11 @@ export function FluidPositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={fluidPositionContent({ status: "closed", wasLiquidated: v.wasLiquidated })}
+        learnMore={fluidPositionContent({
+          status: "closed",
+          wasLiquidated: v.wasLiquidated,
+          peakBasis: v.peakBasis,
+        })}
       >
         <ClosedPositionStats
           outcome={v.wasLiquidated ? "liquidated" : "closed"}
@@ -250,7 +257,7 @@ export function FluidPositionCard({
           collateral={
             Number.isFinite(peakCol) && peakCol > 0 ? (
               <StatValue>
-                <Prov info={peakLegProv("supply", colName, peakCoords)}>
+                <Prov info={peakLegProv("supply", colName, peakCoords, v.peakBasis)}>
                   <AssetAmount value={peakCol} symbol={colName} exact={v.peakCol} />
                 </Prov>
               </StatValue>
@@ -261,13 +268,18 @@ export function FluidPositionCard({
           debt={
             Number.isFinite(peakDebt) && peakDebt > 0 ? (
               <StatValue>
-                <Prov info={peakLegProv("borrow", debtName, peakCoords)}>
+                <Prov info={peakLegProv("borrow", debtName, peakCoords, v.peakBasis)}>
                   <AssetAmount value={peakDebt} symbol={debtName} exact={v.peakDebt} />
                 </Prov>
               </StatValue>
             ) : (
               <StatDash />
             )
+          }
+          debtFootnote={
+            Number.isFinite(peakCol) && peakCol > 0 && Number.isFinite(peakDebt) && peakDebt > 0 ? (
+              <div className="text-xs text-rb-500 mt-0.5">each peak at its own date</div>
+            ) : undefined
           }
         />
       </PositionCardShell>
@@ -350,6 +362,7 @@ export function viewFromSummary(s: FluidPositionSummary): FluidPositionView {
     liquidationCount: s.liquidationCount,
     peakCol: s.peakCol,
     peakDebt: s.peakDebt,
+    peakBasis: s.peakBasis,
     lastActivityAt: s.lastActivityAt,
   };
 }

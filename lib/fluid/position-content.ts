@@ -14,6 +14,8 @@ export function fluidPositionContent(opts: {
   status: "open" | "closed";
   wasLiquidated?: boolean;
   hasDebt?: boolean;
+  /** Where the closed card's peaks come from (FluidPositionSummary.peakBasis). */
+  peakBasis?: "chain" | "replay";
 }): LearnMoreContent {
   if (opts.status === "closed") {
     return {
@@ -33,7 +35,10 @@ export function fluidPositionContent(opts: {
         },
         {
           bold: "Highest recorded",
-          text: "each peak is the maximum of the running balance, replayed from the position's own events — not the interest-bearing current value.",
+          text:
+            opts.peakBasis === "chain"
+              ? "each peak is the highest balance the vault settled for the position just before or after any of its events, interest included. The collateral peak and the debt peak can come from different dates."
+              : "each peak is the highest running balance summed from the position's events. That sum leaves out the interest accrued between events, so the true peak can be higher. The collateral peak and the debt peak can come from different dates.",
         },
       ],
       links: LINKS,
