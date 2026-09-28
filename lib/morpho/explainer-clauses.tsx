@@ -51,6 +51,7 @@ import {
   assetsDeltaProv,
   collateralAfterProv,
   borrowedAfterProv,
+  debtAfterProv,
   liqSeizedValueProv,
   liqClearedValueProv,
   type MorphoCoords,
@@ -73,10 +74,13 @@ export const MORPHO_EPS = 1e-9;
 
 export interface MorphoResultingState {
   collAfter: number;
-  /** Net borrowed PRINCIPAL after (Σ borrow − repay − liquidation cover). Can
-   *  read below zero on a full repay, where the payment settled principal plus
-   *  the interest built up on it. */
+  /** What the position owed after the event: the chain debt (shares at the
+   *  market's totals) where the row carries it, else the net borrowed PRINCIPAL
+   *  (Σ borrow − repay − liquidation cover), which can read below zero on a
+   *  full repay, where the payment settled principal plus its interest. */
   borrowedAfter: number;
+  /** True when `borrowedAfter` is the chain debt. */
+  debtIsChain: boolean;
   hasColl: boolean;
   hasDebt: boolean;
   debtCleared: boolean;
@@ -88,7 +92,8 @@ export interface MorphoResultingState {
 
 export function resultingState(ctx: MorphoContext): MorphoResultingState {
   const collRaw = Number(ctx.collateralAfter);
-  const borrRaw = Number(ctx.borrowedAfter);
+  const debtIsChain = ctx.debtAfter != null;
+  const borrRaw = Number(debtIsChain ? ctx.debtAfter : ctx.borrowedAfter);
   const collAfter = Number.isFinite(collRaw) ? collRaw : 0;
   const borrowedAfter = Number.isFinite(borrRaw) ? borrRaw : 0;
   const hasColl = collAfter > 0;
@@ -96,12 +101,13 @@ export function resultingState(ctx: MorphoContext): MorphoResultingState {
   return {
     collAfter,
     borrowedAfter,
+    debtIsChain,
     hasColl,
     hasDebt,
     debtCleared: !hasDebt,
     collateralOnly: hasColl && !hasDebt,
     emptied: !hasColl && !hasDebt,
-    principalOvershoot: borrowedAfter < -MORPHO_EPS,
+    principalOvershoot: !debtIsChain && borrowedAfter < -MORPHO_EPS,
   };
 }
 
@@ -165,8 +171,12 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
     </Fig>
   );
   const borrowedAfterFig = () => (
-    <Fig echo info={borrowedAfterProv(loanSym, coords)} value={formatNumber(Number(ctx.borrowedAfter))}>
-      {formatNumber(Number(ctx.borrowedAfter))} {loanSym}
+    <Fig
+      echo
+      info={rs.debtIsChain ? debtAfterProv(loanSym, coords) : borrowedAfterProv(loanSym, coords)}
+      value={formatNumber(rs.borrowedAfter)}
+    >
+      {formatNumber(rs.borrowedAfter)} {loanSym}
     </Fig>
   );
 
@@ -193,7 +203,7 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
 
   switch (ctx.eventType) {
     case "borrow": {
-      const firstBorrow = rs.borrowedAfter - delta <= MORPHO_EPS;
+      const firstBorrow = (rs.debtIsChain ? Number(ctx.debtBefore) : rs.borrowedAfter - delta) <= MORPHO_EPS;
       const happened = firstBorrow ? (
         <>
           Borrowed {deltaFig()} against the position&rsquo;s {collSym} collateral — its first debt, at{" "}
@@ -216,7 +226,9 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
         ? rs.emptied
           ? cont(<>, clearing the debt in full and closing the position.</>)
           : cont(<>, clearing the debt in full — the position now holds only collateral.</>)
-        : cont(<>, leaving {borrowedAfterFig()} of principal outstanding.</>);
+        : rs.debtIsChain
+          ? cont(<>, leaving {borrowedAfterFig()} owed.</>)
+          : cont(<>, leaving {borrowedAfterFig()} of principal outstanding.</>);
       // The general debt-as-shares rule is Layer-2 material — the "?" modal
       // (morphoMarketContent's "Debt as shares") carries it verbatim; the
       // state-gated overshoot caveat below stays (§2 misleading-figure).

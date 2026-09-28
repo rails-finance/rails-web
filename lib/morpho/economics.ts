@@ -25,6 +25,7 @@ import {
   positionBorrowedProv,
   morphoCurrentDebtProv,
   morphoFlowProv,
+  morphoLifetimeInterestProv,
 } from "@/lib/morpho/event-provenance";
 import type { Provenance } from "@/components/shared/provenance";
 import type { MorphoIndexRead } from "@/lib/sources/api/morpho-positions";
@@ -73,6 +74,13 @@ export interface MorphoTowerLifetime {
   collateralLiquidated: number;
   borrowed: number;
   repaid: number;
+  /** Interest the debt accrued between rows (Σ each row's interest since the
+   *  previous one), where the rows carry the chain debt. Undefined where they do
+   *  not (the swept Base lane), so no lifetime interest is stated. */
+  interest?: number;
+  /** The debt the newest row states after it, where rows carry the chain debt:
+   *  the head read less this is the interest since the last event. */
+  lastDebtAfter?: number;
 }
 
 /** Reduce a position's events into its lifetime gross flows. Morpho events
@@ -88,9 +96,17 @@ function reduceLifetime(events: BaseActivityEvent[]): MorphoTowerLifetime {
     borrowed: 0,
     repaid: 0,
   };
+  let lastBlock = -1;
   for (const ev of events) {
     if (!isMorphoEvent(ev)) continue;
     const ctx = ev.context.data;
+    if (ctx.debtAfter != null && !unreadToken(ev, ctx.loanSymbol)) {
+      out.interest = (out.interest ?? 0) + (Number(ctx.interestSincePrevious ?? 0) || 0);
+      if (ev.blockNumber >= lastBlock) {
+        lastBlock = ev.blockNumber;
+        out.lastDebtAfter = Number(ctx.debtAfter);
+      }
+    }
     // An amount in a token whose decimals did not load joins no sum.
     if (unreadToken(ev, ctx.side === "collateral" ? ctx.collateralSymbol : ctx.loanSymbol)) continue;
     const amt = Math.abs(Number(ctx.assetsDelta));
@@ -146,7 +162,7 @@ export function morphoLifetimeWithOpening(
   // (bucket key, summary leg) → the MorphoTowerLifetime field it lands on.
   const FIELD: Record<string, Partial<Record<string, keyof MorphoTowerLifetime>>> = {
     collateral: { deposited: "deposited", withdrawn: "collateralWithdrawn", liquidated: "collateralLiquidated" },
-    debt: { borrowed: "borrowed", repaid: "repaid" },
+    debt: { borrowed: "borrowed", repaid: "repaid", interest: "interest" },
   };
   for (const bucket of mergeFlowBuckets(opening?.flows, folderFlows(folders))) {
     const fields = FIELD[bucket.key];
@@ -156,7 +172,7 @@ export function morphoLifetimeWithOpening(
       if (!field) continue;
       const value = scaleBaseUnits(raw, bucket.decimals);
       if (value == null) return undefined;
-      f[field] += value;
+      f[field] = (f[field] ?? 0) + value;
     }
   }
   return f;
@@ -192,7 +208,13 @@ export function computeMorphoEconomics(
     collateralLiquidated: cLiquidated,
     borrowed,
     repaid,
+    interest: rowInterest,
+    lastDebtAfter,
   } = precomputedLifetime ?? reduceLifetime(events);
+  const lifetimeInterest =
+    !loanUnread && rowInterest != null
+      ? rowInterest + (cd && lastDebtAfter != null ? Math.max(0, cd.amount - lastDebtAfter) : 0)
+      : undefined;
   // Surface lifetime flows only where the captured events reconcile to current
   // state (history complete from the position's first event). Per side, since
   // one can be complete while the other isn't.
@@ -271,6 +293,22 @@ export function computeMorphoEconomics(
             }
           : null,
       exited: flowLine("debt-repaid", repaid, view.loanSymbol, loanAddr, "repaid", debtComplete),
+      // The interest the debt accrued over its life: Σ each row's interest
+      // since the previous one, plus the head read less the newest row's debt.
+      costs:
+        lifetimeInterest != null && lifetimeInterest > DUST
+          ? [
+              {
+                key: "debt-interest-accrued",
+                symbol: view.loanSymbol,
+                address: loanAddr,
+                amount: lifetimeInterest,
+                usd: null,
+                flowLabel: "Interest accrued",
+                prov: morphoLifetimeInterestProv(view.loanSymbol),
+              },
+            ]
+          : [],
       liquidated: [],
       lifetimeInflow: debtComplete ? borrowed : 0,
     },

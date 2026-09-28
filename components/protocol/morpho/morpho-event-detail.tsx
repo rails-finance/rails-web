@@ -1,10 +1,11 @@
 "use client";
 
 // Morpho event detail (chain-state tier) — adapter onto the shared
-// ChainTruthDetail grid. The position's collateral and borrowed / supplied
-// PRINCIPAL after this event, replayed from the deltas; each value is a sum of
-// chain fields and traces via <Prov>. The side this event didn't touch is dimmed.
-// Current debt with interest (shares × index) is a layer on the position card.
+// ChainTruthDetail grid. The position's collateral after this event, replayed
+// from the deltas, and its debt: the borrow shares at the market's totals at the
+// row where the answer carries it (Ethereum), the borrowed principal otherwise
+// (the swept Base lane). Each value traces via <Prov>. The side this event
+// didn't touch is dimmed.
 
 import type { AssetFlow, MorphoContext } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
@@ -15,6 +16,10 @@ import {
   assetsDeltaProv,
   collateralBeforeProv,
   borrowedBeforeProv,
+  debtAfterProv,
+  debtBeforeProv,
+  debtChangeProv,
+  interestSincePreviousProv,
   suppliedAfterProv,
   suppliedBeforeProv,
   atBlockOraclePriceProv,
@@ -134,26 +139,54 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
             })
           : undefined,
     },
-    {
-      label: "Borrowed",
-      value: fmtAfter(ctx.borrowedAfter),
-      symbol: ctx.loanSymbol,
-      address: loanAddr,
-      prov: borrowedAfterProv(ctx.loanSymbol, coords),
-      dimmed: !borrActive,
-      // Gated on the debt axis actually moving: a lender-side supply or
-      // withdraw also rides `side: "loan"`, and its delta belongs to the
-      // supplied axis below, not to the borrowed one.
-      transition:
-        ctx.side === "loan" && borrActive
-          ? reconstructTransition({
-              after: ctx.borrowedAfter,
-              change: ctx.assetsDelta,
-              changeProv: assetsDeltaProv(ctx.loanSymbol, "loan", coords, ctx.eventType),
-              beforeProv: borrowedBeforeProv(ctx.loanSymbol, coords),
-            })
-          : undefined,
-    },
+    ctx.debtAfter != null
+      ? {
+          // What the position owed: shares × the market's totals at the row.
+          // Before = after − change, the change being debt after − debt before;
+          // the gap from the previous row's after is the interest between.
+          label: "Debt",
+          value: fmt(ctx.debtAfter),
+          symbol: ctx.loanSymbol,
+          address: loanAddr,
+          prov: debtAfterProv(ctx.loanSymbol, coords),
+          dimmed: !borrActive && !ctx.interestSincePrevious,
+          transition: borrActive
+            ? reconstructTransition({
+                after: ctx.debtAfter,
+                change: ctx.debtChange,
+                changeProv: debtChangeProv(ctx.loanSymbol, coords),
+                beforeProv: debtBeforeProv(ctx.loanSymbol, coords),
+              })
+            : undefined,
+          ...(ctx.interestSincePrevious
+            ? {
+                interestSincePrevious: {
+                  value: ctx.interestSincePrevious,
+                  prov: interestSincePreviousProv(ctx.loanSymbol, coords),
+                },
+              }
+            : {}),
+        }
+      : {
+          label: "Borrowed",
+          value: fmtAfter(ctx.borrowedAfter),
+          symbol: ctx.loanSymbol,
+          address: loanAddr,
+          prov: borrowedAfterProv(ctx.loanSymbol, coords),
+          dimmed: !borrActive,
+          // Gated on the debt axis actually moving: a lender-side supply or
+          // withdraw also rides `side: "loan"`, and its delta belongs to the
+          // supplied axis below, not to the borrowed one.
+          transition:
+            ctx.side === "loan" && borrActive
+              ? reconstructTransition({
+                  after: ctx.borrowedAfter,
+                  change: ctx.assetsDelta,
+                  changeProv: assetsDeltaProv(ctx.loanSymbol, "loan", coords, ctx.eventType),
+                  beforeProv: borrowedBeforeProv(ctx.loanSymbol, coords),
+                })
+              : undefined,
+        },
   ];
 
   // The lender axis — present only where the feeding lane replays it (the

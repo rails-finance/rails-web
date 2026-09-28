@@ -10,7 +10,7 @@
 // page did not already reconcile.
 //
 // One adapter per protocol, a few lines each. AFTER-only protocols (Compound
-// V3, Morpho, MakerDAO, LlamaLend, f(x)) and PWN (no running balance) return
+// V3, MakerDAO, LlamaLend, f(x)) and PWN (no running balance) return
 // null: the line is absent on their card, not a zero. A lane whose before is
 // exactly zero is dropped too — a reserve the row opened says nothing about the
 // position, and "held 0" is not a statement a reader came for.
@@ -125,6 +125,16 @@ export function boundaryStateFromOldestRow(e: BaseActivityEvent | undefined): Bo
         line("Principal", d.principalBefore, d.assetSymbol),
       );
     }
+    // Morpho on Ethereum: each row states the debt before it (shares at the
+    // market's totals); collateral before is the after less the row's own move.
+    case "morpho": {
+      const d = c.data;
+      if (d.debtBefore == null) return null;
+      const collMoved = d.side === "collateral" ? Number(d.assetsDelta) : 0;
+      const collBefore =
+        d.collateralAfter != null && Number.isFinite(collMoved) ? Number(d.collateralAfter) - collMoved : undefined;
+      return lines(line("Collateral", collBefore, d.collateralSymbol), line("Debt", d.debtBefore, d.loanSymbol));
+    }
     // Alchemix V3 rows carry deltas, never the figure before them, and the
     // boundary could not be restated from one even if they did: a redemption
     // moves every open position's debt at once and appears on the timeline as a
@@ -141,7 +151,6 @@ export function boundaryStateFromOldestRow(e: BaseActivityEvent | undefined): Bo
     case "alchemix-v2":
     // After-only rows, or no running balance at all: the line is absent.
     case "compound":
-    case "morpho":
     case "makerdao":
     case "llamalend":
     case "fx":

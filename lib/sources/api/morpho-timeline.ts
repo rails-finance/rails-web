@@ -50,6 +50,12 @@ export interface RawMorphoTimelineRow {
   coll_after?: string | null;
   borr_after?: string | null;
   bsh_after?: string | null;
+  /** What the position owed before and after this row (borrow shares at the
+   *  market's totals, server mig 352), and the interest since its previous
+   *  row, raw loan units. Absent from a route that predates them. */
+  debt_before?: string | null;
+  debt_after?: string | null;
+  interest_prev?: string | null;
   tx: string;
   log_index: number;
   block_number: string;
@@ -162,6 +168,25 @@ function oraclePriceOf(
   return Number.isFinite(human) && human > 0 ? { loanPerCollateral: human, source } : undefined;
 }
 
+/** The chain debt on a row: before, after, the exact change between them and
+ *  the interest since the previous row. A gap of one base unit is the rounding
+ *  of toAssetsUp on two reads, and stays unstated. */
+export function debtFieldsOf(
+  r: Pick<RawMorphoTimelineRow, "debt_before" | "debt_after" | "interest_prev">,
+  loanDec: number,
+): Pick<MorphoContext, "debtBefore" | "debtAfter" | "debtChange" | "interestSincePrevious"> {
+  if (r.debt_after == null || r.debt_before == null) return {};
+  const before = bigintOf(r.debt_before);
+  const after = bigintOf(r.debt_after);
+  const accrued = r.interest_prev != null ? bigintOf(r.interest_prev) : ZERO;
+  return {
+    debtBefore: fmtUnits(before, loanDec),
+    debtAfter: fmtUnits(after, loanDec),
+    debtChange: fmtUnits(after - before, loanDec),
+    ...(accrued > BigInt(1) ? { interestSincePrevious: fmtUnits(accrued, loanDec) } : {}),
+  };
+}
+
 /** Build the position timeline from the rails route's raw delta rows. */
 export async function buildMorphoTimeline(resp: RawMorphoTimelineResponse): Promise<MorphoTimelineResult> {
   const meta = await resolveMarketMeta(resp.marketId, resp.marketParams);
@@ -206,6 +231,7 @@ export async function buildMorphoTimeline(resp: RawMorphoTimelineResponse): Prom
       sharesDelta: shareDelta,
       collateralAfter: r.coll_after != null ? fmtUnits(bigintOf(r.coll_after), collDec) : undefined,
       borrowedAfter: r.borr_after != null ? fmtUnits(bigintOf(r.borr_after), loanDec) : undefined,
+      ...debtFieldsOf(r, loanDec),
       isOpen: r.is_open ?? (wholeHistory && idx === 0),
       // The acting parties, present only on two-fact external rows (the route
       // pre-filters). The card derives third-party marking from these.

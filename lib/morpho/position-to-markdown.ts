@@ -165,8 +165,19 @@ function timelineTable(events: BaseActivityEvent[], history: MarkdownHistoryScop
     out.push("_No transaction history available._");
     return out;
   }
-  out.push("| # | Date | Action | Token | Amount | Collateral after | Borrowed after | Transaction |");
-  out.push("|---|------|--------|-------|--------|------------------|----------------|-------------|");
+  // The Ethereum rows carry the chain debt (shares at the market's totals);
+  // the swept Base lane carries principal until its lane does the same.
+  const chainDebt = rows.some((e) => isMorphoEvent(e) && e.context.data.debtAfter != null);
+  out.push(
+    chainDebt
+      ? "| # | Date | Action | Token | Amount | Collateral after | Debt after | Interest since previous | Transaction |"
+      : "| # | Date | Action | Token | Amount | Collateral after | Borrowed after | Transaction |",
+  );
+  out.push(
+    chainDebt
+      ? "|---|------|--------|-------|--------|------------------|------------|-------------------------|-------------|"
+      : "|---|------|--------|-------|--------|------------------|----------------|-------------|",
+  );
   rows.forEach((e, i) => {
     if (!isMorphoEvent(e)) return;
     const d = e.context.data;
@@ -177,12 +188,19 @@ function timelineTable(events: BaseActivityEvent[], history: MarkdownHistoryScop
     const fig = (v: string | undefined, sym: string) =>
       v == null || unreadToken(e, sym) ? NOT_LOADED_CELL : amt(parseFloat(v));
     const amount = unreadToken(e, token) ? NOT_LOADED_CELL : amt(Math.abs(parseFloat(d.assetsDelta)));
+    const debtCells = chainDebt
+      ? `${fig(d.debtAfter, d.loanSymbol)} | ${d.interestSincePrevious != null ? fig(d.interestSincePrevious, d.loanSymbol) : ""}`
+      : fig(d.borrowedAfter, d.loanSymbol);
     out.push(
-      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${token} | ${amount} | ${fig(d.collateralAfter, d.collateralSymbol)} | ${fig(d.borrowedAfter, d.loanSymbol)} | ${txCell(e)} |`,
+      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${token} | ${amount} | ${fig(d.collateralAfter, d.collateralSymbol)} | ${debtCells} | ${txCell(e)} |`,
     );
   });
   out.push("");
-  out.push("_Borrowed after is net PRINCIPAL (Σ borrows − repays) — accrued interest is the live layer above._");
+  out.push(
+    chainDebt
+      ? "_Debt after is the borrow shares at the market's totals at the row, interest included; interest since previous is the growth since the position's previous event._"
+      : "_Borrowed after is net PRINCIPAL (Σ borrows − repays) — accrued interest is the live layer above._",
+  );
   out.push("");
   return out;
 }

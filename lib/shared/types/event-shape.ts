@@ -821,6 +821,19 @@ export interface MorphoContext {
    *  accrued interest (that's the derived layer). The index's served
    *  `borrowed_after` on the mainnet lane; absent as `collateralAfter` is. */
   borrowedAfter?: string;
+  /** What the position owed just before and just after this event: its borrow
+   *  shares at the market's totalBorrowAssets ÷ totalBorrowShares there
+   *  (toAssetsUp), the figure Morpho.position × Morpho.market give at the block.
+   *  Set on the Ethereum lane (server mig 352); absent where the answer did not
+   *  carry it, and the row then falls back to `borrowedAfter`. */
+  debtBefore?: string;
+  debtAfter?: string;
+  /** debtAfter − debtBefore, exact: the debt this event added or cleared. */
+  debtChange?: string;
+  /** Interest the debt accrued between the position's previous row and this one:
+   *  this row's debtBefore less that row's debtAfter. Absent on the first row
+   *  and where it is zero. */
+  interestSincePrevious?: string;
   /** Net supplied PRINCIPAL after, on the LENDER side = Σ (supply − withdraw)
    *  assets (human-readable loan token). Set only by the swept Base lane —
    *  the index carries no lender rows — and only on supply/withdraw rows, so

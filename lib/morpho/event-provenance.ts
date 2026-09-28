@@ -176,6 +176,55 @@ export const borrowedAfterProv = (sym: string, coords: MorphoCoords): Provenance
   inputs: eventInputs(coords),
 });
 
+/** Debt owed AFTER this event = borrow shares after × the market's totals at
+ *  the row (toAssetsUp), server mig 352. */
+export const debtAfterProv = (sym: string, coords: MorphoCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  verify: stateVerify(coords),
+  summary: `${sym} the position owed AFTER this event${atBlock(coords)}: its borrow shares after the event priced at the market's totalBorrowAssets ÷ totalBorrowShares there, rounded up as Morpho rounds a debt. Equals Morpho.position(id, user).borrowShares converted at Morpho.market(id) read at the block; the interest accrued up to the block is in it.`,
+  contract: MORPHO,
+  via: `${captureVia(coords)} · borrow shares × market totals replayed from Borrow/Repay/Liquidate/AccrueInterest logs`,
+  formula: "ceil(shares × (totalBorrowAssets + 1) ÷ (totalBorrowShares + 10^6))",
+  inputs: eventInputs(coords),
+});
+
+/** Debt owed BEFORE this event, on the same basis. */
+export const debtBeforeProv = (sym: string, coords: MorphoCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `${sym} the position owed just BEFORE this event: its borrow shares before the event priced at the market's totals just before it. It includes the interest accrued since the previous row.`,
+  contract: MORPHO,
+  via: "borrow shares before × market totals before this event",
+  formula: "after − change",
+  inputs: eventInputs(coords, [
+    { label: "after", kind: "chain-derived", pclass: "indexed", note: `${sym} owed after this event` },
+    { label: "change", kind: "chain-derived", pclass: "indexed", note: "the debt this event added or cleared (signed)" },
+  ]),
+});
+
+/** The debt this event added or cleared = debt after − debt before. */
+export const debtChangeProv = (sym: string, coords: MorphoCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  verify: txVerify(coords),
+  summary: `${sym} of debt this event added or cleared${atBlock(coords)}: the debt after less the debt before, both at the market's totals. It matches the event's own assets to within the one-unit rounding of the share conversion.`,
+  contract: MORPHO,
+  via: "debt after − debt before",
+  inputs: eventInputs(coords),
+});
+
+/** Interest accrued between the previous row and this one. */
+export const interestSincePreviousProv = (sym: string, coords: MorphoCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `${sym} of interest the debt accrued since the position's previous event, up to this one${atBlock(coords)}: the debt just before this event less the debt just after the previous one. The shares did not move between them, so this is the shares × the rise in the market's totalBorrowAssets ÷ totalBorrowShares.`,
+  contract: MORPHO,
+  via: "debt before this event − debt after the previous event",
+  formula: "shares × (ratio now − ratio at the previous row)",
+  inputs: eventInputs(coords),
+});
+
 /** Net supplied PRINCIPAL after, on the LENDER side = Σ (supply − withdraw)
  *  assets. Only the swept lane replays this axis (the index carries no lender
  *  rows), so it renders only where a feeding lane set it. Principal only —
@@ -297,6 +346,15 @@ export const morphoFlowProv = (
   summary: `Total ${sym} ${flow} over the position's life — the sum of the matching amounts across the position's own logs. Exact token amounts (a gross flow needs no index).`,
   contract: MORPHO,
   via: `${captureVia(coords)} · Σ ${flow} assets`,
+});
+
+/** Interest the debt accrued over the position's life. */
+export const morphoLifetimeInterestProv = (sym: string, coords?: MorphoCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `${sym} of interest the position's debt accrued over its life: each event's debt just before it less the debt just after the previous event, summed over every event, plus the current debt less the debt after the newest event. Each debt figure is the borrow shares at the market's totals at that point.`,
+  contract: MORPHO,
+  via: `${captureVia(coords)} · Σ (debt before − previous debt after) + (current debt − last debt after)`,
 });
 
 /** Current debt WITH accrued interest = borrow shares converted to assets via
