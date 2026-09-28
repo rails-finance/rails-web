@@ -7,10 +7,10 @@
 //
 // RULE: a line whose priced USD value is under a cent is dust. A line with no
 // price is held, not dust. Dust lines sit behind an "N dust reserves hidden"
-// control; opening it shows them in place. On a position card, a side whose
-// lines are all dust shows them all and no control, so the side never reads
-// as empty. The headline USD total keeps dust in; only the lines, the icon
-// stack and its "+N" leave it out.
+// control. On a position card, opening it shows them after the other lines,
+// largest USD first, and a side whose lines are all dust shows them all and
+// no control, so the side never reads as empty. The headline USD total keeps
+// dust in; only the lines, the icon stack and its "+N" leave it out.
 
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { provInspector } from "@/components/shared/provenance";
@@ -59,16 +59,17 @@ export function DustToggle({ count, open, onToggle }: { count: number; open: boo
 }
 
 /** A position card side's lines under the dust rule: `lines` is what to
- *  render (every line once the control is open), `control` the toggle, null
- *  where nothing is hidden. */
+ *  render, `control` the toggle, null where nothing is hidden. Once the
+ *  control is open the dust lines follow the shown ones, largest USD first. */
 export function useDustLines<T>(
   items: readonly T[],
   usdOf: (item: T) => number | null | undefined,
 ): { lines: T[]; control: ReactNode } {
   const { open, toggle } = useDustOpen();
   const { shown, dust } = splitDust(items, usdOf);
+  const dustByValue = [...dust].sort((a, b) => (usdOf(b) ?? 0) - (usdOf(a) ?? 0));
   return {
-    lines: open ? [...items] : shown,
+    lines: open ? [...shown, ...dustByValue] : shown,
     control: dust.length > 0 ? <DustToggle count={dust.length} open={open} onToggle={toggle} /> : null,
   };
 }
