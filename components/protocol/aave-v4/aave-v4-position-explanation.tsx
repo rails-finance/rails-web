@@ -474,16 +474,24 @@ export function AaveV4PositionExplanation({
 }
 
 /** Past-tense narration for a closed spoke position — the card's own terminal
- *  figures (the recorded peaks), with the ending derived from the life's LAST
- *  event: only a life whose final event is the seizure "ended in liquidation";
- *  a scarred life the owner later wound down was closed by the owner, and its
- *  liquidations are named as history (the same two axes the card's outcome
- *  pill and meta triangle carry). */
+ *  figures (the recorded peaks). Outcome is a HISTORY fact: any liquidation
+ *  on the record marks it "liquidated" (rails-ops TO-DO-ui-jobs.md item 97,
+ *  Miles 2026-09-28 — matches the Aave V3 control's `everLiquidated` rule),
+ *  so this never credits the owner with repaying a debt a seizure cleared.
+ *  The wording still distinguishes HOW it ended: a life whose final event is
+ *  the seizure "ended in liquidation"; a scarred life the owner's own
+ *  transactions later wound down "ran its course" with the seizures named as
+ *  what mark the outcome; a life never liquidated "was closed by its owner". */
 export function AaveV4ClosedExplanation({ spoke, embedded = false }: { spoke: AaveSpokeCardInfo; embedded?: boolean }) {
   const supplyOnly = spoke.peakDebtUsd < 1;
   const lead = spoke.endedByLiquidation ? (
     <>
       This position on the {spoke.name} spoke <H>ended in liquidation</H> — no balances remain on it:
+    </>
+  ) : spoke.wasLiquidated ? (
+    <>
+      This position on the {spoke.name} spoke <H>ran its course and closed</H> — its remaining balances withdrawn — with
+      liquidation seizures in its record:
     </>
   ) : (
     <>
@@ -500,6 +508,15 @@ export function AaveV4ClosedExplanation({ spoke, embedded = false }: { spoke: Aa
         liquidation.
       </span>,
     );
+  } else if (spoke.wasLiquidated) {
+    items.push(
+      <span key="seizures">
+        Liquidation seized it <H>{spoke.liquidationCount}</H> time{spoke.liquidationCount === 1 ? "" : "s"} — each
+        seizure repaid outstanding debt and took collateral in exchange, one collateral and one debt reserve per
+        liquidation. What remained after the seizures left by the position&rsquo;s own transactions. Seizures in the
+        record are what mark the outcome Liquidated.
+      </span>,
+    );
   } else {
     items.push(
       <span key="owner">
@@ -508,14 +525,6 @@ export function AaveV4ClosedExplanation({ spoke, embedded = false }: { spoke: Aa
           : "The owner repaid the debt and withdrew the supplied assets, ending the position by their own transactions."}
       </span>,
     );
-    if (spoke.wasLiquidated) {
-      items.push(
-        <span key="scar">
-          Along the way it was liquidated {spoke.liquidationCount === 1 ? "once" : `${spoke.liquidationCount} times`} —
-          each seizure appears in the timeline below with the collateral seized and the debt cleared.
-        </span>,
-      );
-    }
   }
   if (spoke.peakSupplyUsd > 0) {
     items.push(

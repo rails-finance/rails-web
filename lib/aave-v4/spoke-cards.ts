@@ -187,14 +187,18 @@ export interface AaveSpokeCardInfo {
   }[];
   /** Remaining USD that can be borrowed before HF=1. */
   borrowingPowerUsd: number;
-  /** True when the wallet has ever been liquidated on this spoke. Surfaces
-   *  a red liquidation indicator alongside the status pill — the position may
-   *  still be active afterwards, but the history is permanent. */
+  /** True when the wallet has ever been liquidated on this spoke. Drives the
+   *  closed card's Outcome ("Liquidated" vs "Closed") and the red liquidation
+   *  indicator alongside it — the position may still be active afterwards,
+   *  but a debt cleared by a seizure marks the outcome regardless of what
+   *  happened next (rails-ops TO-DO-ui-jobs.md item 97, Miles 2026-09-28;
+   *  matches Aave V3's `everLiquidated` rule). */
   wasLiquidated: boolean;
-  /** True when the life's FINAL event is a liquidation — the ending, as
-   *  opposed to the scar (wasLiquidated). Drives the closed card's outcome:
-   *  a life partially liquidated and later wound down by the owner is
-   *  "closed", not "liquidated" (migration 057's terminal-event rule). */
+  /** True when the life's FINAL event is a liquidation — the position's own
+   *  transactions never resumed after the seizure. Distinguishes the closed
+   *  explanation's two liquidated tellings ("ended in liquidation" vs "ran
+   *  its course and closed … with liquidation seizures in its record"); it no
+   *  longer decides the Outcome word itself (see `wasLiquidated`). */
   endedByLiquidation: boolean;
   /** Lifetime count of liquidation events on this spoke (summed across
    *  reserves). Drives the red triangle + count indicator; >0 ⟺ wasLiquidated.

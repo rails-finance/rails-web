@@ -120,10 +120,12 @@ export function aaveV4SpokeShareCardModel(
       stats.push({ label: ratioLabel("pooled"), value: hfLabel(chain.healthFactor) });
     }
   } else {
-    // Terminal-event rule (matches the live card's `endedByLiquidation`): only
-    // a life whose FINAL event is a seizure wears "Liquidated" — a life
-    // partially liquidated and later wound down by the owner is "Closed".
-    status = economics?.lastAction === "liquidation" ? "Liquidated" : "Closed";
+    // Outcome is a history fact (matches the live card's `wasLiquidated`,
+    // rails-ops TO-DO-ui-jobs.md item 97, Miles 2026-09-28): any liquidation
+    // on the record wears "Liquidated", whether or not a later owner
+    // transaction is what actually zeroed the position.
+    const everLiquidated = (economics?.reserves ?? []).some((r) => r.liquidationCount > 0);
+    status = everLiquidated ? "Liquidated" : "Closed";
     const topSupply = largest(peakSupplies);
     if (topSupply)
       stats.push({ label: CARD_VOCAB.peakCollateral, value: `${formatCompact(topSupply.amount)} ${topSupply.symbol}` });

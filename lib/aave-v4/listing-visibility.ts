@@ -12,10 +12,11 @@
 //     of Liquity's Redemptions filter; Aave V4 mirrors Aave V3's model here.
 //
 // The wire status (AaveV4SpokePositionStatus) still carries a third value,
-// 'liquidated', but that is the TERMINAL CAUSE of a closed position (closed *by
-// liquidation* vs wound down by the owner) — a refinement the card renders, not a
-// filter bucket. `bucketsToWireStatuses` maps the structural "closed" bucket onto
-// both wire statuses that mean "no live balance" ('closed' + 'liquidated').
+// 'liquidated', but that names whether a closed position was EVER liquidated
+// (Miles 2026-09-28, rails-ops TO-DO-ui-jobs.md item 97) — a refinement the
+// card renders as its Outcome word, not a filter bucket. `bucketsToWireStatuses`
+// maps the structural "closed" bucket onto both wire statuses that mean "no
+// live balance" ('closed' + 'liquidated').
 //
 // The resting view is the MIDDLE PATH (Miles, 2026-09-10, the roster rule): the bare directory
 // shows the positions still open; a search naming a holder (address or ENS) shows every status.
@@ -88,9 +89,9 @@ export function effectiveStatuses(f: AaveV4VisibilityInput): AaveV4StatusBucket[
 
 /** Map the structural display buckets to the wire statuses the API filters on.
  *  The 'closed' bucket admits BOTH server statuses that mean "no live balance":
- *  'closed' (owner wound it down) and 'liquidated' (terminal event was a
- *  liquidation) — the terminal-cause distinction is a card refinement, not a
- *  filter, so both belong under structural "Closed". 'open' maps to itself. */
+ *  'closed' (never liquidated) and 'liquidated' (liquidated at least once) —
+ *  that distinction is a card refinement (the Outcome word), not a filter, so
+ *  both belong under structural "Closed". 'open' maps to itself. */
 export function bucketsToWireStatuses(buckets: AaveV4StatusBucket[]): AaveV4SpokePositionStatus[] {
   const out: AaveV4SpokePositionStatus[] = [];
   for (const b of buckets) {

@@ -121,14 +121,13 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
 
   // Lifecycle (two-axis model). Status is structural: open vs closed (no live
   // balance). A closed position renders through the shared terminal frame
-  // (ClosedPositionStats), grey CLOSED badge / "Closed" outcome for an
-  // owner-driven wind-down, red CLOSED badge / "Liquidated" outcome when the
-  // wire status carries that terminal cause (closedByLiquidation below) — the
-  // Outcome column names it, so no separate qualifier text is needed.
-  // Liquidation *history* (any liquidation over the position's life, open or
-  // closed) is the orthogonal LiquidatedBadge, not this pill. A zeroed position
-  // has no live balances, so in place of the live stat grid it shows the all-time
-  // high-water mark — Peak Supplied / Peak Debt — matching the detail card.
+  // (ClosedPositionStats), grey CLOSED badge / "Closed" outcome for a life
+  // never liquidated, red CLOSED badge / "Liquidated" outcome for one that
+  // was (closedByLiquidation below) — the Outcome column names it, so no
+  // separate qualifier text is needed.
+  // A zeroed position has no live balances, so in place of the live stat grid
+  // it shows the all-time high-water mark — Peak Supplied / Peak Debt —
+  // matching the detail card.
   // Null-safe against a pre-057 API that omits `status`: that API only ever
   // returned open positions (closed ones were pruned), so absent ⇒ open.
   //
@@ -140,12 +139,12 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
   // opening the card must see the lifecycle word the card showed.
   const wireOpen = row.status == null || row.status === "open";
   const isOpen = row.chainHfStale ? wireOpen : !holdsNothingOnChain(row.reserves);
-  // A position the chain closed while the wire still calls it open carries no
-  // terminal cause on the wire: it ended by liquidation when a liquidation was
-  // its last act, the detail card's `lastAction === "liquidation"`.
-  const closedByLiquidation = wireOpen
-    ? row.lastLiquidationAt != null && row.lastLiquidationAt >= row.lastActivityAt
-    : row.status === "liquidated";
+  // Liquidated is a HISTORY fact, not a terminal-event fact (rails-ops
+  // TO-DO-ui-jobs.md item 97, Miles 2026-09-28): any liquidation on the
+  // spoke's record marks the outcome, whether or not a later owner
+  // transaction (e.g. withdrawing what the seizure left) is what actually
+  // zeroed the position — matches Aave V3's `everLiquidated` rule.
+  const closedByLiquidation = (row.liquidationCount ?? 0) > 0;
   // The wire states no peak or closing date for a row it serves as open; the
   // chain-closed card then leaves the peak figure out and dates the close by
   // the last act, which is the one that emptied the position.

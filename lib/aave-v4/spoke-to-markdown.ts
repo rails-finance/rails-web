@@ -120,21 +120,18 @@ export function spokeToMarkdown(args: AaveV4SpokeMarkdownArgs): string {
   );
   lines.push("");
 
-  // The ending and the scar are separate axes: "Closed by liquidation" only
-  // when the FINAL event is the seizure; a scarred-but-owner-closed life says
-  // so without letting the scar claim the ending.
-  const statusLabel = card.isClosed ? (card.endedByLiquidation ? "Closed by liquidation" : "Closed") : "Open";
-  const scarSuffix =
-    card.wasLiquidated && !(card.isClosed && card.endedByLiquidation)
-      ? ` (liquidated ${card.liquidationCount} time${card.liquidationCount === 1 ? "" : "s"} during its life)`
-      : "";
+  // Outcome is a history fact: any liquidation on the record marks it
+  // "Liquidated", matching the live card's Outcome word (rails-ops
+  // TO-DO-ui-jobs.md item 97, Miles 2026-09-28). The liquidation count line
+  // below already states the history, so this carries it once.
+  const statusLabel = card.isClosed ? (card.wasLiquidated ? "Liquidated" : "Closed") : "Open";
   // The notes as the PAGE places them: anchored against this same event list,
   // so a note the timeline drops is absent here too, and the annotation below
   // lands on the row the note renders beside on screen.
   const anchoredNotes = anchorMarketNotes(args.notes ?? [], args.events, "asc");
   const allNotes = [...[...anchoredNotes.values()].flat(), ...(args.liveNotes ?? [])];
 
-  lines.push(`- **Status:** ${statusLabel}${scarSuffix}`);
+  lines.push(`- **Status:** ${statusLabel}`);
   lines.push(`- **Wallet:** ${wallet}`);
   lines.push(`- **Spoke:** ${spokeName} (${card.hub} hub)`);
   if (card.liquidationCount > 0) {
@@ -333,13 +330,12 @@ function closedHeadlines(card: AaveSpokeCardInfo): string[] {
     out.push(
       `- This position **ended in liquidation** on the ${card.name} spoke — the final event on its record is the seizure; no supply or debt remains.`,
     );
+  } else if (card.wasLiquidated) {
+    out.push(
+      `- This position **ran its course and closed** on the ${card.name} spoke, with liquidation seizures in its record — **liquidated** ${card.liquidationCount} time${card.liquidationCount === 1 ? "" : "s"}, each clearing outstanding debt and taking collateral in exchange; the remaining balances left by the position's own transactions. Seizures in the record are what mark the outcome Liquidated.`,
+    );
   } else {
     out.push(`- This position is **closed** — all debt was repaid and supplied collateral withdrawn by the owner.`);
-    if (card.wasLiquidated) {
-      out.push(
-        `- Along the way it was **liquidated** ${card.liquidationCount} time${card.liquidationCount === 1 ? "" : "s"}; each seizure appears in the timeline with the collateral seized and the debt cleared.`,
-      );
-    }
   }
   out.push("");
   return out;

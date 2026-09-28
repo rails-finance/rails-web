@@ -18,11 +18,14 @@
 
 import type { AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
 
-/** Lifecycle status of a (wallet, spoke) position (server migration 057).
+/** Lifecycle status of a (wallet, spoke) position (server migration 057, rewritten
+ *  by migration 339 — rails-ops TO-DO-ui-jobs.md item 97, Miles 2026-09-28).
  *  'open' — ≥1 reserve still carries a live (event-replayed) balance. 'closed' —
- *  every balance was repaid/withdrawn to zero. 'liquidated' — the terminal event
- *  that emptied the position was a liquidation. Derived from chain-grounded data
- *  (truth-preserving delta-replay + terminal event action); see migration 057. */
+ *  every balance was repaid/withdrawn to zero, and the position was never
+ *  liquidated. 'liquidated' — a zeroed position with ≥1 liquidation anywhere in
+ *  its record, whether or not a later owner transaction is what actually zeroed
+ *  it (matches Aave V3's `everLiquidated` rule). Derived from chain-grounded data
+ *  (truth-preserving delta-replay + liquidation count); see migration 339. */
 export type AaveV4SpokePositionStatus = "open" | "closed" | "liquidated";
 
 /** Per-reserve breakdown shipped with every listing row. Mirrors the detail

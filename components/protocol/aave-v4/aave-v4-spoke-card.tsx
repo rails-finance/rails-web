@@ -309,12 +309,12 @@ function AaveV4SpokeCard({
       <div className="px-5 py-4">
         {isClosed ? (
           <ClosedPositionStats
-            // The ending, not the scar: a life partially liquidated and later
-            // wound down by the owner is "closed" (its scar rides the meta
-            // triangle below). Only a life whose FINAL event is the seizure
-            // wears "liquidated" — the same terminal-event rule the backend's
-            // status column (migration 057) and the listing card apply.
-            outcome={spoke.endedByLiquidation ? "liquidated" : "closed"}
+            // Any liquidation in the record marks the outcome "liquidated",
+            // whether or not a later owner transaction is what actually
+            // zeroed the position — matches Aave V3's `everLiquidated` rule
+            // and the backend's status column (migration 057, rewritten for
+            // this rule; rails-ops TO-DO-ui-jobs.md item 97, Miles 2026-09-28).
+            outcome={spoke.wasLiquidated ? "liquidated" : "closed"}
             identity={<PositionCardMeta eventCount={spoke.txCount} liquidationCount={spoke.liquidationCount} />}
             collateralAssetIcons={
               spoke.supplyingSymbols.length > 0 ? <InlineAssetCluster symbols={spoke.supplyingSymbols} /> : undefined
