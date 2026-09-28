@@ -636,7 +636,7 @@ export default function AaveV3PositionDetail({
                 // view (where pool-wide rate context belongs).
                 explanation={
                   liveView.status !== "open" ? (
-                    <AaveV3ClosedPositionExplanation v={liveView} events={aaveEvents} />
+                    <AaveV3ClosedPositionExplanation v={liveView} events={aaveEvents} folders={servedFolders} />
                   ) : (
                     // Passed before the Pool read lands (the Fluid treatment):
                     // the pane, and the copy-view link at its foot, mount with
@@ -690,6 +690,7 @@ export default function AaveV3PositionDetail({
                 view ? (
                   <TimelineActivityHeader
                     events={aaveEvents}
+                    folders={servedFolders}
                     closed={view.status !== "open"}
                     // When the position actually opened, not when the window
                     // does — otherwise a wallet with 104,000 events reads as

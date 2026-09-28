@@ -528,7 +528,12 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                   explanation={
                     view.status !== "open" ? (
                       <>
-                        <AaveV3ClosedPositionExplanation v={view} events={aaveEvents} marketPhrase="Seamless market" />
+                        <AaveV3ClosedPositionExplanation
+                          v={view}
+                          events={aaveEvents}
+                          folders={servedFolders}
+                          marketPhrase="Seamless market"
+                        />
                         <AaveV3PoolNotes chain={data} collateralAccounting="pre-3.2" frozen={FROZEN} />
                       </>
                     ) : (

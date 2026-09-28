@@ -392,7 +392,7 @@ export default function MorphoPositionView({
               // and declines without it.
               explanation={
                 liveView.status !== "open" ? (
-                  <MorphoClosedPositionExplanation v={liveView} events={morphoEvents} />
+                  <MorphoClosedPositionExplanation v={liveView} events={morphoEvents} folders={servedFolders} />
                 ) : chain ? (
                   <MorphoPositionExplanation
                     chain={chain}
@@ -430,6 +430,7 @@ export default function MorphoPositionView({
             toolbarLeading={
               <TimelineActivityHeader
                 events={tl.sortedEvents}
+                folders={servedFolders}
                 closed={liveView?.status !== "open"}
                 // When the position actually opened, not when the window does.
                 firstAt={opening?.firstTimestamp ?? oldestFolderAt}

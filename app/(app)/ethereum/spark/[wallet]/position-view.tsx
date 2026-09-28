@@ -603,7 +603,7 @@ export default function SparkPositionDetail({
                 liveView.status !== "open" ? (
                   // Terminal accounts need no live Pool read — the pane
                   // narrates how the record ended from the rows already here.
-                  <SparkClosedPositionExplanation v={liveView} events={sparkEvents} />
+                  <SparkClosedPositionExplanation v={liveView} events={sparkEvents} folders={servedFolders} />
                 ) : (
                   // Passed before the Pool read lands (the Fluid treatment):
                   // the pane, and the copy-view link at its foot, mount with
@@ -657,6 +657,7 @@ export default function SparkPositionDetail({
               view ? (
                 <TimelineActivityHeader
                   events={sparkEvents}
+                  folders={servedFolders}
                   closed={view.status !== "open"}
                   // When the position actually opened, not when the window
                   // does — otherwise a wallet with 28,000 events reads as days

@@ -160,6 +160,30 @@ export function earliestHeldTimestamp(
 }
 
 /**
+ * The served folder holding the newest activity, when it is newer than every
+ * loaded event — the twin trap `earliestHeldTimestamp` closes at the other
+ * end. A closed record's ending, and the activity header's freshness figure,
+ * both read the LAST thing the position did; on a grouped answer that member
+ * can sit inside a folder, absent from `events` entirely, so a reduction that
+ * stops at `events[events.length - 1]` reads the wrong one.
+ *
+ * Null when nothing is newer than the loaded events (no folders served, or
+ * every folder is older than the newest loaded event).
+ */
+export function newestActivityFolder(
+  events: readonly { timestamp: number }[],
+  folders: readonly ServedFolder[] | null | undefined,
+): ServedFolder | null {
+  if (!folders || folders.length === 0) return null;
+  const lastEvent = events.length > 0 ? Math.max(...events.map((e) => e.timestamp)) : -Infinity;
+  let newest: ServedFolder | null = null;
+  for (const f of folders) {
+    if (f.lastAt > lastEvent && (!newest || f.lastAt > newest.lastAt)) newest = f;
+  }
+  return newest;
+}
+
+/**
  * The folders' day histogram, summed across folders on the UTC day key.
  *
  * The key is already the day's start in unix seconds as a decimal string —

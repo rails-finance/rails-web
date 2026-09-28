@@ -232,6 +232,8 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
 import type { MorphoPositionView } from "./morpho-position-card";
 import { formatDate } from "@/lib/date";
+import type { ServedFolder } from "@/lib/shared/timeline-folder";
+import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
 
 function closureDate(unix: number): string {
   return formatDate(unix);
@@ -240,22 +242,33 @@ function closureDate(unix: number): string {
 export function MorphoClosedPositionExplanation({
   v,
   events,
+  folders,
 }: {
   v: MorphoPositionView;
   /** The position's timeline (morpho events, ascending) — the pane reads how
    *  the record ended and the seizure tally from the rows already fetched. */
   events: BaseActivityEvent[];
+  /** Every folder the index served, whole and unfiltered — the position's
+   *  newest activity can sit inside one, so the closure attribution below
+   *  reads it before falling back to the last loaded row. */
+  folders?: readonly ServedFolder[] | null;
 }) {
   if (v.status === "open") return null;
 
   const morpho = events.filter(isMorphoEvent);
   const liqCount = morpho.filter((e) => e.context.data.eventType === "liquidation").length;
-  const lastType = morpho.length > 0 ? morpho[morpho.length - 1].context.data.eventType : null;
+  // The newest activity overall — a served folder's last member when it is
+  // newer than every loaded row, the loaded row otherwise. Morpho's two
+  // folder kinds are `liquidation` (pure seizures) and `owner_run` (the
+  // position's own supply/withdraw/borrow/repay), so `kind` alone says which
+  // one ended it.
+  const newestFolder = newestActivityFolder(morpho, folders);
+  const lastType = newestFolder ? null : morpho.length > 0 ? morpho[morpho.length - 1].context.data.eventType : null;
   // How the record actually ended — the truthful closure attribution. The
   // liquidated STATUS only says seizures exist somewhere in the record; the
   // ending is a separate fact (709 of 1,535 liquidated-status positions ended
   // with the seizure; the rest closed by their own hand afterwards).
-  const endedBySeizure = lastType === "liquidation";
+  const endedBySeizure = newestFolder ? newestFolder.kind === "liquidation" : lastType === "liquidation";
 
   // A peak in a token whose decimals did not load is not stated.
   const hasPeakColl = v.peakCollateral > 0 && v.collateralSymbol != null && !v.collateralDecimalsUnread;

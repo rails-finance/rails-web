@@ -503,6 +503,7 @@ export default function CompoundPositionView({
             toolbarLeading={
               <TimelineActivityHeader
                 events={compoundEvents}
+                folders={servedFolders}
                 closed={view.status !== "open"}
                 // When the position actually opened, not when the window does —
                 // otherwise a wallet with ten thousand events reads as days old

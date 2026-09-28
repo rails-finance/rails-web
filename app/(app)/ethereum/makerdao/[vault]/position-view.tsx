@@ -460,7 +460,7 @@ export default function MakerVaultDetailView({
               // declines without it.
               explanation={
                 view.status !== "open" ? (
-                  <MakerdaoClosedPositionExplanation v={view} events={makerEvents} />
+                  <MakerdaoClosedPositionExplanation v={view} events={makerEvents} folders={servedFolders} />
                 ) : view.source === "chain" ? (
                   <MakerdaoPositionExplanation v={view} externalActivity={externalActivityWithOpening} />
                 ) : undefined
@@ -496,6 +496,7 @@ export default function MakerVaultDetailView({
             toolbarLeading={
               <TimelineActivityHeader
                 events={tl.sortedEvents}
+                folders={servedFolders}
                 closed={view?.status !== "open"}
                 // When the vault actually opened, not when the window does.
                 firstAt={opening?.firstTimestamp ?? oldestFolderAt}

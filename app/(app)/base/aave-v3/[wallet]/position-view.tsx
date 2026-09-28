@@ -560,7 +560,12 @@ export default function AaveV3BasePositionView({
                   // face deliberately does not carry.
                   explanation={
                     view.status !== "open" ? (
-                      <AaveV3ClosedPositionExplanation v={view} events={aaveEvents} marketPhrase="Base market" />
+                      <AaveV3ClosedPositionExplanation
+                        v={view}
+                        events={aaveEvents}
+                        folders={servedFolders}
+                        marketPhrase="Base market"
+                      />
                     ) : (
                       <>
                         <AaveV3PositionExplanation

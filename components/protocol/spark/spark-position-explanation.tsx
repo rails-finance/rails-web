@@ -264,6 +264,8 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isSparkEvent } from "@/lib/shared/types/event-shape";
 import type { SparkReserveAmount } from "@/lib/sources/api/spark-positions";
 import { formatNumber } from "@/lib/utils/format";
+import type { ServedFolder } from "@/lib/shared/timeline-folder";
+import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
 import { formatDate } from "@/lib/date";
 
 function closureDate(unix: number): string {
@@ -299,11 +301,16 @@ function peakPhrase(reserves: SparkReserveAmount[]): React.ReactNode {
 export function SparkClosedPositionExplanation({
   v,
   events,
+  folders,
 }: {
   v: SparkPositionView;
   /** The account's timeline (SparkLend Pool events, ascending) — the pane reads
    *  how the record ended from the rows already fetched. */
   events: BaseActivityEvent[];
+  /** Every folder the index served, whole and unfiltered — the account's
+   *  newest activity can sit inside one, so the closure attribution below
+   *  reads it before falling back to the last loaded row. */
+  folders?: readonly ServedFolder[] | null;
 }) {
   if (v.status === "open") return null;
 
@@ -313,11 +320,22 @@ export function SparkClosedPositionExplanation({
   // the transfer-only lead keys on the POOL record being empty, not the
   // timeline (which since mig 159 shows the transfers themselves).
   const poolEvents = spark.filter((e) => !isTransferType(e.context.data.eventType));
-  const lastType = spark.length > 0 ? spark[spark.length - 1].context.data.eventType : null;
+  // The newest activity overall — a served folder's last member when it is
+  // newer than every loaded row, the loaded row otherwise.
+  const newestFolder = newestActivityFolder(spark, folders);
+  const lastType = newestFolder ? null : spark.length > 0 ? spark[spark.length - 1].context.data.eventType : null;
   // How the record actually ended — the truthful closure attribution, a
-  // separate fact from the status word.
-  const endedBySeizure = lastType === "liquidation";
-  const endedByTransferOut = lastType === "transfer_out";
+  // separate fact from the status word. A folder groups one run-spec kind at
+  // a time (`liquidation` or `transfer`, never both), so its `kind` alone
+  // answers which one ended it, EXCEPT a `transfer` folder can hold both
+  // directions — only a folder whose legs are all "Sent" states the ending as
+  // a transfer out.
+  const endedBySeizure = newestFolder ? newestFolder.kind === "liquidation" : lastType === "liquidation";
+  const endedByTransferOut = newestFolder
+    ? newestFolder.kind === "transfer" &&
+      newestFolder.legs.length > 0 &&
+      newestFolder.legs.every((l) => l.verb === "Sent")
+    : lastType === "transfer_out";
   const everLiquidated = v.liquidationCount > 0;
 
   const hasPeakSupply = v.peakSupplies.length > 0;

@@ -480,6 +480,7 @@ export default function CompoundV2PositionView({
               liveView ? (
                 <TimelineActivityHeader
                   events={v2Events}
+                  folders={servedFolders}
                   closed={liveView.status !== "open"}
                   // When the account actually opened, not when the window does.
                   firstAt={opening?.firstTimestamp ?? oldestFolderAt}

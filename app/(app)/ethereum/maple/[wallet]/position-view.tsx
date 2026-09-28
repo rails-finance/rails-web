@@ -464,6 +464,7 @@ export default function MaplePositionView({
               view ? (
                 <TimelineActivityHeader
                   events={mapleEvents}
+                  folders={servedFolders}
                   closed={view.status !== "open"}
                   // When the position actually opened, not when the window
                   // does — otherwise a wallet with 41,000 events reads as days

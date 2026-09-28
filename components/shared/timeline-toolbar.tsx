@@ -56,11 +56,17 @@ import type { TimelineEventsState } from "@/hooks/useTimelineEvents";
  *  captured-history caveat the economics tower's lifetime layer states. */
 export function TimelineActivityHeader({
   events,
+  folders,
   closed,
   firstAt,
   tenurePending,
 }: {
   events: { timestamp: number }[];
+  /** Each served folder's own first and last member, whole and unfiltered —
+   *  the newest (or oldest) thing a position did can sit inside a folder
+   *  rather than in `events`, so the tenure and the "ago" pill miss it unless
+   *  every served folder's span is read alongside the events on screen. */
+  folders?: readonly { firstAt: number; lastAt: number }[] | null;
   closed?: boolean;
   /** When the position actually STARTED, for a surface whose event list is a
    *  capped slice of a longer history. Without it the tenure is measured from
@@ -72,15 +78,20 @@ export function TimelineActivityHeader({
    *  from the oldest event on screen: on a windowed page that event is the
    *  start of the last thousand, not the start of the position, and a date
    *  three years wrong reads exactly as confidently as a right one. The
-   *  freshness pill stays — the NEWEST event is always in the window. */
+   *  freshness pill stays — the NEWEST event is always in the window (a served
+   *  folder's `lastAt` included). */
   tenurePending?: boolean;
 }) {
-  if (events.length === 0) return null;
-  let first = events[0].timestamp;
-  let last = events[0].timestamp;
+  if (events.length === 0 && !folders?.length) return null;
+  let first = events.length ? events[0].timestamp : folders![0].firstAt;
+  let last = first;
   for (const e of events) {
     if (e.timestamp < first) first = e.timestamp;
     if (e.timestamp > last) last = e.timestamp;
+  }
+  for (const f of folders ?? []) {
+    if (f.firstAt < first) first = f.firstAt;
+    if (f.lastAt > last) last = f.lastAt;
   }
   if (firstAt != null && firstAt > 0 && firstAt < first) first = firstAt;
   const now = Math.floor(Date.now() / 1000);

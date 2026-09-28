@@ -263,6 +263,8 @@ import type { AaveV3ReserveAmount } from "@/components/protocol/aave-v3/aave-v3-
 import { MARKET_NAME } from "@/lib/aave-v3/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
+import type { ServedFolder } from "@/lib/shared/timeline-folder";
+import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
 
 function closureDate(unix: number): string {
   return formatDate(unix);
@@ -297,12 +299,17 @@ function peakPhrase(reserves: AaveV3ReserveAmount[]): React.ReactNode {
 export function AaveV3ClosedPositionExplanation({
   v,
   events,
+  folders,
   marketPhrase,
 }: {
   v: AaveV3PositionView;
   /** The account's timeline (Aave V3 Pool events, ascending) — the pane reads
    *  how the record ended from the rows already fetched. */
   events: BaseActivityEvent[];
+  /** Every folder the index served, whole and unfiltered — the account's
+   *  newest activity can sit inside one, so the closure attribution below
+   *  reads it before falling back to the last loaded row. */
+  folders?: readonly ServedFolder[] | null;
   /** How the prose names the market — "Core market" by default, resolved from
    *  the view's market key; a single-Pool deployment passes its own ("Base
    *  market", "Seamless market") so the pane never calls a Base Pool "Core". */
@@ -316,13 +323,24 @@ export function AaveV3ClosedPositionExplanation({
   // the transfer-only lead keys on the POOL record being empty, not the
   // timeline (which since mig 160 shows the transfers themselves).
   const poolEvents = aave.filter((e) => !isTransferType(e.context.data.eventType));
-  const lastType = aave.length > 0 ? aave[aave.length - 1].context.data.eventType : null;
+  // The newest activity overall — a served folder's last member when it is
+  // newer than every loaded row, the loaded row otherwise.
+  const newestFolder = newestActivityFolder(aave, folders);
+  const lastType = newestFolder ? null : aave.length > 0 ? aave[aave.length - 1].context.data.eventType : null;
   // How the record actually ended — the truthful closure attribution. The
   // liquidated STATUS only says seizures exist somewhere in the record; the
   // ending is a separate fact (1,438 of 4,369 liquidated-status accounts ended
-  // with the seizure; the rest exited by their own hand afterwards).
-  const endedBySeizure = lastType === "liquidation";
-  const endedByTransferOut = lastType === "transfer_out";
+  // with the seizure; the rest exited by their own hand afterwards). A folder
+  // groups one run-spec kind at a time (`liquidation` or `transfer`, never
+  // both), so its `kind` alone answers which one ended it, EXCEPT a `transfer`
+  // folder can hold both directions — only a folder whose legs are all "Sent"
+  // states the ending as a transfer out.
+  const endedBySeizure = newestFolder ? newestFolder.kind === "liquidation" : lastType === "liquidation";
+  const endedByTransferOut = newestFolder
+    ? newestFolder.kind === "transfer" &&
+      newestFolder.legs.length > 0 &&
+      newestFolder.legs.every((l) => l.verb === "Sent")
+    : lastType === "transfer_out";
   const everLiquidated = v.liquidationCount > 0;
   const marketName = marketPhrase ?? `${MARKET_NAME[v.market] ?? "Core"} market`;
 
