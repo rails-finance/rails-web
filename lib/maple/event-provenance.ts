@@ -510,7 +510,7 @@ export const claimBeforeProv = (
     kind: "chain-derived",
     pclass: "state",
     verify: b.verify,
-    summary: `${assetSym} the position's ${poolSym} were worth just before this event: the shares and escrow it held before, times the same block rate (${b.words}).`,
+    summary: `${assetSym} the position's ${poolSym} were worth just before this event — the shares and escrow it held before, times the same block rate (${b.words}).`,
     contract: poolContract(coords),
     via: "(shares + escrowed) before × rate",
     formula: "(shares + escrowed) × rate",
@@ -673,7 +673,7 @@ export const interestEarnedProv = (sym: string): Provenance => ({
 export const mapleTransferFlowProv = (direction: "in" | "out", sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Lifetime ${sym} value of the pool shares this wallet ${direction === "in" ? "received from" : "sent to"} other wallets: each Transfer's shares times the pool's rate in its block (a same-block Deposit or Withdraw log's assets ÷ shares, or an archive read of totalAssets ÷ totalSupply where the block has none), added up across the captured history.`,
+  summary: `Lifetime ${sym} value of the pool shares this wallet ${direction === "in" ? "received from" : "sent to"} other wallets — each Transfer's shares times the pool's rate in its block (a same-block Deposit or Withdraw log's assets ÷ shares, or an archive read of totalAssets ÷ totalSupply where the block has none), added up across the captured history.`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
   via: `${MAPLE_VIA} · Σ Transfer shares × pool rate at the block · deploy → head`,
   formula: "Σ shares × rate",
