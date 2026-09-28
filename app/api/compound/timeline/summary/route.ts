@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
-import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
-import { COMPOUND_MARKETS } from "@/lib/compound/asset-catalog";
-import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
-import { resolveOpeningAssetKeys, type UpstreamOpeningBalance } from "@/lib/shared/timeline-opening-balance-wire";
+import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
+import { readCompoundOpeningBalance } from "@/lib/compound/proxy-reads";
 
 // The opening balance for a Comet position — everything BELOW the block that
 // `/api/compound/timeline?recent=N` opened its window at. The model, the
@@ -32,16 +29,14 @@ import { resolveOpeningAssetKeys, type UpstreamOpeningBalance } from "@/lib/shar
 // seen has none to scale by.
 //
 // Node runtime, no edge caching — same as its /timeline twin.
+//
+// The read and the shaping live in lib/compound/proxy-reads.ts, which the
+// position page's loader calls too.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const RAILS_API_URL = process.env.RAILS_API_URL;
-
-/** The index keys collateral by raw lowercase token address and base by market
- *  slug, in one response. The two namespaces cannot collide, so one test tells
- *  a key which resolver it belongs to. */
-const isTokenAddress = (key: string) => /^0x[0-9a-f]{40}$/i.test(key);
 
 export async function GET(request: NextRequest) {
   const readerIp = readerIpFromRequest(request);
@@ -50,48 +45,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
 
-  const wallet = request.nextUrl.searchParams.get("wallet");
-  const cutoffBlock = request.nextUrl.searchParams.get("cutoffBlock");
-  const market = request.nextUrl.searchParams.get("market")?.toLowerCase();
-  if (!wallet) return NextResponse.json({ error: "wallet is required" }, { status: 400 });
-  if (!cutoffBlock) return NextResponse.json({ error: "cutoffBlock is required" }, { status: 400 });
-  if (!market || !COMPOUND_MARKETS[market]) {
-    return NextResponse.json({ error: "market is required and must be a known Comet market" }, { status: 400 });
-  }
-
   try {
-    const qs = new URLSearchParams({ wallet, cutoffBlock, market });
-    const url = `${RAILS_API_URL}/api/compound/timeline/summary?${qs.toString()}`;
-    const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));
-    if (!response.ok) {
-      console.error(`Backend API error: ${response.status} ${response.statusText}`);
-      return NextResponse.json({ error: `Backend error: ${response.statusText}` }, { status: response.status });
-    }
-    const upstream = (await response.json()) as UpstreamOpeningBalance;
-
-    // Every token address the summary names, on either axis, in one multicall.
-    // Market slugs are not addresses and never enter it.
-    const keys = [...(upstream.byAsset ?? []).map((b) => b.key), ...(upstream.flows ?? []).map((f) => f.key)];
-    const meta = await resolveErc20Meta(keys.filter(isTokenAddress));
-    const opening = resolveOpeningAssetKeys(
-      upstream,
-      (key) => (isTokenAddress(key) ? meta.get(key.toLowerCase())?.symbol : COMPOUND_MARKETS[key]?.baseSymbol),
-      // Undefined leaves the bucket's decimals null, which the page reads as
-      // unknown and refuses to add — never as zero.
-      (key) =>
-        isTokenAddress(key)
-          ? meta.get(key.toLowerCase())?.unresolved
-            ? undefined
-            : meta.get(key.toLowerCase())?.decimals
-          : COMPOUND_MARKETS[key]?.baseDecimals,
+    return respondWith(
+      await readCompoundOpeningBalance(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)),
     );
-
-    // A token whose decimals did not load leaves its bucket's decimals null
-    // (unknown, never added), and the answer is not kept.
-    const unread = [...meta.values()].some((m) => m.unresolved);
-    return NextResponse.json(opening, {
-      headers: unread ? { "Cache-Control": "no-store" } : proxyCacheControl(response, LISTING_CACHE_CONTROL),
-    });
   } catch (error) {
     console.error("Error fetching compound timeline summary from backend:", error);
     const message = error instanceof Error ? error.message : "Failed to fetch opening balance";

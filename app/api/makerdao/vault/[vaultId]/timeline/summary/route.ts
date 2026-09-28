@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
-import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
-import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
-import { resolveOpeningAssetKeys, type UpstreamOpeningBalance } from "@/lib/shared/timeline-opening-balance-wire";
+import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
+import { readMakerOpeningBalance } from "@/lib/makerdao/proxy-reads";
 
 // The opening balance for a MakerDAO vault — everything BELOW the block that
 // `/api/makerdao/vault/:vaultId/timeline?recent=N` opened its window at. The
@@ -25,36 +23,14 @@ import { resolveOpeningAssetKeys, type UpstreamOpeningBalance } from "@/lib/shar
 // with their decimals stated (18 / 18 / 45), the reducer's own three spaces.
 //
 // Node runtime, no edge caching — same as its /timeline twin.
+//
+// The read and the shaping live in lib/makerdao/proxy-reads.ts, which the
+// position page's loader calls too.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const RAILS_API_URL = process.env.RAILS_API_URL;
-
-/** frob sub-keys → the client's composed labels, modulo the debt symbol. */
-const FROB_LABELS: Record<string, string | ((debtSymbol: string) => string)> = {
-  "frob:open": "Open Vault",
-  "frob:lock-draw": "Deposit & Generate",
-  "frob:lock-wipe": "Deposit & Repay",
-  "frob:free-draw": "Withdraw & Generate",
-  "frob:free-wipe": "Repay & Withdraw",
-  "frob:lock": "Deposit",
-  "frob:free": "Withdraw",
-  "frob:draw": (sym) => `Generate ${sym}`,
-  "frob:wipe": (sym) => `Repay ${sym}`,
-  "frob:zero": "Adjust Vault",
-};
-
-/** Raw non-frob actions → the labels the transform gives them (the client
- *  keys those events by label too — all except `grab`, which keys as itself). */
-const ACTION_LABELS: Record<string, string> = {
-  "fork-out": "Move to Another Vault",
-  "fork-in": "Move from Another Vault",
-  give: "Ownership Transferred",
-  "lse-kick": "Auction Started",
-  "lse-take": "Auction Sale",
-  "lse-remove": "Auction Settled",
-};
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ vaultId: string }> }) {
   const readerIp = readerIpFromRequest(request);
@@ -63,25 +39,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
   const { vaultId } = await params;
-  const cutoffBlock = request.nextUrl.searchParams.get("cutoffBlock");
-  if (!cutoffBlock) return NextResponse.json({ error: "cutoffBlock is required" }, { status: 400 });
 
   try {
-    const url = `${RAILS_API_URL}/api/makerdao/vault/${encodeURIComponent(vaultId)}/timeline/summary?cutoffBlock=${encodeURIComponent(cutoffBlock)}`;
-    const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));
-    if (!response.ok) {
-      console.error(`Backend API error: ${response.status} ${response.statusText}`);
-      return NextResponse.json({ error: `Backend error: ${response.statusText}` }, { status: response.status });
-    }
-    const upstream = (await response.json()) as UpstreamOpeningBalance & { ilk?: string | null };
-    const debtSymbol = ilkDebtSymbol(upstream.ilk ?? "");
-    const opening = resolveOpeningAssetKeys(upstream, () => undefined);
-    opening.byAction = opening.byAction.map(({ key, count }) => {
-      const frob = FROB_LABELS[key];
-      const label = frob != null ? (typeof frob === "function" ? frob(debtSymbol) : frob) : ACTION_LABELS[key];
-      return { key: label ?? key, count };
-    });
-    return NextResponse.json(opening, { headers: proxyCacheControl(response, LISTING_CACHE_CONTROL) });
+    return respondWith(
+      await readMakerOpeningBalance(vaultId, request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)),
+    );
   } catch (error) {
     console.error("Error fetching makerdao timeline summary from backend:", error);
     const message = error instanceof Error ? error.message : "Failed to fetch opening balance";

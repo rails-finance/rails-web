@@ -5,17 +5,23 @@
 // The live Comptroller read stays a client-side second wave: the risk surfaces
 // it feeds simply stay unrendered when it fails, which is not a reason to make
 // the document wait for a chain round trip.
+//
+// The three reads go to the BOX and run the proxy routes' shaping here, in the
+// render (lib/compound-v2/proxy-reads.ts), in place of a fetch of each route.
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { fetchCompoundV2Positions, type CompoundV2PositionsResult } from "@/lib/api/fetch-compound-v2-positions";
-import {
-  fetchCompoundV2Timeline,
-  fetchCompoundV2GroupedTimeline,
-  type CompoundV2GroupedTimelineResult,
-} from "@/lib/api/fetch-compound-v2-timeline";
+import { boxOnlyHop } from "@/lib/shared/listing-ssr";
+import { answerBody, answerEnvelope, answerTimeline } from "@/lib/shared/proxy-answer";
+import type { CompoundV2PositionsResult } from "@/lib/api/fetch-compound-v2-positions";
+import type { CompoundV2GroupedTimelineResult } from "@/lib/api/fetch-compound-v2-timeline";
 import type { CompoundV2TimelineResult } from "@/lib/sources/api/compound-v2-timeline";
-import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
+import {
+  readCompoundV2OpeningBalance,
+  readCompoundV2Positions,
+  readCompoundV2Timeline,
+} from "@/lib/compound-v2/proxy-reads";
+import type { TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
 
 /**
@@ -32,19 +38,29 @@ export const loadCompoundV2PositionTail = cache(async (wallet: string, grouped: 
     CompoundV2TimelineResult | CompoundV2GroupedTimelineResult
   >({
     label: "compound-v2",
-    readPositions: (baseUrl, headers) => fetchCompoundV2Positions({ wallet, limit: 1, baseUrl, headers }),
-    readTimeline: (baseUrl, headers) =>
-      grouped
-        ? fetchCompoundV2GroupedTimeline(wallet, { baseUrl, headers })
-        : fetchCompoundV2Timeline(wallet, { recent: TIMELINE_WINDOW_EVENTS, baseUrl, headers }),
-    readOpening: (baseUrl, cutoffBlock, headers) =>
-      fetchTimelineOpeningBalance({
-        path: "/api/compound-v2/timeline/summary",
-        params: { wallet },
-        cutoffBlock,
-        baseUrl,
-        headers,
-      }),
+    readPositions: async (baseUrl, headers) =>
+      answerEnvelope(
+        await readCompoundV2Positions(new URLSearchParams({ wallet, limit: "1" }), { baseUrl, headers }),
+        "readCompoundV2Positions",
+        1,
+      ),
+    readTimeline: async (baseUrl, headers) =>
+      answerTimeline<CompoundV2TimelineResult | CompoundV2GroupedTimelineResult>(
+        await readCompoundV2Timeline(
+          new URLSearchParams(grouped ? { wallet, group: "1" } : { wallet, recent: String(TIMELINE_WINDOW_EVENTS) }),
+          { baseUrl, headers },
+        ),
+        "readCompoundV2Timeline",
+      ),
+    readOpening: async (baseUrl, cutoffBlock, headers) =>
+      answerBody(
+        await readCompoundV2OpeningBalance(new URLSearchParams({ wallet, cutoffBlock: String(cutoffBlock) }), {
+          baseUrl,
+          headers,
+        }),
+        "readCompoundV2OpeningBalance",
+      ) as TimelineOpeningBalance,
+    hop: boxOnlyHop,
   });
   return {
     ...tail,

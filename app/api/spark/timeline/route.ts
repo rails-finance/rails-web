@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
-import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
-import { timelineCacheHeaders } from "@/lib/shared/decimals-unread";
-import { withRowCeiling } from "@/lib/shared/timeline-row-ceiling";
-import { buildSparkTimeline, type MvRow } from "@/lib/sources/api/spark-timeline";
-import { toTimelineWire } from "@/lib/shared/timeline-wire";
-import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
-import {
-  folderLegAddresses,
-  toServedFolder,
-  type UpstreamGroupedTimeline,
-} from "@/lib/sources/api/timeline-folder-wire";
-import type { TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
+import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
+import { readSparkTimeline } from "@/lib/spark/proxy-reads";
 
 // api arm of a SparkLend wallet's timeline — the LIVE rails-server index.
 // rails-server returns the raw replayed spark_events_served rows; we run the chain-
@@ -44,29 +32,14 @@ import type { TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
 // diet is what keeps a deep history affordable and it works over one flat
 // array, so nesting the transformed events inside the rows would have cost the
 // diet and bought nothing.
+//
+// The read and the shaping live in lib/spark/proxy-reads.ts, which the position
+// page's loader calls too.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const RAILS_API_URL = process.env.RAILS_API_URL;
-
-interface TimelineRowsResponse {
-  wallet: string;
-  rows: MvRow[];
-  totalEvents: number;
-  /** The index's row ceiling cut this query, so `rows` is short of
-   *  `totalEvents`. Optional — a backend that predates the field means the
-   *  fetch was not capped, and the page reads exactly as it did before. */
-  truncated?: boolean;
-  /** Where `?recent=N` drew the line: `rows` holds every event from this block
-   *  onward and everything below it is the opening balance, fetched from the
-   *  /summary twin with THIS number. Null (or absent, on a backend that
-   *  predates it) means the rows ARE the whole history. */
-  cutoffBlock?: number | null;
-  /** The span `?from=`/`?to=` asked for, echoed in unix seconds. Null (or
-   *  absent, on a backend that predates it) means no span was asked for. */
-  span?: { from: number; to: number } | null;
-}
 
 export async function GET(request: NextRequest) {
   const readerIp = readerIpFromRequest(request);
@@ -75,107 +48,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
 
-  const wallet = request.nextUrl.searchParams.get("wallet");
-  if (!wallet) return NextResponse.json({ error: "wallet is required" }, { status: 400 });
-  // Passed straight through, validated upstream: rails-server owns the shape of
-  // `recent` and answers a bad one with its own 400. Re-validating it here
-  // would be a second opinion about the same parameter, and the two would drift.
-  const recent = request.nextUrl.searchParams.get("recent");
-  // `?from=`/`?to=`: a span of time in unix seconds in place of the newest
-  // window, passed straight through for the same reason. Each end is
-  // forwarded independently, so a half span reaches upstream and is refused
-  // there. Under `group` it names the segment.
-  const from = request.nextUrl.searchParams.get("from");
-  const to = request.nextUrl.searchParams.get("to");
-  const spanQs = (from ? `&from=${encodeURIComponent(from)}` : "") + (to ? `&to=${encodeURIComponent(to)}` : "");
-  const grouped = request.nextUrl.searchParams.get("group") === "1";
-
   try {
-    if (grouped) {
-      // `recent` is deliberately NOT composed with `group`: under grouping the
-      // two bounds are the route's own (a row cap and an event scan bound,
-      // whichever binds first), because a caller cannot know how many events
-      // fill a thousand rows on this particular position.
-      const url = `${RAILS_API_URL}/api/spark/timeline?wallet=${encodeURIComponent(wallet)}${spanQs}&group=1`;
-      const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));
-      if (!response.ok) {
-        console.error(`Backend API error: ${response.status} ${response.statusText}`);
-        return NextResponse.json({ error: `Backend error: ${response.statusText}` }, { status: response.status });
-      }
-      const upstream = (await response.json()) as UpstreamGroupedTimeline<MvRow>;
-      // A backend that predates the grouping answers `?group=1` with the FLAT
-      // shape — same 200, raw spark_events_served rows rather than wire rows. Saying so
-      // is the whole point: transforming it anyway would produce a page of
-      // folders that are not folders, and a caller that cannot tell "not
-      // deployed yet" from "this position has no folders" would report a
-      // green run for a feature that never ran.
-      if (upstream.grouped !== true || !Array.isArray(upstream.rows)) {
-        return NextResponse.json(
-          {
-            error: "Not grouped",
-            code: "GROUPING_UNAVAILABLE",
-            message: "This backend does not serve grouped timelines yet, so there are no folders to read.",
-          },
-          { status: 502 },
-        );
-      }
-      const eventRows = upstream.rows.flatMap((r) => (r.kind === "event" ? [r.event] : []));
-      // ONE resolver behind both halves of the answer, exactly as the flat
-      // branch has one behind its rows: a folder header and the rows beneath
-      // it must never disagree about what a symbol is.
-      const [data, legMetas] = await Promise.all([
-        buildSparkTimeline(eventRows, wallet),
-        resolveErc20Meta(folderLegAddresses(upstream.rows)),
-      ]);
-      const resolve = {
-        symbol: (key: string) => legMetas.get(key)?.symbol,
-        decimals: (key: string) => (legMetas.get(key)?.unresolved ? undefined : legMetas.get(key)?.decimals),
-      };
-      const rowPlan: TimelineRowPlanEntry[] = upstream.rows.map((r) =>
-        r.kind === "event" ? { kind: "event" } : { kind: "folder", folder: toServedFolder(r.folder, resolve) },
-      );
-      const body = {
-        ...data,
-        // The position's own count, not this answer's — the same meaning it
-        // carries on the flat branch.
-        totalEvents: upstream.totalEvents,
-        cutoffBlock: upstream.cutoffBlock ?? null,
-        grouped: true as const,
-        rowPlan,
-        eventsServed: upstream.eventsServed,
-        boundBy: upstream.boundBy,
-        span: upstream.span ?? null,
-      };
-      // A leg whose decimals did not load is left off its folder header; the
-      // answer is then not kept, like a row carrying one.
-      const legsUnread = [...legMetas.values()].some((m) => m.unresolved);
-      return NextResponse.json(toTimelineWire(body, MAINNET_CHAIN_ID), {
-        headers: legsUnread
-          ? { "Cache-Control": "no-store" }
-          : timelineCacheHeaders(data.events, proxyCacheControl(response, LISTING_CACHE_CONTROL)),
-      });
-    }
-
-    const recentQs = recent ? `&recent=${encodeURIComponent(recent)}` : "";
-    const url = `${RAILS_API_URL}/api/spark/timeline?wallet=${encodeURIComponent(wallet)}${recentQs}${spanQs}`;
-    const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));
-    if (!response.ok) {
-      console.error(`Backend API error: ${response.status} ${response.statusText}`);
-      return NextResponse.json({ error: `Backend error: ${response.statusText}` }, { status: response.status });
-    }
-    const { rows, totalEvents, truncated, cutoffBlock, span } = (await response.json()) as TimelineRowsResponse;
-    const data = await buildSparkTimeline(rows, wallet);
-    // The ceiling and the window are different claims and both can be absent.
-    // A windowed fetch is never truncated — it asked for a window and got one —
-    // so `withRowCeiling` stays exactly as it was and simply never fires.
-    const windowed = {
-      ...withRowCeiling(data, { totalEvents, truncated }),
-      cutoffBlock: cutoffBlock ?? null,
-      span: span ?? null,
-    };
-    return NextResponse.json(toTimelineWire(windowed, MAINNET_CHAIN_ID), {
-      headers: timelineCacheHeaders(data.events, proxyCacheControl(response, LISTING_CACHE_CONTROL)),
-    });
+    return respondWith(await readSparkTimeline(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)));
   } catch (error) {
     console.error("Error fetching spark timeline from backend:", error);
     const message = error instanceof Error ? error.message : "Failed to fetch timeline";

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
-import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
-import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
-import { resolveOpeningAssetKeys, type UpstreamOpeningBalance } from "@/lib/shared/timeline-opening-balance-wire";
+import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
+import { readCompoundV2OpeningBalance } from "@/lib/compound-v2/proxy-reads";
 
 // The opening balance for a Compound V2 account — everything BELOW the block
 // that `/api/compound-v2/timeline?recent=N` opened its window at. The model,
@@ -20,7 +18,9 @@ import { resolveOpeningAssetKeys, type UpstreamOpeningBalance } from "@/lib/shar
 // own symbol-keyed axis always has; the flow buckets stay keyed by market, the
 // reducer's own grain.
 //
-// Node runtime, no edge caching — same as its /timeline twin.
+// The read and the resolution live in lib/compound-v2/proxy-reads.ts, which
+// the position page's loader calls too. Node runtime, no edge caching — same
+// as its /timeline twin.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,26 +34,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
 
-  const wallet = request.nextUrl.searchParams.get("wallet");
-  const cutoffBlock = request.nextUrl.searchParams.get("cutoffBlock");
-  if (!wallet) return NextResponse.json({ error: "wallet is required" }, { status: 400 });
-  if (!cutoffBlock) return NextResponse.json({ error: "cutoffBlock is required" }, { status: 400 });
-
   try {
-    const qs = new URLSearchParams({ wallet, cutoffBlock });
-    const url = `${RAILS_API_URL}/api/compound-v2/timeline/summary?${qs.toString()}`;
-    const response = await fetch(url, createAuthFetchOptions(undefined, readerIp));
-    if (!response.ok) {
-      console.error(`Backend API error: ${response.status} ${response.statusText}`);
-      return NextResponse.json({ error: `Backend error: ${response.statusText}` }, { status: response.status });
-    }
-    const upstream = (await response.json()) as UpstreamOpeningBalance;
-    const opening = resolveOpeningAssetKeys(
-      upstream,
-      (key) => COMPOUND_V2_MARKET_BY_KEY[key]?.symbol,
-      (key) => COMPOUND_V2_MARKET_BY_KEY[key]?.decimals,
+    const answer = await readCompoundV2OpeningBalance(
+      request.nextUrl.searchParams,
+      routeBoxHop(RAILS_API_URL, readerIp),
     );
-    return NextResponse.json(opening, { headers: proxyCacheControl(response, LISTING_CACHE_CONTROL) });
+    return respondWith(answer);
   } catch (error) {
     console.error("Error fetching compound-v2 timeline summary from backend:", error);
     const message = error instanceof Error ? error.message : "Failed to fetch opening balance";

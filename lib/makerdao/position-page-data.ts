@@ -11,7 +11,9 @@
 // the Vat read answers in 80-230ms, so there is no reason to split it out.
 //
 // It calls the chain loader directly rather than this deployment's own
-// /api/chain/makerdao/vault/<id>: that handler runs exactly this line.
+// /api/chain/makerdao/vault/<id>: that handler runs exactly this line. The
+// indexed reads do the same with the proxy routes' shaping
+// (lib/makerdao/proxy-reads.ts), reading the BOX in place of each route.
 //
 // The [vault] param is a cdp id, or a urn ADDRESS for LockStake engine urns
 // (cdp-less, decision 0013) and direct-Vat urns. The roster lookup must use the
@@ -22,16 +24,13 @@
 //
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { fetchMakerVaults } from "@/lib/api/fetch-makerdao-vaults";
-import {
-  fetchMakerTimeline,
-  fetchMakerGroupedTimeline,
-  type MakerGroupedTimelineResult,
-} from "@/lib/api/fetch-makerdao-timeline";
+import { boxOnlyHop } from "@/lib/shared/listing-ssr";
+import { answerBody, answerEnvelope, answerTimeline } from "@/lib/shared/proxy-answer";
+import { readMakerOpeningBalance, readMakerTimeline, readMakerVaults } from "@/lib/makerdao/proxy-reads";
+import type { MakerGroupedTimelineResult } from "@/lib/api/fetch-makerdao-timeline";
 import type { MakerTimelineResult } from "@/lib/sources/api/makerdao-timeline";
 import { loadMakerVaultStateFromChain } from "@/lib/sources/chain/makerdao-position";
-import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import type { MakerVaultSummary } from "@/lib/sources/api/makerdao-vaults";
 import type { MakerVaultState } from "@/lib/sources/chain/makerdao-position";
 
@@ -55,9 +54,10 @@ export const loadMakerVaultTail = cache(async (vault: string, grouped: boolean =
     label: "makerdao",
     readPositions: async (baseUrl, headers) => {
       const [vaults, chain] = await Promise.all([
-        fetchMakerVaults(
-          isUrnAddr ? { urn: vault, limit: 1, baseUrl, headers } : { cdpId: vault, limit: 1, baseUrl, headers },
-        ),
+        readMakerVaults(new URLSearchParams(isUrnAddr ? { urn: vault, limit: "1" } : { cdpId: vault, limit: "1" }), {
+          baseUrl,
+          headers,
+        }).then((answer) => answerEnvelope<MakerVaultSummary>(answer, "readMakerVaults", 1)),
         // The Vat read is additive: the index row alone still renders a vault,
         // with the chain-derived lines absent rather than wrong. A failure here
         // must not cost the history beside it.
@@ -76,18 +76,24 @@ export const loadMakerVaultTail = cache(async (vault: string, grouped: boolean =
         : null;
       return { summary, chain: chain ?? directChain };
     },
-    readTimeline: (baseUrl, headers) =>
-      grouped
-        ? fetchMakerGroupedTimeline(vault, { baseUrl, headers })
-        : fetchMakerTimeline(vault, { recent: TIMELINE_WINDOW_EVENTS, baseUrl, headers }),
-    readOpening: (baseUrl, cutoffBlock, headers) =>
-      fetchTimelineOpeningBalance({
-        path: `/api/makerdao/vault/${encodeURIComponent(vault)}/timeline/summary`,
-        params: {},
-        cutoffBlock,
-        baseUrl,
-        headers,
-      }),
+    readTimeline: async (baseUrl, headers) =>
+      answerTimeline<MakerTimelineResult | MakerGroupedTimelineResult>(
+        await readMakerTimeline(
+          vault,
+          new URLSearchParams(grouped ? { group: "1" } : { recent: String(TIMELINE_WINDOW_EVENTS) }),
+          { baseUrl, headers },
+        ),
+        "readMakerTimeline",
+      ),
+    readOpening: async (baseUrl, cutoffBlock, headers) =>
+      answerBody(
+        await readMakerOpeningBalance(vault, new URLSearchParams({ cutoffBlock: String(cutoffBlock) }), {
+          baseUrl,
+          headers,
+        }),
+        "readMakerOpeningBalance",
+      ) as TimelineOpeningBalance,
+    hop: boxOnlyHop,
   });
   return {
     ...tail,

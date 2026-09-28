@@ -98,13 +98,24 @@ export async function ssrHop(): Promise<SsrHop | null> {
  *  `X-Rails-Reader-IP` is what the proxy would have sent on its behalf.
  *
  *  Only for a proxy that forwards. A route that shapes the backend's rows into
- *  what the page renders is not a hop to skip — read what it does first.
+ *  what the page renders is not a hop to skip — read what it does first; its
+ *  shaping can run in the render instead (`boxOnlyHop`, lib/shared/proxy-answer.ts).
  *
  *  Falls back to `ssrHop()` when `RAILS_API_URL` is absent, so a deployment
  *  without it degrades to the self-hop rather than to no read at all. */
 export async function boxHop(): Promise<SsrHop | null> {
   const baseUrl = process.env.RAILS_API_URL?.replace(/\/$/, "");
   if (!baseUrl) return ssrHop();
+  return { baseUrl, headers: createAuthHeaders(await readerIpFromHeaders()) };
+}
+
+/** The box and nothing else, for a loader that runs a shaping route's build in
+ *  the render (lib/shared/proxy-answer.ts). Null when `RAILS_API_URL` is
+ *  absent: the self-hop `boxHop()` falls back to answers already built, and
+ *  building them a second time would misread them. The client then fetches. */
+export async function boxOnlyHop(): Promise<SsrHop | null> {
+  const baseUrl = process.env.RAILS_API_URL?.replace(/\/$/, "");
+  if (!baseUrl) return null;
   return { baseUrl, headers: createAuthHeaders(await readerIpFromHeaders()) };
 }
 

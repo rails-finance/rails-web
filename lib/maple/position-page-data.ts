@@ -8,6 +8,9 @@
 // already takes. The card's redeemable value and the pool band both read it, so
 // it is part of the seed, not a second wave.
 //
+// The three reads go to the BOX and run the proxy routes' shaping here, in the
+// render (lib/maple/proxy-reads.ts), in place of a fetch of each route.
+//
 // The CCIP bridge escrows are not lenders: the backend returns no roster row and
 // no timeline for them, and the page renders a custody view off its own chain
 // read. Nothing here is fetched for those addresses — the page decides that
@@ -15,15 +18,12 @@
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { fetchMaplePositions, type MaplePositionsResult } from "@/lib/api/fetch-maple-positions";
-import {
-  fetchMapleTimeline,
-  fetchMapleGroupedTimeline,
-  type MapleGroupedTimelineResult,
-  type MapleTimelineResponse,
-} from "@/lib/api/fetch-maple-timeline";
-import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { boxOnlyHop } from "@/lib/shared/listing-ssr";
+import { answerBody, answerTimeline } from "@/lib/shared/proxy-answer";
+import { readMapleOpeningBalance, readMaplePositions, readMapleTimeline } from "@/lib/maple/proxy-reads";
+import type { MaplePositionsResult } from "@/lib/api/fetch-maple-positions";
+import type { MapleGroupedTimelineResult, MapleTimelineResponse } from "@/lib/api/fetch-maple-timeline";
+import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 
 /**
  * ONE timeline read, whichever shape the URL asked for — the SparkLend and
@@ -37,19 +37,34 @@ import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
 export const loadMaplePositionTail = cache(async (wallet: string, grouped: boolean = false) => {
   const tail = await loadPositionTail<MaplePositionsResult, MapleTimelineResponse | MapleGroupedTimelineResult>({
     label: "maple",
-    readPositions: (baseUrl, headers) => fetchMaplePositions({ wallet, limit: 1, status: undefined, baseUrl, headers }),
-    readTimeline: (baseUrl, headers) =>
-      grouped
-        ? fetchMapleGroupedTimeline(wallet, { baseUrl, headers })
-        : fetchMapleTimeline(wallet, { recent: TIMELINE_WINDOW_EVENTS, baseUrl, headers }),
-    readOpening: (baseUrl, cutoffBlock, headers) =>
-      fetchTimelineOpeningBalance({
-        path: "/api/maple/timeline/summary",
-        params: { wallet },
-        cutoffBlock,
-        baseUrl,
-        headers,
-      }),
+    readPositions: async (baseUrl, headers) => {
+      const json = answerBody(
+        await readMaplePositions(new URLSearchParams({ wallet, limit: "1" }), { baseUrl, headers }),
+        "readMaplePositions",
+      ) as Partial<MaplePositionsResult>;
+      return {
+        data: json.data ?? [],
+        poolState: json.poolState ?? {},
+        pagination: json.pagination ?? { total: json.data?.length ?? 0, limit: 1, offset: 0 },
+      };
+    },
+    readTimeline: async (baseUrl, headers) =>
+      answerTimeline<MapleTimelineResponse | MapleGroupedTimelineResult>(
+        await readMapleTimeline(
+          new URLSearchParams(grouped ? { wallet, group: "1" } : { wallet, recent: String(TIMELINE_WINDOW_EVENTS) }),
+          { baseUrl, headers },
+        ),
+        "readMapleTimeline",
+      ),
+    readOpening: async (baseUrl, cutoffBlock, headers) =>
+      answerBody(
+        await readMapleOpeningBalance(new URLSearchParams({ wallet, cutoffBlock: String(cutoffBlock) }), {
+          baseUrl,
+          headers,
+        }),
+        "readMapleOpeningBalance",
+      ) as TimelineOpeningBalance,
+    hop: boxOnlyHop,
   });
   return {
     ...tail,

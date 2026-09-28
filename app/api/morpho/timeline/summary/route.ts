@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
-import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
-import { MORPHO_MARKETS } from "@/lib/morpho/market-catalog";
-import { splitMorphoPositionId } from "@/lib/morpho/position-id";
-import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
-import { resolveOpeningAssetKeys, type UpstreamOpeningBalance } from "@/lib/shared/timeline-opening-balance-wire";
+import { respondWith, routeBoxHop } from "@/lib/shared/proxy-answer";
+import { readMorphoOpeningBalance } from "@/lib/morpho/proxy-reads";
 
 // The opening balance for a Morpho Blue position — everything BELOW the block
 // that `/api/morpho/position/:positionId/timeline?recent=N` opened its window
@@ -24,6 +20,9 @@ import { resolveOpeningAssetKeys, type UpstreamOpeningBalance } from "@/lib/shar
 // merge then states no lifetime layer rather than a mis-scaled one.
 //
 // Node runtime, no edge caching — same as its /timeline twin.
+//
+// The read and the shaping live in lib/morpho/proxy-reads.ts, which the
+// position page's loader calls too.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,40 +36,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
 
-  const positionId = request.nextUrl.searchParams.get("positionId");
-  const cutoffBlock = request.nextUrl.searchParams.get("cutoffBlock");
-  if (!positionId) return NextResponse.json({ error: "positionId is required" }, { status: 400 });
-  if (!cutoffBlock) return NextResponse.json({ error: "cutoffBlock is required" }, { status: 400 });
-
   try {
-    const { market } = splitMorphoPositionId(positionId);
-    const marketId = market.startsWith("0x") ? market.toLowerCase() : `0x${market.toLowerCase()}`;
-    const entry = MORPHO_MARKETS.find((m) => m.id === marketId);
-
-    const qs = new URLSearchParams({ positionId, cutoffBlock });
-    const url = `${RAILS_API_URL}/api/morpho/timeline/summary?${qs.toString()}`;
-    const [response, meta] = await Promise.all([
-      fetch(url, createAuthFetchOptions(undefined, readerIp)),
-      entry ? resolveErc20Meta([entry.loanToken, entry.collateralToken]) : Promise.resolve(null),
-    ]);
-    if (!response.ok) {
-      console.error(`Backend API error: ${response.status} ${response.statusText}`);
-      return NextResponse.json({ error: `Backend error: ${response.statusText}` }, { status: response.status });
-    }
-    const upstream = (await response.json()) as UpstreamOpeningBalance;
-    const decimalsOf = (key: string): number | undefined => {
-      if (!entry || !meta) return undefined;
-      const token = key === "collateral" ? entry.collateralToken : key === "debt" ? entry.loanToken : null;
-      const m = token ? meta.get(token.toLowerCase()) : undefined;
-      return m && !m.unresolved ? m.decimals : undefined;
-    };
-    const opening = resolveOpeningAssetKeys(upstream, () => undefined, decimalsOf);
-    // A token whose decimals did not load leaves its bucket's decimals null
-    // (unknown, never added), and the answer is not kept.
-    const unread = !!meta && [...meta.values()].some((m) => m.unresolved);
-    return NextResponse.json(opening, {
-      headers: unread ? { "Cache-Control": "no-store" } : proxyCacheControl(response, LISTING_CACHE_CONTROL),
-    });
+    return respondWith(
+      await readMorphoOpeningBalance(request.nextUrl.searchParams, routeBoxHop(RAILS_API_URL, readerIp)),
+    );
   } catch (error) {
     console.error("Error fetching morpho timeline summary from backend:", error);
     const message = error instanceof Error ? error.message : "Failed to fetch opening balance";

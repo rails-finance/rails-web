@@ -5,18 +5,18 @@
 //
 // V3 is one cross-collateralised account per (wallet, market), and the market is
 // a query parameter — so it is part of this cache key, not an afterthought.
+//
+// The three reads go to the BOX and run the proxy routes' shaping here, in the
+// render (lib/aave-v3/proxy-reads.ts), in place of a fetch of each route.
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { fetchAaveV3Positions, type AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
-import {
-  fetchAaveV3Timeline,
-  fetchAaveV3GroupedTimeline,
-  type AaveV3TimelineResponse,
-  type AaveV3GroupedTimelineResponse,
-} from "@/lib/api/fetch-aave-v3-timeline";
-import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { boxOnlyHop } from "@/lib/shared/listing-ssr";
+import { answerBody, answerTimeline } from "@/lib/shared/proxy-answer";
+import { readAaveV3OpeningBalance, readAaveV3Positions, readAaveV3Timeline } from "@/lib/aave-v3/proxy-reads";
+import type { AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
+import type { AaveV3TimelineResponse, AaveV3GroupedTimelineResponse } from "@/lib/api/fetch-aave-v3-timeline";
+import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import type { AaveV3MarketKey } from "@/lib/aave-v3/asset-catalog";
 
 /**
@@ -49,19 +49,30 @@ export const loadAaveV3PositionTail = cache(
       AaveV3TimelineResponse | AaveV3GroupedTimelineResponse
     >({
       label: "aave-v3",
-      readPositions: (baseUrl, headers) => fetchAaveV3Positions({ wallet, market, limit: 1, baseUrl, headers }),
-      readTimeline: (baseUrl, headers) =>
-        grouped
-          ? fetchAaveV3GroupedTimeline({ wallet, market, baseUrl, headers })
-          : fetchAaveV3Timeline({ wallet, market, recent: TIMELINE_WINDOW_EVENTS, baseUrl, headers }),
-      readOpening: (baseUrl, cutoffBlock, headers) =>
-        fetchTimelineOpeningBalance({
-          path: "/api/aave-v3/timeline/summary",
-          params: { wallet, market },
-          cutoffBlock,
-          baseUrl,
-          headers,
-        }),
+      readPositions: async (baseUrl, headers) =>
+        answerBody(
+          await readAaveV3Positions(new URLSearchParams({ wallet, market, limit: "1" }), { baseUrl, headers }),
+          "readAaveV3Positions",
+        ) as { rows: AaveV3PositionRow[] },
+      readTimeline: async (baseUrl, headers) =>
+        answerTimeline<AaveV3TimelineResponse | AaveV3GroupedTimelineResponse>(
+          await readAaveV3Timeline(
+            new URLSearchParams(
+              grouped ? { wallet, market, group: "1" } : { wallet, market, recent: String(TIMELINE_WINDOW_EVENTS) },
+            ),
+            { baseUrl, headers },
+          ),
+          "readAaveV3Timeline",
+        ),
+      readOpening: async (baseUrl, cutoffBlock, headers) =>
+        answerBody(
+          await readAaveV3OpeningBalance(new URLSearchParams({ wallet, market, cutoffBlock: String(cutoffBlock) }), {
+            baseUrl,
+            headers,
+          }),
+          "readAaveV3OpeningBalance",
+        ) as TimelineOpeningBalance,
+      hop: boxOnlyHop,
     });
     return {
       ...tail,

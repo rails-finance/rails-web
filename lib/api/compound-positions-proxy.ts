@@ -9,12 +9,13 @@
 // how complete the lane is — which its page states.
 
 import { NextRequest, NextResponse } from "next/server";
-import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
 import { buildCompoundPositionRows, type RawCompoundPositionRow } from "@/lib/sources/api/compound-positions";
 import type { CometDeployment } from "@/lib/compound/asset-catalog";
 import type { BaseLendingCoverage } from "@/lib/api/fetch-aave-v3-positions";
+import { proxyFail, proxyOk, respondWith, routeBoxHop, type ProxyAnswer } from "@/lib/shared/proxy-answer";
+import type { SsrHop } from "@/lib/shared/listing-ssr";
 
 export interface CompoundProxyTarget {
   /** rails-server mount, e.g. "/api/compound". */
@@ -40,6 +41,48 @@ interface PositionsRawResponse {
   coverage?: BaseLendingCoverage | null;
 }
 
+/** The listing answer for `t`, read from the box through `hop`. The Ethereum
+ *  position page's loader calls it too (lib/shared/proxy-answer.ts). */
+export async function readCompoundPositions(
+  sp: URLSearchParams,
+  hop: SsrHop,
+  t: CompoundProxyTarget,
+  signal?: AbortSignal,
+): Promise<ProxyAnswer<unknown>> {
+  const qs = new URLSearchParams();
+  if (sp.get("market")) qs.set("market", sp.get("market")!);
+  if (sp.get("wallet")) qs.set("wallet", sp.get("wallet")!);
+  if (sp.get("hasDebt")) qs.set("hasDebt", sp.get("hasDebt")!);
+  if (sp.get("noDebt")) qs.set("noDebt", sp.get("noDebt")!);
+  if (sp.get("hasLiquidations")) qs.set("hasLiquidations", sp.get("hasLiquidations")!);
+  if (sp.get("status")) qs.set("status", sp.get("status")!);
+  if (t.supportsSort) {
+    const sortBy = sp.get("sortBy");
+    if (sortBy === "debt" || sortBy === "coll") qs.set("sortBy", sortBy);
+  }
+  qs.set("sortOrder", sp.get("sortOrder") === "asc" ? "asc" : "desc");
+  if (sp.get("limit") != null) qs.set("limit", sp.get("limit")!);
+  if (sp.get("offset") != null) qs.set("offset", sp.get("offset")!);
+
+  const url = `${hop.baseUrl}${t.apiPrefix}/positions?${qs.toString()}`;
+  const response = await fetch(url, { signal, headers: hop.headers });
+  if (!response.ok) {
+    console.error(`Backend API error: ${response.status} ${response.statusText}`);
+    return proxyFail(response.status, { success: false, error: `Backend error: ${response.statusText}` });
+  }
+  const raw = (await response.json()) as PositionsRawResponse;
+  const data = await buildCompoundPositionRows(raw.rows, t.deployment);
+  return proxyOk(
+    {
+      success: true,
+      data,
+      pagination: { total: raw.total, limit: raw.limit, offset: raw.offset },
+      ...(raw.coverage !== undefined ? { coverage: raw.coverage ?? null } : {}),
+    },
+    proxyCacheControl(response, LISTING_CACHE_CONTROL),
+  );
+}
+
 export async function proxyCompoundPositions(request: NextRequest, t: CompoundProxyTarget) {
   const readerIp = readerIpFromRequest(request);
   const RAILS_API_URL = process.env.RAILS_API_URL;
@@ -48,42 +91,14 @@ export async function proxyCompoundPositions(request: NextRequest, t: CompoundPr
     return NextResponse.json({ success: false, error: "Server configuration error" }, { status: 500 });
   }
 
-  const sp = request.nextUrl.searchParams;
   try {
-    const qs = new URLSearchParams();
-    if (sp.get("market")) qs.set("market", sp.get("market")!);
-    if (sp.get("wallet")) qs.set("wallet", sp.get("wallet")!);
-    if (sp.get("hasDebt")) qs.set("hasDebt", sp.get("hasDebt")!);
-    if (sp.get("noDebt")) qs.set("noDebt", sp.get("noDebt")!);
-    if (sp.get("hasLiquidations")) qs.set("hasLiquidations", sp.get("hasLiquidations")!);
-    if (sp.get("status")) qs.set("status", sp.get("status")!);
-    if (t.supportsSort) {
-      const sortBy = sp.get("sortBy");
-      if (sortBy === "debt" || sortBy === "coll") qs.set("sortBy", sortBy);
-    }
-    qs.set("sortOrder", sp.get("sortOrder") === "asc" ? "asc" : "desc");
-    if (sp.get("limit") != null) qs.set("limit", sp.get("limit")!);
-    if (sp.get("offset") != null) qs.set("offset", sp.get("offset")!);
-
-    const url = `${RAILS_API_URL}${t.apiPrefix}/positions?${qs.toString()}`;
-    const response = await fetch(url, createAuthFetchOptions({ signal: request.signal }, readerIp));
-    if (!response.ok) {
-      console.error(`Backend API error: ${response.status} ${response.statusText}`);
-      return NextResponse.json(
-        { success: false, error: `Backend error: ${response.statusText}` },
-        { status: response.status },
-      );
-    }
-    const raw = (await response.json()) as PositionsRawResponse;
-    const data = await buildCompoundPositionRows(raw.rows, t.deployment);
-    return NextResponse.json(
-      {
-        success: true,
-        data,
-        pagination: { total: raw.total, limit: raw.limit, offset: raw.offset },
-        ...(raw.coverage !== undefined ? { coverage: raw.coverage ?? null } : {}),
-      },
-      { headers: proxyCacheControl(response, LISTING_CACHE_CONTROL) },
+    return respondWith(
+      await readCompoundPositions(
+        request.nextUrl.searchParams,
+        routeBoxHop(RAILS_API_URL, readerIp),
+        t,
+        request.signal,
+      ),
     );
   } catch (error) {
     console.error(`Error fetching ${t.label} positions from backend:`, error);

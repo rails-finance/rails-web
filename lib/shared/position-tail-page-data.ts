@@ -25,8 +25,11 @@
 // page renders. Read what a proxy does before deciding it is only a hop; where
 // all of them do forward unchanged, the caller passes `hop: boxHop` and the
 // reads go to RAILS_API_URL with bearer auth instead, one function invocation
-// cheaper each. Either way every read carries headers that name the reader, so
-// the box's per-reader budget applies to the reader and not to the deployment.
+// cheaper each. Where they shape, the caller passes `hop: boxOnlyHop` and reads
+// through the routes' shared reads (lib/shared/proxy-answer.ts), which run the
+// same shaping in this render. Either way every read carries headers that name
+// the reader, so the box's per-reader budget applies to the reader and not to
+// the deployment.
 //
 // THE WINDOWED HISTORY IS PART OF THE TAIL. The timeline fetch asks for a window
 // of the most recent events; a position large enough to need one gets back the
@@ -102,9 +105,10 @@ export async function loadPositionTail<Positions, Timeline extends TimelineRead 
     headers: Record<string, string>,
   ) => Promise<TimelineOpeningBalance>;
   /** Where the reads go. The default is this deployment's own `/api/*` proxies
-   *  (`ssrHop`), which is right whenever a proxy shapes what it forwards. An
-   *  explorer whose three proxies only forward passes `boxHop` instead and
-   *  drops three function invocations from the cold path. */
+   *  (`ssrHop`). An explorer whose three proxies only forward passes `boxHop`
+   *  and drops three function invocations from the cold path; one whose
+   *  proxies shape passes `boxOnlyHop` and reads call the routes' shared
+   *  reads (lib/shared/proxy-answer.ts). */
   hop?: () => Promise<SsrHop | null>;
 }): Promise<PositionTail<Positions, Timeline>> {
   const hop = await (opts.hop ?? ssrHop)();

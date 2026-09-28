@@ -2,18 +2,18 @@
 // the position page's server component. The shape, the failure rules and why the
 // windowed history's opening balance is read here live in
 // lib/shared/position-tail-page-data.ts.
+//
+// The three reads go to the BOX and run the proxy routes' shaping here, in the
+// render (lib/spark/proxy-reads.ts), in place of a fetch of each route.
 
 import { cache } from "react";
 import { loadPositionTail } from "@/lib/shared/position-tail-page-data";
-import { fetchSparkPositions } from "@/lib/api/fetch-spark-positions";
-import {
-  fetchSparkTimeline,
-  fetchSparkGroupedTimeline,
-  type SparkGroupedTimelineResult,
-} from "@/lib/api/fetch-spark-timeline";
+import { boxOnlyHop } from "@/lib/shared/listing-ssr";
+import { answerBody, answerEnvelope, answerTimeline } from "@/lib/shared/proxy-answer";
+import { readSparkOpeningBalance, readSparkPositions, readSparkTimeline } from "@/lib/spark/proxy-reads";
+import type { SparkGroupedTimelineResult } from "@/lib/api/fetch-spark-timeline";
 import type { SparkTimelineResult } from "@/lib/sources/api/spark-timeline";
-import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
-import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
+import { TIMELINE_WINDOW_EVENTS, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import type { SparkPositionSummary } from "@/lib/sources/api/spark-positions";
 
 /**
@@ -35,19 +35,29 @@ export const loadSparkPositionTail = cache(async (wallet: string, grouped: boole
     SparkTimelineResult | SparkGroupedTimelineResult
   >({
     label: "spark",
-    readPositions: (baseUrl, headers) => fetchSparkPositions({ wallet, limit: 1, baseUrl, headers }),
-    readTimeline: (baseUrl, headers) =>
-      grouped
-        ? fetchSparkGroupedTimeline(wallet, { baseUrl, headers })
-        : fetchSparkTimeline(wallet, { recent: TIMELINE_WINDOW_EVENTS, baseUrl, headers }),
-    readOpening: (baseUrl, cutoffBlock, headers) =>
-      fetchTimelineOpeningBalance({
-        path: "/api/spark/timeline/summary",
-        params: { wallet },
-        cutoffBlock,
-        baseUrl,
-        headers,
-      }),
+    readPositions: async (baseUrl, headers) =>
+      answerEnvelope<SparkPositionSummary>(
+        await readSparkPositions(new URLSearchParams({ wallet, limit: "1" }), { baseUrl, headers }),
+        "readSparkPositions",
+        1,
+      ),
+    readTimeline: async (baseUrl, headers) =>
+      answerTimeline<SparkTimelineResult | SparkGroupedTimelineResult>(
+        await readSparkTimeline(
+          new URLSearchParams(grouped ? { wallet, group: "1" } : { wallet, recent: String(TIMELINE_WINDOW_EVENTS) }),
+          { baseUrl, headers },
+        ),
+        "readSparkTimeline",
+      ),
+    readOpening: async (baseUrl, cutoffBlock, headers) =>
+      answerBody(
+        await readSparkOpeningBalance(new URLSearchParams({ wallet, cutoffBlock: String(cutoffBlock) }), {
+          baseUrl,
+          headers,
+        }),
+        "readSparkOpeningBalance",
+      ) as TimelineOpeningBalance,
+    hop: boxOnlyHop,
   });
   return {
     ...tail,
