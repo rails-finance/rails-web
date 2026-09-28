@@ -62,6 +62,7 @@ import {
 } from "@/lib/fluid/vaults-provenance";
 import type { FluidVaultRow, FluidVaultsChainResponse, LegToken } from "@/lib/sources/chain/fluid-vaults";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const pctText = (f: number | null, dp = 0) => (f == null ? "—" : `${(f * 100).toFixed(dp)}%`);
 
@@ -285,16 +286,8 @@ export function FluidVaultsStamp({ data }: { data: FluidVaultsChainResponse }) {
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · block{" "}
-      <a
-        href={explorerUrl(MAINNET_CHAIN_ID, "block", data.blockNumber)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="link-external"
-      >
-        {data.blockNumber.toLocaleString("en-US")}
-      </a>{" "}
-      · one <span className="text-foreground">getVaultsEntireData()</span> call to the{" "}
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · one{" "}
+      <span className="text-foreground">getVaultsEntireData()</span> call to the{" "}
       <a
         href={explorerUrl(MAINNET_CHAIN_ID, "address", "0xa5c3e16523eeeddcc34706b0e6be88b4c6ea95cc")}
         target="_blank"

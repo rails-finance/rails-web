@@ -49,6 +49,7 @@ import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl } from "@/lib/shared/chains";
 import type { LiquityForkBranchesResponse, LiquityForkBranchState } from "@/lib/api/fetch-liquity-fork-branches";
 import { AmountText } from "@/components/shared/amount-text";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const LINK = "text-blue-500 hover:underline";
 
@@ -419,15 +420,7 @@ export function LiquityForkBranchesStamp({ data }: { data: LiquityForkBranchesRe
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · block{" "}
-      <a
-        href={explorerUrl(chainId, "block", data.blockNumber)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="link-external"
-      >
-        {data.blockNumber.toLocaleString("en-US")}
-      </a>
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={chainId} />
       {" · "}
       <AmountText value={data.totalDebt} format="compact" /> {data.debtSymbol} outstanding
       {data.totalCollUsd != null && ` against ${formatUsdValue(data.totalCollUsd)} of collateral`}

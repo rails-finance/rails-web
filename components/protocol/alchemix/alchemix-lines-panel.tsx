@@ -30,13 +30,14 @@ import type {
   AlchemixTransmuterLineCoverage,
   AlchemixV2LineCoverage,
 } from "@/types/api/alchemix";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const block = (n: number | null) => (n == null ? "not recorded" : n.toLocaleString("en-US"));
 const count = (n: number) => n.toLocaleString("en-US");
 const plural = (n: number, one: string, many: string) => `${count(n)} ${n === 1 ? one : many}`;
 
 /** One card: the house raised panel with its title/meta row and muted prose. */
-function CoverageCard({ title, meta, children }: { title: string; meta: string; children: ReactNode }) {
+function CoverageCard({ title, meta, children }: { title: string; meta: ReactNode; children: ReactNode }) {
   return (
     <section className="rounded-xl bg-raised px-4 py-3.5">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
@@ -81,7 +82,12 @@ export function AlchemixLinesPanel({ lines }: { lines: AlchemixLineCoverage[] })
         <CoverageCard
           key={line.lineKey}
           title={line.displayName}
-          meta={`${line.lineKey} · indexed to block ${block(line.indexedToBlock)}`}
+          meta={
+            <>
+              {line.lineKey} · indexed to{" "}
+              {line.indexedToBlock == null ? "block not recorded" : <BlockRef block={line.indexedToBlock} />}
+            </>
+          }
         >
           <p className={PROSE_FIRST}>{gradeSentence(line)}</p>
           {line.unsweptRedemptions > 0 ? (
@@ -127,7 +133,12 @@ export function AlchemixTransmuterCoveragePanel({ lines }: { lines: AlchemixTran
         <CoverageCard
           key={line.lineKey}
           title={`${line.displayName} Transmuter`}
-          meta={`${line.lineKey} · indexed to block ${block(line.indexedToBlock)}`}
+          meta={
+            <>
+              {line.lineKey} · indexed to{" "}
+              {line.indexedToBlock == null ? "block not recorded" : <BlockRef block={line.indexedToBlock} />}
+            </>
+          }
         >
           <p className={PROSE_FIRST}>
             {plural(line.positions, "position", "positions")}, {count(line.outstanding)} not yet claimed. Each

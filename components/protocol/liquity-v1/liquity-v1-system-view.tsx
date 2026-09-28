@@ -72,6 +72,7 @@ import { formatExact, formatUsdValue, formatTinyNonZero } from "@/lib/utils/form
 import type { LiquityV1SystemChainResponse } from "@/lib/api/fetch-liquity-v1-system";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const LINK = "text-blue-500 hover:underline";
 
@@ -404,15 +405,7 @@ export function LiquityV1SystemStamp({ data }: { data: LiquityV1SystemChainRespo
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · block{" "}
-      <a
-        href={explorerUrl(MAINNET_CHAIN_ID, "block", data.blockNumber)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="link-external"
-      >
-        {data.blockNumber.toLocaleString("en-US")}
-      </a>
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} />
       {" · "}
       <AmountText value={data.systemDebt} format="compact" /> {DEBT_SYMBOL} outstanding against{" "}
       {formatUsdValue(data.systemCollUsd)} of {COLLATERAL_SYMBOL}

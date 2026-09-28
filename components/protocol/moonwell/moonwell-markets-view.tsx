@@ -53,6 +53,7 @@ import {
   mwLiquidationIncentiveProv,
 } from "@/lib/moonwell/markets-provenance";
 import type { MoonwellMarketRow, MoonwellMarketsResponse } from "@/lib/sources/chain/moonwell-market-state";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const LINK = "text-blue-500 hover:underline";
 
@@ -306,16 +307,7 @@ export function MoonwellMarketsStamp({
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · block{" "}
-      <a
-        href={explorerUrl(chainId, "block", data.blockNumber)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="link-external"
-      >
-        {data.blockNumber.toLocaleString("en-US")}
-      </a>{" "}
-      · roster from the{" "}
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={chainId} /> · roster from the{" "}
       <a
         href={explorerUrl(chainId, "address", comptroller)}
         target="_blank"

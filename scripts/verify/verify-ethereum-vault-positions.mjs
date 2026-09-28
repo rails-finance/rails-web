@@ -1168,8 +1168,8 @@ check("L9e every date is the en-GB UTC form", badDates.length === 0, badDates.jo
 const fmtBlock = (b) => b.toLocaleString("en-US");
 const expectedBlockLine =
   censusBlocks.length === 1
-    ? `block ${fmtBlock(censusBlocks[0])}`
-    : `blocks ${fmtBlock(censusBlocks[0])} to ${fmtBlock(censusBlocks[censusBlocks.length - 1])}`;
+    ? `${fmtBlock(censusBlocks[0])}`
+    : `${fmtBlock(censusBlocks[0])} to ${fmtBlock(censusBlocks[censusBlocks.length - 1])}`;
 check(
   "L10 the census line states exactly the blocks the route's census rows carry, in the census slot",
   dom.stance.includes(`census at ${expectedBlockLine}`),

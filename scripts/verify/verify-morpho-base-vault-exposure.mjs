@@ -592,7 +592,7 @@ const tryRead = async (address, functionName, blockNumber) => {
 /** The block the page STATES, from the stamp a reader sees — check 2's subject. */
 async function statedBlock() {
   const text = (await page.locator('[data-skel-section="page-header"]').innerText()).replace(/\s+/g, " ");
-  const m = text.match(/Read at block ([\d,]+)/);
+  const m = text.match(/Read at (?:block )?(\d[\d,]*)/);
   return m ? BigInt(m[1].replace(/,/g, "")) : null;
 }
 

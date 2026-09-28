@@ -92,6 +92,7 @@ import type {
 } from "@/lib/sources/chain/aave-ethereum-vault-directory";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import { NotLoaded } from "@/components/shared/not-loaded";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const ZERO = BigInt(0);
@@ -150,17 +151,8 @@ export function AaveVaultDirectoryView({ data }: { data: AaveEthereumVaultDirect
              exemption the tripwire reads. Without it the sweep would report the
              page's own block number as an untraced stat. */
           <p className="mt-1 text-[11px] text-rb-500" data-directory-block={data.blockNumber} data-prov-exempt>
-            Read at block{" "}
-            <a
-              href={explorerUrl(MAINNET_CHAIN_ID, "block", data.blockNumber)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="link-external"
-            >
-              {n(data.blockNumber)}
-            </a>{" "}
-            · a reading of its own, re-read at most every five minutes, so it can name a different block from the
-            census&rsquo;s, which the listing states.
+            Read at <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · a reading of its own, re-read at
+            most every five minutes, so it can name a different block from the census&rsquo;s, which the listing states.
           </p>
         )}
         <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="directory-catalogue">

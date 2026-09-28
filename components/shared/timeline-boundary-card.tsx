@@ -41,6 +41,7 @@ import { formatDate } from "@/lib/date";
 import { explorerUrl } from "@/lib/shared/chains";
 import { useChainId } from "@/lib/shared/chain-context";
 import type { TimelineBoundary } from "@/lib/shared/timeline-boundary";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -202,13 +203,16 @@ export function TimelineBoundaryCard({
       : `+${atLeast}${n(b.omitted as number)} earlier ${noun}`;
   // The rows' own date register, in the rows' own slot: "21 Feb '23 – 23 Mar '26".
   const span =
-    b.firstAt != null && b.cutAt != null
-      ? `${rowDate(b.firstAt)} – ${rowDate(b.cutAt)}`
-      : b.cutAt != null
-        ? `to ${rowDate(b.cutAt)}`
-        : horizon || b.pending
-          ? `before block ${n(b.cutBlock)}`
-          : `to block ${n(b.cutBlock)}`;
+    b.firstAt != null && b.cutAt != null ? (
+      `${rowDate(b.firstAt)} – ${rowDate(b.cutAt)}`
+    ) : b.cutAt != null ? (
+      `to ${rowDate(b.cutAt)}`
+    ) : (
+      <>
+        {horizon || b.pending ? "before " : "to "}
+        <BlockRef block={b.cutBlock} />
+      </>
+    );
   // The range of row numbers the card stands for, read in the direction of
   // the list — which is newest-first, the only direction a timeline has now,
   // so it runs N – 1 and counts DOWN towards the oldest event.
@@ -276,7 +280,12 @@ export function TimelineBoundaryCard({
       )}
       {hasState && (
         <StatCard
-          label={`At block ${n(b.cutBlock)}${b.cutAt != null ? `, ${longDate(b.cutAt)}` : ""}, the position held`}
+          label={
+            <>
+              At <BlockRef block={b.cutBlock} />
+              {b.cutAt != null ? `, ${longDate(b.cutAt)}` : ""}, the position held
+            </>
+          }
         >
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm tabular-nums">
             {(b.state as NonNullable<typeof b.state>).map((l, i) => {

@@ -19,6 +19,7 @@ import { PricesProvider, usePrices, useRequestPrices } from "@/lib/shared/prices
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const PROTOCOL = protocolForHref("/ethereum/aave-v4")!;
 
@@ -68,15 +69,8 @@ function HubsContent() {
                 Chain snapshot
                 {data.blockNumber ? (
                   <>
-                    {" · block "}
-                    <a
-                      href={explorerUrl(MAINNET_CHAIN_ID, "block", data.blockNumber)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="link-external"
-                    >
-                      {data.blockNumber.toLocaleString("en-US")}
-                    </a>
+                    {" · "}
+                    <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} />
                   </>
                 ) : null}
               </p>

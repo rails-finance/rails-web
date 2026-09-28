@@ -47,6 +47,7 @@ import {
   morphoUtilizationProv,
 } from "@/lib/morpho/markets-provenance";
 import type { MorphoMarketViewData } from "@/lib/morpho/markets-shape";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -139,17 +140,8 @@ export function MorphoMarketView({ data, chainId }: { data: MorphoMarketViewData
       </p>
       {/* The read's block — where every receipt below anchors, not a figure of its own. */}
       <p className="mt-2 text-[11px] text-rb-500" data-prov-exempt="">
-        Chain snapshot · block{" "}
-        <a
-          href={explorerUrl(chainId, "block", block)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="link-external"
-        >
-          {block.toLocaleString("en-US")}
-        </a>{" "}
-        · this market&rsquo;s state read from the Morpho Blue singleton, its rate from its own interest-rate model, its
-        price from its own oracle
+        Chain snapshot · <BlockRef block={block} chainId={chainId} /> · this market&rsquo;s state read from the Morpho
+        Blue singleton, its rate from its own interest-rate model, its price from its own oracle
       </p>
 
       <VitalsBand
@@ -325,15 +317,7 @@ export function MorphoMarketView({ data, chainId }: { data: MorphoMarketViewData
           </dd>
           <dt className="text-rb-500">Created</dt>
           <dd>
-            block{" "}
-            <a
-              href={explorerUrl(chainId, "block", m.createdBlock)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="link-external tabular-nums"
-            >
-              {m.createdBlock.toLocaleString("en-US")}
-            </a>
+            <BlockRef block={m.createdBlock} chainId={chainId} />
           </dd>
         </dl>
       </section>

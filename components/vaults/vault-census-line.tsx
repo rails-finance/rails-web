@@ -20,6 +20,7 @@
 // `listing-truncation-and-timeline-axes`).
 
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -43,7 +44,13 @@ export function VaultCensusLine({
   if (census.length === 0) return null;
   const blocks = Array.from(new Set(census.map((c) => c.censusBlock))).sort((a, b) => a - b);
   const blockLine =
-    blocks.length === 1 ? `block ${n(blocks[0])}` : `blocks ${n(blocks[0])} to ${n(blocks[blocks.length - 1])}`;
+    blocks.length === 1 ? (
+      <BlockRef block={blocks[0]} />
+    ) : (
+      <>
+        <BlockRef block={blocks[0]} /> to <BlockRef block={blocks[blocks.length - 1]} />
+      </>
+    );
   const participants = census.reduce((s, c) => s + c.participants, 0);
   const liveCount = census.reduce((s, c) => s + c.liveCount, 0);
   const vaultCount = countHeldOnly ? census.filter((c) => c.participants > 0).length : census.length;
@@ -61,7 +68,7 @@ export function VaultCensusLine({
           <>
             {" · "}cards read live at{" "}
             <span className="tabular-nums" data-live-block>
-              block {n(blockNumber)}
+              <BlockRef block={blockNumber} />
             </span>
           </>
         ) : (

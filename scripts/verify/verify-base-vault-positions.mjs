@@ -1518,8 +1518,8 @@ check("L9e every date is the en-GB UTC form", badDates.length === 0, badDates.jo
 // rule, restated here from the rows so the line is held to what they carry.
 const expectedBlockLine =
   censusBlocks.length === 1
-    ? `block ${n(censusBlocks[0])}`
-    : `blocks ${n(censusBlocks[0])} to ${n(censusBlocks[censusBlocks.length - 1])}`;
+    ? `${n(censusBlocks[0])}`
+    : `${n(censusBlocks[0])} to ${n(censusBlocks[censusBlocks.length - 1])}`;
 check(
   "L10 the census line states exactly the blocks the route's census rows carry, in the census slot",
   dom.stance.includes(`census at ${expectedBlockLine}`),

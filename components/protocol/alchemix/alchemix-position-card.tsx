@@ -52,6 +52,7 @@ import type {
 } from "@/types/api/alchemix";
 import { formatCompact } from "@/lib/shared/format-event";
 import { alchemixPositionName } from "@/lib/alchemix/naming";
+import { BlockRef } from "@/components/shared/block-ref";
 
 /** The collateral, as either surface holds it. The listing serves it with the
  *  block it was settled at; the live read pins one block to the whole reading,
@@ -148,7 +149,7 @@ export function amountColumn(
       ) : undefined
     ) : (
       <StatFootnote>
-        <span className="tabular-nums">at block {block(value.asOfBlock)}</span>
+        <BlockRef block={value.asOfBlock} />
         {note}
       </StatFootnote>
     ),

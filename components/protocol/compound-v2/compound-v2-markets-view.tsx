@@ -55,6 +55,7 @@ import {
 } from "@/lib/compound-v2/markets-provenance";
 import type { CompoundV2MarketRow, CompoundV2MarketsResponse } from "@/lib/sources/chain/compound-v2-markets";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const pctText = (f: number | null, dp = 1) => (f == null ? "—" : `${(f * 100).toFixed(dp)}%`);
 
@@ -185,16 +186,7 @@ export function CompoundV2MarketsStamp({ data }: { data: CompoundV2MarketsRespon
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · block{" "}
-      <a
-        href={explorerUrl(MAINNET_CHAIN_ID, "block", data.blockNumber)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="link-external"
-      >
-        {data.blockNumber.toLocaleString("en-US")}
-      </a>{" "}
-      · roster from the{" "}
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · roster from the{" "}
       <a
         href={explorerUrl(MAINNET_CHAIN_ID, "address", "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B")}
         target="_blank"

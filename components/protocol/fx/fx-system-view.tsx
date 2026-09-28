@@ -68,6 +68,7 @@ import {
 } from "@/lib/fx/system-provenance";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
+import { BlockRef } from "@/components/shared/block-ref";
 
 // A percentage with the false-zero guard: a tick holding 1e-12 fxUSD of the
 // pool must never render as "0.0%" — holding something is why it is listed.
@@ -720,16 +721,8 @@ export function FxSystemStamp({ data }: { data: FxSystemChainResponse }) {
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · block{" "}
-      <a
-        href={explorerUrl(MAINNET_CHAIN_ID, "block", data.blockNumber)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="link-external"
-      >
-        {data.blockNumber.toLocaleString("en-US")}
-      </a>{" "}
-      · the pools&rsquo; own figures at that block
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · the pools&rsquo; own figures
+      at that block
     </p>
   );
 }

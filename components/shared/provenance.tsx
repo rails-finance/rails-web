@@ -37,6 +37,7 @@ import { Box, Check, CircleHelp, Copy, ExternalLink, TriangleAlert, X } from "lu
 import { TokenChipIcon } from "./token-chip-icon";
 import { ProvCoverageBounds } from "./prov-coverage-tripwire";
 import { formatExact } from "@/lib/utils/format";
+import { BlockRef } from "@/components/shared/block-ref";
 
 // Dev gates the coverage tripwire (scope bookends + the <Prov> coverage stamp);
 // Next inlines NODE_ENV, so the prod bundle carries neither.
@@ -904,10 +905,16 @@ export function ProvReceipt({
           )}
           {hasSource && (
             <div className="prov-src">
-              <Box aria-hidden />
+              {/* The block-clock icon leads the row where there is a block;
+                  the cube stands for the source where there is none. */}
+              {block == null && <Box aria-hidden />}
               {block != null && (
                 <span className="prov-src-item">
-                  <span className="prov-src-block">block {String(block)}</span>
+                  <BlockRef
+                    block={/^\d+$/.test(String(block)) ? Number(block) : String(block)}
+                    size={15}
+                    numberClassName="prov-src-block"
+                  />
                   <CopyBtn text={String(block)} title="Copy block number" />
                 </span>
               )}

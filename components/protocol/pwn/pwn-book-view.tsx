@@ -46,6 +46,7 @@ import { formatExact } from "@/lib/utils/format";
 import type { PwnLoanBook } from "@/lib/pwn/loan-book";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const pct = (f: number): string => `${(f * 100).toFixed(1)}%`;
 const days = (d: number): string => (d < 1 ? `${(d * 24).toFixed(0)} h` : `${Math.round(d)} d`);
@@ -446,19 +447,11 @@ export function PwnBookStamp({ book }: { book: PwnLoanBook }) {
   if (book.stale || book.totals.loans === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Indexed loan book · <span className="text-foreground">{book.totals.loans}</span> loans · most recent struck at
-      block{" "}
+      Indexed loan book · <span className="text-foreground">{book.totals.loans}</span> loans · most recent struck at{" "}
       {book.latestCreatedBlock != null ? (
-        <a
-          href={explorerUrl(MAINNET_CHAIN_ID, "block", book.latestCreatedBlock)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="link-external"
-        >
-          {book.latestCreatedBlock.toLocaleString("en-US")}
-        </a>
+        <BlockRef block={book.latestCreatedBlock} chainId={MAINNET_CHAIN_ID} />
       ) : (
-        "—"
+        "block —"
       )}{" "}
       · drawn from the same loan records the{" "}
       <Link href="/ethereum/pwn" className="text-blue-500 hover:underline">

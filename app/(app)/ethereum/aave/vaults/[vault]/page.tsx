@@ -48,6 +48,7 @@ import { aaveVaultAttestation } from "@/lib/aave-vaults/vault-catalog";
 import { ethereumVaultHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
 import { loadAaveEthereumVault } from "@/lib/sources/chain/aave-ethereum-vault";
 import { RailHeader } from "@/components/shared/rail-header";
+import { BlockRef } from "@/components/shared/block-ref";
 
 // Every figure is a call at the head — nothing about this is cacheable across
 // requests.
@@ -151,16 +152,8 @@ export default async function AaveEthereumVaultPage({ params, searchParams }: Pr
                   : `Aave publishes ${attestation.constant}, and that contract's own ${attestation.call} returned this address at the block below.`}
               </p>
               <p className="mt-2 text-[11px] text-rb-500" data-vault-block={data.blockNumber}>
-                Read at block{" "}
-                <a
-                  href={explorerUrl(MAINNET_CHAIN_ID, "block", data.blockNumber)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external"
-                >
-                  {data.blockNumber.toLocaleString("en-US")}
-                </a>{" "}
-                · every figure below is a call answered at that block, on this vault and on the contracts it names.
+                Read at <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · every figure below is a call
+                answered at that block, on this vault and on the contracts it names.
               </p>
               <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                 <Link

@@ -68,6 +68,7 @@ import type {
   CompoundV3MarketRow,
   CompoundV3MarketsResponse,
 } from "@/lib/sources/chain/compound-markets";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const pctText = (f: number | null, dp = 1) => (f == null ? "—" : `${(f * 100).toFixed(dp)}%`);
 
@@ -326,16 +327,8 @@ export function CompoundMarketsStamp({
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · block{" "}
-      <a
-        href={explorerUrl(chainId, "block", data.blockNumber)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="link-external"
-      >
-        {data.blockNumber.toLocaleString("en-US")}
-      </a>{" "}
-      · each market&rsquo;s state read from its own Comet contract ·{" "}
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={chainId} /> · each market&rsquo;s state read from its
+      own Comet contract ·{" "}
       {rosterNote ?? (
         <>
           the roster is the{" "}

@@ -40,6 +40,7 @@ import type { PolarisMarketsChainResponse, PolarisMarketChainState } from "@/lib
 import type { PolarisBook } from "@/lib/sources/api/polaris-book";
 import type { PolarisMarketBook } from "@/lib/sources/api/polaris-positions";
 import { AmountText } from "@/components/shared/amount-text";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const pct = (f: number, dp = 2): string => `${(f * 100).toFixed(dp)}%`;
 
@@ -311,16 +312,8 @@ export function PolarisMarketsStamp({ chain }: { chain: PolarisMarketsChainRespo
   if (chain.chainStale || chain.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Sepolia testnet · chain snapshot · block{" "}
-      <a
-        href={explorerUrl(POLARIS_CHAIN_ID, "block", chain.blockNumber)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="link-external"
-      >
-        {chain.blockNumber.toLocaleString("en-US")}
-      </a>{" "}
-      · every figure a test figure
+      Sepolia testnet · chain snapshot · <BlockRef block={chain.blockNumber} chainId={POLARIS_CHAIN_ID} /> · every
+      figure a test figure
     </p>
   );
 }

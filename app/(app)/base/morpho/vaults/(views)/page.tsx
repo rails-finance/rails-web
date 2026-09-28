@@ -34,6 +34,7 @@ import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { MORPHO_BASE_METAMORPHO_FACTORIES } from "@/lib/morpho-base/vault-catalog";
 import { baseVaultRosterHref } from "@/lib/vaults/routes";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
+import { BlockRef } from "@/components/shared/block-ref";
 
 export const dynamic = "force-dynamic";
 
@@ -79,17 +80,8 @@ export default async function BaseVaultRosterPage() {
             <>
               {!data.chainStale && (
                 <p className="mt-2 text-[11px] text-rb-500" data-directory-block={data.blockNumber}>
-                  Read at block{" "}
-                  <a
-                    href={explorerUrl(MORPHO_BASE_CHAIN_ID, "block", data.blockNumber)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="link-external"
-                  >
-                    {data.blockNumber.toLocaleString("en-US")}
-                  </a>{" "}
-                  · every name, total, share price and curator below is a call answered at that block, re-read at most
-                  every five minutes.
+                  Read at <BlockRef block={data.blockNumber} chainId={MORPHO_BASE_CHAIN_ID} /> · every name, total,
+                  share price and curator below is a call answered at that block, re-read at most every five minutes.
                 </p>
               )}
               {/* The two surfaces under this roster. The rail's own (i) opens

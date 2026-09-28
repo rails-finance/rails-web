@@ -52,6 +52,7 @@ import { resolveHolder } from "@/lib/morpho-base/vault-holder";
 import { morphoBaseWalletHref } from "@/lib/morpho-base/routes";
 import { baseVaultHref, baseVaultsListingHref } from "@/lib/vaults/routes";
 import { loadMorphoBaseVault } from "@/lib/sources/chain/morpho-base-vault";
+import { BlockRef } from "@/components/shared/block-ref";
 
 // Every figure is a slot read at the head, and the holder rides in the query —
 // nothing about this is cacheable across requests.
@@ -174,16 +175,8 @@ export default async function MorphoBaseVaultPage({ params, searchParams }: Prop
                 </a>
               </p>
               <p className="mt-2 text-[11px] text-rb-500" data-vault-block={data.blockNumber}>
-                Read at block{" "}
-                <a
-                  href={explorerUrl(MORPHO_BASE_CHAIN_ID, "block", data.blockNumber)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external"
-                >
-                  {data.blockNumber.toLocaleString("en-US")}
-                </a>{" "}
-                · every figure below is a slot read at that block, on the vault and on the{" "}
+                Read at <BlockRef block={data.blockNumber} chainId={MORPHO_BASE_CHAIN_ID} /> · every figure below is a
+                slot read at that block, on the vault and on the{" "}
                 <a
                   href={explorerUrl(MORPHO_BASE_CHAIN_ID, "address", data.vault.morpho)}
                   target="_blank"

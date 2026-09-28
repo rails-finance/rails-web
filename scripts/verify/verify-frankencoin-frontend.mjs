@@ -308,7 +308,7 @@ const noDollar = (name, text) => {
   );
   check("system: the enforcement record renders", /Challenges ever/.test(t) && /forced sale/i.test(t));
   check("system: no collateral total is invented (counts, with the reason)", /no collateral total exists here/.test(t));
-  check("system: chain snapshot stamp renders", /Chain snapshot · block [\d,]+/.test(t));
+  check("system: chain snapshot stamp renders", /Chain snapshot · (?:block )?[\d,]+/.test(t));
   noDollar("system view", t);
 }
 

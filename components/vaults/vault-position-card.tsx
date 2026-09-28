@@ -118,6 +118,7 @@ import {
   type AaveVaultCoords,
 } from "@/lib/aave-vaults/vault-provenance";
 import { NotLoaded } from "@/components/shared/not-loaded";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -167,7 +168,8 @@ const Unread = ({ what }: { what: string }) => <span className="text-base font-n
 function BlockStamp({ block, at }: { block: number; at: number | null }) {
   return (
     <>
-      {at != null ? `${formatDate(at)} · ` : ""}block {n(block)}
+      {at != null ? `${formatDate(at)} · ` : ""}
+      <BlockRef block={block} />
     </>
   );
 }
@@ -275,7 +277,9 @@ export function VaultPositionCard({
     // above it changed lanes: without a live read the card falls back to the
     // census's balance, and a reader must be told which block that is.
     footnote: row.live ? undefined : (
-      <div className="text-xs mt-0.5 text-rb-500">the census&rsquo;s reading at block {n(row.census.block)}</div>
+      <div className="text-xs mt-0.5 text-rb-500">
+        the census&rsquo;s reading at <BlockRef block={row.census.block} />
+      </div>
     ),
   };
 

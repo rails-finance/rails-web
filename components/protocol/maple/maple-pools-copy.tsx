@@ -7,6 +7,7 @@
 
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { BlockRef } from "@/components/shared/block-ref";
 
 /** The view's chain-snapshot stamp: the block, and where the contract set and
  *  the cross-check come from — in plain words. */
@@ -15,16 +16,7 @@ export function MaplePoolsStamp({ pools }: { pools: MaplePoolState[] }) {
   if (blockNumber == null) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · block{" "}
-      <a
-        href={explorerUrl(MAINNET_CHAIN_ID, "block", blockNumber)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="link-external"
-      >
-        {blockNumber.toLocaleString("en-US")}
-      </a>{" "}
-      · contract set from Maple&rsquo;s own{" "}
+      Chain snapshot · <BlockRef block={blockNumber} chainId={MAINNET_CHAIN_ID} /> · contract set from Maple&rsquo;s own{" "}
       <a
         href="https://github.com/maple-labs/address-registry"
         target="_blank"

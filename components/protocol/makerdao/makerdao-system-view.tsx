@@ -65,6 +65,7 @@ import { formatExact, formatNumber, formatTinyNonZero, formatUsdValue } from "@/
 import type { MakerIlkRow, MakerSystemChainResponse, MakerCeilingState } from "@/lib/sources/chain/makerdao-system";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const DEBT_SYMBOL = "DAI";
 
@@ -607,13 +608,8 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
 export function MakerSystemStamp({ data }: { data: MakerSystemChainResponse }) {
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
-    <a
-      href={explorerUrl(MAINNET_CHAIN_ID, "block", data.blockNumber)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="link-external mt-2 inline-block text-[11px] text-rb-500"
-    >
-      Chain snapshot · block {data.blockNumber.toLocaleString("en-US")}
-    </a>
+    <p className="mt-2 text-[11px] text-rb-500">
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} />
+    </p>
   );
 }

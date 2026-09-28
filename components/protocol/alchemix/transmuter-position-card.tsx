@@ -39,6 +39,7 @@ import type { AlchemixAmount, AlchemixTransmuterPositionSummary } from "@/types/
 import { transmuterEarlyClaim } from "@/lib/alchemix/transmuter-early-claim";
 import { AmountText } from "@/components/shared/amount-text";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -119,7 +120,7 @@ export function stakedColumn(p: AlchemixTransmuterPositionSummary, prov?: Proven
     value: amountValue(p.staked, p.staked.symbol, prov),
     footnote: (
       <StatFootnote>
-        <span className="tabular-nums">at block {block(p.maturity.startBlock)}</span>
+        <BlockRef block={p.maturity.startBlock} />
       </StatFootnote>
     ),
   };
@@ -150,7 +151,7 @@ export function maturityColumn(
   estimate: TransmuterMaturityEstimate | null = transmuterMaturityEstimate(p),
 ): OpenPositionStatsColumn {
   const m = p.maturity;
-  let figure: ReactNode = <span className="tabular-nums">block {block(m.maturationBlock)}</span>;
+  let figure: ReactNode = <BlockRef block={m.maturationBlock} size={20} />;
   let title: string | undefined;
   let note: ReactNode = null;
   if (estimate) {
@@ -166,12 +167,16 @@ export function maturityColumn(
       `that is ${about ?? `${block(estimate.blocksRemaining * estimate.secondsPerBlock)} seconds`} from now.`;
     note = (
       <>
-        block {block(m.maturationBlock)}
+        <BlockRef block={m.maturationBlock} />
         {about ? ` · ${about}` : ""}
       </>
     );
   } else if (p.status !== "claimed" && m.referenceBlock != null && m.matured) {
-    note = <>matured; the line is indexed to block {block(m.referenceBlock)}</>;
+    note = (
+      <>
+        matured; the line is indexed to <BlockRef block={m.referenceBlock} />
+      </>
+    );
   }
   return {
     label: "Matures at",
@@ -238,7 +243,7 @@ export function claimColumn(
     footnote: (
       <StatFootnote>
         <span className="tabular-nums">
-          at block {block(c.blockNumber)}
+          <BlockRef block={c.blockNumber} />
           {early ? `, ${block(early.blocksEarly)} blocks before maturity` : ""}
         </span>
         {returned}

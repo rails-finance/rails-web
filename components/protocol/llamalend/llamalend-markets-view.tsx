@@ -46,6 +46,7 @@ import { VitalsBand } from "@/components/shared/vitals-band";
 import { shortAddress, FACTORY_LABEL, LLAMALEND_ADDRESSES } from "@/lib/llamalend/asset-catalog";
 import type { LlamalendMarketRow, LlamalendMarketsResponse } from "@/lib/sources/chain/llamalend-markets";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const pctText = (f: number | null, dp = 1) => (f == null ? "—" : `${(f * 100).toFixed(dp)}%`);
 
@@ -170,16 +171,8 @@ export function LlamalendMarketsStamp({ data }: { data: LlamalendMarketsResponse
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · block{" "}
-      <a
-        href={explorerUrl(MAINNET_CHAIN_ID, "block", data.blockNumber)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="link-external"
-      >
-        {data.blockNumber.toLocaleString("en-US")}
-      </a>{" "}
-      · roster from the factories&rsquo; own counters —{" "}
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · roster from the
+      factories&rsquo; own counters —{" "}
       <a
         href={explorerUrl(MAINNET_CHAIN_ID, "address", LLAMALEND_ADDRESSES.ONEWAY_FACTORY)}
         target="_blank"

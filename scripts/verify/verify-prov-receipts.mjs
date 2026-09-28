@@ -24,7 +24,7 @@
 //      as their data resolves.
 //   3. Picking a value pins the popover (.prov-inspect-pop) whose embedded
 //      receipt exposes a citable BLOCK — a reader can re-run the read. The
-//      block has TWO lanes: the coordinates row (.prov-src-block, with its
+//      block has TWO lanes: the coordinates row (.prov-src [data-block-ref], with its
 //      copy button), and the vocabulary's own summary prose ("… at block N").
 //      AND-ed with the pickable count so an empty page cannot pass vacuously;
 //      the first few pickables are tried in order, the row preferred, and the
@@ -162,8 +162,11 @@ async function runPage(page, p) {
       // Both block lanes: the structured strip first, else the receipt's
       // own prose ("… at block N" from the vocabulary's summary).
       const got = await page.evaluate(() => {
-        const strip = document.querySelector(".prov-inspect-pop .prov-src-block");
-        if (strip?.textContent) return { lane: "row", text: strip.textContent };
+        // The row states the number beside the block-clock icon; the word is
+        // in its accessible name ("Block N").
+        const strip = document.querySelector(".prov-inspect-pop .prov-src [data-block-ref]");
+        const named = strip?.getAttribute("aria-label");
+        if (named) return { lane: "row", text: named };
         // innerText, not textContent: textContent glues adjacent nodes and
         // bled a neighbouring digit onto the block number (measured:
         // "block 257588874" quoted for block 25758887 on /moonwell/markets).

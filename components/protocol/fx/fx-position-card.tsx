@@ -44,6 +44,7 @@ import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import type { FxPositionSummary } from "@/lib/sources/api/fx-positions";
 import { summariseFxDrift, type FxDriftResult } from "@/lib/sources/api/fx-drift";
 import { AmountText } from "@/components/shared/amount-text";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const DUST = 1e-9;
 
@@ -140,7 +141,12 @@ function CollateralUsdFootnote({ v }: { v: FxPositionView }) {
   return (
     <StatFootnote>
       <Prov info={fxPositionUsdProv(v.normalizedSymbol, v.oracle.priceBlock)}>{formatUsd(v.settled.collUsd)}</Prov>
-      {v.oracle.priceBlock != null ? <> · oracle @ block {v.oracle.priceBlock}</> : null}
+      {v.oracle.priceBlock != null ? (
+        <>
+          {" "}
+          · oracle @ <BlockRef block={v.oracle.priceBlock} />
+        </>
+      ) : null}
     </StatFootnote>
   );
 }

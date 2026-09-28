@@ -99,7 +99,7 @@ export function ClosedLabel() {
  *  Debt, LTV, Interest/Borrow Rate) renders as one of these, all sharing a
  *  single CSS grid so they balance in width and — via `sm:auto-rows-fr` on the
  *  grid plus `h-full` here — match the tallest card's height per row. */
-export function StatCard({ label, children }: { label: string; children: ReactNode }) {
+export function StatCard({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="flex h-full flex-col rounded-xl bg-background px-4 py-3">
       <div className="mb-1.5 text-xs font-semibold text-rb-500">{label}</div>

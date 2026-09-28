@@ -52,8 +52,8 @@ check("markets: override numbers NOT typed in (111.11% / 4%)", !body.includes("1
 // The shared-oracle alias line.
 check("markets: wsrUSD = srUSD alias stated", /wsrUSD/.test(body) && /to the wei/.test(body));
 
-// The block stamp anchors a real head block ("Chain snapshot · block 25,54…").
-check("markets: chain-snapshot block stamp", /Chain snapshot · block\s*[\d,]{9,}/i.test(body));
+// The block stamp anchors a real head block ("Chain snapshot · [block icon] 25,54…").
+check("markets: chain-snapshot block stamp", /Chain snapshot · (?:block\s*)?[\d,]{9,}/i.test(body));
 check("markets: closing markets stated", /closed to new borrowing|closing — no new borrowing/.test(body));
 
 // ── /dolomite — the listing over the REAL index (7,869 accounts) ────────────

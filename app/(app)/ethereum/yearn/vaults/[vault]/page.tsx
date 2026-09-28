@@ -38,6 +38,7 @@ import { loadYearnEthereumVault } from "@/lib/sources/chain/yearn-ethereum-vault
 import { isYearnRosterVault } from "@/lib/yearn/vault-roster";
 import { YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import { YEARN_REGISTRY } from "@/lib/yearn/vault-catalog";
+import { BlockRef } from "@/components/shared/block-ref";
 
 // Every figure is a slot read at the head — nothing about this is cacheable
 // across requests.
@@ -127,27 +128,12 @@ export default async function YearnVaultPage({ params }: Props) {
                 >
                   {v.asset.symbol}
                 </a>
-                {" · created in block "}
-                <a
-                  href={explorerUrl(YEARN_CHAIN_ID, "block", v.createdBlock)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external"
-                >
-                  {v.createdBlock.toLocaleString("en-US")}
-                </a>
+                {" · created in "}
+                <BlockRef block={v.createdBlock} chainId={YEARN_CHAIN_ID} />
               </p>
               <p className="mt-2 text-[11px] text-rb-500" data-vault-block={data.blockNumber}>
-                Read at block{" "}
-                <a
-                  href={explorerUrl(YEARN_CHAIN_ID, "block", data.blockNumber)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external"
-                >
-                  {data.blockNumber.toLocaleString("en-US")}
-                </a>{" "}
-                · every figure below is a slot read at that block, on the vault and on the{" "}
+                Read at <BlockRef block={data.blockNumber} chainId={YEARN_CHAIN_ID} /> · every figure below is a slot
+                read at that block, on the vault and on the{" "}
                 <a
                   href={explorerUrl(YEARN_CHAIN_ID, "address", YEARN_REGISTRY)}
                   target="_blank"

@@ -87,6 +87,7 @@ import type {
 } from "@/lib/morpho/markets-shape";
 import type { MorphoMarketRow } from "@/lib/sources/chain/morpho-markets";
 import { NotLoaded } from "@/components/shared/not-loaded";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -369,16 +370,8 @@ export function MorphoMarketsStamp({
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · block{" "}
-      <a
-        href={explorerUrl(chainId, "block", data.blockNumber)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="link-external"
-      >
-        {data.blockNumber.toLocaleString("en-US")}
-      </a>{" "}
-      · every market&rsquo;s state read from the{" "}
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={chainId} /> · every market&rsquo;s state read from
+      the{" "}
       <a
         href={explorerUrl(chainId, "address", blue)}
         target="_blank"
@@ -387,7 +380,7 @@ export function MorphoMarketsStamp({
       >
         Morpho Blue singleton
       </a>{" "}
-      · roster censused at block {data.censusBlock.toLocaleString("en-US")}
+      · roster censused at <BlockRef block={data.censusBlock} />
     </p>
   );
 }

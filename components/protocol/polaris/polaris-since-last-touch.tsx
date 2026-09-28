@@ -35,6 +35,7 @@ import { formatPethPrice } from "@/components/protocol/polaris/polaris-position-
 import { formatDuration } from "@/lib/date";
 import { polarisProtocolLegNames, signedFigure, type PolarisSinceLastTouch } from "@/lib/polaris/since-last-touch";
 import { AmountText } from "@/components/shared/amount-text";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const DUST = 1e-9;
 
@@ -244,7 +245,7 @@ export function PolarisSinceLastTouchRow({
             </span>
           </Prov>
           <span className="ml-auto text-xs text-rb-500">
-            block {w.from.block.toLocaleString("en-US")} · {elapsed} ago
+            <BlockRef block={w.from.block} /> · {elapsed} ago
           </span>
         </>
       }

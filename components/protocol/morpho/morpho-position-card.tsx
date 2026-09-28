@@ -41,6 +41,7 @@ import { useCaptureSource } from "@/lib/shared/capture-source";
 import { morphoPositionContent, type MorphoPositionDeployment } from "@/lib/morpho/position-content";
 import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import { AmountText } from "@/components/shared/amount-text";
+import { BlockRef } from "@/components/shared/block-ref";
 
 export interface MorphoPositionView {
   positionId: string;
@@ -299,7 +300,9 @@ export function MorphoPositionCard({
                 <StatDash />
               ),
               footnote: hasDebt ? (
-                <StatFootnote>interest included, to block {L.block.toLocaleString("en-US")}</StatFootnote>
+                <StatFootnote>
+                  interest included, to <BlockRef block={L.block} />
+                </StatFootnote>
               ) : undefined,
             },
           ]}
@@ -473,8 +476,8 @@ export function MorphoPositionCard({
                   </Prov>
                   {v.currentDebt.index?.stale && (
                     <div>
-                      interest to {formatDate(v.currentDebt.index.readAt)} (block{" "}
-                      {v.currentDebt.index.block.toLocaleString("en-US")})
+                      interest to {formatDate(v.currentDebt.index.readAt)} (
+                      <BlockRef block={v.currentDebt.index.block} />)
                     </div>
                   )}
                 </StatFootnote>

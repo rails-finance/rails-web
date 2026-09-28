@@ -63,6 +63,7 @@ import { loadYearnEthereumVaultTimeline } from "@/lib/sources/chain/yearn-ethere
 import { YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import { isYearnRosterVault, yearnRosterEntry } from "@/lib/yearn/vault-roster";
 import type { VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
+import { BlockRef } from "@/components/shared/block-ref";
 
 // Every figure is a call at the head with the holder in the path — nothing
 // about this is cacheable across requests.
@@ -270,17 +271,8 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
                 </a>
               </p>
               <p className="mt-2 text-[11px] text-rb-500" data-vault-block={data.blockNumber}>
-                Read at block{" "}
-                <a
-                  href={explorerUrl(YEARN_CHAIN_ID, "block", data.blockNumber)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external"
-                >
-                  {data.blockNumber.toLocaleString("en-US")}
-                </a>{" "}
-                · every figure read at this block is a call answered at it, on this vault. Each row below states its own
-                share price at its own block.
+                Read at <BlockRef block={data.blockNumber} chainId={YEARN_CHAIN_ID} /> · every figure read at this block
+                is a call answered at it, on this vault. Each row below states its own share price at its own block.
               </p>
               <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                 <Link href={yearnVaultHref(address)} className={PAGE_LINK} prefetch={false} data-link="vault-market">

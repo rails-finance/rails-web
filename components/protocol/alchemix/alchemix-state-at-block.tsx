@@ -71,6 +71,7 @@ import {
   type AlchemixReading,
 } from "@/lib/alchemix/readings-before";
 import { Prov } from "@/components/shared/provenance";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -313,7 +314,7 @@ export function AlchemixStateAtBlock({
   return (
     <div className="mt-1 border-t border-rb-200 pt-2 pb-3 dark:border-rb-800">
       <h4 className={`${OVERLAY_HEADING} px-5 text-rb-500`}>
-        {heading} · block {block(atBlock)}
+        {heading} · <BlockRef block={atBlock} />
       </h4>
       <ChainTruthDetail stats={stats} symbolText />
       {ratioStat && ratios ? (
@@ -326,7 +327,7 @@ export function AlchemixStateAtBlock({
           <Prov info={lineRatioProv("collateralizationLowerBound", ratios.lowerBoundRaw, ratios.asOfBlock, coords)}>
             {ratioPct(ratios.lowerBoundRaw)}
           </Prov>
-          , read at block {block(ratios.asOfBlock)}
+          , read at <BlockRef block={ratios.asOfBlock} />
         </p>
       ) : null}
     </div>

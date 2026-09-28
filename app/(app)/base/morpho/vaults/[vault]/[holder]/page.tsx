@@ -76,6 +76,7 @@ import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
 import { ssrHop } from "@/lib/shared/listing-ssr";
 import { MORPHO_BASE_VAULT_TAIL_VERSION, type VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
 import type { VaultPositionRow } from "@/lib/aave-vaults/vault-position";
+import { BlockRef } from "@/components/shared/block-ref";
 
 // Every figure is a call at the head with the holder in the path — nothing
 // about this is cacheable across requests.
@@ -484,16 +485,8 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
                 </a>
               </p>
               <p className="mt-2 text-[11px] text-rb-500" data-vault-block={data.blockNumber}>
-                Read at block{" "}
-                <a
-                  href={explorerUrl(MORPHO_BASE_CHAIN_ID, "block", data.blockNumber)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external"
-                >
-                  {data.blockNumber.toLocaleString("en-US")}
-                </a>{" "}
-                · every figure read at this block is a call answered at it, on this vault and on the{" "}
+                Read at <BlockRef block={data.blockNumber} chainId={MORPHO_BASE_CHAIN_ID} /> · every figure read at this
+                block is a call answered at it, on this vault and on the{" "}
                 <a
                   href={explorerUrl(MORPHO_BASE_CHAIN_ID, "address", data.vault.morpho)}
                   target="_blank"

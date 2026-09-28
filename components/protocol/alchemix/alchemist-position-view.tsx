@@ -130,6 +130,7 @@ import type {
   AlchemixLiveState,
   AlchemixPositionSummary,
 } from "@/types/api/alchemix";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const block = (n: number) => n.toLocaleString("en-US");
 
@@ -731,15 +732,8 @@ export function AlchemistPositionView({
                   // data-prov-exempt: the block the reading was taken at, a
                   // coordinate linked to the explorer, not a figure.
                   <span className="text-[11px] tabular-nums text-rb-500" data-prov-exempt="">
-                    one reading at block{" "}
-                    <a
-                      href={explorerUrl(chainId as ChainId, "block", live.asOfBlock)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="link-muted"
-                    >
-                      {block(live.asOfBlock)}
-                    </a>
+                    one reading at{" "}
+                    <BlockRef block={live.asOfBlock} chainId={chainId as ChainId} linkClassName="link-muted" />
                   </span>
                 ) : null}
               </span>

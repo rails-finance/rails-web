@@ -17,6 +17,7 @@ import { explorerUrl, BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { formatNumber } from "@/lib/utils/format";
 import { publishedText, ageText } from "@/lib/morpho/oracle-age";
 import { AAVE_V4_BASE_API_ROOT } from "@/lib/aave-v4/deployment-routes";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const PROTOCOL = protocolForHref("/base/aave-v4")!;
 
@@ -118,15 +119,7 @@ export default function AaveV4BaseHubPage() {
           stamp={
             block != null && (
               <p className="mt-2 text-[11px] text-rb-500">
-                Read from the Mag7 spoke, its oracle and the hub at block{" "}
-                <a
-                  href={explorerUrl(BASE_CHAIN_ID, "block", block)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external"
-                >
-                  {block.toLocaleString("en-US")}
-                </a>
+                Read from the Mag7 spoke, its oracle and the hub at <BlockRef block={block} chainId={BASE_CHAIN_ID} />
               </p>
             )
           }

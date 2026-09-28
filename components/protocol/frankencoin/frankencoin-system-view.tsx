@@ -49,6 +49,7 @@ import type { FrankencoinBook } from "@/lib/sources/api/frankencoin-system-book"
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
 import { AmountText } from "@/components/shared/amount-text";
+import { BlockRef } from "@/components/shared/block-ref";
 
 const dateOf = (unix: number): string => formatDate(unix);
 
@@ -354,15 +355,7 @@ export function FrankencoinSystemStamp({ data }: { data: FrankencoinSystemChainR
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · block{" "}
-      <a
-        href={explorerUrl(MAINNET_CHAIN_ID, "block", data.blockNumber)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="link-external"
-      >
-        {data.blockNumber.toLocaleString("en-US")}
-      </a>
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} />
       {" · "}
       <AmountText value={data.zchfSupply} format="compact" /> ZCHF outstanding against{" "}
       <AmountText value={data.reserveBalance} format="compact" /> ZCHF of reserve capital

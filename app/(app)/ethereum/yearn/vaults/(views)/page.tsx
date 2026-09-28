@@ -27,6 +27,7 @@ import { explorerUrl } from "@/lib/shared/chains";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { yearnVaultRosterHref } from "@/lib/vaults/routes";
 import { loadYearnVaultRoster } from "@/lib/yearn/vault-roster";
+import { BlockRef } from "@/components/shared/block-ref";
 
 export const dynamic = "force-dynamic";
 
@@ -54,17 +55,8 @@ export default async function YearnVaultRosterPage() {
             <>
               {!data.chainStale && (
                 <p className="mt-2 text-[11px] text-rb-500" data-directory-block={data.blockNumber}>
-                  Read at block{" "}
-                  <a
-                    href={explorerUrl(YEARN_CHAIN_ID, "block", data.blockNumber)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="link-external"
-                  >
-                    {data.blockNumber.toLocaleString("en-US")}
-                  </a>{" "}
-                  · every name, total, share price and endorsement below is a call answered at that block, re-read at
-                  most every five minutes.
+                  Read at <BlockRef block={data.blockNumber} chainId={YEARN_CHAIN_ID} /> · every name, total, share
+                  price and endorsement below is a call answered at that block, re-read at most every five minutes.
                 </p>
               )}
               <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">

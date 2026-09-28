@@ -15,6 +15,7 @@ import { AaveMarketViews, AaveMarketLoadingSkeleton } from "@/components/shared/
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { protocolForHref } from "@/lib/shared/protocols";
+import { BlockRef } from "@/components/shared/block-ref";
 
 export interface AaveMarketPageProps {
   /** This deployment's chain proxy for the market ("/api/chain/spark/market"). */
@@ -94,17 +95,7 @@ export function AaveMarketPage(props: AaveMarketPageProps) {
           stamp={
             data && !data.chainStale && data.blockNumber > 0 ? (
               <p className="mt-2 text-[11px] text-rb-500">
-                Chain snapshot
-                {" · block "}
-                <a
-                  href={explorerUrl(props.chainId ?? MAINNET_CHAIN_ID, "block", data.blockNumber)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external"
-                  aria-label={`Block ${data.blockNumber} on ${chainMeta(props.chainId ?? MAINNET_CHAIN_ID).explorerName}`}
-                >
-                  {data.blockNumber.toLocaleString("en-US")}
-                </a>
+                Chain snapshot · <BlockRef block={data.blockNumber} chainId={props.chainId ?? MAINNET_CHAIN_ID} />
               </p>
             ) : undefined
           }

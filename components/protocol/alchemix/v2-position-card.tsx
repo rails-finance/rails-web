@@ -26,6 +26,7 @@ import type { AlchemixV2PositionSummary } from "@/types/api/alchemix";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import { AmountText } from "@/components/shared/amount-text";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { BlockRef } from "@/components/shared/block-ref";
 
 /** alUSD and alETH are 18 decimals each, read from the tokens. */
 const SYNTHETIC_DECIMALS = 18;
@@ -81,7 +82,7 @@ export function v2DebtColumn(p: AlchemixV2PositionSummary, prov?: Provenance): O
     ),
     footnote: (
       <StatFootnote>
-        <span className="tabular-nums">at block {p.frozenAtBlock.toLocaleString("en-US")}</span>
+        <BlockRef block={p.frozenAtBlock} />
         {d.sign === "credit" ? <div className="mt-0.5 leading-snug">credit the account never drew</div> : null}
       </StatFootnote>
     ),
