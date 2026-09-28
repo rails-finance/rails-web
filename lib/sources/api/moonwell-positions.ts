@@ -74,11 +74,6 @@ export interface MoonwellPeakAmount {
   decimals: number;
   amount: number;
   amountRaw: string;
-  /** True on a supply peak whose market ever moved an mToken by transfer (a
-   *  liquidation seize included) — the principal lane the peak is `max()`-ed
-   *  over never counted those, so `amount` understates or reads zero. The
-   *  card states this instead of the figure. Never set on a debt peak. */
-  stoodDown?: boolean;
 }
 
 export interface MoonwellPositionSummary {
@@ -138,11 +133,6 @@ export interface RawMoonwellWalletRow {
   chainReadAt?: string | null;
   liquidityRaw?: string;
   shortfallRaw?: string;
-  /** Markets this wallet ever moved an mToken on by transfer (a liquidation
-   *  seize included) — the supply-principal lane never counted them. Gates
-   *  `stoodDown` on the matching peak-supply line. Ethereum index only; the
-   *  Base lane has no replayed peak to stand down (its rows show `current`). */
-  transferMarkets?: string[];
 }
 
 /** One market as the listing builder needs it: identity plus the per-market
@@ -231,7 +221,6 @@ export async function buildMoonwellPositionRows(
   return raw.map((w) => {
     const supplies: MoonwellSupplyAmount[] = [];
     const borrows: MoonwellBorrowAmount[] = [];
-    const transferMarkets = new Set(w.transferMarkets ?? []);
 
     for (const r of w.markets) {
       const m = markets.get(r.market);
@@ -272,12 +261,7 @@ export async function buildMoonwellPositionRows(
       if (!m) continue;
       const sup = bigintOf(r.peakSupplyRaw);
       const dbt = bigintOf(r.peakDebtRaw);
-      // A market this wallet ever moved an mToken on by transfer held a real
-      // supply position, even where the principal lane's clamp reads it at
-      // zero — so the stand-down row renders whether or not `sup` is
-      // positive; an unflagged market keeps the sup > 0 gate.
-      const flagged = transferMarkets.has(m.key);
-      if (sup > ZERO || flagged)
+      if (sup > ZERO)
         peakSupplies.push({
           market: m.key,
           symbol: m.symbol,
@@ -285,7 +269,6 @@ export async function buildMoonwellPositionRows(
           decimals: m.decimals,
           amount: scale(sup, m.decimals),
           amountRaw: sup.toString(),
-          stoodDown: flagged,
         });
       if (dbt > ZERO)
         peakBorrows.push({

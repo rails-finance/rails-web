@@ -1660,17 +1660,16 @@ export interface MoonwellContext {
   /** borrow/repay only — the EMITTED accountBorrows: the borrower's total
    *  debt after this event, interest accrued to this moment included. */
   accountBorrows?: string;
-  /** Supply-principal lane before/after (Σ mint − redeem, amounts-only).
-   *  Absent — with `supplyStoodDown` true — on a mint/redeem whose market has
-   *  ever moved an mToken by transfer (a liquidation seize included): the
-   *  lane never counted those moves, so the figure would understate the
-   *  holding or clamp to zero. */
+  /** Supply balance before/after (mint, redeem, transfer rows): the mToken
+   *  balance × the market's exchangeRateStored at this row's block (the
+   *  oracle-at-block read), floored as the mToken floors it. Absent when the
+   *  block has no rate read. */
   supplyBefore?: string;
   supplyAfter?: string;
-  /** True when this market's mToken has moved by transfer at some point in
-   *  the wallet's history, so the supply-principal figure is withheld rather
-   *  than shown wrong. TO-DO-infra-and-backend.md §9. */
-  supplyStoodDown?: boolean;
+  /** Interest the supply balance earned since the position's previous supply
+   *  row on this market: the mTokens held valued at this block's rate less at
+   *  the previous row's. Absent when zero or when either rate is unread. */
+  interestSincePrevious?: string;
   /** Exact mToken balance before/after (= balanceOf at this block). */
   mTokensBefore?: string;
   mTokensAfter?: string;
@@ -1757,6 +1756,10 @@ export interface CompoundV2ContextRaw {
   seizeTokens?: string;
   supplyBefore?: string;
   supplyAfter?: string;
+  /** exchangeRateStored at the row's block (1e(18 + ud − 8)), and at the
+   *  position's previous supply row. */
+  exchangeRate?: string;
+  prevExchangeRate?: string;
   cTokensBefore?: string;
   cTokensAfter?: string;
   debtBefore?: string;
@@ -1781,16 +1784,16 @@ export interface CompoundV2Context {
    *  total debt after this event, interest accrued to this moment included.
    *  A liquidation's comes from the repay leg it itself emitted. */
   accountBorrows?: string;
-  /** Supply-principal lane before/after (Σ mint − redeem, amounts-only).
-   *  Absent — with `supplyStoodDown` true — on a mint/redeem whose market has
-   *  ever moved a cToken by transfer or seizure: the lane never counted those
-   *  moves, so the figure would understate the holding or clamp to zero. */
+  /** Supply balance before/after (mint, redeem, transfer and seize rows): the
+   *  cToken balance × the market's exchangeRateStored at this row's block
+   *  (rails-server mig 353), floored as the cToken floors it. Absent when the
+   *  block has no rate yet. */
   supplyBefore?: string;
   supplyAfter?: string;
-  /** True when this market's cToken has moved by transfer or seizure at some
-   *  point in the wallet's history, so the supply-principal figure is
-   *  withheld rather than shown wrong. TO-DO-infra-and-backend.md §9. */
-  supplyStoodDown?: boolean;
+  /** Interest the supply balance earned since the position's previous supply
+   *  row on this market: the cTokens held valued at this block's rate less at
+   *  the previous row's. Absent when zero or unknown. */
+  interestSincePrevious?: string;
   /** Exact cToken balance before/after (= balanceOf at this block). */
   cTokensBefore?: string;
   cTokensAfter?: string;

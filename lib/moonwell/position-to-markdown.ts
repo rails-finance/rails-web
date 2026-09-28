@@ -253,8 +253,12 @@ function timelineTable(
     out.push("_No transaction history available._");
     return out;
   }
-  out.push("| # | Date | Action | Market | Amount | mTokens after | Debt after | Transaction |");
-  out.push("|---|------|--------|--------|--------|---------------|------------|-------------|");
+  out.push(
+    "| # | Date | Action | Market | Amount | Supplied after | Interest since previous | mTokens after | Debt after | Transaction |",
+  );
+  out.push(
+    "|---|------|--------|--------|--------|----------------|-------------------------|---------------|------------|-------------|",
+  );
   rows.forEach((e, i) => {
     if (!isMoonwellEvent(e)) return;
     const d = e.context.data;
@@ -269,14 +273,16 @@ function timelineTable(
           : "—";
     const mAfter = d.mTokensAfter != null ? amt(parseFloat(d.mTokensAfter)) : "—";
     const debtAfter = d.debtAfter != null ? amt(parseFloat(d.debtAfter)) : "—";
+    const supplied = d.supplyAfter != null ? amt(parseFloat(d.supplyAfter)) : "—";
+    const interest = d.interestSincePrevious != null ? amt(parseFloat(d.interestSincePrevious)) : "";
     const noted = (anchoredNotes.get(e.id) ?? []).map(marketNoteRowAnnotation).join("; ");
     out.push(
-      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${d.marketSymbol} | ${amount} | ${mAfter} | ${debtAfter} | ${txCell(e)}${noted ? ` — ${noted}` : ""} |`,
+      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${d.marketSymbol} | ${amount} | ${supplied} | ${interest} | ${mAfter} | ${debtAfter} | ${txCell(e)}${noted ? ` — ${noted}` : ""} |`,
     );
   });
   out.push("");
   out.push(
-    "_mTokens after is the exact receipt-token balance (= balanceOf, slot-verified); debt after is the event's own emitted accountBorrows (interest to that moment included)._",
+    "_Supplied after is the underlying the position held after the row: mTokens after × the market's exchangeRateStored at the block; interest since previous is what it earned since the position's previous supply row on that market. mTokens after is the exact receipt-token balance (= balanceOf, slot-verified); debt after is the event's own emitted accountBorrows (interest to that moment included)._",
   );
   out.push("");
   return out;

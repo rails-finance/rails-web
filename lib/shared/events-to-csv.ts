@@ -300,6 +300,7 @@ const COMPOUND_V2_FAMILY: Column[] = [
   col<CompoundV2Context>(isCompoundV2Event, "cTokens", (d) => d.cTokensDelta),
   col<CompoundV2Context>(isCompoundV2Event, "Supply Before", (d) => d.supplyBefore),
   col<CompoundV2Context>(isCompoundV2Event, "Supply After", (d) => d.supplyAfter),
+  col<CompoundV2Context>(isCompoundV2Event, "Interest Since Previous", (d) => d.interestSincePrevious),
   col<CompoundV2Context>(isCompoundV2Event, "cTokens Before", (d) => d.cTokensBefore),
   col<CompoundV2Context>(isCompoundV2Event, "cTokens After", (d) => d.cTokensAfter),
   col<CompoundV2Context>(isCompoundV2Event, "Debt Before", (d) => d.debtBefore),

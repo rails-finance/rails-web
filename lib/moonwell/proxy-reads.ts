@@ -46,9 +46,6 @@ interface TimelineRowsResponse {
    *  /summary twin with THIS number. Null (or absent, on a backend that
    *  predates it) means the rows ARE the whole history. */
   cutoffBlock?: number | null;
-  /** Markets this wallet ever moved an mToken on by transfer — a backend
-   *  that predates the flag simply omits it (no stand-down). */
-  transferMarkets?: string[];
 }
 
 /** Answers `/api/moonwell/positions`. */
@@ -108,9 +105,8 @@ export async function readMoonwellTimeline(sp: URLSearchParams, hop: SsrHop): Pr
     console.error(`Backend API error: ${response.status} ${response.statusText}`);
     return proxyFail(response.status, { error: `Backend error: ${response.statusText}` });
   }
-  const { rows, totalEvents, truncated, cutoffBlock, transferMarkets } =
-    (await response.json()) as TimelineRowsResponse;
-  const data = buildMoonwellTimeline(rows, wallet, { transferMarkets });
+  const { rows, totalEvents, truncated, cutoffBlock } = (await response.json()) as TimelineRowsResponse;
+  const data = buildMoonwellTimeline(rows, wallet);
   // The ceiling and the window are different claims and both can be absent.
   // A windowed fetch is never truncated — it asked for a window and got one —
   // so `withRowCeiling` stays exactly as it was and simply never fires.

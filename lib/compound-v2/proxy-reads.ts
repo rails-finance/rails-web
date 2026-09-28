@@ -95,9 +95,6 @@ interface TimelineRowsResponse {
   cutoffBlock?: number | null;
   /** The span `?from=`/`?to=` asked for, echoed in unix seconds. */
   span?: { from: number; to: number } | null;
-  /** Markets this wallet ever moved a cToken on by transfer or seizure — a
-   *  backend that predates the flag simply omits it (no stand-down). */
-  transferMarkets?: string[];
 }
 
 /** `/api/compound-v2/timeline`: the wire timeline, flat or `?group=1`. The
@@ -125,11 +122,7 @@ export async function readCompoundV2Timeline(sp: URLSearchParams, hop: SsrHop): 
       console.error(`Backend API error: ${response.status} ${response.statusText}`);
       return proxyFail(response.status, { error: `Backend error: ${response.statusText}` });
     }
-    const upstream = (await response.json()) as UpstreamGroupedTimeline<CompoundV2MvRow> & {
-      /** Markets this wallet ever moved a cToken on by transfer or seizure —
-       *  a backend that predates the flag simply omits it (no stand-down). */
-      transferMarkets?: string[];
-    };
+    const upstream = (await response.json()) as UpstreamGroupedTimeline<CompoundV2MvRow>;
     // A backend that predates the grouping answers the flat, paged shape;
     // reading it as rows would draw a page of folders that are not folders.
     if (upstream.grouped !== true || !Array.isArray(upstream.rows)) {
@@ -140,7 +133,7 @@ export async function readCompoundV2Timeline(sp: URLSearchParams, hop: SsrHop): 
       });
     }
     const eventRows = upstream.rows.flatMap((r) => (r.kind === "event" ? [r.event] : []));
-    const data = buildCompoundV2Timeline(eventRows, wallet, upstream.totalEvents, upstream.transferMarkets);
+    const data = buildCompoundV2Timeline(eventRows, wallet, upstream.totalEvents);
     const rowPlan: TimelineRowPlanEntry[] = upstream.rows.map((r) =>
       r.kind === "event" ? { kind: "event" } : { kind: "folder", folder: compoundV2ServedFolder(r.folder) },
     );
@@ -162,7 +155,6 @@ export async function readCompoundV2Timeline(sp: URLSearchParams, hop: SsrHop): 
   let cursor: string | null = null;
   let cutoffBlock: number | null = null;
   let span: { from: number; to: number } | null = null;
-  let transferMarkets: string[] | undefined;
   let lastResponse: Response | null = null;
   // True when the walk hit MAX_PAGES with the backend still saying `hasMore`
   // — the drained rows are then a prefix of the history, and the page's
@@ -189,7 +181,6 @@ export async function readCompoundV2Timeline(sp: URLSearchParams, hop: SsrHop): 
     if (page === 0) {
       cutoffBlock = json.cutoffBlock ?? null;
       span = json.span ?? null;
-      transferMarkets = json.transferMarkets;
     }
     lastResponse = response;
     if (!json.hasMore || !json.nextCursor) break;
@@ -198,10 +189,7 @@ export async function readCompoundV2Timeline(sp: URLSearchParams, hop: SsrHop): 
   }
 
   const data = {
-    ...withRowCeiling(buildCompoundV2Timeline(rows, wallet, totalEvents, transferMarkets), {
-      totalEvents,
-      truncated: stoppedShort,
-    }),
+    ...withRowCeiling(buildCompoundV2Timeline(rows, wallet, totalEvents), { totalEvents, truncated: stoppedShort }),
     cutoffBlock,
     span,
   };

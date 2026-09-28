@@ -1,9 +1,11 @@
 // Moonwell timeline — the `api` arm's presentation transform.
 // ----------------------------------------------------------------------------
 // rails-server returns the raw replayed mv_moonwell_events rows (migration 098:
-// supply-principal + exact-mToken running balances, emitted-accountBorrows debt,
-// router-resolved owners); this transform maps each to a BaseActivityEvent +
-// MoonwellContext. Moonwell's four markets are a fixed catalog, so there is NO
+// exact-mToken running balances, emitted-accountBorrows debt, router-resolved
+// owners) with the Comptroller's oracle at each row's block; this transform maps
+// each to a BaseActivityEvent + MoonwellContext. A supply row's balance is its
+// mTokens × the market's exchangeRateStored at the block (the served
+// supply_before / supply_after, which sum Mint and Redeem only, are not read). Moonwell's four markets are a fixed catalog, so there is NO
 // per-request ERC20 resolution — symbols/decimals come from the catalog. The
 // replay lives server-side in the MV; only presentation lives here.
 //
@@ -35,12 +37,6 @@ export interface MoonwellTimelineDeployment {
   /** The WETH Router whose emitted minter/redeemer means "routed, owner
    *  resolved from the same-tx transfer leg". */
   router?: string;
-  /** Markets this wallet ever moved an mToken on by transfer (a liquidation
-   *  seize included — a seize is a plain Transfer here) — the supply-
-   *  principal lane never counted them (mig 098's `supply_delta`, mint/redeem
-   *  only). A mint/redeem in one of these markets stands its
-   *  `supplyBefore`/`supplyAfter` down. TO-DO-infra-and-backend.md §9. */
-  transferMarkets?: readonly string[];
 }
 
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
@@ -180,7 +176,6 @@ export function buildMoonwellTimeline(
   const wallet = walletRaw.toLowerCase();
   const chainId = deployment.chainId ?? MAINNET_CHAIN_ID;
   const router = (deployment.router ?? MOONWELL_ADDRESSES.WETH_ROUTER).toLowerCase();
-  const standDownMarkets = new Set(deployment.transferMarkets ?? []);
   const fallbackMarket = (key: string): MoonwellMarket => ({
     key,
     symbol: key.toUpperCase(),
@@ -192,6 +187,10 @@ export function buildMoonwellTimeline(
   });
   const marketOf = (key: string): MoonwellMarket =>
     (deployment.marketOf ? deployment.marketOf(key) : MOONWELL_MARKET_BY_KEY[key]) ?? fallbackMarket(key);
+
+  // The rate at each market's previous supply row, for the interest since
+  // then; unset after a supply row whose block has no rate read.
+  const prevRate = new Map<string, bigint | null>();
 
   const events: BaseActivityEvent[] = rows.map((r, idx) => {
     const tx = r.tx_hash.startsWith("0x") ? r.tx_hash : `0x${r.tx_hash}`;
@@ -236,20 +235,12 @@ export function buildMoonwellTimeline(
         ctx.mTokensDelta = fmtUnits(mSigned, MTOKEN_DECIMALS);
         ctx.mTokensBefore = scaledStr(r.mtokens_before, MTOKEN_DECIMALS);
         ctx.mTokensAfter = scaledStr(r.mtokens_after, MTOKEN_DECIMALS);
-        const standDown = standDownMarkets.has(m.key);
-        ctx.supplyStoodDown = standDown;
         ctx.raw = {
           amount: rawVal(r.amount),
           mTokens: rawVal(r.mtokens),
           mTokensBefore: rawVal(r.mtokens_before),
           mTokensAfter: rawVal(r.mtokens_after),
         };
-        if (!standDown) {
-          ctx.supplyBefore = scaledStr(r.supply_before, m.decimals);
-          ctx.supplyAfter = scaledStr(r.supply_after, m.decimals);
-          ctx.raw.supplyBefore = rawVal(r.supply_before);
-          ctx.raw.supplyAfter = rawVal(r.supply_after);
-        }
         // Underlying moves toward the protocol on a mint, toward the wallet on a redeem.
         flows = amt !== ZERO ? [flowFor(m.underlying, m.symbol, m.decimals, amt, kind === "mint" ? "out" : "in")] : [];
         break;
@@ -305,6 +296,38 @@ export function buildMoonwellTimeline(
             ? [flowFor(m.mtoken, m.mSymbol, MTOKEN_DECIMALS, mtk, kind === "transfer_in" ? "in" : "out")]
             : [];
         break;
+      }
+    }
+
+    // The supply balance on a supply row: the mTokens before and after × the
+    // market's exchangeRateStored at the row's block (the oracle-at-block
+    // read), floored as the mToken floors it, and the interest since the
+    // market's previous supply row. A block with no rate read states the
+    // mToken balance alone.
+    if (isSupplySide) {
+      const rateRaw = r.oracle_at_block?.exchange_rate_raw;
+      let rate: bigint | null = null;
+      try {
+        rate = rateRaw ? BigInt(rateRaw) : null;
+      } catch {
+        rate = null;
+      }
+      if (rate != null && rate > ZERO) {
+        const WAD = BigInt(10) ** BigInt(18);
+        const mb = bigintOf(r.mtokens_before);
+        const before = (mb * rate) / WAD;
+        const after = (bigintOf(r.mtokens_after) * rate) / WAD;
+        ctx.supplyBefore = fmtUnits(before, m.decimals);
+        ctx.supplyAfter = fmtUnits(after, m.decimals);
+        ctx.raw = { ...(ctx.raw ?? {}), supplyBefore: before.toString(), supplyAfter: after.toString() };
+        const prev = prevRate.get(m.key);
+        if (prev != null) {
+          const interest = before - (mb * prev) / WAD;
+          if (interest !== ZERO) ctx.interestSincePrevious = fmtUnits(interest, m.decimals);
+        }
+        prevRate.set(m.key, rate);
+      } else {
+        prevRate.set(m.key, null);
       }
     }
 

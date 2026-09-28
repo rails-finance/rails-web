@@ -729,7 +729,9 @@ export function replayMoonwellRows(p: MoonwellReplayInput): MoonwellChainTimelin
   // The highest running supply principal and the highest emitted debt per
   // market — noted after every row, so a closed account's card can say what
   // it held at its height — and the wallet's own transactions (a liquidation
-  // is the liquidator's, not the owner's).
+  // is the liquidator's, not the owner's). The principal peak stays: a whole
+  // seed (mig 204) stores it that way, and the seeded and whole replays must
+  // land on the same figure.
   const peakSupplyRaw = new Map<string, bigint>();
   const peakDebtRaw = new Map<string, bigint>();
   const ownTxs = new Set<string>();
@@ -799,31 +801,42 @@ export function replayMoonwellRows(p: MoonwellReplayInput): MoonwellChainTimelin
   const cutTypes = new Map<string, number>();
   const cutAssets = new Map<string, number>();
   let cutState: BoundaryStateLine[] | null | undefined;
+  // The rate at each market's newest row that carried one, to value the
+  // mToken balance at the cut.
+  const lastRate = new Map<string, bigint>();
+  const WAD = BigInt(10) ** BigInt(18);
+  const rateOf = (d: MoonwellDecodedRow): bigint | null => {
+    const raw = d.oracleAtBlock?.exchange_rate_raw;
+    if (!raw) return null;
+    try {
+      const r = BigInt(raw);
+      return r > ZERO ? r : null;
+    } catch {
+      return null;
+    }
+  };
   const snapshotAtCut = (): BoundaryStateLine[] | null => {
     const out: BoundaryStateLine[] = [];
-    for (const key of new Set([...supplyRaw.keys(), ...debtRaw.keys()])) {
+    for (const key of new Set([...mtokRaw.keys(), ...debtRaw.keys()])) {
       const mk = marketByMtoken.get(key);
       if (!mk) continue;
-      const sup = supplyRaw.get(key) ?? ZERO;
+      const mt = mtokRaw.get(key) ?? ZERO;
+      const rate = lastRate.get(key);
       const debt = debtRaw.get(key) ?? ZERO;
-      if (sup > ZERO)
-        out.push({ label: `${mk.symbol} supply`, value: String(scaleUnits(sup, mk.decimals)), unit: mk.symbol });
+      if (mt > ZERO && rate != null)
+        out.push({
+          label: `${mk.symbol} supply`,
+          value: String(scaleUnits((mt * rate) / WAD, mk.decimals)),
+          unit: mk.symbol,
+        });
+      else if (mt > ZERO) out.push({ label: `${mk.mSymbol} held`, value: String(scaleUnits(mt, 8)), unit: mk.mSymbol });
       if (debt > ZERO)
         out.push({ label: `${mk.symbol} debt`, value: String(scaleUnits(debt, mk.decimals)), unit: mk.symbol });
     }
     return out.length > 0 ? out : null;
   };
-  // Markets with a Transfer row in what this sweep read — the supply-
-  // principal lane never counts them (the same gap as the Ethereum index,
-  // TO-DO-infra-and-backend.md §9). Built from `rows`, so a (re)swept
-  // wallet's full history is covered. A cached seed's history predates
-  // `rows` and carries no transfer flag to merge in: a transfer that landed
-  // before the seed's boundary, with none since, stays a gap until the
-  // seed's summary gains a field for it.
-  const transferMarketKeys = new Set<string>();
   rows.forEach((d, i) => {
     const m = marketByMtoken.get(d.market)!;
-    if (d.kind === "transfer_in" || d.kind === "transfer_out") transferMarketKeys.add(d.market);
     if (i === cutoff && cutState === undefined) cutState = snapshotAtCut();
     // The anchor decision comes FIRST, because only an ELIDED row belongs in
     // the histograms. Until decision 0019 leg A every row below the cut was
@@ -847,6 +860,8 @@ export function replayMoonwellRows(p: MoonwellReplayInput): MoonwellChainTimelin
     const s = bump(supplyRaw, d.market, supplyDelta);
     const t = bump(mtokRaw, d.market, mtokDelta);
     notePeak(peakSupplyRaw, d.market, s.after);
+    const rate = rateOf(d);
+    if (rate != null) lastRate.set(d.market, rate);
     if (d.kind === "borrow" || d.kind === "repay") {
       debtRaw.set(d.market, d.accountBorrows!);
       notePeak(peakDebtRaw, d.market, d.accountBorrows!);
@@ -945,7 +960,6 @@ export function replayMoonwellRows(p: MoonwellReplayInput): MoonwellChainTimelin
     marketOf: (key) => marketByMtoken.get(key),
     chainId,
     router,
-    transferMarkets: [...transferMarketKeys],
   });
 
   const positions: MoonwellReplayedPosition[] = [];

@@ -255,57 +255,66 @@ export const mTokensBeforeProv = (mSym: string, coords: MoonwellCoords): Provena
   ]),
 });
 
-/** Supply PRINCIPAL after this event = Σ(mint − redeem) in underlying. */
-export const supplyAfterProv = (sym: string, coords: MoonwellCoords, raw?: string | null): Provenance => ({
+/** Supply balance AFTER this event = mTokens after × exchangeRateStored at
+ *  the block (the oracle-at-block read). */
+export const supplyAfterProv = (
+  sym: string,
+  mSym: string,
+  coords: MoonwellCoords,
+  raw?: string | null,
+): Provenance => ({
   kind: "chain-derived",
-  pclass: "indexed",
-  summary: `${sym} supply PRINCIPAL after this event — replayed by summing the underlying amounts of the position's own mints and redeems, in log order up to this block${atBlock(coords)}. No on-chain slot holds this figure (the chain stores mTokens): it is ${coords.source === "sweep" ? "this request's replay over the swept logs" : "the index's replay"}, clamped at zero — a full exit nets negative by exactly the interest earned. The mToken lane beside it is the slot-exact reading.`,
+  pclass: "state",
+  verify: {
+    kind: "recompute",
+    text:
+      coords.blockNumber != null
+        ? `Read balanceOf and exchangeRateStored on the mToken at block ${coords.blockNumber} against an archive node; their product ÷ 10^18 is this figure`
+        : "Read balanceOf and exchangeRateStored on the mToken at the event's block; their product ÷ 10^18 is this figure",
+  },
+  summary: `${sym} the position held AFTER this event${atBlock(coords)}, interest included — its exact ${mSym} balance times the market's exchangeRateStored read at the block, floored as the mToken floors it.`,
   contract: mtokenContract(coords),
-  via: `${captureVia(coords)} · Σ ±amount across Mint/Redeem logs${raw ? ` = ${raw}` : ""}`,
+  via: `${captureVia(coords)} · ${mSym} balance × exchangeRateStored at the block${raw ? ` = ${raw}` : ""}`,
+  formula: "mTokens after × rate ÷ 10^18",
   inputs: eventInputs(coords),
 });
 
-/** Supply principal BEFORE this event = after − this event's own amount. */
-export const supplyBeforeProv = (sym: string, coords: MoonwellCoords): Provenance => ({
+/** Supply balance BEFORE this event = mTokens before × the same block's rate. */
+export const supplyBeforeProv = (sym: string, mSym: string, coords: MoonwellCoords): Provenance => ({
   kind: "chain-derived",
-  pclass: "indexed",
-  summary: `${sym} supply PRINCIPAL before this event — the after-value minus this event's own underlying amount (after − change), reconstructed in the browser from the replayed after and the logged delta. Same amounts-only basis as the after (no on-chain slot holds principal).`,
+  pclass: "state",
+  summary: `${sym} the position held just BEFORE this event — its ${mSym} balance before the event times this block's exchangeRateStored. It includes the interest earned since the previous row.`,
   contract: mtokenContract(coords),
-  via: "supply principal after − amount",
-  formula: "after − change",
+  via: `${mSym} balance before × exchangeRateStored at this block`,
+  formula: "mTokens before × rate ÷ 10^18",
   inputs: eventInputs(coords, [
-    { label: "after", kind: "chain-derived", pclass: "indexed", note: `replayed ${sym} principal after this event` },
-    { label: "change", kind: "chain", pclass: "emitted", note: "this event's own `amount` (signed)" },
+    { label: "mTokens before", kind: "chain", pclass: "state", note: `replayed ${mSym} balance before this event` },
+    { label: "rate", kind: "chain", pclass: "state", note: "exchangeRateStored at this block" },
   ]),
 });
 
-/** Supply PRINCIPAL stood down: this market moved an mToken by transfer (a
- *  liquidation seize included — a seize is a plain Transfer here), which the
- *  principal lane (Σ mint − redeem) never counted — so the figure understates
- *  the holding, or clamps to zero on a market redeemed past what it minted.
- *  Short-term stand-down pending family 6 of the running-balance plan
- *  (mTokens × exchange rate at the row); rails-ops
- *  reference/chain-matching-running-balances.md, "Gaps that are not interest"
- *  B; TO-DO-infra-and-backend.md §9. */
-export const supplyStoodDownProv = (sym: string, coords: MoonwellCoords): Provenance => ({
+/** The change this event made to the supply balance, at one rate. */
+export const supplyChangeProv = (sym: string, mSym: string, coords: MoonwellCoords): Provenance => ({
   kind: "chain-derived",
-  pclass: "indexed",
-  summary: `${sym} supply PRINCIPAL is not shown on this event — the position's mTokens in this market have moved by transfer (a liquidation seize counts, since a seize is a plain Transfer here) at some point, and the principal lane (Σ mint − redeem) never counts those, so it would read below what the position holds (a market redeemed past what it minted reads zero). The mToken balance beside it is the exact, slot-verified figure.`,
+  pclass: "state",
+  verify: txVerify(coords),
+  summary: `The ${sym} supply change this event made — the balance after less the balance before, both at this block's exchange rate: the ${mSym} moved, valued in ${sym}. On a Mint or Redeem it matches the emitted amount up to the mToken's rounding.`,
   contract: mtokenContract(coords),
-  via: `${captureVia(coords)} · a Transfer log moved this market's mTokens outside Mint/Redeem`,
-  verify: { kind: "none", text: "There is no figure to check" },
+  via: `(${mSym} after − ${mSym} before) × exchangeRateStored at the block`,
+  formula: "after − before",
   inputs: eventInputs(coords),
 });
 
-/** Closed/liquidated-card peak supply stood down — the same gap, over the
- *  lane's lifetime max rather than one event's after-value. */
-export const peakSupplyStoodDownProv = (sym: string): Provenance => ({
+/** Interest the supply balance earned between the previous supply row and
+ *  this one. */
+export const supplyInterestSincePreviousProv = (sym: string, mSym: string, coords: MoonwellCoords): Provenance => ({
   kind: "chain-derived",
-  pclass: "indexed",
-  summary: `The highest ${sym} supply PRINCIPAL this wallet recorded is not shown — this market's mTokens moved by transfer (a liquidation seize included) at some point in its history, which the principal lane (max of Σ mint − redeem) never counts, so the peak would read below what the position held (or zero, on a market redeemed past what it minted). No on-chain slot holds a lifetime-peak claim to read instead.`,
-  contract: { name: "mToken", address: "" },
-  via: `captured mToken events · a Transfer log moved this market's mTokens outside Mint/Redeem`,
-  verify: { kind: "none", text: "There is no figure to check" },
+  pclass: "state",
+  summary: `${sym} interest this supply earned since the position's previous supply event on this market, up to this one${atBlock(coords)} — the balance just before this event less the balance just after the previous one. The ${mSym} balance did not move between them, so this is that balance × (the exchange rate at this block − the rate at the previous row's block).`,
+  contract: mtokenContract(coords),
+  via: `${mSym} before × (exchangeRateStored here − exchangeRateStored at the previous row)`,
+  formula: "mTokens × (rate − previous rate) ÷ 10^18",
+  inputs: eventInputs(coords),
 });
 
 // ── identity ─────────────────────────────────────────────────────────────────
@@ -405,13 +414,13 @@ export const positionDebtProv = (sym: string, atBlockNum?: number): Provenance =
   via: `${MOONWELL_INDEX_VIA} · latest Borrow/RepayBorrow log · accountBorrows`,
 });
 
-/** Closed-card peak supply — the highest principal-lane balance-after. */
+/** Closed-card peak supply — the highest supply balance at a row. */
 export const peakSupplyProv = (sym: string): Provenance => ({
   kind: "chain-derived",
-  pclass: "indexed",
-  summary: `The highest ${sym} supply PRINCIPAL this wallet ever recorded — the maximum of the replayed principal lane (each captured event's own supplied-balance-after) across its whole history. The index's arithmetic over the emitted amounts. Interest lives in the exchange rate outside this lane, so the claim's value at its height sat above this figure; mTokens that arrived by transfer never entered it.`,
+  pclass: "state",
+  summary: `The highest ${sym} supply this wallet held at any of its events — the maximum over its supply rows of the mToken balance after the event × the market's exchangeRateStored at that block, interest included. Between events the balance kept earning, so the true high can sit a little above the highest row.`,
   contract: { name: "mToken", address: "" },
-  via: `${MOONWELL_INDEX_VIA} · max(supply-after) across Mint/Redeem logs`,
+  via: `${MOONWELL_INDEX_VIA} · max(mTokens after × exchangeRateStored at the row's block)`,
 });
 
 /** Closed-card peak debt — the highest emitted accountBorrows. */
@@ -456,6 +465,29 @@ export const moonwellLifetimeFlowProv = (
   summary: `Lifetime ${flow} (${sym}) — the sum of every ${sym} amount this position's own events ${flow === "withdrawn" ? "redeemed" : flow === "repaid" ? "repaid" : "had cleared in liquidations"} across its whole captured history (complete from the market's deploy block, 2026-05-27). mToken events only — wallet↔wallet mToken transfers move the supply claim without a Mint/Redeem log and are not in this sum (they live on the mToken lane).`,
   contract: { name: "mToken", address: "" },
   via: `${MOONWELL_INDEX_VIA} · Σ amount across the position's own logs · deploy → head`,
+});
+
+/** Lifetime interest on one market's supply: the sum of every supply row's
+ *  interest since the previous row, plus what the balance earned since the
+ *  last row (the head value less that row's balance). */
+export const moonwellSupplyInterestProv = (sym: string, mSym: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `Interest the ${sym} supply earned over the position's life — each supply row's interest since the previous one (the ${mSym} held × the change in exchangeRateStored between the two blocks), plus the head value less the last row's balance. mTokens that arrived or left by transfer are valued at their own block's rate, so they move the balance without counting as interest.`,
+  contract: { name: `mToken (${mSym})`, address: "" },
+  via: "Σ mTokens × (rate − previous rate) over the supply rows + (head value − last row)",
+  formula: "Σ interest since previous + (current − last after)",
+});
+
+/** The supply line under the interest segment: the head value less the
+ *  lifetime interest. */
+export const moonwellSupplyNetProv = (sym: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `The ${sym} supply net of the interest it earned — the value now less the lifetime interest segment above it, which equals the net of every supply row's change (mints, redeems and transfers), each valued at its own block's exchange rate.`,
+  contract: { name: "mToken", address: "" },
+  via: "mTokens × exchangeRateStored @ head − lifetime interest",
+  formula: "current − interest",
 });
 
 /** Net borrowed PRINCIPAL across the whole captured history — the tower's debt

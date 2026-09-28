@@ -193,8 +193,12 @@ function timelineTable(events: BaseActivityEvent[], history: MarkdownHistoryScop
     out.push("_No transaction history available._");
     return out;
   }
-  out.push("| # | Date | Action | Market | Amount | cTokens after | Debt after | Transaction |");
-  out.push("|---|------|--------|--------|--------|---------------|------------|-------------|");
+  out.push(
+    "| # | Date | Action | Market | Amount | Supplied after | Interest since previous | cTokens after | Debt after | Transaction |",
+  );
+  out.push(
+    "|---|------|--------|--------|--------|----------------|-------------------------|---------------|------------|-------------|",
+  );
   rows.forEach((e, i) => {
     if (!isCompoundV2Event(e)) return;
     const d = e.context.data;
@@ -210,13 +214,15 @@ function timelineTable(events: BaseActivityEvent[], history: MarkdownHistoryScop
           : "—";
     const cAfter = d.cTokensAfter != null ? amt(parseFloat(d.cTokensAfter)) : "—";
     const debtAfter = d.debtAfter != null ? amt(parseFloat(d.debtAfter)) : "—";
+    const supplied = d.supplyAfter != null ? amt(parseFloat(d.supplyAfter)) : "—";
+    const interest = d.interestSincePrevious != null ? amt(parseFloat(d.interestSincePrevious)) : "";
     out.push(
-      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${d.marketSymbol} | ${amount} | ${cAfter} | ${debtAfter} | ${txCell(e)} |`,
+      `| ${firstIndex + i} | ${fmtUtc(e.timestamp)} | ${label} | ${d.marketSymbol} | ${amount} | ${supplied} | ${interest} | ${cAfter} | ${debtAfter} | ${txCell(e)} |`,
     );
   });
   out.push("");
   out.push(
-    "_cTokens after is the exact receipt-token balance (= balanceOf, slot-verified); debt after is the event's own emitted accountBorrows (interest to that moment included; a liquidation's comes from the repay leg it itself emitted). Seizure rows are collateral being taken under the protocol's liquidation rules — not transfers the borrower made._",
+    "_Supplied after is the underlying the position held after the row: cTokens after × the market's exchangeRateStored at the block; interest since previous is what it earned since the position's previous supply row on that market. cTokens after is the exact receipt-token balance (= balanceOf, slot-verified); debt after is the event's own emitted accountBorrows (interest to that moment included; a liquidation's comes from the repay leg it itself emitted). Seizure rows are collateral being taken under the protocol's liquidation rules — not transfers the borrower made._",
   );
   out.push("");
   return out;

@@ -431,56 +431,66 @@ export const cTokensBeforeProv = (cSym: string, coords: CompoundV2Coords): Prove
   ]),
 });
 
-/** Supply PRINCIPAL after this event = Σ(mint − redeem) in underlying. */
-export const supplyAfterProv = (sym: string, coords: CompoundV2Coords, raw?: string | null): Provenance => ({
+/** Supply balance AFTER this event = cTokens after × exchangeRateStored at
+ *  the block. */
+export const supplyAfterProv = (
+  sym: string,
+  cSym: string,
+  coords: CompoundV2Coords,
+  raw?: { supplyAfter?: string; exchangeRate?: string },
+): Provenance => ({
   kind: "chain-derived",
-  pclass: "indexed",
-  summary: `${sym} supply PRINCIPAL after this event — replayed by summing the underlying amounts of the position's own mints and redeems, in log order up to this block${atBlock(coords)}. No on-chain slot holds this figure (the chain stores cTokens, not deposited principal): it is the index's replay, clamped at zero — a full exit nets negative by exactly the interest earned. The cToken lane beside it is the slot-exact reading.`,
+  pclass: "state",
+  verify: {
+    kind: "recompute",
+    text:
+      coords.blockNumber != null
+        ? `Read balanceOf and exchangeRateStored on the cToken at block ${coords.blockNumber} against an archive node; their product ÷ 10^18 is this figure`
+        : "Read balanceOf and exchangeRateStored on the cToken at the event's block; their product ÷ 10^18 is this figure",
+  },
+  summary: `${sym} the position held AFTER this event${atBlock(coords)}, interest included — its exact ${cSym} balance times the market's exchangeRateStored at the block, floored as the cToken floors it. The rate is read at the block, or taken from the block's own Mint or Redeem (amount ÷ cTokens) where those pin it to under half a cent on this balance.`,
   contract: ctokenContract(coords),
-  via: `${COMPOUND_V2_VIA} · Σ ±amount across Mint/Redeem logs${raw ? ` = ${raw}` : ""}`,
+  via: `${COMPOUND_V2_VIA} · ${cSym} balance × exchangeRateStored${raw?.exchangeRate ? ` (${raw.exchangeRate})` : ""}${raw?.supplyAfter ? ` = ${raw.supplyAfter}` : ""}`,
+  formula: "cTokens after × rate ÷ 10^18",
   inputs: eventInputs(coords),
 });
 
-/** Supply principal BEFORE this event = after − this event's own amount. */
-export const supplyBeforeProv = (sym: string, coords: CompoundV2Coords): Provenance => ({
+/** Supply balance BEFORE this event = cTokens before × the same block's rate. */
+export const supplyBeforeProv = (sym: string, cSym: string, coords: CompoundV2Coords): Provenance => ({
   kind: "chain-derived",
-  pclass: "indexed",
-  summary: `${sym} supply PRINCIPAL before this event — the after-value minus this event's own underlying amount (after − change), reconstructed in the browser from the replayed after and the logged delta. Same amounts-only basis as the after (no on-chain slot holds principal).`,
+  pclass: "state",
+  summary: `${sym} the position held just BEFORE this event — its ${cSym} balance before the event times this block's exchangeRateStored. It includes the interest earned since the previous row.`,
   contract: ctokenContract(coords),
-  via: "supply principal after − amount",
-  formula: "after − change",
+  via: `${cSym} balance before × exchangeRateStored at this block`,
+  formula: "cTokens before × rate ÷ 10^18",
   inputs: eventInputs(coords, [
-    { label: "after", kind: "chain-derived", pclass: "indexed", note: `replayed ${sym} principal after this event` },
-    { label: "change", kind: "chain", pclass: "emitted", note: "this event's own `amount` (signed)" },
+    { label: "cTokens before", kind: "chain", pclass: "state", note: `replayed ${cSym} balance before this event` },
+    { label: "rate", kind: "chain", pclass: "state", note: "exchangeRateStored at this block" },
   ]),
 });
 
-/** Supply PRINCIPAL stood down: this market moved a cToken by transfer or
- *  seizure, which the principal lane (Σ mint − redeem) never counted — so the
- *  figure understates the holding, or clamps to zero on a market redeemed
- *  past what it minted. Short-term stand-down pending family 6 of the running-
- *  balance plan (cTokens × exchange rate at the row); rails-ops
- *  reference/chain-matching-running-balances.md, "Gaps that are not interest"
- *  B; TO-DO-infra-and-backend.md §9. */
-export const supplyStoodDownProv = (sym: string, coords: CompoundV2Coords): Provenance => ({
+/** The change this event made to the supply balance, at one rate. */
+export const supplyChangeProv = (sym: string, cSym: string, coords: CompoundV2Coords): Provenance => ({
   kind: "chain-derived",
-  pclass: "indexed",
-  summary: `${sym} supply PRINCIPAL is not shown on this event — the position's cTokens in this market have moved by transfer or liquidation seizure at some point, and the principal lane (Σ mint − redeem) never counts those, so it would read below what the position holds (a market redeemed past what it minted reads zero). The cToken balance beside it is the exact, slot-verified figure.`,
+  pclass: "state",
+  verify: txVerify(coords),
+  summary: `The ${sym} supply change this event made — the balance after less the balance before, both at this block's exchange rate: the ${cSym} moved, valued in ${sym}. On a Mint or Redeem it matches the emitted amount up to the cToken's rounding.`,
   contract: ctokenContract(coords),
-  via: `${COMPOUND_V2_VIA} · a Transfer or seize log moved this market's cTokens outside Mint/Redeem`,
-  verify: { kind: "none", text: "There is no figure to check" },
+  via: `(${cSym} after − ${cSym} before) × exchangeRateStored at the block`,
+  formula: "after − before",
   inputs: eventInputs(coords),
 });
 
-/** Closed/liquidated-card peak supply stood down — the same gap, over the
- *  lane's lifetime max rather than one event's after-value. */
-export const peakSupplyStoodDownProv = (sym: string): Provenance => ({
+/** Interest the supply balance earned between the previous supply row and
+ *  this one. */
+export const supplyInterestSincePreviousProv = (sym: string, cSym: string, coords: CompoundV2Coords): Provenance => ({
   kind: "chain-derived",
-  pclass: "indexed",
-  summary: `The highest ${sym} supply PRINCIPAL this wallet recorded is not shown — this market's cTokens moved by transfer or liquidation seizure at some point in its history, which the principal lane (max of Σ mint − redeem) never counts, so the peak would read below what the position held (or zero, on a market redeemed past what it minted). No on-chain slot holds a lifetime-peak claim to read instead.`,
-  contract: { name: "cToken", address: "" },
-  via: `${COMPOUND_V2_VIA} · a Transfer or seize log moved this market's cTokens outside Mint/Redeem`,
-  verify: { kind: "none", text: "There is no figure to check" },
+  pclass: "state",
+  summary: `${sym} interest this supply earned since the position's previous supply event on this market, up to this one${atBlock(coords)} — the balance just before this event less the balance just after the previous one. The ${cSym} balance did not move between them, so this is that balance × (the exchange rate at this block − the rate at the previous row's block).`,
+  contract: ctokenContract(coords),
+  via: `${cSym} before × (exchangeRateStored here − exchangeRateStored at the previous row)`,
+  formula: "cTokens × (rate − previous rate) ÷ 10^18",
+  inputs: eventInputs(coords),
 });
 
 // ── identity ─────────────────────────────────────────────────────────────────
@@ -555,13 +565,13 @@ export const positionDebtProv = (sym: string, atBlockNum?: number): Provenance =
   via: `${COMPOUND_V2_VIA} · latest Borrow/RepayBorrow/liquidation log · accountBorrows`,
 });
 
-/** Closed-card peak supply — the highest principal-lane balance-after. */
+/** Closed-card peak supply — the highest supply balance at a row. */
 export const peakSupplyProv = (sym: string): Provenance => ({
   kind: "chain-derived",
-  pclass: "indexed",
-  summary: `The highest ${sym} supply PRINCIPAL this wallet ever recorded — the maximum of the replayed principal lane (each captured event's own supplied-balance-after) across its whole history. Interest lives in the exchange rate outside this lane, so the claim's value at its height sat above this figure; cTokens that arrived by transfer or seizure never entered it.`,
+  pclass: "state",
+  summary: `The highest ${sym} supply this wallet held at any of its events — the maximum over its supply rows of the cToken balance after the event × the market's exchangeRateStored at that block, interest included. Between events the balance kept earning, so the true high can sit a little above the highest row.`,
   contract: { name: "cToken", address: "" },
-  via: `${COMPOUND_V2_VIA} · max(supply-after) across Mint/Redeem logs`,
+  via: `${COMPOUND_V2_VIA} · max(cTokens after × exchangeRateStored at the row's block)`,
 });
 
 /** Closed-card peak debt — the highest emitted accountBorrows. */
@@ -661,6 +671,40 @@ export const compoundV2DebtInterestProv = (sym: string, live?: boolean): Provena
       : { label: "current", kind: "chain", pclass: "emitted", note: "the last event's accountBorrows" },
     { label: "net principal", kind: "chain-derived", pclass: "indexed", note: "Σ signed event amounts" },
   ],
+});
+
+/** Lifetime interest on one market's supply: the sum of every supply row's
+ *  interest since the previous row, plus what the balance earned since the
+ *  last row (the head value less that row's balance). */
+export const compoundV2SupplyInterestProv = (sym: string, cSym: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `Interest the ${sym} supply earned over the position's life — each supply row's interest since the previous one (the ${cSym} held × the change in exchangeRateStored between the two blocks), plus the head value less the last row's balance. cTokens that arrived or left by transfer or seizure are valued at their own block's rate, so they move the balance without counting as interest.`,
+  contract: { name: `cToken (${cSym})`, address: "" },
+  via: "Σ cTokens × (rate − previous rate) over the supply rows + (head value − last row)",
+  formula: "Σ interest since previous + (current − last after)",
+  inputs: [
+    {
+      label: "row interest",
+      kind: "chain-derived",
+      pclass: "state",
+      note: "each supply row's interest since the previous",
+    },
+    { label: "current", kind: "chain-derived", pclass: "state", note: "cTokens × exchangeRateStored at head" },
+    { label: "last after", kind: "chain-derived", pclass: "state", note: "the last supply row's balance" },
+  ],
+});
+
+/** The supply line under the interest segment: the head value less the
+ *  lifetime interest, which is the net of every move in and out, each valued
+ *  at its own block's rate. */
+export const compoundV2SupplyNetProv = (sym: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `The ${sym} supply net of the interest it earned — the value now less the lifetime interest segment above it, which equals the net of every supply row's change (mints, redeems, transfers and seizures), each valued at its own block's exchange rate.`,
+  contract: { name: "cToken", address: "" },
+  via: "cTokens × exchangeRateStored @ head − lifetime interest",
+  formula: "current − interest",
 });
 
 /** The card's "incl. $X interest" stat caption. `live` when the debt side's

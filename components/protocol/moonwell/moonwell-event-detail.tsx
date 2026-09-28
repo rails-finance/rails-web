@@ -2,9 +2,10 @@
 
 // Moonwell event detail — adapter onto the shared ChainTruthDetail grid. The
 // lanes an event touches, with before→after transitions:
-//   mint/redeem  — the supply PRINCIPAL lane (replayed, amounts-only) AND the
-//                  mToken lane (slot-exact Transfer replay) side by side; the
-//                  two bases are the point, each traced to its own class.
+//   supply rows  — mint, redeem and transfers: the supply balance (mTokens ×
+//                  exchangeRateStored at the row's block, with the interest
+//                  since the previous supply row beneath it) beside the mToken
+//                  lane (slot-exact Transfer replay).
 //   borrow/repay — the debt lane: after = the EMITTED accountBorrows (interest
 //                  to this moment included), before = ∓ the event's own amount.
 //   transfers    — the mToken lane (a position can arrive or leave by transfer).
@@ -17,7 +18,12 @@
 //                  pill when the index carries it.
 
 import type { MoonwellContext } from "@/lib/shared/types/event-shape";
-import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import {
+  ChainTruthDetail,
+  reconstructTransition,
+  type ChainTruthStat,
+  type ChainTruthTransition,
+} from "@/components/shared/chain-truth-event";
 import {
   AtBlockPriceFootnote,
   LiquidationForensics,
@@ -33,7 +39,8 @@ import {
   liqDebtRepaidProv,
   supplyAfterProv,
   supplyBeforeProv,
-  supplyStoodDownProv,
+  supplyChangeProv,
+  supplyInterestSincePreviousProv,
   mTokensAfterProv,
   mTokensBeforeProv,
   atBlockPriceProv,
@@ -44,7 +51,7 @@ import {
   type MoonwellCoords,
 } from "@/lib/moonwell/event-provenance";
 import { useMoonwellCoords, useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
-import { formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatCompact, formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
 
 export interface MoonwellEventDetailProps {
   ctx: MoonwellContext;
@@ -132,36 +139,53 @@ function buildMoonwellLiqForensics(
   };
 }
 
+/** The supply balance stat on a supply-side row: after, the transition from
+ *  the before at the same block's rate, and the interest since the previous
+ *  supply row. Undefined when the row's block has no rate read. */
+function supplyStat(ctx: MoonwellContext, mSym: string, coords: MoonwellCoords): ChainTruthStat | undefined {
+  if (ctx.supplyAfter == null || ctx.supplyBefore == null) return undefined;
+  const afterN = Number(ctx.supplyAfter);
+  const beforeN = Number(ctx.supplyBefore);
+  let transition: ChainTruthTransition | undefined;
+  const changeN = afterN - beforeN;
+  if (Number.isFinite(changeN) && changeN !== 0) {
+    const sign = changeN >= 0 ? "+" : "−";
+    transition = {
+      before: formatCompact(beforeN),
+      beforeExact: formatExact(beforeN),
+      beforeProv: supplyBeforeProv(ctx.marketSymbol, mSym, coords),
+      change: `${sign}${formatCompact(Math.abs(changeN))}`,
+      changeExact: `${sign}${formatExact(Math.abs(changeN))}`,
+      changeProv: supplyChangeProv(ctx.marketSymbol, mSym, coords),
+    };
+  }
+  return {
+    label: "Supplied",
+    value: fmt(ctx.supplyAfter),
+    symbol: ctx.marketSymbol,
+    prov: supplyAfterProv(ctx.marketSymbol, mSym, coords, ctx.raw?.supplyAfter),
+    transition,
+    ...(ctx.interestSincePrevious
+      ? {
+          interestSincePrevious: {
+            value: ctx.interestSincePrevious,
+            prov: supplyInterestSincePreviousProv(ctx.marketSymbol, mSym, coords),
+          },
+        }
+      : {}),
+  };
+}
+
 export function MoonwellEventDetail({ ctx, txHash, blockNumber, wallet }: MoonwellEventDetailProps) {
   const dep = useMoonwellDeployment();
   const coords = useMoonwellCoords({ market: ctx.market, symbol: ctx.marketSymbol, txHash, blockNumber, wallet });
   const mSym = coords.marketLabel ?? `m${ctx.marketSymbol}`;
   const stats: ChainTruthStat[] = [];
 
+  const supply = ctx.side === "supply" ? supplyStat(ctx, mSym, coords) : undefined;
+  if (supply) stats.push(supply);
+
   if (ctx.eventType === "mint" || ctx.eventType === "redeem") {
-    if (ctx.supplyStoodDown) {
-      stats.push({
-        label: "Supplied · principal",
-        value: "Not shown",
-        display: "Not shown — mTokens moved by transfer",
-        dimmed: true,
-        symbol: ctx.marketSymbol,
-        prov: supplyStoodDownProv(ctx.marketSymbol, coords),
-      });
-    } else {
-      stats.push({
-        label: "Supplied · principal",
-        value: fmt(ctx.supplyAfter),
-        symbol: ctx.marketSymbol,
-        prov: supplyAfterProv(ctx.marketSymbol, coords, ctx.raw?.supplyAfter),
-        transition: reconstructTransition({
-          after: ctx.supplyAfter,
-          change: ctx.assetsDelta,
-          changeProv: assetsDeltaProv(ctx.marketSymbol, ctx.eventType, coords, ctx.raw?.amount),
-          beforeProv: supplyBeforeProv(ctx.marketSymbol, coords),
-        }),
-      });
-    }
     stats.push({
       label: "mToken balance",
       value: fmt(ctx.mTokensAfter),

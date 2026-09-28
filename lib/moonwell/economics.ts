@@ -50,6 +50,8 @@ import {
   moonwellLifetimeFlowProv,
   moonwellDebtInterestProv,
   moonwellDebtPrincipalProv,
+  moonwellSupplyInterestProv,
+  moonwellSupplyNetProv,
 } from "@/lib/moonwell/event-provenance";
 import { moonwellLiveDebtProv } from "@/lib/moonwell/position-provenance";
 import { MOONWELL_MARKET_BY_KEY } from "@/lib/moonwell/asset-catalog";
@@ -68,6 +70,21 @@ export interface MarketFlows {
   borrowed: number;
   repaid: number;
   liquidatedDebt: number;
+  /** Σ of the supply rows' interest since the previous row, the last supply
+   *  row's balance after, and whether every supply row carried its balance
+   *  (the rate was read). Filled from the event stream only. */
+  supplyInterest?: number;
+  lastSupplyAfter?: number;
+  supplyRowsWhole?: boolean;
+}
+
+/** One market's lifetime supply interest from the whole event stream: Σ the
+ *  rows' interest since the previous row, plus the head value less the last
+ *  row's balance. Null when a supply row had no rate or there is no head
+ *  value. */
+function supplyLifetimeInterest(f: MarketFlows | undefined, current: number | undefined | null): number | null {
+  if (!f || f.supplyRowsWhole !== true || f.lastSupplyAfter == null || current == null) return null;
+  return (f.supplyInterest ?? 0) + (current - f.lastSupplyAfter);
 }
 
 /** The receipts the tower's lines carry. Each takes the ROW it describes (the
@@ -85,6 +102,10 @@ export interface MoonwellTowerVocabulary {
   lifetimeFlow: (flow: "withdrawn" | "repaid" | "liquidated debt", symbol: string) => Provenance;
   debtInterest: (symbol: string, live?: boolean) => Provenance;
   debtPrincipal: (symbol: string) => Provenance;
+  /** The lifetime supply interest segment and the line under it; a
+   *  vocabulary without them draws no supply split. */
+  supplyInterest?: (row: { market: string; symbol: string }) => Provenance;
+  supplyNet?: (symbol: string) => Provenance;
 }
 
 /** The Ethereum explorer's receipts — the captured index, the fixed catalog. */
@@ -101,6 +122,9 @@ export const MOONWELL_INDEXED_VOCABULARY: MoonwellTowerVocabulary = {
   lifetimeFlow: moonwellLifetimeFlowProv,
   debtInterest: moonwellDebtInterestProv,
   debtPrincipal: moonwellDebtPrincipalProv,
+  supplyInterest: (r) =>
+    moonwellSupplyInterestProv(r.symbol, MOONWELL_MARKET_BY_KEY[r.market]?.mSymbol ?? `m${r.symbol}`),
+  supplyNet: moonwellSupplyNetProv,
 };
 
 /** Raw per-market accumulation from a wallet's own mToken events — BEFORE the
@@ -132,6 +156,15 @@ function accumulateMoonwellFlows(events: BaseActivityEvent[]): Map<string, Marke
   for (const ev of events) {
     if (!isMoonwellEvent(ev)) continue;
     const ctx = ev.context.data;
+    if (ctx.side === "supply") {
+      const r = get(ctx.market, ctx.marketSymbol);
+      if (ctx.supplyAfter == null) r.supplyRowsWhole = false;
+      else {
+        r.supplyRowsWhole = r.supplyRowsWhole ?? true;
+        r.lastSupplyAfter = Number(ctx.supplyAfter);
+        r.supplyInterest = (r.supplyInterest ?? 0) + Number(ctx.interestSincePrevious ?? "0");
+      }
+    }
     // Liquidation: the row's amount is the debt the liquidator repaid on this
     // (borrowed) market. The paired RepayBorrow row carries the same movement
     // into `repaid`, so the liquidation row feeds ONLY the liquidated bucket —
@@ -287,10 +320,11 @@ function sideInterestUsd(
     for (const cur of live) {
       if (cur.current == null) return null; // no chain read → can't split
       const f = lifetime.get(cur.market);
-      if (!f || f.supplied <= 0) return null;
-      const net = f.supplied - f.withdrawn;
-      const interest = cur.current - net;
-      if (interest < -DUST || interest > f.supplied) return null;
+      // The rows' own interest when the stream is whole; else the flows split.
+      const fromRows = supplyLifetimeInterest(f, cur.current);
+      if (fromRows == null && (!f || f.supplied <= 0)) return null;
+      const interest = fromRows ?? cur.current - (f!.supplied - f!.withdrawn);
+      if (interest < -DUST || (fromRows == null && interest > f!.supplied)) return null;
       if (interest <= DUST) continue;
       const usd = usdOf(cur.address, interest);
       if (usd == null) return null;
@@ -473,6 +507,31 @@ export function computeMoonwellEconomics(
     }
   }
 
+  // Supply interest segment — the same single-market rule, from the rows'
+  // own interest (whole event stream only). The current line drops to the
+  // balance less that interest.
+  let supplyInterest: TowerLine | null = null;
+  if (lifetime && !precomputedLifetime && supplyLines.length === 1 && vocab.supplyInterest && vocab.supplyNet) {
+    const cur = supplyLines[0];
+    const row = view.supplies.find((r) => r.address === cur.key);
+    const amt = row ? supplyLifetimeInterest(lifetime.get(row.market), row.current) : null;
+    if (row && amt != null && amt > DUST && amt < cur.amount) {
+      supplyInterest = {
+        key: "coll-interest",
+        symbol: cur.symbol,
+        amount: amt,
+        usd: usdOf(cur.key, amt),
+        prov: vocab.supplyInterest(row),
+      };
+      supplyLines[0] = {
+        ...cur,
+        amount: cur.amount - amt,
+        usd: usdOf(cur.key, cur.amount - amt),
+        prov: vocab.supplyNet(cur.symbol),
+      };
+    }
+  }
+
   // Value the tower only when EVERY contributing line is oracle-priced — a strict
   // per-total guard. A single unpriced market drops it to the token gated list,
   // so a bar height is never a partial (misleading) USD figure.
@@ -483,6 +542,7 @@ export function computeMoonwellEconomics(
     ...debtExited,
     ...debtLiquidated,
     ...(interest ? [interest] : []),
+    ...(supplyInterest ? [supplyInterest] : []),
   ];
   const valued = contributing.length > 0 && contributing.every((l) => l.usd != null);
 
@@ -502,7 +562,7 @@ export function computeMoonwellEconomics(
     priceKind: valued ? "chain-derived" : undefined,
     collateral: {
       current: supplyLines,
-      interest: null,
+      interest: supplyInterest,
       exited: collExited,
       liquidated: [],
       lifetimeInflow: inflow((r) => r.supplied),

@@ -39,6 +39,8 @@ import {
   compoundV2LifetimeFlowProv,
   compoundV2DebtInterestProv,
   compoundV2DebtPrincipalProv,
+  compoundV2SupplyInterestProv,
+  compoundV2SupplyNetProv,
 } from "@/lib/compound-v2/event-provenance";
 import { compoundV2LiveDebtProv } from "@/lib/compound-v2/position-provenance";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
@@ -59,6 +61,12 @@ interface MarketFlows {
   borrowed: number;
   repaid: number;
   liquidatedDebt: number;
+  /** Σ of the supply rows' interest since the previous row, the last supply
+   *  row's balance after, and whether every supply row carried its balance
+   *  (the rate was known). Filled from the event stream only. */
+  supplyInterest?: number;
+  lastSupplyAfter?: number;
+  supplyRowsWhole?: boolean;
 }
 
 function replayCompoundV2Lifetime(events: BaseActivityEvent[]): Map<string, MarketFlows> {
@@ -83,6 +91,15 @@ function replayCompoundV2Lifetime(events: BaseActivityEvent[]): Map<string, Mark
     // A liquidation is ONE row here (the index merged the repay leg it
     // emitted), so its cleared debt lands ONLY in the liquidated bucket —
     // there is no paired repay row to subtract, unlike the Moonwell mold.
+    if (ctx.side === "supply") {
+      const r = get(ctx.market, ctx.marketSymbol);
+      if (ctx.supplyAfter == null) r.supplyRowsWhole = false;
+      else {
+        r.supplyRowsWhole = r.supplyRowsWhole ?? true;
+        r.lastSupplyAfter = Number(ctx.supplyAfter);
+        r.supplyInterest = (r.supplyInterest ?? 0) + Number(ctx.interestSincePrevious ?? "0");
+      }
+    }
     if (ctx.eventType === "liquidation") {
       const covered = Math.abs(Number(ctx.assetsDelta ?? "0"));
       if (Number.isFinite(covered)) get(ctx.market, ctx.marketSymbol).liquidatedDebt += covered;
@@ -183,6 +200,15 @@ export function compoundV2LifetimeWithOpening(
   return [...merged.values()];
 }
 
+/** One market's lifetime supply interest from the whole event stream: Σ the
+ *  rows' interest since the previous row, plus the head value less the last
+ *  row's balance. Null when a supply row had no rate or there is no head
+ *  value. */
+function supplyLifetimeInterest(f: MarketFlows | undefined, current: number | undefined | null): number | null {
+  if (!f || f.supplyRowsWhole !== true || f.lastSupplyAfter == null || current == null) return null;
+  return (f.supplyInterest ?? 0) + (current - f.lastSupplyAfter);
+}
+
 /** Chain-faithful interest on one leg (the Spark legInterest gates):
  *  - no current figure / no gross inflow → can't attribute, bail;
  *  - interest < dust → zero (or negative: missed principal, bail);
@@ -227,10 +253,11 @@ function sideInterestUsd(
     for (const cur of live) {
       if (cur.current == null) return null; // no chain read → can't split
       const f = lifetime.get(cur.market);
-      if (!f || f.supplied <= 0) return null;
-      const net = f.supplied - f.withdrawn;
-      const interest = cur.current - net;
-      if (interest < -DUST || interest > f.supplied) return null;
+      // The rows' own interest when the stream is whole; else the flows split.
+      const fromRows = supplyLifetimeInterest(f, cur.current);
+      if (fromRows == null && (!f || f.supplied <= 0)) return null;
+      const interest = fromRows ?? cur.current - (f!.supplied - f!.withdrawn);
+      if (interest < -DUST || (fromRows == null && interest > f!.supplied)) return null;
       if (interest <= DUST) continue;
       const usd = usdOf(cur.market, interest);
       if (usd == null) return null;
@@ -407,6 +434,32 @@ export function computeCompoundV2Economics(
     }
   }
 
+  // Supply interest segment — the same single-market rule, from the rows'
+  // own interest (whole event stream only; a windowed page's opening balance
+  // carries flows, not interest). The current line drops to the balance less
+  // that interest.
+  let supplyInterest: TowerLine | null = null;
+  if (lifetime && !precomputedLifetime && supplyLines.length === 1) {
+    const cur = supplyLines[0];
+    const row = view.supplies.find((r) => r.market === cur.key);
+    const amt = supplyLifetimeInterest(lifetime.get(cur.key), row?.current);
+    if (row && amt != null && amt > DUST && amt < cur.amount) {
+      supplyInterest = {
+        key: "coll-interest",
+        symbol: cur.symbol,
+        amount: amt,
+        usd: usdOf(cur.key, amt),
+        prov: compoundV2SupplyInterestProv(cur.symbol, row.cSymbol),
+      };
+      supplyLines[0] = {
+        ...cur,
+        amount: cur.amount - amt,
+        usd: usdOf(cur.key, cur.amount - amt),
+        prov: compoundV2SupplyNetProv(cur.symbol),
+      };
+    }
+  }
+
   // Value the tower only when EVERY contributing line is oracle-priced — a strict
   // per-total guard. A single unpriced market drops it to the token gated list,
   // so a bar height is never a partial (misleading) USD figure.
@@ -417,6 +470,7 @@ export function computeCompoundV2Economics(
     ...debtExited,
     ...debtLiquidated,
     ...(interest ? [interest] : []),
+    ...(supplyInterest ? [supplyInterest] : []),
   ];
   const valued = contributing.length > 0 && contributing.every((l) => l.usd != null);
 
@@ -445,7 +499,7 @@ export function computeCompoundV2Economics(
     priceKind: valued ? "chain-derived" : undefined,
     collateral: {
       current: supplyLines,
-      interest: null,
+      interest: supplyInterest,
       exited: collExited,
       liquidated: [],
       lifetimeInflow: inflow((r) => r.supplied),

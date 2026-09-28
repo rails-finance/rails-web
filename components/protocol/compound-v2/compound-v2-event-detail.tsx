@@ -2,9 +2,10 @@
 
 // Compound V2 event detail — adapter onto the shared ChainTruthDetail grid.
 // The lanes an event touches, with before→after transitions:
-//   mint/redeem  — the supply PRINCIPAL lane (replayed, amounts-only) AND the
-//                  cToken lane (slot-exact Transfer replay) side by side; the
-//                  two bases are the point, each traced to its own class.
+//   supply rows  — mint, redeem, transfers and seize legs: the supply balance
+//                  (cTokens × exchangeRateStored at the row's block, with the
+//                  interest since the previous supply row beneath it) beside
+//                  the cToken lane (slot-exact Transfer replay).
 //   borrow/repay — the debt lane: after = the EMITTED accountBorrows (interest
 //                  to this moment included), before = ∓ the event's own amount.
 //   transfers    — the cToken lane (a position can arrive or leave by transfer).
@@ -17,7 +18,12 @@
 //                  Transfer — it just wasn't the borrower's act.
 
 import type { CompoundV2Context } from "@/lib/shared/types/event-shape";
-import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import {
+  ChainTruthDetail,
+  reconstructTransition,
+  type ChainTruthStat,
+  type ChainTruthTransition,
+} from "@/components/shared/chain-truth-event";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
 import {
   assetsDeltaProv,
@@ -30,7 +36,8 @@ import {
   liqDebtRepaidProv,
   supplyAfterProv,
   supplyBeforeProv,
-  supplyStoodDownProv,
+  supplyChangeProv,
+  supplyInterestSincePreviousProv,
   cTokensAfterProv,
   cTokensBeforeProv,
   liqAtBlockPriceProv,
@@ -42,7 +49,7 @@ import {
 } from "@/lib/compound-v2/event-provenance";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { compoundV2LiquidationValues } from "@/lib/compound-v2/liquidation-values";
-import { formatNumber, formatUsdValue, formatPrice } from "@/lib/utils/format";
+import { formatCompact, formatExact, formatNumber, formatUsdValue, formatPrice } from "@/lib/utils/format";
 
 export interface CompoundV2EventDetailProps {
   ctx: CompoundV2Context;
@@ -127,6 +134,43 @@ function buildCompoundV2LiqForensics(
   };
 }
 
+/** The supply balance stat on a supply-side row: after, the transition from
+ *  the before at the same block's rate, and the interest since the previous
+ *  supply row. Undefined when the row's block has no rate. */
+function supplyStat(ctx: CompoundV2Context, cSym: string, coords: CompoundV2Coords): ChainTruthStat | undefined {
+  if (ctx.supplyAfter == null || ctx.supplyBefore == null) return undefined;
+  const afterN = Number(ctx.supplyAfter);
+  const beforeN = Number(ctx.supplyBefore);
+  let transition: ChainTruthTransition | undefined;
+  const changeN = afterN - beforeN;
+  if (Number.isFinite(changeN) && changeN !== 0) {
+    const sign = changeN >= 0 ? "+" : "−";
+    transition = {
+      before: formatCompact(beforeN),
+      beforeExact: formatExact(beforeN),
+      beforeProv: supplyBeforeProv(ctx.marketSymbol, cSym, coords),
+      change: `${sign}${formatCompact(Math.abs(changeN))}`,
+      changeExact: `${sign}${formatExact(Math.abs(changeN))}`,
+      changeProv: supplyChangeProv(ctx.marketSymbol, cSym, coords),
+    };
+  }
+  return {
+    label: "Supplied",
+    value: fmt(ctx.supplyAfter),
+    symbol: ctx.marketSymbol,
+    prov: supplyAfterProv(ctx.marketSymbol, cSym, coords, ctx.raw),
+    transition,
+    ...(ctx.interestSincePrevious
+      ? {
+          interestSincePrevious: {
+            value: ctx.interestSincePrevious,
+            prov: supplyInterestSincePreviousProv(ctx.marketSymbol, cSym, coords),
+          },
+        }
+      : {}),
+  };
+}
+
 export function CompoundV2EventDetail({ ctx, txHash, blockNumber, wallet }: CompoundV2EventDetailProps) {
   const market = COMPOUND_V2_MARKET_BY_KEY[ctx.market];
   const cSym = market?.cSymbol ?? `c${ctx.marketSymbol}`;
@@ -139,30 +183,10 @@ export function CompoundV2EventDetail({ ctx, txHash, blockNumber, wallet }: Comp
   };
   const stats: ChainTruthStat[] = [];
 
+  const supply = ctx.side === "supply" ? supplyStat(ctx, cSym, coords) : undefined;
+  if (supply) stats.push(supply);
+
   if (ctx.eventType === "mint" || ctx.eventType === "redeem") {
-    if (ctx.supplyStoodDown) {
-      stats.push({
-        label: "Supplied · principal",
-        value: "Not shown",
-        display: "Not shown — cTokens moved by transfer",
-        dimmed: true,
-        symbol: ctx.marketSymbol,
-        prov: supplyStoodDownProv(ctx.marketSymbol, coords),
-      });
-    } else {
-      stats.push({
-        label: "Supplied · principal",
-        value: fmt(ctx.supplyAfter),
-        symbol: ctx.marketSymbol,
-        prov: supplyAfterProv(ctx.marketSymbol, coords, ctx.raw?.supplyAfter),
-        transition: reconstructTransition({
-          after: ctx.supplyAfter,
-          change: ctx.assetsDelta,
-          changeProv: assetsDeltaProv(ctx.marketSymbol, ctx.eventType, coords, ctx.raw?.amount),
-          beforeProv: supplyBeforeProv(ctx.marketSymbol, coords),
-        }),
-      });
-    }
     stats.push({
       label: "cToken balance",
       value: fmt(ctx.cTokensAfter),
