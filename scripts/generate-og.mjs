@@ -71,6 +71,7 @@ function readRoster() {
     const id = obj.match(/id:\s*"([^"]+)"/);
     const label = obj.match(/label:\s*"([^"]+)"/);
     const chainId = obj.match(/chainId:\s*(\d+)/);
+    const protocolKey = obj.match(/protocolKey:\s*"([^"]+)"/);
     if (!id || !label || !chainId) {
       throw new Error("a SPECS entry is missing id/label/chainId — has ProtocolSpec's shape changed?");
     }
@@ -80,6 +81,11 @@ function readRoster() {
       throw new Error(`roster entry "${id[1]}" is on chain ${chain}, which lib/shared/chains.ts does not name`);
     return {
       id: id[1],
+      // Mirrors ProtocolSpec.protocolKey in lib/shared/protocols.ts: the
+      // stable identity a version shares across its chain rows, defaulting to
+      // `id` (its own entry's row, most of the time). Used below to render one
+      // marquee tile and count one protocol per VERSION, not per chain.
+      protocolKey: protocolKey ? protocolKey[1] : id[1],
       label: chain === 1 ? label[1] : `${label[1]} on ${chainName}`,
       // Omitted means launched (see ProtocolSpec.unlaunched in protocols.ts).
       unlaunched: /unlaunched:\s*true/.test(obj),
@@ -206,6 +212,23 @@ const MARQUEE = [
   "frankencoin",
   "fx",
 ];
+
+// One row per protocol VERSION, not per chain deployment — Aave V3 on
+// Ethereum and Aave V3 on Base share a protocolKey and count once toward the
+// home card's headline and glyph marquee; Aave V3 and Aave V4 do not. Mirrors
+// LAUNCHED_PROTOCOL_VERSIONS in lib/shared/protocols.ts — re-derived here
+// rather than imported, since this script parses the roster as text (see
+// readRoster()'s own note on why).
+function dedupeByProtocolKey(protocols) {
+  const seen = new Set();
+  const versions = [];
+  for (const p of protocols) {
+    if (seen.has(p.protocolKey)) continue;
+    seen.add(p.protocolKey);
+    versions.push(p);
+  }
+  return versions;
+}
 
 // Truth guard: a renamed or removed id must fail the render, not silently show
 // a stale logo. Mirrors readRoster()'s "shape is asserted, not trusted" stance.
@@ -375,11 +398,13 @@ function shellHtml(body) {
 </html>`;
 }
 
-// `protocols` here is the LAUNCHED roster only — the same set app/layout.tsx
-// counts for EXPLORER_COUNT and the same set a reader can reach from the nav.
-// An unlaunched row (the vault layer — see ProtocolSpec.unlaunched)
-// still gets its own explore-<id>.png (below), but doesn't inflate the home
-// card's coverage claim with a door that isn't open yet.
+// `protocols` here is the LAUNCHED roster, deduplicated to one row per
+// protocol VERSION — the same set app/layout.tsx counts for PROTOCOL_COUNT
+// and the same set a reader can reach from the nav. An unlaunched row (the
+// vault layer — see ProtocolSpec.unlaunched) still gets its own
+// explore-<id>.png (below), but doesn't inflate the home card's coverage
+// claim with a door that isn't open yet, and a second-chain row (a `-base`
+// entry) doesn't inflate it with a version already tiled.
 function homeHtml(protocols, glyphs) {
   const byId = new Map(protocols.map((p) => [p.id, p]));
   const shown = MARQUEE.map((id) => byId.get(id));
@@ -437,6 +462,7 @@ async function render(html, out) {
 }
 
 const launchedProtocols = protocols.filter((p) => !p.unlaunched);
-await render(homeHtml(launchedProtocols, glyphs), HOME_OUT);
+const launchedVersions = dedupeByProtocolKey(launchedProtocols);
+await render(homeHtml(launchedVersions, glyphs), HOME_OUT);
 for (const p of protocols) await render(explorerHtml(p, glyphs), cardOut(p.id));
 await browser.close();

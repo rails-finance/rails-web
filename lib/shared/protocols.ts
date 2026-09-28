@@ -45,6 +45,20 @@ type ProtocolSpec = {
    *  table, the coverage matrix and the API and component directories, none of
    *  which the chain axis should have moved. */
   slug: string;
+  /** Stable identity for counting distinct protocol VERSIONS regardless of how
+   *  many chains carry one — Aave V3 on Ethereum and Aave V3 on Base share a
+   *  `protocolKey` and count once toward "N DeFi protocols"; Aave V3 and Aave
+   *  V4 do not, because they are different versions (Miles, 2026-09-28: count
+   *  a version once however many chains it's on, each version separately).
+   *  Omitted defaults to `id`, which is already a version's own stable key for
+   *  every entry that is the only chain row its version ships on. Only a
+   *  second-chain row (a `-base` entry today) needs to state it, naming back
+   *  the id of the row it shares a version with. Not `label`: the two happen
+   *  to match today for every chain-duplicate pair, but a version's identity
+   *  should not depend on two display strings staying equal — this field is
+   *  what SETS that they are the same version, not something a reader of the
+   *  label should have to infer. See `LAUNCHED_PROTOCOL_VERSIONS`. */
+  protocolKey?: string;
   /** Capability tags shown as pills (Borrow / Lend / CDP / …). Provenance
    *  meta-tags like "Chain state" are surfaced elsewhere, not here. */
   tags: string[];
@@ -166,6 +180,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Aave V3",
     chainId: 8453,
     slug: "aave-v3",
+    protocolKey: "aave-v3",
     tags: ["Lend", "Borrow"],
     desc: "Aave V3's Base deployment — a separate Pool with its own reserves and risk parameters, every wallet's account read whole from the contracts, no modeled state",
     subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
@@ -191,6 +206,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Aave V4",
     chainId: 8453,
     slug: "aave-v4",
+    protocolKey: "aave-v4",
     tags: ["Lend", "Borrow"],
     desc: "Aave V4's Base deployment — the Equities hub's Mag7 spoke, where seven Coinbase tokenized stocks back USDC loans, each account read from the spoke and each stock price stated with the time it was published",
     subPages: [{ segment: "hubs", label: "Equities hub", tab: "Hub" }],
@@ -243,6 +259,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Alchemix",
     chainId: 8453,
     slug: "alchemix",
+    protocolKey: "alchemix",
     tags: ["CDP", "Yield"],
     desc: "Alchemix V3's Base deployment — the alUSDb line, every position's debt and collateral replayed from its own events, with the block each figure was settled at stated beside it",
     subPages: [{ segment: "lines", label: "Lines overview", tab: "Lines" }],
@@ -288,6 +305,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Compound V3",
     chainId: 8453,
     slug: "compound-v3",
+    protocolKey: "compound",
     tags: ["Lend", "Borrow"],
     desc: "Compound V3's Base deployment — five Comets read live, and a wallet's standing in every one of them found by asking each market directly",
     subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
@@ -423,6 +441,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Moonwell",
     chainId: 8453,
     slug: "moonwell",
+    protocolKey: "moonwell",
     tags: ["Lend", "Borrow"],
     desc: "Moonwell's Base deployment — twenty-one markets under one Comptroller, every account's standing read from the contracts themselves, no modeled state",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
@@ -448,6 +467,7 @@ const SPECS: ProtocolSpec[] = [
     label: "Morpho Blue",
     chainId: 8453,
     slug: "morpho",
+    protocolKey: "morpho",
     tags: ["Lend", "Borrow"],
     desc: "Morpho Blue's Base deployment — more than 4,300 isolated markets, every borrower position across them listed, and a wallet's whole standing found by asking the singleton directly",
     // MetaMorpho is Morpho's own vault layer, so it is a view of this explorer
@@ -564,6 +584,35 @@ export const PROTOCOLS: ProtocolEntry[] = SPECS.map((spec) => {
  *  reads `PROTOCOLS`. */
 export const LAUNCHED_PROTOCOLS: ProtocolEntry[] = PROTOCOLS.filter((p) => !p.unlaunched);
 
+/** One row per distinct launched protocol VERSION — the roster deduplicated on
+ *  `protocolKey`, keeping the first entry in roster order for each key (so a
+ *  chain-1 row stands for its `-base` sibling). This is what "N DeFi
+ *  protocols" counts: Aave V3 on Ethereum and Aave V3 on Base are one version
+ *  and count once; Aave V3 and Aave V4 (or Compound V2/V3, Liquity V1/V2) are
+ *  different versions and count separately; a fork (Spark, Seamless, Ebisu,
+ *  Asymmetry, Basedollar) is its own protocol, distinct from what it forked.
+ *  Unlaunched entries are excluded, same as `LAUNCHED_PROTOCOLS` — see its own
+ *  note (Miles, 2026-09-28: count a version once however many chains it's on,
+ *  each version separately). Also the source for a labels list that cannot
+ *  print a version twice (StructuredData's `featureList`). */
+export const LAUNCHED_PROTOCOL_VERSIONS: ProtocolEntry[] = (() => {
+  const seen = new Set<string>();
+  const versions: ProtocolEntry[] = [];
+  for (const entry of LAUNCHED_PROTOCOLS) {
+    const key = entry.protocolKey ?? entry.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    versions.push(entry);
+  }
+  return versions;
+})();
+
+/** "23" — the number of distinct DeFi protocol versions Rails has a launched
+ *  explorer for, which is what the home/SEO/share copy states. NOT
+ *  `LAUNCHED_PROTOCOLS.length` (29): that counts one row per chain deployment,
+ *  so it double-counts a version on two chains — see `LAUNCHED_PROTOCOL_VERSIONS`. */
+export const LAUNCHED_PROTOCOL_VERSION_COUNT = LAUNCHED_PROTOCOL_VERSIONS.length;
+
 /** Is this route inside an unlaunched explorer? Takes any path under one — the
  *  listing, a sub-page, a vault, a position, an event — so a surface that has
  *  only a pathname in hand (the work-in-progress strip, a metadata builder)
@@ -597,6 +646,20 @@ export function launchedProductionChains(): ChainMeta[] {
  *  an Oxford comma. */
 export function launchedChainScope(): string {
   const names = launchedProductionChains().map((c) => `${c.name} ${c.layer}`);
+  return names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
+}
+
+/** "Ethereum and Base" — the production chains a protocol-COUNT claim names
+ *  ("N DeFi protocols on Ethereum and Base"), built from the roster rather
+ *  than written out for the reason `launchedChainScope` is. Bare chain names,
+ *  no `L1`/`L2` suffix: unlike `launchedChainScope`'s sentence, which is about
+ *  how deep Rails goes, this one is a headcount, and the layer marker would
+ *  just be noise on it. A testnet (Sepolia, Polaris) is left out here too —
+ *  the copy sites that count it name it on their own, in words, where they
+ *  have room ("…on Ethereum and Base, plus Polaris on Sepolia"), because it is
+ *  one explorer on one chain, not a third production chain the site offers. */
+export function launchedProductionChainNames(): string {
+  const names = launchedProductionChains().map((c) => c.name);
   return names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
 }
 

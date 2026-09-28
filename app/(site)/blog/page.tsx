@@ -1,7 +1,7 @@
 import { BlogCard } from "@/components/blog/BlogCard";
 import { articles } from "./data/articles";
 import type { Metadata } from "next";
-import { SITE_URL } from "@/lib/shared/page-metadata";
+import { HOME_SHARE_IMAGE, SITE_URL } from "@/lib/shared/page-metadata";
 
 export const metadata: Metadata = {
   title: "Blog",
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     description:
       "Insights and updates from the Rails team about DeFi analytics, transaction explanations, and building better support infrastructure.",
     url: `${SITE_URL}/blog`,
-    images: ["/og/home.png"],
+    images: [HOME_SHARE_IMAGE],
   },
 };
 

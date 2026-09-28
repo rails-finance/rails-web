@@ -3,7 +3,12 @@ import { DM_Sans } from "next/font/google";
 import "./globals.css";
 
 import { Providers } from "./providers";
-import { LAUNCHED_PROTOCOLS, launchedProductionChains } from "@/lib/shared/protocols";
+import {
+  LAUNCHED_PROTOCOL_VERSIONS,
+  LAUNCHED_PROTOCOL_VERSION_COUNT,
+  launchedProductionChainNames,
+  launchedProductionChains,
+} from "@/lib/shared/protocols";
 import { IconSymbols } from "@/components/icons/iconSymbols";
 import { HeaderBar } from "@/components/nav/header-bar";
 import { NavigationProgress } from "@/components/nav/navigation-progress";
@@ -37,8 +42,11 @@ export const viewport: Viewport = {
 // The share card's coverage claim, in prose. Both are stated off the roster
 // rather than written out: the previous copy named "Liquity V2 and Aave V4" as
 // what was live, which was true when there were two explorers and untrue for
-// the thirteen that followed. The count is the launched roster's length, and
-// the keywords are its labels, so onboarding an explorer updates them.
+// the thirteen that followed. The count is protocol VERSIONS, not roster
+// rows — a version on two chains (Aave V3 on Ethereum and Base) is one
+// protocol, and Aave V3/Aave V4 are two (Miles, 2026-09-28) — and the
+// keywords are the same deduplicated set's labels, so onboarding an explorer
+// updates them.
 //
 // Every explorer counted here is reachable from this origin — Rails is one
 // site now, the chain being a path segment rather than a hostname (rails-ops
@@ -53,11 +61,15 @@ export const viewport: Viewport = {
 // difference into a blanket claim.
 // The card itself: `scripts/generate-og.mjs` → public/og/home.png.
 //
-// LAUNCHED explorers only, and launched chains only. This copy is the site's
-// own coverage claim: a count that included an explorer nothing links, or a
-// coverage page a reader cannot get to, would advertise a door that is not
-// open. Both come back on their own when the flags come off.
-const EXPLORER_COUNT = LAUNCHED_PROTOCOLS.length;
+// LAUNCHED protocol versions only, and launched chains only. This copy is the
+// site's own coverage claim: a count that included an explorer nothing links,
+// or a coverage page a reader cannot get to, would advertise a door that is
+// not open. Both come back on their own when the flags come off.
+const PROTOCOL_COUNT = LAUNCHED_PROTOCOL_VERSION_COUNT;
+/** "Ethereum and Base" — see `launchedProductionChainNames`. Polaris is named
+ *  separately, in words, where the sentence has room for it: it is one
+ *  explorer on Sepolia, not a third production chain. */
+const PRODUCTION_CHAIN_NAMES = launchedProductionChainNames();
 /** "/coverage/ethereum" — the coverage doors this description points a reader
  *  at, named off the roster rather than written out, so the sentence cannot
  *  cite a page the sitemap has dropped. Production chains only: the sentence
@@ -67,12 +79,12 @@ const COVERAGE_PATHS = launchedProductionChains()
   .map((c) => `/coverage/${c.slug}`)
   .join(" and ");
 
-// No chain is named. Rails spans chains, and marking one would either date the
-// copy or under-claim the rest; the per-chain coverage pages are where that
-// distinction is drawn.
+// No chain is named in the title. Rails spans chains, and marking one would
+// either date the copy or under-claim the rest; the per-chain coverage pages
+// are where that distinction is drawn.
 const SITE_TITLE = "Rails - DeFi Protocol Explorers";
-const OG_DESCRIPTION = `Dedicated explorers for ${EXPLORER_COUNT} DeFi protocols — every position replayed from the protocol's own on-chain events, with a receipt on every number.`;
-const SITE_DESCRIPTION = `Rails builds a dedicated explorer for each of ${EXPLORER_COUNT} DeFi protocols — browse every open position, not just your own. Every number is replayed from the protocol's own on-chain events, with a receipt showing where it came from. How deep each explorer goes is stated per protocol at ${COVERAGE_PATHS}.`;
+const OG_DESCRIPTION = `${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia — every position replayed from the protocol's own on-chain events, with a receipt on every number.`;
+const SITE_DESCRIPTION = `Rails builds a dedicated explorer for each of ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia — browse every open position, not just your own. Every number is replayed from the protocol's own on-chain events, with a receipt showing where it came from. How deep each explorer goes is stated per protocol at ${COVERAGE_PATHS}.`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -90,10 +102,12 @@ export const metadata: Metadata = {
     "Position History",
     "Transaction Analysis",
     "On-chain Provenance",
-    // The production chains a reader can reach from the nav, and the explorers
-    // on them. A testnet is not a keyword anyone searches Rails for.
+    // The production chains a reader can reach from the nav, and the launched
+    // protocol versions on them (one label per version, not one per chain row
+    // — see LAUNCHED_PROTOCOL_VERSIONS). A testnet is not a keyword anyone
+    // searches Rails for.
     ...launchedProductionChains().map((c) => c.name),
-    ...LAUNCHED_PROTOCOLS.map((p) => p.label),
+    ...LAUNCHED_PROTOCOL_VERSIONS.map((p) => p.label),
   ],
   authors: [{ name: "Rails", url: SITE_URL }],
   creator: "Rails",
@@ -112,10 +126,10 @@ export const metadata: Metadata = {
         // fresh rather than served stale from their cache. Bump the hash
         // (`shasum -a 256 public/og/home.png | cut -c1-8`) whenever
         // `node scripts/generate-og.mjs` changes this file's bytes.
-        url: "/og/home-c9f0b163.png",
+        url: "/og/home-c5c8c63e.png",
         width: 1200,
         height: 630,
-        alt: `Explore ${EXPLORER_COUNT} DeFi protocols on Rails`,
+        alt: `Explore ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia`,
       },
     ],
   },
@@ -123,7 +137,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: OG_DESCRIPTION,
-    images: ["/og/home-c9f0b163.png"],
+    images: ["/og/home-c5c8c63e.png"],
     creator: TWITTER_HANDLE,
     site: TWITTER_HANDLE,
   },

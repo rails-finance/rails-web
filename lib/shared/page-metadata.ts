@@ -70,7 +70,14 @@ export const TWITTER_HANDLE = RAILS_X_AT;
 // render fails or the id/wallet has no recorded position (see
 // `lib/share/position-image.ts`).
 
-export const HOME_SHARE_IMAGE = "/og/home.png";
+// Content-hashed: Discord/X/Telegram/Slack cache a link preview by image URL,
+// so a regenerated card needs a new URL to be fetched fresh rather than served
+// stale from their cache. Bump the hash (`shasum -a 256 public/og/home.png |
+// cut -c1-8`) whenever `node scripts/generate-og.mjs` changes that file's
+// bytes — `public/og/home.png` itself stays at its unhashed path too (kept on
+// disk for scripts/verify/verify-share-abuse.mjs's static-file census), and is
+// regenerated in place alongside this hashed copy.
+export const HOME_SHARE_IMAGE = "/og/home-c5c8c63e.png";
 
 /** The share card for an explorer, by roster `id`. Must agree with `cardOut`
  *  in scripts/generate-og.mjs; `npm run check:og` proves every roster card exists. */

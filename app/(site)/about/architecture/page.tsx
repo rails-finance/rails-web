@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
-import { SITE_URL } from "@/lib/shared/page-metadata";
+import { HOME_SHARE_IMAGE, SITE_URL } from "@/lib/shared/page-metadata";
 
 export const metadata: Metadata = {
   title: "Technical Architecture",
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     title: "Technical Architecture — Rails",
     description: "How Rails processes and serves blockchain data accurately, layer by layer.",
     url: `${SITE_URL}/about/architecture`,
-    images: ["/og/home.png"],
+    images: [HOME_SHARE_IMAGE],
   },
 };
 

@@ -20,7 +20,7 @@ import { InfoDisclosure } from "@/components/shared/info-disclosure";
 import { DepthMatrix } from "@/components/coverage/depth-matrix";
 import { CapabilityPill } from "@/components/coverage/capability-sheet";
 import { CoverageDrawerBody } from "@/components/coverage/drawer-body";
-import { SITE_URL } from "@/lib/shared/page-metadata";
+import { HOME_SHARE_IMAGE, SITE_URL } from "@/lib/shared/page-metadata";
 
 // The coverage surface is one page component behind two per-chain routes
 // (/coverage/ethereum, /coverage/base). The toggle at the top links between
@@ -47,7 +47,7 @@ export function coverageMetadata(chainId: ChainId): Metadata {
       title: `Rails Coverage — ${CHAINS[chainId].name}`,
       description: blurb,
       url,
-      images: ["/og/home.png"],
+      images: [HOME_SHARE_IMAGE],
     },
     alternates: { canonical: url },
     // A chain whose every explorer is unlaunched has an unlaunched front door:
