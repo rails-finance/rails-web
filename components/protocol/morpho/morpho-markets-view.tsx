@@ -342,7 +342,7 @@ function NeverFunded({ runs, count, loanSymbol }: { runs: MorphoEmptyRun[]; coun
           title="Each entry's lltv is the immutable market parameter already receipted for the funded markets on the same value (id == keccak(params)); the never-funded roster is listed for completeness, not re-traced per market."
         >
           {runs.map((r) => (
-            <span key={`${r.collateralSymbol ?? "idle"}:${r.lltv}`}>
+            <span key={`${r.collateralToken ?? "idle"}:${r.lltv}`}>
               <span className={r.collateralSymbol && !r.collateralNamed ? "font-mono" : ""}>
                 {r.collateralSymbol ?? "idle"}
               </span>{" "}
