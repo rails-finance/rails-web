@@ -97,6 +97,25 @@ export interface LiquityTroveLive {
   status: string;
 }
 
+/** A liquidated Trove's collateral surplus, read at the head
+ *  (hooks/useLiquityCollSurplus.ts). While `claimable` is above zero the
+ *  terminal card leads with it in place of the two lifetime maxima. */
+export interface LiquityTroveSurplus {
+  /** This Trove's surplus as the liquidation credited it, token units. */
+  surplus: number;
+  surplusRaw: string;
+  /** What the owner can still claim of it — zero once claimed. */
+  claimable: number;
+  claimableRaw: string;
+  decimals: number;
+  /** The branch's CollSurplusPool. */
+  pool: string;
+  /** Head block of the read. */
+  blockNumber: number;
+  /** The claim; block/tx/time null when no log could date it. */
+  claimed: { block: number | null; txHash: string | null; timestamp: number | null } | null;
+}
+
 /** What the card hands a protocol's face-provenance builder — the displayed
  *  figures, so every receipt names the value actually on the face. */
 export interface LiquityFaceProvContext {

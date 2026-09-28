@@ -66,6 +66,7 @@ import {
   LiquityForkClosedExplanation,
 } from "@/components/protocol/liquity-fork/liquity-fork-position-explanation";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
 import { computeEbisuEconomics, ebisuLifetimeWithOpening } from "@/lib/ebisu/economics";
 import {
   liquityForkEconomicsExplanation,
@@ -373,6 +374,14 @@ export default function EbisuTroveDetail({
   // the owner's closeTrove; liquidated = the liquidation), and the seizure legs
   // come from the life's own liquidate event once the timeline lands.
   const lastLiq = ebisuEvents.find((e) => e.context.data.eventType === "liquidate");
+  // The liquidation's surplus at the head: claimable or claimed (the index
+  // records the credit, never the claim).
+  const surplus = useLiquityCollSurplus({
+    protocol: "ebisu",
+    branch: collateralType,
+    owner: view?.status === "liquidated" ? (view.lastOwner ?? view.owner) : null,
+    liquidationTx: lastLiq?.txHash,
+  });
   const terminalPane =
     view && view.status !== "open" ? (
       <LiquityForkClosedExplanation
@@ -389,6 +398,7 @@ export default function EbisuTroveDetail({
               }
             : null
         }
+        surplus={surplus}
         redemptionSource="EbisuBranchManager"
       />
     ) : null;
@@ -427,6 +437,7 @@ export default function EbisuTroveDetail({
             <EbisuPositionCard
               v={view}
               receipts
+              surplus={surplus}
               viewHref={tl.viewHref}
               live={liveRisk ? chain : undefined}
               // The risk slot rides the card's heading-button row (the Aave V3

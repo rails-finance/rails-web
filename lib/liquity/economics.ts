@@ -36,6 +36,7 @@ import {
   collLiquidatedProv,
   collFeesReceivedProv,
   collClaimableProv,
+  collClaimedProv,
   debtCurrentProv,
   debtInterestProv,
   debtRepaidProv,
@@ -341,7 +342,14 @@ export interface LiquityEconomicsResult {
 
 export function computeLiquityEconomics(
   events: MinimalEvent[],
-  opts: { currentPrice?: number; collateralType: string },
+  opts: {
+    currentPrice?: number;
+    collateralType: string;
+    /** The owner has claimed the liquidation surplus (a head read of the
+     *  CollSurplusPool — the index does not see the claim). The surplus then
+     *  leaves the held stack as an exit. */
+    surplusClaimed?: boolean;
+  },
 ): LiquityEconomicsResult | null {
   const baseResult = calculateEconomicsFromEvents(events);
   const redeemer = calculateRedeemerStats(events);
@@ -477,9 +485,12 @@ export function computeLiquityEconomics(
       ? [line("coll-fees-received", collateralSymbol, feesReceivedColl, collFeesReceivedProv, "Fees received")]
       : [];
   const collClaimable: TowerLine[] =
-    claimableSurplus > DUST
+    claimableSurplus > DUST && !opts.surplusClaimed
       ? [line("coll-claimable", collateralSymbol, claimableSurplus, collClaimableProv, "Claimable")]
       : [];
+  if (claimableSurplus > DUST && opts.surplusClaimed) {
+    collExited.push(line("coll-claimed", collateralSymbol, claimableSurplus, collClaimedProv, "Surplus claimed"));
+  }
 
   // ── Debt side ────────────────────────────────────────────────────────
   // The shared tower stacks `current` + `interest` as the "currently owed"

@@ -58,6 +58,12 @@ export const collClaimableProv: Provenance = flow({
   formula: "Σ liquidation collateral surplus",
 });
 
+export const collClaimedProv: Provenance = flow({
+  summary:
+    "Surplus claimed — the collateral left over once a liquidation had covered the trove's debt, which the owner has since claimed from the branch's CollSurplusPool.",
+  formula: "Σ liquidation collateral surplus",
+});
+
 export const debtCurrentProv: Provenance = {
   kind: "derived",
   summary:

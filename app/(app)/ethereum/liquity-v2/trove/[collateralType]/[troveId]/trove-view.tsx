@@ -27,6 +27,7 @@ import { TroveStateData, TroveStateResponse } from "@/types/api/troveState";
 import { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
 import { useTroveUiState } from "@/hooks/useTroveUiState";
 import { useDebtInFront } from "@/hooks/useDebtInFront";
+import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
 import { useWalletContext } from "@/components/nav/wallet-context";
 
 import { fetchTroveTimeline } from "@/lib/api/fetch-timeline";
@@ -305,6 +306,19 @@ export default function TroveView({
       .sort((a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp || logIndex(a) - logIndex(b));
   }, [events]);
 
+  // A liquidated trove's surplus: claimable or claimed, read at the head
+  // (the index records the credit, never the claim).
+  const lastLiquidation = useMemo(
+    () => [...liquityEvents].reverse().find((e) => e.context.data.operation === "liquidate"),
+    [liquityEvents],
+  );
+  const surplus = useLiquityCollSurplus({
+    protocol: "liquity-v2",
+    branch: collateralType,
+    owner: troveData?.status === "liquidated" ? effectiveOwner : null,
+    liquidationTx: lastLiquidation?.txHash,
+  });
+
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - liquityEvents.length) : 0;
   const tl = useTimelineEvents(liquityEvents, {
     storageKey: `liquity-v2-${troveKey}`,
@@ -473,6 +487,7 @@ export default function TroveView({
           summaryExplanationOpen={summaryExplanationOpen}
           onToggleSummaryExplanation={setSummaryExplanationOpen}
           viewHref={tl.viewHref}
+          surplus={surplus}
           loadingStatus={{
             message: getEnhancementStatus(),
             snapshotDate: lastEventTs ?? undefined,
@@ -489,6 +504,7 @@ export default function TroveView({
           const result = computeLiquityEconomics(tl.sortedEvents, {
             currentPrice,
             collateralType: troveData.collateralType,
+            surplusClaimed: surplus?.claimed != null,
           });
           if (!result) return null;
           return (
@@ -496,7 +512,12 @@ export default function TroveView({
               <ChainTruthTower
                 data={result.data}
                 title="Lifetime flows"
-                explanation={liquityEconomicsExplanation(result.economics, result.economics._meta, currentPrice)}
+                explanation={liquityEconomicsExplanation(
+                  result.economics,
+                  result.economics._meta,
+                  currentPrice,
+                  surplus?.claimed != null,
+                )}
                 learnMore={liquityEconomicsContent({ isBatched: result.economics._meta.isInBatch })}
                 rowExtra={liquityRedemptionOutcome(result.economics, currentPrice)}
               />

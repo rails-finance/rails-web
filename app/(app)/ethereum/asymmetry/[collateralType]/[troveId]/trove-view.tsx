@@ -66,6 +66,7 @@ import {
   LiquityForkClosedExplanation,
 } from "@/components/protocol/liquity-fork/liquity-fork-position-explanation";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
 import { computeAsymmetryEconomics, asymmetryLifetimeWithOpening } from "@/lib/asymmetry/economics";
 import {
   liquityForkEconomicsExplanation,
@@ -371,6 +372,14 @@ export default function AsymmetryTroveDetail({
   // the owner's closeTrove; liquidated = the liquidation), and the seizure legs
   // come from the life's own liquidate event once the timeline lands.
   const lastLiq = asymmetryEvents.find((e) => e.context.data.eventType === "liquidate");
+  // The liquidation's surplus at the head: claimable or claimed (the index
+  // records the credit, never the claim).
+  const surplus = useLiquityCollSurplus({
+    protocol: "asymmetry",
+    branch: collateralType,
+    owner: view?.status === "liquidated" ? (view.lastOwner ?? view.owner) : null,
+    liquidationTx: lastLiq?.txHash,
+  });
   const terminalPane =
     view && view.status !== "open" ? (
       <LiquityForkClosedExplanation
@@ -379,6 +388,7 @@ export default function AsymmetryTroveDetail({
         debtSymbol={DEBT_SYMBOL}
         peakCollateral={view.peakCollateral}
         peakDebt={view.peakDebt}
+        surplus={surplus}
         seizure={
           lastLiq
             ? {
@@ -424,6 +434,7 @@ export default function AsymmetryTroveDetail({
             <AsymmetryPositionCard
               v={view}
               receipts
+              surplus={surplus}
               viewHref={tl.viewHref}
               live={liveRisk ? chain : undefined}
               // The risk slot rides the card's heading-button row (the Aave V3
