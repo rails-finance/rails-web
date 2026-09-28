@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useContext, useId } from "react";
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
 import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
@@ -10,6 +10,10 @@ import { isCardOpen, setCardOpen } from "@/lib/shared/card-open-store";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
 import type { UnreadToken } from "@/lib/shared/types/event-shape";
+import { EventCaptionContext, SpineRowContext, useSpineView } from "@/components/shared/mobile-spine";
+import { EventDateContext } from "@/components/shared/event-time";
+import { shortDate, shortDateYear } from "@/lib/shared/format-event";
+import { formatDate } from "@/lib/date";
 
 /** The Explanation of an event naming a token whose decimals did not load: its
  *  prose states amounts, so it waits for the chain in full. */
@@ -77,6 +81,9 @@ export interface EventCardProps {
    *  and inside a folder the dimmed rows read as disabled, not as quieter
    *  (Miles, 2026-09-02). */
   muted?: boolean;
+  /** The phone spine view's caption kind, where the card's label differs from
+   *  the event's `actionLabel` (which the timeline provides by default). */
+  caption?: string;
 }
 
 /* ── EventCard ───────────────────────────────────────────────────────── */
@@ -103,6 +110,7 @@ export function EventCard({
   hideDetailChevron,
   persistKey,
   muted,
+  caption,
 }: EventCardProps) {
   const scale = useTimelineScale();
   const singleWallet = useSingleWallet();
@@ -115,7 +123,21 @@ export function EventCard({
   const [detailOpenInternal, setDetailOpenInternal] = useState(false);
 
   const isControlled = detailOpenProp !== undefined;
-  const showDetail = isControlled ? detailOpenProp : detailOpenInternal;
+
+  // ── The phone spine view (components/shared/mobile-spine.tsx) ─────────
+  // A card with a detail panel draws as its spine segment and caption, one
+  // button; the panel opens under it, one card open on the timeline at a
+  // time. Rows without a panel (runs and folders) keep the list layout.
+  const spineView = useSpineView();
+  const captionCtx = useContext(EventCaptionContext);
+  const reactId = useId();
+  const cardId = persistKey ?? reactId;
+  const hasPanel = detail != null || !!detailLoading || !!detailError;
+  const spine = spineView && hasPanel && !hideDetailChevron && captionCtx ? spineView : null;
+  const spineOpen = !!spine && spine.openId === cardId;
+  const [spokenLegs, setSpokenLegs] = useState<string | null>(null);
+
+  const showDetail = spine ? spineOpen : isControlled ? detailOpenProp : detailOpenInternal;
 
   // ── Receipts scope — the inspector's per-card roster ──────────────────
   // Every <Prov> value inside this card reports into a per-card registry; the
@@ -150,9 +172,11 @@ export function EventCard({
   const explainerTeaser = unread ? undefined : explainerTeaserProp;
   const explainer = unread && explainerProp != null ? <ExplanationNotLoaded tokens={unread} /> : explainerProp;
 
-  const hasDetail = detail != null || detailLoading || detailError;
+  const hasDetail = hasPanel;
   const hasExplainer = explainer != null;
-  const showChevron = hasDetail && !hideDetailChevron;
+  // In the spine view the segment is the control, so the header is not one.
+  const headerToggles = !hideDetailChevron && !spine;
+  const showChevron = hasDetail && headerToggles;
 
   /* ── Info sections — the headings are the buttons ────────────────── */
   // The story (Explanation, (i) disc): the heading-button expands the shared
@@ -200,14 +224,14 @@ export function EventCard({
         }`}
       >
         <div
-          className={hideDetailChevron ? "" : "group/evt cursor-pointer"}
+          className={headerToggles ? "group/evt cursor-pointer" : ""}
           onClick={() => {
-            if (hasDetail && !hideDetailChevron) toggleDetail();
+            if (hasDetail && headerToggles) toggleDetail();
           }}
-          role={hideDetailChevron ? undefined : "button"}
-          tabIndex={hideDetailChevron ? undefined : 0}
+          role={headerToggles ? "button" : undefined}
+          tabIndex={headerToggles ? 0 : undefined}
           onKeyDown={(e) => {
-            if ((e.key === "Enter" || e.key === " ") && hasDetail && !hideDetailChevron) {
+            if ((e.key === "Enter" || e.key === " ") && hasDetail && headerToggles) {
               e.preventDefault();
               toggleDetail();
             }
@@ -298,6 +322,72 @@ export function EventCard({
       )}
     </div>
   );
+
+  if (spine && captionCtx) {
+    const kind = caption ?? captionCtx.kind;
+    const labelId = `${reactId}-label`;
+    const spokenCaption = `${kind}, ${formatDate(captionCtx.ts)}`;
+    const regionId = `${reactId}-card`;
+    const captionNode = (
+      <span
+        aria-hidden
+        className={`block max-w-full truncate px-2 text-xs leading-5 ${spineOpen ? "text-foreground" : "text-rb-500"}`}
+        style={{ backgroundColor: "var(--background)" }}
+      >
+        {kind} &middot; {shortDate(captionCtx.ts)} {shortDateYear(captionCtx.ts)}
+      </span>
+    );
+    return (
+      <ProvReceiptsScope registry={registry}>
+        <div
+          data-skel-section="detail-event"
+          className={`flex w-full flex-col relative ${scale.cardRounded}`}
+          style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
+        >
+          {/* The segment, its flank values and its caption are one button. The
+              glyphs are hidden from screen readers and inert to the pointer;
+              the button's name is the caption and the legs the spine column
+              reports ("Repay, 6 Feb 2026: 7,500 BOLD repaid"). */}
+          <button
+            type="button"
+            data-spine-toggle=""
+            aria-expanded={spineOpen}
+            aria-controls={spineOpen ? regionId : undefined}
+            aria-label={spokenLegs ? `${spokenCaption}: ${spokenLegs}` : spokenCaption}
+            onClick={(e) => spine.toggle(cardId, e.currentTarget)}
+            className="hidden w-full min-h-11 cursor-pointer items-stretch justify-center rounded-xl text-left mspine:max-sm:flex focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+          >
+            <span aria-hidden className="pointer-events-none flex w-full items-stretch justify-center">
+              <SpineRowContext.Provider value={{ caption: captionNode, setLegs: setSpokenLegs }}>
+                {iconColumn}
+              </SpineRowContext.Provider>
+            </span>
+            <span id={labelId} hidden>
+              {spokenCaption}
+            </span>
+          </button>
+          {spineOpen && (
+            <div
+              role="region"
+              id={regionId}
+              aria-labelledby={labelId}
+              data-spine-card={cardId}
+              // Positioned, so it paints over the line running down from the
+              // segment above it.
+              className="relative mt-2 w-full"
+            >
+              {/* The opened card states its date in full: the caption above
+                  it drops the time, and the list's once-a-day prefix does not
+                  apply to a card read alone. */}
+              <EventDateContext.Provider value={`${shortDate(captionCtx.ts)} ${shortDateYear(captionCtx.ts)}`}>
+                {contentTiers}
+              </EventDateContext.Provider>
+            </div>
+          )}
+        </div>
+      </ProvReceiptsScope>
+    );
+  }
 
   return (
     <ProvReceiptsScope registry={registry}>

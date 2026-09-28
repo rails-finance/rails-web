@@ -106,6 +106,12 @@ function getOperationStyle(operation: string, ctx?: LiquityContext): OperationSt
   }
 }
 
+/** The event's kind as the header names it ("Withdraw + Repay", "Redemption").
+ *  The phone spine view's caption uses it. */
+export function liquityOperationLabel(ctx: LiquityContext): string {
+  return getOperationStyle(ctx.operation, ctx).label;
+}
+
 function formatNumber(n: number): string {
   if (Math.abs(n) < 0.01) return "0";
   if (Math.abs(n) >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
@@ -348,7 +354,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
             // reduced — mirroring the Aave liquidation header grammar.
             <>
               <span
-                className={`sm:hidden inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
+                className={`sm:hidden mspine:max-sm:hidden inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
               >
                 {style.label}
               </span>
@@ -391,7 +397,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
             // (rb-500); the red spine alone carries the critical valence.
             <>
               <span
-                className={`sm:hidden inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
+                className={`sm:hidden mspine:max-sm:hidden inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
               >
                 {style.label}
               </span>

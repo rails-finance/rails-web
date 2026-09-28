@@ -7,7 +7,7 @@ import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { fmtSpine } from "@/components/shared/activity-timeline";
 import { Facehash } from "@/components/shared/facehash";
-import { LiquityEventHeader } from "./liquity-event-header";
+import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-header";
 import { LiquityEventDetail } from "./liquity-event-detail";
 import { LiquityEventExplainer, getLiquityExplainerTeaser, liquityLearnMoreContent } from "./liquity-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -187,6 +187,7 @@ export function LiquityEventCard({
                 symbol: ctx.collateralType,
                 address: soleFlowAddress(event.flows, ctx.collateralType),
                 direction: collDir,
+                verb: collDir === "left" ? "withdrawn" : "added",
                 value: collVal,
                 prov: collVal != null ? collProv : undefined,
               },
@@ -198,6 +199,7 @@ export function LiquityEventCard({
                 symbol: "BOLD",
                 address: soleFlowAddress(event.flows, "BOLD"),
                 direction: boldDir,
+                verb: boldDir === "left" ? "borrowed" : "repaid",
                 value: debtVal,
                 prov: debtVal != null ? debtProv : undefined,
               },
@@ -262,6 +264,7 @@ export function LiquityEventCard({
       txHash={event.txHash}
       learnMore={<LearnMore inline content={liquityLearnMoreContent(ctx)} />}
       persistKey={`liquity-v2:${event.id}`}
+      caption={liquityOperationLabel(ctx)}
     />
   );
 }

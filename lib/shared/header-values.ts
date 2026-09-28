@@ -23,7 +23,9 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 // floor. The sm breakpoint matches the card's own detail-grid breakpoint, so the
 // spine and the card body reflow together.
 
-const HIDE_CLASS = "sm:hidden";
+// The phone spine view (components/shared/mobile-spine.tsx) draws the flank
+// values below sm too, so its opened card hides them the same way.
+const HIDE_CLASS = "sm:hidden mspine:max-sm:hidden";
 
 export function useHeaderValueHideClass(opts?: { isPassive?: boolean }): string {
   const { showTimelineValues } = useTimelineDisplay();

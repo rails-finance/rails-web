@@ -103,6 +103,13 @@ import {
 } from "@/lib/shared/timeline-folder";
 import { TimelineRunCard } from "@/components/shared/timeline-run-card";
 import { EventDateContext } from "@/components/shared/event-time";
+import {
+  EventCaptionContext,
+  SpineKeyRow,
+  SpineViewProvider,
+  useSpineViewActive,
+  type MobileSpineConfig,
+} from "@/components/shared/mobile-spine";
 import { dayKey, shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { EventShareProvider } from "@/components/shared/event-share-context";
 import { setCardOpen } from "@/lib/shared/card-open-store";
@@ -140,7 +147,8 @@ function clickToOpenIfClosed(id: string): void {
   if (typeof document === "undefined") return;
   const wrapper = document.getElementById(`event-${id}`);
   if (!wrapper || wrapper.querySelector(".rounded-b-xl.bg-raised")) return;
-  const toggle = wrapper.querySelector('[role="button"]');
+  // The spine view's segment button first: there the header is not a control.
+  const toggle = wrapper.querySelector('[data-spine-toggle], [role="button"]');
   if (toggle instanceof HTMLElement) toggle.click();
 }
 
@@ -446,6 +454,10 @@ export interface ChainTruthTimelineProps {
    *  panel on 2026-09-25 (live's form with dev's reach) and
    *  `timeline-segment-picker.tsx` went with the ruling. */
   segments?: TimelineSegments;
+  /** Opts this timeline into the phone spine view, behind `?timeline=spine`
+   *  (components/shared/mobile-spine.tsx). Omit it and the flag does nothing
+   *  here. Families are added one at a time after a 390px sweep. */
+  mobileSpine?: MobileSpineConfig;
 }
 
 export interface TimelineSegments {
@@ -618,6 +630,7 @@ function ChainTruthTimelineBody({
   persistKeyPrefix,
   closed,
   segments,
+  mobileSpine,
 }: ChainTruthTimelineProps) {
   // Run-collapse is a display preference: flag off ⇒ no run specs reach the
   // rows memo, so it maps events straight to lone cards (the plain
@@ -703,6 +716,8 @@ function ChainTruthTimelineBody({
   const routeParams = useParams<{ eventId?: string | string[] }>();
   const rawEventId = Array.isArray(routeParams?.eventId) ? routeParams.eventId[0] : routeParams?.eventId;
   const pinnedId = rawEventId != null ? decodeEventId(rawEventId) : null;
+  // The phone spine view: never on a pinned page, which shows one card open.
+  const spineActive = useSpineViewActive(pinnedId ? undefined : mobileSpine);
   const chainId = useChainId();
   // The query params that are part of WHICH position this is, not view state:
   // Aave V3's `?market=` (Core vs Prime is a different account), Liquity V1's
@@ -1232,43 +1247,45 @@ function ChainTruthTimelineBody({
       value={opts?.datePrefix !== undefined ? opts.datePrefix : datePrefixAt(flatIdx)}
     >
       <EventShareProvider href={shareHrefFor(event.id)}>
-        {/* The scroll/highlight target for a `?at=` landing (and, in pinned
+        <EventCaptionContext.Provider value={{ kind: event.actionLabel, ts: event.timestamp }}>
+          {/* The scroll/highlight target for a `?at=` landing (and, in pinned
             mode below, for the lone card) — `id` for `getElementById`,
             `data-event-id` as the brief's documented alternative for anything
             that prefers a data-attribute query. The ring fades over the
             `duration-[2000ms]` already on the wrapper; `highlightId` is only
             ever set when `prefers-reduced-motion` did NOT ask for none. */}
-        {/* The tip reaches the card's own <SpineColumn> through context: a
+          {/* The tip reaches the card's own <SpineColumn> through context: a
             member of an expanded run re-provides null, so the run's folder
             node above it keeps the one dot. */}
-        <SpineTipContext.Provider
-          value={!closed && !opts?.inRun && !liveHoldsTip && event.id === tipEventId ? tipSide : null}
-        >
-          <div
-            id={`event-${event.id}`}
-            data-event-id={event.id}
-            data-row-at={event.timestamp}
-            className={`rounded-xl transition-shadow duration-[2000ms] ${
-              highlightId === event.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
-            }`}
+          <SpineTipContext.Provider
+            value={!closed && !opts?.inRun && !liveHoldsTip && event.id === tipEventId ? tipSide : null}
           >
-            <UnreadTokensProvider tokens={event.decimalsUnread}>
-              {renderCard(event, {
-                eventNumber: opts?.eventNumber ?? tl.eventNumberOf(event),
-                // Line ends only — the dot is the tip's (see `tipEventId`).
-                // Inside an expanded run the LAST member still owns the spine
-                // terminus so the dotted segment ends where the timeline does.
-                // Suppressed at the top when a live note now sits there
-                // instead — see `liveSlotAtTop`.
-                isFirst: flatIdx === 0 && !opts?.inRun && !topTerminusTaken,
-                isLast:
-                  opts?.isLastMember !== undefined
-                    ? opts.isLastMember
-                    : flatIdx === events.length - 1 && !bottomTerminusTaken,
-              })}
-            </UnreadTokensProvider>
-          </div>
-        </SpineTipContext.Provider>
+            <div
+              id={`event-${event.id}`}
+              data-event-id={event.id}
+              data-row-at={event.timestamp}
+              className={`rounded-xl transition-shadow duration-[2000ms] ${
+                highlightId === event.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
+              }`}
+            >
+              <UnreadTokensProvider tokens={event.decimalsUnread}>
+                {renderCard(event, {
+                  eventNumber: opts?.eventNumber ?? tl.eventNumberOf(event),
+                  // Line ends only — the dot is the tip's (see `tipEventId`).
+                  // Inside an expanded run the LAST member still owns the spine
+                  // terminus so the dotted segment ends where the timeline does.
+                  // Suppressed at the top when a live note now sits there
+                  // instead — see `liveSlotAtTop`.
+                  isFirst: flatIdx === 0 && !opts?.inRun && !topTerminusTaken,
+                  isLast:
+                    opts?.isLastMember !== undefined
+                      ? opts.isLastMember
+                      : flatIdx === events.length - 1 && !bottomTerminusTaken,
+                })}
+              </UnreadTokensProvider>
+            </div>
+          </SpineTipContext.Provider>
+        </EventCaptionContext.Provider>
       </EventShareProvider>
     </EventDateContext.Provider>
   );
@@ -1356,49 +1373,52 @@ function ChainTruthTimelineBody({
     // 70 rows showed 7 of its 9 price-gap notes, and the two absent ones were
     // read as a defect in the rule for a day). The toolbar pill states the
     // whole count throughout; these two say when the list agrees with it.
-    <div
-      className="space-y-3"
-      data-timeline-rows-drawn={Math.min(windowSize, rows.length)}
-      data-timeline-rows-loaded={rows.length}
-    >
-      {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder). */}
-      <div data-skel-section="detail-timeline-header">
-        <TimelineToolbar
-          tl={toolbarTl}
-          displayItems={items}
-          leading={toolbarLeading}
-          countTooltip={countTooltip}
-          marketNoteCount={marketNoteCount}
-          marketNotesOn={showMarketNotes}
-          onToggleMarketNotes={() => toggleDisplay("showMarketNotes")}
-          // The navigator prototype's marks (`?nav=1`). Reduced here — this is
-          // where the notes it marks are anchored — and handed to the toolbar,
-          // which owns the Date button the panel now hangs from. The panel
-          // used to stand as a sibling of the rows; it floats over them now.
-          monthReach={
-            segments
-              ? {
-                  lifeDays: segments.lifeDays,
-                  month: segments.month,
-                  onReach: segments.onPick,
-                  onReset: segments.onReset,
-                }
-              : undefined
-          }
-        />
-      </div>
-      {notice}
-      {/* A `?at=` landing whose id never turned up in `tl.sortedEvents` — the
+    <SpineViewProvider active={spineActive}>
+      <div
+        className="space-y-3"
+        data-timeline-rows-drawn={Math.min(windowSize, rows.length)}
+        data-timeline-rows-loaded={rows.length}
+        data-mview={spineActive ? "spine" : undefined}
+      >
+        {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder). */}
+        <div data-skel-section="detail-timeline-header">
+          <TimelineToolbar
+            tl={toolbarTl}
+            displayItems={items}
+            leading={toolbarLeading}
+            countTooltip={countTooltip}
+            marketNoteCount={marketNoteCount}
+            marketNotesOn={showMarketNotes}
+            onToggleMarketNotes={() => toggleDisplay("showMarketNotes")}
+            // The navigator prototype's marks (`?nav=1`). Reduced here — this is
+            // where the notes it marks are anchored — and handed to the toolbar,
+            // which owns the Date button the panel now hangs from. The panel
+            // used to stand as a sibling of the rows; it floats over them now.
+            monthReach={
+              segments
+                ? {
+                    lifeDays: segments.lifeDays,
+                    month: segments.month,
+                    onReach: segments.onPick,
+                    onReset: segments.onReset,
+                  }
+                : undefined
+            }
+          />
+        </div>
+        {notice}
+        {/* A `?at=` landing whose id never turned up in `tl.sortedEvents` — the
           list otherwise renders exactly as it would have without `at`. */}
-      {landingNotFoundId && <EventNotFoundNotice id={landingNotFoundId} chainId={chainId} />}
-      {/* The month being loaded: a skeleton sized from its days, under its
+        {landingNotFoundId && <EventNotFoundNotice id={landingNotFoundId} chainId={chainId} />}
+        {/* The month being loaded: a skeleton sized from its days, under its
           label, in place of the rows (0019, amendment 2026-09-24, rule 3). */}
-      {segments?.loading != null ? (
-        <SegmentSkeleton monthIdx={segments.loading} lifeDays={segments.lifeDays} />
-      ) : rows.length > 0 ? (
-        <>
-          <div className="flex flex-col gap-2">
-            {/* The top is the NEWEST end, so the only omission that can stand
+        {segments?.loading != null ? (
+          <SegmentSkeleton monthIdx={segments.loading} lifeDays={segments.lifeDays} />
+        ) : rows.length > 0 ? (
+          <>
+            <div className="flex flex-col gap-2">
+              {spineActive && mobileSpine && <SpineKeyRow config={mobileSpine} />}
+              {/* The top is the NEWEST end, so the only omission that can stand
                 here is the TIP's — drawn when the newest events the page holds
                 are filtered out, so the row below is not the newest and the
                 pulsing dot has been withheld from it. The cut's glyph and the
@@ -1407,118 +1427,125 @@ function ChainTruthTimelineBody({
                 Above everything in the head slot as well as the rows — the
                 glyph is the end of the drawn spine, and the spine is the
                 account's events. */}
-            {tipBoundaryAtTop && <TimelineBoundaryRow kind="tip" isFirst isLast={false} />}
-            {/* The live window is the head row: it ends at now, so it stands
+              {tipBoundaryAtTop && <TimelineBoundaryRow kind="tip" isFirst isLast={false} />}
+              {/* The live window is the head row: it ends at now, so it stands
                 above the live notes and takes the lead-in dot. The notes
                 toggle does not reach it — it is not a note (see `liveWindow`). */}
-            {liveWindow && (
-              <SpineTipContext.Provider value={tipSide}>
-                {liveWindow({ isFirst: !tipBoundaryAtTop })}
-              </SpineTipContext.Provider>
-            )}
-            {liveSkeletonAtTop && <SkeletonBlock height={LIVE_NOTE_SKELETON_HEIGHT} />}
-            {liveSlotAtTop &&
-              liveRowsShown.map((note, i) => (
-                <SpineTipContext.Provider key={`live_${note.id}`} value={i === 0 && !liveWindowAtTop ? tipSide : null}>
-                  <MarketNoteRow
-                    note={note}
-                    isFirst={i === 0 && !tipBoundaryAtTop && !liveWindowAtTop}
-                    isLast={false}
-                  />
+              {liveWindow && (
+                <SpineTipContext.Provider value={tipSide}>
+                  {liveWindow({ isFirst: !tipBoundaryAtTop })}
                 </SpineTipContext.Provider>
-              ))}
-            {windowed.map((row, rowIdx) => {
-              const rowNode =
-                row.kind === "event" ? (
-                  renderEventRow(row.event, row.flatIdx)
-                ) : row.kind === "folder" ? (
+              )}
+              {liveSkeletonAtTop && <SkeletonBlock height={LIVE_NOTE_SKELETON_HEIGHT} />}
+              {liveSlotAtTop &&
+                liveRowsShown.map((note, i) => (
                   <SpineTipContext.Provider
-                    key={`folder_${row.folder.responseId}`}
-                    // The folder's own node is the tip when the folder IS the
-                    // newest row; its members re-provide null, so one dot.
-                    value={!liveHoldsTip && rowIdx === tipRowIdx ? tipSide : null}
+                    key={`live_${note.id}`}
+                    value={i === 0 && !liveWindowAtTop ? tipSide : null}
                   >
-                    {/* The folder's newest moment (see `data-row-at`). */}
-                    <div data-row-at={row.folder.lastAt}>
-                      <ServedFolderRow
-                        folder={row.folder}
-                        register={folderRegister as ServedFolderRegister}
-                        forceOpen={
-                          openFilteredFolders || splitByFilter(row) || row.folder.responseId === landedFolderId
-                        }
-                        memberPasses={tl.isFiltered ? tl.memberPasses : null}
-                        onlyDates={
-                          tl.dateRange !== null &&
-                          tl.visibleActionKeys.size === tl.eventOptions.length &&
-                          tl.visibleAssetKeys.size === tl.assetOptions.length &&
-                          tl.visibleCounterpartyKeys.size === tl.counterpartyOptions.length &&
-                          tl.visibleVersionKeys.size === tl.versionOptions.length
-                        }
-                        // A served folder has no run around it to scope its
-                        // spine termini to, so its place in the displayed list
-                        // is the whole answer — suppressed at either end where
-                        // a live note or the boundary card now sits there.
-                        isFirst={folderTerminus(rowIdx, rows.length).isFirst && !topTerminusTaken}
-                        isLast={folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken}
-                        renderMember={(event, eventNumber, isLastMember) =>
-                          renderEventRow(event, row.flatIdx, {
-                            inRun: true,
-                            eventNumber,
-                            // A member's own day, read off the member itself:
-                            // `datePrefixAt` indexes the flat displayed list,
-                            // and a folder's members are not in it.
-                            datePrefix: `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`,
-                            isLastMember:
-                              isLastMember && folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken,
-                          })
-                        }
-                      />
-                    </div>
+                    <MarketNoteRow
+                      note={note}
+                      isFirst={i === 0 && !tipBoundaryAtTop && !liveWindowAtTop}
+                      isLast={false}
+                    />
                   </SpineTipContext.Provider>
-                ) : (
-                  <SpineTipContext.Provider
-                    key={`run_${row.events[0].id}`}
-                    // The run's own folder node is the tip when the newest
-                    // event is among its members; the members re-provide null.
-                    value={!liveHoldsTip && row.events.some((e) => e.id === tipEventId) ? tipSide : null}
+                ))}
+              {windowed.map((row, rowIdx) => {
+                const rowNode =
+                  row.kind === "event" ? (
+                    renderEventRow(row.event, row.flatIdx)
+                  ) : row.kind === "folder" ? (
+                    <SpineTipContext.Provider
+                      key={`folder_${row.folder.responseId}`}
+                      // The folder's own node is the tip when the folder IS the
+                      // newest row; its members re-provide null, so one dot.
+                      value={!liveHoldsTip && rowIdx === tipRowIdx ? tipSide : null}
+                    >
+                      {/* The folder's newest moment (see `data-row-at`). */}
+                      <div data-row-at={row.folder.lastAt}>
+                        <ServedFolderRow
+                          folder={row.folder}
+                          register={folderRegister as ServedFolderRegister}
+                          forceOpen={
+                            openFilteredFolders || splitByFilter(row) || row.folder.responseId === landedFolderId
+                          }
+                          memberPasses={tl.isFiltered ? tl.memberPasses : null}
+                          onlyDates={
+                            tl.dateRange !== null &&
+                            tl.visibleActionKeys.size === tl.eventOptions.length &&
+                            tl.visibleAssetKeys.size === tl.assetOptions.length &&
+                            tl.visibleCounterpartyKeys.size === tl.counterpartyOptions.length &&
+                            tl.visibleVersionKeys.size === tl.versionOptions.length
+                          }
+                          // A served folder has no run around it to scope its
+                          // spine termini to, so its place in the displayed list
+                          // is the whole answer — suppressed at either end where
+                          // a live note or the boundary card now sits there.
+                          isFirst={folderTerminus(rowIdx, rows.length).isFirst && !topTerminusTaken}
+                          isLast={folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken}
+                          renderMember={(event, eventNumber, isLastMember) =>
+                            renderEventRow(event, row.flatIdx, {
+                              inRun: true,
+                              eventNumber,
+                              // A member's own day, read off the member itself:
+                              // `datePrefixAt` indexes the flat displayed list,
+                              // and a folder's members are not in it.
+                              datePrefix: `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`,
+                              isLastMember:
+                                isLastMember && folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken,
+                            })
+                          }
+                        />
+                      </div>
+                    </SpineTipContext.Provider>
+                  ) : (
+                    <SpineTipContext.Provider
+                      key={`run_${row.events[0].id}`}
+                      // The run's own folder node is the tip when the newest
+                      // event is among its members; the members re-provide null.
+                      value={!liveHoldsTip && row.events.some((e) => e.id === tipEventId) ? tipSide : null}
+                    >
+                      <UnreadTokensProvider tokens={unreadTokensIn(row.events)}>
+                        {wrapRunRow(
+                          row,
+                          row.spec.render(row.events, {
+                            isFirst: row.flatIdx === 0 && !topTerminusTaken,
+                            isLast: row.flatIdx + row.events.length === events.length && !bottomTerminusTaken,
+                            children: row.events.map((e, k) => renderEventRow(e, row.flatIdx + k, { inRun: true })),
+                          }),
+                        )}
+                      </UnreadTokensProvider>
+                    </SpineTipContext.Provider>
+                  );
+                const rowNotes = notesFor(row);
+                if (rowNotes.length === 0) return rowNode;
+                // Below is older, so a note FOLLOWS the event it is known to
+                // have happened before. The row itself is untouched — this only
+                // wraps it.
+                const rowLastIdx = row.kind === "run" ? row.flatIdx + row.events.length - 1 : row.flatIdx;
+                const noteRows = rowNotes.map((note) => (
+                  <MarketNoteRow
+                    key={`note_${note.id}`}
+                    note={note}
+                    datePrefix={noteDatePrefixAfter(note, rowLastIdx)}
+                  />
+                ));
+                return (
+                  <Fragment
+                    key={
+                      row.kind === "event"
+                        ? `evt_${row.event.id}`
+                        : row.kind === "folder"
+                          ? `folderrow_${row.folder.responseId}`
+                          : `runrow_${row.events[0].id}`
+                    }
                   >
-                    <UnreadTokensProvider tokens={unreadTokensIn(row.events)}>
-                      {wrapRunRow(
-                        row,
-                        row.spec.render(row.events, {
-                          isFirst: row.flatIdx === 0 && !topTerminusTaken,
-                          isLast: row.flatIdx + row.events.length === events.length && !bottomTerminusTaken,
-                          children: row.events.map((e, k) => renderEventRow(e, row.flatIdx + k, { inRun: true })),
-                        }),
-                      )}
-                    </UnreadTokensProvider>
-                  </SpineTipContext.Provider>
+                    {rowNode}
+                    {noteRows}
+                  </Fragment>
                 );
-              const rowNotes = notesFor(row);
-              if (rowNotes.length === 0) return rowNode;
-              // Below is older, so a note FOLLOWS the event it is known to
-              // have happened before. The row itself is untouched — this only
-              // wraps it.
-              const rowLastIdx = row.kind === "run" ? row.flatIdx + row.events.length - 1 : row.flatIdx;
-              const noteRows = rowNotes.map((note) => (
-                <MarketNoteRow key={`note_${note.id}`} note={note} datePrefix={noteDatePrefixAfter(note, rowLastIdx)} />
-              ));
-              return (
-                <Fragment
-                  key={
-                    row.kind === "event"
-                      ? `evt_${row.event.id}`
-                      : row.kind === "folder"
-                        ? `folderrow_${row.folder.responseId}`
-                        : `runrow_${row.events[0].id}`
-                  }
-                >
-                  {rowNode}
-                  {noteRows}
-                </Fragment>
-              );
-            })}
-            {/* The bottom is the OLDER end, so the omission here is the
+              })}
+              {/* The bottom is the OLDER end, so the omission here is the
                 CUT's or — where there is no cut — the VIEW's. The two are
                 exclusive by the guard, not by convention: where a cut and a
                 filter both hide older events the cut's statement is the one
@@ -1531,29 +1558,29 @@ function ChainTruthTimelineBody({
                 family. <TimelineBoundaryRow> carries the list of what the card
                 was the only statement of, so nobody rediscovers the loss by
                 accident. */}
-            {(boundaryAtBottom || viewBoundaryAtBottom) && (
-              <TimelineBoundaryRow kind={boundaryAtBottom ? "cut" : tailKind} isFirst={false} isLast />
-            )}
-          </div>
-          {/* The button alone: how many rows the page holds is not a figure
+              {(boundaryAtBottom || viewBoundaryAtBottom) && (
+                <TimelineBoundaryRow kind={boundaryAtBottom ? "cut" : tailKind} isFirst={false} isLast />
+              )}
+            </div>
+            {/* The button alone: how many rows the page holds is not a figure
               for the reader (0019, amendment 2026-09-24); the two data
               attributes on the root carry it for a machine. */}
-          {hasMore && (
-            <div ref={sentinelRef} className="flex flex-col items-center gap-1.5 pt-1">
-              <button
-                type="button"
-                onClick={growWindow}
-                className="rounded-md border border-teal-600/40 px-3 py-1.5 text-xs font-medium text-teal-600 hover:bg-teal-600/10 dark:border-teal-400/40 dark:text-teal-400 dark:hover:bg-teal-400/10"
-              >
-                Show {Math.min(WINDOW_CHUNK, rows.length - windowSize)} more
-              </button>
-            </div>
-          )}
-          {footer && !hasMore && footer}
-        </>
-      ) : (
-        <>
-          {/* A list with no rows but a boundary is not an empty history: every
+            {hasMore && (
+              <div ref={sentinelRef} className="flex flex-col items-center gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={growWindow}
+                  className="rounded-md border border-teal-600/40 px-3 py-1.5 text-xs font-medium text-teal-600 hover:bg-teal-600/10 dark:border-teal-400/40 dark:text-teal-400 dark:hover:bg-teal-400/10"
+                >
+                  Show {Math.min(WINDOW_CHUNK, rows.length - windowSize)} more
+                </button>
+              </div>
+            )}
+            {footer && !hasMore && footer}
+          </>
+        ) : (
+          <>
+            {/* A list with no rows but a boundary is not an empty history: every
               event sits before the cut (a wallet dormant since before a seed's
               cut, its whole life travelling as state). The card stands alone
               on the spine and says so; the empty label would say the
@@ -1565,24 +1592,25 @@ function ChainTruthTimelineBody({
               LIST and the rows above it are the statement. Here there are no
               rows: a lone glyph on an otherwise blank panel would state
               nothing at all, and "no events" would state something false. */}
-          {effectiveBoundary && !tl.isFiltered ? (
-            <div className="flex flex-col gap-2">
-              <TimelineBoundaryCard
-                boundary={effectiveBoundary}
-                protocolKey={tl.protocolKey}
-                csvExport={csvExport}
-                isFirst
-                isLast
-              />
-            </div>
-          ) : (
-            <div className="py-8 text-center text-sm text-rb-500">
-              {tl.isFiltered ? "All events filtered out — adjust the filters above to show some." : emptyLabel}
-            </div>
-          )}
-          {footer && !tl.isFiltered && footer}
-        </>
-      )}
-    </div>
+            {effectiveBoundary && !tl.isFiltered ? (
+              <div className="flex flex-col gap-2">
+                <TimelineBoundaryCard
+                  boundary={effectiveBoundary}
+                  protocolKey={tl.protocolKey}
+                  csvExport={csvExport}
+                  isFirst
+                  isLast
+                />
+              </div>
+            ) : (
+              <div className="py-8 text-center text-sm text-rb-500">
+                {tl.isFiltered ? "All events filtered out — adjust the filters above to show some." : emptyLabel}
+              </div>
+            )}
+            {footer && !tl.isFiltered && footer}
+          </>
+        )}
+      </div>
+    </SpineViewProvider>
   );
 }

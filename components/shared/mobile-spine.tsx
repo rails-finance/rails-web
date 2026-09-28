@@ -1,0 +1,163 @@
+"use client";
+
+// The phone spine view of a timeline (rails-ops TO-DO-mobile-timeline.md).
+//
+// On a phone the timeline draws each event as its spine segment with a
+// caption, and a tap opens the event's card inline, one at a time. It is
+// behind a flag while it is built: `?timeline=spine` switches it on, on a page
+// whose timeline passes `mobileSpine`. Without both, nothing here renders and
+// the list view is untouched.
+//
+// The view is a root attribute plus CSS. The timeline root carries
+// `data-mview="spine"` while the view is on, and every layout change is a
+// `mspine:max-sm:` class (the `mspine` variant is in app/globals.css). The flag
+// and the width are read after mount, so the server and the first client
+// render are the list view and hydrate alike. At ≥640px the view never turns
+// on, so desktop is unchanged with or without the flag.
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
+import { useTimelineScale } from "@/components/shared/activity-timeline";
+
+/** What a family passes to turn the phone spine view on for its timeline. */
+export interface MobileSpineConfig {
+  /** The key row above the first event: what the left and the right arrows
+   *  mean, in the family's words ("to wallet" / "into Trove"). */
+  keyLeft: string;
+  keyRight: string;
+}
+
+/** `?timeline=spine`, read after mount the way `?nav=1` is: no
+ *  `useSearchParams`, so no Suspense boundary and no server read. */
+export function useSpineViewFlag(): boolean {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    setOn(new URLSearchParams(window.location.search).get("timeline") === "spine");
+  }, []);
+  return on;
+}
+
+/** True when the page opted in, the flag is set and the viewport is a phone. */
+export function useSpineViewActive(config: MobileSpineConfig | undefined): boolean {
+  const flag = useSpineViewFlag();
+  const phone = useMediaQuery(PHONE_QUERY);
+  return !!config && flag && phone;
+}
+
+interface SpineViewState {
+  /** The one open card's id, or null. */
+  openId: string | null;
+  /** Open `id` (closing any other) or close it if it is the open one. `anchor`
+   *  is the tapped segment, which holds its place on screen. */
+  toggle: (id: string, anchor: HTMLElement) => void;
+}
+
+const SpineViewContext = createContext<SpineViewState | null>(null);
+
+/** The spine view's state, or null while the list view is showing. */
+export function useSpineView(): SpineViewState | null {
+  return useContext(SpineViewContext);
+}
+
+const cssEscape = (s: string) => (typeof CSS !== "undefined" && CSS.escape ? CSS.escape(s) : s);
+
+/** Holds the one open card. When a tap closes a card above the tapped one, the
+ *  tapped segment would jump up by that card's height; the layout effect
+ *  scrolls it back to where it was, then reveals the opened card as far as it
+ *  can while the segment stays on screen. */
+export function SpineViewProvider({ active, children }: { active: boolean; children: ReactNode }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const pending = useRef<{ el: HTMLElement; top: number; id: string } | null>(null);
+
+  const toggle = useCallback((id: string, anchor: HTMLElement) => {
+    pending.current = { el: anchor, top: anchor.getBoundingClientRect().top, id };
+    setOpenId((cur) => (cur === id ? null : id));
+  }, []);
+
+  useLayoutEffect(() => {
+    const p = pending.current;
+    if (!p) return;
+    pending.current = null;
+    if (!p.el.isConnected) return;
+    const drift = p.el.getBoundingClientRect().top - p.top;
+    if (Math.abs(drift) >= 1) window.scrollBy(0, drift);
+    if (openId !== p.id) return;
+    const region = document.querySelector<HTMLElement>(`[data-spine-card="${cssEscape(p.id)}"]`);
+    if (!region) return;
+    const overflow = region.getBoundingClientRect().bottom - window.innerHeight + 12;
+    const room = p.el.getBoundingClientRect().top - 8;
+    const by = Math.min(overflow, room);
+    if (by <= 0) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollBy({ top: by, behavior: reduced ? "auto" : "smooth" });
+  }, [openId]);
+
+  // Leaving the view (the viewport widened) drops the open card, so a return
+  // to it starts closed.
+  useEffect(() => {
+    if (!active) setOpenId(null);
+  }, [active]);
+
+  const value = useMemo(() => (active ? { openId, toggle } : null), [active, openId, toggle]);
+  return <SpineViewContext.Provider value={value}>{children}</SpineViewContext.Provider>;
+}
+
+/** The caption a row states by default: the event's kind and its moment. The
+ *  timeline provides it around each row; a card's `caption` prop overrides it. */
+export interface EventCaption {
+  kind: string;
+  ts: number;
+}
+
+export const EventCaptionContext = createContext<EventCaption | null>(null);
+
+/** What a card in the spine view hands its `SpineColumn`: the caption to
+ *  draw on the line, and where to report the spoken legs for the card
+ *  button's name. */
+export interface SpineRowSlot {
+  caption: ReactNode;
+  setLegs: (legs: string | null) => void;
+}
+
+export const SpineRowContext = createContext<SpineRowSlot | null>(null);
+
+export function useSpineRow(): SpineRowSlot | null {
+  return useContext(SpineRowContext);
+}
+
+/** One row above the first event, under the two flanks: what a left arrow and
+ *  a right arrow mean. It stays true whichever way the first event moves. */
+export function SpineKeyRow({ config }: { config: MobileSpineConfig }) {
+  const scale = useTimelineScale();
+  return (
+    <div
+      aria-hidden
+      className="grid items-center px-1 pb-1 text-xs text-rb-500"
+      style={{ gridTemplateColumns: scale.gridCols }}
+    >
+      <span className="justify-self-end whitespace-nowrap pr-3">&larr; {config.keyLeft}</span>
+      <span />
+      <span />
+      <span />
+      <span className="justify-self-start whitespace-nowrap pl-3">{config.keyRight} &rarr;</span>
+    </div>
+  );
+}
+
+/** A leg amount for a spoken label: grouped, and only as precise as a reader
+ *  needs to tell two events apart. */
+export function spokenAmount(v: number): string {
+  const a = Math.abs(v);
+  const digits = a >= 1000 ? 0 : a >= 1 ? 2 : 4;
+  return a.toLocaleString("en-US", { maximumFractionDigits: digits });
+}

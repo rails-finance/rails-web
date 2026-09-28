@@ -2,6 +2,10 @@
 
 @variant dark (&:where(.dark, .dark *));
 
+/* The phone spine view (components/shared/mobile-spine.tsx): the timeline root
+   carries data-mview="spine" while it is on. Always paired with max-sm:. */
+@custom-variant mspine (&:where([data-mview="spine"] *));
+
 @theme {
   /* Set default transition duration to 0 to prevent halo effect on theme switch */
   --default-transition-duration: 0s;

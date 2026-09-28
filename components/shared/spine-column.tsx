@@ -1,7 +1,7 @@
 "use client";
 
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { ArrowRightToLine, Folder, FolderOpen, Layers, LogOut } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -11,6 +11,7 @@ import { Prov } from "@/components/shared/provenance";
 import { useTimelineScale, SpineVal, fmtSpine, type SpineValProv } from "@/components/shared/activity-timeline";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import type { LinkedHoverHandlers } from "@/hooks/useLinkedHover";
+import { spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
 
 // ── Icon overrides ──────────────────────────────────────────────────────────
 
@@ -102,6 +103,10 @@ export interface SpineTokenRow {
    *  value IS that receipt's figure (e.g. no redistribution/fee component
    *  separating them) — a false pairing is worse than none. */
   prov?: SpineValProv;
+  /** The leg's verb in the phone spine view's spoken label ("0.5 ETH
+   *  withdrawn"). Unset reads by direction: "to the wallet", "into the
+   *  position". */
+  verb?: string;
 }
 
 /** One leg of a position swap, stacked on the swap node's right flank: the
@@ -708,6 +713,20 @@ function SpineLeadingMask() {
   );
 }
 
+/** The phone spine view's spoken legs, for the card button's name: "7,500
+ *  BOLD repaid, 2 rETH withdrawn". */
+function spokenLegs(rows: SpineTokenRow[], unreadOf: ReturnType<typeof useUnreadTokenOf>): string | null {
+  const legs = rows.flatMap((r) => {
+    if (unreadOf(r.address, r.symbol)) return [];
+    const v = typeof r.value === "string" ? parseFloat(r.value) : r.value;
+    if (v == null || !isFinite(v) || v === 0) return [];
+    const verb =
+      r.verb ?? (r.direction === "left" ? "to the wallet" : r.direction === "right" ? "into the position" : "");
+    return [`${spokenAmount(v)} ${r.symbol} ${verb}`.trim()];
+  });
+  return legs.length ? legs.join(", ") : null;
+}
+
 // ── SpineColumn ─────────────────────────────────────────────────────────────
 
 export function SpineColumn({
@@ -737,6 +756,18 @@ export function SpineColumn({
   const effectiveTip: SpineTip | null = tip !== undefined ? tip : contextTip;
   const { showTimelineValues } = useTimelineDisplay();
   const unreadOf = useUnreadTokenOf();
+  // The phone spine view: the card's caption sits on the line below the node,
+  // and the card's segment button is the only control: the chips drop their
+  // filter, and the card stops the pointer reaching the flank values.
+  const spineRow = useSpineRow();
+  const legs = spineRow && !icon && tokens?.length ? spokenLegs(tokens, unreadOf) : null;
+  const setLegs = spineRow?.setLegs;
+  useEffect(() => {
+    setLegs?.(legs);
+  }, [setLegs, legs]);
+  const captionEl = spineRow && (
+    <div className="relative z-10 flex justify-center pt-1.5 pb-2.5">{spineRow.caption}</div>
+  );
   // ── The spine is never empty; the icon states WHY there is no flow ────────
   //
   // A card reaches this component with no token rows for many reasons unrelated
@@ -1194,7 +1225,7 @@ export function SpineColumn({
     })();
 
     return (
-      <div className={"hidden sm:flex flex-col items-center relative px-1 pt-4 self-stretch"}>
+      <div className="hidden sm:flex mspine:max-sm:flex mspine:max-sm:max-w-full flex-col items-center relative px-1 pt-4 self-stretch">
         {leadingMask}
         <div
           className="relative z-10"
@@ -1209,6 +1240,7 @@ export function SpineColumn({
           {spineEl}
           {isLast && !detached && <SpineTrailingMask />}
           {tipBelow}
+          {captionEl}
         </div>
       </div>
     );
@@ -1222,7 +1254,7 @@ export function SpineColumn({
   const hasBadge = rows.some((r) => r.badge) || (externalParty && rows.length > 0);
 
   return (
-    <div className={"hidden sm:flex flex-col items-center relative px-1 pt-4 self-stretch"}>
+    <div className="hidden sm:flex mspine:max-sm:flex mspine:max-sm:max-w-full flex-col items-center relative px-1 pt-4 self-stretch">
       {leadingMask}
       <div
         className="relative z-10 flex flex-col gap-y-1 items-center"
@@ -1265,6 +1297,7 @@ export function SpineColumn({
                   iconOverride={row.iconSymbol}
                   address={row.address}
                   size={scale.tokenSize}
+                  filterable={!spineRow}
                 />
                 {row.badge === "check" ? (
                   <CheckBadge size={scale.tokenSize} />
@@ -1284,6 +1317,7 @@ export function SpineColumn({
                 iconOverride={row.iconSymbol}
                 address={row.address}
                 size={scale.tokenSize}
+                filterable={!spineRow}
               />
             )}
             {row.direction === "right" ? <ArrowFromDot direction="right" size={scale.arrowSize} /> : <span />}
@@ -1304,6 +1338,7 @@ export function SpineColumn({
         {spineEl}
         {isLast && !detached && <SpineTrailingMask />}
         {tipBelow}
+        {captionEl}
       </div>
     </div>
   );
