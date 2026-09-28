@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SITE_URL } from "@/lib/shared/page-metadata";
+import { HOME_SHARE_IMAGE, SITE_URL } from "@/lib/shared/page-metadata";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     title: "Terms of Service | Rails",
     description: "Rails Terms of Service. Read about acceptable use, disclaimers, and limitations.",
     url: `${SITE_URL}/terms`,
-    images: ["/og/home.png"],
+    images: [HOME_SHARE_IMAGE],
   },
   robots: {
     index: true,

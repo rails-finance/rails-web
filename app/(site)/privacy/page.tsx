@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SITE_URL } from "@/lib/shared/page-metadata";
+import { HOME_SHARE_IMAGE, SITE_URL } from "@/lib/shared/page-metadata";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     title: "Privacy Policy | Rails",
     description: "Rails Privacy Policy. Learn how we handle data and protect your privacy.",
     url: `${SITE_URL}/privacy`,
-    images: ["/og/home.png"],
+    images: [HOME_SHARE_IMAGE],
   },
   robots: {
     index: true,
