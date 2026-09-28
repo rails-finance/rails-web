@@ -71,7 +71,8 @@ import {
 import { AAVE_V4_FALLBACK_LT, isDollarRail } from "@/lib/aave-v4/liquidation-thresholds";
 import { calculateAaveV4Position, type CalcPositionInputs } from "@/lib/aave-v4/utils/position-calculation";
 import { resolvePrice, type PriceEntry } from "@/lib/aave/prices";
-import { fmtUsd } from "@/lib/aave-v4/format";
+import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
+import { fmtUsd, fmtSignedUsd, fmtTokenAmount } from "@/lib/aave-v4/format";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
@@ -385,8 +386,11 @@ function AaveV4SpokePageInner({
         spokeScopedEvents.flatMap((e) =>
           isAaveV4Event(e)
             ? [
+                // Keyed on the spoke's `caller` alone: on V4 a caller other
+                // than the owner is a position manager the owner approved, and
+                // it is the manager the card names (the signer may be a relayer).
                 {
-                  txFrom: e.context.data.txFrom,
+                  txFrom: e.context.data.caller,
                   poolCaller: e.context.data.caller,
                   wallet: e.context.data.owner ?? e.wallet,
                 },
@@ -920,6 +924,32 @@ function AaveV4SpokeTowerBlock({
     () => computeAaveLifetimeTotals(reserves, prices, historyComplete),
     [reserves, prices, historyComplete],
   );
+  // What liquidations cost the borrower: collateral seized minus debt cleared,
+  // in tokens and in dollars at each event's price and at today's.
+  const liqNet = useMemo(() => {
+    const coll = reserves.filter((r) => r.liquidatedCollateral > 0);
+    const debt = reserves.filter((r) => r.liquidatedDebt > 0);
+    if (coll.length === 0 || debt.length === 0) return null;
+    const list = (rs: typeof reserves, amt: (r: (typeof reserves)[number]) => number) =>
+      rs.map((r) => `${fmtTokenAmount(amt(r))} ${aaveV4DisplaySymbol(r.symbol)}`).join(" and ");
+    const atTimeUsd = totals.liquidatedDebtUsd - totals.liquidatedCollUsd;
+    let todayUsd: number | null = 0;
+    for (const r of coll) {
+      const p = resolvePrice(r.symbol, prices);
+      todayUsd = p == null || todayUsd == null ? null : todayUsd - r.liquidatedCollateral * p;
+    }
+    for (const r of debt) {
+      const p = resolvePrice(r.symbol, prices);
+      todayUsd = p == null || todayUsd == null ? null : todayUsd + r.liquidatedDebt * p;
+    }
+    return {
+      seized: list(coll, (r) => r.liquidatedCollateral),
+      cleared: list(debt, (r) => r.liquidatedDebt),
+      atTimeUsd,
+      todayUsd,
+    };
+  }, [reserves, prices, totals]);
+
   // Figures mirrored in the breakdown legend render foreground-bold; the rest of
   // the prose stays muted (same grammar as the Liquity economics footnote).
   const fig = (n: number) => <span className="font-semibold text-foreground tabular-nums">{fmtUsd(n).title}</span>;
@@ -995,6 +1025,20 @@ function AaveV4SpokeTowerBlock({
                         </>
                       )}
                       , leaving {fig(totals.outstandingUsd)} owed today.
+                    </span>
+                  </div>
+                )}
+                {liqNet && (
+                  <div className="flex items-start gap-2 leading-relaxed">
+                    <span className="select-none text-rb-500">•</span>
+                    <span>
+                      Liquidations took {liqNet.seized} of collateral to clear {liqNet.cleared} of debt:{" "}
+                      {fig(totals.liquidatedCollUsd)} against {fig(totals.liquidatedDebtUsd)} at the prices of the day,
+                      a net {fmtSignedUsd(liqNet.atTimeUsd).display} to the borrower, the bonus the liquidators kept
+                      {liqNet.todayUsd != null && (
+                        <> ({fmtSignedUsd(liqNet.todayUsd).display} at today&apos;s prices)</>
+                      )}
+                      .
                     </span>
                   </div>
                 )}

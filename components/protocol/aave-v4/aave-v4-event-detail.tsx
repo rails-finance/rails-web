@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { AaveV4Context, AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
 import type { AaveV4SnapshotItem } from "@/lib/shared/types/event-shape";
 import {
@@ -35,6 +35,7 @@ import {
   type EventProvDetail,
 } from "@/lib/aave-v4/position-provenance";
 import { AmountText } from "@/components/shared/amount-text";
+import { useHealthFactorAround, hfOf } from "@/lib/aave-v4/use-health-factor-around";
 
 const SNAPSHOT_USD_PROV = usdProv("The after-balance", {
   amountLabel: "balance after event",
@@ -113,40 +114,6 @@ function BorrowRateRow({ symbol, apr, coord }: { symbol: string; apr: string; co
     </span>
   );
 }
-
-interface HealthFactorRead {
-  block: number;
-  wad: string | null;
-}
-
-/** The health factor at the end of the block before a liquidation and of its
- *  own block, read from the spoke (fetched once, when the detail mounts on
- *  expand). `undefined` while loading or after a miss: the card then draws no
- *  health-factor section. */
-function useHealthFactorAround(
-  enabled: boolean,
-  spoke: string | undefined,
-  wallet: string,
-  blockNumber?: number,
-): { before: HealthFactorRead; after: HealthFactorRead } | undefined {
-  const [hf, setHf] = useState<{ before: HealthFactorRead; after: HealthFactorRead } | undefined>(undefined);
-  useEffect(() => {
-    if (!enabled || !spoke || !wallet || blockNumber == null) return;
-    let live = true;
-    fetch(`/api/chain/aave-v4/health-factor?spoke=${spoke}&wallet=${wallet}&block=${blockNumber}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (live && d?.before && d?.after) setHf({ before: d.before, after: d.after });
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [enabled, spoke, wallet, blockNumber]);
-  return hf;
-}
-
-const hfOf = (wad: string | null): number | null => (wad == null ? null : Number(wad) / 1e18);
 
 export interface AaveV4EventDetailProps {
   ctx: AaveV4Context;
@@ -263,7 +230,9 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber, wallet }: AaveV4Ev
   const token = ctx.reserveSymbol ?? "???";
   const isLiq = ctx.eventType === "liquidation";
   const isToggle = ctx.eventType === "collateral_toggle";
-  const hfAround = useHealthFactorAround(isLiq, ctx.spokeAddress, ctx.owner ?? wallet, blockNumber);
+  // Every event that moves a balance shows the health factor either side of it,
+  // read from the spoke; a collateral toggle moves none.
+  const hfAround = useHealthFactorAround(!isToggle, ctx.spokeAddress, ctx.owner ?? wallet, blockNumber);
 
   const isSupplySide = ctx.eventType === "supply" || ctx.eventType === "withdraw";
   const isDebtSide = ctx.eventType === "borrow" || ctx.eventType === "repay";
@@ -491,10 +460,24 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber, wallet }: AaveV4Ev
       ),
     });
   }
-  // Health factor before → after, on a liquidation: the figure the liquidation
-  // turned on, read from the spoke either side of the event's block, at the
-  // precision every health-factor display uses (hfLabel).
-  if (isLiq && hfAround) {
+  // Health factor before → after: read from the spoke at the end of the block
+  // before the event and of its own block, at the precision every health-factor
+  // display uses (hfLabel). The cell holds its place while the read is in
+  // flight, so the grid does not reflow when it lands; a position with no debt
+  // either side has no finite factor to show, and a failed read draws nothing.
+  const hfBothInfinite = hfAround.status === "ok" && hfAround.before.wad == null && hfAround.after.wad == null;
+  if (hfAround.status === "loading" && hasDebts) {
+    snapshotCards.push({
+      key: "health-factor",
+      label: "Health factor",
+      body: (
+        <span
+          className="inline-block h-[1em] w-24 rounded-md bg-skeleton animate-pulse align-middle"
+          aria-hidden="true"
+        />
+      ),
+    });
+  } else if (hfAround.status === "ok" && !hfBothInfinite) {
     snapshotCards.push({
       key: "health-factor",
       label: "Health factor",

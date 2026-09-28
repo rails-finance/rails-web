@@ -134,7 +134,11 @@ export function AaveV4EventHeader({
   // than replacing it (SpineColumn `externalParty`), so the amount hands off to
   // the flank exactly as an owner-acted row's does. See chain-truth-event.tsx.
   const hideVal = useHeaderValueHideClass({ isPassive: ctx.eventType === "liquidation" });
-  const { showEventNumbers, showInterestRates } = useTimelineDisplay();
+  const { showEventNumbers, showInterestRates, showTickerLabels } = useTimelineDisplay();
+  // The symbol beside each icon, under the Display menu's ticker-label toggle
+  // (the same switch the opened card's rows follow).
+  const ticker = (sym?: string | null) =>
+    showTickerLabels && sym ? <span className="text-xs text-rb-500">{aaveV4DisplaySymbol(sym)}</span> : null;
   // Concrete coordinates for the amount provenance. `asset` is filled per-Prov
   // below (liquidation's two legs concern different reserves).
   const coord = { spokeName: ctx.spokeName, spokeAddress: ctx.spokeAddress, txHash, blockNumber };
@@ -218,6 +222,7 @@ export function AaveV4EventHeader({
                   </Prov>
                 </span>
                 <TokenChipIcon symbol={ctx.collateralSymbol} size={16} />
+                {ticker(ctx.collateralSymbol)}
               </span>
             )}
             {ctx.debtToCover && (
@@ -242,6 +247,7 @@ export function AaveV4EventHeader({
                   </Prov>
                 </span>
                 <TokenChipIcon symbol={ctx.reserveSymbol ?? "???"} size={16} />
+                {ticker(ctx.reserveSymbol)}
               </span>
             )}
           </>
@@ -259,6 +265,7 @@ export function AaveV4EventHeader({
                   </Prov>
                 </span>
                 <TokenChipIcon symbol={ctx.reserveSymbol ?? "???"} size={16} />
+                {ticker(ctx.reserveSymbol)}
               </span>
             )}
             {ctx.eventType === "collateral_toggle" && ctx.reserveSymbol && (

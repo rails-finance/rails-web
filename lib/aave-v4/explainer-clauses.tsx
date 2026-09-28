@@ -22,12 +22,11 @@
 //
 // ── Fill-standard notes (charter §5) ─────────────────────────────────────────
 // Checklist items Aave V4 cannot fill per event, each a data fact of its wire:
-//   • §5.1 (risk consequence with figures) on operate events: the indexed
-//     stream carries no per-event health factor, and v1 serves no USD at event
-//     time, so a health-factor-before→after or a distance-to-the-line read can't
-//     be computed for a supply / withdraw / borrow / repay. Stated qualitatively
-//     (the mechanic) and, on liquidation, categorically (a liquidation IS the
-//     health factor having fallen below 1.0).
+//   • §5.1 (risk consequence with figures): the indexed stream carries no
+//     per-event health factor. The opened card's grid reads it from the spoke
+//     either side of the block (use-health-factor-around.ts); the liquidation
+//     prose reads the same figure to say why the factor moved, and the operate
+//     prose leaves it to the grid.
 //   • §5.2 (mechanic-why on fees): Aave V4 operates charge no per-event fee. The
 //     borrow rate is a rate, not a fee (surfaced as its own figure); the only
 //     fee-like figure is the liquidation bonus, priced by the valued sentence.
@@ -48,6 +47,7 @@ import {
   clause,
   cont,
   eventClauses,
+  H,
   splitLead,
   type ClauseInput,
   type EventProseSlots,
@@ -62,6 +62,7 @@ import {
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { effectiveBorrowAPR, borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
 import { formatExact } from "@/lib/utils/format";
+import { hfLabel } from "@/lib/aave-v4/format";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { chainIdForSpokeAddress } from "@/lib/aave-v4/spoke-meta";
 
@@ -275,74 +276,53 @@ function rateFig(ctx: AaveV4Context, coord: EventProvDetail): ReactNode | null {
 
 // ── the variant table ────────────────────────────────────────────────────────
 
-/** The third-party-actor clause — the prose half of the pink chip the header
- *  renders when the position owner was neither the transaction signer nor the
- *  spoke's own `caller`.
+/** The position-manager line: who sent this event, when it was not the owner.
  *
- *  `txFrom`/`caller` ship exactly where that two-fact verdict is decidable (see
- *  AaveV4Context), so their presence IS the verdict — which is what keeps this
- *  a pure function with no owner address in hand. No party is named here: a
- *  clause builder can't reach the ENS hook, and the header's chip directly
- *  above the prose already carries the identity.
+ *  On Aave V4 every spoke entry point (supply, withdraw, borrow, repay,
+ *  setUsingAsCollateral) carries `onlyPositionManager(onBehalfOf)`: the spoke's
+ *  `caller` is the user itself, or a position manager that governance activated
+ *  and the owner approved (a borrow or withdraw through one also needs the
+ *  owner's per-reserve allowance). So a `caller` other than the owner IS a
+ *  position manager, and that comparison is the condition here. The presence of
+ *  `txFrom` / `caller` is not: the index ships both on every owner-sent row too.
  *
- *  ⚠️⚠️ DO NOT reuse Aave V3's story here — this is where V4 diverges hardest,
- *  and the V3 sentence ("anyone may add to a position without asking") is
- *  FALSE on V4. Every spoke entry point — supply, withdraw, borrow, repay,
- *  setUsingAsCollateral — carries `onlyPositionManager(onBehalfOf)`, and
- *  `_isPositionManager` is a TWO-GATE check: the caller is the user itself, OR
- *  (`config.active` — governance activated that manager via
- *  `updatePositionManager` — AND `config.approval[user]` — the owner approved
- *  it for their own account via `setUserPositionManager`, or
- *  `setUserPositionManagersWithSig` over EIP-712). There is NO permissionless
- *  third-party supply or repay in V4: even a pure gift needs the owner to have
- *  enabled that manager first.
- *
- *  The built-in managers split on direction, which is why this clause does:
- *    • GiverPositionManager (`supplyOnBehalfOf` / `repayOnBehalfOf`) — the
- *      caller provides the funds, so there is no per-reserve allowance.
- *    • TakerPositionManager (`withdrawOnBehalfOf` / `borrowOnBehalfOf`) — value
- *      leaves the position, so each reserve needs an allowance the owner
- *      granted with `approveWithdraw` / `approveBorrow`.
- *
- *  `liquidationCall` is the one path the modifier does not gate — and it is
- *  moot here anyway: liquidation rows carry neither `txFrom` nor `caller`, so
- *  the two-fact guard drops them before the switch.
- *
- *  Worth knowing when reading a real timeline: `SignatureGateway` is ITSELF a
- *  position manager, so an owner-signed EIP-712 instruction relayed by someone
- *  else surfaces here as a non-owner caller. */
-function positionManagerMechanic(ctx: AaveV4Context): ClauseInput {
-  if (!ctx.txFrom || !ctx.caller) return null;
-  switch (ctx.eventType) {
-    case "supply":
-    case "repay":
-      return clause(
-        <>
-          Another account executed this on the owner&rsquo;s behalf. Aave V4 offers no permissionless route for that —
-          every spoke entry point admits only a position manager, meaning an account governance has activated and the
-          owner has separately approved for this position. Even adding value needed that approval first.
-        </>,
-      );
-    case "withdraw":
-    case "borrow":
-      return clause(
-        <>
-          Another account executed this on the owner&rsquo;s behalf, which on Aave V4 took the owner&rsquo;s approval
-          twice over: the account had to be approved as a position manager for this position, and — because value left
-          the position rather than entering it — hold a per-reserve allowance the owner granted for this asset.
-        </>,
-      );
-    case "collateral_toggle":
-      return clause(
-        <>
-          Another account executed this on the owner&rsquo;s behalf. The same gate stands on every spoke entry point,
-          this one included: only a position manager the owner has approved may change how the position is configured,
-          so that approval predates this event.
-        </>,
-      );
-    default:
-      return null;
-  }
+ *  The event T3 names the manager in one line; what a position manager is, and
+ *  why a borrow needs an allowance, is T4 (the supply / borrow / repay modals).
+ *  `liquidationCall` is ungated and names its liquidator in its own clause. */
+function positionManagerLine(ctx: AaveV4Context): ClauseInput {
+  if (ctx.eventType === "liquidation" || !ctx.caller) return null;
+  const owner = ctx.owner?.toLowerCase();
+  const caller = ctx.caller.toLowerCase();
+  if (!owner || caller === owner) return null;
+  const signedByOwner = ctx.txFrom?.toLowerCase() === owner;
+  return clause(
+    signedByOwner ? (
+      <>Sent by the owner through position manager {addressLink(ctx, caller)}.</>
+    ) : (
+      <>Sent by position manager {addressLink(ctx, caller)}, acting on the owner&rsquo;s behalf.</>
+    ),
+  );
+}
+
+function addressLink(ctx: AaveV4Context, address: string): ReactNode {
+  return (
+    <a
+      href={explorerUrl(chainIdForSpokeAddress(ctx.spokeAddress), "address", address)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-500 hover:underline"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {address.slice(0, 6)}…{address.slice(-4)}
+    </a>
+  );
+}
+
+/** The health factor either side of the event, as the opened card's grid reads
+ *  it (see useHealthFactorAround). Absent while loading or after a miss. */
+export interface AaveV4HfPair {
+  before: number | null;
+  after: number | null;
 }
 
 export function aaveV4EventSlots(
@@ -350,9 +330,10 @@ export function aaveV4EventSlots(
   coord: EventProvDetail,
   siblings: AaveV4Event[],
   self: AaveV4Event,
+  hf?: AaveV4HfPair,
 ): EventProseSlots {
-  const slots = aaveV4EventSlotsBase(ctx, coord, siblings, self);
-  const managed = positionManagerMechanic(ctx);
+  const slots = aaveV4EventSlotsBase(ctx, coord, siblings, self, hf);
+  const managed = positionManagerLine(ctx);
   if (!managed) return slots;
   return { ...slots, meansNow: [...(slots.meansNow ?? []), managed] };
 }
@@ -362,6 +343,7 @@ function aaveV4EventSlotsBase(
   coord: EventProvDetail,
   siblings: AaveV4Event[],
   self: AaveV4Event,
+  hf?: AaveV4HfPair,
 ): EventProseSlots {
   const rs = resultingState(ctx);
   const token = aaveV4DisplaySymbol(ctx.reserveSymbol) || "the asset";
@@ -441,11 +423,7 @@ function aaveV4EventSlotsBase(
       const ending: ClauseInput = rs.debtCleared
         ? cont(<>, clearing the {token} debt on this market in full.</>)
         : rs.debtAfter != null
-          ? cont(
-              <>
-                , leaving {afterFig(coord, "debt", ctx)} of {token} debt.
-              </>,
-            )
+          ? cont(<>, leaving {afterFig(coord, "debt", ctx)} of debt.</>)
           : cont(<>.</>);
       const repayRate = rateFig(ctx, coord);
       const meansNow: ClauseInput[] = rs.debtCleared
@@ -462,11 +440,11 @@ function aaveV4EventSlotsBase(
             repayRate ? clause(<>The debt still outstanding accrues interest at a {repayRate} borrow rate.</>) : null,
             sibling,
           ];
-      return { happened: [clause(<>Repaid {amountFig(ctx, coord, true)} of debt</>), ending], meansNow };
+      return { happened: [clause(<>Repaid {amountFig(ctx, coord, true)}</>), ending], meansNow };
     }
 
     case "liquidation":
-      return liquidationSlots(ctx, coord, token);
+      return liquidationSlots(ctx, coord, hf);
 
     case "collateral_toggle": {
       const happened = ctx.enabled ? (
@@ -499,9 +477,25 @@ function aaveV4EventSlotsBase(
   }
 }
 
-function liquidationSlots(ctx: AaveV4Context, coord: EventProvDetail, token: string): EventProseSlots {
+/** A snapshot leg list read as prose: "175.8240 USDT", "1,591 USDG and 0.808 USDC".
+ *  Amounts at the grid's own precision (fmt), so each matches its T2 row. */
+function legList(rows: { symbol: string; amount: string }[] | undefined): ReactNode | null {
+  const live = (rows ?? []).filter((r) => (num(r.amount) ?? 0) > EPS);
+  if (live.length === 0) return null;
+  return live.map((r, i) => (
+    <span key={r.symbol}>
+      {i > 0 ? (i === live.length - 1 ? " and " : ", ") : null}
+      <strong className="font-semibold text-foreground">
+        {fmt(r.amount)} {aaveV4DisplaySymbol(r.symbol)}
+      </strong>
+    </span>
+  ));
+}
+
+function liquidationSlots(ctx: AaveV4Context, coord: EventProvDetail, hf?: AaveV4HfPair): EventProseSlots {
   const rs = resultingState(ctx);
   const market = ctx.spokeName;
+  const debtSym = aaveV4DisplaySymbol(ctx.reserveSymbol) || "debt";
   const seizedFig =
     ctx.liquidatedCollateralAmount && ctx.collateralSymbol ? (
       <Fig
@@ -558,33 +552,59 @@ function liquidationSlots(ctx: AaveV4Context, coord: EventProvDetail, token: str
           ? clause(<>A liquidator seized {seizedFig} of collateral.</>)
           : null;
 
+  // Why the health factor moved. The figures echo the grid's Health factor cell
+  // when the read has landed; the reason stands without them.
+  const otherDebts = (ctx.allDebts ?? []).filter((d) => d.symbol !== ctx.reserveSymbol && (num(d.amount) ?? 0) > EPS);
+  const hfMove =
+    hf && hf.before != null ? (
+      <>
+        The health factor went from <H>{hfLabel(hf.before)}</H> to <H>{hfLabel(hf.after)}</H>
+      </>
+    ) : null;
+  const why: ClauseInput = rs.debtCleared
+    ? clause(
+        <>
+          {hfMove ? <>{hfMove} because it</> : <>It</>} cleared all of the {debtSym} debt
+          {otherDebts.length > 0 ? (
+            <>; the {legList(otherDebts)} debt remains.</>
+          ) : (
+            <>, the position&rsquo;s only debt.</>
+          )}
+        </>,
+      )
+    : rs.debtAfter != null && rs.debtBefore != null
+      ? clause(
+          <>
+            {hfMove ? <>{hfMove}: the</> : <>The</>} {debtSym} debt fell from <H>{fmt(rs.debtBefore)}</H> to{" "}
+            <H>{fmt(rs.debtAfter)}</H>. Collateral counts toward the health factor only up to its liquidation threshold,
+            so seizing it lowers the factor less than clearing the same value of debt raises it.
+          </>,
+        )
+      : null;
+
+  // What is left, on every liquidation: collateral and debt per reserve, as
+  // the grid's after rows show them.
+  const collLeft = legList(ctx.allSupplies);
+  const debtLeft = legList(ctx.allDebts);
+  const left: ClauseInput =
+    collLeft || debtLeft
+      ? clause(
+          debtLeft ? (
+            <>
+              Left after it: {collLeft ? <>{collLeft} of collateral</> : <>no collateral</>} against {debtLeft} of debt,
+              still accruing interest; the position can be liquidated again if its health factor falls below 1.0.
+            </>
+          ) : (
+            <>Left after it: {collLeft} of collateral and no debt.</>
+          ),
+        )
+      : null;
+
   const meansNow: ClauseInput[] = [
+    why,
     liquidationBonus(ctx),
-    rs.debtAfter != null && rs.debtAfter > EPS
-      ? clause(
-          <>
-            The position still owes {afterFig(coord, "debt", ctx)}, which keeps accruing interest and can be liquidated
-            again while the health factor stays below 1.0.
-          </>,
-        )
-      : null,
-    ctx.liquidator
-      ? clause(
-          <>
-            Cleared by a third-party liquidator:{" "}
-            <a
-              href={explorerUrl(chainIdForSpokeAddress(ctx.spokeAddress), "address", ctx.liquidator)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500 hover:underline"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {ctx.liquidator.slice(0, 6)}…{ctx.liquidator.slice(-4)}
-            </a>
-            .
-          </>,
-        )
-      : null,
+    left,
+    ctx.liquidator ? clause(<>Sent by liquidator {addressLink(ctx, ctx.liquidator)}.</>) : null,
   ];
 
   return { happened: [clause(happened)], changed: changed ? [changed] : [], meansNow };

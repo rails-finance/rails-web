@@ -10,7 +10,7 @@ import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { type HubTier, hubChipLabel } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
-import { type AaveSpokeCardInfo, liquidationBuffer } from "@/lib/aave-v4/spoke-cards";
+import { type AaveSpokeCardInfo, liquidationBuffer, rateSymbolLabel } from "@/lib/aave-v4/spoke-cards";
 import { AaveV4LiquidationFootnote } from "@/components/protocol/aave-v4/aave-v4-liquidation-footnote";
 import { bucketForHealth } from "@/lib/aave-v4/health-bucket";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
@@ -172,6 +172,15 @@ function SupplyInterestFootnote({ spoke }: { spoke: AaveSpokeCardInfo }) {
   );
 }
 
+/** The activity badge's hover label: the count is the holder's transactions,
+ *  and the liquidations beside it were sent by liquidators. */
+function txCountTitle(spoke: AaveSpokeCardInfo): string {
+  const tx = `${spoke.txCount} transaction${spoke.txCount === 1 ? "" : "s"} by or for the owner`;
+  return spoke.liquidationCount > 0
+    ? `${tx}; the ${spoke.liquidationCount} liquidation${spoke.liquidationCount === 1 ? "" : "s"} beside it ${spoke.liquidationCount === 1 ? "was" : "were"} sent by liquidators`
+    : tx;
+}
+
 /** Debt-stat footnote: the latest borrow rate plus, when non-dust, the accrued
  *  borrow interest. Accrued interest GREW the debt — it's already part of the
  *  debt balance shown above — so it reads as "incl. $X interest" with no sign. A
@@ -187,7 +196,7 @@ function DebtFootnote({ spoke }: { spoke: AaveSpokeCardInfo }) {
     <div className="text-xs mt-0.5 text-rb-500 space-y-0.5">
       {rate !== null && (
         <div>
-          <Prov info={borrowRateProv()}>{rate.toFixed(2)}%</Prov> borrow rate
+          <Prov info={borrowRateProv()}>{rate.toFixed(2)}%</Prov> {rateSymbolLabel(spoke)}borrow rate
         </div>
       )}
       {interest && (
@@ -315,7 +324,13 @@ function AaveV4SpokeCard({
             // and the backend's status column (migration 057, rewritten for
             // this rule; rails-ops TO-DO-ui-jobs.md item 97, Miles 2026-09-28).
             outcome={spoke.wasLiquidated ? "liquidated" : "closed"}
-            identity={<PositionCardMeta eventCount={spoke.txCount} liquidationCount={spoke.liquidationCount} />}
+            identity={
+              <PositionCardMeta
+                eventCount={spoke.txCount}
+                eventCountTitle={txCountTitle(spoke)}
+                liquidationCount={spoke.liquidationCount}
+              />
+            }
             collateralAssetIcons={
               spoke.supplyingSymbols.length > 0 ? <InlineAssetCluster symbols={spoke.supplyingSymbols} /> : undefined
             }
@@ -370,7 +385,11 @@ function AaveV4SpokeCard({
               // the page is already scoped to one wallet. txCount counts distinct
               // non-liquidation transactions, so it isn't inflated by the
               // supply+enable merge and doesn't double-count the triangle beside it.
-              <PositionCardMeta eventCount={spoke.txCount} liquidationCount={spoke.liquidationCount} />
+              <PositionCardMeta
+                eventCount={spoke.txCount}
+                eventCountTitle={txCountTitle(spoke)}
+                liquidationCount={spoke.liquidationCount}
+              />
             }
             columns={
               supplyOnly

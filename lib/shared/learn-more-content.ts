@@ -2,7 +2,7 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { POLARIS_APP_LINK, POLARIS_DOC_LINKS } from "@/lib/polaris/docs-links";
 import type { CurveEventType } from "@/lib/shared/types/protocols/curve";
 import type { UniswapEventType } from "@/lib/shared/types/protocols/uniswap";
-import { getSpokeMeta, ARCHETYPE_LABEL, SPOKE_DOC_LINKS } from "@/lib/aave-v4/spoke-meta";
+import { getSpokeMeta, ARCHETYPE_GLOSS, SPOKE_DOC_LINKS } from "@/lib/aave-v4/spoke-meta";
 import { HUB_TIER_LABEL, type HubTier } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { SEAMLESS_DOCS_URL, v3Brand, v3Possessive, type V3Protocol } from "@/lib/aave-v3/protocol-name";
 import { FAQ_URLS, AAVE_FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
@@ -538,6 +538,10 @@ export function aaveV4SupplyContent(): LearnMoreContent {
         bold: "Withdrawing",
         text: "any supply not currently needed to keep borrows covered can be withdrawn.",
       },
+      {
+        bold: "Position managers",
+        text: "contracts an owner can approve to act on a position for them. A manager that supplies or repays pays with its own funds, so it needs only that approval; one that withdraws or borrows sends the tokens to itself, so it also needs an allowance the owner grants per asset. Governance activates each manager, and the owner can revoke one at any time.",
+      },
     ],
     links: [
       { label: "Aave V4 positions", url: AAVE_FAQ_URLS.V4_POSITIONS },
@@ -566,11 +570,47 @@ export function aaveV4BorrowContent(): LearnMoreContent {
         bold: "Borrow interest",
         text: "debt accrues interest continuously at the asset's borrow rate until it's repaid.",
       },
+      {
+        bold: "Position managers",
+        text: "a contract the owner has approved can borrow for them. Because the borrowed tokens go to the manager, it also needs an allowance the owner grants for that asset; governance activates each manager, and the owner can revoke one at any time.",
+      },
     ],
     links: [
-      { label: "Borrowing assets", url: AAVE_FAQ_URLS.BORROWING },
+      { label: "Borrowing on Aave V4", url: "https://aave.com/docs/aave-v4/positions/borrow" },
+      { label: "Position managers", url: "https://aave.com/docs/aave-v4/positions/managers" },
       { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
-      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
+    ],
+  };
+}
+
+export function aaveV4RepayContent(): LearnMoreContent {
+  return {
+    title: "How Repaying Works",
+    intro:
+      "Repaying returns borrowed tokens to the spoke, which lowers the debt, raises the health factor and frees collateral for withdrawal or further borrowing.",
+    detailsHeading: "Key concepts:",
+    details: [
+      {
+        bold: "Partial or full",
+        text: "any amount can be repaid at any time; repaying the full amount clears that asset's debt, including the interest it has accrued.",
+      },
+      {
+        bold: "Interest",
+        text: "debt grows with interest every block, so the amount owed at repayment is more than was borrowed. Whatever is left after a partial repay keeps accruing at the asset's borrow rate.",
+      },
+      {
+        bold: "Repaying for someone else",
+        text: "a position manager the owner has approved can repay the owner's debt with its own tokens. It needs no per-asset allowance, since no value leaves the position.",
+      },
+      {
+        bold: "Token approval",
+        text: "the repaying account first approves the spoke to take the tokens, in a separate transaction or with a signed permit.",
+      },
+    ],
+    links: [
+      { label: "Repaying on Aave V4", url: "https://aave.com/docs/aave-v4/positions/repay" },
+      { label: "Position managers", url: "https://aave.com/docs/aave-v4/positions/managers" },
+      { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
     ],
   };
 }
@@ -647,32 +687,31 @@ export function aaveV4PositionFallbackContent(): LearnMoreContent {
 // modal still teaches what it shows. See learn-more-modal-grammar.md §1.
 export function aaveV4EconomicsContent(): LearnMoreContent {
   return {
-    title: "About the Economics",
+    title: "About Lifetime Flows",
     intro:
-      "This section traces a position's supply and borrow flows over its lifetime and shows how much price cushion each collateral asset has before liquidation.",
+      "This panel totals every token that has moved into and out of a position over its life, as two towers: collateral on one side, debt on the other.",
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "Lifetime flows",
-        text: "the towers show every supply, withdrawal, borrow, and repayment over the position's life.",
+        bold: "Collateral tower",
+        text: "what was deposited plus the interest it earned, set against what left: withdrawals and collateral seized in liquidations. What remains is the collateral held today.",
       },
       {
-        bold: "Accrued interest",
-        text: "what a balance holds beyond the amounts its events moved. Borrowed plus accrued interest is what the position has repaid, lost to liquidation and still owes; deposited plus interest earned is what it has withdrawn, lost to liquidation and still holds.",
+        bold: "Debt tower",
+        text: "what was borrowed plus the interest it accrued, set against what was repaid and what liquidators repaid. What remains is the debt owed today.",
       },
       {
-        bold: "Price runway",
-        text: "for a borrowing position, how far each collateral asset's price can fall before it reaches the liquidation price.",
+        bold: "Interest",
+        text: "no event moves it: balances grow every block, so interest is what a balance holds beyond the amounts its events moved.",
       },
       {
-        bold: "Health factor",
-        text: "the single safety number for the whole spoke; a runway is exhausted when the position's health factor would hit 1.0. A position with no borrows has no health factor or liquidation risk to track.",
+        bold: "Liquidation cost",
+        text: "a liquidator takes collateral worth more than the debt it repays. The difference is the liquidation bonus, and it is what a liquidation costs the borrower.",
       },
     ],
     links: [
       { label: "Aave V4 positions", url: AAVE_FAQ_URLS.V4_POSITIONS },
-      { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
-      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
+      { label: "Liquidations in Aave V4", url: "https://aave.com/docs/aave-v4/positions/liquidations" },
     ],
   };
 }
@@ -691,16 +730,15 @@ export function aaveV4SpokeContent(spokeName: string): LearnMoreContent | null {
   const hub = (h: HubTier) => HUB_TIER_LABEL[h];
   const sameHub = meta.borrowHubs.length === 1 && meta.borrowHubs[0] === meta.collateralHub;
   const hubMapping = sameHub
-    ? `Collateral and borrows both sit in the ${hub(meta.collateralHub)} Hub.`
-    : `Collateral sits in the ${hub(meta.collateralHub)} Hub; borrows are drawn from the ${meta.borrowHubs.map(hub).join(" and ")} Hub${meta.borrowHubs.length > 1 ? "s" : ""}.`;
-  const archetype = ARCHETYPE_LABEL[meta.archetype];
+    ? `Here ${hub(meta.collateralHub)} is the hub and ${meta.name} the spoke: collateral supplied to ${meta.name} and what it lends both sit in the ${hub(meta.collateralHub)} hub.`
+    : `Here ${meta.name} is the spoke: its collateral sits in the ${hub(meta.collateralHub)} hub, and it borrows from the ${meta.borrowHubs.map(hub).join(" and ")} hub${meta.borrowHubs.length > 1 ? "s" : ""}.`;
 
-  const extraParagraphs = [...meta.narrative];
+  const extraParagraphs = [ARCHETYPE_GLOSS[meta.archetype], ...meta.narrative];
   if (meta.rateNote) extraParagraphs.push(meta.rateNote);
 
   return {
     title: `How the ${meta.name} Spoke Works`,
-    intro: `${archetype} — ${meta.name} on Aave V4's Hub & Spoke model. ${hubMapping}`,
+    intro: `Aave V4 splits lending in two. A hub holds the pooled tokens and sets their interest rates; a spoke is the market you use, with its own list of collateral, its own risk settings and its own health factor, and it draws tokens from a hub up to a limit the hub sets. ${hubMapping}`,
     extraParagraphs,
     links: meta.links ?? SPOKE_DOC_LINKS,
   };

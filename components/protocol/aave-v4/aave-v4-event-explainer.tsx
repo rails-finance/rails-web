@@ -16,6 +16,7 @@ import {
   aaveV4LiquidationContent,
   aaveV4SupplyContent,
   aaveV4BorrowContent,
+  aaveV4RepayContent,
   aaveV4CollateralToggleContent,
   aaveV4EventFallbackContent,
 } from "@/lib/shared/learn-more-content";
@@ -29,6 +30,7 @@ import {
   type ClauseInput,
 } from "@/lib/shared/explainer-prose";
 import { aaveV4EventSlots, coordsFor, type AaveV4Event } from "@/lib/aave-v4/explainer-clauses";
+import { useHealthFactorAround, hfOf } from "@/lib/aave-v4/use-health-factor-around";
 
 export interface AaveV4EventExplainerProps {
   ctx: AaveV4Context;
@@ -54,8 +56,9 @@ export function aaveV4LearnMoreContent(ctx: AaveV4Context): LearnMoreContent {
     case "withdraw":
       return aaveV4SupplyContent();
     case "borrow":
-    case "repay":
       return aaveV4BorrowContent();
+    case "repay":
+      return aaveV4RepayContent();
     case "collateral_toggle":
       return aaveV4CollateralToggleContent();
     default:
@@ -65,7 +68,16 @@ export function aaveV4LearnMoreContent(ctx: AaveV4Context): LearnMoreContent {
 
 export function AaveV4EventExplainer({ ctx, event, siblings, gas, skipLead }: AaveV4EventExplainerProps) {
   const coord = coordsFor(event);
-  const clauses = eventClauses(aaveV4EventSlots(ctx, coord, siblings ?? [event], event));
+  // The same read the opened grid's Health factor cell makes (one request,
+  // shared), so a liquidation's prose can say why the factor moved.
+  const hfRead = useHealthFactorAround(
+    ctx.eventType === "liquidation",
+    ctx.spokeAddress,
+    ctx.owner ?? event.wallet,
+    event.blockNumber,
+  );
+  const hf = hfRead.status === "ok" ? { before: hfOf(hfRead.before.wad), after: hfOf(hfRead.after.wad) } : undefined;
+  const clauses = eventClauses(aaveV4EventSlots(ctx, coord, siblings ?? [event], event, hf));
   // Per-transaction gas as the closing clause (muted — not a header/grid value,
   // so it stays in the body tone). Appended after the arc so it always reads
   // last, regardless of the teaser/skipLead split.

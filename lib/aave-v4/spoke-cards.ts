@@ -8,6 +8,7 @@
 // plus the chain-read liquidation thresholds (lib/aave-v4/liquidation-thresholds.ts). Interest
 // carry (computeAaveV4InterestPnl) additionally consumes chain-state balances.
 
+import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AaveV4Context } from "@/lib/shared/types/protocols/aave-v4";
 import { type PriceEntry, resolvePrice } from "@/lib/aave/prices";
@@ -19,7 +20,7 @@ import {
   computeSupplyBreakdown,
   type SupplyBreakdown,
 } from "@/lib/aave-v4/utils/position-calculation";
-import { effectiveBorrowAPR } from "@/lib/aave-v4/borrow-rate";
+import { borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
 
 // ---- Types ----
 
@@ -169,6 +170,13 @@ export interface AaveSpokeCardInfo {
   supplyingSymbols: string[];
   borrowingSymbols: string[];
   latestBorrowRate: number | null;
+  /** The debt asset `latestBorrowRate` belongs to. */
+  latestBorrowRateSymbol: string | null;
+  /** Every reserve this position has ever borrowed, with how much of it was
+   *  repaid by the owner and how much liquidators repaid, in tokens. Read
+   *  beside `borrowingSymbols` (the debt held now) to say when the debt mix
+   *  changed over the position's life. */
+  debtReserveHistory: { symbol: string; borrowed: number; repaid: number; liquidated: number }[];
   /** Aave-native HF = weightedCollateralUsd / totalDebtUsd. null when no debt. */
   healthFactor: number | null;
   /** Where `healthFactor` came from: "calc" when it is worked out from the same
@@ -778,11 +786,13 @@ export function buildSpokeCards(
     // Most-recent borrow rate on this spoke — the true per-block on-chain rate
     // (effectiveBorrowAPR prefers allDebts[].borrowAPR, falls back to inferred).
     let spokeBorrowRate: number | null = null;
+    let spokeBorrowRateSymbol: string | null = null;
     for (const e of [...g.events].reverse()) {
       if (!isAaveV4Event(e)) continue;
-      const apr = effectiveBorrowAPR(e.context.data);
-      if (apr) {
-        spokeBorrowRate = parseFloat(apr) * 100;
+      const top = borrowRatesByDebt(e.context.data)[0];
+      if (top) {
+        spokeBorrowRate = parseFloat(top.apr) * 100;
+        spokeBorrowRateSymbol = top.symbol;
         break;
       }
     }
@@ -884,6 +894,10 @@ export function buildSpokeCards(
       supplyingSymbols,
       borrowingSymbols,
       latestBorrowRate: spokeBorrowRate,
+      latestBorrowRateSymbol: spokeBorrowRateSymbol,
+      debtReserveHistory: g.result.reserves
+        .filter((r) => r.borrowed > 0)
+        .map((r) => ({ symbol: r.symbol, borrowed: r.borrowed, repaid: r.repaid, liquidated: r.liquidatedDebt })),
       healthFactor: calcResult.healthFactor,
       liqPrice,
       assetLiqPrices,
@@ -965,4 +979,12 @@ export function liquidationBufferFrom(
     single = { symbol: a.symbol, currentPrice: a.currentPrice, liqPrice: a.currentPrice / healthFactor };
   }
   return { dropPct, liquidatable: false, single };
+}
+
+/** "USDC " before "borrow rate" when the position has borrowed more than one
+ *  asset, so the rate says whose it is; "" otherwise. */
+export function rateSymbolLabel(spoke: AaveSpokeCardInfo): string {
+  return spoke.debtReserveHistory.length > 1 && spoke.latestBorrowRateSymbol
+    ? `${aaveV4DisplaySymbol(spoke.latestBorrowRateSymbol)} `
+    : "";
 }

@@ -11,10 +11,16 @@
 // §3's highlight rule — bold only chrome-mirrored figures, and every figure on
 // the card's chrome appears bold somewhere in this pane (reverse-completeness).
 
-import { type AaveSpokeCardInfo, type AaveV4InterestPnl, liquidationBuffer } from "@/lib/aave-v4/spoke-cards";
+import {
+  type AaveSpokeCardInfo,
+  type AaveV4InterestPnl,
+  liquidationBuffer,
+  rateSymbolLabel,
+} from "@/lib/aave-v4/spoke-cards";
 import { fmtUsd, hfLabel, fmtLiqPrice, fmtSignedUsd, fmtTokenAmount } from "@/lib/aave-v4/format";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import { fmtPrice } from "@/components/shared/price-pill";
 import { aaveV4SpokeContent, aaveV4PositionFallbackContent } from "@/lib/shared/learn-more-content";
 import { Prov } from "@/components/shared/provenance";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -46,6 +52,8 @@ const CURRENT_PRICE_PROV = {
     "Collateral asset price — the price Aave's oracle answers for the asset now, which is what the spoke values the position at. An off-chain market price stands in where the oracle registry leaves an asset out.",
   via: "Aave's oracle price · an off-chain market price where it has none",
 };
+
+const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 // Oxford-join a list of asset symbols for prose ("wstETH, WBTC and USDC").
 function joinSymbols(syms: string[]): string {
@@ -249,14 +257,26 @@ function buildSpokePositionItems(spoke: AaveSpokeCardInfo): {
       );
     }
     if (spoke.healthFactor != null) {
+      const lt = spoke.blendedLt;
       items.push(
         <span key="hf">
           Health factor of{" "}
           <H>
             <Prov info={healthFactorProv(spoke.healthFactorBasis)}>{hfLabel(spoke.healthFactor)}</Prov>
           </H>
-          : the risk-adjusted collateral is worth {hfLabel(spoke.healthFactor)}× the outstanding debt, and the position
-          becomes liquidatable if it falls to 1.00.
+          {lt != null && lt > 0 ? (
+            <>
+              : the {fmtUsd(spoke.weightedCollateralUsd).display} of debt the collateral can carry, divided by the debt
+              owed; at 1.00 the position becomes liquidatable. The event cards show the collateral ratio (collateral ÷
+              debt) instead: times {Math.round(lt * 100)}% it gives the health factor, so a {Math.round(100 / lt)}%
+              ratio is a health factor of 1.00.
+            </>
+          ) : (
+            <>
+              : the collateral counted at its liquidation threshold, divided by the debt; at 1.00 the position becomes
+              liquidatable.
+            </>
+          )}
         </span>,
       );
     }
@@ -273,8 +293,8 @@ function buildSpokePositionItems(spoke: AaveSpokeCardInfo): {
             <span key="liq">
               Liquidation tracks{" "}
               <span className="text-foreground/90 font-medium">{aaveV4DisplaySymbol(buf.single.symbol)}</span>: from
-              today&rsquo;s <Prov info={CURRENT_PRICE_PROV}>{fmtLiqPrice(buf.single.currentPrice)}</Prov> it would have
-              to fall about{" "}
+              today&rsquo;s <Prov info={CURRENT_PRICE_PROV}>{fmtPrice(buf.single.currentPrice)}</Prov> it would have to
+              fall about{" "}
               <H>
                 <Prov info={LIQ_DROP_PROV}>{buf.dropPct.toFixed(0)}%</Prov>
               </H>{" "}
@@ -315,11 +335,37 @@ function buildSpokePositionItems(spoke: AaveSpokeCardInfo): {
     if (spoke.latestBorrowRate != null) {
       items.push(
         <span key="rate">
-          The most recent borrow rate recorded on this spoke was{" "}
+          The most recent {rateSymbolLabel(spoke)}borrow rate recorded on this spoke was{" "}
           <H>
             <Prov info={borrowRateProv()}>{spoke.latestBorrowRate.toFixed(2)}%</Prov>
           </H>
           .
+        </span>,
+      );
+    }
+  }
+
+  // The debt mix over the position's life: a reserve borrowed before and not
+  // owed now, said once, with what cleared it.
+  if (!supplyOnly) {
+    const gone = spoke.debtReserveHistory.filter((r) => !spoke.borrowingSymbols.includes(r.symbol));
+    if (gone.length > 0 && spoke.borrowingSymbols.length > 0) {
+      const how = (r: (typeof gone)[number]) =>
+        r.liquidated > 0 && r.repaid > 0
+          ? "partly repaid and the rest cleared by liquidation"
+          : r.liquidated > 0
+            ? "cleared by liquidation"
+            : "repaid";
+      items.push(
+        <span key="debt-mix">
+          The debt changed asset over the position&rsquo;s life:{" "}
+          {gone.map((r, i) => (
+            <span key={r.symbol}>
+              {i > 0 ? "; " : null}
+              its {aaveV4DisplaySymbol(r.symbol)} debt was {how(r)}
+            </span>
+          ))}
+          , and the {borrowStr} debt is what remains.
         </span>,
       );
     }
@@ -374,7 +420,16 @@ function buildSpokePositionItems(spoke: AaveSpokeCardInfo): {
   if (spoke.wasLiquidated) {
     items.push(
       <span key="liquidated" className="text-rb-500">
-        This position has been liquidated at least once — that history is permanent even if it is healthy again now.
+        Liquidated{" "}
+        {spoke.liquidationCount > 0 ? (
+          <>
+            <H>{spoke.liquidationCount}</H> time{spoke.liquidationCount === 1 ? "" : "s"}
+          </>
+        ) : (
+          <>at least once</>
+        )}
+        . Liquidators sent those transactions, so the card counts them beside the owner&rsquo;s {spoke.txCount}, and the
+        timeline lists both.
       </span>,
     );
   }
@@ -411,18 +466,16 @@ export function AaveV4PositionExplanation({
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
   const { lead, items } = buildSpokePositionItems(spoke);
 
-  // Who has been operating the position, across the events on this spoke — the
-  // same externalActor() verdict each event card renders on its spine, reduced
-  // once so this pane can state the PATTERN rather than one row at a time. On a
-  // managed position it is the single most important thing about it (charter §5
-  // item 7), and no other surface here says it.
+  // The position managers that sent events on this spoke: the spoke's
+  // `caller` against the owner, reduced over the spoke's history by the page
+  // (aave-v4-spoke-view.tsx), so the card names each manager once and every
+  // event's own line stays one sentence. What a position manager is lives in
+  // the events' "?" modals (T4).
   //
-  // Count-first and plurality-safe: an "operated by <name>" template is false
-  // as soon as two accounts share the work, which is the normal shape of a
-  // professionally run position. An address is never spoken in place of a name
-  // — the count holds whether or not anything resolves. The identity stays
-  // unbolded: it has no chrome twin on the card, so bolding it would break the
-  // pane's reverse-completeness (charter §3).
+  // Count-first and plurality-safe: two or more managers are counted, with the
+  // busiest named where a name resolves. A lone manager is named by address
+  // when no name resolves. The identity stays unbolded: it has no chrome twin
+  // on the card (charter §3).
   //
   // ⚠️ Passes null, so the bullet always carries its own denominator. It must
   // NOT offer spoke.txCount: that counts DISTINCT NON-LIQUIDATION TRANSACTIONS
@@ -431,22 +484,25 @@ export function AaveV4PositionExplanation({
   // would have said "of those" about transactions while counting events.
   const ext = externalActivity;
   if (ext && ext.external > 0) {
-    const trailing = ext.external - (ext.actors[0]?.count ?? 0);
+    const n = ext.actors.length;
     items.push(
       <span key="operators">
         {operatorLead(ext, null, "recorded on this spoke")}
-        {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed not by the owner but by
-        another account acting on the owner&rsquo;s behalf. Aave V4 has no permissionless path for that: every spoke
-        action admits only a position manager — an account that governance has activated and the owner has separately
-        approved for this position — with a further per-reserve allowance behind anything that moved value out. So each
-        of these accounts was enabled by the owner before it acted.
-        {ext.actors.length === 1
-          ? leadName
-            ? ` All of it ran through ${leadName}.`
-            : " One address accounts for every one of them."
-          : leadName
-            ? ` The busiest of them, ${leadName}, accounts for ${ext.actors[0].count.toLocaleString("en-US")}, with ${trailing.toLocaleString("en-US")} across ${ext.actors.length - 1} further address${ext.actors.length === 2 ? "" : "es"}${secondName ? `, among them ${secondName}` : ""}.`
-            : ` The work splits across ${ext.actors.length} addresses, the busiest accounting for ${ext.actors[0].count.toLocaleString("en-US")}.`}
+        {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} sent through{" "}
+        {n === 1 ? "a position manager" : `${n} position managers`}, contracts acting for the owner with its approval
+        {n === 1 ? (
+          <>: {leadName ?? short(ext.actors[0].address)}</>
+        ) : n <= 3 ? (
+          <>
+            :{" "}
+            {ext.actors
+              .map((a, i) => (i === 0 && leadName) || (i === 1 && secondName) || short(a.address))
+              .join(n === 2 ? " and " : ", ")}
+          </>
+        ) : (
+          <>, the busiest of them {leadName ?? short(ext.actors[0].address)}</>
+        )}
+        .
       </span>,
     );
   }

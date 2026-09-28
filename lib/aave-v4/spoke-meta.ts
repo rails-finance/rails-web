@@ -179,7 +179,7 @@ export const SPOKE_META: Record<string, SpokeMeta> = {
     collateralHub: "Core",
     borrowHubs: ["Core"],
     narrative: [
-      "FX Spoke on the Core Hub: stablecoin collateral — USDC, USDT and EURC — against the Hub's full stable roster (USDT, USDC, USDG, RLUSD, frxUSD, GHO, EURC).",
+      "Collateral is USDC, USDT or EURC; it borrows any stablecoin the Core hub lends (USDT, USDC, USDG, RLUSD, frxUSD, GHO, EURC).",
       "EURC is the venue's non-USD leg; tight correlation between the currencies carries higher borrowing power than the same assets earn on the Main Spoke, with liquidation tuned to a narrow volatility profile.",
     ],
   },
@@ -199,7 +199,7 @@ export const SPOKE_META: Record<string, SpokeMeta> = {
     collateralHub: "Plus",
     borrowHubs: ["Plus"],
     narrative: [
-      "Correlated e-Mode Spoke on the Plus Hub: the Ethena basket — USDe, sUSDe and their Pendle principal tokens — borrowing USDe only.",
+      "Correlated Spoke on the Plus Hub: the Ethena basket — USDe, sUSDe and their Pendle principal tokens — borrowing USDe only.",
       "The USDe-only borrow side is what earns the tight correlated parameter set, with PT collateral carrying the Hub's highest borrowing power; the Spoke connects to the Plus Hub alone, with no Core credit line.",
     ],
   },
@@ -209,7 +209,7 @@ export const SPOKE_META: Record<string, SpokeMeta> = {
     collateralHub: "Plus",
     borrowHubs: ["Plus", "Core"],
     narrative: [
-      "Ethena ecosystem Spoke on the Plus Hub: the same collateral basket as the Correlated Spoke (USDe, sUSDe, Pendle PTs), borrowing USDe, USDC, USDT and GHO from the Plus Hub.",
+      "Ethena ecosystem Spoke on the Plus Hub: the same collateral basket as the Ethena Correlated Spoke (USDe, sUSDe, Pendle PTs), borrowing USDe, USDC, USDT and GHO from the Plus Hub.",
       "USDC, USDT and frxUSD also arrive from the Core Hub over a capped credit line, which limits how much Core liquidity Ethena strategies can draw while each Hub keeps its own solvency boundary.",
     ],
   },
@@ -219,7 +219,7 @@ export const SPOKE_META: Record<string, SpokeMeta> = {
     collateralHub: "Core",
     borrowHubs: ["Core"],
     narrative: [
-      "EtherFi e-Mode Spoke on the Core Hub: weETH collateral borrowing wETH only — a single-pair restaking-loop venue.",
+      "EtherFi Spoke on the Core Hub: weETH collateral borrowing wETH only — a single-pair restaking-loop venue.",
       "The one-collateral, one-borrow scope keeps LTV, liquidation bonus, oracle scope and caps independently adjustable for the LRT without touching the wider Hub.",
     ],
   },
@@ -229,7 +229,7 @@ export const SPOKE_META: Record<string, SpokeMeta> = {
     collateralHub: "Core",
     borrowHubs: ["Core"],
     narrative: [
-      "Kelp e-Mode Spoke on the Core Hub: rsETH collateral borrowing wETH only — the same single-pair restaking-loop shape as the EtherFi and Lido Spokes.",
+      "Kelp Spoke on the Core Hub: rsETH collateral borrowing wETH only — the same single-pair restaking-loop shape as the EtherFi and Lido Spokes.",
       "Parameters move independently of the wider Hub, sized to rsETH's own risk.",
     ],
   },
@@ -239,7 +239,7 @@ export const SPOKE_META: Record<string, SpokeMeta> = {
     collateralHub: "Core",
     borrowHubs: ["Core"],
     narrative: [
-      "Lido e-Mode Spoke on the Core Hub: wstETH collateral borrowing wETH only — the dedicated LST looping venue.",
+      "Lido Spoke on the Core Hub: wstETH collateral borrowing wETH only — the dedicated LST looping venue.",
       "Its collateral carries a collateral risk of 0%, so Lido borrowers pay no risk premium on top of the Hub's base rate.",
     ],
   },
@@ -249,7 +249,7 @@ export const SPOKE_META: Record<string, SpokeMeta> = {
     collateralHub: "Core",
     borrowHubs: ["Core"],
     narrative: [
-      "Lombard BTC e-Mode Spoke on the Core Hub: LBTC — Lombard's Babylon-staked BTC — borrowing wBTC and cbBTC.",
+      "Lombard BTC Spoke on the Core Hub: LBTC — Lombard's Babylon-staked BTC — borrowing wBTC and cbBTC.",
       "The dedicated Spoke keeps Babylon-protocol exposure inside its own bounded perimeter rather than in the Hub-wide collateral pool.",
     ],
   },
@@ -344,17 +344,22 @@ export function chainIdForSpokeAddress(address?: string | null): 1 | 8453 {
   return address && BASE_SPOKE_ADDRESSES.has(address.toLowerCase()) ? 8453 : 1;
 }
 
-export const ARCHETYPE_LABEL: Record<SpokeArchetype, string> = {
-  standard: "Standard Spoke",
-  "cross-hub-credit": "Cross-Hub Credit",
-  correlated: "Correlated Spoke",
-  isolation: "Isolation Spoke",
-  ecosystem: "Ecosystem Spoke",
+/** One plain sentence per spoke kind, opening the spoke's learn-more modal. */
+export const ARCHETYPE_GLOSS: Record<SpokeArchetype, string> = {
+  standard: "A general-purpose spoke: a broad list of collateral, borrowing from the hub it sits on.",
+  "cross-hub-credit":
+    "A spoke with credit lines to more than one hub, so it can lend tokens pooled in a hub other than the one holding its collateral.",
+  correlated:
+    "A spoke for assets whose prices move closely together. Because a sharp gap between them is unlikely, each unit of collateral can back more debt here than on a general-purpose spoke.",
+  isolation:
+    "A spoke with a short asset list and tight limits, so the risk of that collateral stays inside this one market.",
+  ecosystem:
+    "A spoke built around one asset family, with settings tuned to that family and kept apart from the rest of the hub.",
 };
 
 // A former `ARCHETYPE_ACCENT` map (per-archetype amber/violet/cyan/fuchsia tints)
-// lived here but was never consumed — the archetype renders as a neutral label
-// via ARCHETYPE_LABEL. It was removed to keep off-grammar color references out of
+// lived here but was never consumed — the archetype renders as a plain sentence
+// via ARCHETYPE_GLOSS. It was removed to keep off-grammar color references out of
 // the code; the archetype is identity, not a status, so it carries no color.
 
 // Display-name → server spoke-key map. Mirrors SPOKE_BY_KEY in
