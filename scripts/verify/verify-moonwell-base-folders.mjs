@@ -23,8 +23,9 @@
 // are skipped and the guard says the fixture drifted.
 //
 //   exploiter   0x719e…be919d — 21 owner-signed rows and 2,386 keeper events
-//               in folders; the position decision 0019 was decided from. Flat,
-//               its page draws 1,021 rows and a boundary card over 1,386.
+//               in folders; the position decision 0019 was decided from. Its
+//               2,407 events sit under the flat preload (TIMELINE_WINDOW_ROWS,
+//               2,500 since 2026-09-27), so its flat page draws them all.
 //   all-folders 0x11a0…520a — every event third-party-signed, so every event is
 //               inside a folder and `events` is EMPTY; its folders' members are
 //               mostly of kinds the header does not name (`other`).
@@ -56,7 +57,8 @@
 //   N2  a folder that could move the balance withholds a note; one that could
 //       not leaves it
 //   H0–H4 (exploiter, in a browser) the page asks for rows, the count line
-//       states the whole history where the flat page states a cut, no boundary
+//       states the whole history (the flat page states a cut when the history
+//       is deeper than the flat preload, and the whole history when not), no boundary
 //       is drawn, the heatmap counts every event, and the export note counts
 //       the folders' members
 //
@@ -93,7 +95,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve as resolvePath } from "node:path";
 import { readFileSync, existsSync } from "node:fs";
-import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
+import { BASE, hostFetch, bypassHeaders, reserveTimeline } from "./lib/host.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolvePath(HERE, "../..");
@@ -152,6 +154,7 @@ const { marketMapFromRoster } = await import("../../lib/sources/chain/moonwell-e
 const { resolveMoonwellRoster } = await import("../../lib/sources/chain/moonwell-roster.ts");
 const { rehydrateChainTimelineWire } = await import("../../lib/shared/timeline-wire.ts");
 const { shareRateNotesFor } = await import("../../lib/shared/market-note.ts");
+const { TIMELINE_WINDOW_ROWS } = await import("../../lib/shared/timeline-opening-balance.ts");
 const { MOONWELL_BASE_DEPLOYMENT, MOONWELL_BASE_DEPLOY_BLOCK, MOONWELL_BASE_WETH_ROUTER } = await import(
   "../../lib/moonwell-base/asset-catalog.ts"
 );
@@ -705,11 +708,15 @@ async function runPage(f, got, noteIds) {
       })
       .then(() => true)
       .catch(() => false);
+    // A page load's /timeline requests count against the Firewall rule
+    // and do not pass through hostFetch: book a few slots for each.
+    await reserveTimeline(3);
     await page.goto(`${BASE}/base/moonwell/${f.wallet}`, { waitUntil: "domcontentloaded", timeout: 300_000 });
     check(id("H0 the position page asks for its history as rows"), await asked);
     const line = await countLine(page);
 
     const flatPage = await ctx.newPage();
+    await reserveTimeline(3);
     await flatPage.goto(`${BASE}/base/moonwell/${f.wallet}?folders=0`, {
       waitUntil: "domcontentloaded",
       timeout: 300_000,
@@ -717,12 +724,19 @@ async function runPage(f, got, noteIds) {
     const flatLine = await countLine(flatPage);
     await flatPage.close();
     const total = fmt(got.grouped.totalEvents);
+    // The flat page cuts only a history deeper than its preload; under it, the
+    // flat page states the whole history as well.
+    const flatCuts = got.grouped.totalEvents > TIMELINE_WINDOW_ROWS;
+    const flatOk =
+      typeof flatLine === "string" &&
+      (flatCuts ? flatLine.startsWith("Showing ") && flatLine.includes(`of ${total}`) : flatLine === `${total} events`);
     check(
-      id("H1 the count line states the whole history, where the flat page states a cut"),
-      line === `${total} events` &&
-        typeof flatLine === "string" &&
-        flatLine.startsWith("Showing ") &&
-        flatLine.includes(`of ${total}`),
+      id(
+        flatCuts
+          ? "H1 the count line states the whole history, where the flat page states a cut"
+          : `H1 the count line states the whole history, as the flat page does under its ${fmt(TIMELINE_WINDOW_ROWS)}-row preload`,
+      ),
+      line === `${total} events` && flatOk,
       `grouped "${line}", flat "${flatLine}"`,
     );
 
