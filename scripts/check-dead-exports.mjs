@@ -29,6 +29,10 @@
 //     caller elsewhere, so reporting them is noise. A gate that always fails is
 //     as useless as one that cannot.
 //
+// The offline verifiers (`scripts/verify/**/*.ts`) are entries: a reference
+// only a verifier calls, such as the scrubber's event-level adapter
+// (`aaveV3FlowTimeline`) the index's day rows are tested against, is used.
+//
 // Both of those are the whole exclusion list. An earlier version of this
 // comment also claimed `lib/shared/types/protocols/**` was excluded; `3021ebd`
 // collapsed those mirrored declarations onto event-shape.ts and dropped the

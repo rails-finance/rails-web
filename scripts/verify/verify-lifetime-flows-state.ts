@@ -1,11 +1,16 @@
 // verify-lifetime-flows-state — the date scrubber's state(day) against the
-// design brief's reconciliation table and the Lifetime flows ledger
-// (rails-ops TO-DO-ui-jobs §141).
+// design brief's reconciliation table and the Lifetime flows ledger, and the
+// index's day rows (GET /api/aave-v3/flows/daily) against the page's events
+// (rails-ops reference/lifetime-flows-scrubber.md).
 // ----------------------------------------------------------------------------
 // OFFLINE. The fixture is the index's answer for Aave V3 Core wallet
 // 0xfb9395e0…2a71 (whole history, 63 events), so the ledger
 // (computeAaveV3Economics), the adapter (aaveV3FlowTimeline) and the model
-// (buildFlowModel / stateAt) all run on the rows the page runs on.
+// (buildFlowModel / stateAt) all run on the rows the page runs on. The
+// lifetime-flows-series-*.json fixtures are the route's answers for that
+// wallet and for 0xfb45f0e6…750a (liquidated five times), read on victoria
+// 2026-09-29; the liquidated wallet's events come from the shared flow-legs
+// fixture's rows.
 //
 //   npx tsx --test scripts/verify/verify-lifetime-flows-state.ts
 import { test } from "node:test";
@@ -16,10 +21,18 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AaveV3PositionView } from "@/components/protocol/aave-v3/aave-v3-position-card";
 import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { computeAaveV3Economics } from "@/lib/aave-v3/chain-truth-tower";
-import { aaveV3FlowTimeline } from "@/lib/aave-v3/flows-timeline";
+import {
+  AAVE_V3_FLOW_BUCKETS,
+  aaveV3FlowEvents,
+  aaveV3FlowSeriesTimeline,
+  aaveV3FlowTimeline,
+} from "@/lib/aave-v3/flows-timeline";
+import type { AaveV3FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
+import { aaveV3RowsToEvents, type MvRow } from "@/lib/sources/api/aave-v3-timeline";
 import {
   axisFor,
   buildFlowModel,
+  daysFromEvents,
   dayStart,
   formatFlowUsd,
   nextEventDay,
@@ -27,6 +40,7 @@ import {
   stateAt,
   type FlowModel,
   type FlowSideState,
+  type FlowTimeline,
 } from "@/lib/shared/flows-timeline";
 import { formatDate } from "@/lib/date";
 
@@ -162,4 +176,139 @@ test("the number format", () => {
   assert.equal(formatFlowUsd(-5_000), "−$5.0k");
   assert.equal(formatFlowUsd(1_234_567), "$1.2M");
   assert.equal(formatFlowUsd(9_999.7), "$10k");
+});
+
+// ── the route's day rows ────────────────────────────────────────────────────
+
+const readJson = <T>(name: string): T =>
+  JSON.parse(readFileSync(join(process.cwd(), "scripts/verify/fixtures", name), "utf8")) as T;
+
+/** The event-level answer and the route's, on the same footing: no daily
+ *  prices, one live stop, so every event day is valued at its events' prices. */
+function sameFooting(t: FlowTimeline): FlowTimeline {
+  return { ...t, dailyPrices: undefined, today: undefined };
+}
+
+function assertDaysMatch(name: string, reference: FlowModel, route: FlowModel) {
+  assert.deepEqual(route.eventDays, reference.eventDays, `${name}: the same active days`);
+  assert.equal(route.start, reference.start);
+  for (const day of reference.eventDays) {
+    const a = stateAt(reference, day);
+    const b = stateAt(route, day);
+    assert.equal(b.count, a.count, `${name} day ${day}: events`);
+    for (const side of ["collateral", "debt"] as const) {
+      assert.ok(near(b[side].now, a[side].now, Math.max(0.02, a[side].now * 1e-9)), `${name} day ${day}: ${side} held`);
+      for (const seg of [...a[side].bar, ...a[side].sources]) {
+        const other = [...b[side].bar, ...b[side].sources].find((x) => x.key === seg.key);
+        assert.ok(other && near(other.value, seg.value, 0.02), `${name} day ${day}: ${seg.key}`);
+      }
+    }
+  }
+}
+
+test("the route's day rows reproduce the event-level answer at every event day: 0xfb9395e0…2a71", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const route = aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress);
+  assert.ok(route);
+  assert.equal(series.unpricedLegs, 0);
+  const a = buildFlowModel(sameFooting(timeline!)) as FlowModel;
+  const b = buildFlowModel(sameFooting(route)) as FlowModel;
+  assertDaysMatch("fb93", a, b);
+  // The live stop is the ledger's in both.
+  const la = stateAt(a, a.liveStop);
+  const lb = stateAt(b, b.liveStop);
+  assert.ok(near(lb.collateral.now, la.collateral.now) && near(lb.debt.now, la.debt.now));
+});
+
+test("the route's day rows reproduce the event-level answer at every event day: 0xfb45f0e6…750a, liquidated", () => {
+  const legs = readJson<{
+    tokens: Record<string, { symbol: string; decimals: number }>;
+    cases: { wallet: string; rows: MvRow[] }[];
+  }>("aave-v3-flow-legs.json");
+  const c = legs.cases.find((x) => x.wallet === "0xfb45f0e612424104753f2e2fc9507b3d082e750a")!;
+  const metas = new Map(
+    Object.entries(legs.tokens).map(([address, t]) => [
+      address,
+      { address, symbol: t.symbol, decimals: t.decimals, lt: null },
+    ]),
+  );
+  const flows = aaveV3FlowEvents(aaveV3RowsToEvents(c.rows, c.wallet, metas).events, undefined);
+  assert.ok(flows);
+  const live = { collateralUsd: 0, debtUsd: 0, collateralInterestUsd: null, debtInterestUsd: null };
+  const reference: FlowTimeline = {
+    buckets: AAVE_V3_FLOW_BUCKETS.filter((b) => flows.used.has(b.key)),
+    days: daysFromEvents(
+      AAVE_V3_FLOW_BUCKETS.map((b) => b.key),
+      flows.events,
+    ),
+    live,
+  };
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb45.json");
+  const route = aaveV3FlowSeriesTimeline(series, null, undefined);
+  assert.ok(route);
+  const a = buildFlowModel(reference) as FlowModel;
+  const b = buildFlowModel({ ...sameFooting(route), live }) as FlowModel;
+  assertDaysMatch("fb45", a, b);
+  assert.ok(b.ticks.filter((t) => t.tick === "liquidation").length >= 1, "liquidation days tick red");
+});
+
+test("with daily prices the stale WBTC step is gone and the slider runs to today", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const route = aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!;
+  const m = buildFlowModel(route) as FlowModel;
+  assert.ok(m.daily);
+  // Every reserve this wallet held recorded a price every day it was held.
+  assert.deepEqual(
+    Object.values(series.prices).map((p) => p.maxGapDays),
+    Object.values(series.prices).map(() => 0),
+  );
+  assert.equal(m.repricings.length, 0);
+  for (let stop = 0; stop < m.liveStop; stop++) assert.equal(stateAt(m, stop).stale.length, 0);
+  // The last event is today's, so the live stop follows it; with none today
+  // it would be today's own stop.
+  assert.equal(m.liveStop, Math.max(m.lastDay + 1, series.today - Math.floor(m.start / 86_400_000)));
+  // Between events a quiet WBTC balance now moves with the market. On the
+  // day before the old step the event prices valued it at August 2023's
+  // price; the daily series values it at that day's. On the step's own day
+  // both read that day's prices: the event's block against the day's end.
+  const oct7 = Math.floor((Date.parse("2025-10-07T00:00:00Z") - m.start) / 86_400_000);
+  const stale = stateAt(model, oct7 - 1).collateral.now;
+  const daily = stateAt(m, oct7 - 1).collateral.now;
+  assert.ok(daily > 3 * stale, `the day before: ${stale} at event prices, ${daily} at daily prices`);
+  const a = stateAt(model, oct7).collateral.now;
+  const b = stateAt(m, oct7).collateral.now;
+  assert.ok(Math.abs(a - b) / a < 0.05, `the step's day: ${a} and ${b}`);
+});
+
+test("a gap past SERIES_GAP_DAYS keeps the older price and marks the refresh", () => {
+  const t: FlowTimeline = {
+    buckets: [{ key: "deposited", label: "Deposited", side: "collateral", dir: "in" }],
+    days: [
+      {
+        day: 1000,
+        events: 1,
+        tick: "collateral",
+        cum: { deposited: 100 },
+        balances: [{ asset: "0xa", symbol: "A", side: "collateral", amount: 1 }],
+        prices: [{ asset: "0xa", usd: 100, ts: 1000 * 86_400 + 60 }],
+      },
+    ],
+    live: { collateralUsd: 300, debtUsd: 0, collateralInterestUsd: null, debtInterestUsd: null },
+    dailyPrices: {
+      "0xa": [
+        [1000, 100],
+        [1001, 110],
+        [1020, 300],
+      ],
+    },
+    today: 1030,
+  };
+  const m = buildFlowModel(t) as FlowModel;
+  assert.equal(stateAt(m, 1).collateral.now, 110);
+  assert.equal(stateAt(m, 8).stale.length, 0);
+  assert.equal(stateAt(m, 9).stale[0]?.symbol, "A");
+  assert.equal(stateAt(m, 19).collateral.now, 110);
+  assert.equal(stateAt(m, 20).collateral.now, 300);
+  assert.equal(stateAt(m, 20).stale.length, 0);
+  assert.deepEqual(m.repricings, [{ day: 20, symbol: "A", from: 1001 * 86_400 }]);
 });

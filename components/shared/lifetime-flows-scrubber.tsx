@@ -198,6 +198,7 @@ function Legend({
   onPin,
   when,
   isLive,
+  daily,
 }: {
   side: FlowSide;
   segments: FlowSegment[];
@@ -207,6 +208,7 @@ function Legend({
   onPin: (k: string) => void;
   when: string;
   isLive: boolean;
+  daily: boolean;
 }) {
   return (
     <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-rb-500">
@@ -227,7 +229,7 @@ function Legend({
             >
               <i aria-hidden className="inline-block h-2.5 w-3.5 shrink-0 rounded-[2px]" style={fillStyle(side, s)} />
               <Label s={s} />
-              <Prov info={flowSegmentProv(s, side, when, isLive)} echo={s.fill === "held"}>
+              <Prov info={flowSegmentProv(s, side, when, isLive, daily)} echo={s.fill === "held"}>
                 <span className="font-medium tabular-nums text-foreground">{formatFlowUsd(s.value)}</span>
               </Prov>
             </button>
@@ -282,7 +284,7 @@ function SideBlock({
     <div className="mt-4 first:mt-3">
       <div className="mb-1.5 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
         <div className="flex items-baseline gap-2">
-          <Prov info={flowSegmentProv(held, side, when, isLive)}>
+          <Prov info={flowSegmentProv(held, side, when, isLive, model.daily)}>
             <span className="text-xl font-semibold tabular-nums text-foreground">{formatFlowUsd(st.now)}</span>
           </Prov>
           <span className="text-xs text-rb-500">{coll ? "collateral now" : "owed now"}</span>
@@ -359,6 +361,7 @@ function SideBlock({
               onPin={onPin}
               when={when}
               isLive={isLive}
+              daily={model.daily}
             />
           </>
         )}
@@ -372,6 +375,7 @@ function SideBlock({
         onPin={onPin}
         when={when}
         isLive={isLive}
+        daily={model.daily}
       />
     </div>
   );
@@ -425,7 +429,7 @@ function ScrubberBody({ model }: { model: FlowModel }) {
   const pin = (k: string) => setPinned((p) => (p === k ? null : k));
   const dateText = s.isLive ? "Today, live prices" : formatDate(dayStart(model, stop));
   const when = s.isLive ? "now" : `the end of ${dateText}`;
-  const total = model.rows.length;
+  const total = model.totalEvents;
   const repricedHere = s.isLive ? [] : model.repricings.filter((r) => r.day === stop);
   const btn = `${CTRL_GHOST} ${CTRL_OFF} size-11 shrink-0 rounded-md sm:size-9`;
 
@@ -556,15 +560,17 @@ function ScrubberBody({ model }: { model: FlowModel }) {
         <p className="mt-2 text-[11px] leading-snug text-rb-500">
           {repricedHere.map((r) => `${r.symbol} repriced on this day, last priced ${formatDate(r.from)}. `).join("")}
           {s.stale.length > 0 &&
-            `Valued at each asset's last event price: ${s.stale
+            `${model.daily ? "No newer price recorded" : "Valued at each asset's last event price"}: ${s.stale
               .map((x) => `${x.symbol} from ${monthYear(x.pricedAt)}`)
               .join(", ")}.`}
         </p>
       )}
       <p className="mt-2 text-[11px] leading-snug text-rb-500">
         Solid is still there, hatched has left, and a dashed fill moved no funds. The dashed outline marks where each
-        bar ends today. Flows are valued at the oracle price at their block; between events an asset keeps the price of
-        its last event.
+        bar ends today. Flows are valued at the oracle price at their block;{" "}
+        {model.daily
+          ? "what is held on a day is valued at the last oracle price recorded by that day's end."
+          : "between events an asset keeps the price of its last event."}
       </p>
     </div>
   );

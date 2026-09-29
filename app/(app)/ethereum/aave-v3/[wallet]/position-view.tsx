@@ -54,7 +54,8 @@ import { fetchAaveV3GroupedTimeline, type AaveV3GroupedTimelineResponse } from "
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
-import { aaveV3FlowTimeline } from "@/lib/aave-v3/flows-timeline";
+import { aaveV3FlowSeriesTimeline } from "@/lib/aave-v3/flows-timeline";
+import { fetchAaveV3FlowSeries, type AaveV3FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
 import { aaveV3CountNote, aaveV3CountSplit, aaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
@@ -578,16 +579,25 @@ export default function AaveV3PositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
-  // Lifetime flows over time (rails-ops TO-DO-ui-jobs §141): the date
-  // scrubber leads the panel and the ledger sits one click under it. It needs
-  // the whole history on the page, so a windowed or folder-served page keeps
-  // the ledger alone.
+  // Lifetime flows over time (rails-ops reference/lifetime-flows-scrubber.md):
+  // the date scrubber leads the panel and the ledger sits one click under it.
+  // Its day rows and daily prices come from the index for the whole history,
+  // so a windowed or folder-served page draws it too. A failed read leaves the
+  // ledger alone.
+  const [flowSeries, setFlowSeries] = useState<AaveV3FlowSeries | null>(null);
+  useEffect(() => {
+    const ctl = new AbortController();
+    setFlowSeries(null);
+    fetchAaveV3FlowSeries({ wallet, market, signal: ctl.signal })
+      .then(setFlowSeries)
+      .catch((err) => {
+        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
+      });
+    return () => ctl.abort();
+  }, [wallet, market]);
   const flowTimeline = useMemo(
-    () =>
-      towerData && view && historyWindow.state === "whole" && (servedFolders?.length ?? 0) === 0
-        ? aaveV3FlowTimeline(aaveEvents, towerData, view.priceByAddress)
-        : null,
-    [towerData, view, historyWindow.state, servedFolders, aaveEvents],
+    () => (flowSeries ? aaveV3FlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
+    [flowSeries, towerData, view],
   );
 
   // The top row's price dropdown: the on-chain oracle
