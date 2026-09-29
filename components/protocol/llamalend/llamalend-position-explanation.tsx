@@ -20,12 +20,15 @@ import { fmtColl, fmtHealth } from "@/lib/llamalend/event-figures";
 import { formatDate } from "@/lib/date";
 import { isLlamalendEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { LlamalendPositionView } from "./llamalend-position-card";
+import type { LlamalendFactoryKind } from "@/lib/llamalend/asset-catalog";
 
 export function LlamalendPositionExplanation({
   chain,
   liquidationCount,
   eventCount,
   lost,
+  sold,
+  factory,
   closed,
 }: {
   /** The live chain read. Null until it lands (or for a closed account):
@@ -39,6 +42,11 @@ export function LlamalendPositionExplanation({
   /** Collateral lost to soft-liquidation over the position's life
    *  (llamalendLostToSoftLiq), where it can be stated. */
   lost?: number | null;
+  /** Collateral the AMM has sold net of buy-backs, on a position in its bands
+   *  now (llamalendSoldInBands). */
+  sold?: number | null;
+  /** The market's factory lineage, for the mint / lend line. */
+  factory?: LlamalendFactoryKind | null;
   /** A closed position's story, from its events. */
   closed?: { view: LlamalendPositionView; events: BaseActivityEvent[] } | null;
 }) {
@@ -59,7 +67,15 @@ export function LlamalendPositionExplanation({
         {chain.liquidationDiscount != null ? <>{pct(chain.liquidationDiscount)} </> : null}liquidation discount, with
         the debt{aboveBand ? "; while the price is above the bands, the distance adds to it" : ""}. Below 0 anyone may
         liquidate the position. It falls as the price moves down through the bands, as interest adds to the debt, and
-        with each loss on the AMM&rsquo;s sales.
+        with each loss on the AMM&rsquo;s sales.{" "}
+        {aboveBand ? (
+          <>Interest also raises the band prices, which shortens the distance.</>
+        ) : chain.inSoftLiq ? (
+          <>
+            Inside the bands a rising price does not lift it: the AMM buys the collateral back, and each round
+            trip&rsquo;s loss lowers it.
+          </>
+        ) : null}
       </span>,
     );
   }
@@ -88,7 +104,9 @@ export function LlamalendPositionExplanation({
             , bands {chain.n1}…{chain.n2} (a higher band number is a lower price)
           </>
         ) : null}
-        . Soft-liquidation begins at the top of that range and completes at its bottom.
+        . Soft-liquidation begins at the top of that range and completes at its bottom. Band prices rise over time with
+        the market&rsquo;s interest, by the same multiplier that grows the debt, so the same bands price higher than
+        when the loan was placed in them.
       </span>,
     );
   }
@@ -143,6 +161,39 @@ export function LlamalendPositionExplanation({
         </H>{" "}
         of this position&rsquo;s collateral{aboveBand ? ", because the price sits above the band" : ""}, and only
         interest accrues, second by second.
+      </span>,
+    );
+  }
+
+  if (sold != null && sold > 0 && chain.converted != null) {
+    bullets.push(
+      <span key="sold">
+        Sold by the AMM and not bought back:{" "}
+        <H>
+          {fmtColl(sold)} {chain.collateralSymbol}
+        </H>
+        , what was deposited less what was withdrawn and what is held now. The{" "}
+        <H>
+          <AmountText value={chain.converted} /> {chain.borrowedSymbol}
+        </H>{" "}
+        converted is what the AMM holds for it.
+      </span>,
+    );
+  }
+
+  if (factory === "crvusd") {
+    bullets.push(
+      <span key="market-kind">
+        This is a mint market: the {chain.borrowedSymbol} is minted against the loan by Curve&rsquo;s crvUSD system, up
+        to the market&rsquo;s debt ceiling. The rate moves with crvUSD&rsquo;s price and the size of the Peg
+        Stabilization Reserve.
+      </span>,
+    );
+  } else if (factory === "oneway") {
+    bullets.push(
+      <span key="market-kind">
+        This is a lend market: the {chain.borrowedSymbol} is lent from a vault of lenders&rsquo; deposits, all the
+        interest goes to those lenders, and the rate rises with the share of the vault that is lent.
       </span>,
     );
   }

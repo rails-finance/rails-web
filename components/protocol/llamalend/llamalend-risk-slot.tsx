@@ -35,20 +35,27 @@
 import { Prov } from "@/components/shared/provenance";
 import { RiskFigure, RiskFooterStrip, RiskMeter, RiskStrong } from "@/components/shared/risk-footer-strip";
 import { llamalendConvertedProv, llamalendHealthFullProv, llamalendHealthProv } from "@/lib/llamalend/live-provenance";
-import { llamalendLostProv } from "@/lib/llamalend/event-provenance";
+import { llamalendLostProv, llamalendSoldProv } from "@/lib/llamalend/event-provenance";
 import { fmtColl, fmtHealth } from "@/lib/llamalend/event-figures";
 import { formatNumber, formatUnitsExact } from "@/lib/utils/format";
 import { LlamalendBandsAxis } from "./llamalend-bands-axis";
 import type { LlamalendChainResponse } from "@/lib/api/fetch-llamalend-position";
 
+/** Health under this (5%) and above 0 carries the near-0 line. */
+const HEALTH_NEAR_ZERO = 0.05;
+
 export function LlamalendRiskSlot({
   chain,
   lost,
+  sold,
 }: {
   chain: LlamalendChainResponse;
   /** Collateral lost to soft-liquidation over the position's life, where it
    *  can be stated (llamalendLostToSoftLiq). */
   lost?: number | null;
+  /** Collateral the AMM has sold net of buy-backs, on a position in its bands
+   *  now (llamalendSoldInBands). */
+  sold?: number | null;
 }) {
   if (chain.chainStale || !chain.hasLoan) return null;
 
@@ -75,6 +82,15 @@ export function LlamalendRiskSlot({
               {fmtHealth(chain.healthFull)}
             </Prov>
           </RiskStrong>
+          {/* Near 0 the figure alone reads as small, not as close to
+              liquidation: one plain line, in the caution tone Liquity V1's
+              card gives Recovery Mode. */}
+          {chain.healthFull > 0 && chain.healthFull < HEALTH_NEAR_ZERO && (
+            <span className="font-semibold text-caution-600 dark:text-caution-400">
+              {" "}
+              · close to 0; below 0 anyone may liquidate it
+            </span>
+          )}
         </RiskFigure>
       )}
 
@@ -107,6 +123,16 @@ export function LlamalendRiskSlot({
               >
                 {chain.converted != null ? formatNumber(chain.converted) : "—"} {chain.borrowedSymbol}
               </span>
+            </Prov>
+          </RiskStrong>
+        </RiskFigure>
+      )}
+
+      {sold != null && sold > 0 && (
+        <RiskFigure label="Sold by the AMM, net">
+          <RiskStrong>
+            <Prov info={llamalendSoldProv(chain.collateralSymbol, chain.controller)}>
+              {fmtColl(sold)} {chain.collateralSymbol}
             </Prov>
           </RiskStrong>
         </RiskFigure>

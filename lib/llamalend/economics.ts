@@ -149,6 +149,21 @@ export function llamalendLostToSoftLiq(view: LlamalendPositionView, lifetime: Li
   return gap;
 }
 
+/**
+ * Collateral the AMM has sold net of buy-backs on a position in its bands now:
+ * deposited − withdrawn − held. The converted balance at head is what it holds
+ * for it. Stated only on an open position with the live read landed, something
+ * converted, and no hard liquidation (which takes the converted leg with it).
+ */
+export function llamalendSoldInBands(view: LlamalendPositionView, lifetime: LifetimeFlows | null | undefined) {
+  if (!lifetime || view.status !== "open" || view.stateBasis !== "chain" || view.collateral == null) return null;
+  if (view.converted == null || view.converted <= DUST) return null;
+  if (view.liquidationCount > 0 || lifetime.collateralTaken > DUST || lifetime.convertedTaken > DUST) return null;
+  const gap = lifetime.collateralAdded - lifetime.collateralWithdrawn - view.collateral;
+  if (gap <= Math.max(lifetime.collateralAdded * 1e-9, DUST)) return null;
+  return gap;
+}
+
 export function computeLlamalendEconomics(
   view: LlamalendPositionView,
   events?: BaseActivityEvent[],
@@ -302,8 +317,22 @@ export function computeLlamalendEconomics(
     return valued ? (usd ?? 0) : amount;
   };
 
+  // Each segment's hover names what it is.
+  const label = (lines: TowerLine[], text: string) => lines.forEach((l) => (l.tipLabel = text));
+  collateralLines.forEach((l) => (l.tipLabel = l.key === "converted" ? "Converted" : "Collateral held"));
+  label(debtLines, "Debt now");
+  collExited.forEach((l) => (l.tipLabel = l.key === "coll-lost" ? "Lost to soft-liquidation" : "Withdrawn"));
+  label(collLiquidated, "Taken in liquidation");
+  label(debtExited, "Repaid");
+  label(debtLiquidated, "Cleared in liquidation");
+
   return {
     valued,
+    // The side counts the converted balance with the collateral token, so its
+    // title says so where there is one.
+    ...(view.converted != null && view.converted > DUST
+      ? { collateralTitle: "Collateral and converted", wrapFlowLabels: true }
+      : {}),
     // crvUSD (~$1) through the AMM's own oracle → chain-derived; survives
     // the render gate.
     priceKind: valued ? "chain-derived" : undefined,

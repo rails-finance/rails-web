@@ -38,7 +38,12 @@ import { parseAbi } from "viem";
 import { alchemyClient } from "@/lib/sources/chain/rpc";
 import { scaleRaw } from "@/lib/sources/chain/erc20-meta";
 import { resolveLlamalendMarketState, type LlamalendMarketStateMap } from "@/lib/sources/chain/llamalend-markets";
-import { marketPairLabel, LLAMALEND_ADDRESSES, type LlamalendVersion } from "@/lib/llamalend/asset-catalog";
+import {
+  marketPairLabel,
+  LLAMALEND_ADDRESSES,
+  type LlamalendFactoryKind,
+  type LlamalendVersion,
+} from "@/lib/llamalend/asset-catalog";
 
 export type LlamalendPositionStatus = "open" | "closed" | "liquidated";
 // Mirrors the rails route's sortBy allowlist (mig 187's debt_usd/collateral_usd
@@ -58,6 +63,9 @@ export interface LlamalendPositionSummary {
   /** The market's LLAMMA AMM (for receipts/links). */
   amm: string | null;
   version: LlamalendVersion;
+  /** Which factory made the market (mint, lend or V2); null when the row's
+   *  factory is not one of the three. */
+  factory?: LlamalendFactoryKind | null;
   /** "wstETH / crvUSD" — display; the controller address is the key. */
   marketLabel: string;
   collateralSymbol: string;
@@ -252,6 +260,7 @@ export async function buildLlamalendPositionRows(
       user,
       amm: mk.amm ? mk.amm.toLowerCase() : (state.get(controller)?.amm ?? null),
       version: (mk.version === 2 ? "v2" : "v1") as LlamalendVersion,
+      factory: factoryKindOf(mk.factory, mk.version),
       marketLabel: marketPairLabel(mk.collateral.symbol, mk.borrowed.symbol),
       collateralSymbol: mk.collateral.symbol,
       collateralDecimals,
@@ -284,4 +293,14 @@ export async function buildLlamalendPositionRows(
       lastTxHash: r.lastTxHash,
     };
   });
+}
+
+/** The factory lineage from the row's factory field (an address, or the
+ *  lineage's own name). */
+function factoryKindOf(factory: string | null | undefined, version: number): LlamalendFactoryKind | null {
+  const f = (factory ?? "").toLowerCase();
+  if (version === 2 || f === LLAMALEND_ADDRESSES.V2_FACTORY || f === "v2") return "v2";
+  if (f === LLAMALEND_ADDRESSES.CRVUSD_FACTORY || f === "crvusd" || f === "mint") return "crvusd";
+  if (f === LLAMALEND_ADDRESSES.ONEWAY_FACTORY || f === "oneway" || f === "lend") return "oneway";
+  return null;
 }

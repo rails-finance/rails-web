@@ -19,6 +19,7 @@ import {
   liquidationConvertedProv,
   type LlamalendCoords,
 } from "@/lib/llamalend/event-provenance";
+import type { LlamalendLoanMark } from "@/lib/llamalend/event-figures";
 
 export interface LlamalendEventHeaderProps {
   actionLabel: string;
@@ -35,6 +36,9 @@ export interface LlamalendEventHeaderProps {
    *  table can stay ahead of — and without an address the chip never reaches a
    *  CDN at all. The event states both contracts; this reads them. */
   flows?: AssetFlow[];
+  /** Where the event sits among the page's loans: the first row of a loan
+   *  carries the "Open" pill, a repay that clears the debt the "Close" pill. */
+  loanMark?: LlamalendLoanMark | null;
 }
 
 export function LlamalendEventHeader({
@@ -46,6 +50,7 @@ export function LlamalendEventHeader({
   eventNumber,
   wallet,
   flows,
+  loanMark,
 }: LlamalendEventHeaderProps) {
   const coords: LlamalendCoords = { txHash, blockNumber, controller: ctx.controller, user: wallet };
   const isLiq = ctx.eventType === "liquidation";
@@ -56,8 +61,20 @@ export function LlamalendEventHeader({
   const deltas: ChainTruthDelta[] = [];
   const coll = Number(ctx.collateralDelta ?? "0") || 0;
   const debt = Number(ctx.debtDelta ?? "0") || 0;
+  // An operate row reads as Liquity V2's does: each amount carries its own
+  // verb and token, and the row label is the Open / Close pill or nothing.
+  const opens = !isLiq && (loanMark ? loanMark.opens : !!ctx.isOpen);
+  const closes = !isLiq && !!loanMark?.closes;
+  const verb = (axis: "coll" | "debt", v: number): Pick<ChainTruthDelta, "label" | "axisVerb"> =>
+    isLiq
+      ? {}
+      : {
+          label: axis === "coll" ? (v > 0 ? (opens ? "Deposit" : "Add") : "Withdraw") : v > 0 ? "Borrow" : "Repay",
+          axisVerb: true,
+        };
   if (coll !== 0) {
     deltas.push({
+      ...verb("coll", coll),
       value: coll,
       symbol: ctx.collateralSymbol,
       address: soleFlowAddress(flows, ctx.collateralSymbol),
@@ -83,6 +100,7 @@ export function LlamalendEventHeader({
   if (debt !== 0) {
     deltas.push({
       ...(borrowerLoss ? { suffix: "debt" } : {}),
+      ...verb("debt", debt),
       value: debt,
       symbol: ctx.borrowedSymbol,
       address: soleFlowAddress(flows, ctx.borrowedSymbol),
@@ -135,7 +153,8 @@ export function LlamalendEventHeader({
   return (
     <ChainTruthRow
       spec={{
-        label: actionLabel,
+        label: isLiq ? actionLabel : opens ? "Open" : closes ? "Close" : "",
+        ...(opens ? { status: "open" as const } : closes ? { status: "close" as const } : {}),
         critical: borrowerLoss,
         deltas,
         party,

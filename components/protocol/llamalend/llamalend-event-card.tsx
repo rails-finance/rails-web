@@ -25,7 +25,7 @@ import { LlamalendEventHeader } from "./llamalend-event-header";
 import { LlamalendEventDetail } from "./llamalend-event-detail";
 import { LlamalendEventExplainer, llamalendLearnMoreContent } from "./llamalend-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import type { LlamalendPreviousStated } from "@/lib/llamalend/event-figures";
+import type { LlamalendLoanMark, LlamalendPreviousStated } from "@/lib/llamalend/event-figures";
 
 export interface LlamalendEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "llamalend"; data: LlamalendContext } };
@@ -35,9 +35,18 @@ export interface LlamalendEventCardProps {
   /** The last collateral balance an earlier row stated, for what the AMM
    *  sold since (lib/llamalend/event-figures.ts). */
   previousStated?: LlamalendPreviousStated | null;
+  /** Where the event sits among the page's loans (llamalendLoanMarks). */
+  loanMark?: LlamalendLoanMark | null;
 }
 
-export function LlamalendEventCard({ event, isFirst, isLast, eventNumber, previousStated }: LlamalendEventCardProps) {
+export function LlamalendEventCard({
+  event,
+  isFirst,
+  isLast,
+  eventNumber,
+  previousStated,
+  loanMark,
+}: LlamalendEventCardProps) {
   const ctx = event.context.data;
   // Only the BORROWER's leg of a third-party liquidation is a passive loss;
   // the liquidator's leg and a self-liquidation are the subject's own acts.
@@ -87,7 +96,7 @@ export function LlamalendEventCard({ event, isFirst, isLast, eventNumber, previo
         info: isLiq
           ? liquidationProv("collateral", ctx.collateralSymbol, role ?? "borrower", coords, ctx.raw?.collateralDelta)
           : collateralDeltaProv(ctx.collateralSymbol, ctx.eventType, coords, ctx.raw?.collateralDelta),
-        value: chainTruthDeltaValue(coll, false),
+        value: chainTruthDeltaValue(coll, !isLiq),
         symbol: ctx.collateralSymbol,
       },
     });
@@ -101,7 +110,7 @@ export function LlamalendEventCard({ event, isFirst, isLast, eventNumber, previo
         info: isLiq
           ? liquidationProv("debt", ctx.borrowedSymbol, role ?? "borrower", coords, ctx.raw?.debtDelta)
           : debtDeltaProv(ctx.borrowedSymbol, ctx.eventType, coords, ctx.raw?.debtDelta),
-        value: chainTruthDeltaValue(debt, false),
+        value: chainTruthDeltaValue(debt, !isLiq),
         symbol: ctx.borrowedSymbol,
       },
     });
@@ -133,6 +142,7 @@ export function LlamalendEventCard({ event, isFirst, isLast, eventNumber, previo
           eventNumber={eventNumber}
           wallet={event.wallet}
           flows={event.flows}
+          loanMark={loanMark}
         />
       }
       detail={
@@ -152,10 +162,11 @@ export function LlamalendEventCard({ event, isFirst, isLast, eventNumber, previo
           blockNumber={event.blockNumber}
           wallet={event.wallet}
           skipLead
+          loanMark={loanMark}
         />
       }
       explainerLabel="Plain English"
-      explainerTeaser={llamalendExplainerTeaser(ctx, coords)}
+      explainerTeaser={llamalendExplainerTeaser(ctx, coords, loanMark)}
       txHash={event.txHash}
       learnMore={<LearnMore inline content={llamalendLearnMoreContent(ctx)} />}
       persistKey={`llamalend:${event.id}`}

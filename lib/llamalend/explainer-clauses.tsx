@@ -60,7 +60,7 @@ import {
   type LlamalendCoords,
 } from "@/lib/llamalend/event-provenance";
 import { formatNumber } from "@/lib/utils/format";
-import { fmtColl, fmtHealth, type LlamalendEventFigures } from "@/lib/llamalend/event-figures";
+import { fmtColl, fmtHealth, type LlamalendEventFigures, type LlamalendLoanMark } from "@/lib/llamalend/event-figures";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 /** A balance below this is arithmetic dust, not a real leg. Mirrors economics.ts. */
@@ -149,6 +149,8 @@ export function llamalendEventSlots(
   coords: LlamalendCoords,
   /** The position read at block − 1 and at this block, once it landed. */
   f?: LlamalendEventFigures | null,
+  /** Where the event sits among the page's loans (llamalendLoanMarks). */
+  mark?: LlamalendLoanMark | null,
 ): EventProseSlots {
   const collSym = ctx.collateralSymbol;
   const debtSym = ctx.borrowedSymbol;
@@ -156,13 +158,14 @@ export function llamalendEventSlots(
   const bands = bandMoveClause(ctx, f);
   const inBand = inBandRepayClause(ctx, f);
 
-  // Emitted-delta figures echo the header row (signed exact value, same prov
-  // vocabulary + coords → same entry key).
+  // Emitted-delta figures echo the header row (the bare magnitude its verb
+  // label carries, same prov vocabulary + coords → same entry key). Only the
+  // operate kinds use these; a liquidation re-keys onto liquidationProv.
   const collDeltaFig = () => (
     <Fig
       echo
       info={collateralDeltaProv(collSym, ctx.eventType, coords, ctx.raw?.collateralDelta)}
-      value={chainTruthDeltaValue(Number(ctx.collateralDelta ?? 0), false)}
+      value={chainTruthDeltaValue(Number(ctx.collateralDelta ?? 0), true)}
       symbol={collSym}
     >
       {fmtAbs(ctx.collateralDelta)} {collSym}
@@ -172,7 +175,7 @@ export function llamalendEventSlots(
     <Fig
       echo
       info={debtDeltaProv(debtSym, ctx.eventType, coords, ctx.raw?.debtDelta)}
-      value={chainTruthDeltaValue(Number(ctx.debtDelta ?? 0), false)}
+      value={chainTruthDeltaValue(Number(ctx.debtDelta ?? 0), true)}
       symbol={debtSym}
     >
       {fmtAbs(ctx.debtDelta)} {debtSym}
@@ -208,13 +211,19 @@ export function llamalendEventSlots(
   switch (ctx.eventType) {
     case "borrow": {
       const collMoved = present(ctx.collateralDelta);
-      const happened = ctx.isOpen ? (
+      // The first row of each loan opens it; a page holding several loans
+      // names which one.
+      const opens = mark ? mark.opens : !!ctx.isOpen;
+      const what = mark && mark.loans > 1 ? `loan ${mark.loan}` : "the position";
+      const happened = opens ? (
         collMoved ? (
           <>
-            Opened the position, depositing {collDeltaFig()} of collateral and drawing {debtDeltaFig()}.
+            Opened {what}, depositing {collDeltaFig()} of collateral and drawing {debtDeltaFig()}.
           </>
         ) : (
-          <>Opened the position, drawing {debtDeltaFig()}.</>
+          <>
+            Opened {what}, drawing {debtDeltaFig()}.
+          </>
         )
       ) : collMoved ? (
         <>
@@ -226,7 +235,7 @@ export function llamalendEventSlots(
       // On open the totals equal the deltas just stated — skip the echo; on a
       // later borrow the running totals are worth stating.
       const changed: ClauseInput =
-        !ctx.isOpen && rs.hasDebtAfter && rs.hasColAfter
+        !opens && rs.hasDebtAfter && rs.hasColAfter
           ? clause(
               <>
                 That takes the debt to {debtAfterFig()} against {colAfterFig()} of collateral.
@@ -258,7 +267,13 @@ export function llamalendEventSlots(
 
     case "repay": {
       const ending: ClauseInput = rs.closedLoan
-        ? cont(<>, clearing it in full and closing the loan — the remaining collateral left the AMM with it.</>)
+        ? cont(
+            present(ctx.collateralDelta) ? (
+              <>, clearing it in full and closing the loan; {collDeltaFig()} of collateral left the AMM with it.</>
+            ) : (
+              <>, clearing it in full and closing the loan.</>
+            ),
+          )
         : rs.debtStanding
           ? cont(
               <>
@@ -476,7 +491,8 @@ function liquidationSlots(
 const pct = (fraction: number): string => `${(fraction * 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
 
 /** Where the event placed the bands, from the ticks at block − 1 and after:
- *  how many bands, and which way (a higher band number is a lower price). */
+ *  how many bands, and which way in price (a higher band number is a lower
+ *  price, so the direction is always said in price). */
 function bandMoveClause(ctx: LlamalendContext, f?: LlamalendEventFigures | null): ClauseInput {
   if (!f || !f.hasLoan || f.n1After == null) return null;
   if (!f.hadLoan) {
@@ -505,8 +521,7 @@ function bandMoveClause(ctx: LlamalendContext, f?: LlamalendEventFigures | null)
   if (!who) return null;
   return clause(
     <>
-      {who} placed the bands {n} {k > 0 ? "lower" : "higher"}, at {f.n1After}…{f.n2After}; a higher band number is a
-      lower price.
+      {who} moved the bands {n} {k > 0 ? "down" : "up"} in price, to {f.n1After}…{f.n2After}.
     </>,
   );
 }
@@ -524,6 +539,10 @@ function inBandRepayClause(ctx: LlamalendContext, f?: LlamalendEventFigures | nu
 
 /** The teaser = the lead of the composed arc (the first sentence plus its
  *  trailing continuations). */
-export function llamalendExplainerTeaser(ctx: LlamalendContext, coords: LlamalendCoords): ReactNode | null {
-  return splitLead(eventClauses(llamalendEventSlots(ctx, coords))).lead;
+export function llamalendExplainerTeaser(
+  ctx: LlamalendContext,
+  coords: LlamalendCoords,
+  mark?: LlamalendLoanMark | null,
+): ReactNode | null {
+  return splitLead(eventClauses(llamalendEventSlots(ctx, coords, null, mark))).lead;
 }

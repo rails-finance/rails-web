@@ -283,7 +283,7 @@ function mergedTipNode(l: DisplayLine, valued: boolean) {
       {parts.slice(0, 6).map((p) => (
         <div key={p.key} className="flex items-center gap-1.5 text-rb-500">
           <TokenChipIcon symbol={p.symbol} address={p.address} size={12} filterable={false} />
-          <span>{p.symbol}</span>
+          <span>{p.tipLabel ?? p.symbol}</span>
           <span className="ml-auto">{tipFigure(p, valued)}</span>
         </div>
       ))}
@@ -866,6 +866,7 @@ function tip(l: TowerLine, valued: boolean, suffix = "") {
   if (!l.symbol) return figure;
   return (
     <span className="inline-flex items-center gap-1.5">
+      {l.tipLabel && <span>{l.tipLabel}</span>}
       <TokenChipIcon symbol={l.symbol} address={l.address} size={12} filterable={false} />
       {figure}
     </span>

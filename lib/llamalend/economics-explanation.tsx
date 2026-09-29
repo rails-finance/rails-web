@@ -8,7 +8,7 @@
 import type { ReactNode } from "react";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { formatCompact } from "@/lib/utils/format";
+import { formatCompact, formatNumber } from "@/lib/utils/format";
 import { fmtColl } from "@/lib/llamalend/event-figures";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
 
@@ -23,6 +23,10 @@ function soleSymbol(lines: TowerLine[]): string | null {
   return symbols.size === 1 ? [...symbols][0] : null;
 }
 
+function lineFig(l: TowerLine, valued: boolean): string {
+  return valued && l.usd != null ? formatCompactUsd(l.usd) : `${formatCompact(l.amount)}`;
+}
+
 function fmt(n: number, valued: boolean, symbol: string | null): string {
   return valued ? formatCompactUsd(n) : symbol ? `${formatCompact(n)} ${symbol}` : formatCompact(n);
 }
@@ -32,6 +36,9 @@ export function llamalendEconomicsExplanation(
   /** The collateral price the dollar figures use (today's oracle), with its
    *  units, where the tower is valued. */
   pricing?: { price: number; collateralSymbol: string; borrowedSymbol: string } | null,
+  /** On a position in its bands now: the collateral the AMM sold net of
+   *  buy-backs (llamalendSoldInBands) and the converted balance it holds. */
+  inBands?: { sold: number; converted: number } | null,
 ): ReactNode {
   const valued = data.valued;
   const bullets: string[] = [];
@@ -72,20 +79,39 @@ export function llamalendEconomicsExplanation(
     bullets.push("Part of this position's collateral and debt was taken in a hard liquidation.");
   }
 
-  const hasConverted = data.collateral.current.some((l) => l.symbol.includes("(converted)"));
-  bullets.push(
-    hasConverted
-      ? "Part of this position's collateral currently sits converted to the borrowed token — the market's soft-liquidation band has been swapping between the two as the price moved through it."
-      : "When the price falls into a position's bands, the AMM converts its collateral into the borrowed token band by band; this position isn't in its bands right now.",
-  );
+  const convertedLine = data.collateral.current.find((l) => l.key === "converted");
+  const heldLine = data.collateral.current.find((l) => l.key === "collateral");
+  if (!convertedLine) {
+    bullets.push(
+      "When the price falls into a position's bands, the AMM converts its collateral into the borrowed token band by band; this position isn't in its bands right now.",
+    );
+  }
 
   const currentColl = sideTotal(data.collateral.current, valued);
   const currentDebt = sideTotal(data.debt.current, valued);
   if (currentColl > 0 || currentDebt > 0) {
-    const pieces: string[] = [];
-    if (currentColl > 0) pieces.push(`${fmt(currentColl, valued, soleSymbol(data.collateral.current))} of collateral`);
-    if (currentDebt > 0) pieces.push(`${fmt(currentDebt, valued, soleSymbol(data.debt.current))} of debt`);
-    bullets.push(`Right now it holds ${pieces.join(" against ")}.`);
+    const coll = fmt(currentColl, valued, soleSymbol(data.collateral.current));
+    const debt = currentDebt > 0 ? ` against ${fmt(currentDebt, valued, soleSymbol(data.debt.current))} of debt` : "";
+    // The card's Collateral figure is the collateral token alone; the tower's
+    // counts the converted balance with it, so the split is stated.
+    bullets.push(
+      convertedLine && heldLine && currentColl > 0
+        ? `Right now it holds ${coll} of collateral: ${lineFig(heldLine, valued)} of ${heldLine.symbol} and ${lineFig(convertedLine, valued)} of ${convertedLine.symbol.replace(" (converted)", "")} converted from it${debt ? `,${debt}` : ""}. The card's Collateral figure counts the ${heldLine.symbol} alone.`
+        : currentColl > 0
+          ? `Right now it holds ${coll} of collateral${debt}.`
+          : `Right now it owes ${fmt(currentDebt, valued, soleSymbol(data.debt.current))}.`,
+    );
+  }
+
+  // Deposits and holdings are valued at the same (today's) price, so the gap
+  // between them on a position in its bands is what the AMM's sales cost.
+  if (inBands && heldLine && valued && pricing && liquidated <= 0) {
+    const gap = deposited - withdrawn - currentColl;
+    if (gap > 0) {
+      bullets.push(
+        `Deposits and holdings are both valued at today's price, so the ${formatCompactUsd(gap)} between them is what the AMM's sales cost at that price: it sold ${fmtColl(inBands.sold)} ${heldLine.symbol} more than it bought back, and holds ${formatNumber(inBands.converted)} ${pricing.borrowedSymbol} for it.`,
+      );
+    }
   }
 
   if (valued && pricing) {
@@ -121,11 +147,11 @@ export function llamalendEconomicsContent(): LearnMoreContent {
   return {
     title: "About the Economics",
     intro:
-      "This section traces this position's collateral and debt flows over its lifetime, replayed from the controller's own on-chain events.",
+      "This section traces this position's collateral and debt flows over its lifetime, added up from the position's own transactions.",
     stepsHeading: "How this is built:",
     steps: [
-      "Every collateral add/withdraw and borrow/repay is replayed from the position's own controller events.",
-      "Current collateral and debt are read at the head block, from the controller's live user state.",
+      "Every collateral deposit and withdrawal, borrow and repay is added up from the position's own transactions.",
+      "Current collateral and debt are the position's balances read from the chain at the latest block; collateral counts the borrowed token the AMM holds from sold collateral with the collateral token.",
       "Dollar values are shown only on markets that borrow crvUSD; other markets are drawn in their own token.",
     ],
     detailsHeading: "Key concepts:",
@@ -136,7 +162,7 @@ export function llamalendEconomicsContent(): LearnMoreContent {
       },
       {
         bold: "Hard liquidation",
-        text: "if the price moves past the band without recovering, the remaining collateral (and any already-converted balance) can be seized to clear the debt.",
+        text: "once health is below 0, anyone may repay the debt and take the collateral and any already-converted balance.",
       },
     ],
     links: [{ label: "Curve lending docs", url: LLAMALEND_DOC_URL }],

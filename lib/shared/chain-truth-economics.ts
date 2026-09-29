@@ -59,6 +59,10 @@ export interface TowerLine {
    *  held amount is not the whole balance (Morpho: the principal row under an
    *  accrued-interest row reads "Net borrowed"). Unset: the symbol. */
   heldLabel?: string;
+  /** What the segment is, printed before the figure in its hover tip
+   *  ("Collateral held $3.8k"). Unset: the tip is the token mark and the
+   *  figure, as before. */
+  tipLabel?: string;
 }
 
 /** One side of the tower (collateral or debt) as faithful, attributable lines. */

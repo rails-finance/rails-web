@@ -56,11 +56,12 @@ import {
   computeLlamalendEconomics,
   llamalendLifetimeWithOpening,
   llamalendLostToSoftLiq,
+  llamalendSoldInBands,
   replayLlamalendLifetime,
 } from "@/lib/llamalend/economics";
 import { llamalendEconomicsExplanation, llamalendEconomicsContent } from "@/lib/llamalend/economics-explanation";
 import { normalizeAddressParam } from "@/lib/llamalend/asset-catalog";
-import { llamalendLoans, llamalendPreviousStatedMap } from "@/lib/llamalend/event-figures";
+import { llamalendLoanMarks, llamalendLoans, llamalendPreviousStatedMap } from "@/lib/llamalend/event-figures";
 import { LlamalendLoansLine } from "@/components/protocol/llamalend/llamalend-loans-line";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -255,6 +256,11 @@ export default function LlamalendPositionView({
     () => (cutoffBlock == null ? llamalendLoans(llamalendEvents) : []),
     [llamalendEvents, cutoffBlock],
   );
+  // Which row opens or closes each loan; read only over the whole history.
+  const loanMarks = useMemo(
+    () => (cutoffBlock == null ? llamalendLoanMarks(llamalendEvents) : null),
+    [llamalendEvents, cutoffBlock],
+  );
 
   const tl = useTimelineEvents(llamalendEvents, {
     storageKey: `llamalend-${controller}-${user}`,
@@ -273,6 +279,11 @@ export default function LlamalendPositionView({
     if (!liveView) return null;
     const lifetime = precomputedLifetimeFor(liveView, llamalendEvents, opening, lifetimeKnown);
     return llamalendLostToSoftLiq(liveView, lifetime);
+  }, [liveView, llamalendEvents, opening, lifetimeKnown]);
+  const soldInBands = useMemo(() => {
+    if (!liveView) return null;
+    const lifetime = precomputedLifetimeFor(liveView, llamalendEvents, opening, lifetimeKnown);
+    return llamalendSoldInBands(liveView, lifetime);
   }, [liveView, llamalendEvents, opening, lifetimeKnown]);
   const precomputedLifetime = useMemo(
     () =>
@@ -363,7 +374,7 @@ export default function LlamalendPositionView({
               // Explanation heading-button narrates the same figures.
               rowExtra={
                 chain && chain.hasLoan && liveView.status === "open" ? (
-                  <LlamalendRiskSlot chain={chain} lost={lost} />
+                  <LlamalendRiskSlot chain={chain} lost={lost} sold={soldInBands} />
                 ) : undefined
               }
               // Passed whatever the status and before the chain read lands:
@@ -380,6 +391,8 @@ export default function LlamalendPositionView({
                       : null
                   }
                   lost={lost}
+                  sold={soldInBands}
+                  factory={liveView.factory ?? null}
                   liquidationCount={liveView.liquidationCount}
                   eventCount={liveView.eventCount}
                 />
@@ -400,6 +413,9 @@ export default function LlamalendPositionView({
                           collateralSymbol: liveView.collateralSymbol,
                           borrowedSymbol: liveView.borrowedSymbol,
                         }
+                      : null,
+                    soldInBands != null && liveView.converted != null
+                      ? { sold: soldInBands, converted: liveView.converted }
                       : null,
                   )}
                   learnMore={llamalendEconomicsContent()}
@@ -424,6 +440,7 @@ export default function LlamalendPositionView({
                   // does.
                   firstAt={opening?.firstTimestamp}
                   tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                  labelLastActivity
                   reopenedAt={
                     loans.length > 1 && loans[loans.length - 1].closedAt == null
                       ? loans[loans.length - 1].openedAt
@@ -440,6 +457,7 @@ export default function LlamalendPositionView({
                   isFirst={meta.isFirst}
                   isLast={meta.isLast}
                   previousStated={previousStated.get(event.id) ?? null}
+                  loanMark={loanMarks?.get(event.id) ?? null}
                 />
               ) : null
             }

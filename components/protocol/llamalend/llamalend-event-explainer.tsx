@@ -23,7 +23,7 @@ import {
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { llamalendEventSlots } from "@/lib/llamalend/explainer-clauses";
 import { useLlamalendEventState } from "@/lib/llamalend/use-event-state";
-import { llamalendEventFigures } from "@/lib/llamalend/event-figures";
+import { llamalendEventFigures, type LlamalendLoanMark } from "@/lib/llamalend/event-figures";
 
 export interface LlamalendEventExplainerProps {
   ctx: LlamalendContext;
@@ -32,6 +32,8 @@ export interface LlamalendEventExplainerProps {
   wallet?: string;
   /** The card shows the lead sentence as the teaser; render only the rest here. */
   skipLead?: boolean;
+  /** Where the event sits among the page's loans. */
+  loanMark?: LlamalendLoanMark | null;
 }
 
 /** Mechanic modal content for this event — never-empty floor: every event type
@@ -52,12 +54,19 @@ export function llamalendLearnMoreContent(ctx: LlamalendContext): LearnMoreConte
   }
 }
 
-export function LlamalendEventExplainer({ ctx, txHash, blockNumber, wallet, skipLead }: LlamalendEventExplainerProps) {
+export function LlamalendEventExplainer({
+  ctx,
+  txHash,
+  blockNumber,
+  wallet,
+  skipLead,
+  loanMark,
+}: LlamalendEventExplainerProps) {
   const coords: LlamalendCoords = { txHash, blockNumber, controller: ctx.controller, user: wallet };
   // The same before/after read the grid uses (one request, shared).
   const state = useLlamalendEventState(ctx, blockNumber, wallet);
   const f = state ? llamalendEventFigures(ctx, state) : null;
-  const clauses = eventClauses(llamalendEventSlots(ctx, coords, f));
+  const clauses = eventClauses(llamalendEventSlots(ctx, coords, f, loanMark));
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;

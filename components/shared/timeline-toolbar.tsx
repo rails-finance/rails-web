@@ -62,6 +62,7 @@ export function TimelineActivityHeader({
   firstAt,
   tenurePending,
   reopenedAt,
+  labelLastActivity,
 }: {
   events: { timestamp: number }[];
   /** Each served folder's own first and last member, whole and unfiltered —
@@ -88,6 +89,9 @@ export function TimelineActivityHeader({
    *  loan began: the eyebrow then reads "Open again since {date} · {tenure} ·
    *  first opened {date}". Unset changes nothing. */
   reopenedAt?: number | null;
+  /** Say "last activity" inside the freshness pill, so it cannot read as the
+   *  age of the date before it. Unset changes nothing. */
+  labelLastActivity?: boolean;
 }) {
   if (events.length === 0 && !folders?.length) return null;
   let first = events.length ? events[0].timestamp : folders![0].firstAt;
@@ -109,11 +113,12 @@ export function TimelineActivityHeader({
         <span className={PILL_META} data-prov-exempt="">
           {formatDuration(reopenedAt, now)}
         </span>
-        <span className="text-muted-foreground">first opened {formatDate(first)}</span>
         <span className={PILL_META}>
           <Clock size={12} />
+          {labelLastActivity ? "last activity " : ""}
           {formatDuration(last, now)} ago
         </span>
+        <span className="text-muted-foreground">first opened {formatDate(first)}</span>
       </div>
     );
   }
@@ -135,6 +140,7 @@ export function TimelineActivityHeader({
       )}
       <span className={PILL_META}>
         <Clock size={12} />
+        {labelLastActivity ? "last activity " : ""}
         {formatDuration(last, now)} ago
       </span>
     </div>

@@ -38,7 +38,7 @@ import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { positionStateProv, positionIndexProv, llamalendUsdProv } from "@/lib/llamalend/event-provenance";
 import { llamalendConvertedProv } from "@/lib/llamalend/live-provenance";
 import { llamalendPositionContent } from "@/lib/llamalend/position-content";
-import { type LlamalendVersion } from "@/lib/llamalend/asset-catalog";
+import { type LlamalendFactoryKind, type LlamalendVersion } from "@/lib/llamalend/asset-catalog";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
 import type { LlamalendPositionSummary } from "@/lib/sources/api/llamalend-positions";
@@ -50,6 +50,8 @@ export interface LlamalendPositionView {
   user: string;
   amm: string | null;
   version: LlamalendVersion;
+  /** Which factory made the market: a mint market or a lend market (V1), or V2. */
+  factory?: LlamalendFactoryKind | null;
   /** "wstETH / crvUSD" — display; the controller address is the key. */
   marketLabel: string;
   collateralSymbol: string;
@@ -286,7 +288,9 @@ export function LlamalendPositionCard({
     ...(v.inSoftLiq && v.converted != null
       ? [
           {
-            label: "In soft-liquidation",
+            // The detail card's status pill already says "In soft-liquidation";
+            // the listing row has no such pill, so its tile carries the word.
+            label: receipts ? "Converted" : "In soft-liquidation",
             value: (
               <StatValue>
                 <Prov
@@ -307,7 +311,7 @@ export function LlamalendPositionCard({
             ),
             footnote: (
               <div className="text-xs mt-0.5 text-rb-500">
-                collateral the AMM has already converted — read live, cross-checked
+                {v.borrowedSymbol} the AMM holds from sold {v.collateralSymbol}
               </div>
             ),
           },
@@ -400,6 +404,7 @@ export function viewFromSummary(s: LlamalendPositionSummary): LlamalendPositionV
     user: s.user,
     amm: s.amm,
     version: s.version,
+    factory: s.factory ?? null,
     marketLabel: s.marketLabel,
     collateralSymbol: s.collateralSymbol,
     collateralDecimals: s.collateralDecimals,

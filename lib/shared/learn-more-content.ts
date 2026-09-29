@@ -2023,21 +2023,37 @@ export function llamalendBorrowContent(kind: "borrow" | "add_collateral"): Learn
   return {
     title: borrowing ? "How Borrowing Works" : "How Adding Collateral Works",
     intro: borrowing
-      ? "Borrowing deposits collateral into the market's LLAMMA AMM — spread across a chosen number of price bands (N, 4–50) — and draws the borrowed token against it. The band placement follows from the loan size: more debt pushes the band closer to the current price."
-      : "Adding collateral deposits more of the collateral token into the position's bands without changing the debt — the same Borrow event with a zero loan amount. The extra collateral pushes the band further below the current price.",
+      ? "Borrowing deposits collateral into the market's AMM, spread across a number of price bands the borrower picks (4 to 50), and draws the borrowed token against it. The more debt against the collateral, the closer the bands sit below the current price."
+      : "Adding collateral deposits more of the collateral token into the position's bands without changing the debt. The extra collateral moves the bands further below the current price.",
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "Collateral lives in an AMM",
-        text: "the collateral is not parked in a vault — it is liquidity in the market's LLAMMA AMM, placed across a set of adjacent price bands whose number the borrower chose at opening. That placement is what makes soft-liquidation possible.",
+        text: "the collateral is liquidity in the market's AMM (LLAMMA), placed across a set of adjacent price bands whose number the borrower chose at opening. That placement is what makes soft-liquidation possible.",
       },
       {
-        bold: "The band is the risk line",
-        text: "soft-liquidation begins at the band's top price (p_oracle_up(n1)) and completes at its bottom (p_oracle_down(n2)) — a range, not a single liquidation price.",
+        bold: "The bands are the risk range",
+        text: "soft-liquidation begins at the top price of the highest band and completes at the bottom price of the lowest.",
+      },
+      {
+        bold: "Band prices rise with interest",
+        text: "each band's price is scaled by the same multiplier that grows the debt, so the same bands price higher as time passes.",
+      },
+      {
+        bold: "A",
+        text: "the market's band width: each band spans about 1/A of its price (1% at A = 100).",
+      },
+      {
+        bold: "Loan discount",
+        text: "sets how much can be borrowed: the most a loan may draw is what its bands would hold with the price through their bottom, less this discount.",
+      },
+      {
+        bold: "Liquidation discount",
+        text: "sets when health reaches 0: health takes this smaller discount off the same value before comparing it with the debt, so a new loan starts above 0.",
       },
       {
         bold: "Isolated markets",
-        text: "each Controller is one market (one collateral, one borrowed token) — positions in different markets never share margin and liquidate independently.",
+        text: "each market has one collateral and one borrowed token; positions in different markets never share collateral and are liquidated independently.",
       },
     ],
     links: [{ label: "Curve lending docs", url: LLAMALEND_DOC_URL }],
@@ -2049,17 +2065,17 @@ export function llamalendRepayContent(kind: "repay" | "remove_collateral"): Lear
   return {
     title: repaying ? "How Repaying Works" : "How Removing Collateral Works",
     intro: repaying
-      ? "Repaying returns borrowed tokens to the Controller, reducing the debt (to zero on a full close, which also withdraws the collateral from the AMM). Less debt moves the position's band further below the current price."
-      : "Removing collateral withdraws part of the position's collateral from the AMM's bands. It is only possible while the position is NOT in soft-liquidation, and it moves the band closer to the current price.",
+      ? "Repaying returns borrowed tokens to the market and lowers the debt; a full repay closes the loan and returns the collateral. Outside soft-liquidation, less debt moves the bands further below the current price; inside it, the bands stay where they are."
+      : "Removing collateral withdraws part of the position's collateral from its bands. It is only possible while the position is not in soft-liquidation, and it moves the bands closer to the current price.",
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "Debt accrues per second",
-        text: "the market's monetary policy sets a per-second rate; the debt figure in any event is the accrued total at that block.",
+        text: "the market's rate policy sets a per-second rate; the debt figure in any event is the total owed at that block, interest included.",
       },
       {
-        bold: "Bands re-place on every change",
-        text: "each borrow/repay/collateral change re-computes the band ticks (n1, n2) — the position's own UserState after-image records them.",
+        bold: "Bands move on every change",
+        text: "each borrow, repay or collateral change outside soft-liquidation places the bands again, and the event records where. Band prices also rise over time with the market's interest.",
       },
     ],
     links: [{ label: "Curve lending docs", url: LLAMALEND_DOC_URL }],
@@ -2070,11 +2086,11 @@ export function llamalendLiquidationContent(self: boolean): LearnMoreContent {
   return {
     title: self ? "How Self-Liquidation Works" : "How Hard Liquidation Works",
     intro: self
-      ? "A borrower whose position is partly converted can settle it themselves: self-liquidation repays the debt using the already-converted borrowed tokens plus a top-up, and withdraws whatever collateral remains — a normal close from soft-liquidation, not a loss to a third party."
+      ? "A borrower whose position is partly converted can settle it themselves: self-liquidation repays the debt using the already-converted borrowed tokens plus a top-up, and withdraws whatever collateral remains. It is a normal close from soft-liquidation, with no third party."
       : "Hard liquidation needs health below 0. Health falls as the price moves down through the bands, as interest adds to the debt, and with each loss on the AMM's sales. Anyone may then liquidate the position, in full or in part: the liquidator repays the debt, partly from the position's already-converted tokens, and takes the collateral and converted tokens it held. The owner, or an address the owner approved, may liquidate at any health.",
     extraParagraphs: [
-      "Soft-liquidation comes first: while the oracle price is inside the position's bands, the AMM sells its collateral for the borrowed token as the price falls and buys it back as the price rises, with no event and no liquidator. The swap reverses; the losses do not. The converted amount is readable from user_state up to the liquidating block.",
-      "The Controller emits a paired Repay alongside every Liquidate with identical amounts — the index de-duplicates that pair, so the timeline shows one liquidation event, counted once.",
+      "Soft-liquidation comes first: while the oracle price is inside the position's bands, the AMM sells its collateral for the borrowed token as the price falls and buys it back as the price rises, with no event and no liquidator. The swap reverses; the losses do not. The converted amount can be read from the chain up to the liquidating block.",
+      "The market logs a repay alongside every liquidation with the same amounts; the timeline shows the pair as one liquidation event.",
     ],
     links: [{ label: "Curve lending docs", url: LLAMALEND_DOC_URL }],
   };
@@ -2084,16 +2100,16 @@ export function llamalendEventFallbackContent(): LearnMoreContent {
   return {
     title: "How LlamaLend Positions Work",
     intro:
-      "LlamaLend is Curve's LLAMMA lending. A position is a (market, user) pair: each Controller is an isolated market whose collateral sits in a price-band AMM, so liquidation is a band the price moves through, not a line it crosses.",
+      "LlamaLend is Curve's lending system. A position is one borrower in one market; each market is isolated, and its collateral sits in an AMM across a range of price bands, so liquidation is a range the price moves through.",
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "Soft-liquidation is a state",
-        text: "inside the bands the AMM converts collateral to the borrowed token, and back as the price recovers; each round trip loses a little collateral. The converted amount appears in no event — it is read live from user_state.",
+        text: "inside the bands the AMM converts collateral to the borrowed token, and back as the price recovers; each round trip loses a little collateral. The converted amount appears in no event; it is read from the chain.",
       },
       {
         bold: "Hard liquidation is an event",
-        text: "once health goes negative, a Liquidate transaction clears the debt, in full or in part, and takes the balances it covers.",
+        text: "once health goes negative, a liquidation clears the debt, in full or in part, and takes the balances it covers.",
       },
       {
         bold: "Most markets borrow crvUSD",

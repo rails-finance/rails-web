@@ -46,6 +46,18 @@ const ADDCOLL = {
 // found as an unstaged deletion).
 const WIRE = {};
 
+/** Open every collapsed disclosure on the page (the event rows' (i) panes,
+ *  the card's explanation), then read what a reader sees. */
+async function openAllAndRead(pg) {
+  for (const b of await pg.$$('button[aria-expanded="false"]')) {
+    try {
+      await b.click({ timeout: 1000 });
+    } catch {}
+  }
+  await pg.waitForTimeout(2500);
+  return pg.evaluate(() => document.body.innerText);
+}
+
 let failures = 0;
 const check = (name, cond, detail = "") => {
   console.log(`${cond ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
@@ -514,9 +526,14 @@ try {
     waitUntil: "networkidle",
     timeout: 180000,
   });
-  await page.waitForSelector("text=Add collateral", { timeout: 120000 });
-  body = await page.textContent("body");
-  check("add-collateral: 'Add collateral' label renders (never a zero Borrow)", /Add collateral/.test(body));
+  // The row reads "Add ◊": the collateral verb alone, no Borrow beside it.
+  await page.waitForSelector("text=/^Add$/", { timeout: 120000 });
+  const addRow = await page.locator("text=/^Add$/").first().locator("xpath=..").textContent();
+  check(
+    "add-collateral: the row reads Add with no Borrow verb (never a zero Borrow)",
+    !/Borrow/.test(addRow ?? ""),
+    addRow ?? "",
+  );
 
   // ── 6. the newcomer-review fixture — reads at block − 1 and block ─────────
   // A closed block's state never changes, so these raw figures are exact
@@ -581,6 +598,109 @@ try {
     /1\.0472/.test(body) && /0\.0061 WETH fewer/.test(body),
   );
   check("nr: no 'reversibly' in the page copy", !/reversibl/i.test(body));
+  body = await openAllAndRead(page);
+  check(
+    "nr: the add-collateral row says the direction in price",
+    /moved the bands 46 down in price, to 122…125/.test(body) && !/placed the bands/.test(body),
+  );
+
+  // ── 7. round 2: a position in its bands now, and a closed-and-reopened one ─
+  const INBAND = {
+    controller: "0x4e59541306910ad6dc1dac0ac9dfb29bd9f15c67",
+    user: "0xfd4b674df85d12f63efd4093dd0c30dd6de60645",
+    open: "borrow:96ab9822058bad72ec9b1f7780b5fd38f33cbbc0dd1c5e2436c6469e1fe6fef1:785:self",
+    repay: "repay:e253c80b92e0fb286e3c77f1eff18f479f8b29fc20f5d63021c6d15b74d1af1f:727:self",
+  };
+  const inbandLive = await (
+    await fetch(`${BASE}/api/chain/llamalend/position?controller=${INBAND.controller}&user=${INBAND.user}`)
+  ).json();
+  const p2 = await browser.newPage();
+  await p2.addInitScript(
+    (keys) => {
+      try {
+        const o = {};
+        for (const k of keys) o[`llamalend:${k}`] = true;
+        localStorage.setItem("rails-open-cards-v1", JSON.stringify(o));
+      } catch {}
+    },
+    [INBAND.open, INBAND.repay],
+  );
+  await p2.goto(`${BASE}${EXPLORER}/${INBAND.controller}/${INBAND.user}`, {
+    waitUntil: "networkidle",
+    timeout: 180000,
+  });
+  await p2.waitForSelector("text=83,966.3", { timeout: 120000 });
+  await p2.waitForSelector("text=Sold by the AMM, net", { timeout: 120000 });
+  body = await openAllAndRead(p2);
+  // The opening row's band prices are a closed block's read (exact forever);
+  // the card's are today's, higher by the interest multiplier since.
+  const nowTop = Number((body.match(/10 bands:\s*([\d,.]+)/) ?? [])[1]?.replace(/,/g, ""));
+  check(
+    "inband: opening row prices bands −79…−70 at 83,966.3 → 75,937.6; the card prices them higher now",
+    /83,966\.3 → 75,937\.6/.test(body) && nowTop > 83966.3,
+    `now ${nowTop}`,
+  );
+  check(
+    "inband: the card says band prices rise with interest",
+    /Band prices rise over time with the market/.test(body),
+  );
+  check(
+    "inband: converted tile is named Converted, with no method note",
+    /Converted\s*1\.8K/.test(body) && !/read live, cross-checked/.test(body),
+  );
+  if (inbandLive.healthFull != null && inbandLive.healthFull > 0 && inbandLive.healthFull < 0.05) {
+    check("inband: health near 0 carries its plain line", /close to 0; below 0 anyone may liquidate it/.test(body));
+  } else {
+    console.log(`SKIP  inband: near-0 health line — health is ${inbandLive.healthFull} now`);
+  }
+  check(
+    "inband: net sold 0.02734 WBTC stated on the card and in the flows",
+    /Sold by the AMM, net:\s*0\.02734 WBTC/.test(body) && /sold 0\.02734 WBTC more than it bought back/.test(body),
+  );
+  check(
+    "inband: flows name the converted balance with the collateral",
+    /Collateral and converted/.test(body) && /The card's Collateral figure counts the WBTC alone/.test(body),
+  );
+  check("inband: mint market line on the card", /This is a mint market/.test(body));
+  check("inband: opening row reads Open · Deposit · Borrow", /Open\s*Deposit\s*Borrow/.test(body));
+  check("inband: freshness pill says last activity", /last activity \d+ days ago/.test(body));
+  await p2.close();
+
+  const REOPEN = {
+    controller: "0x5756a035f276a8095a922931f224f4ed06149608",
+    user: "0xa76532c17f4cdef7db3e554e0338a68b7952cb63",
+    ids: [
+      "borrow:989800b59b994e38dc7cefa9c267e41192bbcd491e84d836bee52a84601ba834:327:self",
+      "borrow:9c9920a5d99941277b70ce26ce2fad21a0978988100e2f185f25fc3bcbf085d3:435:self",
+      "repay:46fcdde48dbbe70804074e44c9315adad2dac503bbd3c2320ce194d0476aec0e:496:self",
+      "borrow:11fbec31661912bd1ec5c2e151a97f501123493489335d43364950c64780435c:116:self",
+    ],
+  };
+  const p3 = await browser.newPage();
+  await p3.addInitScript((keys) => {
+    try {
+      const o = {};
+      for (const k of keys) o[`llamalend:${k}`] = true;
+      localStorage.setItem("rails-open-cards-v1", JSON.stringify(o));
+    } catch {}
+  }, REOPEN.ids);
+  await p3.goto(`${BASE}${EXPLORER}/${REOPEN.controller}/${REOPEN.user}`, {
+    waitUntil: "networkidle",
+    timeout: 180000,
+  });
+  await p3.waitForSelector("text=Loan 2 of 2", { timeout: 120000 });
+  await p3.waitForSelector("text=74 … 83", { timeout: 120000 });
+  body = await openAllAndRead(p3);
+  check("reopen: first borrow of each loan opens it", /Opened loan 1,/.test(body) && /Opened loan 2,/.test(body));
+  check("reopen: no top-up wording on loan 2's first borrow", !/Borrowed another 9,000/.test(body));
+  check("reopen: band move said in price", /moved the bands 2 up in price, to 74…83/.test(body));
+  check("reopen: the full repay reads Close · Withdraw · Repay", /Close\s*Withdraw\s*Repay/.test(body));
+  check(
+    "reopen: last activity sits before first opened",
+    /Open again since[\s\S]{0,60}last activity[\s\S]{0,40}first opened/.test(body),
+  );
+  check("reopen: lend market line on the card", /This is a lend market/.test(body));
+  await p3.close();
 
   const SPOT = {
     controller: "0xa920de414ea4ab66b97da1bfe9e6eca7d4219635",
@@ -601,6 +721,14 @@ try {
   check(
     "markets: near-zero-rate markets state their policy bounds",
     /minimum and maximum at 3 wei a second/.test(body),
+  );
+  check(
+    "markets: terms defined once, no contract names in the stamp",
+    /Loan discount/.test(body) && /Liquidation discount/.test(body) && !/OneWayLendingFactory/.test(body),
+  );
+  check(
+    "markets: yield-bearing shares say why they price above 1",
+    /sDOLA is a yield-bearing share of DOLA/.test(body),
   );
 
   // The screenshot is a debugging aid, not an assertion. It used to hard-code an

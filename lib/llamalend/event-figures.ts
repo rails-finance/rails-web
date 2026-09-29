@@ -161,3 +161,38 @@ export function llamalendLoans(
   if (cur) loans.push(cur);
   return loans;
 }
+
+/** Where an event sits among the page's loans: `opens` on the first row of a
+ *  loan, `closes` on a repay that leaves the debt at 0. `loan` is 1-based and
+ *  `loans` the page's count, so copy can say "loan 2" only where there are
+ *  several. */
+export interface LlamalendLoanMark {
+  loan: number;
+  loans: number;
+  opens: boolean;
+  closes: boolean;
+}
+
+export function llamalendLoanMarks(
+  events: readonly { id: string; blockNumber: number; context: { data: LlamalendContext } }[],
+): Map<string, LlamalendLoanMark> {
+  const rows = events
+    .map((e, i) => ({ e, i }))
+    .filter(({ e }) => e.context.data.role !== "liquidator")
+    .sort((a, b) => a.e.blockNumber - b.e.blockNumber || a.i - b.i);
+  const marks: { id: string; loan: number; opens: boolean; closes: boolean }[] = [];
+  let loan = 0;
+  let open = false;
+  for (const { e } of rows) {
+    const c = e.context.data;
+    const opens = !open;
+    if (opens) loan += 1;
+    open = true;
+    const closedHere = c.debtAfter != null && Number(c.debtAfter) <= 1e-12;
+    if (closedHere) open = false;
+    marks.push({ id: e.id, loan, opens, closes: closedHere && c.eventType === "repay" });
+  }
+  const out = new Map<string, LlamalendLoanMark>();
+  for (const m of marks) out.set(m.id, { loan: m.loan, loans: loan, opens: m.opens, closes: m.closes });
+  return out;
+}

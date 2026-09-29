@@ -63,6 +63,23 @@ const tokenAmount = (v: number, symbol: string): string => {
   return `${n} ${symbol}`;
 };
 
+/** Collateral tokens that are vault shares of a dollar stablecoin: each
+ *  share redeems for more of the stablecoin as yield accrues, which is why
+ *  the oracle prices them above 1. Each checked on chain (ERC-4626 asset()
+ *  and convertToAssets against the market's oracle, 2026-09-29); a token not
+ *  listed here carries no such line. */
+const YIELD_SHARES: Record<string, string> = {
+  "0x9d39a5de30e57443bff2a8307a4256c8797a3497": "USDe", // sUSDe
+  "0xa663b02cf0a4b149d2ad41910cb81e23e1c41c32": "FRAX", // sFRAX
+  "0xb45ad160634c528cc3d2926d9807104fa3157305": "DOLA", // sDOLA
+  "0xcf62f905562626cfcdd2261162a51fd02fc9c5b6": "frxUSD", // sfrxUSD
+  "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd": "USDS", // sUSDS
+  "0xc8cf6d7991f15525488b2a83df53468d682ba4b0": "USDf", // sUSDf
+  "0xbe53a109b494e5c9f97b9cd39fe969be68bf6204": "USDC", // yvUSDC-1
+  "0x182863131f9a4630ff9e27830d945b1413e347e8": "USDS", // yvUSDS-1
+  "0x80ac24aa929eaf5013f6436cda2a7ba190f5cc0b": "USDC", // syrupUSDC
+};
+
 /** A lend market whose policy bounds hold the rate near zero: a maximum under
  *  a million wei a second (1e-12 at 1e18 scale), about 0.003% a year. */
 const nearZeroRate = (m: LlamalendMarketRow): boolean =>
@@ -122,19 +139,20 @@ function MarketCard({ m, block }: { m: LlamalendMarketRow; block: number }) {
       </div>
 
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] tabular-nums text-rb-500">
-        <span title="AMM.A() — amplification, immutable per market: how many bands the price grid packs per doubling, i.e. how GRADUAL soft-liquidation is. The live roster spans 10 (coarse, fast conversion) to 500 (fine, slow).">
+        <span title="The band width: each band spans about 1/A of its price. Fixed per market.">
           A ={" "}
           <Prov info={llamaAmplificationProv(coords)}>
             <span className="text-foreground">{m.A}</span>
           </Prov>
         </span>
-        <span title="Controller.loan_discount() — sizes borrowing power against the collateral.">
+        <span title="Sets how much can be borrowed against the collateral.">
           loan discount <Prov info={llamaDiscountProv("loan", coords)}>{pctText(m.loanDiscount)}</Prov>
         </span>
-        <span title="Controller.liquidation_discount() — arms hard liquidation.">
-          liq. discount <Prov info={llamaDiscountProv("liquidation", coords)}>{pctText(m.liquidationDiscount)}</Prov>
+        <span title="Sets when a loan's health reaches 0.">
+          liquidation discount{" "}
+          <Prov info={llamaDiscountProv("liquidation", coords)}>{pctText(m.liquidationDiscount)}</Prov>
         </span>
-        <span title="monetary_policy().rate — per-second at 1e18, annualized by simple multiplication.">
+        <span title="The market's borrow rate, charged per second and shown a year at a time.">
           borrow{" "}
           {m.borrowAprPct != null ? (
             <Prov info={llamaBorrowRateProv(coords)}>{`${m.borrowAprPct.toFixed(2)}%`}</Prov>
@@ -152,6 +170,14 @@ function MarketCard({ m, block }: { m: LlamalendMarketRow; block: number }) {
         </p>
       )}
 
+      {YIELD_SHARES[m.collateralToken?.toLowerCase() ?? ""] && (
+        <p className="mt-1 text-[11px] text-rb-500">
+          {m.collateralSymbol} is a yield-bearing share of {YIELD_SHARES[m.collateralToken.toLowerCase()]}: each share
+          redeems for more {YIELD_SHARES[m.collateralToken.toLowerCase()]} as yield accrues, so the oracle prices it
+          above 1.
+        </p>
+      )}
+
       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] tabular-nums text-rb-500">
         <span>
           <Prov info={llamaOpenLoansProv(coords)}>
@@ -163,8 +189,8 @@ function MarketCard({ m, block }: { m: LlamalendMarketRow; block: number }) {
           <span
             title={
               m.utilisationBasis === "crvUSD debt ceiling"
-                ? "Debt ÷ the factory's own debt_ceiling(controller) — a mint market borrows against a crvUSD ceiling, not lender deposits."
-                : "Debt ÷ (debt + the borrowed token still sitting on the controller) — the lender-funded liquidity."
+                ? "Debt ÷ the market's crvUSD debt ceiling."
+                : "Debt ÷ (debt + the lenders' deposits not yet lent)."
             }
           >
             <Prov info={llamaUtilisationProv(coords)}>
@@ -173,7 +199,7 @@ function MarketCard({ m, block }: { m: LlamalendMarketRow; block: number }) {
             of {m.utilisationBasis}
           </span>
         )}
-        <span title="AMM.price_oracle() — the collateral priced in the market's own borrowed token (1e18).">
+        <span title="The price the market's AMM uses for the collateral, in the borrowed token.">
           oracle <Prov info={llamaPriceOracleProv(coords)}>{tokenAmount(m.priceOracle, m.borrowedSymbol)}</Prov>
         </span>
       </div>
@@ -185,15 +211,15 @@ export function LlamalendMarketsStamp({ data }: { data: LlamalendMarketsResponse
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · roster from the
-      factories&rsquo; own counters —{" "}
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · markets listed by
+      Curve&rsquo;s three factories (
       <a
         href={explorerUrl(MAINNET_CHAIN_ID, "address", LLAMALEND_ADDRESSES.ONEWAY_FACTORY)}
         target="_blank"
         rel="noopener noreferrer"
         className="link-external"
       >
-        OneWayLendingFactory
+        V1 lend
       </a>
       ,{" "}
       <a
@@ -202,18 +228,18 @@ export function LlamalendMarketsStamp({ data }: { data: LlamalendMarketsResponse
         rel="noopener noreferrer"
         className="link-external"
       >
-        crvUSD ControllerFactory
+        V1 mint
       </a>{" "}
-      and the{" "}
+      and{" "}
       <a
         href={explorerUrl(MAINNET_CHAIN_ID, "address", LLAMALEND_ADDRESSES.V2_FACTORY)}
         target="_blank"
         rel="noopener noreferrer"
         className="link-external"
       >
-        V2 Factory
-      </a>{" "}
-      · priced by each AMM&rsquo;s own <span className="text-foreground">price_oracle()</span>
+        V2
+      </a>
+      ) · prices from each market&rsquo;s own oracle
     </p>
   );
 }
@@ -314,6 +340,36 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
           </>
         }
       />
+
+      <dl
+        className="mb-6 grid max-w-3xl gap-x-3 gap-y-1 text-[11px] leading-relaxed text-rb-500 sm:grid-cols-[max-content_1fr]"
+        data-llamalend-terms=""
+      >
+        <dt className="font-semibold text-foreground">Mint market</dt>
+        <dd>
+          The crvUSD is minted against the loan by Curve&rsquo;s crvUSD system, up to the market&rsquo;s debt ceiling.
+          The rate moves with crvUSD&rsquo;s price and the size of the Peg Stabilization Reserve.
+        </dd>
+        <dt className="font-semibold text-foreground">Lend market</dt>
+        <dd>
+          The borrowed token is lent from a vault of lenders&rsquo; deposits, and all the interest goes to those
+          lenders. The rate rises with the share of the vault that is lent.
+        </dd>
+        <dt className="font-semibold text-foreground">A</dt>
+        <dd>The band width: each band spans about 1/A of its price (1% at A = 100).</dd>
+        <dt className="font-semibold text-foreground">Loan discount</dt>
+        <dd>
+          Sets how much can be borrowed: the most a loan may draw is what its bands would hold with the price through
+          their bottom, less this discount.
+        </dd>
+        <dt className="font-semibold text-foreground">Liquidation discount</dt>
+        <dd>
+          Sets when health reaches 0: health takes this smaller discount off the same value before comparing it with the
+          debt. Below 0 anyone may liquidate the loan.
+        </dd>
+        <dt className="font-semibold text-foreground">Oracle</dt>
+        <dd>The price the market&rsquo;s AMM uses for the collateral, in the borrowed token.</dd>
+      </dl>
 
       <section>
         <h2 className="mb-2 text-sm font-semibold text-foreground">V1 markets</h2>

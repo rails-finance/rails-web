@@ -203,10 +203,10 @@ export interface ChainTruthRowSpec {
    *  same carve-out as the position-listing OPEN pill (pure-truth-status-pill-color.md)
    *  — never opinionated color on a number. The adapter pairs it with per-axis
    *  delta labels (each axis' own deposit/borrow-family verb), so the opener reads
-   *  `Open  Deposit 6 ◊  Borrow 10K ♭`. Room reserved to add `"close"` (neutral)
-   *  later; this pass only needs `"open"`. Ignored when `labelOnSpine`/`critical`
-   *  own the label. */
-  status?: "open";
+   *  `Open  Deposit 6 ◊  Borrow 10K ♭`. `"close"` draws Liquity V2's neutral
+   *  "Close" pill the same way. Ignored when `labelOnSpine`/`critical` own the
+   *  label. */
+  status?: "open" | "close";
   /** A trailing ratio chip ("134% CR") — the position's collateral ratio at
    *  this event, for an explorer whose rows carry the figures and an at-block
    *  price to state one (Polaris). Rendered once, just before the `evt-meta`
@@ -461,6 +461,11 @@ export function ChainTruthRow({
         // Open/Enable green (app/globals.css). The per-axis delta labels beside it
         // carry each axis' own verb, so the CDP openers read as V2 does.
         <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-positive/20 text-positive">
+          {spec.label}
+        </span>
+      ) : spec.status === "close" && !spec.critical ? (
+        // Closing event — Liquity V2's neutral "Close" pill (liquity-event-header.tsx).
+        <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-rb-500/20 dark:bg-rb-500/20">
           {spec.label}
         </span>
       ) : spec.label && (!spec.custody || spec.custodyLabel) ? (

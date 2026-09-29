@@ -411,3 +411,20 @@ export const llamalendLostProv = (sym: string, controller?: string): Provenance 
     { label: "held now", kind: "chain", pclass: "state", note: "user_state(user)[0] @ head" },
   ],
 });
+
+/** Collateral the AMM has sold net of buy-backs on a position in its bands
+ *  now: deposited − withdrawn − held, the converted balance being what it
+ *  holds for it. */
+export const llamalendSoldProv = (sym: string, controller?: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `${sym} the AMM has sold from this position and not bought back: everything deposited, less everything withdrawn, less what the position holds now. The converted balance is what the AMM holds for it; nothing was liquidated.`,
+  formula: "deposited − withdrawn − held now",
+  contract: { name: "LlamaLend Controller", address: controller ?? "" },
+  via: `${LLAMALEND_VIA} · Σ emitted collateral amounts · user_state @ head`,
+  inputs: [
+    { label: "deposited", kind: "chain", pclass: "emitted", note: "Σ collateral added in the position's events" },
+    { label: "withdrawn", kind: "chain", pclass: "emitted", note: "Σ collateral removed in the position's events" },
+    { label: "held now", kind: "chain", pclass: "state", note: "user_state(user)[0] @ head" },
+  ],
+});
