@@ -54,7 +54,14 @@ import { v3Brand, v3Possessive, v3Protocol, type V3Protocol } from "./protocol-n
 import { AAVE_V3_SWAP_LABELS } from "./swap-kinds";
 import { externalActor } from "@/lib/shared/external-actor";
 import { hfLabelV4, fmtUnitPrice } from "@/lib/aave-v4/format";
-import { baseToUsd, humanOf, wadToNumber, type AaveV3PositionState } from "./position-state";
+import {
+  baseToUsd,
+  humanOf,
+  sincePrevious,
+  stateEmptyAfter,
+  wadToNumber,
+  type AaveV3PositionState,
+} from "./position-state";
 import { feeLiquidation, fmt2, liquidationBonus, liquidationFee, pctPlain } from "./liquidation-fee";
 import type { AaveV3TimelineEvent } from "./event-neighbours";
 
@@ -150,7 +157,16 @@ export interface V3StateRead {
   debtUsdBefore?: number;
   /** Balances after the transaction, per reserve and side. */
   left?: { symbol: string; side: "supply" | "debt"; amount: number }[];
+  /** The event's own balance at the previous event and the interest since. */
+  sincePrev?: { prevAfter: number; interest: number };
+  /** The event's reserve's loan-to-value at the block, in bps. */
+  reserveLtvBps?: number | null;
+  /** The account held nothing and owed nothing once the transaction had run. */
+  emptyAfter?: boolean;
 }
+
+/** A health factor under this is close enough to 1 for the prose to say so. */
+export const NEAR_LIQUIDATION_HF = 1.2;
 
 export function v3StateRead(
   ctx: AaveV3Context,
@@ -161,10 +177,15 @@ export function v3StateRead(
   const hfOf = (wad: string | null): number | null => (wad == null ? null : wadToNumber(wad));
   const reserve = (ctx.eventType === "liquidation" ? ctx.collateralAsset : ctx.reserve)?.toLowerCase();
   const own = here.reserves.find((r) => r.reserve.toLowerCase() === reserve);
+  const debtSide = ctx.eventType === "borrow" || ctx.eventType === "repay";
+  const since = sincePrevious(here, prev, reserve, debtSide ? "debt" : "supply");
   const out: V3StateRead = {
     hfBefore: hfOf(here.account.before.healthFactor),
     hfAfter: hfOf(here.account.after.healthFactor),
     collateral: own?.collateral ?? undefined,
+    sincePrev: since ? { prevAfter: Number(since.prevAfter), interest: Number(since.interest) } : undefined,
+    reserveLtvBps: own?.ltvBps ?? null,
+    emptyAfter: stateEmptyAfter(here),
     debtUsdBefore: baseToUsd(here.account.before.totalDebtBase),
     left: here.reserves.flatMap((r) => {
       const dec = r.decimals;
@@ -212,7 +233,21 @@ function healthFactorLine(state: V3StateRead | undefined, withdraw = false): Cla
       ? null
       : clause(<>With no debt left, the account has no health factor and cannot be liquidated.</>);
   }
-  const tail = a < 1.1 ? <>, close to the liquidation line at 1</> : null;
+  // Close to the line after the event, or only before it (a repay that
+  // lifted the account clear of it).
+  const nearAfter = a < NEAR_LIQUIDATION_HF;
+  const nearBefore = b != null && b < NEAR_LIQUIDATION_HF;
+  const drop = nearAfter && a > 1 ? Math.round((1 - 1 / a) * 100) : null;
+  const tail = nearAfter ? (
+    <>
+      , close to the liquidation line at 1
+      {drop != null ? (
+        <>: a fall of about {drop}% in the collateral&rsquo;s value would have made the account liquidatable</>
+      ) : null}
+    </>
+  ) : nearBefore ? (
+    <>: the account started this transaction close to the liquidation line at 1</>
+  ) : null;
   const allowed = withdraw ? (
     <>. The Pool allows a withdrawal only while the health factor stays at or above 1</>
   ) : null;
@@ -289,6 +324,54 @@ function priorMoveLine(state: V3StateRead | undefined): ClauseInput {
   );
 }
 
+/** A supplied balance that left entirely took its collateral switch with it. */
+function switchedOffLine(state: V3StateRead | undefined, sym: string): ClauseInput {
+  const c = state?.collateral;
+  if (!c || !c.before || c.after) return null;
+  return clause(
+    <>With none of it left, {sym} no longer counts as collateral: the Pool switched it off in the same transaction.</>,
+  );
+}
+
+/** The event that left the account empty closed the position; its value in
+ *  dollars at the block's oracle price. */
+function closedLine(ctx: AaveV3Context, state: V3StateRead | undefined, sym: string, verb: string): ClauseInput {
+  if (!state?.emptyAfter) return null;
+  const amt = Math.abs(numOf(ctx.amount) ?? 0);
+  const usd = ctx.price && amt > 0 ? amt * ctx.price.usd : null;
+  return clause(
+    <>
+      This closed the position: once it ran, the account held nothing supplied and owed nothing.
+      {usd != null ? (
+        <>
+          {" "}
+          The {fmtAmt(ctx.amount)} {sym} {verb} was worth {formatUsdValue(usd)} at the block&rsquo;s oracle price.
+        </>
+      ) : null}
+    </>,
+  );
+}
+
+/** A repay of the token a withdraw and swap sent to the wallet shortly before. */
+function fundedBySwapLine(
+  ctx: AaveV3Context,
+  sym: string,
+  prev: AaveV3TimelineEvent | undefined,
+  at?: number,
+): ClauseInput {
+  const p = prev?.context.data;
+  const s = p?.swap;
+  if (!prev || !p || !s || s.kind !== "withdraw_and_swap" || s.receivedSymbol !== sym || at == null) return null;
+  const minutes = Math.round((at - prev.timestamp) / 60);
+  if (minutes < 0 || minutes > 60) return null;
+  return clause(
+    <>
+      The {sym} for this repay came from the withdraw and swap {minutes <= 1 ? "a minute" : `${minutes} minutes`}{" "}
+      earlier, which sent {fmtAmt(s.receivedAmount)} {sym} to the wallet.
+    </>,
+  );
+}
+
 // ── reconciliation ───────────────────────────────────────────────────────────
 
 /** Figures of one sum at one precision: the lead sentence's (three decimals,
@@ -333,13 +416,20 @@ const numOf = (s: string | undefined): number | null => {
 };
 
 /** The event's own balance line: supply for supply/withdraw, debt for borrow/repay. */
-function eventReconcile(ctx: AaveV3Context, sym: string): ClauseInput {
+function eventReconcile(ctx: AaveV3Context, sym: string, state?: V3StateRead): ClauseInput {
   const supplySide = ctx.eventType === "supply" || ctx.eventType === "withdraw";
   const before = numOf(supplySide ? ctx.supplyBefore : ctx.debtBefore);
   const after = numOf(supplySide ? ctx.supplyAfter : ctx.debtAfter);
   const amount = Math.abs(numOf(ctx.amount) ?? 0);
   if (after == null || amount === 0) return null;
-  const interest = numOf(supplySide ? ctx.supplyInterestSincePrevious : ctx.debtInterestSincePrevious) ?? 0;
+  // The chain runs event to event: the balance the previous event left, and
+  // the interest from there. Without the two reads, the row's own figure is
+  // the interest since this balance last moved, and the sentence says so.
+  const since = state?.sincePrev;
+  const interest = since
+    ? since.interest
+    : (numOf(supplySide ? ctx.supplyInterestSincePrevious : ctx.debtInterestSincePrevious) ?? 0);
+  const start = since ? undefined : "when this balance last moved";
   const verb = { supply: "supplied", withdraw: "withdrawn", borrow: "borrowed", repay: "repaid" }[
     ctx.eventType as "supply" | "withdraw" | "borrow" | "repay"
   ];
@@ -363,6 +453,7 @@ function eventReconcile(ctx: AaveV3Context, sym: string): ClauseInput {
     after,
     interest,
     moves: [{ amount, sign, what: verb }],
+    start,
   });
 }
 
@@ -373,11 +464,30 @@ export interface V3SlotOpts {
   siblings?: readonly AaveV3TimelineEvent[];
   /** The position state around this event (Ethereum only). */
   state?: V3StateRead;
+  /** The last row of the previous transaction on the timeline, and this
+   *  event's own time: a repay reads whether a swap just before funded it. */
+  previousEvent?: AaveV3TimelineEvent;
+  timestamp?: number;
 }
 
 export function aaveV3EventSlots(ctx: AaveV3Context, coords: V3Coords, opts: V3SlotOpts = {}): EventProseSlots {
   const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
-  const slots = aaveV3EventSlotsBase(ctx, coords, opts);
+  let slots = aaveV3EventSlotsBase(ctx, coords, opts);
+  // A swap that moved the account's own balances moves its health factor
+  // like any supply, withdraw or repay; the account block states it too.
+  if (ctx.eventType === "swap" && ctx.swap && ctx.swap.kind !== "supply_from_swap") {
+    const sym = ctx.reserveSymbol ?? "the asset";
+    slots = {
+      ...slots,
+      meansNow: [
+        ...(slots.meansNow ?? []),
+        switchedOffLine(opts.state, sym),
+        healthFactorLine(opts.state, ctx.swap.kind === "withdraw_and_swap"),
+        priorMoveLine(opts.state),
+        closedLine(ctx, opts.state, sym, ctx.swap.kind === "withdraw_and_swap" ? "withdrawn" : "sold"),
+      ],
+    };
+  }
   const delegated = delegatedActorLine(ctx, opts.owner, chainId);
   if (!delegated) return slots;
   return { ...slots, meansNow: [...(slots.meansNow ?? []), delegated] };
@@ -433,7 +543,25 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
                 </>,
               )
             : coll
-              ? clause(<>{sym} is not on as collateral here, so this supply backs no borrowing.</>)
+              ? state?.reserveLtvBps === 0
+                ? clause(
+                    <>
+                      {sym} cannot back borrowing in this market: its loan-to-value at this block is 0%. This supply
+                      earns the supply rate and backs no debt.
+                    </>,
+                  )
+                : clause(
+                    <>
+                      {sym} could back borrowing in this market
+                      {state?.reserveLtvBps != null ? (
+                        <> (its loan-to-value at this block was {state.reserveLtvBps / 100}%)</>
+                      ) : null}
+                      , but it stayed off as collateral, so this supply backs no debt and only earns the supply rate.
+                      The Pool switches an asset on automatically at a first supply only where the account may use it as
+                      collateral (an asset in isolation mode, for one, stays off while other collateral is on);
+                      otherwise the owner switches it on.
+                    </>,
+                  )
               : clause(
                   <>Once {sym} is on as collateral, the supplied amount also backs the account&rsquo;s borrowing.</>,
                 );
@@ -445,7 +573,7 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
             </>,
           ),
         ],
-        changed: [eventReconcile(ctx, sym)],
+        changed: [eventReconcile(ctx, sym, state)],
         meansNow: [
           clause(<>It earns {brandOwns} variable supply rate, paid into the balance as it accrues.</>),
           collateralLine,
@@ -464,8 +592,13 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
             </>,
           ),
         ],
-        changed: [eventReconcile(ctx, sym)],
-        meansNow: [healthFactorLine(state, true), priorMoveLine(state)],
+        changed: [eventReconcile(ctx, sym, state)],
+        meansNow: [
+          switchedOffLine(state, sym),
+          healthFactorLine(state, true),
+          priorMoveLine(state),
+          closedLine(ctx, state, sym, "withdrawn"),
+        ],
       };
     }
 
@@ -474,7 +607,7 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
       const ratePct = ctx.borrowRate ? (Number(ctx.borrowRate) / 1e27) * 100 : null;
       return {
         happened: [clause(happened)],
-        changed: [eventReconcile(ctx, sym)],
+        changed: [eventReconcile(ctx, sym, state)],
         meansNow: [
           ratePct != null && ratePct > 0
             ? clause(<>The variable borrow rate at the time was {ratePct.toFixed(2)}% a year.</>)
@@ -497,8 +630,13 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
             </>,
           ),
         ],
-        changed: [eventReconcile(ctx, sym)],
-        meansNow: [healthFactorLine(state), priorMoveLine(state)],
+        changed: [eventReconcile(ctx, sym, state)],
+        meansNow: [
+          fundedBySwapLine(ctx, sym, opts.previousEvent, opts.timestamp),
+          healthFactorLine(state),
+          priorMoveLine(state),
+          closedLine(ctx, state, sym, "repaid"),
+        ],
       };
     }
 
@@ -547,13 +685,6 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
       const adapter = s.route === "cow_adapter";
       const paraswap = s.route === "paraswap";
       const through = paraswap ? "made through ParaSwap" : "settled through CoW Protocol";
-      const paired = clause(
-        paraswap ? (
-          <>The rows are paired by the ParaSwap adapter that made every one of them, not by sharing a transaction.</>
-        ) : (
-          <>The two legs are paired by the settlement&rsquo;s Trade log, not by sharing a transaction.</>
-        ),
-      );
       // What a ParaSwap adapter returned from the part of the swap it did not
       // use (server mig 248); the card nets it into its leg.
       const back = s.events?.find((e) => e.leftover);
@@ -612,52 +743,55 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
                   </>,
                 )
               : null,
-            paired,
           ],
         };
 
-      if (s.kind === "repay_with_collateral")
+      if (s.kind === "repay_with_collateral") {
+        // With a leftover, the figure on the card is the net: what the adapter
+        // took, less what it supplied back unused.
+        const sent = back ? s.events?.find((e) => e.action === "transfer_out" && !e.leftover) : undefined;
         return {
           happened: [
             clause(
               <>
-                Repaid {receivedFig} of {rSym} debt with {givenFig} of supplied {sym} in a repay with collateral{" "}
-                {through}.
+                Repaid {receivedFig} of {rSym} debt with {givenFig} of supplied {sym}
+                {sent ? " (net)" : ""} in a repay with collateral {through}.
               </>,
             ),
           ],
           meansNow: [
             clause(
               <>
-                The collateral paid the debt: the {sym} was sold for {rSym} and the debt repaid in one transaction.
+                The collateral paid the debt: one transaction sold the {sym} for {rSym} and repaid the debt with it.
               </>,
             ),
             adapter
               ? clause(
                   <>
-                    The order belonged to a one-order contract the Aave app created, which took the {sym} aTokens,
-                    withdrew and sold them, and repaid the {rSym} debt on this position&rsquo;s behalf.
+                    The order belonged to a one-order contract the Aave app created, which took the owner&rsquo;s
+                    supplied {sym}, withdrew and sold it, and repaid the {rSym} debt on this position&rsquo;s behalf.
                   </>,
                 )
               : null,
             paraswap
               ? clause(
                   <>
-                    ParaSwap&rsquo;s repay adapter took the {sym} aTokens, withdrew and swapped them through ParaSwap,
-                    and repaid the {rSym} debt on this position&rsquo;s behalf.
-                    {backFig ? (
+                    ParaSwap&rsquo;s repay adapter, a contract Aave publishes for this, took the owner&rsquo;s supplied{" "}
+                    {sym} with the owner&rsquo;s approval, withdrew it from the Pool, sold it through ParaSwap and
+                    repaid the {rSym} debt for the owner.
+                    {backFig && sent ? (
                       <>
                         {" "}
-                        It supplied {backFig} back at once, the part the swap did not use, so the figure is the {sym}{" "}
-                        that left the position.
+                        It took {fmtAmt(sent.amount)} {sym} and supplied {backFig} back unused, so {fmtAmt(ctx.amount)}{" "}
+                        {sym} net left the position.
                       </>
                     ) : null}
                   </>,
                 )
               : null,
-            paired,
           ],
         };
+      }
 
       if (s.kind === "supply_from_swap")
         return {
@@ -693,12 +827,12 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
           meansNow: [
             clause(
               <>
-                The {sym} left the position: ParaSwap&rsquo;s withdraw swap adapter took the aTokens, withdrew the {sym}{" "}
-                from the Pool and swapped it through ParaSwap. The {rSym} went to this account&rsquo;s wallet, not into
-                the position.
+                The {sym} left the position: ParaSwap&rsquo;s withdraw swap adapter, a contract Aave publishes for this,
+                took the owner&rsquo;s supplied {sym} with the owner&rsquo;s approval, withdrew it from the Pool and
+                swapped it through ParaSwap, all in one transaction. The {rSym} went to the owner&rsquo;s wallet,
+                outside the position.
               </>,
             ),
-            clause(<>The swap is read from the adapter&rsquo;s Swapped log, in the same transaction.</>),
           ],
         };
 
@@ -760,7 +894,6 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
                     aTokens in the same settlement.
                   </>,
                 ),
-          paired,
         ],
       };
     }
@@ -821,6 +954,25 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
           Sent {transferFig} of supplied {sym} to {recipient} as an aToken transfer.
         </>
       );
+      // The gateway pulls aWETH only to withdraw it as ETH (WrappedTokenGatewayV3
+      // withdrawETH): the transfer is the first step of a withdrawal.
+      if (named?.kind === "gateway")
+        return {
+          happened: [clause(happened)],
+          meansNow: [
+            clause(
+              <>
+                This is how the Aave app withdraws ETH: the gateway took the supplied {sym}, withdrew it from the Pool,
+                unwrapped it and sent it on as ETH to the address the owner named, all in this transaction. The {sym}{" "}
+                left the position and the Pool.
+              </>,
+            ),
+            switchedOffLine(state, sym),
+            healthFactorLine(state, true),
+            priorMoveLine(state),
+            closedLine(ctx, state, sym, "withdrawn"),
+          ],
+        };
       return {
         happened: [clause(happened)],
         meansNow: [

@@ -632,24 +632,34 @@ for (const fx of FIXTURES) {
         (await cardText("liquidation-threshold")).endsWith(bpsPct(a.after.liquidationThresholdBps)),
       );
     }
-    if (state.emode) {
+    // The eMode card draws only where a category is in use on either side.
+    if (state.emode && (state.emode.before !== 0 || state.emode.after !== 0)) {
       const em = await cardText("emode");
       check(
         `${fx.label}: eMode reads ${emodeName(state, state.emode.after)}`,
         em.endsWith(emodeName(state, state.emode.after)),
         em,
       );
+    } else if (state.emode) {
+      check(
+        `${fx.label}: no eMode card with no category in use`,
+        (await block.locator('[data-position-card="emode"]').count()) === 0,
+      );
     }
 
     // No second read: close and reopen, and the answer is drawn from memory.
+    // The page also reads the previous transaction's state and prefetches on
+    // hover, so the rule is per key: this card's transaction asked once, and
+    // no key twice.
     await toggleCard(card);
     await page.waitForTimeout(300);
     await toggleCard(card);
     const again = await waitForAnswer(card);
+    const own = asks.filter((u) => u.toLowerCase().includes(`tx=${fx.tx.toLowerCase()}`)).length;
     check(
       `${fx.label}: reopening draws the kept answer without a second request`,
-      again === "ready" && asks.length === 1,
-      `${asks.length} request(s)`,
+      again === "ready" && own === 1 && new Set(asks).size === asks.length,
+      `${own} request(s) for this transaction, ${asks.length} in all, ${new Set(asks).size} distinct`,
     );
 
     if (fx.deep) {

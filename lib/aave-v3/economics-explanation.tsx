@@ -56,10 +56,15 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
   const debtSym = sideSymbol(data.debt);
 
   const collSupplied = data.collateral.lifetimeInflow;
-  const collWithdrawn = sumScalar(data.collateral.exited, valued);
+  const collReceived = sumScalar(data.collateral.received ?? [], valued);
+  const collEarned = sumScalar(data.collateral.earned ?? [], valued);
   const debtBorrowed = data.debt.lifetimeInflow;
   const debtRepaid = sumScalar(data.debt.exited, valued);
   const interest = data.debt.interest && data.debt.interest.amount > 0 ? data.debt.interest : null;
+  // Interest over the life: what is still owed on top of the principal, and
+  // what the lanes no longer held (or held beside others) accrued and repaid.
+  const debtInterest =
+    (interest ? (valued ? (interest.usd ?? 0) : interest.amount) : 0) + sumScalar(data.debt.earned ?? [], valued);
   const collLiquidated = sumScalar(data.collateral.liquidated, valued);
   // The debt side's involuntary bucket holds two mechanics: the cover a
   // liquidator repaid, and the remainder the Pool wrote off. Told apart by key.
@@ -70,22 +75,71 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
   );
   const debtWrittenOff = sumScalar(data.debt.liquidated.filter(isWrittenOff), valued);
 
-  const currentColl = sumScalar(data.collateral.current, valued);
+  const currentColl =
+    sumScalar(data.collateral.current, valued) +
+    (data.collateral.interest ? sumScalar([data.collateral.interest], valued) : 0);
   const currentDebt =
     sumScalar(data.debt.current, valued) + (interest ? (valued ? (interest.usd ?? 0) : interest.amount) : 0);
+
+  // Collateral out, by how it left: each exited row's caption.
+  const outBy = new Map<string, number>();
+  for (const l of data.collateral.exited) {
+    const k = l.flowLabel ?? "Withdrawn";
+    outBy.set(k, (outBy.get(k) ?? 0) + (valued ? (l.usd ?? 0) : l.amount));
+  }
+  const OUT_WORDS: Record<string, string> = {
+    Withdrawn: "withdrawn",
+    "Sold to repay": "sold to repay debt",
+    "Withdrawn and swapped": "withdrawn and swapped to the wallet",
+    "Swapped to another asset": "swapped into another asset",
+    "Sent to another account": "sent to another account",
+  };
+  const outParts = [...outBy].filter(([, v]) => v > 0);
 
   const items: ReactNode[] = [];
 
   if (collSupplied > 0) {
+    // Deposited + received + earned − out = held now, as one sum.
     items.push(
       <span key="coll-flow">
         Supplied <Fig>{fmt(collSupplied, valued, collSym)}</Fig> over the position&apos;s life
-        {collWithdrawn > 0 && (
+        {collReceived > 0 && (
           <>
-            , of which <Fig>{fmt(collWithdrawn, valued, collSym)}</Fig> was withdrawn
+            , received <Fig>{fmt(collReceived, valued, collSym)}</Fig> more
           </>
         )}
-        .
+        {collEarned > 0 && (
+          <>
+            {" "}
+            and earned <Fig>{fmt(collEarned, valued, collSym)}</Fig> of interest on it
+          </>
+        )}
+        {outParts.length > 0 && (
+          <>
+            ; then{" "}
+            {outParts.map(([k, v], i) => (
+              <span key={k}>
+                {i > 0 ? (i === outParts.length - 1 ? " and " : ", ") : null}
+                <Fig>{fmt(v, valued, collSym)}</Fig> {OUT_WORDS[k] ?? k.toLowerCase()}
+              </span>
+            ))}
+          </>
+        )}
+        {collLiquidated > 0 && (
+          <>
+            {outParts.length > 0 ? ", with " : "; then "}
+            <Fig>{fmt(collLiquidated, valued, collSym)}</Fig> taken by liquidation
+          </>
+        )}
+        {currentColl > 0 ? (
+          <>
+            , leaving <Fig>{fmt(currentColl, valued, collSym)}</Fig> supplied.
+          </>
+        ) : outParts.length > 0 || collLiquidated > 0 ? (
+          <>, leaving nothing supplied.</>
+        ) : (
+          "."
+        )}
       </span>,
     );
   }
@@ -95,11 +149,10 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
     items.push(
       <span key="debt-flow">
         Borrowed <Fig>{fmt(debtBorrowed, valued, debtSym)}</Fig> over the position&apos;s life
-        {interest && (
+        {debtInterest > 0 && (
           <>
             {" "}
-            and <Fig>{fmt(valued ? (interest.usd ?? 0) : interest.amount, valued, debtSym)}</Fig> of interest accrued on
-            it
+            and <Fig>{fmt(debtInterest, valued, debtSym)}</Fig> of interest accrued on it
           </>
         )}
         {debtRepaid > 0 && (
@@ -117,13 +170,15 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
           <>
             , leaving <Fig>{fmt(currentDebt, valued, debtSym)}</Fig> owed.
           </>
+        ) : debtRepaid > 0 || debtLiquidated > 0 ? (
+          <>, leaving nothing owed.</>
         ) : (
           "."
         )}
       </span>,
     );
   }
-  if (currentColl > 0) {
+  if (currentColl > 0 && collSupplied <= 0) {
     items.push(
       <span key="current">
         The position currently holds <Fig>{fmt(currentColl, valued, collSym)}</Fig> supplied.
@@ -151,8 +206,8 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
   if (data.liquidatedAtEventPrices && valued) {
     items.push(
       <span key="price-basis">
-        Supplied, withdrawn, borrowed and repaid are valued at today&apos;s prices, and the liquidated amounts at the
-        prices when each liquidation happened.
+        Supplied, withdrawn, borrowed, repaid and interest are valued at today&apos;s prices, and the liquidated amounts
+        at the prices when each liquidation happened.
       </span>,
     );
   }
@@ -200,7 +255,7 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}): LearnMor
       "This section traces a position's supply and borrow flows over its lifetime, replayed from the Pool's own events.",
     stepsHeading: "How it's built:",
     steps: [
-      "Flows are replayed from every supply, withdraw, borrow, repay and liquidation event the position's Pool has recorded.",
+      "Flows are replayed from every supply, withdraw, borrow, repay, swap, aToken transfer and liquidation the position's history records.",
       "Current balances come from the Pool at the block the page reads, with interest already included.",
       `Dollar values use ${isSeamless ? "Seamless" : "Aave"}'s own on-chain oracle — the same price the Pool liquidates with.`,
     ],
@@ -208,11 +263,15 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}): LearnMor
     details: [
       {
         bold: "Lifetime flows",
-        text: "the bars show every supply, withdrawal, borrow and repayment over the position's life.",
+        text: "the bars show every supply, withdrawal, borrow and repayment over the position's life, so deposited plus interest less everything that left equals what is held now.",
       },
       {
-        bold: "Accrued interest",
-        text: "the current balance minus the net of what the position's events supplied or borrowed. It is a segment of the debt bar, in USD when the debt is in more than one asset.",
+        bold: "Other ways out",
+        text: "collateral sold in a repay with collateral, withdrawn and swapped, or sent to another account as an aToken transfer has a separate row. A transfer to the WETH gateway counts as withdrawn: the gateway withdraws it as ETH in the same transaction.",
+      },
+      {
+        bold: "Interest",
+        text: "supplied balances earn interest and debts accrue it without an event. On the supply side it is a separate row beside what was deposited; on the debt side, interest still owed is a segment of the debt bar and interest already repaid is a row beside what was borrowed.",
       },
       {
         bold: "Liquidated",

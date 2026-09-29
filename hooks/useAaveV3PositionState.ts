@@ -48,6 +48,23 @@ async function read(key: string, qs: string): Promise<Settled> {
   }
 }
 
+/** Start the read ahead of the open (the pointer on a card's header): the
+ *  answer lands in the module cache, so the card's first paint on open is the
+ *  settled state. A no-op when it is kept or already in flight. */
+export function prefetchAaveV3PositionState(args: {
+  wallet?: string;
+  market?: string;
+  block?: number;
+  txHash?: string;
+}): void {
+  const { wallet, market, block, txHash } = args;
+  if (!wallet || !market || block == null || !txHash) return;
+  const key = `${wallet.toLowerCase()}:${market}:${block}:${txHash.toLowerCase()}`;
+  if (settled.has(key) || inFlight.has(key)) return;
+  const qs = new URLSearchParams({ wallet, market, block: String(block), tx: txHash }).toString();
+  inFlight.set(key, read(key, qs));
+}
+
 /** Null when the card carries no market (Base, Seamless): those keep the
  *  replayed principal line and never ask. */
 export function useAaveV3PositionState(args: {

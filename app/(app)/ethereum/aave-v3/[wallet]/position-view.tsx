@@ -55,7 +55,7 @@ import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-f
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
-import { aaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
+import { aaveV3CountSentence, aaveV3CountSplit, aaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
 import {
   AaveV3PositionCard,
   viewFromSummary,
@@ -68,6 +68,7 @@ import {
 import { AaveV3RiskSlot } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
 import {
   computeAaveV3Economics,
+  isWethGateway,
   computeAaveV3CardCaptions,
   unpricedAaveV3FlowAddresses,
   aaveV3LifetimeWithOpening,
@@ -341,6 +342,15 @@ export default function AaveV3PositionDetail({
   // reducer below treats an absent event list as "no lifetime layer" rather
   // than as an empty one — so the surfaces state nothing while they cannot
   // state the whole, which is the only correct answer between the two requests.
+  // Why the timeline's event count and the card's transaction count differ;
+  // stated only where the page holds the whole history.
+  const countNote = useMemo(
+    () =>
+      view && historyWindow.state === "whole" && (servedFolders?.length ?? 0) === 0
+        ? aaveV3CountSentence(aaveV3CountSplit(aaveEvents as AaveV3Event[], isWethGateway), view.txCount)
+        : null,
+    [view, historyWindow.state, servedFolders, aaveEvents],
+  );
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? aaveEvents : undefined;
   const precomputedLifetime = useMemo(
@@ -633,6 +643,7 @@ export default function AaveV3PositionDetail({
               <AaveV3PositionCard
                 v={liveView}
                 receipts
+                countNote={countNote}
                 viewHref={tl.viewHref}
                 captions={captions ?? undefined}
                 // The risk slot rides the card's heading-button row (the V2 trove
@@ -652,7 +663,12 @@ export default function AaveV3PositionDetail({
                 // view (where pool-wide rate context belongs).
                 explanation={
                   liveView.status !== "open" ? (
-                    <AaveV3ClosedPositionExplanation v={liveView} events={aaveEvents} folders={servedFolders} />
+                    <AaveV3ClosedPositionExplanation
+                      v={liveView}
+                      events={aaveEvents}
+                      folders={servedFolders}
+                      countNote={countNote}
+                    />
                   ) : (
                     // Passed before the Pool read lands (the Fluid treatment):
                     // the pane, and the copy-view link at its foot, mount with
@@ -663,6 +679,7 @@ export default function AaveV3PositionDetail({
                       view={liveView}
                       externalActivity={externalActivity}
                       marketName={MARKET_NAME[market] ?? "Core"}
+                      countNote={countNote}
                     />
                   )
                 }

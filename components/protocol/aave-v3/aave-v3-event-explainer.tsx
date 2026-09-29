@@ -18,11 +18,13 @@ import {
   aaveV3BadDebtContent,
   aaveV3TransferContent,
   aaveV3EventFallbackContent,
+  aaveV3RepayWithCollateralContent,
+  aaveV3WithdrawAndSwapContent,
 } from "@/lib/shared/learn-more-content";
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { aaveV3EventSlots, v3StateRead } from "@/lib/aave-v3/explainer-clauses";
 import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
-import type { AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
+import type { AaveV3Neighbours, AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
 import { feeLiquidation } from "@/lib/aave-v3/liquidation-fee";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
@@ -43,7 +45,9 @@ export interface AaveV3EventExplainerProps {
   /** This transaction's rows (a liquidation and its fee transfer). */
   siblings?: AaveV3TimelineEvent[];
   /** The previous transaction, to say how the health factor moved between events. */
-  previous?: { blockNumber: number; txHash: string };
+  previous?: AaveV3Neighbours["previous"];
+  /** The event's own time (unix seconds). */
+  timestamp?: number;
 }
 
 /** Mechanic modal content for this event — never-empty floor: every event type
@@ -67,6 +71,14 @@ export function aaveV3LearnMoreContent(ctx: AaveV3Context, protocol: V3Protocol 
     case "transfer_in":
     case "transfer_out":
       return aaveV3TransferContent(protocol);
+    // The two ParaSwap adapter kinds have their own modals; the other swap
+    // kinds and routes keep the general one.
+    case "swap":
+      if (ctx.swap?.route === "paraswap" && ctx.swap.kind === "repay_with_collateral")
+        return aaveV3RepayWithCollateralContent();
+      if (ctx.swap?.route === "paraswap" && ctx.swap.kind === "withdraw_and_swap")
+        return aaveV3WithdrawAndSwapContent();
+      return aaveV3EventFallbackContent(protocol);
     default:
       return aaveV3EventFallbackContent(protocol);
   }
@@ -81,6 +93,7 @@ export function AaveV3EventExplainer({
   market,
   siblings,
   previous,
+  timestamp,
 }: AaveV3EventExplainerProps) {
   const chainId = useChainId();
   const coords: V3Coords = {
@@ -110,7 +123,9 @@ export function AaveV3EventExplainer({
     here?.status === "ready" ? here.data : undefined,
     before?.status === "ready" ? before.data : undefined,
   );
-  const clauses = eventClauses(aaveV3EventSlots(ctx, coords, { owner, siblings, state }));
+  const clauses = eventClauses(
+    aaveV3EventSlots(ctx, coords, { owner, siblings, state, previousEvent: previous?.event, timestamp }),
+  );
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;

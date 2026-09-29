@@ -332,9 +332,13 @@ export function AaveV3PositionCard({
   captions,
   deployment,
   peaks = true,
+  countNote,
 }: {
   v: AaveV3PositionView;
   receipts?: boolean;
+  /** Why the timeline's event count differs from the transaction count
+   *  (aaveV3CountSentence), where the page holds the whole history. */
+  countNote?: string | null;
   /** Which deployment the row describes — its session, market label and the
    *  receipts behind every figure. Ethereum's indexed lane by default; a Base
    *  lender passes its own (lib/aave-v3/card-deployment.tsx). */
@@ -369,6 +373,7 @@ export function AaveV3PositionCard({
           viewHref={viewHref}
           captions={captions}
           peaks={peaks}
+          countNote={countNote}
         />
       </AaveV3CardDeploymentProvider>
     );
@@ -382,6 +387,7 @@ export function AaveV3PositionCard({
       viewHref={viewHref}
       captions={captions}
       peaks={peaks}
+      countNote={countNote}
     />
   );
 }
@@ -394,9 +400,11 @@ function AaveV3PositionCardBody({
   viewHref,
   captions,
   peaks = true,
+  countNote,
 }: {
   v: AaveV3PositionView;
   receipts?: boolean;
+  countNote?: string | null;
   rowExtra?: React.ReactNode;
   explanation?: React.ReactNode;
   /** Copy-this-view control, forwarded straight through to `PositionCardShell`
@@ -414,7 +422,7 @@ function AaveV3PositionCardBody({
   const marketTitle = marketLabel
     ? `${marketLabel} is one of the Aave V3 markets on Ethereum. Each market is a separate account with a separate health factor.`
     : undefined;
-  const countTitle = txCountTitle(v, dep.session === "aave-v3");
+  const countTitle = [txCountTitle(v, dep.session === "aave-v3"), countNote].filter(Boolean).join(". ");
   const collUsd = totalUsd(v, v.supplies);
   const debtUsd = totalUsd(v, v.borrows);
   // `receipts` is the render-site switch (listing defaults false; only the
@@ -480,6 +488,8 @@ function AaveV3PositionCardBody({
             />
           }
           closedAt={v.lastActivityAt}
+          // The peaks are supplied balances, collateral or not.
+          collateralLabel="Highest recorded supplied"
           collateral={peaks ? <PeakStack reserves={v.peakSupplies} side="supply" /> : <StatDash />}
           collateralFootnote={noPeaksNote}
           debt={peaks ? <PeakStack reserves={v.peakBorrows} side="debt" /> : <StatDash />}

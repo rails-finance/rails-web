@@ -17,12 +17,13 @@ import { AaveV3CtEventHeader, isAaveV3LossRow, signedAmount } from "./aave-v3-ct
 import { AaveV3CtEventDetail } from "./aave-v3-ct-event-detail";
 import { AaveV3EventExplainer, aaveV3LearnMoreContent } from "./aave-v3-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import { prefetchAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { v3Protocol } from "@/lib/aave-v3/protocol-name";
 import { feeLiquidation, liquidationFee } from "@/lib/aave-v3/liquidation-fee";
-import type { AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
+import type { AaveV3Neighbours, AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
 
 export interface AaveV3CtEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "aave-v3"; data: AaveV3Context } };
@@ -39,7 +40,7 @@ export interface AaveV3CtEventCardProps {
   siblings?: AaveV3TimelineEvent[];
   /** The transaction before this one on the timeline, whose after-state is
    *  where this event's before-state started. */
-  previous?: { blockNumber: number; txHash: string };
+  previous?: AaveV3Neighbours["previous"];
 }
 
 // direction "right" = token moves toward the protocol (deposit / repay),
@@ -78,6 +79,14 @@ export function AaveV3CtEventCard({
 }: AaveV3CtEventCardProps) {
   const ctx = event.context.data;
   const chainId = useChainId();
+  const prefetch = () => {
+    if (!market) return;
+    const wallet = event.wallet;
+    const feeRow = !!feeLiquidation(ctx, siblings, chainId);
+    if (feeRow) return;
+    prefetchAaveV3PositionState({ wallet, market, block: event.blockNumber, txHash: event.txHash });
+    prefetchAaveV3PositionState({ wallet, market, block: previous?.blockNumber, txHash: previous?.txHash });
+  };
   // A transfer to the Aave treasury in a liquidation's transaction is that
   // liquidation's protocol fee (lib/aave-v3/liquidation-fee.ts).
   const feeOf = feeLiquidation(ctx, siblings, chainId);
@@ -283,17 +292,23 @@ export function AaveV3CtEventCard({
       avatar={null}
       iconColumn={iconSlot}
       header={
-        <AaveV3CtEventHeader
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          externalBy={extBy ?? undefined}
-          wallet={event.wallet}
-          flows={event.flows}
-          feeOf={feeOf}
-        />
+        // The pointer on the header starts the position reads the open card
+        // makes (this transaction's and the previous one's), so the state is
+        // usually in hand by the time the card opens. `contents` keeps the
+        // layout; the pointer events still bubble through it.
+        <div className="contents" onPointerOver={prefetch} onFocus={prefetch}>
+          <AaveV3CtEventHeader
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+            externalBy={extBy ?? undefined}
+            wallet={event.wallet}
+            flows={event.flows}
+            feeOf={feeOf}
+          />
+        </div>
       }
       detail={
         <AaveV3CtEventDetail
@@ -304,6 +319,7 @@ export function AaveV3CtEventCard({
           market={market}
           feeOf={feeOf}
           fee={fee}
+          previous={previous}
         />
       }
       detailLabel="Position state"
@@ -316,6 +332,7 @@ export function AaveV3CtEventCard({
           market={market}
           siblings={siblings}
           previous={previous}
+          timestamp={event.timestamp}
           skipLead
         />
       }

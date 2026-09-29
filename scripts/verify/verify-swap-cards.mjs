@@ -125,10 +125,10 @@ const FIXTURES = [
     venue: PARASWAP_VENUE,
     // D4: the open card reads the Borrowed balance ending at the net 18,76x (the
     // gross borrow alone would end at 18.8K), the Borrow row at its gross, and the
-    // leftover as its own "Repaid back" row. The balance is the exact one read when
+    // leftover as its own "Repaid back unused" row. The balance is the exact one read when
     // the card opens (rails-ops TO-DO-ui-jobs §19) and is stated by the position
     // block's Borrowed row alone (§47), so the account beneath it shows too.
-    readsWhenOpen: [/Borrowed .*\b0 18,76\d\b/, "Borrow 18.8K", "Repaid back 37.528", "Health factor"],
+    readsWhenOpen: [/Borrowed .*\b0 18,76\d\b/, "Borrow 18.8K", "Repaid back unused 37.528", "Health factor"],
   },
   {
     label: "aave-v3 core 0xf0838f (ParaSwap repay with collateral, leftover supplied back)",

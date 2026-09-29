@@ -164,6 +164,32 @@ export function findReserve(
   return named.length === 1 ? named[0] : undefined;
 }
 
+/** One reserve leg read against the previous event: its balance once the
+ *  previous transaction had run, and the interest it accrued from there to
+ *  immediately before this one (this before − previous after). Undefined where
+ *  the previous read is missing or the same transaction, the reserve is not in
+ *  either answer, or the gap is negative. */
+export function sincePrevious(
+  here: AaveV3PositionState,
+  prev: AaveV3PositionState | undefined,
+  reserve: string | undefined,
+  side: "supply" | "debt",
+): { prevAfter: string; interest: string } | undefined {
+  if (!prev || !reserve || prev.txHash.toLowerCase() === here.txHash.toLowerCase()) return undefined;
+  const a = reserve.toLowerCase();
+  const h = here.reserves.find((r) => r.reserve.toLowerCase() === a);
+  const p = prev.reserves.find((r) => r.reserve.toLowerCase() === a);
+  if (!h || h.decimals == null) return undefined;
+  const prevAfterRaw = p ? big((side === "supply" ? p.supply : p.debt).after) : ZERO;
+  const gap = big((side === "supply" ? h.supply : h.debt).before) - prevAfterRaw;
+  if (gap < ZERO) return undefined;
+  return { prevAfter: humanOf(prevAfterRaw.toString(), h.decimals), interest: humanOf(gap.toString(), h.decimals) };
+}
+
+/** Nothing supplied and nothing owed once the transaction had run. */
+export const stateEmptyAfter = (state: AaveV3PositionState): boolean =>
+  state.reserves.every((r) => big(r.supply.after) === ZERO && big(r.debt.after) === ZERO);
+
 /** How the card names an eMode category: "None" for 0, the category's own label
  *  where the at-block read carries one, else its id. */
 export function emodeName(state: AaveV3PositionState, id: number): string {

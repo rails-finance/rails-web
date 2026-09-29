@@ -1023,6 +1023,21 @@ export const accountTotalProv = (
   ]),
 });
 
+/** The account's loan-to-value as it stands: total debt ÷ total collateral. */
+export const currentLtvProv = (
+  when: "before" | "after",
+  coords: V3Coords,
+  vals: { debtUsd: number; collateralUsd: number },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `Current loan to value ${when} this transaction — the total debt divided by the total collateral, both in US dollars at the block's oracle prices (${vals.debtUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })} ÷ ${vals.collateralUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })}). The account can borrow until it reaches the weighted max LTV.`,
+  contract: poolOf(coords),
+  via: "total debt ÷ total collateral, the account figures above",
+  formula: "debt ÷ collateral",
+  inputs: eventInputs(coords),
+});
+
 /** The account's weighted LTV or liquidation threshold. */
 export const accountRatioProv = (
   which: "ltv" | "lt",
@@ -1159,22 +1174,40 @@ export const aaveV3UsdProvOnchain = (what: string): Provenance => ({
  *  transfers (captured and shown on the timeline as their own events) move
  *  custody without a Pool flow: they are neither deposits nor withdrawals,
  *  so they stay out of these sums (stated, not hidden). */
-export type AaveV3LifetimeFlow = "withdrawn" | "repaid" | "liquidated collateral" | "liquidated debt" | "written off";
+export type AaveV3LifetimeFlow =
+  | "withdrawn"
+  | "repaid"
+  | "liquidated collateral"
+  | "liquidated debt"
+  | "written off"
+  | "sold to repay"
+  | "withdrawn and swapped"
+  | "swapped out"
+  | "swapped in"
+  | "transferred in"
+  | "transferred out";
 
 /** The verb a lifetime-flow receipt uses for its Σ. */
 export const lifetimeFlowVerb = (flow: AaveV3LifetimeFlow): string =>
-  flow === "withdrawn"
-    ? "withdrew"
-    : flow === "repaid"
-      ? "repaid"
-      : flow === "written off"
-        ? "had written off as bad debt, the debt a liquidation left no collateral to cover"
-        : "moved in liquidations";
+  ({
+    withdrawn:
+      "withdrew (a transfer to a WETH gateway included: the gateway withdraws it as ETH in the same transaction)",
+    repaid: "repaid",
+    "written off": "had written off as bad debt, the debt a liquidation left no collateral to cover",
+    "liquidated collateral": "moved in liquidations",
+    "liquidated debt": "moved in liquidations",
+    "sold to repay": "sold in a repay with collateral, net of what the adapter supplied back unused",
+    "withdrawn and swapped": "withdrew and swapped to the wallet in a withdraw and swap",
+    "swapped out": "swapped into another reserve under an order the owner signed",
+    "swapped in": "received as aTokens from a swap order the owner signed",
+    "transferred in": "received as aToken transfers from another account",
+    "transferred out": "sent as aToken transfers to another account",
+  })[flow];
 
 export const aaveV3LifetimeFlowProv = (flow: AaveV3LifetimeFlow, sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Lifetime ${flow} (${sym}) — the sum of every ${sym} amount this position's Pool events ${lifetimeFlowVerb(flow)}, across the whole history on record for it. Pool flows only: an aToken transfer hands the position to another account without a Pool flow, so it counts here as neither a deposit nor a withdrawal. The timeline draws it as a transfer.`,
+  summary: `Lifetime ${flow} (${sym}) — the sum of every ${sym} amount this position ${lifetimeFlowVerb(flow)}, across the whole history on record for it.`,
   contract: POOL,
   via: `${V3_INDEX_VIA} · Σ amount across the position's logs · the history on record`,
 });
@@ -1314,14 +1347,25 @@ export const rowChainBalanceProv = (
 export const rowInterestProv = (sym: string, side: "supply" | "debt", coords: V3Coords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Interest the ${side === "supply" ? "supplied" : "borrowed"} ${sym} ${
-    side === "supply" ? "earned" : "accrued"
-  } since the last transaction that moved it: the scaled balance held over that time, valued at this transaction's ${
+  summary: `${side === "supply" ? "Supply" : "Borrow"} interest on ${sym} since this balance last moved — the scaled balance held since the last transaction that moved it, valued at this transaction's ${
     side === "supply" ? "liquidity" : "variable borrow"
-  } index, less the same balance at the index of that transaction. It is the gap between this event's balance before and the previous event's balance after.`,
+  } index, less the same balance at the index of that transaction.`,
   contract: poolOf(coords),
   via: `${captureVia(coords)} · scaled × (index now − index then) ÷ 1e27`,
   formula: "scaled × index now ÷ 1e27 − scaled × index then ÷ 1e27",
+  inputs: eventInputs(coords),
+});
+
+/** Interest one balance accrued between the previous event on the timeline and
+ *  this one: this event's exact balance before, less the previous event's
+ *  exact balance after (decision 0025's position reads). */
+export const prevEventInterestProv = (sym: string, side: "supply" | "debt", coords: V3Coords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `${side === "supply" ? "Supply" : "Borrow"} interest on ${sym} since the previous event — the balance immediately before this transaction, less the balance once the previous transaction on this timeline had run. Both are exact balances, interest included, from the position's scaled balances and the reserve index at each block.`,
+  contract: poolOf(coords),
+  via: "exact balance before this transaction − exact balance after the previous one",
+  formula: "before − previous after",
   inputs: eventInputs(coords),
 });
 

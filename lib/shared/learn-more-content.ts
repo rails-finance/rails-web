@@ -1208,7 +1208,7 @@ export function aaveV3TransferContent(protocol: V3Protocol = "Aave V3"): LearnMo
     details: [
       {
         bold: "Not a deposit or withdrawal",
-        text: "a transfer is a change of custody, not new capital arriving or leaving, so the lifetime flows leave it out of supplied and withdrawn. A liquidation's protocol fee is the exception the flows count: it leaves as an aToken transfer to the treasury, and the flows count it with the collateral the liquidation took.",
+        text: "a transfer is a change of custody, so the lifetime flows give it a separate row from supplied and withdrawn. Two transfers count as something else: one to the WETH gateway is a withdrawal to ETH (the gateway withdraws it in the same transaction), and a liquidation's protocol fee to the treasury counts with the collateral the liquidation took.",
       },
       {
         bold: "Two accounts, one move",
@@ -1230,6 +1230,76 @@ export function aaveV3TransferContent(protocol: V3Protocol = "Aave V3"): LearnMo
   };
 }
 
+/** Official sources for the swap modals: Aave's help page on withdrawing
+ *  (the app's withdraw-and-switch), and the adapters' source in Aave's own
+ *  periphery repository. */
+const AAVE_V3_SWAP_SOURCES = {
+  WITHDRAW_HELP: "https://aave.com/help/supplying/withdraw-tokens",
+  REPAY_ADAPTER:
+    "https://github.com/aave/aave-v3-periphery/blob/master/contracts/adapters/paraswap/ParaSwapRepayAdapter.sol",
+  WITHDRAW_SWAP_ADAPTER:
+    "https://github.com/aave/aave-v3-periphery/blob/master/contracts/adapters/paraswap/ParaSwapWithdrawSwapAdapter.sol",
+} as const;
+
+export function aaveV3RepayWithCollateralContent(): LearnMoreContent {
+  return {
+    title: "How Repaying with Collateral Works",
+    intro:
+      "Repaying with collateral pays a debt with the account's own supplied collateral instead of tokens from the wallet: in one transaction, part of the collateral is withdrawn, swapped for the debt asset, and used to repay.",
+    detailsHeading: "Key concepts:",
+    details: [
+      {
+        bold: "One transaction",
+        text: "Aave's repay adapter takes the owner's supplied collateral (the owner approves it first), withdraws it, swaps it through ParaSwap for the debt asset and repays. Where taking the collateral first would leave the account unhealthy, it repays first with a flash loan, a loan taken and returned inside the same transaction, and pays that back from the swap.",
+      },
+      {
+        bold: "Leftover supplied back",
+        text: "the swap is sized with room for price movement. Collateral the swap did not use is supplied back to the account in the same transaction, so what left the position is the amount taken less that return.",
+      },
+      {
+        bold: "Health factor",
+        text: "the debt and the collateral both fall. When the debt falls by more, relative to each asset's liquidation threshold, the health factor rises, which is why it is used to pull an account back from the liquidation line without new funds.",
+      },
+      {
+        bold: "Cost",
+        text: "the swap's price and slippage, and a flash-loan fee where one is used, are paid out of the collateral sold.",
+      },
+    ],
+    links: [
+      { label: "ParaSwap repay adapter (Aave source)", url: AAVE_V3_SWAP_SOURCES.REPAY_ADAPTER },
+      { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
+      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
+    ],
+  };
+}
+
+export function aaveV3WithdrawAndSwapContent(): LearnMoreContent {
+  return {
+    title: "How Withdraw and Swap Works",
+    intro:
+      "Withdraw and swap takes supplied tokens out of the Pool and swaps them for another token in one transaction; the Aave app calls it withdrawing and switching. The swapped tokens go to the wallet, outside the position.",
+    detailsHeading: "Key concepts:",
+    details: [
+      {
+        bold: "One transaction",
+        text: "Aave's withdraw swap adapter takes the owner's supplied tokens (the owner approves it to), withdraws them from the Pool, swaps them through ParaSwap and sends the result to the owner.",
+      },
+      {
+        bold: "A withdrawal first",
+        text: "for the position it is a withdrawal: the supplied balance falls, and the Pool refuses it if the health factor would end below 1.0.",
+      },
+      {
+        bold: "Cost",
+        text: "the swap's price and slippage decide how much of the new token arrives.",
+      },
+    ],
+    links: [
+      { label: "Withdrawing (Aave help)", url: AAVE_V3_SWAP_SOURCES.WITHDRAW_HELP },
+      { label: "ParaSwap withdraw swap adapter (Aave source)", url: AAVE_V3_SWAP_SOURCES.WITHDRAW_SWAP_ADAPTER },
+    ],
+  };
+}
+
 export function aaveV3EventFallbackContent(protocol: V3Protocol = "Aave V3"): LearnMoreContent {
   return {
     title: `How ${protocol} Positions Work`,
@@ -1246,10 +1316,7 @@ export function aaveV3EventFallbackContent(protocol: V3Protocol = "Aave V3"): Le
       },
       {
         bold: "One pooled account",
-        text:
-          protocol === "Aave V3"
-            ? "all of a wallet's supply and debt share one account and one health factor — there's no per-market isolation like V4's spokes."
-            : "all of a wallet's supply and debt share one account and one health factor — there's no per-market isolation.",
+        text: "all of a wallet's supply and debt in one market share one account and one health factor.",
       },
     ],
     links: v3ModalLinks(protocol, [

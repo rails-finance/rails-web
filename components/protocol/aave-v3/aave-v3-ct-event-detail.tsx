@@ -58,6 +58,7 @@ import {
   exactBalanceChangeProv,
   rowChainBalanceProv,
   rowInterestProv,
+  prevEventInterestProv,
   type V3Coords,
 } from "@/lib/aave-v3/event-provenance";
 import { Prov } from "@/components/shared/provenance";
@@ -75,7 +76,7 @@ import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
-import { findReserve, groupExact, humanOf, legChange, legHeld } from "@/lib/aave-v3/position-state";
+import { findReserve, groupExact, humanOf, legChange, legHeld, sincePrevious } from "@/lib/aave-v3/position-state";
 import { AmountText } from "@/components/shared/amount-text";
 import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
 
@@ -95,13 +96,16 @@ export interface AaveV3CtEventDetailProps {
   /** On a liquidation, its fee transfer to the treasury, where the timeline
    *  holds one. */
   fee?: AaveV3Context;
+  /** The previous transaction: its after-state is where this event's
+   *  interest line starts. */
+  previous?: { blockNumber: number; txHash: string };
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
 
 /** A row behind a ParaSwap swap card, by the index action it was. */
 const SWAP_ROW_LABEL: Record<AaveV3SwapPoolEvent["action"], string> = {
-  transfer_out: "Sent",
+  transfer_out: "Sent to be swapped",
   supply: "Supply",
   borrow: "Borrow",
   repay: "Repay",
@@ -151,6 +155,7 @@ export function AaveV3CtEventDetail({
   market,
   feeOf,
   fee,
+  previous,
 }: AaveV3CtEventDetailProps) {
   const coords: V3Coords = {
     txHash,
@@ -163,6 +168,16 @@ export function AaveV3CtEventDetail({
   // transaction would restate the liquidation: it states its own change only.
   const state = useAaveV3PositionState({ wallet, market: feeOf ? undefined : market, block: blockNumber, txHash });
   const ready = state?.status === "ready" ? state.data : undefined;
+  // The previous transaction's state (the explainer reads the same one): the
+  // interest line runs from that event's after-balance, so T2 and T3 chain
+  // event to event.
+  const prevState = useAaveV3PositionState({
+    wallet,
+    market: feeOf ? undefined : market,
+    block: previous?.blockNumber,
+    txHash: previous?.txHash,
+  });
+  const prevReady = prevState?.status === "ready" ? prevState.data : undefined;
   // The position-state receipts also name the owner.
   const stateCoords: V3Coords = wallet ? { ...coords, wallet: wallet.toLowerCase() } : coords;
 
@@ -171,10 +186,25 @@ export function AaveV3CtEventDetail({
   const touched: TouchedLeg[] = [];
   // The interest line of a stat that gave way to the block's row: drawn under
   // the grid, so the row still states it.
-  const interestLines: { symbol: string; side: "supply" | "debt"; value: string }[] = [];
+  const interestLines: (NonNullable<ChainTruthStat["interestSincePrevious"]> & { symbol: string })[] = [];
 
-  const interestOf = (a: Axis): ChainTruthStat["interestSincePrevious"] =>
-    a.chain?.interest ? { value: a.chain.interest, prov: rowInterestProv(a.symbol, a.side, coords) } : undefined;
+  /** Interest since the previous event, from the two position reads; where
+   *  they are not in hand, the row's own figure, which runs from the last
+   *  transaction that moved this balance and is labelled so. */
+  const interestOf = (a: Axis): ChainTruthStat["interestSincePrevious"] => {
+    const since = ready ? sincePrevious(ready, prevReady, a.reserve, a.side) : undefined;
+    // Interest under a millionth of a token is below what the line can show.
+    if (since && Number(since.interest) < 1e-6) return undefined;
+    if (since) return { value: since.interest, prov: prevEventInterestProv(a.symbol, a.side, stateCoords) };
+    if (since || (ready && previous && prevState?.status === "loading")) return undefined;
+    return a.chain?.interest
+      ? {
+          value: a.chain.interest,
+          prov: rowInterestProv(a.symbol, a.side, coords),
+          label: "Interest since this balance last moved",
+        }
+      : undefined;
+  };
 
   /** The row's own balance, before → after (the chain's where the index valued it). */
   const rowStat = (a: Axis): ChainTruthStat => ({
@@ -235,7 +265,8 @@ export function AaveV3CtEventDetail({
     // rule never hides that row (§52).
     if (legHeld(leg)) {
       touched.push({ reserve: r.reserve, side: a.side });
-      if (a.chain?.interest) interestLines.push({ symbol: a.symbol, side: a.side, value: a.chain.interest });
+      const line = interestOf(a);
+      if (line) interestLines.push({ ...line, symbol: a.symbol });
       return null;
     }
     const before = humanOf(leg.before, r.decimals);
@@ -413,10 +444,35 @@ export function AaveV3CtEventDetail({
     for (const leg of s.kind === "supply_from_swap" ? [received, given] : [given, received]) push(leg);
     // Where a leftover nets into a leg (§15 D4), every row behind the figures
     // above is listed with its own amount.
+    // A collateral leg netted by a leftover states the net beside its rows:
+    // taken, less supplied back unused.
+    const netted =
+      s.givenAction === "transfer_out" && (s.events ?? []).some((e) => e.leftover && e.action === "supply");
+    if (netted)
+      stats.push({
+        label: "Sold, net",
+        value: fmt(ctx.amount),
+        symbol: sym,
+        address: ctx.reserve,
+        prov: swapLegProv(
+          sym,
+          s.givenAction,
+          coords,
+          ctx.raw?.amount,
+          ctx.origin?.amount,
+          s.kind,
+          swapLegNet(s, "given"),
+          s,
+        ),
+      });
     for (const e of s.events ?? []) {
       const eSym = e.symbol ?? "—";
       stats.push({
-        label: e.leftover ? (e.action === "repay" ? "Repaid back" : "Supplied back") : SWAP_ROW_LABEL[e.action],
+        label: e.leftover
+          ? e.action === "repay"
+            ? "Repaid back unused"
+            : "Supplied back unused"
+          : SWAP_ROW_LABEL[e.action],
         value: fmt(e.amount),
         symbol: eSym,
         address: e.asset,
@@ -549,10 +605,10 @@ export function AaveV3CtEventDetail({
     <>
       {stats.length > 0 && <ChainTruthDetail stats={stats} />}
       {interestLines.map((l) => (
-        <div key={`${l.side}:${l.symbol}`} className="px-5 pb-1">
+        <div key={`${l.label ?? ""}:${l.symbol}`} className="px-5 pb-1">
           <StatSubline>
-            Interest since previous event:{" "}
-            <Prov info={rowInterestProv(l.symbol, l.side, coords)} value={l.value} symbol={l.symbol}>
+            {l.label ?? "Interest since previous event"}:{" "}
+            <Prov info={l.prov} value={l.value} symbol={l.symbol}>
               <span title={l.value}>
                 <AmountText value={Number(l.value)} />
               </span>

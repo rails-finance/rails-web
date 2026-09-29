@@ -39,6 +39,7 @@ import { formatUsdValue } from "@/lib/utils/format";
 import {
   accountRatioProv,
   accountTotalProv,
+  currentLtvProv,
   collateralFlagProv,
   emodeCategoryProv,
   exactBalanceChangeProv,
@@ -431,20 +432,38 @@ export function AaveV3PositionStateBlock({
         }),
       })),
     },
-    { key: "ltv", label: "LTV", body: ratio("ltv") },
-    { key: "liquidation-threshold", label: "Liquidation threshold", body: ratio("lt") },
+    // Debt as a share of collateral, the loan-to-value the account stands at.
     {
-      key: "emode",
-      label: "eMode",
-      body: emode ? (
-        <BeforeAfter
-          before={emodeFigure(state, emode.before, "before", coords)}
-          after={emodeFigure(state, emode.after, "after", coords)}
-        />
-      ) : (
-        <NotAvailable />
-      ),
+      key: "current-ltv",
+      label: "Current LTV",
+      body: accountCard((a, when) => {
+        const coll = baseToUsd(a.totalCollateralBase);
+        const debt = baseToUsd(a.totalDebtBase);
+        const text = coll > 0 ? `${((debt / coll) * 100).toFixed(2)}%` : "—";
+        return { text, value: text, prov: currentLtvProv(when, coords, { debtUsd: debt, collateralUsd: coll }) };
+      }),
     },
+    // The most the account may borrow, as a share of its collateral: each
+    // collateral's own LTV averaged by value, so it moves with the mix.
+    { key: "ltv", label: "Max LTV (weighted)", body: ratio("ltv") },
+    { key: "liquidation-threshold", label: "Liquidation threshold (weighted)", body: ratio("lt") },
+    // eMode draws only where the account used a category on either side.
+    ...(emode && !inEmode
+      ? []
+      : [
+          {
+            key: "emode",
+            label: "eMode",
+            body: emode ? (
+              <BeforeAfter
+                before={emodeFigure(state, emode.before, "before", coords)}
+                after={emodeFigure(state, emode.after, "after", coords)}
+              />
+            ) : (
+              <NotAvailable />
+            ),
+          },
+        ]),
   ];
 
   const missing =
@@ -468,7 +487,11 @@ export function AaveV3PositionStateBlock({
       </div>
       <div className="mt-2 space-y-0.5 text-xs text-rb-500">
         {account && (
-          <p>LTV and liquidation threshold are the values at this block; Aave governance changes them over time.</p>
+          <p>
+            Current LTV is the debt divided by the collateral. Max LTV and the liquidation threshold are each collateral
+            asset&rsquo;s setting at this block averaged by its value, so they move when the mix of collateral changes;
+            Aave governance changes the settings over time.
+          </p>
         )}
         {missing && <p>{missing}</p>}
         {clamped && <p>A balance whose recorded changes sum below zero is shown as 0.</p>}

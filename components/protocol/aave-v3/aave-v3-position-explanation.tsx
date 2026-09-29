@@ -40,6 +40,7 @@ export function AaveV3PositionExplanation({
   view,
   externalActivity,
   marketName,
+  countNote,
 }: {
   /** The live Pool read. Null until it lands (or when it came back stale):
    *  nothing is narrated, and the pane still mounts so its foot controls draw. */
@@ -57,6 +58,8 @@ export function AaveV3PositionExplanation({
   /** The Ethereum market's name (Core, Prime, EtherFi): the pane says what a
    *  market is. Omitted on the single-Pool deployments. */
   marketName?: string;
+  /** Why the timeline lists more events than the count (aaveV3CountSentence). */
+  countNote?: string | null;
 }) {
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
@@ -228,7 +231,7 @@ export function AaveV3PositionExplanation({
             ) : null}
           </>
         ) : null}
-        .
+        .{countNote ? <> {countNote}</> : null}
       </span>,
     );
   }
@@ -331,8 +334,11 @@ export function AaveV3ClosedPositionExplanation({
   events,
   folders,
   marketPhrase,
+  countNote,
 }: {
   v: AaveV3PositionView;
+  /** Why the timeline lists more events than the count (aaveV3CountSentence). */
+  countNote?: string | null;
   /** The account's timeline (Aave V3 Pool events, ascending) — the pane reads
    *  how the record ended from the rows already fetched. */
   events: BaseActivityEvent[];
@@ -463,7 +469,7 @@ export function AaveV3ClosedPositionExplanation({
       ) : aave.length > 0 ? (
         <>; the liquidation calls are its only recorded events, so it counts no transactions of its own</>
       ) : null}
-      .
+      .{countNote ? <> {countNote}</> : null}
     </span>,
   );
 
