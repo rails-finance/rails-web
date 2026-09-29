@@ -70,7 +70,7 @@ export function liveInterestProv(hub: "v1" | "v2", position?: string): Provenanc
     kind: "chain",
     pclass: "state",
     verify: recompute("annualInterestPPM()"),
-    summary: `This position's annual interest rate — its own annualInterestPPM() at the latest block (parts-per-million ÷ 10,000 = percent). Frankencoin charges interest UP FRONT at minting time, not as an ongoing accrual: each mint deducts the fee for the remaining term, so no interest lane ever grows on this page. ${
+    summary: `The rate a mint would pay today — the position's annualInterestPPM() at the latest block (parts-per-million ÷ 10,000 = percent). Each earlier mint paid the rate in force at its own block, which an opened mint shows. Frankencoin charges interest UP FRONT at minting time, not as an ongoing accrual: each mint deducts the fee for the remaining term, so no interest lane ever grows on this page. ${
       hub === "v2"
         ? "On V2 the rate is the system Leadrate plus this position's fixed riskPremiumPPM — the premium is set at open; the Leadrate part moves by governance."
         : "On V1 the rate was fixed at the position's opening."

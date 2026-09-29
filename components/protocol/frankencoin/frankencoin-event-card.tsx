@@ -23,6 +23,8 @@ import { FrankencoinEventHeader } from "./frankencoin-event-header";
 import { FrankencoinEventDetail } from "./frankencoin-event-detail";
 import { FrankencoinEventExplainer, frankencoinLearnMoreContent } from "./frankencoin-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import { useFrankencoinPageFacts } from "@/lib/frankencoin/page-facts";
+import { useFrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
 
 export interface FrankencoinEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "frankencoin"; data: FrankencoinContext } };
@@ -38,6 +40,10 @@ const num = (s?: string): number => {
 
 export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: FrankencoinEventCardProps) {
   const ctx = event.context.data;
+  const facts = useFrankencoinPageFacts();
+  // The receipt read the teaser's lead can use (a new owner's kind); the same
+  // request serves the grid and the explanation.
+  const { read } = useFrankencoinEventRead(ctx, event.txHash, event.id);
 
   const critical = ctx.eventType === "challenge_succeeded" || ctx.eventType === "denied";
   const caution =
@@ -139,7 +145,7 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
           ctx.eventType === "challenge_started"
             ? "Challenge"
             : ctx.eventType === "challenge_succeeded"
-              ? "Challenge won"
+              ? "Collateral sold"
               : ctx.eventType === "denied"
                 ? "Denied"
                 : ctx.eventType === "auction_settlement"
@@ -176,7 +182,15 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
           flows={event.flows}
         />
       }
-      detail={<FrankencoinEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
+      detail={
+        <FrankencoinEventDetail
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          eventId={event.id}
+          timestamp={event.timestamp}
+        />
+      }
       detailLabel="Position state"
       explainer={
         <FrankencoinEventExplainer
@@ -184,13 +198,14 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
           txHash={event.txHash}
           blockNumber={event.blockNumber}
           timestamp={event.timestamp}
+          eventId={event.id}
           skipLead
         />
       }
       explainerLabel="Plain English"
-      explainerTeaser={frankencoinExplainerTeaser(ctx, coords, event.timestamp)}
+      explainerTeaser={frankencoinExplainerTeaser(ctx, coords, event.timestamp, facts, event.txHash, read)}
       txHash={event.txHash}
-      learnMore={<LearnMore inline content={frankencoinLearnMoreContent(ctx)} />}
+      learnMore={<LearnMore inline content={frankencoinLearnMoreContent(ctx, facts)} />}
       persistKey={`frankencoin:${event.id}`}
     />
   );

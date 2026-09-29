@@ -126,6 +126,13 @@ export function frankencoinLifetimeWithOpening(
   return f;
 }
 
+/** The tower's legend for the sold / cleared flow lines, by sale kind. */
+export const FC_SALE_LABEL = {
+  challenge: { collateral: "Sold by challenge", debt: "Cleared by challenge sale" },
+  forced: { collateral: "Sold at expiry", debt: "Cleared by forced sale" },
+  both: { collateral: "Sold at auction", debt: "Cleared by sale" },
+} as const;
+
 export function computeFrankencoinEconomics(
   view: FrankencoinPositionView,
   events?: BaseActivityEvent[],
@@ -182,8 +189,24 @@ export function computeFrankencoinEconomics(
     symbol: string,
     amount: number,
     flow: Parameters<typeof lifetimeFlowProv>[0],
+    flowLabel?: string,
   ): TowerLine[] =>
-    ok && lifetime && amount > DUST ? [{ key, symbol, amount, usd: null, prov: lifetimeFlowProv(flow, symbol) }] : [];
+    ok && lifetime && amount > DUST
+      ? [{ key, symbol, amount, usd: null, prov: lifetimeFlowProv(flow, symbol), ...(flowLabel ? { flowLabel } : {}) }]
+      : [];
+
+  // The sales that cleared collateral and debt, named by kind (standards/
+  // lexicon.md, "challenge sale"): a phase-2 challenge sale, an expiry forced
+  // sale, or both on one position. Frankencoin has no liquidation.
+  const kinds = new Set((events ?? []).map((e) => (e.context?.data as { eventType?: string } | undefined)?.eventType));
+  const bySale = kinds.has("challenge_succeeded")
+    ? kinds.has("forced_sale")
+      ? "both"
+      : "challenge"
+    : kinds.has("forced_sale")
+      ? "forced"
+      : "both";
+  const saleLabel = { collateral: FC_SALE_LABEL[bySale].collateral, debt: FC_SALE_LABEL[bySale].debt };
 
   return {
     // NEVER valued: Frankencoin is oracle-free — token mode by charter, each
@@ -198,7 +221,14 @@ export function computeFrankencoinEconomics(
       current: supplyLines,
       interest: null,
       exited: line(collOk, "coll-withdrawn", sym, lifetime?.collateralWithdrawn ?? 0, "collateral withdrawn"),
-      liquidated: line(collOk, "coll-auctioned", sym, lifetime?.collateralAuctioned ?? 0, "collateral auctioned"),
+      liquidated: line(
+        collOk,
+        "coll-auctioned",
+        sym,
+        lifetime?.collateralAuctioned ?? 0,
+        "collateral auctioned",
+        saleLabel.collateral,
+      ),
       lifetimeInflow: collOk ? (lifetime?.collateralAdded ?? 0) : 0,
     },
     debt: {
@@ -211,6 +241,7 @@ export function computeFrankencoinEconomics(
         "ZCHF",
         lifetime?.debtClearedByAuction ?? 0,
         "debt cleared by auction",
+        saleLabel.debt,
       ),
       lifetimeInflow: debtOk ? (lifetime?.minted ?? 0) : 0,
     },

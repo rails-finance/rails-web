@@ -8,6 +8,7 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { ChainTruthTowerData, TowerSideData } from "@/lib/shared/chain-truth-economics";
 import { fmtFcColl, fmtZchf } from "@/lib/frankencoin/figures";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
+import { FC_SALE_LABEL } from "@/lib/frankencoin/economics";
 
 const DUST = 1e-9;
 
@@ -72,11 +73,21 @@ export function frankencoinEconomicsExplanation(data: ChainTruthTowerData): Reac
   const collAuctioned = collateral.liquidated[0];
   const debtAuctioned = debt.liquidated[0];
   if (collAuctioned || debtAuctioned) {
+    const label = collAuctioned?.flowLabel ?? debtAuctioned?.flowLabel;
+    const who =
+      label === FC_SALE_LABEL.challenge.collateral || label === FC_SALE_LABEL.challenge.debt
+        ? "A challenge sale"
+        : label === FC_SALE_LABEL.forced.collateral || label === FC_SALE_LABEL.forced.debt
+          ? "A forced sale after expiry"
+          : "Auction sales";
     bullets.push(
       <span key="auction">
-        A challenge auction has cleared {collAuctioned && <>{fig(collAuctioned.amount, collSym)} collateral</>}
-        {collAuctioned && debtAuctioned && " and "}
-        {debtAuctioned && <>{fig(debtAuctioned.amount, "ZCHF")} debt</>} from this position.
+        {who} {who === "Auction sales" ? "have" : "has"} taken{" "}
+        {collAuctioned && <>{fig(collAuctioned.amount, collSym)} of collateral</>}
+        {collAuctioned && debtAuctioned && " and cleared "}
+        {!collAuctioned && debtAuctioned && "cleared "}
+        {debtAuctioned && <>{fig(debtAuctioned.amount, "ZCHF")} of debt</>}. The opened sale events show who bought and
+        where the ZCHF went.
       </span>,
     );
   }
@@ -114,22 +125,22 @@ export function frankencoinEconomicsContent(): LearnMoreContent {
       {
         bold: "Gross debt",
         text: "a mint adds its whole amount to the debt. The wallet receives it less the position's reserve share and the interest for the remaining term.",
-        sources: [{ label: "Adjusting a position", url: `${FRANKENCOIN_DOC_URL}/positions/adjust` }],
+        sources: [{ label: "what a mint pays out", url: `${FRANKENCOIN_DOC_URL}/positions/adjust` }],
       },
       {
         bold: "Interest up front",
-        text: "interest for the remaining term is paid at each mint and is not returned; nothing accrues afterwards.",
-        sources: [{ label: "Collateralized minting", url: `${FRANKENCOIN_DOC_URL}/positions` }],
+        text: "interest for the remaining term is paid at each mint, at the rate in force then, and is not returned; nothing accrues afterwards.",
+        sources: [{ label: "interest on positions", url: `${FRANKENCOIN_DOC_URL}/positions` }],
       },
       {
         bold: "Reserve share",
         text: "the reserve share of each mint stays in the system reserve and is released on repayment: in full while the reserve covers every position's share, in proportion when losses have drawn it down.",
-        sources: [{ label: "Reserve", url: `${FRANKENCOIN_DOC_URL}/reserve` }],
+        sources: [{ label: "the reserve", url: `${FRANKENCOIN_DOC_URL}/reserve` }],
       },
       {
-        bold: "Challenge auctions",
-        text: "collateral and debt cleared by a challenge are counted apart from the owner's own withdrawals and repayments.",
-        sources: [{ label: "Challenges and auctions", url: `${FRANKENCOIN_DOC_URL}/positions/auctions` }],
+        bold: "Sales",
+        text: "collateral sold and debt cleared by a challenge sale (phase 2 of a challenge) or a forced sale after expiry are counted apart from the owner's own withdrawals and repayments. Frankencoin has no liquidation.",
+        sources: [{ label: "challenges and sales", url: `${FRANKENCOIN_DOC_URL}/positions/auctions` }],
       },
     ],
     links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],
