@@ -7,25 +7,22 @@
 // its Aave V3 port under SparkLend's rules, held to `sparkEventLegs` by one
 // fixture file (scripts/verify/verify-spark-flow-legs.ts).
 //
-// Where the scrubber and the ledger (lib/spark/economics.ts) differ: the ledger
-// leaves spToken transfers out of its flows; the scrubber draws them as
-// "Received by transfer" and "Sent to another account", a transfer to the Spark
-// WETH gateway as a withdrawal, and one to the Spark treasury inside a
-// liquidation as part of what the liquidation took.
+// The ledger (lib/spark/economics.ts) counts with the same classifier,
+// `sparkEventLegs`, so its in and out meet the bars at the live stop.
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isSparkEvent } from "@/lib/shared/types/event-shape";
 import type { ChainTruthTowerData } from "@/lib/shared/chain-truth-economics";
-import type { FlowEvent, FlowLive, FlowTimeline } from "@/lib/shared/flows-timeline";
+import type { FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { scaleRaw } from "@/lib/sources/chain/erc20-meta";
 import type { AaveV3EventLeg, FlowLeg } from "@/lib/aave-v3/chain-truth-tower";
 import {
   AAVE_V3_FLOW_BUCKETS,
   LIQUIDATIONS_NOT_COUNTED,
+  aaveV3FlowLive,
   flowEventsFromLegs,
   flowSeriesTimeline,
-  towerAssets,
   type StatedBalance,
 } from "@/lib/aave-v3/flows-timeline";
 
@@ -149,24 +146,6 @@ export function sparkFlowEvents(
   });
 }
 
-const usdOf = (lines: { usd: number | null }[] | undefined): number =>
-  (lines ?? []).reduce((s, l) => s + (l.usd ?? 0), 0);
-
-/** Held and owed now, as the ledger states them: where a side splits into
- *  principal and interest, both. The ledger states no price change, so the
- *  balancing segment stays one item. */
-export function sparkFlowLive(tower: ChainTruthTowerData): FlowLive {
-  const c = tower.collateral;
-  const d = tower.debt;
-  return {
-    collateralUsd: Math.max(0, usdOf(c.current) + (c.interest?.usd ?? 0)),
-    debtUsd: Math.max(0, usdOf(d.current) + (d.interest?.usd ?? 0)),
-    collateralInterestUsd: null,
-    debtInterestUsd: null,
-    assets: towerAssets(tower, true),
-  };
-}
-
 /** The scrubber's timeline from the index's day rows. */
 export function sparkFlowSeriesTimeline(
   series: FlowSeries,
@@ -176,7 +155,7 @@ export function sparkFlowSeriesTimeline(
   return flowSeriesTimeline(
     series,
     AAVE_V3_FLOW_BUCKETS,
-    tower?.valued === true ? sparkFlowLive(tower) : null,
+    tower?.valued === true ? aaveV3FlowLive(tower) : null,
     todayPrices,
   );
 }
