@@ -113,11 +113,19 @@ export function AaveV3CtEventHeader({
         ? `${sw.receivedSymbol} → ${ctx.reserveSymbol}`
         : `${ctx.reserveSymbol} → ${sw.receivedSymbol}`
       : null;
+  // An aToken transfer to a WETH gateway is a withdrawal to ETH: the gateway
+  // withdraws it from the Pool and sends ETH on in the same transaction
+  // (WrappedTokenGatewayV3 withdrawETH), and the lifetime flows count it as
+  // withdrawn. The row says so, and names the gateway as the route.
+  const named = getProtocolContract(ctx.counterparty, coords.chainId ?? MAINNET_CHAIN_ID);
+  const viaGateway = !feeOf && ctx.eventType === "transfer_out" && named?.kind === "gateway";
   const label = feeOf
     ? "Liquidation fee"
-    : sw && AAVE_V3_SWAP_LABELS[sw.kind]
-      ? `${AAVE_V3_SWAP_LABELS[sw.kind]}${direction ? ` ${direction}` : ""}`
-      : (LABELS[ctx.eventType] ?? ctx.eventType);
+    : viaGateway
+      ? "Withdraw as ETH"
+      : sw && AAVE_V3_SWAP_LABELS[sw.kind]
+        ? `${AAVE_V3_SWAP_LABELS[sw.kind]}${direction ? ` ${direction}` : ""}`
+        : (LABELS[ctx.eventType] ?? ctx.eventType);
   // A liquidation's fee reads as an act with its verb, not as a custody move.
   const isTransferRow = !feeOf && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out");
 
@@ -218,7 +226,6 @@ export function AaveV3CtEventHeader({
   // protocol contract (lib/shared/known-infrastructure.ts) is named with its
   // mark; any other address by ENS where it has a reverse record.
   const transferOut = ctx.eventType === "transfer_out";
-  const named = getProtocolContract(ctx.counterparty, coords.chainId ?? MAINNET_CHAIN_ID);
   // A swap names its venue, "via CoW Protocol" or "via ParaSwap" — never a CoW
   // order's one-order adapter.
   const venue = ctx.swap ? swapVenueParty(ctx.swap, coords.chainId ?? MAINNET_CHAIN_ID) : undefined;
@@ -233,7 +240,7 @@ export function AaveV3CtEventHeader({
         }
       : ctx.counterparty != null
         ? {
-            prefix: transferOut ? "to" : "from",
+            prefix: viaGateway ? "via" : transferOut ? "to" : "from",
             address: ctx.counterparty,
             name: feeOf ? "Aave treasury" : named?.name,
             icon: feeOf

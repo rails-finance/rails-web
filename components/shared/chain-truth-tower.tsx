@@ -39,6 +39,7 @@
 // opt-in; a feeder that sets none renders as before.
 
 import { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
+import { FlowsLedgerNoteContext } from "@/components/shared/lifetime-flows-scrubber";
 import { usePathname } from "next/navigation";
 import { ChartBarBig, ChevronDown } from "lucide-react";
 import {
@@ -1133,6 +1134,8 @@ export function ChainTruthTower({
   const [groupOverride, setGroupOverride] = useState<boolean | null>(null);
   // The ledger behind the scrubber, when one is drawn: closed by default.
   const [ledgerOpen, setLedgerOpen] = useState(false);
+  // What the ledger shows while the scrubber's slider is off its last stop.
+  const [ledgerNote, setLedgerNote] = useState<string | null>(null);
   const ledgerShown = timeline == null || ledgerOpen;
   // Collapsed, per protocol (ui-jobs 61). `settled` is false until the effect
   // below has read the store, and while it is false React writes NO collapsed
@@ -1268,17 +1271,26 @@ export function ChainTruthTower({
         <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
           {timeline != null && (
             <>
-              <div className="mt-2">{timeline}</div>
-              <button
-                type="button"
-                onClick={() => setLedgerOpen((v) => !v)}
-                aria-expanded={ledgerOpen}
-                aria-controls={`${bodyId}-ledger`}
-                className={`${CTRL_GHOST} mt-3 -mx-1 gap-1 rounded-md px-1 text-xs font-semibold text-foreground`}
-              >
-                Full breakdown
-                <ChevronDown size={14} aria-hidden className={ledgerOpen ? "rotate-180" : ""} />
-              </button>
+              <FlowsLedgerNoteContext.Provider value={setLedgerNote}>
+                <div className="mt-2">{timeline}</div>
+              </FlowsLedgerNoteContext.Provider>
+              <div className="mt-3 flex flex-wrap items-center gap-x-2">
+                <button
+                  type="button"
+                  onClick={() => setLedgerOpen((v) => !v)}
+                  aria-expanded={ledgerOpen}
+                  aria-controls={`${bodyId}-ledger`}
+                  className={`${CTRL_GHOST} -mx-1 gap-1 rounded-md px-1 text-xs font-semibold text-foreground`}
+                >
+                  Full breakdown
+                  <ChevronDown size={14} aria-hidden className={ledgerOpen ? "rotate-180" : ""} />
+                </button>
+                {ledgerNote && (
+                  <span className="text-xs text-rb-500" data-flow-ledger-note="">
+                    {ledgerNote}
+                  </span>
+                )}
+              </div>
             </>
           )}
           <div id={`${bodyId}-ledger`} hidden={!ledgerShown} className={timeline != null ? "mt-2" : undefined}>
