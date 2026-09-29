@@ -142,7 +142,7 @@ const LABELS: Record<EbisuEventType, string> = {
   adjustTrove: "Adjust Trove",
   adjustTroveInterestRate: "Adjust Interest Rate",
   applyPendingDebt: "Apply Pending Debt",
-  liquidate: "Liquidation",
+  liquidate: "Liquidated",
   redeemCollateral: "Redemption",
   openTroveAndJoinBatch: "Open Trove + Join Batch",
   setInterestBatchManager: "Set Batch Manager",

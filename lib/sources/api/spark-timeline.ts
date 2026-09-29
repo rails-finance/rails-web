@@ -127,7 +127,7 @@ const LABELS: Record<SparkEventType, string> = {
   withdraw: "Withdraw",
   borrow: "Borrow",
   repay: "Repay",
-  liquidation: "Liquidation",
+  liquidation: "Liquidated",
   transfer_in: "Transferred in",
   transfer_out: "Transferred out",
 };

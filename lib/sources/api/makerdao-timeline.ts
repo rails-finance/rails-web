@@ -153,7 +153,7 @@ function labelFor(
   isOpen: boolean,
   debtSymbol: string,
 ): { actionType: string; actionLabel: string } {
-  if (eventType === "grab") return { actionType: "grab", actionLabel: "Liquidation" };
+  if (eventType === "grab") return { actionType: "grab", actionLabel: "Liquidated" };
   // A fork moves the position (collateral AND debt together) between urns —
   // no tokens reach or leave the wallet, so neither side is a deposit/withdraw.
   if (eventType === "fork-out") return { actionType: "fork", actionLabel: "Move to Another Vault" };

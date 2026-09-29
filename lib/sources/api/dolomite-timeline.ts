@@ -103,7 +103,7 @@ const LABELS: Record<DolomiteEventType, string> = {
   transfer_out: "Sent",
   trade_taker: "Trade (spent)",
   trade_maker: "Trade (received)",
-  liquidation: "Liquidation",
+  liquidation: "Liquidated",
   seize_out: "Collateral seized",
   seize_in: "Seized collateral received",
   liquidation_payout: "Liquidation payout",

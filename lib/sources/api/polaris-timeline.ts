@@ -155,7 +155,7 @@ const LABELS: Record<PolarisEventType, string> = {
   open: "Open CDP",
   adjust: "Adjust",
   close: "Close CDP",
-  liquidate: "Liquidation",
+  liquidate: "Liquidated",
   transfer: "Transfer",
 };
 
