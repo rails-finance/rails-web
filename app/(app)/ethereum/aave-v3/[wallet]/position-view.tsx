@@ -54,7 +54,7 @@ import { fetchAaveV3GroupedTimeline, type AaveV3GroupedTimelineResponse } from "
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
-import { aaveV3FlowSeriesTimeline } from "@/lib/aave-v3/flows-timeline";
+import { aaveV3FlowSeriesTimeline, lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
 import { fetchAaveV3FlowSeries, type AaveV3FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
@@ -356,35 +356,62 @@ export default function AaveV3PositionDetail({
   );
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? aaveEvents : undefined;
-  const precomputedLifetime = useMemo(
+  // Lifetime flows over time (rails-ops reference/lifetime-flows-scrubber.md):
+  // the date scrubber leads the panel and the ledger sits one click under it.
+  // Its day rows and daily prices come from the index for the whole history,
+  // so a windowed or folder-served page draws it too. A failed read leaves the
+  // ledger on the page's own rows.
+  const [flowSeries, setFlowSeries] = useState<AaveV3FlowSeries | null>(null);
+  useEffect(() => {
+    const ctl = new AbortController();
+    setFlowSeries(null);
+    fetchAaveV3FlowSeries({ wallet, market, signal: ctl.signal })
+      .then(setFlowSeries)
+      .catch((err) => {
+        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
+      });
+    return () => ctl.abort();
+  }, [wallet, market]);
+  // The ledger's flows: the route's whole-history sums once they land, which
+  // count folder members and rows before a window's cut as the bars do; until
+  // then the page's rows with the opening balance and the folders' sums.
+  const pageLifetime = useMemo(
     () => aaveV3LifetimeWithOpening(aaveEvents, opening, servedFolders),
     [aaveEvents, opening, servedFolders],
+  );
+  const precomputedLifetime = useMemo(
+    () => (flowSeries ? lifetimeFromSeries(flowSeries) : undefined) ?? pageLifetime,
+    [flowSeries, pageLifetime],
   );
 
   const pricedFlowsRef = useRef<string | null>(null);
   useEffect(() => {
     if (!view || view.status !== "open" || aaveEvents.length === 0) return;
-    const key = `${wallet}:${market}`;
-    if (pricedFlowsRef.current === key) return;
     // Seeded from the merged lifetime, so a reserve the position only ever
     // touched below the cut still gets its oracle price — otherwise the tower's
     // strict per-total guard would gate the whole ECONOMICS panel on a wallet
     // whose oldest reserves are all in the opening balance.
     const missing = unpricedAaveV3FlowAddresses(view, aaveEvents, precomputedLifetime);
     if (missing.length === 0) return;
+    // One read per set of reserves: the route's lifetime can name reserves the
+    // page's rows did not.
+    const key = `${wallet}:${market}:${missing.join(",")}`;
+    if (pricedFlowsRef.current === key) return;
     pricedFlowsRef.current = key;
-    let cancelled = false;
+    // Not cancelled when the lifetime changes under it (the route's answer
+    // landing): the prices still belong to this wallet's view.
     fetchAaveV3OraclePrices(missing)
       .then((prices) => {
-        if (cancelled || Object.keys(prices).length === 0) return;
-        setView((v) => (v ? { ...v, priceByAddress: { ...prices, ...(v.priceByAddress ?? {}) } } : v));
+        if (Object.keys(prices).length === 0) return;
+        setView((v) =>
+          v && v.wallet.toLowerCase() === wallet.toLowerCase()
+            ? { ...v, priceByAddress: { ...prices, ...(v.priceByAddress ?? {}) } }
+            : v,
+        );
       })
       .catch(() => {
         // The tower simply stays on the gated token list.
       });
-    return () => {
-      cancelled = true;
-    };
   }, [view, aaveEvents, wallet, market, precomputedLifetime]);
 
   // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
@@ -579,22 +606,6 @@ export default function AaveV3PositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
-  // Lifetime flows over time (rails-ops reference/lifetime-flows-scrubber.md):
-  // the date scrubber leads the panel and the ledger sits one click under it.
-  // Its day rows and daily prices come from the index for the whole history,
-  // so a windowed or folder-served page draws it too. A failed read leaves the
-  // ledger alone.
-  const [flowSeries, setFlowSeries] = useState<AaveV3FlowSeries | null>(null);
-  useEffect(() => {
-    const ctl = new AbortController();
-    setFlowSeries(null);
-    fetchAaveV3FlowSeries({ wallet, market, signal: ctl.signal })
-      .then(setFlowSeries)
-      .catch((err) => {
-        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
-      });
-    return () => ctl.abort();
-  }, [wallet, market]);
   const flowTimeline = useMemo(
     () => (flowSeries ? aaveV3FlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
     [flowSeries, towerData, view],

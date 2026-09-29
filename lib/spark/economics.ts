@@ -62,7 +62,8 @@ const SPARK_VOCABULARY: AaveV3TowerVocabulary = {
  * (`aaveV3LifetimeWithOpening`). Pass the result to `computeSparkEconomics`,
  * `computeSparkCardCaptions` and `unpricedSparkFlowAddresses`. The index's
  * summary sums supply, withdraw, borrow, repay and liquidation legs only, so a
- * transfer below the cut is not in it (rails-ops TO-DO-ui-jobs §134).
+ * transfer below the cut is not in it; the page reads it only until the flows
+ * route's `lifetime` lands (rails-ops reference/lifetime-flows-scrubber.md).
  */
 export function sparkLifetimeWithOpening(
   events: BaseActivityEvent[],

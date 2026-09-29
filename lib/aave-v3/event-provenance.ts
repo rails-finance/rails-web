@@ -1251,6 +1251,7 @@ export const aaveV3UsdProvOnchain = (what: string): Provenance => ({
  *  custody without a Pool flow: they are neither deposits nor withdrawals,
  *  so they stay out of these sums (stated, not hidden). */
 export type AaveV3LifetimeFlow =
+  | "borrowed"
   | "withdrawn"
   | "repaid"
   | "liquidated collateral"
@@ -1267,6 +1268,7 @@ export type AaveV3LifetimeFlow =
 /** The verb a lifetime-flow receipt uses for its Σ. */
 export const lifetimeFlowVerb = (flow: AaveV3LifetimeFlow): string =>
   ({
+    borrowed: "borrowed",
     withdrawn:
       "withdrew (a transfer to a WETH gateway included: the gateway withdraws it as ETH in the same transaction)",
     repaid: "repaid",
