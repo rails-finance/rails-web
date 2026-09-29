@@ -1,25 +1,36 @@
 // Aave V3 (and SparkLend, the same Pool) → the date scrubber's timeline
 // (lib/shared/flows-timeline.ts).
 // ----------------------------------------------------------------------------
-// Every event's legs come from `aaveV3EventLegs`, the classifier the Lifetime
-// flows ledger reduces, and are valued the way the ledger values them: at the
-// oracle price the event carries, else at today's. The live stop takes its
-// held, owed and interest figures from the ledger's own data, so at the live
-// stop the two views state the same numbers.
+// The page reads the day rows the index serves (GET /api/aave-v3/flows/daily,
+// rails-ops reference/lifetime-flows-scrubber.md): the whole history and a
+// daily price per held asset, however the timeline itself is served.
+// `aaveV3FlowSeriesTimeline` maps that answer. The server classifies each
+// event with a port of `aaveV3EventLegs`, held to it by one fixture file
+// (scripts/verify/verify-aave-v3-flow-legs.ts).
 //
-// The scrubber needs every event from the position's first: a page holding a
-// window of its history (an opening balance, served folders) gets the ledger
-// alone. `aaveV3FlowTimeline` returns null there, and wherever a leg cannot be
-// valued.
+// `aaveV3FlowTimeline` builds the same day rows from a page's events, with
+// the legs `aaveV3EventLegs` gives: the reference the route is tested against,
+// valued the way the ledger values its flows (the oracle price the event
+// carries, else today's). The live stop takes held, owed and interest from the
+// ledger in both, so at the live stop the scrubber states the ledger's figures.
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
-import type { FlowBucket, FlowEvent, FlowSide, FlowTimeline } from "@/lib/shared/flows-timeline";
+import {
+  daysFromEvents,
+  type FlowBucket,
+  type FlowDayRow,
+  type FlowEvent,
+  type FlowLive,
+  type FlowSide,
+  type FlowTimeline,
+} from "@/lib/shared/flows-timeline";
+import type { AaveV3FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { aaveV3EventLegs, aaveV3LiquidationTxs, type AaveV3EventLeg, type FlowLeg } from "./chain-truth-tower";
 
 /** Every bucket an Aave-family position can fill, in drawing order. */
-const BUCKETS: FlowBucket[] = [
+export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
   { key: "deposited", label: "Deposited", side: "collateral", dir: "in" },
   { key: "received", label: "Received by transfer", short: "Received", side: "collateral", dir: "in", light: true },
   { key: "swappedIn", label: "Swapped in", side: "collateral", dir: "in", light: true },
@@ -71,8 +82,8 @@ const BUCKET_OF: Record<FlowLeg, string> = {
 const bucketOf = (l: AaveV3EventLeg): string | null =>
   l.leg == null ? null : l.fromCollateral ? "repaidWithCollateral" : BUCKET_OF[l.leg];
 
-const sideOf = (bucket: string): FlowSide => BUCKETS.find((b) => b.key === bucket)?.side ?? "collateral";
-const signOf = (bucket: string): number => (BUCKETS.find((b) => b.key === bucket)?.dir === "in" ? 1 : -1);
+const sideOf = (bucket: string): FlowSide => AAVE_V3_FLOW_BUCKETS.find((b) => b.key === bucket)?.side ?? "collateral";
+const signOf = (bucket: string): number => (AAVE_V3_FLOW_BUCKETS.find((b) => b.key === bucket)?.dir === "in" ? 1 : -1);
 
 /** The log index an event id ends in ("0xhash:12"), for ordering one block. */
 const logIndex = (id: string): number => {
@@ -89,8 +100,8 @@ const num = (s: string | undefined): number | null => {
 const usdOf = (lines: TowerLine[] | undefined): number => (lines ?? []).reduce((s, l) => s + (l.usd ?? 0), 0);
 
 /**
- * The scrubber's timeline for an Aave-family position, or null where it cannot
- * be drawn: no events, a valued ledger missing, or a leg with no price.
+ * The scrubber's timeline from a page's events, or null where it cannot be
+ * drawn: no events, a valued ledger missing, or a leg with no price.
  *
  * `events` must be the position's whole history. `todayPrices` is the oracle
  * price by lowercase address the ledger values with (`priceByAddress`).
@@ -101,6 +112,26 @@ export function aaveV3FlowTimeline(
   todayPrices: Record<string, number> | undefined,
 ): FlowTimeline | null {
   if (!tower.valued) return null;
+  const flows = aaveV3FlowEvents(events, todayPrices);
+  if (!flows) return null;
+  return {
+    buckets: AAVE_V3_FLOW_BUCKETS.filter((b) => flows.used.has(b.key)),
+    days: daysFromEvents(
+      AAVE_V3_FLOW_BUCKETS.map((b) => b.key),
+      flows.events,
+    ),
+    live: aaveV3FlowLive(tower),
+    todayPrices,
+    totalEvents: flows.events.length,
+  };
+}
+
+/** Each event's legs in USD, the balances it states and the prices it
+ *  carries, or null where a leg has no price at its block or today. */
+export function aaveV3FlowEvents(
+  events: BaseActivityEvent[],
+  todayPrices: Record<string, number> | undefined,
+): { events: FlowEvent[]; used: Set<string> } | null {
   const ordered = events
     .filter(isAaveV3Event)
     .sort((a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber || logIndex(a.id) - logIndex(b.id));
@@ -190,22 +221,60 @@ export function aaveV3FlowTimeline(
           : "collateral";
     out.push(flowEvent);
   }
+  return { events: out, used };
+}
 
+/** Held, owed and each side's interest now, as the ledger states them. */
+export function aaveV3FlowLive(tower: ChainTruthTowerData): FlowLive {
   const c = tower.collateral;
   const d = tower.debt;
   // The ledger states a price change only where its token sums reconcile;
   // elsewhere the balancing segment stays one item, interest and prices.
-  const collInterestKnown = c.priceChange != null;
-  const debtInterestKnown = d.priceChange != null;
   return {
-    buckets: BUCKETS.filter((b) => used.has(b.key)),
-    events: out,
-    live: {
-      collateralUsd: Math.max(0, usdOf(c.current)),
-      debtUsd: Math.max(0, usdOf(d.current) + (d.interest?.usd ?? 0)),
-      collateralInterestUsd: collInterestKnown ? usdOf(c.earned) : null,
-      debtInterestUsd: debtInterestKnown ? (d.interest?.usd ?? 0) + usdOf(d.earned) : null,
-    },
+    collateralUsd: Math.max(0, usdOf(c.current)),
+    debtUsd: Math.max(0, usdOf(d.current) + (d.interest?.usd ?? 0)),
+    collateralInterestUsd: c.priceChange != null ? usdOf(c.earned) : null,
+    debtInterestUsd: d.priceChange != null ? (d.interest?.usd ?? 0) + usdOf(d.earned) : null,
+  };
+}
+
+/**
+ * The scrubber's timeline from the index's day rows, or null where there is
+ * nothing to draw. `tower` supplies the live stop when the ledger is valued;
+ * otherwise the route's own live figures (balances after the last event at the
+ * latest recorded price) stand, with no interest split.
+ */
+export function aaveV3FlowSeriesTimeline(
+  series: AaveV3FlowSeries,
+  tower: ChainTruthTowerData | null,
+  todayPrices: Record<string, number> | undefined,
+): FlowTimeline | null {
+  if (series.days.length === 0) return null;
+  const symbolOf = (a: string) => series.assets[a]?.symbol ?? a.slice(0, 8);
+  const days: FlowDayRow[] = series.days.map(([day, events, tick, cum, balances, prices]) => ({
+    day,
+    events,
+    tick,
+    cum: Object.fromEntries(series.buckets.map((k, i) => [k, cum[i] ?? 0])),
+    balances: balances.map(([side, asset, amount]) => ({ side, asset, symbol: symbolOf(asset), amount })),
+    prices: prices.map(([asset, usd, ts]) => ({ asset, usd, ts })),
+  }));
+  const used = new Set<string>(series.buckets);
+  return {
+    buckets: AAVE_V3_FLOW_BUCKETS.filter((b) => used.has(b.key)),
+    days,
+    live:
+      tower?.valued === true
+        ? aaveV3FlowLive(tower)
+        : {
+            collateralUsd: series.live.collateralUsd,
+            debtUsd: series.live.debtUsd,
+            collateralInterestUsd: null,
+            debtInterestUsd: null,
+          },
     todayPrices,
+    dailyPrices: Object.fromEntries(Object.entries(series.prices).map(([a, p]) => [a, p.obs])),
+    today: series.today,
+    totalEvents: series.totalEvents,
   };
 }

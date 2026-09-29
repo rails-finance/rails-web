@@ -316,13 +316,21 @@ export function aaveV3RowTokens(r: MvRow): string[] {
  * shape. The replay lives in the MV; the presentation (symbols, basket) lives here.
  */
 export async function buildAaveV3Timeline(rows: MvRow[], walletRaw: string): Promise<AaveV3TimelineResult> {
-  const wallet = walletRaw.toLowerCase();
-
   // Resolve symbol/decimals for every reserve referenced (primary / collateral /
   // debt) in one batched ERC20 multicall.
   const addrs = new Set<string>();
   for (const r of rows) for (const a of aaveV3RowTokens(r)) addrs.add(a);
-  const metas = await resolveV3Tokens([...addrs]);
+  return aaveV3RowsToEvents(rows, walletRaw, await resolveV3Tokens([...addrs]));
+}
+
+/** The transform with the token metadata in hand: no read, so the flow-legs
+ *  fixture test (scripts/verify/verify-aave-v3-flow-legs.ts) runs it offline. */
+export function aaveV3RowsToEvents(
+  rows: MvRow[],
+  walletRaw: string,
+  metas: Map<string, V3TokenMeta>,
+): AaveV3TimelineResult {
+  const wallet = walletRaw.toLowerCase();
   const meta = (a: string | null | undefined): V3TokenMeta | undefined =>
     a == null ? undefined : a.toLowerCase() === NATIVE_ETH ? NATIVE_ETH_META : metas.get(a.toLowerCase());
 
