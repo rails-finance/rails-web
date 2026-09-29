@@ -34,7 +34,17 @@ import { LearnMore } from "@/components/shared/learn-more-modal";
 import { formatCompact, withRealMinus } from "@/lib/utils/format";
 import type { BaseActivityEvent, SkySavingsContext } from "@/lib/shared/types/event-shape";
 import { SUSDS, USDS } from "@/lib/sky-savings/constants";
-import { annualRate, exact, fixed6, pct, rayExact, rayNumber, skyTransition, units } from "@/lib/sky-savings/math";
+import {
+  annualRate,
+  exact,
+  fixed6,
+  pct,
+  pctString,
+  rayExact,
+  rayNumber,
+  skyTransition,
+  units,
+} from "@/lib/sky-savings/math";
 import {
   eventChiProv,
   eventCounterpartyProv,
@@ -228,6 +238,8 @@ export function SkySavingsEventCard({
     {
       label: "Interest earned to date",
       value: withRealMinus(exact(t.earnedAfter)),
+      // A first deposit's one wei of rounding reads 0.000 here; T3 states it.
+      display: t.earnedAfter < BigInt(0) && t.earnedAfter > BigInt(-1_000_000) ? "0.000" : undefined,
       symbol: USDS.symbol,
       address: USDS.address,
       prov: eventEarnedProv(coords, "after", c.earnedAfter),
@@ -240,6 +252,9 @@ export function SkySavingsEventCard({
           ? {
               value: exact(sinceRaw),
               display: fixed6(sinceRaw),
+              after: previous.rateChanges
+                ? `, across ${previous.rateChanges.count} Savings Rate change${previous.rateChanges.count === 1 ? "" : "s"}, ${pctString(previous.rateChanges.from)} → ${pctString(previous.rateChanges.to)}`
+                : undefined,
               prov: eventInterestSinceProv(
                 coords,
                 sinceRaw.toString(),

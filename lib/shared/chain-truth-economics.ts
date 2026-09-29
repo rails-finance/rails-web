@@ -207,6 +207,9 @@ export interface ChainTruthTowerData {
    *  ("2.94K"), so a small accrued-interest row visibly changes the total
    *  beneath it. Unset: compact, as every other feeder renders. */
   fullTokenAmounts?: boolean;
+  /** Token-mode rows name their token after the figure ("5.09K USDS") on
+   *  every row, compact or full. Unset: only `fullTokenAmounts` names it. */
+  unitOnEveryRow?: boolean;
 }
 
 /** The scalar a tower stacks by: USD when valued, else the token amount. */

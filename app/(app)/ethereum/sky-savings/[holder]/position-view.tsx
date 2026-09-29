@@ -33,6 +33,9 @@ import { skyFlowsContent } from "@/lib/sky-savings/learn-more";
 import { chiProv, gateProv, psmPriceProv, rateChangeProv } from "@/lib/sky-savings/provenance";
 import type { SkyAsOf, SkyFlowDay, SkyGate, SkyPosition, SkyRateChange, SkyRates } from "@/lib/sky-savings/types";
 
+/** On a phone, consecutive Savings Rate changes draw as one row that opens. */
+const RATE_CHANGE_RUN = { many: "Savings Rate changes" };
+
 export default function SkySavingsPositionView({
   position,
   asOf,
@@ -68,19 +71,31 @@ export default function SkySavingsPositionView({
   // Each row's previous event, for the interest earned between the two: the
   // next row down in the newest-first list, null under the first event of a
   // whole history, undefined under the oldest row of a longer one.
+  // With it, the Savings Rate changes in the stretch between the two.
   const previousOf = useMemo(() => {
     const rows = [...skyEvents].sort((a, b) => b.blockNumber - a.blockNumber);
     const whole = rows.length >= totalEvents;
+    const changes = [...(rates?.ssr ?? rateNotes)].sort((a, b) => a.blockNumber - b.blockNumber);
     const m = new Map<string, SkyPreviousEvent | null | undefined>();
     rows.forEach((e, i) => {
       const p = rows[i + 1];
-      m.set(
-        e.id,
-        p ? { ctx: p.context.data, timestamp: p.timestamp, blockNumber: p.blockNumber } : whole ? null : undefined,
-      );
+      if (!p) return m.set(e.id, whole ? null : undefined);
+      const between = changes.filter((r) => r.blockNumber > p.blockNumber && r.blockNumber <= e.blockNumber);
+      m.set(e.id, {
+        ctx: p.context.data,
+        timestamp: p.timestamp,
+        blockNumber: p.blockNumber,
+        rateChanges: between.length
+          ? {
+              count: between.length,
+              from: between[0].previousAnnualRate,
+              to: between[between.length - 1].annualRate,
+            }
+          : undefined,
+      });
     });
     return m;
-  }, [skyEvents, totalEvents]);
+  }, [skyEvents, totalEvents, rates, rateNotes]);
 
   // Savings Rate changes inside the holder's span, placed between the rows by
   // block, and those after its last event (from the rate history), which have
@@ -163,7 +178,9 @@ export default function SkySavingsPositionView({
           <RiskStrong>{gate.holdersChecked.toLocaleString("en-US")}</RiskStrong>
         </Prov>{" "}
         addresses that ever held sUSDS
-        {gate.openHoldersChecked != null ? `, ${gate.openHoldersChecked.toLocaleString("en-US")} of them holding` : ""}
+        {gate.openHoldersChecked != null
+          ? `, ${gate.openHoldersChecked.toLocaleString("en-US")} of them holding sUSDS`
+          : ""}
       </RiskFigure>
     </RiskFooterStrip>
   );
@@ -205,6 +222,7 @@ export default function SkySavingsPositionView({
         tl={tl}
         notes={notes}
         liveNotes={trailingNotes.length ? trailingNotes : undefined}
+        phoneNoteRun={RATE_CHANGE_RUN}
         notice={
           totalEvents > skyEvents.length ? (
             <p className="text-xs text-rb-500">

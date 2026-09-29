@@ -290,6 +290,9 @@ export interface ChainTruthStat {
     /** The figure as shown, where the family states its amounts at its own
      *  precision. Default: formatNumber of `value`. */
     display?: string;
+    /** Words after the unit (Sky: ", across 5 Savings Rate changes, 4.00% →
+     *  3.60%"). Default: none. */
+    after?: string;
   };
   /** Show the USD chip whatever the timeline's USD-values flag says — the
    *  Liquity V2 grid's rule for the collateral's value at the event's price,
@@ -774,6 +777,7 @@ export function ChainTruthDetail({
                     />
                   </Prov>{" "}
                   {s.symbol}
+                  {s.interestSincePrevious.after}
                 </StatSubline>
               )}
               {s.sub && <StatSubline changed={changed}>{s.sub}</StatSubline>}

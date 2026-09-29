@@ -386,6 +386,8 @@ function buildSide(
     fullAmounts?: boolean;
     /** Wrap the breakdown labels (ChainTruthTowerData.wrapFlowLabels). */
     wrapLabels?: boolean;
+    /** Every token-mode row names its token (ChainTruthTowerData.unitOnEveryRow). */
+    unitAll?: boolean;
   },
 ): TowerSide {
   const {
@@ -404,9 +406,10 @@ function buildSide(
   } = opts;
   const sc = (l: TowerLine) => Math.max(0, lineScalar(l, valued));
   const cmp = (n: number) => (opts.fullAmounts ? formatNumber(n) : formatCompact(n));
-  // Full token amounts (a Morpho-only opt-in) name their token on every row.
+  // Full token amounts (a Morpho-only opt-in) name their token on every row,
+  // as does a tower that opts into `unitOnEveryRow`.
   const cmpUnit = (n: number, symbol: string | undefined) =>
-    opts.fullAmounts && symbol ? `${cmp(n)} ${symbol}` : cmp(n);
+    (opts.fullAmounts || opts.unitAll) && symbol ? `${cmp(n)} ${symbol}` : cmp(n);
   const interestLine = withInterest && side.interest && side.interest.amount > 0 ? side.interest : null;
   const receivedLines = side.received ?? [];
   const receivedTotal = receivedLines.reduce((s, l) => s + sc(l), 0);
@@ -892,6 +895,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     flowsPricedAtEvents: data.flowsPricedAtEvents,
     fullAmounts: data.fullTokenAmounts,
     wrapLabels: data.wrapFlowLabels,
+    unitAll: data.unitOnEveryRow,
   });
   const right = build(debtParts, d, {
     solid: DEBT_SOLID,
@@ -907,6 +911,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     flowsPricedAtEvents: data.flowsPricedAtEvents,
     fullAmounts: data.fullTokenAmounts,
     wrapLabels: data.wrapFlowLabels,
+    unitAll: data.unitOnEveryRow,
   });
   // A position with no debt axis (a lender, a saver) draws its one tower.
   const noDebt = data.debtAxisAbsent && data.debt.current.length === 0 && data.debt.exited.length === 0;

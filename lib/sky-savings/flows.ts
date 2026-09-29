@@ -104,7 +104,7 @@ export function skyFlowTimeline(
       priceNote:
         "Flows are valued at the PSM rate at their block, one USDC per USDS for the whole life of sUSDS; what is held on a day is its sUSDS times that day's closing share price.",
       totalIn: " in with interest, ",
-      interestMin: 1e-9,
+      rest: "Interest earned",
     },
   };
 }
@@ -166,6 +166,7 @@ export function skyTowerData(
     collateralInflowLabel: totals ? "Deposited" : "Deposited and received",
     debtAxisAbsent: true,
     wrapFlowLabels: true,
+    unitOnEveryRow: true,
   };
 }
 

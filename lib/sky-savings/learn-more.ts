@@ -24,6 +24,11 @@ const RATE = {
   text: "The Savings Rate, SSR in the contract, is a per-second growth factor. Only an address Sky governance has authorised can change it, by calling the contract's file function, and each change is a public log. It can change at any block.",
   sources: [link(SKY_DOCS.source)],
 };
+const RELY = {
+  bold: "What a saver can rely on",
+  text: "The contract has no lock-up and no withdrawal limit: a holder can withdraw every share at any block, for what the shares are worth then. The Savings Rate cannot go below 0%, because file refuses a growth factor under one. Governance can upgrade the contract.",
+  sources: [link(SKY_DOCS.source)],
+};
 const SOURCE = {
   bold: "Where the interest comes from",
   text: "Sky mints the interest as new USDS. drip is the contract function that brings the share price up to date; every deposit and withdrawal calls it first, and anyone may call it. Each drip mints the USDS savers have earned since the last one and books the same amount as debt at the Vow, Sky's surplus buffer. Borrowers pay stability fees on Sky vaults into the same Vow, where debt and surplus settle against each other.",
@@ -42,6 +47,7 @@ export function skyPositionContent(): LearnMoreContent {
       SHARE,
       PRICE,
       RATE,
+      RELY,
       SOURCE,
       {
         bold: "Interest earned",
