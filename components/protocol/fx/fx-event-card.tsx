@@ -116,6 +116,11 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
       icon="warning"
       warningTone="critical"
       warningLabel="Liquidation"
+      warningTip={
+        ctx.poolWide
+          ? "A keeper liquidated the pool from its top tick down, reaching this position's tick. The owner did not act."
+          : "A keeper liquidated this position: it repaid the debt and took the collateral plus the bonus. The owner did not act."
+      }
       spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
@@ -127,6 +132,7 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
       icon="warning"
       warningTone="caution"
       warningLabel="Rebalance"
+      warningTip="A keeper rebalanced the tick this position sat in: it repaid part of the debt and took collateral plus the bonus. The position stays open; the owner did not act."
       spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}

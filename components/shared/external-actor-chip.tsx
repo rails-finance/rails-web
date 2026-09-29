@@ -19,16 +19,21 @@
 
 import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
+import type { ReactNode } from "react";
 import { useEnsName } from "@/lib/ens/use-ens-names";
+import { RevealTip } from "@/components/shared/reveal-tip";
 
-export function ExternalActorChip({ address, prov }: { address: string; prov: Provenance }) {
+export function ExternalActorChip({ address, prov, tip }: { address: string; prov: Provenance; tip?: ReactNode }) {
   const name = useEnsName(address);
+  const label = (
+    <span className="font-medium text-pink-600 dark:text-pink-400">
+      {name ?? `${address.slice(0, 6)}…${address.slice(-4)}`}
+    </span>
+  );
   return (
     <Prov info={prov} value={name ?? address} className="inline-flex items-center gap-1 text-sm">
       <span className="text-rb-500">by</span>
-      <span className="font-medium text-pink-600 dark:text-pink-400">
-        {name ?? `${address.slice(0, 6)}…${address.slice(-4)}`}
-      </span>
+      {tip ? <RevealTip tip={tip}>{label}</RevealTip> : label}
     </Prov>
   );
 }

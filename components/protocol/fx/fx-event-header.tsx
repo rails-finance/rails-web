@@ -210,6 +210,11 @@ export function FxEventHeader({
             ? {
                 address: externalBy,
                 prov: fxExternalActorProv({ owner: ctx.ownerAt, txFrom: ctx.txFrom }, coords),
+                tip: (
+                  <>
+                    {externalBy} sent this transaction. The position&rsquo;s owner at this block was {ctx.ownerAt}.
+                  </>
+                ),
               }
             : undefined,
       }}

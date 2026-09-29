@@ -8,6 +8,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { DisclosureChevron } from "@/components/shared/expand-chevron";
 import { ArrowFromDot } from "@/components/shared/timeline-spine";
 import { Prov } from "@/components/shared/provenance";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { useTimelineScale, SpineVal, fmtSpine, type SpineValProv } from "@/components/shared/activity-timeline";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import type { LinkedHoverHandlers } from "@/hooks/useLinkedHover";
@@ -183,6 +184,8 @@ export interface SpineColumnProps {
    *  and with icon="folder" for a one-kind folder that keeps its kind's pill
    *  (a liquidations-only chunk). */
   warningLabel?: string;
+  /** Optional hover/tap tip on the warning pill: what the kind means. */
+  warningTip?: ReactNode;
   /** icon="warning" only, drawn in the phone spine view: the amounts the
    *  event moved, worded as the desktop header words them ("Cleared" left,
    *  "Reduced" right). The opened card's header then drops them. */
@@ -817,6 +820,7 @@ export function SpineColumn({
   externalParty,
   warningTone = "caution",
   warningLabel,
+  warningTip,
   warningLegs,
   folderOpen,
   folderMark,
@@ -975,13 +979,18 @@ export function SpineColumn({
               </div>
               {/* The phone spine view's caption names the kind below the node,
                   so the pill stays on desktop only. */}
-              {warningLabel && !spineRow && (
-                <span
-                  className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide leading-none whitespace-nowrap ${WARNING_PILL_CLASSES[warningTone]}`}
-                >
-                  {warningLabel}
-                </span>
-              )}
+              {warningLabel &&
+                !spineRow &&
+                (() => {
+                  const pill = (
+                    <span
+                      className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide leading-none whitespace-nowrap ${WARNING_PILL_CLASSES[warningTone]}`}
+                    >
+                      {warningLabel}
+                    </span>
+                  );
+                  return warningTip ? <RevealTip tip={warningTip}>{pill}</RevealTip> : pill;
+                })()}
             </div>
           );
         case "rate-change":
