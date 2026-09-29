@@ -153,23 +153,48 @@ export const beforeProv = (
   sym: string,
   coords: FrankencoinCoords,
   raw?: string | null,
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  verify: {
-    kind: "recompute",
-    text:
-      coords.blockNumber != null
-        ? `Re-run the corresponding eth_call at block ${coords.blockNumber - 1} against an archive node — the before-value is the previous MintingUpdate's own emitted absolute.`
-        : "Re-run the corresponding eth_call just before this event.",
-  },
-  summary: `${what === "minted" ? "ZCHF minted" : what === "collateral" ? `${sym} collateral` : `the declared liquidation price`} BEFORE this event — the previous MintingUpdate's own emitted \`${what}\` absolute at this position: a lag of the emitted absolutes, never a running sum, so every before-value is anchored to a figure the position itself emitted (and its storage held).`,
-  contract: positionContract(coords),
-  via: `${FRANKENCOIN_VIA} · lag(${what}) at this position${raw ? ` = ${raw}` : ""}`,
-  inputs: eventInputs(coords, [
-    { label: `previous ${what}`, kind: "chain", pclass: "state", note: "the prior MintingUpdate's emitted absolute" },
-  ]),
-});
+  /** The first ledger row after an opening that recorded none: the before
+   *  value is read from the chain one block earlier. */
+  readBefore = false,
+): Provenance =>
+  readBefore
+    ? {
+        kind: "chain",
+        pclass: "state",
+        verify: {
+          kind: "recompute",
+          text:
+            coords.blockNumber != null
+              ? `Re-run the eth_call at block ${coords.blockNumber - 1} against an archive node.`
+              : "Re-run the eth_call just before this event.",
+        },
+        summary: `${what === "collateral" ? `${sym} collateral` : "The declared liquidation price"} BEFORE this event — read from the chain one block earlier (${what === "collateral" ? "the collateral token's balanceOf(position)" : "Position.price()"}). The opening transaction set it without a MintingUpdate, so no earlier ledger row carries it.`,
+        contract: positionContract(coords),
+        via: `${RECEIPT_VIA} · ${what === "collateral" ? "balanceOf(position)" : "price()"} one block earlier${raw ? ` = ${raw}` : ""}`,
+        inputs: eventInputs(coords, [{ label: `${what} one block earlier`, kind: "chain", pclass: "state" }]),
+      }
+    : {
+        kind: "chain-derived",
+        pclass: "state",
+        verify: {
+          kind: "recompute",
+          text:
+            coords.blockNumber != null
+              ? `Re-run the corresponding eth_call at block ${coords.blockNumber - 1} against an archive node — the before-value is the previous MintingUpdate's own emitted absolute.`
+              : "Re-run the corresponding eth_call just before this event.",
+        },
+        summary: `${what === "minted" ? "ZCHF minted" : what === "collateral" ? `${sym} collateral` : `the declared liquidation price`} BEFORE this event — the previous MintingUpdate's own emitted \`${what}\` absolute at this position: a lag of the emitted absolutes, never a running sum, so every before-value is anchored to a figure the position itself emitted (and its storage held).`,
+        contract: positionContract(coords),
+        via: `${FRANKENCOIN_VIA} · lag(${what}) at this position${raw ? ` = ${raw}` : ""}`,
+        inputs: eventInputs(coords, [
+          {
+            label: `previous ${what}`,
+            kind: "chain",
+            pclass: "state",
+            note: "the prior MintingUpdate's emitted absolute",
+          },
+        ]),
+      };
 
 /** A per-event change — this MintingUpdate's absolute minus the previous one:
  *  a difference of two emitted absolutes. */
@@ -181,7 +206,7 @@ export const changeProv = (
   kind: "chain-derived",
   pclass: "state",
   verify: txVerify(coords),
-  summary: `The ${what === "minted" ? "ZCHF debt" : what === "collateral" ? `${sym} collateral` : "declared-price"} change this event made — this MintingUpdate's emitted \`${what}\` absolute minus the previous one, a difference of two figures the position itself emitted (each equal to its stored state at its block). MintingUpdate carries no delta field, so the change is derived — and says so.`,
+  summary: `The ${what === "minted" ? "ZCHF debt" : what === "collateral" ? `${sym} collateral` : "declared-price"} change this event made — this MintingUpdate's emitted \`${what}\` absolute minus the previous one (on the first row after an opening that recorded none, minus the position's figure read one block earlier), a difference of two figures the position itself emitted (each equal to its stored state at its block). MintingUpdate carries no delta field, so the change is derived — and says so.`,
   contract: positionContract(coords),
   via: `${what} − previous ${what} (two emitted absolutes)`,
   formula: "after − before",
@@ -328,7 +353,10 @@ export type FrankencoinChallengeLeg =
   | "forcedReserveToBuyer"
   | "forcedOwner"
   | "forcedShortfall"
-  | "forcedTerms";
+  | "forcedTerms"
+  | "openDeposit"
+  | "openFee"
+  | "openTerms";
 
 const CHALLENGE_LEG: Record<
   FrankencoinChallengeLeg,
@@ -465,6 +493,24 @@ const CHALLENGE_LEG: Record<
     summary: () =>
       "The position's terms before the sale — its minted(), price(), expiration(), challengePeriod() and reserveContribution() read one block earlier in one multicall.",
     via: "Position.minted() · price() · expiration() · challengePeriod() · reserveContribution() one block earlier",
+    token: "position",
+  },
+  openDeposit: {
+    summary: (sym) =>
+      `${sym} the opening transaction moved into the new position — the collateral token's Transfer to the position in the openPosition transaction. MintingHub.openPosition sends it without a MintingUpdate, so the index's ledger starts after it.`,
+    via: "Transfer(owner → position) on the collateral token",
+    token: "collateral",
+  },
+  openFee: {
+    summary: () =>
+      "The opening fee — the ZCHF contract's Profit log for the hub in the opening transaction, with its Transfer from the owner to the reserve (the Equity contract). MintingHubV2 charges OPENING_FEE = 1,000 ZCHF on every new original and none on a clone.",
+    via: "Profit(reportingMinter = hub) · Transfer(owner → Equity) · ÷10^18",
+    token: "zchf",
+  },
+  openTerms: {
+    summary: () =>
+      "A term the position was opened with — its getter read at the opening block, in one multicall with the others: price(), minimumCollateral(), limit(), challengePeriod(), start(), expiration(), riskPremiumPPM(), reserveContribution(), annualInterestPPM().",
+    via: "Position getters at the opening block (multicall)",
     token: "position",
   },
   ownerKind: {

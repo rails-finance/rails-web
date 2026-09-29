@@ -67,8 +67,13 @@ import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { RiskFooterStrip, RiskFigure } from "@/components/shared/risk-footer-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { formatDayMonth } from "@/lib/date";
+import { phaseText } from "@/lib/frankencoin/figures";
 import { FrankencoinPageFactsProvider, frankencoinPageFacts } from "@/lib/frankencoin/page-facts";
-import { prefetchFrankencoinEventReads } from "@/lib/frankencoin/use-event-read";
+import {
+  applyFrankencoinOpening,
+  prefetchFrankencoinEventReads,
+  useFrankencoinOpening,
+} from "@/lib/frankencoin/use-event-read";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle.
@@ -213,13 +218,22 @@ export default function FrankencoinPositionView({
     return summary ? viewFromSummary(summary) : null;
   }, [chain, summary]);
 
-  const frankEvents = useMemo(() => events.filter(isFrankencoinEvent), [events]);
+  const indexedEvents = useMemo(() => events.filter(isFrankencoinEvent), [events]);
+  // An original's opening transaction, read from its receipt: the Open row's
+  // deposit, fee and terms, and the first ledger row corrected to what its own
+  // transaction moved (the index books the opening deposit there).
+  const { read: openingRead, pending: openingPending } = useFrankencoinOpening(indexedEvents);
+  const frankEvents = useMemo(() => applyFrankencoinOpening(indexedEvents, openingRead), [indexedEvents, openingRead]);
 
   // What each event card needs from the rest of the page: challenge starts,
   // the phase length, the family's original, what each transaction recorded.
   const pageFacts = useMemo(
-    () => frankencoinPageFacts(frankEvents, chain?.challengePeriod ?? null, chain?.original ?? null),
-    [frankEvents, chain],
+    () => ({
+      ...frankencoinPageFacts(frankEvents, chain?.challengePeriod ?? null, chain?.original ?? null),
+      opening: openingRead?.opening ?? null,
+      openingPending,
+    }),
+    [frankEvents, chain, openingRead, openingPending],
   );
 
   // Start the receipt reads the cards will ask for as soon as the rows land,
@@ -254,10 +268,18 @@ export default function FrankencoinPositionView({
     const denied = frankEvents.find((e) => e.context.data.eventType === "denied");
     const saleAmounts = Object.values(pageFacts.txSold);
     if (!last && !denied && saleAmounts.length === 0) return null;
+    // The last ledger row, written in a challenge sale's transaction, left the
+    // position empty: the sale closed it.
+    const lastLedger = [...frankEvents].reverse().find((e) => e.context.data.collateral != null);
+    const closedByChallenge =
+      lastLedger != null &&
+      Number(lastLedger.context.data.collateral) === 0 &&
+      (pageFacts.txKinds[lastLedger.txHash] ?? []).includes("challenge_succeeded");
     return {
       forcedAt: last?.timestamp ?? null,
       soldMost: saleAmounts.length > 0 ? Math.max(...saleAmounts) : null,
       deniedAt: denied?.timestamp ?? null,
+      closedByChallenge,
     };
   }, [pageFacts, frankEvents]);
 
@@ -358,7 +380,9 @@ export default function FrankencoinPositionView({
       {
         symbol: view.collateralSymbol,
         address: chain?.collateralToken ?? undefined,
-        label: `${view.collateralSymbol}, the position's collateral`,
+        label: chain?.collateralName
+          ? `${view.collateralSymbol} (on-chain name: ${chain.collateralName}), the position's collateral`
+          : `${view.collateralSymbol}, the position's collateral`,
       },
       { symbol: "ZCHF", address: FRANKENCOIN_ADDRESSES.ZCHF, label: "ZCHF, the token this position mints" },
     ];
@@ -417,6 +441,9 @@ export default function FrankencoinPositionView({
                           ? "never challenged"
                           : `challenged ${summary.challengeCount}×, none running`}
                       </RiskFigure>
+                    ) : null}
+                    {chain.challengePeriod != null && chain.challengePeriod > 0 ? (
+                      <RiskFigure>challenge phases {phaseText(chain.challengePeriod)} each</RiskFigure>
                     ) : null}
                     {chain.cooldownActive && chain.cooldownUntil != null ? (
                       <RiskFigure>minting cooldown until {formatDayMonth(chain.cooldownUntil)}</RiskFigure>

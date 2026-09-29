@@ -216,12 +216,15 @@ function coordsOf(e: FrankEvent): FrankencoinCoords {
 function GroupVerdict({ g }: { g: ChallengeGroup }) {
   const verdict =
     g.succeeded.length > 0
-      ? { label: "SUCCEEDED", cls: "bg-red-500/20 text-red-500" }
+      ? // Names whose bet succeeded: the challenge's (rails-ops lexicon, Frankencoin).
+        { label: "CHALLENGE SUCCEEDED", cls: "bg-red-500/20 text-red-500" }
       : g.averted.length > 0
         ? { label: "AVERTED", cls: "bg-positive/20 text-positive" }
         : { label: "ONGOING", cls: "bg-caution-400/20 text-caution-400" };
   return (
-    <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${verdict.cls}`}>{verdict.label}</span>
+    <span className={`whitespace-nowrap font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${verdict.cls}`}>
+      {verdict.label}
+    </span>
   );
 }
 
@@ -230,10 +233,12 @@ function Group({ g, positionOpen }: { g: ChallengeGroup; positionOpen: boolean |
   return (
     <div className="rounded-lg border border-rb-300/40 dark:border-rb-700/40 px-4 py-3 space-y-2">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="flex items-center gap-2 text-sm">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           <GroupVerdict g={g} />
-          <span className="font-semibold">Challenge #{g.number.startsWith("tx:") ? "—" : g.number}</span>
-          <span className="text-xs text-rb-500">{g.hub === "v1" ? "Hub V1" : "Hub V2"}</span>
+          <span className="whitespace-nowrap font-semibold">
+            Challenge #{g.number.startsWith("tx:") ? "—" : g.number}
+          </span>
+          <span className="whitespace-nowrap text-xs text-rb-500">{g.hub === "v1" ? "Hub V1" : "Hub V2"}</span>
         </span>
         {g.started && <EventTime ts={g.started.timestamp} />}
       </div>

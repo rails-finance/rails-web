@@ -28,7 +28,7 @@ import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { frankencoinMintingContent, frankencoinChallengeContent } from "@/lib/shared/learn-more-content";
+import { frankencoinBookContent, frankencoinChallengeContent } from "@/lib/shared/learn-more-content";
 import {
   zchfSupplyProv,
   equityProv,
@@ -191,7 +191,7 @@ function BookCard({ book }: { book: FrankencoinBook }) {
     <div className="rounded-xl bg-raised px-4 py-3.5">
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold text-foreground">The minting book</span>
-        <LearnMore content={frankencoinMintingContent()} inline />
+        <LearnMore content={frankencoinBookContent(book)} inline />
       </div>
 
       {book.bookStale ? (
@@ -284,11 +284,13 @@ function EnforcementCard({ book }: { book: FrankencoinBook }) {
               >
                 {book.challengesSucceeded}
               </Prov>
+              <span className="ml-1 text-rb-500">· of {book.challengesStarted} challenges</span>
             </Stat>
             <Stat label="Denied in the veto window">
               <Prov info={bookCountProv("Positions denied", "The replayed PositionDenied lifecycle.")}>
                 {book.denied}
               </Prov>
+              <span className="ml-1 text-rb-500">· of {book.total - book.clones} originals</span>
             </Stat>
             <Stat label="Cleared by forced sale">
               <Prov

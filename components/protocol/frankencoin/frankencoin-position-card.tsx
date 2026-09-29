@@ -85,6 +85,8 @@ export interface FrankencoinPositionView {
   basis: "chain" | "index";
   /** The position's fixed annual interest (ppm) — chain lane only. */
   annualInterestPPM: number | null;
+  /** The reserve share held against the debt, ZCHF — chain lane only. */
+  reserveHeld?: number | null;
 }
 
 /** How a terminal position ended, from its timeline: the forced sale that
@@ -96,6 +98,8 @@ export interface FrankencoinEnding {
    *  challenge's slices), whole units. */
   soldMost: number | null;
   deniedAt: number | null;
+  /** The position closed in a challenge sale's transaction. */
+  closedByChallenge?: boolean;
 }
 
 /** The card's lifecycle vocabulary: the API's three + the chain-only
@@ -143,22 +147,27 @@ function PositionIdentity({ v, cloneParent }: { v: FrankencoinPositionView; clon
       <RevealTip tip={hubTip} label={hubTip} focusable className="focus-ring rounded-sm">
         {v.hub === "v1" ? "Hub V1" : "Hub V2"}
       </RevealTip>
-      {v.isClone && (
-        <>
-          <span className="mx-1 text-rb-400">·</span>
-          <RevealTip
-            tip={cloneTip(v.original ?? null, cloneParent ?? null)}
-            label="Clone"
-            focusable
-            className="focus-ring rounded-sm"
-          >
-            clone
-          </RevealTip>
-        </>
+      <span className="mx-1 text-rb-400">·</span>
+      {v.isClone ? (
+        <RevealTip
+          tip={cloneTip(v.original ?? null, cloneParent ?? null)}
+          label="Clone"
+          focusable
+          className="focus-ring rounded-sm"
+        >
+          clone
+        </RevealTip>
+      ) : (
+        <RevealTip tip={ORIGINAL_TIP} label="Original" focusable className="focus-ring rounded-sm">
+          original
+        </RevealTip>
       )}
     </span>
   );
 }
+
+const ORIGINAL_TIP =
+  "An original: it proposed its own terms, paid the opening fee and faced a veto window before it could mint. A clone copies an original's terms and shares its minting limit.";
 
 /** The clone chip's tip: the position it was cloned from and, when that is
  *  not the family's original, the original too. */
@@ -171,9 +180,12 @@ function cloneTip(root: string | null, parent: string | null): string {
 
 /** The orthogonal challenge marker — caution triangle + count, named as
  *  challenges (never "liquidations": Frankencoin's own vocabulary). */
-function ChallengeMarker({ count }: { count: number }) {
+function ChallengeMarker({ count, closedBySale }: { count: number; closedBySale: boolean }) {
   if (count <= 0) return null;
-  const title = `Challenged ${count} time${count === 1 ? "" : "s"} — a challenged position can survive its auction`;
+  const times = `Challenged ${count} time${count === 1 ? "" : "s"}`;
+  const title = closedBySale
+    ? `${times}. A challenge sale took its collateral below the position's minimum, which closed it.`
+    : `${times}. A challenged position can survive its auction.`;
   return (
     // Mounted outside PositionCardMeta's cluster (Frankencoin's own vocabulary,
     // never "liquidations"); RevealTip gives it the same hover, tap and
@@ -185,11 +197,11 @@ function ChallengeMarker({ count }: { count: number }) {
   );
 }
 
-function MetaCluster({ v }: { v: FrankencoinPositionView }) {
+function MetaCluster({ v, closedBySale = false }: { v: FrankencoinPositionView; closedBySale?: boolean }) {
   return (
     <span className="flex items-center gap-2">
       <PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} />
-      <ChallengeMarker count={v.challengeCount} />
+      <ChallengeMarker count={v.challengeCount} closedBySale={closedBySale} />
     </span>
   );
 }
@@ -306,7 +318,7 @@ export function FrankencoinPositionCard({
           outcomeLabel={outcomeLabel}
           extra={extra}
           leadingIdentity={<IdentityLead v={v} cloneParent={cloneParent} />}
-          identity={<MetaCluster v={v} />}
+          identity={<MetaCluster v={v} closedBySale={v.status === "closed" && ending?.closedByChallenge === true} />}
           closedAt={closedAt ?? undefined}
           collateral={
             peakCollateral != null && peakCollateral > 0 ? (
@@ -416,6 +428,12 @@ export function FrankencoinPositionCard({
                     </span>
                   </Prov>{" "}
                   <span className="text-rb-400">(owner-declared)</span>
+                  {surface === "detail" && v.collateral != null && v.collateral * v.liqPrice - v.minted > -0.005 && (
+                    <div className="mt-0.5">
+                      headroom <AmountText value={Math.max(0, v.collateral * v.liqPrice - v.minted)} /> ZCHF at this
+                      price
+                    </div>
+                  )}
                 </div>
               ) : undefined,
           },
@@ -444,6 +462,11 @@ export function FrankencoinPositionCard({
                       <span>{ppmToPct(v.annualInterestPPM).toFixed(2)}%</span>
                     </Prov>{" "}
                     a year on today&rsquo;s terms, charged at each mint
+                  </div>
+                )}
+                {v.minted > 0 && v.reserveHeld != null && v.reserveHeld > 0 && (
+                  <div className="text-xs mt-0.5 text-rb-500">
+                    <AmountText value={v.minted - v.reserveHeld} /> ZCHF repays it in full
                   </div>
                 )}
                 {expiry && <div className="text-xs mt-0.5 text-rb-500">{expiry}</div>}
@@ -517,6 +540,7 @@ export function viewFromChain(c: FrankencoinChainResponse): FrankencoinPositionV
     txCount: 0,
     basis: "chain",
     annualInterestPPM: c.annualInterestPPM,
+    reserveHeld: c.reserveHeld,
   };
 }
 
