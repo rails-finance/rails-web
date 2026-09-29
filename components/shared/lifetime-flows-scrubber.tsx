@@ -369,6 +369,7 @@ function SideBlock({
   motion,
   when,
   assets,
+  last,
 }: {
   side: FlowSide;
   st: FlowSideState;
@@ -383,6 +384,8 @@ function SideBlock({
   onPin: (k: string) => void;
   motion: string;
   assets: ReturnType<typeof assetsAt>;
+  /** The last bar drawn: the axis labels sit under it. */
+  last: boolean;
 }) {
   const id = `flows-${side}`;
   const coll = side === "collateral";
@@ -454,7 +457,7 @@ function SideBlock({
         motion={motion}
         split={split}
       />
-      {!coll && <AxisLabels model={model} />}
+      {last && <AxisLabels model={model} />}
       <div id={`${id}-zoom`} hidden={!open}>
         {open && (
           <>
@@ -599,6 +602,7 @@ function ScrubberBody({ model }: { model: FlowModel }) {
   }, [playing, stop, model.liveStop, halt]);
 
   const s = stateAt(model, stop);
+  const hasDebt = model.buckets.some((b) => b.side === "debt");
   const anyOpen = open.collateral || open.debt;
   const assets = useMemo(
     () => (anyOpen ? assetsAt(model, stop) : { held: [], flows: new Map() }),
@@ -636,22 +640,28 @@ function ScrubberBody({ model }: { model: FlowModel }) {
         motion={motion}
         when={when}
         assets={assets}
+        last={!hasDebt}
       />
-      <SideBlock
-        side="debt"
-        st={s.debt}
-        model={model}
-        isLive={s.isLive}
-        open={open.debt}
-        onToggle={() => setOpen((o) => ({ ...o, debt: !o.debt }))}
-        active={active}
-        pinned={pinned}
-        onHover={setHover}
-        onPin={pin}
-        motion={motion}
-        when={when}
-        assets={assets}
-      />
+      {/* A one-sided position (savings, a lender) names no debt bucket and
+          draws a single bar. */}
+      {hasDebt && (
+        <SideBlock
+          side="debt"
+          st={s.debt}
+          model={model}
+          isLive={s.isLive}
+          open={open.debt}
+          onToggle={() => setOpen((o) => ({ ...o, debt: !o.debt }))}
+          active={active}
+          pinned={pinned}
+          onHover={setHover}
+          onPin={pin}
+          motion={motion}
+          when={when}
+          assets={assets}
+          last
+        />
+      )}
 
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1">
         <button

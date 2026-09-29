@@ -48,6 +48,13 @@ export function boundaryStateFromOldestRow(e: BaseActivityEvent | undefined): Bo
         line(`${d.reserveSymbol ?? "Reserve"} debt`, d.debtBefore, d.reserveSymbol),
       );
     }
+    // The sUSDS ledger states the balance after each row, so the balance
+    // before it is that less the row's signed shares.
+    case "sky-savings": {
+      const d = c.data;
+      const before = BigInt(d.sharesAfter) - BigInt(d.sharesDelta);
+      return lines(line("sUSDS held", Number(before) / 1e18, "sUSDS"));
+    }
     case "spark": {
       const d = c.data;
       const supplySym = d.eventType === "liquidation" ? (d.collateralSymbol ?? d.reserveSymbol) : d.reserveSymbol;

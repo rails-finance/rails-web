@@ -67,7 +67,11 @@ export type SessionProtocol =
   // is vaults, so the explorer's roster is the vault directory and there is no
   // position listing beside it (rails-ops decision 0027 point 2). Yearn V2 is
   // an older registry and different vault code, and is not covered (call 4).
-  | "yearn";
+  | "yearn"
+  // Sky Savings, at `/ethereum/sky-savings`: sUSDS holders, a position being a
+  // holder address. A roster explorer outside the home headline (rails-ops
+  // TO-DO-sky-savings-scoping §6.1, decision 0027 call 2).
+  | "sky-savings";
 
 /** What a bookmark can be scoped to. Every scope is a protocol's rail now: the
  *  chain-scoped vault sections and their two namespaces (`vaults-sessions`,
