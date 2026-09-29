@@ -69,3 +69,33 @@ export function flowTotalProv(side: FlowSide, part: "in" | "out" | "liquidated",
     formula: "Σ out",
   };
 }
+
+/** One asset's figures in a bar's zoom view: held or owed at the stop, and
+ *  what came in and left by then. */
+export function flowAssetProv(
+  symbol: string,
+  side: FlowSide,
+  part: "held" | "in" | "out",
+  when: string,
+  isLive: boolean,
+  daily: boolean,
+): Provenance {
+  const heldWord = side === "collateral" ? "held" : "owed";
+  if (part === "held")
+    return isLive
+      ? {
+          kind: "chain-derived",
+          summary: `${symbol} ${heldWord} now — its balance at the oracle price now, as the Full breakdown states it.`,
+          formula: "balance × price",
+        }
+      : {
+          kind: "chain-derived",
+          summary: `${symbol} ${heldWord} at ${when} — its balance after its last event by then, at ${daily ? "the last oracle price recorded by that day's end" : "the oracle price that event carried"}.`,
+          formula: daily ? "balance × price at the day's end" : "balance × price at its last event",
+        };
+  return {
+    kind: "chain-derived",
+    summary: `${symbol} ${part === "in" ? "in" : "out"} up to ${when} — every such flow of it, each at the oracle price at its block, added up.`,
+    formula: "Σ amount × price at block",
+  };
+}

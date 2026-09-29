@@ -32,6 +32,8 @@ export const ORACLE_USD_REASON: Record<string, string> = {
   pwn: "no protocol oracle — the two parties set the price",
   "aave-vaults":
     "a vault share has no protocol oracle to value it — the one priced figure is the census's, the balance through the vault's own convertToAssets and the chain's Aave V3 oracle on the ASSET at that block",
+  "sky-savings":
+    "Sky runs no USDS price feed, so figures are in USDS; Lifetime flows value USDS at the PSM's exit rate, 1 ÷ (1 + fee) USDC, and that fee has been zero for the whole life of sUSDS",
   yearn:
     "72 distinct assets across the roster and no per-asset feed to value them against, so every figure stays in the vault's own asset and no two assets are ever added together",
 };

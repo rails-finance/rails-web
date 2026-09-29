@@ -25,6 +25,7 @@ import type { V3TokenMeta } from "@/lib/sources/chain/aave-v3-tokens";
 import { aaveV3EventLegs, aaveV3LiquidationTxs } from "@/lib/aave-v3/chain-truth-tower";
 import { aaveV3FlowEvents, AAVE_V3_FLOW_BUCKETS } from "@/lib/aave-v3/flows-timeline";
 import { daysFromEvents } from "@/lib/shared/flows-timeline";
+import { dayStates, type DayState } from "./lib/flow-day-states";
 
 const FIXTURE = join(process.cwd(), "scripts/verify/fixtures/aave-v3-flow-legs.json");
 const SERVER_COPY = join(process.cwd(), "../rails-server-onboarding/api/src/services/fixtures/aave-v3-flow-legs.json");
@@ -37,16 +38,6 @@ interface Leg {
   price?: number;
   fromCollateral?: true;
   treasuryFee?: true;
-}
-interface DayState {
-  day: number;
-  events: number;
-  tick: string;
-  cum: Record<string, number>;
-  /** Every balance stated so far, `${side}:${asset}` → amount. */
-  held: Record<string, number>;
-  /** Each asset's last at-block price so far: [usd, unix seconds]. */
-  prices: Record<string, [number, number]>;
 }
 interface Case {
   name: string;
@@ -84,18 +75,15 @@ function answer(f: Fixture, c: Case): { legs: Record<string, Leg[]>; days?: DayS
   // No today's prices: every leg in a whole case carries its block's price.
   const flows = aaveV3FlowEvents(events, undefined);
   assert.ok(flows, `${c.name}: every leg is priced at its block`);
-  const held: Record<string, number> = {};
-  const prices: Record<string, [number, number]> = {};
-  const days = daysFromEvents(
-    AAVE_V3_FLOW_BUCKETS.map((b) => b.key),
-    flows.events,
-  ).map((d) => {
-    for (const b of d.balances) held[`${b.side}:${b.asset}`] = b.amount;
-    for (const p of d.prices) prices[p.asset] = [p.usd, p.ts];
-    const cum = Object.fromEntries(Object.entries(d.cum).filter(([, v]) => v !== 0));
-    return { day: d.day, events: d.events, tick: d.tick, cum, held: { ...held }, prices: { ...prices } };
-  });
-  return { legs, days };
+  return {
+    legs,
+    days: dayStates(
+      daysFromEvents(
+        AAVE_V3_FLOW_BUCKETS.map((b) => b.key),
+        flows.events,
+      ),
+    ),
+  };
 }
 
 if (process.env.WRITE === "1") {

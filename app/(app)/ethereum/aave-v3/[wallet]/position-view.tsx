@@ -599,6 +599,11 @@ export default function AaveV3PositionDetail({
     () => (flowSeries ? aaveV3FlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
     [flowSeries, towerData, view],
   );
+  // The card's count counts transactions; its tip gives the events too.
+  const cardView = useMemo(
+    () => (liveView && flowSeries ? { ...liveView, eventTotal: flowSeries.totalEvents } : liveView),
+    [liveView, flowSeries],
+  );
 
   // The top row's price dropdown: the on-chain oracle
   // price of each reserve the account currently holds.
@@ -663,9 +668,9 @@ export default function AaveV3PositionDetail({
           <DetailBodySkeleton />
         ) : (
           <>
-            {liveView && (
+            {cardView && (
               <AaveV3PositionCard
-                v={liveView}
+                v={cardView}
                 receipts
                 viewHref={tl.viewHref}
                 captions={captions ?? undefined}
@@ -685,9 +690,9 @@ export default function AaveV3PositionDetail({
                 // into the risk slot above; the reserve rates live on the market
                 // view (where pool-wide rate context belongs).
                 explanation={
-                  liveView.status !== "open" ? (
+                  cardView.status !== "open" ? (
                     <AaveV3ClosedPositionExplanation
-                      v={liveView}
+                      v={cardView}
                       events={aaveEvents}
                       folders={servedFolders}
                       countNote={countNote}

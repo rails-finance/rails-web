@@ -1,5 +1,7 @@
-// Aave V3 (and SparkLend, the same Pool) → the date scrubber's timeline
-// (lib/shared/flows-timeline.ts).
+// Aave V3 → the date scrubber's timeline (lib/shared/flows-timeline.ts), and
+// the pieces SparkLend (lib/spark/flows-timeline.ts) and Aave V4
+// (lib/aave-v4/flows-timeline.ts) share: the buckets, the event-level
+// reduction from a classifier's legs, and the mapping of a route's answer.
 // ----------------------------------------------------------------------------
 // The page reads the day rows the index serves (GET /api/aave-v3/flows/daily,
 // rails-ops reference/lifetime-flows-scrubber.md): the whole history and a
@@ -19,6 +21,7 @@ import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import {
   daysFromEvents,
+  type FlowAssetHeld,
   type FlowBucket,
   type FlowDayRow,
   type FlowEvent,
@@ -26,7 +29,7 @@ import {
   type FlowSide,
   type FlowTimeline,
 } from "@/lib/shared/flows-timeline";
-import type { AaveV3FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
+import type { FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { aaveV3EventLegs, aaveV3LiquidationTxs, type AaveV3EventLeg, type FlowLeg } from "./chain-truth-tower";
 
 /** Every bucket an Aave-family position can fill, in drawing order. */
@@ -34,11 +37,32 @@ export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
   { key: "deposited", label: "Deposited", side: "collateral", dir: "in" },
   { key: "received", label: "Received by transfer", short: "Received", side: "collateral", dir: "in", light: true },
   { key: "swappedIn", label: "Swapped in", side: "collateral", dir: "in", light: true },
-  { key: "withdrawn", label: "Withdrawn", side: "collateral", dir: "out" },
-  { key: "soldToRepay", label: "Sold to repay", side: "collateral", dir: "out", link: "repay-with-collateral" },
-  { key: "withdrawnSwapped", label: "Withdrawn and swapped", short: "Swapped out", side: "collateral", dir: "out" },
-  { key: "swappedOut", label: "Swapped to another asset", short: "Swapped", side: "collateral", dir: "out" },
-  { key: "sent", label: "Sent to another account", short: "Sent", side: "collateral", dir: "out" },
+  { key: "withdrawn", label: "Withdrawn", side: "collateral", dir: "out", hatch: "reverse" },
+  {
+    key: "soldToRepay",
+    label: "Sold to repay",
+    side: "collateral",
+    dir: "out",
+    link: "repay-with-collateral",
+    hatch: "horizontal",
+  },
+  {
+    key: "withdrawnSwapped",
+    label: "Withdrawn and swapped",
+    short: "Swapped out",
+    side: "collateral",
+    dir: "out",
+    hatch: "cross",
+  },
+  {
+    key: "swappedOut",
+    label: "Swapped to another asset",
+    short: "Swapped",
+    side: "collateral",
+    dir: "out",
+    hatch: "vertical",
+  },
+  { key: "sent", label: "Sent to another account", short: "Sent", side: "collateral", dir: "out", hatch: "dots" },
   {
     key: "liquidatedCollateral",
     label: "Liquidated",
@@ -46,9 +70,10 @@ export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
     dir: "out",
     tone: "liquidation",
     link: "liquidation",
+    hatch: "forward",
   },
   { key: "borrowed", label: "Borrowed", side: "debt", dir: "in" },
-  { key: "repaid", label: "Repaid", side: "debt", dir: "out" },
+  { key: "repaid", label: "Repaid", side: "debt", dir: "out", hatch: "reverse" },
   {
     key: "repaidWithCollateral",
     label: "Repaid with collateral",
@@ -56,10 +81,26 @@ export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
     side: "debt",
     dir: "out",
     link: "repay-with-collateral",
+    hatch: "horizontal",
   },
-  { key: "repaidBySwap", label: "Repaid by a debt swap", short: "Debt swap", side: "debt", dir: "out" },
-  { key: "liquidatedDebt", label: "Liquidated", side: "debt", dir: "out", tone: "liquidation", link: "liquidation" },
-  { key: "writtenOff", label: "Written off", side: "debt", dir: "out", tone: "liquidation" },
+  {
+    key: "repaidBySwap",
+    label: "Repaid by a debt swap",
+    short: "Debt swap",
+    side: "debt",
+    dir: "out",
+    hatch: "vertical",
+  },
+  {
+    key: "liquidatedDebt",
+    label: "Liquidated",
+    side: "debt",
+    dir: "out",
+    tone: "liquidation",
+    link: "liquidation",
+    hatch: "forward",
+  },
+  { key: "writtenOff", label: "Written off", side: "debt", dir: "out", tone: "liquidation", hatch: "cross" },
 ];
 
 const BUCKET_OF: Record<FlowLeg, string> = {
@@ -137,17 +178,105 @@ export function aaveV3FlowEvents(
     .sort((a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber || logIndex(a.id) - logIndex(b.id));
   if (ordered.length === 0) return null;
   const liqTxs = aaveV3LiquidationTxs(ordered);
+  return flowEventsFromLegs(
+    ordered,
+    (ev) => aaveV3EventLegs(ev, liqTxs),
+    (ev) => {
+      const ctx = ev.context.data;
+      // The balances the row states after it: a liquidation's supply figures
+      // are the collateral reserve's, its debt figures the debt reserve's.
+      const isLiq = ctx.eventType === "liquidation";
+      const out: StatedBalance[] = [];
+      const state = (side: FlowSide, asset: string | undefined, symbol: string | undefined, amount: number | null) => {
+        if (asset && symbol && amount != null) out.push({ side, asset, symbol, amount });
+      };
+      state(
+        "collateral",
+        isLiq ? (ctx.collateralAsset ?? ev.flows[0]?.token) : (ctx.reserve ?? ev.flows[0]?.token),
+        isLiq ? ctx.collateralSymbol : ctx.reserveSymbol,
+        num(ctx.supplyAfter),
+      );
+      state(
+        "debt",
+        ctx.reserve ?? (isLiq ? ev.flows[1]?.token : ev.flows[0]?.token),
+        ctx.reserveSymbol,
+        num(ctx.debtAfter),
+      );
+      const s = ctx.swap;
+      if (s) {
+        state("collateral", s.receivedAsset, s.receivedSymbol, num(s.receivedSupplyAfter));
+        state("debt", s.receivedAsset, s.receivedSymbol, num(s.receivedDebtAfter));
+      }
+      return out;
+    },
+    todayPrices,
+  );
+}
+
+/** Actions each family's position card leaves out of its transaction count
+ *  (rails-server `LegRules.notCounted`): Aave V3's listing leaves out
+ *  transfers too; SparkLend's and Aave V4's leave out liquidations only. */
+export const AAVE_V3_NOT_COUNTED: readonly string[] = ["liquidation", "transfer_in", "transfer_out"];
+export const LIQUIDATIONS_NOT_COUNTED: readonly string[] = ["liquidation"];
+
+/** Whether the card counts an event's transaction: its action, or for a swap
+ *  any of the rows behind it (rails-server `rowCountsTx`). */
+export function countsTx(ev: BaseActivityEvent, notCounted: readonly string[]): boolean {
+  const out = (a: string | undefined) => a != null && notCounted.includes(a);
+  const c = ev.context?.data as
+    | {
+        eventType?: string;
+        swap?: { givenAction?: string; receivedAction?: string; events?: { action: string }[] };
+      }
+    | undefined;
+  if (!c?.eventType) return true;
+  if (c.eventType !== "swap") return !out(c.eventType);
+  const s = c.swap;
+  if (!s) return false;
+  if (!out(s.givenAction)) return true;
+  if (s.receivedAction != null && s.receivedAction !== "trade" && !out(s.receivedAction)) return true;
+  return (s.events ?? []).some((e) => !out(e.action));
+}
+
+/** A balance an event states after it. */
+export interface StatedBalance {
+  side: FlowSide;
+  asset: string;
+  symbol: string;
+  amount: number;
+}
+
+/**
+ * The scrubber's events from a family's classifier: each leg into its bucket
+ * at the price its event carries (else today's), the balances the event
+ * states, and a balance it does not state following its legs. Null where a
+ * leg has no price at its block or today. `ordered` is ascending.
+ * `opts.pricesOf` adds prices an event carries beyond its legs';
+ * `opts.statesAll` says every event states every balance, so none follows a leg;
+ * `opts.notCounted` names the actions the card's transaction count leaves out.
+ */
+export function flowEventsFromLegs<E extends BaseActivityEvent>(
+  ordered: E[],
+  legsOf: (ev: E) => AaveV3EventLeg[],
+  statedOf: (ev: E) => StatedBalance[],
+  todayPrices: Record<string, number> | undefined,
+  opts: {
+    pricesOf?: (ev: E) => { asset: string; usd: number }[];
+    statesAll?: boolean;
+    notCounted?: readonly string[];
+  } = {},
+): { events: FlowEvent[]; used: Set<string> } | null {
+  const { pricesOf, statesAll = false, notCounted = AAVE_V3_NOT_COUNTED } = opts;
+  if (ordered.length === 0) return null;
   const priceToday = (address: string | undefined) => {
-    const p = address ? todayPrices?.[address.toLowerCase()] : undefined;
+    const p = address ? (todayPrices?.[address] ?? todayPrices?.[address.toLowerCase()]) : undefined;
     return typeof p === "number" && p > 0 ? p : undefined;
   };
-
   const running = new Map<string, number>();
   const used = new Set<string>();
   const out: FlowEvent[] = [];
   for (const ev of ordered) {
-    const ctx = ev.context.data;
-    const legs = aaveV3EventLegs(ev, liqTxs);
+    const legs = legsOf(ev);
     const flowEvent: FlowEvent = {
       id: ev.id,
       ts: ev.timestamp,
@@ -156,46 +285,26 @@ export function aaveV3FlowEvents(
       legs: [],
       balances: [],
       prices: [],
+      tx: ev.txHash ?? ev.id,
+      countsTx: countsTx(ev, notCounted),
     };
     const sides = new Set<FlowSide>();
     const stated = new Map<string, { symbol: string; side: FlowSide; amount: number }>();
-    const state = (side: FlowSide, asset: string | undefined, symbol: string | undefined, amount: number | null) => {
-      if (!asset || !symbol || amount == null) return;
-      stated.set(`${side}:${asset.toLowerCase()}`, { symbol, side, amount });
-    };
-    // The balances the row states after it: a liquidation's supply figures
-    // are the collateral reserve's, its debt figures the debt reserve's.
-    const isLiq = ctx.eventType === "liquidation";
-    state(
-      "collateral",
-      isLiq ? (ctx.collateralAsset ?? ev.flows[0]?.token) : (ctx.reserve ?? ev.flows[0]?.token),
-      isLiq ? ctx.collateralSymbol : ctx.reserveSymbol,
-      num(ctx.supplyAfter),
-    );
-    state(
-      "debt",
-      ctx.reserve ?? (isLiq ? ev.flows[1]?.token : ev.flows[0]?.token),
-      ctx.reserveSymbol,
-      num(ctx.debtAfter),
-    );
-    const s = ctx.swap;
-    if (s) {
-      state("collateral", s.receivedAsset, s.receivedSymbol, num(s.receivedSupplyAfter));
-      state("debt", s.receivedAsset, s.receivedSymbol, num(s.receivedDebtAfter));
-    }
+    for (const b of statedOf(ev))
+      stated.set(`${b.side}:${b.asset.toLowerCase()}`, { symbol: b.symbol, side: b.side, amount: b.amount });
 
     for (const l of legs) {
       const bucket = bucketOf(l);
       if (!bucket || !(l.amount > 0) || !Number.isFinite(l.amount)) continue;
       const address = l.address?.toLowerCase();
-      const price = l.price != null && l.price > 0 ? l.price : priceToday(address);
+      const price = l.price != null && l.price > 0 ? l.price : priceToday(l.address);
       if (price == null) return null;
       if (l.price != null && l.price > 0 && address) flowEvent.prices.push({ asset: address, usd: l.price });
-      flowEvent.legs.push({ bucket, usd: l.amount * price });
+      flowEvent.legs.push({ bucket, usd: l.amount * price, symbol: l.symbol });
       used.add(bucket);
       const side = sideOf(bucket);
       sides.add(side);
-      if (!address) continue;
+      if (!address || statesAll) continue;
       // A balance the row does not state follows the legs.
       const key = `${side}:${address}`;
       if (!stated.has(key)) {
@@ -203,6 +312,9 @@ export function aaveV3FlowEvents(
         stated.set(key, { symbol: l.symbol, side, amount: next });
       }
     }
+    for (const p of pricesOf?.(ev) ?? [])
+      if (!flowEvent.prices.some((x) => x.asset === p.asset.toLowerCase()))
+        flowEvent.prices.push({ asset: p.asset.toLowerCase(), usd: p.usd });
     for (const [key, b] of stated) {
       running.set(key, b.amount);
       flowEvent.balances.push({
@@ -235,7 +347,40 @@ export function aaveV3FlowLive(tower: ChainTruthTowerData): FlowLive {
     debtUsd: Math.max(0, usdOf(d.current) + (d.interest?.usd ?? 0)),
     collateralInterestUsd: c.priceChange != null ? usdOf(c.earned) : null,
     debtInterestUsd: d.priceChange != null ? (d.interest?.usd ?? 0) + usdOf(d.earned) : null,
+    assets: towerAssets(tower, false),
   };
+}
+
+/** Each asset the ledger holds and owes now: its current lines, and where a
+ *  side splits off interest (`interest`), that line joined to its asset.
+ *  `collateralInterest` joins the collateral side's too. */
+export function towerAssets(tower: ChainTruthTowerData, collateralInterest: boolean): FlowAssetHeld[] {
+  const out: FlowAssetHeld[] = [];
+  const add = (side: FlowSide, lines: TowerLine[], interest: TowerLine | null | undefined) => {
+    for (const l of lines) {
+      const at = out.find((x) => x.side === side && x.symbol === l.symbol);
+      if (at) {
+        at.usd += l.usd ?? 0;
+        at.amount = at.amount != null ? at.amount + l.amount : null;
+      } else out.push({ side, symbol: l.symbol, amount: l.amount, usd: l.usd ?? 0 });
+    }
+    if (!interest) return;
+    // Interest on one asset joins it; interest summed across assets is its own line.
+    const at = out.find((x) => x.side === side && x.symbol === interest.symbol);
+    if (at) {
+      at.usd += interest.usd ?? 0;
+      at.amount = at.amount != null ? at.amount + interest.amount : null;
+    } else
+      out.push({
+        side,
+        symbol: side === "debt" ? "Interest accrued" : "Interest earned",
+        amount: null,
+        usd: interest.usd ?? 0,
+      });
+  };
+  add("collateral", tower.collateral.current, collateralInterest ? tower.collateral.interest : null);
+  add("debt", tower.debt.current, tower.debt.interest);
+  return out;
 }
 
 /**
@@ -245,36 +390,53 @@ export function aaveV3FlowLive(tower: ChainTruthTowerData): FlowLive {
  * latest recorded price) stand, with no interest split.
  */
 export function aaveV3FlowSeriesTimeline(
-  series: AaveV3FlowSeries,
+  series: FlowSeries,
   tower: ChainTruthTowerData | null,
+  todayPrices: Record<string, number> | undefined,
+): FlowTimeline | null {
+  return flowSeriesTimeline(
+    series,
+    AAVE_V3_FLOW_BUCKETS,
+    tower?.valued === true ? aaveV3FlowLive(tower) : null,
+    todayPrices,
+  );
+}
+
+/** Any family's day rows as the scrubber's timeline. `live` is the ledger's
+ *  live stop; null takes the route's (balances after the last event at the
+ *  latest recorded price), with no interest split. */
+export function flowSeriesTimeline(
+  series: FlowSeries,
+  bucketDefs: FlowBucket[],
+  live: FlowLive | null,
   todayPrices: Record<string, number> | undefined,
 ): FlowTimeline | null {
   if (series.days.length === 0) return null;
   const symbolOf = (a: string) => series.assets[a]?.symbol ?? a.slice(0, 8);
-  const days: FlowDayRow[] = series.days.map(([day, events, tick, cum, balances, prices]) => ({
+  const days: FlowDayRow[] = series.days.map(([day, events, tick, cum, balances, prices, txs, cells]) => ({
     day,
     events,
     tick,
     cum: Object.fromEntries(series.buckets.map((k, i) => [k, cum[i] ?? 0])),
     balances: balances.map(([side, asset, amount]) => ({ side, asset, symbol: symbolOf(asset), amount })),
     prices: prices.map(([asset, usd, ts]) => ({ asset, usd, ts })),
+    ...(txs != null ? { txs } : {}),
+    ...(cells ? { cumAsset: cells.map(([i, symbol, usd]) => ({ bucket: series.buckets[i], symbol, usd })) } : {}),
   }));
   const used = new Set<string>(series.buckets);
   return {
-    buckets: AAVE_V3_FLOW_BUCKETS.filter((b) => used.has(b.key)),
+    buckets: bucketDefs.filter((b) => used.has(b.key)),
     days,
-    live:
-      tower?.valued === true
-        ? aaveV3FlowLive(tower)
-        : {
-            collateralUsd: series.live.collateralUsd,
-            debtUsd: series.live.debtUsd,
-            collateralInterestUsd: null,
-            debtInterestUsd: null,
-          },
+    live: live ?? {
+      collateralUsd: series.live.collateralUsd,
+      debtUsd: series.live.debtUsd,
+      collateralInterestUsd: null,
+      debtInterestUsd: null,
+    },
     todayPrices,
     dailyPrices: Object.fromEntries(Object.entries(series.prices).map(([a, p]) => [a, p.obs])),
     today: series.today,
     totalEvents: series.totalEvents,
+    ...(series.totalTxs != null ? { totalTxs: series.totalTxs } : {}),
   };
 }

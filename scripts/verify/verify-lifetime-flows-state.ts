@@ -1,6 +1,7 @@
 // verify-lifetime-flows-state — the date scrubber's state(day) against the
 // design brief's reconciliation table and the Lifetime flows ledger, and the
-// index's day rows (GET /api/aave-v3/flows/daily) against the page's events
+// index's day rows (GET /api/{aave-v3,spark,aave-v4}/flows/daily) against the
+// page's events at every event day, with transactions and each asset's part
 // (rails-ops reference/lifetime-flows-scrubber.md).
 // ----------------------------------------------------------------------------
 // OFFLINE. The fixture is the index's answer for Aave V3 Core wallet
@@ -27,9 +28,13 @@ import {
   aaveV3FlowSeriesTimeline,
   aaveV3FlowTimeline,
 } from "@/lib/aave-v3/flows-timeline";
-import type { AaveV3FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
+import type { AaveV3FlowSeries, FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
+import { sparkRowsToEvents } from "@/lib/sources/api/spark-timeline";
+import { sparkFlowEvents, sparkFlowSeriesTimeline } from "@/lib/spark/flows-timeline";
+import { aaveV4FlowSeriesTimeline, aaveV4FlowTimeline } from "@/lib/aave-v4/flows-timeline";
 import { aaveV3RowsToEvents, type MvRow } from "@/lib/sources/api/aave-v3-timeline";
 import {
+  assetsAt,
   axisFor,
   buildFlowModel,
   daysFromEvents,
@@ -192,10 +197,24 @@ function sameFooting(t: FlowTimeline): FlowTimeline {
 function assertDaysMatch(name: string, reference: FlowModel, route: FlowModel) {
   assert.deepEqual(route.eventDays, reference.eventDays, `${name}: the same active days`);
   assert.equal(route.start, reference.start);
+  assert.equal(route.totalTxs, reference.totalTxs, `${name}: transactions`);
   for (const day of reference.eventDays) {
     const a = stateAt(reference, day);
     const b = stateAt(route, day);
     assert.equal(b.count, a.count, `${name} day ${day}: events`);
+    assert.equal(b.txs, a.txs, `${name} day ${day}: transactions`);
+    // Each asset's part: held at the day's end, and each bucket by symbol.
+    const pa = assetsAt(reference, day);
+    const pb = assetsAt(route, day);
+    for (const h of pa.held) {
+      const o = pb.held.find((x) => x.side === h.side && x.symbol === h.symbol);
+      assert.ok(o && near(o.usd, h.usd, Math.max(0.02, h.usd * 1e-9)), `${name} day ${day}: ${h.symbol} held`);
+    }
+    for (const [bucket, parts] of pa.flows)
+      for (const p of parts) {
+        const o = pb.flows.get(bucket)?.find((x) => x.symbol === p.symbol);
+        assert.ok(o && near(o.usd, p.usd, 0.02), `${name} day ${day}: ${bucket} ${p.symbol}`);
+      }
     for (const side of ["collateral", "debt"] as const) {
       assert.ok(near(b[side].now, a[side].now, Math.max(0.02, a[side].now * 1e-9)), `${name} day ${day}: ${side} held`);
       for (const seg of [...a[side].bar, ...a[side].sources]) {
@@ -311,4 +330,75 @@ test("a gap past SERIES_GAP_DAYS keeps the older price and marks the refresh", (
   assert.equal(stateAt(m, 20).collateral.now, 300);
   assert.equal(stateAt(m, 20).stale.length, 0);
   assert.deepEqual(m.repricings, [{ day: 20, symbol: "A", from: 1001 * 86_400 }]);
+});
+
+// ── SparkLend and Aave V4: the route against the event-level answer ─────────
+
+test("SparkLend: the route's day rows reproduce the event-level answer at every event day, liquidated 33 times", () => {
+  const legs = readJson<{
+    tokens: Record<string, { symbol: string; decimals: number }>;
+    cases: { wallet: string; rows: Parameters<typeof sparkRowsToEvents>[0] }[];
+  }>("spark-flow-legs.json");
+  const metas = new Map(Object.entries(legs.tokens).map(([address, t]) => [address, { address, ...t, named: true }]));
+  for (const [wallet, file] of [
+    ["0x685ffd82e8395229974a4dc4e9034fe6108f128c", "lifetime-flows-series-spark-685f.json"],
+    ["0xe4317db5791ea5de9209b9839898ef65522b239e", "lifetime-flows-series-spark-e431.json"],
+  ]) {
+    const c = legs.cases.find((x) => x.wallet === wallet)!;
+    const flows = sparkFlowEvents(sparkRowsToEvents(c.rows, wallet, metas).events, undefined);
+    assert.ok(flows);
+    const live = { collateralUsd: 0, debtUsd: 0, collateralInterestUsd: null, debtInterestUsd: null };
+    const reference: FlowTimeline = {
+      buckets: AAVE_V3_FLOW_BUCKETS.filter((b) => flows.used.has(b.key)),
+      days: daysFromEvents(
+        AAVE_V3_FLOW_BUCKETS.map((b) => b.key),
+        flows.events,
+      ),
+      live,
+    };
+    const route = sparkFlowSeriesTimeline(readJson<FlowSeries>(file), null, undefined);
+    assert.ok(route);
+    const a = buildFlowModel(reference) as FlowModel;
+    const b = buildFlowModel({ ...sameFooting(route), live }) as FlowModel;
+    assertDaysMatch(wallet.slice(0, 10), a, b);
+    if (wallet.startsWith("0x685f"))
+      assert.ok(
+        b.ticks.some((t) => t.tick === "liquidation"),
+        "liquidation days tick red",
+      );
+  }
+});
+
+test("Aave V4: the route's day rows reproduce the event-level answer at every event day, one spoke position", () => {
+  const legs = readJson<{ cases: { wallet: string; spoke: string; events: BaseActivityEvent[] }[] }>(
+    "aave-v4-flow-legs.json",
+  );
+  const live = { collateralUsd: 0, debtUsd: 0, collateralInterestUsd: null, debtInterestUsd: null };
+  for (const [wallet, file] of [
+    ["0xb0dd3df3f4f9b4767e5cc68de3a41c91624bff76", "lifetime-flows-series-v4-b0dd.json"],
+    ["0x0fc9b8b7a341da6b41638c2f58cd1509bfa0afd3", "lifetime-flows-series-v4-0fc9.json"],
+  ]) {
+    const c = legs.cases.find((x) => x.wallet === wallet)!;
+    const reference = aaveV4FlowTimeline(c.events, wallet, c.spoke, live, undefined);
+    assert.ok(reference);
+    const route = aaveV4FlowSeriesTimeline(readJson<FlowSeries>(file), live, undefined);
+    assert.ok(route);
+    const a = buildFlowModel(reference) as FlowModel;
+    const b = buildFlowModel({ ...sameFooting(route), live }) as FlowModel;
+    assertDaysMatch(wallet.slice(0, 10), a, b);
+    assert.ok(
+      b.ticks.some((t) => t.tick === "liquidation"),
+      "liquidation days tick red",
+    );
+  }
+});
+
+test("the counter counts the card's transactions", () => {
+  const m = buildFlowModel(
+    aaveV4FlowSeriesTimeline(readJson<FlowSeries>("lifetime-flows-series-v4-b0dd.json"), null, undefined)!,
+  )!;
+  const s = stateAt(m, m.liveStop);
+  assert.equal(s.count, 33);
+  assert.equal(s.txs, 28);
+  assert.equal(m.totalTxs, 28);
 });

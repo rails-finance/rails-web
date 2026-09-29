@@ -42,7 +42,16 @@ export interface FlowBucket {
   /** Buckets sharing a link are one on-chain act seen from both sides (a
    *  repay with collateral, a liquidation): hovering one highlights all. */
   link?: string;
+  /** Outflows: the hatch that tells this kind of exit from the others
+   *  (standards/lexicon.md, chart grammar). Default "reverse". */
+  hatch?: FlowHatch;
 }
+
+/** The outflow hatches: reverse diagonal (a withdrawal or repayment), cross
+ *  (withdrawn and swapped), vertical (swapped within the position), dots (sent
+ *  to another account), horizontal (the two sides of a repay with collateral),
+ *  forward diagonal (a liquidation or a redemption, in its tone's hue). */
+export type FlowHatch = "reverse" | "cross" | "vertical" | "dots" | "horizontal" | "forward";
 
 export interface FlowEvent {
   id: string;
@@ -51,8 +60,12 @@ export interface FlowEvent {
   block: number;
   /** Which side the event moved, for the tick strip under the slider. */
   tick: "collateral" | "debt" | "both" | "liquidation";
-  /** What the event adds to each bucket, in USD. */
-  legs: { bucket: string; usd: number }[];
+  /** What the event adds to each bucket, in USD, and the asset it moved. */
+  legs: { bucket: string; usd: number; symbol?: string }[];
+  /** The transaction, and whether the position card counts it (false: a
+   *  liquidation or a transfer). Default counted. */
+  tx?: string;
+  countsTx?: boolean;
   /** Token balances after the event, for the assets it touched. */
   balances: { asset: string; symbol: string; side: FlowSide; amount: number }[];
   /** Prices the event carries, USD per token at its block. */
@@ -69,6 +82,18 @@ export interface FlowLive {
    *  into this and a price change. */
   collateralInterestUsd: number | null;
   debtInterestUsd: number | null;
+  /** Each asset held and owed now, as the ledger values it, for the zoom
+   *  view; absent, the last day's balances at today's prices. */
+  assets?: FlowAssetHeld[];
+}
+
+/** One asset held or owed at a stop. */
+export interface FlowAssetHeld {
+  side: FlowSide;
+  symbol: string;
+  /** Token units, where known. */
+  amount: number | null;
+  usd: number;
 }
 
 /** One active UTC day: the position after the day's last event. */
@@ -85,6 +110,10 @@ export interface FlowDayRow {
   balances: FlowEvent["balances"];
   /** Each asset's last at-block price that day, with its block time. */
   prices: { asset: string; usd: number; ts: number }[];
+  /** Transactions on or before this day (the position card's count). */
+  txs?: number;
+  /** The running USD per bucket and symbol, for the cells the day moved. */
+  cumAsset?: { bucket: string; symbol: string; usd: number }[];
 }
 
 export interface FlowTimeline {
@@ -102,6 +131,10 @@ export interface FlowTimeline {
   today?: number;
   /** Events in the history (the last day row's count when absent). */
   totalEvents?: number;
+  /** Transactions in the history, where the day rows count them. */
+  totalTxs?: number;
+  /** The headline words, the position card's: "Collateral" and "Debt" by default. */
+  labels?: { collateral: string; debt: string };
 }
 
 /** A held asset whose price, at some date, is older than the gap allowed. */
@@ -126,7 +159,11 @@ interface FlowRow {
   /** Slider stop of the active day. */
   day: number;
   events: number;
+  /** Transactions through the day, where the day rows count them. */
+  txs: number | null;
   cum: Record<string, number>;
+  /** The running USD per `${bucket}|${symbol}` the day moved. */
+  cells: { bucket: string; symbol: string; usd: number }[];
 }
 
 export interface FlowModel {
@@ -152,6 +189,14 @@ export interface FlowModel {
   /** Whether held assets are valued at a daily price series. */
   daily: boolean;
   totalEvents: number;
+  /** Transactions in the history, where the day rows count them. */
+  totalTxs: number | null;
+  /** The headline words. */
+  labels: { collateral: string; debt: string };
+  /** Each asset held and owed at the end of each stop before the live one,
+   *  and at the live stop. */
+  heldAt: FlowAssetHeld[][];
+  liveHeld: FlowAssetHeld[];
   /** The shared x-axis, fixed for the position so bars never rescale. */
   axis: { max: number; ticks: number[] };
   /** Each bar's length at the live stop, for the "today" outline. */
@@ -165,6 +210,7 @@ export interface FlowSegment {
   /** "held" solid, "out" hatched, "in" solid source, "estimate" dashed. */
   fill: "held" | "out" | "in" | "estimate";
   tone?: FlowTone;
+  hatch?: FlowHatch;
   light?: boolean;
   link?: string;
   /** Drawn width in USD (clamped so the strip never overruns its bar). */
@@ -192,6 +238,8 @@ export interface FlowState {
   isLive: boolean;
   /** Events on or before the stop. */
   count: number;
+  /** Transactions on or before the stop, where the day rows count them. */
+  txs: number | null;
   collateral: FlowSideState;
   debt: FlowSideState;
   /** Held assets valued at an old price at this stop. */
@@ -240,6 +288,7 @@ export function axisFor(peak: number): { max: number; ticks: number[] } {
 export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowDayRow[] {
   const ordered = [...events].sort((a, b) => a.ts - b.ts || a.block - b.block);
   const cum: Record<string, number> = Object.fromEntries(bucketKeys.map((k) => [k, 0]));
+  const cumAsset: Record<string, number> = {};
   const days: FlowDayRow[] = [];
   let cur: {
     day: number;
@@ -247,8 +296,11 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
     liq: boolean;
     balances: Map<string, FlowEvent["balances"][number]>;
     prices: Map<string, { usd: number; ts: number }>;
+    cells: Set<string>;
   } | null = null;
   let n = 0;
+  let txs = 0;
+  let lastTx: string | null = null;
   const close = () => {
     if (!cur) return;
     days.push({
@@ -258,16 +310,38 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
       cum: { ...cum },
       balances: [...cur.balances.values()],
       prices: [...cur.prices].map(([asset, p]) => ({ asset, usd: p.usd, ts: p.ts })),
+      txs,
+      cumAsset: [...cur.cells].map((c) => ({
+        bucket: c.slice(0, c.indexOf("|")),
+        symbol: c.slice(c.indexOf("|") + 1),
+        usd: cumAsset[c],
+      })),
     });
     cur = null;
   };
   for (const ev of ordered) {
     const day = utcDay(ev.ts);
     if (cur && cur.day !== day) close();
-    cur ??= { day, sides: new Set(), liq: false, balances: new Map(), prices: new Map() };
+    cur ??= { day, sides: new Set(), liq: false, balances: new Map(), prices: new Map(), cells: new Set() };
     n += 1;
+    // A transaction's events are consecutive; the card leaves some out.
+    if (ev.countsTx !== false) {
+      const tx = ev.tx ? ev.tx.toLowerCase() : null;
+      if (tx == null || tx !== lastTx) {
+        txs += 1;
+        lastTx = tx;
+      }
+    }
     for (const p of ev.prices) if (p.usd > 0) cur.prices.set(p.asset, { usd: p.usd, ts: ev.ts });
-    for (const leg of ev.legs) if (leg.bucket in cum && Number.isFinite(leg.usd)) cum[leg.bucket] += leg.usd;
+    for (const leg of ev.legs) {
+      if (!(leg.bucket in cum) || !Number.isFinite(leg.usd)) continue;
+      cum[leg.bucket] += leg.usd;
+      if (leg.symbol) {
+        const cell = `${leg.bucket}|${leg.symbol}`;
+        cumAsset[cell] = (cumAsset[cell] ?? 0) + leg.usd;
+        cur.cells.add(cell);
+      }
+    }
     for (const b of ev.balances) cur.balances.set(`${b.side}:${b.asset}`, b);
     if (ev.tick === "liquidation") cur.liq = true;
     else if (ev.tick === "both") {
@@ -300,7 +374,13 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   const outOf = (side: FlowSide, c: Record<string, number>) =>
     t.buckets.filter((b) => b.side === side && b.dir === "out").reduce((s, b) => s + (c[b.key] ?? 0), 0);
 
-  const rows: FlowRow[] = days.map((d) => ({ day: d.day - startDay, events: d.events, cum: { ...d.cum } }));
+  const rows: FlowRow[] = days.map((d) => ({
+    day: d.day - startDay,
+    events: d.events,
+    txs: d.txs ?? null,
+    cum: { ...d.cum },
+    cells: d.cumAsset ?? [],
+  }));
   const lastDay = rows[rows.length - 1].day;
   const eventDays = rows.map((r) => r.day);
 
@@ -332,6 +412,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   const eventPrice = new Map<string, PriceAt>();
   const seriesCursor = new Map<string, { i: number }>();
   const valued: FlowModel["valued"] = [];
+  const heldAt: FlowAssetHeld[][] = [];
   const stale = new Map<number, StalePrice[]>();
   const repricings: Repricing[] = [];
   let prevPrice = new Map<string, PriceAt>();
@@ -401,6 +482,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     // Only what was held at this stop can be repriced at the next.
     prevPrice = priceNow;
     valued.push({ collateral: coll, debt });
+    heldAt.push(lines.map(({ h, usd }) => ({ side: h.side, symbol: h.symbol, amount: h.amount, usd })));
     if (staleHere.length) stale.set(stop, staleHere);
   }
 
@@ -432,9 +514,56 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     stale,
     daily,
     totalEvents: t.totalEvents ?? last.events,
+    totalTxs: t.totalTxs ?? last.txs ?? null,
+    labels: t.labels ?? { collateral: "Collateral", debt: "Debt" },
+    heldAt,
+    liveHeld: t.live.assets ?? liveHeldFromBalances(held, t.todayPrices, heldAt[heldAt.length - 1] ?? []),
     axis: axisFor(peak),
     today,
   };
+}
+
+/** The live stop's assets where the ledger names none: the last balances at
+ *  today's price, else at the last stop's. */
+function liveHeldFromBalances(
+  held: Map<string, { symbol: string; side: FlowSide; amount: number }>,
+  todayPrices: Record<string, number> | undefined,
+  last: FlowAssetHeld[],
+): FlowAssetHeld[] {
+  const out: FlowAssetHeld[] = [];
+  for (const [key, h] of held) {
+    if (!(h.amount > 0)) continue;
+    const asset = key.slice(key.indexOf(":") + 1);
+    const p = todayPrices?.[asset];
+    const prev = last.find((x) => x.side === h.side && x.symbol === h.symbol);
+    const usd = typeof p === "number" && p > 0 ? h.amount * p : (prev?.usd ?? 0);
+    out.push({ side: h.side, symbol: h.symbol, amount: h.amount, usd });
+  }
+  return out;
+}
+
+/** Each asset's part of the position at a stop: what is held and owed, and
+ *  each bucket's running USD by symbol. */
+export function assetsAt(
+  m: FlowModel,
+  stop: number,
+): { held: FlowAssetHeld[]; flows: Map<string, { symbol: string; usd: number }[]> } {
+  const isLive = stop >= m.liveStop;
+  const upto = isLive ? m.rows.length - 1 : rowAt(m, stop);
+  const cells = new Map<string, { bucket: string; symbol: string; usd: number }>();
+  for (let i = 0; i <= upto; i++) for (const c of m.rows[i].cells) cells.set(`${c.bucket}|${c.symbol}`, c);
+  const flows = new Map<string, { symbol: string; usd: number }[]>();
+  for (const c of cells.values()) {
+    if (!(Math.abs(c.usd) >= 0.005)) continue;
+    const list = flows.get(c.bucket) ?? [];
+    list.push({ symbol: c.symbol, usd: c.usd });
+    flows.set(c.bucket, list);
+  }
+  for (const list of flows.values()) list.sort((a, b) => b.usd - a.usd);
+  const held = (isLive ? m.liveHeld : (m.heldAt[Math.max(0, Math.min(stop, m.heldAt.length - 1))] ?? []))
+    .filter((h) => h.usd >= 0.005 || (h.amount ?? 0) > 0)
+    .sort((a, b) => b.usd - a.usd);
+  return { held, flows };
 }
 
 /** Index of the last row on or before the end of day `stop`, or -1. */
@@ -504,6 +633,7 @@ function sideState(
         short: b.short,
         fill: "out" as const,
         tone: b.tone ?? "exit",
+        hatch: b.hatch,
         link: b.link,
         width: v,
         value: v,
@@ -553,6 +683,7 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
     stop: Math.min(stop, m.liveStop),
     isLive,
     count: row?.events ?? 0,
+    txs: m.totalTxs == null ? null : (row?.txs ?? 0),
     collateral: sideState(m, "collateral", cum, collNow, isLive ? m.live.collateralInterestUsd : null),
     debt: sideState(m, "debt", cum, debtNow, isLive ? m.live.debtInterestUsd : null),
     stale: isLive ? [] : (m.stale.get(stop) ?? []),

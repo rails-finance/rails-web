@@ -25,6 +25,9 @@ export interface PositionCardMetaProps {
   /** What the count counts, singular or plural, in the hover tip ("52 transactions").
    *  Default "transaction"; a vault position counts "transfer". */
   eventCountNoun?: string;
+  /** The position's events, where they differ from the count: the tip then
+   *  gives both ("104 transactions · 167 events"), the timeline's figure too. */
+  eventTotal?: number | null;
   /** Exact liquidation count, when known (Aave, Compound). */
   liquidationCount?: number | null;
   /** Boolean-only liquidation history, when no count exists (Morpho, MakerDAO). */
@@ -49,6 +52,7 @@ export function PositionCardMeta({
   lastActivityAt,
   eventCount,
   eventCountNoun = "transaction",
+  eventTotal,
   liquidationCount,
   liquidated,
   redemptionCount,
@@ -80,11 +84,16 @@ export function PositionCardMeta({
       )}
       {showEvents &&
         (() => {
-          const label = `${eventCount} ${eventCountNoun}${eventCount === 1 ? "" : "s"}`;
+          const n = eventCount as number;
+          const label =
+            `${n.toLocaleString("en-US")} ${eventCountNoun}${n === 1 ? "" : "s"}` +
+            (eventTotal != null && eventTotal > 0 && eventTotal !== n
+              ? ` · ${eventTotal.toLocaleString("en-US")} event${eventTotal === 1 ? "" : "s"}`
+              : "");
           return (
             <RevealTip tip={label} label={label} focusable className="focus-ring rounded-sm">
               <Icon name="arrow-left-right" size={12} />
-              <span className="ml-1">{eventCount}</span>
+              <span className="ml-1">{n.toLocaleString("en-US")}</span>
             </RevealTip>
           );
         })()}

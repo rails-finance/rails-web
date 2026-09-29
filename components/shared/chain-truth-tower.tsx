@@ -908,7 +908,17 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     fullAmounts: data.fullTokenAmounts,
     wrapLabels: data.wrapFlowLabels,
   });
-  return <DualTowerChart left={left} right={right} height={TOWER_H} maxValue={towerMax} className="mb-1" />;
+  // A position with no debt axis (a lender, a saver) draws its one tower.
+  const noDebt = data.debtAxisAbsent && data.debt.current.length === 0 && data.debt.exited.length === 0;
+  return (
+    <DualTowerChart
+      left={left}
+      right={noDebt ? undefined : right}
+      height={TOWER_H}
+      maxValue={towerMax}
+      className="mb-1"
+    />
+  );
 }
 
 // ── Gated path (Spark): no faithful interest, multi-token → no bars ──────────

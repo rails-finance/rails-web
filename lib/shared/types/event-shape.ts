@@ -1648,6 +1648,41 @@ export interface PwnContext {
   isOpen?: boolean;
 }
 
+// ───────────────────────── Sky Savings (sUSDS) ─────────────────────────
+// Mirrors rails-server-onboarding api/src/types/event-shape.ts: one row of the
+// sealed sUSDS ledger (rails-ops reference/sky-savings-pipeline.md). Every
+// amount is a raw integer string at 18 decimals; chi and ssr are rays.
+
+export type SkySavingsEventType = "deposit" | "withdrawal" | "received" | "sent" | "self";
+
+export interface SkySavingsContext {
+  eventType: SkySavingsEventType;
+  /** The position: the address whose sUSDS balance the log moved. */
+  holder: string;
+  /** The sender of a Deposit, the receiver of a Withdraw's USDS, the other
+   *  side of a transfer. */
+  counterparty: string | null;
+  /** msg.sender of a Withdraw (an approved spender may redeem for the owner). */
+  actor: string | null;
+  sharesDelta: string;
+  /** The log's `assets` on a Deposit or Withdraw ("log"), shares × chi on a
+   *  transfer ("chi"). */
+  usds: string;
+  usdsSource: "log" | "chi";
+  /** USDS per share at the block, ray. */
+  chi: string;
+  /** The Sky Savings Rate in force, per second, ray. */
+  ssr: string;
+  sharesAfter: string;
+  valueAfter: string;
+  usdsInAfter: string;
+  usdsOutAfter: string;
+  /** valueAfter − usdsInAfter + usdsOutAfter. Signed. */
+  earnedAfter: string;
+  /** The Referral code a Deposit carried, as a number. */
+  referral: number | null;
+}
+
 // ───────────────────────── Generic / unknown ─────────────────────────
 
 export interface OtherContext {
@@ -2979,6 +3014,7 @@ export type ProtocolContext =
   | { protocol: "fx"; data: FxContext }
   | { protocol: "fluid"; data: FluidContext }
   | { protocol: "polaris"; data: PolarisContext }
+  | { protocol: "sky-savings"; data: SkySavingsContext }
   | { protocol: "alchemix-v3"; data: AlchemixV3Context }
   | { protocol: "alchemix-v2"; data: AlchemixV2Context }
   | { protocol: "liquity-coll-surplus-claim"; data: CollSurplusClaimContext }
@@ -3156,6 +3192,14 @@ export function isPolarisEvent(
   context: { protocol: "polaris"; data: PolarisContext };
 } {
   return e.context?.protocol === "polaris";
+}
+
+export function isSkySavingsEvent(
+  e: BaseActivityEvent,
+): e is BaseActivityEvent & {
+  context: { protocol: "sky-savings"; data: SkySavingsContext };
+} {
+  return e.context?.protocol === "sky-savings";
 }
 
 export function isLlamalendEvent(

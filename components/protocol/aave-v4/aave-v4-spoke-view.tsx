@@ -87,7 +87,11 @@ import { AAVE_V4_TIMELINE_RUNS } from "@/lib/aave-v4/timeline-runs";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
-import { OVERLAY_HEADING, NAV_LINK, PILL_META } from "@/lib/shared/ui-grammar";
+import { OVERLAY_HEADING, NAV_LINK, PILL_META, CTRL_GHOST } from "@/lib/shared/ui-grammar";
+import { ChevronDown } from "lucide-react";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { aaveV4FlowLive, aaveV4FlowSeriesTimeline } from "@/lib/aave-v4/flows-timeline";
+import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { shortAddr } from "@/lib/shared/format-event";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { useAaveV4UiState } from "@/hooks/useAaveV4UiState";
@@ -825,6 +829,9 @@ function AaveV4SpokePageInner({
             the aggregate of the same flows the event list itemizes below. */}
         {activeGroup && hasUiHydrated ? (
           <AaveV4SpokeTowerBlock
+            wallet={wallet}
+            spokeName={spokeName}
+            flowSeriesEnabled={deployment.key !== "base"}
             reserves={activeGroup.result.reserves}
             prices={chainTruthPrices}
             oraclePrices={oraclePrices}
@@ -911,6 +918,9 @@ function RiskPremiumNotice({ raw, spokeName }: { raw: string | null; spokeName: 
 // same lifetime flows the timeline itemizes (every supply, withdrawal, borrow
 // and repayment), so the two read as summary-then-detail.
 function AaveV4SpokeTowerBlock({
+  wallet,
+  spokeName,
+  flowSeriesEnabled,
   reserves,
   prices,
   oraclePrices,
@@ -918,6 +928,10 @@ function AaveV4SpokeTowerBlock({
   gasUsd,
   historyComplete,
 }: {
+  wallet: string;
+  spokeName: string;
+  /** The index serves the day rows for Ethereum's spokes. */
+  flowSeriesEnabled: boolean;
   reserves: ReserveStats[];
   prices: Record<string, PriceEntry | number>;
   /** The oracle map behind `prices` — passed on so each priced row's receipt
@@ -998,6 +1012,47 @@ function AaveV4SpokeTowerBlock({
     };
   }, [reserves, prices, totals]);
 
+  // Lifetime flows over time (rails-ops reference/lifetime-flows-scrubber.md):
+  // the date scrubber leads the panel and the towers sit one click under it.
+  // Its day rows and daily prices come from the index for the spoke's whole
+  // history. A failed read leaves the towers alone.
+  const [flowSeries, setFlowSeries] = useState<FlowSeries | null>(null);
+  useEffect(() => {
+    if (!flowSeriesEnabled) return;
+    const ctl = new AbortController();
+    setFlowSeries(null);
+    fetchFlowSeries("/api/aave-v4/flows", { wallet, spoke: spokeName }, ctl.signal)
+      .then(setFlowSeries)
+      .catch((err) => {
+        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
+      });
+    return () => ctl.abort();
+  }, [wallet, spokeName, flowSeriesEnabled]);
+  const todayPrices = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const r of reserves) {
+      const p = resolvePrice(r.symbol, prices);
+      if (p != null) out[r.symbol.toLowerCase()] = p;
+    }
+    return out;
+  }, [reserves, prices]);
+  const flowTimeline = useMemo(
+    () =>
+      flowSeries
+        ? aaveV4FlowSeriesTimeline(
+            flowSeries,
+            totals.unpricedSymbols.length === 0
+              ? aaveV4FlowLive(totals, reserves, (sym) => resolvePrice(sym, prices))
+              : null,
+            todayPrices,
+          )
+        : null,
+    [flowSeries, totals, todayPrices, reserves, prices],
+  );
+  const [ledgerOpen, setLedgerOpen] = useState(false);
+  const ledgerShown = flowTimeline == null || ledgerOpen;
+  const title = <span className={`${OVERLAY_HEADING} text-rb-500`}>Lifetime flows</span>;
+
   // Figures mirrored in the breakdown legend render foreground-bold; the rest of
   // the prose stays muted (same grammar as the Liquity economics footnote).
   const fig = (n: number) => <span className="font-semibold text-foreground tabular-nums">{fmtUsd(n).title}</span>;
@@ -1009,16 +1064,36 @@ function AaveV4SpokeTowerBlock({
           title rides the chart's toolbar row instead of a row of its own. */}
       <div className="rounded-2xl bg-raised px-5 py-4">
         <div className="space-y-3">
-          <AaveV4TowerChart
-            reserves={reserves}
-            prices={prices}
-            oraclePrices={oraclePrices}
-            surplusSymbols={surplusSymbols}
-            hideSurplus={hideSurplus}
-            onToggleHideSurplus={() => setHideSurplus((v) => !v)}
-            title={<span className={`${OVERLAY_HEADING} text-rb-500`}>Lifetime flows</span>}
-            historyComplete={historyComplete}
-          />
+          {flowTimeline != null && (
+            <div>
+              <div className="flex min-h-[28px] items-center">{title}</div>
+              <div className="mt-2">
+                <LifetimeFlowsScrubber timeline={flowTimeline} />
+              </div>
+              <button
+                type="button"
+                onClick={() => setLedgerOpen((v) => !v)}
+                aria-expanded={ledgerOpen}
+                aria-controls="aave-v4-flows-ledger"
+                className={`${CTRL_GHOST} mt-3 -mx-1 gap-1 rounded-md px-1 text-xs font-semibold text-foreground`}
+              >
+                Full breakdown
+                <ChevronDown size={14} aria-hidden className={ledgerOpen ? "rotate-180" : ""} />
+              </button>
+            </div>
+          )}
+          <div id="aave-v4-flows-ledger" hidden={!ledgerShown}>
+            <AaveV4TowerChart
+              reserves={reserves}
+              prices={prices}
+              oraclePrices={oraclePrices}
+              surplusSymbols={surplusSymbols}
+              hideSurplus={hideSurplus}
+              onToggleHideSurplus={() => setHideSurplus((v) => !v)}
+              title={flowTimeline == null ? title : undefined}
+              historyComplete={historyComplete}
+            />
+          </div>
 
           {/* The panel's info area: (i) Explanation — the tower legend narrated
               with its figures — beside route-icon Provenance, the receipts list

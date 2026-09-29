@@ -2562,6 +2562,11 @@
        0.99890993,
        1691706539
       ]
+     },
+     "txs": 4,
+     "cells": {
+      "deposited|WBTC": 56235.56812791056,
+      "borrowed|USDT": 30966.20783
      }
     },
     {
@@ -2586,6 +2591,12 @@
        0.99875747,
        1692309563
       ]
+     },
+     "txs": 5,
+     "cells": {
+      "deposited|WBTC": 56235.56812791056,
+      "borrowed|USDT": 30966.20783,
+      "repaid|USDT": 1572.1455877178764
      }
     },
     {
@@ -2610,6 +2621,12 @@
        1.0002,
        1696141439
       ]
+     },
+     "txs": 6,
+     "cells": {
+      "deposited|WBTC": 56235.56812791056,
+      "borrowed|USDT": 30966.20783,
+      "repaid|USDT": 6060.684369968676
      }
     },
     {
@@ -2634,6 +2651,12 @@
        0.9991196,
        1710569999
       ]
+     },
+     "txs": 7,
+     "cells": {
+      "deposited|WBTC": 56235.56812791056,
+      "borrowed|USDT": 30966.20783,
+      "repaid|USDT": 8988.014279731156
      }
     },
     {
@@ -2668,6 +2691,15 @@
        15.64747993,
        1743112955
       ]
+     },
+     "txs": 12,
+     "cells": {
+      "deposited|WBTC": 56235.56812791056,
+      "borrowed|USDT": 30966.20783,
+      "repaid|USDT": 8988.014279731156,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 1576.5245488,
+      "repaid|LINK": 1603.7273300943646
      }
     },
     {
@@ -2702,6 +2734,15 @@
        14.229405,
        1743161795
       ]
+     },
+     "txs": 14,
+     "cells": {
+      "deposited|WBTC": 56235.56812791056,
+      "borrowed|USDT": 30966.20783,
+      "repaid|USDT": 8988.014279731156,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495
      }
     },
     {
@@ -2738,6 +2779,17 @@
        14.229405,
        1743161795
       ]
+     },
+     "txs": 16,
+     "cells": {
+      "deposited|WBTC": 56235.56812791056,
+      "borrowed|USDT": 30966.20783,
+      "repaid|USDT": 8988.014279731156,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 999.89011
      }
     },
     {
@@ -2774,6 +2826,17 @@
        14.229405,
        1743161795
       ]
+     },
+     "txs": 17,
+     "cells": {
+      "deposited|WBTC": 56235.56812791056,
+      "borrowed|USDT": 32966.94553,
+      "repaid|USDT": 8988.014279731156,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 999.89011
      }
     },
     {
@@ -2810,6 +2873,18 @@
        14.229405,
        1743161795
       ]
+     },
+     "txs": 18,
+     "cells": {
+      "deposited|WBTC": 56235.56812791056,
+      "borrowed|USDT": 32966.94553,
+      "repaid|USDT": 8988.014279731156,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 999.89011,
+      "withdrawn|WBTC": 24778.235071016003
      }
     },
     {
@@ -2848,6 +2923,19 @@
        14.229405,
        1743161795
       ]
+     },
+     "txs": 18,
+     "cells": {
+      "deposited|WBTC": 56235.56812791056,
+      "borrowed|USDT": 32966.94553,
+      "repaid|USDT": 8988.014279731156,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 999.89011,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809
      }
     },
     {
@@ -2886,6 +2974,19 @@
        14.229405,
        1743161795
       ]
+     },
+     "txs": 19,
+     "cells": {
+      "deposited|WBTC": 56235.56812791056,
+      "borrowed|USDT": 32966.94553,
+      "repaid|USDT": 8988.014279731156,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809
      }
     },
     {
@@ -2925,6 +3026,20 @@
        14.229405,
        1743161795
       ]
+     },
+     "txs": 22,
+     "cells": {
+      "deposited|WBTC": 56235.56812791056,
+      "borrowed|USDT": 52057.395529999994,
+      "repaid|USDT": 8988.014279731156,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521
      }
     },
     {
@@ -2965,6 +3080,21 @@
        15.072844,
        1762660343
       ]
+     },
+     "txs": 23,
+     "cells": {
+      "deposited|WBTC": 56235.56812791056,
+      "borrowed|USDT": 52057.395529999994,
+      "repaid|USDT": 8988.014279731156,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 4968.007247561126
      }
     },
     {
@@ -3007,6 +3137,23 @@
        15.072844,
        1762660343
       ]
+     },
+     "txs": 25,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 52057.395529999994,
+      "repaid|USDT": 8988.014279731156,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 4968.007247561126,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257
      }
     },
     {
@@ -3049,6 +3196,24 @@
        15.072844,
        1762660343
       ]
+     },
+     "txs": 27,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 52057.395529999994,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 4968.007247561126,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464
      }
     },
     {
@@ -3091,6 +3256,25 @@
        15.072844,
        1762660343
       ]
+     },
+     "txs": 27,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 52057.395529999994,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 4968.007247561126,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 64564.87658130188
      }
     },
     {
@@ -3133,6 +3317,25 @@
        15.072844,
        1762660343
       ]
+     },
+     "txs": 27,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 52057.395529999994,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 4968.007247561126,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 99884.46560575688
      }
     },
     {
@@ -3175,6 +3378,25 @@
        15.072844,
        1762660343
       ]
+     },
+     "txs": 28,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 52797.132797669394,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 4968.007247561126,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 100618.76759655692
      }
     },
     {
@@ -3217,6 +3439,25 @@
        15.072844,
        1762660343
       ]
+     },
+     "txs": 29,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 53537.394761110394,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 4968.007247561126,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 101352.59569963063
      }
     },
     {
@@ -3259,6 +3500,25 @@
        12.92160835,
        1764054683
       ]
+     },
+     "txs": 30,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 53537.394761110394,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 101352.59569963063
      }
     },
     {
@@ -3301,6 +3561,25 @@
        12.92160835,
        1764054683
       ]
+     },
+     "txs": 31,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 55018.465220779195,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 102816.08375551783
      }
     },
     {
@@ -3343,6 +3622,26 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 32,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 57240.940264968594,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 102816.08375551783,
+      "received|LINK": 2191.314671762537
      }
     },
     {
@@ -3385,6 +3684,26 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 33,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 61241.40810496859,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 102816.08375551783,
+      "received|LINK": 2191.314671762537
      }
     },
     {
@@ -3427,6 +3746,26 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 34,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 64239.46254496859,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 102816.08375551783,
+      "received|LINK": 2191.314671762537
      }
     },
     {
@@ -3470,6 +3809,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 35,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 69229.01254496859,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -3513,6 +3873,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 36,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 72230.21362496859,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -3556,6 +3937,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 37,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 76226.89626496859,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -3599,6 +4001,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 38,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 76526.95026496859,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -3642,6 +4065,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 39,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 76727.01349296859,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -3685,6 +4129,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 40,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 77126.95336096859,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -3728,6 +4193,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 41,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 77226.86556396859,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -3771,6 +4257,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 42,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 77326.71693896859,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -3814,6 +4321,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 43,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 77406.5826309686,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -3857,6 +4385,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 44,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 77506.4973899686,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -3900,6 +4449,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 45,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 77606.4349179686,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -3943,6 +4513,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 46,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 77656.3859179686,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -3986,6 +4577,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 47,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 77716.3373419686,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -4029,6 +4641,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 48,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 77741.3290944686,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1100.87595384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -4072,6 +4705,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 49,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 77741.3290944686,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 1600.86307384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -4115,6 +4769,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 50,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 77741.3290944686,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 2000.84307384,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -4158,6 +4833,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 51,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 77741.3290944686,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 2300.81267784,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     },
     {
@@ -4201,6 +4897,27 @@
        14.17596,
        1764877511
       ]
+     },
+     "txs": 52,
+     "cells": {
+      "deposited|WBTC": 59855.512656173065,
+      "borrowed|USDT": 77741.3290944686,
+      "repaid|USDT": 47356.87599511835,
+      "deposited|USDC": 987.545887,
+      "borrowed|LINK": 2589.2766388,
+      "repaid|LINK": 2599.7879851096495,
+      "withdrawn|USDC": 995.4911414557804,
+      "borrowed|USDC": 2500.80558784,
+      "withdrawn|WBTC": 24778.235071016003,
+      "received|USDT": 9.082510349971809,
+      "withdrawnSwapped|WBTC": 57268.17462487521,
+      "deposited|LINK": 18445.34525829655,
+      "soldToRepay|WBTC": 1123.9750634447796,
+      "repaidWithCollateral|USDC": 1123.1930847234257,
+      "withdrawn|USDT": 9.10609662464,
+      "received|WBTC": 107752.40940084701,
+      "received|LINK": 2191.314671762537,
+      "sent|WBTC": 5473.38026882037
      }
     }
    ]
@@ -7057,6 +7774,13 @@
        0.99951487,
        1708095107
       ]
+     },
+     "txs": 3,
+     "cells": {
+      "deposited|WETH": 8470.02,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044
      }
     },
     {
@@ -7084,6 +7808,15 @@
        0.99951487,
        1708095107
       ]
+     },
+     "txs": 3,
+     "cells": {
+      "deposited|WETH": 8470.02,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 54.22626947648956,
+      "liquidatedDebt|PYUSD": 51.6440661680853
      }
     },
     {
@@ -7111,6 +7844,15 @@
        0.99951487,
        1708095107
       ]
+     },
+     "txs": 3,
+     "cells": {
+      "deposited|WETH": 8470.02,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404
      }
     },
     {
@@ -7153,6 +7895,22 @@
        0.99981646,
        1747994315
       ]
+     },
+     "txs": 12,
+     "cells": {
+      "deposited|WETH": 18134.244177599998,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 9395.773506,
+      "swappedIn|WBTC": 16351.868823662144,
+      "borrowed|USDT": 6998.71522,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 6998.71522,
+      "swappedOut|USDT": 6998.7157828966665
      }
     },
     {
@@ -7195,6 +7953,22 @@
        1.00018825,
        1750342547
       ]
+     },
+     "txs": 17,
+     "cells": {
+      "deposited|WETH": 23417.4451776,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 10999.468219999999,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 10999.468219999999,
+      "swappedOut|USDT": 10999.469066950129
      }
     },
     {
@@ -7237,6 +8011,24 @@
        1.00018825,
        1750342547
       ]
+     },
+     "txs": 18,
+     "cells": {
+      "deposited|WETH": 23417.4451776,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 10999.468219999999,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 10999.468219999999,
+      "swappedOut|USDT": 10999.469066950129,
+      "swappedOut|WBTC": 15252.330032559357,
+      "swappedIn|WETH": 15234.849830072946
      }
     },
     {
@@ -7279,6 +8071,24 @@
        1.000318,
        1752746627
       ]
+     },
+     "txs": 19,
+     "cells": {
+      "deposited|WETH": 23417.4451776,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 14000.422219999999,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 10999.468219999999,
+      "swappedOut|USDT": 10999.469066950129,
+      "swappedOut|WBTC": 15252.330032559357,
+      "swappedIn|WETH": 15234.849830072946
      }
     },
     {
@@ -7321,6 +8131,24 @@
        1.000318,
        1752746627
       ]
+     },
+     "txs": 20,
+     "cells": {
+      "deposited|WETH": 28998.627603,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 14000.422219999999,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 10999.468219999999,
+      "swappedOut|USDT": 10999.469066950129,
+      "swappedOut|WBTC": 15252.330032559357,
+      "swappedIn|WETH": 15234.849830072946
      }
     },
     {
@@ -7363,6 +8191,24 @@
        1.00050989,
        1753402019
       ]
+     },
+     "txs": 23,
+     "cells": {
+      "deposited|WETH": 28998.627603,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 19503.226615,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 16602.323603999997,
+      "swappedOut|USDT": 16602.325883680292,
+      "swappedOut|WBTC": 15252.330032559357,
+      "swappedIn|WETH": 20852.940161576273
      }
     },
     {
@@ -7405,6 +8251,24 @@
        1.00021576,
        1753581839
       ]
+     },
+     "txs": 27,
+     "cells": {
+      "deposited|WETH": 30502.928215800002,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 21503.658134999998,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 18602.755123999996,
+      "swappedOut|USDT": 18602.757728750414,
+      "swappedOut|WBTC": 15252.330032559357,
+      "swappedIn|WETH": 22854.30286637284
      }
     },
     {
@@ -7447,6 +8311,24 @@
        1.00005667,
        1754766395
       ]
+     },
+     "txs": 32,
+     "cells": {
+      "deposited|WETH": 33903.4722158,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 26503.941484999996,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 23603.038473999994,
+      "swappedOut|USDT": 23603.041775789912,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 40520.34621017345
      }
     },
     {
@@ -7489,6 +8371,24 @@
        0.99957852,
        1756051043
       ]
+     },
+     "txs": 35,
+     "cells": {
+      "deposited|WETH": 33903.4722158,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 31501.834084999995,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 28600.931073999993,
+      "swappedOut|USDT": 28600.934764625956,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 45526.47040139646
      }
     },
     {
@@ -7531,6 +8431,24 @@
        0.99957852,
        1756051043
       ]
+     },
+     "txs": 36,
+     "cells": {
+      "deposited|WETH": 35092.395774152,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 31501.834084999995,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 28600.931073999993,
+      "swappedOut|USDT": 28600.934764625956,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 45526.47040139646
      }
     },
     {
@@ -7573,6 +8491,24 @@
        0.99957852,
        1756051043
       ]
+     },
+     "txs": 37,
+     "cells": {
+      "deposited|WETH": 36092.288566252,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 31501.834084999995,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 28600.931073999993,
+      "swappedOut|USDT": 28600.934764625956,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 45526.47040139646
      }
     },
     {
@@ -7615,6 +8551,24 @@
        0.99957852,
        1756051043
       ]
+     },
+     "txs": 38,
+     "cells": {
+      "deposited|WETH": 38488.668166252,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 31501.834084999995,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 28600.931073999993,
+      "swappedOut|USDT": 28600.934764625956,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 45526.47040139646
      }
     },
     {
@@ -7657,6 +8611,24 @@
        0.99957852,
        1756051043
       ]
+     },
+     "txs": 39,
+     "cells": {
+      "deposited|WETH": 39835.803166252,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 31501.834084999995,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 28600.931073999993,
+      "swappedOut|USDT": 28600.934764625956,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 45526.47040139646
      }
     },
     {
@@ -7699,6 +8671,24 @@
        0.99957852,
        1756051043
       ]
+     },
+     "txs": 40,
+     "cells": {
+      "deposited|WETH": 41884.44744288942,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 31501.834084999995,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 28600.931073999993,
+      "swappedOut|USDT": 28600.934764625956,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 45526.47040139646
      }
     },
     {
@@ -7741,6 +8731,24 @@
        0.99957852,
        1756051043
       ]
+     },
+     "txs": 41,
+     "cells": {
+      "deposited|WETH": 43720.42587142384,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 31501.834084999995,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 28600.931073999993,
+      "swappedOut|USDT": 28600.934764625956,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 45526.47040139646
      }
     },
     {
@@ -7783,6 +8791,24 @@
        0.99957852,
        1756051043
       ]
+     },
+     "txs": 42,
+     "cells": {
+      "deposited|WETH": 46918.951921843836,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 109.02322882353425,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 31501.834084999995,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 28600.931073999993,
+      "swappedOut|USDT": 28600.934764625956,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 45526.47040139646
      }
     },
     {
@@ -7825,6 +8851,25 @@
        0.99957852,
        1756051043
       ]
+     },
+     "txs": 42,
+     "cells": {
+      "deposited|WETH": 46918.951921843836,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 14935.967082851625,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 31501.834084999995,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 28600.931073999993,
+      "swappedOut|USDT": 28600.934764625956,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 45526.47040139646,
+      "liquidatedDebt|USDT": 14120.89890859818
      }
     },
     {
@@ -7867,6 +8912,25 @@
        0.99957852,
        1756051043
       ]
+     },
+     "txs": 42,
+     "cells": {
+      "deposited|WETH": 46918.951921843836,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 23656.581887624277,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 31501.834084999995,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 28600.931073999993,
+      "swappedOut|USDT": 28600.934764625956,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 45526.47040139646,
+      "liquidatedDebt|USDT": 22426.246341714992
      }
     },
     {
@@ -7910,6 +8974,26 @@
        0.99957852,
        1756051043
       ]
+     },
+     "txs": 42,
+     "cells": {
+      "deposited|WETH": 46918.951921843836,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 23656.581887624277,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 31501.834084999995,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 28600.931073999993,
+      "swappedOut|USDT": 28600.934764625956,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 45526.47040139646,
+      "liquidatedDebt|USDT": 22426.246341714992,
+      "sent|WETH": 5997.357677510081
      }
     },
     {
@@ -7953,6 +9037,26 @@
        0.99957852,
        1756051043
       ]
+     },
+     "txs": 42,
+     "cells": {
+      "deposited|WETH": 46918.951921843836,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 23656.581887624277,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 31501.834084999995,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 28600.931073999993,
+      "swappedOut|USDT": 28600.934764625956,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 45526.47040139646,
+      "liquidatedDebt|USDT": 22426.246341714992,
+      "sent|WETH": 6497.306783057732
      }
     },
     {
@@ -7996,6 +9100,26 @@
        0.99957852,
        1756051043
       ]
+     },
+     "txs": 43,
+     "cells": {
+      "deposited|WETH": 47899.662941481496,
+      "borrowed|PYUSD": 4997.57435,
+      "repaid|PYUSD": 4897.6228630000005,
+      "withdrawn|WETH": 8197.945268734044,
+      "liquidatedCollateral|WETH": 28450.515473794294,
+      "liquidatedDebt|PYUSD": 103.83164649860404,
+      "swappedOut|WETH": 14935.397801446301,
+      "swappedIn|WBTC": 25898.147605389888,
+      "borrowed|USDT": 31501.834084999995,
+      "repaidBySwap|USDT": 3999.2665178755597,
+      "borrowed|WBTC": 4027.5908952315062,
+      "deposited|USDT": 28600.931073999993,
+      "swappedOut|USDT": 28600.934764625956,
+      "swappedOut|WBTC": 27907.012609619575,
+      "swappedIn|WETH": 45526.47040139646,
+      "liquidatedDebt|USDT": 26991.89737616263,
+      "sent|WETH": 8248.097497916238
      }
     }
    ]
@@ -8485,6 +9609,11 @@
        1560.73963608,
        1697083595
       ]
+     },
+     "txs": 4,
+     "cells": {
+      "deposited|USDC": 14499.564855,
+      "borrowed|WETH": 7796.5991123471995
      }
     },
     {
@@ -8514,6 +9643,14 @@
        1760.26416857,
        1697178731
       ]
+     },
+     "txs": 6,
+     "cells": {
+      "deposited|USDC": 14999.617035000001,
+      "borrowed|WETH": 7796.5991123471995,
+      "repaidBySwap|WETH": 7703.236278141713,
+      "borrowed|wstETH": 7713.697087544706,
+      "repaidBySwap|wstETH": 7.705991096448258
      }
     },
     {
@@ -8543,6 +9680,14 @@
        1760.26416857,
        1697178731
       ]
+     },
+     "txs": 7,
+     "cells": {
+      "deposited|USDC": 19999.267435,
+      "borrowed|WETH": 7796.5991123471995,
+      "repaidBySwap|WETH": 7703.236278141713,
+      "borrowed|wstETH": 7713.697087544706,
+      "repaidBySwap|wstETH": 7.705991096448258
      }
     },
     {
@@ -8573,6 +9718,15 @@
        2602.25734018,
        1703164463
       ]
+     },
+     "txs": 8,
+     "cells": {
+      "deposited|USDC": 19999.267435,
+      "borrowed|WETH": 7796.5991123471995,
+      "repaidBySwap|WETH": 7703.236278141713,
+      "borrowed|wstETH": 7713.697087544706,
+      "repaidBySwap|wstETH": 7.705991096448258,
+      "repaid|wstETH": 11400.009047494754
      }
     },
     {
@@ -8604,6 +9758,16 @@
        2602.25734018,
        1703164463
       ]
+     },
+     "txs": 9,
+     "cells": {
+      "deposited|USDC": 19999.267435,
+      "borrowed|WETH": 7796.5991123471995,
+      "repaidBySwap|WETH": 7703.236278141713,
+      "borrowed|wstETH": 7713.697087544706,
+      "repaidBySwap|wstETH": 7.705991096448258,
+      "repaid|wstETH": 11400.009047494754,
+      "withdrawn|USDC": 10000.090100000001
      }
     },
     {
@@ -8635,6 +9799,16 @@
        2602.25734018,
        1703164463
       ]
+     },
+     "txs": 10,
+     "cells": {
+      "deposited|USDC": 19999.267435,
+      "borrowed|WETH": 7796.5991123471995,
+      "repaidBySwap|WETH": 7703.236278141713,
+      "borrowed|wstETH": 7713.697087544706,
+      "repaidBySwap|wstETH": 7.705991096448258,
+      "repaid|wstETH": 11400.009047494754,
+      "withdrawn|USDC": 20295.76020720825
      }
     }
    ]
@@ -8869,6 +10043,11 @@
        0.99997941,
        1762494791
       ]
+     },
+     "txs": 2,
+     "cells": {
+      "deposited|WETH": 1.8865677127693203,
+      "borrowed|DAI": 1.4441700176738848
      }
     },
     {
@@ -8895,6 +10074,14 @@
        1.00001798,
        1771855115
       ]
+     },
+     "txs": 3,
+     "cells": {
+      "deposited|WETH": 1.8865677127693203,
+      "borrowed|DAI": 1.4441700176738848,
+      "writtenOff|DAI": 0.4266728533391505,
+      "liquidatedCollateral|WETH": 1.0887413721200827,
+      "liquidatedDebt|DAI": 1.0368965448762693
      }
     }
    ]
@@ -9001,6 +10188,11 @@
        2539.77,
        1747706423
       ]
+     },
+     "txs": 1,
+     "cells": {
+      "deposited|WETH": 0.12190896,
+      "withdrawn|WETH": 0.12190900331440842
      }
     }
    ]
@@ -9632,6 +10824,12 @@
        0.99978739,
        1777030199
       ]
+     },
+     "txs": 4,
+     "cells": {
+      "deposited|USDT": 757.6183649076486,
+      "received|USDT": 6898.097473857659,
+      "borrowed|USDC": 3689.2154691
      }
     },
     {
@@ -9658,6 +10856,14 @@
        0.99982,
        1777964495
       ]
+     },
+     "txs": 10,
+     "cells": {
+      "deposited|USDT": 757.6183649076486,
+      "received|USDT": 6898.097473857659,
+      "borrowed|USDC": 3689.2154691,
+      "withdrawn|USDT": 7664.947840501982,
+      "repaid|USDC": 3695.26847592608
      }
     }
    ]
