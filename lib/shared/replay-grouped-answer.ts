@@ -134,12 +134,16 @@ export function groupReplaySpan<R extends { events: E[] }, E>(o: {
   cap: number;
   span: { from: number; to: number };
 }): ReplayGroupedAnswer<R, E> {
-  const all = o.full.events;
-  let lo = 0;
-  while (lo < all.length && o.access.timestamp(all[lo]) < o.span.from) lo++;
-  let hi = lo;
-  while (hi < all.length && o.access.timestamp(all[hi]) <= o.span.to) hi++;
-  const grouped = groupIntoRows(all.slice(lo, hi), o.specs, o.access, { ordinalBase: o.eventsBefore + lo + 1 });
+  // The whole replay is grouped and the span kept, so a run reaching past the
+  // span's edge qualifies on its full length (rails-ops decision 0021,
+  // amendment 2026-09-29).
+  const grouped = groupIntoRows(o.full.events, o.specs, o.access, {
+    ordinalBase: o.eventsBefore + 1,
+    keep: (e) => {
+      const t = o.access.timestamp(e);
+      return t >= o.span.from && t <= o.span.to;
+    },
+  });
   const trimmed = trimToRowCap(grouped, o.access, o.cap);
   const { kept } = keptOf(grouped, trimmed, o.access);
   return { result: o.full, grouped, trimmed, kept, span: o.span, belowByDay: null };

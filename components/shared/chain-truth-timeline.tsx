@@ -95,6 +95,7 @@ import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { anchorMarketNotes, type MarketNote } from "@/lib/shared/market-note";
 import { TIMELINE_PAGE_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { folderTerminus } from "@/lib/shared/run-folders";
+import { settleRunRows } from "@/lib/shared/timeline-chunks";
 import type { DisplayedTimelineRow, TimelineEventsState } from "@/hooks/useTimelineEvents";
 import { FolderMembersProvider, useFolderMembers, type FolderMembersReader } from "@/lib/shared/folder-members";
 import { filteredEventCount } from "@/lib/shared/timeline-folder-filter";
@@ -673,30 +674,22 @@ function ChainTruthTimelineBody({
   // without served rows would have nothing to draw, and served rows without a
   // register would have no words for it.
   const servedRows = folderRegister && tl.displayedRows ? tl.displayedRows : null;
-  // A DATE FILTER SHOWS WHAT COVERS THE DAY. Since leg B the activity map
-  // counts a folder's members on their own days — they are ordinary days, with
-  // an ordinary click (settled 2026-09-12) — so a reader can now select a day
-  // whose every event sits inside a folder. A folder header alone would be a
-  // dead end there: it states its own span and its own Σ, neither of which is
-  // an answer to "what happened on this day". So every folder the date filter
-  // left standing opens to its members, and the member rows answer the filter.
-  //
-  // It is bounded by the filter itself: `useTimelineEvents` has already dropped
-  // every folder whose span misses the range, so this is one or two reads, not
-  // forty — through the queued, cached provider (`lib/shared/folder-members.tsx`).
-  // The folder's own header is NEVER re-grained to the day (rule 3): `byDay`
-  // carries a day's COUNT and not its per-leg amounts, so a re-stated header
-  // would be half re-stated and half not.
-  const openFilteredFolders = !!servedRows && tl.dateRange !== null;
-  // AN ACTION, ASSET OR COUNTERPARTY FILTER OPENS WHAT IT SPLITS. A folder
-  // stands while any of its members can pass, so on those axes a standing
-  // folder can hold members the filter admits beside members it hides — four
-  // supplies among ninety-six transfers. Its header cannot be re-grained
-  // (rule 3), so it opens the way a date filter opens the folders covering a
-  // day, and its members answer the filter row by row. A folder every member
-  // of which passes stays shut: its header already describes exactly what
-  // the filter admits. `matched` is the header's own answer
+  // A FILTER OPENS WHAT IT SPLITS. A folder stands while any of its members
+  // can pass, so a standing folder can hold members the filter admits beside
+  // members it hides — four supplies among ninety-six transfers, or a day
+  // inside a folder's span. Its header cannot be re-grained (rule 3: `byDay`
+  // carries a day's COUNT and not its per-leg amounts), so it opens and its
+  // members answer the filter row by row. A folder every member of which
+  // passes stays shut: its header already describes exactly what the filter
+  // admits. `matched` is the header's own answer
   // (lib/shared/timeline-folder-filter.ts).
+  //
+  // Since a group never straddles a UTC month (rails-ops decision 0021,
+  // amendment 2026-09-29), a month selection admits every standing folder
+  // whole and opens none; a day, or a custom range, still opens the folders
+  // it cuts through. `useTimelineEvents` has already dropped every folder
+  // whose span misses the range, so this is a few reads, through the queued,
+  // cached provider (`lib/shared/folder-members.tsx`).
   const splitByFilter = (row: { folder: ServedFolder; matched: number | null }) => row.matched !== row.folder.count;
   // The count line's numerator counts those members too, and the header can
   // say how many only on one countable axis at a time. Where it cannot, the
@@ -890,34 +883,23 @@ function ChainTruthTimelineBody({
   const pinnedPending = askFolderForPin && pinnedFolderId === undefined;
 
   // Settle the displayed list into rows: stretches of ≥min consecutive
-  // matching events become one run row. Without `activeRuns` this is the
-  // identity mapping.
+  // matching events become one run row, cut at month boundaries (rails-ops
+  // decision 0021, amendment 2026-09-29). Runs are found on the list before
+  // the date range, so a run's floor reads its full length and a month filter
+  // shows the groups the unfiltered page shows (`settleRunRows`). Without
+  // `activeRuns` this is the identity mapping.
+  const dateRange = tl.dateRange;
   const rows = useMemo<TimelineRow[]>(() => {
     if (servedRows) return servedRows;
     if (!activeRuns || activeRuns.length === 0) {
       return events.map((event, flatIdx) => ({ kind: "event", event, flatIdx }) as const);
     }
-    const out: TimelineRow[] = [];
-    let i = 0;
-    while (i < events.length) {
-      const spec = activeRuns.find((r) => r.match(events[i]));
-      if (!spec) {
-        out.push({ kind: "event", event: events[i], flatIdx: i });
-        i++;
-        continue;
-      }
-      let j = i + 1;
-      while (j < events.length && spec.match(events[j]) && (!spec.sameRun || spec.sameRun(events[j - 1], events[j])))
-        j++;
-      if (j - i >= spec.min) {
-        out.push({ kind: "run", spec, events: events.slice(i, j), flatIdx: i });
-      } else {
-        for (let k = i; k < j; k++) out.push({ kind: "event", event: events[k], flatIdx: k });
-      }
-      i = j;
-    }
-    return out;
-  }, [events, activeRuns, servedRows]);
+    const all = dateRange ? [...tl.visibleEvents].reverse() : events;
+    const inRange = dateRange
+      ? (e: BaseActivityEvent) => e.timestamp >= dateRange[0] && e.timestamp <= dateRange[1]
+      : () => true;
+    return settleRunRows(all, activeRuns, inRange);
+  }, [events, activeRuns, servedRows, dateRange, tl.visibleEvents]);
 
   // Market notes, attached by anchor event id — OUTSIDE the rows.
   //
@@ -1560,9 +1542,7 @@ function ChainTruthTimelineBody({
                         <ServedFolderRow
                           folder={row.folder}
                           register={folderRegister as ServedFolderRegister}
-                          forceOpen={
-                            openFilteredFolders || splitByFilter(row) || row.folder.responseId === landedFolderId
-                          }
+                          forceOpen={splitByFilter(row) || row.folder.responseId === landedFolderId}
                           memberPasses={tl.isFiltered ? tl.memberPasses : null}
                           onlyDates={
                             tl.dateRange !== null &&
