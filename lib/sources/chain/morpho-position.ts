@@ -375,6 +375,11 @@ export interface MorphoMarketBlockRead {
    *  APR (rate per second × seconds per year). Null where the IRM is unset or
    *  did not answer. */
   borrowApr: number | null;
+  /** The market's total supplied and borrowed loan token at this block
+   *  (human units, as last settled), where the market read answered: the
+   *  utilization the borrow rate follows is borrowed ÷ supplied. */
+  totalSupply?: number;
+  totalBorrow?: number;
 }
 
 export interface MorphoMarketAtBlockResponse {
@@ -426,6 +431,11 @@ export async function loadMorphoMarketAtBlock(
     });
     const priceRaw = priceRes.status === "success" ? (priceRes.result as bigint) : ZERO;
     let borrowApr: number | null = null;
+    let totals: { totalSupply: number; totalBorrow: number } | null = null;
+    if (mktRes.status === "success") {
+      const [tsa, , tba] = mktRes.result as readonly [bigint, bigint, bigint, bigint, bigint, bigint];
+      totals = { totalSupply: Number(tsa) / 10 ** loanDecimals, totalBorrow: Number(tba) / 10 ** loanDecimals };
+    }
     if (mktRes.status === "success" && irm.toLowerCase() !== ZERO_ADDR) {
       const [totalSupplyAssets, totalSupplyShares, totalBorrowAssets, totalBorrowShares, lastUpdate, fee] =
         mktRes.result as readonly [bigint, bigint, bigint, bigint, bigint, bigint];
@@ -449,6 +459,7 @@ export async function loadMorphoMarketAtBlock(
       block,
       price: priceRaw > ZERO ? Number(priceRaw) / 10 ** (36 + loanDecimals - collateralDecimals) : 0,
       borrowApr,
+      ...(totals ?? {}),
     };
   };
 

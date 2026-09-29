@@ -145,7 +145,19 @@ function Fig({
 
 // ── the variant table ────────────────────────────────────────────────────────
 
-function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords, read?: MorphoAtBlock): EventProseSlots {
+/** What the events around this one add: the market read at the previous
+ *  event's block and the kinds earlier in the same transaction. */
+export interface MorphoSlotExtras {
+  prevEventRead?: MorphoAtBlock;
+  earlierInTx?: MorphoContext["eventType"][];
+}
+
+function morphoEventSlotsBase(
+  ctx: MorphoContext,
+  coords: MorphoCoords,
+  read?: MorphoAtBlock,
+  extra?: MorphoSlotExtras,
+): EventProseSlots {
   // Every sentence below reads the position after the event. Without the
   // index's running state for this row there is nothing true to say about it.
   if (ctx.collateralAfter == null || ctx.borrowedAfter == null) {
@@ -222,14 +234,27 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords, read?: M
       {move.priceBlock.toLocaleString("en-US")})
     </>
   ) : null;
-  const grade = (hf: number): ReactNode =>
+  // The fall in the collateral's price (in the loan token) that would take
+  // the position to the line: 1 − 1 ÷ HF.
+  const fallPct = (hf: number): string => {
+    const pct = (1 - 1 / hf) * 100;
+    return pct < 10 ? pct.toFixed(1) : String(Math.round(pct));
+  };
+  const fall = (hf: number, tail: string) =>
+    `a fall of about ${fallPct(hf)}% in the ${collSym} price (in ${loanSym}) would reach ${tail}`;
+  // Graded near the line; `always` (a borrow, a withdrawal) states the
+  // distance at any health factor.
+  const grade = (hf: number, always = false): ReactNode =>
     hf < 1
       ? ", below 1, where the position can be liquidated"
       : hf < 1.1
-        ? ", close to the liquidation line at 1"
-        : hf < 1.2
-          ? `; a ${Math.round((1 - 1 / hf) * 100)}% fall in the ${collSym} price would reach the liquidation line`
+        ? always
+          ? `, close to the liquidation line at 1: ${fall(hf, "it")}`
+          : ", close to the liquidation line at 1"
+        : hf < 1.2 || (always && hf < 100)
+          ? `; ${fall(hf, "the liquidation line")}`
           : "";
+  const distanceAlways = ctx.eventType === "borrow" || ctx.eventType === "withdraw_collateral";
   const hfSentence = (extra?: ReactNode): ClauseInput => {
     if (!move) return null;
     const { hfBefore, hfAfter } = move;
@@ -250,7 +275,7 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords, read?: M
       return clause(
         <>
           {priceAt ? <>Priced {priceAt}, it</> : "It"} starts with a health factor of {b(fmtMorphoHf(hfAfter))}
-          {grade(hfAfter)}.
+          {grade(hfAfter, distanceAlways)}.
         </>,
       );
     const dir = hfAfter < hfBefore ? "fell" : hfAfter > hfBefore ? "rose" : "stayed";
@@ -265,7 +290,7 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords, read?: M
           </>
         )}
         {extra}
-        {grade(hfAfter)}.
+        {grade(hfAfter, distanceAlways)}.
       </>,
     );
   };
@@ -288,6 +313,80 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords, read?: M
         {amt(rs.borrowedAfter * apr)} {loanSym} a year on this debt while it holds.
       </>,
     );
+  };
+
+  // A borrow-rate move of more than a percentage point, and what moved it.
+  // Within this block: the market totals either side say whether this event
+  // alone changed utilization (borrowed ÷ supplied), or other activity in the
+  // block did too. Since the previous event: the position did nothing, so the
+  // market's other users and the rate model's adjustment over time moved it.
+  const RATE_STEP = 0.01;
+  const pctRate = (r: number) => `${(r * 100).toFixed(2)}%`;
+  const util = (r: { totalSupply?: number; totalBorrow?: number }) =>
+    r.totalSupply && r.totalSupply > 0 && r.totalBorrow != null ? r.totalBorrow / r.totalSupply : null;
+  const rateMoves = (): ClauseInput[] => {
+    if (!read || read.status !== "ok") return [];
+    const out: ClauseInput[] = [];
+    const prevEventApr = extra?.prevEventRead?.status === "ok" ? extra.prevEventRead.at.borrowApr : null;
+    const before = read.prev.borrowApr;
+    if (prevEventApr != null && before != null && Math.abs(before - prevEventApr) > RATE_STEP) {
+      out.push(
+        clause(
+          <>
+            Between the previous event and this one the rate {before > prevEventApr ? "rose" : "fell"} from{" "}
+            {pctRate(prevEventApr)} to {pctRate(before)} with no action by this position: other users&rsquo; borrowing,
+            repaying and supplying changed the market&rsquo;s utilization, and the rate model also adjusts its rate over
+            time.
+          </>,
+        ),
+      );
+    }
+    const after = read.at.borrowApr;
+    if (before == null || after == null || Math.abs(after - before) <= RATE_STEP) return out;
+    // The move within this block reads first, beside the rate it
+    // produced; the drift since the previous event follows it.
+    const dir = after > before ? "rose" : "fell";
+    const uBefore = util(read.prev);
+    const uAfter = util(read.at);
+    const moved = ctx.eventType === "borrow" ? Math.abs(delta) : ctx.eventType === "repay" ? -Math.abs(delta) : 0;
+    // Accrued interest raises supplied and borrowed alike; what is left of the
+    // borrowed total's change after it is the borrowing and repaying in the block.
+    const dSupply = (read.at.totalSupply ?? NaN) - (read.prev.totalSupply ?? NaN);
+    const dBorrow = (read.at.totalBorrow ?? NaN) - (read.prev.totalBorrow ?? NaN);
+    const own =
+      moved !== 0 &&
+      Number.isFinite(dSupply) &&
+      Number.isFinite(dBorrow) &&
+      Math.abs(dBorrow - dSupply - moved) <= Math.abs(moved) * 0.001 + 1e-6 * (read.at.totalBorrow ?? 0) &&
+      Math.abs(dSupply) <= Math.abs(moved) * 0.01;
+    const utilText =
+      uBefore != null && uAfter != null ? (
+        <>
+          {" "}
+          from {(uBefore * 100).toFixed(1)}% to {(uAfter * 100).toFixed(1)}%
+        </>
+      ) : null;
+    out.unshift(
+      clause(
+        own ? (
+          <>
+            That rate was {pctRate(before)} at the end of the block before: this{" "}
+            {ctx.eventType === "borrow" ? "borrow" : "repay"} alone moved the market&rsquo;s utilization (borrowed ÷
+            supplied){utilText}, and the rate model sets the rate from utilization.
+          </>
+        ) : (
+          <>
+            That rate was {pctRate(before)} at the end of the block before; it {dir} as the market&rsquo;s utilization
+            changed{utilText}
+            {moved !== 0 && Number.isFinite(dBorrow)
+              ? ", with other users' activity in the same block as well as this event"
+              : ""}
+            .
+          </>
+        ),
+      ),
+    );
+    return out;
   };
 
   // Forward paths (charter §5.3) — the possibility space of a named state, never
@@ -319,7 +418,7 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords, read?: M
       return {
         happened: [clause(happened)],
         changed: [firstBorrow ? null : debtLine("borrowed")],
-        meansNow: [hfSentence(), rateLine()],
+        meansNow: [hfSentence(), rateLine(), ...rateMoves()],
       };
     }
 
@@ -356,7 +455,11 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords, read?: M
       return {
         happened: [clause(<>Repaid {deltaFig()} of the position&rsquo;s debt</>), ending],
         changed: [covered],
-        meansNow: [rs.debtCleared ? collateralOnlyPath() : hfSentence(), rs.debtCleared ? null : rateLine()],
+        meansNow: [
+          rs.debtCleared ? collateralOnlyPath() : hfSentence(),
+          rs.debtCleared ? null : rateLine(),
+          ...(rs.debtCleared ? [] : rateMoves()),
+        ],
       };
     }
 
@@ -387,7 +490,7 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords, read?: M
 
     case "withdraw_collateral": {
       const ending: ClauseInput = rs.emptied
-        ? cont(<>, emptying the position&rsquo;s collateral.</>)
+        ? cont(<>, emptying the position&rsquo;s collateral and closing the position.</>)
         : rs.collateralOnly
           ? cont(<>, leaving {collAfterFig()} in the market.</>)
           : cont(
@@ -397,6 +500,16 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords, read?: M
             );
       return {
         happened: [clause(<>Withdrew {deltaFig()} of collateral</>), ending],
+        changed: [
+          rs.emptied && extra?.earlierInTx?.includes("repay")
+            ? clause(
+                <>
+                  Its debt was cleared in the same transaction: the repay just before this withdrawal paid it off, so
+                  one transaction closed the position.
+                </>,
+              )
+            : null,
+        ],
         meansNow: [rs.hasDebt ? hfSentence(liqPriceMove()) : null, collateralOnlyPath()],
       };
     }
@@ -617,8 +730,13 @@ function authorisedActorMechanic(ctx: MorphoContext): ClauseInput {
   );
 }
 
-export function morphoEventSlots(ctx: MorphoContext, coords: MorphoCoords, read?: MorphoAtBlock): EventProseSlots {
-  const slots = morphoEventSlotsBase(ctx, coords, read);
+export function morphoEventSlots(
+  ctx: MorphoContext,
+  coords: MorphoCoords,
+  read?: MorphoAtBlock,
+  extra?: MorphoSlotExtras,
+): EventProseSlots {
+  const slots = morphoEventSlotsBase(ctx, coords, read, extra);
   const authorised = authorisedActorMechanic(ctx);
   if (!authorised) return slots;
   return { ...slots, meansNow: [...(slots.meansNow ?? []), authorised] };

@@ -37,6 +37,7 @@ import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { folderFlows, mergeFlowBuckets } from "@/lib/shared/timeline-folder-reductions";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 import { unreadToken } from "@/lib/shared/decimals-unread";
+import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import type { UnreadToken } from "@/lib/shared/types/event-shape";
 
 const DUST = 1e-9;
@@ -229,8 +230,20 @@ export function computeMorphoEconomics(
   // one can be complete while the other isn't.
   const collComplete =
     !collUnread && flowsReconcile(deposited - cWithdrawn - cLiquidated, coll, deposited + cWithdrawn + cLiquidated);
+  // A position that owes nothing now: repayments settled the interest as well
+  // as the amount borrowed, so borrowed + interest − repaid − cleared reaches
+  // zero and the interest joins the inflow ("+ Interest accrued"). The
+  // borrowed-less-repaid ledger is negative here and cannot be the check.
+  const debtSettled = !loanUnread && !cd && !morphoHasDebt(view.borrowSharesRaw) && lifetimeInterest != null;
   const debtComplete =
-    !loanUnread && flowsReconcile(borrowed - repaid - debtLiquidated, principal, borrowed + repaid + debtLiquidated);
+    !loanUnread &&
+    (debtSettled
+      ? flowsReconcile(
+          borrowed + (lifetimeInterest ?? 0) - repaid - debtLiquidated,
+          0,
+          borrowed + repaid + debtLiquidated + (lifetimeInterest ?? 0),
+        )
+      : flowsReconcile(borrowed - repaid - debtLiquidated, principal, borrowed + repaid + debtLiquidated));
   // Every tower line carries the token's own address beside its symbol. Morpho
   // Blue is permissionless — the market params ARE two addresses — so the
   // symbol alone leaves the icon chip to guess from the 88-entry house table,
@@ -320,8 +333,23 @@ export function computeMorphoEconomics(
       // since the previous one, plus the head read less the newest row's debt.
       // Where the accrued-interest segment is drawn it is this same interest,
       // so the row is left out rather than stated twice.
+      ...(debtSettled && debtComplete && lifetimeInterest != null && lifetimeInterest > DUST
+        ? {
+            earned: [
+              {
+                key: "debt-interest-accrued",
+                symbol: view.loanSymbol,
+                address: loanAddr,
+                amount: lifetimeInterest,
+                usd: null,
+                flowLabel: "Interest accrued",
+                prov: morphoLifetimeInterestProv(view.loanSymbol),
+              },
+            ],
+          }
+        : {}),
       costs:
-        !(cd && accrued > 0) && lifetimeInterest != null && lifetimeInterest > DUST
+        !debtSettled && !(cd && accrued > 0) && lifetimeInterest != null && lifetimeInterest > DUST
           ? [
               {
                 key: "debt-interest-accrued",
@@ -346,7 +374,7 @@ export function computeMorphoEconomics(
       lifetimeInflow: debtComplete ? borrowed : 0,
     },
     interestNote:
-      cd || loanUnread
+      cd || loanUnread || debtSettled
         ? undefined
         : "Accrued interest isn't shown here — the position has no open debt for it to build on.",
     ...(notLoaded.length > 0 ? { notLoaded } : {}),

@@ -17,6 +17,7 @@ import { oracleAge } from "@/lib/morpho/oracle-age";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { AmountText } from "@/components/shared/amount-text";
+import { parsePendlePt, pendlePtSentence } from "@/lib/morpho/pendle-pt";
 
 export function MorphoPositionExplanation({
   chain,
@@ -133,6 +134,11 @@ export function MorphoPositionExplanation({
       threatens the position.
     </span>,
   );
+
+  const pt = parsePendlePt(chain.collateralSymbol);
+  if (pt && chain.collateralSymbol) {
+    bullets.push(<span key="pendle-pt">{pendlePtSentence(pt, chain.collateralSymbol)}</span>);
+  }
 
   if (hasColl && !hasDebt && chain.maxBorrow > 0) {
     bullets.push(
@@ -279,8 +285,11 @@ export function MorphoClosedPositionExplanation({
   v,
   events,
   folders,
+  eventCount,
 }: {
   v: MorphoPositionView;
+  /** The timeline's whole event count; omit where the page cannot count it. */
+  eventCount?: number;
   /** The position's timeline (morpho events, ascending) — the pane reads how
    *  the record ended and the seizure tally from the rows already fetched. */
   events: BaseActivityEvent[];
@@ -309,6 +318,10 @@ export function MorphoClosedPositionExplanation({
   // A peak in a token whose decimals did not load is not stated.
   const hasPeakColl = v.peakCollateral > 0 && v.collateralSymbol != null && !v.collateralDecimalsUnread;
   const hasPeakBorr = v.peakBorrowed > 0 && !v.loanDecimalsUnread;
+  // The highest debt owed at an event (interest included), where the page
+  // loaded the whole history; the principal peak otherwise.
+  const owedPeak = v.peakDebtOwed != null && v.peakDebtOwed > 0;
+  const peakDebt = owedPeak ? v.peakDebtOwed! : v.peakBorrowed;
 
   const lead = endedBySeizure ? (
     <>This position was emptied by liquidation — the final seizure took the last of its collateral to cover its debt:</>
@@ -334,20 +347,30 @@ export function MorphoClosedPositionExplanation({
             <AmountText value={v.peakCollateral} /> {v.collateralSymbol}
           </H>
         ) : null}
-        {hasPeakColl && hasPeakBorr ? <> of collateral and had drawn as much as </> : null}
+        {hasPeakColl && hasPeakBorr ? <> of collateral and owed as much as </> : null}
         {hasPeakBorr ? (
           <H>
-            <AmountText value={v.peakBorrowed} /> {v.loanSymbol}
+            <AmountText value={peakDebt} /> {v.loanSymbol}
           </H>
         ) : null}
         {hasPeakColl && hasPeakBorr ? (
-          <>
-            {" "}
-            of principal — each figure is its own highest point over the position&rsquo;s recorded events, so the two
-            need not have stood together; interest accrued on top of the principal between events.
-          </>
+          owedPeak ? (
+            <>
+              {" "}
+              — each figure is its highest point over the position&rsquo;s events, so the two need not have stood
+              together. The debt figure includes the interest accrued to that event.
+            </>
+          ) : (
+            <>
+              {" "}
+              of principal — each figure is its own highest point over the position&rsquo;s recorded events, so the two
+              need not have stood together; interest accrued on top of the principal between events.
+            </>
+          )
         ) : hasPeakColl ? (
           <> of collateral — its highest point over the position&rsquo;s recorded events; it never drew debt.</>
+        ) : owedPeak ? (
+          <> of debt, interest included — its highest over the position&rsquo;s events.</>
         ) : (
           <> of principal — its highest recorded draw over the position&rsquo;s life.</>
         )}
@@ -361,6 +384,11 @@ export function MorphoClosedPositionExplanation({
       {(v.lltv * 100).toFixed(1)}% — so nothing outside that market backed or threatened it.
     </span>,
   );
+
+  const pt = parsePendlePt(v.collateralSymbol);
+  if (pt && v.collateralSymbol) {
+    bullets.push(<span key="pendle-pt">{pendlePtSentence(pt, v.collateralSymbol, v.lastTs)}</span>);
+  }
 
   if (v.everLiquidated) {
     bullets.push(
@@ -403,7 +431,14 @@ export function MorphoClosedPositionExplanation({
           on <H>{closureDate(v.lastTs)}</H>
         </>
       ) : null}
-      , after <H>{v.txCount}</H> transaction{v.txCount === 1 ? "" : "s"} of its own.
+      , after <H>{v.txCount}</H> transaction{v.txCount === 1 ? "" : "s"} of its own
+      {eventCount != null && eventCount - liqCount > v.txCount ? (
+        <>
+          . The timeline lists {eventCount} events because one transaction can carry several, such as adding collateral
+          and borrowing, or repaying and withdrawing
+        </>
+      ) : null}
+      .
     </span>,
   );
 

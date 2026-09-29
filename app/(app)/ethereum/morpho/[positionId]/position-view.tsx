@@ -61,6 +61,7 @@ import {
   MorphoClosedPositionExplanation,
 } from "@/components/protocol/morpho/morpho-position-explanation";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { MorphoNeighboursProvider } from "@/lib/morpho/timeline-neighbours";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle, mirroring the V4 spoke page.
@@ -316,7 +317,22 @@ export default function MorphoPositionView({
   // case — scripts/verify-morpho-chain.mjs) — the same toAssetsUp conversion,
   // fresher operands (interest accrued to head in view). On any disagreement
   // the backend pairing stays untouched.
+  // A closed card's peak debt: the highest debt OWED after any event (the
+  // share-derived figure each event shows, interest included), where the page
+  // holds the whole history; the index's principal peak stands otherwise.
+  const peakDebtOwed = useMemo(() => {
+    if (historyWindow.state !== "whole" || (servedFolders?.length ?? 0) > 0) return undefined;
+    let peak = 0;
+    for (const e of morphoEvents) {
+      const d = Number(e.context.data.debtAfter);
+      if (!Number.isFinite(d)) return undefined;
+      if (d > peak) peak = d;
+    }
+    return peak > 0 ? peak : undefined;
+  }, [historyWindow, servedFolders, morphoEvents]);
+
   const liveView = useMemo(() => {
+    if (view && view.status !== "open") return peakDebtOwed != null ? { ...view, peakDebtOwed } : view;
     if (!view || !chain || view.status !== "open") return view;
     if (chain.borrowSharesRaw !== view.borrowSharesRaw || chain.currentDebt <= 0) return view;
     return {
@@ -329,7 +345,7 @@ export default function MorphoPositionView({
         totalBorrowShares: chain.totalBorrowSharesRaw,
       },
     };
-  }, [view, chain]);
+  }, [view, chain, peakDebtOwed]);
 
   // The top row's price dropdown. Morpho Blue runs no USD oracle: a market's
   // oracle prices the collateral in that market's own loan token, which is the
@@ -431,7 +447,12 @@ export default function MorphoPositionView({
               // and declines without it.
               explanation={
                 liveView.status !== "open" ? (
-                  <MorphoClosedPositionExplanation v={liveView} events={morphoEvents} folders={servedFolders} />
+                  <MorphoClosedPositionExplanation
+                    v={liveView}
+                    events={morphoEvents}
+                    folders={servedFolders}
+                    {...(historyWindow.state === "whole" ? { eventCount: liveView.eventCount } : {})}
+                  />
                 ) : chain ? (
                   <MorphoPositionExplanation
                     chain={chain}
@@ -460,39 +481,41 @@ export default function MorphoPositionView({
                 />
               );
             })()}
-          <ChainTruthTimeline
-            csvExportCeiling={INDEX_ROW_CEILING}
-            // Matches `MorphoEventCard`'s own `persistKey={`morpho:${event.id}`}`
-            // — lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="morpho"
-            closed={liveView?.status !== "open"}
-            tl={tl}
-            runs={MORPHO_LIQUIDATION_RUNS}
-            folderRegister={MORPHO_FOLDER_REGISTER}
-            readFolderMembers={readFolderMembers}
-            segments={segments}
-            toolbarLeading={
-              <TimelineActivityHeader
-                events={tl.sortedEvents}
-                folders={servedFolders}
-                closed={liveView?.status !== "open"}
-                // When the position actually opened, not when the window does.
-                firstAt={opening?.firstTimestamp ?? oldestFolderAt}
-                tenurePending={!lifetimeFiguresKnown(historyWindow)}
-              />
-            }
-            renderCard={(event, meta) =>
-              isMorphoEvent(event) ? (
-                <MorphoEventCard
-                  event={event}
-                  eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
+          <MorphoNeighboursProvider events={morphoEvents}>
+            <ChainTruthTimeline
+              csvExportCeiling={INDEX_ROW_CEILING}
+              // Matches `MorphoEventCard`'s own `persistKey={`morpho:${event.id}`}`
+              // — lets pinned mode (the per-event share route) force a landed
+              // card's detail panel open on its first mount.
+              persistKeyPrefix="morpho"
+              closed={liveView?.status !== "open"}
+              tl={tl}
+              runs={MORPHO_LIQUIDATION_RUNS}
+              folderRegister={MORPHO_FOLDER_REGISTER}
+              readFolderMembers={readFolderMembers}
+              segments={segments}
+              toolbarLeading={
+                <TimelineActivityHeader
+                  events={tl.sortedEvents}
+                  folders={servedFolders}
+                  closed={liveView?.status !== "open"}
+                  // When the position actually opened, not when the window does.
+                  firstAt={opening?.firstTimestamp ?? oldestFolderAt}
+                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
                 />
-              ) : null
-            }
-          />
+              }
+              renderCard={(event, meta) =>
+                isMorphoEvent(event) ? (
+                  <MorphoEventCard
+                    event={event}
+                    eventNumber={meta.eventNumber}
+                    isFirst={meta.isFirst}
+                    isLast={meta.isLast}
+                  />
+                ) : null
+              }
+            />
+          </MorphoNeighboursProvider>
           <ProvInspectorLayer />
         </>
       )}

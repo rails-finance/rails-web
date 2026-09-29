@@ -392,6 +392,17 @@ export const morphoPeakBorrowedProv = (sym: string, coords?: MorphoCoords): Prov
   via: `${captureVia(coords)} · max(net principal after each event) · open → close${coords?.marketId ? ` · market ${coords.marketId.slice(0, 10)}…` : ""}`,
 });
 
+/** Terminal-card peak debt OWED — the MAX of the debt after each captured
+ *  event, each one the borrow shares at the market's totals at that event, so
+ *  interest accrued to then is included (the figure the events show). */
+export const morphoPeakOwedProv = (sym: string, coords?: MorphoCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `The highest ${sym} debt this position owed at any of its events — the maximum of the debt after each captured event, each one the borrow shares at the market's totals at that event, so the interest accrued to then is included. Between events the debt kept growing with interest until the next one.`,
+  contract: MORPHO,
+  via: `${captureVia(coords)} · max(debt after each event) · open → close${coords?.marketId ? ` · market ${coords.marketId.slice(0, 10)}…` : ""}`,
+});
+
 /** Lifetime gross flow (deposited / withdrawn / borrowed / repaid / liquidated)
  *  — the sum of that event type's own `assets` amounts over the position's life.
  *  Exact token amounts (Morpho events carry real assets, not normalized units). */

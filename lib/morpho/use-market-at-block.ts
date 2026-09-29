@@ -17,7 +17,9 @@ export type MorphoAtBlock =
 const cache = new Map<string, Promise<MorphoMarketAtBlockResponse | null>>();
 
 function load(marketId: string, block: number, chainId: number) {
-  const url = `/api/chain/morpho/at-block?market=${marketId}&block=${block}&chain=${chainId}`;
+  // `v=2`: the answer gained the market totals; a new key keeps a cached v1
+  // answer (max-age a day) from standing in for it.
+  const url = `/api/chain/morpho/at-block?market=${marketId}&block=${block}&chain=${chainId}&v=2`;
   let p = cache.get(url);
   if (!p) {
     p = fetch(url)

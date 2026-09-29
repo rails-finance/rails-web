@@ -83,7 +83,20 @@ export function morphoEconomicsExplanation(data: ChainTruthTowerData, opts: Morp
   const clearedFig = scalarFig(clearedAmt, debtUnit);
   const interestAmt = debt.interest?.amount ?? 0;
   const owedNow = debt.current.reduce((a, l) => a + l.amount, 0) + interestAmt;
-  if (borrowedFig && (repaidFig || clearedFig)) {
+  // A position that owes nothing: its lifetime interest joins the inflow, and
+  // the column reads borrowed + interest − repaid − cleared = 0.
+  const settledInterest = (debt.earned ?? []).reduce((a, l) => a + l.amount, 0);
+  if (borrowedFig && settledInterest > 1e-9 && (repaidFig || clearedFig)) {
+    bullets.push(
+      <span key="borrow">
+        It borrowed {borrowedFig}, interest added {scalarFig(settledInterest, debtUnit)} while the debt was open, and it
+        {repaidFig ? <> repaid {repaidFig}</> : null}
+        {repaidFig && clearedFig ? " and" : null}
+        {clearedFig ? <> had {clearedFig} cleared by liquidation</> : null}: the amount borrowed plus that interest,
+        which leaves {fig(`0 ${debtUnit ?? ""}`)} owed.
+      </span>,
+    );
+  } else if (borrowedFig && (repaidFig || clearedFig)) {
     // The debt column reconciled: borrowed − repaid − cleared + interest = owed.
     bullets.push(
       <span key="borrow">

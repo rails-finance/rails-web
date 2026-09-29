@@ -130,7 +130,15 @@ export function MorphoEventCard({ event, isFirst, isLast, eventNumber }: MorphoE
       }
       detail={<MorphoEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} flows={event.flows} />}
       detailLabel="Position state"
-      explainer={<MorphoEventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} skipLead />}
+      explainer={
+        <MorphoEventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          eventId={event.id}
+          skipLead
+        />
+      }
       explainerLabel="Plain English"
       explainerTeaser={morphoExplainerTeaser(ctx, coords)}
       txHash={event.txHash}

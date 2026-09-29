@@ -25,7 +25,8 @@ export interface LearnMoreContent {
   steps?: string[];
   /** Optional bullet-point benefits/details */
   detailsHeading?: string;
-  details?: { bold: string; text: string }[];
+  /** `sources`: where the claim comes from, linked inline after the text. */
+  details?: { bold: string; text: string; sources?: LearnMoreLink[] }[];
   /** Optional extra paragraphs (context-sensitive) */
   extraParagraphs?: string[];
   /** Optional video resource */
@@ -155,7 +156,28 @@ export function LearnMoreModal({ content, onClose }: { content: LearnMoreContent
                     <li key={i} className="flex gap-2">
                       <span className=" shrink-0">&bull;</span>
                       <span>
-                        <strong className="">{d.bold}</strong> &mdash; {d.text}
+                        <strong className="">{d.bold}</strong> &mdash;{" "}
+                        {d.sources && d.sources.length > 0 ? (
+                          <>
+                            {d.text.replace(/\.$/, "")} (
+                            {d.sources.map((src, j) => (
+                              <span key={j}>
+                                {j > 0 ? "; " : null}
+                                <a
+                                  href={src.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="link-external underline"
+                                >
+                                  {src.label}
+                                </a>
+                              </span>
+                            ))}
+                            ).
+                          </>
+                        ) : (
+                          d.text
+                        )}
                       </span>
                     </li>
                   ))}

@@ -1,4 +1,4 @@
-import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
 import { POLARIS_APP_LINK, POLARIS_DOC_LINKS } from "@/lib/polaris/docs-links";
 import type { CurveEventType } from "@/lib/shared/types/protocols/curve";
 import type { UniswapEventType } from "@/lib/shared/types/protocols/uniswap";
@@ -2468,6 +2468,7 @@ const MORPHO_DOC_URLS = {
   VAULT: "https://docs.morpho.org/learn/concepts/vault/",
   MECHANICS: "https://docs.morpho.org/developers/borrow/concepts/market-mechanics",
   HEALTH: "https://docs.morpho.org/developers/borrow/concepts/ltv/",
+  CONTRACT: "https://github.com/morpho-org/morpho-blue/blob/main/src/Morpho.sol",
 } as const;
 
 /** What the vault-exposure lookup on /base/morpho/vaults/<vault> computes, and —
@@ -2520,7 +2521,26 @@ const MORPHO_LINKS = {
   liquidation: { label: "Liquidation on Morpho", url: MORPHO_DOC_URLS.LIQUIDATION },
   irm: { label: "Interest rate model", url: MORPHO_DOC_URLS.IRM },
   markets: { label: "Morpho markets", url: MORPHO_DOC_URLS.MARKET },
+  contract: { label: "Morpho Blue contract", url: MORPHO_DOC_URLS.CONTRACT },
 };
+
+/** A claim's source, linked: a docs page above, or a Morpho Blue contract
+ *  function (the contract's source, where the function is written). */
+const MORPHO_SOURCE: Record<string, LearnMoreLink> = {
+  "Market mechanics": MORPHO_LINKS.mechanics,
+  "Collateral, LTV & Health": MORPHO_LINKS.health,
+  "Liquidation on Morpho": MORPHO_LINKS.liquidation,
+  "Interest rate model": MORPHO_LINKS.irm,
+  "Morpho markets": MORPHO_LINKS.markets,
+};
+const morphoSources = (...labels: string[]): LearnMoreLink[] =>
+  labels.map(
+    (l) =>
+      MORPHO_SOURCE[l] ??
+      (l.startsWith("Morpho Blue contract")
+        ? { label: l, url: MORPHO_DOC_URLS.CONTRACT }
+        : { label: l, url: MORPHO_DOC_URLS.OVERVIEW }),
+  );
 
 /** One modal per Morpho event kind. Each claim names its source in brackets:
  *  a page of the Morpho docs (linked below it) or the Morpho Blue contract. */
@@ -2537,26 +2557,37 @@ export function morphoMarketContent(
         details: [
           {
             bold: "It earns nothing",
-            text: "collateral in Morpho does not earn yield, so it is held as a plain amount rather than as shares (Market mechanics).",
+            text: "collateral in Morpho does not earn yield, so it is held as a plain amount rather than as shares.",
+            sources: morphoSources("Market mechanics"),
           },
           {
             bold: "One market only",
-            text: "it backs only this market's loan and is not shared with any other market (Collateral, LTV & Health).",
+            text: "it backs only this market's loan and is not shared with any other market.",
+            sources: morphoSources("Collateral, LTV & Health"),
           },
           {
             bold: "Health factor",
-            text: "health factor = collateral value in the loan token × LLTV ÷ debt, so more collateral raises it and lowers the LTV (Liquidation on Morpho).",
+            text: "health factor = collateral value in the loan token × LLTV ÷ debt, so more collateral raises it and lowers the LTV.",
+            sources: morphoSources("Liquidation on Morpho"),
           },
           {
             bold: "Valued by the market's oracle",
-            text: "the market's own oracle prices the collateral in the loan asset (Morpho markets).",
+            text: "the market's own oracle prices the collateral in the loan asset.",
+            sources: morphoSources("Morpho markets"),
           },
           {
             bold: "Anyone can add",
-            text: "adding collateral for another address needs no permission from it (Morpho Blue contract, supplyCollateral).",
+            text: "adding collateral for another address needs no permission from it.",
+            sources: morphoSources("Morpho Blue contract, supplyCollateral"),
           },
         ],
-        links: [MORPHO_LINKS.mechanics, MORPHO_LINKS.health, MORPHO_LINKS.liquidation, MORPHO_LINKS.markets],
+        links: [
+          MORPHO_LINKS.mechanics,
+          MORPHO_LINKS.health,
+          MORPHO_LINKS.liquidation,
+          MORPHO_LINKS.markets,
+          MORPHO_LINKS.contract,
+        ],
       };
     case "withdraw_collateral":
       return {
@@ -2567,22 +2598,26 @@ export function morphoMarketContent(
         details: [
           {
             bold: "The health check",
-            text: "the health factor decides whether collateral can be withdrawn; a withdrawal that would leave it below 1 is refused (Market mechanics).",
+            text: "the health factor decides whether collateral can be withdrawn; a withdrawal that would leave it below 1 is refused.",
+            sources: morphoSources("Market mechanics"),
           },
           {
             bold: "Liquidation comes closer",
-            text: "less collateral means a higher LTV and a lower health factor, so a smaller fall in the collateral's price reaches the liquidation line (Collateral, LTV & Health).",
+            text: "less collateral means a higher LTV and a lower health factor, so a smaller fall in the collateral's price reaches the liquidation line.",
+            sources: morphoSources("Collateral, LTV & Health"),
           },
           {
             bold: "No debt, no limit",
-            text: "with nothing borrowed, all of the collateral can be withdrawn at any time (Market mechanics).",
+            text: "with nothing borrowed, all of the collateral can be withdrawn at any time.",
+            sources: morphoSources("Market mechanics"),
           },
           {
             bold: "The owner or an authorised account",
-            text: "only the owner, or an account the owner has authorised on chain, can withdraw collateral (Morpho Blue contract, setAuthorization).",
+            text: "only the owner, or an account the owner has authorised on chain, can withdraw collateral.",
+            sources: morphoSources("Morpho Blue contract, setAuthorization"),
           },
         ],
-        links: [MORPHO_LINKS.mechanics, MORPHO_LINKS.health],
+        links: [MORPHO_LINKS.mechanics, MORPHO_LINKS.health, MORPHO_LINKS.contract],
       };
     case "borrow":
       return {
@@ -2593,26 +2628,37 @@ export function morphoMarketContent(
         details: [
           {
             bold: "One line",
-            text: "a position can borrow up to the LLTV, and becomes liquidatable once its LTV passes it (Morpho markets; Liquidation on Morpho).",
+            text: "a position can borrow up to the LLTV, and becomes liquidatable once its LTV passes it.",
+            sources: morphoSources("Morpho markets", "Liquidation on Morpho"),
           },
           {
             bold: "Debt as shares",
-            text: "a borrow is recorded as borrow shares; interest raises the market's total borrowed assets, so each share owes more over time (Market mechanics).",
+            text: "a borrow is recorded as borrow shares; interest raises the market's total borrowed assets, so each share owes more over time.",
+            sources: morphoSources("Market mechanics"),
           },
           {
             bold: "The rate",
-            text: "the market's interest rate model sets the borrow rate and moves it to keep utilization near 90%, faster the further utilization is from that target (Interest rate model).",
+            text: "the market's interest rate model sets the borrow rate and moves it to keep utilization near 90%, faster the further utilization is from that target.",
+            sources: morphoSources("Interest rate model"),
           },
           {
             bold: "No borrowing fee",
-            text: "the cost of a borrow is its interest; the contract charges nothing to open it (Morpho Blue contract, borrow).",
+            text: "the cost of a borrow is its interest; the contract charges nothing to open it.",
+            sources: morphoSources("Morpho Blue contract, borrow"),
           },
           {
             bold: "The owner or an authorised account",
-            text: "only the owner, or an account the owner has authorised on chain, can borrow against the position (Morpho Blue contract, setAuthorization).",
+            text: "only the owner, or an account the owner has authorised on chain, can borrow against the position.",
+            sources: morphoSources("Morpho Blue contract, setAuthorization"),
           },
         ],
-        links: [MORPHO_LINKS.markets, MORPHO_LINKS.liquidation, MORPHO_LINKS.mechanics, MORPHO_LINKS.irm],
+        links: [
+          MORPHO_LINKS.markets,
+          MORPHO_LINKS.liquidation,
+          MORPHO_LINKS.mechanics,
+          MORPHO_LINKS.irm,
+          MORPHO_LINKS.contract,
+        ],
       };
     case "repay":
       return {
@@ -2623,22 +2669,26 @@ export function morphoMarketContent(
         details: [
           {
             bold: "Interest included",
-            text: "the debt is one balance of shares that grows with interest, so it has no separate principal and interest, and a full repay returns more than was borrowed (Market mechanics).",
+            text: "the debt is one balance of shares that grows with interest, so it has no separate principal and interest, and a full repay returns more than was borrowed.",
+            sources: morphoSources("Market mechanics"),
           },
           {
             bold: "Partial or full",
-            text: "a repay names an amount of the loan asset or a number of shares; repaying all the shares closes the debt without leaving dust (Market mechanics).",
+            text: "a repay names an amount of the loan asset or a number of shares; repaying all the shares closes the debt without leaving dust.",
+            sources: morphoSources("Market mechanics"),
           },
           {
             bold: "Collateral stays",
-            text: "repaying returns no collateral; taking it out is a separate withdrawal (Market mechanics).",
+            text: "repaying returns no collateral; taking it out is a separate withdrawal.",
+            sources: morphoSources("Market mechanics"),
           },
           {
             bold: "Anyone can repay",
-            text: "repaying another address's debt needs no permission from it (Morpho Blue contract, repay).",
+            text: "repaying another address's debt needs no permission from it.",
+            sources: morphoSources("Morpho Blue contract, repay"),
           },
         ],
-        links: [MORPHO_LINKS.mechanics, MORPHO_LINKS.health],
+        links: [MORPHO_LINKS.mechanics, MORPHO_LINKS.health, MORPHO_LINKS.contract],
       };
   }
 }
@@ -2652,26 +2702,31 @@ export function morphoLiquidationContent(): LearnMoreContent {
     details: [
       {
         bold: "The incentive",
-        text: "the collateral seized is the debt repaid × the market's incentive factor, min(1.15, 1 ÷ (0.3 × LLTV + 0.7)) at the oracle price: 4.38% extra on an 86% LLTV market (Liquidation on Morpho).",
+        text: "the collateral seized is the debt repaid × the market's incentive factor, min(1.15, 1 ÷ (0.3 × LLTV + 0.7)) at the oracle price: 4.38% extra on an 86% LLTV market.",
+        sources: morphoSources("Liquidation on Morpho"),
       },
       {
         bold: "All of it to the liquidator",
-        text: "Morpho takes no fee; the whole incentive goes to the liquidator (Liquidation on Morpho). To the borrower it is the collateral value given up beyond the debt cleared.",
+        text: "Morpho takes no fee; the whole incentive goes to the liquidator. To the borrower it is the collateral value given up beyond the debt cleared.",
+        sources: morphoSources("Liquidation on Morpho"),
       },
       {
         bold: "Up to the whole debt",
-        text: "a liquidator can repay up to 100% of the debt in one transaction (Liquidation on Morpho).",
+        text: "a liquidator can repay up to 100% of the debt in one transaction.",
+        sources: morphoSources("Liquidation on Morpho"),
       },
       {
         bold: "The price it runs on",
-        text: "the health check and the seized amount use the market oracle's price at the moment of the call (Morpho Blue contract, liquidate).",
+        text: "the health check and the seized amount use the market oracle's price at the moment of the call.",
+        sources: morphoSources("Morpho Blue contract, liquidate"),
       },
       {
         bold: "Bad debt",
-        text: "if the collateral runs out before the debt is covered, the rest is written off against this market's lenders in the same call (Morpho Blue contract, liquidate).",
+        text: "if the collateral runs out before the debt is covered, the rest is written off against this market's lenders in the same call.",
+        sources: morphoSources("Morpho Blue contract, liquidate"),
       },
     ],
-    links: [MORPHO_LINKS.liquidation, MORPHO_LINKS.health],
+    links: [MORPHO_LINKS.liquidation, MORPHO_LINKS.health, MORPHO_LINKS.contract],
   };
 }
 

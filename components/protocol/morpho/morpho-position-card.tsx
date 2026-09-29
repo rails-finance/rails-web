@@ -27,6 +27,7 @@ import {
   morphoAccruedProv,
   morphoPeakCollateralProv,
   morphoPeakBorrowedProv,
+  morphoPeakOwedProv,
   morphoBorrowRateNowProv,
 } from "@/lib/morpho/event-provenance";
 import { formatNumber } from "@/lib/utils/format";
@@ -75,6 +76,10 @@ export interface MorphoPositionView {
   /** Highest recorded collateral / borrowed principal over the life (closed cards). */
   peakCollateral: number;
   peakBorrowed: number;
+  /** The highest debt OWED at any event, interest included (the share-derived
+   *  debt the events show). Set on the detail page when its whole history is
+   *  loaded; the card then states it in place of the principal peak. */
+  peakDebtOwed?: number;
   /** Set where the lane replayed the position from a seed rather than from
    *  every row (a vault's history is sent as its newest rows plus the state
    *  behind them), so a running peak is not among the figures it recorded. The
@@ -364,6 +369,8 @@ export function MorphoPositionCard({
           debtFootnote={
             v.peaksPartial ? (
               <PeakNotRecorded />
+            ) : v.peakDebtOwed != null && v.peakDebtOwed > 0 ? (
+              <div className="text-xs mt-0.5 text-rb-500">owed at its events, interest included</div>
             ) : v.peakBorrowed > 0 ? (
               <div className="text-xs mt-0.5 text-rb-500">principal only — accrued interest not included</div>
             ) : undefined
@@ -371,6 +378,10 @@ export function MorphoPositionCard({
           debt={
             v.peaksPartial ? (
               <StatDash />
+            ) : v.peakDebtOwed != null && v.peakDebtOwed > 0 ? (
+              <StatValue>
+                <Prov info={morphoPeakOwedProv(v.loanSymbol, coords)}>{loanFigure(v.peakDebtOwed)}</Prov>
+              </StatValue>
             ) : v.peakBorrowed > 0 ? (
               <StatValue>
                 <Prov info={morphoPeakBorrowedProv(v.loanSymbol, coords)}>{loanFigure(v.peakBorrowed)}</Prov>
