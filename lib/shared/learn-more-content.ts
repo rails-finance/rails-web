@@ -2973,7 +2973,15 @@ const MAKER_DOCS = {
 } as const;
 
 /** The act a Maker vault row performs, for its "?" modal. */
-export type MakerVaultAct = "open" | "deposit" | "withdraw" | "generate" | "repay" | "adjust" | "returned";
+export type MakerVaultAct =
+  | "open"
+  | "deposit"
+  | "withdraw"
+  | "generate"
+  | "repay"
+  | "adjust"
+  | "returned"
+  | "ownership";
 
 /** Where the on-chain names go: one closing paragraph, so the modal's body
  *  stays in plain terms. */
@@ -3057,6 +3065,32 @@ export function makerdaoVaultContent(kind: MakerVaultAct = "adjust"): LearnMoreC
         ],
         extraParagraphs: [MAKER_FROB_SOURCE],
         links,
+      };
+    case "ownership":
+      return {
+        title: "How Vault Ownership Works",
+        intro:
+          "Every vault opened through Maker's CDP manager has a number (the cdp id) and an owner recorded against it. Handing a vault to another address, a give, changes that record and nothing else: the collateral and the debt stay where they are.",
+        stepsHeading: "Who the owner is:",
+        steps: [
+          "The recorded owner is usually a DSProxy, a small contract wallet each user deploys once and controls from their own address. The page names the address behind the proxy as the owner.",
+          "Some tools hold a vault in a contract of their own for part of a transaction (a migration contract, an automation account) and hand it on or back before the transaction ends.",
+          "Only the owner, or an address the owner allowed on this vault, can give it away.",
+        ],
+        detailsHeading: "What the owner can do:",
+        details: [
+          { bold: "Borrow and withdraw", text: "draw DAI and take collateral out, within the minimum ratio." },
+          {
+            bold: "Allow others",
+            text: "let another address act on the vault, and withdraw that permission at any time.",
+          },
+          { bold: "Give", text: "hand the vault, with its collateral and debt, to another address." },
+        ],
+        links: [
+          { label: "CDP manager source (dss-cdp-manager)", url: "https://github.com/makerdao/dss-cdp-manager" },
+          { label: "DSProxy source (ds-proxy)", url: "https://github.com/dapphub/ds-proxy" },
+          { label: "Maker protocol docs", url: MAKER_DOCS.OVERVIEW },
+        ],
       };
     case "returned":
       return {
@@ -4361,11 +4395,11 @@ export function marketNoteRateStepContent(protocol: RateStepProtocol): LearnMore
         details: [
           {
             bold: "Stability fee",
-            text: "the yearly rate a collateral type's debt compounds at, set by governance as the duty on the Jug.",
+            text: "the yearly rate a collateral type's debt compounds at. Governance sets it, and it is stored on Maker's Jug contract.",
           },
           {
             bold: "Fee in force at a touch",
-            text: "a vault's rows carry no fee, and the spell that set it is not indexed. So the fee in force at a touch is read off the Vat's own fold series (every Jug.drip's delta encodes the duty it compounded at) and then confirmed by reading the Jug's duty at that drip's own block, which is the figure the note states.",
+            text: "a vault's rows carry no fee. The fee in force at each of the vault's touches is worked out from how fast the collateral type's debt grew around it, then checked against the rate stored on the Jug at that block; the note states the checked figure.",
           },
           {
             bold: "Which stretches are stated",
@@ -4373,7 +4407,7 @@ export function marketNoteRateStepContent(protocol: RateStepProtocol): LearnMore
           },
           {
             bold: "A live note",
-            text: "the same idea, but the later end is the chain head: the Jug's base plus duty for this collateral type, compounded over a year and read right now.",
+            text: "the same idea, but the later end is now: the collateral type's rate on the Jug, read at the latest block and stated as a yearly figure.",
           },
         ],
         links: [

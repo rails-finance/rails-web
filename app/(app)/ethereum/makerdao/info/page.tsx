@@ -18,15 +18,31 @@ const intro = (
     <p>
       Each row of the listing is one vault: its collateral, its DAI debt with accrued fees, and its status. Dollar
       values use the protocol&apos;s own price feeds — the same delayed oracles Maker itself acts on, and the same ones
-      the collateral ratio beside each debt divides into it. Maker states the price and the debt; the ratio is ours,
-      drawn from nothing else. The listing filters by collateral type and searches by wallet or vault number. Or see{" "}
+      the collateral ratio beside each debt divides into it. The listing filters by collateral type and searches by
+      wallet or vault number. Or see{" "}
       <Link href="/ethereum/makerdao/system" className="text-blue-500 hover:underline">
         the Vat&apos;s balance sheet, decomposed by collateral type
       </Link>
       .
     </p>
     <p>
-      MakerDAO is now Sky, and its savings are a separate explorer:{" "}
+      Each vault page follows one vault: the card states its{" "}
+      <Link href="/ethereum/makerdao/14012" className="text-blue-500 hover:underline">
+        collateral, debt with the stability fee in it, and collateral ratio
+      </Link>{" "}
+      and who owns it; Lifetime flows adds up what went in and out; the timeline lists every event, with{" "}
+      <Link href="/ethereum/makerdao/24785" className="text-blue-500 hover:underline">
+        what a liquidation&apos;s auction sold and handed back
+      </Link>{" "}
+      and{" "}
+      <Link href="/ethereum/makerdao/3772" className="text-blue-500 hover:underline">
+        who the vault passed to
+      </Link>
+      .
+    </p>
+    <p>
+      MakerDAO renamed itself Sky in 2024: the same vault system, now minting USDS beside DAI, so vaults opened through
+      Sky&apos;s LockStake engine are listed here too. Its savings are a separate explorer:{" "}
       <Link href="/ethereum/sky-savings" className="text-blue-500 hover:underline">
         Sky Savings
       </Link>{" "}

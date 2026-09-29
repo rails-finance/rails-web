@@ -436,6 +436,19 @@ export const giveDstProv = (coords: MakerCoords): Provenance => ({
   inputs: eventInputs(coords),
 });
 
+/** The owner before a give: the previous give's destination, or for the
+ *  vault's first give the account that held it (the give's caller, which the
+ *  CDP manager requires to be the owner or an address it allowed). */
+export const ownerBeforeProv = (coords: MakerCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "emitted",
+  verify: txVerify(coords),
+  summary: `The vault's owner before this transfer — the destination of the vault's previous give, or, before any give, the account that held it (this give's caller: CdpManager.give requires the owner or an address the owner allowed)${atBlock(coords)}. An Instadapp account or a DSProxy is named by the transaction read at its block (owner(), the Proxy Registry, the Instadapp index).`,
+  contract: CDP_MANAGER,
+  via: "captured CdpManager give LogNotes (maker_give) · previous dst / caller",
+  inputs: eventInputs(coords),
+});
+
 /** The new owner behind a give's dst, resolved through the DSProxy hop —
  *  a head-time chain read (the chain keeps no per-block proxy-owner history),
  *  recorded as such. */
@@ -573,9 +586,9 @@ export const peakInkProv = (collSym: string, coords?: MakerCoords): Provenance =
 export const peakDebtProv = (symbol: string, coords?: MakerCoords): Provenance => ({
   kind: "derived",
   pclass: "indexed",
-  summary: `The highest ${symbol} debt this vault ever recorded — each captured event's normalized art repriced at the Vat rate accumulator in force at that event, the ${symbol} actually owed at that on-chain touch. Measured at recorded events only: the stability fee accrues between events with no log of its own, so the true peak can sit slightly above this figure.`,
+  summary: `The most ${symbol} this vault owed at any of its events, stability fee accrued to that event included — the larger of each event's normalized art before and after it, repriced at the Vat rate accumulator in force at that event. A liquidation's debt before is what it seized against. Measured at recorded events: the fee also accrues between events with no log of its own.`,
   contract: VAT,
-  via: `${MAKER_VIA} · max(art × rate-at-block) · open → close${coords?.ilk ? ` · ${coords.ilk}` : ""}`,
+  via: `${MAKER_VIA} · max(max(art before, art after) × rate-at-block) · open → close${coords?.ilk ? ` · ${coords.ilk}` : ""}`,
 });
 
 // ── The debt split: DAI drawn and the stability fee on it ────────────────────

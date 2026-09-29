@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { TipLabel } from "@/components/shared/tip-label";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { formatDate } from "@/lib/date";
 
@@ -32,6 +33,8 @@ export interface ClosedPositionStatsProps {
   outcomeFollows?: boolean;
   collateralLabel?: string;
   debtLabel?: string;
+  /** What each heading means, shown on hover or tap (MakerDAO). */
+  labelTips?: { collateral?: string; debt?: string; outcome?: string };
   /** Token icon shown after the collateral column label */
   collateralIcon?: ReactNode;
   /** Token icon shown after the debt column label */
@@ -73,6 +76,7 @@ export function ClosedPositionStats({
   debt,
   outcomeFollows,
   outcomeLabel,
+  labelTips,
   collateralLabel = CARD_VOCAB.peakCollateral,
   debtLabel = CARD_VOCAB.peakDebt,
   collateralIcon,
@@ -114,7 +118,7 @@ export function ClosedPositionStats({
         {useLeadingIcons && <div className="hidden sm:flex items-center self-stretch">{icons}</div>}
         <div>
           <div className="text-rb-500 text-xs font-semibold flex items-center gap-1.5">
-            {collateralLabel}
+            <TipLabel text={collateralLabel} tip={labelTips?.collateral} />
             {collateralIcon}
           </div>
           {collateralAssetIcons ? (
@@ -130,7 +134,7 @@ export function ClosedPositionStats({
         {showDebt ? (
           <div>
             <div className="text-rb-500 text-xs font-semibold flex items-center gap-1.5">
-              {debtLabel}
+              <TipLabel text={debtLabel} tip={labelTips?.debt} />
               {debtIcon}
             </div>
             {debtAssetIcons ? (
@@ -147,7 +151,9 @@ export function ClosedPositionStats({
           <div className="hidden sm:block" />
         )}
         <div>
-          <div className="text-rb-500 text-xs font-semibold">Outcome</div>
+          <div className="text-rb-500 text-xs font-semibold">
+            <TipLabel text="Outcome" tip={labelTips?.outcome} />
+          </div>
           <div className={`text-lg font-bold mt-2 ${color}`}>{outcomeLabel ?? label}</div>
           {closure && <div className="text-xs text-rb-500 mt-0.5">{closure}</div>}
         </div>

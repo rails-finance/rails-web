@@ -40,11 +40,18 @@ import { useMakerVaultHistory } from "@/lib/makerdao/vault-history";
 import { useMakerIlkAt } from "@/lib/makerdao/use-chain-history";
 import type { MakerAuctionRead, MakerIlkAt } from "@/lib/makerdao/chain-history-types";
 import { formatDate } from "@/lib/date";
+import type { MakerTxContext } from "@/lib/makerdao/chain-history-types";
+import type { MakerOwnerRef, MakerOwnershipStep } from "@/lib/makerdao/vault-history";
+import { knownContract } from "@/lib/makerdao/known-contracts";
+import { shortAddr } from "@/lib/makerdao/ownership-prose";
+import { giveDstProv, giveOwnerProv, ownerBeforeProv } from "@/lib/makerdao/event-provenance";
 
 export interface MakerDAOEventDetailProps {
   ctx: MakerDAOContext;
   txHash?: string;
   blockNumber?: number;
+  /** The row's id, which the page's history is keyed by. */
+  eventId?: string;
 }
 
 const fmt = (human: string): string => formatNumber(Number(human));
@@ -92,7 +99,7 @@ export function rowRatios(ctx: MakerDAOContext, price: number | null) {
   };
 }
 
-export function MakerDAOEventDetail({ ctx, txHash, blockNumber }: MakerDAOEventDetailProps) {
+export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: MakerDAOEventDetailProps) {
   const coords: MakerCoords = { txHash, blockNumber, urn: ctx.urn, ilk: ctx.ilk };
   const debtSym = ilkDebtSymbol(ctx.ilk);
   const collSym = ctx.collateralSymbol;
@@ -226,9 +233,16 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber }: MakerDAOEventD
 
   const auction = isGrab && txHash ? history.auctions.get(txHash.toLowerCase()) : undefined;
 
+  const step = ctx.eventType === "give" && eventId ? history.ownership.get(eventId) : undefined;
+  const idTx = eventId?.split(":")[1];
+  const txCtx = history.txContext.get((txHash || idTx || "").toLowerCase());
+
   return (
     <>
-      <ChainTruthDetail stats={stats} />
+      <ChainTruthDetail
+        stats={stats}
+        extra={step ? <MakerdaoOwnerCell step={step} ctx={ctx} coords={coords} txCtx={txCtx} /> : undefined}
+      />
       {isGrab && <MakerdaoAuctionOutcome ctx={ctx} coords={coords} price={price} auction={auction} />}
     </>
   );
@@ -393,5 +407,57 @@ function MakerdaoAuctionOutcome({
         />
       )}
     </div>
+  );
+}
+
+/** A give's owner before → after: the account, and under it what the CDP
+ *  manager records (a DSProxy, an Instadapp account, a known contract). */
+function MakerdaoOwnerCell({
+  step,
+  ctx,
+  coords,
+  txCtx,
+}: {
+  step: MakerOwnershipStep;
+  ctx: MakerDAOContext;
+  coords: MakerCoords;
+  txCtx?: MakerTxContext;
+}) {
+  const side = (ref: MakerOwnerRef, after: boolean) => {
+    const holder = ref.holder;
+    const known = knownContract(holder);
+    const party = holder ? txCtx?.parties[holder] : undefined;
+    const head = known ? known.short : shortAddr(party?.kind === "instadapp-account" ? holder : (ref.owner ?? holder));
+    const sub = known
+      ? shortAddr(holder)
+      : party?.kind === "instadapp-account"
+        ? `Instadapp account${ref.owner ? ` for ${shortAddr(ref.owner)}` : ""}`
+        : holder && ref.owner && holder !== ref.owner
+          ? `through ${party?.kind === "dsproxy" ? "DSProxy" : "proxy"} ${shortAddr(holder)}`
+          : party?.kind === "eoa"
+            ? "a wallet"
+            : null;
+    const prov = after ? (ctx.giveDstOwner ? giveOwnerProv(coords) : giveDstProv(coords)) : ownerBeforeProv(coords);
+    return (
+      <span className="inline-flex flex-col">
+        <Prov info={prov} value={ref.owner ?? holder ?? ""}>
+          <span className={`text-sm font-semibold ${after ? "text-foreground" : "text-rb-500"}`}>{head}</span>
+        </Prov>
+        {sub && <span className={`text-xs ${after ? "text-foreground/80" : "text-rb-500"}`}>{sub}</span>}
+      </span>
+    );
+  };
+  return (
+    <StatCard label="Owner">
+      <StateTransition>
+        {side(step.before, false)}
+        <span className="inline-flex items-start gap-2">
+          <span aria-hidden="true" className="text-rb-500">
+            →
+          </span>
+          {side(step.after, true)}
+        </span>
+      </StateTransition>
+    </StatCard>
   );
 }

@@ -463,6 +463,12 @@ export function noteMarkerText(note: MarketNote): { tip: string; spoken: string 
     const text = note.tip ?? `${sym} ${noun}`;
     return { tip: text, spoken: text };
   }
+  // MakerDAO's fee notes state the ilk's fee both ends: "ETH-A fee 2.00% → 9.50%".
+  if (note.kind === "rate-step" && note.protocol === "makerdao") {
+    const f = rateStepFigures(note);
+    const text = `${note.marketName ?? sym} fee ${f.fromRate} → ${f.toRate}`;
+    return { tip: text, spoken: `${note.marketName ?? sym} fee from ${f.fromRate} to ${f.toRate}` };
+  }
   const text = `${sym} ${noun} ${note.to.value >= note.from.value ? "up" : "down"}`;
   return { tip: text, spoken: text };
 }
@@ -1836,12 +1842,17 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     stats.push({ label: "Elapsed", figure: elapsedFigure(note, f.elapsed, makerRateStepProv(note, "elapsed")) });
   }
 
+  const lifted = liftTimeCells(stats);
   return {
     label: `${ilk} stability fee`,
     measure: { kind: "protocol", id: "makerdao" },
     headline: { text: f.toRate, prov: makerRateStepProv(note, "rate"), exact: String(note.to.value) },
     quantity: "stability fee",
-    ...liftTimeCells(stats),
+    ...lifted,
+    intro: {
+      ...lifted.intro,
+      lead: `Governance ${note.setsBetween != null && note.setsBetween > 1 ? `changed ${ilk}'s fee ${f.sets} times` : `changed ${ilk}'s fee`} since the vault's ${note.live ? "last event" : "previous event"}`,
+    },
     learnMore: marketNoteRateStepContent("makerdao"),
     // T3 in plain words. How the fee at each touch is found (the Jug.drip
     // derivation) is the receipts' job: makerRateStepProv.

@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
+import { TipLabel } from "@/components/shared/tip-label";
 
 export interface OpenPositionStatsColumn {
   label: string;
+  /** What the heading means, shown on hover or tap (MakerDAO). */
+  labelTip?: string;
   value: ReactNode;
   footnote?: ReactNode;
   /** Token icon shown after the column label */
@@ -80,7 +83,7 @@ export function OpenPositionStats({ columns, icons, identity, leadingIdentity, s
           return (
             <div key={col.label || `col-${i}`} className={spanLast ? "col-span-2 sm:col-span-1" : undefined}>
               <div className="text-rb-500 text-xs font-semibold flex items-center gap-1.5">
-                {col.label}
+                <TipLabel text={col.label} tip={col.labelTip} />
                 {col.headerIcon}
               </div>
               {col.assetIcons ? (

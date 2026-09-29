@@ -9,6 +9,41 @@ import type { TowerSideData } from "@/lib/shared/chain-truth-economics";
 import type { MakerTowerData } from "@/lib/makerdao/economics";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
 import { formatNumber, formatPrice } from "@/lib/utils/format";
+import { formatDate } from "@/lib/date";
+import type { MakerCollateralLeg } from "@/lib/makerdao/economics";
+
+const usd0 = (n: number): string => `$${Math.round(n).toLocaleString("en-US")}`;
+const px = (n: number): string =>
+  `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const LEG_VERB: Record<MakerCollateralLeg["kind"], string> = {
+  deposited: "deposit",
+  returned: "return by auction",
+  withdrawn: "withdrawal",
+  liquidated: "liquidation",
+};
+
+/** Up to four legs by name; more as a count and a price range. */
+function legSummary(legs: MakerCollateralLeg[], noun: string): ReactNode {
+  if (legs.length <= 4) return legList(legs);
+  const prices = legs.map((l) => l.price).filter((p): p is number => p != null);
+  return (
+    <>
+      {legs.length} {noun} between {formatDate(legs[0].at)} and {formatDate(legs[legs.length - 1].at)}, at{" "}
+      {px(Math.min(...prices))} to {px(Math.max(...prices))}
+    </>
+  );
+}
+
+/** "the 23 Jun 2021 deposit at $33,650.01" for each leg, joined. */
+function legList(legs: MakerCollateralLeg[]): ReactNode {
+  return legs.map((l, i) => (
+    <span key={i}>
+      {i > 0 ? (i === legs.length - 1 ? " and " : ", ") : ""}
+      the {formatDate(l.at)} {LEG_VERB[l.kind]} at {l.price != null ? px(l.price) : "no price"}
+    </span>
+  ));
+}
 
 const DUST = 1e-9;
 
@@ -50,6 +85,29 @@ export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
           </>
         )}
         {atEvents ? ", each valued at the OSM price at its own block." : `, valued at ${nowText}.`}
+      </span>,
+    );
+  }
+
+  for (const n of data.netted ?? []) {
+    bullets.push(
+      <span key={`netted-${n.at}`}>
+        {formatNumber(n.amount)} {collSym} deposited and withdrawn in the same transaction on {formatDate(n.at)} is left
+        out of both rows.
+      </span>,
+    );
+  }
+
+  // The returned collateral and its withdrawal are the same coins.
+  const legs = data.legs ?? [];
+  const retLeg = legs.find((l) => l.kind === "returned");
+  const outLeg = legs.find((l) => l.leftoverOut);
+  if (retLeg && outLeg && retLeg.price != null && outLeg.price != null) {
+    bullets.push(
+      <span key="returned-pair">
+        Returned by auction and the matching Withdrawn are the same {formatNumber(retLeg.amount)} {collSym}:{" "}
+        {usd0(retLeg.amount * retLeg.price)} at the OSM price when it came back ({px(retLeg.price)}) and{" "}
+        {usd0(outLeg.amount * outLeg.price)} when the owner took it out ({px(outLeg.price)}).
       </span>,
     );
   }
@@ -100,12 +158,24 @@ export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
 
   if (collateral.priceChange && collateral.priceChange.usd != null) {
     const c = collateral.priceChange.usd;
+    const holdsNothing = collateral.current.every((l) => (l.usd ?? 0) < 0.5);
+    const ins = legs.filter((l) => l.kind === "deposited" || l.kind === "returned");
+    const outs = legs.filter((l) => l.kind === "withdrawn" || l.kind === "liquidated");
     bullets.push(
-      <span key="price-change">
-        Price change {c < 0 ? "−" : "+"}
-        {fig(Math.abs(c))}: {collSym}&apos;s price {c < 0 ? "fell" : "rose"} between the events and today, so the
-        collateral held is worth {c < 0 ? "less" : "more"} than the flows above add up to.
-      </span>,
+      holdsNothing && ins.length > 0 && outs.length > 0 ? (
+        <span key="price-change">
+          Price change {c < 0 ? "−" : "+"}
+          {usd0(Math.abs(c))}: the vault holds nothing now, so this is the difference between the collateral valued at
+          the prices it came in at ({legSummary(ins, "moves in")}) and at the prices it left at (
+          {legSummary(outs, "moves out")}).
+        </span>
+      ) : (
+        <span key="price-change">
+          Price change {c < 0 ? "−" : "+"}
+          {fig(Math.abs(c))}: {collSym}&apos;s price {c < 0 ? "fell" : "rose"} between the events and today, so the
+          collateral held is worth {c < 0 ? "less" : "more"} than the flows above add up to.
+        </span>
+      ),
     );
   }
 
@@ -161,7 +231,9 @@ export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
 
   return (
     <div className="space-y-2 text-sm text-rb-500">
-      <p className="leading-relaxed">These figures total every event of this vault on MakerDAO.</p>
+      <p className="leading-relaxed">
+        These figures total every event of this vault on MakerDAO. They are rounded; hover a figure for its exact value.
+      </p>
       {bullets.map((item, i) => (
         <div key={i} className="flex items-start gap-2 leading-relaxed">
           <span className="select-none text-rb-500">•</span>

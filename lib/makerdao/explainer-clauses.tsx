@@ -53,8 +53,24 @@ import { formatNumber } from "@/lib/utils/format";
 import { AmountText } from "@/components/shared/amount-text";
 import { H } from "@/lib/shared/explainer-prose";
 import { formatDate } from "@/lib/date";
-import type { MakerAuctionRead, MakerIlkAt } from "@/lib/makerdao/chain-history-types";
-import type { MakerDebtSplit, MakerLeftoverLink } from "@/lib/makerdao/vault-history";
+import type { MakerAuctionRead, MakerIlkAt, MakerTxContext } from "@/lib/makerdao/chain-history-types";
+import type {
+  MakerDebtSplit,
+  MakerEvent,
+  MakerLeftoverLink,
+  MakerMatStep,
+  MakerOwnershipStep,
+} from "@/lib/makerdao/vault-history";
+import { indefiniteArticle } from "@/lib/utils/format";
+import {
+  describeCaller,
+  describeOwner,
+  describeSender,
+  inAndOutPartner,
+  shortAddr,
+  txSummary,
+} from "@/lib/makerdao/ownership-prose";
+import { knownContract } from "@/lib/makerdao/known-contracts";
 
 /** What the page knows about a row beyond its own fields
  *  (lib/makerdao/vault-history.tsx). Every clause that needs one of these is
@@ -72,6 +88,21 @@ export interface MakerRowExtras {
   auction?: MakerAuctionRead;
   /** A liquidation row: when the owner took the handed-back collateral out. */
   leftoverTakenAt?: number;
+  /** The row's own id. */
+  eventId?: string;
+  /** Every loaded row of the row's transaction, in chain order. */
+  txRows?: MakerEvent[];
+  /** What the row's transaction did (read for ownership transactions). */
+  txContext?: MakerTxContext;
+  /** A give row: the owner before and after. */
+  ownership?: MakerOwnershipStep;
+  /** Every give row's owners, for the transaction summary. */
+  ownershipAll?: Map<string, MakerOwnershipStep>;
+  /** The ilk's minimum ratio moved since the previous row. */
+  matStep?: MakerMatStep;
+  /** Signed by someone other than the owner in force, in a transaction that
+   *  handed the vault to the signer: the vault was created for them. */
+  createdForSigner?: boolean;
 }
 
 const dai2 = (n: number): string => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -206,7 +237,7 @@ export function makerdaoEventSlots(
   extras: MakerRowExtras = {},
 ): EventProseSlots {
   const slots = makerdaoEventSlotsBase(ctx, coords, extras);
-  const actor = delegatedActorMechanic(ctx);
+  const actor = extras.createdForSigner ? null : delegatedActorMechanic(ctx);
   if (!actor) return slots;
   return { ...slots, meansNow: [...(slots.meansNow ?? []), actor] };
 }
@@ -259,7 +290,7 @@ function makerdaoEventSlotsBase(ctx: MakerDAOContext, coords: MakerCoords, extra
     case "grab":
       return grabSlots(ctx, coords, sym, dsym, dink, dart, daiAmount, rate, colDeltaFig, extras);
     case "give":
-      return giveSlots(ctx, coords, colAfterFig, rs);
+      return giveSlots(ctx, coords, colAfterFig, rs, extras);
     case "fork-out":
     case "fork-in":
       return forkSlots(ctx, dink, dart, daiAmount, colDeltaFig, colAfterFig, rs);
@@ -270,6 +301,68 @@ function makerdaoEventSlotsBase(ctx: MakerDAOContext, coords: MakerCoords, extra
     default:
       return { happened: [] };
   }
+}
+
+// ── the minimum ratio moved by governance ────────────────────────────────────
+
+function matStepClause(ilk: string, step?: MakerMatStep): ClauseInput {
+  if (!step) return null;
+  const dir = step.to < step.from ? "lowered" : "raised";
+  return clause(
+    <>
+      {ilk}&rsquo;s minimum ratio was {dir} from {matPct(step.from)} to <H>{matPct(step.to)}</H> by governance
+      {step.change ? <> on {formatDate(step.change.timestamp)}</> : <> between the previous event and this one</>}.
+    </>,
+  );
+}
+
+// ── a vault created by a contract for the signer ─────────────────────────────
+
+function createdForClause(ctx: MakerDAOContext, extras: MakerRowExtras): ClauseInput {
+  if (!extras.createdForSigner || !ctx.txFrom) return null;
+  const creator = ctx.ownerAt ?? null;
+  const known = knownContract(creator);
+  const give = extras.txRows?.find((r) => r.context.data.eventType === "give");
+  const proxy = give?.context.data.giveDst;
+  const cup = extras.txContext?.migratedCup;
+  return clause(
+    <>
+      {known ? known.name : shortAddr(creator)} ({shortAddr(creator)}) created this vault and handed it to{" "}
+      {shortAddr(ctx.txFrom)}
+      {proxy && proxy !== ctx.txFrom ? <>&rsquo;s DSProxy ({shortAddr(proxy)})</> : null} in the same transaction, which{" "}
+      {shortAddr(ctx.txFrom)} sent
+      {cup ? (
+        <>
+          : it moved {shortAddr(ctx.txFrom)}&rsquo;s Single-Collateral Dai CDP #{cup} into this vault, with its
+          collateral and debt
+        </>
+      ) : null}
+      .
+    </>,
+  );
+}
+
+// ── a deposit and a withdrawal of the same amount in one transaction ─────────
+
+function inAndOutClause(ctx: MakerDAOContext, extras: MakerRowExtras): ClauseInput {
+  const self = extras.txRows?.find((r) => r.id === extras.eventId);
+  if (!self) return null;
+  const partner = inAndOutPartner(self, extras.txRows);
+  if (!partner) return null;
+  const dink = Number(ctx.dink) || 0;
+  const amount = `${formatNumber(Math.abs(dink))} ${ctx.collateralSymbol}`;
+  const gives = extras.txRows?.filter((r) => r.context.data.eventType === "give").length ?? 0;
+  return clause(
+    dink > 0 ? (
+      <>
+        The same {amount} came out again later in this transaction
+        {gives > 0 ? <>, after the vault&rsquo;s ownership moved and came back</> : null}, so it added nothing to the
+        vault.
+      </>
+    ) : (
+      <>This is the {amount} put in earlier in this transaction; the vault ends it holding what it held before.</>
+    ),
+  );
 }
 
 // ── frob (deposit / withdraw / draw / repay, singly or combined) ──────────────
@@ -346,9 +439,11 @@ function frobSlots(
         ),
       ],
       meansNow: [
-        kept > MAKER_EPS
+        kept >= 1e-6
           ? clause(<>{colAfterFig()} stays behind; the vault owes nothing and holds nothing else.</>)
-          : clause(<>The vault is empty again.</>),
+          : kept > MAKER_EPS
+            ? clause(<>A trace under 0.000001 {sym} stays behind; the vault owes nothing.</>)
+            : clause(<>The vault is empty again.</>),
       ],
     };
   }
@@ -392,9 +487,9 @@ function frobSlots(
   const riskClause: ClauseInput = risk
     ? clause(
         <>
-          At <H>{usd2(risk.price)}</H> an {sym}, the vault could draw <H>{dai2(risk.room)}</H> {dsym} more before the{" "}
-          <H>{matPct(risk.mat)}</H> minimum, and {sym} could fall {Math.max(0, Math.round(risk.drop * 100))}% (to{" "}
-          {usd2(risk.liqPrice)}) before it could be liquidated.
+          At <H>{usd2(risk.price)}</H> {indefiniteArticle(sym).toLowerCase()} {sym}, the vault could draw{" "}
+          <H>{dai2(risk.room)}</H> {dsym} more before the <H>{matPct(risk.mat)}</H> minimum, and {sym} could fall{" "}
+          {Math.max(0, Math.round(risk.drop * 100))}% (to {usd2(risk.liqPrice)}) before it could be liquidated.
         </>,
       )
     : null;
@@ -442,7 +537,7 @@ function frobSlots(
     );
     return {
       happened: [clause(happened)],
-      changed: [riskClause],
+      changed: [riskClause, createdForClause(ctx, extras)],
       meansNow: [
         rs.collateralOnly
           ? noDebtPath
@@ -492,7 +587,11 @@ function frobSlots(
 
   const meansNow: ClauseInput[] = rs.collateralOnly ? [noDebtPath] : [];
 
-  return { happened: [clause(action), ending], changed: [feeClause, riskClause, holding], meansNow };
+  return {
+    happened: [clause(action), ending],
+    changed: [inAndOutClause(ctx, extras), matStepClause(ctx.ilk, extras.matStep), feeClause, riskClause, holding],
+    meansNow,
+  };
 }
 
 // ── grab (liquidation) ───────────────────────────────────────────────────────
@@ -600,7 +699,11 @@ function grabSlots(
     </>,
   );
   void coords;
-  return { happened: [clause(happened)], changed: [auctionClause], meansNow: [outcome] };
+  return {
+    happened: [clause(happened)],
+    changed: [matStepClause(ctx.ilk, extras.matStep), auctionClause],
+    meansNow: [outcome],
+  };
 }
 
 // ── give (ownership transfer) ────────────────────────────────────────────────
@@ -610,38 +713,64 @@ function giveSlots(
   coords: MakerCoords,
   colAfterFig: () => ReactNode,
   rs: MakerResultingState,
+  extras: MakerRowExtras,
 ): EventProseSlots {
-  const short = (a?: string) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
-  // The new holder echoes the header's party chip — the resolved owner when the
-  // give resolved the proxy hop, otherwise the raw destination.
+  const step = extras.ownership;
+  const tx = extras.txContext;
+  // The new holder echoes the header's party chip.
   const dst = ctx.giveDstOwner ?? ctx.giveDst;
-  const newOwnerFig = dst ? (
-    <Fig echo info={ctx.giveDstOwner ? giveOwnerProv(coords) : giveDstProv(coords)} value={dst}>
-      {short(dst)}
-    </Fig>
-  ) : (
-    <>a new owner</>
-  );
+  if (!step) {
+    const newOwnerFig = dst ? (
+      <Fig echo info={ctx.giveDstOwner ? giveOwnerProv(coords) : giveDstProv(coords)} value={dst}>
+        {shortAddr(dst)}
+      </Fig>
+    ) : (
+      <>a new owner</>
+    );
+    return {
+      happened: [clause(<>Ownership of the vault moved to {newOwnerFig}.</>)],
+      meansNow: [clause(<>The collateral and the debt stayed where they were.</>)],
+    };
+  }
+
+  // What the whole transaction did, on its first give only.
+  const rows = extras.txRows ?? [];
+  const firstGive = rows.find((r) => r.context.data.eventType === "give");
+  const summary =
+    firstGive && firstGive.id === extras.eventId && extras.ownershipAll
+      ? txSummary(rows, tx, extras.ownershipAll)
+      : null;
 
   const happened = (
     <>
-      The vault changed hands: its ownership moved to {newOwnerFig}
-      {ctx.giveDstOwner && ctx.giveDstOwner !== ctx.giveDst ? <> — the owner behind a proxy contract</> : null}.
+      Ownership moved from {describeOwner(step.before, tx)} to {describeOwner(step.after, tx)}.
     </>
   );
-  const meansNow: ClauseInput[] = [
-    clause(
-      <>
-        Nothing in the vault moved — the collateral and debt are untouched; only who controls it changed. An owner can
-        hand the vault to another address, or authorise another address to do so on their behalf
-        {ctx.giveCaller ? <> (this one was carried out by {short(ctx.giveCaller)})</> : null}.
-      </>,
-    ),
-  ];
-  if (rs.inkAfter > MAKER_EPS) {
-    meansNow.push(clause(<>The vault still holds {colAfterFig()} of collateral, now under the new owner.</>));
+  const who: ClauseInput = clause(
+    <>
+      The transfer was made by {describeCaller(step.caller, tx)}
+      {tx && step.caller !== tx.from ? <>, in a transaction {describeSender(tx)}</> : null}.
+    </>,
+  );
+  const why: ClauseInput =
+    tx?.migratedCup != null && knownContract(step.before.holder)?.role === "maker"
+      ? clause(
+          <>
+            The migration contract opens each migrated vault in its own name and hands it to the migrating account; this
+            one carries Single-Collateral Dai CDP #{tx.migratedCup}.
+          </>,
+        )
+      : null;
+  const meansNow: ClauseInput[] = [clause(<>The collateral and the debt stayed where they were.</>)];
+  const movedInTx = rows.some((r) => r.context.data.eventType === "frob");
+  if (rs.inkAfter > MAKER_EPS && !movedInTx) {
+    meansNow.push(clause(<>The vault holds {colAfterFig()} of collateral.</>));
   }
-  return { happened: [clause(happened)], meansNow };
+  return {
+    happened: summary ? [clause(summary), clause(happened)] : [clause(happened)],
+    changed: [who, why],
+    meansNow,
+  };
 }
 
 // ── fork-out / fork-in (position migration between urns) ──────────────────────

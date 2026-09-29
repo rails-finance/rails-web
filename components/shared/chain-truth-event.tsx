@@ -179,6 +179,9 @@ export interface ChainTruthRowSpec {
    *  (degrading to the address before it does); `tone: "party"` tints the chip
    *  party-pink for a delegate the owner handed control to (the fork batch
    *  manager). */
+  /** A second neutral chip before `party`, same shape: the earlier side of a
+   *  handover ("from 0x… to 0x…", MakerDAO's give). */
+  fromParty?: NonNullable<ChainTruthRowSpec["party"]>;
   party?: {
     prefix: string;
     address: string;
@@ -614,6 +617,11 @@ export function ChainTruthRow({
           );
         })()}
 
+      {spec.fromParty && (
+        <span className="-ml-1.5 inline-flex items-center">
+          <PartyChip party={spec.fromParty} />
+        </span>
+      )}
       {spec.party && (
         <span className="-ml-1.5 inline-flex items-center">
           <PartyChip party={spec.party} />

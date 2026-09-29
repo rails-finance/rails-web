@@ -174,8 +174,18 @@ export function MakerVaultCard({
           leadingIdentity={identity}
           closedAt={v.lastActivityAt ?? undefined}
           identity={
-            <PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} liquidated={v.everLiquidated} />
+            <PositionCardMeta
+              lastActivityAt={v.lastActivityAt}
+              eventCount={v.txCount}
+              eventTotal={v.eventCount}
+              liquidated={v.everLiquidated}
+            />
           }
+          labelTips={{
+            collateral: "The most collateral the vault held at any of its events.",
+            debt: "The most the vault owed at any of its events, stability fee accrued to that event included.",
+            outcome: "How the vault's history ended: closed by its owner, or liquidated.",
+          }}
           collateral={
             v.peakInk > 0 ? (
               <StatValue>
@@ -200,7 +210,7 @@ export function MakerVaultCard({
           }
           debtFootnote={
             v.peakDebtDai != null && v.peakDebtDai > 0 ? (
-              <StatFootnote>the most it owed at any of its events</StatFootnote>
+              <StatFootnote>the most it owed at any event, fee included</StatFootnote>
             ) : undefined
           }
         />
@@ -265,11 +275,17 @@ export function MakerVaultCard({
         // liquidation flag (the roster grammar; the count is distinct own
         // transactions, per the chip title's claim).
         identity={
-          <PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} liquidated={v.everLiquidated} />
+          <PositionCardMeta
+            lastActivityAt={v.lastActivityAt}
+            eventCount={v.txCount}
+            eventTotal={v.eventCount}
+            liquidated={v.everLiquidated}
+          />
         }
         columns={[
           {
             label: CARD_VOCAB.collateral,
+            labelTip: `The ${v.collateralSymbol} locked in the vault, valued at Maker's oracle price.`,
             value: (
               <StatValue>
                 <Prov info={vaultInkProv(v.collateralSymbol, v.atBlock, false, v.source)}>
@@ -288,6 +304,7 @@ export function MakerVaultCard({
           },
           {
             label: CARD_VOCAB.debt,
+            labelTip: `The ${debtSym} the vault owes: what it drew plus the stability fee added since.`,
             value:
               v.debtDai != null && v.rate ? (
                 <StatValue>
@@ -334,6 +351,8 @@ export function MakerVaultCard({
           },
           {
             label: ratioLabel("cdp"),
+            labelTip:
+              "The collateral's value divided by the debt. Below the collateral type's minimum the vault can be liquidated.",
             value:
               ratio != null ? (
                 <StatValue>

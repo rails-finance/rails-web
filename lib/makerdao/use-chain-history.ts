@@ -7,7 +7,13 @@
 // and its liquidations, and a card opened later reads the same answer.
 
 import { useEffect, useMemo, useState } from "react";
-import type { MakerAuctionRead, MakerIlkAt, MakerIlkAtResponse } from "@/lib/makerdao/chain-history-types";
+import type {
+  MakerAuctionRead,
+  MakerIlkAt,
+  MakerIlkAtResponse,
+  MakerMatChangesResponse,
+  MakerTxContext,
+} from "@/lib/makerdao/chain-history-types";
 
 const MAX_BLOCKS = 60;
 
@@ -135,3 +141,110 @@ export function useMakerAuctions(grabs: readonly { txHash: string; urn: string }
 }
 
 const EMPTY = new Map<string, MakerAuctionRead>();
+
+const txContextCache = new Map<string, Promise<MakerTxContext | null>>();
+const matCache = new Map<string, Promise<MakerMatChangesResponse | null>>();
+const isTxContext = (d: unknown): d is MakerTxContext => d != null && typeof d === "object" && "parties" in d;
+const isMatChanges = (d: unknown): d is MakerMatChangesResponse => d != null && typeof d === "object" && "changes" in d;
+
+function cached<T>(cache: Map<string, Promise<T | null>>, key: string, load: () => Promise<T | null>) {
+  let p = cache.get(key);
+  if (!p) {
+    p = load();
+    p.then((v) => {
+      if (v == null) cache.delete(key);
+    });
+    cache.set(key, p);
+  }
+  return p;
+}
+
+/** Each transaction's context (lib/sources/chain/makerdao-tx-context.ts),
+ *  keyed by transaction hash. `requests` pairs a hash with the addresses its
+ *  rows name. Absent while loading or after a failed read. */
+export function useMakerTxContexts(
+  requests: readonly { txHash: string; addresses: string[] }[],
+): Map<string, MakerTxContext> {
+  const key = useMemo(
+    () =>
+      requests
+        .filter((r) => /^0x[0-9a-f]{64}$/i.test(r.txHash))
+        .map(
+          (r) => `${r.txHash.toLowerCase()}|${[...new Set(r.addresses.map((a) => a.toLowerCase()))].sort().join(",")}`,
+        )
+        .sort()
+        .join(";"),
+    [requests],
+  );
+  const [state, setState] = useState<{ key: string; map: Map<string, MakerTxContext> } | null>(null);
+  useEffect(() => {
+    if (!key) return;
+    let live = true;
+    const items = key.split(";").map((k) => k.split("|") as [string, string]);
+    Promise.all(
+      items.map(([tx, addrs]) =>
+        cached(txContextCache, `${tx}|${addrs}`, () =>
+          fetchJson(
+            `/api/chain/makerdao/tx-context?${new URLSearchParams({ tx, addresses: addrs }).toString()}`,
+            isTxContext,
+          ),
+        ),
+      ),
+    ).then((got) => {
+      if (!live) return;
+      const map = new Map<string, MakerTxContext>();
+      got.forEach((g, i) => {
+        if (g) map.set(items[i][0], g);
+      });
+      setState({ key, map });
+    });
+    return () => {
+      live = false;
+    };
+  }, [key]);
+  return state?.key === key ? state.map : EMPTY_TX;
+}
+
+const EMPTY_TX = new Map<string, MakerTxContext>();
+
+/** Changes to an ilk's minimum ratio inside each (from, to] block span, keyed
+ *  by `${from}-${to}`. */
+export function useMakerMatChanges(
+  ilk: string | null | undefined,
+  spans: readonly { from: number; to: number }[],
+): Map<string, MakerMatChangesResponse> {
+  const key = useMemo(
+    () => (ilk ? [...new Set(spans.map((s) => `${s.from}-${s.to}`))].sort().join(",") : ""),
+    [ilk, spans],
+  );
+  const [state, setState] = useState<{ key: string; map: Map<string, MakerMatChangesResponse> } | null>(null);
+  useEffect(() => {
+    if (!ilk || !key) return;
+    let live = true;
+    const items = key.split(",");
+    Promise.all(
+      items.map((span) => {
+        const [from, to] = span.split("-");
+        return cached(matCache, `${ilk}:${span}`, () =>
+          fetchJson(
+            `/api/chain/makerdao/mat-changes?${new URLSearchParams({ ilk, from, to }).toString()}`,
+            isMatChanges,
+          ),
+        );
+      }),
+    ).then((got) => {
+      if (!live) return;
+      const map = new Map<string, MakerMatChangesResponse>();
+      got.forEach((g, i) => {
+        if (g) map.set(items[i], g);
+      });
+      setState({ key: `${ilk}|${key}`, map });
+    });
+    return () => {
+      live = false;
+    };
+  }, [ilk, key]);
+  return state?.key === `${ilk}|${key}` ? state.map : EMPTY_MAT;
+}
+
+const EMPTY_MAT = new Map<string, MakerMatChangesResponse>();

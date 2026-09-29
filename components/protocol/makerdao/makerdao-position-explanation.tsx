@@ -34,6 +34,7 @@ export function MakerdaoPositionExplanation({
   // Hooks first — the pane declines below.
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
+  const history = useMakerVaultHistory();
   // Narrates the LIVE vault only — the summary can't supply the ilk parameters
   // (liquidation ratio, fee, minimum debt), so without the overlay this panel
   // declines.
@@ -189,7 +190,112 @@ export function MakerdaoPositionExplanation({
     );
   }
 
+  bullets.push(...ownershipBullets(history, v.txCount, ext?.external ?? 0));
+
   return <ProseExplainer paragraph={lead} items={bullets} />;
+}
+
+/** Who has owned the vault, and who acted on it, by kind with counts: the
+ *  owners over the loaded history (lib/makerdao/vault-history.tsx), the
+ *  transactions the owner signed or sent through its own proxy, and the
+ *  ownership transfers another contract made inside them. Nothing where the
+ *  vault never changed hands. */
+function ownershipBullets(history: MakerVaultHistory, txCount: number, external: number): React.ReactNode[] {
+  const owners = history.owners;
+  if (owners.length < 2) return [];
+  // The transaction read that names each owner's holder.
+  const allCtx = [...history.txContext.values()];
+  const partyCtx = (ref: MakerOwnerRef) => allCtx.find((c) => (ref.holder ? c.parties[ref.holder] : undefined));
+  // The current owner's stretch reaches back over any transaction-long
+  // interlude that handed the vault straight back.
+  const key = (r: MakerOwnerRef) => r.holder ?? r.owner;
+  const current = owners[owners.length - 1];
+  let start = owners.length - 1;
+  while (start >= 2 && owners[start - 1].withinTx && key(owners[start - 2].ref) === key(current.ref)) start -= 2;
+  const since = owners[start].since;
+  const earlier = owners.slice(0, start);
+  const interludes = owners.slice(start).filter((o) => o.withinTx);
+  const creator = earlier[0];
+  const creatorKnown = creator ? knownContract(creator.ref.holder) : undefined;
+  const ownerBullet = (
+    <span key="owners">
+      Owned by {describeOwner(current.ref, partyCtx(current.ref), false)} since <H>{formatDate(since)}</H>
+      {creatorKnown && earlier.length === 1 ? (
+        <>, when {creatorKnown.name} created the vault and handed it over</>
+      ) : earlier.length > 0 ? (
+        <>
+          ; before that by{" "}
+          {earlier.map((o, i) => (
+            <span key={i}>
+              {i > 0 ? ", then " : ""}
+              {describeOwner(o.ref, partyCtx(o.ref), false)}
+            </span>
+          ))}
+        </>
+      ) : null}
+      .
+      {interludes.map((o, i) => (
+        <span key={i}>
+          {" "}
+          On {formatDate(o.since)} {describeOwner(o.ref, partyCtx(o.ref), false)} held it inside one transaction and
+          handed it back.
+        </span>
+      ))}
+    </span>
+  );
+  // Transfers made by a contract other than the owner's own holder.
+  const byKind = new Map<string, number>();
+  let transfers = 0;
+  for (const [id, step] of history.ownership) {
+    transfers += 1;
+    const c = history.txContext.get(id.split(":")[1]?.toLowerCase() ?? "");
+    const known = knownContract(step.caller);
+    const party = step.caller ? c?.parties[step.caller] : undefined;
+    // The owner's own wallet or DSProxy is the owner acting.
+    if (!known && (party?.kind === "dsproxy" || step.caller === step.before.owner)) continue;
+    const label = known
+      ? known.name
+      : party?.kind === "instadapp-account"
+        ? "the Instadapp account"
+        : step.caller
+          ? `${step.caller.slice(0, 6)}…${step.caller.slice(-4)}`
+          : null;
+    if (!label) continue;
+    byKind.set(label, (byKind.get(label) ?? 0) + 1);
+  }
+  const others = [...byKind.entries()];
+  const own = Math.max(0, txCount - external);
+  const actorsBullet = (
+    <span key="actors">
+      {own > 0 ? (
+        <>
+          {own === txCount ? (
+            <>All {txCount.toLocaleString("en-US")} of its transactions were</>
+          ) : (
+            <>
+              {own.toLocaleString("en-US")} of its {txCount.toLocaleString("en-US")} transactions were
+            </>
+          )}{" "}
+          signed by the owner or sent through the owner&rsquo;s own proxy.
+        </>
+      ) : null}
+      {others.length > 0 ? (
+        <>
+          {" "}
+          Inside them, other contracts made {others.reduce((t, [, n]) => t + n, 0)} of the vault&rsquo;s {transfers}{" "}
+          ownership transfers:{" "}
+          {others.map(([label, n], i) => (
+            <span key={label}>
+              {i > 0 ? (i === others.length - 1 ? " and " : ", ") : ""}
+              {label} ({n})
+            </span>
+          ))}
+          .
+        </>
+      ) : null}
+    </span>
+  );
+  return [ownerBullet, actorsBullet];
 }
 
 // ── Terminal pane ───────────────────────────────────────────────────────────
@@ -204,7 +310,9 @@ import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
 import { formatDate } from "@/lib/date";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
-import { useMakerVaultHistory } from "@/lib/makerdao/vault-history";
+import { useMakerVaultHistory, type MakerOwnerRef, type MakerVaultHistory } from "@/lib/makerdao/vault-history";
+import { knownContract } from "@/lib/makerdao/known-contracts";
+import { describeOwner } from "@/lib/makerdao/ownership-prose";
 import { makerTxHashOf } from "@/lib/makerdao/market-notes";
 import type { MakerAuctionOutcome } from "@/lib/makerdao/chain-history-types";
 
@@ -404,25 +512,15 @@ export function MakerdaoClosedPositionExplanation({
   if (inkResidue || artResidue) {
     bullets.push(
       <span key="residue">
-        The Vat still records a trace on this urn —{" "}
-        {inkResidue ? (
-          <H>
-            <AmountText value={v.ink} /> {sym}
-          </H>
-        ) : null}
-        {inkResidue && artResidue ? <> of collateral and </> : null}
-        {artResidue ? (
-          <H>
-            <AmountText value={v.art} /> {dsym}
-          </H>
-        ) : null}
-        {inkResidue && !artResidue ? <> of collateral</> : artResidue && !inkResidue ? <> of debt</> : null} — the
-        wei-scale remainder left in the slot{inkResidue && artResidue ? "s" : ""} when the record emptied. It sits below
-        the 0.000001 line the lifecycle status reads balances against, so the record reads as {v.status}; the
-        lifetime-flows section shows it at its true magnitude.
+        A trace under 0.000001 {inkResidue ? sym : dsym}
+        {inkResidue && artResidue ? <> and under 0.000001 {dsym}</> : null} remains in the vault, below the line the
+        page counts balances from, so the vault reads as {v.status}.
       </span>,
     );
   }
+
+  // Who owned it; the actors line needs the external verdict the open pane has.
+  bullets.push(...ownershipBullets(history, v.txCount, 0).slice(0, 1));
 
   if (v.lastActivityAt != null) {
     bullets.push(

@@ -62,13 +62,23 @@ import { fetchMakerRateLog, type MakerRateLogResponse } from "@/lib/api/fetch-ma
 import { liveMakerRateStepNote, makerRateStepNotesFor } from "@/lib/makerdao/market-notes";
 import type { MarketNote } from "@/lib/shared/market-note";
 import { makerTxHashOf } from "@/lib/makerdao/market-notes";
-import { useMakerAuctions, useMakerIlkAt } from "@/lib/makerdao/use-chain-history";
+import {
+  useMakerAuctions,
+  useMakerIlkAt,
+  useMakerMatChanges,
+  useMakerTxContexts,
+} from "@/lib/makerdao/use-chain-history";
 import {
   MakerVaultHistoryProvider,
   makerDebtSplits,
   makerLeftoverLinks,
+  makerMatSteps,
+  makerOwnership,
   makerPreviousAt,
+  makerTxRows,
+  openedForSigner,
   sortedMakerEvents,
+  type MakerMatStep,
   type MakerVaultHistory,
 } from "@/lib/makerdao/vault-history";
 
@@ -331,6 +341,41 @@ export default function MakerVaultDetailView({
     [sortedMaker],
   );
   const auctions = useMakerAuctions(grabRows);
+  // The transactions that moved the vault's ownership, read for who the
+  // parties are and what else ran in them (lib/sources/chain/makerdao-tx-context.ts).
+  const txRows = useMemo(() => makerTxRows(sortedMaker), [sortedMaker]);
+  const txRequests = useMemo(() => {
+    const out: { txHash: string; addresses: string[] }[] = [];
+    for (const [tx, rows] of txRows) {
+      const gives = rows.filter((r) => r.context.data.eventType === "give");
+      if (gives.length === 0) continue;
+      const addrs = gives.flatMap((g) => [g.context.data.giveDst, g.context.data.giveCaller]);
+      out.push({ txHash: tx, addresses: [...new Set(addrs.filter((a): a is string => !!a))].slice(0, 8) });
+    }
+    return out;
+  }, [txRows]);
+  const txContext = useMakerTxContexts(txRequests);
+  const ownership = useMemo(() => makerOwnership(sortedMaker, txContext), [sortedMaker, txContext]);
+  // The ilk's minimum ratio between rows, and the governance change behind a
+  // step (the Spotter's file logs between the two rows' blocks).
+  const matStepsBase = useMemo(
+    () => makerMatSteps(sortedMaker, ilkAtRead?.reads ?? new Map()).steps,
+    [sortedMaker, ilkAtRead],
+  );
+  const matSpans = useMemo(
+    () => [...matStepsBase.values()].map((m) => ({ from: m.fromBlock, to: m.toBlock })),
+    [matStepsBase],
+  );
+  const matChanges = useMakerMatChanges(ilk, matSpans);
+  const matSteps = useMemo(() => {
+    const out = new Map<string, MakerMatStep>();
+    for (const [id, m] of matStepsBase) {
+      const read = matChanges.get(`${m.fromBlock}-${m.toBlock}`);
+      const change = read?.changes.length ? read.changes[read.changes.length - 1] : null;
+      out.set(id, { from: m.from, to: m.to, previousAt: m.previousAt, change });
+    }
+    return out;
+  }, [matStepsBase, matChanges]);
   const vaultHistory = useMemo<MakerVaultHistory>(
     () => ({
       ilkAt: ilkAtRead?.reads ?? new Map(),
@@ -338,17 +383,42 @@ export default function MakerVaultDetailView({
       leftover: makerLeftoverLinks(sortedMaker, auctions),
       debtSplit,
       previousAt: makerPreviousAt(sortedMaker),
+      ownership: ownership.steps,
+      txRows,
+      txContext,
+      matSteps,
+      owners: ownership.owners,
     }),
-    [ilkAtRead, auctions, sortedMaker, debtSplit],
+    [ilkAtRead, auctions, sortedMaker, debtSplit, ownership, txRows, txContext, matSteps],
   );
   // The card's debt split, from the newest row's.
   const lastSplit = sortedMaker.length ? debtSplit.get(sortedMaker[sortedMaker.length - 1].id) : undefined;
+  // The most the vault owed at any event, the fee accrued to that event
+  // included: the larger of each row's debt before and after it. A
+  // liquidation's debt before is what it seized against.
+  const peakDebtOwed = useMemo(() => {
+    if (!wholeRows) return null;
+    let peak = 0;
+    for (const e of sortedMaker) {
+      const d = e.context.data;
+      if (d.debtAfter == null) return null;
+      const after = Number(d.debtAfter);
+      const before = after - (Number(d.debtChange) || 0);
+      peak = Math.max(peak, after, before);
+    }
+    return peak;
+  }, [sortedMaker, wholeRows]);
   const cardView = useMemo<MakerVaultView | null>(
     () =>
       view && !(servedFolders?.length ?? 0)
-        ? { ...view, drawnDai: lastSplit?.drawnAfter ?? null, drawnSince: lastSplit?.stretchStartAt ?? null }
+        ? {
+            ...view,
+            drawnDai: lastSplit?.drawnAfter ?? null,
+            drawnSince: lastSplit?.stretchStartAt ?? null,
+            ...(peakDebtOwed != null && peakDebtOwed > 0 ? { peakDebtDai: peakDebtOwed } : {}),
+          }
         : view,
-    [view, lastSplit, servedFolders],
+    [view, lastSplit, servedFolders, peakDebtOwed],
   );
   const feeLiquidated = useMemo(() => {
     let sum = 0;
@@ -425,13 +495,17 @@ export default function MakerVaultDetailView({
   const externalActivity = useMemo(
     () =>
       summariseExternalActors(
-        makerEvents.map((e) => ({
-          txFrom: e.context.data.txFrom,
-          poolCaller: e.context.data.txTo,
-          wallet: e.context.data.ownerAt ?? e.wallet,
-        })),
+        makerEvents
+          // A vault created by a contract and handed to the signer in the same
+          // transaction was opened by that signer.
+          .filter((e) => !(isMakerDAOEvent(e) && openedForSigner(e, txRows)))
+          .map((e) => ({
+            txFrom: e.context.data.txFrom,
+            poolCaller: e.context.data.txTo,
+            wallet: e.context.data.ownerAt ?? e.wallet,
+          })),
       ),
-    [makerEvents],
+    [makerEvents, txRows],
   );
 
   // On a windowed page the opening balance's own split is added: rails-server

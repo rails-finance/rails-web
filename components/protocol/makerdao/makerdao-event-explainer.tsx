@@ -19,7 +19,7 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { makerdaoVaultContent, makerdaoLiquidationContent } from "@/lib/shared/learn-more-content";
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { makerdaoEventSlots, type MakerRowExtras } from "@/lib/makerdao/explainer-clauses";
-import { useMakerVaultHistory } from "@/lib/makerdao/vault-history";
+import { openedForSigner, useMakerVaultHistory, type MakerEvent } from "@/lib/makerdao/vault-history";
 import { useIlkAtRow } from "./makerdao-event-detail";
 
 export interface MakerDAOEventExplainerProps {
@@ -39,6 +39,7 @@ export interface MakerDAOEventExplainerProps {
  *  renders prose only). */
 export function makerdaoLearnMoreContent(ctx: MakerDAOContext, returned = false): LearnMoreContent {
   if (ctx.eventType === "grab" || ctx.eventType.startsWith("lse-")) return makerdaoLiquidationContent();
+  if (ctx.eventType === "give") return makerdaoVaultContent("ownership");
   if (ctx.eventType !== "frob") return makerdaoVaultContent("adjust");
   if (ctx.isOpen) return makerdaoVaultContent("open");
   if (returned) return makerdaoVaultContent("returned");
@@ -64,7 +65,9 @@ export function useMakerRowExtras(
 ): MakerRowExtras {
   const history = useMakerVaultHistory();
   const ilkAt = useIlkAtRow(ctx, blockNumber, readOwn);
-  const tx = txHash?.toLowerCase();
+  // The hash sits in the row id's middle segment when the row carries none.
+  const idTx = eventId?.split(":")[1];
+  const tx = (txHash || (idTx && /^0x[0-9a-fA-F]{64}$/.test(idTx) ? idTx : undefined))?.toLowerCase();
   const auction = ctx.eventType === "grab" && tx ? history.auctions.get(tx) : undefined;
   let leftoverTakenAt: number | undefined;
   if (auction?.kind === "clipper") {
@@ -72,8 +75,17 @@ export function useMakerRowExtras(
       if (link.role === "out" && link.auction.txHash.toLowerCase() === tx) leftoverTakenAt = link.at;
     }
   }
+  const txRows = tx ? history.txRows.get(tx) : undefined;
+  const self = eventId ? txRows?.find((r) => r.id === eventId) : undefined;
   return {
     ilkAt,
+    txRows,
+    txContext: tx ? history.txContext.get(tx) : undefined,
+    ownership: eventId ? history.ownership.get(eventId) : undefined,
+    ownershipAll: history.ownership,
+    matStep: eventId ? history.matSteps.get(eventId) : undefined,
+    createdForSigner: self ? openedForSigner(self as MakerEvent, history.txRows) : false,
+    eventId,
     split: eventId ? history.debtSplit.get(eventId) : undefined,
     previousAt: eventId ? history.previousAt.get(eventId) : undefined,
     leftover: eventId ? history.leftover.get(eventId) : undefined,

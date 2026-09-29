@@ -61,25 +61,25 @@ export function MakerdaoCrCard({ v }: { v: MakerVaultView }) {
         </Prov>{" "}
         · minimum <Prov info={matProv(v.ilk)}>{pct(v.matRatio)}</Prov>
       </RiskFigure>
-      <RiskFigure>
-        can borrow{" "}
+      {/* One label-led figure per line, so the stacked strip at phone width
+          reads as a column of label: figure pairs. */}
+      <RiskFigure label="Can borrow">
         <Prov info={borrowHeadroomProv(pct(v.matRatio))}>
-          <AmountText value={headroomDai} format="compact" /> {dsym}
+          <RiskStrong>
+            <AmountText value={headroomDai} format="compact" /> {dsym}
+          </RiskStrong>
         </Prov>{" "}
-        more before reaching the {pct(v.matRatio)} minimum
-        {v.dustDai != null && v.dustDai > 0 ? (
-          <>
-            {" "}
-            · min debt{" "}
-            <Prov info={dustProv(v.ilk)}>
-              <AmountText value={v.dustDai} format="compact" /> {dsym}
-            </Prov>
-          </>
-        ) : null}
+        more
       </RiskFigure>
+      {v.dustDai != null && v.dustDai > 0 ? (
+        <RiskFigure label="Minimum debt">
+          <Prov info={dustProv(v.ilk)}>
+            <AmountText value={v.dustDai} format="compact" /> {dsym}
+          </Prov>
+        </RiskFigure>
+      ) : null}
       {v.ilkDebtDai != null && v.lineDai != null && v.lineDai > 0 ? (
-        <RiskFigure>
-          {v.ilk} ceiling{" "}
+        <RiskFigure label={`${v.ilk} ceiling`}>
           <Prov info={ilkCeilingProv(v.ilk)}>
             <AmountText value={v.ilkDebtDai} format="compact" /> of <AmountText value={v.lineDai} format="compact" />{" "}
             {dsym}
