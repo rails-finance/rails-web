@@ -26,13 +26,11 @@
 //   • §5.2 (mechanic-why on fees): stated where the event exhibits one — the
 //     reserve contribution (held back at mint, released on repay) and interest
 //     charged up front at minting. Frankencoin charges no ongoing accrual.
-//   • §5.4 (derived net-outcome): only a succeeded challenge slice carries both a
-//     ZCHF bid and the collateral acquired, so the effective price is derived
-//     there; a forced sale emits only the collateral amount (no proceeds), so no
-//     net-outcome figure exists to derive on it.
 // Filled: forward paths (§5.3) on denied / expired-forced-sale / price-raise
 // cooldown / collateral-only; the reserve + up-front-interest mechanic (§5.2);
-// the challenge slice's effective price (§5.4); the highlight rule (§5.6) via Fig.
+// the net outcome (§5.4) of a challenge slice (its cleared price) and of a
+// forced sale (its price on the expiry curve and where the payment went, from
+// the receipt); the highlight rule (§5.6) via Fig.
 
 import type { ReactNode } from "react";
 import type { FrankencoinContext } from "@/lib/shared/types/event-shape";
