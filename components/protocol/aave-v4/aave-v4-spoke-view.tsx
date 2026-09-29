@@ -89,7 +89,7 @@ import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import { OVERLAY_HEADING, NAV_LINK, PILL_META, CTRL_GHOST } from "@/lib/shared/ui-grammar";
 import { ChartBarBig, ChevronDown } from "lucide-react";
-import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowsLedgerNoteContext, LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { aaveV4FlowLive, aaveV4FlowSeriesTimeline } from "@/lib/aave-v4/flows-timeline";
 import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { shortAddr } from "@/lib/shared/format-event";
@@ -1050,6 +1050,7 @@ function AaveV4SpokeTowerBlock({
     [flowSeries, totals, todayPrices, reserves, prices],
   );
   const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [ledgerNote, setLedgerNote] = useState<string | null>(null);
   const ledgerShown = flowTimeline == null || ledgerOpen;
   const title = (
     <span className={`${OVERLAY_HEADING} inline-flex items-center gap-1.5 text-rb-500`}>
@@ -1073,18 +1074,27 @@ function AaveV4SpokeTowerBlock({
             <div>
               <div className="flex min-h-[28px] items-center">{title}</div>
               <div className="mt-2">
-                <LifetimeFlowsScrubber timeline={flowTimeline} />
+                <FlowsLedgerNoteContext.Provider value={setLedgerNote}>
+                  <LifetimeFlowsScrubber timeline={flowTimeline} />
+                </FlowsLedgerNoteContext.Provider>
               </div>
-              <button
-                type="button"
-                onClick={() => setLedgerOpen((v) => !v)}
-                aria-expanded={ledgerOpen}
-                aria-controls="aave-v4-flows-ledger"
-                className={`${CTRL_GHOST} mt-3 -mx-1 gap-1 rounded-md px-1 text-xs font-semibold text-foreground`}
-              >
-                Full breakdown
-                <ChevronDown size={14} aria-hidden className={ledgerOpen ? "rotate-180" : ""} />
-              </button>
+              <div className="mt-3 flex flex-wrap items-center gap-x-2">
+                <button
+                  type="button"
+                  onClick={() => setLedgerOpen((v) => !v)}
+                  aria-expanded={ledgerOpen}
+                  aria-controls="aave-v4-flows-ledger"
+                  className={`${CTRL_GHOST} -mx-1 gap-1 rounded-md px-1 text-xs font-semibold text-foreground`}
+                >
+                  Full breakdown
+                  <ChevronDown size={14} aria-hidden className={ledgerOpen ? "rotate-180" : ""} />
+                </button>
+                {ledgerNote && (
+                  <span className="text-xs text-rb-500" data-flow-ledger-note="">
+                    {ledgerNote}
+                  </span>
+                )}
+              </div>
             </div>
           )}
           <div id="aave-v4-flows-ledger" hidden={!ledgerShown}>

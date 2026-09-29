@@ -20,10 +20,10 @@ import type { SkyFlowDay, SkyPosition, SkyRates } from "@/lib/sky-savings/types"
 import type { SkySavingsContext } from "@/lib/shared/types/event-shape";
 
 const BUCKETS: FlowBucket[] = [
-  { key: "deposited", label: "Deposited", side: "collateral", dir: "in" },
-  { key: "received", label: "Received", side: "collateral", dir: "in" },
-  { key: "withdrawn", label: "Withdrawn", side: "collateral", dir: "out" },
-  { key: "sent", label: "Sent", side: "collateral", dir: "out" },
+  { key: "deposited", label: "Deposited", event: "Deposit", side: "collateral", dir: "in" },
+  { key: "received", label: "Received by transfer", event: "Received", side: "collateral", dir: "in" },
+  { key: "withdrawn", label: "Withdrawn", event: "Withdrawal", side: "collateral", dir: "out", hatch: "reverse" },
+  { key: "sent", label: "Sent to another account", event: "Sent", side: "collateral", dir: "out", hatch: "dots" },
 ];
 
 /** Exact per-kind totals over the whole life, in raw USDS. */

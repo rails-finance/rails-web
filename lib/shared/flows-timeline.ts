@@ -31,8 +31,9 @@ export type FlowTone = "exit" | "liquidation" | "redemption";
 export interface FlowBucket {
   key: string;
   label: string;
-  /** A shorter label for a phone-width legend. */
-  short?: string;
+  /** The timeline's name for the event that fills it ("Supply"), for the
+   *  event pips' tips. */
+  event?: string;
   side: FlowSide;
   dir: "in" | "out";
   /** Outflows: the hatch. Default "exit". */
@@ -191,8 +192,9 @@ export interface FlowModel {
   liveStop: number;
   /** Day indexes that carry at least one event, ascending, unique. */
   eventDays: number[];
-  /** The tick strip: one entry per active day. */
-  ticks: { day: number; tick: FlowEvent["tick"] }[];
+  /** The tick strip: one entry per active day, with the timeline's names
+   *  for the events that moved a bucket that day. */
+  ticks: { day: number; tick: FlowEvent["tick"]; kinds: string[] }[];
   repricings: Repricing[];
   live: FlowLive;
   /** Held and owed, valued, at the end of each stop before the live one. */
@@ -220,7 +222,6 @@ export interface FlowModel {
 export interface FlowSegment {
   key: string;
   label: string;
-  short?: string;
   /** "held" solid and "out" hatched on the bar; "in" an exact source and
    *  "estimate" the balancing item on the line under it. */
   fill: "held" | "out" | "in" | "estimate";
@@ -523,7 +524,16 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     lastDay,
     liveStop,
     eventDays,
-    ticks: days.map((d) => ({ day: d.day - startDay, tick: d.tick })),
+    ticks: days.map((d, i) => {
+      const prev = days[i - 1];
+      const kinds: string[] = [];
+      for (const b of t.buckets) {
+        const word = b.event ?? b.label;
+        const now = d.cum[b.key];
+        if (now != null && Math.abs(now - (prev?.cum[b.key] ?? 0)) > 1e-9 && !kinds.includes(word)) kinds.push(word);
+      }
+      return { day: d.day - startDay, tick: d.tick, kinds };
+    }),
     repricings,
     live: t.live,
     valued,
@@ -643,7 +653,6 @@ function sideState(
       return {
         key: b.key,
         label: b.label,
-        short: b.short,
         fill: "out" as const,
         tone: b.tone ?? "exit",
         hatch: b.hatch,
@@ -655,7 +664,7 @@ function sideState(
   ];
   const exact: FlowSegment[] = ins.map((b) => {
     const v = cum[b.key] ?? 0;
-    return { key: b.key, label: b.label, short: b.short, fill: "in", width: v, value: v };
+    return { key: b.key, label: b.label, fill: "in", width: v, value: v };
   });
   const rest = total - exact.reduce((s, x) => s + x.value, 0);
   const oneRest = side === "collateral" ? m.words.rest : undefined;

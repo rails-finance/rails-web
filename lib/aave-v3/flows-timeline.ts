@@ -40,13 +40,14 @@ import {
 
 /** Every bucket an Aave-family position can fill, in drawing order. */
 export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
-  { key: "deposited", label: "Deposited", side: "collateral", dir: "in" },
-  { key: "received", label: "Received by transfer", short: "Received", side: "collateral", dir: "in" },
-  { key: "swappedIn", label: "Swapped in", side: "collateral", dir: "in" },
-  { key: "withdrawn", label: "Withdrawn", side: "collateral", dir: "out", hatch: "reverse" },
+  { key: "deposited", label: "Deposited", event: "Supply", side: "collateral", dir: "in" },
+  { key: "received", label: "Received by transfer", event: "Transferred in", side: "collateral", dir: "in" },
+  { key: "swappedIn", label: "Swapped in", event: "Collateral swap", side: "collateral", dir: "in" },
+  { key: "withdrawn", label: "Withdrawn", event: "Withdraw", side: "collateral", dir: "out", hatch: "reverse" },
   {
     key: "soldToRepay",
     label: "Sold to repay",
+    event: "Repay with collateral",
     side: "collateral",
     dir: "out",
     link: "repay-with-collateral",
@@ -55,7 +56,7 @@ export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
   {
     key: "withdrawnSwapped",
     label: "Withdrawn and swapped",
-    short: "Swapped out",
+    event: "Withdraw and swap",
     side: "collateral",
     dir: "out",
     hatch: "cross",
@@ -63,27 +64,35 @@ export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
   {
     key: "swappedOut",
     label: "Swapped to another asset",
-    short: "Swapped",
+    event: "Collateral swap",
     side: "collateral",
     dir: "out",
     hatch: "vertical",
   },
-  { key: "sent", label: "Sent to another account", short: "Sent", side: "collateral", dir: "out", hatch: "dots" },
+  {
+    key: "sent",
+    label: "Sent to another account",
+    event: "Transferred out",
+    side: "collateral",
+    dir: "out",
+    hatch: "dots",
+  },
   {
     key: "liquidatedCollateral",
     label: "Liquidated",
+    event: "Liquidated",
     side: "collateral",
     dir: "out",
     tone: "liquidation",
     link: "liquidation",
     hatch: "forward",
   },
-  { key: "borrowed", label: "Borrowed", side: "debt", dir: "in" },
-  { key: "repaid", label: "Repaid", side: "debt", dir: "out", hatch: "reverse" },
+  { key: "borrowed", label: "Borrowed", event: "Borrow", side: "debt", dir: "in" },
+  { key: "repaid", label: "Repaid", event: "Repay", side: "debt", dir: "out", hatch: "reverse" },
   {
     key: "repaidWithCollateral",
     label: "Repaid with collateral",
-    short: "With collateral",
+    event: "Repay with collateral",
     side: "debt",
     dir: "out",
     link: "repay-with-collateral",
@@ -92,7 +101,7 @@ export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
   {
     key: "repaidBySwap",
     label: "Repaid by a debt swap",
-    short: "Debt swap",
+    event: "Debt swap",
     side: "debt",
     dir: "out",
     hatch: "vertical",
@@ -100,13 +109,22 @@ export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
   {
     key: "liquidatedDebt",
     label: "Liquidated",
+    event: "Liquidated",
     side: "debt",
     dir: "out",
     tone: "liquidation",
     link: "liquidation",
     hatch: "forward",
   },
-  { key: "writtenOff", label: "Written off", side: "debt", dir: "out", tone: "liquidation", hatch: "cross" },
+  {
+    key: "writtenOff",
+    label: "Written off",
+    event: "Debt written off",
+    side: "debt",
+    dir: "out",
+    tone: "liquidation",
+    hatch: "cross",
+  },
 ];
 
 const BUCKET_OF: Record<FlowLeg, string> = {

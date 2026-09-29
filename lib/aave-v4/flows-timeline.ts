@@ -12,7 +12,13 @@
 
 import type { AaveV4SnapshotItem, BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV4Event } from "@/lib/shared/types/event-shape";
-import { daysFromEvents, type FlowAssetHeld, type FlowLive, type FlowTimeline } from "@/lib/shared/flows-timeline";
+import {
+  daysFromEvents,
+  type FlowAssetHeld,
+  type FlowBucket,
+  type FlowLive,
+  type FlowTimeline,
+} from "@/lib/shared/flows-timeline";
 import type { FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import type { AaveLifetimeTotals } from "@/lib/aave-v4/lifetime-totals";
 import type { ReserveStats } from "@/lib/aave-v4/spoke-cards";
@@ -175,7 +181,7 @@ export function aaveV4FlowTimeline(
   );
   if (!flows) return null;
   return {
-    buckets: AAVE_V3_FLOW_BUCKETS.filter((b) => flows.used.has(b.key)),
+    buckets: AAVE_V4_FLOW_BUCKETS.filter((b) => flows.used.has(b.key)),
     days: daysFromEvents(
       AAVE_V3_FLOW_BUCKETS.map((b) => b.key),
       flows.events,
@@ -186,11 +192,17 @@ export function aaveV4FlowTimeline(
   };
 }
 
+/** Aave V3's buckets under the V4 timeline's event names (its liquidation
+ *  row reads "Liquidation"). */
+const AAVE_V4_FLOW_BUCKETS: FlowBucket[] = AAVE_V3_FLOW_BUCKETS.map((b) =>
+  b.event === "Liquidated" ? { ...b, event: "Liquidation" } : b,
+);
+
 /** The scrubber's timeline from the index's day rows. */
 export function aaveV4FlowSeriesTimeline(
   series: FlowSeries,
   live: FlowLive | null,
   todayPrices: Record<string, number> | undefined,
 ): FlowTimeline | null {
-  return flowSeriesTimeline(series, AAVE_V3_FLOW_BUCKETS, live, todayPrices);
+  return flowSeriesTimeline(series, AAVE_V4_FLOW_BUCKETS, live, todayPrices);
 }

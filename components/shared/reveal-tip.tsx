@@ -54,13 +54,15 @@ export function RevealTip({
   const ref = useRef<HTMLSpanElement>(null);
   const bubbleRef = useRef<HTMLSpanElement>(null);
   // Shift left by however far the bubble would run past the viewport's right
-  // edge (a right-aligned cell at 390px), keeping the arrow on the value.
+  // edge (a right-aligned cell at 390px), keeping the arrow on the value. The
+  // edge is the document's width: on a phone an unshifted bubble widens the
+  // layout viewport, and `innerWidth` then reports the widened one.
   const [shift, setShift] = useState(0);
   useLayoutEffect(() => {
     if (!open) return setShift(0);
     const b = bubbleRef.current;
     if (!b) return;
-    const over = b.getBoundingClientRect().right - (window.innerWidth - 8);
+    const over = b.getBoundingClientRect().right - (document.documentElement.clientWidth - 8);
     const room = ref.current ? ref.current.getBoundingClientRect().left - 8 : 0;
     setShift(over > 0 ? Math.min(over, Math.max(room, 0)) : 0);
   }, [open]);

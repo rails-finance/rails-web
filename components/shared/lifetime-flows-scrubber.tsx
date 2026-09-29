@@ -8,7 +8,17 @@
 // this file only draws them. Under each bar one line says where its length
 // came from; hovering or tapping a segment lists its assets.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { Prov } from "@/components/shared/provenance";
@@ -65,7 +75,9 @@ function hatchImage(hatch: FlowHatch, color: string): CSSProperties {
     cross: `<path d='M0,0 l6,6 M6,0 l-6,6' stroke='${c}' stroke-width='1.1'/>`,
     vertical: `<path d='M1.5,0 v6 M4.5,0 v6' stroke='${c}' stroke-width='1.2'/>`,
     horizontal: `<path d='M0,1.5 h6 M0,4.5 h6' stroke='${c}' stroke-width='1.2'/>`,
-    dots: `<circle cx='1.5' cy='1.5' r='1.1' fill='${c}'/><circle cx='4.5' cy='4.5' r='1.1' fill='${c}'/>`,
+    // One dot a tile, a square grid: a diagonal pair of dots reads as the
+    // reverse diagonal at bar size.
+    dots: `<circle cx='3' cy='3' r='1.3' fill='${c}'/>`,
   };
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='6' height='6'>${paths[hatch]}</svg>`;
   return { backgroundImage: `url("data:image/svg+xml,${svg}")`, backgroundSize: "6px 6px", backgroundRepeat: "repeat" };
@@ -99,15 +111,10 @@ const isToken = (h: FlowAssetHeld) => h.amount != null;
 /** The highlight key a segment answers to: its link group, else its own key. */
 const hlKey = (s: FlowSegment) => (s.link ? `link:${s.link}` : s.key);
 
-function Label({ s }: { s: FlowSegment }) {
-  if (!s.short) return <>{s.label}</>;
-  return (
-    <>
-      <span className="sm:hidden">{s.short}</span>
-      <span className="hidden sm:inline">{s.label}</span>
-    </>
-  );
-}
+/** Set by the panel around the scrubber: told what the ledger under it shows
+ *  while the slider is off its last stop ("Shows the position today"), and
+ *  null at the last stop, where the two agree. */
+export const FlowsLedgerNoteContext = createContext<((note: string | null) => void) | null>(null);
 
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -333,14 +340,7 @@ function SourceLine({
         return (
           <span key={s.key}>
             <span className="whitespace-nowrap">
-              {s.short ? (
-                <>
-                  <span className="sm:hidden">{word(s.short)}</span>
-                  <span className="hidden sm:inline">{word(s.label)}</span>
-                </>
-              ) : (
-                word(s.label)
-              )}{" "}
+              {word(s.label)}{" "}
               <Prov info={flowSegmentProv(s, side, when, isLive, daily)}>
                 <span className="font-medium tabular-nums text-foreground">
                   {s.signed && s.value >= 0.5 ? "+" : ""}
@@ -357,18 +357,62 @@ function SourceLine({
 }
 
 /** The hatches the bars draw, by name: each kind of exit the position has
- *  had over its life. The segments' tips carry the figures. */
-function HatchKey({ items }: { items: { side: FlowSide; s: FlowSegment }[] }) {
-  if (items.length === 0) return null;
+ *  had over its life. The segments' tips carry the figures. Off the last
+ *  stop, the dashed outline too: where each bar ends at that stop. */
+function HatchKey({ items, outline }: { items: { side: FlowSide; s: FlowSegment }[]; outline: string | null }) {
+  if (items.length === 0 && !outline) return null;
   return (
     <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-rb-500" aria-label="Key" data-flow-key="">
       {items.map(({ side, s }) => (
         <li key={`${side}:${s.key}`} className="inline-flex items-center gap-1.5">
           <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px]" style={fillStyle(side, s)} />
-          <Label s={s} />
+          {s.label}
         </li>
       ))}
+      {outline && (
+        <li className="inline-flex items-center gap-1.5" data-flow-key-outline="">
+          <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px] border border-dashed border-rb-500" />
+          {outline}
+        </li>
+      )}
     </ul>
+  );
+}
+
+/** Where a pip under the pointer sits from the strip's left edge, and what
+ *  its tip says. */
+type PipOpen = { x: number; text: string };
+
+/** The event pips' tip: one bubble over the strip, held inside the viewport. */
+function PipTip({ at }: { at: PipOpen }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [dx, setDx] = useState(0);
+  useLayoutEffect(() => {
+    const b = ref.current;
+    if (!b) return;
+    const r = b.getBoundingClientRect();
+    const vw = document.documentElement.clientWidth;
+    const left = r.left - dx;
+    const right = r.right - dx;
+    setDx(left < 8 ? 8 - left : right > vw - 8 ? vw - 8 - right : 0);
+    // Measured once per position of the tip; `dx` is this render's.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [at.x, at.text]);
+  return (
+    <span
+      ref={ref}
+      role="tooltip"
+      data-prov-hidden=""
+      className="pointer-events-none absolute bottom-full z-50 mb-1.5 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
+      style={{
+        left: at.x,
+        transform: `translateX(calc(-50% + ${dx}px))`,
+        background: "var(--rb-tooltip-bg)",
+        borderColor: "var(--rb-tooltip-border)",
+      }}
+    >
+      {at.text}
+    </span>
   );
 }
 
@@ -407,6 +451,8 @@ function ScrubberBody({ model }: { model: FlowModel }) {
   const [hover, setHover] = useState<string | null>(null);
   const [pinned, setPinned] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [pip, setPip] = useState<PipOpen | null>(null);
+  const pipRef = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
   const motion = reduced ? "" : "transition-all duration-200 ease-out";
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -488,6 +534,43 @@ function ScrubberBody({ model }: { model: FlowModel }) {
       ? `${s.txs.toLocaleString("en-US")} of ${model.totalTxs.toLocaleString("en-US")} transaction${model.totalTxs === 1 ? "" : "s"}`
       : `${s.count.toLocaleString("en-US")} of ${model.totalEvents.toLocaleString("en-US")} event${model.totalEvents === 1 ? "" : "s"}`;
   const repricedHere = s.isLive ? [] : model.repricings.filter((r) => r.day === stop);
+  // Off the last stop, the dashed outline marks where each bar ends there.
+  const outline = s.isLive ? null : closed ? "Length at close" : "Today's length";
+  // The ledger under the panel shows the last stop; say so while the slider is elsewhere.
+  const ledgerNote = useContext(FlowsLedgerNoteContext);
+  const ledgerText = s.isLive ? null : closed ? "Shows the position at close" : "Shows the position today";
+  useEffect(() => {
+    ledgerNote?.(ledgerText);
+  }, [ledgerNote, ledgerText]);
+  useEffect(() => () => ledgerNote?.(null), [ledgerNote]);
+  // A pip's tip: the day and the timeline's names for its events.
+  const pipText = (t: FlowModel["ticks"][number]) =>
+    `${dayStamp(dayStart(model, t.day))}${t.kinds.length ? `: ${t.kinds.join(", ")}` : ""}`;
+  const pipAt = (clientX: number): PipOpen | null => {
+    const el = pipRef.current;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    let best: FlowModel["ticks"][number] | null = null;
+    let bestD = Infinity;
+    for (const t of model.ticks) {
+      const d = Math.abs((t.day / model.liveStop) * r.width - (clientX - r.left));
+      if (d < bestD) {
+        bestD = d;
+        best = t;
+      }
+    }
+    return best && bestD <= 8 ? { x: (best.day / model.liveStop) * r.width, text: pipText(best) } : null;
+  };
+  // A tap elsewhere closes a pip's tip.
+  useEffect(() => {
+    if (!pip) return;
+    const away = (e: PointerEvent) => {
+      if (!pipRef.current?.contains(e.target as Node)) setPip(null);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [pip]);
+  const tickHere = model.ticks.find((t) => t.day === stop);
   const btn = `${CTRL_GHOST} ${CTRL_OFF} size-11 shrink-0 rounded-md sm:size-9`;
   const go = (to: number) => {
     halt();
@@ -531,18 +614,30 @@ function ScrubberBody({ model }: { model: FlowModel }) {
         />
       )}
 
-      <HatchKey items={keyItems} />
+      <HatchKey items={keyItems} outline={outline} />
 
       <div className="relative mt-3">
-        {/* Event pips over the line, coloured by the side each event moved. */}
-        <div className="pointer-events-none relative mx-2 h-3" aria-hidden>
-          {model.ticks.map((t, i) => (
-            <i
-              key={i}
-              className="absolute bottom-0 h-2.5 w-[2px] rounded-[1px]"
-              style={{ left: pct(t.day, model.liveStop), background: TICK[t.tick] }}
-            />
-          ))}
+        {/* Event pips over the line, coloured by the side each event moved.
+            Hovering or tapping one names its day's events; the keyboard hears
+            the same through the slider's value. */}
+        <div
+          ref={pipRef}
+          className="relative mx-2 h-4 sm:h-3"
+          data-flow-pips=""
+          onPointerMove={(e) => e.pointerType === "mouse" && setPip(pipAt(e.clientX))}
+          onPointerLeave={(e) => e.pointerType === "mouse" && setPip(null)}
+          onClick={(e) => setPip(pipAt(e.clientX))}
+        >
+          <div aria-hidden>
+            {model.ticks.map((t, i) => (
+              <i
+                key={i}
+                className="pointer-events-none absolute bottom-0 h-2.5 w-[2px] rounded-[1px]"
+                style={{ left: pct(t.day, model.liveStop), background: TICK[t.tick] }}
+              />
+            ))}
+          </div>
+          {pip && <PipTip at={pip} />}
         </div>
         <div className="relative">
           <input
@@ -552,7 +647,7 @@ function ScrubberBody({ model }: { model: FlowModel }) {
             step={1}
             value={stop}
             aria-label="Date"
-            aria-valuetext={dateText}
+            aria-valuetext={tickHere?.kinds.length ? `${dateText}: ${tickHere.kinds.join(", ")}` : dateText}
             onChange={(e) => {
               halt();
               setStop(Number(e.target.value));
