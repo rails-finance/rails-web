@@ -59,6 +59,8 @@ import {
 } from "@/lib/liquity-v1/economics-explanation";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import { useLiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
+import { protocolPriceProv } from "@/lib/liquity-v1/position-provenance";
+import { eventPriceProv } from "@/lib/liquity-v1/event-provenance";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle, mirroring the V4 spoke page.
@@ -311,7 +313,11 @@ export default function LiquityV1TroveView({
       <DetailTopRow
         session="liquity-v1"
         wallet={wallet}
-        assets={chain && view?.status === "open" && chain.price > 0 ? [{ symbol: "ETH", price: chain.price }] : []}
+        assets={
+          chain && view?.status === "open" && chain.price > 0
+            ? [{ symbol: "ETH", price: chain.price, info: protocolPriceProv() }]
+            : []
+        }
         closed={view != null && view.status !== "open"}
         closing={
           // The PriceFeed's lastGoodPrice at the closing block, carried on
@@ -319,7 +325,15 @@ export default function LiquityV1TroveView({
           view && view.status !== "open"
             ? closingPricesAt(v1Events, (row) => {
                 const usd = row.context.data.priceAtBlock?.usd;
-                return usd != null && usd > 0 ? [{ symbol: "ETH", price: usd }] : undefined;
+                return usd != null && usd > 0
+                  ? [
+                      {
+                        symbol: "ETH",
+                        price: usd,
+                        info: eventPriceProv({ txHash: row.txHash, blockNumber: row.blockNumber }, usd),
+                      },
+                    ]
+                  : undefined;
               })
             : undefined
         }
