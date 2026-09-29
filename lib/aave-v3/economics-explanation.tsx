@@ -34,6 +34,12 @@ export interface AaveV3EconomicsOpts {
   token?: string;
   swaps?: boolean;
   links?: { label: string; url: string }[];
+  /** How the pane words what was withdrawn, where the market says more
+   *  (SparkLend: withdrawals as ETH through its WETH gateway are included). */
+  withdrawnWords?: string;
+  /** The liquidation card states the split, the bonus and the net, so the
+   *  pane keeps one line pointing at it (SparkLend). */
+  liquidationOnCard?: boolean;
 }
 
 const sumScalar = (lines: TowerLine[], valued: boolean): number =>
@@ -154,7 +160,8 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
             {outParts.map(([k, v], i) => (
               <span key={k}>
                 {i > 0 ? (i === outParts.length - 1 ? " and " : ", ") : null}
-                <Fig>{fmt(v, valued, collSym)}</Fig> {OUT_WORDS[k] ?? k.toLowerCase()}
+                <Fig>{fmt(v, valued, collSym)}</Fig>{" "}
+                {k === "Withdrawn" && opts.withdrawnWords ? opts.withdrawnWords : (OUT_WORDS[k] ?? k.toLowerCase())}
               </span>
             ))}
           </>
@@ -257,15 +264,24 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
             )
             .join(" and ")
         : tokenList(data.collateral.liquidated);
-    items.push(
-      <span key="liq-net">
-        Liquidations took {taken} of collateral to clear{" "}
-        {tokenList(data.debt.liquidated.filter((l) => !isWrittenOff(l)))} of debt:{" "}
-        <Fig>{fmt(collLiquidated, valued, collSym)}</Fig> against <Fig>{fmt(debtLiquidated, valued, debtSym)}</Fig>
-        {data.flowsPricedAtEvents ? " at the prices of the day" : ""}, a net {signedUsd(net)} to the borrower: the
-        liquidation bonus, part of which went to the {treasury} treasury.
-      </span>,
-    );
+    if (opts.liquidationOnCard)
+      items.push(
+        <span key="liq-net">
+          Liquidations took {tokenList(data.collateral.liquidated)} of collateral to clear{" "}
+          {tokenList(data.debt.liquidated.filter((l) => !isWrittenOff(l)))} of debt, a net {signedUsd(net)} to the
+          borrower; the liquidation&apos;s card sets out the bonus and the {treasury} treasury&apos;s fee.
+        </span>,
+      );
+    else
+      items.push(
+        <span key="liq-net">
+          Liquidations took {taken} of collateral to clear{" "}
+          {tokenList(data.debt.liquidated.filter((l) => !isWrittenOff(l)))} of debt:{" "}
+          <Fig>{fmt(collLiquidated, valued, collSym)}</Fig> against <Fig>{fmt(debtLiquidated, valued, debtSym)}</Fig>
+          {data.flowsPricedAtEvents ? " at the prices of the day" : ""}, a net {signedUsd(net)} to the borrower: the
+          liquidation bonus, part of which went to the {treasury} treasury.
+        </span>,
+      );
   } else if (collLiquidated > 0) {
     items.push(
       <span key="coll-liq">

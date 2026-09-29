@@ -25,6 +25,10 @@ export interface SparkChainReserve {
   /** Liquidation threshold (0..1) — chain-read from the reserve configuration at
    *  head (falls back to the curated catalog LT, then null). */
   lt: number | null;
+  /** The reserve's own max loan-to-value (0..1) at head. */
+  ltv?: number;
+  /** The reserve is in the wallet's e-mode category. */
+  inEmode?: boolean;
   // ── Reserve economics, read from getReserveData @ head (0..1 fractions) ──
   /** Supply APR (currentLiquidityRate, ray → fraction). */
   supplyApr?: number;
@@ -56,6 +60,8 @@ export interface SparkPositionChainResponse {
   chainStale: boolean;
   /** Reserves with non-zero supply or debt. */
   reserves: SparkChainReserve[];
+  /** The wallet's e-mode category at head (id 0: none); null where unread. */
+  emode?: { id: number; label: string | null; ltv: number | null; lt: number | null } | null;
 }
 
 export interface FetchSparkPositionParams {

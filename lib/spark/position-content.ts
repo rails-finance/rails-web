@@ -17,47 +17,39 @@ const LINKS: LearnMoreContent["links"] = [
   { label: "Spark FAQ", url: SPARK_DOC_URLS.FAQ },
 ];
 
+const EMODE_URL = "https://docs.spark.fi/products/sparklend/guides/e-mode";
+
 export function sparkPositionContent(opts: {
   /** "unread" (no state recorded yet, 0018) reads as open: the concepts hold
    *  and no lifecycle claim is made. */
   status: "open" | "closed" | "liquidated" | "unread";
   hasDebt?: boolean;
 }): LearnMoreContent {
-  if (opts.status === "liquidated") {
+  if (opts.status === "liquidated" || opts.status === "closed") {
     return {
       title: "About This Position",
       intro:
-        "This account was liquidated when its health factor fell below 1.0. The panel above reconstructs its final state — the highest recorded supply and debt for each reserve it held.",
-      detailsHeading: "Key concepts:",
-      details: [
-        {
-          bold: "Health factor",
-          text: "the account's single safety number across every reserve; once it drops below 1.0, a liquidator can step in.",
-        },
-        {
-          bold: "Cross-collateralisation",
-          text: "SparkLend pools every supplied reserve into one account — all of it backed all of the borrowing, under one shared health factor.",
-        },
-      ],
-      links: LINKS,
-    };
-  }
-
-  if (opts.status === "closed") {
-    return {
-      title: "About This Position",
-      intro:
-        "This account has repaid all its debt and withdrawn its collateral. The panel above shows its lifetime peaks — the highest supply and debt each reserve ever reached.",
+        opts.status === "liquidated"
+          ? "This account was liquidated at least once, when its health factor fell below 1, and holds nothing now. Its card shows the most each reserve ever held or owed."
+          : "This account has repaid its debt and withdrawn its collateral. Its card shows the most each reserve ever held or owed.",
       detailsHeading: "Key concepts:",
       details: [
         {
           bold: "Highest recorded",
-          text: "each reserve's peak is the maximum of its running balance, replayed from the account's own events — not a snapshot at one moment.",
+          text: "each reserve's peak is the largest balance it reached at any event, interest to then included; the peaks of different reserves need not have stood at the same time.",
         },
         {
-          bold: "Cross-collateralisation",
-          text: "SparkLend pools every supplied reserve into one account — all of it backs all of the borrowing, under one shared health factor.",
+          bold: "One account per wallet",
+          text: "SparkLend pools every supplied reserve into one account per wallet, under one health factor. A new supply by the same wallet reopens it.",
         },
+        ...(opts.status === "liquidated"
+          ? [
+              {
+                bold: "Liquidated",
+                text: "a liquidation repays part of the debt (up to half while the health factor is between 0.95 and 1) and takes collateral worth that plus a bonus, so an account often survives it and is closed by its owner later.",
+              },
+            ]
+          : []),
       ],
       links: LINKS,
     };
@@ -65,34 +57,38 @@ export function sparkPositionContent(opts: {
 
   const details: LearnMoreContent["details"] = [
     {
-      bold: "Cross-collateralisation",
-      text: "SparkLend pools every supplied reserve into one account per wallet — all of it backs all of the account's borrowing, under one shared health factor.",
-    },
-    {
-      bold: "Health factor",
-      text: "measures how safely the debt is covered against the collateral's liquidation thresholds; below 1.0 the account can be liquidated.",
+      bold: "One account per wallet",
+      text: "SparkLend pools every supplied reserve into one account per wallet: all of the collateral backs all of the borrowing, under one health factor.",
     },
     opts.hasDebt
       ? {
-          bold: "Liquidation price",
-          text: "for a single-reserve collateral, the oracle price at which the health factor would hit 1.0 — the figure the panel above restates beneath the health factor; with several collateral reserves it shows the combined-value drop instead.",
+          bold: "Two limits",
+          text: "the account may borrow up to its maximum loan-to-value; its liquidation threshold sits a little higher, and the health factor reaches 1 when the loan-to-value reaches it. Both are each collateral's figure averaged by value.",
         }
       : {
           bold: "Supply only",
-          text: "with no debt, the account carries no health factor or liquidation risk — supplied reserves simply earn interest.",
+          text: "with no debt the account has no health factor and cannot be liquidated; supplied reserves earn interest.",
         },
     {
-      bold: "sDAI, not DAI",
-      text: "raw DAI's liquidation threshold is set to an on-chain epsilon (0.01%), so DAI supply earns interest but effectively doesn't back borrowing — sDAI does.",
+      bold: "Health factor",
+      text: "Σ (collateral value × its liquidation threshold) ÷ debt value, at SparkLend's oracle prices. Below 1 the account can be liquidated.",
+    },
+    {
+      bold: "E-mode",
+      text: "an account can choose one category of price-correlated assets (ETH-correlated, or stablecoins); collateral inside it then counts at the category's higher loan-to-value and threshold, and only assets of that category can be borrowed.",
+    },
+    {
+      bold: "sDAI and DAI",
+      text: "raw DAI's liquidation threshold is 0.01%, so DAI supply earns interest but backs almost nothing; sDAI is the collateral form.",
     },
   ];
 
   return {
     title: "About This Position",
     intro:
-      "This panel explains the account's live state in plain language — what's supplied across each SparkLend reserve, what's borrowed against it, and how safely the debt is covered, all read from SparkLend's own Pool at the block this card names.",
+      "A SparkLend position is one wallet's account on the SparkLend Pool: what it has supplied, what it has borrowed against that, and how safely the debt is covered, read from the Pool.",
     detailsHeading: "Key concepts:",
     details,
-    links: LINKS,
+    links: [...(LINKS ?? []), { label: "E-mode", url: EMODE_URL }],
   };
 }

@@ -151,8 +151,9 @@ const PARTY_ROLES = [
   { role: "depositor", prefixes: ["for this address by"], phrases: [/\bdeposited\b.*\bfor this address\b/i] },
   { role: "veto", prefixes: ["vetoed by"], phrases: [/\bveto\w*/i, /\bdenied\b/i] },
   { role: "delegate", prefixes: ["delegate"], phrases: [/\bbatch manager\b/i, /\bdelegat\w*/i] },
-  // "via" also names a swap's venue (Aave V3's "via CoW Protocol").
-  { role: "router", prefixes: ["via"], phrases: [/\brouter\b/i, /\bsettle(d|ment)\b/i] },
+  // "via" also names a swap's venue (Aave V3's "via CoW Protocol"); "as ETH
+  // via" is SparkLend's WETH gateway on a withdrawal.
+  { role: "router", prefixes: ["via", "as ETH via"], phrases: [/\brouter\b/i, /\bsettle(d|ment)\b/i] },
 ];
 
 function read(p) {

@@ -43,12 +43,26 @@ import {
   type AtBlockPricePill,
 } from "@/components/shared/liquidation-forensics";
 import { formatNumber } from "@/lib/utils/format";
+import type { V3Coords } from "@/lib/aave-v3/event-provenance";
+import { SPARK_POOL_IDENTITY } from "@/lib/spark/pool-identity";
+import { SparkAccountState } from "./spark-account-state";
+import { useSparkEventState } from "./use-spark-event-state";
 
 export interface SparkEventDetailProps {
   ctx: SparkContext;
   txHash?: string;
   blockNumber?: number;
+  /** With `market`, the grid adds the account before → after, read at blocks
+   *  N−1 and N (SparkAccountState). */
+  wallet?: string;
+  market?: "spark";
+  reserveAddress?: string;
+  previous?: { blockNumber: number; txHash: string };
 }
+
+/** Interest below this reads as "<0.000001" and says nothing; the line is left
+ *  out under it (a supplied wstETH balance earns about 1e-14 a block). */
+const INTEREST_FLOOR = 0.000001;
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
 
@@ -109,8 +123,18 @@ function BasketList({
   );
 }
 
-export function SparkEventDetail({ ctx, txHash, blockNumber }: SparkEventDetailProps) {
+export function SparkEventDetail({
+  ctx,
+  txHash,
+  blockNumber,
+  wallet,
+  market,
+  reserveAddress,
+  previous,
+}: SparkEventDetailProps) {
   const coords: SparkCoords = { txHash, blockNumber };
+  const read = useSparkEventState({ ctx, wallet, market, blockNumber, txHash, reserveAddress, previous });
+  const v3Coords: V3Coords = { txHash, blockNumber, wallet, stateRead: "chain-at-block", pool: SPARK_POOL_IDENTITY };
   const stats: ChainTruthStat[] = [];
   // A row the index valued at the chain balance (decision 0033) carries its
   // own receipts and the interest since the lane's previous move.
@@ -136,7 +160,9 @@ export function SparkEventDetail({ ctx, txHash, blockNumber }: SparkEventDetailP
         : debtBeforeProv(sym, coords);
   const interestOf = (sym: string, side: "supply" | "debt"): ChainTruthStat["interestSincePrevious"] => {
     const v = side === "supply" ? ctx.supplyInterestSincePrevious : ctx.debtInterestSincePrevious;
-    return v ? { value: v, prov: rowInterestProv(sym, side, coords) } : undefined;
+    return v && Math.abs(Number(v)) >= INTEREST_FLOOR
+      ? { value: v, prov: rowInterestProv(sym, side, coords) }
+      : undefined;
   };
 
   if (ctx.eventType === "liquidation") {
@@ -252,6 +278,18 @@ export function SparkEventDetail({ ctx, txHash, blockNumber }: SparkEventDetailP
   return (
     <div>
       <ChainTruthDetail stats={stats} />
+      {read.status === "ready" && read.state && read.raw ? (
+        <SparkAccountState
+          state={read.state}
+          raw={read.raw}
+          coords={v3Coords}
+          isLiquidation={ctx.eventType === "liquidation"}
+        />
+      ) : read.status === "loading" ? (
+        <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="loading">
+          Reading the account before and after this transaction…
+        </div>
+      ) : null}
       {forensics && <LiquidationForensics {...forensics} />}
       {pricePills.length > 0 && (
         <div className="px-5 pb-2">

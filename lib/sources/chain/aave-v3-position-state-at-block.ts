@@ -1,8 +1,10 @@
-// The position state of an Aave V3 account on Base around one transaction,
+// The position state of an Aave V3-family account around one transaction,
 // read from the chain at two blocks — the Base lane's equivalent of the
 // Ethereum index's /api/aave-v3/timeline/position-state (rails-ops
 // TO-DO-ui-jobs §19; the Base lane reads balances with balanceOf, decision 0008
-// addendum, so there are no scaled deltas to reduce).
+// addendum, so there are no scaled deltas to reduce). SparkLend on Ethereum
+// reads the same way (/api/chain/spark/position-state): the index serves no
+// SparkLend position state.
 //
 // RULE: "before" is the account at the end of block N−1 and "after" at the end
 // of block N, so the answer holds only where the owner has no other
@@ -36,6 +38,8 @@ const POOL_ABI = parseAbi([
   "function getEModeCategoryCollateralBitmap(uint8 id) view returns (uint128)",
   "function getEModeCategoryCollateralConfig(uint8 id) view returns ((uint16 ltv, uint16 liquidationThreshold, uint16 liquidationBonus))",
   "function getEModeCategoryLabel(uint8 id) view returns (string)",
+  "function getEModeCategoryData(uint8 id) view returns ((uint16 ltv, uint16 liquidationThreshold, uint16 liquidationBonus, address priceSource, string label))",
+  "function getConfiguration(address asset) view returns ((uint256 data))",
 ]);
 const TOKEN_ABI = parseAbi([
   "function balanceOf(address) view returns (uint256)",
@@ -139,15 +143,22 @@ export async function loadAaveV3PositionStateAtBlock(args: {
       { address: d.variableDebtTokenAddress, abi: TOKEN_ABI, functionName: "scaledBalanceOf", args: [wallet] },
     ] as const;
   });
-  const [rAfter, rBefore] = await Promise.all([
+  // Each reserve's configuration at the end of N−1: the liquidation bonus and
+  // protocol fee a liquidation in this transaction ran under.
+  const configBefore = reserves.map(
+    (a) => ({ address: pool, abi: POOL_ABI, functionName: "getConfiguration", args: [a] }) as const,
+  );
+  const [rAfter, rBefore, rConfigBefore] = await Promise.all([
     client.multicall({ allowFailure: true, ...after, contracts: perAfter }),
     client.multicall({ allowFailure: true, ...before, contracts: perBefore }),
+    client.multicall({ allowFailure: true, ...before, contracts: configBefore }),
   ]);
   const val = (r: { status: string; result?: unknown } | undefined): bigint | null =>
     r && r.status === "success" ? (r.result as bigint) : null;
 
-  // eMode categories either side names (liquid generation: Base answers the
-  // bitmap getters).
+  // eMode categories either side names. Base answers the bitmap getters
+  // (v3.2+); an older Pool (SparkLend) answers only getEModeCategoryData, and
+  // there a reserve's category is bits 168–175 of its configuration.
   const catIds = [...new Set([emBefore, emAfter].filter((id) => id > 0))];
   const categories: Record<string, AaveV3EmodeCategory> = {};
   let bitmapAfter: bigint | null = null;
@@ -176,17 +187,43 @@ export async function loadAaveV3PositionStateAtBlock(args: {
         .catch(() => null),
     ]);
     if (id === emAfter) bitmapAfter = (bitmap as bigint | null) ?? null;
-    const c = cfg as { ltv: number; liquidationThreshold: number } | null;
-    if (c)
+    const c = cfg as { ltv: number; liquidationThreshold: number; liquidationBonus: number } | null;
+    if (c) {
       categories[String(id)] = {
         label: (label as string | null) || null,
         ltvBps: Number(c.ltv),
         liquidationThresholdBps: Number(c.liquidationThreshold),
+        liquidationBonusBps: Number(c.liquidationBonus),
         priceSource: null,
         generation: "bitmap",
       };
+      continue;
+    }
+    const legacy = (await client
+      .readContract({ address: pool, abi: POOL_ABI, functionName: "getEModeCategoryData", args: [id], ...after })
+      .catch(() => null)) as {
+      ltv: number;
+      liquidationThreshold: number;
+      liquidationBonus: number;
+      priceSource: string;
+      label: string;
+    } | null;
+    if (legacy)
+      categories[String(id)] = {
+        label: legacy.label || null,
+        ltvBps: Number(legacy.ltv),
+        liquidationThresholdBps: Number(legacy.liquidationThreshold),
+        liquidationBonusBps: Number(legacy.liquidationBonus),
+        priceSource: /^0x0{40}$/i.test(legacy.priceSource) ? null : legacy.priceSource.toLowerCase(),
+        generation: "legacy",
+      };
   }
+  const legacyEmode = emAfter > 0 && categories[String(emAfter)]?.generation === "legacy";
 
+  const configAtBefore = (i: number): bigint | null => {
+    const r = rConfigBefore[i];
+    return r && r.status === "success" ? (r.result as { data: bigint }).data : null;
+  };
   const collateralBit = (cfg: bigint, id: number) => ((cfg >> BigInt(2 * id + 1)) & BigInt(1)) === BigInt(1);
   const rows: { addr: string; row: Omit<AaveV3PositionStateReserve, "symbol" | "decimals"> }[] = [];
   reserves.forEach((addr, i) => {
@@ -211,6 +248,7 @@ export async function loadAaveV3PositionStateAtBlock(args: {
       collBefore ||
       collAfter;
     if (!held || income == null || debtIndex == null) return;
+    const cb = configAtBefore(i);
     const leg = (scaledBefore: bigint, scaledAfter: bigint, afterBal: bigint, index: bigint, rate: bigint) => ({
       before: rayMul(scaledBefore, index).toString(),
       after: afterBal.toString(),
@@ -232,7 +270,14 @@ export async function loadAaveV3PositionStateAtBlock(args: {
         priceBase: price != null ? price.toString() : null,
         ltvBps: Number(d.configuration & BigInt(0xffff)),
         liquidationThresholdBps: Number((d.configuration >> BigInt(16)) & BigInt(0xffff)),
-        inEmode: emAfter > 0 && bitmapAfter != null ? ((bitmapAfter >> BigInt(d.id)) & BigInt(1)) === BigInt(1) : false,
+        inEmode:
+          emAfter > 0 && bitmapAfter != null
+            ? ((bitmapAfter >> BigInt(d.id)) & BigInt(1)) === BigInt(1)
+            : legacyEmode
+              ? Number((d.configuration >> BigInt(168)) & BigInt(0xff)) === emAfter
+              : false,
+        liquidationBonusBps: cb == null ? null : Number((cb >> BigInt(32)) & BigInt(0xffff)),
+        liquidationProtocolFeeBps: cb == null ? null : Number((cb >> BigInt(152)) & BigInt(0xffff)),
       },
     });
   });

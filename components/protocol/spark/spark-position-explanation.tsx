@@ -69,6 +69,7 @@ export function SparkPositionExplanation({
   // A prose-only rollup with no chrome twin, so it renders muted.
   const debtCeilingUsd = chain.totalCollateralUsd * chain.avgLiquidationThreshold;
   const hf = chain.healthFactor;
+  const emode = chain.emode;
   const dropPct = hf != null && hf > 1 ? Math.round((1 - 1 / hf) * 100) : null;
   const liqRead = view ? sparkLiquidationRead(view) : null;
   const supplyInterestUsd = captions?.supplyInterestUsd ?? null;
@@ -121,28 +122,49 @@ export function SparkPositionExplanation({
         {collateralSyms.length > 0 ? <>, collateralised by {joinSymbols(collateralSyms)}</> : null}.
       </span>,
     );
-    if (chain.totalCollateralUsd > 0 && chain.ltv > 0) {
+    // One sentence for the three limits the card states apart: the borrow
+    // limit (max LTV), the liquidation point (the threshold) and the distance
+    // to it.
+    if (chain.totalCollateralUsd > 0 && chain.ltv > 0 && chain.avgLiquidationThreshold > 0) {
       bullets.push(
         <span key="ltv">
-          Borrowing stands at <H>{pct(chain.totalDebtUsd / chain.totalCollateralUsd)}</H> loan-to-value, against a{" "}
-          <H>{pct(chain.ltv)}</H> borrow cap.
+          Borrowing stands at <H>{pct(chain.totalDebtUsd / chain.totalCollateralUsd)}</H> of the collateral&rsquo;s
+          value: the account may borrow up to <H>{pct(chain.ltv)}</H> and is liquidated at{" "}
+          <H>{pct(chain.avgLiquidationThreshold)}</H>
+          {dropPct != null ? (
+            <>
+              , which a fall of about <H>{dropPct}%</H> in the collateral&rsquo;s value against the debt would reach
+            </>
+          ) : null}
+          .
         </span>,
       );
     }
-    if (chain.avgLiquidationThreshold > 0 && debtCeilingUsd > 0) {
-      bullets.push(
-        <span key="ceiling">
-          Each asset counts only up to its liquidation threshold (<H>{pct(chain.avgLiquidationThreshold)}</H> blended),
-          so the collateral can carry up to {fmtUsd(debtCeilingUsd).display} of debt before the position is
-          liquidatable.
-        </span>,
+    if (emode && emode.id > 0) {
+      const own = chain.reserves.filter(
+        (r) => r.inEmode && r.isCollateral && r.supplyBalanceRaw !== "0" && r.ltv != null && r.lt != null,
       );
-    }
-    if (hf != null) {
       bullets.push(
-        <span key="hf">
-          Risk-adjusted collateral covers the debt {hf.toFixed(2)}× over; at a health factor of 1.00 the position
-          becomes liquidatable.
+        <span key="emode">
+          Those limits are the <H>{emode.label ?? `category ${emode.id}`}</H> e-mode category&rsquo;s
+          {emode.ltv != null && emode.lt != null ? (
+            <>
+              {" "}
+              ({pct(emode.ltv)} and {pct(emode.lt)})
+            </>
+          ) : null}
+          {own.length > 0 ? (
+            <>
+              ; outside e-mode{" "}
+              {own.map((r, i) => (
+                <span key={r.address}>
+                  {i > 0 ? ", " : null}
+                  {r.symbol} counts at {pct(r.ltv as number)} and {pct(r.lt as number)}
+                </span>
+              ))}
+            </>
+          ) : null}
+          .
         </span>,
       );
     }
@@ -151,13 +173,6 @@ export function SparkPositionExplanation({
         <span key="liq-price">
           Liquidation tracks {liqRead.single.symbol}: the position liquidates at{" "}
           <H>{fmtLiqPrice(liqRead.single.liqPrice)}</H>.
-        </span>,
-      );
-    }
-    if (dropPct != null) {
-      bullets.push(
-        <span key="drop">
-          The collateral basket can fall about <H>{dropPct}%</H> before liquidation begins.
         </span>,
       );
     }
@@ -267,9 +282,49 @@ import type { SparkReserveAmount } from "@/lib/sources/api/spark-positions";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
 import { formatDate } from "@/lib/date";
+import { isGatewayWithdrawal } from "@/lib/spark/liquidation-fee";
 
 function closureDate(unix: number): string {
   return formatDate(unix);
+}
+
+const DAY = 86400;
+
+/** What the owner did after the last liquidation: how many repays and
+ *  withdrawals (a withdrawal as ETH through the gateway counts as one), and
+ *  over which days. Null where nothing of the owner's followed. */
+function windDown(spark: BaseActivityEvent[]): React.ReactNode | null {
+  const rows = spark.filter(isSparkEvent);
+  const lastLiq = [...rows].reverse().find((e) => e.context.data.eventType === "liquidation");
+  if (!lastLiq) return null;
+  const later = rows.filter((e) => e.timestamp > lastLiq.timestamp);
+  const repays = later.filter((e) => e.context.data.eventType === "repay").length;
+  const withdrawals = later.filter(
+    (e) => e.context.data.eventType === "withdraw" || isGatewayWithdrawal(e.context.data),
+  ).length;
+  if (later.length === 0 || repays + withdrawals === 0) return null;
+  const first = later[0].timestamp;
+  const last = later[later.length - 1].timestamp;
+  const sameDay = Math.floor(first / DAY) === Math.floor(last / DAY);
+  const gapDays = Math.round((first - lastLiq.timestamp) / DAY);
+  const gap = gapDays >= 60 ? `${Math.round(gapDays / 30)} months` : `${gapDays} day${gapDays === 1 ? "" : "s"}`;
+  const parts = [
+    repays > 0 ? `${repays} repay${repays === 1 ? "" : "s"}` : null,
+    withdrawals > 0 ? `${withdrawals} withdrawal${withdrawals === 1 ? "" : "s"}` : null,
+  ].filter(Boolean);
+  return (
+    <>
+      After the liquidation on {formatDate(lastLiq.timestamp)} the owner closed the account with {parts.join(" and ")}{" "}
+      {sameDay ? (
+        <>on {formatDate(first)}</>
+      ) : (
+        <>
+          from {formatDate(first)} to {formatDate(last)}
+        </>
+      )}
+      , {gap} later.
+    </>
+  );
 }
 
 /** Up to three peak reserve figures, bolded, then a count for the rest — the
@@ -331,11 +386,14 @@ export function SparkClosedPositionExplanation({
   // directions — only a folder whose legs are all "Sent" states the ending as
   // a transfer out.
   const endedBySeizure = newestFolder ? newestFolder.kind === "liquidation" : lastType === "liquidation";
+  // A transfer to the Spark WETH gateway is a withdrawal to ETH, so a record
+  // ending on one ended by the owner's withdrawal.
+  const lastRow = spark.length > 0 ? spark[spark.length - 1].context.data : null;
   const endedByTransferOut = newestFolder
     ? newestFolder.kind === "transfer" &&
       newestFolder.legs.length > 0 &&
       newestFolder.legs.every((l) => l.verb === "Sent")
-    : lastType === "transfer_out";
+    : lastType === "transfer_out" && !(lastRow && isGatewayWithdrawal(lastRow));
   const everLiquidated = v.liquidationCount > 0;
 
   const hasPeakSupply = v.peakSupplies.length > 0;
@@ -406,15 +464,15 @@ export function SparkClosedPositionExplanation({
   if (everLiquidated) {
     bullets.push(
       <span key="seizures">
-        Liquidation seized it <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} — a SparkLend
-        liquidation is by parts: a liquidator repays a slice of one borrowed reserve and takes collateral from one
-        supplied reserve at that pair&rsquo;s liquidation bonus, so a single call need not empty the account.{" "}
+        It was liquidated <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"}, which is why the
+        outcome reads Liquidated.{" "}
         {endedBySeizure
-          ? "Here the final seizure emptied it entirely."
-          : "What remained after the seizures left by the account's own transactions."}{" "}
-        Seizures in the record are what mark the outcome Liquidated.
+          ? "The final liquidation took the last of its collateral."
+          : "A liquidation repays only part of the debt, so the account stayed open afterwards and the owner closed it."}
       </span>,
     );
+    const after = windDown(spark);
+    if (after) bullets.push(<span key="after">{after}</span>);
   }
 
   bullets.push(

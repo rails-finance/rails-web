@@ -205,6 +205,10 @@ export interface ChainTruthRowSpec {
   /** A custody row that keeps its action label before the amounts (Aave V3's
    *  "Transferred out"); the amounts stay bare. Unset: no label, as above. */
   custodyLabel?: boolean;
+  /** Draw the deltas' magnitudes without a sign, where the label's verb says
+   *  the direction and the ≥sm spine draws it as an arrow (SparkLend: a "+681"
+   *  on a Borrow read as a gain at 390px). The receipts keep the signed value. */
+  unsignedDeltas?: boolean;
   /** A rate the position holder (or a delegate acting for them) CHOSE — never a
    *  utilization rate. Renders as the same lozenge Liquity V2 uses (individual
    *  rb-500, or party-pink `tone: "delegate"` with the people glyph), and echoes
@@ -515,7 +519,10 @@ export function ChainTruthRow({
         // keeps the sign from running into the "<" ("− <0.01").
         const bare = Boolean(d.label) || Boolean(spec.custody);
         const magnitude = fmtHeaderMagnitude(Math.abs(d.value), d.symbol);
-        const text = bare ? magnitude : `${d.value < 0 ? "−" : "+"}${magnitude.startsWith("<") ? " " : ""}${magnitude}`;
+        const text =
+          bare || spec.unsignedDeltas
+            ? magnitude
+            : `${d.value < 0 ? "−" : "+"}${magnitude.startsWith("<") ? " " : ""}${magnitude}`;
         const toneClass =
           d.tone === "caution"
             ? "text-caution-600 dark:text-caution-400"
