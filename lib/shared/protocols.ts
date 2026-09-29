@@ -523,6 +523,9 @@ const SPECS: ProtocolSpec[] = [
     label: "Sky Savings",
     chainId: 1,
     slug: "sky-savings",
+    // Held back until the newcomer review loop closes (rails-ops
+    // TO-DO-sky-savings-scoping item 4).
+    unlaunched: true,
     tags: ["Savings"],
     desc: "Every sUSDS holder on Ethereum — the balance, its worth in USDS and the interest earned to the wei, replayed from the token's logs and checked against the contract",
     subPages: [{ segment: "rates", label: "Savings Rate history", tab: "Rate" }],
