@@ -83,19 +83,3 @@ export async function fetchSparkOraclePrices(assets: string[], baseUrl?: string)
   const data = (await res.json()) as { prices?: Record<string, number> };
   return data.prices ?? {};
 }
-
-/** Scale a raw balance string by token decimals into a display Number (BigInt-safe,
- *  ES2017). */
-export function scaleSparkChainBalance(raw: string, decimals: number): number {
-  if (!raw || raw === "0") return 0;
-  let big: bigint;
-  try {
-    big = BigInt(raw);
-  } catch {
-    return 0;
-  }
-  if (big === BigInt(0)) return 0;
-  if (decimals <= 0) return Number(big);
-  const divisor = BigInt("1" + "0".repeat(decimals));
-  return Number(big / divisor) + Number(big % divisor) / Number(divisor);
-}

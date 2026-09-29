@@ -11,7 +11,10 @@
 // lifetime-flows-series-*.json fixtures are the route's answers for that
 // wallet and for 0xfb45f0e6…750a (liquidated five times), read on victoria
 // 2026-09-29; the liquidated wallet's events come from the shared flow-legs
-// fixture's rows.
+// fixture's rows. The SparkLend ledger (computeSparkEconomics) is held to the
+// route's buckets at the live stop, row by row, on 0x685f…128c (33 treasury
+// fees) and 0xe431…239e (spToken transfers), from the rows and from the
+// route's `lifetime`.
 //
 //   npx tsx --test scripts/verify/verify-lifetime-flows-state.ts
 import { test } from "node:test";
@@ -27,10 +30,14 @@ import {
   aaveV3FlowEvents,
   aaveV3FlowSeriesTimeline,
   aaveV3FlowTimeline,
+  lifetimeFromSeries,
 } from "@/lib/aave-v3/flows-timeline";
 import type { AaveV3FlowSeries, FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { sparkRowsToEvents } from "@/lib/sources/api/spark-timeline";
 import { sparkFlowEvents, sparkFlowSeriesTimeline } from "@/lib/spark/flows-timeline";
+import { computeSparkEconomics } from "@/lib/spark/economics";
+import type { SparkPositionView } from "@/components/protocol/spark/spark-position-card";
+import type { TowerLine } from "@/lib/shared/chain-truth-economics";
 import { aaveV4FlowSeriesTimeline, aaveV4FlowTimeline } from "@/lib/aave-v4/flows-timeline";
 import { aaveV3RowsToEvents, type MvRow } from "@/lib/sources/api/aave-v3-timeline";
 import {
@@ -366,6 +373,122 @@ test("SparkLend: the route's day rows reproduce the event-level answer at every 
         b.ticks.some((t) => t.tick === "liquidation"),
         "liquidation days tick red",
       );
+  }
+});
+
+test("SparkLend: the ledger's in and out meet the route's buckets at the live stop, transfers and the treasury fee included", () => {
+  const legs = readJson<{
+    tokens: Record<string, { symbol: string; decimals: number }>;
+    cases: { wallet: string; rows: Parameters<typeof sparkRowsToEvents>[0] }[];
+  }>("spark-flow-legs.json");
+  const metas = new Map(Object.entries(legs.tokens).map(([address, t]) => [address, { address, ...t, named: true }]));
+  const LEDGER_BUCKET: Record<string, string> = {
+    "Sent to another account": "sent",
+    "Received by transfer": "received",
+  };
+  for (const [wallet, file] of [
+    // 33 liquidations, each with the Spark treasury's fee.
+    ["0x685ffd82e8395229974a4dc4e9034fe6108f128c", "lifetime-flows-series-spark-685f.json"],
+    // spToken transfers in and out.
+    ["0xe4317db5791ea5de9209b9839898ef65522b239e", "lifetime-flows-series-spark-e431.json"],
+  ]) {
+    const c = legs.cases.find((x) => x.wallet === wallet)!;
+    const events = sparkRowsToEvents(c.rows, wallet, metas).events;
+    const series = readJson<FlowSeries>(file);
+    // Today's prices: the series' latest per asset, else the last event's.
+    const prices: Record<string, number> = {};
+    for (const d of series.days) for (const [asset, usd] of d[5]) prices[asset] = usd;
+    for (const [asset, p] of Object.entries(series.prices)) prices[asset] = p.obs[p.obs.length - 1][1];
+    // What the position holds and owes: each reserve's balance after its last row.
+    const held = new Map<string, { side: "supply" | "debt"; raw: string }>();
+    for (const r of c.rows as unknown as Record<string, string | null>[]) {
+      const set = (side: "supply" | "debt", asset: string | null, raw: string | null) => {
+        if (asset && raw != null) held.set(`${side}:${asset}`, { side, raw });
+      };
+      if (r.action === "liquidation") {
+        set("supply", r.collateral_asset, r.supply_after);
+        set("debt", r.debt_asset ?? r.reserve, r.debt_after);
+      } else if (["supply", "withdraw", "transfer_in", "transfer_out"].includes(r.action ?? ""))
+        set("supply", r.reserve, r.supply_after);
+      else set("debt", r.reserve, r.debt_after);
+    }
+    const reserves = (side: "supply" | "debt") =>
+      [...held]
+        .filter(([, v]) => v.side === side && v.raw !== "0")
+        .map(([k, v]) => {
+          const address = k.slice(k.indexOf(":") + 1);
+          const t = legs.tokens[address];
+          return {
+            symbol: t.symbol,
+            address,
+            decimals: t.decimals,
+            amount: Number(v.raw) / 10 ** t.decimals,
+            amountRaw: v.raw,
+            balanceSource: "reduced" as const,
+          };
+        });
+    const view: SparkPositionView = {
+      wallet,
+      status: "open",
+      supplies: reserves("supply"),
+      borrows: reserves("debt"),
+      peakSupplies: [],
+      peakBorrows: [],
+      liquidationCount: 0,
+      txCount: 0,
+      lastActivityAt: 0,
+      priceByAddress: prices,
+    };
+    // The ledger from the page's rows, and from the route's whole-history sums
+    // (what a folder-served or windowed page reads).
+    for (const from of ["rows", "route"] as const) {
+      const ledger =
+        from === "rows"
+          ? computeSparkEconomics(view, events)
+          : computeSparkEconomics(view, undefined, lifetimeFromSeries(series));
+      assert.ok(ledger.valued, `${wallet.slice(0, 10)}: the ledger is valued`);
+      const route = sparkFlowSeriesTimeline(series, ledger, prices);
+      assert.ok(route);
+      const m = buildFlowModel(route) as FlowModel;
+      const s = stateAt(m, m.liveStop);
+      const name = `${wallet.slice(0, 10)} (${from})`;
+      const cl = ledger.collateral;
+      const dl = ledger.debt;
+      // The totals.
+      assert.ok(near(seg(s.collateral, "deposited"), cl.lifetimeInflow), `${name}: deposited`);
+      assert.ok(near(seg(s.collateral, "received"), usdSum(cl.received)), `${name}: received`);
+      assert.ok(near(s.collateral.out, usdSum(cl.exited) + usdSum(cl.liquidated)), `${name}: collateral out`);
+      assert.ok(near(seg(s.debt, "borrowed"), dl.lifetimeInflow), `${name}: borrowed`);
+      assert.ok(near(s.debt.out, usdSum(dl.exited) + usdSum(dl.liquidated)), `${name}: debt out`);
+      assert.ok(near(s.collateral.now, usdSum(cl.current)), `${name}: held`);
+      assert.ok(near(s.debt.now, usdSum(dl.current) + (dl.interest?.usd ?? 0)), `${name}: owed`);
+      // Each ledger row against the bucket's part for its asset.
+      const parts = assetsAt(m, m.liveStop).flows;
+      const rows: [string, TowerLine[]][] = [
+        ["collateral", cl.exited],
+        ["received", cl.received ?? []],
+        ["liquidatedCollateral", cl.liquidated],
+        ["repaid", dl.exited],
+        ["liquidatedDebt", dl.liquidated],
+      ];
+      let checked = 0;
+      for (const [kind, lines] of rows)
+        for (const l of lines) {
+          const bucket =
+            kind === "collateral"
+              ? (LEDGER_BUCKET[l.flowLabel ?? ""] ?? "withdrawn")
+              : (LEDGER_BUCKET[l.flowLabel ?? ""] ?? kind);
+          const part = parts.get(bucket)?.find((p) => p.symbol === l.symbol);
+          assert.ok(part && near(part.usd, l.usd ?? NaN), `${name}: ${bucket} ${l.symbol} ${part?.usd} vs ${l.usd}`);
+          checked++;
+        }
+      assert.ok(checked > 0);
+      if (wallet.startsWith("0x685ffd82"))
+        // The treasury's fee rides the liquidated collateral, as the card states it.
+        assert.ok((ledger.liquidationSplit ?? []).some((x) => x.symbol === "WETH" && x.fee > 0));
+      else
+        assert.ok((cl.received ?? []).length > 0 && cl.exited.some((l) => l.flowLabel === "Sent to another account"));
+    }
   }
 });
 
