@@ -21,6 +21,8 @@ import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { v3Protocol } from "@/lib/aave-v3/protocol-name";
+import { feeLiquidation, liquidationFee } from "@/lib/aave-v3/liquidation-fee";
+import type { AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
 
 export interface AaveV3CtEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "aave-v3"; data: AaveV3Context } };
@@ -32,6 +34,12 @@ export interface AaveV3CtEventCardProps {
    *  Base and Seamless leave it unset and keep the replayed principal line
    *  (rails-ops TO-DO-ui-jobs §19). */
   market?: string;
+  /** The rows of this event's transaction, this one included (a liquidation
+   *  and its fee transfer to the treasury share one). */
+  siblings?: AaveV3TimelineEvent[];
+  /** The transaction before this one on the timeline, whose after-state is
+   *  where this event's before-state started. */
+  previous?: { blockNumber: number; txHash: string };
 }
 
 // direction "right" = token moves toward the protocol (deposit / repay),
@@ -59,8 +67,21 @@ const DIRECTION: Record<
   bad_debt_written_off: "right",
 };
 
-export function AaveV3CtEventCard({ event, isFirst, isLast, eventNumber, market }: AaveV3CtEventCardProps) {
+export function AaveV3CtEventCard({
+  event,
+  isFirst,
+  isLast,
+  eventNumber,
+  market,
+  siblings,
+  previous,
+}: AaveV3CtEventCardProps) {
   const ctx = event.context.data;
+  const chainId = useChainId();
+  // A transfer to the Aave treasury in a liquidation's transaction is that
+  // liquidation's protocol fee (lib/aave-v3/liquidation-fee.ts).
+  const feeOf = feeLiquidation(ctx, siblings, chainId);
+  const fee = liquidationFee(ctx, siblings, chainId);
   const isLiq = ctx.eventType === "liquidation";
   // A loss row: the liquidation, or the write-off of the debt it could not
   // cover. Both draw the critical warning glyph on the dotted (passive) spine
@@ -87,7 +108,7 @@ export function AaveV3CtEventCard({ event, isFirst, isLast, eventNumber, market 
   const coords: V3Coords = {
     txHash: event.txHash,
     blockNumber: event.blockNumber,
-    chainId: useChainId(),
+    chainId,
     source: useCaptureSource(),
     pool: useV3Pool(),
   };
@@ -271,6 +292,7 @@ export function AaveV3CtEventCard({ event, isFirst, isLast, eventNumber, market 
           externalBy={extBy ?? undefined}
           wallet={event.wallet}
           flows={event.flows}
+          feeOf={feeOf}
         />
       }
       detail={
@@ -280,14 +302,27 @@ export function AaveV3CtEventCard({ event, isFirst, isLast, eventNumber, market 
           blockNumber={event.blockNumber}
           wallet={event.wallet}
           market={market}
+          feeOf={feeOf}
+          fee={fee}
         />
       }
       detailLabel="Position state"
-      explainer={<AaveV3EventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} skipLead />}
+      explainer={
+        <AaveV3EventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          owner={event.wallet}
+          market={market}
+          siblings={siblings}
+          previous={previous}
+          skipLead
+        />
+      }
       explainerLabel="Plain English"
-      explainerTeaser={aaveV3ExplainerTeaser(ctx, coords)}
+      explainerTeaser={aaveV3ExplainerTeaser(ctx, coords, { owner: event.wallet, siblings })}
       txHash={event.txHash}
-      learnMore={<LearnMore inline content={aaveV3LearnMoreContent(ctx, v3Protocol(coords.pool))} />}
+      learnMore={<LearnMore inline content={aaveV3LearnMoreContent(feeOf ?? ctx, v3Protocol(coords.pool))} />}
       persistKey={`aave-v3:${event.id}`}
     />
   );

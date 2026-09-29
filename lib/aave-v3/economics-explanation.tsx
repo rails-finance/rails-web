@@ -5,13 +5,22 @@
 // the doc links differ, threaded through `opts.label`.
 
 import type { ReactNode } from "react";
-import type { ChainTruthTowerData, TowerLine, TowerSideData } from "@/lib/shared/chain-truth-economics";
+import type { TowerLine, TowerSideData } from "@/lib/shared/chain-truth-economics";
+import type { AaveV3TowerData } from "@/lib/aave-v3/chain-truth-tower";
+import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
 import { formatCompact } from "@/lib/utils/format";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { AAVE_FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { SEAMLESS_DOCS_URL } from "@/lib/aave-v3/protocol-name";
 import { WRITTEN_OFF_KEY } from "@/lib/aave-v3/chain-truth-tower";
+
+/** Signed dollars for a net: "−$295". */
+const signedUsd = (n: number): string => `${n < 0 ? "−" : "+"}${formatCompactUsd(Math.abs(n))}`;
+
+/** "67.36 AAVE and 1.2 WETH" — each line's own token amount. */
+const tokenList = (lines: TowerLine[]): string =>
+  lines.map((l) => `${fmt2(String(l.amount))} ${l.symbol}`).join(" and ");
 
 export interface AaveV3EconomicsOpts {
   /** How the market names itself in the prose — "Aave V3" when unstated. */
@@ -40,7 +49,7 @@ function Fig({ children }: { children: ReactNode }) {
   return <span className="font-semibold text-foreground tabular-nums">{children}</span>;
 }
 
-export function aaveV3EconomicsExplanation(data: ChainTruthTowerData, opts: AaveV3EconomicsOpts = {}): ReactNode {
+export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3EconomicsOpts = {}): ReactNode {
   const label = opts.label ?? "Aave V3";
   const valued = data.valued;
   const collSym = sideSymbol(data.collateral);
@@ -81,58 +90,69 @@ export function aaveV3EconomicsExplanation(data: ChainTruthTowerData, opts: Aave
     );
   }
   if (debtBorrowed > 0) {
+    // Borrowed + interest − repaid − liquidated = owed now, stated as one sum.
+    const liqFirst = debtRepaid > 0 ? " and " : ", then ";
     items.push(
       <span key="debt-flow">
         Borrowed <Fig>{fmt(debtBorrowed, valued, debtSym)}</Fig> over the position&apos;s life
-        {debtRepaid > 0 && (
+        {interest && (
           <>
-            , of which <Fig>{fmt(debtRepaid, valued, debtSym)}</Fig> was repaid
+            {" "}
+            and <Fig>{fmt(valued ? (interest.usd ?? 0) : interest.amount, valued, debtSym)}</Fig> of interest accrued on
+            it
           </>
         )}
-        .
-      </span>,
-    );
-  }
-  if (interest) {
-    items.push(
-      <span key="interest">
-        <Fig>{fmt(valued ? (interest.usd ?? 0) : interest.amount, valued, debtSym)}</Fig> in interest has accrued on the
-        debt, included in the current balance below.
-      </span>,
-    );
-  }
-  if (currentColl > 0 || currentDebt > 0) {
-    items.push(
-      <span key="current">
-        {currentColl > 0 ? (
+        {debtRepaid > 0 && (
           <>
-            The position currently holds <Fig>{fmt(currentColl, valued, collSym)}</Fig> supplied
+            , then <Fig>{fmt(debtRepaid, valued, debtSym)}</Fig> repaid
           </>
-        ) : (
-          "The position currently holds no collateral"
+        )}
+        {debtLiquidated > 0 && (
+          <>
+            {liqFirst}
+            <Fig>{fmt(debtLiquidated, valued, debtSym)}</Fig> cleared by liquidation
+          </>
         )}
         {currentDebt > 0 ? (
           <>
-            {" "}
-            and owes <Fig>{fmt(currentDebt, valued, debtSym)}</Fig>.
+            , leaving <Fig>{fmt(currentDebt, valued, debtSym)}</Fig> owed.
           </>
         ) : (
-          ", with no debt outstanding."
+          "."
         )}
       </span>,
     );
   }
-  if (collLiquidated > 0) {
+  if (currentColl > 0) {
+    items.push(
+      <span key="current">
+        The position currently holds <Fig>{fmt(currentColl, valued, collSym)}</Fig> supplied.
+      </span>,
+    );
+  }
+  if (collLiquidated > 0 && debtLiquidated > 0 && valued) {
+    const net = debtLiquidated - collLiquidated;
+    items.push(
+      <span key="liq-net">
+        Liquidations took {tokenList(data.collateral.liquidated)} of collateral to clear{" "}
+        {tokenList(data.debt.liquidated.filter((l) => !isWrittenOff(l)))} of debt:{" "}
+        <Fig>{fmt(collLiquidated, valued, collSym)}</Fig> against <Fig>{fmt(debtLiquidated, valued, debtSym)}</Fig>
+        {data.liquidatedAtEventPrices ? " at the prices of the day" : ""}, a net {signedUsd(net)} to the borrower: the
+        liquidation bonus, part of which went to the {label === "Seamless" ? "Seamless" : "Aave"} treasury.
+      </span>,
+    );
+  } else if (collLiquidated > 0) {
     items.push(
       <span key="coll-liq">
         <Fig>{fmt(collLiquidated, valued, collSym)}</Fig> of collateral was seized in liquidation.
       </span>,
     );
   }
-  if (debtLiquidated > 0) {
+  if (data.liquidatedAtEventPrices && valued) {
     items.push(
-      <span key="debt-liq">
-        <Fig>{fmt(debtLiquidated, valued, debtSym)}</Fig> of debt was cleared by liquidation.
+      <span key="price-basis">
+        Supplied, withdrawn, borrowed and repaid are valued at today&apos;s prices, and the liquidated amounts at the
+        prices when each liquidation happened.
       </span>,
     );
   }
@@ -180,7 +200,7 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}): LearnMor
       "This section traces a position's supply and borrow flows over its lifetime, replayed from the Pool's own events.",
     stepsHeading: "How it's built:",
     steps: [
-      "Flows are replayed from every supply, withdraw, borrow and repay event the position's own Pool has recorded.",
+      "Flows are replayed from every supply, withdraw, borrow, repay and liquidation event the position's Pool has recorded.",
       "Current balances come from the Pool at the block the page reads, with interest already included.",
       `Dollar values use ${isSeamless ? "Seamless" : "Aave"}'s own on-chain oracle — the same price the Pool liquidates with.`,
     ],
@@ -192,7 +212,11 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}): LearnMor
       },
       {
         bold: "Accrued interest",
-        text: "the current balance minus the net of what was actually supplied or borrowed; shown as its own segment when the debt is a single asset whose history adds up cleanly.",
+        text: "the current balance minus the net of what the position's events supplied or borrowed. It is a segment of the debt bar, in USD when the debt is in more than one asset.",
+      },
+      {
+        bold: "Liquidated",
+        text: "the collateral a liquidation took (the liquidator's share and the treasury's fee) and the debt it cleared, valued at the prices when it happened.",
       },
     ],
     links: [

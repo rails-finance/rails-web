@@ -68,6 +68,9 @@ export interface LiquidationForensicsProps {
   /** seized ÷ cleared − 1, as a fraction (0.045 = +4.5%). */
   premium: number;
   premiumProv: Provenance;
+  /** The two legs' captions — default "Seized, at fire" / "Cleared, at fire". */
+  seizedLabel?: string;
+  clearedLabel?: string;
   /** Who pockets the gap — default "Realized premium" (the Aave-model
    *  liquidator bonus); Comet labels it "Absorption margin". */
   premiumLabel?: string;
@@ -199,6 +202,8 @@ export function LiquidationForensics({
   premiumReference,
   pricePills,
   format,
+  seizedLabel,
+  clearedLabel,
 }: LiquidationForensicsProps) {
   const fmtValue = format?.value ?? formatUsdValue;
   const fmtPrice = format?.price ?? formatPrice;
@@ -216,8 +221,8 @@ export function LiquidationForensics({
   return (
     <div className="px-5 pb-2">
       <div className="grid grid-cols-1 gap-2.5 sm:auto-rows-fr sm:grid-cols-3">
-        <LegStat label="Seized, at fire" leg={seized} formatValue={fmtValue} />
-        <LegStat label="Cleared, at fire" leg={cleared} formatValue={fmtValue} />
+        <LegStat label={seizedLabel ?? "Seized, at fire"} leg={seized} formatValue={fmtValue} />
+        <LegStat label={clearedLabel ?? "Cleared, at fire"} leg={cleared} formatValue={fmtValue} />
         <StatCard label={premiumLabel ?? "Realized premium"}>
           <StateTransition>
             <Prov info={premiumProv} value={premiumPct}>

@@ -39,6 +39,7 @@ export function AaveV3PositionExplanation({
   captions,
   view,
   externalActivity,
+  marketName,
 }: {
   /** The live Pool read. Null until it lands (or when it came back stale):
    *  nothing is narrated, and the pane still mounts so its foot controls draw. */
@@ -53,6 +54,9 @@ export function AaveV3PositionExplanation({
    *  page derives it from the events already on the page; omit to skip the
    *  operator bullet. */
   externalActivity?: ExternalActorSummary;
+  /** The Ethereum market's name (Core, Prime, EtherFi): the pane says what a
+   *  market is. Omitted on the single-Pool deployments. */
+  marketName?: string;
 }) {
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
@@ -64,6 +68,8 @@ export function AaveV3PositionExplanation({
     .map((r) => r.symbol);
   const debtSyms = chain.reserves.filter((r) => r.debtBalanceRaw !== "0").map((r) => r.symbol);
 
+  // "blended" only where several collateral assets are averaged.
+  const blended = collateralSyms.length > 1 ? " blended" : "";
   // LT-weighted debt ceiling — the debt the collateral can carry before the
   // position is liquidatable. Σ(collateral × LT) ≈ totalCollateral × blended LT.
   // A prose-only rollup with no chrome twin, so it renders muted.
@@ -107,8 +113,8 @@ export function AaveV3PositionExplanation({
       // render, so both figures stay muted here.
       bullets.push(
         <span key="ceiling-idle">
-          Each asset counts as collateral only up to its liquidation threshold ({pct(chain.avgLiquidationThreshold)}{" "}
-          blended), so this collateral could carry up to {fmtUsd(debtCeilingUsd).display} of debt before becoming
+          Each asset counts as collateral only up to its liquidation threshold ({pct(chain.avgLiquidationThreshold)}
+          {blended}), so this collateral could carry up to {fmtUsd(debtCeilingUsd).display} of debt before becoming
           liquidatable.
         </span>,
       );
@@ -132,9 +138,15 @@ export function AaveV3PositionExplanation({
     if (chain.avgLiquidationThreshold > 0 && debtCeilingUsd > 0) {
       bullets.push(
         <span key="ceiling">
-          Each asset counts only up to its liquidation threshold (<H>{pct(chain.avgLiquidationThreshold)}</H> blended),
-          so the collateral can carry up to {fmtUsd(debtCeilingUsd).display} of debt before the position is
-          liquidatable.
+          {collateralSyms.length === 1 ? (
+            <>{collateralSyms[0]} counts only up to its liquidation threshold (</>
+          ) : (
+            <>Each asset counts only up to its liquidation threshold (</>
+          )}
+          <H>{pct(chain.avgLiquidationThreshold)}</H>
+          {blended}), so the collateral can carry up to {fmtUsd(debtCeilingUsd).display} of debt before the position is
+          liquidatable. The loan-to-value cap and the threshold are today&rsquo;s settings; Aave governance changes
+          them, and each event&rsquo;s details show the values at its block.
         </span>,
       );
     }
@@ -204,9 +216,27 @@ export function AaveV3PositionExplanation({
   }
 
   if (view != null && view.txCount > 0) {
+    const liq = view.liquidationCount;
     bullets.push(
       <span key="tx-count">
-        The position has recorded <H>{view.txCount}</H> transaction{view.txCount === 1 ? "" : "s"} to date.
+        The position records <H>{view.txCount}</H> transaction{view.txCount === 1 ? "" : "s"} by or for its owner
+        {liq > 0 ? (
+          <>
+            ; the <H>{liq}</H> liquidation{liq === 1 ? " was sent by a liquidator" : "s were sent by liquidators"}
+            {marketName ? (
+              <>, and {liq === 1 ? "its" : "each one’s"} fee to the Aave treasury is a separate row in the timeline</>
+            ) : null}
+          </>
+        ) : null}
+        .
+      </span>,
+    );
+  }
+  if (marketName) {
+    bullets.push(
+      <span key="market">
+        {marketName} is one of the Aave V3 markets on Ethereum; each market is a separate account with a separate health
+        factor.
       </span>,
     );
   }

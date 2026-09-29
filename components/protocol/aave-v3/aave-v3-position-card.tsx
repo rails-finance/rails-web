@@ -410,6 +410,11 @@ function AaveV3PositionCardBody({
   // for it; a listing deployment has none, and the column stays off.
   const hfProv = dep.healthFactor;
   const marketLabel = dep.marketLabel(v.market);
+  // What the market chip is and what the count badge counts, on hover.
+  const marketTitle = marketLabel
+    ? `${marketLabel} is one of the Aave V3 markets on Ethereum. Each market is a separate account with a separate health factor.`
+    : undefined;
+  const countTitle = txCountTitle(v, dep.session === "aave-v3");
   const collUsd = totalUsd(v, v.supplies);
   const debtUsd = totalUsd(v, v.borrows);
   // `receipts` is the render-site switch (listing defaults false; only the
@@ -470,6 +475,7 @@ function AaveV3PositionCardBody({
             <PositionCardMeta
               lastActivityAt={v.lastActivityAt}
               eventCount={v.txCount}
+              eventCountTitle={countTitle}
               liquidationCount={v.liquidationCount}
             />
           }
@@ -529,7 +535,16 @@ function AaveV3PositionCardBody({
         leadingIdentity={
           <span className="flex items-center gap-2">
             <WalletPill wallet={v.wallet} ensName={null} filterProtocol={dep.session} bookmarkProtocol={dep.session} />
-            {marketLabel && <span className="text-xs font-semibold text-rb-500">{marketLabel}</span>}
+            {marketLabel && (
+              <span
+                className="text-xs font-semibold text-rb-500 header-badge-tip focus-ring rounded-sm"
+                title={marketTitle}
+                data-tooltip={marketTitle}
+                tabIndex={receipts ? 0 : undefined}
+              >
+                {marketLabel}
+              </span>
+            )}
           </span>
         }
         // Right-hand activity-meta cluster: time-ago, transaction count, liquidation.
@@ -537,6 +552,7 @@ function AaveV3PositionCardBody({
           <PositionCardMeta
             lastActivityAt={v.lastActivityAt}
             eventCount={v.txCount}
+            eventCountTitle={countTitle}
             liquidationCount={v.liquidationCount}
           />
         }
@@ -634,6 +650,18 @@ function AaveV3PositionCardBody({
       />
     </PositionCardShell>
   );
+}
+
+/** The count badge's hover label: the owner's transactions, and the
+ *  liquidations beside them, sent by liquidators. On Ethereum a liquidation's
+ *  protocol fee is a second timeline row in its transaction. */
+function txCountTitle(v: AaveV3PositionView, feeRows: boolean): string {
+  const tx = `${v.txCount} transaction${v.txCount === 1 ? "" : "s"} sent by or for the owner`;
+  if (v.liquidationCount <= 0) return tx;
+  const n = v.liquidationCount;
+  return `${tx}; the ${n} liquidation${n === 1 ? "" : "s"} beside ${n === 1 ? "it was" : "them were"} sent by liquidators${
+    feeRows ? `, and each liquidation's fee to the Aave treasury is its own row in the timeline` : ""
+  }`;
 }
 
 function statusOf(hasOpen: boolean, liquidationCount: number): AaveV3PositionView["status"] {

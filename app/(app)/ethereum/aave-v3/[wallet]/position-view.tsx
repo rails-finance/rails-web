@@ -55,6 +55,7 @@ import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-f
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
+import { aaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
 import {
   AaveV3PositionCard,
   viewFromSummary,
@@ -276,6 +277,9 @@ export default function AaveV3PositionDetail({
   // below) — a fresh array identity every render would cancel the in-flight
   // fetch whenever anything else (e.g. the chain read) re-rendered the page.
   const aaveEvents = useMemo(() => events.filter(isAaveV3Event), [events]);
+  // Each card's same-transaction rows and the transaction before it (the
+  // liquidation fee's pairing, the health factor's move between events).
+  const neighbours = useMemo(() => aaveV3Neighbours(aaveEvents as AaveV3Event[]), [aaveEvents]);
 
   // The served list as ROWS. `aaveEvents` holds the grouped answer's own events
   // when one is in hand — the read above put them there — so the plan and the
@@ -658,6 +662,7 @@ export default function AaveV3PositionDetail({
                       captions={captions}
                       view={liveView}
                       externalActivity={externalActivity}
+                      marketName={MARKET_NAME[market] ?? "Core"}
                     />
                   )
                 }
@@ -722,6 +727,8 @@ export default function AaveV3PositionDetail({
                     isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     market={market}
+                    siblings={neighbours.get(event.id)?.siblings}
+                    previous={neighbours.get(event.id)?.previous}
                   />
                 ) : null
               }

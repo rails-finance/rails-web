@@ -1022,28 +1022,56 @@ export function aaveV3SupplyWithdrawContent(
   eventType: "supply" | "withdraw",
   protocol: V3Protocol = "Aave V3",
 ): LearnMoreContent {
-  const supplying = eventType === "supply";
   const pool = `${v3Possessive(protocol, "'")} Pool`;
+  if (eventType === "withdraw")
+    return {
+      title: "How Withdrawing Works",
+      intro: `Withdrawing returns supplied assets from ${pool} to a wallet, burning the matching aTokens. It can go only as far as the collateral left keeps any debt covered.`,
+      detailsHeading: "Key concepts:",
+      details: [
+        {
+          bold: "Interest comes with it",
+          text: "the supplied balance includes the supply interest earned so far, so more can come out than went in.",
+        },
+        {
+          bold: "Health factor",
+          text: "withdrawing collateral lowers the account's health factor. The Pool refuses a withdrawal that would leave it below 1.0; one that leaves it just above is allowed, and a later price fall can then make the account liquidatable.",
+        },
+        {
+          bold: "Only the owner",
+          text: "a withdrawal takes the sender's own aTokens, so no other account can withdraw from this position. The tokens can be sent to any address.",
+        },
+        {
+          bold: "Available liquidity",
+          text: "the asset has to be in the Pool to leave it: when most of a reserve is borrowed, a withdrawal can wait until borrowers repay or new supply arrives.",
+        },
+      ],
+      links: v3ModalLinks(protocol, [
+        { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
+        { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
+        { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
+      ]),
+    };
   return {
-    title: supplying ? "How Supplying Works" : "How Withdrawing Works",
-    intro: supplying
-      ? `Supplying deposits an asset into ${pool}, where it earns the variable supply rate and — unless turned off — backs borrowing as collateral. Withdrawing reverses it.`
-      : `Withdrawing returns supplied assets from ${pool} to the wallet. It can only go as far as the remaining collateral keeps any outstanding debt covered.`,
+    title: "How Supplying Works",
+    intro: `Supplying deposits an asset into ${pool}, which mints aTokens for it. The deposit earns the variable supply rate and, while it is on as collateral, backs borrowing.`,
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "Supplied balance",
-        text: "the deposit, which accrues supply interest continuously and stays withdrawable unless it's needed to keep a borrow covered.",
+        text: "the aToken balance grows with the supply rate, so the deposit accrues interest without a transaction.",
       },
       {
-        bold: "Cross-collateralisation",
-        text: `${protocol} pools every supplied asset into one account per wallet — all of it backs all of the account's borrowing, under one shared health factor.`,
+        bold: "Collateral on or off",
+        text: "each supplied asset is on or off as collateral for the account. On a first supply of an asset that can back borrowing, the Pool switches it on in the same transaction; the owner can switch it off while the debt stays covered.",
       },
       {
-        bold: supplying ? "As collateral" : "Effect on health",
-        text: supplying
-          ? "supplied assets count as collateral unless explicitly disabled; only collateral-enabled supply raises borrowing power."
-          : "withdrawing removes collateral, so the account's health factor falls — the Pool blocks any withdrawal that would push it below 1.0.",
+        bold: "One account",
+        text: `${protocol} pools every asset on as collateral into one account per wallet and market: all of it backs all of the account's borrowing, under one health factor.`,
+      },
+      {
+        bold: "Supplying for someone else",
+        text: "anyone can supply on behalf of any account; the deposit belongs to that account and needs nothing from its owner.",
       },
     ],
     links: v3ModalLinks(protocol, [
@@ -1057,25 +1085,57 @@ export function aaveV3BorrowRepayContent(
   eventType: "borrow" | "repay",
   protocol: V3Protocol = "Aave V3",
 ): LearnMoreContent {
-  const borrowing = eventType === "borrow";
+  if (eventType === "repay")
+    return {
+      title: "How Repaying Works",
+      intro:
+        "Repaying returns borrowed tokens to the Pool, burning the matching debt tokens. The debt falls, the health factor rises, and collateral is freed to withdraw or borrow against.",
+      detailsHeading: "Key concepts:",
+      details: [
+        {
+          bold: "Partial or full",
+          text: "any amount can be repaid at any time; repaying the whole balance clears that asset's debt, interest included.",
+        },
+        {
+          bold: "Interest",
+          text: "debt grows with the variable borrow rate every block, so the amount owed at repayment is more than was borrowed. What is left after a partial repay keeps accruing.",
+        },
+        {
+          bold: "Repaying with aTokens",
+          text: "a debt can be repaid with supplied tokens of the same asset, burning those aTokens instead of taking tokens from the wallet.",
+        },
+        {
+          bold: "Repaying for someone else",
+          text: "anyone can repay any account's debt; it needs nothing from the owner.",
+        },
+      ],
+      links: v3ModalLinks(protocol, [
+        { label: "Borrowing assets", url: AAVE_FAQ_URLS.BORROWING },
+        { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
+        { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
+      ]),
+    };
   return {
-    title: borrowing ? "How Borrowing Works" : "How Repaying Works",
-    intro: borrowing
-      ? "Borrowing draws an asset against the account's supplied collateral, accruing variable borrow interest until it's repaid."
-      : "Repaying returns borrowed assets to the Pool, clearing debt and raising the account's health factor — moving it away from the liquidation line.",
+    title: "How Borrowing Works",
+    intro:
+      "Borrowing draws an asset from the Pool against the account's collateral, minting debt tokens that accrue variable borrow interest until repaid.",
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "Borrowing power",
-        text: "how much can be borrowed depends on the collateral's value weighted by each asset's loan-to-value and liquidation threshold.",
+        text: "the account can borrow up to its collateral's value times each asset's loan-to-value (LTV). The liquidation threshold, a little higher, is where it becomes liquidatable.",
       },
       {
         bold: "One shared health factor",
-        text: "the whole cross-collateralised account has a single health factor; borrowing lowers it, repaying raises it, and below 1.0 the account can be liquidated.",
+        text: "the account has one health factor across all its collateral and debt; borrowing lowers it, and below 1.0 the account can be liquidated.",
       },
       {
         bold: "Variable borrow interest",
-        text: "debt accrues interest continuously at the reserve's variable borrow rate, which moves with pool utilisation, until repaid.",
+        text: "the rate moves with how much of the reserve is borrowed, and applies to the whole debt while it lasts.",
+      },
+      {
+        bold: "Borrowing for someone else",
+        text: "credit delegation: the owner approves another account on the asset's debt token for an amount they set, and that account can then borrow against the owner's collateral. The debt is the owner's.",
       },
     ],
     links: v3ModalLinks(protocol, [
@@ -1087,13 +1147,17 @@ export function aaveV3BorrowRepayContent(
 }
 
 export function aaveV3LiquidationContent(protocol: V3Protocol = "Aave V3"): LearnMoreContent {
-  const account = protocol === "Aave V3" ? "An Aave V3 account" : `A ${protocol} account`;
+  const aave = protocol === "Aave V3";
+  const account = aave ? "An Aave V3 account" : `A ${protocol} account`;
   return {
     title: "How Liquidations Work",
-    intro: `${account} becomes eligible for liquidation when its health factor falls below 1.0 — the point where its borrowed value, measured against each collateral asset's liquidation threshold, is no longer sufficiently covered. Once eligible, anyone (in practice, automated liquidator bots) can step in.`,
+    intro: `${account} can be liquidated when its health factor falls below 1.0: its collateral, each asset counted up to its liquidation threshold, no longer covers its debt. Anyone can then liquidate it; in practice automated bots do.`,
     extraParagraphs: [
-      "A liquidator repays part of the account's outstanding debt and, in return, receives an equivalent value of its collateral plus a liquidation bonus — so the collateral seized is worth more than the debt cleared. That bonus is the liquidator's incentive and the borrower's effective penalty. Because V3 pools everything into one cross-collateralised account, the liquidator can take any of the account's collateral assets, not just one in isolation.",
-      `${v3Brand(protocol)} liquidates only partially — enough to nudge the health factor back above 1.0 — rather than closing the whole position at once. Health factor = (collateral value × each asset's liquidation threshold) ÷ total debt; keep it comfortably above 1.0 by holding more collateral or carrying less debt.`,
+      "A liquidator repays some of one debt asset and takes one collateral asset in return, worth the debt repaid plus the collateral asset's liquidation bonus, which governance sets per asset. The bonus is the liquidator's reward and the borrower's cost. A share of it, the liquidation protocol fee, goes to the treasury as aTokens in the same transaction.",
+      aave
+        ? "One liquidation may repay up to half of the account's total debt. It may repay all of the debt asset when the health factor is at or below 0.95, or when the account's position in the debt or the collateral asset is worth under $2,000. The account stays open, and it can be liquidated again while its health factor is below 1.0."
+        : `One liquidation may repay up to half of the debt asset it repays, or all of it when the health factor is below 0.95. The account stays open, and it can be liquidated again while its health factor is below 1.0.`,
+      "Health factor = (collateral value × each asset's liquidation threshold) ÷ total debt. More collateral or less debt keeps it above 1.0.",
     ],
     links: v3ModalLinks(protocol, [
       { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
@@ -1144,7 +1208,7 @@ export function aaveV3TransferContent(protocol: V3Protocol = "Aave V3"): LearnMo
     details: [
       {
         bold: "Not a deposit or withdrawal",
-        text: "a transfer is a change of custody, not new capital arriving or leaving — so this explorer counts it on its own line rather than merging it into supplied/withdrawn, which stay true to real Pool flows.",
+        text: "a transfer is a change of custody, not new capital arriving or leaving, so the lifetime flows leave it out of supplied and withdrawn. A liquidation's protocol fee is the exception the flows count: it leaves as an aToken transfer to the treasury, and the flows count it with the collateral the liquidation took.",
       },
       {
         bold: "Two accounts, one move",

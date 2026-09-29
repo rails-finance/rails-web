@@ -29,6 +29,8 @@ export interface SparkEventExplainerProps {
   blockNumber?: number;
   /** The card shows the lead sentence as the teaser; render only the rest here. */
   skipLead?: boolean;
+  /** The position's owner: the third-party clause keys on it. */
+  owner?: string;
 }
 
 /** Mechanic modal content for this event — never-empty floor: every event type
@@ -53,9 +55,9 @@ export function sparkLearnMoreContent(ctx: SparkContext): LearnMoreContent {
   }
 }
 
-export function SparkEventExplainer({ ctx, txHash, blockNumber, skipLead }: SparkEventExplainerProps) {
+export function SparkEventExplainer({ ctx, txHash, blockNumber, skipLead, owner }: SparkEventExplainerProps) {
   const coords: SparkCoords = { txHash, blockNumber };
-  const clauses = eventClauses(sparkEventSlots(ctx, coords));
+  const clauses = eventClauses(sparkEventSlots(ctx, coords, owner));
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;

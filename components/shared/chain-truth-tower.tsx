@@ -659,7 +659,19 @@ function buildSide(
       prov: l.prov,
     });
   });
-  if (interestLine) {
+  if (interestLine && !interestLine.symbol && valued) {
+    // Interest summed across several assets: one USD figure, no token (the
+    // cross-symbol merged row's rule).
+    rows.push({
+      sign: "+",
+      label: opts.interestLabel ?? "Accrued interest",
+      amount: formatCompactUsd(interestLine.usd ?? 0),
+      exact: formatUsdValue(interestLine.usd ?? 0),
+      swatchClass: FEE_SOLID,
+      prov: interestLine.prov,
+      indent: true,
+    });
+  } else if (interestLine) {
     rows.push({
       sign: "+",
       label: opts.interestLabel ?? "Accrued interest",

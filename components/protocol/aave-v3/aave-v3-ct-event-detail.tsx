@@ -77,6 +77,7 @@ import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
 import { findReserve, groupExact, humanOf, legChange, legHeld } from "@/lib/aave-v3/position-state";
 import { AmountText } from "@/components/shared/amount-text";
+import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
 
 export interface AaveV3CtEventDetailProps {
   ctx: AaveV3Context;
@@ -87,6 +88,13 @@ export interface AaveV3CtEventDetailProps {
   /** The served market key. Set on Ethereum only; its presence selects the
    *  position-state lane (see AaveV3CtEventCard). */
   market?: string;
+  /** This transfer is the protocol fee of that liquidation (same transaction):
+   *  the card states the fee's own change, and the account figures stay on the
+   *  liquidation's card. */
+  feeOf?: AaveV3Context;
+  /** On a liquidation, its fee transfer to the treasury, where the timeline
+   *  holds one. */
+  fee?: AaveV3Context;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
@@ -135,7 +143,15 @@ interface Axis {
   price?: { usd: number };
 }
 
-export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }: AaveV3CtEventDetailProps) {
+export function AaveV3CtEventDetail({
+  ctx,
+  txHash,
+  blockNumber,
+  wallet,
+  market,
+  feeOf,
+  fee,
+}: AaveV3CtEventDetailProps) {
   const coords: V3Coords = {
     txHash,
     blockNumber,
@@ -143,7 +159,9 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
     source: useCaptureSource(),
     pool: useV3Pool(),
   };
-  const state = useAaveV3PositionState({ wallet, market, block: blockNumber, txHash });
+  // A fee row shares the liquidation's transaction, so the read around the
+  // transaction would restate the liquidation: it states its own change only.
+  const state = useAaveV3PositionState({ wallet, market: feeOf ? undefined : market, block: blockNumber, txHash });
   const ready = state?.status === "ready" ? state.data : undefined;
   // The position-state receipts also name the owner.
   const stateCoords: V3Coords = wallet ? { ...coords, wallet: wallet.toLowerCase() } : coords;
@@ -418,6 +436,18 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
     // index), not a Pool log's own amount param — same reconstruction, its
     // own vocabulary entry.
     const isTransfer = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";
+    // The Pool sends the fee after the seizure, so the fee's balance runs from
+    // the post-seizure balance to the liquidation's after-balance.
+    const feeAxis = feeOf
+      ? {
+          principalAfter: feeOf.supplyAfter,
+          principalRawAfter: feeOf.raw?.supplyAfter,
+          chain:
+            feeOf.balanceBasis === "chain"
+              ? { scaled: feeOf.raw?.supplyScaledAfter, index: feeOf.raw?.supplyIndex }
+              : undefined,
+        }
+      : null;
     push(
       statFor({
         label: "Supplied",
@@ -428,9 +458,9 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
         changeProv: isTransfer
           ? transferDeltaProv(sym, ctx.eventType === "transfer_in" ? "in" : "out", coords)
           : assetsDeltaProv(sym, "supply", coords, ctx.raw?.amount, ctx.origin?.amount),
-        principalAfter: ctx.supplyAfter,
-        principalRawAfter: ctx.raw?.supplyAfter,
-        chain: chainOf("supply"),
+        principalAfter: feeAxis ? feeAxis.principalAfter : ctx.supplyAfter,
+        principalRawAfter: feeAxis ? feeAxis.principalRawAfter : ctx.raw?.supplyAfter,
+        chain: feeAxis ? feeAxis.chain : chainOf("supply"),
         price: ctx.price,
       }),
     );
@@ -466,17 +496,29 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
   // The Base index lanes carry the seized reserve's bonus at the block; the
   // premium reads against it. The Ethereum lanes never stored it.
   const bonus = ctx.liquidationBonusAtBlock;
+  // Each leg leads with its token amount at the precision the prose uses, so
+  // the card and the explanation state one figure.
+  const legged = built
+    ? {
+        ...built,
+        seizedLabel: "Collateral seized",
+        clearedLabel: "Debt cleared",
+        premiumLabel: "Liquidator's premium",
+        seized: { ...built.seized, amount: `${fmt2(ctx.liquidatedCollateralAmount)} ${ctx.collateralSymbol ?? ""}` },
+        cleared: { ...built.cleared, amount: `${fmt2(ctx.debtToCover)} ${sym}` },
+      }
+    : undefined;
   const forensics =
-    built && bonus
+    legged && bonus
       ? {
-          ...built,
+          ...legged,
           premiumReference: {
             label: "Bonus at block",
             value: `+${((bonus.bonusBps - 10000) / 100).toFixed(2)}%${bonus.protocolFeeBps > 0 ? ` (${bonus.protocolFeeBps / 100}% of it to the protocol)` : ""}`,
             prov: liqBonusRefProv(coords, bonus),
           },
         }
-      : built;
+      : legged;
 
   // Ordinary events gain the at-block price footnote pill for the touched
   // reserve — the read the USD chip above derives from. Liquidations carry
@@ -535,6 +577,18 @@ export function AaveV3CtEventDetail({ ctx, txHash, blockNumber, wallet, market }
       )}
       {ready && <AaveV3PositionStateBlock state={ready} coords={stateCoords} touched={touched} />}
       {forensics && <LiquidationForensics {...forensics} />}
+      {fee && ctx.collateralSymbol && (
+        <div className="px-5 pb-2 text-xs text-rb-500">
+          The collateral taken includes {fmt2(fee.amount)} {ctx.collateralSymbol} to the Aave treasury, the
+          liquidation&rsquo;s protocol fee.
+        </div>
+      )}
+      {feeOf && (
+        <div className="px-5 pb-2 text-xs text-rb-500">
+          Paid out of the liquidation in the same transaction; the account&rsquo;s figures for that transaction are on
+          the liquidation&rsquo;s card.
+        </div>
+      )}
       {pricePills.length > 0 && (
         <div className="px-5 pb-2">
           <AtBlockPriceFootnote pills={pricePills} />

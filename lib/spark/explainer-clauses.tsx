@@ -52,6 +52,7 @@ import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { MAINNET_CHAIN_ID, explorerUrl } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { AmountText } from "@/components/shared/amount-text";
+import { externalActor } from "@/lib/shared/external-actor";
 
 /** A leg reads as cleared when its replayed after-balance sits at or below this
  *  — the interest-blind residual a full repay or a full seizure can leave. */
@@ -104,9 +105,9 @@ const fmtAmt = (s: string | undefined): string => formatNumber(Math.abs(Number(s
  *  renders when the position owner was neither the transaction signer nor the
  *  Pool's own caller.
  *
- *  `txFrom`/`poolCaller` ship exactly where that two-fact verdict is decidable
- *  (see SparkContext), so their presence IS the verdict — which is what keeps
- *  this a pure function with no owner address in hand. No party is named here:
+ *  Keyed on the header chip's own verdict (externalActor against the owner):
+ *  the index ships `txFrom`/`poolCaller` on owner-sent rows too, so their
+ *  presence is not the verdict. No party is named here:
  *  a clause builder can't reach the ENS hook, and the header's chip directly
  *  above the prose already carries the identity.
  *
@@ -129,8 +130,8 @@ const fmtAmt = (s: string | undefined): string => formatNumber(Math.abs(Number(s
  *  third-party withdraw is not expressible on SparkLend at all. `withdraw`
  *  burns msg.sender's OWN spTokens and `to` is only a recipient, so the chip
  *  can reach supply, repay and borrow rows and no others. */
-function delegatedActorMechanic(ctx: SparkContext): ClauseInput {
-  if (!ctx.txFrom || !ctx.poolCaller) return null;
+function delegatedActorMechanic(ctx: SparkContext, owner: string | undefined): ClauseInput {
+  if (!owner || !externalActor(ctx, owner)) return null;
   if (ctx.eventType === "borrow")
     return clause(
       <>
@@ -150,9 +151,9 @@ function delegatedActorMechanic(ctx: SparkContext): ClauseInput {
   return null;
 }
 
-export function sparkEventSlots(ctx: SparkContext, coords: SparkCoords): EventProseSlots {
+export function sparkEventSlots(ctx: SparkContext, coords: SparkCoords, owner?: string): EventProseSlots {
   const slots = sparkEventSlotsBase(ctx, coords);
-  const delegated = delegatedActorMechanic(ctx);
+  const delegated = delegatedActorMechanic(ctx, owner);
   if (!delegated) return slots;
   return { ...slots, meansNow: [...(slots.meansNow ?? []), delegated] };
 }
@@ -513,6 +514,6 @@ const liquidatorClause = (liquidator: string): ClauseInput =>
 
 /** The teaser = the lead of the composed arc (the first sentence plus its
  *  trailing continuations — the after-balance rides along on operate events). */
-export function sparkExplainerTeaser(ctx: SparkContext, coords: SparkCoords): ReactNode | null {
-  return splitLead(eventClauses(sparkEventSlots(ctx, coords))).lead;
+export function sparkExplainerTeaser(ctx: SparkContext, coords: SparkCoords, owner?: string): ReactNode | null {
+  return splitLead(eventClauses(sparkEventSlots(ctx, coords, owner))).lead;
 }

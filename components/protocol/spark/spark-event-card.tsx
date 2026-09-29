@@ -135,9 +135,17 @@ export function SparkEventCard({ event, isFirst, isLast, eventNumber }: SparkEve
       }
       detail={<SparkEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
       detailLabel="Position state"
-      explainer={<SparkEventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} skipLead />}
+      explainer={
+        <SparkEventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          owner={event.wallet}
+          skipLead
+        />
+      }
       explainerLabel="Plain English"
-      explainerTeaser={sparkExplainerTeaser(ctx, coords)}
+      explainerTeaser={sparkExplainerTeaser(ctx, coords, event.wallet)}
       txHash={event.txHash}
       learnMore={<LearnMore inline content={sparkLearnMoreContent(ctx)} />}
       persistKey={`spark:${event.id}`}

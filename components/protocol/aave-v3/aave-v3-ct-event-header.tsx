@@ -80,6 +80,9 @@ export interface AaveV3CtEventHeaderProps {
    *  reserves, and the house symbol table only learns about them when someone
    *  edits it. The flow states the contract at the time of the transfer. */
   flows?: AssetFlow[];
+  /** Set when this transfer is a liquidation's protocol fee to the Aave
+   *  treasury (lib/aave-v3/liquidation-fee.ts): the row names itself so. */
+  feeOf?: AaveV3Context;
 }
 
 export function AaveV3CtEventHeader({
@@ -91,6 +94,7 @@ export function AaveV3CtEventHeader({
   externalBy,
   wallet,
   flows,
+  feeOf,
 }: AaveV3CtEventHeaderProps) {
   const coords: V3Coords = {
     txHash,
@@ -100,8 +104,11 @@ export function AaveV3CtEventHeader({
     pool: useV3Pool(),
   };
   const deltas: ChainTruthDelta[] = [];
-  const label = (ctx.swap && AAVE_V3_SWAP_LABELS[ctx.swap.kind]) ?? LABELS[ctx.eventType] ?? ctx.eventType;
-  const isTransferRow = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";
+  const label = feeOf
+    ? "Liquidation fee"
+    : ((ctx.swap && AAVE_V3_SWAP_LABELS[ctx.swap.kind]) ?? LABELS[ctx.eventType] ?? ctx.eventType);
+  // A liquidation's fee reads as an act with its verb, not as a custody move.
+  const isTransferRow = !feeOf && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out");
 
   if (ctx.eventType === "liquidation") {
     const coll = Number(ctx.liquidatedCollateralAmount ?? "0") || 0;
@@ -189,6 +196,9 @@ export function AaveV3CtEventHeader({
         prov: isTransfer
           ? transferDeltaProv(ctx.reserveSymbol, ctx.eventType === "transfer_in" ? "in" : "out", coords)
           : assetsDeltaProv(ctx.reserveSymbol, side, coords, ctx.raw?.amount, ctx.origin?.amount),
+        // The fee row's spine draws the badged token with no amount, so the
+        // header keeps it.
+        ...(feeOf ? { noSpineCounterpart: true } : {}),
       });
   }
 
@@ -214,8 +224,12 @@ export function AaveV3CtEventHeader({
         ? {
             prefix: transferOut ? "to" : "from",
             address: ctx.counterparty,
-            name: named?.name,
-            icon: named?.protocolIcon ? protocolIconSrc(named.protocolIcon) : undefined,
+            name: feeOf ? "Aave treasury" : named?.name,
+            icon: feeOf
+              ? protocolIconSrc("aave-v3")
+              : named?.protocolIcon
+                ? protocolIconSrc(named.protocolIcon)
+                : undefined,
             prov: transferCounterpartyProv(transferOut ? "out" : "in", coords, ctx.counterparty),
             ens: true,
           }

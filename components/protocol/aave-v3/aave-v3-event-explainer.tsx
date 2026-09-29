@@ -20,7 +20,10 @@ import {
   aaveV3EventFallbackContent,
 } from "@/lib/shared/learn-more-content";
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { aaveV3EventSlots } from "@/lib/aave-v3/explainer-clauses";
+import { aaveV3EventSlots, v3StateRead } from "@/lib/aave-v3/explainer-clauses";
+import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
+import type { AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
+import { feeLiquidation } from "@/lib/aave-v3/liquidation-fee";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
@@ -32,6 +35,15 @@ export interface AaveV3EventExplainerProps {
   blockNumber?: number;
   /** The card shows the lead sentence as the teaser; render only the rest here. */
   skipLead?: boolean;
+  /** The position's owner: the third-party line keys on it. */
+  owner?: string;
+  /** The Ethereum market key; with it the prose reads the position state the
+   *  open card reads (health factor, collateral flag), one shared request. */
+  market?: string;
+  /** This transaction's rows (a liquidation and its fee transfer). */
+  siblings?: AaveV3TimelineEvent[];
+  /** The previous transaction, to say how the health factor moved between events. */
+  previous?: { blockNumber: number; txHash: string };
 }
 
 /** Mechanic modal content for this event — never-empty floor: every event type
@@ -47,6 +59,7 @@ export function aaveV3LearnMoreContent(ctx: AaveV3Context, protocol: V3Protocol 
     case "borrow":
     case "repay":
       return aaveV3BorrowRepayContent(ctx.eventType, protocol);
+    // (A liquidation's fee transfer passes its liquidation here.)
     case "liquidation":
       return aaveV3LiquidationContent(protocol);
     case "bad_debt_written_off":
@@ -59,15 +72,45 @@ export function aaveV3LearnMoreContent(ctx: AaveV3Context, protocol: V3Protocol 
   }
 }
 
-export function AaveV3EventExplainer({ ctx, txHash, blockNumber, skipLead }: AaveV3EventExplainerProps) {
+export function AaveV3EventExplainer({
+  ctx,
+  txHash,
+  blockNumber,
+  skipLead,
+  owner,
+  market,
+  siblings,
+  previous,
+}: AaveV3EventExplainerProps) {
+  const chainId = useChainId();
   const coords: V3Coords = {
     txHash,
     blockNumber,
-    chainId: useChainId(),
+    chainId,
     source: useCaptureSource(),
     pool: useV3Pool(),
   };
-  const clauses = eventClauses(aaveV3EventSlots(ctx, coords));
+  const feeOf = feeLiquidation(ctx, siblings, chainId);
+  // The same reads the open card makes (module-scope cache, one request each):
+  // around this transaction, and around the previous one.
+  const here = useAaveV3PositionState({
+    wallet: owner,
+    market: feeOf ? undefined : market,
+    block: blockNumber,
+    txHash,
+  });
+  const before = useAaveV3PositionState({
+    wallet: owner,
+    market: feeOf ? undefined : market,
+    block: previous?.blockNumber,
+    txHash: previous?.txHash,
+  });
+  const state = v3StateRead(
+    ctx,
+    here?.status === "ready" ? here.data : undefined,
+    before?.status === "ready" ? before.data : undefined,
+  );
+  const clauses = eventClauses(aaveV3EventSlots(ctx, coords, { owner, siblings, state }));
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;

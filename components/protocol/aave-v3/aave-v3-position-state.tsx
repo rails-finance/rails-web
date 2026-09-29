@@ -23,7 +23,7 @@
 // RULE (§54): the Supplied panel lists its reserves under two sub-headings,
 // "Collateral on" then "Collateral off", by each reserve's AFTER-state flag; an
 // empty group draws no heading. A row whose flag flipped on the event carries a
-// short muted "was on" / "was off" holding the receipt the icon used to carry
+// short muted "switched on here" / "switched off here" holding the receipt the icon used to carry
 // (collateralFlagProv). A row that did not flip has no per-row flag icon or
 // words; its flag receipt rides on the row's own after-balance receipt instead
 // (see `withFlagNote` below) rather than a new per-heading receipt, since
@@ -34,7 +34,7 @@ import { DustToggle, isDustUsd, useDustOpen } from "@/components/shared/dust-res
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { StatCard, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
 import { PositionRow, fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
-import { hfLabel } from "@/lib/aave-v4/format";
+import { hfLabelV4 } from "@/lib/aave-v4/format";
 import { formatUsdValue } from "@/lib/utils/format";
 import {
   accountRatioProv,
@@ -184,7 +184,7 @@ function CollateralFlipNote({
   return (
     <Prov info={collateralFlagProv(sym, "before", flag.before, coords)} value={was}>
       <span className="text-xs text-rb-500" data-collateral-flip={flag.after ? "on" : "off"}>
-        was {was}
+        switched {flag.after ? "on" : "off"} here
       </span>
     </Prov>
   );
@@ -421,7 +421,7 @@ export function AaveV3PositionStateBlock({
       key: "health-factor",
       label: "Health factor",
       body: accountCard((a, when) => ({
-        text: hfLabel(a.healthFactor == null ? null : wadToNumber(a.healthFactor)),
+        text: hfLabelV4(a.healthFactor == null ? null : wadToNumber(a.healthFactor)),
         value: a.healthFactor == null ? "∞" : groupExact(humanOf(a.healthFactor, 18)),
         prov: healthFactorProv(when, coords, {
           wad: a.healthFactor,
@@ -466,12 +466,13 @@ export function AaveV3PositionStateBlock({
           </div>
         ))}
       </div>
-      {(missing || clamped) && (
-        <div className="mt-2 space-y-0.5 text-xs text-rb-500">
-          {missing && <p>{missing}</p>}
-          {clamped && <p>A balance whose recorded changes sum below zero is shown as 0.</p>}
-        </div>
-      )}
+      <div className="mt-2 space-y-0.5 text-xs text-rb-500">
+        {account && (
+          <p>LTV and liquidation threshold are the values at this block; Aave governance changes them over time.</p>
+        )}
+        {missing && <p>{missing}</p>}
+        {clamped && <p>A balance whose recorded changes sum below zero is shown as 0.</p>}
+      </div>
     </div>
   );
 }

@@ -1,23 +1,24 @@
 // Aave V3 plain-English authoring — the variant table for the prose explainer.
 // ----------------------------------------------------------------------------
 // Every clause states the amounts this event moved and the account mechanics it
-// exhibits. It states no resulting balance: the replayed principal the rows
-// carry leaves out interest, and the exact balance before and after the event is
-// the open card's to show (rails-ops TO-DO-ui-jobs §19), read when the card
-// opens, which prose rendered with the row cannot wait for.
+// exhibits. The balance reconciliation (previous + interest ± amount = after)
+// reads the row's chain-valued before/after (decision 0033), unbolded: the
+// open card's position block states those balances with their receipts.
+// The one same-transaction case is a liquidation and its protocol fee
+// (liquidation-fee.ts); each names the other.
 //
 // Figures render through <Prov>: an `echo` of the primary receipt the card
 // already carries — deltas → the header's ChainTruthRow, and the liquidation
-// legs / premium / at-block prices → the detail's forensics block. Aave V3 has no same-tx sibling case and no
-// cross-scope figure, so every traced figure here is an echo (the highlight
-// rule §5.6: bold only a figure the reader can also see on the card's chrome).
+// legs / premium / at-block prices → the detail's forensics block (the
+// highlight rule §5.6: bold only a figure the reader can also see on the
+// card's chrome).
 //
 // ── Fill-standard notes (charter §5) ─────────────────────────────────────────
 // Checklist items Aave V3 cannot fill per event, each a data fact of its stream:
-//   • §5.1 (risk consequence with figures) on ordinary events: the indexed
-//     stream carries no per-event health factor — only the liquidation embeds
-//     the account's fall below 1.0 — so a health-factor before→after at event
-//     time cannot be shown in prose. The Ethereum card's open detail shows it.
+//   • §5.1 (risk consequence with figures): the indexed stream carries no
+//     per-event health factor. On Ethereum the prose reads the position state
+//     the open card reads (decision 0025) and states the move, and how the
+//     factor moved since the previous event; Base and Seamless carry none.
 //   • §5.2 (mechanic-why on fees): an ordinary supply/withdraw/borrow/repay
 //     charges no per-event fee. The only fee-like figure is the liquidation
 //     bonus, priced by the valued sentence (§5.4).
@@ -51,7 +52,11 @@ import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { v3Brand, v3Possessive, v3Protocol, type V3Protocol } from "./protocol-name";
 import { AAVE_V3_SWAP_LABELS } from "./swap-kinds";
-import { AmountText } from "@/components/shared/amount-text";
+import { externalActor } from "@/lib/shared/external-actor";
+import { hfLabelV4, fmtUnitPrice } from "@/lib/aave-v4/format";
+import { baseToUsd, humanOf, wadToNumber, type AaveV3PositionState } from "./position-state";
+import { feeLiquidation, fmt2, liquidationBonus, liquidationFee, pctPlain } from "./liquidation-fee";
+import type { AaveV3TimelineEvent } from "./event-neighbours";
 
 /** The signed reserve delta this event moved — supply/borrow/transfer_in raise
  *  their side (+), withdraw/repay/transfer_out lower it (−). Mirrors the
@@ -91,51 +96,295 @@ const fmtAmt = (s: string | undefined): string => formatNumber(Math.abs(Number(s
 
 // ── the variant table ────────────────────────────────────────────────────────
 
-/** The third-party-actor clause — the prose half of the pink chip the header
- *  renders when the owner was neither the signer nor the Pool's caller.
+/** The third-party line: who sent this event, when it was not the owner.
  *
- *  `txFrom`/`poolCaller` ship exactly where the two-fact verdict is decidable
- *  (see AaveV3Context), so their presence IS the verdict — which is what lets
- *  this stay a pure function with no owner in hand.
+ *  Keyed on the same verdict the header's pink chip uses (externalActor): the
+ *  owner is neither the transaction's signer nor the Pool's caller. The index
+ *  ships `txFrom` / `poolCaller` on owner-sent rows too, so their presence is
+ *  not the condition. One line naming the sender; why a supply or repay needs
+ *  no consent and a borrow needs credit delegation is T4 (the modals).
  *
- *  The authority is protocol-specific and must not be borrowed from a sibling
- *  explorer. Aave V3 splits it by direction: `supply(asset, amount, onBehalfOf,
- *  referralCode)` and `repay(..., onBehalfOf)` accept any `onBehalfOf` with no
- *  consent checked, while borrowing for someone else requires that they first
- *  called `approveDelegation` on the variable debt token.
- *
- *  ⚠️ A third-party WITHDRAW is not expressible on V3 at all: `withdraw` burns
- *  msg.sender's own aTokens and `to` is only a recipient, so the chip can reach
- *  supply, repay and borrow rows and no others. That is why there is no
- *  withdraw branch here rather than an oversight. */
-function delegatedActorMechanic(ctx: AaveV3Context, brand: string): ClauseInput {
-  if (!ctx.txFrom || !ctx.poolCaller) return null;
-  if (ctx.eventType === "borrow")
-    return clause(
-      <>
-        Another account executed this on the owner&rsquo;s behalf. {brand} checks credit delegation on chain before
-        letting anyone borrow against collateral they don&rsquo;t own, so the owner had approved that account on the
-        debt token beforehand — for a capped amount they set.
-      </>,
-    );
-  if (ctx.eventType === "supply" || ctx.eventType === "repay")
-    return clause(
-      <>
-        Another account executed this on the owner&rsquo;s behalf. {brand} asks for no permission to add to a position —
-        supplying and repaying can be done by anyone, for anyone — so this needed nothing from the owner.
-      </>,
-    );
-  return null;
+ *  A third-party WITHDRAW is not expressible on V3 (`withdraw` burns
+ *  msg.sender's own aTokens), so the line reaches supply, repay and borrow. */
+function delegatedActorLine(ctx: AaveV3Context, owner: string | undefined, chainId: ChainId): ClauseInput {
+  if (!owner) return null;
+  if (ctx.eventType !== "supply" && ctx.eventType !== "repay" && ctx.eventType !== "borrow") return null;
+  const actor = externalActor(ctx, owner);
+  if (!actor) return null;
+  return clause(
+    ctx.eventType === "borrow" ? (
+      <>Sent by {addressLink(actor, chainId)}, an account the owner had allowed to borrow on its behalf.</>
+    ) : (
+      <>Sent by {addressLink(actor, chainId)}, another account acting for the owner.</>
+    ),
+  );
 }
 
-export function aaveV3EventSlots(ctx: AaveV3Context, coords: V3Coords): EventProseSlots {
-  const slots = aaveV3EventSlotsBase(ctx, coords);
-  const delegated = delegatedActorMechanic(ctx, v3Brand(v3Protocol(coords.pool)));
+const addressLink = (address: string, chainId: ChainId): ReactNode => (
+  <a
+    href={explorerUrl(chainId, "address", address)}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-blue-500 hover:underline"
+    onClick={(e) => e.stopPropagation()}
+  >
+    {address.slice(0, 6)}…{address.slice(-4)}
+  </a>
+);
+
+// ── the position state around the event (Ethereum) ──────────────────────────
+
+/** What the prose reads from the position state the open card reads
+ *  (decision 0025), around this transaction and the previous one. */
+export interface V3StateRead {
+  /** Health factor either side of the transaction; null where there is no debt. */
+  hfBefore: number | null;
+  hfAfter: number | null;
+  /** The event's own reserve's collateral flag either side. */
+  collateral?: { before: boolean; after: boolean };
+  /** The health factor after the previous transaction, and what moved it since. */
+  prevHf?: number | null;
+  priceMove?: { symbol: string; from: number; to: number };
+  ltMove?: { from: number; to: number };
+  /** Account totals before the transaction, in USD. */
+  debtUsdBefore?: number;
+  /** Balances after the transaction, per reserve and side. */
+  left?: { symbol: string; side: "supply" | "debt"; amount: number }[];
+}
+
+export function v3StateRead(
+  ctx: AaveV3Context,
+  here: AaveV3PositionState | undefined,
+  prev: AaveV3PositionState | undefined,
+): V3StateRead | undefined {
+  if (!here?.account) return undefined;
+  const hfOf = (wad: string | null): number | null => (wad == null ? null : wadToNumber(wad));
+  const reserve = (ctx.eventType === "liquidation" ? ctx.collateralAsset : ctx.reserve)?.toLowerCase();
+  const own = here.reserves.find((r) => r.reserve.toLowerCase() === reserve);
+  const out: V3StateRead = {
+    hfBefore: hfOf(here.account.before.healthFactor),
+    hfAfter: hfOf(here.account.after.healthFactor),
+    collateral: own?.collateral ?? undefined,
+    debtUsdBefore: baseToUsd(here.account.before.totalDebtBase),
+    left: here.reserves.flatMap((r) => {
+      const dec = r.decimals;
+      if (dec == null) return [];
+      return (["supply", "debt"] as const)
+        .map((side) => ({
+          symbol: r.symbol ?? r.reserve.slice(0, 6),
+          side,
+          amount: Number(humanOf((side === "supply" ? r.supply : r.debt).after, dec)),
+        }))
+        .filter((l) => l.amount > 0);
+    }),
+  };
+  if (prev?.account && prev.txHash.toLowerCase() !== here.txHash.toLowerCase()) {
+    out.prevHf = hfOf(prev.account.after.healthFactor);
+    // The collateral whose price moved most between the two reads.
+    let best: V3StateRead["priceMove"];
+    for (const r of here.reserves) {
+      if (!r.collateral?.before || r.priceBase == null) continue;
+      const p = prev.reserves.find((q) => q.reserve === r.reserve);
+      if (!p?.priceBase) continue;
+      const from = Number(p.priceBase) / 1e8;
+      const to = Number(r.priceBase) / 1e8;
+      if (!best || Math.abs(to / from - 1) > Math.abs(best.to / best.from - 1))
+        best = { symbol: r.symbol ?? "the collateral", from, to };
+    }
+    if (best && Math.abs(best.to / best.from - 1) >= 0.005) out.priceMove = best;
+    const ltFrom = prev.account.after.liquidationThresholdBps;
+    const ltTo = here.account.before.liquidationThresholdBps;
+    if (ltFrom > 0 && ltTo > 0 && ltFrom !== ltTo) out.ltMove = { from: ltFrom / 100, to: ltTo / 100 };
+  }
+  return out;
+}
+
+/** The health factor as the open card shows it: a third decimal below 1.1,
+ *  rounded down under 1 so a liquidatable account never reads 1.000. */
+const hfText = (hf: number): string => hfLabelV4(hf);
+
+/** One sentence on how the health factor moved in this transaction. */
+function healthFactorLine(state: V3StateRead | undefined, withdraw = false): ClauseInput {
+  if (!state) return null;
+  const { hfBefore: b, hfAfter: a } = state;
+  if (a == null) {
+    return b == null
+      ? null
+      : clause(<>With no debt left, the account has no health factor and cannot be liquidated.</>);
+  }
+  const tail = a < 1.1 ? <>, close to the liquidation line at 1</> : null;
+  const allowed = withdraw ? (
+    <>. The Pool allows a withdrawal only while the health factor stays at or above 1</>
+  ) : null;
+  if (b == null)
+    return clause(
+      <>
+        With this first debt the health factor is {hfText(a)}
+        {tail}
+        {allowed}.
+      </>,
+    );
+  const d = a - b;
+  const verb = Math.abs(d) < 0.005 ? null : d > 0 ? "rose" : "fell";
+  return clause(
+    verb ? (
+      <>
+        The health factor {verb} from {hfText(b)} to {hfText(a)}
+        {tail}
+        {allowed}.
+      </>
+    ) : (
+      <>
+        The health factor stayed at {hfText(a)}
+        {tail}
+        {allowed}.
+      </>
+    ),
+  );
+}
+
+/** How the health factor moved between the previous event and this one, with
+ *  no event: a price, a governance change to the threshold, or interest. */
+function priorMoveLine(state: V3StateRead | undefined): ClauseInput {
+  if (!state || state.prevHf == null || state.hfBefore == null) return null;
+  const from = state.prevHf;
+  const to = state.hfBefore;
+  if (Math.abs(to - from) < 0.01) return null;
+  const pm = state.priceMove;
+  const causes: ReactNode[] = [];
+  if (pm)
+    causes.push(
+      <>
+        {pm.symbol}&rsquo;s price {pm.to > pm.from ? "rose" : "fell"} from {fmtUnitPrice(pm.from)} to{" "}
+        {fmtUnitPrice(pm.to)}
+      </>,
+    );
+  if (state.ltMove)
+    causes.push(
+      <>
+        Aave governance {state.ltMove.to > state.ltMove.from ? "raised" : "lowered"} the liquidation threshold from{" "}
+        {state.ltMove.from}% to {state.ltMove.to}%
+      </>,
+    );
+  const why =
+    causes.length > 0 ? (
+      <>
+        {" "}
+        as{" "}
+        {causes.map((c, i) => (
+          <span key={i}>
+            {i > 0 ? " and " : null}
+            {c}
+          </span>
+        ))}
+      </>
+    ) : to < from ? (
+      <> as interest accrued on the debt</>
+    ) : null;
+  return clause(
+    <>
+      Since the previous event the health factor had moved from {hfText(from)} to {hfText(to)} with no action on the
+      account{why}.
+    </>,
+  );
+}
+
+// ── reconciliation ───────────────────────────────────────────────────────────
+
+/** Figures of one sum at one precision: the lead sentence's (three decimals,
+ *  trailing zeros dropped), or two where the liquidation's legs state two. */
+const recFmt = (n: number, decimals: number): string =>
+  n.toLocaleString("en-US", { minimumFractionDigits: decimals === 2 ? 2 : 0, maximumFractionDigits: decimals });
+
+/** The balance reconciled, Liquity-style: the balance at the previous event,
+ *  the interest since, the amount this event moved, the balance after. The
+ *  previous balance is stated as the after less the other terms, each at the
+ *  same precision, so the sum reads exactly. */
+function reconcileLine(
+  label: string,
+  sym: string,
+  terms: { after: number; interest?: number; moves: { amount: number; sign: 1 | -1; what: string }[]; start?: string },
+  d = 3,
+): ClauseInput {
+  const { after, moves } = terms;
+  const interest = terms.interest ?? 0;
+  const r = (n: number) => Number(n.toFixed(d));
+  const prev = r(r(after) - r(interest) - moves.reduce((s, m) => s + m.sign * r(m.amount), 0));
+  if (prev < -1e-9) return null;
+  return clause(
+    <>
+      {label}: {recFmt(prev, d)} {terms.start ?? "at the previous event"}
+      {r(interest) > 0 ? <> + {recFmt(interest, d)} interest since</> : null}
+      {moves.map((m, i) => (
+        <span key={i}>
+          {" "}
+          {m.sign > 0 ? "+" : "−"} {recFmt(m.amount, d)} {m.what}
+        </span>
+      ))}{" "}
+      = {recFmt(after, d)} {sym}.
+    </>,
+  );
+}
+
+const numOf = (s: string | undefined): number | null => {
+  if (s == null) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** The event's own balance line: supply for supply/withdraw, debt for borrow/repay. */
+function eventReconcile(ctx: AaveV3Context, sym: string): ClauseInput {
+  const supplySide = ctx.eventType === "supply" || ctx.eventType === "withdraw";
+  const before = numOf(supplySide ? ctx.supplyBefore : ctx.debtBefore);
+  const after = numOf(supplySide ? ctx.supplyAfter : ctx.debtAfter);
+  const amount = Math.abs(numOf(ctx.amount) ?? 0);
+  if (after == null || amount === 0) return null;
+  const interest = numOf(supplySide ? ctx.supplyInterestSincePrevious : ctx.debtInterestSincePrevious) ?? 0;
+  const verb = { supply: "supplied", withdraw: "withdrawn", borrow: "borrowed", repay: "repaid" }[
+    ctx.eventType as "supply" | "withdraw" | "borrow" | "repay"
+  ];
+  const sign: 1 | -1 = ctx.eventType === "supply" || ctx.eventType === "borrow" ? 1 : -1;
+  // A first supply or borrow of the reserve: nothing before to reconcile.
+  if (before != null && before <= 0) {
+    return clause(
+      supplySide ? (
+        <>
+          {sym} supplied is now {recFmt(after, 3)} {sym}.
+        </>
+      ) : (
+        <>
+          {sym} debt is now {recFmt(after, 3)} {sym}.
+        </>
+      ),
+    );
+  }
+  if (after <= 0 && !supplySide) return null;
+  return reconcileLine(supplySide ? `${sym} supplied` : `${sym} debt`, sym, {
+    after,
+    interest,
+    moves: [{ amount, sign, what: verb }],
+  });
+}
+
+export interface V3SlotOpts {
+  /** The position's owner: the third-party line keys on it. */
+  owner?: string;
+  /** This transaction's rows (a liquidation and its fee transfer). */
+  siblings?: readonly AaveV3TimelineEvent[];
+  /** The position state around this event (Ethereum only). */
+  state?: V3StateRead;
+}
+
+export function aaveV3EventSlots(ctx: AaveV3Context, coords: V3Coords, opts: V3SlotOpts = {}): EventProseSlots {
+  const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
+  const slots = aaveV3EventSlotsBase(ctx, coords, opts);
+  const delegated = delegatedActorLine(ctx, opts.owner, chainId);
   if (!delegated) return slots;
   return { ...slots, meansNow: [...(slots.meansNow ?? []), delegated] };
 }
 
-function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords): EventProseSlots {
+function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3SlotOpts): EventProseSlots {
+  const state = opts.state;
   const sym = ctx.reserveSymbol ?? "the asset";
   // The protocol the Pool belongs to — "Aave V3" unless the page says otherwise
   // (Seamless). Rendered identically to the literal it replaced on Aave.
@@ -166,6 +415,28 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords): EventProseS
   );
   switch (ctx.eventType) {
     case "supply": {
+      const coll = state?.collateral;
+      const collateralLine: ClauseInput =
+        coll && !coll.before && coll.after
+          ? clause(
+              <>
+                The Pool switched {sym} on as collateral in the same transaction, as it does on a first supply of an
+                asset that can back borrowing, so this {sym} backs the account&rsquo;s debt and can be seized in a
+                liquidation.
+              </>,
+            )
+          : coll?.after
+            ? clause(
+                <>
+                  {sym} was already on as collateral, so the new {sym} backs the account&rsquo;s debt at once and can be
+                  seized in a liquidation.
+                </>,
+              )
+            : coll
+              ? clause(<>{sym} is not on as collateral here, so this supply backs no borrowing.</>)
+              : clause(
+                  <>Once {sym} is on as collateral, the supplied amount also backs the account&rsquo;s borrowing.</>,
+                );
       return {
         happened: [
           clause(
@@ -174,14 +445,12 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords): EventProseS
             </>,
           ),
         ],
+        changed: [eventReconcile(ctx, sym)],
         meansNow: [
-          clause(
-            <>
-              The supplied {sym} earns {brandOwns} variable supply rate, and any interest accrues into the balance
-              itself so the supplied amount grows in place.
-            </>,
-          ),
-          clause(<>Once enabled as collateral, the supplied {sym} also backs the account&rsquo;s borrowing.</>),
+          clause(<>It earns {brandOwns} variable supply rate, paid into the balance as it accrues.</>),
+          collateralLine,
+          healthFactorLine(state),
+          priorMoveLine(state),
         ],
       };
     }
@@ -191,11 +460,12 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords): EventProseS
         happened: [
           clause(
             <>
-              Withdrew {deltaFig()} from {protocol}.
+              Withdrew {deltaFig()} from {protocol} to the wallet.
             </>,
           ),
         ],
-        meansNow: [],
+        changed: [eventReconcile(ctx, sym)],
+        meansNow: [healthFactorLine(state, true), priorMoveLine(state)],
       };
     }
 
@@ -204,25 +474,31 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords): EventProseS
       const ratePct = ctx.borrowRate ? (Number(ctx.borrowRate) / 1e27) * 100 : null;
       return {
         happened: [clause(happened)],
+        changed: [eventReconcile(ctx, sym)],
         meansNow: [
           ratePct != null && ratePct > 0
             ? clause(<>The variable borrow rate at the time was {ratePct.toFixed(2)}% a year.</>)
             : null,
+          healthFactorLine(state),
+          priorMoveLine(state),
         ],
       };
     }
 
     case "repay": {
-      const usingATokens = ctx.useATokens ? " using aTokens" : "";
+      const usingATokens = ctx.useATokens ? ` using supplied ${sym}` : "";
+      const cleared = (numOf(ctx.debtAfter) ?? 1) <= 0;
       return {
         happened: [
           clause(
             <>
-              Repaid {deltaFig()} of the account&rsquo;s debt{usingATokens}.
+              Repaid {deltaFig()} of the account&rsquo;s debt{usingATokens}
+              {cleared ? <>, clearing its {sym} debt</> : null}.
             </>,
           ),
         ],
-        meansNow: [],
+        changed: [eventReconcile(ctx, sym)],
+        meansNow: [healthFactorLine(state), priorMoveLine(state)],
       };
     }
 
@@ -527,6 +803,8 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords): EventProseS
     }
 
     case "transfer_out": {
+      const feeOf = feeLiquidation(ctx, opts.siblings, coords.chainId ?? MAINNET_CHAIN_ID);
+      if (feeOf) return feeSlots(ctx, coords, sym, feeOf);
       const transferFig = (
         <Fig
           info={transferDeltaProv(sym, "out", coords)}
@@ -558,7 +836,7 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords): EventProseS
     }
 
     case "liquidation":
-      return liquidationSlots(ctx, coords, sym);
+      return liquidationSlots(ctx, coords, sym, opts);
 
     case "bad_debt_written_off":
       return writtenOffSlots(ctx, coords, sym, protocol);
@@ -609,12 +887,16 @@ function writtenOffSlots(ctx: AaveV3Context, coords: V3Coords, sym: string, prot
   };
 }
 
-function liquidationSlots(ctx: AaveV3Context, coords: V3Coords, debtSym: string): EventProseSlots {
+function liquidationSlots(ctx: AaveV3Context, coords: V3Coords, debtSym: string, opts: V3SlotOpts): EventProseSlots {
   const collSym = ctx.collateralSymbol ?? "the collateral";
+  const state = opts.state;
+  const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
+  const fee = liquidationFee(ctx, opts.siblings, chainId);
 
   // Seized / cleared amounts echo the header's liquidation deltas (value keyed
   // to the header's signed source — seized from liquidatedCollateralAmount,
-  // cleared from debtToCover, both rendered negative there).
+  // cleared from debtToCover, both rendered negative there). Two decimals, as
+  // the open card's legs state them.
   const seizedFig = (
     <Fig
       info={seizedCollateralProv(
@@ -626,7 +908,7 @@ function liquidationSlots(ctx: AaveV3Context, coords: V3Coords, debtSym: string)
       value={chainTruthDeltaValue(-Number(ctx.liquidatedCollateralAmount), false)}
       symbol={collSym}
     >
-      <AmountText value={Number(ctx.liquidatedCollateralAmount)} /> {collSym}
+      {fmt2(ctx.liquidatedCollateralAmount)} {collSym}
     </Fig>
   );
   const clearedFig = (
@@ -635,22 +917,181 @@ function liquidationSlots(ctx: AaveV3Context, coords: V3Coords, debtSym: string)
       value={chainTruthDeltaValue(-Number(ctx.debtToCover), false)}
       symbol={debtSym}
     >
-      <AmountText value={Number(ctx.debtToCover)} /> {debtSym}
+      {fmt2(ctx.debtToCover)} {debtSym}
     </Fig>
   );
 
+  const fell =
+    state?.hfBefore != null ? (
+      <>The account&rsquo;s health factor had fallen to {hfText(state.hfBefore)}, below 1.0</>
+    ) : (
+      <>The account&rsquo;s health factor fell below 1.0</>
+    );
   const happened = (
     <>
-      The account&rsquo;s health factor fell below 1.0, so a liquidator repaid {clearedFig} of its debt and seized{" "}
-      {seizedFig} of collateral in return.
+      {fell}, so a liquidator repaid {clearedFig} of its debt and took {seizedFig} of its collateral.
     </>
   );
 
+  // The two balances reconciled. The Pool sends the fee after the seizure, and
+  // the timeline's fee row sits in the same transaction.
+  const feeAmt = fee ? Math.abs(Number(fee.amount)) || 0 : 0;
+  const collAfter = numOf(ctx.supplyAfter);
+  const debtAfter = numOf(ctx.debtAfter);
+  const collLine: ClauseInput =
+    collAfter != null
+      ? reconcileLine(
+          `${collSym} supplied`,
+          collSym,
+          {
+            after: collAfter,
+            start: "before",
+            moves: [
+              { amount: Number(ctx.liquidatedCollateralAmount), sign: -1, what: "to the liquidator" },
+              ...(feeAmt > 0 ? [{ amount: feeAmt, sign: -1 as const, what: "to the Aave treasury" }] : []),
+            ],
+          },
+          2,
+        )
+      : null;
+  const debtLine: ClauseInput =
+    debtAfter != null
+      ? reconcileLine(
+          `${debtSym} debt`,
+          debtSym,
+          {
+            after: debtAfter,
+            interest: numOf(ctx.debtInterestSincePrevious) ?? 0,
+            moves: [{ amount: Number(ctx.debtToCover), sign: -1, what: "repaid by the liquidator" }],
+          },
+          2,
+        )
+      : null;
+
+  // How much one call may take (aave-v3-origin LiquidationLogic, v3.3+):
+  // half the account's total debt, or all of the debt asset when the health
+  // factor is at or below 0.95 or either asset's position is under $2,000.
+  const clearedUsd = ctx.debtPrice ? Number(ctx.debtToCover) * ctx.debtPrice.usd : null;
+  const half =
+    clearedUsd != null && state?.debtUsdBefore ? Math.abs(clearedUsd / state.debtUsdBefore - 0.5) < 0.002 : false;
+  const closeFactor: ClauseInput =
+    v3Protocol(coords.pool) === "Aave V3"
+      ? clause(
+          half && state?.debtUsdBefore ? (
+            <>
+              One liquidation may repay at most half of the account&rsquo;s total debt, or all of the debt asset when
+              the health factor is at or below 0.95 or the position in either asset is under $2,000: the{" "}
+              {formatUsdValue(clearedUsd as number)} cleared here is half of the {formatUsdValue(state.debtUsdBefore)}{" "}
+              owed.
+            </>
+          ) : (
+            <>
+              One liquidation may repay at most half of the account&rsquo;s total debt, or all of the debt asset when
+              the health factor is at or below 0.95 or the position in either asset is under $2,000.
+            </>
+          ),
+        )
+      : null;
+
+  const hfMove: ClauseInput =
+    state?.hfBefore != null && state.hfAfter != null
+      ? clause(
+          <>
+            The health factor went from {hfText(state.hfBefore)} to {hfText(state.hfAfter)}: collateral counts toward it
+            only up to its liquidation threshold, so taking collateral lowers it less than clearing the same value of
+            debt raises it.
+          </>,
+        )
+      : null;
+
+  const debtLeft = state?.left?.filter((l) => l.side === "debt") ?? [];
+  const otherDebt = debtLeft.filter((l) => l.symbol !== debtSym);
+  const leftLine: ClauseInput =
+    otherDebt.length > 0
+      ? clause(
+          <>
+            A liquidation repays one debt asset, so the{" "}
+            {otherDebt.map((l, i) => (
+              <span key={l.symbol}>
+                {i > 0 ? " and " : null}
+                {l.symbol}
+              </span>
+            ))}{" "}
+            debt was left as it was. The account stays open and can be liquidated again if its health factor falls below
+            1.0.
+          </>,
+        )
+      : clause(<>The account stays open and can be liquidated again if its health factor falls below 1.0.</>);
+
   return {
     happened: [clause(happened)],
+    changed: [debtLine, collLine],
     meansNow: [
-      valuedSentences(ctx, coords, collSym, debtSym),
-      ctx.liquidator ? liquidatorClause(ctx.liquidator, coords.chainId ?? MAINNET_CHAIN_ID) : null,
+      priorMoveLine(state),
+      valuedSentences(ctx, coords, collSym, debtSym, fee),
+      closeFactor,
+      hfMove,
+      leftLine,
+      ctx.liquidator
+        ? clause(<>Sent by liquidator {addressLink(ctx.liquidator, chainId)}, typically an automated bot.</>)
+        : null,
+    ],
+  };
+}
+
+/** The liquidation's protocol fee: an aToken transfer to the Aave treasury in
+ *  the liquidation's transaction (lib/aave-v3/liquidation-fee.ts). */
+function feeSlots(ctx: AaveV3Context, coords: V3Coords, sym: string, liq: AaveV3Context): EventProseSlots {
+  const transferFig = (
+    <Fig
+      info={transferDeltaProv(sym, "out", coords)}
+      value={chainTruthDeltaValue(signedDelta(ctx), false)}
+      symbol={sym}
+    >
+      {fmt2(ctx.amount)} {sym}
+    </Fig>
+  );
+  const feeAmt = Math.abs(Number(ctx.amount)) || 0;
+  const after = numOf(liq.supplyAfter);
+  const b = liquidationBonus(liq, ctx);
+  const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
+  return {
+    happened: [
+      clause(
+        <>
+          Sent {transferFig} of supplied {sym} to the Aave treasury as the protocol fee of the liquidation in the same
+          transaction.
+        </>,
+      ),
+    ],
+    changed: [
+      after != null
+        ? reconcileLine(
+            `${sym} supplied`,
+            sym,
+            {
+              after,
+              start: "after the liquidator’s share",
+              moves: [{ amount: feeAmt, sign: -1, what: "fee" }],
+            },
+            2,
+          )
+        : null,
+    ],
+    meansNow: [
+      clause(
+        b?.feeShare != null ? (
+          <>
+            Aave keeps {pctPlain(b.feeShare)} of the liquidation bonus on {sym}. The fee moved as aTokens to the Aave
+            Collector {addressLink(ctx.counterparty ?? "", chainId)}, the treasury contract; nothing was withdrawn.
+          </>
+        ) : (
+          <>
+            Aave keeps a share of the liquidation bonus on {sym}. The fee moved as aTokens to the Aave Collector{" "}
+            {addressLink(ctx.counterparty ?? "", chainId)}, the treasury contract; nothing was withdrawn.
+          </>
+        ),
+      ),
     ],
   };
 }
@@ -659,7 +1100,13 @@ function liquidationSlots(ctx: AaveV3Context, coords: V3Coords, debtSym: string)
  *  both legs, and their ratio is the liquidator's realized premium. Echoes the
  *  detail's forensics block. Drops WHOLE when either leg is unpriced (the
  *  never-empty floor). Two sentences: the two valued legs, then the premium. */
-function valuedSentences(ctx: AaveV3Context, coords: V3Coords, collSym: string, debtSym: string): ClauseInput {
+function valuedSentences(
+  ctx: AaveV3Context,
+  coords: V3Coords,
+  collSym: string,
+  debtSym: string,
+  fee?: AaveV3Context,
+): ClauseInput {
   const cp = ctx.collateralPrice;
   const dp = ctx.debtPrice;
   const seizedAmt = Number(ctx.liquidatedCollateralAmount);
@@ -704,33 +1151,47 @@ function valuedSentences(ctx: AaveV3Context, coords: V3Coords, collSym: string, 
     </Fig>
   );
 
+  // The bonus the Pool paid on this collateral: the Base lanes carry it at the
+  // block; on Ethereum it is read off the liquidation's own legs plus its fee.
+  const atBlock = ctx.liquidationBonusAtBlock;
+  const b = atBlock
+    ? {
+        bonus: (atBlock.bonusBps - 10000) / 10000,
+        feeShare: atBlock.protocolFeeBps > 0 ? atBlock.protocolFeeBps / 10000 : null,
+      }
+    : liquidationBonus(ctx, fee);
+  const feeAmt = fee ? Math.abs(Number(fee.amount)) || 0 : 0;
+  const bonusLine =
+    b && b.bonus > 0 ? (
+      <>
+        {v3Brand(v3Protocol(coords.pool))} pays a {pctPlain(b.bonus)} liquidation bonus on {collSym}: the collateral
+        taken is worth {pctPlain(b.bonus)} more than the debt repaid
+        {b.feeShare != null ? (
+          <>
+            , and {pctPlain(b.feeShare)} of that bonus
+            {feeAmt > 0 ? (
+              <>
+                {" "}
+                ({fmt2(fee?.amount)} {collSym})
+              </>
+            ) : null}{" "}
+            goes to the Aave treasury
+          </>
+        ) : null}
+        .{" "}
+      </>
+    ) : null;
+
   return clause(
     <>
-      At the market&rsquo;s own prices at the time, the seized collateral was worth {seizedUsdFig} against{" "}
-      {clearedUsdFig} of debt cleared. That is a {premiumFig} premium to the liquidator.
+      {bonusLine}At the block&rsquo;s oracle prices the liquidator&rsquo;s {fmt2(ctx.liquidatedCollateralAmount)}{" "}
+      {collSym} was worth {seizedUsdFig} against {clearedUsdFig} of debt cleared, a {premiumFig} premium.
     </>,
   );
 }
 
-const liquidatorClause = (liquidator: string, chainId: ChainId): ClauseInput =>
-  clause(
-    <>
-      Cleared by a third-party liquidator (typically an automated bot):{" "}
-      <a
-        href={explorerUrl(chainId, "address", liquidator)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-blue-500 hover:underline"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {liquidator.slice(0, 6)}…{liquidator.slice(-4)}
-      </a>
-      .
-    </>,
-  );
-
 /** The teaser = the lead of the composed arc (the first sentence plus its
  *  trailing continuations — the after-balance rides along on operate events). */
-export function aaveV3ExplainerTeaser(ctx: AaveV3Context, coords: V3Coords): ReactNode | null {
-  return splitLead(eventClauses(aaveV3EventSlots(ctx, coords))).lead;
+export function aaveV3ExplainerTeaser(ctx: AaveV3Context, coords: V3Coords, opts: V3SlotOpts = {}): ReactNode | null {
+  return splitLead(eventClauses(aaveV3EventSlots(ctx, coords, opts))).lead;
 }

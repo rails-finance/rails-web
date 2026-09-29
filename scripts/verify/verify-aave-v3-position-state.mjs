@@ -201,10 +201,14 @@ const fmtUsd = (v) =>
   v < 0.01 ? "< $0.01" : v < 1 ? `$${v.toFixed(2)}` : "$" + v.toLocaleString("en-US", { maximumFractionDigits: 0 });
 const rawToUsd = (raw, priceBase, decimals) => Number((big(raw) * big(priceBase)) / pow10(decimals + 4)) / 1e4;
 const baseToUsd = (base) => Number(big(base) / pow10(4)) / 1e4;
+// hfLabelV4 (lib/aave-v4/format.ts): a third decimal below 1.1, rounded down
+// under 1, ">100" from 100.
 const hfLabel = (wad) => {
   if (wad == null) return "∞";
   const n = Number(big(wad) / pow10(14)) / 1e4;
-  return n >= 100 ? "∞" : n.toFixed(2);
+  if (n >= 100) return ">100";
+  if (n < 1) return (Math.floor(n * 1000) / 1000).toFixed(3);
+  return n < 1.1 ? n.toFixed(3) : n.toFixed(2);
 };
 const bpsPct = (bps) => `${(bps / 100).toFixed(2)}%`;
 const emodeName = (state, id) => (id === 0 ? "None" : state.emode?.categories?.[String(id)]?.label || `Category ${id}`);
@@ -514,7 +518,12 @@ for (const fx of FIXTURES) {
               `count=${flipCount}`,
             );
             const flipText = await text(flipEl);
-            check(`${fx.label}: ${r.symbol}'s flip text reads "was ${was}"`, flipText === `was ${was}`, flipText);
+            const now = r.collateral.after ? "on" : "off";
+            check(
+              `${fx.label}: ${r.symbol}'s flip text reads "switched ${now} here" (was ${was})`,
+              flipText === `switched ${now} here`,
+              flipText,
+            );
           } else {
             check(`${fx.label}: ${r.symbol} carries no flip text — its flag did not change`, flipCount === 0);
           }
@@ -563,16 +572,16 @@ for (const fx of FIXTURES) {
         check(`${fx.label}: ${side} carries no dust count line`, (await dustButton.count()) === 0);
       }
 
-      // §54: no receipt is lost when the icon retires. A flipped row's "was
-      // on"/"was off" still opens collateralFlagProv; a row that did not flip
+      // §54: no receipt is lost when the icon retires. A flipped row's
+      // "switched on/off here" still opens collateralFlagProv; a row that did not flip
       // has that same receipt's summary riding on its own balance receipt.
       // By now any dust row is revealed, so a flipped reserve hidden behind
       // the count line is still on the page to click.
       if (side === "supply" && fx.checkFlagProv) {
         const flippedR = rows.find((r) => r.collateral && r.collateral.before !== r.collateral.after);
         if (flippedR) {
-          const was = flippedR.collateral.before ? "on" : "off";
-          const receipt = await receiptText(page, scope, `was ${was}`);
+          const now = flippedR.collateral.after ? "on" : "off";
+          const receipt = await receiptText(page, scope, `switched ${now} here`);
           check(
             `${fx.label}: ${flippedR.symbol}'s flip note opens the collateral-flag receipt`,
             !!receipt && receipt.includes("collateral switch"),
