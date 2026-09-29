@@ -3581,6 +3581,61 @@ export function frankencoinMintingContent(): LearnMoreContent {
   };
 }
 
+/** The system page's minting book: what each count is out of. */
+export function frankencoinBookContent(b: {
+  total: number;
+  v1: number;
+  v2: number;
+  open: number;
+  clones: number;
+  denied: number;
+  challengesStarted: number;
+  challengesSucceeded: number;
+  challengedPositions: number;
+  forcedSalePositions: number;
+}): LearnMoreContent {
+  const originals = b.total - b.clones;
+  const n = (x: number) => x.toLocaleString("en-US");
+  return {
+    title: "What the Minting Book Counts",
+    intro: `The book is every position Frankencoin's two MintingHubs have opened: ${n(b.total)} of them. Each count below names what it is out of.`,
+    detailsHeading: "The counts:",
+    details: [
+      {
+        bold: "Positions ever",
+        text: `${n(b.total)} positions, ${n(b.v1)} opened on Hub V1 (2023) and ${n(b.v2)} on Hub V2 (2024).`,
+        sources: [fcSource("positions and the hubs", "positions")],
+      },
+      {
+        bold: "Originals and clones",
+        text: `${n(b.clones)} of the ${n(b.total)} are clones, which copy an accepted original's terms and share its minting limit. The other ${n(originals)} are originals: each proposed its own terms, paid the opening fee and faced a veto window.`,
+        sources: [fcSource("opening an original", "open"), fcSource("cloning a position", "clone")],
+      },
+      {
+        bold: "Open at head",
+        text: `${n(b.open)} of the ${n(b.total)} are open now; the others have closed or were denied.`,
+        sources: [fcSource("a position's life", "positions")],
+      },
+      {
+        bold: "Denied in the veto window",
+        text: `${n(b.denied)} of the ${n(originals)} originals. Only an original can be denied: a clone has no veto window.`,
+        sources: [fcSource("the veto", "governance")],
+      },
+      {
+        bold: "Challenges",
+        text: `${n(b.challengesStarted)} challenges were started, against ${n(b.challengedPositions)} positions; ${n(b.challengesSucceeded)} of the ${n(b.challengesStarted)} reached a phase-2 sale of position collateral, and the others were averted or are still running.`,
+        sources: [fcSource("challenges", "auctions")],
+      },
+      {
+        bold: "Cleared by forced sale",
+        text: `${n(b.forcedSalePositions)} positions had collateral bought after expiry through the V2 hub.`,
+        sources: [fcSource("expiry and the forced sale", "auctions")],
+      },
+    ],
+    links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],
+  };
+}
+
 /** A declared-price change. */
 export function frankencoinPriceContent(): LearnMoreContent {
   return {

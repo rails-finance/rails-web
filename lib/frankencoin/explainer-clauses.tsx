@@ -59,8 +59,9 @@ import {
   type FrankencoinChallengeLeg,
 } from "@/lib/frankencoin/event-provenance";
 import { hubAddress, shortAddress } from "@/lib/frankencoin/asset-catalog";
-import { fmtFcColl, fmtFcPct, fmtFcPrice, fmtZchf } from "@/lib/frankencoin/figures";
+import { fmtFcColl, fmtFcPct, fmtFcPrice, fmtZchf, groupExact } from "@/lib/frankencoin/figures";
 import type { FrankencoinEventRead, FrankencoinZchfSplit } from "@/lib/frankencoin/use-event-read";
+import type { FrankencoinOpeningRead } from "@/lib/sources/chain/frankencoin-event";
 import {
   challengeKey,
   dateTimeText,
@@ -72,6 +73,18 @@ import { fmtMultiple, forcedCurvePoint, gapText, periodAfterExpiry, termText } f
 import { formatDate } from "@/lib/date";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
+
+/** Who holds the governance votes, glossed where a veto is named. */
+const VOTES_GLOSS = (
+  <>The votes come with FPS, Frankencoin&rsquo;s pool shares (its equity), and with FCS, which wraps FPS.</>
+);
+
+const NO_ORACLE = clause(
+  <>
+    Frankencoin runs no price oracle: the liquidation price is the owner&rsquo;s declaration, and a challenge auction is
+    what tests it.
+  </>,
+);
 
 /** The dust epsilon — a balance below this is treated as zero. */
 const FC_EPS = 1e-9;
@@ -251,6 +264,7 @@ export function frankencoinEventSlots(
 
   // What a mint paid out, from the receipt; the mechanic in words while the
   // receipt is not read.
+  const mintGross = dMint != null && dMint > 0 ? dMint : num(ctx.minted);
   const mintSplit = (): ClauseInput =>
     split?.received != null
       ? clause(
@@ -270,6 +284,7 @@ export function frankencoinEventSlots(
                   <>
                     : {split.ratePct.toFixed(2)}% a year, the rate in force at this block
                     {split.termDays != null ? <>, for the {termText(split.termDays)} left to expiry</> : null}
+                    {mintGross > 0 ? <>, {((split.interest / mintGross) * 100).toFixed(2)}% of the mint</> : null}
                   </>
                 ) : (
                   <> for the remaining term</>
@@ -332,8 +347,10 @@ export function frankencoinEventSlots(
     return clause(
       <>
         At that price {collAfterFig()} backs up to {fmtZchf(ceiling)} ZCHF of debt
-        {exact ? (
-          <>, exactly the debt it carries.</>
+        {debt <= FC_EPS ? (
+          <>; it carries no debt.</>
+        ) : exact ? (
+          <>, the debt it carries.</>
         ) : ceiling > debt ? (
           <>
             , {fmtZchf(ceiling - debt)} ZCHF more than the {mintAfterFig()} it carries.
@@ -359,6 +376,97 @@ export function frankencoinEventSlots(
             </>,
           )
         : clause(<>The lower price took effect at once; no cooldown started.</>);
+
+  // An original's opening, from its receipt and the terms read at its block.
+  const openingSlots = (o: FrankencoinOpeningRead, deposited: number): EventProseSlots => {
+    const price = o.priceRaw != null ? Number(o.priceRaw) / 10 ** (36 - dec) : null;
+    const minimum = o.minimumCollateralRaw != null ? Number(o.minimumCollateralRaw) / 10 ** dec : null;
+    const priceFig =
+      price != null && o.priceRaw != null
+        ? chFig(
+            "openTerms",
+            o.priceRaw,
+            <>
+              {fmtFcPrice(price)} ZCHF/{sym}
+            </>,
+          )
+        : null;
+    const opened: ReactNode =
+      deposited > 0 ? (
+        <>
+          This position opened with {collDeltaFig(deposited, true)} of collateral
+          {minimum != null && Math.abs(minimum - deposited) < FC_EPS ? (
+            <>, the minimum it must hold{priceFig ? "," : ""}</>
+          ) : minimum != null ? (
+            <>
+              {" "}
+              (its minimum is {fmtFcColl(minimum)} {sym})
+            </>
+          ) : null}
+          {priceFig ? <> and a declared liquidation price of {priceFig}</> : null}.
+        </>
+      ) : priceFig ? (
+        <>This position opened with a declared liquidation price of {priceFig} and no collateral yet.</>
+      ) : (
+        <>This position opened.</>
+      );
+    const fee = Number(o.fee);
+    const feeClause: ClauseInput =
+      fee > 0
+        ? clause(
+            <>
+              {o.feePayer && (o.feePayer === ctx.txFrom || o.feePayer === facts?.createdFor) ? (
+                "The owner"
+              ) : o.feePayer ? (
+                <Addr address={o.feePayer} />
+              ) : (
+                "The opener"
+              )}{" "}
+              paid the {chFig("openFee", o.fee, <>{fmtZchf(fee)} ZCHF</>, "ZCHF")} opening fee into the system reserve.
+            </>,
+          )
+        : null;
+    const deniedAt = facts?.deniedAt ?? null;
+    const veto: ClauseInput =
+      o.start != null && ts != null && o.start > ts
+        ? clause(
+            <>
+              Its veto window ran {spanText(o.start - ts)}
+              {Math.abs(o.start - ts - 3 * 86400) < 60 ? ", the shortest allowed" : ""}, from {dateTimeText(ts)} to{" "}
+              {dateTimeText(o.start)}. Holders of more than 1% of the governance votes could deny it in that time, and{" "}
+              {deniedAt != null && deniedAt < o.start ? <>one did, on {formatDate(deniedAt)}</> : <>nobody did</>}.{" "}
+              {VOTES_GLOSS}
+            </>,
+          )
+        : null;
+    const fixed: string[] = [];
+    if (minimum != null) fixed.push(`the ${fmtFcColl(minimum)} ${sym} minimum`);
+    if (o.limit != null) fixed.push(`the ${groupExact(o.limit)} ZCHF minting limit it shares with its clones`);
+    if (o.challengePeriod != null) fixed.push(`the challenge period of ${phaseText(o.challengePeriod)}`);
+    if (o.reservePPM != null) fixed.push(`the ${fmtFcPct(o.reservePPM / 1_000_000)} reserve share`);
+    if (o.riskPremiumPPM != null) fixed.push(`the ${(o.riskPremiumPPM / 10_000).toFixed(2)}% risk premium`);
+    if (o.expiration != null) fixed.push(`the expiry, ${dateTimeText(o.expiration)}`);
+    const terms: ClauseInput =
+      ctx.hub === "v2" && fixed.length > 0
+        ? clause(
+            <>
+              Fixed for the position&rsquo;s life: the collateral token, {fixed.slice(0, -1).join(", ")} and{" "}
+              {fixed[fixed.length - 1]}. The owner can change the declared price, the collateral and the debt.
+              {o.annualInterestPPM != null ? (
+                <>
+                  {" "}
+                  The {(o.annualInterestPPM / 10_000).toFixed(2)}% interest rate is the base rate governance sets plus
+                  the risk premium, so it moves with the base rate.
+                </>
+              ) : null}
+            </>,
+          )
+        : null;
+    return {
+      happened: [clause(opened), feeClause],
+      meansNow: [veto, terms, NO_ORACLE],
+    };
+  };
 
   switch (ctx.eventType) {
     case "open":
@@ -396,6 +504,8 @@ export function frankencoinEventSlots(
         ) : (
           <>{lede}.</>
         );
+      const o = !cloneRow ? (facts?.opening ?? null) : null;
+      if (o) return openingSlots(o, openColl);
       const declaredPrice: ClauseInput =
         ctx.liqPrice != null ? clause(<>The owner declared a liquidation price of {liqPriceAfterFig()}.</>) : null;
       const viaParent = root != null && ctx.original != null && root !== ctx.original;
@@ -419,7 +529,7 @@ export function frankencoinEventSlots(
         : clause(
             <>
               As a new original position it first waits out a veto window of at least three days, chosen by the owner,
-              in which holders of more than 1% of the governance votes (FCS, or the FPS it wraps) can deny it.
+              in which holders of more than 1% of the governance votes can deny it. {VOTES_GLOSS}
             </>,
           );
       return {
@@ -427,12 +537,7 @@ export function frankencoinEventSlots(
         changed: [declaredPrice],
         meansNow: [
           lifecycleMechanic,
-          clause(
-            <>
-              Frankencoin runs no price oracle: the liquidation price is the owner&rsquo;s declaration, and a challenge
-              auction is what tests it.
-            </>,
-          ),
+          NO_ORACLE,
           openMint > 0 ? mintSplit() : null,
           openMint > 0 ? rollClause() : null,
           understatedCaveat(),
@@ -498,9 +603,23 @@ export function frankencoinEventSlots(
                 </>,
               )
             : null;
+      // Where the withdrawal stopped against the declared price's limit.
+      const atLimit =
+        rs.hasDebt && showColl && priceAfter != null && Math.abs(rs.colAfter * priceAfter - rs.debtAfter) < 0.005;
+      const limitClause: ClauseInput = atLimit
+        ? clause(
+            <>
+              At the declared {liqPriceAfterFig()} that is the least collateral the debt allows (
+              {fmtFcColl(rs.colAfter)} × {fmtFcPrice(priceAfter as number)} = {fmtZchf(rs.debtAfter)} ZCHF): the
+              withdrawal stopped at the limit.
+            </>,
+          )
+        : rs.hasDebt
+          ? ceilingClause()
+          : null;
       return {
         happened: [clause(<>Withdrew {collDeltaFig(delta, true)} of collateral.</>)],
-        changed: [changed],
+        changed: [changed, limitClause],
         meansNow: [understatedCaveat()],
       };
     }
@@ -674,8 +793,8 @@ export function frankencoinEventSlots(
         meansNow: [
           clause(
             <>
-              A veto needs more than 1% of the governance votes (FCS, or the FPS it wraps, with delegations) and is open
-              only during a new original position&rsquo;s veto window.
+              A veto needs more than 1% of the governance votes, counting delegations, and is open only during a new
+              original position&rsquo;s veto window. {VOTES_GLOSS}
             </>,
           ),
           clause(<>Denial disables minting permanently. The collateral stays withdrawable by the owner.</>),

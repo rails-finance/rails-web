@@ -13,6 +13,7 @@ import { createContext, useContext } from "react";
 
 export { dateTimeText, phaseText, spanText } from "@/lib/frankencoin/figures";
 import type { BaseActivityEvent, FrankencoinContext } from "@/lib/shared/types/event-shape";
+import type { FrankencoinOpeningRead } from "@/lib/sources/chain/frankencoin-event";
 
 export interface FrankencoinChallengeFacts {
   start: number;
@@ -60,6 +61,14 @@ export interface FrankencoinPageFacts {
   /** Collateral each transaction's sales sold (forced sale amounts and
    *  challenge slices), whole units, keyed by tx hash. */
   txSold: Record<string, number>;
+  /** When the position was denied, if it was. */
+  deniedAt: number | null;
+  /** The owner the creating transaction handed the position to. */
+  createdFor: string | null;
+  /** An original's opening transaction and terms, from its receipt and reads
+   *  at the opening block (the position page supplies it). */
+  opening?: FrankencoinOpeningRead | null;
+  openingPending?: boolean;
 }
 
 const FactsContext = createContext<FrankencoinPageFacts | null>(null);
@@ -82,8 +91,13 @@ export function frankencoinPageFacts(
   const txKinds: Record<string, string[]> = {};
   const forcedSales: FrankencoinForcedSaleFact[] = [];
   const txSold: Record<string, number> = {};
+  let deniedAt: number | null = null;
+  let createdFor: string | null = null;
   for (const e of events) {
     const ctx = e.context.data;
+    if (ctx.eventType === "ownership_transferred" && ctx.initialization)
+      createdFor = ctx.handoverOwner ?? ctx.newOwner ?? createdFor;
+    if (ctx.eventType === "denied" && deniedAt == null) deniedAt = e.timestamp;
     (txKinds[e.txHash] ??= []).push(ctx.eventType);
     const sold =
       ctx.eventType === "forced_sale"
@@ -132,5 +146,15 @@ export function frankencoinPageFacts(
     }
   }
   forcedSales.sort((a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp);
-  return { challengePeriod, familyOriginal, challenges, txKinds, saleExample, forcedSales, txSold };
+  return {
+    challengePeriod,
+    familyOriginal,
+    challenges,
+    txKinds,
+    saleExample,
+    forcedSales,
+    txSold,
+    deniedAt,
+    createdFor,
+  };
 }

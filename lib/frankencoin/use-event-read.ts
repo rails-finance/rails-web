@@ -187,3 +187,141 @@ export function frankencoinZchfSplit(read: FrankencoinEventRead | null, dMint: n
     reserveReturned: back + (n(read.burnedFromReserve) ?? 0),
   };
 }
+
+type FrankEvent = BaseActivityEvent & { context: { protocol: "frankencoin"; data: FrankencoinContext } };
+
+/** The opening read's URL for an original's page: its PositionOpened row, and
+ *  the block of its first ledger row when a later transaction wrote it. */
+function openingUrl(events: FrankEvent[]): string | null {
+  const open = events.find((e) => e.context.data.eventType === "open");
+  if (!open?.txHash) return null;
+  const first = events.find((e) => e.context.data.firstState === true);
+  const q = new URLSearchParams({ tx: open.txHash, position: open.context.data.position.toLowerCase(), kind: "open" });
+  const log = logIndexOf(open.id);
+  if (log != null) q.set("log", log);
+  if (first && first.txHash !== open.txHash && first.blockNumber > open.blockNumber)
+    q.set("first", String(first.blockNumber));
+  return `/api/chain/frankencoin/event?${q.toString()}`;
+}
+
+/** The opening read of an original's page (null on a clone's), with whether it
+ *  is still loading. One request per page; the Open row and the first ledger
+ *  row both read from it. */
+export function useFrankencoinOpening(events: FrankEvent[]): FrankencoinEventReadState {
+  const url = openingUrl(events);
+  const [state, setState] = useState<{ url: string; value: FrankencoinEventRead | null } | null>(null);
+  useEffect(() => {
+    if (!url) return;
+    let live = true;
+    load(url).then((d) => {
+      if (live) setState({ url, value: d });
+    });
+    return () => {
+      live = false;
+    };
+  }, [url]);
+  if (!url) return { read: null, pending: false };
+  if (state?.url !== url) return { read: null, pending: true };
+  return { read: state.value?.opening ? state.value : null, pending: false };
+}
+
+const scaleRaw = (raw: string, decimals: number): string => {
+  const neg = raw.startsWith("-");
+  const digits = (neg ? raw.slice(1) : raw).padStart(decimals + 1, "0");
+  const whole = digits.slice(0, digits.length - decimals);
+  const frac = decimals > 0 ? digits.slice(digits.length - decimals).replace(/0+$/, "") : "";
+  return `${neg ? "-" : ""}${whole}${frac ? `.${frac}` : ""}`;
+};
+
+/** The timeline with the opening transaction's figures in place, from the
+ *  receipt: the Open row carries the collateral it moved in and the declared
+ *  price it set, and the first ledger row (written by a later transaction)
+ *  starts from the balance and price one block before it, so its change is
+ *  what that transaction moved. The index books the opening deposit into that
+ *  row instead (rails-ops item 158). */
+export function applyFrankencoinOpening(events: FrankEvent[], read: FrankencoinEventRead | null): FrankEvent[] {
+  const o = read?.opening;
+  if (!o) return events;
+  return events.map((e) => {
+    const c = e.context.data;
+    if (c.eventType === "open") {
+      const deposited = BigInt(o.depositedRaw);
+      const data: FrankencoinContext = {
+        ...c,
+        ...(deposited > BigInt(0) ? { collateral: scaleRaw(o.depositedRaw, c.collateralDecimals) } : {}),
+        ...(o.priceRaw != null ? { liqPrice: scaleRaw(o.priceRaw, 36 - c.collateralDecimals) } : {}),
+        raw: {
+          ...c.raw,
+          ...(deposited > BigInt(0) ? { collateral: o.depositedRaw } : {}),
+          ...(o.priceRaw != null ? { price: o.priceRaw } : {}),
+        },
+      };
+      return { ...e, context: { ...e.context, data } };
+    }
+    const fb = o.firstBefore;
+    if (c.firstState !== true || !fb || fb.block !== e.blockNumber || fb.collateralRaw == null) return e;
+    const collBefore = BigInt(fb.collateralRaw);
+    const collAfter = c.raw?.collateral != null ? BigInt(c.raw.collateral) : null;
+    const priceAfter = c.raw?.price != null ? BigInt(c.raw.price) : null;
+    const priceBefore = fb.priceRaw != null ? BigInt(fb.priceRaw) : null;
+    const dColl = collAfter != null ? collAfter - collBefore : null;
+    const priceMoved = priceBefore != null && priceAfter != null && priceBefore !== priceAfter;
+    const dMint = Number(c.minted ?? 0) - Number(c.mintedBefore ?? 0);
+    // Re-classified on the corrected axes; a settlement stays a settlement.
+    let eventType = c.eventType;
+    if (eventType !== "auction_settlement" && eventType !== "close") {
+      const axes = [dColl != null && dColl !== BigInt(0), dMint !== 0, priceMoved].filter(Boolean).length;
+      eventType =
+        axes > 1
+          ? "adjust"
+          : dMint !== 0
+            ? dMint > 0
+              ? "mint"
+              : "repay"
+            : dColl != null && dColl !== BigInt(0)
+              ? dColl > BigInt(0)
+                ? "add_collateral"
+                : "withdraw_collateral"
+              : priceMoved
+                ? "adjust_price"
+                : "adjust";
+    }
+    const data: FrankencoinContext = {
+      ...c,
+      eventType,
+      collateralBefore: scaleRaw(fb.collateralRaw, c.collateralDecimals),
+      ...(fb.priceRaw != null ? { liqPriceBefore: scaleRaw(fb.priceRaw, 36 - c.collateralDecimals) } : {}),
+      firstState: collBefore === BigInt(0) && fb.priceRaw == null ? true : undefined,
+      beforeReadAtBlock: true,
+      raw: {
+        ...c.raw,
+        collateralBefore: fb.collateralRaw,
+        ...(fb.priceRaw != null ? { priceBefore: fb.priceRaw } : {}),
+      },
+    };
+    const flows = e.flows.map((f) =>
+      eq(f.token, c.collateralToken) && dColl != null
+        ? {
+            ...f,
+            amount: (dColl < BigInt(0) ? -dColl : dColl).toString(),
+            amountFormatted: Math.abs(Number(scaleRaw(dColl.toString(), c.collateralDecimals))),
+            direction: dColl < BigInt(0) ? ("out" as const) : ("in" as const),
+          }
+        : f,
+    );
+    const parts: string[] = [];
+    if (dColl != null && dColl !== BigInt(0)) parts.push(dColl > BigInt(0) ? "Add" : "Withdraw");
+    if (dMint !== 0) parts.push(dMint > 0 ? "Mint" : "Repay");
+    if (priceMoved) parts.push("Reprice");
+    const actionLabel = eventType === "adjust" && parts.length > 1 ? parts.join(" + ") : e.actionLabel;
+    return {
+      ...e,
+      actionType: eventType,
+      actionLabel,
+      flows: flows.filter((f) => !(eq(f.token, c.collateralToken) && dColl === BigInt(0))),
+      context: { ...e.context, data },
+    };
+  });
+}
+
+const eq = (a: string | undefined, b: string | undefined) => (a ?? "").toLowerCase() === (b ?? "").toLowerCase();

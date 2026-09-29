@@ -39,6 +39,8 @@ export interface FrankencoinChainResponse {
 
   collateralToken: string | null;
   collateralSymbol: string | null;
+  /** The collateral token's name(), as its contract states it. */
+  collateralName?: string | null;
   collateralDecimals: number | null;
   /** balanceOf(position) — raw integer string + scaled. */
   collateralRaw: string | null;
