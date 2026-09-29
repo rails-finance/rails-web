@@ -9,12 +9,14 @@
 // where its inflows came from, and its assets.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ChevronDown, Info, Pause, Play, SkipBack, SkipForward, ZoomIn } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward, ZoomIn } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { Prov } from "@/components/shared/provenance";
+import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { flowAssetProv, flowSegmentProv, flowTotalProv } from "@/lib/shared/flows-timeline-provenance";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
-import { formatDate, monthShort } from "@/lib/date";
+import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
   assetsAt,
   buildFlowModel,
@@ -93,6 +95,12 @@ const TICK: Record<FlowModel["ticks"][number]["tick"], string> = {
 
 const pct = (v: number, max: number) => `${Math.max(0, (v / max) * 100)}%`;
 
+/** "7 Feb '26": the timeline's day stamp (chain-truth-timeline). */
+const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
+
+/** A held line that names a token (the ledger's summed interest line names none). */
+const isToken = (h: FlowAssetHeld) => h.amount != null;
+
 /** The highlight key a segment answers to: its link group, else its own key. */
 const hlKey = (s: FlowSegment) => (s.link ? `link:${s.link}` : s.key);
 
@@ -129,7 +137,10 @@ function useReducedMotion(): boolean {
 }
 
 /** A segment's assets, largest first, for its tip. */
-type AssetSplit = Map<string, { symbol: string; usd: number }[]>;
+type AssetSplit = Map<string, { symbol: string; usd: number; token?: boolean }[]>;
+
+/** Rows a segment's tip lists before it counts the rest. */
+const TIP_ROWS = 6;
 
 /** One strip: a bar or its drill-down. Fills are clipped to the rounded
  *  track; the hover and tap targets ride a layer above, unclipped, so the
@@ -197,13 +208,16 @@ function Strip({
                       <span>{s.label}</span>
                       <span className="ml-auto">{formatFlowUsd(s.value)}</span>
                     </span>
-                    {parts.length > 1 &&
-                      parts.slice(0, 6).map((p) => (
-                        <span key={p.symbol} className="flex items-center gap-2 text-xs font-normal opacity-80">
-                          <span>{p.symbol}</span>
-                          <span className="ml-auto">{formatFlowUsd(p.usd)}</span>
-                        </span>
-                      ))}
+                    {parts.slice(0, TIP_ROWS).map((p) => (
+                      <span key={p.symbol} className="flex items-center gap-1.5 text-xs font-normal">
+                        {p.token !== false && <TokenChipIcon symbol={p.symbol} size={14} filterable={false} />}
+                        <span className="opacity-80">{p.symbol}</span>
+                        <span className="ml-auto pl-2 opacity-80">{formatFlowUsd(p.usd)}</span>
+                      </span>
+                    ))}
+                    {parts.length > TIP_ROWS && (
+                      <span className="text-xs font-normal opacity-80">{parts.length - TIP_ROWS} more</span>
+                    )}
                   </span>
                 }
               >
@@ -369,7 +383,7 @@ function SideBlock({
   motion,
   when,
   assets,
-  last,
+  first,
 }: {
   side: FlowSide;
   st: FlowSideState;
@@ -384,8 +398,8 @@ function SideBlock({
   onPin: (k: string) => void;
   motion: string;
   assets: ReturnType<typeof assetsAt>;
-  /** The last bar drawn: the axis labels sit under it. */
-  last: boolean;
+  /** The first bar drawn: the axis labels sit over it. */
+  first: boolean;
 }) {
   const id = `flows-${side}`;
   const coll = side === "collateral";
@@ -398,17 +412,14 @@ function SideBlock({
     ? `${word}: ${spokenUsd(st.now)} still supplied, of ${spokenUsd(st.total)} that came in; ${spokenUsd(st.out)} has left.`
     : `${word}: ${spokenUsd(st.now)} owed, of ${spokenUsd(st.total)} owed in all; ${spokenUsd(repaid)} repaid` +
       (liquidated > 0 ? `, ${spokenUsd(liquidated)} liquidated.` : ".");
-  const srcSpoken = `${coll ? "Everything that came in" : "Everything that was owed"}, by source: ${st.sources
-    .map((s) => `${s.label} ${spokenUsd(s.value)}`)
-    .join(", ")}.`;
-
   // Each segment's assets: held from the stop's balances, flows from the
   // day rows' per-asset totals.
   const sideHeld = assets.held.filter((h) => h.side === side);
+  const heldTokens = sideHeld.filter((h) => isToken(h) && (h.amount ?? 0) > 0).map((h) => h.symbol);
   const split: AssetSplit = new Map();
   split.set(
     `${side}-held`,
-    sideHeld.map((h) => ({ symbol: h.symbol, usd: h.usd })),
+    sideHeld.map((h) => ({ symbol: h.symbol, usd: h.usd, token: isToken(h) })),
   );
   const bucketsHere = model.buckets.filter((b) => b.side === side);
   const ins = new Map<string, number>();
@@ -424,25 +435,14 @@ function SideBlock({
 
   return (
     <div className="mt-4 first:mt-1">
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <div className="flex items-baseline gap-2">
-          <Prov info={flowSegmentProv(held, side, when, isLive, model.daily)}>
-            <span className="text-xl font-semibold tabular-nums text-foreground">{formatFlowUsd(st.now)}</span>
-          </Prov>
-          <span className="text-xs text-rb-500">{word}</span>
-        </div>
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
-          aria-controls={`${id}-zoom`}
-          aria-label={`${word}: ${open ? "hide" : "show"} what came in, what left and each asset`}
-          className={`${CTRL_GHOST} ${CTRL_OFF} min-h-11 min-w-11 justify-center gap-0.5 rounded-md px-2 sm:min-h-8 sm:min-w-0`}
-        >
-          <ZoomIn size={16} aria-hidden />
-          <ChevronDown size={14} aria-hidden className={`${motion} ${open ? "rotate-180" : ""}`} />
-        </button>
+      <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <Prov info={flowSegmentProv(held, side, when, isLive, model.daily)}>
+          <span className="text-xl font-semibold tabular-nums text-foreground">{formatFlowUsd(st.now)}</span>
+        </Prov>
+        {heldTokens.length > 0 && <InlineAssetCluster symbols={heldTokens} size={16} overlap={5} max={3} />}
+        <span className="text-xs text-rb-500">{word}</span>
       </div>
+      {first && <AxisLabels model={model} />}
       <Strip
         side={side}
         segments={st.bar}
@@ -457,7 +457,17 @@ function SideBlock({
         motion={motion}
         split={split}
       />
-      {last && <AxisLabels model={model} />}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={`${id}-zoom`}
+        aria-label={`${word}: ${open ? "hide" : "show"} what came in, what left and each asset`}
+        className={`${CTRL_GHOST} ${CTRL_OFF} -ml-2 mt-0.5 min-h-11 min-w-11 justify-center gap-0.5 rounded-md px-2 sm:min-h-8 sm:min-w-0`}
+      >
+        <ZoomIn size={16} aria-hidden />
+        <ChevronDown size={14} aria-hidden className={`${motion} ${open ? "rotate-180" : ""}`} />
+      </button>
       <div id={`${id}-zoom`} hidden={!open}>
         {open && (
           <>
@@ -491,33 +501,7 @@ function SideBlock({
                 </>
               )}
             </div>
-            <div className="mb-1 mt-3 text-[11px] text-rb-500">
-              {coll ? "Everything that came in, by source" : "Everything that was owed, by source"}
-            </div>
-            <Strip
-              side={side}
-              segments={st.sources}
-              max={model.axis.max}
-              ticks={model.axis.ticks}
-              height="h-5"
-              active={active}
-              onHover={onHover}
-              onPin={onPin}
-              label={srcSpoken}
-              motion={motion}
-              split={split}
-            />
-            <Legend
-              side={side}
-              segments={st.sources}
-              active={active}
-              pinned={pinned}
-              onHover={onHover}
-              onPin={onPin}
-              when={when}
-              isLive={isLive}
-              daily={model.daily}
-            />
+            <Sources side={side} segments={st.sources} when={when} isLive={isLive} daily={model.daily} />
             <AssetList
               side={side}
               held={sideHeld}
@@ -535,10 +519,40 @@ function SideBlock({
   );
 }
 
-/** The shared axis's labels, under the last bar. */
+/** Where a bar's length came from, as text: each source and its figure. */
+function Sources({
+  side,
+  segments,
+  when,
+  isLive,
+  daily,
+}: {
+  side: FlowSide;
+  segments: FlowSegment[];
+  when: string;
+  isLive: boolean;
+  daily: boolean;
+}) {
+  if (segments.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs text-rb-500">
+      <span>By source</span>
+      {segments.map((s) => (
+        <span key={s.key} className="whitespace-nowrap">
+          <Label s={s} />{" "}
+          <Prov info={flowSegmentProv(s, side, when, isLive, daily)}>
+            <span className="font-medium tabular-nums text-foreground">{formatFlowUsd(s.value)}</span>
+          </Prov>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The shared axis's labels, over the first bar. */
 function AxisLabels({ model }: { model: FlowModel }) {
   return (
-    <div className="relative mt-1.5 h-4 text-[11px] tabular-nums text-rb-500" aria-hidden data-prov-exempt="">
+    <div className="relative mb-1 h-4 text-[11px] tabular-nums text-rb-500" aria-hidden data-prov-exempt="">
       {model.axis.ticks.map((t) => {
         const at = t / model.axis.max;
         return (
@@ -558,11 +572,6 @@ function AxisLabels({ model }: { model: FlowModel }) {
   );
 }
 
-const monthYear = (tsSec: number) => {
-  const d = new Date(tsSec * 1000);
-  return `${monthShort(d.getUTCMonth())} ${d.getUTCFullYear()}`;
-};
-
 export function LifetimeFlowsScrubber({ timeline }: { timeline: FlowTimeline }) {
   const model = useMemo(() => buildFlowModel(timeline), [timeline]);
   if (!model) return null;
@@ -575,6 +584,7 @@ function ScrubberBody({ model }: { model: FlowModel }) {
   const [open, setOpen] = useState<Record<FlowSide, boolean>>({ collateral: false, debt: false });
   const [hover, setHover] = useState<string | null>(null);
   const [pinned, setPinned] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const reduced = useReducedMotion();
   const motion = reduced ? "" : "transition-all duration-200 ease-out";
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -588,6 +598,18 @@ function ScrubberBody({ model }: { model: FlowModel }) {
     setPlaying(false);
   }, []);
   useEffect(() => halt, [halt]);
+
+  // The date tip rides the handle while it is dragged.
+  useEffect(() => {
+    if (!dragging) return;
+    const up = () => setDragging(false);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  }, [dragging]);
 
   const play = () => {
     if (timer.current) return halt();
@@ -604,20 +626,27 @@ function ScrubberBody({ model }: { model: FlowModel }) {
   const s = stateAt(model, stop);
   const hasDebt = model.buckets.some((b) => b.side === "debt");
   const anyOpen = open.collateral || open.debt;
-  const assets = useMemo(
-    () => (anyOpen ? assetsAt(model, stop) : { held: [], flows: new Map() }),
-    [anyOpen, model, stop],
-  );
+  // Every stop: the headline icons and each segment's tip list the assets.
+  const assets = useMemo(() => assetsAt(model, stop), [model, stop]);
   const active = pinned ?? hover;
   const pin = (k: string) => setPinned((p) => (p === k ? null : k));
-  const dateText = s.isLive ? "Today, live prices" : formatDate(dayStart(model, stop));
+  const dateText = s.isLive ? "Today, live prices" : dayStamp(dayStart(model, stop));
   const when = s.isLive ? "now" : `the end of ${dateText}`;
+  const dateLine = s.isLive
+    ? `Position ${dateText.charAt(0).toLowerCase()}${dateText.slice(1)}`
+    : `Position on ${dateText}`;
   const counter =
     model.totalTxs != null && s.txs != null
       ? `${s.txs.toLocaleString("en-US")} of ${model.totalTxs.toLocaleString("en-US")} transaction${model.totalTxs === 1 ? "" : "s"}`
       : `${s.count.toLocaleString("en-US")} of ${model.totalEvents.toLocaleString("en-US")} event${model.totalEvents === 1 ? "" : "s"}`;
   const repricedHere = s.isLive ? [] : model.repricings.filter((r) => r.day === stop);
+  // Closed: nothing held after the last event, so the last stop is its close.
+  const closed = !(model.heldAt[model.heldAt.length - 1] ?? []).some((h) => (h.amount ?? 0) > 0);
   const btn = `${CTRL_GHOST} ${CTRL_OFF} size-11 shrink-0 rounded-md sm:size-9`;
+  const go = (to: number) => {
+    halt();
+    setStop(to);
+  };
   const hint =
     "Solid is still there; each hatch is one way value left, and a dashed fill moved no funds. The dashed outline marks where each bar ends today. Flows are valued at the oracle price at their block; " +
     (model.daily
@@ -626,6 +655,9 @@ function ScrubberBody({ model }: { model: FlowModel }) {
 
   return (
     <div className="text-sm">
+      <p className="mb-3 font-semibold tabular-nums text-foreground" aria-live="polite">
+        {dateLine}
+      </p>
       <SideBlock
         side="collateral"
         st={s.collateral}
@@ -640,7 +672,7 @@ function ScrubberBody({ model }: { model: FlowModel }) {
         motion={motion}
         when={when}
         assets={assets}
-        last={!hasDebt}
+        first
       />
       {/* A one-sided position (savings, a lender) names no debt bucket and
           draws a single bar. */}
@@ -659,101 +691,105 @@ function ScrubberBody({ model }: { model: FlowModel }) {
           motion={motion}
           when={when}
           assets={assets}
-          last
+          first={false}
         />
       )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <button
-          type="button"
-          className={btn}
-          aria-label="Previous event"
-          onClick={() => {
-            halt();
-            setStop(prevEventDay(model, stop));
-          }}
-        >
-          <SkipBack size={16} aria-hidden />
-        </button>
-        <button type="button" className={btn} aria-label={playing ? "Pause" : "Play"} onClick={play}>
-          {playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
-        </button>
-        <button
-          type="button"
-          className={btn}
-          aria-label="Next event"
-          onClick={() => {
-            halt();
-            setStop(nextEventDay(model, stop));
-          }}
-        >
-          <SkipForward size={16} aria-hidden />
-        </button>
-        <span className="ml-1 min-w-[7.5rem] flex-1 font-semibold tabular-nums text-foreground" aria-live="polite">
-          {dateText}
-        </span>
-        <span className="flex items-center gap-1 text-xs tabular-nums text-rb-500" data-prov-exempt="">
-          {counter}
-          <RevealTip
-            tip={<span className="block max-w-72 font-normal leading-snug">{hint}</span>}
-            label={hint}
-            focusable
-            className="focus-ring ml-1 inline-flex size-7 items-center justify-center rounded-full text-rb-500 hover:text-foreground"
-          >
-            <Info size={14} aria-hidden />
-          </RevealTip>
-        </span>
-      </div>
-
-      <div className="relative mt-1">
-        <input
-          type="range"
-          min={0}
-          max={model.liveStop}
-          step={1}
-          value={stop}
-          aria-label="Date"
-          aria-valuetext={dateText}
-          onChange={(e) => {
-            halt();
-            setStop(Number(e.target.value));
-          }}
-          className="block h-11 w-full cursor-pointer accent-[var(--color-rb-500)] sm:h-7"
-        />
-        {/* Event ticks, coloured by the side each event moved, and a marker
-            where an event repriced an asset whose price had gone stale. */}
+      <div className="relative mt-3">
+        {/* Event pips over the line, coloured by the side each event moved. */}
         <div className="pointer-events-none relative mx-2 h-3" aria-hidden>
           {model.ticks.map((t, i) => (
             <i
               key={i}
-              className="absolute top-0 h-2.5 w-[2px] rounded-[1px]"
+              className="absolute bottom-0 h-2.5 w-[2px] rounded-[1px]"
               style={{ left: pct(t.day, model.liveStop), background: TICK[t.tick] }}
             />
           ))}
         </div>
-        <div className="relative mx-2 h-3">
-          {model.repricings.map((r, i) => (
-            <span key={i} className="absolute top-0 -translate-x-1/2" style={{ left: pct(r.day, model.liveStop) }}>
-              <RevealTip
-                tip={`Repriced ${formatDate(dayStart(model, r.day))}: ${r.symbol} last priced ${formatDate(r.from)}`}
-                label={`Repriced ${formatDate(dayStart(model, r.day))}: ${r.symbol} last priced ${formatDate(r.from)}`}
-              >
-                <span className="block size-2 rotate-45 border border-rb-500" />
-              </RevealTip>
+        <div className="relative">
+          <input
+            type="range"
+            min={0}
+            max={model.liveStop}
+            step={1}
+            value={stop}
+            aria-label="Date"
+            aria-valuetext={dateText}
+            onChange={(e) => {
+              halt();
+              setStop(Number(e.target.value));
+            }}
+            onPointerDown={() => setDragging(true)}
+            className="block h-11 w-full cursor-pointer accent-[var(--color-rb-500)] sm:h-7"
+          />
+          {dragging && (
+            <span
+              aria-hidden
+              data-prov-hidden=""
+              className="pointer-events-none absolute bottom-full z-50 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
+              style={{
+                left: `calc(${stop / model.liveStop} * (100% - 16px) + 8px)`,
+                background: "var(--rb-tooltip-bg)",
+                borderColor: "var(--rb-tooltip-border)",
+              }}
+            >
+              {s.isLive ? "Today" : dateText}
             </span>
-          ))}
+          )}
         </div>
+        {/* A marker where an event repriced an asset whose price had gone stale. */}
+        {model.repricings.length > 0 && (
+          <div className="relative mx-2 h-3">
+            {model.repricings.map((r, i) => (
+              <span key={i} className="absolute top-0 -translate-x-1/2" style={{ left: pct(r.day, model.liveStop) }}>
+                <RevealTip
+                  tip={`Repriced ${dayStamp(dayStart(model, r.day))}: ${r.symbol} last priced ${dayStamp(r.from)}`}
+                  label={`Repriced ${dayStamp(dayStart(model, r.day))}: ${r.symbol} last priced ${dayStamp(r.from)}`}
+                >
+                  <span className="block size-2 rotate-45 border border-rb-500" />
+                </RevealTip>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1">
+        <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
+          <SkipBack size={16} aria-hidden />
+        </button>
+        <button type="button" className={btn} aria-label="Previous event" onClick={() => go(prevEventDay(model, stop))}>
+          <ChevronLeft size={18} aria-hidden />
+        </button>
+        <button type="button" className={btn} aria-label={playing ? "Pause" : "Play"} onClick={play}>
+          {playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
+        </button>
+        <button type="button" className={btn} aria-label="Next event" onClick={() => go(nextEventDay(model, stop))}>
+          <ChevronRight size={18} aria-hidden />
+        </button>
+        <button
+          type="button"
+          className={btn}
+          aria-label={closed ? "Jump to close" : "Jump to today"}
+          onClick={() => go(model.liveStop)}
+        >
+          <SkipForward size={16} aria-hidden />
+        </button>
+        <span className="ml-auto text-xs tabular-nums text-rb-500" data-prov-exempt="">
+          {counter}
+        </span>
       </div>
 
       {(s.stale.length > 0 || repricedHere.length > 0) && (
         <p className="mt-2 text-[11px] leading-snug text-rb-500">
-          {repricedHere.map((r) => `${r.symbol} repriced on this day, last priced ${formatDate(r.from)}. `).join("")}
+          {repricedHere.map((r) => `${r.symbol} repriced on this day, last priced ${dayStamp(r.from)}. `).join("")}
           {s.stale.length > 0 &&
             `${model.daily ? "No newer price recorded" : "Valued at each asset's last event price"}: ${s.stale
-              .map((x) => `${x.symbol} from ${monthYear(x.pricedAt)}`)
+              .map((x) => `${x.symbol} from ${dayStamp(x.pricedAt)}`)
               .join(", ")}.`}
         </p>
       )}
+      {anyOpen && <p className="mt-2 text-[11px] leading-snug text-rb-500">{hint}</p>}
     </div>
   );
 }

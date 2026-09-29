@@ -19,7 +19,7 @@ import type { OriginEnvelope } from "@/lib/shared/types/event-shape";
 import { SPARK_ADDRESSES } from "./asset-catalog";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
-import { counterpartyNameInput } from "@/lib/aave-v3/event-provenance";
+import { counterpartyNameInput, type AaveV3LifetimeFlow } from "@/lib/aave-v3/event-provenance";
 
 const SPARK = { name: "SparkLend Pool", address: SPARK_ADDRESSES.POOL };
 
@@ -328,20 +328,26 @@ export const sparkUsdProvOnchain = (what: string): Provenance => ({
   ],
 });
 
-/** A lifetime gross flow (Σ withdrawn / repaid / liquidated on one reserve) —
- *  the signed sum of the position's own emitted Pool amounts across its whole
- *  captured history (the Spark index is genesis-complete: deploy block → head).
- *  Every input is an on-chain event amount, so chain-derived. Pool flows only —
- *  spToken transfers (captured and shown on the timeline as their own events)
- *  move custody without a Pool flow: they are neither deposits nor withdrawals,
- *  so they stay out of these sums (stated, not hidden). */
-export const sparkLifetimeFlowProv = (
-  flow: "withdrawn" | "repaid" | "liquidated collateral" | "liquidated debt",
-  sym: string,
-): Provenance => ({
+/** What a lifetime flow sums, in the receipt's words. */
+const SPARK_FLOW_VERB: Partial<Record<AaveV3LifetimeFlow, string>> = {
+  withdrawn:
+    "withdrew (a transfer to the Spark WETH gateway included: the gateway withdraws it as ETH in the same transaction)",
+  repaid: "repaid",
+  "liquidated collateral":
+    "lost in liquidations (the Spark treasury's fee included: an spToken transfer to the treasury in the liquidation's transaction)",
+  "liquidated debt": "had cleared in liquidations",
+  "transferred in": "received as spToken transfers from another account",
+  "transferred out": "sent as spToken transfers to another account",
+};
+
+/** A lifetime gross flow on one reserve — the sum of the position's own event
+ *  amounts across its whole captured history (the Spark index is
+ *  genesis-complete: deploy block → head). Every input is an on-chain event
+ *  amount, so chain-derived. */
+export const sparkLifetimeFlowProv = (flow: AaveV3LifetimeFlow, sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Lifetime ${flow} (${sym}) — the sum of every ${sym} amount this position's own Pool events ${flow === "withdrawn" ? "withdrew" : flow === "repaid" ? "repaid" : "moved in liquidations"} across its whole captured history (complete from SparkLend's deploy block). Pool flows only — spToken transfers move custody between accounts without a Pool flow; they appear on the timeline as their own events and are not counted as deposits or withdrawals here.`,
+  summary: `Lifetime ${flow} (${sym}) — the sum of every ${sym} amount this position ${SPARK_FLOW_VERB[flow] ?? flow}, across its whole captured history (complete from SparkLend's deploy block).`,
   contract: SPARK,
   via: `${SPARK_VIA} · Σ amount across the position's own logs · genesis → head`,
 });
@@ -366,13 +372,13 @@ export const sparkDebtPrincipalProv = (sym: string): Provenance => ({
  *  position's own Pool events, × SparkLend's own oracle price, summed. Every
  *  leg on-chain → chain-derived. Gated by the caller (any reserve whose
  *  principal doesn't attribute cleanly nulls the caption —
- *  computeSparkCardCaptions). */
+ *  computeAaveV3CardCaptions). */
 export const sparkInterestCaptionProv = (side: "supply" | "debt"): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
   summary:
     side === "supply"
-      ? "Accrued supply interest included in the collateral balance above — per reserve, the current rebased balance (equal to the spToken's balanceOf at the indexed head) minus the net principal replayed from the position's own Supply/Withdraw/LiquidationCall events, valued at SparkLend's own on-chain oracle price. Interest grew the collateral, so it is part of the headline figure, not a separate holding."
+      ? "Accrued supply interest included in the collateral balance above — per reserve, the current rebased balance (equal to the spToken's balanceOf at the indexed head) minus the net principal replayed from the position's own Supply/Withdraw/LiquidationCall events and spToken transfers, valued at SparkLend's own on-chain oracle price. Interest grew the collateral, so it is part of the headline figure, not a separate holding."
       : "Accrued borrow interest included in the debt balance above — per reserve, the current rebased debt (equal to the variableDebtToken's balanceOf at the indexed head) minus the net principal replayed from the position's own Borrow/Repay/LiquidationCall events, valued at SparkLend's own on-chain oracle price. Interest grew the debt, so it is part of the headline figure, not an amount repaid.",
   contract: SPARK,
   via: "(current rebased balance − Σ net event principal) × IAaveOracle getAssetPrice, per reserve",
@@ -412,7 +418,7 @@ export const sparkLiqPriceProv = (sym: string): Provenance => ({
  *  reduction, = variableDebtToken balanceOf) minus the net borrowed principal
  *  replayed from the position's own Pool events. Both legs chain-derived, so the
  *  difference is too. Gated by the caller (only shown when the arithmetic is
- *  attributable — see legInterest in lib/spark/economics.ts). */
+ *  attributable — see legInterest in lib/aave-v3/chain-truth-tower.ts). */
 export const sparkDebtInterestProv = (sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",

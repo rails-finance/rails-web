@@ -88,7 +88,7 @@ import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/prove
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import { OVERLAY_HEADING, NAV_LINK, PILL_META, CTRL_GHOST } from "@/lib/shared/ui-grammar";
-import { ChevronDown } from "lucide-react";
+import { ChartBarBig, ChevronDown } from "lucide-react";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { aaveV4FlowLive, aaveV4FlowSeriesTimeline } from "@/lib/aave-v4/flows-timeline";
 import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
@@ -1051,7 +1051,12 @@ function AaveV4SpokeTowerBlock({
   );
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const ledgerShown = flowTimeline == null || ledgerOpen;
-  const title = <span className={`${OVERLAY_HEADING} text-rb-500`}>Lifetime flows</span>;
+  const title = (
+    <span className={`${OVERLAY_HEADING} inline-flex items-center gap-1.5 text-rb-500`}>
+      <ChartBarBig size={14} aria-hidden />
+      Lifetime flows
+    </span>
+  );
 
   // Figures mirrored in the breakdown legend render foreground-bold; the rest of
   // the prose stays muted (same grammar as the Liquity economics footnote).

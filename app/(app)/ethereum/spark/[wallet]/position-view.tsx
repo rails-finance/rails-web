@@ -62,6 +62,7 @@ import { SparkRiskSlot } from "@/components/protocol/spark/spark-risk-slot";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { sparkFlowSeriesTimeline } from "@/lib/spark/flows-timeline";
+import { lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
 import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import {
   computeSparkEconomics,
@@ -331,34 +332,62 @@ export default function SparkPositionDetail({
   // two requests.
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? sparkEvents : undefined;
-  const precomputedLifetime = useMemo(
+  // Lifetime flows over time (rails-ops reference/lifetime-flows-scrubber.md):
+  // the date scrubber leads the panel and the ledger sits one click under it.
+  // Its day rows and daily prices come from the index for the whole history,
+  // so a windowed or folder-served page draws it too. A failed read leaves the
+  // ledger on the page's own rows.
+  const [flowSeries, setFlowSeries] = useState<FlowSeries | null>(null);
+  useEffect(() => {
+    const ctl = new AbortController();
+    setFlowSeries(null);
+    fetchFlowSeries("/api/spark/flows", { wallet }, ctl.signal)
+      .then(setFlowSeries)
+      .catch((err) => {
+        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
+      });
+    return () => ctl.abort();
+  }, [wallet]);
+  // The ledger's flows: the route's whole-history sums once they land, which
+  // count folder members and rows before a window's cut as the bars do; until
+  // then the page's rows with the opening balance and the folders' sums.
+  const pageLifetime = useMemo(
     () => sparkLifetimeWithOpening(sparkEvents, opening, servedFolders),
     [sparkEvents, opening, servedFolders],
+  );
+  const precomputedLifetime = useMemo(
+    () => (flowSeries ? lifetimeFromSeries(flowSeries) : undefined) ?? pageLifetime,
+    [flowSeries, pageLifetime],
   );
 
   const pricedFlowsRef = useRef<string | null>(null);
   useEffect(() => {
     if (!view || view.status !== "open" || sparkEvents.length === 0) return;
-    if (pricedFlowsRef.current === wallet) return;
     // Seeded from the merged lifetime, so a reserve the position only ever
     // touched below the cut still gets its oracle price — otherwise the tower's
     // strict per-total guard would gate the whole ECONOMICS panel on a wallet
     // whose oldest reserves are all in the opening balance.
     const missing = unpricedSparkFlowAddresses(view, sparkEvents, precomputedLifetime);
     if (missing.length === 0) return;
-    pricedFlowsRef.current = wallet;
-    let cancelled = false;
+    // One read per set of reserves: the route's lifetime can name reserves the
+    // page's rows did not.
+    const key = `${wallet}:${missing.join(",")}`;
+    if (pricedFlowsRef.current === key) return;
+    pricedFlowsRef.current = key;
+    // Not cancelled when the lifetime changes under it (the route's answer
+    // landing): the prices still belong to this wallet's view.
     fetchSparkOraclePrices(missing)
       .then((prices) => {
-        if (cancelled || Object.keys(prices).length === 0) return;
-        setView((v) => (v ? { ...v, priceByAddress: { ...prices, ...(v.priceByAddress ?? {}) } } : v));
+        if (Object.keys(prices).length === 0) return;
+        setView((v) =>
+          v && v.wallet.toLowerCase() === wallet.toLowerCase()
+            ? { ...v, priceByAddress: { ...prices, ...(v.priceByAddress ?? {}) } }
+            : v,
+        );
       })
       .catch(() => {
         // The tower simply stays on the gated token list.
       });
-    return () => {
-      cancelled = true;
-    };
   }, [view, sparkEvents, wallet, precomputedLifetime]);
 
   // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
@@ -543,22 +572,6 @@ export default function SparkPositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
-  // Lifetime flows over time (rails-ops reference/lifetime-flows-scrubber.md):
-  // the date scrubber leads the panel and the ledger sits one click under it.
-  // Its day rows and daily prices come from the index for the whole history,
-  // so a windowed or folder-served page draws it too. A failed read leaves the
-  // ledger alone.
-  const [flowSeries, setFlowSeries] = useState<FlowSeries | null>(null);
-  useEffect(() => {
-    const ctl = new AbortController();
-    setFlowSeries(null);
-    fetchFlowSeries("/api/spark/flows", { wallet }, ctl.signal)
-      .then(setFlowSeries)
-      .catch((err) => {
-        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
-      });
-    return () => ctl.abort();
-  }, [wallet]);
   const flowTimeline = useMemo(
     () => (flowSeries ? sparkFlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
     [flowSeries, towerData, view],
@@ -663,7 +676,7 @@ export default function SparkPositionDetail({
             <ChainTruthTower
               data={towerData}
               explanation={sparkEconomicsExplanation(towerData)}
-              learnMore={sparkEconomicsContent()}
+              learnMore={sparkEconomicsContent(towerData)}
               timeline={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : undefined}
             />
           )}

@@ -40,6 +40,11 @@ export interface FlowSeries {
   prices: Record<string, { obs: [number, number][]; maxGapDays: number }>;
   live: { collateralUsd: number; debtUsd: number };
   unpricedLegs: number;
+  /** The Aave V3 Pool family: the whole history per [bucket, asset, token
+   *  units, USD at the legs' prices], counted as the bars count it. */
+  lifetime?: [string, string, number, number][];
+  /** Of the liquidated collateral, what the treasury took: [asset, token units]. */
+  treasuryFees?: [string, number][];
 }
 
 export type AaveV3FlowSeries = FlowSeries;

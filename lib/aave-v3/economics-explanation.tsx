@@ -25,6 +25,15 @@ const tokenList = (lines: TowerLine[]): string =>
 export interface AaveV3EconomicsOpts {
   /** How the market names itself in the prose — "Aave V3" when unstated. */
   label?: string;
+  /** Whose treasury takes a liquidation's fee — "Aave" (or "Seamless") when unstated. */
+  treasury?: string;
+  /** The modal's words where the market is not an Aave deployment: whose
+   *  oracle prices it, its position token's name, whether its history
+   *  records swaps, and its links. */
+  oracle?: string;
+  token?: string;
+  swaps?: boolean;
+  links?: { label: string; url: string }[];
 }
 
 const sumScalar = (lines: TowerLine[], valued: boolean): number =>
@@ -235,7 +244,7 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
   }
   if (collLiquidated > 0 && debtLiquidated > 0 && valued) {
     const net = debtLiquidated - collLiquidated;
-    const treasury = label === "Seamless" ? "Seamless" : "Aave";
+    const treasury = opts.treasury ?? (label === "Seamless" ? "Seamless" : "Aave");
     // The collateral that left, as the liquidation card states it: the
     // liquidator's share plus the treasury's fee.
     const split = data.liquidationSplit ?? [];
@@ -328,9 +337,9 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}, data?: Aa
       "This section traces a position's supply and borrow flows over its lifetime, replayed from the Pool's own events.",
     stepsHeading: "How it's built:",
     steps: [
-      "Flows are replayed from every supply, withdraw, borrow, repay, swap, aToken transfer and liquidation the position's history records.",
+      `Flows are replayed from every supply, withdraw, borrow, repay, ${opts.swaps === false ? "" : "swap, "}${opts.token ?? "aToken"} transfer and liquidation the position's history records.`,
       "Current balances come from the Pool at the block the page reads, with interest already included.",
-      `Dollar values use ${isSeamless ? "Seamless" : "Aave"}'s own on-chain oracle — the same price the Pool liquidates with.`,
+      `Dollar values use ${opts.oracle ?? (isSeamless ? "Seamless" : "Aave")}'s own on-chain oracle — the same price the Pool liquidates with.`,
     ],
     detailsHeading: "Key concepts:",
     details: [
@@ -350,7 +359,7 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}, data?: Aa
         ? [
             {
               bold: "Other ways out",
-              text: "collateral swapped into another asset, sold in a repay with collateral, withdrawn and swapped, or sent to another account as an aToken transfer has a separate row. A transfer to the WETH gateway counts as withdrawn: the gateway withdraws it as ETH in the same transaction.",
+              text: `${opts.swaps === false ? "collateral" : "collateral swapped into another asset, sold in a repay with collateral, withdrawn and swapped, or"} sent to another account as an ${opts.token ?? "aToken"} transfer has a separate row. A transfer to the WETH gateway counts as withdrawn: the gateway withdraws it as ETH in the same transaction.`,
             },
           ]
         : []),
@@ -375,7 +384,7 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}, data?: Aa
           ]
         : []),
     ],
-    links: [
+    links: opts.links ?? [
       ...(isSeamless ? [{ label: "Seamless docs", url: SEAMLESS_DOCS_URL }] : []),
       ...(isBase ? [{ label: "Aave on Base", url: "https://app.aave.com/markets/?marketName=proto_base_v3" }] : []),
       { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },

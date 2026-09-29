@@ -12,10 +12,11 @@
 // lifetime layer: hatched withdrawn/repaid + liquidated segments per reserve,
 // the faded lifetime-inflow bar, and — on a single-reserve debt side — the
 // accrued-interest segment (current rebased debt − net event principal, with
-// plausibility gates). aToken transfers (captured and shown on the timeline
-// since mig 160) are custody moves, not Pool flows — they stay outside the
-// deposited/withdrawn sums by design (the provenance says so), and a
-// transfer-fed reserve fails the conservation gates below rather than guess.
+// plausibility gates). aToken transfers (mig 160) count as "Received by
+// transfer" and "Sent to another account", a transfer to a WETH gateway as a
+// withdrawal and one to the treasury inside a liquidation as that
+// liquidation's fee, as the date scrubber counts them. SparkLend's ledger runs
+// through the same reduction with its own classifier (lib/spark/economics.ts).
 // The V3 index starts at the backfill floor, not V3's deploy block, so
 // "lifetime" means the captured history — the interest gates bail whenever the
 // principal doesn't attribute cleanly. When RPC is down and a contributing
@@ -53,6 +54,18 @@ import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chai
 export const isWethGateway = (address: string | undefined): boolean =>
   ([MAINNET_CHAIN_ID, BASE_CHAIN_ID] as ChainId[]).some((c) => getProtocolContract(address, c)?.kind === "gateway");
 
+/** What the tower reads of a position: its reserves and their oracle prices.
+ *  Aave V3 and SparkLend views both carry it. */
+export type AaveFamilyTowerView = Pick<AaveV3PositionView, "supplies" | "borrows" | "priceByAddress" | "atBlock">;
+
+/** What the card captions read of the live Pool read: the borrow rates. */
+export type AaveFamilyChainRead = Pick<AaveV3PositionChainResponse, "chainStale" | "pool"> & {
+  reserves: Pick<
+    AaveV3PositionChainResponse["reserves"][number],
+    "address" | "symbol" | "decimals" | "hasBorrow" | "debtBalanceRaw" | "borrowApr"
+  >[];
+};
+
 /** The five receipts the tower attaches to its lines.
  *
  *  A seam, not an abstraction for its own sake: the ARITHMETIC below is the
@@ -66,6 +79,9 @@ export const isWethGateway = (address: string | undefined): boolean =>
 export interface AaveV3TowerVocabulary {
   /** Whose oracle the note names — Aave V3 when unstated (see protocol-name.ts). */
   protocol?: V3Protocol;
+  /** The name the interest note gives the oracle's owner, where it is not the
+   *  protocol's brand ("SparkLend"). */
+  brand?: string;
   supply: (symbol: string, atBlock?: number) => Provenance;
   debt: (symbol: string, atBlock?: number) => Provenance;
   lifetimeFlow: (flow: AaveV3LifetimeFlow, symbol: string) => Provenance;
@@ -382,7 +398,24 @@ export function aaveV3EventLegs(ev: BaseActivityEvent, liqTxs: Set<string | unde
   return out;
 }
 
-function foldAaveV3Lifetime(events: BaseActivityEvent[]): Map<string, ReserveFlows> {
+/** A Pool family's classifier: the legs one event adds to the lifetime flows,
+ *  given the transactions that carry a liquidation. The ledger and the date
+ *  scrubber read the same one, so both count every event the same way. */
+export interface AaveFamilyClassifier {
+  liquidationTxs: (events: BaseActivityEvent[]) => Set<string | undefined>;
+  legs: (ev: BaseActivityEvent, liqTxs: Set<string | undefined>) => AaveV3EventLeg[];
+}
+
+export const AAVE_V3_CLASSIFIER: AaveFamilyClassifier = {
+  liquidationTxs: aaveV3LiquidationTxs,
+  legs: aaveV3EventLegs,
+};
+
+/** Per reserve, the lifetime flows the events' legs add up to. */
+export function reduceAaveFamilyLifetime(
+  events: BaseActivityEvent[],
+  classifier: AaveFamilyClassifier = AAVE_V3_CLASSIFIER,
+): Map<string, ReserveFlows> {
   const flows = new Map<string, ReserveFlows>();
   const get = (symbol: string, address?: string): ReserveFlows => {
     const cur = flows.get(symbol) ?? {
@@ -399,9 +432,9 @@ function foldAaveV3Lifetime(events: BaseActivityEvent[]): Map<string, ReserveFlo
     flows.set(symbol, cur);
     return cur;
   };
-  const liqTxs = aaveV3LiquidationTxs(events);
+  const liqTxs = classifier.liquidationTxs(events);
   for (const ev of events)
-    for (const l of aaveV3EventLegs(ev, liqTxs)) {
+    for (const l of classifier.legs(ev, liqTxs)) {
       const r = get(l.symbol, l.address);
       if (l.leg) addLeg(r, l.leg, l.amount, l.price);
       if (l.treasuryFee) r.treasuryFee = (r.treasuryFee ?? 0) + l.amount;
@@ -439,6 +472,7 @@ export function aaveV3LifetimeWithOpening(
   events: BaseActivityEvent[],
   opening: TimelineOpeningBalance | null | undefined,
   folders?: readonly ServedFolder[] | null,
+  classifier: AaveFamilyClassifier = AAVE_V3_CLASSIFIER,
 ): ReserveFlows[] | undefined {
   // Undefined = there is NOTHING outside `events`, so the reducer should read
   // them as the whole history and this layer should not exist. A grouped answer
@@ -506,7 +540,7 @@ export function aaveV3LifetimeWithOpening(
   }
   // A leg summed outside the loaded rows has no event price: only the loaded
   // rows' priced part rides along, and the tower values the rest today.
-  for (const [symbol, windowFlows] of foldAaveV3Lifetime(events)) {
+  for (const [symbol, windowFlows] of reduceAaveFamilyLifetime(events, classifier)) {
     if (refused.has(symbol)) continue;
     const r = get(symbol, windowFlows.address);
     for (const leg of LEGS) r[leg] += windowFlows[leg];
@@ -540,11 +574,11 @@ function legInterest(current: number | undefined, netPrincipal: number, grossIn:
  *  strict per-total guard can value a multi-reserve history instead of
  *  degrading the whole panel to the gated token list. */
 export function unpricedAaveV3FlowAddresses(
-  view: AaveV3PositionView,
+  view: AaveFamilyTowerView,
   events: BaseActivityEvent[],
   precomputed?: ReserveFlows[],
 ): string[] {
-  const lifetime = precomputed ? bySymbol(precomputed) : foldAaveV3Lifetime(events);
+  const lifetime = precomputed ? bySymbol(precomputed) : reduceAaveFamilyLifetime(events);
   const out = new Set<string>();
   for (const f of lifetime.values()) {
     if (!f.address) continue; // no address → unpriceable either way
@@ -616,7 +650,7 @@ export interface AaveV3CardCaptions {
  *  ~zero interest just contributes nothing. */
 function sideInterestUsd(
   side: "supply" | "debt",
-  view: AaveV3PositionView,
+  view: AaveFamilyTowerView,
   lifetime: Map<string, ReserveFlows> | null,
   usdOf: (address: string | undefined, amount: number) => number | null,
 ): number | null {
@@ -641,9 +675,9 @@ function sideInterestUsd(
 }
 
 export function computeAaveV3CardCaptions(
-  view: AaveV3PositionView,
+  view: AaveFamilyTowerView,
   events?: BaseActivityEvent[],
-  chain?: AaveV3PositionChainResponse | null,
+  chain?: AaveFamilyChainRead | null,
   /** Lifetime gross flows computed elsewhere over the WHOLE history — the
    *  swept explorers hand these in (their event list is capped), and the
    *  interest split then attributes against the whole life rather than a
@@ -661,7 +695,7 @@ export function computeAaveV3CardCaptions(
     precomputedLifetime
       ? bySymbol(precomputedLifetime)
       : events && events.length > 0
-        ? foldAaveV3Lifetime(events)
+        ? reduceAaveFamilyLifetime(events)
         : null,
     leftOut,
   );
@@ -704,7 +738,7 @@ const bySymbol = (rows: ReserveFlows[]): Map<string, ReserveFlows> => new Map(ro
 /** The tokens the tower leaves out: a reserve the card flags, and any token an
  *  event names whose decimals did not load (lib/shared/decimals-unread.ts). */
 function aaveV3NotLoaded(
-  view: AaveV3PositionView,
+  view: AaveFamilyTowerView,
   events: BaseActivityEvent[],
   precomputed?: ReserveFlows[],
 ): UnreadToken[] {
@@ -734,7 +768,7 @@ export type AaveV3TowerData = ChainTruthTowerData & {
 };
 
 export function computeAaveV3Economics(
-  view: AaveV3PositionView,
+  view: AaveFamilyTowerView,
   events?: BaseActivityEvent[],
   vocab: AaveV3TowerVocabulary = AAVE_V3_INDEXED_VOCABULARY,
   /** Lifetime gross flows computed elsewhere, over a history longer than the
@@ -784,7 +818,7 @@ export function computeAaveV3Economics(
     precomputedLifetime
       ? bySymbol(precomputedLifetime)
       : events && events.length > 0
-        ? foldAaveV3Lifetime(events)
+        ? reduceAaveFamilyLifetime(events)
         : null,
     leftOut,
   );
@@ -1130,7 +1164,7 @@ export function computeAaveV3Economics(
     interestNote:
       interest != null || debtEarned.length > 0
         ? undefined
-        : `Balances include the interest built up since each supply and borrow, so every figure is what the position holds now rather than the amount originally moved. The split between principal and accrued interest is shown only when the debt is a single asset whose history adds up cleanly. Dollar values use ${v3Possessive(v3Brand(vocab.protocol ?? "Aave V3"), "'")} own price for each asset.`,
+        : `Balances include the interest built up since each supply and borrow, so every figure is what the position holds now rather than the amount originally moved. The split between principal and accrued interest is shown only when the debt is a single asset whose history adds up cleanly. Dollar values use ${v3Possessive(vocab.brand ?? v3Brand(vocab.protocol ?? "Aave V3"), "'")} own price for each asset.`,
     ...(notLoaded.length > 0 ? { notLoaded } : {}),
     flowsPricedAtEvents: valued && flowsAtEventPrices,
     ...(liquidationSplit.length > 0 ? { liquidationSplit } : {}),

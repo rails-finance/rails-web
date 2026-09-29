@@ -30,7 +30,13 @@ import {
   type FlowTimeline,
 } from "@/lib/shared/flows-timeline";
 import type { FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
-import { aaveV3EventLegs, aaveV3LiquidationTxs, type AaveV3EventLeg, type FlowLeg } from "./chain-truth-tower";
+import {
+  aaveV3EventLegs,
+  aaveV3LiquidationTxs,
+  type AaveV3EventLeg,
+  type FlowLeg,
+  type ReserveFlows,
+} from "./chain-truth-tower";
 
 /** Every bucket an Aave-family position can fill, in drawing order. */
 export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
@@ -119,6 +125,53 @@ const BUCKET_OF: Record<FlowLeg, string> = {
   liquidatedDebt: "liquidatedDebt",
   writtenOff: "writtenOff",
 };
+
+/**
+ * The ledger's lifetime flows from the route's whole-history sums: each
+ * bucket's token units and value per asset, and the treasury's fees. The route
+ * counts every row with the family's classifier, folder members and rows
+ * before a window's cut included, so a ledger reading these meets the bars on
+ * any page. Undefined where the answer carries none.
+ */
+export function lifetimeFromSeries(series: FlowSeries): ReserveFlows[] | undefined {
+  if (!series.lifetime?.length) return undefined;
+  const legOf: Record<string, FlowLeg> = { repaidWithCollateral: "repaid" };
+  for (const [leg, bucket] of Object.entries(BUCKET_OF)) legOf[bucket] = leg as FlowLeg;
+  const out = new Map<string, ReserveFlows>();
+  const get = (asset: string): ReserveFlows => {
+    const symbol = series.assets[asset]?.symbol ?? asset.slice(0, 8);
+    let r = out.get(symbol);
+    if (!r) {
+      r = {
+        symbol,
+        address: asset,
+        supplied: 0,
+        withdrawn: 0,
+        borrowed: 0,
+        repaid: 0,
+        liquidatedCollateral: 0,
+        liquidatedDebt: 0,
+        writtenOff: 0,
+      };
+      out.set(symbol, r);
+    }
+    return r;
+  };
+  for (const [bucket, asset, amount, usd] of series.lifetime) {
+    const leg = legOf[bucket];
+    if (!leg || !(amount > 0)) continue;
+    const r = get(asset);
+    r[leg] = (r[leg] ?? 0) + amount;
+    const at = (r.atEvent ??= {});
+    const cur = at[leg] ?? { amount: 0, usd: 0 };
+    at[leg] = { amount: cur.amount + amount, usd: cur.usd + usd };
+  }
+  for (const [asset, amount] of series.treasuryFees ?? []) {
+    const r = get(asset);
+    r.treasuryFee = (r.treasuryFee ?? 0) + amount;
+  }
+  return [...out.values()];
+}
 
 const bucketOf = (l: AaveV3EventLeg): string | null =>
   l.leg == null ? null : l.fromCollateral ? "repaidWithCollateral" : BUCKET_OF[l.leg];
