@@ -111,7 +111,9 @@ export function frankencoinPositionToMarkdown(args: FrankencoinPositionMarkdownA
     if (live.reserveContributionPPM != null)
       lines.push(
         `- **Reserve contribution:** ${num(ppmToPct(live.reserveContributionPPM), 0)}% of every mint held back${
-          live.reserveHeld != null ? ` — currently ${amt(live.reserveHeld)} ZCHF, returned on repayment` : ""
+          live.reserveHeld != null
+            ? ` — currently ${amt(live.reserveHeld)} ZCHF, released on repayment in full while the reserve covers every position's share`
+            : ""
         }`,
       );
     if (live.mintCeiling != null && live.mintCeiling > 0)

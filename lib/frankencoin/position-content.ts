@@ -26,16 +26,18 @@ export function frankencoinPositionContent(opts: {
     return {
       title: "About This Position",
       intro:
-        "This position was denied: FPS holders vetoed it during its veto window, before it ever minted ZCHF. It never became a live position — there is no collateral or debt history to show.",
+        "This position was denied: a holder of more than 1% of the governance votes vetoed it during its veto window, before it ever minted ZCHF.",
       detailsHeading: "Key concepts:",
       details: [
         {
           bold: "Veto window",
-          text: "a new original position waits an owner-chosen period (3 days minimum) before its first mint; enough FPS held against it in that window disables minting for good.",
+          text: "a new original position waits an owner-chosen period (3 days minimum) before its first mint. Holders of more than 1% of the governance votes (FCS, or the FPS it wraps, with delegations) can deny it in that window, which disables minting for good.",
+          sources: [{ label: "FCS governance", url: `${FRANKENCOIN_DOC_URL}/governance` }],
         },
         {
           bold: "Clones skip the wait",
-          text: "only original positions carry a veto window — a clone reuses an already-vetted original's terms and limit, and can mint immediately.",
+          text: "only original positions carry a veto window. A clone uses an accepted original's terms and limit, and can mint at once.",
+          sources: [{ label: "Cloning existing positions", url: `${FRANKENCOIN_DOC_URL}/positions/clone` }],
         },
       ],
       links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],
@@ -55,7 +57,7 @@ export function frankencoinPositionContent(opts: {
         },
         {
           bold: "Owner-declared price",
-          text: "Frankencoin has no oracle; the liquidation price shown is the value the owner set, held to the market by challenge auctions.",
+          text: "Frankencoin has no oracle; the liquidation price shown is the value the owner set, which challenge auctions test.",
         },
       ],
       links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],
@@ -75,7 +77,8 @@ export function frankencoinPositionContent(opts: {
         },
         {
           bold: "Reserve contribution",
-          text: "a fixed share of every mint was held back in the system reserve and returned as the position repaid.",
+          text: "a fixed share of every mint was held in the system reserve and released as the position repaid: in full while the reserve covered every position's share, in proportion when losses had drawn it down.",
+          sources: [{ label: "Reserve", url: `${FRANKENCOIN_DOC_URL}/reserve` }],
         },
       ],
       links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],
@@ -86,24 +89,28 @@ export function frankencoinPositionContent(opts: {
   return {
     title: "About This Position",
     intro:
-      "This panel explains the position's live state in plain language — what backs the minted ZCHF, how its liquidation price is set, and what a challenge would mean for it.",
+      "The card reads the position contract now: the collateral it holds, the ZCHF debt it carries, the liquidation price its owner declared, and the terms it runs on.",
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "Owner-declared price",
-        text: "Frankencoin has no oracle: the liquidation price is a value the owner sets and can adjust. Raising it starts a 3-day cooldown; anyone who thinks it too high can challenge it.",
+        text: "Frankencoin has no oracle: the liquidation price is a value the owner sets and can adjust, and collateral × price is the most debt the position may carry. Raising it pauses minting for 3 days.",
+        sources: [{ label: "Adjusting a position", url: `${FRANKENCOIN_DOC_URL}/positions/adjust` }],
       },
       {
         bold: "Interest up front",
-        text: "each mint deducts interest for the remaining term at mint time — the minted figure only moves when the owner mints or repays, never on its own.",
+        text: "each mint pays interest for the remaining term at once, so the debt moves only when the owner mints or repays. The debt is gross: the wallet received each mint less the interest and the reserve share.",
+        sources: [{ label: "Collateralized minting", url: `${FRANKENCOIN_DOC_URL}/positions` }],
       },
       {
         bold: "Reserve contribution",
-        text: "a fixed share of every mint is held back in the system reserve and returned on repayment; it absorbs shortfalls first if a challenge ends badly.",
+        text: "a fixed share of every mint stays in the system reserve and is released on repayment: in full while the reserve covers every position's share, in proportion when losses have drawn it down. It covers this position's shortfall first if a challenge sells the collateral for less than the debt.",
+        sources: [{ label: "Reserve", url: `${FRANKENCOIN_DOC_URL}/reserve` }],
       },
       {
         bold: "Challenges",
-        text: "anyone who thinks the declared price is too high can post collateral and start a two-phase auction against the position — a survived challenge (averted, or left standing after a partial sale) still counts against the caution marker above, without ending the position.",
+        text: "anyone who thinks the declared price is too high can post collateral of the same kind and start a two-phase auction against the position. A challenge can end without harm to the position (averted), or sell some or all of its collateral. The triangle beside the card's counters counts challenges; it does not show when there have been none.",
+        sources: [{ label: "Challenges and auctions", url: `${FRANKENCOIN_DOC_URL}/positions/auctions` }],
       },
     ],
     links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],

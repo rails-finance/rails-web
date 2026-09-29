@@ -56,7 +56,7 @@ export const minterReserveProv = (): Provenance => ({
   pclass: "state",
   verify: headCall("Frankencoin.minterReserve()"),
   summary:
-    "ZCHF held back from borrowers — the Frankencoin contract's own minterReserve() at the stamped block: the sum of every position's reserve contribution (a fixed share of each mint, held back and returned on repayment). It sits in the same reserve pool as the equity, on the borrowers' side of the ledger.",
+    "ZCHF held back from borrowers — the Frankencoin contract's own minterReserve() at the stamped block: the sum of every position's reserve contribution (a fixed share of each mint, held back and released on repayment, in full while the reserve covers them all). It sits in the same reserve pool as the equity, on the borrowers' side of the ledger.",
   contract: zchfContract,
   via: "eth_call · minterReserve() @ head",
 });

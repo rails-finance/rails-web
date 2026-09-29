@@ -55,6 +55,8 @@ export interface FrankencoinPositionView {
   hub: "v1" | "v2";
   owner: string | null;
   isClone: boolean;
+  /** The original a clone was cloned from — chain lane only. */
+  original?: string | null;
   collateralSymbol: string;
   collateralDecimals: number;
   /** NULL ≠ zero on the index lane: the ledger never spoke (direct-transferred
@@ -108,17 +110,38 @@ const liqPriceProv = (v: FrankencoinPositionView): Provenance =>
     ? liveLiqPriceProv(v.collateralSymbol, v.collateralDecimals, v.position)
     : latestAbsoluteProv("price", v.collateralSymbol, v.collateralDecimals);
 
-/** The position-grain identity: the contract address + which hub + lineage. */
+/** The position-grain identity: the contract address + which hub + lineage,
+ *  each explained on hover or tap. */
 function PositionIdentity({ v }: { v: FrankencoinPositionView }) {
+  const hubTip =
+    v.hub === "v1"
+      ? "Minting Hub V1 (2023), the first of Frankencoin's two hubs. It opened this position and runs its challenges."
+      : "Minting Hub V2 (2024), the current hub. It opened this position and runs its challenges and, after expiry, the sale of its collateral.";
   return (
     <span className="text-xs text-rb-500 tabular-nums">
-      {shortAddress(v.position)}
+      <RevealTip
+        tip="The position's own contract address. Every Frankencoin position is a contract of its own."
+        label="Position contract address"
+        focusable
+        className="focus-ring rounded-sm"
+      >
+        {shortAddress(v.position)}
+      </RevealTip>
       <span className="mx-1 text-rb-400">·</span>
-      {v.hub === "v1" ? "Hub V1" : "Hub V2"}
+      <RevealTip tip={hubTip} label={hubTip} focusable className="focus-ring rounded-sm">
+        {v.hub === "v1" ? "Hub V1" : "Hub V2"}
+      </RevealTip>
       {v.isClone && (
         <>
           <span className="mx-1 text-rb-400">·</span>
-          clone
+          <RevealTip
+            tip={`A clone${v.original ? ` of ${shortAddress(v.original)}` : ""}: a position of its own on that original's terms, sharing its minting limit.`}
+            label="Clone"
+            focusable
+            className="focus-ring rounded-sm"
+          >
+            clone
+          </RevealTip>
         </>
       )}
     </span>
@@ -261,9 +284,16 @@ export function FrankencoinPositionCard({
       <OpenPositionStats
         statusPill={
           surface === "detail" && v.status === "open" ? (
-            <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-              Minting
-            </span>
+            <RevealTip
+              tip="An open minting position: it holds collateral and can mint ZCHF against it."
+              label="Minting: an open minting position"
+              focusable
+              className="focus-ring rounded-sm"
+            >
+              <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
+                Minting
+              </span>
+            </RevealTip>
           ) : (
             <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${st.cls}`}>{st.label}</span>
           )
@@ -386,6 +416,7 @@ export function viewFromChain(c: FrankencoinChainResponse): FrankencoinPositionV
     hub: c.hub,
     owner: c.owner,
     isClone: c.isClone,
+    original: c.original,
     collateralSymbol: c.collateralSymbol ?? (c.collateralToken ? shortAddress(c.collateralToken) : "—"),
     collateralDecimals: c.collateralDecimals ?? 0,
     // A failed balanceOf stays null → a dash, never a fabricated zero.

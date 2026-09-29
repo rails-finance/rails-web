@@ -50,7 +50,10 @@ import {
   viewFromSummary,
   type FrankencoinPositionView,
 } from "@/components/protocol/frankencoin/frankencoin-position-card";
-import { FrankencoinPositionExplanation } from "@/components/protocol/frankencoin/frankencoin-position-explanation";
+import {
+  FrankencoinPositionExplanation,
+  type FrankencoinEventTally,
+} from "@/components/protocol/frankencoin/frankencoin-position-explanation";
 import { FrankencoinChallengeCard } from "@/components/protocol/frankencoin/frankencoin-challenge-card";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { computeFrankencoinEconomics, frankencoinLifetimeWithOpening } from "@/lib/frankencoin/economics";
@@ -209,6 +212,47 @@ export default function FrankencoinPositionView({
 
   const frankEvents = useMemo(() => events.filter(isFrankencoinEvent), [events]);
 
+  // How the timeline's events divide over the transactions, for the card's
+  // counter sentence. Whole history only: a window's rows are not the count.
+  const eventTally = useMemo<FrankencoinEventTally | null>(() => {
+    if (cutoffBlock != null || frankEvents.length === 0) return null;
+    const byTx = new Map<string, typeof frankEvents>();
+    for (const e of frankEvents) {
+      const list = byTx.get(e.txHash) ?? [];
+      list.push(e);
+      byTx.set(e.txHash, list);
+    }
+    let biggest: (typeof frankEvents)[number][] = [];
+    for (const list of byTx.values()) if (list.length > biggest.length) biggest = list;
+    const kinds = biggest.map((e) => e.context.data);
+    const count = (pred: (c: (typeof kinds)[number]) => boolean) => kinds.filter(pred).length;
+    const parts: string[] = [];
+    const plural = (n: number, one: string, many: string) => (n === 1 ? one : `${n} ${many}`);
+    if (count((c) => c.eventType === "clone")) parts.push("the clone");
+    if (count((c) => c.eventType === "open")) parts.push("the opening");
+    if (count((c) => c.firstState === true)) parts.push("the first deposit and mint");
+    const prices = count((c) => c.eventType === "adjust_price");
+    if (prices) parts.push(plural(prices, "a price change", "price changes"));
+    const handovers = count((c) => c.eventType === "ownership_transferred" && c.initialization === true);
+    if (handovers) parts.push(plural(handovers, "an ownership handover", "ownership handovers"));
+    const described = count(
+      (c) =>
+        c.eventType === "clone" ||
+        c.eventType === "open" ||
+        c.firstState === true ||
+        c.eventType === "adjust_price" ||
+        (c.eventType === "ownership_transferred" && c.initialization === true),
+    );
+    return {
+      total: frankEvents.length,
+      biggest: {
+        count: biggest.length,
+        opening: kinds.some((c) => c.eventType === "clone" || c.eventType === "open"),
+        parts: described === biggest.length ? parts : [],
+      },
+    };
+  }, [frankEvents, cutoffBlock]);
+
   const tl = useTimelineEvents(frankEvents, {
     storageKey: `frankencoin-${position}`,
     protocolKey: "frankencoin",
@@ -309,16 +353,30 @@ export default function FrankencoinPositionView({
             // challenge state and the cooldown — the risk grammar's own
             // surfaces, from the position's slots at head.
             rowExtra={
-              chain && view.status !== "closed" && ((chain.challengedAmount ?? 0) > 0 || chain.cooldownActive) ? (
+              chain && view.status === "open" ? (
                 <RiskFooterStrip>
-                  {(chain.challengedAmount ?? 0) > 0 && (
+                  {(chain.challengedAmount ?? 0) > 0 ? (
                     <RiskFigure caution>
                       Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
                     </RiskFigure>
-                  )}
-                  {chain.cooldownActive && chain.cooldownUntil != null && (
+                  ) : summary ? (
+                    <RiskFigure>
+                      {summary.challengeCount === 0
+                        ? "never challenged"
+                        : `challenged ${summary.challengeCount}×, none running`}
+                    </RiskFigure>
+                  ) : null}
+                  {chain.cooldownActive && chain.cooldownUntil != null ? (
                     <RiskFigure>minting cooldown until {formatDayMonth(chain.cooldownUntil)}</RiskFigure>
-                  )}
+                  ) : !chain.mintingDisabledForGood ? (
+                    <RiskFigure>no minting cooldown</RiskFigure>
+                  ) : null}
+                </RiskFooterStrip>
+              ) : chain && view.status !== "closed" && (chain.challengedAmount ?? 0) > 0 ? (
+                <RiskFooterStrip>
+                  <RiskFigure caution>
+                    Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
+                  </RiskFigure>
                 </RiskFooterStrip>
               ) : undefined
             }
@@ -333,6 +391,7 @@ export default function FrankencoinPositionView({
                   challengeCount={summary?.challengeCount}
                   denied={summary?.status === "denied"}
                   txCount={summary?.txCount}
+                  eventTally={eventTally}
                 />
               ) : undefined
             }

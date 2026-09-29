@@ -25,6 +25,9 @@ export const FRANKENCOIN_ADDRESSES = {
   HUB_V2: "0xDe12B620A8a714476A97EfD14E6F7180Ca653557",
   /** The Frankencoin (ZCHF) token — 18 decimals. */
   ZCHF: "0xB58E61C3098d85632Df34EecfB899A1Ed80921cB",
+  /** The Equity contract (FPS) — ZCHF's reserve: it holds the minter reserve
+   *  and the equity, and receives the reserve share and interest of each mint. */
+  EQUITY: "0x1bA26788dfDe592fec8bcB0Eaff472a42BE341B2",
 } as const;
 
 export type FrankencoinHubVersion = "v1" | "v2";

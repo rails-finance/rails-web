@@ -2116,6 +2116,15 @@ export interface FrankencoinContext {
   /** ownership_transferred only — the mint-time factory→owner handover
    *  (shares the position_opened tx): initialization, not a real transfer. */
   initialization?: boolean;
+  /** The creation handover, on an `initialization` row: this row's step (1-based)
+   *  among the opening transaction's ownership transfers, how many there are,
+   *  and the owner the last one handed the position to. */
+  handoverStep?: number;
+  handoverSteps?: number;
+  handoverOwner?: string;
+  /** The position's first MintingUpdate: its collateral and debt before are
+   *  zero (the opening deposit and mint), and its price has no before. */
+  firstState?: boolean;
   /** Exact integer twins of the scaled fields above. */
   raw?: FrankencoinContextRaw;
   /** True for the position's first event. */

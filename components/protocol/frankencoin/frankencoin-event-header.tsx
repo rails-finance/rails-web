@@ -18,8 +18,11 @@ import {
   deniedProv,
   ownershipProv,
   forcedSaleProv,
+  liqPriceAfterProv,
   type FrankencoinCoords,
 } from "@/lib/frankencoin/event-provenance";
+import { formatCompact } from "@/lib/utils/format";
+import { fmtFcPrice } from "@/lib/frankencoin/figures";
 
 export interface FrankencoinEventHeaderProps {
   actionLabel: string;
@@ -251,10 +254,37 @@ export function FrankencoinEventHeader({
           ? { prefix: "to", address: ctx.newOwner, prov: ownershipProv(coords) }
           : undefined;
 
+  // A declared-price move names its direction in the row (a raise starts the
+  // minting cooldown, a cut does not) and carries its before → after, on a
+  // price-only row and on a combined adjust alike. The figure echoes the
+  // detail grid's price receipt.
+  const priceBefore = ctx.liqPriceBefore != null ? num(ctx.liqPriceBefore) : null;
+  const priceAfter = ctx.liqPrice != null ? num(ctx.liqPrice) : null;
+  const priceMoved =
+    (ctx.eventType === "adjust_price" || ctx.eventType === "adjust") &&
+    priceBefore != null &&
+    priceAfter != null &&
+    priceBefore !== priceAfter;
+  const priceLabel = priceMoved ? `${priceAfter! > priceBefore! ? "Raise" : "Lower"} Liq. Price` : null;
+  const priceChip = priceMoved
+    ? {
+        text: `${ctx.eventType === "adjust" ? `${priceLabel!.toLowerCase()} ` : ""}${formatCompact(priceBefore!)} → ${formatCompact(priceAfter!)} ZCHF/${sym}`,
+        value: fmtFcPrice(priceAfter!),
+        prov: liqPriceAfterProv(sym, ctx.collateralDecimals, coords, ctx.raw?.price),
+      }
+    : undefined;
+
   return (
     <ChainTruthRow
       spec={{
-        label: isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : actionLabel,
+        label: isOpen
+          ? "Open"
+          : ctx.eventType === "adjust_price" && priceLabel
+            ? priceLabel
+            : isAdjust && deltas.length > 0
+              ? ""
+              : actionLabel,
+        ratioChip: priceChip,
         status: isOpen ? "open" : undefined,
         // Terminal-adverse rows tint critical; the challenge's start and the
         // forced sale carry the caution spine from the card composer instead.

@@ -323,13 +323,6 @@ export function genericRuleHits(src) {
 export const GENERIC_ALLOWLIST = {
   // Signed-balance mode-teller: why a deposit was a repayment (×2 variants).
   "lib/dolomite/explainer-clauses.tsx": ["A negative balance IS the debt here."],
-  // §5.2 mechanic-why on the mint fee; the factory-handoff mode explanation
-  // (gated on ctx.initialization; no modal covers the handoff — Miles's
-  // JUDGMENT ruling, KEEP).
-  "lib/frankencoin/explainer-clauses.tsx": [
-    "Interest for the remaining term is charged up front at minting, and a fixed share of each mint is held back in the system reserve; the borrower receives the rest.",
-    "Every position starts life owned by the factory for a single transaction.",
-  ],
   // §2 misleading-figure caveat on the repay card's gap.
   "lib/compound-v2/explainer-clauses.tsx": [
     "Interest accrues continuously, so any gap from the previous event’s figure is that interest, not new borrowing.",

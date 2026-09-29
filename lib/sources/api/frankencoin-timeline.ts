@@ -233,6 +233,19 @@ export function buildFrankencoinTimeline(
   // mint-time factory→owner handover — initialization, not a real transfer.
   const openedTxs = new Set(rows.filter((r) => r.event_type === "position_opened").map((r) => r.tx_hash.toLowerCase()));
 
+  // The creation handover, per opening transaction: its OwnershipTransferred
+  // rows in log order, so each row can say which step it is and whom the
+  // position ends the transaction owned by.
+  const handovers = new Map<string, FrankencoinMvRow[]>();
+  for (const r of rows) {
+    const tx = r.tx_hash.toLowerCase();
+    if (r.event_type !== "ownership_transferred" || !openedTxs.has(tx)) continue;
+    const list = handovers.get(tx) ?? [];
+    list.push(r);
+    handovers.set(tx, list);
+  }
+  for (const list of handovers.values()) list.sort((a, b) => a.log_index - b.log_index);
+
   const events: BaseActivityEvent[] = rows.map((r, idx) => {
     const tx = r.tx_hash.startsWith("0x") ? r.tx_hash : `0x${r.tx_hash}`;
     // The wire spells it "V1"/"V2" (and `hub` is the hub ADDRESS — a
@@ -248,8 +261,17 @@ export function buildFrankencoinTimeline(
     const collateral = bigintOf(r.collateral);
     const minted = bigintOf(r.minted);
     const price = bigintOf(r.price);
-    const collateralBefore = bigintOf(r.collateral_before);
-    const mintedBefore = bigintOf(r.minted_before);
+    // A position's first MintingUpdate has no lag: the position held nothing
+    // before it, so its collateral and debt start from zero (the deposit and
+    // first mint of an open or a clone). Its price has no before: the first
+    // price is set, not changed.
+    const firstTouch =
+      r.event_type === "minting_update" &&
+      r.collateral_before == null &&
+      r.minted_before == null &&
+      r.price_before == null;
+    const collateralBefore = firstTouch ? ZERO : bigintOf(r.collateral_before);
+    const mintedBefore = firstTouch ? ZERO : bigintOf(r.minted_before);
     const priceBefore = bigintOf(r.price_before);
 
     let kind: FrankencoinEventType;
@@ -304,6 +326,9 @@ export function buildFrankencoinTimeline(
       p != null && r.collateral_decimals != null && kind !== "forced_sale" ? fmtUnits(p, 36 - decimals) : undefined;
 
     const initialization = kind === "ownership_transferred" && openedTxs.has(r.tx_hash.toLowerCase());
+    const handover = initialization ? (handovers.get(r.tx_hash.toLowerCase()) ?? []) : [];
+    const handoverStep = handover.findIndex((h) => h.event_key === r.event_key) + 1;
+    const handoverOwner = handover.length > 0 ? handover[handover.length - 1].new_owner : null;
 
     // A composite adjust names the axes it moved (the classifier collapsed them
     // to "adjust"). Uses the SAME effective collateral as the classification —
@@ -354,6 +379,14 @@ export function buildFrankencoinTimeline(
       ...(r.tx_from ? { txFrom: r.tx_from.toLowerCase() } : {}),
       ...(r.collateral_understated ? { collateralUnderstated: true } : {}),
       ...(initialization ? { initialization: true } : {}),
+      ...(initialization && handoverStep > 0
+        ? {
+            handoverStep,
+            handoverSteps: handover.length,
+            ...(handoverOwner ? { handoverOwner: handoverOwner.toLowerCase() } : {}),
+          }
+        : {}),
+      ...(firstTouch ? { firstState: true } : {}),
       raw: {
         collateral: rawVal(r.collateral),
         price: rawVal(r.price),

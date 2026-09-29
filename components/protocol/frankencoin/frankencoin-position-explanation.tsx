@@ -21,12 +21,23 @@ import { AmountText } from "@/components/shared/amount-text";
 
 const dateOf = (unix: number): string => formatDate(unix);
 
+/** How the timeline's events divide over the transactions: the total, and
+ *  the transaction that recorded the most, described by what it recorded. */
+export interface FrankencoinEventTally {
+  total: number;
+  biggest: { count: number; opening: boolean; parts: string[] } | null;
+}
+
+const listOf = (parts: string[]): string =>
+  parts.length <= 1 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+
 export function FrankencoinPositionExplanation({
   chain,
   openedAt,
   challengeCount,
   denied,
   txCount,
+  eventTally,
 }: {
   chain: FrankencoinChainResponse;
   /** The PositionOpened timestamp from the index — lets the narration state
@@ -39,6 +50,9 @@ export function FrankencoinPositionExplanation({
   denied?: boolean;
   /** The card's transaction count (the count badge). Omit to skip. */
   txCount?: number;
+  /** How the timeline's events divide over the transactions, to say what the
+   *  counter counts. Null on a windowed page. */
+  eventTally?: FrankencoinEventTally | null;
 }) {
   const sym = chain.collateralSymbol ?? "collateral";
   const now = Date.now() / 1000;
@@ -92,12 +106,16 @@ export function FrankencoinPositionExplanation({
         <H>
           <AmountText value={chain.liqPrice} /> ZCHF
         </H>{" "}
-        per {sym} — <H>declared by the owner</H>, not an oracle: Frankencoin runs no price feed, and a declared price
-        stands until someone challenges it.
+        per {sym}, <H>declared by the owner</H>. Frankencoin has no price feed; a declared price stands until someone
+        challenges it.
         {chain.mintCeiling != null && chain.mintCeiling > 0 ? (
           <>
             {" "}
-            At this price the posted collateral covers up to <AmountText value={chain.mintCeiling} /> ZCHF of minting.
+            At this price the collateral backs up to <AmountText value={chain.mintCeiling} /> ZCHF of debt
+            {hasMint && Math.abs(chain.mintCeiling - (chain.minted as number)) < 0.005 ? (
+              <>, the debt it carries</>
+            ) : null}
+            .
           </>
         ) : null}
       </span>,
@@ -107,8 +125,10 @@ export function FrankencoinPositionExplanation({
   if (hasMint && chain.reserveHeld != null && chain.reserveContributionPPM != null) {
     bullets.push(
       <span key="reserve">
-        The system reserve holds back <AmountText value={chain.reserveHeld} /> ZCHF (
-        {ppmToPct(chain.reserveContributionPPM).toFixed(0)}%) of that minted total, returned on repayment.
+        The debt is gross: <AmountText value={chain.reserveHeld} /> ZCHF of it (
+        {ppmToPct(chain.reserveContributionPPM).toFixed(0)}%) is this position&rsquo;s reserve share, held in the system
+        reserve. Repaying releases it: in full while the reserve covers every position&rsquo;s share, in proportion when
+        losses have drawn it down.
       </span>,
     );
   }
@@ -116,15 +136,16 @@ export function FrankencoinPositionExplanation({
   if (chain.annualInterestPPM != null) {
     bullets.push(
       <span key="interest">
-        The annual interest rate is <H>{ppmToPct(chain.annualInterestPPM).toFixed(2)}%</H>, charged{" "}
-        <H>at minting time</H> for the remaining term, so the minted figure grows only when the position mints again.
+        The annual interest rate is <H>{ppmToPct(chain.annualInterestPPM).toFixed(2)}%</H>
         {chain.hub === "v2" && chain.riskPremiumPPM != null ? (
           <>
             {" "}
-            On V2 that is the system base rate plus this position&rsquo;s fixed{" "}
-            {ppmToPct(chain.riskPremiumPPM).toFixed(2)}% risk premium.
+            (the system base rate, set by governance, plus this position&rsquo;s{" "}
+            {ppmToPct(chain.riskPremiumPPM).toFixed(2)}% risk premium)
           </>
         ) : null}
+        , paid <H>at each mint</H> for the time left to expiry and taken from the minted amount. Nothing accrues after
+        that, so the debt changes only when the owner mints or repays.
       </span>,
     );
   }
@@ -151,8 +172,8 @@ export function FrankencoinPositionExplanation({
   if (denied) {
     bullets.push(
       <span key="denied">
-        The position was <H>denied</H> during its init window — holders of enough FPS vetoed it. Minting is closed to it
-        permanently; the collateral stays withdrawable by the owner.
+        The position was <H>denied</H> during its veto window: a holder of more than 1% of the governance votes vetoed
+        it. Minting is closed to it permanently; the collateral stays withdrawable by the owner.
       </span>,
     );
   } else if (chain.mintingDisabledForGood && !chain.isClosed) {
@@ -188,13 +209,13 @@ export function FrankencoinPositionExplanation({
     );
   }
 
-  if (chain.start != null && openedAt != null && openedAt > 0 && !chain.isClone && chain.start > openedAt) {
+  if (!denied && chain.start != null && openedAt != null && openedAt > 0 && !chain.isClone && chain.start > openedAt) {
     const vetoDays = (chain.start - openedAt) / 86400;
     bullets.push(
       <span key="veto">
         As an original position it waited a <AmountText value={Math.round(vetoDays * 10) / 10} />
-        -day veto window before it could mint — at least three days, chosen by the owner — the window in which FPS
-        holders could have denied it.
+        -day veto window before it could mint (at least three days, chosen by the owner), in which holders of more than
+        1% of the governance votes could have denied it.
       </span>,
     );
   }
@@ -202,8 +223,33 @@ export function FrankencoinPositionExplanation({
   if (chain.isClone && chain.original) {
     bullets.push(
       <span key="clone">
-        A <H>clone</H> of {chain.original.slice(0, 6)}…{chain.original.slice(-4)} — it reuses that original&rsquo;s
-        already-vetted terms and mint limit, and skipped the veto window.
+        A <H>clone</H> of {chain.original.slice(0, 6)}…{chain.original.slice(-4)}: a position of its own on that
+        original&rsquo;s terms, sharing its minting limit. It skipped the veto window an original waits out.
+      </span>,
+    );
+  }
+
+  // The cooldown that is not running: when the last one ended, if it ended
+  // in this position's life (a clone inherits no earlier clock worth naming).
+  const cooldownEnded = chain.cooldownRaw != null && /^\d+$/.test(chain.cooldownRaw) ? Number(chain.cooldownRaw) : null;
+  if (
+    !chain.isClosed &&
+    !chain.cooldownActive &&
+    !chain.mintingDisabledForGood &&
+    cooldownEnded != null &&
+    cooldownEnded < now &&
+    openedAt != null &&
+    cooldownEnded > openedAt
+  ) {
+    bullets.push(
+      <span key="cooldown-ended">No minting cooldown is running; the last ended on {dateOf(cooldownEnded)}.</span>,
+    );
+  }
+
+  if (challengeCount === 0 && !chain.isClosed && !denied) {
+    bullets.push(
+      <span key="never-challenged">
+        It has <H>never been challenged</H>.
       </span>,
     );
   }
@@ -221,7 +267,20 @@ export function FrankencoinPositionExplanation({
   if (txCount != null && txCount > 0 && !chain.isClosed) {
     bullets.push(
       <span key="tx-count">
-        The position has recorded <H>{txCount}</H> transaction{txCount === 1 ? "" : "s"} to date.
+        The position has recorded <H>{txCount}</H> transaction{txCount === 1 ? "" : "s"} to date
+        {eventTally && eventTally.total !== txCount ? (
+          <>
+            ; the timeline lists {eventTally.total} events because one transaction can record several
+            {eventTally.biggest && eventTally.biggest.count > 1 ? (
+              <>
+                {" "}
+                ({eventTally.biggest.opening ? "its creation" : "one"} recorded {eventTally.biggest.count}
+                {eventTally.biggest.parts.length > 0 ? <>: {listOf(eventTally.biggest.parts)}</> : null})
+              </>
+            ) : null}
+          </>
+        ) : null}
+        .
       </span>,
     );
   }

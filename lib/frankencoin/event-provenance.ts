@@ -240,6 +240,70 @@ export const ownershipProv = (coords: FrankencoinCoords): Provenance => ({
   inputs: eventInputs(coords),
 });
 
+/** PositionOpened on the hub — the position's creation and, for a clone, the
+ *  original it was cloned from. */
+export const openedProv = (coords: FrankencoinCoords): Provenance => ({
+  kind: "chain",
+  pclass: "emitted",
+  verify: txVerify(coords),
+  summary: `The position's creation — the hub's own PositionOpened log${atBlock(coords)}, naming the new Position contract and the original whose terms it uses (itself, for an original).`,
+  contract: hubContract(coords),
+  via: `${FRANKENCOIN_VIA} · PositionOpened · original`,
+  inputs: eventInputs(coords),
+});
+
+// ── the receipt's ZCHF legs (lib/sources/chain/frankencoin-event.ts) ─────────
+
+const RECEIPT_VIA = "the transaction receipt, read over RPC";
+
+const ZCHF_TOKEN = { name: "Frankencoin (ZCHF)", address: FRANKENCOIN_ADDRESSES.ZCHF };
+
+export type FrankencoinReceiptLeg = "received" | "reserveShare" | "interest" | "paid" | "reserveReturned";
+
+const RECEIPT_LEG: Record<FrankencoinReceiptLeg, { summary: string; via: string; derived?: boolean }> = {
+  received: {
+    summary:
+      "ZCHF the borrower received from this mint — the ZCHF token's Transfer log out of the zero address to anyone but the reserve (followed one hop where the recipient forwarded the whole amount in the same transaction). The gross debt added is this plus the reserve share and the interest.",
+    via: "Transfer(0x0 → borrower) · ÷10^18",
+  },
+  reserveShare: {
+    summary:
+      "The position's reserve share of this mint — the ZCHF minted to the reserve (the Equity contract) less the interest the position reported as Profit. It stays in the reserve against this position's debt.",
+    via: "Transfer(0x0 → Equity) − Profit(position) · ÷10^18",
+    derived: true,
+  },
+  interest: {
+    summary:
+      "Interest for the remaining term, paid up front — the Profit log the ZCHF contract emitted for this position when it minted. It goes to the reserve as equity income and is not returned.",
+    via: "Profit(reportingMinter = position, amount) · ÷10^18",
+  },
+  paid: {
+    summary:
+      "ZCHF the payer spent on this repayment — the ZCHF burned from their wallet (Transfer to the zero address) less the reserve share the reserve sent back to them in the same transaction.",
+    via: "Transfer(payer → 0x0) − Transfer(Equity → payer) · ÷10^18",
+    derived: true,
+  },
+  reserveReturned: {
+    summary:
+      "The position's reserve share released by this repayment — the ZCHF the reserve (the Equity contract) sent to the payer, or burned itself, in this transaction. It is the whole share while the reserve covers every position's share, and a proportional part when losses have drawn it down (Frankencoin.calculateAssignedReserve).",
+    via: "Transfer(Equity → payer) + Transfer(Equity → 0x0) · ÷10^18",
+  },
+};
+
+/** One ZCHF leg of a mint or a repayment, read from the transaction receipt. */
+export const receiptLegProv = (leg: FrankencoinReceiptLeg, coords: FrankencoinCoords, value: string): Provenance => {
+  const def = RECEIPT_LEG[leg];
+  return {
+    kind: def.derived ? "chain-derived" : "chain",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary: def.summary,
+    contract: ZCHF_TOKEN,
+    via: `${RECEIPT_VIA} · ${def.via}`,
+    inputs: [{ label: leg, value, kind: "chain", pclass: "emitted" }, ...eventInputs(coords)],
+  };
+};
+
 /** ForcedSale (V2 hub) — an expired position's collateral sold. */
 export const forcedSaleProv = (sym: string, coords: FrankencoinCoords, raw?: string | null): Provenance => ({
   kind: "chain",

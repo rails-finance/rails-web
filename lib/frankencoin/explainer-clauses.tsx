@@ -54,21 +54,25 @@ import {
   liqPriceAfterProv,
   challengeFigureProv,
   forcedSaleProv,
+  receiptLegProv,
   type FrankencoinCoords,
+  type FrankencoinReceiptLeg,
 } from "@/lib/frankencoin/event-provenance";
-import { shortAddress } from "@/lib/frankencoin/asset-catalog";
-import { formatNumber } from "@/lib/utils/format";
+import { hubAddress, shortAddress } from "@/lib/frankencoin/asset-catalog";
+import { fmtFcColl, fmtFcPct, fmtFcPrice, fmtZchf } from "@/lib/frankencoin/figures";
+import type { FrankencoinZchfSplit } from "@/lib/frankencoin/use-event-read";
+import { formatDate } from "@/lib/date";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 
 /** The dust epsilon — a balance below this is treated as zero. */
 const FC_EPS = 1e-9;
+const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
 const num = (s?: string): number => {
   const n = Number(s ?? "0");
   return Number.isFinite(n) ? n : 0;
 };
-const fmt = (h?: string): string => formatNumber(Math.abs(Number(h)));
 
 // ── resulting state ──────────────────────────────────────────────────────────
 
@@ -136,51 +140,76 @@ function Addr({ address }: { address: string }) {
 
 // ── the variant table ────────────────────────────────────────────────────────
 
-export function frankencoinEventSlots(ctx: FrankencoinContext, coords: FrankencoinCoords): EventProseSlots {
+/** What the explainer knows beyond the row: the receipt's ZCHF split, once
+ *  read. Absent while it loads (the lead never needs it). */
+export interface FrankencoinExplainerExtras {
+  split?: FrankencoinZchfSplit | null;
+  /** The event's unix time, for the dates a price raise sets. */
+  timestamp?: number;
+}
+
+export function frankencoinEventSlots(
+  ctx: FrankencoinContext,
+  coords: FrankencoinCoords,
+  extras: FrankencoinExplainerExtras = {},
+): EventProseSlots {
   const sym = ctx.collateralSymbol;
   const dec = ctx.collateralDecimals;
   const rs = resultingState(ctx);
   const showColl = !ctx.collateralUnderstated && ctx.collateral != null;
+  const split = extras.split ?? null;
 
   const dMint = ctx.minted != null && ctx.mintedBefore != null ? num(ctx.minted) - num(ctx.mintedBefore) : null;
   const dColl =
     !ctx.collateralUnderstated && ctx.collateral != null && ctx.collateralBefore != null
       ? num(ctx.collateral) - num(ctx.collateralBefore)
       : null;
+  const priceBefore = ctx.liqPriceBefore != null ? num(ctx.liqPriceBefore) : null;
+  const priceAfter = ctx.liqPrice != null ? num(ctx.liqPrice) : null;
+  const priceMoved = priceBefore != null && priceAfter != null && priceBefore !== priceAfter;
+  const raised = priceMoved && (priceAfter as number) > (priceBefore as number);
+  const isClone = ctx.original != null && ctx.original !== ctx.position;
 
   // Delta figures echo the header's per-axis receipt (changeProv + the header's
   // own value key: a BARE magnitude on the labeled open/adjust axes, a SIGNED one
   // on a close's unlabeled deltas).
   const mintDeltaFig = (value: number, labeled: boolean) => (
     <Fig info={changeProv("minted", sym, coords)} value={chainTruthDeltaValue(value, labeled)} symbol="ZCHF">
-      <AmountText value={Math.abs(value)} /> ZCHF
+      {fmtZchf(value)} ZCHF
     </Fig>
   );
   const collDeltaFig = (value: number, labeled: boolean) => (
     <Fig info={changeProv("collateral", sym, coords)} value={chainTruthDeltaValue(value, labeled)} symbol={sym}>
-      <AmountText value={Math.abs(value)} /> {sym}
+      {fmtFcColl(value)} {sym}
     </Fig>
   );
-  // After-absolutes echo the detail grid's after-value receipt. The grid's own
-  // <Prov> passes NO symbol (the ticker rides as a decorative icon), so its
-  // entry key registers a null symbol — these echoes omit `symbol` too, so the
-  // key matches byte-for-byte and the figure pulse-links to its grid twin. `fmt`
-  // is the grid's own formatter, so the value key matches as well.
+  // After-absolutes echo the detail grid's after-value receipt: the grid states
+  // each lane at its unit's precision (lib/frankencoin/figures.ts) and passes no
+  // symbol, so these echoes use the same formatter and omit `symbol` too — the
+  // key matches byte-for-byte and the figure pulse-links to its grid twin.
   const mintAfterFig = () => (
-    <Fig info={mintedAfterProv(coords, ctx.raw?.minted)} value={fmt(ctx.minted)}>
-      {fmt(ctx.minted)} ZCHF
+    <Fig info={mintedAfterProv(coords, ctx.raw?.minted)} value={fmtZchf(num(ctx.minted))}>
+      {fmtZchf(num(ctx.minted))} ZCHF
     </Fig>
   );
   const collAfterFig = () => (
-    <Fig info={collateralAfterProv(sym, coords, ctx.raw?.collateral)} value={fmt(ctx.collateral)}>
-      {fmt(ctx.collateral)} {sym}
+    <Fig info={collateralAfterProv(sym, coords, ctx.raw?.collateral)} value={fmtFcColl(num(ctx.collateral))}>
+      {fmtFcColl(num(ctx.collateral))} {sym}
     </Fig>
   );
   const liqPriceAfterFig = () => (
-    <Fig info={liqPriceAfterProv(sym, dec, coords, ctx.raw?.price)} value={fmt(ctx.liqPrice)}>
-      {fmt(ctx.liqPrice)} ZCHF/{sym}
+    <Fig info={liqPriceAfterProv(sym, dec, coords, ctx.raw?.price)} value={fmtFcPrice(num(ctx.liqPrice))}>
+      {fmtFcPrice(num(ctx.liqPrice))} ZCHF/{sym}
     </Fig>
   );
+  // A receipt figure: muted like any figure without an on-card twin.
+  const legFig = (leg: FrankencoinReceiptLeg, n: number) => (
+    <Prov info={receiptLegProv(leg, coords, String(n))} value={fmtZchf(n)} symbol="ZCHF">
+      <strong className="font-semibold text-foreground">{fmtZchf(n)} ZCHF</strong>
+    </Prov>
+  );
+  const who = (addr: string | null | undefined): ReactNode =>
+    addr && ctx.txFrom && addr === ctx.txFrom ? "The owner" : addr ? <Addr address={addr} /> : "The wallet";
 
   // The V1 clone-creation caveat (charter §2 misleading-figure exception): the
   // recorded collateral figure understates reality, so no amount is shown — said
@@ -195,43 +224,118 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
         )
       : null;
 
-  // The reserve + up-front-interest mechanic (§5.2), stated where a mint exhibits
-  // it.
-  const mintFeeMechanic = (): ClauseInput =>
-    clause(
+  // What a mint paid out, from the receipt; the mechanic in words while the
+  // receipt is not read.
+  const mintSplit = (): ClauseInput =>
+    split?.received != null
+      ? clause(
+          <>
+            {who(split.receivedBy)} received {legFig("received", split.received)}
+            {split.reserveShare != null && dMint != null && dMint > 0 && (
+              <>
+                ; {legFig("reserveShare", split.reserveShare)} ({fmtFcPct(split.reserveShare / dMint)}) stayed in the
+                system reserve as this position&rsquo;s reserve share
+              </>
+            )}
+            {split.interest != null && (
+              <>
+                {split.reserveShare != null ? ", and " : "; "}
+                {legFig("interest", split.interest)} paid the interest for the remaining term up front
+              </>
+            )}
+            .
+          </>,
+        )
+      : clause(
+          <>
+            The wallet receives the minted amount less the position&rsquo;s reserve share and the interest for the
+            remaining term, both taken at minting.
+          </>,
+        );
+
+  // What a repayment cost the payer, from the receipt; the release rule in
+  // words while it is not read.
+  const repaySplit = (): ClauseInput =>
+    split?.paid != null
+      ? clause(
+          <>
+            {who(split.payer)} paid {legFig("paid", split.paid)}
+            {split.reserveReturned != null && split.reserveReturned > 0 && (
+              <>
+                ; the other {legFig("reserveReturned", split.reserveReturned)} was this position&rsquo;s reserve share,
+                which the system reserve released
+              </>
+            )}
+            .
+          </>,
+        )
+      : clause(
+          <>
+            Repaying releases the position&rsquo;s reserve share for the amount repaid: in full while the system reserve
+            covers every position&rsquo;s share, in proportion when losses have drawn it down.
+          </>,
+        );
+
+  // What the declared price allows now: collateral × price is the most debt
+  // the position may carry.
+  const ceilingClause = (): ClauseInput => {
+    if (!showColl || priceAfter == null || ctx.minted == null) return null;
+    const ceiling = num(ctx.collateral) * priceAfter;
+    const debt = num(ctx.minted);
+    const exact = Math.abs(ceiling - debt) < 0.005;
+    return clause(
       <>
-        Interest for the remaining term is charged up front at minting, and a fixed share of each mint is held back in
-        the system reserve; the borrower receives the rest.
+        At that price {collAfterFig()} backs up to {fmtZchf(ceiling)} ZCHF of debt
+        {exact ? (
+          <>, exactly the debt it carries.</>
+        ) : ceiling > debt ? (
+          <>
+            , {fmtZchf(ceiling - debt)} ZCHF more than the {mintAfterFig()} it carries.
+          </>
+        ) : (
+          <>, against the {mintAfterFig()} it carries.</>
+        )}
       </>,
     );
+  };
+
+  // The price move's consequence: a raise pauses minting three days, a cut
+  // applies at once.
+  const priceRule = (): ClauseInput =>
+    !priceMoved
+      ? null
+      : raised
+        ? clause(
+            <>
+              A raise pauses minting for three days,{" "}
+              {extras.timestamp != null && <>here until {formatDate(extras.timestamp + 3 * 86400)}, </>}so the new price
+              can be challenged before it backs new ZCHF.
+            </>,
+          )
+        : clause(<>The lower price took effect at once; no cooldown started.</>);
 
   switch (ctx.eventType) {
     case "open":
     case "clone": {
-      const isClone = ctx.eventType === "clone";
-      // Understated collateral (the V1 clone-creation quirk) is never narrated —
-      // the caveat explains its absence.
+      const cloneRow = ctx.eventType === "clone";
       const openColl = showColl ? num(ctx.collateral) : 0;
       const openMint = num(ctx.minted);
-      const lede = (
+      const lede = cloneRow ? (
         <>
-          {isClone ? "Cloned from an existing position" : "This position opened"}
-          {isClone && ctx.original ? (
-            <>
-              {" "}
-              (<Addr address={ctx.original} />)
-            </>
-          ) : null}
+          This position was cloned from {ctx.original ? <Addr address={ctx.original} /> : "an existing position"}: a new
+          position contract with its own collateral and debt
         </>
+      ) : (
+        <>This position opened</>
       );
       const opening =
         openColl > 0 && openMint > 0 ? (
           <>
-            {lede} with {collDeltaFig(openColl, true)} of collateral, minting {mintDeltaFig(openMint, true)}.
+            {lede}, with {collDeltaFig(openColl, true)} of collateral, minting {mintDeltaFig(openMint, true)}.
           </>
         ) : openColl > 0 ? (
           <>
-            {lede} with {collDeltaFig(openColl, true)} of collateral.
+            {lede}, with {collDeltaFig(openColl, true)} of collateral.
           </>
         ) : openMint > 0 ? (
           <>
@@ -242,29 +346,34 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
         );
       const declaredPrice: ClauseInput =
         ctx.liqPrice != null ? clause(<>The owner declared a liquidation price of {liqPriceAfterFig()}.</>) : null;
-      const oracleMechanic = clause(
-        <>
-          Frankencoin runs no price oracle — that price is the owner&rsquo;s own declaration, and a challenge auction is
-          what tests it.
-        </>,
-      );
-      const lifecycleMechanic = isClone
+      const lifecycleMechanic = cloneRow
         ? clause(
             <>
-              A clone reuses the original&rsquo;s already-vetted terms and mint limit, so it skips the veto window and
-              can mint straight away.
+              It uses the original&rsquo;s terms (interest rate, reserve share, challenge period, an expiry no later
+              than the original&rsquo;s) and shares its minting limit. An original waits out a veto window before it can
+              mint; a clone skips it.
             </>,
           )
         : clause(
             <>
-              As a new original position it first waits out a veto window — at least three days, chosen by the owner —
-              in which FPS holders can deny it.
+              As a new original position it first waits out a veto window of at least three days, chosen by the owner,
+              in which holders of more than 1% of the governance votes (FCS, or the FPS it wraps) can deny it.
             </>,
           );
       return {
         happened: [clause(opening)],
         changed: [declaredPrice],
-        meansNow: [oracleMechanic, lifecycleMechanic, openMint > 0 ? mintFeeMechanic() : null, understatedCaveat()],
+        meansNow: [
+          lifecycleMechanic,
+          clause(
+            <>
+              Frankencoin runs no price oracle: the liquidation price is the owner&rsquo;s declaration, and a challenge
+              auction is what tests it.
+            </>,
+          ),
+          openMint > 0 ? mintSplit() : null,
+          understatedCaveat(),
+        ],
       };
     }
 
@@ -272,13 +381,13 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
       const delta = dMint ?? num(ctx.minted);
       const firstDebt = dMint != null && Math.abs(num(ctx.minted) - dMint) <= FC_EPS;
       const happened = firstDebt ? (
-        <>Minted {mintDeltaFig(delta, true)} — the position&rsquo;s first debt.</>
+        <>Minted {mintDeltaFig(delta, true)}, the position&rsquo;s first debt.</>
       ) : (
         <>
           Minted {mintDeltaFig(delta, true)}, taking its debt to {mintAfterFig()}.
         </>
       );
-      return { happened: [clause(happened)], meansNow: [mintFeeMechanic()] };
+      return { happened: [clause(happened)], meansNow: [mintSplit()] };
     }
 
     case "repay": {
@@ -287,18 +396,15 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
         rs.debtCleared && !rs.hasCol
           ? cont(<>, clearing the debt in full and closing the position.</>)
           : rs.debtCleared
-            ? cont(<>, clearing the debt in full — the position now holds only collateral.</>)
-            : cont(<>, leaving {mintAfterFig()} of debt outstanding.</>);
-      // The general reserve-release rule (a share of each mint is held back and
-      // released as debt is repaid) is Layer-2 material — the "?" modal
-      // (frankencoinMintingContent's Reserve contribution) carries it.
+            ? cont(<>, clearing the debt in full; the position now holds only collateral.</>)
+            : cont(<>, leaving {mintAfterFig()} of debt.</>);
       const collateralOnlyPath: ClauseInput =
         rs.debtCleared && rs.hasCol
           ? clause(<>With no debt left, the collateral can be withdrawn or left to back a future mint.</>)
           : null;
       return {
         happened: [clause(<>Repaid {mintDeltaFig(delta, true)}</>), ending],
-        meansNow: [collateralOnlyPath],
+        meansNow: [repaySplit(), collateralOnlyPath],
       };
     }
 
@@ -337,51 +443,72 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
     }
 
     case "adjust_price": {
-      const raised = ctx.liqPriceBefore != null && ctx.liqPrice != null && num(ctx.liqPrice) > num(ctx.liqPriceBefore);
-      const from =
-        ctx.liqPriceBefore != null ? (
-          <>
-            {" "}
-            from <AmountText value={Math.abs(Number(ctx.liqPriceBefore))} /> ZCHF/{sym}
-          </>
-        ) : null;
-      const happened = (
+      const happened = priceMoved ? (
         <>
-          Changed the declared liquidation price{from} to {liqPriceAfterFig()}.
+          {raised ? "Raised" : "Lowered"} the declared liquidation price from {fmtFcPrice(priceBefore as number)} to{" "}
+          {liqPriceAfterFig()}.
         </>
+      ) : (
+        <>Set the declared liquidation price to {liqPriceAfterFig()}.</>
       );
-      const meaning = raised
-        ? clause(
-            <>
-              Raising the declared price starts a three-day cooldown on minting — the window in which the new price can
-              be challenged before it backs any fresh ZCHF.
-            </>,
-          )
-        : clause(
-            <>
-              The declared price is the owner&rsquo;s own; Frankencoin runs no oracle, and a challenge auction is what
-              keeps it in line.
-            </>,
-          );
-      return { happened: [clause(happened)], meansNow: [meaning] };
+      return { happened: [clause(happened)], changed: [ceilingClause()], meansNow: [priceRule()] };
     }
 
     case "adjust": {
-      const changed: ClauseInput[] = [];
-      if (showColl && ctx.minted != null)
-        changed.push(
-          clause(
+      // The contract applies an adjust in a fixed order: repay, withdraw, mint,
+      // then the price. Named in that order, each axis with its own verb.
+      const parts: { verb: string; rest: ReactNode }[] = [];
+      if (dColl != null && dColl > 0) parts.push({ verb: "deposited", rest: collDeltaFig(dColl, true) });
+      if (dMint != null && dMint < 0) parts.push({ verb: "repaid", rest: <>{mintDeltaFig(dMint, true)} of debt</> });
+      if (dColl != null && dColl < 0) parts.push({ verb: "withdrew", rest: collDeltaFig(dColl, true) });
+      if (dMint != null && dMint > 0) parts.push({ verb: "minted", rest: mintDeltaFig(dMint, true) });
+      if (priceMoved)
+        parts.push({
+          verb: raised ? "raised" : "lowered",
+          rest: (
             <>
-              It now holds {collAfterFig()} against {mintAfterFig()} of debt.
-            </>,
+              the declared liquidation price from {fmtFcPrice(priceBefore as number)} to {liqPriceAfterFig()}
+            </>
           ),
+        });
+      const joined = parts.map((p, i) => (
+        <span key={i}>
+          {i === 0 ? "" : i === parts.length - 1 ? " and " : ", "}
+          {i === 0 ? p.verb[0].toUpperCase() + p.verb.slice(1) : p.verb} {p.rest}
+        </span>
+      ));
+      const first = ctx.firstState === true;
+      const happened: ReactNode =
+        parts.length === 0 ? (
+          <>Updated the position without changing its collateral, debt or price.</>
+        ) : first ? (
+          <>{joined}: the position&rsquo;s first collateral and debt.</>
+        ) : (
+          <>{joined}, in one transaction.</>
         );
-      else if (ctx.minted != null) changed.push(clause(<>Its debt now stands at {mintAfterFig()}.</>));
-      if (ctx.liqPrice != null) changed.push(clause(<>The declared liquidation price is {liqPriceAfterFig()}.</>));
+      const firstPrice: ClauseInput =
+        first && ctx.liqPrice != null
+          ? isClone
+            ? clause(<>It started at the original&rsquo;s declared price, {liqPriceAfterFig()}.</>)
+            : clause(<>The owner declared a liquidation price of {liqPriceAfterFig()}.</>)
+          : null;
+      const state: ClauseInput =
+        !first && dMint != null && dMint !== 0 && ctx.minted != null
+          ? clause(<>Its debt now stands at {mintAfterFig()}.</>)
+          : null;
+      const mintBeforeRaise: ClauseInput =
+        dMint != null && dMint > 0 && raised
+          ? clause(<>The mint came before the price change, so the old price backed it.</>)
+          : null;
       return {
-        happened: [clause(<>Adjusted the position in a single transaction.</>)],
-        changed,
-        meansNow: [understatedCaveat()],
+        happened: [clause(happened)],
+        changed: [firstPrice, state, priceMoved ? ceilingClause() : null],
+        meansNow: [
+          dMint != null && dMint > 0 ? mintSplit() : dMint != null && dMint < 0 ? repaySplit() : null,
+          priceRule(),
+          mintBeforeRaise,
+          understatedCaveat(),
+        ],
       };
     }
 
@@ -419,7 +546,7 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
     case "close":
       return {
         happened: [clause(<>Closed the position — collateral and its ZCHF debt both returned to zero.</>)],
-        meansNow: [clause(<>The share of each mint held in the system reserve came back with the final repayment.</>)],
+        meansNow: [dMint != null && dMint < 0 ? repaySplit() : null],
       };
 
     case "denied": {
@@ -438,7 +565,12 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
       return {
         happened: [clause(happened)],
         meansNow: [
-          clause(<>Holders of enough FPS vetoed it during its init window.</>),
+          clause(
+            <>
+              A veto needs more than 1% of the governance votes (FCS, or the FPS it wraps, with delegations) and is open
+              only during a new original position&rsquo;s veto window.
+            </>,
+          ),
           clause(<>Denial disables minting permanently. The collateral stays withdrawable by the owner.</>),
         ],
       };
@@ -593,24 +725,51 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
 
     case "ownership_transferred": {
       if (ctx.initialization) {
+        const step = ctx.handoverStep;
+        const steps = ctx.handoverSteps;
+        const stepped = step != null && steps != null && steps > 1;
+        const last = !stepped || step === steps;
+        const to = ctx.newOwner;
+        const isHub = to != null && to === hubAddress(ctx.hub).toLowerCase();
+        const lead = stepped ? `Step ${step} of ${steps} of the position's creation: ` : "";
+        const happened: ReactNode = !stepped ? (
+          <>
+            At creation the position contract was handed to {to ? <Addr address={to} /> : "its owner"}
+            {isHub ? ", the MintingHub" : ", the owner the position was created for"}.
+          </>
+        ) : ctx.previousOwner === ZERO_ADDR || !ctx.previousOwner ? (
+          <>
+            {lead}the new position contract starts out owned by{" "}
+            {isHub ? <>the MintingHub ({to ? <Addr address={to} /> : null}), which creates it</> : null}
+            {!isHub && to ? <Addr address={to} /> : null}.
+          </>
+        ) : last ? (
+          <>
+            {lead}ownership reached {to ? <Addr address={to} /> : "the owner"}, the owner the position was created for
+            {to && ctx.txFrom === to ? ", who sent this transaction" : ""}.
+          </>
+        ) : (
+          <>
+            {lead}ownership passed to {to ? <Addr address={to} /> : "an intermediate owner"}, which held it within the
+            creation transaction.
+          </>
+        );
         return {
-          happened: [
+          happened: [clause(happened)],
+          meansNow: [
+            !last && ctx.handoverOwner
+              ? clause(
+                  <>
+                    The position ends this transaction owned by <Addr address={ctx.handoverOwner} />.
+                  </>,
+                )
+              : null,
             clause(
               <>
-                The factory handed the new position contract to its owner
-                {ctx.newOwner ? (
-                  <>
-                    {" "}
-                    (<Addr address={ctx.newOwner} />)
-                  </>
-                ) : null}
-                .
+                {stepped ? "These handovers are" : "This handover is"} part of creating the position, not a sale or a
+                transfer between holders.
               </>,
             ),
-          ],
-          meansNow: [
-            clause(<>This is part of opening, not a transfer between holders.</>),
-            clause(<>Every position starts life owned by the factory for a single transaction.</>),
           ],
         };
       }
@@ -653,6 +812,10 @@ export function frankencoinEventSlots(ctx: FrankencoinContext, coords: Frankenco
 
 /** The teaser = the lead of the composed arc (the first sentence plus any
  *  trailing continuations). */
-export function frankencoinExplainerTeaser(ctx: FrankencoinContext, coords: FrankencoinCoords): ReactNode | null {
-  return splitLead(eventClauses(frankencoinEventSlots(ctx, coords))).lead;
+export function frankencoinExplainerTeaser(
+  ctx: FrankencoinContext,
+  coords: FrankencoinCoords,
+  timestamp?: number,
+): ReactNode | null {
+  return splitLead(eventClauses(frankencoinEventSlots(ctx, coords, { timestamp }))).lead;
 }

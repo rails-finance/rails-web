@@ -75,22 +75,58 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
       }
     : undefined;
 
+  // The ZCHF the owner's own action moved: minted to the wallet or repaid into
+  // the position. The header registers a `changeProv("minted", …)` receipt on
+  // these rows (bare on open/mint/repay/adjust, signed on close), so the flank
+  // echoes it and the amount the header hands off at ≥sm lands here.
+  const dMint = ctx.minted != null && ctx.mintedBefore != null ? num(ctx.minted) - num(ctx.mintedBefore) : null;
+  const debtMove = dMint ?? (isOpen ? num(ctx.minted) : 0);
+  const headerRegistersDebt =
+    debtMove !== 0 &&
+    (isOpen ||
+      ctx.eventType === "mint" ||
+      ctx.eventType === "repay" ||
+      ctx.eventType === "adjust" ||
+      ctx.eventType === "close");
+
   // A Frankencoin position is minted against whatever ERC-20 its proposer put
   // up, so the collateral symbol is drawn from an open set the house address
   // table was never going to cover — exactly the case where the chip gives up
   // and prints an initial. The collateral's contract is in the event's flows,
   // recorded as the transfer that moved it, so it is read from there. A symbol
   // claimed by two flows resolves to nothing and the letter stands.
+  //
+  // direction "right" = toward the position (deposit / repay), "left" = toward
+  // the wallet (withdraw / mint).
   const tokens =
-    !critical && !caution && collMove !== 0
+    !critical && !caution && (collMove !== 0 || headerRegistersDebt)
       ? [
-          {
-            symbol: ctx.collateralSymbol,
-            address: soleFlowAddress(event.flows, ctx.collateralSymbol),
-            direction: collMove > 0 ? ("left" as const) : ("right" as const),
-            value: Math.abs(collMove),
-            prov: collProv,
-          },
+          ...(collMove !== 0
+            ? [
+                {
+                  symbol: ctx.collateralSymbol,
+                  address: soleFlowAddress(event.flows, ctx.collateralSymbol),
+                  direction: collMove > 0 ? ("right" as const) : ("left" as const),
+                  value: Math.abs(collMove),
+                  prov: collProv,
+                },
+              ]
+            : []),
+          ...(headerRegistersDebt
+            ? [
+                {
+                  symbol: "ZCHF",
+                  address: soleFlowAddress(event.flows, "ZCHF"),
+                  direction: debtMove > 0 ? ("left" as const) : ("right" as const),
+                  value: Math.abs(debtMove),
+                  prov: {
+                    info: changeProv("minted", ctx.collateralSymbol, coords),
+                    value: chainTruthDeltaValue(debtMove, ctx.eventType !== "close"),
+                    symbol: "ZCHF",
+                  },
+                },
+              ]
+            : []),
         ]
       : undefined;
 
@@ -142,9 +178,17 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
       }
       detail={<FrankencoinEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
       detailLabel="Position state"
-      explainer={<FrankencoinEventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} skipLead />}
+      explainer={
+        <FrankencoinEventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          timestamp={event.timestamp}
+          skipLead
+        />
+      }
       explainerLabel="Plain English"
-      explainerTeaser={frankencoinExplainerTeaser(ctx, coords)}
+      explainerTeaser={frankencoinExplainerTeaser(ctx, coords, event.timestamp)}
       txHash={event.txHash}
       learnMore={<LearnMore inline content={frankencoinLearnMoreContent(ctx)} />}
       persistKey={`frankencoin:${event.id}`}

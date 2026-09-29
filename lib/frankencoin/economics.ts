@@ -150,7 +150,9 @@ export function computeFrankencoinEconomics(
       ? [{ key: "collateral", symbol: sym, amount: view.collateral, usd: null, prov: collProv }]
       : [];
   const debtLines: TowerLine[] =
-    view.minted > DUST ? [{ key: "minted", symbol: "ZCHF", amount: view.minted, usd: null, prov: mintProv }] : [];
+    view.minted > DUST
+      ? [{ key: "minted", symbol: "ZCHF", amount: view.minted, usd: null, prov: mintProv, heldLabel: "Owed now" }]
+      : [];
 
   const lifetime = precomputedLifetime ?? (events && events.length > 0 ? replayLifetime(events) : null);
   // Per-side reconcile gates (the morpho pattern): the replay deliberately
@@ -191,7 +193,7 @@ export function computeFrankencoinEconomics(
     debtUnit: "ZCHF",
     // Not "principal": interest is prepaid at minting, so the minted figure
     // is the WHOLE debt — the label says exactly what the amount is.
-    debtListLabel: "Debt · ZCHF minted",
+    debtListLabel: "Debt now · ZCHF",
     collateral: {
       current: supplyLines,
       interest: null,
@@ -212,8 +214,12 @@ export function computeFrankencoinEconomics(
       ),
       lifetimeInflow: debtOk ? (lifetime?.minted ?? 0) : 0,
     },
-    interestNote:
-      "Frankencoin charges interest at minting time — each mint deducts the fee for the remaining term up front, so no interest accrues on an open position and there is no principal-versus-interest split to draw. Units are native: ZCHF debt on one side, the position's own collateral token on the other. Frankencoin runs no oracle, so the two towers stack in different units and are not height-comparable. Lifetime flows are gross totals over the position's life; the interest charged up front at each mint isn't a separate line, and collateral or debt cleared by an auction is counted separately as involuntary.",
+    // Minted, not borrowed: nothing is lent out of a pool — every mint is new
+    // ZCHF, and the debt is its gross amount.
+    debtInflowLabel: "Minted",
+    wrapFlowLabels: true,
+    // The mechanic (gross debt, interest up front, the reserve share) is said
+    // once, in the Explanation under the panel.
     flowsNote:
       lifetime != null
         ? undefined

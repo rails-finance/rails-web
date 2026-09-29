@@ -6,53 +6,65 @@
 import type { ReactNode } from "react";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { ChainTruthTowerData, TowerSideData } from "@/lib/shared/chain-truth-economics";
-import { formatCompact } from "@/lib/utils/format";
+import { fmtFcColl, fmtZchf } from "@/lib/frankencoin/figures";
+import { ProseExplainer } from "@/lib/shared/explainer-prose";
 
 const DUST = 1e-9;
 
 const sideSymbol = (side: TowerSideData, fallback: string): string =>
   side.current[0]?.symbol ?? side.exited[0]?.symbol ?? side.liquidated[0]?.symbol ?? fallback;
 
-// Frankencoin runs no oracle — always token mode.
-const fig = (amount: number, symbol: string): string => `${formatCompact(amount)} ${symbol}`;
+// Frankencoin runs no oracle — always token mode, each figure at its unit's
+// precision (lib/frankencoin/figures.ts), so the sentence states what the
+// panel's compact rows round.
+const fig = (amount: number, symbol: string): string =>
+  `${symbol === "ZCHF" ? fmtZchf(amount) : fmtFcColl(amount)} ${symbol}`;
 
 const sideTotal = (lines: TowerSideData["exited"]): number => lines.reduce((sum, l) => sum + l.amount, 0);
 
 /** Explanation body for the Frankencoin tower — a lead sentence plus bullets
- *  derived from `data`. Returns null when there's nothing to narrate. */
+ *  derived from `data`. The mechanic behind the figures (gross debt, interest
+ *  up front) is said here once; the panel above carries no second copy. */
 export function frankencoinEconomicsExplanation(data: ChainTruthTowerData): ReactNode {
   const { collateral, debt } = data;
   const collSym = sideSymbol(collateral, "collateral");
   const bullets: ReactNode[] = [];
 
   const collWithdrawn = sideTotal(collateral.exited);
-  if (collateral.lifetimeInflow > DUST || collWithdrawn > DUST) {
+  const debtRepaid = sideTotal(debt.exited);
+  const collNow = collateral.current[0];
+  const debtNow = debt.current[0];
+  const debtFlows = debt.lifetimeInflow > DUST || debtRepaid > DUST;
+  const collFlows = collateral.lifetimeInflow > DUST || collWithdrawn > DUST;
+
+  // Status lead: the debt's life in three figures (minted, repaid, owed now),
+  // or the current figures alone where the flows are not drawn.
+  const lead: ReactNode = debtFlows ? (
+    <>
+      Over its life this position minted {fig(debt.lifetimeInflow, "ZCHF")} of debt
+      {debtRepaid > DUST && <> and repaid {fig(debtRepaid, "ZCHF")}</>}
+      {debtNow ? <>; it owes {fig(debtNow.amount, "ZCHF")} now.</> : <>, and owes nothing now.</>}
+    </>
+  ) : debtNow || collNow ? (
+    <>
+      The position holds {collNow ? fig(collNow.amount, collSym) : `no ${collSym}`} and owes{" "}
+      {debtNow ? fig(debtNow.amount, "ZCHF") : "nothing"}.
+    </>
+  ) : (
+    <>The position is closed: no collateral or debt remain.</>
+  );
+
+  if (collFlows) {
     bullets.push(
       <span key="coll-flow">
-        {collateral.lifetimeInflow > DUST && <>{fig(collateral.lifetimeInflow, collSym)} added</>}
+        {collateral.lifetimeInflow > DUST && <>{fig(collateral.lifetimeInflow, collSym)} deposited</>}
         {collWithdrawn > DUST && (
           <>
             {collateral.lifetimeInflow > DUST ? ", " : ""}
             {fig(collWithdrawn, collSym)} withdrawn
           </>
         )}
-        {" over the position's life."}
-      </span>,
-    );
-  }
-
-  const debtRepaid = sideTotal(debt.exited);
-  if (debt.lifetimeInflow > DUST || debtRepaid > DUST) {
-    bullets.push(
-      <span key="debt-flow">
-        {debt.lifetimeInflow > DUST && <>{fig(debt.lifetimeInflow, "ZCHF")} minted</>}
-        {debtRepaid > DUST && (
-          <>
-            {debt.lifetimeInflow > DUST ? ", " : ""}
-            {fig(debtRepaid, "ZCHF")} repaid
-          </>
-        )}
-        {" over the position's life."}
+        {collNow ? <>; {fig(collNow.amount, collSym)} held now.</> : <>.</>}
       </span>,
     );
   }
@@ -70,48 +82,23 @@ export function frankencoinEconomicsExplanation(data: ChainTruthTowerData): Reac
   }
 
   bullets.push(
-    <span key="mechanic">
-      Frankencoin charges interest up front at minting — each mint deducts the fee for the remaining term — and holds
-      back a fixed reserve contribution from every mint, returned on repayment.
+    <span key="gross">
+      The debt is gross: each mint adds its whole amount, and the wallet receives it less the reserve share and the
+      interest for the remaining term, both taken at minting. Nothing accrues afterwards, so the debt moves only when
+      the owner mints or repays. An opened Mint or Repay event shows the split.
     </span>,
   );
 
-  const collNow = collateral.current[0];
-  const debtNow = debt.current[0];
-  if (collNow || debtNow) {
+  if (collFlows && debtFlows) {
     bullets.push(
-      <span key="current">
-        The position currently holds {collNow ? fig(collNow.amount, collSym) : `no ${collSym}`}, backing{" "}
-        {debtNow ? fig(debtNow.amount, "ZCHF") : "no"} minted ZCHF.
+      <span key="units">
+        Frankencoin has no price oracle, so the two bars stay in their own units, {collSym} and ZCHF, and are not drawn
+        to one scale.
       </span>,
     );
-  } else if (bullets.length > 1) {
-    bullets.push(<span key="closed">The position is closed — no collateral or minted debt remain.</span>);
   }
 
-  bullets.push(
-    <span key="unvalued">
-      Frankencoin runs no price oracle, so amounts are shown in native token units — collateral in {collSym}, debt in
-      ZCHF — and the two towers are not directly comparable.
-    </span>,
-  );
-
-  if (bullets.length === 0) return null;
-
-  return (
-    <div className="space-y-2 text-sm text-rb-500">
-      <p className="leading-relaxed">
-        These figures total this position&apos;s lifetime flows on Frankencoin across every event in its captured
-        history.
-      </p>
-      {bullets.map((item, i) => (
-        <div key={i} className="flex items-start gap-2 leading-relaxed">
-          <span className="select-none text-rb-500">•</span>
-          <span>{item}</span>
-        </div>
-      ))}
-    </div>
-  );
+  return <ProseExplainer paragraph={lead} items={bullets} />;
 }
 
 const FRANKENCOIN_DOC_URL = "https://docs.frankencoin.com";
@@ -119,28 +106,30 @@ const FRANKENCOIN_DOC_URL = "https://docs.frankencoin.com";
 /** The tower's "?" FAQ for Frankencoin. */
 export function frankencoinEconomicsContent(): LearnMoreContent {
   return {
-    title: "About the Economics",
+    title: "About Lifetime Flows",
     intro:
-      "This panel replays the position's own MintingUpdate events into lifetime flows. Frankencoin runs no oracle, so amounts stay in native token units — collateral in the position's own token, debt in ZCHF — and never mix into a USD figure.",
-    stepsHeading: "How the tower is built:",
-    steps: [
-      "Minted, repaid, added and withdrawn collateral are differences between two emitted absolute balances, summed event by event.",
-      "Collateral or debt cleared by a challenge auction is bucketed separately, as involuntary.",
-      "There is no accrued-interest segment: Frankencoin charges interest up front at minting, so no interest ever accrues on an open position.",
-    ],
+      "This panel adds up every change the position's own events record: collateral deposited and withdrawn on one side, ZCHF minted and repaid on the other, and what is held and owed now. Frankencoin has no price oracle, so each side stays in its own unit.",
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "Interest up front",
-        text: "each mint deducts the fee for the remaining term immediately — the minted figure is already the whole debt.",
+        bold: "Gross debt",
+        text: "a mint adds its whole amount to the debt. The wallet receives it less the position's reserve share and the interest for the remaining term.",
+        sources: [{ label: "Adjusting a position", url: `${FRANKENCOIN_DOC_URL}/positions/adjust` }],
       },
       {
-        bold: "Reserve contribution",
-        text: "a fixed share of every mint is held back in the system reserve and returned on repayment.",
+        bold: "Interest up front",
+        text: "interest for the remaining term is paid at each mint and is not returned; nothing accrues afterwards.",
+        sources: [{ label: "Collateralized minting", url: `${FRANKENCOIN_DOC_URL}/positions` }],
+      },
+      {
+        bold: "Reserve share",
+        text: "the reserve share of each mint stays in the system reserve and is released on repayment: in full while the reserve covers every position's share, in proportion when losses have drawn it down.",
+        sources: [{ label: "Reserve", url: `${FRANKENCOIN_DOC_URL}/reserve` }],
       },
       {
         bold: "Challenge auctions",
-        text: "anyone can challenge a position's declared price with a two-phase auction; a successful challenge clears collateral and debt with no oracle involved.",
+        text: "collateral and debt cleared by a challenge are counted apart from the owner's own withdrawals and repayments.",
+        sources: [{ label: "Challenges and auctions", url: `${FRANKENCOIN_DOC_URL}/positions/auctions` }],
       },
     ],
     links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],
