@@ -265,7 +265,7 @@ const AAVE_V4_OP_LABELS: Record<string, string> = {
 };
 
 // Morpho's filter reads the timeline rows' own labels (the index's wire
-// `al`: "Remove Collateral", "Liquidation"), so a filter entry and the row it
+// `al`: "Remove Collateral", "Liquidated"), so a filter entry and the row it
 // selects say the same words.
 const MORPHO_OP_LABELS: Record<string, string> = {
   supply_collateral: "Add Collateral",
@@ -274,11 +274,11 @@ const MORPHO_OP_LABELS: Record<string, string> = {
   repay: "Repay",
   supply: "Supply",
   withdraw: "Withdraw",
-  liquidation: "Liquidation",
+  liquidation: "Liquidated",
 };
 
 // Maker keys ARE already labels (see getEventActionKey), so they map to
-// themselves via the identity fallback; only the grab → "Liquidation" rename
+// themselves via the identity fallback; only the grab → "Liquidated" rename
 // needs an entry.
 const MAKERDAO_OP_LABELS: Record<string, string> = {
   grab: "Liquidated",
@@ -507,7 +507,7 @@ const POLARIS_OP_LABELS: Record<string, string> = {
   open: "Open",
   adjust: "Adjust",
   close: "Close",
-  liquidate: "Liquidation",
+  liquidate: "Liquidated",
   transfer: "Transfer",
 };
 

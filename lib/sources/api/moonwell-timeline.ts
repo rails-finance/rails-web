@@ -114,7 +114,7 @@ const LABELS: Record<MoonwellEventType, string> = {
   redeem: "Withdraw",
   borrow: "Borrow",
   repay: "Repay",
-  liquidation: "Liquidation",
+  liquidation: "Liquidated",
   transfer_in: "Received",
   transfer_out: "Sent",
 };

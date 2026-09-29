@@ -105,7 +105,7 @@ const LABELS: Record<LlamalendEventType, string> = {
   add_collateral: "Add collateral",
   repay: "Repay",
   remove_collateral: "Remove collateral",
-  liquidation: "Liquidation",
+  liquidation: "Liquidated",
 };
 
 const ZERO = BigInt(0);
@@ -302,8 +302,8 @@ export function buildLlamalendTimeline(
         ? role === "self"
           ? "Self-liquidation"
           : role === "liquidator"
-            ? "Liquidation (as liquidator)"
-            : "Liquidation"
+            ? "Liquidated (as liquidator)"
+            : "Liquidated"
         : (LABELS[kind] ?? kind);
 
     return {

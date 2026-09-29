@@ -261,7 +261,7 @@ export function buildFxTimeline(resp: RawFxTimelineResponse): FxTimelineResult {
     const debtDelta = r.delta_debts != null ? BigInt(r.delta_debts) : ZERO;
 
     const { actionType, actionLabel } = isLiq
-      ? { actionType: "liquidatePosition", actionLabel: "Liquidation" }
+      ? { actionType: "liquidatePosition", actionLabel: "Liquidated" }
       : labelFor(collDelta, debtDelta, r.is_open_event, r.empties_position);
 
     const flows: AssetFlow[] = [];

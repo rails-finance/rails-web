@@ -38,7 +38,7 @@ export function ageText(seconds: number): string {
 
 /** The read's own time: "03:19 UTC" on the day the price was published, the
  *  full "Tue 29 Sep 03:19 UTC" otherwise. */
-function readAtText(readUnix: number, publishedUnix: number): string {
+export function readAtText(readUnix: number, publishedUnix: number): string {
   const r = new Date(readUnix * 1000);
   const p = new Date(publishedUnix * 1000);
   const sameDay =
@@ -52,6 +52,13 @@ function readAtText(readUnix: number, publishedUnix: number): string {
  *  current one. Client-rendered surfaces only (it reads the clock). */
 export function blockTimeText(unix: number): string {
   return publishedText(unix, Date.now() / 1000);
+}
+
+/** "(21 h before this page’s chain read at block 45,000,000, 03:19 UTC)" — the
+ *  age clause for a price read without a Morpho position (Aave V4 on Base),
+ *  worded as the Morpho pages word it. */
+export function ageClauseText(publishedUnix: number, readUnix: number, blockNumber: number): string {
+  return `(${ageText(readUnix - publishedUnix)} before this page\u2019s chain read at block ${blockNumber.toLocaleString("en-US")}, ${readAtText(readUnix, publishedUnix)})`;
 }
 
 interface OracleAge {

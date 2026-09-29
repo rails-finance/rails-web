@@ -40,7 +40,7 @@
 //      the list's own `coverage.omitted` shows liquidations are the reason;
 //      SHALLOW_ID (read off the default list itself) IS served.
 //   1. Server lookup — the event page's HTML (no JS) titles DEEP_ID with its
-//      verb ("· Liquidation"), so metadata and the share image name it.
+//      verb ("· Liquidated"), so metadata and the share image name it.
 //   2. Pinned page, fresh context — `/event/DEEP_ID` renders the card
 //      (`[data-event-id]` equals the id) and never the not-found notice.
 //   3. Control — `/event/SHALLOW_ID` renders the same way.

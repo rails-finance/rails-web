@@ -110,7 +110,7 @@ const LABELS: Record<CompoundV2EventType, string> = {
   redeem: "Withdraw",
   borrow: "Borrow",
   repay: "Repay",
-  liquidation: "Liquidation",
+  liquidation: "Liquidated",
   transfer_in: "Received",
   transfer_out: "Sent",
   seize_out: "Collateral seized",

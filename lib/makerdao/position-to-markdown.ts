@@ -235,7 +235,7 @@ function timelineTable(
     // transferred), give = a CDP Manager ownership transfer (zero-delta).
     const label =
       d.eventType === "grab"
-        ? "Liquidation (grab)"
+        ? "Liquidated (grab)"
         : d.eventType === "fork-out"
           ? "Moved out (fork)"
           : d.eventType === "fork-in"
