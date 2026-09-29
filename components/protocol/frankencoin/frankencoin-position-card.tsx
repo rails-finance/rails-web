@@ -25,6 +25,7 @@
 
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { StatValue, StatDash, StatFootnote } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
@@ -130,22 +131,13 @@ function ChallengeMarker({ count }: { count: number }) {
   if (count <= 0) return null;
   const title = `Challenged ${count} time${count === 1 ? "" : "s"} — a challenged position can survive its auction`;
   return (
-    // role="img" + tabIndex + focus-ring + header-badge-tip: mounted outside
-    // PositionCardMeta's cluster (Frankencoin's own vocabulary — never
-    // "liquidations"), so it needs the same keyboard reach and focus tooltip
-    // that cluster's own badges get (2026-09-28, header-badge accessibility
-    // pass).
-    <span
-      className="inline-flex items-center text-caution-400 focus-ring header-badge-tip rounded-sm"
-      title={title}
-      data-tooltip={title}
-      aria-label={title}
-      role="img"
-      tabIndex={0}
-    >
+    // Mounted outside PositionCardMeta's cluster (Frankencoin's own vocabulary,
+    // never "liquidations"); RevealTip gives it the same hover, tap and
+    // keyboard tip as that cluster's badges.
+    <RevealTip tip={title} label={title} focusable className="text-caution-400 focus-ring rounded-sm">
       <Icon name="triangle" size={12} />
       <span className="ml-1 font-semibold text-xs">{count}</span>
-    </span>
+    </RevealTip>
   );
 }
 

@@ -10,6 +10,7 @@
 // Liquity's external-party pink for a redemption.
 
 import { Icon } from "@/components/icons/icon";
+import { RevealTip } from "@/components/shared/reveal-tip";
 
 export function LiquidatedBadge({ count }: { count?: number }) {
   const hasCount = typeof count === "number" && count > 0;
@@ -18,21 +19,13 @@ export function LiquidatedBadge({ count }: { count?: number }) {
     // data-prov-exempt: an index tally (activity-meta chrome), not a
     // chain-state figure — some cards (Aave V4, Fluid) mount this badge
     // outside PositionCardMeta's exempted cluster, so it declares itself.
-    // role="img" + tabIndex + focus-ring: the icon and count read as one
-    // named figure, reachable by Tab; header-badge-tip (globals.css) shows
-    // the tooltip on focus too, not just hover (2026-09-28, header-badge
-    // accessibility pass).
-    <span
-      data-prov-exempt=""
-      className="inline-flex items-center text-red-500 focus-ring header-badge-tip rounded-sm"
-      title={label}
-      data-tooltip={label}
-      aria-label={label}
-      role="img"
-      tabIndex={0}
-    >
-      <Icon name="triangle" size={12} />
-      {hasCount && <span className="ml-1 text-xs font-semibold">{count}</span>}
+    // RevealTip is the one tooltip (hover, tap, keyboard focus); no native
+    // title and no data-tooltip, so two never show together.
+    <span data-prov-exempt="" className="inline-flex">
+      <RevealTip tip={label} label={label} focusable className="text-red-500 focus-ring rounded-sm">
+        <Icon name="triangle" size={12} />
+        {hasCount && <span className="ml-1 text-xs font-semibold">{count}</span>}
+      </RevealTip>
     </span>
   );
 }

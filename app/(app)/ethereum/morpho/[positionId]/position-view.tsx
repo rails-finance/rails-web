@@ -437,7 +437,7 @@ export default function MorphoPositionView({
         <>
           {liveView && (
             <MorphoPositionCard
-              v={liveView}
+              v={historyWindow.state === "whole" && liquidationCount > 0 ? { ...liveView, liquidationCount } : liveView}
               receipts
               viewHref={tl.viewHref}
               // The risk slot rides the card's heading-button row (the Aave V3

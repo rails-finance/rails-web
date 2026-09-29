@@ -102,6 +102,9 @@ export interface MorphoPositionView {
   txCount: number;
   lastTs: number | null;
   everLiquidated: boolean;
+  /** Exact liquidation count, set only where the page holds the whole history
+   *  (detail page, whole window). Absent, the badge is the bare triangle. */
+  liquidationCount?: number;
   /** Σ bad debt written off across the position's liquidations, loan units. */
   badDebt: number;
   atBlock?: number;
@@ -228,7 +231,12 @@ export function MorphoPositionCard({
             outcome={v.status}
             leadingIdentity={leadingIdentity}
             identity={
-              <PositionCardMeta lastActivityAt={v.lastTs} eventCount={v.txCount} liquidated={v.everLiquidated} />
+              <PositionCardMeta
+                lastActivityAt={v.lastTs}
+                eventCount={v.txCount}
+                liquidated={v.everLiquidated}
+                liquidationCount={v.liquidationCount}
+              />
             }
             closedAt={v.lastTs ?? undefined}
             collateral={
@@ -271,7 +279,14 @@ export function MorphoPositionCard({
             )
           }
           leadingIdentity={leadingIdentity}
-          identity={<PositionCardMeta lastActivityAt={v.lastTs} eventCount={v.txCount} liquidated={v.everLiquidated} />}
+          identity={
+            <PositionCardMeta
+              lastActivityAt={v.lastTs}
+              eventCount={v.txCount}
+              liquidated={v.everLiquidated}
+              liquidationCount={v.liquidationCount}
+            />
+          }
           columns={[
             {
               label: CARD_VOCAB.collateral,
@@ -359,7 +374,14 @@ export function MorphoPositionCard({
               </span>
             </span>
           }
-          identity={<PositionCardMeta lastActivityAt={v.lastTs} eventCount={v.txCount} liquidated={v.everLiquidated} />}
+          identity={
+            <PositionCardMeta
+              lastActivityAt={v.lastTs}
+              eventCount={v.txCount}
+              liquidated={v.everLiquidated}
+              liquidationCount={v.liquidationCount}
+            />
+          }
           closedAt={v.lastTs ?? undefined}
           collateral={
             v.peaksPartial ? (
@@ -450,7 +472,14 @@ export function MorphoPositionCard({
         }
         // Right-hand activity-meta cluster: time-ago, event count, and the
         // liquidation flag (Morpho carries a boolean, not a count).
-        identity={<PositionCardMeta lastActivityAt={v.lastTs} eventCount={v.txCount} liquidated={v.everLiquidated} />}
+        identity={
+          <PositionCardMeta
+            lastActivityAt={v.lastTs}
+            eventCount={v.txCount}
+            liquidated={v.everLiquidated}
+            liquidationCount={v.liquidationCount}
+          />
+        }
         columns={[
           {
             label: CARD_VOCAB.collateral,

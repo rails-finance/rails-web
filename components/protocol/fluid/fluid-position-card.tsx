@@ -206,7 +206,6 @@ export function FluidPositionCard({
     <PositionCardMeta
       lastActivityAt={v.lastActivityAt}
       eventCount={v.txCount}
-      eventCountUnit={v.txCount === 1 ? "transaction" : "transactions"}
       eventCountTitle={`${v.txCount} transaction${v.txCount === 1 ? "" : "s"} on this position, liquidations excluded. The timeline counts events, and one transaction can carry several.`}
       liquidationCount={v.liquidationCount}
     />

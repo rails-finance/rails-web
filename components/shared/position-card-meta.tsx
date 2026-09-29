@@ -13,6 +13,7 @@
 
 import { Icon } from "@/components/icons/icon";
 import { formatDuration } from "@/lib/date";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { LiquidatedBadge } from "@/components/shared/liquidated-badge";
 
 export interface PositionCardMetaProps {
@@ -27,9 +28,6 @@ export interface PositionCardMetaProps {
    *  share-token transfers naming the address, and has no liquidations to
    *  exclude) states its own. Omitted, nothing changes for any caller. */
   eventCountTitle?: string;
-  /** A word printed after the count ("transactions"), for a page whose
-   *  timeline counts a different unit beside it. Omitted, the count stands alone. */
-  eventCountUnit?: string;
   /** Exact liquidation count, when known (Aave, Compound). */
   liquidationCount?: number | null;
   /** Boolean-only liquidation history, when no count exists (Morpho, MakerDAO). */
@@ -45,11 +43,15 @@ function toSeconds(epoch: number): number {
   return epoch > 1e12 ? Math.floor(epoch / 1000) : epoch;
 }
 
+// "2026-09-29 14:03 UTC" — UTC so server and client render the same string.
+function utcStamp(sec: number): string {
+  return `${new Date(sec * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}
+
 export function PositionCardMeta({
   lastActivityAt,
   eventCount,
   eventCountTitle,
-  eventCountUnit,
   liquidationCount,
   liquidated,
   redemptionCount,
@@ -69,10 +71,15 @@ export function PositionCardMeta({
     // receipt on every consumer. Exempted once at the cluster root.
     <span data-prov-exempt="" className="flex items-center gap-2 text-xs text-rb-500">
       {showTime && (
-        <span className="inline-flex items-center gap-1">
+        <RevealTip
+          tip={`Last activity ${utcStamp(toSeconds(lastActivityAt as number))}`}
+          label={`Last activity ${utcStamp(toSeconds(lastActivityAt as number))}`}
+          focusable
+          className="gap-1 focus-ring rounded-sm"
+        >
           <Icon name="clock-zap" size={12} />
           {formatDuration(toSeconds(lastActivityAt as number), new Date())} ago
-        </span>
+        </RevealTip>
       )}
       {showEvents &&
         (() => {
@@ -85,44 +92,25 @@ export function PositionCardMeta({
               ? `${eventCount} transaction${eventCount === 1 ? "" : "s"} on this position (excludes liquidations and redemptions)`
               : `${eventCount} transaction${eventCount === 1 ? "" : "s"} on this position (excludes liquidations)`);
           return (
-            // role="img": the icon + count read as one figure with one name,
-            // not two children a screen reader would step through separately.
-            // tabIndex + focus-ring (control-affordances.md's focus utility)
-            // put the badge in the tab order; header-badge-tip (globals.css)
-            // repaints `data-tooltip` as a popover on :focus-visible too, since
-            // the native title-on-hover tooltip alone never reaches a
-            // keyboard-only reader.
-            <span
-              className="inline-flex items-center focus-ring header-badge-tip rounded-sm"
-              title={label}
-              data-tooltip={label}
-              aria-label={label}
-              role="img"
-              tabIndex={0}
-            >
+            <RevealTip tip={label} label={label} focusable className="focus-ring rounded-sm">
               <Icon name="arrow-left-right" size={12} />
-              <span className="ml-1">
-                {eventCount}
-                {eventCountUnit ? ` ${eventCountUnit}` : null}
-              </span>
-            </span>
+              <span className="ml-1">{eventCount}</span>
+            </RevealTip>
           );
         })()}
       {showRedemption &&
         (() => {
           const label = `Redeemed against ${redemptionCount} time${redemptionCount === 1 ? "" : "s"}`;
           return (
-            <span
-              className="inline-flex items-center text-pink-500 dark:text-pink-400 focus-ring header-badge-tip rounded-sm"
-              title={label}
-              data-tooltip={label}
-              aria-label={label}
-              role="img"
-              tabIndex={0}
+            <RevealTip
+              tip={label}
+              label={label}
+              focusable
+              className="text-pink-500 dark:text-pink-400 focus-ring rounded-sm"
             >
               <Icon name="triangle" size={12} />
               <span className="ml-1 font-semibold">{redemptionCount}</span>
-            </span>
+            </RevealTip>
           );
         })()}
       {showLiquidation && <LiquidatedBadge count={hasLiqCount ? (liquidationCount as number) : undefined} />}

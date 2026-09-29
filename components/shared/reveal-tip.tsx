@@ -37,11 +37,17 @@ export function RevealTip({
   children,
   className,
   label,
+  focusable,
 }: {
   tip: ReactNode;
   children: ReactNode;
   className?: string;
   label?: string;
+  /** Put the wrapper in the tab order and show the tip on keyboard focus
+   *  (:focus-visible only, so a touch tap still reveals on the click and
+   *  leaves navigation to the second tap). Give it `role="img"`-style
+   *  semantics through `label`. */
+  focusable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const hasHover = useHasHover();
@@ -75,6 +81,15 @@ export function RevealTip({
       className={`relative inline-flex items-center ${className ?? ""}`}
       onMouseEnter={hasHover ? () => setOpen(true) : undefined}
       onMouseLeave={hasHover ? () => setOpen(false) : undefined}
+      tabIndex={focusable ? 0 : undefined}
+      onFocus={
+        focusable
+          ? (e) => {
+              if (e.currentTarget.matches(":focus-visible")) setOpen(true);
+            }
+          : undefined
+      }
+      onBlur={focusable ? () => setOpen(false) : undefined}
       onClick={
         hasHover
           ? undefined
