@@ -123,6 +123,9 @@ export interface MakerTxContext {
   migratedCup: string | null;
   /** ERC-20 received by an Instadapp account listed in `parties`. */
   tokensIn: MakerTokenIn[];
+  /** DSProxies Maker's ProxyFactory built in the transaction, with the
+   *  account each was built for (its Created log). */
+  proxiesBuilt?: { owner: string; proxy: string }[];
 }
 
 /** A change to an ilk's minimum collateral ratio (Spotter file "mat"). */

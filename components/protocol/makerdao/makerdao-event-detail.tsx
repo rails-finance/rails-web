@@ -111,6 +111,25 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: Maker
   const mat = ilkAt?.mat ?? null;
   const ratios = ctx.eventType === "frob" ? rowRatios(ctx, price) : null;
   const inkAfter = ctx.inkAfter != null ? Number(ctx.inkAfter) : null;
+  const dink = Number(ctx.dink) || 0;
+  const debtMove = Number(ctx.debtChange) || 0;
+  const isFrob = ctx.eventType === "frob";
+  // The row's own amount under the box it moved, and "unchanged" under the
+  // one it did not, so the grid states what this event did without the toggle.
+  const collSub = isFrob
+    ? dink > 0
+      ? `deposited ${formatNumber(dink)} ${collSym}`
+      : dink < 0
+        ? `withdrew ${formatNumber(-dink)} ${collSym}`
+        : "unchanged"
+    : undefined;
+  const debtSub = isFrob
+    ? debtMove > 0
+      ? `drew ${fmtDai(debtMove)} ${debtSym}`
+      : debtMove < 0
+        ? `repaid ${fmtDai(-debtMove)} ${debtSym}`
+        : "unchanged by this event"
+    : undefined;
 
   const stats: ChainTruthStat[] = [
     {
@@ -125,6 +144,7 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: Maker
         beforeProv: inkBeforeProv(collSym, coords),
       }),
       changed: Number(ctx.dink) !== 0,
+      ...(collSub ? { sub: <>{collSub}</> } : {}),
       // The collateral's value at this block's OSM price.
       ...(ctx.eventType === "frob" && price != null && inkAfter != null && inkAfter > 1e-9
         ? {
@@ -151,6 +171,7 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: Maker
         beforeProv: debtBeforeProv(debtSym, coords),
       }),
       changed: Number(ctx.dart) !== 0,
+      ...(debtSub ? { sub: <>{debtSub}</> } : {}),
       ...(ctx.interestSincePrevious
         ? {
             interestSincePrevious: {
@@ -227,7 +248,12 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: Maker
       symbol: "",
       prov: eventPriceProv(collSym, coords, price),
       changed: false,
-      sub: blockNumber != null ? <>at block {blockNumber.toLocaleString("en-US")}</> : undefined,
+      sub: (
+        <>
+          Maker&rsquo;s oracle price, one hour behind the market
+          {blockNumber != null ? <> · block {blockNumber.toLocaleString("en-US")}</> : null}
+        </>
+      ),
     });
   }
 

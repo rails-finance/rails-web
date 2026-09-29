@@ -45,6 +45,9 @@ import type {
 } from "@/lib/makerdao/chain-history-types";
 
 const PROXY_REGISTRY = "0x4678f0a6958e4d2bc4f1baf7bc52e8f3564f3fe4";
+// Maker changelog: PROXY_FACTORY. Its Created log names each DSProxy it builds.
+const PROXY_FACTORY = "0xa26e15c895efc0616177b7c1e7270a4c7d51c997";
+const PROXY_CREATED = keccak256(toHex("Created(address,address,address,address)"));
 const TRANSFER = keccak256(toHex("Transfer(address,address,uint256)"));
 const ACCOUNT_CREATED = keccak256(toHex("LogAccountCreated(address,address,address,address)"));
 const TUB_GIVE = keccak256(toHex("give(bytes32,address)")).slice(0, 10);
@@ -141,9 +144,14 @@ async function readTxContextOnce(txHash: Hex, addresses: string[]): Promise<Make
   let migratedCup: string | null = null;
   let flashLoan: MakerTxContext["flashLoan"] = null;
   const transfers: { token: string; from: string; to: string; value: bigint }[] = [];
+  const proxiesBuilt: { owner: string; proxy: string }[] = [];
   for (const log of receipt.logs) {
     const at = lower(log.address);
     const t0 = log.topics[0];
+    if (at === PROXY_FACTORY && t0 === PROXY_CREATED && log.data.length >= 130) {
+      // Created(sender indexed, owner indexed, proxy, cache)
+      proxiesBuilt.push({ owner: topicAddress(log.topics[2]), proxy: lower(`0x${log.data.slice(26, 66)}`) });
+    }
     if (at === INSTA_INDEX && t0 === ACCOUNT_CREATED) {
       created.set(topicAddress(log.topics[2]), topicAddress(log.topics[1]));
     }
@@ -202,6 +210,7 @@ async function readTxContextOnce(txHash: Hex, addresses: string[]): Promise<Make
     flashLoan,
     migratedCup,
     tokensIn,
+    proxiesBuilt,
   };
 }
 

@@ -103,6 +103,8 @@ export interface MakerRowExtras {
   /** Signed by someone other than the owner in force, in a transaction that
    *  handed the vault to the signer: the vault was created for them. */
   createdForSigner?: boolean;
+  /** The account that owned the vault at this row (behind its proxy). */
+  ownerAt?: string | null;
 }
 
 const dai2 = (n: number): string => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -365,6 +367,108 @@ function inAndOutClause(ctx: MakerDAOContext, extras: MakerRowExtras): ClauseInp
   );
 }
 
+// ── who sent the transaction ─────────────────────────────────────────────────
+
+/** A transaction in which a contract the sender called opened the vault in
+ *  its own name and gave it to the sender (or the sender's proxy): the give
+ *  row, its caller (the contract) and the proxy the vault went to. */
+export function openedViaContract(
+  rows: readonly MakerEvent[] | undefined,
+  tx: MakerTxContext | undefined,
+): { contract: string; proxy: string | null; built: boolean } | null {
+  if (!rows || !tx || !tx.to) return null;
+  if (!rows.some((r) => r.context.data.isOpen)) return null;
+  const give = rows.find((r) => r.context.data.eventType === "give");
+  const g = give?.context.data;
+  if (!g || g.giveCaller !== tx.to) return null;
+  if (g.giveDstOwner !== tx.from && g.giveDst !== tx.from) return null;
+  const proxy = g.giveDst && g.giveDst !== tx.from ? g.giveDst : null;
+  const built = proxy != null && (tx.proxiesBuilt ?? []).some((p) => p.proxy === proxy && p.owner === tx.from);
+  return { contract: tx.to, proxy, built };
+}
+
+/** "Sent by 0x3ee4…7675, the owner, through its DSProxy 0xc0a8…9d7b." */
+function senderClause(extras: MakerRowExtras): ClauseInput {
+  const tx = extras.txContext;
+  if (!tx || extras.createdForSigner) return null;
+  const via = openedViaContract(extras.txRows, tx);
+  if (via) {
+    return clause(
+      <>
+        {shortAddr(tx.from)} sent this transaction to the contract {shortAddr(via.contract)}. The contract{" "}
+        {via.built && via.proxy ? (
+          <>
+            built {shortAddr(tx.from)}&rsquo;s DSProxy ({shortAddr(via.proxy)}),{" "}
+          </>
+        ) : null}
+        opened this vault, becoming its owner, and gave it to {via.proxy ? <>that DSProxy</> : shortAddr(tx.from)} in
+        the same transaction.
+      </>,
+    );
+  }
+  const to = tx.to ? tx.parties[tx.to] : undefined;
+  const owner = extras.ownerAt ?? null;
+  const isOwner = owner != null && tx.from === owner;
+  const known = knownContract(tx.to);
+  const route: ReactNode =
+    to?.kind === "dsproxy" && to.owner === tx.from ? (
+      <> through its DSProxy {shortAddr(tx.to)}</>
+    ) : to?.kind === "dsproxy" && to.owner ? (
+      <>
+        {" "}
+        through {shortAddr(to.owner)}&rsquo;s DSProxy {shortAddr(tx.to)}
+      </>
+    ) : known ? (
+      <> through {known.name}</>
+    ) : to?.kind === "instadapp-account" ? (
+      <> through the Instadapp account {shortAddr(tx.to)}</>
+    ) : tx.to ? (
+      <>
+        {" "}
+        to {to?.kind === "contract" ? "the contract " : ""}
+        {shortAddr(tx.to)}
+      </>
+    ) : null;
+  return clause(
+    <>
+      Sent by {shortAddr(tx.from)}
+      {isOwner ? <>, the owner,</> : null}
+      {route}
+      {tx.tools.length > 0 ? <>, running {tx.tools.join(" and ")}</> : null}.
+    </>,
+  );
+}
+
+/** A transaction that changed the vault more than once: each change in chain
+ *  order, and which one this row is. */
+function txStepsClause(extras: MakerRowExtras): ClauseInput {
+  const rows = extras.txRows ?? [];
+  if (rows.some((r) => r.context.data.eventType !== "frob")) return null;
+  if (rows.length < 2) return null;
+  const parts = rows.map((r) => {
+    const d = r.context.data;
+    const dink = Number(d.dink) || 0;
+    const debt = Number(d.debtChange) || 0;
+    const dsym = ilkDebtSymbol(d.ilk);
+    const bits: string[] = [];
+    if (dink > 0) bits.push(`deposited ${formatNumber(dink)} ${d.collateralSymbol}`);
+    if (dink < 0) bits.push(`withdrew ${formatNumber(-dink)} ${d.collateralSymbol}`);
+    if (debt > 0) bits.push(`drew ${dai2(debt)} ${dsym}`);
+    if (debt < 0) bits.push(`repaid ${dai2(-debt)} ${dsym}`);
+    return bits.join(" and ") || "moved nothing";
+  });
+  const at = rows.findIndex((r) => r.id === extras.eventId);
+  if (at < 0) return null;
+  const ORD = ["first", "second", "third", "fourth", "fifth"];
+  return clause(
+    <>
+      This transaction changed the vault {rows.length === 2 ? "twice" : `${rows.length} times`}, each change a separate
+      row: {parts.map((p, i) => (i === 0 ? `first it ${p}` : `, then it ${p}`)).join("")}. This row is the{" "}
+      {ORD[at] ?? `number ${at + 1}`}.
+    </>,
+  );
+}
+
 // ── frob (deposit / withdraw / draw / repay, singly or combined) ──────────────
 
 /** What the row's collateral and debt mean at its block's price: the ratio,
@@ -384,6 +488,13 @@ function riskAt(rs: MakerResultingState, debtAfter: number, ilkAt?: MakerIlkAt |
     drop: 1 - liqPrice / price,
     room: Math.max(0, (rs.inkAfter * price) / mat - debtAfter),
   };
+}
+
+/** A fall as a whole percent; a figure that rounds to 100 while the price
+ *  would still be above zero reads "over 99%". */
+export function dropText(drop: number): string {
+  const whole = Math.max(0, Math.round(drop * 100));
+  return whole >= 100 && drop < 1 ? "over 99%" : `${whole}%`;
 }
 
 function frobSlots(
@@ -449,7 +560,7 @@ function frobSlots(
   }
 
   const valueOf = (amount: number) =>
-    price != null ? <> (worth {usd0(amount * price)} at the OSM price then)</> : null;
+    price != null ? <> (worth {usd0(amount * price)} at Maker&rsquo;s oracle price then)</> : null;
   const collFrag: ReactNode | null =
     dink > 0 ? (
       <>
@@ -489,7 +600,7 @@ function frobSlots(
         <>
           At <H>{usd2(risk.price)}</H> {indefiniteArticle(sym).toLowerCase()} {sym}, the vault could draw{" "}
           <H>{dai2(risk.room)}</H> {dsym} more before the <H>{matPct(risk.mat)}</H> minimum, and {sym} could fall{" "}
-          {Math.max(0, Math.round(risk.drop * 100))}% (to {usd2(risk.liqPrice)}) before it could be liquidated.
+          {dropText(risk.drop)} (to {usd2(risk.liqPrice)}) before it could be liquidated.
         </>,
       )
     : null;
@@ -506,8 +617,8 @@ function frobSlots(
       const recent = ctx.interestSincePrevious != null ? Number(ctx.interestSincePrevious) : null;
       return clause(
         <>
-          The {dai2(repaid)} {dsym} repayment covered {dai2(drawnPart)} {dsym} drawn since {since} and {dai2(feePart)}{" "}
-          {dsym} of stability fee
+          The {dai2(repaid)} {dsym} repayment covered {dai2(drawnPart)} {dsym} of principal (drawn less repaid) and{" "}
+          {dai2(feePart)} {dsym} of stability fee
           {recent != null && recent > 0.005 && extras.previousAt != null ? (
             <>
               , <H>{dai2(recent)}</H> of it accrued since {formatDate(extras.previousAt)}
@@ -519,10 +630,18 @@ function frobSlots(
     }
     if (split.drawnAfter == null || split.feeAfter == null || !(debtAfter > 1e-9) || split.feeAfter < 0.005)
       return null;
+    const repaidNow = dart < 0 ? -debtChange : 0;
+    const intoFee = repaidNow > 0 ? repaidNow - split.drawnBefore : 0;
     return clause(
       <>
-        The <H>{dai2(debtAfter)}</H> {dsym} now owed is {dai2(split.drawnAfter)} {dsym} drawn since {since} and{" "}
-        {dai2(split.feeAfter)} {dsym} of stability fee.
+        {intoFee > 0.005 ? (
+          <>
+            The repayment cleared the last {dai2(split.drawnBefore)} {dsym} of principal, and the other {dai2(intoFee)}{" "}
+            {dsym} paid down fee.{" "}
+          </>
+        ) : null}
+        The <H>{dai2(debtAfter)}</H> {dsym} now owed is {dai2(split.drawnAfter)} {dsym} of principal (drawn less repaid)
+        and {dai2(split.feeAfter)} {dsym} of stability fee.
       </>,
     );
   })();
@@ -537,7 +656,7 @@ function frobSlots(
     );
     return {
       happened: [clause(happened)],
-      changed: [riskClause, createdForClause(ctx, extras)],
+      changed: [riskClause, createdForClause(ctx, extras), senderClause(extras)],
       meansNow: [
         rs.collateralOnly
           ? noDebtPath
@@ -589,7 +708,15 @@ function frobSlots(
 
   return {
     happened: [clause(action), ending],
-    changed: [inAndOutClause(ctx, extras), matStepClause(ctx.ilk, extras.matStep), feeClause, riskClause, holding],
+    changed: [
+      txStepsClause(extras),
+      inAndOutClause(ctx, extras),
+      matStepClause(ctx.ilk, extras.matStep),
+      feeClause,
+      riskClause,
+      holding,
+      senderClause(extras),
+    ],
     meansNow,
   };
 }
@@ -746,12 +873,35 @@ function giveSlots(
       Ownership moved from {describeOwner(step.before, tx)} to {describeOwner(step.after, tx)}.
     </>
   );
-  const who: ClauseInput = clause(
-    <>
-      The transfer was made by {describeCaller(step.caller, tx)}
-      {tx && step.caller !== tx.from ? <>, in a transaction {describeSender(tx)}</> : null}.
-    </>,
-  );
+  const opened = openedViaContract(rows, tx);
+  const proxyNamed = [step.before.holder, step.after.holder].some((h) => h && tx?.parties[h]?.kind === "dsproxy");
+  const who: ClauseInput =
+    opened && tx
+      ? clause(
+          <>
+            {shortAddr(tx.from)} started this transfer. The CDP manager makes whoever opens a vault its owner, so the
+            contract {shortAddr(opened.contract)}, which {shortAddr(tx.from)} sent the transaction to, opened the vault
+            and then gave it to{" "}
+            {opened.proxy ? (
+              <>
+                {shortAddr(tx.from)}&rsquo;s DSProxy ({shortAddr(opened.proxy)})
+                {opened.built ? <>, built in the same transaction</> : null}
+              </>
+            ) : (
+              shortAddr(tx.from)
+            )}
+            .
+          </>,
+        )
+      : clause(
+          <>
+            The transfer was made by {describeCaller(step.caller, tx)}
+            {tx && step.caller !== tx.from ? <>, in a transaction {describeSender(tx)}</> : null}.
+          </>,
+        );
+  const proxyGloss: ClauseInput = proxyNamed
+    ? clause(<>A DSProxy is a contract wallet its owner acts through.</>)
+    : null;
   const why: ClauseInput =
     tx?.migratedCup != null && knownContract(step.before.holder)?.role === "maker"
       ? clause(
@@ -768,7 +918,7 @@ function giveSlots(
   }
   return {
     happened: summary ? [clause(summary), clause(happened)] : [clause(happened)],
-    changed: [who, why],
+    changed: [who, why, proxyGloss],
     meansNow,
   };
 }

@@ -261,7 +261,8 @@ export function makerdaoEconomicsContent(): LearnMoreContent {
       "Collateral flows are valued at Maker's oracle (OSM) price at each event's block when the page has read every one of them; otherwise at today's OSM price, and the explanation says which.",
       "What the vault holds is valued at today's OSM price. The difference between the two is the Price change row.",
       "DAI is counted at $1. Each draw and repayment is the DAI minted or burned at the time.",
-      "The stability fee owed is the debt less the DAI drawn since the vault last owed nothing; the all-time fee row adds the fee already paid inside repayments or cleared by a liquidation.",
+      "Maker keeps one debt figure. The page splits it into principal (DAI drawn less DAI repaid) and the stability fee owed (the rest). A repayment counts against principal first and against fee only once principal reaches zero, so the repaid rows split the same way.",
+      "The all-time fee row adds the fee already paid inside repayments or cleared by a liquidation to the fee owed now.",
     ],
     detailsHeading: "Key concepts:",
     details: [

@@ -21,9 +21,10 @@ const intro = (
       the collateral ratio beside each debt divides into it. The listing filters by collateral type and searches by
       wallet or vault number. Or see{" "}
       <Link href="/ethereum/makerdao/system" className="text-blue-500 hover:underline">
-        the Vat&apos;s balance sheet, decomposed by collateral type
-      </Link>
-      .
+        the balance sheet of the Vat
+      </Link>{" "}
+      (Maker&apos;s core accounting contract, where every vault&apos;s collateral and debt is recorded), split by
+      collateral type.
     </p>
     <p>
       Each vault page follows one vault: the card states its{" "}

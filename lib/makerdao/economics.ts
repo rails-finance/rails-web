@@ -29,6 +29,7 @@ import {
   daiDebtProv,
   drawnDaiProv,
   lifetimeFeeProv,
+  repaidPartProv,
   collateralFlowAtEventsProv,
   returnedCollateralProv,
   collateralPriceChangeProv,
@@ -491,6 +492,42 @@ export function computeMakerEconomics(
         ]
       : [];
 
+  // The repayments split principal-first: the fee paid inside them is the
+  // lifetime fee less the fee owed now and the fee a liquidation cleared, so
+  // Borrowed − Repaid: principal lands on the Principal row and the fee rows
+  // close the same way. Unsplit where a liquidation's fee is not known.
+  const feeInRepaid =
+    lifetimeInterest != null && feeOwed != null && (daiLiquidated <= DUST || inputs.feeLiquidated != null)
+      ? Math.max(0, lifetimeInterest - feeOwed - (inputs.feeLiquidated ?? 0))
+      : null;
+  const repaidLines: TowerLine[] =
+    debtComplete && daiRepaid > DUST && feeInRepaid != null && feeInRepaid > 0.005 && feeInRepaid < daiRepaid
+      ? [
+          {
+            key: "debt-repaid",
+            symbol: debtSym,
+            amount: daiRepaid - feeInRepaid,
+            usd: daiRepaid - feeInRepaid,
+            prov: repaidPartProv("principal", {
+              repaid: `${formatNumber(daiRepaid)} ${debtSym}`,
+              fee: `${formatNumber(feeInRepaid)} ${debtSym}`,
+            }),
+            flowLabel: "Repaid: principal",
+          },
+          {
+            key: "debt-repaid-fee",
+            symbol: debtSym,
+            amount: feeInRepaid,
+            usd: feeInRepaid,
+            prov: repaidPartProv("fee", {
+              repaid: `${formatNumber(daiRepaid)} ${debtSym}`,
+              fee: `${formatNumber(feeInRepaid)} ${debtSym}`,
+            }),
+            flowLabel: "Repaid: fee",
+          },
+        ]
+      : debtFlowLine("debt-repaid", daiRepaid, "repaid");
+
   return {
     ...(lifetimeInterest != null ? { lifetimeInterest } : {}),
     ...(feeOwed != null ? { feeOwed } : {}),
@@ -542,7 +579,7 @@ export function computeMakerEconomics(
                     amount: drawn,
                     // DAI valued at $1 — the same axis as the OSM-priced collateral.
                     usd: drawn,
-                    heldLabel: "Drawn",
+                    heldLabel: "Principal",
                     prov: drawnDaiProv({ drawn: `${formatNumber(drawn)} ${debtSym}`, since }),
                   }
                 : {
@@ -569,10 +606,7 @@ export function computeMakerEconomics(
             }
           : null,
       ...(feeEarned.length > 0 ? { earned: feeEarned } : {}),
-      exited: [
-        ...debtFlowLine("debt-repaid", daiRepaid, "repaid"),
-        ...debtFlowLine("debt-moved-out", daiMovedOut, "moved out", "Moved out"),
-      ],
+      exited: [...repaidLines, ...debtFlowLine("debt-moved-out", daiMovedOut, "moved out", "Moved out")],
       liquidated: debtFlowLine("debt-liquidated", daiLiquidated, "liquidated"),
       lifetimeInflow: debtComplete ? daiGenerated + daiMovedIn : 0,
     },
