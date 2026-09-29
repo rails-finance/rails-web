@@ -55,12 +55,22 @@ import {
   challengeFigureProv,
   forcedSaleProv,
   receiptLegProv,
+  challengeReceiptProv,
   type FrankencoinCoords,
   type FrankencoinReceiptLeg,
+  type FrankencoinChallengeLeg,
 } from "@/lib/frankencoin/event-provenance";
 import { hubAddress, shortAddress } from "@/lib/frankencoin/asset-catalog";
 import { fmtFcColl, fmtFcPct, fmtFcPrice, fmtZchf } from "@/lib/frankencoin/figures";
-import type { FrankencoinZchfSplit } from "@/lib/frankencoin/use-event-read";
+import type { FrankencoinEventRead, FrankencoinZchfSplit } from "@/lib/frankencoin/use-event-read";
+import {
+  challengeKey,
+  dateTimeText,
+  phaseText,
+  spanText,
+  type FrankencoinPageFacts,
+} from "@/lib/frankencoin/page-facts";
+import { termText } from "@/lib/frankencoin/figures";
 import { formatDate } from "@/lib/date";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
@@ -144,8 +154,16 @@ function Addr({ address }: { address: string }) {
  *  read. Absent while it loads (the lead never needs it). */
 export interface FrankencoinExplainerExtras {
   split?: FrankencoinZchfSplit | null;
+  /** The whole receipt read (a challenge's buyer, bidder and ZCHF legs; the
+   *  other positions a roll touched; a new owner's kind). */
+  read?: FrankencoinEventRead | null;
+  /** What the rest of the page knows: challenge starts, the phase length, the
+   *  family's original, what else each transaction recorded. */
+  facts?: FrankencoinPageFacts | null;
   /** The event's unix time, for the dates a price raise sets. */
   timestamp?: number;
+  /** The event's id: which transaction's other rows are its siblings. */
+  txHash?: string;
 }
 
 export function frankencoinEventSlots(
@@ -158,6 +176,9 @@ export function frankencoinEventSlots(
   const rs = resultingState(ctx);
   const showColl = !ctx.collateralUnderstated && ctx.collateral != null;
   const split = extras.split ?? null;
+  const read = extras.read ?? null;
+  const facts = extras.facts ?? null;
+  const ts = extras.timestamp;
 
   const dMint = ctx.minted != null && ctx.mintedBefore != null ? num(ctx.minted) - num(ctx.mintedBefore) : null;
   const dColl =
@@ -208,6 +229,12 @@ export function frankencoinEventSlots(
       <strong className="font-semibold text-foreground">{fmtZchf(n)} ZCHF</strong>
     </Prov>
   );
+  const chFig = (leg: FrankencoinChallengeLeg, value: string, text: ReactNode, symbol?: string) => (
+    <Prov info={challengeReceiptProv(leg, sym, coords, value)} value={value} symbol={symbol}>
+      <strong className="font-semibold text-foreground">{text}</strong>
+    </Prov>
+  );
+  const scaled = (raw: string, decimals: number) => Number(raw) / 10 ** decimals;
   const who = (addr: string | null | undefined): ReactNode =>
     addr && ctx.txFrom && addr === ctx.txFrom ? "The owner" : addr ? <Addr address={addr} /> : "The wallet";
 
@@ -240,7 +267,15 @@ export function frankencoinEventSlots(
             {split.interest != null && (
               <>
                 {split.reserveShare != null ? ", and " : "; "}
-                {legFig("interest", split.interest)} paid the interest for the remaining term up front
+                {legFig("interest", split.interest)} paid the interest up front
+                {split.ratePct != null ? (
+                  <>
+                    : {split.ratePct.toFixed(2)}% a year, the rate in force at this block
+                    {split.termDays != null ? <>, for the {termText(split.termDays)} left to expiry</> : null}
+                  </>
+                ) : (
+                  <> for the remaining term</>
+                )}
               </>
             )}
             .
@@ -252,6 +287,19 @@ export function frankencoinEventSlots(
             remaining term, both taken at minting.
           </>,
         );
+
+  // A roll: the same transaction emptied another position through the hub's
+  // roller, which the mint paid for.
+  const rollClause = (): ClauseInput => {
+    const emptied = read?.otherPositions.filter((o) => o.emptied) ?? [];
+    if (!read || emptied.length !== 1) return null;
+    return clause(
+      <>
+        The same transaction {read.viaRoller ? "ran through the hub’s roller and " : ""}repaid and emptied position{" "}
+        <Addr address={emptied[0].position} />: a roll of that position into this one, paid for with this mint.
+      </>,
+    );
+  };
 
   // What a repayment cost the payer, from the receipt; the release rule in
   // words while it is not read.
@@ -320,10 +368,16 @@ export function frankencoinEventSlots(
       const cloneRow = ctx.eventType === "clone";
       const openColl = showColl ? num(ctx.collateral) : 0;
       const openMint = num(ctx.minted);
+      const root = facts?.familyOriginal ?? null;
       const lede = cloneRow ? (
         <>
-          This position was cloned from {ctx.original ? <Addr address={ctx.original} /> : "an existing position"}: a new
-          position contract with its own collateral and debt
+          This position was cloned from {ctx.original ? <Addr address={ctx.original} /> : "an existing position"}
+          {root && ctx.original && root !== ctx.original ? (
+            <>
+              , a clone of the family&rsquo;s original <Addr address={root} />
+            </>
+          ) : null}
+          : a new position contract with its own collateral and debt
         </>
       ) : (
         <>This position opened</>
@@ -346,13 +400,23 @@ export function frankencoinEventSlots(
         );
       const declaredPrice: ClauseInput =
         ctx.liqPrice != null ? clause(<>The owner declared a liquidation price of {liqPriceAfterFig()}.</>) : null;
+      const viaParent = root != null && ctx.original != null && root !== ctx.original;
       const lifecycleMechanic = cloneRow
         ? clause(
-            <>
-              It uses the original&rsquo;s terms (interest rate, reserve share, challenge period, an expiry no later
-              than the original&rsquo;s) and shares its minting limit. An original waits out a veto window before it can
-              mint; a clone skips it.
-            </>,
+            viaParent ? (
+              <>
+                It took its starting declared price from <Addr address={ctx.original as string} /> and its other terms
+                (interest rate, reserve share, challenge period, an expiry no later than the original&rsquo;s) from the
+                family&rsquo;s original, and shares the family&rsquo;s minting limit. An original waits out a veto
+                window before it can mint; a clone skips it.
+              </>
+            ) : (
+              <>
+                It uses the original&rsquo;s terms (interest rate, reserve share, challenge period, an expiry no later
+                than the original&rsquo;s) and shares its minting limit. An original waits out a veto window before it
+                can mint; a clone skips it.
+              </>
+            ),
           )
         : clause(
             <>
@@ -372,6 +436,7 @@ export function frankencoinEventSlots(
             </>,
           ),
           openMint > 0 ? mintSplit() : null,
+          openMint > 0 ? rollClause() : null,
           understatedCaveat(),
         ],
       };
@@ -387,7 +452,7 @@ export function frankencoinEventSlots(
           Minted {mintDeltaFig(delta, true)}, taking its debt to {mintAfterFig()}.
         </>
       );
-      return { happened: [clause(happened)], meansNow: [mintSplit()] };
+      return { happened: [clause(happened)], meansNow: [mintSplit(), rollClause()] };
     }
 
     case "repay": {
@@ -489,7 +554,12 @@ export function frankencoinEventSlots(
       const firstPrice: ClauseInput =
         first && ctx.liqPrice != null
           ? isClone
-            ? clause(<>It started at the original&rsquo;s declared price, {liqPriceAfterFig()}.</>)
+            ? clause(
+                <>
+                  It started at the declared price of <Addr address={ctx.original as string} />, the position it was
+                  cloned from: {liqPriceAfterFig()}.
+                </>,
+              )
             : clause(<>The owner declared a liquidation price of {liqPriceAfterFig()}.</>)
           : null;
       const state: ClauseInput =
@@ -505,6 +575,7 @@ export function frankencoinEventSlots(
         changed: [firstPrice, state, priceMoved ? ceilingClause() : null],
         meansNow: [
           dMint != null && dMint > 0 ? mintSplit() : dMint != null && dMint < 0 ? repaySplit() : null,
+          dMint != null && dMint > 0 ? rollClause() : null,
           priceRule(),
           mintBeforeRaise,
           understatedCaveat(),
@@ -515,28 +586,57 @@ export function frankencoinEventSlots(
     case "auction_settlement": {
       const tookColl = showColl && dColl != null && dColl < 0;
       const clearedDebt = dMint != null && dMint < 0;
+      const siblings = extras.txHash ? (facts?.txKinds[extras.txHash] ?? []) : [];
+      const bySale = siblings.includes("challenge_succeeded")
+        ? "challenge"
+        : siblings.includes("forced_sale")
+          ? "forced"
+          : null;
+      const saleName =
+        bySale === "challenge" ? "The challenge sale" : bySale === "forced" ? "The forced sale" : "The sale";
       const tail: ReactNode =
         tookColl && clearedDebt ? (
           <>
-            , taking {collDeltaFig(dColl as number, true)} of collateral and clearing{" "}
-            {mintDeltaFig(dMint as number, true)} of debt.
+            {" "}
+            took {collDeltaFig(dColl as number, true)} of collateral and cleared {mintDeltaFig(dMint as number, true)}{" "}
+            of debt.
           </>
         ) : tookColl ? (
-          <>, taking {collDeltaFig(dColl as number, true)} of collateral.</>
+          <> took {collDeltaFig(dColl as number, true)} of collateral.</>
         ) : clearedDebt ? (
-          <>, clearing {mintDeltaFig(dMint as number, true)} of debt.</>
+          <> cleared {mintDeltaFig(dMint as number, true)} of debt.</>
         ) : (
-          <>.</>
+          <> left the position&rsquo;s collateral and debt unchanged.</>
         );
-      const happened = <>The protocol wrote this position down as an auction settled{tail}</>;
       return {
-        happened: [clause(happened)],
-        meansNow: [
+        happened: [
           clause(
             <>
-              This was the protocol&rsquo;s write-down, not an act of the owner — a challenge slice or forced sale
-              settled in the same transaction.
+              {saleName}
+              {tail}
             </>,
+          ),
+        ],
+        changed: [
+          rs.closed && (tookColl || clearedDebt)
+            ? clause(<>Nothing is left on either side, so the position is closed.</>)
+            : null,
+        ],
+        meansNow: [
+          clause(
+            bySale === "challenge" ? (
+              <>
+                This row records the sale&rsquo;s effect on the position. The Challenge Succeeded row that follows it in
+                the same transaction records the bid, the reward and where the ZCHF went.
+              </>
+            ) : bySale === "forced" ? (
+              <>
+                This row records the sale&rsquo;s effect on the position. The Forced Sale row that follows it in the
+                same transaction records the amount sold.
+              </>
+            ) : (
+              <>This row records a sale&rsquo;s effect on the position, written by the hub in the same transaction.</>
+            ),
           ),
           understatedCaveat(),
         ],
@@ -578,6 +678,7 @@ export function frankencoinEventSlots(
 
     case "challenge_started": {
       const size = num(ctx.challengeSize);
+      const phase = facts?.challengePeriod ?? null;
       const happened = (
         <>
           {ctx.challenger ? <Addr address={ctx.challenger} /> : "A challenger"} challenged{" "}
@@ -586,7 +687,7 @@ export function frankencoinEventSlots(
             value={chainTruthDeltaValue(size, true)}
             symbol={sym}
           >
-            <AmountText value={size} /> {sym}
+            {fmtFcColl(size)} {sym}
           </Fig>{" "}
           of this position&rsquo;s collateral.
         </>
@@ -597,12 +698,24 @@ export function frankencoinEventSlots(
         // high) is Layer-2 material — the "?" modal
         // (frankencoinChallengeContent) carries it.
         meansNow: [
-          clause(<>The challenger posts their own {sym}, not ZCHF.</>),
           clause(
             <>
-              Phase one offers that collateral at the declared price; only if nobody buys it does the position&rsquo;s
-              own collateral go to a declining auction.
+              The challenger posts {fmtFcColl(size)} of its own {sym}, not ZCHF.
             </>,
+          ),
+          clause(
+            phase != null && ts != null ? (
+              <>
+                Phase 1 runs {phaseText(phase)}, to {dateTimeText(ts + phase)}: anyone, the owner included, can buy that
+                collateral at the declared price. If nobody does, phase 2 runs {phaseText(phase)} more and sells the
+                position&rsquo;s collateral at a price falling from the declared price to zero.
+              </>
+            ) : (
+              <>
+                Phase 1 offers that collateral at the declared price, to anyone, the owner included; only if nobody buys
+                it does the position&rsquo;s collateral go to a falling-price auction.
+              </>
+            ),
           ),
         ],
       };
@@ -610,43 +723,95 @@ export function frankencoinEventSlots(
 
     case "challenge_averted": {
       const size = num(ctx.challengeSize);
+      const a = read?.challenge?.kind === "averted" ? read.challenge : null;
+      const started = facts?.challenges[challengeKey(ctx)];
+      const sizeFig = (
+        <Fig
+          info={challengeFigureProv("size", "averted", sym, coords, ctx.raw?.size)}
+          value={chainTruthDeltaValue(size, true)}
+          symbol={sym}
+        >
+          {fmtFcColl(size)} {sym}
+        </Fig>
+      );
+      const startAt = a?.challengeStart ?? started?.start ?? null;
       const happened = (
         <>
-          The challenge over{" "}
-          <Fig
-            info={challengeFigureProv("size", "averted", sym, coords, ctx.raw?.size)}
-            value={chainTruthDeltaValue(size, true)}
-            symbol={sym}
-          >
-            <AmountText value={size} /> {sym}
-          </Fig>{" "}
-          was averted.
+          The challenge over {sizeFig} was averted in phase 1
+          {startAt != null && ts != null && ts > startAt ? <>, {spanText(ts - startAt)} after it started</> : null}.
         </>
       );
+      const paid = a ? Number(a.paid) : 0;
+      const bought = a ? scaled(a.boughtRaw, dec) : 0;
+      const liq = a?.liqPriceRaw != null ? scaled(a.liqPriceRaw, 36 - dec) : null;
+      const unit = paid > 0 && bought > 0 ? paid / bought : null;
+      const buyerIsOwner = a?.buyer != null && a.owner != null && a.buyer === a.owner;
+      const withdrawn = a?.buyer != null && a.challenger != null && a.buyer === a.challenger;
+      const buyerLine: ClauseInput = !a
+        ? clause(
+            <>
+              Someone bought the challenger&rsquo;s posted collateral at the declared price, which ends the challenge.
+            </>,
+          )
+        : withdrawn
+          ? clause(<>The challenger withdrew its own challenge and took back its collateral; nobody paid anything.</>)
+          : clause(
+              <>
+                {a.buyer ? <Addr address={a.buyer} /> : "The buyer"}
+                {buyerIsOwner
+                  ? ", the owner,"
+                  : a.buyerIsContract === true
+                    ? ", a contract and not the owner,"
+                    : a.buyerIsContract === false
+                      ? ", a wallet and not the owner,"
+                      : ""}{" "}
+                paid {a.challenger ? <Addr address={a.challenger} /> : "the challenger"}{" "}
+                {chFig("paidChallenger", a.paid, <>{fmtZchf(paid)} ZCHF</>, "ZCHF")} for its {fmtFcColl(bought)} {sym}
+                {unit != null ? (
+                  <>
+                    : {fmtFcPrice(unit)} ZCHF per {sym}
+                    {liq != null && Math.abs(unit - liq) < 0.01 ? ", the declared price" : null}
+                  </>
+                ) : null}
+                .
+              </>,
+            );
+      const sender: ClauseInput =
+        a && a.buyer && read && read.sender !== a.buyer && !withdrawn
+          ? clause(
+              <>
+                The transaction was sent by <Addr address={read.sender} />.
+              </>,
+            )
+          : null;
+      const cooldown: ClauseInput =
+        a?.cooldownUntil != null && ts != null && a.cooldownUntil > ts
+          ? clause(
+              <>
+                The position&rsquo;s collateral and debt did not move. Averting paused its minting for{" "}
+                {spanText(a.cooldownUntil - ts)}, to {dateTimeText(a.cooldownUntil)}, so the same challenge can be
+                repeated before the owner mints more.
+              </>,
+            )
+          : clause(<>The position&rsquo;s collateral and debt did not move.</>);
       return {
         happened: [clause(happened)],
-        meansNow: [
-          clause(
-            <>
-              Someone bought the challenger&rsquo;s posted collateral at the declared price — the market judging the
-              price fair.
-            </>,
-          ),
-          clause(<>The position survived untouched; the challenger&rsquo;s bet lost.</>),
-        ],
+        changed: [buyerLine, sender],
+        meansNow: [cooldown],
       };
     }
 
     case "challenge_succeeded": {
       const bid = num(ctx.bid);
       const acquired = num(ctx.acquiredCollateral);
+      const c = read?.challenge?.kind === "succeeded" ? read.challenge : null;
       const bidFig = (
         <Fig
           info={challengeFigureProv("bid", "succeeded", sym, coords, ctx.raw?.bid)}
           value={chainTruthDeltaValue(bid, true)}
           symbol="ZCHF"
         >
-          <AmountText value={bid} /> ZCHF
+          {fmtZchf(bid)} ZCHF
         </Fig>
       );
       const acquiredFig = (
@@ -655,56 +820,207 @@ export function frankencoinEventSlots(
           value={chainTruthDeltaValue(acquired, true)}
           symbol={sym}
         >
-          <AmountText value={acquired} /> {sym}
+          {fmtFcColl(acquired)} {sym}
         </Fig>
       );
-      // §5.4 derived net-outcome: the effective price the slice cleared at (ZCHF
-      // per collateral). Muted — no on-card twin, and rendered inline so the dev
-      // coverage tripwire (whole-token spans only) never sees a bare figure.
-      const effectivePrice: ClauseInput =
-        bid > 0 && acquired > FC_EPS
+      const started = facts?.challenges[challengeKey(ctx)];
+      const start = c?.challengeStart ?? started?.start ?? null;
+      const phase = c?.phase ?? facts?.challengePeriod ?? null;
+      const liq = c?.liqPriceRaw != null ? scaled(c.liqPriceRaw, 36 - dec) : null;
+      const unit = bid > 0 && acquired > FC_EPS ? bid / acquired : null;
+      const into = start != null && phase != null && ts != null ? ts - (start + phase) : null;
+      // §5.4 derived net-outcome: the price the sale cleared at, against the
+      // declared price, and when in phase 2 the bid came.
+      const cleared: ClauseInput =
+        unit != null
           ? clause(
               <>
-                That is an effective <AmountText value={bid / acquired} /> ZCHF per {sym}.
+                That is{" "}
+                {c
+                  ? chFig(
+                      "clearedPrice",
+                      String(unit),
+                      <>
+                        {fmtFcPrice(unit)} ZCHF per {sym}
+                      </>,
+                    )
+                  : `${fmtFcPrice(unit)} ZCHF per ${sym}`}
+                {liq != null && liq > 0 ? (
+                  <>
+                    , {fmtFcPct(unit / liq)} of the declared {fmtFcPrice(liq)}
+                  </>
+                ) : null}
+                {into != null && into >= 0 && phase != null ? (
+                  <>
+                    , {spanText(into)} into phase 2, after nobody bought the challenger&rsquo;s collateral in phase
+                    1&rsquo;s {phaseText(phase)}
+                  </>
+                ) : null}
+                .
               </>,
             )
           : null;
+      if (!c)
+        return {
+          happened: [
+            clause(
+              <>
+                Phase 2 sold {acquiredFig} of the position&rsquo;s collateral for {bidFig}.
+              </>,
+            ),
+          ],
+          changed: [cleared],
+          meansNow: [
+            clause(
+              <>
+                The bid, less the challenger&rsquo;s reward, goes against the debt; a shortfall is covered from the
+                reserve, and an excess is shared between the reserve and the owner.
+              </>,
+            ),
+          ],
+        };
+      const reward = Number(c.reward);
+      const back = scaled(c.challengerReturnedRaw, dec);
+      const cleared$ = Number(c.debtCleared);
+      const shortfall = Number(c.shortfall);
+      const released = c.reserveReleased != null ? Number(c.reserveReleased) : null;
+      const ownerGot = Number(c.ownerReceived);
+      const excessKept = Number(c.excessToReserve);
+      const rewardLine = clause(
+        <>
+          Of the bid, {chFig("reward", c.reward, <>{fmtZchf(reward)} ZCHF</>, "ZCHF")}
+          {bid > 0 ? <> ({fmtFcPct(reward / bid)})</> : null} went to the challenger
+          {c.challenger ? (
+            <>
+              {" "}
+              <Addr address={c.challenger} />
+            </>
+          ) : null}
+          {back > 0 ? (
+            <>
+              , which {c.challengerReturnPostponed ? "can also collect" : "also got back"} the{" "}
+              {chFig(
+                "challengerReturned",
+                c.challengerReturnedRaw,
+                <>
+                  {fmtFcColl(back)} {sym}
+                </>,
+              )}{" "}
+              it posted
+            </>
+          ) : null}
+          .
+        </>,
+      );
+      const debtLine: ClauseInput =
+        shortfall > 0
+          ? clause(
+              <>
+                Clearing the {chFig("debtCleared", c.debtCleared, <>{fmtZchf(cleared$)} ZCHF</>, "ZCHF")} debt took{" "}
+                {chFig("shortfall", c.shortfall, <>{fmtZchf(shortfall)} ZCHF</>, "ZCHF")} more than the rest of the bid,
+                which the reserve paid
+                {released != null && released > 0 ? (
+                  <>
+                    . The sale also released this position&rsquo;s{" "}
+                    {chFig("reserveReleased", c.reserveReleased as string, <>{fmtZchf(released)} ZCHF</>, "ZCHF")}{" "}
+                    reserve share, so the shortfall came out of that share
+                    {released > shortfall ? (
+                      <> and the other {fmtZchf(released - shortfall)} ZCHF stayed with the reserve</>
+                    ) : null}
+                  </>
+                ) : null}
+                .
+              </>,
+            )
+          : ownerGot > 0 || excessKept > 0
+            ? clause(
+                cleared$ > 0 ? (
+                  <>
+                    The rest of the bid cleared the{" "}
+                    {chFig("debtCleared", c.debtCleared, <>{fmtZchf(cleared$)} ZCHF</>, "ZCHF")} debt with{" "}
+                    {fmtZchf(ownerGot + excessKept)} ZCHF over: the reserve kept {fmtZchf(excessKept)} ZCHF (
+                    {fmtFcPct(excessKept / (ownerGot + excessKept))}) and the owner received{" "}
+                    {chFig("ownerReceived", c.ownerReceived, <>{fmtZchf(ownerGot)} ZCHF</>, "ZCHF")}.
+                  </>
+                ) : (
+                  <>
+                    The position had no debt, so the other {fmtZchf(ownerGot + excessKept)} ZCHF of the bid was excess:
+                    the reserve kept {fmtZchf(excessKept)} ZCHF ({fmtFcPct(excessKept / (ownerGot + excessKept))}) and
+                    the owner received {chFig("ownerReceived", c.ownerReceived, <>{fmtZchf(ownerGot)} ZCHF</>, "ZCHF")}.
+                  </>
+                ),
+              )
+            : clause(
+                <>
+                  The rest of the bid cleared the{" "}
+                  {chFig("debtCleared", c.debtCleared, <>{fmtZchf(cleared$)} ZCHF</>, "ZCHF")} debt.
+                </>,
+              );
+      const endsWith = clause(
+        <>
+          Who ends up with what: the bidder
+          {c.bidder ? (
+            <>
+              {" "}
+              <Addr address={c.bidder} />
+            </>
+          ) : null}{" "}
+          has the {fmtFcColl(acquired)} {sym} for {fmtZchf(bid)} ZCHF; the challenger has
+          {back > 0 ? <> its {sym} back and</> : null} {fmtZchf(reward)} ZCHF; the owner received {fmtZchf(ownerGot)}{" "}
+          ZCHF here
+          {cleared$ > 0 ? <>, keeps the ZCHF minted earlier and no longer owes the {fmtZchf(cleared$)} ZCHF</> : null}
+          {shortfall > 0 ? (
+            <>
+              ; the reserve paid {fmtZchf(shortfall)} ZCHF
+              {released != null && released > 0 ? (
+                <> out of the {fmtZchf(released)} ZCHF held for this position</>
+              ) : null}
+            </>
+          ) : excessKept > 0 ? (
+            <>; the reserve gained {fmtZchf(excessKept)} ZCHF</>
+          ) : null}
+          .
+        </>,
+      );
       return {
         happened: [
           clause(
             <>
-              A challenge slice succeeded: a bidder paid {bidFig} and took {acquiredFig} of the position&rsquo;s
-              collateral.
+              Phase 2 sold {acquiredFig} of the position&rsquo;s collateral for {bidFig}
+              {c.bidder ? (
+                <>
+                  {" "}
+                  to <Addr address={c.bidder} />
+                  {c.bidderIsContract === true ? ", a contract" : c.bidderIsContract === false ? ", a wallet" : ""}
+                </>
+              ) : null}
+              .
             </>,
           ),
         ],
-        changed: [effectivePrice],
-        meansNow: [
-          clause(
-            <>
-              The ZCHF repays the position&rsquo;s debt, the challenger earns the protocol&rsquo;s reward, and any
-              shortfall is covered by the reserve.
-            </>,
-          ),
-          // The general slicing rule ("one challenge can settle in several
-          // slices") is Layer-2 material — the "?" modal
-          // (frankencoinChallengeContent step 3) carries it verbatim.
-          clause(
-            <>
-              A partial sale can leave the position standing: a challenge is an event in its life, not necessarily its
-              end.
-            </>,
-          ),
-        ],
+        changed: [cleared],
+        meansNow: [rewardLine, debtLine, endsWith],
       };
     }
 
     case "forced_sale": {
       const amt = num(ctx.forcedSaleAmount);
+      if (amt <= FC_EPS)
+        return {
+          happened: [clause(<>This forced sale sold no collateral: the position held none by then.</>)],
+          meansNow: [
+            clause(
+              <>
+                The position&rsquo;s expiration had passed, so anyone could call the hub&rsquo;s forced sale on it; this
+                call found nothing left to sell.
+              </>,
+            ),
+          ],
+        };
       const happened = (
         <>
           <Fig info={forcedSaleProv(sym, coords, ctx.raw?.size)} value={chainTruthDeltaValue(amt, true)} symbol={sym}>
-            <AmountText value={amt} /> {sym}
+            {fmtFcColl(amt)} {sym}
           </Fig>{" "}
           of the position&rsquo;s collateral was sold in a forced sale.
         </>
@@ -718,7 +1034,7 @@ export function frankencoinEventSlots(
               the proceeds repay the debt.
             </>,
           ),
-          clause(<>The sale was the hub&rsquo;s clearing on the expiry clock, not an act of the owner.</>),
+          clause(<>Anyone can make this sale once a position has expired; the owner does not need to act.</>),
         ],
       };
     }
@@ -735,7 +1051,14 @@ export function frankencoinEventSlots(
         const happened: ReactNode = !stepped ? (
           <>
             At creation the position contract was handed to {to ? <Addr address={to} /> : "its owner"}
-            {isHub ? ", the MintingHub" : ", the owner the position was created for"}.
+            {isHub
+              ? ", the MintingHub"
+              : read?.newOwnerIsContract === true
+                ? ", a contract, the owner the position was created for"
+                : read?.newOwnerIsContract === false
+                  ? ", a wallet (no contract code), the owner the position was created for"
+                  : ", the owner the position was created for"}
+            .
           </>
         ) : ctx.previousOwner === ZERO_ADDR || !ctx.previousOwner ? (
           <>
@@ -745,13 +1068,19 @@ export function frankencoinEventSlots(
           </>
         ) : last ? (
           <>
-            {lead}ownership reached {to ? <Addr address={to} /> : "the owner"}, the owner the position was created for
+            {lead}ownership reached {to ? <Addr address={to} /> : "the owner"}
+            {read?.newOwnerIsContract === true
+              ? ", a contract,"
+              : read?.newOwnerIsContract === false
+                ? ", a wallet (no contract code),"
+                : ","}{" "}
+            the owner the position was created for
             {to && ctx.txFrom === to ? ", who sent this transaction" : ""}.
           </>
         ) : (
           <>
-            {lead}ownership passed to {to ? <Addr address={to} /> : "an intermediate owner"}, which held it within the
-            creation transaction.
+            {lead}ownership passed to {to ? <Addr address={to} /> : "an intermediate owner"}
+            {read?.newOwnerIsContract === true ? ", a contract," : ""} which held it within the creation transaction.
           </>
         );
         return {
@@ -788,6 +1117,11 @@ export function frankencoinEventSlots(
                 <>
                   {" "}
                   to <Addr address={ctx.newOwner} />
+                  {read?.newOwnerIsContract === true
+                    ? ", a contract"
+                    : read?.newOwnerIsContract === false
+                      ? ", a wallet"
+                      : ""}
                 </>
               ) : null}
               .
@@ -816,6 +1150,9 @@ export function frankencoinExplainerTeaser(
   ctx: FrankencoinContext,
   coords: FrankencoinCoords,
   timestamp?: number,
+  facts?: FrankencoinPageFacts | null,
+  txHash?: string,
+  read?: FrankencoinEventRead | null,
 ): ReactNode | null {
-  return splitLead(eventClauses(frankencoinEventSlots(ctx, coords, { timestamp }))).lead;
+  return splitLead(eventClauses(frankencoinEventSlots(ctx, coords, { timestamp, facts, txHash, read }))).lead;
 }

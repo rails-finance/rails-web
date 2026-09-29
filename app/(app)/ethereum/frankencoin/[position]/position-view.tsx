@@ -66,6 +66,8 @@ import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { RiskFooterStrip, RiskFigure } from "@/components/shared/risk-footer-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { formatDayMonth } from "@/lib/date";
+import { FrankencoinPageFactsProvider, frankencoinPageFacts } from "@/lib/frankencoin/page-facts";
+import { prefetchFrankencoinEventReads } from "@/lib/frankencoin/use-event-read";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle.
@@ -212,6 +214,37 @@ export default function FrankencoinPositionView({
 
   const frankEvents = useMemo(() => events.filter(isFrankencoinEvent), [events]);
 
+  // What each event card needs from the rest of the page: challenge starts,
+  // the phase length, the family's original, what each transaction recorded.
+  const pageFacts = useMemo(
+    () => frankencoinPageFacts(frankEvents, chain?.challengePeriod ?? null, chain?.original ?? null),
+    [frankEvents, chain],
+  );
+
+  // Start the receipt reads the cards will ask for as soon as the rows land,
+  // so an opened mint or challenge has its figures in place.
+  useEffect(() => {
+    if (frankEvents.length > 0) prefetchFrankencoinEventReads(frankEvents);
+  }, [frankEvents]);
+
+  // The clone's parent (PositionOpened names it) and the last mint, whose rate
+  // a closed card states.
+  const cloneParent = useMemo(
+    () => frankEvents.find((e) => e.context.data.eventType === "clone")?.context.data.original ?? null,
+    [frankEvents],
+  );
+  const lastMint = useMemo(() => {
+    for (let i = frankEvents.length - 1; i >= 0; i--) {
+      const e = frankEvents[i];
+      const d = e.context.data;
+      const after = Number(d.minted ?? NaN);
+      const before = Number(d.mintedBefore ?? NaN);
+      if (Number.isFinite(after) && Number.isFinite(before) && after > before && d.eventType !== "auction_settlement")
+        return e;
+    }
+    return null;
+  }, [frankEvents]);
+
   // How the timeline's events divide over the transactions, for the card's
   // counter sentence. Whole history only: a window's rows are not the count.
   const eventTally = useMemo<FrankencoinEventTally | null>(() => {
@@ -345,117 +378,122 @@ export default function FrankencoinPositionView({
         </div>
       ) : (
         <>
-          <FrankencoinPositionCard
-            v={view}
-            receipts
-            viewHref={tl.viewHref}
-            // The context strip riding the heading-button row: the live
-            // challenge state and the cooldown — the risk grammar's own
-            // surfaces, from the position's slots at head.
-            rowExtra={
-              chain && view.status === "open" ? (
-                <RiskFooterStrip>
-                  {(chain.challengedAmount ?? 0) > 0 ? (
+          <FrankencoinPageFactsProvider value={pageFacts}>
+            <FrankencoinPositionCard
+              v={view}
+              cloneParent={cloneParent}
+              receipts
+              viewHref={tl.viewHref}
+              // The context strip riding the heading-button row: the live
+              // challenge state and the cooldown — the risk grammar's own
+              // surfaces, from the position's slots at head.
+              rowExtra={
+                chain && view.status === "open" ? (
+                  <RiskFooterStrip>
+                    {(chain.challengedAmount ?? 0) > 0 ? (
+                      <RiskFigure caution>
+                        Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
+                      </RiskFigure>
+                    ) : summary ? (
+                      <RiskFigure>
+                        {summary.challengeCount === 0
+                          ? "never challenged"
+                          : `challenged ${summary.challengeCount}×, none running`}
+                      </RiskFigure>
+                    ) : null}
+                    {chain.cooldownActive && chain.cooldownUntil != null ? (
+                      <RiskFigure>minting cooldown until {formatDayMonth(chain.cooldownUntil)}</RiskFigure>
+                    ) : !chain.mintingDisabledForGood ? (
+                      <RiskFigure>no minting cooldown</RiskFigure>
+                    ) : null}
+                  </RiskFooterStrip>
+                ) : chain && view.status !== "closed" && (chain.challengedAmount ?? 0) > 0 ? (
+                  <RiskFooterStrip>
                     <RiskFigure caution>
                       Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
                     </RiskFigure>
-                  ) : summary ? (
-                    <RiskFigure>
-                      {summary.challengeCount === 0
-                        ? "never challenged"
-                        : `challenged ${summary.challengeCount}×, none running`}
-                    </RiskFigure>
-                  ) : null}
-                  {chain.cooldownActive && chain.cooldownUntil != null ? (
-                    <RiskFigure>minting cooldown until {formatDayMonth(chain.cooldownUntil)}</RiskFigure>
-                  ) : !chain.mintingDisabledForGood ? (
-                    <RiskFigure>no minting cooldown</RiskFigure>
-                  ) : null}
-                </RiskFooterStrip>
-              ) : chain && view.status !== "closed" && (chain.challengedAmount ?? 0) > 0 ? (
-                <RiskFooterStrip>
-                  <RiskFigure caution>
-                    Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
-                  </RiskFigure>
-                </RiskFooterStrip>
-              ) : undefined
-            }
-            // Everything describing the CURRENT on-chain position lives on
-            // the card: the Explanation heading-button holds the narration —
-            // mounted when the live read landed.
-            explanation={
-              chain ? (
-                <FrankencoinPositionExplanation
-                  chain={chain}
-                  openedAt={summary?.openedAt}
-                  challengeCount={summary?.challengeCount}
-                  denied={summary?.status === "denied"}
-                  txCount={summary?.txCount}
-                  eventTally={eventTally}
+                  </RiskFooterStrip>
+                ) : undefined
+              }
+              // Everything describing the CURRENT on-chain position lives on
+              // the card: the Explanation heading-button holds the narration —
+              // mounted when the live read landed.
+              explanation={
+                chain ? (
+                  <FrankencoinPositionExplanation
+                    chain={chain}
+                    openedAt={summary?.openedAt}
+                    challengeCount={summary?.challengeCount}
+                    denied={summary?.status === "denied"}
+                    txCount={summary?.txCount}
+                    eventTally={eventTally}
+                    cloneParent={cloneParent}
+                    lastMint={lastMint}
+                  />
+                ) : undefined
+              }
+            />
+
+            {(() => {
+              const towerData = computeFrankencoinEconomics(view, lifetimeEvents, precomputedLifetime);
+              return (
+                <ChainTruthTower
+                  data={towerData}
+                  explanation={frankencoinEconomicsExplanation(towerData)}
+                  learnMore={frankencoinEconomicsContent()}
                 />
-              ) : undefined
-            }
-          />
+              );
+            })()}
 
-          {(() => {
-            const towerData = computeFrankencoinEconomics(view, lifetimeEvents, precomputedLifetime);
-            return (
-              <ChainTruthTower
-                data={towerData}
-                explanation={frankencoinEconomicsExplanation(towerData)}
-                learnMore={frankencoinEconomicsContent()}
-              />
-            );
-          })()}
-
-          {/* The challenge forensics card — grouped by (hub, challenge
+            {/* The challenge forensics card — grouped by (hub, challenge
               number), slices within; renders only when history carries
               challenges. On a windowed page it reads the loaded rows alone —
               a challenge older than the window is summarised in the counts
               above the timeline, not re-narrated here. No observed position
               is deep enough to reach that case. */}
-          <FrankencoinChallengeCard
-            events={frankEvents}
-            positionOpen={chain ? !chain.isClosed : summary ? summary.status === "open" : null}
-          />
-
-          {indexPending && frankEvents.length === 0 ? (
-            <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
-              Event history pending — the indexed backend for this explorer is still being filled. Everything above is
-              read live from the position contract at the latest block.
-            </div>
-          ) : (
-            <ChainTruthTimeline
-              csvExportCeiling={DRAINED_ROW_CEILING}
-              // Matches `FrankencoinEventCard`'s own `persistKey={`frankencoin:${event.id}`}` —
-              // lets pinned mode (the per-event share route) force a landed
-              // card's detail panel open on its first mount.
-              persistKeyPrefix="frankencoin"
-              closed={view.status !== "open"}
-              tl={tl}
-              runs={FRANKENCOIN_AUCTION_RUNS}
-              toolbarLeading={
-                <TimelineActivityHeader
-                  events={frankEvents}
-                  closed={view.status !== "open"}
-                  // When the position actually opened, not when the window
-                  // does.
-                  firstAt={opening?.firstTimestamp}
-                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                />
-              }
-              renderCard={(event, meta) =>
-                isFrankencoinEvent(event) ? (
-                  <FrankencoinEventCard
-                    event={event}
-                    eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
-                    isLast={meta.isLast}
-                  />
-                ) : null
-              }
+            <FrankencoinChallengeCard
+              events={frankEvents}
+              positionOpen={chain ? !chain.isClosed : summary ? summary.status === "open" : null}
             />
-          )}
+
+            {indexPending && frankEvents.length === 0 ? (
+              <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
+                Event history pending — the indexed backend for this explorer is still being filled. Everything above is
+                read live from the position contract at the latest block.
+              </div>
+            ) : (
+              <ChainTruthTimeline
+                csvExportCeiling={DRAINED_ROW_CEILING}
+                // Matches `FrankencoinEventCard`'s own `persistKey={`frankencoin:${event.id}`}` —
+                // lets pinned mode (the per-event share route) force a landed
+                // card's detail panel open on its first mount.
+                persistKeyPrefix="frankencoin"
+                closed={view.status !== "open"}
+                tl={tl}
+                runs={FRANKENCOIN_AUCTION_RUNS}
+                toolbarLeading={
+                  <TimelineActivityHeader
+                    events={frankEvents}
+                    closed={view.status !== "open"}
+                    // When the position actually opened, not when the window
+                    // does.
+                    firstAt={opening?.firstTimestamp}
+                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                  />
+                }
+                renderCard={(event, meta) =>
+                  isFrankencoinEvent(event) ? (
+                    <FrankencoinEventCard
+                      event={event}
+                      eventNumber={meta.eventNumber}
+                      isFirst={meta.isFirst}
+                      isLast={meta.isLast}
+                    />
+                  ) : null
+                }
+              />
+            )}
+          </FrankencoinPageFactsProvider>
           <ProvInspectorLayer />
         </>
       )}

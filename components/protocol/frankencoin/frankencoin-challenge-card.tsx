@@ -22,7 +22,8 @@ import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { Prov } from "@/components/shared/provenance";
 import { EventTime } from "@/components/shared/event-time";
 import { challengeFigureProv, type FrankencoinCoords } from "@/lib/frankencoin/event-provenance";
-import { formatNumber } from "@/lib/utils/format";
+import { fmtFcColl, fmtFcPct, fmtZchf, dateTimeText } from "@/lib/frankencoin/figures";
+import { useFrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
 import { shortAddress } from "@/lib/frankencoin/asset-catalog";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
@@ -82,7 +83,112 @@ export function groupChallenges(events: BaseActivityEvent[]): ChallengeGroup[] {
   );
 }
 
-const fmt = (s?: string): string => (s == null ? "—" : formatNumber(Math.abs(Number(s))));
+const coll = (s?: string): string => (s == null ? "—" : fmtFcColl(Number(s)));
+
+/** A phase-1 purchase: who bought, for how much, and the pause it set. */
+function AvertedLine({ e, symbol }: { e: FrankEvent; symbol: string }) {
+  const ctx = e.context.data;
+  const { read } = useFrankencoinEventRead(ctx, e.txHash, e.id);
+  const a = read?.challenge?.kind === "averted" ? read.challenge : null;
+  const paid = a ? Number(a.paid) : 0;
+  const sizeFig = (
+    <Prov info={challengeFigureProv("size", "averted", symbol, coordsOf(e), ctx.raw?.size)}>
+      <strong className="font-semibold text-foreground">
+        {coll(ctx.challengeSize)} {symbol}
+      </strong>
+    </Prov>
+  );
+  if (!a)
+    return (
+      <div className="text-sm text-rb-500 leading-relaxed">
+        Averted: someone bought the challenger&rsquo;s {sizeFig} at the declared price, and the position&rsquo;s
+        collateral and debt did not move.
+      </div>
+    );
+  const withdrawn = a.buyer != null && a.buyer === a.challenger;
+  return (
+    <div className="text-sm text-rb-500 leading-relaxed">
+      {withdrawn ? (
+        <>Averted: the challenger withdrew its challenge and took back its {sizeFig}.</>
+      ) : (
+        <>
+          Averted: {a.buyer ? <AddrLink address={a.buyer} /> : "a buyer"}
+          {a.buyer && a.owner && a.buyer === a.owner ? " (the owner)" : " (not the owner)"} paid{" "}
+          <strong className="font-semibold text-foreground">{fmtZchf(paid)} ZCHF</strong> for the challenger&rsquo;s{" "}
+          {sizeFig}, the declared price. The position&rsquo;s collateral and debt did not move
+          {a.cooldownUntil != null && a.cooldownUntil > e.timestamp ? (
+            <>; its minting paused until {dateTimeText(a.cooldownUntil)}</>
+          ) : null}
+          .
+        </>
+      )}
+    </div>
+  );
+}
+
+/** A phase-2 slice: who bought what for how much, and where the ZCHF went. */
+function SaleLine({ e, symbol }: { e: FrankEvent; symbol: string }) {
+  const ctx = e.context.data;
+  const c = coordsOf(e);
+  const { read } = useFrankencoinEventRead(ctx, e.txHash, e.id);
+  const s = read?.challenge?.kind === "succeeded" ? read.challenge : null;
+  const bid = Number(ctx.bid ?? 0);
+  const reward = s ? Number(s.reward) : null;
+  const shortfall = s ? Number(s.shortfall) : 0;
+  const ownerGot = s ? Number(s.ownerReceived) : 0;
+  const bidder = s?.bidder ?? null;
+  return (
+    <div className="text-sm text-rb-500 leading-relaxed">
+      {bidder ? (
+        <>
+          <AddrLink address={bidder} /> paid
+        </>
+      ) : ctx.txFrom ? (
+        <>
+          A bid sent by <AddrLink address={ctx.txFrom} /> paid
+        </>
+      ) : (
+        <>A bidder paid</>
+      )}{" "}
+      <Prov info={challengeFigureProv("bid", "succeeded", symbol, c, ctx.raw?.bid)}>
+        <strong className="font-semibold text-foreground">{fmtZchf(bid)} ZCHF</strong>
+      </Prov>{" "}
+      for{" "}
+      <Prov info={challengeFigureProv("acquiredCollateral", "succeeded", symbol, c, ctx.raw?.acquiredCollateral)}>
+        <strong className="font-semibold text-foreground">
+          {coll(ctx.acquiredCollateral)} {symbol}
+        </strong>
+      </Prov>{" "}
+      of the position&rsquo;s collateral.
+      {s && reward != null ? (
+        <>
+          {" "}
+          The challenger got {fmtZchf(reward)} ZCHF ({bid > 0 ? fmtFcPct(reward / bid) : "—"}) and its collateral back;{" "}
+          {shortfall > 0 ? (
+            <>
+              the reserve covered a {fmtZchf(shortfall)} ZCHF shortfall on the {fmtZchf(Number(s.debtCleared))} ZCHF
+              debt cleared
+            </>
+          ) : Number(s.debtCleared) > 0 ? (
+            <>the rest cleared {fmtZchf(Number(s.debtCleared))} ZCHF of debt</>
+          ) : (
+            <>the position had no debt</>
+          )}
+          ; the owner received {fmtZchf(ownerGot)} ZCHF.
+        </>
+      ) : null}{" "}
+      <a
+        href={explorerUrl(MAINNET_CHAIN_ID, "tx-logs", e.txHash)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-500 hover:underline"
+        onClick={(ev) => ev.stopPropagation()}
+      >
+        tx ↗
+      </a>
+    </div>
+  );
+}
 
 function AddrLink({ address }: { address: string }) {
   return (
@@ -137,81 +243,32 @@ function Group({ g, positionOpen }: { g: ChallengeGroup; positionOpen: boolean |
           {g.challenger ? <AddrLink address={g.challenger} /> : "A challenger"} posted{" "}
           <Prov info={challengeFigureProv("size", "started", g.collateralSymbol, coordsOf(g.started), sctx.raw?.size)}>
             <strong className="font-semibold text-foreground">
-              {fmt(sctx.challengeSize)} {g.collateralSymbol}
+              {coll(sctx.challengeSize)} {g.collateralSymbol}
             </strong>
           </Prov>{" "}
-          of their own {g.collateralSymbol} — a bet that the owner-declared liquidation price was too high.
+          of its own, a bet that the owner-declared liquidation price was too high.
         </div>
       )}
 
-      {g.averted.map((e) => {
-        const ctx = e.context.data;
-        return (
-          <div key={e.id} className="text-sm text-rb-500 leading-relaxed">
-            Averted:{" "}
-            <Prov info={challengeFigureProv("size", "averted", g.collateralSymbol, coordsOf(e), ctx.raw?.size)}>
-              <strong className="font-semibold text-foreground">
-                {fmt(ctx.challengeSize)} {g.collateralSymbol}
-              </strong>
-            </Prov>{" "}
-            of the challenger&rsquo;s tokens were bought at the declared price — the market called the price fair, and
-            the position survived this phase untouched.
-          </div>
-        );
-      })}
+      {g.averted.map((e) => (
+        <AvertedLine key={e.id} e={e} symbol={g.collateralSymbol} />
+      ))}
+
+      {g.started && g.succeeded.length > 0 && g.averted.length === 0 && (
+        <div className="text-sm text-rb-500 leading-relaxed">
+          Nobody bought the challenger&rsquo;s collateral in phase 1, so phase 2 sold the position&rsquo;s.
+        </div>
+      )}
 
       {g.succeeded.length > 0 && (
         <div className="space-y-1.5">
           <div className="text-xs font-semibold text-rb-500">
-            Phase-2 auction — {g.succeeded.length} slice{g.succeeded.length === 1 ? "" : "s"}
+            Phase 2, the challenge sale: {g.succeeded.length} slice{g.succeeded.length === 1 ? "" : "s"}
             {g.succeeded.length > 1 ? " (one settlement per bid, same challenge number)" : ""}
           </div>
-          {g.succeeded.map((e) => {
-            const ctx = e.context.data;
-            const c = coordsOf(e);
-            return (
-              <div key={e.id} className="text-sm text-rb-500 leading-relaxed">
-                {/* The event names no bidder — the tx sender (the nightly
-                    tx-from filler) is the only identity there is; until it
-                    runs, the identity is stated as pending, never guessed. */}
-                {ctx.txFrom ? (
-                  <>
-                    A bid sent by <AddrLink address={ctx.txFrom} /> paid
-                  </>
-                ) : (
-                  <>A bidder (sender pending capture) paid</>
-                )}{" "}
-                <Prov info={challengeFigureProv("bid", "succeeded", g.collateralSymbol, c, ctx.raw?.bid)}>
-                  <strong className="font-semibold text-foreground">{fmt(ctx.bid)} ZCHF</strong>
-                </Prov>{" "}
-                and took{" "}
-                <Prov
-                  info={challengeFigureProv(
-                    "acquiredCollateral",
-                    "succeeded",
-                    g.collateralSymbol,
-                    c,
-                    ctx.raw?.acquiredCollateral,
-                  )}
-                >
-                  <strong className="font-semibold text-foreground">
-                    {fmt(ctx.acquiredCollateral)} {g.collateralSymbol}
-                  </strong>
-                </Prov>{" "}
-                of the position&rsquo;s collateral; the ZCHF repaid the position&rsquo;s debt and the challenger earned
-                the protocol&rsquo;s reward.{" "}
-                <a
-                  href={explorerUrl(MAINNET_CHAIN_ID, "tx-logs", e.txHash)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-500 hover:underline"
-                  onClick={(ev) => ev.stopPropagation()}
-                >
-                  tx ↗
-                </a>
-              </div>
-            );
-          })}
+          {g.succeeded.map((e) => (
+            <SaleLine key={e.id} e={e} symbol={g.collateralSymbol} />
+          ))}
         </div>
       )}
 
@@ -220,8 +277,8 @@ function Group({ g, positionOpen }: { g: ChallengeGroup; positionOpen: boolean |
       {g.succeeded.length > 0 && positionOpen != null && (
         <div className="text-xs text-rb-500">
           {positionOpen
-            ? "The position survived this challenge — the auction sold part of its collateral, and it remains open."
-            : "The position did not continue past its challenges — it is closed at head."}
+            ? "The position survived this challenge: the sale took part of its collateral, and it remains open."
+            : "The position is closed."}
         </div>
       )}
     </div>

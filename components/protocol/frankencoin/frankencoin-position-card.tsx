@@ -48,6 +48,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import type { FrankencoinPositionSummary, FrankencoinPositionStatus } from "@/lib/sources/api/frankencoin-positions";
 import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-position";
 import { AmountText } from "@/components/shared/amount-text";
+import { formatDate } from "@/lib/date";
 
 export interface FrankencoinPositionView {
   /** Lowercased Position contract address — the identity. */
@@ -112,7 +113,7 @@ const liqPriceProv = (v: FrankencoinPositionView): Provenance =>
 
 /** The position-grain identity: the contract address + which hub + lineage,
  *  each explained on hover or tap. */
-function PositionIdentity({ v }: { v: FrankencoinPositionView }) {
+function PositionIdentity({ v, cloneParent }: { v: FrankencoinPositionView; cloneParent?: string | null }) {
   const hubTip =
     v.hub === "v1"
       ? "Minting Hub V1 (2023), the first of Frankencoin's two hubs. It opened this position and runs its challenges."
@@ -135,7 +136,7 @@ function PositionIdentity({ v }: { v: FrankencoinPositionView }) {
         <>
           <span className="mx-1 text-rb-400">·</span>
           <RevealTip
-            tip={`A clone${v.original ? ` of ${shortAddress(v.original)}` : ""}: a position of its own on that original's terms, sharing its minting limit.`}
+            tip={cloneTip(v.original ?? null, cloneParent ?? null)}
             label="Clone"
             focusable
             className="focus-ring rounded-sm"
@@ -146,6 +147,15 @@ function PositionIdentity({ v }: { v: FrankencoinPositionView }) {
       )}
     </span>
   );
+}
+
+/** The clone chip's tip: the position it was cloned from and, when that is
+ *  not the family's original, the original too. */
+function cloneTip(root: string | null, parent: string | null): string {
+  if (parent && root && parent !== root)
+    return `A clone: cloned from ${shortAddress(parent)}, a clone of the family's original ${shortAddress(root)}. It is a position of its own, started at ${shortAddress(parent)}'s declared price on the original's other terms, and shares the family's minting limit.`;
+  const of = parent ?? root;
+  return `A clone${of ? ` of ${shortAddress(of)}` : ""}: a position of its own on that original's terms, sharing its minting limit.`;
 }
 
 /** The orthogonal challenge marker — caution triangle + count, named as
@@ -177,12 +187,12 @@ function MetaCluster({ v }: { v: FrankencoinPositionView }) {
  *  wallet pill (facehash + copy + bookmark — the bookmark keys off the owner
  *  wallet, so the address is its home) when the owner is known, then the
  *  position's own identity (contract address · hub · clone). */
-function IdentityLead({ v }: { v: FrankencoinPositionView }) {
-  if (!v.owner) return <PositionIdentity v={v} />;
+function IdentityLead({ v, cloneParent }: { v: FrankencoinPositionView; cloneParent?: string | null }) {
+  if (!v.owner) return <PositionIdentity v={v} cloneParent={cloneParent} />;
   return (
     <span className="flex items-center gap-2">
       <WalletPill wallet={v.owner} ensName={null} filterProtocol="frankencoin" bookmarkProtocol="frankencoin" />
-      <PositionIdentity v={v} />
+      <PositionIdentity v={v} cloneParent={cloneParent} />
     </span>
   );
 }
@@ -197,6 +207,12 @@ function expiryText(expiration: number | null): string | null {
   return `expires in ${Math.round(days)}d`;
 }
 
+/** A closed card's expiry: the date its terms ran to. */
+function closedExpiryText(expiration: number | null): string | null {
+  if (expiration == null || expiration <= 0) return null;
+  return `${expiration * 1000 <= Date.now() ? "expiry was" : "expiry"} ${formatDate(expiration)}`;
+}
+
 export function FrankencoinPositionCard({
   v,
   receipts = false,
@@ -204,8 +220,12 @@ export function FrankencoinPositionCard({
   explanation,
   viewHref,
   surface = "detail",
+  cloneParent,
 }: {
   v: FrankencoinPositionView;
+  /** The position a clone was cloned from (PositionOpened's parent), where the
+   *  timeline has it; `v.original` is the family's original. */
+  cloneParent?: string | null;
   receipts?: boolean;
   /** Context content riding the shell's heading-button row. */
   rowExtra?: React.ReactNode;
@@ -239,7 +259,7 @@ export function FrankencoinPositionCard({
       >
         <ClosedPositionStats
           outcome={v.status}
-          leadingIdentity={<IdentityLead v={v} />}
+          leadingIdentity={<IdentityLead v={v} cloneParent={cloneParent} />}
           identity={<MetaCluster v={v} />}
           closedAt={v.lastActivityAt ?? undefined}
           collateral={
@@ -265,7 +285,14 @@ export function FrankencoinPositionCard({
             )
           }
           debtLabel={CARD_VOCAB.peakDebt}
-          debtFootnote={<StatFootnote>minted ZCHF</StatFootnote>}
+          debtFootnote={
+            <>
+              <StatFootnote>minted ZCHF</StatFootnote>
+              {closedExpiryText(v.expiration) && (
+                <div className="text-xs mt-0.5 text-rb-500">{closedExpiryText(v.expiration)}</div>
+              )}
+            </>
+          }
         />
       </PositionCardShell>
     );
@@ -298,7 +325,7 @@ export function FrankencoinPositionCard({
             <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${st.cls}`}>{st.label}</span>
           )
         }
-        leadingIdentity={<IdentityLead v={v} />}
+        leadingIdentity={<IdentityLead v={v} cloneParent={cloneParent} />}
         identity={<MetaCluster v={v} />}
         columns={[
           {
@@ -361,7 +388,7 @@ export function FrankencoinPositionCard({
                     <Prov info={liveInterestProv(v.hub, v.position)}>
                       <span>{ppmToPct(v.annualInterestPPM).toFixed(2)}%</span>
                     </Prov>{" "}
-                    annual interest, charged at minting
+                    a year on today&rsquo;s terms, charged at each mint
                   </div>
                 )}
                 {expiry && <div className="text-xs mt-0.5 text-rb-500">{expiry}</div>}
