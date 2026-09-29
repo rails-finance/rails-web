@@ -33,11 +33,8 @@ export function ProtocolInfoPage({ session, children }: { session: SessionProtoc
           audit reader wants that register); the intro above carries any
           reader-facing consequence in plain words instead. */}
       <p className="mt-4 text-sm text-rb-500">
-        <Link
-          href={`/coverage/${CHAINS[chainId].slug}`}
-          className="whitespace-nowrap font-medium text-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-blue-500"
-        >
-          What Rails covers
+        <Link href={`/coverage/${CHAINS[chainId].slug}`} className="text-blue-500 hover:underline">
+          See what Rails covers on each {CHAINS[chainId].name} explorer
         </Link>
       </p>
     </div>

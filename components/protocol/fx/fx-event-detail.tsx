@@ -79,7 +79,17 @@ const impliedDebtBeforeProv = (coords: FxCoords): Provenance => ({
   formula: "implied debt after − debt change",
 });
 
+/** A liquidation's figures run to dust (a wei of collateral, 2,477 wei of
+ *  fxUSD): their accessible names use the site's number format. */
+const readable = (st: ChainTruthStat): ChainTruthStat => ({ ...st, readableLabel: true });
+
 /** A before → after pair from the row read, as a grid stat. */
+/** Collateral worth less than this at the row's price is dust: what a
+ *  liquidation leaves behind. A debt ratio over it (131.7% on 0.006 stETH
+ *  against 21.3 fxUSD) says nothing about the position, so the tile says
+ *  "dust left" in its place. */
+export const FX_DUST_USD = 100;
+
 function readStat(
   label: string,
   side: "coll" | "debt" | "ratio",
@@ -87,19 +97,24 @@ function readStat(
   before: FxSide | null,
   after: FxSide | null,
   coords: FxCoords,
+  price?: number | null,
 ): ChainTruthStat | null {
-  // A ratio over dust collateral (a wei left after a liquidation) is no
-  // figure to show.
+  const isDust = (s: FxSide | null) =>
+    s?.colls != null &&
+    s.colls > 0 &&
+    (s.colls < 1e-9 || (price != null && price > 0 && s.colls * price < FX_DUST_USD));
   const pick = (s: FxSide | null) =>
-    s == null
-      ? null
-      : side === "coll"
-        ? s.colls
-        : side === "debt"
-          ? s.debts
-          : s.colls != null && s.colls > 0 && s.colls < 1e-9
-            ? null
-            : s.ratio;
+    s == null ? null : side === "coll" ? s.colls : side === "debt" ? s.debts : isDust(s) ? null : s.ratio;
+  if (side === "ratio" && isDust(after)) {
+    return {
+      label,
+      value: "dust left",
+      display: "dust left",
+      symbol: "",
+      prov: rowStateProv(side, "after", symbol, coords),
+      sub: <>collateral under ${FX_DUST_USD} at the row&rsquo;s price</>,
+    };
+  }
   const a = pick(after);
   const b = pick(before);
   if (a == null) return null;
@@ -123,6 +138,7 @@ function readStat(
   return {
     label,
     value: String(a),
+    ...(a === 0 ? { display: "0" } : {}),
     symbol,
     prov: afterProv,
     transition:
@@ -251,13 +267,14 @@ function FxEventDetailBody({
       });
     }
     const tag = blockPeers && blockPeers > 1 ? ` · this block (${blockPeers} rebalances)` : "";
+    const px = poolLiq ? (before?.minPrice ?? null) : null;
     for (const s of [
       readStat(`This position · collateral${tag}`, "coll", normalizedSymbol, before, after, coords),
       readStat(`This position · debt${tag}`, "debt", "fxUSD", before, after, coords),
-      readStat(`This position · debt ratio${tag}`, "ratio", normalizedSymbol, before, after, coords),
+      readStat(`This position · debt ratio${tag}`, "ratio", normalizedSymbol, before, after, coords, px),
     ])
       if (s) tickStats.push(s);
-    return <ChainTruthDetail stats={tickStats} />;
+    return <ChainTruthDetail stats={poolLiq ? tickStats.map(readable) : tickStats} />;
   }
 
   if (ctx.eventType === "liquidation") {
@@ -397,9 +414,18 @@ function FxEventDetailBody({
           }
         : {}),
     });
-    const ratio = readStat("Debt ratio", "ratio", normalizedSymbol, before, after, coords);
+    const ratio = readStat(
+      "Debt ratio",
+      "ratio",
+      normalizedSymbol,
+      before,
+      after,
+      coords,
+      // Dust is what a liquidation leaves: only its rows test for it.
+      ctx.eventType === "liquidation" && ctx.oraclePrice != null ? Number(ctx.oraclePrice) : null,
+    );
     if (ratio) stats.push(ratio);
-    return <ChainTruthDetail stats={withPrice(stats)} />;
+    return <ChainTruthDetail stats={withPrice(ctx.eventType === "liquidation" ? stats.map(readable) : stats)} />;
   }
 
   // The replay lane — labeled event-implied so it is never read as the

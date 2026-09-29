@@ -23,6 +23,7 @@ import {
 } from "@/lib/fx/event-provenance";
 import { fxBlockChange, useFxSocializedReads } from "@/lib/fx/socialized-reads";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
+import { fxLiquidationMoved } from "@/lib/fx/row-figures";
 
 export interface FxEventHeaderProps {
   actionLabel: string;
@@ -77,13 +78,20 @@ export function FxEventHeader({
   const perAxis = isOpen || isAdjust;
 
   const poolLiq = ctx.eventType === "liquidation" && ctx.poolWide === true;
+  let note: string | undefined;
+  if (ctx.eventType === "liquidation" && !poolLiq && !fxLiquidationMoved(ctx)) note = "nothing left to take";
   if (ctx.eventType === "tickRebalance" || poolLiq) {
     // This position's change first: getPosition at block − 1 and at the block,
-    // stated on the block's first row (the read covers every row in it).
-    const change =
-      blockNumber != null && eventId != null && socialized?.leads.has(eventId)
-        ? fxBlockChange(socialized.reads, blockNumber)
-        : null;
+    // stated on the block's top row (the read covers every row in it).
+    const lead = blockNumber != null && eventId != null && socialized?.leads.has(eventId) === true;
+    const change = lead ? fxBlockChange(socialized?.reads, blockNumber as number) : null;
+    const peers = blockNumber != null ? (socialized?.peers?.get(blockNumber) ?? 1) : 1;
+    const noun = ctx.redemption ? "redemptions" : poolLiq ? "liquidations" : "rebalances";
+    if (peers > 1) note = lead ? `${peers === 2 ? "both" : `all ${peers}`} ${noun} in this block` : "included above";
+    if (poolLiq && change) {
+      const repaid = Number(ctx.tickRebFxusdDebts ?? "0") || 0;
+      if (-change.debt - repaid > 0.001) note = "debt written off";
+    }
     const normSym = meta?.normalizedSymbol ?? tokenSym;
     if (change) {
       if (Math.abs(change.coll) > 1e-12)
@@ -93,6 +101,7 @@ export function FxEventHeader({
           address: normSym === tokenSym ? tokenAddr : undefined,
           prov: rowChangeProv("coll", normSym, coords),
           noSpineCounterpart: true,
+          readableLabel: true,
         });
       if (Math.abs(change.debt) > 1e-12)
         deltas.push({
@@ -101,23 +110,14 @@ export function FxEventHeader({
           address: fxusdAddr,
           prov: rowChangeProv("debt", normSym, coords),
           noSpineCounterpart: true,
+          readableLabel: true,
         });
     }
   }
   if (ctx.eventType === "tickRebalance" || poolLiq) {
-    // TICK-level amounts (the whole tick's clear), NOT this position's slice —
-    // the logs never state the slice (fx.ts tick-lineage header), and the
-    // settled reconciliation on the card carries the exact per-position drift.
-    // Every other row's header delta IS the position's own figure, so a bare
-    // "−140.58" here would read as one. The deltas therefore take the
-    // redemption grammar (Liquity V1/fork "Cleared" / "Reduced"): a caution
-    // label per axis carries the meaning and the value renders as a bare
-    // magnitude. Each axis gets its own verb, the tick named once, so the
-    // pair reads as one clause — "Tick cleared 140.58 ◊ · Repaid 249K ♭"
-    // (the tick's collateral was sold, its fxUSD debt repaid with the
-    // proceeds), never "Tick cleared … Tick cleared …" and never "−140.58 ◊".
-    // The detail grid repeats the same figures under their "· whole tick"
-    // captions, beside this position's own slice when its stretch is read.
+    // TICK-level amounts (the whole tick's clear), NOT this position's slice:
+    // drawn muted with the scope word ("Tick cleared 140.58 ◊ · repaid
+    // 249K ♭"), so the position's own change beside them reads first.
     const scope = ctx.poolWide ? "Pool" : "Tick";
     const colls = Number(ctx.tickRebColls ?? "0") || 0;
     if (colls !== 0)
@@ -127,7 +127,8 @@ export function FxEventHeader({
         address: tokenAddr,
         prov: tickRebAmountProv("colls", tokenSym, coords, undefined, ctx.poolWide, poolLiq, ctx.redemption),
         label: poolLiq ? "Pool liquidated" : ctx.redemption ? "Pool redeemed" : `${scope} cleared`,
-        tone: "caution",
+        muted: true,
+        readableLabel: true,
       });
     const debt = Number(ctx.tickRebFxusdDebts ?? "0") || 0;
     if (debt !== 0)
@@ -138,8 +139,9 @@ export function FxEventHeader({
         prov: tickRebAmountProv("fxusd", "fxUSD", coords, undefined, ctx.poolWide, poolLiq, ctx.redemption),
         // The collateral delta already scopes the clause; a second scope word
         // would only repeat it.
-        label: colls !== 0 ? "Repaid" : `${scope} repaid`,
-        tone: "caution",
+        label: colls !== 0 ? "repaid" : `${scope} repaid`,
+        muted: true,
+        readableLabel: true,
       });
   } else if (ctx.eventType === "liquidation") {
     // Collateral sent to the liquidator — token units.
@@ -150,6 +152,7 @@ export function FxEventHeader({
         symbol: tokenSym,
         address: tokenAddr,
         prov: liqCollsProv(tokenSym, coords),
+        readableLabel: true,
       });
     // The combined debt cleared (fxUSD-side + stable-side), signed negative —
     // the detail grid splits the two lanes.
@@ -160,6 +163,7 @@ export function FxEventHeader({
         symbol: "fxUSD",
         address: fxusdAddr,
         prov: liqDebtTotalProv(coords),
+        readableLabel: true,
       });
   } else {
     const coll = Number(ctx.collDelta ?? "0") || 0;
@@ -198,6 +202,7 @@ export function FxEventHeader({
         // warning spine shows no flanking numbers).
         labelOnSpine: ctx.eventType === "tickRebalance" || poolLiq,
         deltas,
+        note,
         party: transferTo
           ? {
               prefix: "to",

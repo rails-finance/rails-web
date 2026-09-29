@@ -47,9 +47,15 @@ import {
   otherDebtMovesProv,
   socializedCollTakenProv,
   fundingTakenProv,
+  positionTickProv,
+  leftUnpaidProv,
+  badDebtAddedProv,
 } from "@/lib/fx/event-provenance";
 import { useFxPoolTerms, useFxPricesAt, type FxPoolTerms } from "@/lib/fx/use-event-state";
 import { fxBlocksChange } from "@/lib/fx/socialized-reads";
+import type { FxNoTxParts } from "@/lib/fx/no-tx-parts";
+import { FX_LIQUIDATION_RULE } from "@/lib/fx/row-figures";
+import Link from "next/link";
 import type { FxStateAt } from "@/lib/sources/chain/fx-event-state";
 import { formatDate } from "@/lib/date";
 import { FX_POOLS } from "@/lib/fx/asset-catalog";
@@ -92,6 +98,9 @@ export interface FxRebalanceRows {
    *  there mixes the two, so the split is not stated. */
   ownEventBlocks: number[];
   reads?: Record<string, FxStateAt> | null;
+  /** What moved the debt without a transaction, part by part
+   *  (lib/fx/no-tx-parts.ts). */
+  parts?: FxNoTxParts | null;
 }
 
 /** What the socialized rows took from the position: Σ over their blocks of
@@ -153,6 +162,71 @@ function SocializedLine({ v, rows }: { v: FxPositionView; rows?: FxRebalanceRows
     );
   }
   const n = rows ? new Set(rows.blocks).size : 0;
+  const parts = rows?.parts;
+  if (parts && parts.badDebt > -0.0005) {
+    // One name for the bucket everywhere ("moved by the pool"), and
+    // each part that is there named with its figure.
+    const items: React.ReactNode[] = [];
+    const span = (p: { firstTs: number; lastTs: number }) => ` (${dateSpan(p.firstTs, p.lastTs)})`;
+    if (parts.rebalances && parts.rebalances.debt > 0.0005)
+      items.push(
+        <span key="reb">
+          <Prov info={rebalanceClearedProv(parts.rebalances.rows)}>
+            <AmountText value={parts.rebalances.debt} /> fxUSD
+          </Prov>{" "}
+          cleared by rebalances{span(parts.rebalances)}
+        </span>,
+      );
+    if (parts.redemptions && parts.redemptions.debt > 0.0005)
+      items.push(
+        <span key="red">
+          <Prov info={rebalanceClearedProv(parts.redemptions.rows, "redemption")}>
+            <AmountText value={parts.redemptions.debt} /> fxUSD
+          </Prov>{" "}
+          by redemptions{span(parts.redemptions)}
+        </span>,
+      );
+    if (parts.poolLiquidations && parts.poolLiquidations.debt > 0.0005)
+      items.push(
+        <span key="pliq">
+          <Prov info={rebalanceClearedProv(parts.poolLiquidations.rows, "pool-wide liquidation")}>
+            <AmountText value={parts.poolLiquidations.debt} /> fxUSD
+          </Prov>{" "}
+          by a pool-wide liquidation that repaid <AmountText value={parts.poolLiquidations.poolRepaid ?? 0} /> fxUSD
+          across the pool and wrote off the rest{span(parts.poolLiquidations)}
+        </span>,
+      );
+    if (parts.leftUnpaid > 0.0005)
+      items.push(
+        <span key="unpaid">
+          <Prov info={leftUnpaidProv()}>
+            <AmountText value={parts.leftUnpaid} /> fxUSD
+          </Prov>{" "}
+          written off at this position&apos;s liquidation
+        </span>,
+      );
+    if (parts.badDebt > 0.0005)
+      items.push(
+        <span key="bad">
+          <Prov info={badDebtAddedProv()}>
+            +<AmountText value={parts.badDebt} /> fxUSD
+          </Prov>{" "}
+          of other positions&apos; bad debt
+        </span>,
+      );
+    return (
+      <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+        its transactions add up to <Prov info={impliedDebtProv()}>{impliedHuman} fxUSD</Prov>
+        {" · "}moved by the pool:{" "}
+        {items.map((it, i) => (
+          <span key={i}>
+            {i > 0 ? (i === items.length - 1 ? " and " : ", ") : ""}
+            {it}
+          </span>
+        ))}
+      </div>
+    );
+  }
   if (cleared != null && rows && cleared > 0) {
     // settled = implied − cleared + other  →  other = cleared − diff
     const other = cleared - diff;
@@ -206,7 +280,7 @@ function RatioFootnote({
 }: {
   v: FxPositionView;
   terms: FxPoolTerms | null;
-  px: { anchor: number; min: number; block: number } | null;
+  px: { anchor: number; min: number; block: number; tick?: number | null } | null;
 }) {
   const { colls, debts, debtRatio } = v.settled;
   if (colls == null || debts == null || debtRatio == null || colls <= 0 || debtRatio <= 0) return null;
@@ -230,6 +304,21 @@ function RatioFootnote({
           </>
         ) : null}
       </StatFootnote>
+      {px?.tick != null ? (
+        <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+          in tick{" "}
+          <Prov info={positionTickProv(sym, px.block)} value={String(px.tick)}>
+            #{px.tick}
+          </Prov>{" "}
+          ·{" "}
+          <Link
+            href={`/ethereum/fx/pools?pool=${v.pool}&tick=${px.tick}#tick-${v.pool}-${px.tick}`}
+            className="text-blue-500 hover:underline"
+          >
+            find it on the pools page
+          </Link>
+        </div>
+      ) : null}
       {px && minRatio != null ? (
         <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
           <Prov info={minRatioProv(px.block)}>{(minRatio * 100).toFixed(1)}%</Prov> at the min price{" "}
@@ -300,7 +389,7 @@ function CollateralDriftLine({ v, drift, rows }: { v: FxPositionView; drift: FxD
     const n = rows.blocks.length;
     return (
       <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-        without the owner&apos;s transaction, {rowsNoun(rows)} took{" "}
+        moved by the pool: {rowsNoun(rows)} took{" "}
         <Prov info={socializedCollTakenProv(v.normalizedSymbol, n)}>
           <AmountText value={Math.abs(taken.coll)} /> {v.normalizedSymbol}
         </Prov>{" "}
@@ -312,7 +401,7 @@ function CollateralDriftLine({ v, drift, rows }: { v: FxPositionView; drift: FxD
     );
   }
   const scope = s.complete
-    ? "without the owner's transaction"
+    ? "without a transaction"
     : `over the latest ${s.intervals} stretch${s.intervals === 1 ? "" : "es"} read so far`;
   const prov = lifetimeCollateralDriftProv(v.normalizedSymbol, s.intervals, s.complete, drift.headBlock);
   if (Math.abs(s.collsDrift) <= DUST) {
@@ -337,12 +426,39 @@ function CollateralDriftLine({ v, drift, rows }: { v: FxPositionView; drift: FxD
  *  anchor price of the settled block (read with the min leg beside it), so
  *  the debt divided by it is the debt ratio; the listing keeps the sweep's
  *  stored min-price reading and names its block. */
-function CollateralUsdFootnote({ v, px }: { v: FxPositionView; px?: { anchor: number; block: number } | null }) {
+/** The listing's one price per pool: the oracle's anchor leg at the block the
+ *  pool's totals were swept at. */
+export interface FxListingPrice {
+  anchor: number;
+  block: number;
+}
+
+function CollateralUsdFootnote({
+  v,
+  px,
+  listing,
+}: {
+  v: FxPositionView;
+  px?: { anchor: number; block: number } | null;
+  listing?: FxListingPrice | null;
+}) {
   if (px && v.settled.colls != null) {
     return (
       <StatFootnote>
         <Prov info={anchorUsdProv(v.normalizedSymbol, px.block)}>{formatUsd(v.settled.colls * px.anchor)}</Prov> at the
         anchor price
+      </StatFootnote>
+    );
+  }
+  if (listing && v.settled.colls != null) {
+    return (
+      <StatFootnote>
+        <Prov info={anchorUsdProv(v.normalizedSymbol, listing.block)}>
+          {formatUsd(v.settled.colls * listing.anchor)}
+        </Prov>{" "}
+        at the anchor price{" "}
+        <Prov info={oracleLegAtProv("anchor", v.normalizedSymbol, listing.block)}>{formatUsd(listing.anchor)}</Prov> ·
+        oracle @ <BlockRef block={listing.block} />
       </StatFootnote>
     );
   }
@@ -371,6 +487,7 @@ export function FxPositionCard({
   drift,
   rebalanceRows,
   bodyExtra,
+  listingPx,
 }: {
   v: FxPositionView;
   receipts?: boolean;
@@ -390,15 +507,22 @@ export function FxPositionCard({
   rebalanceRows?: FxRebalanceRows;
   /** Lines under the card's figures (the loans this NFT has carried). */
   bodyExtra?: React.ReactNode;
+  /** The listing's price for this pool (FxListing). */
+  listingPx?: FxListingPrice | null;
 }) {
   const st = STATUS[v.status] ?? STATUS.unknown;
   const poolMeta = FX_POOLS[v.pool];
   const terms = useFxPoolTerms(receipts ? v.pool : null);
   // The oracle's anchor and min legs at the settled block (detail page only).
-  const pxRead = useFxPricesAt(v.pool, v.positionId, receipts && v.status === "open" ? v.settled.block : null);
+  const pxRead = useFxPricesAt(v.pool, v.positionId, receipts && v.status === "open" ? v.settled.block : null, true);
   const px =
     pxRead?.anchorPrice != null && pxRead.minPrice != null && v.settled.block != null
-      ? { anchor: Number(pxRead.anchorPrice) / 1e18, min: Number(pxRead.minPrice) / 1e18, block: v.settled.block }
+      ? {
+          anchor: Number(pxRead.anchorPrice) / 1e18,
+          min: Number(pxRead.minPrice) / 1e18,
+          block: v.settled.block,
+          tick: pxRead.tick ?? null,
+        }
       : null;
 
   const identityLead = (
@@ -423,6 +547,7 @@ export function FxPositionCard({
       // they have their own badge beside it.
       eventCount={v.activity.eventCount - v.liquidationCount}
       liquidationCount={v.liquidationCount}
+      liquidationRule={receipts ? FX_LIQUIDATION_RULE : undefined}
     />
   );
 
@@ -546,7 +671,7 @@ export function FxPositionCard({
               ),
             footnote: (
               <>
-                <CollateralUsdFootnote v={v} px={px} />
+                <CollateralUsdFootnote v={v} px={px} listing={listingPx} />
                 {drift ? <CollateralDriftLine v={v} drift={drift} rows={rebalanceRows} /> : null}
               </>
             ),

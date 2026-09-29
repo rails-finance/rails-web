@@ -12,9 +12,12 @@
 import { Icon } from "@/components/icons/icon";
 import { RevealTip } from "@/components/shared/reveal-tip";
 
-export function LiquidatedBadge({ count }: { count?: number }) {
+export function LiquidatedBadge({ count, rule }: { count?: number; rule?: string }) {
   const hasCount = typeof count === "number" && count > 0;
-  const label = hasCount ? `Liquidated ${count} time${count === 1 ? "" : "s"}` : "Liquidated at least once";
+  const base = hasCount ? `Liquidated ${count} time${count === 1 ? "" : "s"}` : "Liquidated at least once";
+  // `rule`: what the count counts, where the protocol's logs hold liquidations
+  // that moved nothing (f(x)).
+  const label = rule ? `${base}. ${rule}` : base;
   return (
     // data-prov-exempt: an index tally (activity-meta chrome), not a
     // chain-state figure — some cards (Aave V4, Fluid) mount this badge

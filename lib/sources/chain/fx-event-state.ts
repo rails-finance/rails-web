@@ -11,6 +11,14 @@
 // (PositionLogic.getPositionDebtRatio; BasePool operate / rebalance /
 // liquidate). Two more eth_calls per block.
 //
+// With `tick` (one block only), the tick the position sits in at that block:
+// positionData(id) names the tree node its shares were stored in at its last
+// own transaction; a rebalance, liquidation or redemption that moved that tick
+// gives the node a parent in the tick the shares went to, so the walk up the
+// parents (tickTreeData(node).metadata: parent in bits 0–47, tick in 48–63)
+// ends at the node that holds them now, and its tick is the position's tick
+// (TickLogic.sol, _getRootNode). One eth_call per node on the path.
+//
 // A single-row read may also ask for what the transaction was charged
 // (`tx`): the pool's fee schedule for the manager's caller at block − 1
 // (PoolConfiguration.getPoolFeeRatio(pool, caller), which falls back to the
@@ -40,6 +48,8 @@ const POOL_ABI = parseAbi([
   "function getRebalanceRatios() view returns (uint256 debtRatio, uint256 bonusRatio)",
   "function getLiquidateRatios() view returns (uint256 debtRatio, uint256 bonusRatio)",
   "function priceOracle() view returns (address)",
+  "function positionData(uint256) view returns (int16 tick, uint48 nodeId, uint96 colls, uint96 debts)",
+  "function tickTreeData(uint256) view returns (bytes32 metadata, bytes32 value)",
 ]);
 const ORACLE_ABI = parseAbi(["function getPrice() view returns (uint256 anchor, uint256 min, uint256 max)"]);
 const WSTETH_ABI = parseAbi(["function stEthPerToken() view returns (uint256)"]);
@@ -70,6 +80,8 @@ export interface FxStateAt {
    *  unit, 1e18. */
   anchorPrice?: string | null;
   minPrice?: string | null;
+  /** With `tick`: the tick the position's shares sit in at this block. */
+  tick?: number | null;
 }
 
 /** Fee ratios (fractions, 1e9 on chain) the pool applied to the caller. */
@@ -153,6 +165,44 @@ function readPrices(pool: FxPoolKey, block: number): Promise<{ anchor: string; m
 async function readAtWithPrices(pool: FxPoolKey, id: bigint, block: number): Promise<FxStateAt> {
   const [s, px] = await Promise.all([readAt(pool, id, block), readPrices(pool, block).catch(() => null)]);
   return { ...s, anchorPrice: px?.anchor ?? null, minPrice: px?.min ?? null };
+}
+
+/** The position's tick at `block`: its stored tree node, then up the parent
+ *  links to the node that holds its shares now. Null for a position with no
+ *  node (never opened) or a path longer than 64 nodes. */
+function readTick(pool: FxPoolKey, id: bigint, block: number): Promise<number | null> {
+  return remember(extraCache, `tick:${pool}:${id}:${block}`, async () => {
+    const client = alchemyClient();
+    const address = getAddress(FX_POOLS[pool].address);
+    const at = BigInt(block);
+    const pd = (await client.readContract({
+      address,
+      abi: POOL_ABI,
+      functionName: "positionData",
+      args: [id],
+      blockNumber: at,
+    })) as readonly [number, number, bigint, bigint];
+    let node = BigInt(pd[1]);
+    if (node === BigInt(0)) return null;
+    const mask48 = (BigInt(1) << BigInt(48)) - BigInt(1);
+    for (let hop = 0; hop < 64; hop++) {
+      const [meta] = (await client.readContract({
+        address,
+        abi: POOL_ABI,
+        functionName: "tickTreeData",
+        args: [node],
+        blockNumber: at,
+      })) as readonly [`0x${string}`, `0x${string}`];
+      const m = BigInt(meta);
+      const parent = m & mask48;
+      if (parent === BigInt(0)) {
+        const raw = Number((m >> BigInt(48)) & BigInt(0xffff));
+        return raw >= 0x8000 ? raw - 0x10000 : raw;
+      }
+      node = parent;
+    }
+    return null;
+  }) as Promise<number | null>;
 }
 
 function readAt(pool: FxPoolKey, id: bigint, block: number): Promise<FxStateAt> {
@@ -292,6 +342,7 @@ export async function readFxEventState(
   blocks: number[],
   tx?: `0x${string}`,
   prices = false,
+  tick = false,
 ): Promise<FxEventState> {
   const pid = BigInt(id);
   const wanted = [...new Set(blocks.flatMap((b) => [b - 1, b]))].sort((a, b) => a - b);
@@ -302,6 +353,10 @@ export async function readFxEventState(
       wanted.slice(i, i + 4).map((b) => (prices ? readAtWithPrices(pool, pid, b) : readAt(pool, pid, b))),
     );
     for (const g of got) reads[String(g.block)] = g;
+  }
+  if (tick && blocks.length === 1) {
+    const at = reads[String(blocks[0])];
+    if (at) at.tick = await readTick(pool, pid, blocks[0]).catch(() => null);
   }
   const out: FxEventState = { pool, id, reads };
   if (blocks.length === 1) {

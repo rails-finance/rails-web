@@ -739,11 +739,14 @@ export const triggerPriceProv = (line: string, sym: string): Provenance => ({
 
 /** What rebalances cleared from the position: its debt at block − 1 less at the
  *  block, summed over the rebalance rows' blocks. */
-export const rebalanceClearedProv = (count: number): Provenance => ({
+export const rebalanceClearedProv = (
+  count: number,
+  noun: "rebalance" | "redemption" | "pool-wide liquidation" = "rebalance",
+): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  verify: { kind: "recompute", text: "Re-run getPosition at each rebalance row's block and the block before" },
-  summary: `Debt cleared by rebalances — the position's getPosition debt at the block before each of its ${count} rebalance row${count === 1 ? "" : "s"} less the debt at that block, summed. The rows are the rebalances the tick replay placed on this position.`,
+  verify: { kind: "recompute", text: `Re-run getPosition at each ${noun} row's block and the block before` },
+  summary: `Debt cleared by ${noun}s — the position's getPosition debt at the block before each of its ${count} ${noun} block${count === 1 ? "" : "s"} less the debt at that block, summed. The rows are the ${noun}s the tick replay placed on this position.${noun === "pool-wide liquidation" ? " The keeper's Liquidate log gives what it repaid across the whole pool; the pool wrote the rest of the tick's debt off and added it to every other position through its debt index (BasePool._liquidateTick)." : ""}`,
   contract: { name: "AaveFundingPool", address: "" },
   via: "Σ (getPosition debt at block − 1 − at block) over the rebalance blocks",
   formula: "Σ (before − after)",
@@ -775,6 +778,40 @@ export const fundingTakenProv = (unit: string): Provenance => ({
 });
 
 /** The rest of the debt that moved without the owner's transaction. */
+/** Debt a liquidation of this position left unpaid: the row's debt at the
+ *  block before, less what the keeper repaid, less the debt after. */
+export const leftUnpaidProv = (): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary:
+    "Debt left unpaid at this position's liquidations — at each liquidation row, getPosition's debt at the block before less the fxUSD the LiquidatePosition log says the keeper repaid less getPosition's debt at the block, summed. The pool removed it from the position and added it to every other position's debt through its debt index.",
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "Σ (debt before − repaid − debt after) over the liquidation rows",
+  formula: "Σ (before − repaid − after)",
+});
+
+/** Other positions' bad debt added to this one: the remainder once the rows'
+ *  and the liquidations' parts are counted. */
+export const badDebtAddedProv = (): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary:
+    "Other positions' bad debt the pool's debt index added to this one — the settled debt less (what the transactions add up to, minus the debt the rebalance, redemption and pool-wide liquidation rows cleared, minus the debt left unpaid at this position's liquidations).",
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "settled − (implied − cleared − left unpaid)",
+  formula: "settled − implied + cleared + unpaid",
+});
+
+/** The tick the position's shares sit in at the settled block. */
+export const positionTickProv = (sym: string, block: number): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  summary: `The tick this position's shares sit in at block ${block} — positionData(id) names the tree node they were stored in at its last own transaction; tickTreeData(node) gives each node's parent, set when a rebalance, liquidation or redemption moved the tick, and the node with no parent holds them now. Its tick is bits 48–63 of that node's metadata. Ticks group positions by debt-to-collateral share ratio (1.0015^tick fxUSD per ${sym}-share).`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "positionData(id).nodeId → tickTreeData(node).metadata parent links → root's tick",
+  formula: "root(node).tick",
+});
+
 export const otherDebtMovesProv = (): Provenance => ({
   kind: "chain-derived",
   pclass: "state",

@@ -25,13 +25,48 @@ import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-a
 import { AmountText } from "@/components/shared/amount-text";
 import { useFxPoolTerms, useFxPricesAt } from "@/lib/fx/use-event-state";
 import { formatNumber } from "@/lib/utils/format";
+import type { FxNoTxParts } from "@/lib/fx/no-tx-parts";
+import { FX_LIQUIDATION_RULE } from "@/lib/fx/row-figures";
+
+/** "5,568.943 fxUSD by rebalances, 355.055 by redemptions and …": each part
+ *  of the debt the pool moved, where it is there. */
+function partsWords(p: FxNoTxParts): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  const f = (n: number) => <AmountText value={n} />;
+  if (p.rebalances && p.rebalances.debt > 0.0005) out.push(<>rebalances cleared {f(p.rebalances.debt)} fxUSD</>);
+  if (p.redemptions && p.redemptions.debt > 0.0005) out.push(<>redemptions {f(p.redemptions.debt)}</>);
+  if (p.poolLiquidations && p.poolLiquidations.debt > 0.0005)
+    out.push(
+      <>
+        a pool-wide liquidation {f(p.poolLiquidations.debt)}, of which its keeper repaid at most{" "}
+        {f(p.poolLiquidations.poolRepaid ?? 0)} across the pool and the rest was written off
+      </>,
+    );
+  if (p.leftUnpaid > 0.0005) out.push(<>{f(p.leftUnpaid)} was written off at its liquidation</>);
+  if (p.badDebt > 0.0005) out.push(<>other positions&rsquo; bad debt added {f(p.badDebt)}</>);
+  return out;
+}
+
+const joinParts = (items: React.ReactNode[]) =>
+  items.map((it, i) => (
+    <span key={i}>
+      {i > 0 ? (i === items.length - 1 ? " and " : ", ") : ""}
+      {it}
+    </span>
+  ));
 
 export function FxPositionExplanation({
   v,
+  parts,
+  emptyLiquidations = 0,
   externalActivity,
   timelineRows,
 }: {
   v: FxPositionView;
+  /** What moved the debt without a transaction, part by part. */
+  parts?: FxNoTxParts | null;
+  /** Liquidation rows that took nothing (not in the card's count). */
+  emptyLiquidations?: number;
   /** Who executed the position's events, reduced over its whole history with
    *  the same predicate the event cards render (summariseFxExternalActors).
    *  Omit to skip the operator bullet. */
@@ -45,7 +80,7 @@ export function FxPositionExplanation({
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
   const terms = useFxPoolTerms(v.status === "open" ? v.pool : null);
-  const pxRead = useFxPricesAt(v.pool, v.positionId, v.status === "open" ? v.settled.block : null);
+  const pxRead = useFxPricesAt(v.pool, v.positionId, v.status === "open" ? v.settled.block : null, true);
   const px =
     pxRead?.anchorPrice != null && pxRead.minPrice != null
       ? { anchor: Number(pxRead.anchorPrice) / 1e18, min: Number(pxRead.minPrice) / 1e18 }
@@ -87,6 +122,16 @@ export function FxPositionExplanation({
             — more debt left through its transactions than arrived, because other positions&rsquo; bad debt, which the
             pool adds to every position, raised its debt with no transaction of its own and its repayments and
             liquidation cleared that too. The <AmountText value={Math.abs(diff)} /> fxUSD difference is that debt.
+          </span>,
+        );
+      } else if (Math.abs(diff) > 1e-9 && parts && partsWords(parts).length > 0) {
+        bullets.push(
+          <span key="socialized">
+            Its transactions add up to{" "}
+            <H>
+              <AmountText value={implied} /> fxUSD
+            </H>{" "}
+            of debt, and all of it left without the owner&rsquo;s transaction: {joinParts(partsWords(parts))}.
           </span>,
         );
       } else if (Math.abs(diff) > 1e-9) {
@@ -301,7 +346,13 @@ export function FxPositionExplanation({
             <AmountText value={implied} /> fxUSD
           </H>{" "}
           of debt.
-          {diff > 0 ? (
+          {parts && Math.abs(diff) > 1e-9 && partsWords(parts).length > 0 ? (
+            <>
+              {" "}
+              It owes <AmountText value={Math.abs(diff)} /> fxUSD {diff > 0 ? "less" : "more"}, moved by the pool
+              without the owner&rsquo;s transaction: {joinParts(partsWords(parts))}.
+            </>
+          ) : diff > 0 ? (
             <>
               {" "}
               It owes <AmountText value={diff} /> fxUSD less, because debt left without the owner&rsquo;s transaction:
@@ -326,11 +377,32 @@ export function FxPositionExplanation({
     }
   }
 
+  const bonus = parts?.bonus;
+  if (bonus && bonus.debt > 0.0005) {
+    const who = parts?.redemptions && parts.redemptions.debt > 0.0005 ? "Rebalances and redemptions" : "Rebalances";
+    const paid = bonus.collUsd - bonus.debt;
+    bullets.push(
+      <span key="bonus">
+        {who} took {formatNumber(bonus.coll)} {v.normalizedSymbol} of collateral for <AmountText value={bonus.debt} />{" "}
+        fxUSD of debt. At the oracle&rsquo;s min price at the block before each, the price a rebalance is paid at, that
+        collateral was worth {formatUsd(bonus.collUsd)}: {formatUsd(Math.abs(paid))} {paid >= 0 ? "more" : "less"} than
+        the debt it cleared, which the pool counts at $1 per fxUSD.
+        {paid > 0 ? (
+          <>
+            {" "}
+            That difference is the bonus the owner paid the keepers, {((paid / bonus.collUsd) * 100).toFixed(1)}% of the
+            collateral taken.
+          </>
+        ) : null}
+      </span>,
+    );
+  }
+
   if (v.liquidationCount > 0 && !isClosed) {
     bullets.push(
       <span key="liq">
         The position has been liquidated <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} and
-        remains open.
+        remains open. {FX_LIQUIDATION_RULE}
       </span>,
     );
   }
@@ -354,7 +426,14 @@ export function FxPositionExplanation({
           <>
             {" "}
             The timeline below carries {timelineRows} rows; the other {extras} are rebalances run by keepers and
-            ownership handovers, placed on its history.
+            ownership handovers, placed on its history
+            {emptyLiquidations > 0 ? (
+              <>
+                , and {emptyLiquidations} liquidation call{emptyLiquidations === 1 ? "" : "s"} that found nothing left
+                to take
+              </>
+            ) : null}
+            .
           </>
         ) : null}
       </span>,

@@ -36,15 +36,15 @@ export interface FxEventExplainerProps {
  *  Selection preserved byte-for-byte from the pre-prose explainer. Used by the
  *  card composer, which renders the "?" trigger on the footer row (this pane
  *  renders prose only). */
-export function fxLearnMoreContent(ctx: FxContext): LearnMoreContent {
+export function fxLearnMoreContent(ctx: FxContext, expenseRatio?: number | null): LearnMoreContent {
   const isOpen = ctx.isOpen === true;
   const isClose = ctx.emptiesPosition === true && ctx.eventType !== "liquidation";
   return ctx.eventType === "transfer"
     ? fxTransferContent()
     : ctx.eventType === "tickRebalance"
-      ? fxLiquidationContent()
+      ? fxLiquidationContent(expenseRatio)
       : ctx.eventType === "liquidation"
-        ? fxLiquidationContent()
+        ? fxLiquidationContent(expenseRatio)
         : ctx.reopens
           ? fxOperateContent("reopen")
           : isOpen

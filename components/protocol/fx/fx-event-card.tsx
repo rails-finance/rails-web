@@ -26,6 +26,7 @@ import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
 import { FxEventHeader } from "./fx-event-header";
 import { FxEventDetail } from "./fx-event-detail";
 import { FxEventExplainer, fxLearnMoreContent } from "./fx-event-explainer";
+import { useFxPoolTerms } from "@/lib/fx/use-event-state";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 
 export interface FxEventCardProps {
@@ -49,6 +50,9 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
   const isTransfer = ctx.eventType === "transfer";
   const meta = isFxPoolKey(ctx.pool) ? FX_POOLS[ctx.pool] : undefined;
   const extBy = fxExternalActor(ctx);
+  // The pool's terms at the latest read: the Learn more names the manager's
+  // share of a bonus from it (one read per pool, shared by every row).
+  const terms = useFxPoolTerms(ctx.eventType === "liquidation" || ctx.eventType === "tickRebalance" ? ctx.pool : null);
 
   const collDelta = Number(ctx.collDelta ?? "0") || 0;
   const debtDelta = Number(ctx.debtDelta ?? "0") || 0;
@@ -207,7 +211,7 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
       explainerLabel="Plain English"
       explainerTeaser={fxExplainerTeaser(ctx, coords)}
       txHash={event.txHash}
-      learnMore={<LearnMore inline content={fxLearnMoreContent(ctx)} />}
+      learnMore={<LearnMore inline content={fxLearnMoreContent(ctx, terms?.expenseRatio)} />}
       persistKey={`fx:${event.id}`}
     />
   );

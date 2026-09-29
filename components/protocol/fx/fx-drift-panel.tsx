@@ -74,13 +74,14 @@ export function FxDriftPanel({
     <ProvReceiptsScope registry={registry}>
       <div className="rounded-xl bg-raised px-4 py-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <span className="text-sm font-semibold">Moved without a transaction · by stretch</span>
+          <span className="text-sm font-semibold">Moved by the pool · by stretch</span>
           {!drift && loading && <span className="text-xs text-rb-500">Reading boundary states…</span>}
         </div>
         <p className="mt-1 text-xs text-rb-500">
-          Between the owner&rsquo;s transactions, funding takes collateral, rebalances take collateral and debt, and
-          other positions&rsquo; bad debt adds debt. Each row is one stretch between two transactions: the pool&rsquo;s{" "}
-          <code>getPosition</code> at its start and end, and the difference.
+          Between the owner&rsquo;s transactions, funding takes collateral, rebalances and redemptions take collateral
+          and debt, a pool-wide liquidation can write debt off, and other positions&rsquo; bad debt adds debt. Each row
+          is one stretch between two transactions: the pool&rsquo;s reading of the position at its start and end, and
+          the difference.
         </p>
         {state === "error" && (
           <p className="mt-2 text-xs text-rb-500">

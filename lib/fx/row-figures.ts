@@ -52,3 +52,23 @@ export function fxScheduleWords(s: { supply: number; withdraw: number; borrow: n
   if (parts.length === 0) return "nothing";
   return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
+
+/** The amount below which a liquidation moved nothing: the site's display
+ *  floor for an amount (formatTinyNonZero). */
+const MOVED_FLOOR = 1e-6;
+
+/** Whether a per-position liquidation took collateral or repaid debt. The
+ *  manager also logs a LiquidatePosition for a keeper's call that reached a
+ *  position with nothing left to take (wsteth-243, block 21,763,933: 0 and
+ *  0); the position card does not count those. */
+export function fxLiquidationMoved(ctx: FxContext): boolean {
+  if (ctx.eventType !== "liquidation") return false;
+  if (ctx.poolWide) return true;
+  const colls = Number(ctx.liqColls ?? "0") || 0;
+  const repaid = (Number(ctx.liqFxusdDebts ?? "0") || 0) + (Number(ctx.liqStableDebts ?? "0") || 0);
+  return colls > 0 || repaid >= MOVED_FLOOR;
+}
+
+/** The card's liquidation-count rule, in the words its tip gives. */
+export const FX_LIQUIDATION_RULE =
+  "Counts the liquidations that took collateral or repaid debt; a keeper's call that found nothing left to take is on the timeline and not counted.";

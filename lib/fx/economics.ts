@@ -37,6 +37,28 @@ import {
 } from "@/lib/fx/event-provenance";
 import { type ChainTruthTowerData, type TowerLine, flowsReconcile } from "@/lib/shared/chain-truth-economics";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import type { FxNoTxParts } from "@/lib/fx/no-tx-parts";
+import { formatNumber } from "@/lib/utils/format";
+
+/** The one name the card, its Explanation, this segment and the drift table
+ *  give debt that moved without the owner's transaction. */
+export const FX_NO_TX_LABEL = "Moved by the pool";
+
+/** The segment's tip: each part that is there, with its figure. */
+function noTxTip(p: FxNoTxParts | null | undefined, everLiquidated: boolean): string {
+  if (!p) return everLiquidated ? `${FX_NO_TX_LABEL}: rebalances and liquidations` : `${FX_NO_TX_LABEL}: rebalances`;
+  const f = (n: number) => formatNumber(n);
+  const items = [
+    p.rebalances && p.rebalances.debt > 0.0005 ? `rebalances ${f(p.rebalances.debt)}` : null,
+    p.redemptions && p.redemptions.debt > 0.0005 ? `redemptions ${f(p.redemptions.debt)}` : null,
+    p.poolLiquidations && p.poolLiquidations.debt > 0.0005
+      ? `pool-wide liquidation, written off ${f(p.poolLiquidations.debt)}`
+      : null,
+    p.leftUnpaid > 0.0005 ? `left unpaid at liquidation ${f(p.leftUnpaid)}` : null,
+    p.badDebt > 0.0005 ? `less other positions' bad debt ${f(p.badDebt)}` : null,
+  ].filter((x): x is string => x != null);
+  return items.length > 0 ? `${FX_NO_TX_LABEL}: ${items.join(" · ")}` : FX_NO_TX_LABEL;
+}
 
 const DUST = 1e-9;
 
@@ -120,6 +142,9 @@ export function computeFxEconomics(
    *  windowed page whose opening balance has not arrived passes NEITHER — the
    *  lifetime layer states nothing rather than a window's arithmetic. */
   precomputedLifetime?: FxDebtFlows,
+  /** What moved the debt without a transaction, part by part: names the
+   *  segment's parts in its tip. */
+  parts?: FxNoTxParts | null,
 ): ChainTruthTowerData {
   const settledColls = position.settled.colls;
   const settledDebts = position.settled.debts;
@@ -173,11 +198,9 @@ export function computeFxEconomics(
         amount: socialized,
         usd: null,
         prov: socializedDebtProv("cleared", settledBlock),
-        // Short enough for the legend column; the tip says the rest.
-        flowLabel: "Rebalances",
-        tipLabel: position.everLiquidated
-          ? "Cleared by rebalances and left unpaid at liquidation"
-          : "Cleared by rebalances, net of others' bad debt",
+        // The one name for the bucket; the tip names its parts.
+        flowLabel: FX_NO_TX_LABEL,
+        tipLabel: noTxTip(parts, position.everLiquidated),
       });
     } else if (socialized < -DUST) {
       // Settled exceeds implied: debt accrued beyond the event record. The
@@ -279,6 +302,6 @@ export function computeFxEconomics(
         ? undefined
         : preSweep
           ? "This position's current collateral and debt aren't in yet — f(x) reads them straight from the pool. Its own events can't stand in for them: funding on collateral, and rebalances and write-offs on debt, all change the real amounts with no per-position record, so the event-implied running debt is history, never the live figure."
-          : "The current lines are the pool's reading, funding and rebalances applied. The hatched segment is the gap between what this position's transactions add up to and that reading: debt cleared by rebalances, net of other positions' bad debt that the pool adds to every position. Debt is shown in fxUSD; fxUSD is not pinned to a dollar, so it is never restated as USD.",
+          : "The current lines are the pool's reading, funding and rebalances applied. The hatched segment, moved by the pool, is the gap between what this position's transactions add up to and that reading: debt cleared by rebalances and redemptions, written off at liquidations, less other positions' bad debt that the pool adds to every position. Its tip names each part. Debt is shown in fxUSD; fxUSD is not pinned to a dollar, so it is never restated as USD.",
   };
 }

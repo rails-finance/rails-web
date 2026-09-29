@@ -246,6 +246,14 @@ const nextConfig: NextConfig = {
         destination: "/",
         permanent: true,
       },
+      // An f(x) position sits at /ethereum/fx/<pool>-<id>; a /positions/
+      // segment in front of the slug (the shape other explorers use) lands
+      // on it.
+      {
+        source: "/ethereum/fx/positions/:slug((?:wsteth|wbtc)-\\d+)",
+        destination: "/ethereum/fx/:slug",
+        permanent: false,
+      },
       // The cross-protocol /wallet/[address] umbrella is gone — each rail
       // stands alone. Preserve inbound bookmarks by sending stale links to
       // the platform home, which surfaces the protocol cards.
