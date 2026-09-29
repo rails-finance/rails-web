@@ -8,6 +8,8 @@
 // trove card carried it. A fork whose lane lacks a datum leaves the optional
 // field unset and the card simply omits that slot — it never fakes a value.
 
+import type { CollSurplusClaim } from "@/lib/sources/chain/liquity-coll-surplus";
+
 export type LiquityFamilyId = "liquity-v2" | "asymmetry" | "ebisu" | "basedollar";
 
 export type LiquityTroveStatus = "open" | "closed" | "liquidated";
@@ -113,7 +115,7 @@ export interface LiquityTroveSurplus {
   /** Head block of the read. */
   blockNumber: number;
   /** The claim; block/tx/time null when no log could date it. */
-  claimed: { block: number | null; txHash: string | null; timestamp: number | null } | null;
+  claimed: CollSurplusClaim | null;
 }
 
 /** What the card hands a protocol's face-provenance builder — the displayed

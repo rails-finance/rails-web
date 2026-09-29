@@ -14,6 +14,8 @@ import { useHeaderValueHideClass, fmtHeaderMagnitude } from "@/lib/shared/header
 import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
 import { Prov } from "@/components/shared/provenance";
+import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
+import { formatDate } from "@/lib/date";
 import { formatUsd } from "@/lib/shared/format-event";
 import { collChangeProv, debtChangeProv, rateAfterProv } from "@/lib/liquity/event-provenance";
 // The rate pills live in the shared module now (the two Liquity forks render the
@@ -141,6 +143,7 @@ export interface LiquityEventHeaderProps {
 }
 
 export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventNumber }: LiquityEventHeaderProps) {
+  const surplusClaim = useSurplusClaimFor(ctx.operation === "liquidate" ? txHash : undefined);
   const style = getOperationStyle(ctx.operation, ctx);
   const { stateBefore, stateAfter, troveOperation } = ctx;
   const { showTimestamps, showEventNumbers, showCollateralRatio, showTimelineValues } = useTimelineDisplay();
@@ -536,13 +539,28 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               collateral value exceeded its debt, the remainder is returned to
               the owner and remains claimable. Mirrors the prod liquidation
               header (and the redemption "claimable" treatment in the detail). */}
-          {ctx.operation === "liquidate" && ctx.liquidation && ctx.liquidation.collSurplus > 0 && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-700 dark:text-green-400">
-              <span>{ctx.liquidation.collSurplus.toFixed(4)}</span>
-              <TokenChipIcon symbol={ctx.collateralType} size={16} />
-              claimable
-            </span>
-          )}
+          {ctx.operation === "liquidate" &&
+            ctx.liquidation &&
+            ctx.liquidation.collSurplus > 0 &&
+            (surplusClaim ? (
+              // Claimed since (the head read): the pill keeps what the
+              // liquidation left claimable, muted, and says when it was claimed.
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-rb-500/15 text-rb-500"
+                title="Claimable at the liquidation; the owner has since claimed it"
+              >
+                <span>{ctx.liquidation.collSurplus.toFixed(4)}</span>
+                <TokenChipIcon symbol={ctx.collateralType} size={16} />
+                claimable, claimed
+                {surplusClaim.timestamp != null && <> {formatDate(surplusClaim.timestamp)}</>}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-700 dark:text-green-400">
+                <span>{ctx.liquidation.collSurplus.toFixed(4)}</span>
+                <TokenChipIcon symbol={ctx.collateralType} size={16} />
+                claimable
+              </span>
+            ))}
 
           {/* Interest rate — single pill. The label already says it's a rate,
               so no second "% APR" is needed in the trailing cluster below. */}

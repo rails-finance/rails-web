@@ -2968,7 +2968,36 @@ export type ProtocolContext =
   | { protocol: "polaris"; data: PolarisContext }
   | { protocol: "alchemix-v3"; data: AlchemixV3Context }
   | { protocol: "alchemix-v2"; data: AlchemixV2Context }
+  | { protocol: "liquity-coll-surplus-claim"; data: CollSurplusClaimContext }
   | { protocol: "other"; data: OtherContext };
+
+/** A Liquity-family Trove's collateral-surplus claim: the owner's
+ *  claimCollateral() that emptied their CollSurplusPool balance, drawn on the
+ *  Trove's timeline at the claim transaction. The index does not carry it; the
+ *  page builds the row from the coll-surplus read
+ *  (lib/shared/liquity-coll-surplus-claim.ts). */
+export interface CollSurplusClaimContext {
+  /** The explorer the row sits on. */
+  family: "liquity-v2" | "asymmetry" | "ebisu" | "basedollar" | "liquity-v1";
+  protocolName: string;
+  /** Collateral symbol as the page shows it. */
+  symbol: string;
+  decimals: number;
+  /** The branch's CollSurplusPool. */
+  pool: string;
+  owner: string;
+  /** This Trove's surplus, which the claim paid out (token units + integer). */
+  amount: number;
+  amountRaw: string;
+  /** What the claim paid out in all: above `amount` when it also paid other
+   *  Troves' surplus. Null when the read could not recover it. */
+  paid: number | null;
+  paidRaw: string | null;
+  /** The transaction that credited this Trove's surplus, and what it was. */
+  creditTx: string;
+  creditKind: "liquidation" | "redemption";
+  creditAt: number | null;
+}
 
 // ───────────────────────── The unified event ─────────────────────────
 
@@ -3029,6 +3058,12 @@ export function isLiquityEvent(
     e.context?.protocol === "liquity-v2-troves" &&
     !!(e.context.data as LiquityContext)?.collateralType
   );
+}
+
+export function isCollSurplusClaimEvent(
+  e: BaseActivityEvent,
+): e is BaseActivityEvent & { context: { protocol: "liquity-coll-surplus-claim"; data: CollSurplusClaimContext } } {
+  return e.context?.protocol === "liquity-coll-surplus-claim";
 }
 
 export function isAaveV4Event(

@@ -38,6 +38,7 @@
 // simply absent (the never-empty floor) — noted per branch in the report.
 
 import type { ReactNode } from "react";
+import { formatDate } from "@/lib/date";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { BaseActivityEvent, GasCost } from "@/lib/shared/types/activity";
 import type { Provenance } from "@/components/shared/provenance";
@@ -646,7 +647,14 @@ function applyPendingDebtSlots(ctx: LiquityContext, coords: EventCoords, mode: R
 
 // ── liquidate (beneficial redistribution + destructive) ──────────────────────
 
-function liquidateSlots(ctx: LiquityContext, coords: EventCoords, mode: RatioMode): EventProseSlots {
+function liquidateSlots(
+  ctx: LiquityContext,
+  coords: EventCoords,
+  mode: RatioMode,
+  /** When the owner claimed the surplus (the page's head read); undefined
+   *  while it is unclaimed or unknown, null when claimed but undated. */
+  surplusClaimedAt?: number | null,
+): EventProseSlots {
   const { liquidation, troveOperation, stateBefore, stateAfter, collateralType, collateralPrice } = ctx;
   const debtSym = ctx.assetType ?? "BOLD";
 
@@ -755,7 +763,10 @@ function liquidateSlots(ctx: LiquityContext, coords: EventCoords, mode: RatioMod
         <>
           The collateral&rsquo;s value exceeded the debt, so{" "}
           {fig(undefined, `${fmtColl(liquidation.collSurplus)} ${collateralType}`)} of surplus (
-          {fmtUsd(collSurplusValueUsd)}) remains claimable by the borrower.
+          {fmtUsd(collSurplusValueUsd)}){" "}
+          {surplusClaimedAt === undefined
+            ? "remains claimable by the borrower."
+            : `was left claimable by the borrower, who claimed it${surplusClaimedAt != null ? ` on ${formatDate(surplusClaimedAt)}` : ""}.`}
         </>,
       ),
     );
@@ -1298,6 +1309,8 @@ export function liquityEventSlots(
   previousEvent?: BaseActivityEvent,
   currentEvent?: BaseActivityEvent,
   currentPrice?: number,
+  /** See liquidateSlots. */
+  surplusClaimedAt?: number | null,
 ): EventProseSlots {
   let accruedInterest = 0;
   let accruedManagementFees = 0;
@@ -1307,7 +1320,15 @@ export function liquityEventSlots(
     accruedManagementFees = calc.accruedManagementFees;
   }
 
-  const slots = liquityEventSlotsFor(ctx, coords, mode, accruedInterest, accruedManagementFees, currentPrice);
+  const slots = liquityEventSlotsFor(
+    ctx,
+    coords,
+    mode,
+    accruedInterest,
+    accruedManagementFees,
+    currentPrice,
+    surplusClaimedAt,
+  );
   const same = sameBlockClause(ctx, coords);
   return same ? { ...slots, meansNow: [...(slots.meansNow ?? []), same] } : slots;
 }
@@ -1319,6 +1340,7 @@ function liquityEventSlotsFor(
   accruedInterest: number,
   accruedManagementFees: number,
   currentPrice?: number,
+  surplusClaimedAt?: number | null,
 ): EventProseSlots {
   switch (ctx.operation) {
     case "openTrove":
@@ -1331,7 +1353,7 @@ function liquityEventSlotsFor(
     case "adjustTroveInterestRate":
       return adjustRateSlots(ctx, coords, accruedInterest, accruedManagementFees, mode);
     case "liquidate":
-      return liquidateSlots(ctx, coords, mode);
+      return liquidateSlots(ctx, coords, mode, surplusClaimedAt);
     case "redeemCollateral":
     case "adjustZombieTrove":
     case "adjustUnredeemableZombieTrove":

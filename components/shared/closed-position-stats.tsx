@@ -26,6 +26,10 @@ export interface ClosedPositionStatsProps {
   collateral: ReactNode;
   /** Omit for supply-only positions that never carried debt — Debt column is dropped entirely. */
   debt?: ReactNode;
+  /** With no `debt`, let Outcome take the second column instead of keeping the
+   *  empty debt slot (a liquidated Trove's card while its surplus is
+   *  claimable, where the claimable figure stands alone). */
+  outcomeFollows?: boolean;
   collateralLabel?: string;
   debtLabel?: string;
   /** Token icon shown after the collateral column label */
@@ -63,6 +67,7 @@ export function ClosedPositionStats({
   outcome,
   collateral,
   debt,
+  outcomeFollows,
   collateralLabel = CARD_VOCAB.peakCollateral,
   debtLabel = CARD_VOCAB.peakDebt,
   collateralIcon,
@@ -133,7 +138,7 @@ export function ClosedPositionStats({
             )}
             {debtFootnote}
           </div>
-        ) : (
+        ) : outcomeFollows ? null : (
           <div className="hidden sm:block" />
         )}
         <div>

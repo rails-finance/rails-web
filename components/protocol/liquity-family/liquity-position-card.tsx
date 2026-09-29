@@ -93,7 +93,11 @@ import {
   BASEDOLLAR_BRANCHES,
 } from "@/lib/basedollar/asset-catalog";
 import { TroveIdentityRow } from "./trove-identity-row";
-import { collSurplusClaimableProv, collSurplusUsdProv } from "@/lib/shared/liquity-coll-surplus-provenance";
+import {
+  CLAIMABLE_WHERE,
+  collSurplusClaimableProv,
+  collSurplusUsdProv,
+} from "@/lib/shared/liquity-coll-surplus-provenance";
 import type {
   LiquityFamilyId,
   LiquityFaceProvContext,
@@ -570,14 +574,18 @@ export function LiquityPositionCard({
         </Prov>
       </StatValue>
     ) : null;
-    const claimableFootnote =
-      claimableUsd != null && claimable ? (
-        <div className="text-xs mt-0.5 min-h-[1rem]">
-          <span className="inline-flex items-center font-bold text-green-400 border-l-2 border-r-2 border-green-400 rounded-sm px-1 py-0">
-            <Prov info={collSurplusUsdProv(claimable, ct, priceUsd as number)}>{formatUsdValue(claimableUsd)}</Prov>
-          </span>
-        </div>
-      ) : undefined;
+    const claimableFootnote = claimable ? (
+      <>
+        {claimableUsd != null && (
+          <div className="text-xs mt-0.5 min-h-[1rem]">
+            <span className="inline-flex items-center font-bold text-green-400 border-l-2 border-r-2 border-green-400 rounded-sm px-1 py-0">
+              <Prov info={collSurplusUsdProv(claimable, ct, priceUsd as number)}>{formatUsdValue(claimableUsd)}</Prov>
+            </span>
+          </div>
+        )}
+        <div className="text-xs text-rb-500 mt-0.5">{CLAIMABLE_WHERE}</div>
+      </>
+    ) : undefined;
     return (
       <PositionCardShell
         receipts={receipts}
@@ -617,6 +625,7 @@ export function LiquityPositionCard({
           // The debt the liquidation cleared is not the owner's to act on, so
           // it stands down while the surplus is claimable.
           debt={claimable ? undefined : peakDebtStat}
+          outcomeFollows={!!claimable}
         />
         {footer}
       </PositionCardShell>

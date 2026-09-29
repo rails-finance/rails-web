@@ -15,16 +15,26 @@
 //      liquidation minus the balance one block before it;
 //   3. looks for a later CollBalanceUpdated(owner, 0) — the claim, which
 //      empties the balance in one call — and reads getCollateral(owner) at
-//      the head.
+//      the head. The balance the log before it recorded is what the claim
+//      paid out: this Trove's surplus plus any other the same owner had
+//      waiting in the pool, since claimColl pays the account's whole balance.
+//
+// The log search asks the state RPC first and, when it refuses the range,
+// the chain's wide-range logs lane (`chainLogsClient`: BASE_BACKFILL_RPC_URL
+// on Base; on Ethereum the two are one endpoint, so there is no second try). Neither of Base's
+// other two lanes is tried: BASE_LOGS_RPC_URL refuses any range over 1,000
+// blocks and BASE_HYPERRPC_URL has answered a whole-life query short with no
+// error (scripts/census-morpho-base-vaults.mjs), which here would read a
+// claimed surplus as still claimable.
 //
 // Claimed: a zeroing log after the liquidation. Claimable: none, and the
 // amount is this Trove's surplus (capped at the head balance, which also
 // holds any other Trove's surplus the same owner has on the branch).
 // SERVER-ONLY.
 
-import { parseAbi, type Hex } from "viem";
-import { chainClient } from "./rpc";
-import type { ChainId } from "@/lib/shared/chains";
+import { parseAbi, type Hex, type PublicClient } from "viem";
+import { chainClient, chainLogsClient } from "./rpc";
+import { chainMeta, type ChainId } from "@/lib/shared/chains";
 
 const POOL_ABI = parseAbi([
   "event CollBalanceUpdated(address indexed _account, uint256 _newBalance)",
@@ -41,6 +51,12 @@ export interface CollSurplusClaim {
   block: number | null;
   txHash: string | null;
   timestamp: number | null;
+  /** The claim log's index in its block, to order it among same-block rows. */
+  logIndex?: number | null;
+  /** What the claim paid out in all: the owner's pool balance the log before
+   *  it recorded (integer string). Above `surplusRaw` when the same claim
+   *  also paid out other Troves' surplus. Null when no log dated the claim. */
+  paidRaw?: string | null;
 }
 
 export interface CollSurplusRead {
@@ -116,30 +132,30 @@ export async function readTroveCollSurplus(args: {
   // the head balance to decide (a balance below this Trove's surplus can only
   // mean a claim emptied it since).
   let claimed: CollSurplusClaim | null = null;
-  try {
-    const logs = await client.getLogs({
-      address: pool,
-      event: POOL_ABI[0],
-      args: { _account: owner as Hex },
-      fromBlock: liqBlock,
-      toBlock: head,
-    });
-    const zeroing = logs.find(
-      (l) =>
-        l.args._newBalance === BigInt(0) &&
-        (l.blockNumber! > liqBlock || (l.blockNumber === liqBlock && l.logIndex! > credit.logIndex)),
-    );
-    if (zeroing) {
+  const logs = await balanceLogs(chainId, pool, owner, liqBlock, head);
+  if (logs) {
+    // Re-checked in code: an endpoint may ignore the indexed-account filter.
+    const own = logs
+      .filter((l) => l.args._account?.toLowerCase() === owner.toLowerCase())
+      .sort((a, b) => Number(a.blockNumber! - b.blockNumber!) || a.logIndex! - b.logIndex!);
+    const sinceCredit = (l: (typeof own)[number]) =>
+      l.blockNumber! > liqBlock || (l.blockNumber === liqBlock && l.logIndex! > credit.logIndex);
+    const zi = own.findIndex((l) => l.args._newBalance === BigInt(0) && sinceCredit(l));
+    if (zi >= 0) {
+      const zeroing = own[zi];
+      // The balance the log before recorded is what the claim paid; the credit
+      // log itself is in range, so there is always one.
+      const prev = zi > 0 ? own[zi - 1].args._newBalance : null;
       const b = await client.getBlock({ blockNumber: zeroing.blockNumber! });
       claimed = {
         block: Number(zeroing.blockNumber),
         txHash: zeroing.transactionHash!,
         timestamp: Number(b.timestamp),
+        logIndex: zeroing.logIndex ?? null,
+        paidRaw: prev != null ? prev.toString() : null,
       };
     }
-  } catch {
-    if (balance < surplus) claimed = { block: null, txHash: null, timestamp: null };
-  }
+  } else if (balance < surplus) claimed = { block: null, txHash: null, timestamp: null };
   const claimable = claimed ? BigInt(0) : surplus < balance ? surplus : balance;
 
   return {
@@ -151,4 +167,27 @@ export async function readTroveCollSurplus(args: {
     decimals,
     claimed,
   };
+}
+
+/** The owner's CollBalanceUpdated logs from `from` to `to`: the state RPC
+ *  first, then the chain's wide-range logs lane when it is a different
+ *  endpoint. Null when every lane refused. */
+async function balanceLogs(chainId: ChainId, pool: Hex, owner: string, from: bigint, to: bigint) {
+  const meta = chainMeta(chainId);
+  const lanes: (() => PublicClient)[] = [() => chainClient(chainId)];
+  if (meta.logsRpcEnv !== meta.rpcEnv) lanes.push(() => chainLogsClient(chainId));
+  for (const lane of lanes) {
+    try {
+      return await lane().getLogs({
+        address: pool,
+        event: POOL_ABI[0],
+        args: { _account: owner as Hex },
+        fromBlock: from,
+        toBlock: to,
+      });
+    } catch {
+      // The next lane, if any.
+    }
+  }
+  return null;
 }

@@ -48,7 +48,7 @@ import { DEBT_SYMBOL, EBISU_DOCS } from "@/lib/ebisu/asset-catalog";
 // The general Ebisu link (docs.ebisu.money doesn't answer) plus the
 // question-level docs links per card topic (EBISU_DOCS — read and verified
 // against ebisu.gitbook.io/ebisu-money, 2026-09-28, Miles's OK).
-const EBISU_FORK = {
+export const EBISU_FORK = {
   protocolName: "Ebisu",
   stablecoin: DEBT_SYMBOL,
   docsLink: { label: "Ebisu", url: "https://ebisu.money" },

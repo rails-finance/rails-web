@@ -238,6 +238,9 @@ const LIQUITY_OP_LABELS: Record<string, string> = {
   adjustTroveInterestRate: "Interest rate",
   applyPendingDebt: "Apply debt",
   redeemCollateral: "Redeemed",
+  // The owner's claimCollateral(): a liquidation's surplus paid out of the
+  // CollSurplusPool (a row the page adds from the chain read, not the index).
+  claimCollateral: "Claim collateral",
   adjustZombieTrove: "Redeemed",
   adjustUnredeemableZombieTrove: "Redeemed",
   setInterestBatchManager: "Delegate",
@@ -422,6 +425,7 @@ const LIQUITY_V1_OP_LABELS: Record<string, string> = {
   closeTrove: "Close",
   liquidation: "Liquidated",
   redemption: "Redeemed",
+  claimCollateral: "Claim collateral",
 };
 
 // Liquity V2 forks (Ebisu, Asymmetry, basedollar) — the same Trove lifecycle
@@ -438,6 +442,7 @@ const LIQUITY_FORK_OP_LABELS: Record<string, string> = {
   adjustTroveInterestRate: "Adjust Rate",
   applyPendingDebt: "Apply Pending Debt",
   liquidate: "Liquidated",
+  claimCollateral: "Claim collateral",
   redeemCollateral: "Redeemed",
   openTroveAndJoinBatch: "Open + Join Batch",
   setInterestBatchManager: "Set Batch Manager",

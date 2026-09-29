@@ -31,7 +31,11 @@ import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { isBasedollarEvent } from "@/lib/shared/types/event-shape";
+import { isCollSurplusClaimEvent, isBasedollarEvent } from "@/lib/shared/types/event-shape";
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { collSurplusClaimEvent } from "@/lib/shared/liquity-coll-surplus-claim";
+import { CollSurplusClaimCard } from "@/components/protocol/liquity-family/coll-surplus-claim-card";
+import { BASEDOLLAR_FORK } from "@/components/protocol/basedollar/basedollar-event-card";
 import type { BasedollarTroveSummary } from "@/lib/sources/api/basedollar-troves";
 import { fetchBasedollarTroves } from "@/lib/api/fetch-basedollar-troves";
 import {
@@ -250,15 +254,55 @@ export default function BasedollarTroveDetail({
     [basedollarEvents, servedFolders],
   );
 
+  const lastLiq = basedollarEvents.find((e) => e.context.data.eventType === "liquidate");
+  // The liquidation's surplus at the head: claimable or claimed (the index
+  // records the credit, never the claim).
+  const surplus = useLiquityCollSurplus({
+    protocol: "basedollar",
+    branch: collateralType,
+    owner: view?.status === "liquidated" ? (view.lastOwner ?? view.owner) : null,
+    liquidationTx: lastLiq?.txHash,
+  });
+
+  // The claim that paid the surplus out, as its own row (the index has none):
+  // added to the served rows, so it is numbered, filtered and exported.
+  const claimRow = useMemo(
+    () =>
+      collSurplusClaimEvent({
+        source: surplus,
+        family: "basedollar",
+        protocolName: "Basedollar",
+        chainId: BASE_CHAIN_ID,
+        symbol: view?.collateralType ?? collateralType,
+        owner: view?.lastOwner ?? view?.owner,
+        creditTx: lastLiq?.txHash,
+        creditKind: "liquidation",
+        creditAt: lastLiq?.timestamp ?? null,
+      }),
+    [surplus, view?.collateralType, collateralType, view?.lastOwner, view?.owner, lastLiq],
+  );
+  const timelineEvents = useMemo(
+    () => (claimRow ? [...basedollarEvents, claimRow] : basedollarEvents),
+    [basedollarEvents, claimRow],
+  );
+  const timelineRows = useMemo(
+    () => (servedRows && claimRow ? [...servedRows, { kind: "event" as const, event: claimRow }] : servedRows),
+    [servedRows, claimRow],
+  );
+  const timelineTail = useMemo(
+    () => (groupedTail && claimRow ? { ...groupedTail, eventsServed: groupedTail.eventsServed + 1 } : groupedTail),
+    [groupedTail, claimRow],
+  );
+
   // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
   // Decision 0019, amendments 2026-09-24 and 2026-09-25: a month the loaded
   // rows do not hold is read from the index as its segment
   // (hooks/useTimelineSegment.ts). The preload stays the page's whole-history
   // record; the timeline alone swaps.
   const { tl, segments, readFolderMembers } = useTimelineSegment({
-    events: basedollarEvents,
-    groupedTail,
-    servedRows,
+    events: timelineEvents,
+    groupedTail: timelineTail,
+    servedRows: timelineRows,
     servedFolders,
     opening,
     historyWindow,
@@ -333,15 +377,6 @@ export default function BasedollarTroveDetail({
   // Terminal narration: the ending mechanism is exact on this fork (closed =
   // the owner's closeTrove; liquidated = the liquidation), and the seizure legs
   // come from the life's own liquidate event once the timeline lands.
-  const lastLiq = basedollarEvents.find((e) => e.context.data.eventType === "liquidate");
-  // The liquidation's surplus at the head: claimable or claimed (the index
-  // records the credit, never the claim).
-  const surplus = useLiquityCollSurplus({
-    protocol: "basedollar",
-    branch: collateralType,
-    owner: view?.status === "liquidated" ? (view.lastOwner ?? view.owner) : null,
-    liquidationTx: lastLiq?.txHash,
-  });
   const terminalPane =
     view && view.status !== "open" ? (
       <LiquityForkClosedExplanation
@@ -382,6 +417,7 @@ export default function BasedollarTroveDetail({
             // A grouped page's `events` hold only the ungrouped rows, so its
             // CSV reads the whole history too.
             fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
+            claimRow={claimRow}
             history={markdownHistoryScope(historyWindow, basedollarEvents, servedFolders)}
             scopeNote={exportScopeNote(historyWindow, basedollarEvents, "this Trove's whole history", servedFolders)}
           />
@@ -467,7 +503,16 @@ export default function BasedollarTroveDetail({
               ) : undefined
             }
             renderCard={(event, meta) =>
-              isBasedollarEvent(event) ? (
+              isCollSurplusClaimEvent(event) ? (
+                <CollSurplusClaimCard
+                  event={event}
+                  isFirst={meta.isFirst}
+                  isLast={meta.isLast}
+                  eventNumber={meta.eventNumber}
+                  persistPrefix="basedollar"
+                  fork={BASEDOLLAR_FORK}
+                />
+              ) : isBasedollarEvent(event) ? (
                 <BasedollarEventCard
                   event={event}
                   eventNumber={meta.eventNumber}

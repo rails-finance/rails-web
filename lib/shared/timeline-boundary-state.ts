@@ -156,6 +156,9 @@ export function boundaryStateFromOldestRow(e: BaseActivityEvent | undefined): Bo
     case "fx":
     case "pwn":
     case "polaris":
+    // A surplus claim is always newer than the credit it pays out, so it is
+    // never the oldest row.
+    case "liquity-coll-surplus-claim":
     case "other":
       return null;
   }
