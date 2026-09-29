@@ -45,6 +45,8 @@ import { FxSocializedReadsContext } from "@/lib/fx/socialized-reads";
 import { useFxPositionReads, useFxPricesAt } from "@/lib/fx/use-event-state";
 import { fetchFxDrift, FxDriftError, type FxDriftResult } from "@/lib/sources/api/fx-drift";
 import { computeFxEconomics, fxDebtFlowsWithOpening } from "@/lib/fx/economics";
+import { fxNoTxParts } from "@/lib/fx/no-tx-parts";
+import { fxLiquidationMoved } from "@/lib/fx/row-figures";
 import { fxEconomicsExplanation, fxEconomicsContent } from "@/lib/fx/economics-explanation";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -211,20 +213,44 @@ export default function FxPositionView({
     [fxEvents],
   );
   const socializedBlocks = useMemo(() => socializedRows.map((e) => e.blockNumber), [socializedRows]);
-  const socializedReadsMap = useFxPositionReads(parsed?.pool ?? "", parsed?.positionId ?? "", socializedBlocks);
+  // With the oracle's legs at each block and the one before: the card values
+  // what rebalances and redemptions took at the min price they were paid at.
+  const socializedReadsMap = useFxPositionReads(
+    parsed?.pool ?? "",
+    parsed?.positionId ?? "",
+    socializedBlocks,
+    undefined,
+    true,
+  );
   const socializedReads = useMemo(() => {
+    // The timeline reads newest first, so a block's LAST row is the one drawn
+    // on top: it states the block's change, and the rows under it say so.
     const leads = new Set<string>();
-    const seen = new Set<number>();
+    const lastOf = new Map<number, string>();
+    const peers = new Map<number, number>();
     for (const e of socializedRows) {
-      if (seen.has(e.blockNumber)) continue;
-      seen.add(e.blockNumber);
-      leads.add(e.id);
+      lastOf.set(e.blockNumber, e.id);
+      peers.set(e.blockNumber, (peers.get(e.blockNumber) ?? 0) + 1);
     }
-    return { reads: socializedReadsMap, leads };
+    for (const id of lastOf.values()) leads.add(id);
+    return { reads: socializedReadsMap, leads, peers };
   }, [socializedRows, socializedReadsMap]);
 
   // The socialized rows, for the card's lines (what they took, read per
   // block), and the loans this NFT has carried.
+  // What moved the debt without the owner's transaction, part by part: the
+  // card's line, its Explanation and the Lifetime flows segment share it.
+  const noTxParts = useMemo(
+    () =>
+      historyWindow.state === "whole" && view
+        ? fxNoTxParts(
+            fxEvents,
+            socializedReadsMap,
+            view.settled.debts != null ? (view.socializedDebt ?? view.impliedDebt.amount - view.settled.debts) : null,
+          )
+        : null,
+    [fxEvents, socializedReadsMap, view, historyWindow.state],
+  );
   const rebalanceRows = useMemo(() => {
     const reb = socializedRows;
     if (reb.length === 0) return undefined;
@@ -234,6 +260,7 @@ export default function FxPositionView({
       lastTs: reb[reb.length - 1].timestamp,
       liquidations: reb.filter((e) => e.context.data.eventType === "liquidation").length,
       redemptions: reb.filter((e) => e.context.data.redemption === true).length,
+      parts: noTxParts,
       ownEventBlocks: fxEvents
         .filter(
           (e) =>
@@ -243,21 +270,31 @@ export default function FxPositionView({
         .map((e) => e.blockNumber),
       reads: socializedReadsMap,
     };
-  }, [fxEvents, socializedRows, socializedReadsMap]);
+  }, [fxEvents, socializedRows, socializedReadsMap, noTxParts]);
   const loans = useMemo(() => fxLoans(fxEvents), [fxEvents]);
   // Pool-wide liquidations (mig 369) are not in the summary's counts, which
   // come from the per-position LiquidatePosition lane: the card counts them
-  // from the rows.
+  // from the rows. A LiquidatePosition that took no collateral and repaid
+  // under 0.000001 fxUSD (a keeper's call that found the position already
+  // emptied) stays a row and leaves the count (fxLiquidationMoved).
+  const emptyLiquidations = useMemo(
+    () =>
+      fxEvents.filter(
+        (e) =>
+          e.context.data.eventType === "liquidation" && !e.context.data.poolWide && !fxLiquidationMoved(e.context.data),
+      ).length,
+    [fxEvents],
+  );
   const cardView = useMemo(() => {
     const n = socializedRows.filter((e) => e.context.data.eventType === "liquidation").length;
-    if (!view || n === 0 || historyWindow.state !== "whole") return view;
+    if (!view || (n === 0 && emptyLiquidations === 0) || historyWindow.state !== "whole") return view;
     return {
       ...view,
-      everLiquidated: true,
-      liquidationCount: view.liquidationCount + n,
-      activity: { ...view.activity, eventCount: view.activity.eventCount + n },
+      everLiquidated: view.everLiquidated || n > 0,
+      liquidationCount: view.liquidationCount + n - emptyLiquidations,
+      activity: { ...view.activity, eventCount: view.activity.eventCount + n - emptyLiquidations },
     };
-  }, [view, socializedRows, historyWindow.state]);
+  }, [view, socializedRows, emptyLiquidations, historyWindow.state]);
   const blockDates = useMemo(() => new Map(fxEvents.map((e) => [e.blockNumber, e.timestamp])), [fxEvents]);
 
   const tl = useTimelineEvents(fxEvents, { storageKey: `fx-${slug}`, protocolKey: "fx", window: historyWindow });
@@ -308,6 +345,7 @@ export default function FxPositionView({
     parsed?.pool ?? "",
     parsed?.positionId ?? "",
     view?.status === "open" ? view.settled.block : null,
+    true,
   );
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
     if (!view || view.status !== "open") return [];
@@ -371,6 +409,8 @@ export default function FxPositionView({
               explanation={
                 <FxPositionExplanation
                   v={cardView ?? view}
+                  parts={noTxParts}
+                  emptyLiquidations={historyWindow.state === "whole" ? emptyLiquidations : 0}
                   externalActivity={externalActivity}
                   // The full record's row count: the loaded rows plus the
                   // MV-lane events the opening balance summarised (the raw
@@ -383,7 +423,7 @@ export default function FxPositionView({
           )}
           {view &&
             (() => {
-              const towerData = computeFxEconomics(view, lifetimeEvents ?? [], precomputedLifetime);
+              const towerData = computeFxEconomics(view, lifetimeEvents ?? [], precomputedLifetime, noTxParts);
               return (
                 <ChainTruthTower
                   data={towerData}

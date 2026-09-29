@@ -5,15 +5,18 @@
 // once by the position page (useFxPositionReads) and shared with the card's
 // split, each row's header and each run's header. A block that holds several
 // of these rows is read once; its change belongs to the block, so only the
-// block's first row (`leads`) states it.
+// block's top row (`leads`) states it.
 
 import { createContext, useContext } from "react";
 import type { FxStateAt } from "@/lib/sources/chain/fx-event-state";
 
 export interface FxSocializedReads {
   reads: Record<string, FxStateAt> | null;
-  /** Ids of the first socialized row in each block. */
+  /** Ids of the row in each block that states the block's change: its last,
+   *  the one the newest-first timeline draws on top. */
   leads: Set<string>;
+  /** Socialized rows per block. */
+  peers?: Map<number, number>;
 }
 
 export const FxSocializedReadsContext = createContext<FxSocializedReads | null>(null);

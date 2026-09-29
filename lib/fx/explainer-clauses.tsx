@@ -67,7 +67,7 @@ import {
 } from "@/lib/fx/event-provenance";
 import type { FxSide } from "@/lib/fx/use-event-state";
 import type { FxFeeSchedule } from "@/lib/sources/chain/fx-event-state";
-import { fxRowFees, fxFeePct, fxScheduleWords } from "@/lib/fx/row-figures";
+import { fxRowFees, fxFeePct, fxScheduleWords, fxLiquidationMoved } from "@/lib/fx/row-figures";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
 import { fxExternalActor } from "@/lib/fx/external-actor";
 import { formatExact, formatNumber, formatTinyNonZero } from "@/lib/utils/format";
@@ -553,6 +553,23 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
 
     case "liquidation": {
       if (ctx.poolWide === true) {
+        // The run repaid what its keeper paid across the whole pool; where this
+        // position's debt fell by more, the tick's collateral ran out and the
+        // pool wrote the rest off onto everyone else (BasePool._liquidateTick:
+        // debtIndex += unpaid ÷ remaining debt shares).
+        const writeOffClause = (): ClauseInput => {
+          if (before?.debts == null || after?.debts == null) return null;
+          const fell = before.debts - after.debts;
+          const repaid = Number(ctx.tickRebFxusdDebts ?? "0") || 0;
+          if (fell - repaid <= 0.001) return null;
+          return clause(
+            <>
+              Its keeper repaid {fmtVal(ctx.tickRebFxusdDebts)} fxUSD across the whole pool, and this position&rsquo;s
+              debt fell by {formatNumber(fell)} fxUSD: the collateral in its tick could not cover the tick&rsquo;s debt,
+              so the pool wrote the rest off and added it to every other position&rsquo;s debt through its debt index.
+            </>,
+          );
+        };
         const tickFig = () => (
           <Fig info={tickRebalanceHitProv(ctx.rebalancedTick, coords, true)} value={`#${ctx.rebalancedTick}`}>
             #{ctx.rebalancedTick}
@@ -584,6 +601,7 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
           ],
           changed: [ownChange("liquidations")],
           meansNow: [
+            writeOffClause(),
             clause(
               empties ? (
                 <>
@@ -603,6 +621,36 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
       }
       const hasStable = ctx.liqStableDebts != null && Number(ctx.liqStableDebts) !== 0;
       const sent = Number(ctx.liqColls ?? "0") || 0;
+      if (!fxLiquidationMoved(ctx)) {
+        // A keeper's call that reached the position after it was emptied (or
+        // with a wei of collateral left): the manager logs it all the same.
+        const keeperAddr = ctx.txFrom ? ` (${shortAddr(ctx.txFrom)})` : "";
+        return {
+          happened: [
+            clause(
+              <>
+                A keeper&rsquo;s liquidation call{keeperAddr} reached position #{id} with nothing left to take: the log
+                records {fmtVal(ctx.liqColls ?? "0")} {sym} taken and{" "}
+                {Number(ctx.liqFxusdDebts ?? "0") > 0 ? formatNumber(Number(ctx.liqFxusdDebts)) : "0"} fxUSD repaid.
+              </>,
+            ),
+          ],
+          meansNow: [
+            after?.debts != null && after.debts > 0.0005
+              ? clause(
+                  <>
+                    Its debt of{" "}
+                    <Fig info={rowStateProv("debt", "after", normSym, coords)} value={String(after.debts)}>
+                      {formatNumber(after.debts)} fxUSD
+                    </Fig>{" "}
+                    stayed on the position.
+                  </>,
+                )
+              : null,
+            clause(<>The position card does not count it among the liquidations.</>),
+          ],
+        };
+      }
       const liqCollsFig = () => (
         <Fig info={liqCollsProv(sym, coords)} value={fmtVal(ctx.liqColls)}>
           {fmtVal(ctx.liqColls)} {sym}

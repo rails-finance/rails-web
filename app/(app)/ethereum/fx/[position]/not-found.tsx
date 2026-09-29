@@ -10,8 +10,8 @@ export default function FxPositionNotFound() {
       backHref="/ethereum/fx"
       backLabel="Browse f(x) Protocol positions"
     >
-      An f(x) position is one id in one pool, so its slug is the pool then the id — <code>wsteth-416</code>. The URL
-      does not carry that pair, so there is nothing the protocol could answer to.
+      An f(x) position is one id in one pool, and its page is <code>/ethereum/fx/</code> followed by the pool and the
+      id: <code>/ethereum/fx/wsteth-416</code>. This URL does not have that shape.
     </RouteNotFound>
   );
 }

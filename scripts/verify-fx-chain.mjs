@@ -584,5 +584,189 @@ if (priceLegChecked > 0) {
   );
 }
 
+// ── Newcomer round 3 (2026-09-29): the claims the position page added ──────
+// Receipts and eth_calls only (no eth_getLogs).
+{
+  const R3_POOL = "0x6ecfa38fee8a5277b91efda204c235814f0122e8";
+  const LIQ_ABI = parseAbi([
+    "event LiquidatePosition(address indexed pool, uint256 indexed position, uint256 colls, uint256 fxUSDDebts, uint256 stableDebts)",
+    "event Liquidate(address indexed pool, uint256 colls, uint256 fxUSDDebts, uint256 stableDebts)",
+  ]);
+  const R3_ABI = parseAbi([
+    "function getPosition(uint256) view returns (uint256,uint256)",
+    "function getDebtAndCollateralIndex() view returns (uint256,uint256)",
+    "function getTotalRawDebts() view returns (uint256)",
+    "function positionData(uint256) view returns (int16,uint48,uint96,uint96)",
+    "function tickTreeData(uint256) view returns (bytes32,bytes32)",
+    "function tickData(int256) view returns (uint48)",
+    "function priceOracle() view returns (address)",
+  ]);
+  const { decodeEventLog } = await import("viem");
+  const near = (a, b, tol) => Math.abs(a - b) <= tol;
+  const liqLog = async (hash, position) => {
+    const rc = await client.getTransactionReceipt({ hash });
+    for (const l of rc.logs) {
+      try {
+        const d = decodeEventLog({ abi: LIQ_ABI, data: l.data, topics: l.topics });
+        if (position == null ? d.eventName === "Liquidate" : d.args.position === BigInt(position)) return d.args;
+      } catch {}
+    }
+    return null;
+  };
+  const pos = (id, b) =>
+    client.readContract({
+      address: R3_POOL,
+      abi: R3_ABI,
+      functionName: "getPosition",
+      args: [BigInt(id)],
+      blockNumber: BigInt(b),
+    });
+
+  // Z1: the manager logs a liquidation that moved nothing.
+  const empty243 = await liqLog("0x67c3b352d00d5656c6895d16ca911bb808251e843f3a0c321d5103a4f94c3dff", 243);
+  const [c0, d0] = await pos(243, 21763932);
+  check(
+    "r3 Z1: wsteth-243's LiquidatePosition at block 21,763,933 took 0 and repaid 0, the position already empty",
+    empty243 != null && empty243.colls === 0n && empty243.fxUSDDebts === 0n && c0 === 0n && d0 === 0n,
+  );
+  const empty154 = await liqLog("0xbfb562c311a1517e3033fde872dad11a4eb5084a8b7a41290a11b7f4c06c38ba", 154);
+  const [c1, d1] = await pos(154, 21764007);
+  check(
+    "r3 Z1: wsteth-154's LiquidatePosition at block 21,764,007 took 0 wstETH and repaid 2,477 wei; 287.882 fxUSD of debt stayed",
+    empty154 != null &&
+      empty154.colls === 0n &&
+      empty154.fxUSDDebts === 2477n &&
+      c1 === 0n &&
+      d1 / 10n ** 15n === 287882n,
+    `after: ${c1} / ${d1}`,
+  );
+  // Z1 (dust): what liquidation 1 left on 243 and 154.
+  const [c2] = await pos(243, 21763470);
+  const [c3] = await pos(154, 21763456);
+  check(
+    "r3 Z1: the collateral left by the first liquidations is under $100 at the row's price ($16 and $80)",
+    (Number(c2) / 1e18) * 2531.9 < 100 && (Number(c3) / 1e18) * 2517.37 < 100,
+    `${Number(c2) / 1e18} and ${Number(c3) / 1e18} stETH`,
+  );
+
+  // Z2: the pool-wide Liquidate wrote 154's debt off onto the debt index.
+  const pw = await liqLog("0xcbd0ca5598d15a91a20a548cd69753ec8115eb98f1fb24916632f230a2bcd4b5", null);
+  const [, dBefore] = await pos(154, 22081082);
+  const [, dAfter] = await pos(154, 22081083);
+  const idx = async (b) =>
+    (
+      await client.readContract({
+        address: R3_POOL,
+        abi: R3_ABI,
+        functionName: "getDebtAndCollateralIndex",
+        blockNumber: BigInt(b),
+      })
+    )[0];
+  const tot = (b) =>
+    client.readContract({ address: R3_POOL, abi: R3_ABI, functionName: "getTotalRawDebts", blockNumber: BigInt(b) });
+  const [i0, i1, t0, t1] = await Promise.all([idx(22081082), idx(22081083), tot(22081082), tot(22081083)]);
+  const repaid = Number(pw?.fxUSDDebts ?? 0n) / 1e18;
+  const fell = Number(dBefore - dAfter) / 1e18;
+  const poolFell = Number(t0 - t1) / 1e18;
+  // The index rose by the written-off debt over the debt that stayed.
+  const addedByIndex = (Number(i1 - i0) / Number(i0)) * (Number(t1) / 1e18);
+  check(
+    "r3 Z2: at block 22,081,083 the keeper repaid 0.028 fxUSD across the pool, 154's debt fell 287.882, and the pool's debt fell only by what was repaid",
+    near(repaid, 0.028, 0.0005) && near(fell, 287.882, 0.001) && near(poolFell, repaid, 0.001),
+    `repaid ${repaid}, 154 fell ${fell}, pool total fell ${poolFell}`,
+  );
+  check(
+    "r3 Z2: the debt index rose by the written-off debt (BasePool._liquidateTick bad-debt redistribution)",
+    near(addedByIndex, fell - repaid, 1),
+    `index added ${addedByIndex.toFixed(3)} fxUSD vs ${(fell - repaid).toFixed(3)} written off`,
+  );
+
+  // Z4: what 243's rebalances and redemptions took, valued at the min price
+  // at the block before each (the socialized row blocks, from the index).
+  const r3tl = await fetch(`${process.env.BASE ?? "http://localhost:3903"}/api/fx/position/wsteth/243/timeline`)
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null);
+  if (r3tl) {
+    const blocks = [
+      ...new Set(r3tl.events.filter((e) => e.context.data.eventType === "tickRebalance").map((e) => e.blockNumber)),
+    ];
+    let coll = 0;
+    let debt = 0;
+    let usd = 0;
+    for (let i = 0; i < blocks.length; i += 8) {
+      await Promise.all(
+        blocks.slice(i, i + 8).map(async (b) => {
+          const [a, z, px] = await Promise.all([
+            pos(243, b - 1),
+            pos(243, b),
+            // The pool's oracle then: it has been replaced since.
+            client
+              .readContract({ address: R3_POOL, abi: R3_ABI, functionName: "priceOracle", blockNumber: BigInt(b - 1) })
+              .then((oracle) =>
+                client.readContract({
+                  address: oracle,
+                  abi: ORACLE_ABI,
+                  functionName: "getPrice",
+                  blockNumber: BigInt(b - 1),
+                }),
+              ),
+          ]);
+          const dc = Number(a[0] - z[0]) / 1e18;
+          coll += dc;
+          debt += Number(a[1] - z[1]) / 1e18;
+          usd += dc * (Number(px[1]) / 1e18);
+        }),
+      );
+    }
+    check(
+      "r3 Z4: 243's rebalances and redemptions took 3.063 stETH for 5,923.998 fxUSD, worth about $6,070 at the min price: a $146 bonus, 2.4% of it",
+      near(coll, 3.063, 0.001) && near(debt, 5923.998, 0.01) && near(usd, 6070.49, 1) && near(usd - debt, 146.5, 1),
+      `${coll.toFixed(4)} stETH, ${debt.toFixed(3)} fxUSD, $${usd.toFixed(2)}, bonus $${(usd - debt).toFixed(2)} (${(((usd - debt) / usd) * 100).toFixed(2)}%)`,
+    );
+  } else info("      r3 Z4 skipped: no dev server for the row blocks (BASE)");
+
+  // Z11: the position's tick, by the node walk the page makes.
+  const head = await client.getBlockNumber();
+  const pd = await client.readContract({
+    address: R3_POOL,
+    abi: R3_ABI,
+    functionName: "positionData",
+    args: [243n],
+    blockNumber: head,
+  });
+  let node = BigInt(pd[1]);
+  let meta = 0n;
+  for (let h = 0; h < 64; h++) {
+    meta = BigInt(
+      (
+        await client.readContract({
+          address: R3_POOL,
+          abi: R3_ABI,
+          functionName: "tickTreeData",
+          args: [node],
+          blockNumber: head,
+        })
+      )[0],
+    );
+    const parent = meta & ((1n << 48n) - 1n);
+    if (parent === 0n) break;
+    node = parent;
+  }
+  let tick = Number((meta >> 48n) & 0xffffn);
+  if (tick >= 0x8000) tick -= 0x10000;
+  const cur = await client.readContract({
+    address: R3_POOL,
+    abi: R3_ABI,
+    functionName: "tickData",
+    args: [BigInt(tick)],
+    blockNumber: head,
+  });
+  check(
+    "r3 Z11: 243's node walk ends at the node its tick holds now (tickData(tick) == root)",
+    BigInt(cur) === node,
+    `tick ${tick}, node ${node}`,
+  );
+}
+
 console.log(`\n${pass}/${pass + fail} checks passed${fail ? ` — ${fail} FAILED` : ""}`);
 process.exit(fail ? 1 : 0);

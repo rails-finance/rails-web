@@ -125,6 +125,28 @@ export interface ChainTruthDelta {
    *  what the omitting card intended by "the header carries this one". Do NOT
    *  set it to paper over a missing row that ought to exist — draw the row. */
   noSpineCounterpart?: boolean;
+  /** A figure that is not the position's own (a whole tick's or pool's
+   *  total): label and value drawn in the muted tone, so the position's own
+   *  change beside it reads first. */
+  muted?: boolean;
+  /** The accessible name states the figure in the site's number format
+   *  (formatNumber) rather than the exact decimal: for dust, where the exact
+   *  decimal is eighteen digits no one reads aloud. */
+  readableLabel?: boolean;
+}
+
+/** "−0.00534 wstETH": a figure's accessible name in the site's number format. */
+function readableName(value: number, symbol: string, signed: boolean): string {
+  const sign = signed ? (value < 0 ? "−" : "+") : "";
+  return `${sign}${formatNumber(Math.abs(value))}${symbol ? ` ${symbol}` : ""}`;
+}
+
+/** readableName over an exact string ("−0.000000000000002477" → "−<0.000001"). */
+function readableExact(exact: string, symbol: string): string | undefined {
+  const m = /^([+\u2212-]?)(.*)$/.exec(exact.trim());
+  const n = m ? Number(m[2].replace(/,/g, "")) : NaN;
+  if (!m || !Number.isFinite(n)) return undefined;
+  return `${m[1] === "-" ? "−" : m[1]}${formatNumber(n)}${symbol ? ` ${symbol}` : ""}`;
 }
 
 export interface ChainTruthRowSpec {
@@ -221,6 +243,8 @@ export interface ChainTruthRowSpec {
    *  verb — V2's grammar — so the header never shows a merged "Deposit & Borrow"
    *  verb ahead of the split. */
   deltas: ChainTruthDelta[];
+  /** A short muted note after the deltas ("both rebalances in this block"). */
+  note?: ReactNode;
 }
 
 /** A before→after transition attached to a snapshot stat: the reconstructed
@@ -261,6 +285,9 @@ export interface ChainTruthStat {
    *  a plain amount — a signed change shown while the balance it moved is still
    *  being read. `value` stays the receipt's exact figure. */
   display?: string;
+  /** The accessible name states the value in the site's number format
+   *  rather than the exact decimal (see ChainTruthDelta.readableLabel). */
+  readableLabel?: boolean;
   /** Whether this event changed the value (the T2 change-colour rule: changed
    *  renders foreground, unchanged muted text — no opacity, no before→after).
    *  Defaults to true (foreground); set `false` for a side this event didn't
@@ -540,9 +567,14 @@ export function ChainTruthRow({
         return (
           <Prov key={i} info={d.prov} value={exact} symbol={d.symbol} className={deltaHide || undefined}>
             <span className="inline-flex items-center gap-1.5 text-sm">
-              {d.label && <span className={toneClass}>{d.label}</span>}
-              <span className="font-semibold tabular-nums text-foreground">
-                <ExactTip text={text} exact={exact} symbol={d.symbol} />
+              {d.label && <span className={d.muted ? "text-rb-500" : toneClass}>{d.label}</span>}
+              <span className={d.muted ? "tabular-nums text-rb-500" : "font-semibold tabular-nums text-foreground"}>
+                <ExactTip
+                  text={text}
+                  exact={exact}
+                  symbol={d.symbol}
+                  label={d.readableLabel ? readableName(d.value, d.symbol, !bare) : undefined}
+                />
               </span>
               <TokenChipIcon symbol={d.symbol} address={d.address} size={16} />
               {d.suffix && <span className="text-[10px] font-normal text-rb-500">{d.suffix}</span>}
@@ -599,6 +631,8 @@ export function ChainTruthRow({
           />
         </span>
       )}
+
+      {spec.note != null && <span className="text-xs text-rb-500">{spec.note}</span>}
 
       {/* Ratio chip — the position's collateral ratio at this event. Like the
           rate pill, not a moved amount, so not behind hideClass. An echo of
@@ -728,6 +762,7 @@ export function ChainTruthDetail({
                           }
                           exact={s.transition.beforeExact}
                           symbol={s.symbol}
+                          label={s.readableLabel ? readableExact(s.transition.beforeExact, s.symbol) : undefined}
                         />
                       </Prov>
                     }
@@ -742,6 +777,7 @@ export function ChainTruthDetail({
                           }
                           exact={s.transition.changeExact}
                           symbol={s.symbol}
+                          label={s.readableLabel ? readableExact(s.transition.changeExact, s.symbol) : undefined}
                         />
                       </Prov>
                     }
@@ -754,7 +790,17 @@ export function ChainTruthDetail({
                   icon={s.symbol ? <TokenChipIcon symbol={s.symbol} address={s.address} size={16} /> : undefined}
                 >
                   <span className={`text-sm font-semibold tabular-nums ${changeTone(changed)}`}>
-                    <ExactTip always text={s.display ?? compactAmount(s.value)} exact={s.value} symbol={s.symbol} />
+                    <ExactTip
+                      always
+                      text={s.display ?? compactAmount(s.value)}
+                      exact={s.value}
+                      symbol={s.symbol}
+                      label={
+                        s.readableLabel && Number.isFinite(Number(s.value))
+                          ? readableName(Number(s.value), s.symbol, false)
+                          : undefined
+                      }
+                    />
                     {symbolText && s.symbol ? <span className="font-normal text-rb-500"> {s.symbol}</span> : null}
                   </span>
                 </Prov>

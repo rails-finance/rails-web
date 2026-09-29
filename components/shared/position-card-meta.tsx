@@ -34,6 +34,8 @@ export interface PositionCardMetaProps {
   liquidated?: boolean;
   /** Liquity-only redemption count (triangle in the external-party pink). */
   redemptionCount?: number | null;
+  /** What the liquidation count counts, added to its tip. */
+  liquidationRule?: string;
 }
 
 // formatDuration treats a bare number as SECONDS. Unix seconds are ~1.7e9 today;
@@ -56,6 +58,7 @@ export function PositionCardMeta({
   liquidationCount,
   liquidated,
   redemptionCount,
+  liquidationRule,
 }: PositionCardMetaProps) {
   const showTime = lastActivityAt != null && lastActivityAt > 0;
   const showEvents = eventCount != null && eventCount > 0;
@@ -112,7 +115,9 @@ export function PositionCardMeta({
             </RevealTip>
           );
         })()}
-      {showLiquidation && <LiquidatedBadge count={hasLiqCount ? (liquidationCount as number) : undefined} />}
+      {showLiquidation && (
+        <LiquidatedBadge count={hasLiqCount ? (liquidationCount as number) : undefined} rule={liquidationRule} />
+      )}
     </span>
   );
 }

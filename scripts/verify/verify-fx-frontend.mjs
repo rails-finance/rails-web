@@ -14,6 +14,11 @@
 //   wsteth-154 — its last 287.88 fxUSD written off by a pool-wide Liquidate on
 //                19 Mar 2025 (block 22,081,083; mig 369 on the server).
 //   wsteth-177 — redemptions in March 2025 took 17,745.93 fxUSD of its debt.
+//   wsteth-243 — liquidated three times on 3 Feb 2025, the last a call that
+//                took nothing (block 21,763,933); 87 rebalance and 3
+//                redemption blocks whose collateral, at the min price of the
+//                block before each, was worth $6,070.49 for 5,923.998 fxUSD
+//                (scripts/verify-fx-chain.mjs, round 3).
 
 import { chromium } from "playwright";
 
@@ -171,7 +176,8 @@ check(
   "249: the card names the lines and the trigger price",
   new RegExp(
     `rebalancing from ${Math.round(terms.rebalanceRatio * 100)}%, liquidation from ${Math.round(terms.liquidateRatio * 100)}%`,
-  ).test(p249.text) && /88% if the min price falls to \$[\d,]+ \(−\d+\.\d%\), 95% at \$[\d,]+ \(−\d+\.\d%\)/.test(p249.text),
+  ).test(p249.text) &&
+    /88% if the min price falls to \$[\d,]+ \(−\d+\.\d%\), 95% at \$[\d,]+ \(−\d+\.\d%\)/.test(p249.text),
 );
 check(
   "249: the USD figure and the ratio name their prices",
@@ -179,7 +185,7 @@ check(
 );
 check(
   "249: the debt line splits rebalances from other positions' bad debt",
-  /1,713\.04\d? fxUSD cleared by rebalances without the owner's transaction \(3 Feb 2025\) · \+5\.7\d+ fxUSD of other positions' bad debt/.test(
+  /moved by the pool: 1,713\.04\d? fxUSD cleared by rebalances \(3 Feb 2025\) and \+5\.7\d+ fxUSD of other positions' bad debt/.test(
     p249.text,
   ),
 );
@@ -216,7 +222,10 @@ check(
   "484: funding apart from the rebalances",
   /rebalances took 3\.545 WBTC and funding took 0\.2\d+ WBTC/.test(p484.text),
 );
-check("484: yearly funding in the card's explanation", /takes about [\d.]+ WBTC a year from this collateral/.test(p484.text));
+check(
+  "484: yearly funding in the card's explanation",
+  /takes about [\d.]+ WBTC a year from this collateral/.test(p484.text),
+);
 check(
   "484: the run header states this position's total",
   /7 pool-wide rebalances\nThis position lost\n3\.54\d*\nDebt repaid\n279K/.test(p484.text),
@@ -259,7 +268,73 @@ check(
   /Pool-wide liquidation · liquidated this position's tick/.test(p154.text) &&
     /debt went from 287\.882 to 0 fxUSD/.test(p154.text),
 );
-check("154: counted among its liquidations", /Liquidated 4 times/.test(p154.text));
+check("154: counted among its liquidations; the call that took nothing is not", /Liquidated 3 times/.test(p154.text));
+check(
+  "154 r3: the pool-wide row says the debt was written off onto the debt index",
+  /debt written off/.test(p154.text) &&
+    /Its keeper repaid 0\.028 fxUSD across the whole pool, and this position’s debt fell by 287\.882 fxUSD[\s\S]{0,160}through its debt index/.test(
+      p154.text,
+    ),
+);
+check(
+  "154 r3: the card names each part moved by the pool",
+  /22,667\.08\d fxUSD cleared by rebalances \(2 Feb 2025 – 3 Feb 2025\), 287\.882 fxUSD by a pool-wide liquidation that repaid 0\.028 fxUSD across the pool and wrote off the rest \(19 Mar 2025\) and \+1\.88\d fxUSD of other positions' bad debt/.test(
+    p154.text,
+  ),
+);
+check(
+  "154 r3: the empty liquidation keeps its row and says so",
+  /reached position #154 with nothing left to take/.test(p154.text) &&
+    /Its debt of 287\.882 fxUSD stayed/.test(p154.text),
+);
+check("154 r3: dust after the first liquidation reads 'dust left'", /dust left/.test(p154.text));
+
+// ── round 3: wsteth-243 ─────────────────────────────────────────────────────
+const p243 = await openAndRead("/ethereum/fx/wsteth-243");
+check("243: no page errors", p243.errors.length === 0, p243.errors.slice(0, 2).join(" | "));
+check(
+  "243 r3: two liquidations counted, the rule in the tip",
+  /Liquidated 2 times\. Counts the liquidations that took collateral or repaid debt/.test(p243.text),
+);
+check(
+  "243 r3: the 05:36 call is a row that found nothing",
+  /reached position #243 with nothing left to take/.test(p243.text),
+);
+check(
+  "243 r3: the card's debt line names each part",
+  /moved by the pool: 5,568\.94\d fxUSD cleared by rebalances \(3 Feb 2025 – 22 Jun 2025\), 355\.05\d fxUSD by redemptions \(28 Mar 2025\), 5\.54\d fxUSD written off at this position's liquidation and \+0\.16\d fxUSD of other positions' bad debt/.test(
+    p243.text,
+  ),
+);
+check(
+  "243 r3: the bonus the owner paid (chain: $6,070.49 − 5,923.998 = $146.49, 2.41%)",
+  /Rebalances and redemptions took 3\.06\d stETH of collateral for 5,923\.99\d fxUSD of debt[\s\S]{0,200}worth \$6,070: \$146 more[\s\S]{0,160}2\.4% of the collateral taken/.test(
+    p243.text,
+  ),
+);
+check("243 r3: the flows segment has the card's name", /Moved by the pool\n/.test(p243.text));
+check(
+  "243 r3: same-block rebalances state the change once",
+  /both rebalances in this block/.test(p243.text) && /included above/.test(p243.text),
+);
+check("243 r3: dust after liquidation 1", /dust left/.test(p243.text));
+check("243 r3: the card names the position's tick", /in tick #\d+ · find it on the pools page/.test(p243.text));
+check("243 r3: pool figures carry their scope word", /Pool cleared/.test(p243.text) && /Tick cleared/.test(p243.text));
+
+// ── round 3: listing price, path, pools highlight ───────────────────────────
+const pList = await openAndRead("/ethereum/fx");
+check(
+  "listing r3: rows value collateral at the anchor price, block named",
+  /at the anchor price \$[\d,]+ · oracle @/.test(pList.text) && /stETH \$[\d,]+ anchor @ [\d,]+/.test(pList.text),
+);
+{
+  const r = await fetch(BASE + "/ethereum/fx/positions/wsteth-243", { redirect: "manual" });
+  check(
+    "r3: /ethereum/fx/positions/<slug> redirects to the position",
+    r.status >= 300 && r.status < 400 && /\/ethereum\/fx\/wsteth-243$/.test(r.headers.get("location") ?? ""),
+    `${r.status} ${r.headers.get("location")}`,
+  );
+}
 {
   const tl = await json("/api/fx/position/wsteth/177/timeline");
   const red = tl.events.filter((e) => e.context.data.redemption);
@@ -284,6 +359,17 @@ check(
     ? /redemption open/.test(pPools.text)
     : /redemption closed: it opens only while fxUSD trades below its peg/.test(pPools.text),
 );
+{
+  const pg = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
+  await pg.goto(BASE + "/ethereum/fx/pools?pool=wsteth&tick=4718", { waitUntil: "networkidle", timeout: 120000 });
+  await pg.waitForTimeout(3000);
+  const t = await pg
+    .locator("#tick-wsteth-4718")
+    .innerText()
+    .catch(() => "");
+  check("pools r3: a linked tick is marked", /the position’s tick/.test(t), t.split("\n").join(" "));
+  await pg.close();
+}
 check("pools: shorts are named as not covered", /short positions sit on a separate manager/.test(pPools.text));
 check(
   "pools: default fees are stated",

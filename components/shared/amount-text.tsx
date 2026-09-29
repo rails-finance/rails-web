@@ -42,17 +42,21 @@ export function ExactTip({
   symbol,
   always = false,
   className,
+  label,
 }: {
   text: ReactNode;
   exact: string;
   symbol?: string;
   always?: boolean;
   className?: string;
+  /** The accessible name in place of the exact decimal (a dust figure read
+   *  in the site's number format). The tip still shows the exact decimal. */
+  label?: string;
 }) {
   if (!always && !(typeof text === "string" && isFloorText(text))) return <>{text}</>;
   const full = symbol ? `${exact} ${symbol}` : exact;
   return (
-    <RevealTip tip={full} label={full} className={className}>
+    <RevealTip tip={full} label={label ?? full} className={className}>
       {text}
     </RevealTip>
   );

@@ -92,6 +92,9 @@ export function useFxPositionReads(
   id: string,
   blocks: number[],
   maxBlocks = 240,
+  /** Also the oracle's anchor and min legs at each block and the one before
+   *  (what the rows' bonus is valued at). */
+  prices = false,
 ): Record<string, FxStateAt> | null {
   const key = [...new Set(blocks)]
     .sort((a, b) => a - b)
@@ -105,7 +108,11 @@ export function useFxPositionReads(
     const chunks: string[][] = [];
     for (let i = 0; i < list.length; i += 60) chunks.push(list.slice(i, i + 60));
     Promise.all(
-      chunks.map((c) => load(`/api/chain/fx/event-state?${new URLSearchParams({ pool, id, blocks: c.join(",") })}`)),
+      chunks.map((c) =>
+        load(
+          `/api/chain/fx/event-state?${new URLSearchParams({ pool, id, blocks: c.join(","), ...(prices ? { prices: "1" } : {}) })}`,
+        ),
+      ),
     ).then((all) => {
       if (!live) return;
       const merged: Record<string, FxStateAt> = {};
@@ -115,17 +122,23 @@ export function useFxPositionReads(
     return () => {
       live = false;
     };
-  }, [pool, id, key]);
+  }, [pool, id, key, prices]);
   if (!key || state?.key !== key) return null;
   return state.value;
 }
 
 /** The position and the oracle's anchor and min legs at one block (the card's
  *  settled block). */
-export function useFxPricesAt(pool: string, id: string, block: number | null | undefined): FxStateAt | null {
+export function useFxPricesAt(
+  pool: string,
+  id: string,
+  block: number | null | undefined,
+  /** Also the tick the position sits in at the block. */
+  tick = false,
+): FxStateAt | null {
   const url =
     block != null && block > 0
-      ? `/api/chain/fx/event-state?${new URLSearchParams({ pool, id, blocks: String(block), prices: "1" })}`
+      ? `/api/chain/fx/event-state?${new URLSearchParams({ pool, id, blocks: String(block), prices: "1", ...(tick ? { tick: "1" } : {}) })}`
       : null;
   const s = useStateAt(url);
   return block != null ? (s?.reads[String(block)] ?? null) : null;

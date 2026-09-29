@@ -92,7 +92,7 @@ export function fxPositionContent(opts: {
       detailsHeading: "Key concepts:",
       details: [
         {
-          bold: "Debt that moved without a transaction",
+          bold: "Debt moved by the pool",
           text: "rebalances and other positions' bad debt change a position's debt with no event of its own, so the pool's reading is the current figure and the sum of the transactions is shown beside it.",
         },
         {
@@ -115,11 +115,11 @@ export function fxPositionContent(opts: {
       ...(cost ? [cost] : []),
       {
         bold: "Tick-tree shares",
-        text: "the pool stores a position as shares of a tick; the collateral and debt above are the pool's getPosition reading of those shares at a named block.",
+        text: "the pool stores a position as shares of a tick; the collateral and debt above are the pool's reading of those shares at a named block.",
       },
       {
         bold: "On fx.aladdin.club",
-        text: "this is the xPOSITION the app shows on its Trade tab: the app's Current Size − xPOSITION Size equals the fxUSD debt above, and its Funding History is the collateral this page reads leaving between the position's transactions.",
+        text: "f(x)'s app lists this position on its Trade tab, and its Funding History there is the collateral this page reads leaving between the position's transactions.",
       },
       nft,
     ],

@@ -31,7 +31,7 @@
 // No animation: hundreds of rows, and a framer node per row is what froze the
 // listing shells (see the listing entrance incident).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { VitalsBand } from "@/components/shared/vitals-band";
@@ -537,14 +537,18 @@ function LadderStrip({ p }: { p: FxPoolSystem }) {
 
 // ── The tick table ───────────────────────────────────────────────────────────
 
-function TickRow({ p, t }: { p: FxPoolSystem; t: FxTickRow }) {
+function TickRow({ p, t, mine }: { p: FxPoolSystem; t: FxTickRow; mine?: boolean }) {
   const label = poolLabel(p);
   return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-1 px-4 py-2 sm:grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)] sm:items-baseline">
+    <div
+      id={`tick-${p.key}-${t.tick}`}
+      className={`grid grid-cols-2 gap-x-3 gap-y-1 px-4 py-2 sm:grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)] sm:items-baseline ${mine ? "bg-blue-500/10" : ""}`}
+    >
       <div className="text-xs tabular-nums text-foreground">
         <Prov info={tickIdProv(label, p.address, t.tick)} value={String(t.tick)}>
           {t.tick}
         </Prov>
+        {mine && <span className="ml-1.5 text-[10px] text-blue-500">the position&rsquo;s tick</span>}
       </div>
       <div className="text-xs tabular-nums">
         {t.debtRatio != null ? (
@@ -595,6 +599,18 @@ function TickTable({ p }: { p: FxPoolSystem }) {
   const ordered = [...p.ticks].sort((a, b) => b.tick - a.tick);
   const major = ordered.filter((t) => t.shareOfDebt >= SHARE_CUT);
   const rows = showAll ? ordered : major;
+  // A position page links here with ?pool=<pool>&tick=<tick>: that row is
+  // marked and scrolled to, the whole roster opened if the cut hides it. Read
+  // after mount: the page is cached for every visitor.
+  const [mine, setMine] = useState<number | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const tick = Number(q.get("tick"));
+    if (q.get("pool") !== p.key || !Number.isInteger(tick) || !p.ticks.some((t) => t.tick === tick)) return;
+    setMine(tick);
+    if (!p.ticks.some((t) => t.tick === tick && t.shareOfDebt >= SHARE_CUT)) setShowAll(true);
+    requestAnimationFrame(() => document.getElementById(`tick-${p.key}-${tick}`)?.scrollIntoView({ block: "center" }));
+  }, [p.key, p.ticks]);
 
   return (
     <div className="rounded-xl bg-raised">
@@ -628,7 +644,7 @@ function TickTable({ p }: { p: FxPoolSystem }) {
 
       <div className="divide-y divide-rb-200 dark:divide-rb-700">
         {rows.map((t) => (
-          <TickRow key={t.tick} p={p} t={t} />
+          <TickRow key={t.tick} p={p} t={t} mine={t.tick === mine} />
         ))}
       </div>
     </div>

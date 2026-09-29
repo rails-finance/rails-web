@@ -51,8 +51,11 @@ export function fxEconomicsExplanation(data: ChainTruthTowerData): ReactNode {
   if (socialized) {
     bullets.push(
       <span key="socialized">
-        {fig(socialized.amount, "fxUSD")} of debt left this position without the owner&apos;s transaction: rebalances
-        cleared it, net of other positions&apos; bad debt that the pool adds to every position.
+        {fig(socialized.amount, "fxUSD")} of debt was moved by the pool, without the owner&apos;s transaction:{" "}
+        {socialized.tipLabel?.includes(": ")
+          ? socialized.tipLabel.slice(socialized.tipLabel.indexOf(": ") + 2).replace(/ · /g, ", ")
+          : "rebalances cleared it, net of other positions' bad debt"}
+        .
       </span>,
     );
   } else if (socializedAccrual) {
@@ -115,12 +118,12 @@ export function fxEconomicsContent(): LearnMoreContent {
   return {
     title: "About the Economics",
     intro:
-      "This panel reads the position's current collateral and debt straight from f(x)'s pool contract (getPosition), because funding charges collateral while tick rebalances and bad-debt write-offs move debt — all with no event of its own. The position's own events supply the lifetime borrow/repay flows and the redemption of what event replay implies against the settled figure.",
+      "This panel reads the position's current collateral and debt from f(x)'s pool contract, because funding charges collateral while tick rebalances and bad-debt write-offs move debt, none of which logs an event for the position. Its transactions give the lifetime borrowed and repaid fxUSD, and the difference between what they add up to and the pool's figure is drawn as a segment of its own.",
     stepsHeading: "How the tower is built:",
     steps: [
       "Current collateral and debt are the pool's own settled reading at a named block — funding and rebalances already applied.",
-      "Borrowed and repaid fxUSD are summed from the position's own Operate events.",
-      "The gap between what the transactions add up to and the pool's reading is drawn as its own segment: debt cleared by rebalances, or other positions' bad debt added through the pool's debt index. Neither leaves an event on the position.",
+      "Borrowed and repaid fxUSD are summed from the position's transactions.",
+      "The gap between what the transactions add up to and the pool's reading is drawn as one segment, moved by the pool: debt cleared by rebalances and redemptions, debt written off at liquidations, and other positions' bad debt added through the pool's debt index. None logs an event for the position.",
     ],
     detailsHeading: "Key concepts:",
     details: [

@@ -2139,7 +2139,7 @@ export function fxOperateContent(kind: "open" | "reopen" | "adjust" | "close"): 
       ? "Opening a position deposits collateral into one of f(x)'s pools (wstETH or WBTC) and mints fxUSD debt against it, creating a leveraged long held as an ERC-721 position NFT."
       : kind === "close"
         ? "Closing repays the position's remaining fxUSD debt and withdraws its collateral, emptying the position. The final repay amount settles whatever the debt really was at that block — including every socialized adjustment accrued since the last touch."
-        : "Adjusting moves a position's collateral and/or fxUSD debt in one operation — deposits, withdrawals, borrows and repays are all the same Operate call with signed deltas.";
+        : "Adjusting moves a position's collateral and/or fxUSD debt in one operation: deposits, withdrawals, borrows and repays are one call to the pool manager with a signed amount for each side.";
   return {
     title:
       kind === "open" || kind === "reopen"
@@ -2151,7 +2151,7 @@ export function fxOperateContent(kind: "open" | "reopen" | "adjust" | "close"): 
     ...(kind === "reopen"
       ? {
           extraParagraphs: [
-            "Closing or liquidating a position empties it but does not burn the NFT: the owner keeps it, and the pool's ownerOf still answers for it. A later deposit to the same id funds it again, as a new loan on the same NFT. The timeline numbers the loans, and this row starts the next one; nothing from the previous loan carries into it.",
+            "Closing or liquidating a position empties it but does not burn the NFT: the owner keeps it, and the pool still records them as its holder. A later deposit to the same id funds it again, as a new loan on the same NFT. The timeline numbers the loans, and this row starts the next one; nothing from the previous loan carries into it.",
           ],
         }
       : {}),
@@ -2159,7 +2159,7 @@ export function fxOperateContent(kind: "open" | "reopen" | "adjust" | "close"): 
     details: [
       {
         bold: "Positions are tick-tree shares",
-        text: "a position's stored value is a share count in the pool's tick tree, not a fixed amount — the pool's own getPosition view resolves shares through the tick and funding indices to the real collateral and debt at any block.",
+        text: "a position's stored value is a share count in the pool's tick tree, not a fixed amount; the pool converts the shares through its tick and its debt and collateral indexes into the collateral and debt at any block.",
       },
       {
         bold: "Funding costs",
@@ -2174,7 +2174,10 @@ export function fxOperateContent(kind: "open" | "reopen" | "adjust" | "close"): 
   };
 }
 
-export function fxLiquidationContent(): LearnMoreContent {
+/** `expenseRatio`: the manager's share of each bonus at the latest read of
+ *  the pool's terms (/api/chain/fx/terms); unread, the sentence names no
+ *  figure. */
+export function fxLiquidationContent(expenseRatio?: number | null): LearnMoreContent {
   return {
     title: "How Liquidations & Rebalances Work",
     intro:
@@ -2182,7 +2185,7 @@ export function fxLiquidationContent(): LearnMoreContent {
     extraParagraphs: [
       "A rebalance repays part of the tick's fxUSD debt and takes collateral worth that debt plus the rebalance bonus, bringing the tick back to the rebalance line. Every position in the tick loses collateral and debt in proportion and stays open. The position has no event of its own for it; the timeline places the rebalance on its history and reads the position before and after.",
       "A liquidation repays the position's debt and takes collateral worth it plus the liquidation bonus. Collateral beyond that stays in the position for the owner. When the collateral cannot cover the debt and the bonus, the liquidator takes all of it, and the debt it did not cover is added to every other position in the pool through the pool's debt index.",
-      "Of each bonus the protocol keeps a share (getLiquidationExpenseRatio: 10% on both pools in September 2026), so the collateral the keeper receives is less than what the position lost. The owner keeps the fxUSD they borrowed.",
+      `Of each bonus the protocol keeps a share${expenseRatio != null ? `, ${Math.round(expenseRatio * 100)}% at the latest read` : ""}, so the collateral the keeper receives is less than what the position lost. The owner keeps the fxUSD they borrowed.`,
       "A redemption is the third way a position changes without its owner: anyone may pay fxUSD into the manager for collateral at the oracle's max price, taken from the highest-ratio ticks first, at most 20% of a tick per pass. Today the manager opens it only while fxUSD trades below its peg; six redemptions have run, all on the wstETH pool in March 2025.",
     ],
     links: [{ label: "f(x) docs", url: FX_DOC_URL }],
@@ -2196,7 +2199,7 @@ export function fxTransferContent(): LearnMoreContent {
       "f(x) V2 positions are ERC-721 tokens minted by the pool contract — the pool is the NFT. Holding the token is owning the position: only the account holding it when the manager is called can withdraw collateral or borrow against it (anyone may add collateral or repay), and it transfers like any NFT. A contract the holder approves, such as f(x)'s router or limit-order manager, can hold it for one transaction and hand it back.",
     extraParagraphs: [
       "A Transfer log moves only the holder record — the position's collateral, debt and tick are untouched. The explorer replays these logs into ownership eras, so each historic event is judged against the owner in force at its block, not the current holder.",
-      "The mint (a Transfer from the zero address) is the position's birth record. A handful of positions were minted via a path that emits no Operate event — for those, the mint transfer is the only dated record of their creation, and their state lives entirely in the settled lane.",
+      "The mint (a transfer from the zero address) is the position's birth record. A handful of positions were minted by a path that logs no deposit or borrow; for those, the mint is the only dated record of their creation, and the pool's current reading is all there is of their state.",
     ],
     links: [{ label: "f(x) docs", url: FX_DOC_URL }],
   };
@@ -2206,7 +2209,7 @@ export function fxEventFallbackContent(): LearnMoreContent {
   return {
     title: "How f(x) Positions Work",
     intro:
-      "f(x) V2 splits yield-bearing collateral into fxUSD (a stable token) and leveraged xPOSITIONs. A position deposits wstETH or WBTC, mints fxUSD against it, and pays a funding rate routed through Aave.",
+      "f(x) V2 splits yield-bearing collateral into fxUSD (a stable token) and leveraged long positions. A position deposits wstETH or WBTC, mints fxUSD against it, and pays a funding rate that follows Aave's borrow rate.",
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -2215,7 +2218,7 @@ export function fxEventFallbackContent(): LearnMoreContent {
       },
       {
         bold: "Settled state",
-        text: "because socialized changes emit no per-position events, current collateral and debt are read from the pool contract's own getPosition view — the same math the protocol itself uses — at a named block.",
+        text: "because changes shared across a tick log no event for the position, current collateral and debt are read from the pool contract, with the same arithmetic the protocol uses, at a named block.",
       },
       {
         bold: "fxUSD",
