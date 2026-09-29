@@ -113,8 +113,11 @@ export function fmtMorphoPrice(p: number): string {
 
 export interface MorphoHealthMove {
   /** The price both sides are valued at: the market oracle at the end of the
-   *  block before the event. */
+   *  block before the event; on a liquidation, the price the liquidation call
+   *  ran on (morphoLiquidationPrice). */
   price: number;
+  /** Set on a liquidation valued at the price its call ran on. */
+  liquidationPrice?: boolean;
   priceBlock: number;
   /** That block's time (unix seconds), where the read carried it. */
   priceBlockTime?: number;
@@ -136,8 +139,15 @@ export interface MorphoHealthMove {
 
 /** The position's health either side of an event, from the row's own
  *  collateral and debt, both valued at the oracle price going into the block.
- *  One price for both sides, so the move is the event's alone. */
-export function morphoHealthMove(ctx: MorphoContext, read: MorphoAtBlock): MorphoHealthMove | null {
+ *  One price for both sides, so the move is the event's alone. A liquidation
+ *  is valued at the price its call ran on — an oracle update earlier in the
+ *  same block moves it off the block-before read — so the before-value is the
+ *  one that made the position liquidatable. */
+export function morphoHealthMove(
+  ctx: MorphoContext,
+  read: MorphoAtBlock,
+  eventBlock?: number,
+): MorphoHealthMove | null {
   if (read.status !== "ok" || !(read.prev.price > 0)) return null;
   if (ctx.collateralAfter == null || ctx.debtAfter == null || ctx.debtBefore == null) return null;
   const collAfter = Number(ctx.collateralAfter);
@@ -149,7 +159,10 @@ export function morphoHealthMove(ctx: MorphoContext, read: MorphoAtBlock): Morph
   const debtBefore = Number(ctx.debtBefore);
   const debtAfter = Number(ctx.debtAfter);
   if (![collAfter, collBefore, debtBefore, debtAfter].every(Number.isFinite)) return null;
-  const price = read.prev.price;
+  const used = ctx.eventType === "liquidation" ? morphoLiquidationPrice(ctx, read, eventBlock) : null;
+  const price = used && used.price > 0 ? used.price : read.prev.price;
+  const priceBlock = used && used.price > 0 && used.block != null ? used.block : read.prev.block;
+  const priceBlockTime = used && used.price > 0 && used.block != null ? used.time : read.prev.timestamp;
   const lltv = read.lltv;
   // A debt under a millionth of a token is dust: no meaningful factor.
   const hf = (c: number, d: number) => (d > 1e-6 ? (c * price * lltv) / d : null);
@@ -157,8 +170,9 @@ export function morphoHealthMove(ctx: MorphoContext, read: MorphoAtBlock): Morph
   const liq = (c: number, d: number) => (d > 1e-6 && c > 0 ? d / (c * lltv) : null);
   return {
     price,
-    priceBlock: read.prev.block,
-    priceBlockTime: read.prev.timestamp,
+    ...(used && used.price > 0 ? { liquidationPrice: true } : {}),
+    priceBlock,
+    priceBlockTime,
     lltv,
     collBefore,
     collAfter,

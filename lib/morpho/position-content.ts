@@ -23,6 +23,10 @@ export function morphoPositionContent(opts: {
   status: "open" | "closed" | "liquidated" | "unread";
   deployment?: MorphoPositionDeployment;
   hasDebt?: boolean;
+  /** What the terminal card's debt peak is: the highest owed at an event,
+   *  interest included ("owed"), the principal peak ("principal"), or not
+   *  recorded on this read ("unrecorded", a listed row). */
+  peakDebt?: "owed" | "principal" | "unrecorded";
 }): LearnMoreContent {
   const onBase = opts.deployment === "morpho-base";
   const deploymentDetail: { bold: string; text: string } = {
@@ -32,11 +36,18 @@ export function morphoPositionContent(opts: {
       : "Morpho Blue is one immutable contract holding every market; each market is isolated, sharing no collateral or lenders with any other.",
   };
 
+  // What the terminal panel shows, said to match its figures.
+  const peaksText =
+    opts.peakDebt === "unrecorded"
+      ? "The panel above shows how it ended; this read does not record its highest collateral and debt."
+      : opts.peakDebt === "owed"
+        ? "The panel above shows the highest collateral it held, the highest debt it owed at any of its events (interest included), and how it ended."
+        : "The panel above shows the highest collateral it held, the highest principal it borrowed, and how it ended.";
+
   if (opts.status === "liquidated") {
     return {
       title: "About This Position",
-      intro:
-        "This position was liquidated once its debt exceeded its market's LLTV × the collateral's oracle value. The panel above reconstructs its final state — the highest recorded collateral and borrowed principal it ever held.",
+      intro: `Liquidators took part of this position's collateral once its debt passed its market's LLTV × the collateral's oracle value. ${peaksText}`,
       detailsHeading: "Key concepts:",
       details: [
         {
@@ -56,13 +67,15 @@ export function morphoPositionContent(opts: {
   if (opts.status === "closed") {
     return {
       title: "About This Position",
-      intro:
-        "This position has repaid its debt and withdrawn its collateral. The panel above shows its lifetime peaks — the highest collateral and borrowed principal it ever held.",
+      intro: `This position has repaid its debt and withdrawn its collateral. ${peaksText}`,
       detailsHeading: "Key concepts:",
       details: [
         {
           bold: "Highest recorded",
-          text: "the peaks are the maximum of the running balances, replayed from the position's own events — principal only, not the interest-bearing current debt.",
+          text:
+            opts.peakDebt === "owed"
+              ? "each peak is the highest of the figures at the position's events; the debt peak includes the interest accrued to that event."
+              : "each peak is the highest of the running balances replayed from the position's events; the debt peak is borrowed principal, without the interest accrued on it.",
         },
         {
           bold: "One line, not two",

@@ -2596,7 +2596,7 @@ export function morphoMarketContent(
       return {
         title: "How Removing Collateral Works",
         intro:
-          "Removing collateral takes some or all of it out of the market. With debt open, the market allows it only while the position stays healthy afterwards.",
+          "Removing collateral takes some or all of it out of the market. With no debt, any amount can be withdrawn at any time, including the collateral a liquidation leaves behind. With debt open, the market allows it only while the position stays healthy afterwards.",
         detailsHeading: "Key concepts:",
         details: [
           {
@@ -2608,11 +2608,6 @@ export function morphoMarketContent(
             bold: "Liquidation comes closer",
             text: "less collateral means a higher LTV and a lower health factor, so a smaller fall in the collateral's price reaches the liquidation line.",
             sources: morphoSources("Collateral, LTV & Health"),
-          },
-          {
-            bold: "No debt, no limit",
-            text: "with nothing borrowed, all of the collateral can be withdrawn at any time.",
-            sources: morphoSources("Market mechanics"),
           },
           {
             bold: "The owner or an authorised account",

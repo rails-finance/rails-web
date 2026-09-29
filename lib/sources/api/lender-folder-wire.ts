@@ -24,6 +24,7 @@ import { ilkDebtMeta, ilkToCollateralSymbol } from "@/lib/makerdao/asset-catalog
 import { MAPLE_SHARE_DECIMALS, maplePoolOf } from "@/lib/maple/asset-catalog";
 import type { Erc20Meta } from "@/lib/sources/chain/erc20-meta";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
+import { MORPHO_LIQUIDATION_REPAID_VERB } from "@/lib/morpho/position-legs";
 import { toServedFolder, type FolderAssetResolver, type UpstreamFolder } from "@/lib/sources/api/timeline-folder-wire";
 
 /** Ink is a wad; the DAI a frob moved is a rad (wad × ray). */
@@ -75,7 +76,14 @@ export function morphoServedFolder(
       return m && !m.unresolved ? m.decimals : undefined;
     },
   };
-  return withLegs(folder, resolve);
+  const served = withLegs(folder, resolve);
+  // A liquidation run's debt leg names who repaid it (MORPHO_LIQUIDATION_REPAID_VERB).
+  return served.kind === "liquidation"
+    ? {
+        ...served,
+        legs: served.legs.map((l) => (l.verb === "Repaid" ? { ...l, verb: MORPHO_LIQUIDATION_REPAID_VERB } : l)),
+      }
+    : served;
 }
 
 /** The key prefix of a Maple shape run's share leg. */

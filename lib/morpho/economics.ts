@@ -184,6 +184,19 @@ export function morphoLifetimeWithOpening(
       f[field] = (f[field] ?? 0) + value;
     }
   }
+  // A liquidation run whose flows carry no debt `liquidated` leg (the index
+  // sends the collateral seized and the interest, not the debt cleared) adds
+  // its header's "Debt cleared" leg — the same Σ of the members' Liquidate
+  // repaid assets the loaded rows sum.
+  for (const folder of folders ?? []) {
+    if (folder.kind !== "liquidation") continue;
+    if (folder.flows?.some((b) => b.key === "debt" && b.legs.liquidated != null)) continue;
+    const leg = folder.legs.find((l) => l.asset === "loan");
+    if (!leg) continue;
+    const value = scaleBaseUnits(leg.amount, leg.decimals);
+    if (value == null) return undefined;
+    f.debtLiquidated = (f.debtLiquidated ?? 0) + value;
+  }
   return f;
 }
 

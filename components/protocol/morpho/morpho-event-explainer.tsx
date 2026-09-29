@@ -83,7 +83,11 @@ export function MorphoEventExplainer({ ctx, txHash, blockNumber, skipLead, event
   const rateEvent = ctx.eventType === "borrow" || ctx.eventType === "repay";
   const prevEventRead = useMorphoAtBlock(ctx.marketId, rateEvent ? neighbours?.prevBlock : undefined, chainId);
   const clauses = eventClauses(
-    morphoEventSlots(ctx, coords, read, { prevEventRead, earlierInTx: neighbours?.earlierInTx }),
+    morphoEventSlots(ctx, coords, read, {
+      prevEventRead,
+      earlierInTx: neighbours?.earlierInTx,
+      prevEvent: neighbours?.prev,
+    }),
   );
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 

@@ -52,6 +52,9 @@ export type BreakdownRow = {
   swatchClass?: string;
   swatchStyle?: CSSProperties;
   indent?: boolean;
+  /** The label wraps onto a second line instead of truncating, and on a phone
+   *  the amount may break between its figure and its token. */
+  wrapLabel?: boolean;
   /** Optional React node rendered after the label (e.g. token icon) */
   icon?: React.ReactNode;
   /** Optional provenance for the amount — when set, the figure becomes
@@ -368,11 +371,13 @@ export function BreakdownTable({ rows }: { rows: BreakdownRow[] }) {
                     labels like "Deposited (all time)" would otherwise swallow
                     it inside the ellipsizing cell). */}
                 <span className="flex min-w-0 items-center">
-                  <span className="truncate">{row.label}</span>
+                  <span className={row.wrapLabel ? "min-w-0" : "truncate"}>{row.label}</span>
                   {row.icon && <span className="ml-1 inline-flex shrink-0 align-middle">{row.icon}</span>}
                 </span>
               </td>
-              <td className={`py-1 pl-3 text-right tabular-nums whitespace-nowrap ${cellBorder}`}>
+              <td
+                className={`py-1 pl-3 text-right tabular-nums whitespace-nowrap ${row.wrapLabel ? "max-sm:whitespace-normal" : ""} ${cellBorder}`}
+              >
                 {row.prov ? (
                   <Prov info={row.prov} value={row.exact}>
                     <RowAmount amount={row.amount} exact={row.exact} />

@@ -30,6 +30,7 @@ import {
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
+  scaleBaseUnits,
   TIMELINE_WINDOW_EVENTS,
   WHOLE_HISTORY,
   type TimelineOpeningBalance,
@@ -317,15 +318,28 @@ export default function MorphoPositionView({
   // case — scripts/verify-morpho-chain.mjs) — the same toAssetsUp conversion,
   // fresher operands (interest accrued to head in view). On any disagreement
   // the backend pairing stays untouched.
-  // A closed card's peak debt: the highest debt OWED after any event (the
-  // share-derived figure each event shows, interest included), where the page
-  // holds the whole history; the index's principal peak stands otherwise.
+  // A terminal card's peak debt: the highest debt OWED at any event, before
+  // or after it (the share-derived figure each event shows, interest
+  // included), where the page holds the whole history; the index's principal
+  // peak stands otherwise. A liquidation run only lowers the debt, so its
+  // highest is the debt going into it (the folder's `stateBefore`); a run of
+  // the owner's own events can peak inside, and the principal peak stands.
   const peakDebtOwed = useMemo(() => {
-    if (historyWindow.state !== "whole" || (servedFolders?.length ?? 0) > 0) return undefined;
+    if (historyWindow.state !== "whole") return undefined;
     let peak = 0;
     for (const e of morphoEvents) {
-      const d = Number(e.context.data.debtAfter);
-      if (!Number.isFinite(d)) return undefined;
+      const after = Number(e.context.data.debtAfter);
+      if (!Number.isFinite(after)) return undefined;
+      const before = e.context.data.debtBefore != null ? Number(e.context.data.debtBefore) : 0;
+      peak = Math.max(peak, after, Number.isFinite(before) ? before : 0);
+    }
+    for (const f of servedFolders ?? []) {
+      if (f.kind !== "liquidation") return undefined;
+      const decimals = f.legs.find((l) => l.asset === "loan")?.decimals;
+      const before = f.stateBefore?.debt;
+      if (decimals == null || before == null) return undefined;
+      const d = scaleBaseUnits(before, decimals);
+      if (d == null) return undefined;
       if (d > peak) peak = d;
     }
     return peak > 0 ? peak : undefined;
@@ -451,7 +465,9 @@ export default function MorphoPositionView({
                     v={liveView}
                     events={morphoEvents}
                     folders={servedFolders}
-                    {...(historyWindow.state === "whole" ? { eventCount: liveView.eventCount } : {})}
+                    {...(historyWindow.state === "whole"
+                      ? { eventCount: liveView.eventCount, liquidationCount: liquidationCount }
+                      : {})}
                   />
                 ) : chain ? (
                   <MorphoPositionExplanation
@@ -481,7 +497,7 @@ export default function MorphoPositionView({
                 />
               );
             })()}
-          <MorphoNeighboursProvider events={morphoEvents}>
+          <MorphoNeighboursProvider events={morphoEvents} folders={servedFolders}>
             <ChainTruthTimeline
               csvExportCeiling={INDEX_ROW_CEILING}
               // Matches `MorphoEventCard`'s own `persistKey={`morpho:${event.id}`}`

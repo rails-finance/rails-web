@@ -293,9 +293,63 @@ import type { MorphoPositionView } from "./morpho-position-card";
 import { formatDate } from "@/lib/date";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
+import { useChainId } from "@/lib/shared/chain-context";
+import { fmtMorphoPrice, useMorphoAtBlock } from "@/lib/morpho/use-market-at-block";
 
 function closureDate(unix: number): string {
   return formatDate(unix);
+}
+
+type Activity = { block: number; at: number } | null;
+
+/** The position's first and last activity, a served folder's edge where one
+ *  is older (or newer) than every loaded row. */
+function firstActivity(rows: BaseActivityEvent[], folders?: readonly ServedFolder[] | null): Activity {
+  let a: Activity = rows[0] ? { block: rows[0].blockNumber, at: rows[0].timestamp } : null;
+  for (const f of folders ?? []) if (!a || f.firstBlock < a.block) a = { block: f.firstBlock, at: f.firstAt };
+  return a;
+}
+function lastActivity(rows: BaseActivityEvent[], folders?: readonly ServedFolder[] | null): Activity {
+  const r = rows[rows.length - 1];
+  let a: Activity = r ? { block: r.blockNumber, at: r.timestamp } : null;
+  for (const f of folders ?? []) if (!a || f.lastBlock > a.block) a = { block: f.lastBlock, at: f.lastAt };
+  return a;
+}
+
+/** The PT collateral's oracle price at the position's first and last
+ *  activity (the price going into each block), and — where it fell — why a
+ *  PT's price can fall before maturity. Nothing while either read is out. */
+function PtPriceRun({
+  marketId,
+  first,
+  last,
+  collSym,
+  loanSym,
+}: {
+  marketId: string;
+  first: Activity;
+  last: Activity;
+  collSym: string;
+  loanSym: string;
+}) {
+  const chainId = useChainId();
+  const a = useMorphoAtBlock(marketId, first?.block, chainId);
+  const b = useMorphoAtBlock(marketId, last && first && last.block !== first.block ? last.block : undefined, chainId);
+  if (!first || !last || a.status !== "ok" || b.status !== "ok") return null;
+  const p0 = a.prev.price;
+  const p1 = b.prev.price;
+  if (!(p0 > 0) || !(p1 > 0)) return null;
+  return (
+    <>
+      {" "}
+      Its oracle price was {fmtMorphoPrice(p0)} {loanSym} per {collSym} at the position&rsquo;s first event (
+      {formatDate(first.at)}) and {fmtMorphoPrice(p1)} {loanSym} at its last ({formatDate(last.at)})
+      {p1 < p0
+        ? "; a PT's price also follows the price of its underlying token and market yields, so it can fall before maturity"
+        : ""}
+      .
+    </>
+  );
 }
 
 export function MorphoClosedPositionExplanation({
@@ -303,12 +357,17 @@ export function MorphoClosedPositionExplanation({
   events,
   folders,
   eventCount,
+  liquidationCount,
 }: {
   v: MorphoPositionView;
   /** The timeline's whole event count; omit where the page cannot count it. */
   eventCount?: number;
+  /** The liquidations in the whole history — the loaded rows plus the members
+   *  of every served liquidation folder. Omit where the page cannot count the
+   *  whole history; the pane then states no number. */
+  liquidationCount?: number;
   /** The position's timeline (morpho events, ascending) — the pane reads how
-   *  the record ended and the seizure tally from the rows already fetched. */
+   *  the record ended from the rows already fetched. */
   events: BaseActivityEvent[];
   /** Every folder the index served, whole and unfiltered — the position's
    *  newest activity can sit inside one, so the closure attribution below
@@ -318,7 +377,7 @@ export function MorphoClosedPositionExplanation({
   if (v.status === "open") return null;
 
   const morpho = events.filter(isMorphoEvent);
-  const liqCount = morpho.filter((e) => e.context.data.eventType === "liquidation").length;
+  const liqCount = liquidationCount;
   // The newest activity overall — a served folder's last member when it is
   // newer than every loaded row, the loaded row otherwise. Morpho's two
   // folder kinds are `liquidation` (pure seizures) and `owner_run` (the
@@ -331,6 +390,15 @@ export function MorphoClosedPositionExplanation({
   // ending is a separate fact (709 of 1,535 liquidated-status positions ended
   // with the seizure; the rest closed by their own hand afterwards).
   const endedBySeizure = newestFolder ? newestFolder.kind === "liquidation" : lastType === "liquidation";
+  // What the owner did after the last seizure, where that seizure is a loaded
+  // row (a seizure inside a folder leaves the rows after it unread here).
+  const lastLiqIdx = morpho.map((e) => e.context.data.eventType).lastIndexOf("liquidation");
+  const lastLiqNewest =
+    lastLiqIdx >= 0 &&
+    !(folders ?? []).some((f) => f.kind === "liquidation" && f.lastBlock > morpho[lastLiqIdx].blockNumber);
+  const after = lastLiqNewest ? morpho.slice(lastLiqIdx + 1).map((e) => e.context.data.eventType) : [];
+  const repaidAfter = after.includes("repay");
+  const withdrawnAfter = after.includes("withdraw_collateral");
 
   // A peak in a token whose decimals did not load is not stated.
   const hasPeakColl = v.peakCollateral > 0 && v.collateralSymbol != null && !v.collateralDecimalsUnread;
@@ -343,10 +411,7 @@ export function MorphoClosedPositionExplanation({
   const lead = endedBySeizure ? (
     <>This position was emptied by liquidation — the final seizure took the last of its collateral to cover its debt:</>
   ) : v.everLiquidated ? (
-    <>
-      This position ran its course and closed — the remaining collateral withdrawn and the debt repaid — with
-      liquidation seizures in its record:
-    </>
+    <>This position closed with liquidations in its record — its debt cleared and the collateral left withdrawn:</>
   ) : v.peakBorrowed > 0 ? (
     <>This position ran its course and closed — the collateral withdrawn and the debt repaid:</>
   ) : (
@@ -404,24 +469,39 @@ export function MorphoClosedPositionExplanation({
 
   const pt = parsePendlePt(v.collateralSymbol);
   if (pt && v.collateralSymbol) {
-    bullets.push(<span key="pendle-pt">{pendlePtSentence(pt, v.collateralSymbol, v.lastTs)}</span>);
+    bullets.push(
+      <span key="pendle-pt">
+        {pendlePtSentence(pt, v.collateralSymbol, v.lastTs)}
+        <PtPriceRun
+          marketId={v.marketId}
+          first={firstActivity(morpho, folders)}
+          last={lastActivity(morpho, folders)}
+          collSym={v.collateralSymbol}
+          loanSym={v.loanSymbol}
+        />
+      </span>,
+    );
   }
 
   if (v.everLiquidated) {
     bullets.push(
       <span key="seizures">
-        {liqCount > 0 ? (
+        {liqCount != null && liqCount > 0 ? (
           <>
-            Liquidation seized it {liqCount} time{liqCount === 1 ? "" : "s"} —{" "}
+            Liquidators seized its collateral {liqCount} time{liqCount === 1 ? "" : "s"}.{" "}
           </>
         ) : (
-          <>Liquidation seized it — </>
+          <>Liquidators seized its collateral. </>
         )}
-        a Morpho liquidation is by parts (a liquidator repays a slice of the debt and takes collateral at the
-        market&rsquo;s fixed discount), so a single seizure need not empty a position.{" "}
+        A Morpho liquidation can take part of a position: a liquidator repays some of the debt and takes collateral
+        worth that amount plus the market&rsquo;s incentive, so one seizure need not empty it.{" "}
         {endedBySeizure
-          ? "Here the final seizure emptied it entirely."
-          : "What remained after the seizures left by the position's own transactions."}{" "}
+          ? "Here the final seizure emptied it."
+          : withdrawnAfter
+            ? repaidAfter
+              ? "After the last seizure the owner repaid the debt left and withdrew the collateral left."
+              : "After the last seizure the owner withdrew the collateral left."
+            : "After the seizures the owner closed the position with transactions of its own."}{" "}
         Seizures in the record are what mark the outcome Liquidated.
       </span>,
     );
@@ -439,6 +519,9 @@ export function MorphoClosedPositionExplanation({
     }
   }
 
+  // The counts: the timeline's events, the owner's transactions behind them
+  // (one transaction can carry several events), and the liquidations.
+  const own = eventCount != null && liqCount != null ? eventCount - liqCount : null;
   bullets.push(
     <span key="closure">
       Its record closed
@@ -448,13 +531,23 @@ export function MorphoClosedPositionExplanation({
           on <H>{closureDate(v.lastTs)}</H>
         </>
       ) : null}
-      , after <H>{v.txCount}</H> transaction{v.txCount === 1 ? "" : "s"} of its own
-      {eventCount != null && eventCount - liqCount > v.txCount ? (
+      {own != null && own >= v.txCount ? (
         <>
-          . The timeline lists {eventCount} events because one transaction can carry several, such as adding collateral
-          and borrowing, or repaying and withdrawing
+          . Its timeline lists {eventCount} events{liqCount ? <>: {own}</> : null} from <H>{v.txCount}</H> transaction
+          {v.txCount === 1 ? "" : "s"} of its own
+          {own > v.txCount ? " (one transaction can carry several, such as adding collateral and borrowing)" : ""}
+          {liqCount ? (
+            <>
+              {" "}
+              and {liqCount} liquidation{liqCount === 1 ? "" : "s"}
+            </>
+          ) : null}
         </>
-      ) : null}
+      ) : (
+        <>
+          , after <H>{v.txCount}</H> transaction{v.txCount === 1 ? "" : "s"} of its own
+        </>
+      )}
       .
     </span>,
   );

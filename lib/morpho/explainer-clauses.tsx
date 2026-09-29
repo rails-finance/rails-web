@@ -68,6 +68,7 @@ import {
   type MorphoAtBlock,
   type MorphoHealthMove,
 } from "@/lib/morpho/use-market-at-block";
+import { blockTimeText } from "@/lib/morpho/oracle-age";
 
 /** A magnitude below this is a rounding leftover, not a real balance.
  *
@@ -151,6 +152,26 @@ function Fig({
 export interface MorphoSlotExtras {
   prevEventRead?: MorphoAtBlock;
   earlierInTx?: MorphoContext["eventType"][];
+  /** The event just before this one (timeline-neighbours). */
+  prevEvent?: { kind: MorphoContext["eventType"]; at: number; run?: number };
+}
+
+const EVENT_NAME: Record<MorphoContext["eventType"], string> = {
+  supply_collateral: "Add Collateral",
+  withdraw_collateral: "Remove Collateral",
+  borrow: "Borrow",
+  repay: "Repay",
+  liquidation: "Liquidation",
+  supply: "Supply",
+  withdraw: "Withdraw",
+};
+
+/** " (the Liquidation at Thu 18 Jun 14:30 UTC, the last of a collapsed run of
+ *  5)" — names the previous event so a reader can find it on the timeline. */
+function prevEventName(prev: MorphoSlotExtras["prevEvent"]): string {
+  if (!prev) return "";
+  const name = EVENT_NAME[prev.kind] ?? prev.kind;
+  return ` (the ${name} at ${blockTimeText(prev.at)}${prev.run ? `, the last of a collapsed run of ${prev.run}` : ""})`;
 }
 
 function morphoEventSlotsBase(
@@ -215,20 +236,21 @@ function morphoEventSlotsBase(
     const part = (n: number) => fmtMorphoPart(n, debtBefore);
     return clause(
       <>
-        The debt reconciles: {part(prevDebt)} {loanSym} after the previous event
+        The debt reconciles: {part(prevDebt)} {loanSym} after the previous event{prevEventName(extra?.prevEvent)}
         {interest > 0 ? (
           <>
-            , plus {part(interest)} of interest since, is {part(debtBefore)}
+            , plus {part(interest)} {loanSym} of interest since, is {part(debtBefore)} {loanSym}
           </>
         ) : null}
-        ; {verb === "borrowed" ? "plus" : "less"} the {part(moved)} {verb}, {part(rs.borrowedAfter)} {loanSym}.
+        ; {verb === "borrowed" ? "plus" : "less"} the {part(moved)} {loanSym} {verb}, {part(rs.borrowedAfter)} {loanSym}
+        .
       </>,
     );
   };
 
   // The health factor either side of the event, at the oracle price going
   // into the block — one sentence per event, graded near the line.
-  const move = read ? morphoHealthMove(ctx, read) : null;
+  const move = read ? morphoHealthMove(ctx, read, coords.blockNumber) : null;
   const priceAt = move ? (
     <>
       at {collSym} {fmtMorphoPrice(move.price)} {loanSym}, the market oracle&rsquo;s price at{" "}
@@ -241,20 +263,16 @@ function morphoEventSlotsBase(
     const pct = (1 - 1 / hf) * 100;
     return pct < 10 ? pct.toFixed(1) : String(Math.round(pct));
   };
-  const fall = (hf: number, tail: string) =>
-    `a fall of about ${fallPct(hf)}% in the ${collSym} price (in ${loanSym}) would reach ${tail}`;
-  // Graded near the line; `always` (a borrow, a withdrawal) states the
-  // distance at any health factor.
+  const fall = (hf: number) =>
+    `a fall of about ${fallPct(hf)}% in the ${collSym} price (in ${loanSym}) would make it liquidatable`;
+  // Stated as the distance near the line; `always` (a borrow, a withdrawal)
+  // states it at any health factor.
   const grade = (hf: number, always = false): ReactNode =>
     hf < 1
       ? ", below 1, where the position can be liquidated"
-      : hf < 1.1
-        ? always
-          ? `, close to the liquidation line at 1: ${fall(hf, "it")}`
-          : ", close to the liquidation line at 1"
-        : hf < 1.2 || (always && hf < 100)
-          ? `; ${fall(hf, "the liquidation line")}`
-          : "";
+      : hf < 1.2 || (always && hf < 100)
+        ? `; ${fall(hf)}`
+        : "";
   const distanceAlways = ctx.eventType === "borrow" || ctx.eventType === "withdraw_collateral";
   const hfSentence = (extra?: ReactNode): ClauseInput => {
     if (!move) return null;
@@ -465,8 +483,8 @@ function morphoEventSlotsBase(
           ? clause(
               <>
                 The {fmtMorphoPart(Math.abs(delta), delta)} {loanSym} repaid is the {fmtMorphoPart(prevDebt, delta)}{" "}
-                owed after the previous event plus {b(fmtMorphoPart(interest, delta))} {loanSym} of interest accrued
-                since.
+                owed after the previous event{prevEventName(extra?.prevEvent)} plus {b(fmtMorphoPart(interest, delta))}{" "}
+                {loanSym} of interest accrued since.
               </>,
             )
           : rs.debtCleared && rs.principalOvershoot
@@ -614,10 +632,9 @@ function liquidationSlots(
   const changed: ClauseInput[] = [];
   if (used) {
     const priceText = `${collSym} ${fmtMorphoPrice(used.price)} ${loanSym}`;
-    const hfBefore =
-      h.move && ctx.debtBefore != null && used.price > 0 && read?.status === "ok"
-        ? (h.move.collBefore * used.price * read.lltv) / Number(ctx.debtBefore)
-        : null;
+    // The health factor at the price the call ran on — the figure the opened
+    // card's health cell shows as its before-value.
+    const hfBefore = h.move?.liquidationPrice ? h.move.hfBefore : null;
     changed.push(
       clause(
         <>
@@ -625,8 +642,8 @@ function liquidationSlots(
           {used.block != null ? atBlockText(used.block, used.time) : "the liquidation's block"}
           {hfBefore != null ? (
             <>
-              , where the position&rsquo;s health factor was {b(fmtMorphoHf(hfBefore))}: below 1, so anyone could
-              liquidate it
+              , where the position&rsquo;s health factor was {b(fmtMorphoHf(hfBefore))}
+              {hfBefore < 1 ? ": below 1, so anyone could liquidate it" : ""}
             </>
           ) : null}
           .

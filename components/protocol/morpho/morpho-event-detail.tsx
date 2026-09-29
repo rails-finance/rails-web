@@ -238,11 +238,17 @@ function MorphoRiskCards({
     price: move.price,
     priceBlock: move.priceBlock,
     lltv: move.lltv,
+    liquidation: move.liquidationPrice,
   });
   const hfText = (hf: number | null) => (hf == null ? "no debt" : fmtMorphoHf(hf));
   const ltvText = (l: number | null) =>
     l == null ? "no debt" : l > 0 && l < 0.001 ? "<0.1%" : `${(l * 100).toFixed(1)}%`;
-  const priceNote = (
+  const priceNote = move.liquidationPrice ? (
+    <>
+      at {collSym} {fmtMorphoPrice(move.price)} {loanSym}, the market oracle at{" "}
+      {atBlockText(move.priceBlock, move.priceBlockTime)}: the price the liquidation ran at
+    </>
+  ) : (
     <>
       at {collSym} {fmtMorphoPrice(move.price)} {loanSym}, the market oracle at{" "}
       {atBlockText(move.priceBlock, move.priceBlockTime)}
@@ -434,7 +440,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
   }
 
   const forensics = ctx.eventType === "liquidation" ? buildMorphoLiqForensics(ctx, coords, flows, read) : undefined;
-  const move = morphoHealthMove(ctx, read);
+  const move = morphoHealthMove(ctx, read, blockNumber);
 
   return (
     <>

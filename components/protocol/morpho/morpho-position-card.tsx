@@ -218,7 +218,11 @@ export function MorphoPositionCard({
           receipts={receipts}
           explanation={explanation}
           viewHref={viewHref}
-          learnMore={morphoPositionContent({ status: v.status, deployment: positionDeployment })}
+          learnMore={morphoPositionContent({
+            status: v.status,
+            deployment: positionDeployment,
+            peakDebt: "unrecorded",
+          })}
         >
           <ClosedPositionStats
             outcome={v.status}
@@ -332,7 +336,11 @@ export function MorphoPositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={morphoPositionContent({ status: v.status, deployment: positionDeployment })}
+        learnMore={morphoPositionContent({
+          status: v.status,
+          deployment: positionDeployment,
+          peakDebt: v.peaksPartial ? "unrecorded" : v.peakDebtOwed != null && v.peakDebtOwed > 0 ? "owed" : "principal",
+        })}
       >
         <ClosedPositionStats
           outcome={v.status}

@@ -53,3 +53,7 @@ export function morphoHasCollateralRaw(collateralRaw: string | null | undefined)
 export function morphoHasDebt(borrowSharesRaw: string | null | undefined): boolean {
   return morphoRawAbove(borrowSharesRaw, MORPHO_SHARE_DUST);
 }
+
+/** The verb on a liquidation run's debt leg. A liquidator repays the debt, so
+ *  the run's header says who did, and "Repaid" is not read as the borrower's. */
+export const MORPHO_LIQUIDATION_REPAID_VERB = "Liquidators repaid";

@@ -16,6 +16,7 @@ import { renderRunFolders, DANGER_FOLDER_BADGE } from "@/lib/shared/run-folders"
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
+import { MORPHO_LIQUIDATION_REPAID_VERB } from "@/lib/morpho/position-legs";
 
 /** Runs shorter than this stay as individual cards — the four-row floor every
  *  explorer's liquidation run uses. */
@@ -41,7 +42,12 @@ export const MORPHO_LIQUIDATION_RUNS: TimelineRunSpec[] = [
           })),
         );
         const aggregates: RunAggregate[] = [
-          ...[...repaid].map(([symbol, value]) => ({ verb: "Repaid", value, symbol, provWhat: "Debt cleared" })),
+          ...[...repaid].map(([symbol, value]) => ({
+            verb: MORPHO_LIQUIDATION_REPAID_VERB,
+            value,
+            symbol,
+            provWhat: "Debt cleared",
+          })),
           ...[...seized].map(([symbol, value]) => ({ verb: "Seized", value, symbol, provWhat: "Collateral seized" })),
         ];
         const count = events.length;

@@ -232,7 +232,23 @@ export function MorphoBasePositionSection({
           }
           explanation={
             view.status !== "open" ? (
-              <MorphoClosedPositionExplanation v={view} events={events} folders={servedFolders} />
+              <MorphoClosedPositionExplanation
+                v={view}
+                events={events}
+                folders={servedFolders}
+                // The counts are stated only where the rows and folders drawn are the whole history.
+                {...(events.length + (servedFolders ?? []).reduce((n, f) => n + f.count, 0) === view.eventCount
+                  ? {
+                      eventCount: view.eventCount,
+                      liquidationCount:
+                        events.filter((e) => e.context.data.eventType === "liquidation").length +
+                        (servedFolders ?? []).reduce(
+                          (n, f) => n + (f.counts.find((c) => c.key === "liquidation")?.count ?? 0),
+                          0,
+                        ),
+                    }
+                  : {})}
+              />
             ) : live ? (
               <MorphoPositionExplanation
                 chain={live}

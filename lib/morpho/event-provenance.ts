@@ -595,12 +595,14 @@ export const morphoHealthAtEventProv = (
   collSym: string,
   loanSym: string,
   coords: MorphoCoords,
-  vals: { collateral: string; debt: string; price: number; priceBlock: number; lltv: number },
+  vals: { collateral: string; debt: string; price: number; priceBlock: number; lltv: number; liquidation?: boolean },
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
   verify: oracleReadVerify(vals.priceBlock),
-  summary: `The position's ${metric} ${side} this event: its ${collSym} collateral and ${loanSym} debt ${side} the event, as this row states them, with the collateral valued at the market's own oracle at the end of block ${vals.priceBlock}. Both sides use that one price, so the move is the event's alone.`,
+  summary: vals.liquidation
+    ? `The position's ${metric} ${side} this liquidation: its ${collSym} collateral and ${loanSym} debt ${side} it, as this row states them, with the collateral valued at the oracle price the liquidation ran at — the read, at the end of block ${vals.priceBlock}, that reproduces seized = repaid × incentive ÷ price. Both sides use that one price, so the move is the liquidation's alone.`
+    : `The position's ${metric} ${side} this event: its ${collSym} collateral and ${loanSym} debt ${side} the event, as this row states them, with the collateral valued at the market's own oracle at the end of block ${vals.priceBlock}. Both sides use that one price, so the move is the event's alone.`,
   contract: MORPHO,
   via: `market oracle price() at block ${vals.priceBlock} · row collateral and debt`,
   formula: metric === "health factor" ? "collateral × price × LLTV ÷ debt" : "debt ÷ (collateral × price)",

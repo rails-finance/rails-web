@@ -402,6 +402,9 @@ function buildSide(
   } = opts;
   const sc = (l: TowerLine) => Math.max(0, lineScalar(l, valued));
   const cmp = (n: number) => (opts.fullAmounts ? formatNumber(n) : formatCompact(n));
+  // Full token amounts (a Morpho-only opt-in) name their token on every row.
+  const cmpUnit = (n: number, symbol: string | undefined) =>
+    opts.fullAmounts && symbol ? `${cmp(n)} ${symbol}` : cmp(n);
   const interestLine = withInterest && side.interest && side.interest.amount > 0 ? side.interest : null;
   const receivedLines = side.received ?? [];
   const receivedTotal = receivedLines.reduce((s, l) => s + sc(l), 0);
@@ -544,7 +547,9 @@ function buildSide(
     rows.push({
       sign: "",
       label: `${inflowLabel} (all time)`,
-      amount: valued ? formatCompactUsd(side.lifetimeInflow) : cmp(side.lifetimeInflow),
+      // Full token amounts (a Morpho-only opt-in) name their token, as the
+      // other rows do, and the label wraps rather than clipping beside them.
+      amount: valued ? formatCompactUsd(side.lifetimeInflow) : cmpUnit(side.lifetimeInflow, sideSymbol ?? undefined),
       exact: valued ? undefined : formatNumber(side.lifetimeInflow),
       icon: sideSymbol ? chip(sideSymbol, sideAddress) : undefined,
       swatchStyle: { backgroundColor: flowColor },
@@ -651,7 +656,7 @@ function buildSide(
     rows.push({
       sign: "",
       label: l.heldLabel ?? l.symbol,
-      amount: cmp(l.amount),
+      amount: l.heldLabel ? cmpUnit(l.amount, l.symbol) : cmp(l.amount),
       exact: formatNumber(l.amount),
       symbol: l.symbol,
       icon: chip(l.symbol, l.address),
@@ -694,7 +699,7 @@ function buildSide(
     rows.push({
       sign: "+",
       label: opts.interestLabel ?? "Accrued interest",
-      amount: cmp(interestLine.amount),
+      amount: cmpUnit(interestLine.amount, interestLine.symbol),
       exact: formatNumber(interestLine.amount),
       symbol: interestLine.symbol,
       usdHint: hintUsd(interestLine) != null ? formatCompactUsd(hintUsd(interestLine)!) : undefined,
@@ -803,7 +808,9 @@ function buildSide(
 
   return {
     segments,
-    breakdownRows: rows,
+    // Full token amounts (a Morpho-only opt-in) run long: their rows wrap
+    // rather than clip.
+    breakdownRows: opts.fullAmounts ? rows.map((r) => ({ ...r, wrapLabel: true })) : rows,
     sideBar,
     placeholder: segments.length === 0 ? <EmptyTower label={`No ${resultLabel.toLowerCase()}`} /> : undefined,
   };

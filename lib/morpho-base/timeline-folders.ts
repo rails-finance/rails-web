@@ -33,6 +33,7 @@
 
 import type { BaseActivityEvent, MorphoContext } from "@/lib/shared/types/event-shape";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
+import { MORPHO_LIQUIDATION_REPAID_VERB } from "@/lib/morpho/position-legs";
 import type { TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
 import {
@@ -131,13 +132,13 @@ export function morphoBaseFolderSpecs(
       match: (e) => dataOf(e)?.eventType === "liquidation",
       min: MIN_LIQUIDATION_RUN,
       kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
-      // "Repaid" is the loan the liquidation cleared (repaid plus any bad
-      // debt), "Seized" the collateral taken, in the client spec's order.
+      // "Liquidators repaid" is the loan the liquidation cleared (repaid plus
+      // any bad debt), "Seized" the collateral taken, in the client spec's order.
       legsOf: (e) => {
         const r = rowOf(e);
         return r
           ? [
-              leg("Repaid", "loan", r.assets, "Debt cleared"),
+              leg(MORPHO_LIQUIDATION_REPAID_VERB, "loan", r.assets, "Debt cleared"),
               leg("Seized", "collateral", r.collateral, "Collateral seized"),
             ]
           : [];
