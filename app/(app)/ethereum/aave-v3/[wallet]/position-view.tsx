@@ -53,6 +53,8 @@ import { AAVE_V3_FOLDER_REGISTER, AAVE_V3_TIMELINE_RUNS } from "@/lib/aave-v3/ti
 import { fetchAaveV3GroupedTimeline, type AaveV3GroupedTimelineResponse } from "@/lib/api/fetch-aave-v3-timeline";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { aaveV3FlowTimeline } from "@/lib/aave-v3/flows-timeline";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
 import { aaveV3CountNote, aaveV3CountSplit, aaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
@@ -576,6 +578,18 @@ export default function AaveV3PositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
+  // Lifetime flows over time (rails-ops TO-DO-ui-jobs §141): the date
+  // scrubber leads the panel and the ledger sits one click under it. It needs
+  // the whole history on the page, so a windowed or folder-served page keeps
+  // the ledger alone.
+  const flowTimeline = useMemo(
+    () =>
+      towerData && view && historyWindow.state === "whole" && (servedFolders?.length ?? 0) === 0
+        ? aaveV3FlowTimeline(aaveEvents, towerData, view.priceByAddress)
+        : null,
+    [towerData, view, historyWindow.state, servedFolders, aaveEvents],
+  );
+
   // The top row's price dropdown: the on-chain oracle
   // price of each reserve the account currently holds.
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
@@ -643,7 +657,6 @@ export default function AaveV3PositionDetail({
               <AaveV3PositionCard
                 v={liveView}
                 receipts
-                countNote={countNote}
                 viewHref={tl.viewHref}
                 captions={captions ?? undefined}
                 // The risk slot rides the card's heading-button row (the V2 trove
@@ -690,6 +703,7 @@ export default function AaveV3PositionDetail({
                 data={towerData}
                 explanation={aaveV3EconomicsExplanation(towerData)}
                 learnMore={aaveV3EconomicsContent({}, towerData)}
+                timeline={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : undefined}
               />
             )}
             <ChainTruthTimeline

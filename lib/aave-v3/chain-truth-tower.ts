@@ -202,6 +202,186 @@ const supplyOut = (r: ReserveFlows): number =>
 /** Everything that left one reserve's debt, interest aside. */
 const debtOut = (r: ReserveFlows): number => r.repaid + legOf(r, "repaidBySwap") + r.liquidatedDebt + r.writtenOff;
 
+/** One leg an event adds to one reserve's lifetime flows. `leg` null is a
+ *  reserve the event names without moving it (the reducer still lists it). */
+export interface AaveV3EventLeg {
+  symbol: string;
+  address?: string;
+  leg: FlowLeg | null;
+  /** Token units; the reducer skips a zero or non-finite amount. */
+  amount: number;
+  /** USD per token at the event's block, where the event carries it. */
+  price?: number;
+  /** A repay paid with the position's own collateral (a repay-with-collateral
+   *  swap's debt leg): the same act as that swap's "Sold to repay". */
+  fromCollateral?: true;
+  /** A liquidation's protocol fee to the Aave treasury. */
+  treasuryFee?: true;
+}
+
+/** The transactions that carry a liquidation: an aToken transfer to the Aave
+ *  treasury in one is that liquidation's protocol fee (liquidation-fee.ts),
+ *  collateral the liquidation took from the position. */
+export function aaveV3LiquidationTxs(events: BaseActivityEvent[]): Set<string | undefined> {
+  return new Set(
+    events
+      .filter((e) => isAaveV3Event(e) && e.context.data.eventType === "liquidation")
+      .map((e) => e.txHash?.toLowerCase()),
+  );
+}
+
+/** The legs one event adds to the lifetime flows, in the order the reducer
+ *  applies them. The ledger's reducer (below) and the date scrubber
+ *  (lib/aave-v3/flows-timeline.ts) both read this, so the two classify every
+ *  event the same way. */
+export function aaveV3EventLegs(ev: BaseActivityEvent, liqTxs: Set<string | undefined>): AaveV3EventLeg[] {
+  if (!isAaveV3Event(ev)) return [];
+  const out: AaveV3EventLeg[] = [];
+  const ctx = ev.context.data;
+  const px = ctx.price?.usd;
+  if (ctx.eventType === "liquidation") {
+    const seized = Math.abs(Number(ctx.liquidatedCollateralAmount));
+    const covered = Math.abs(Number(ctx.debtToCover));
+    // flows: [collateral out, debt out] — addresses for pricing.
+    const collAddr = ctx.collateralAsset ?? ev.flows[0]?.token;
+    const debtAddr = ev.flows[1]?.token;
+    if (ctx.collateralSymbol && Number.isFinite(seized))
+      out.push({
+        symbol: ctx.collateralSymbol,
+        address: collAddr,
+        leg: "liquidatedCollateral",
+        amount: seized,
+        price: ctx.collateralPrice?.usd,
+      });
+    if (ctx.reserveSymbol && Number.isFinite(covered))
+      out.push({
+        symbol: ctx.reserveSymbol,
+        address: debtAddr,
+        leg: "liquidatedDebt",
+        amount: covered,
+        price: ctx.debtPrice?.usd,
+      });
+    return out;
+  }
+  if (
+    ctx.eventType === "transfer_out" &&
+    isAaveCollector(ctx.counterparty) &&
+    liqTxs.has(ev.txHash?.toLowerCase()) &&
+    ctx.reserveSymbol
+  ) {
+    const fee = Math.abs(Number(ctx.amount));
+    if (Number.isFinite(fee) && fee > 0)
+      out.push({
+        symbol: ctx.reserveSymbol,
+        address: ctx.reserve ?? ev.flows[0]?.token,
+        leg: "liquidatedCollateral",
+        amount: fee,
+        price: px,
+        treasuryFee: true,
+      });
+    return out;
+  }
+  const mag = Math.abs(Number(ctx.amount));
+  if (!ctx.reserveSymbol || !Number.isFinite(mag) || mag === 0) return out;
+  const symbol = ctx.reserveSymbol;
+  const address = ev.flows[0]?.token;
+  const own = (leg: FlowLeg | null) => out.push({ symbol, address, leg, amount: mag, price: px });
+  if (ctx.eventType === "swap") {
+    const s = ctx.swap;
+    // A debt swap's repays (the old debt, and the new debt's unused part)
+    // are their own row, so "Repaid" keeps the owner's own repayments.
+    const add = (sym: string, addr: string | undefined, action: string | undefined, amount: number, price?: number) => {
+      const leg: FlowLeg | null = !Number.isFinite(amount)
+        ? null
+        : action === "supply"
+          ? // What a collateral swap bought and supplied is its own row too, so
+            // "Deposited" keeps what came from the wallet.
+            s?.kind === "collateral_swap"
+            ? "swappedIn"
+            : "supplied"
+          : action === "borrow"
+            ? "borrowed"
+            : action === "repay"
+              ? s?.kind === "debt_swap"
+                ? "repaidBySwap"
+                : "repaid"
+              : null;
+      out.push({
+        symbol: sym,
+        address: addr,
+        leg,
+        amount,
+        price,
+        ...(leg === "repaid" && s?.kind === "repay_with_collateral" ? { fromCollateral: true as const } : {}),
+      });
+    };
+    // The given leg: supplied collateral that left under the owner's order
+    // (an aToken transfer to the adapter or settlement) counts as leaving
+    // at its net figure, the card's; a debt swap's repay is a repay.
+    if (s?.givenAction === "transfer_out")
+      own(
+        s.kind === "repay_with_collateral"
+          ? "soldToRepay"
+          : s.kind === "withdraw_and_swap"
+            ? "withdrawnSwapped"
+            : "swappedOut",
+      );
+    // A supply from a swap: aTokens bought with wallet tokens arrive.
+    else if (s?.givenAction === "transfer_in") own("supplied");
+    else add(symbol, address, s?.givenAction, mag, px);
+    const rpx = s?.receivedPrice?.usd;
+    if (s?.events) {
+      // A ParaSwap swap's rows behind the card (server mig 248): the Pool
+      // rows count as their own flows, except the aToken transfer and the
+      // collateral supplied back unused, both inside the net given leg.
+      for (const e of s.events) {
+        if (!e.symbol || e.action === "transfer_out" || e.leg === "given") continue;
+        if (e.leftover && e.action === "supply" && s.givenAction === "transfer_out") continue;
+        add(e.symbol, e.asset, e.action, Math.abs(Number(e.amount)), e.symbol === s.receivedSymbol ? rpx : undefined);
+      }
+      return out;
+    }
+    // A withdraw and swap's bought token left the position: no reserve of it.
+    if (s?.receivedSymbol && s.receivedAction !== "trade" && s.receivedAction !== "transfer_in")
+      add(
+        s.receivedSymbol,
+        s.receivedAsset ?? ev.flows[1]?.token,
+        s.receivedAction,
+        Math.abs(Number(s.receivedAmount)),
+        rpx,
+      );
+    else if (s?.receivedSymbol && s.receivedAction === "transfer_in")
+      // aTokens of another reserve the order bought into the position.
+      out.push({
+        symbol: s.receivedSymbol,
+        address: s.receivedAsset ?? ev.flows[1]?.token,
+        leg: "swappedIn",
+        amount: Math.abs(Number(s.receivedAmount)),
+        price: rpx,
+      });
+    return out;
+  }
+  // aToken transfers: a transfer to a WETH gateway is the first step of a
+  // withdrawal to ETH (the gateway withdraws and unwraps it in the same
+  // transaction); any other is custody moving to or from another account.
+  if (ctx.eventType === "transfer_out") own(isWethGateway(ctx.counterparty) ? "withdrawn" : "transferredOut");
+  else if (ctx.eventType === "transfer_in") own("transferredIn");
+  else if (ctx.eventType === "supply") own("supplied");
+  else if (ctx.eventType === "withdraw") own("withdrawn");
+  else if (ctx.eventType === "borrow") own("borrowed");
+  else if (ctx.eventType === "repay") own("repaid");
+  // bad_debt_written_off: a debt OUTFLOW. The Pool burned this much of the
+  // reserve's debt with nothing repaid (DeficitCreated), so it left the
+  // position exactly as a repay or a liquidation cover does, and the debt
+  // side's principal, interest split and conservation gates must all see
+  // it leave. Left out, every written-off wallet's lifetime debt was
+  // under-counted by the burn and its interest split read the burn as
+  // principal still owed (rails-ops TO-DO-ui-jobs §20).
+  else if (ctx.eventType === "bad_debt_written_off") own("writtenOff");
+  else own(null);
+  return out;
+}
+
 function foldAaveV3Lifetime(events: BaseActivityEvent[]): Map<string, ReserveFlows> {
   const flows = new Map<string, ReserveFlows>();
   const get = (symbol: string, address?: string): ReserveFlows => {
@@ -219,132 +399,13 @@ function foldAaveV3Lifetime(events: BaseActivityEvent[]): Map<string, ReserveFlo
     flows.set(symbol, cur);
     return cur;
   };
-
-  // The transactions that carry a liquidation: an aToken transfer to the Aave
-  // treasury in one is that liquidation's protocol fee (liquidation-fee.ts),
-  // collateral the liquidation took from the position.
-  const liqTxs = new Set(
-    events
-      .filter((e) => isAaveV3Event(e) && e.context.data.eventType === "liquidation")
-      .map((e) => e.txHash?.toLowerCase()),
-  );
-
-  for (const ev of events) {
-    if (!isAaveV3Event(ev)) continue;
-    const ctx = ev.context.data;
-    const px = ctx.price?.usd;
-    if (ctx.eventType === "liquidation") {
-      const seized = Math.abs(Number(ctx.liquidatedCollateralAmount));
-      const covered = Math.abs(Number(ctx.debtToCover));
-      // flows: [collateral out, debt out] — addresses for pricing.
-      const collAddr = ctx.collateralAsset ?? ev.flows[0]?.token;
-      const debtAddr = ev.flows[1]?.token;
-      if (ctx.collateralSymbol && Number.isFinite(seized))
-        addLeg(get(ctx.collateralSymbol, collAddr), "liquidatedCollateral", seized, ctx.collateralPrice?.usd);
-      if (ctx.reserveSymbol && Number.isFinite(covered))
-        addLeg(get(ctx.reserveSymbol, debtAddr), "liquidatedDebt", covered, ctx.debtPrice?.usd);
-      continue;
+  const liqTxs = aaveV3LiquidationTxs(events);
+  for (const ev of events)
+    for (const l of aaveV3EventLegs(ev, liqTxs)) {
+      const r = get(l.symbol, l.address);
+      if (l.leg) addLeg(r, l.leg, l.amount, l.price);
+      if (l.treasuryFee) r.treasuryFee = (r.treasuryFee ?? 0) + l.amount;
     }
-    if (
-      ctx.eventType === "transfer_out" &&
-      isAaveCollector(ctx.counterparty) &&
-      liqTxs.has(ev.txHash?.toLowerCase()) &&
-      ctx.reserveSymbol
-    ) {
-      const fee = Math.abs(Number(ctx.amount));
-      if (Number.isFinite(fee) && fee > 0) {
-        const r = get(ctx.reserveSymbol, ctx.reserve ?? ev.flows[0]?.token);
-        addLeg(r, "liquidatedCollateral", fee, px);
-        r.treasuryFee = (r.treasuryFee ?? 0) + fee;
-      }
-      continue;
-    }
-    const mag = Math.abs(Number(ctx.amount));
-    if (!ctx.reserveSymbol || !Number.isFinite(mag) || mag === 0) continue;
-    const r = get(ctx.reserveSymbol, ev.flows[0]?.token);
-    if (ctx.eventType === "swap") {
-      const s = ctx.swap;
-      // A debt swap's repays (the old debt, and the new debt's unused part)
-      // are their own row, so "Repaid" keeps the owner's own repayments.
-      const add = (into: ReserveFlows, action: string | undefined, amount: number, price?: number) => {
-        if (!Number.isFinite(amount)) return;
-        // What a collateral swap bought and supplied is its own row too, so
-        // "Deposited" keeps what came from the wallet.
-        if (action === "supply") addLeg(into, s?.kind === "collateral_swap" ? "swappedIn" : "supplied", amount, price);
-        else if (action === "borrow") addLeg(into, "borrowed", amount, price);
-        else if (action === "repay") addLeg(into, s?.kind === "debt_swap" ? "repaidBySwap" : "repaid", amount, price);
-      };
-      // The given leg: supplied collateral that left under the owner's order
-      // (an aToken transfer to the adapter or settlement) counts as leaving
-      // at its net figure, the card's; a debt swap's repay is a repay.
-      if (s?.givenAction === "transfer_out") {
-        const bucket =
-          s.kind === "repay_with_collateral"
-            ? "soldToRepay"
-            : s.kind === "withdraw_and_swap"
-              ? "withdrawnSwapped"
-              : "swappedOut";
-        addLeg(r, bucket, mag, px);
-      } else if (s?.givenAction === "transfer_in") {
-        // A supply from a swap: aTokens bought with wallet tokens arrive.
-        addLeg(r, "supplied", mag, px);
-      } else add(r, s?.givenAction, mag, px);
-      const rpx = s?.receivedPrice?.usd;
-      if (s?.events) {
-        // A ParaSwap swap's rows behind the card (server mig 248): the Pool
-        // rows count as their own flows, except the aToken transfer and the
-        // collateral supplied back unused, both inside the net given leg.
-        for (const e of s.events) {
-          if (!e.symbol || e.action === "transfer_out" || e.leg === "given") continue;
-          if (e.leftover && e.action === "supply" && s.givenAction === "transfer_out") continue;
-          add(
-            get(e.symbol, e.asset),
-            e.action,
-            Math.abs(Number(e.amount)),
-            e.symbol === s.receivedSymbol ? rpx : undefined,
-          );
-        }
-        continue;
-      }
-      // A withdraw and swap's bought token left the position: no reserve of it.
-      if (s?.receivedSymbol && s.receivedAction !== "trade" && s.receivedAction !== "transfer_in")
-        add(
-          get(s.receivedSymbol, s.receivedAsset ?? ev.flows[1]?.token),
-          s.receivedAction,
-          Math.abs(Number(s.receivedAmount)),
-          rpx,
-        );
-      else if (s?.receivedSymbol && s.receivedAction === "transfer_in") {
-        // aTokens of another reserve the order bought into the position.
-        const into = get(s.receivedSymbol, s.receivedAsset ?? ev.flows[1]?.token);
-        addLeg(into, "swappedIn", Math.abs(Number(s.receivedAmount)), rpx);
-      }
-      continue;
-    }
-    // aToken transfers: a transfer to a WETH gateway is the first step of a
-    // withdrawal to ETH (the gateway withdraws and unwraps it in the same
-    // transaction); any other is custody moving to or from another account.
-    if (ctx.eventType === "transfer_out") {
-      addLeg(r, isWethGateway(ctx.counterparty) ? "withdrawn" : "transferredOut", mag, px);
-      continue;
-    }
-    if (ctx.eventType === "transfer_in") {
-      addLeg(r, "transferredIn", mag, px);
-      continue;
-    }
-    if (ctx.eventType === "supply") addLeg(r, "supplied", mag, px);
-    else if (ctx.eventType === "withdraw") addLeg(r, "withdrawn", mag, px);
-    else if (ctx.eventType === "borrow") addLeg(r, "borrowed", mag, px);
-    else if (ctx.eventType === "repay") addLeg(r, "repaid", mag, px);
-    // bad_debt_written_off: a debt OUTFLOW. The Pool burned this much of the
-    // reserve's debt with nothing repaid (DeficitCreated), so it left the
-    // position exactly as a repay or a liquidation cover does, and the debt
-    // side's principal, interest split and conservation gates must all see
-    // it leave. Left out, every written-off wallet's lifetime debt was
-    // under-counted by the burn and its interest split read the burn as
-    // principal still owed (rails-ops TO-DO-ui-jobs §20).
-    else if (ctx.eventType === "bad_debt_written_off") addLeg(r, "writtenOff", mag, px);
-  }
   return flows;
 }
 

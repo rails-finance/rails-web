@@ -1617,8 +1617,8 @@ for (const f of FIXTURES) {
 //       least" — and the map cell's own figure (on a windowed page the
 //       month is chosen wholly above the cut, so the two count one set);
 //   G3  the folders left standing are exactly the ones whose span meets the
-//       month, and every one of them is open (a date filter opens what covers
-//       the dates);
+//       month (since rails-ops decision 0021's 2026-09-29 amendment a folder
+//       never straddles a month, so each stands whole and shut);
 //   G4  the same month again clears the selection and the count line returns;
 //   G5  a day carried in the URL, on the busiest day a folder covers: the
 //       line counts that day's loose events plus the members the folders'
