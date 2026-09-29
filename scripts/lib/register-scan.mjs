@@ -334,8 +334,6 @@ export const GENERIC_ALLOWLIST = {
   "lib/compound-v2/explainer-clauses.tsx": [
     "Interest accrues continuously, so any gap from the previous event’s figure is that interest, not new borrowing.",
   ],
-  // §5.2 — gated on the event exhibiting a draw.
-  "lib/liquity-v1/explainer-clauses.tsx": ["A one-time borrowing fee is included in the amount drawn."],
   // The no-change-adjust mode's moral (zero-delta bot retries).
   "lib/liquity/explainer-clauses.tsx": ["Each attempt costs the sender only gas."],
   // §5.3 forward path after cancelling a withdrawal request.

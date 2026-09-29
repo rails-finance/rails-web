@@ -4,13 +4,15 @@ import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { resolveBranch as asymmetryBranch } from "@/lib/asymmetry/asset-catalog";
 import { resolveBranch as ebisuBranch } from "@/lib/ebisu/asset-catalog";
 import { resolveBranch as basedollarBranch } from "@/lib/basedollar/asset-catalog";
+import { LIQUITY_V1_ADDRESSES, ASSET_DECIMALS } from "@/lib/liquity-v1/asset-catalog";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
-// A liquidated Trove's collateral surplus at the head — still claimable, or
-// claimed — for any Liquity-V2-architecture explorer (lib/sources/chain/
+// A Trove's collateral surplus at the head — still claimable, or claimed — for
+// any Liquity-V2-architecture explorer and for Liquity V1 (lib/sources/chain/
 // liquity-coll-surplus.ts). `?protocol=` names the explorer, `?branch=` the
-// collateral branch, `?owner=` the Trove's last owner and `?tx=` the
-// liquidation transaction. Node runtime, no edge caching.
+// collateral branch (V1 has one, so any value stands), `?owner=` the Trove's
+// last owner and `?tx=` the transaction that credited the surplus: a
+// liquidation, or on V1 also a full redemption. Node runtime, no edge caching.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +24,12 @@ const PROTOCOLS: Record<string, { chainId: ChainId; branch: BranchLookup }> = {
   asymmetry: { chainId: MAINNET_CHAIN_ID, branch: asymmetryBranch },
   ebisu: { chainId: MAINNET_CHAIN_ID, branch: ebisuBranch },
   basedollar: { chainId: BASE_CHAIN_ID, branch: basedollarBranch },
+  // V1 runs the same CollSurplusPool events and getters on its single ETH
+  // market; a full redemption credits it as well as a capped liquidation.
+  "liquity-v1": {
+    chainId: MAINNET_CHAIN_ID,
+    branch: () => ({ troveManager: LIQUITY_V1_ADDRESSES.TROVE_MANAGER, decimals: ASSET_DECIMALS }),
+  },
 };
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;

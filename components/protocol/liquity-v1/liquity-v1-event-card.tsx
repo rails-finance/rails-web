@@ -16,18 +16,20 @@ import { LiquityV1EventDetail } from "./liquity-v1-event-detail";
 import { LiquityV1EventExplainer, liquityV1LearnMoreContent } from "./liquity-v1-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { liquityV1ExplainerTeaser } from "@/lib/liquity-v1/explainer-clauses";
-import { soleFlowAddress } from "@/lib/shared/format-event";
-import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
-import { collDeltaProv, debtDeltaProv } from "@/lib/liquity-v1/event-provenance";
+import { COLLATERAL_SYMBOL, DEBT_SYMBOL, LIQUITY_V1_ADDRESSES } from "@/lib/liquity-v1/asset-catalog";
+import { LIQUITY_V1_RESERVE } from "@/lib/liquity-v1/event-figures";
+import { collDeltaProv, debtDeltaProv, closeRepaidProv } from "@/lib/liquity-v1/event-provenance";
 
 export interface LiquityV1EventCardProps {
   event: BaseActivityEvent & { context: { protocol: "liquity-v1"; data: LiquityV1Context } };
   isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
+  /** The PriceFeed price now — a redemption's net outcome at today's price. */
+  currentPrice?: number | null;
 }
 
-export function LiquityV1EventCard({ event, isFirst, isLast, eventNumber }: LiquityV1EventCardProps) {
+export function LiquityV1EventCard({ event, isFirst, isLast, eventNumber, currentPrice }: LiquityV1EventCardProps) {
   const ctx = event.context.data;
   const isLiq = ctx.eventType === "liquidation";
   const isRedemption = ctx.eventType === "redemption";
@@ -57,8 +59,12 @@ export function LiquityV1EventCard({ event, isFirst, isLast, eventNumber }: Liqu
           symbol: COLLATERAL_SYMBOL,
         }
       : undefined;
+  // A close burns the debt less the 200 LUSD reserve from the owner; the
+  // GasPool burns the reserve. The spine draws what left the owner's wallet.
+  const isClose = ctx.eventType === "closeTrove";
+  const debtSpineValue = isClose ? Math.max(0, Math.abs(debtDelta) - LIQUITY_V1_RESERVE) : Math.abs(debtDelta);
   const debtProv: SpineValProv | undefined =
-    debtDelta !== 0
+    debtDelta !== 0 && !isClose
       ? {
           info: debtDeltaProv(coords, {
             after: ctx.debtAfter,
@@ -67,12 +73,18 @@ export function LiquityV1EventCard({ event, isFirst, isLast, eventNumber }: Liqu
           value: chainTruthDeltaValue(debtDelta, labeled),
           symbol: DEBT_SYMBOL,
         }
-      : undefined;
+      : debtDelta !== 0 && isClose
+        ? {
+            info: closeRepaidProv(coords, ctx.debtBefore),
+            value: chainTruthDeltaValue(-debtSpineValue, false),
+            symbol: DEBT_SYMBOL,
+          }
+        : undefined;
 
   // direction "right" = token moves toward the protocol (collateral deposit / debt
   // repay), "left" = toward the wallet (collateral withdraw / debt draw).
   //
-  // The debt row names LUSD's contract, read off the event's own flows, so the
+  // The debt row names LUSD's contract from the catalog, so the
   // icon chip has an address to ask a CDN about rather than a symbol to look up
   // in the house table. The collateral row deliberately does not: V1's
   // collateral is native ETH, which has no ERC-20 to name, and the flow records
@@ -94,9 +106,9 @@ export function LiquityV1EventCard({ event, isFirst, isLast, eventNumber }: Liqu
           debtDelta !== 0
             ? {
                 symbol: DEBT_SYMBOL,
-                address: soleFlowAddress(event.flows, DEBT_SYMBOL),
+                address: LIQUITY_V1_ADDRESSES.LUSD,
                 direction: debtDelta > 0 ? ("left" as const) : ("right" as const),
-                value: Math.abs(debtDelta),
+                value: debtSpineValue,
                 prov: debtProv,
               }
             : null,
@@ -128,12 +140,28 @@ export function LiquityV1EventCard({ event, isFirst, isLast, eventNumber }: Liqu
           txHash={event.txHash}
           blockNumber={event.blockNumber}
           eventNumber={eventNumber}
-          flows={event.flows}
         />
       }
-      detail={<LiquityV1EventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
+      detail={
+        <LiquityV1EventDetail
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          wallet={event.wallet}
+          currentPrice={currentPrice}
+        />
+      }
       detailLabel="Trove state"
-      explainer={<LiquityV1EventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} skipLead />}
+      explainer={
+        <LiquityV1EventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          wallet={event.wallet}
+          currentPrice={currentPrice}
+          skipLead
+        />
+      }
       explainerLabel="Plain English"
       explainerTeaser={liquityV1ExplainerTeaser(ctx, coords)}
       txHash={event.txHash}

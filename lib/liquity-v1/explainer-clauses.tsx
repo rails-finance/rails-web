@@ -14,24 +14,13 @@
 // so there is no primary-across-scope narrator here — every figure has its twin on
 // this card.
 //
-// ── Fill-standard notes (charter §5) ─────────────────────────────────────────
-// Checklist items Liquity V1 cannot fill, each a data fact of its pipeline:
-//   • §5.1 (risk consequence per event) on open / adjust / close: the indexed
-//     stream carries no per-event oracle price for these — only liquidation and
-//     redemption rows embed priceAtBlock — so a collateral-ratio-vs-threshold read
-//     at event time cannot be computed for an operate. Stated on liquidation
-//     events, where the sweep itself carries the price (the seized/cleared/premium
-//     legs ARE the ratio at fire).
-//   • §5.2 (mechanic-why on fees): the one-time borrowing fee is named on open /
-//     borrow, but V1 emits no fee AMOUNT in the stream, so it is described, not
-//     figured. The 200 LUSD gas-compensation reserve is a fixed constant, named
-//     plainly.
-//   • §5.4 beyond liquidations: a redemption exposes no priced twin on its own card
-//     (the forensics block is liquidation-only), so its net outcome stays
-//     qualitative — the deltas are equal-value at the oracle price by construction.
-// Filled: forward paths (§5.3) on a fully-redeemed Trove's claimable surplus and a
-// closed position; the valued liquidation net-outcome (§5.4) with the premium
-// landed on the seized/cleared legs; the highlight rule (§5.6) via Fig.
+// Figures the stream does not carry (the borrowing fee, the LUSD the owner
+// received, the reserve burned on a close, where a liquidation's debt and ETH
+// went, the ETH price at an operate's block, a full redemption's surplus and
+// its claim) come from the event's receipt read and the CollSurplusPool read
+// (lib/liquity-v1/use-event-read.ts). The LEAD sentence never depends on them:
+// the card's teaser renders it before either read lands, and the pane renders
+// the rest.
 
 import type { ReactNode } from "react";
 import type { LiquityV1Context } from "@/lib/shared/types/event-shape";
@@ -45,13 +34,35 @@ import {
   collAfterProv,
   debtAfterProv,
   atBlockPriceProv,
+  eventPriceProv,
+  ratioAtBlockProv,
+  borrowingFeeProv,
+  lusdReceivedProv,
+  ownerRepaidProv,
+  closeRepaidProv,
   liqSeizedUsdProv,
   liqClearedFaceProv,
   liqPremiumProv,
+  liqRouteProv,
+  redemptionLegProv,
+  redemptionNetProv,
   type LiquityV1Coords,
 } from "@/lib/liquity-v1/event-provenance";
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
-import { formatNumber, formatUsdValue, formatPrice } from "@/lib/utils/format";
+import { formatUsdValue, formatPrice } from "@/lib/utils/format";
+import { formatDate } from "@/lib/date";
+import {
+  LIQUITY_V1_RESERVE,
+  fmtEth,
+  fmtLusd,
+  fmtPct,
+  fmtUsd,
+  fmtUsdSigned,
+  ratioOf,
+  redemptionSplit,
+  sidesOf,
+} from "@/lib/liquity-v1/event-figures";
+import type { LiquityV1EventRead, LiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
 
 /** A leg below this magnitude reads as empty — a full repay or a full sweep
  *  leaves the emitted absolute at (or a hair above) zero. */
@@ -105,20 +116,40 @@ function Fig({
   );
 }
 
-const fmtAbs = (h?: string): string => formatNumber(Math.abs(Number(h)));
-const fmtVal = (h?: string): string => formatNumber(Number(h));
-
 // ── the variant table ────────────────────────────────────────────────────────
 
-export function liquityV1EventSlots(ctx: LiquityV1Context, coords: LiquityV1Coords): EventProseSlots {
+/** The reads the pane has in hand; every field optional, since the teaser
+ *  renders the lead before any of them lands. */
+export interface LiquityV1ClauseReads {
+  read?: LiquityV1EventRead | null;
+  surplus?: LiquityV1Surplus | null;
+  /** The ETH price at the event's block (the row's capture, else the read's). */
+  price?: number | null;
+  /** The PriceFeed price now. */
+  currentPrice?: number | null;
+}
+
+const muted = (children: ReactNode) => <strong className="font-semibold text-foreground">{children}</strong>;
+
+export function liquityV1EventSlots(
+  ctx: LiquityV1Context,
+  coords: LiquityV1Coords,
+  reads: LiquityV1ClauseReads = {},
+): EventProseSlots {
+  const { read, surplus, price, currentPrice } = reads;
   const rs = resultingState(ctx);
-  const coll = Number(ctx.collDelta) || 0;
-  const debt = Number(ctx.debtDelta) || 0;
+  const s = sidesOf(ctx);
+  const coll = s.collDelta;
+  const debt = s.debtDelta;
   // The header shows a BARE magnitude on opens, owner adjusts and redemptions
   // (each axis or the redemption pill carries the direction) and a SIGNED figure on
   // liquidations and closes — so the delta echo must key its value the same way,
   // or it lands on no receipt.
-  const labeled = ctx.eventType === "openTrove" || ctx.eventType === "adjustTrove" || ctx.eventType === "redemption";
+  const labeled =
+    ctx.eventType === "openTrove" ||
+    ctx.eventType === "adjustTrove" ||
+    ctx.eventType === "redemption" ||
+    ctx.eventType === "liquidation";
 
   // Signed deltas echo the spine / header delta receipt (same prov vocabulary +
   // coords → same entry key). Display is the magnitude; the sign rides the value.
@@ -132,7 +163,7 @@ export function liquityV1EventSlots(ctx: LiquityV1Context, coords: LiquityV1Coor
       value={chainTruthDeltaValue(coll, labeled)}
       symbol={COLLATERAL_SYMBOL}
     >
-      {fmtAbs(ctx.collDelta)} {COLLATERAL_SYMBOL}
+      {fmtEth(Math.abs(coll))} {COLLATERAL_SYMBOL}
     </Fig>
   );
   const debtDeltaFig = () => (
@@ -145,20 +176,109 @@ export function liquityV1EventSlots(ctx: LiquityV1Context, coords: LiquityV1Coor
       value={chainTruthDeltaValue(debt, labeled)}
       symbol={DEBT_SYMBOL}
     >
-      {fmtAbs(ctx.debtDelta)} {DEBT_SYMBOL}
+      {fmtLusd(Math.abs(debt))} {DEBT_SYMBOL}
     </Fig>
   );
-  // After-balance figures echo the detail grid's after-value receipt.
   const collAfterFig = () => (
-    <Fig echo info={collAfterProv(coords)} value={fmtVal(ctx.collAfter)} symbol={COLLATERAL_SYMBOL}>
-      {fmtVal(ctx.collAfter)} {COLLATERAL_SYMBOL}
+    <Fig info={collAfterProv(coords)} symbol={COLLATERAL_SYMBOL}>
+      {fmtEth(s.collAfter)} {COLLATERAL_SYMBOL}
     </Fig>
   );
   const debtAfterFig = () => (
-    <Fig echo info={debtAfterProv(coords)} value={fmtVal(ctx.debtAfter)} symbol={DEBT_SYMBOL}>
-      {fmtVal(ctx.debtAfter)} {DEBT_SYMBOL}
+    <Fig info={debtAfterProv(coords)} symbol={DEBT_SYMBOL}>
+      {fmtLusd(s.debtAfter)} {DEBT_SYMBOL}
     </Fig>
   );
+  const priceFig = (p: number) => (
+    <Fig info={eventPriceProv(coords, p)} symbol={COLLATERAL_SYMBOL}>
+      {fmtUsd(p)}
+    </Fig>
+  );
+
+  // The ratio either side of the event, both at this block's price.
+  const ratioClause = (): ClauseInput => {
+    if (price == null) return null;
+    const before = ctx.eventType === "openTrove" ? null : ratioOf(s.collBefore, s.debtBefore, price);
+    const after = rs.hasDebtAfter ? ratioOf(s.collAfter, s.debtAfter, price) : null;
+    if (after == null && before == null) return null;
+    const pct = (r: number, side: "before" | "after") => (
+      <Fig
+        info={ratioAtBlockProv(coords, {
+          coll: side === "before" ? ctx.collBefore : ctx.collAfter,
+          debt: side === "before" ? ctx.debtBefore : ctx.debtAfter,
+          priceUsd: price,
+          side,
+        })}
+      >
+        {fmtPct(r)}
+      </Fig>
+    );
+    if (after != null && (before == null || fmtPct(before) === fmtPct(after)))
+      return clause(
+        <>
+          At the ETH price of {priceFig(price)} at this block, the collateral ratio is {pct(after, "after")}, against
+          the 110% minimum.
+        </>,
+      );
+    if (after != null && before != null)
+      return clause(
+        <>
+          At the ETH price of {priceFig(price)} at this block, the collateral ratio went from {pct(before, "before")} to{" "}
+          {pct(after, "after")}; the minimum is 110%.
+        </>,
+      );
+    return null;
+  };
+
+  // What a draw added to the debt, where the receipt says.
+  const drawClauses = (opening: boolean): ClauseInput[] => {
+    const received = read ? Number(read.lusdMintedToOwner) : 0;
+    const fee = read?.borrowingFee != null ? Number(read.borrowingFee) : null;
+    if (!read || fee == null || !(received > 0)) {
+      return [
+        clause(
+          opening ? (
+            <>
+              The debt is the LUSD the owner received plus a one-time borrowing fee and the 200 LUSD liquidation
+              reserve.
+            </>
+          ) : (
+            <>The debt added is the LUSD the owner received plus a one-time borrowing fee.</>
+          ),
+        ),
+      ];
+    }
+    const feeFig = (
+      <Fig info={borrowingFeeProv(coords, read.borrowingFee as string)} symbol={DEBT_SYMBOL}>
+        {fmtLusd(fee)} {DEBT_SYMBOL}
+      </Fig>
+    );
+    const recvFig = (
+      <Fig info={lusdReceivedProv(coords, read.lusdMintedToOwner)} symbol={DEBT_SYMBOL}>
+        {fmtLusd(received)} {DEBT_SYMBOL}
+      </Fig>
+    );
+    return [
+      clause(
+        opening ? (
+          <>
+            The owner received {recvFig}. The rest of the debt is a {feeFig} borrowing fee ({fmtPct(fee / received)} of
+            the amount received) and the {muted(`${LIQUITY_V1_RESERVE} ${DEBT_SYMBOL}`)} liquidation reserve.
+          </>
+        ) : fee > 0 ? (
+          <>
+            The owner received {recvFig}; the other {feeFig} is the one-time borrowing fee ({fmtPct(fee / received)} of
+            the amount received).
+          </>
+        ) : (
+          <>
+            The owner received {recvFig}. No borrowing fee was charged: the system was in Recovery Mode, where the fee
+            is zero.
+          </>
+        ),
+      ),
+    ];
+  };
 
   switch (ctx.eventType) {
     case "openTrove":
@@ -166,97 +286,161 @@ export function liquityV1EventSlots(ctx: LiquityV1Context, coords: LiquityV1Coor
         happened: [
           clause(
             <>
-              Opened the Trove with {collDeltaFig()} of collateral and drew {debtDeltaFig()} of debt.
+              Opened the Trove with {collDeltaFig()} of collateral and {debtDeltaFig()} of debt.
             </>,
           ),
         ],
         changed: [
-          clause(<>The debt drawn includes a one-time borrowing fee and a 200 LUSD gas-compensation reserve.</>),
-          clause(<>The reserve is returned when the Trove closes.</>),
+          ...drawClauses(true),
+          clause(
+            <>
+              The reserve stays part of the debt: closing repays the debt less 200 LUSD and the reserve is burned; if
+              the Trove is liquidated, the reserve pays the liquidator.
+            </>,
+          ),
         ],
-        // The general no-ongoing-interest rule is Layer-2 material — the "?"
-        // modal (liquityV1BorrowingContent) carries it verbatim; openTrove's
-        // pane keeps its happened + changed slots (legal per charter §4).
+        meansNow: [ratioClause()],
       };
 
     case "adjustTrove": {
       const happened: ClauseInput[] = [];
       if (coll > 0) happened.push(clause(<>Added {collDeltaFig()} of collateral to the Trove.</>));
       else if (coll < 0) happened.push(clause(<>Withdrew {collDeltaFig()} of collateral from the Trove.</>));
-      if (debt > 0) happened.push(clause(<>Drew {debtDeltaFig()} of new debt.</>));
+      if (debt > 0) happened.push(clause(<>Borrowed more: the debt rose by {debtDeltaFig()}.</>));
       else if (debt < 0) happened.push(clause(<>Repaid {debtDeltaFig()} of debt.</>));
-      const changed: ClauseInput[] =
-        debt > 0 ? [clause(<>A one-time borrowing fee is included in the amount drawn.</>)] : [];
       return {
         happened,
-        changed,
+        changed: debt > 0 ? drawClauses(false) : [],
         meansNow: [
           clause(
             <>
               The Trove now holds {collAfterFig()} against {debtAfterFig()} of debt.
             </>,
           ),
-          clause(<>It stays open while its collateral ratio holds above the 110% minimum.</>),
+          ratioClause(),
         ],
       };
     }
 
-    case "closeTrove":
+    case "closeTrove": {
+      const repaid = Math.max(0, Math.abs(debt) - LIQUITY_V1_RESERVE);
+      const repaidFig = (
+        <Fig
+          echo
+          info={closeRepaidProv(coords, ctx.debtBefore)}
+          value={chainTruthDeltaValue(-repaid, false)}
+          symbol={DEBT_SYMBOL}
+        >
+          {fmtLusd(repaid)} {DEBT_SYMBOL}
+        </Fig>
+      );
+      const burned = read ? Number(read.lusdBurnedFromOwner) : null;
       return {
         happened: [
           clause(
             <>
-              Closed the Trove: repaid the remaining {debtDeltaFig()} of debt and withdrew all {collDeltaFig()} of
-              collateral.
-            </>,
-          ),
-        ],
-        changed: [clause(<>The 200 LUSD gas-compensation reserve was returned with the repayment.</>)],
-        meansNow: [clause(<>Nothing remains on either side of the position.</>)],
-      };
-
-    case "liquidation":
-      return {
-        happened: [
-          clause(
-            <>
-              This Trove&rsquo;s collateral ratio fell below the protocol&rsquo;s liquidation threshold, so it was
-              liquidated.
+              Closed the Trove: the owner repaid {repaidFig} and took back all {collDeltaFig()} of collateral.
             </>,
           ),
         ],
         changed: [
           clause(
             <>
-              {collDeltaFig()} of collateral was seized and {debtDeltaFig()} of debt cleared.
+              The debt was {muted(`${fmtLusd(Math.abs(debt))} ${DEBT_SYMBOL}`)}. The owner&rsquo;s LUSD cancelled all of
+              it except the {LIQUITY_V1_RESERVE} LUSD liquidation reserve, which the GasPool burned in the same
+              transaction.
             </>,
           ),
-          clause(<>A V1 liquidation closes the whole Trove, not part of it.</>),
+          burned != null && Math.abs(burned - repaid) > 0.01
+            ? clause(
+                <>
+                  The transaction burned{" "}
+                  <Fig info={ownerRepaidProv(coords, read!.lusdBurnedFromOwner)} symbol={DEBT_SYMBOL}>
+                    {fmtLusd(burned)} {DEBT_SYMBOL}
+                  </Fig>{" "}
+                  from the owner&rsquo;s wallet.
+                </>,
+              )
+            : null,
         ],
-        // The disjunctive absorb-or-redistribute rule is Layer-2 material (the
-        // pane cannot say which route THIS liquidation took) — the "?" modal
-        // (liquityV1LiquidationContent steps 1–2) carries it verbatim.
-        meansNow: [valuedLiquidationSentence(ctx, coords)],
+        meansNow: [clause(<>Nothing remains on either side of the position.</>)],
       };
+    }
 
-    case "redemption": {
-      const meansNow: ClauseInput[] = rs.debtCleared
+    case "liquidation": {
+      const l = read?.liquidation ?? null;
+      const n = (v: string) => Number(v);
+      const route: ClauseInput[] = l
         ? [
-            clause(<>This redemption cleared the Trove&rsquo;s debt in full.</>),
-            rs.collAfter > LIQUITY_V1_EPS
-              ? clause(<>The remaining collateral is left claimable by the owner.</>)
+            l.recoveryMode
+              ? clause(
+                  <>
+                    This was a Recovery Mode liquidation: the system&rsquo;s total collateral ratio was below 150%, and
+                    in that state any Trove below the system ratio can be liquidated.
+                    {n(l.surplusEth) > 0 && (
+                      <>
+                        {" "}
+                        The Stability Pool took collateral worth 110% of the debt, and{" "}
+                        <Fig info={liqRouteProv(coords, "surplus")} symbol={COLLATERAL_SYMBOL}>
+                          {fmtEth(n(l.surplusEth))} {COLLATERAL_SYMBOL}
+                        </Fig>{" "}
+                        was left in the CollSurplusPool for the owner
+                        {surplus?.claimed ? <>, who has since claimed it</> : <> to claim</>}.
+                      </>
+                    )}
+                  </>,
+                )
+              : null,
+            n(l.stabilityPoolDebt) > 0
+              ? clause(
+                  <>
+                    The Stability Pool burned{" "}
+                    <Fig info={liqRouteProv(coords, "stability pool debt")} symbol={DEBT_SYMBOL}>
+                      {fmtLusd(n(l.stabilityPoolDebt))} {DEBT_SYMBOL}
+                    </Fig>{" "}
+                    of its deposits to cancel the debt and received{" "}
+                    <Fig info={liqRouteProv(coords, "stability pool eth")} symbol={COLLATERAL_SYMBOL}>
+                      {fmtEth(n(l.stabilityPoolEth))} {COLLATERAL_SYMBOL}
+                    </Fig>
+                    , shared among its depositors.
+                  </>,
+                )
+              : null,
+            n(l.redistributedDebt) > 0 || n(l.redistributedEth) > 0
+              ? clause(
+                  <>
+                    The Stability Pool could not cover{" "}
+                    <Fig info={liqRouteProv(coords, "redistributed")} symbol={DEBT_SYMBOL}>
+                      {fmtLusd(n(l.redistributedDebt))} {DEBT_SYMBOL}
+                    </Fig>{" "}
+                    of the debt; that debt and {fmtEth(n(l.redistributedEth))} ETH were shared out to every other open
+                    Trove in proportion to its collateral.
+                  </>,
+                )
+              : null,
+            clause(
+              <>
+                The liquidator was paid the{" "}
+                <Fig info={liqRouteProv(coords, "liquidator")} symbol={DEBT_SYMBOL}>
+                  {fmtLusd(n(l.liquidatorLusd))} {DEBT_SYMBOL}
+                </Fig>{" "}
+                reserve and {fmtEth(n(l.liquidatorEth))} ETH (0.5% of the collateral).
+              </>,
+            ),
+            l.trovesInTx > 1
+              ? clause(
+                  <>
+                    The transaction liquidated {l.trovesInTx} Troves at once, so these amounts are its totals across all
+                    of them.
+                  </>,
+                )
               : null,
           ]
         : [
             clause(
               <>
-                The Trove keeps {collAfterFig()} against {debtAfterFig()} of debt, at a higher collateral ratio.
-              </>,
-            ),
-            clause(
-              <>
-                At the oracle price the collateral given up is worth about the debt cancelled — a forced deleveraging,
-                not a loss.
+                The Stability Pool cancels the debt with its LUSD deposits and receives the ETH; debt it cannot cover is
+                shared out to the other open Troves. The liquidator is paid the 200 LUSD reserve and 0.5% of the ETH.
               </>,
             ),
           ];
@@ -264,12 +448,157 @@ export function liquityV1EventSlots(ctx: LiquityV1Context, coords: LiquityV1Coor
         happened: [
           clause(
             <>
-              An LUSD holder redeemed against this Trove, one of the lowest collateral ratios at the time: it gave up{" "}
-              {collDeltaFig()} of collateral and {debtDeltaFig()} of its debt was cancelled at the $1 redemption face.
+              The Trove was liquidated: {collDeltaFig()} of collateral was seized and {debtDeltaFig()} of debt
+              cancelled.
             </>,
           ),
         ],
-        meansNow,
+        changed: [liquidationWhyClause(ctx), ...route],
+        meansNow: [
+          valuedLiquidationSentence(ctx, coords),
+          clause(<>The owner keeps the LUSD they borrowed and gets none of the seized ETH back.</>),
+        ],
+      };
+    }
+
+    case "redemption": {
+      const split = redemptionSplit(ctx);
+      const legVals = split ? { debt: String(split.lusdRedeemed), priceUsd: split.price, coll: ctx.collBefore } : null;
+      const redeemerFig =
+        split && legVals ? (
+          <Fig
+            echo={split.full}
+            info={redemptionLegProv(coords, "redeemer", legVals)}
+            value={split.full ? chainTruthDeltaValue(-split.ethToRedeemer, true) : undefined}
+            symbol={COLLATERAL_SYMBOL}
+          >
+            {fmtEth(split.ethToRedeemer)} {COLLATERAL_SYMBOL}
+          </Fig>
+        ) : null;
+
+      const happened = [
+        clause(
+          split?.full && redeemerFig ? (
+            <>
+              An LUSD holder redeemed against this Trove, one of the lowest collateral ratios in the queue at the time:{" "}
+              {debtDeltaFig()} of debt was cancelled and {redeemerFig} went to the redeemer.
+            </>
+          ) : (
+            <>
+              An LUSD holder redeemed against this Trove, one of the lowest collateral ratios in the queue at the time:{" "}
+              {collDeltaFig()} went to the redeemer and {debtDeltaFig()} of its debt was cancelled at $1 per LUSD.
+            </>
+          ),
+        ),
+      ];
+
+      const net: ClauseInput =
+        split && split.lusdRedeemed > 0
+          ? (() => {
+              const atRedemption = split.lusdRedeemed - split.ethToRedeemer * split.price;
+              const today =
+                currentPrice != null && currentPrice > 0
+                  ? split.lusdRedeemed - split.ethToRedeemer * currentPrice
+                  : null;
+              const netVals = { debt: String(split.lusdRedeemed), eth: String(split.ethToRedeemer) };
+              return clause(
+                <>
+                  The owner&rsquo;s net outcome is{" "}
+                  <Fig info={redemptionNetProv(coords, { ...netVals, priceUsd: split.price, when: "redemption" })}>
+                    {fmtUsdSigned(Math.abs(atRedemption) < 0.005 ? 0 : atRedemption)}
+                  </Fig>{" "}
+                  at the redemption price
+                  {today != null && (
+                    <>
+                      {" "}
+                      and{" "}
+                      <Fig
+                        info={redemptionNetProv(coords, {
+                          ...netVals,
+                          priceUsd: currentPrice as number,
+                          when: "today",
+                        })}
+                      >
+                        {fmtUsdSigned(today)}
+                      </Fig>{" "}
+                      at today&rsquo;s {fmtUsd(currentPrice as number)}:{" "}
+                      {today < 0
+                        ? "the ETH taken is worth more now than the debt it cancelled"
+                        : "the ETH taken is worth less now than the debt it cancelled"}
+                    </>
+                  )}
+                  .
+                </>,
+              );
+            })()
+          : null;
+
+      if (split?.full && legVals) {
+        const claimNote = surplus?.claimed ? (
+          <>
+            , which the owner claimed
+            {surplus.claimed.timestamp != null && <> on {formatDate(surplus.claimed.timestamp)}</>}
+          </>
+        ) : surplus && surplus.claimable > 0 ? (
+          <>, where the owner can still claim it</>
+        ) : (
+          <>, where the owner can claim it</>
+        );
+        return {
+          happened,
+          changed: [
+            clause(
+              <>
+                The redeemer&rsquo;s {muted(`${fmtLusd(split.lusdRedeemed)} ${DEBT_SYMBOL}`)} bought that ETH at{" "}
+                {priceFig(split.price)} per ETH. The last {LIQUITY_V1_RESERVE} LUSD of the debt was the liquidation
+                reserve, which the GasPool burned.
+              </>,
+            ),
+            clause(
+              <>
+                The Trove closed, and the other{" "}
+                <Fig
+                  echo
+                  info={redemptionLegProv(coords, "surplus", legVals)}
+                  value={chainTruthDeltaValue(split.ethSurplus, true)}
+                  symbol={COLLATERAL_SYMBOL}
+                >
+                  {fmtEth(split.ethSurplus)} {COLLATERAL_SYMBOL}
+                </Fig>{" "}
+                of collateral moved to the CollSurplusPool{claimNote}.
+              </>,
+            ),
+          ],
+          meansNow: [net],
+        };
+      }
+
+      return {
+        happened,
+        changed: [
+          price != null
+            ? (() => {
+                const before = ratioOf(s.collBefore, s.debtBefore, price);
+                const after = ratioOf(s.collAfter, s.debtAfter, price);
+                return before != null && after != null
+                  ? clause(
+                      <>
+                        At {priceFig(price)} per ETH the ETH taken was worth the debt cancelled, so the collateral ratio
+                        rose from {fmtPct(before)} to {fmtPct(after)}.
+                      </>,
+                    )
+                  : null;
+              })()
+            : null,
+        ],
+        meansNow: [
+          clause(
+            <>
+              The Trove keeps {collAfterFig()} against {debtAfterFig()} of debt.
+            </>,
+          ),
+          net,
+        ],
       };
     }
 
@@ -278,17 +607,34 @@ export function liquityV1EventSlots(ctx: LiquityV1Context, coords: LiquityV1Coor
   }
 }
 
-/** The valued liquidation sentence — the protocol's own oracle price at the time,
- *  echoing the forensics block's three legs (seized value, cleared face, premium)
- *  and its price pill. LUSD counts at the $1 redemption face the protocol's own
- *  ratio math uses, so the premium is the Trove's collateral ratio at fire minus
- *  100% — what the Stability Pool depositors (or the redistributed Troves) gained.
- *  Drops WHOLE when the row is unpriced — the never-empty floor, and the same gate
- *  the forensics block uses. */
+/** Why the Trove could be liquidated: its ratio at the PriceFeed price at the
+ *  time against the 110% minimum, or, at 110% or more, Recovery Mode. */
+function liquidationWhyClause(ctx: LiquityV1Context): ClauseInput {
+  const price = ctx.priceAtBlock?.usd;
+  const r = ratioOf(Number(ctx.collBefore), Number(ctx.debtBefore), price);
+  if (r == null) return null;
+  return clause(
+    r < 1.1 ? (
+      <>Its collateral ratio at the time was {fmtPct(r)}, below the 110% minimum, so anyone could liquidate it.</>
+    ) : (
+      <>
+        Its collateral ratio at the time was {fmtPct(r)}, above the 110% minimum: only Recovery Mode, where a Trove
+        below the system&rsquo;s total ratio can be liquidated, made that possible.
+      </>
+    ),
+  );
+}
+
+/** The valued liquidation sentence — the PriceFeed price at the time, echoing
+ *  the forensics block's three legs (seized value, cleared face, premium) and
+ *  its price pill. LUSD counts at $1, as the protocol's ratio math counts it,
+ *  so the premium is the Trove's collateral ratio when it was liquidated minus
+ *  100%. Drops whole when the row is unpriced, the same gate the forensics
+ *  block uses. */
 function valuedLiquidationSentence(ctx: LiquityV1Context, coords: LiquityV1Coords): ClauseInput {
   const price = ctx.priceAtBlock?.usd;
   const seizedAmt = Number(ctx.collBefore);
-  const clearedUsd = Number(ctx.debtBefore); // LUSD at the $1 redemption face
+  const clearedUsd = Number(ctx.debtBefore);
   if (price == null || !Number.isFinite(seizedAmt) || seizedAmt <= 0 || !Number.isFinite(clearedUsd) || clearedUsd <= 0)
     return null;
   const seizedUsd = seizedAmt * price;
@@ -331,9 +677,8 @@ function valuedLiquidationSentence(ctx: LiquityV1Context, coords: LiquityV1Coord
   );
   return clause(
     <>
-      At the protocol&rsquo;s own oracle price at the time ({priceFig} per ETH), the seized collateral was worth{" "}
-      {seizedFig} against {clearedFig} of debt at its $1 redemption face — a {premiumFig} premium for whoever absorbed
-      the debt.
+      At the PriceFeed price at the time (${priceFig} per ETH), the seized collateral was worth {seizedFig} against{" "}
+      {clearedFig} of debt counted at $1 per LUSD, a {premiumFig} premium for whoever absorbed the debt.
     </>,
   );
 }

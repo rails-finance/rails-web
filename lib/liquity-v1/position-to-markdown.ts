@@ -41,7 +41,7 @@ const ACTION_LABEL: Record<LiquityV1EventType, string> = {
   openTrove: "Open Trove",
   adjustTrove: "Adjust Trove",
   closeTrove: "Close Trove",
-  liquidation: "Liquidation",
+  liquidation: "Liquidated",
   redemption: "Redemption",
 };
 

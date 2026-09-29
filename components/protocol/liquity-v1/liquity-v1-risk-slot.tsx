@@ -41,6 +41,7 @@ export function LiquityV1RiskSlot({ chain }: { chain: LiquityV1PositionChainResp
             queueDebtTotal={chain.queueDebtTotal}
             shareProv={queueShareProv()}
             markerTitle="This Trove's place in the redemption queue — everything left of the marker is redeemed first"
+            shareLabel="of the queue's debt would be redeemed before this Trove"
           />
         </RiskMeter>
       )}

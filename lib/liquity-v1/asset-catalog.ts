@@ -22,6 +22,17 @@ export const LIQUITY_V1_ADDRESSES = {
   /** MultiTroveGetter — batch reader over the sorted list (deployment helper;
    *  cross-checked against SortedTroves + TroveManager.Troves by the script). */
   MULTI_TROVE_GETTER: "0xfc92d0e9fa35df17e3a6d9f40716ca2ce749922b",
+  /** ActivePool — holds the open Troves' ETH; its EtherSent logs say where ETH
+   *  left to (owner, Stability Pool, liquidator, CollSurplusPool). Its
+   *  troveManagerAddress() names the TroveManager above. */
+  ACTIVE_POOL: "0xdf9eb223bafbe5c5271415c75aecd68c21fe3d7f",
+  /** GasPool — holds each Trove's 200 LUSD liquidation reserve (minted to it
+   *  on open; burned on close or full redemption; paid to a liquidator). */
+  GAS_POOL: "0x9555b042f969e561855e5f28cb1230819149a8d9",
+  /** CollSurplusPool — ETH a full redemption (or a capped Recovery Mode
+   *  liquidation) leaves over, claimable by the owner. Its
+   *  troveManagerAddress() names the TroveManager above. */
+  COLL_SURPLUS_POOL: "0x3d32e8b97ed5881324241cf03b2da5e2ebce5521",
   /** LUSD stablecoin. */
   LUSD: "0x5f98805a4e8be255a32880fdec7f6728c6568ba0",
   /** LQTY token. */

@@ -6,8 +6,8 @@
 // deltas (after − before over consecutive emitted absolutes).
 //
 // The protocol charges NO ongoing interest, so there is no principal-vs-accrued
-// split to draw: the emitted LUSD debt is the Trove's EXACT obligation (drawn
-// LUSD + one-time borrowing fee + 200 LUSD gas reserve) — the note says so.
+// split to draw: the emitted LUSD debt is the Trove's whole debt (the
+// LUSD received + one-time borrowing fees + the 200 LUSD liquidation reserve).
 //
 // Pricing: when the live chain read has landed, ETH is valued at the protocol's
 // OWN PriceFeed price (the same figure the liquidation path uses this block)
@@ -29,6 +29,7 @@ import { positionCollateralProv, positionDebtProv, lifetimeFlowProv } from "@/li
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
 import { flowsReconcile, type ChainTruthTowerData, type TowerLine } from "@/lib/shared/chain-truth-economics";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { redemptionSplit } from "@/lib/liquity-v1/event-figures";
 
 const DUST = 1e-9;
 
@@ -39,8 +40,12 @@ export interface TroveFlows {
   deposited: number; // ETH in (open / adjust)
   withdrawn: number; // ETH out, voluntary (adjust / close)
   collLiquidated: number; // ETH seized by liquidation
-  collRedeemed: number; // ETH exchanged away by redemptions
-  borrowed: number; // LUSD drawn (incl. the one-time fee + gas reserve)
+  collRedeemed: number; // ETH that went to redeemers
+  /** ETH a full redemption moved to the CollSurplusPool for the owner. Summed
+   *  from the loaded rows only: the opening balance carries no such leg, so on
+   *  a windowed page a surplus below the cut stays inside collRedeemed. */
+  collSurplus: number;
+  borrowed: number; // debt taken on (LUSD received + one-time fees + the 200 LUSD reserve)
   repaid: number; // LUSD repaid, voluntary
   debtLiquidated: number; // LUSD cleared by liquidation
   debtRedeemed: number; // LUSD repaid by redemptions
@@ -52,6 +57,7 @@ function replayLifetime(events: BaseActivityEvent[], epoch: number | null): Trov
     withdrawn: 0,
     collLiquidated: 0,
     collRedeemed: 0,
+    collSurplus: 0,
     borrowed: 0,
     repaid: 0,
     debtLiquidated: 0,
@@ -69,7 +75,13 @@ function replayLifetime(events: BaseActivityEvent[], epoch: number | null): Trov
       continue;
     }
     if (ctx.eventType === "redemption") {
-      f.collRedeemed += Math.abs(Math.min(collDelta, 0));
+      // A full redemption splits the collateral: the redeemer's ETH, and the
+      // rest left to the owner in the CollSurplusPool.
+      const split = redemptionSplit(ctx);
+      if (split?.full) {
+        f.collRedeemed += split.ethToRedeemer;
+        f.collSurplus += split.ethSurplus;
+      } else f.collRedeemed += Math.abs(Math.min(collDelta, 0));
       f.debtRedeemed += Math.abs(Math.min(debtDelta, 0));
       continue;
     }
@@ -191,9 +203,9 @@ export function computeLiquityV1Economics(
   const reconciles =
     f != null &&
     flowsReconcile(
-      f.deposited - f.withdrawn - f.collLiquidated - f.collRedeemed,
+      f.deposited - f.withdrawn - f.collLiquidated - f.collRedeemed - f.collSurplus,
       view.collateral,
-      f.deposited + f.withdrawn + f.collLiquidated + f.collRedeemed,
+      f.deposited + f.withdrawn + f.collLiquidated + f.collRedeemed + f.collSurplus,
     ) &&
     flowsReconcile(
       f.borrowed - f.repaid - f.debtLiquidated - f.debtRedeemed,
@@ -211,7 +223,10 @@ export function computeLiquityV1Economics(
   ): TowerLine[] =>
     reconciles && amount > DUST ? [line(key, symbol, amount, lifetimeFlowProv(flow), label, flowKind)] : [];
 
-  const collExited = flowLine(f?.withdrawn ?? 0, COLLATERAL_SYMBOL, "coll-withdrawn", "withdrawn");
+  const collExited = [
+    ...flowLine(f?.withdrawn ?? 0, COLLATERAL_SYMBOL, "coll-withdrawn", "withdrawn"),
+    ...flowLine(f?.collSurplus ?? 0, COLLATERAL_SYMBOL, "coll-surplus", "surplus collateral", "To surplus pool"),
+  ];
   const collLiquidated = [
     ...flowLine(f?.collLiquidated ?? 0, COLLATERAL_SYMBOL, "coll-liq", "liquidated collateral"),
     ...flowLine(
@@ -262,7 +277,48 @@ export function computeLiquityV1Economics(
     collateralListLabel: "Collateral · ETH",
     debtListLabel: "Debt · LUSD",
     interestNote: valued
-      ? "Liquity V1 charges no ongoing interest, so the LUSD figure is the Trove's exact obligation: the drawn LUSD, the one-time borrowing fee, the 200 LUSD gas reserve, and any debt redistributed to it from liquidations the Stability Pool could not fully absorb. There is no accrued-interest segment to draw. USD values use the protocol's own pricing: ETH at its own oracle price, LUSD at its $1 redemption face value."
-      : "Liquity V1 charges no ongoing interest, so the LUSD figure is the Trove's exact obligation — the drawn LUSD, the one-time borrowing fee, the 200 LUSD gas reserve, and any debt redistributed to it from liquidations the Stability Pool could not fully absorb — not a principal approximation. USD values appear once the protocol's own ETH oracle price is available.",
+      ? `Liquity V1 charges no interest, so the LUSD figure is the Trove's whole debt: the LUSD received, the one-time borrowing fees, the 200 LUSD liquidation reserve, and any debt shared out to it from liquidations the Stability Pool could not cover. ETH is valued at today's PriceFeed price of $${(ethPrice as number).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}, LUSD at $1.`
+      : "Liquity V1 charges no interest, so the LUSD figure is the Trove's whole debt: the LUSD received, the one-time borrowing fees, the 200 LUSD liquidation reserve, and any debt shared out to it from liquidations the Stability Pool could not cover. Dollar values appear once the PriceFeed's ETH price has loaded.",
   };
+}
+
+/** A Trove life's redemptions, from the rows that carry a price: the LUSD the
+ *  redeemers paid in, the ETH they took, and that ETH's value at each
+ *  redemption's PriceFeed price. Null when there were none, or when a row is
+ *  unpriced (a partial sum would state the wrong outcome). */
+export interface LiquityV1RedemptionTotals {
+  count: number;
+  lusdRedeemed: number;
+  ethTaken: number;
+  ethValueAtRedemption: number;
+  /** Reserves burned by full redemptions (LUSD). */
+  reserveBurned: number;
+}
+
+export function liquityV1RedemptionTotals(
+  events: BaseActivityEvent[] | undefined,
+  epoch: number | null,
+): LiquityV1RedemptionTotals | null {
+  if (!events) return null;
+  const t: LiquityV1RedemptionTotals = {
+    count: 0,
+    lusdRedeemed: 0,
+    ethTaken: 0,
+    ethValueAtRedemption: 0,
+    reserveBurned: 0,
+  };
+  for (const ev of events) {
+    if (!isLiquityV1Event(ev)) continue;
+    const ctx = ev.context.data;
+    if (ctx.eventType !== "redemption") continue;
+    if (epoch != null && ctx.epoch != null && ctx.epoch !== epoch) continue;
+    const split = redemptionSplit(ctx);
+    if (!split) return null;
+    t.count += 1;
+    t.lusdRedeemed += split.lusdRedeemed;
+    t.ethTaken += split.ethToRedeemer;
+    t.ethValueAtRedemption += split.ethToRedeemer * split.price;
+    t.reserveBurned += split.reserveBurned;
+  }
+  return t.count > 0 ? t : null;
 }

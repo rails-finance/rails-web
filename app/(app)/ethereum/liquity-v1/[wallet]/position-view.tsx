@@ -47,9 +47,18 @@ import {
 } from "@/components/protocol/liquity-v1/liquity-v1-position-explanation";
 import { LiquityV1RiskSlot } from "@/components/protocol/liquity-v1/liquity-v1-risk-slot";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { computeLiquityV1Economics, liquityV1LifetimeWithOpening } from "@/lib/liquity-v1/economics";
-import { liquityV1EconomicsExplanation, liquityV1EconomicsContent } from "@/lib/liquity-v1/economics-explanation";
+import {
+  computeLiquityV1Economics,
+  liquityV1LifetimeWithOpening,
+  liquityV1RedemptionTotals,
+} from "@/lib/liquity-v1/economics";
+import {
+  liquityV1EconomicsExplanation,
+  liquityV1EconomicsContent,
+  liquityV1RedemptionOutcome,
+} from "@/lib/liquity-v1/economics-explanation";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
+import { useLiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle, mirroring the V4 spoke page.
@@ -278,6 +287,19 @@ export default function LiquityV1TroveView({
   // is primary truth on the detail page. The tower keeps the replayed view —
   // its lifetime flows reconcile against the recorded absolutes and its
   // receipts declare that basis.
+  // A closed life that ended in a full redemption or a liquidation may have left
+  // ETH in the CollSurplusPool: read it (claimable, or claimed) for the card.
+  const lastRow = v1Events.length > 0 ? v1Events[v1Events.length - 1] : null;
+  const closingTx =
+    view && view.status !== "open" && lastRow
+      ? lastRow.context.data.eventType === "liquidation" ||
+        (lastRow.context.data.eventType === "redemption" && Number(lastRow.context.data.debtAfter) <= 1e-9)
+        ? lastRow.txHash
+        : null
+      : null;
+  const surplus = useLiquityV1Surplus(closingTx, wallet);
+  const priceNow = chain && !chain.chainStale && chain.price > 0 ? chain.price : null;
+
   const chainLive = view?.status === "open" && chain != null && chain.troveStatus === "active" ? chain : null;
   const faceView =
     view && chainLive
@@ -328,6 +350,8 @@ export default function LiquityV1TroveView({
               receipts
               live={chainLive != null}
               viewHref={tl.viewHref}
+              surplus={surplus}
+              priceUsd={priceNow}
               // The risk slot rides the card's heading-button row (the Aave V3
               // treatment): the Display menu plus the chosen risk picture —
               // liquidation runway (default) or the collateral-ratio card —
@@ -360,6 +384,7 @@ export default function LiquityV1TroveView({
                     v={view}
                     openedAt={epochOpenedAt}
                     lastAction={v1Events.length > 0 ? v1Events[v1Events.length - 1].context.data.eventType : null}
+                    surplus={surplus}
                   />
                 ) : chain && chain.troveStatus !== "active" ? (
                   // Index says open, the chain says the Trove has since closed
@@ -382,11 +407,16 @@ export default function LiquityV1TroveView({
           {view &&
             (() => {
               const towerData = computeLiquityV1Economics(view, lifetimeEvents, chain, precomputedLifetime);
+              // The redemption outcome needs every redemption row of the life,
+              // so it is stated only on a page holding the whole history.
+              const redemptions =
+                historyWindow.state === "whole" ? liquityV1RedemptionTotals(v1Events, selectedEpoch) : null;
               return (
                 <ChainTruthTower
                   data={towerData}
-                  explanation={liquityV1EconomicsExplanation(towerData)}
+                  explanation={liquityV1EconomicsExplanation(towerData, { priceNow, redemptions })}
                   learnMore={liquityV1EconomicsContent()}
+                  rowExtra={liquityV1RedemptionOutcome(redemptions, priceNow)}
                 />
               );
             })()}
@@ -419,6 +449,9 @@ export default function LiquityV1TroveView({
                   eventNumber={meta.eventNumber}
                   isFirst={meta.isFirst}
                   isLast={meta.isLast}
+                  // Today's PriceFeed price — a redemption's net outcome at
+                  // today's value. Read on any life: it prices the ETH now.
+                  currentPrice={priceNow}
                 />
               ) : null
             }

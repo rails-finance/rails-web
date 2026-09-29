@@ -20,6 +20,10 @@ import { formatDate, formatDuration } from "@/lib/date";
 import { pct } from "@/components/shared/ratio-bar";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { AmountText } from "@/components/shared/amount-text";
+import { LearnMore } from "@/components/shared/learn-more-modal";
+import { liquityV1LiquidationContent } from "@/lib/shared/learn-more-content";
+import { surplusClaimableProv } from "@/lib/liquity-v1/event-provenance";
+import type { LiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
 
 const DUST = 1e-9;
 
@@ -68,7 +72,7 @@ export function LiquityV1PositionExplanation({
     // The USD value has no stat-row twin on this card, so it stays muted.
     bullets.push(
       <span key="worth">
-        At the protocol&rsquo;s own oracle price, that collateral is worth {fmtUsd(collUsd).display}.
+        At the PriceFeed&rsquo;s ETH price now, that collateral is worth {fmtUsd(collUsd).display}.
       </span>,
     );
   }
@@ -82,9 +86,9 @@ export function LiquityV1PositionExplanation({
   } else {
     bullets.push(
       <span key="interest-free">
-        Liquity V1 charges no ongoing interest, so the LUSD figure is the Trove&rsquo;s exact obligation: the drawn
-        LUSD, the one-time borrowing fee, the 200 LUSD gas reserve, and any debt redistributed to it from liquidations
-        the Stability Pool could not fully absorb.
+        Liquity V1 charges no interest, so the LUSD figure is the Trove&rsquo;s whole debt: the LUSD received, the
+        one-time borrowing fees, the 200 LUSD liquidation reserve, and any debt shared out to it from liquidations the
+        Stability Pool could not cover.
       </span>,
     );
     if (chain.icr != null) {
@@ -96,11 +100,8 @@ export function LiquityV1PositionExplanation({
       );
       bullets.push(
         <span key="liq-line">
-          Below <H>{(chain.mcr * 100).toFixed(0)}%</H> the Trove can be liquidated
-          {chain.recoveryMode ? (
-            <> (and, while the system is in recovery mode, below {(chain.ccr * 100).toFixed(0)}%)</>
-          ) : null}
-          .
+          Below <H>{(chain.mcr * 100).toFixed(0)}%</H> anyone can liquidate the Trove: the Stability Pool takes its debt
+          and its ETH, and the owner keeps the LUSD borrowed.
         </span>,
       );
     }
@@ -123,7 +124,7 @@ export function LiquityV1PositionExplanation({
             <H>
               <AmountText value={headroomLusd} format="compact" /> LUSD
             </H>{" "}
-            more could be borrowed before the Trove reaches the {(activeRatio * 100).toFixed(0)}% minimum.
+            more could be borrowed before the Trove&rsquo;s ratio falls to {(activeRatio * 100).toFixed(0)}%.
           </span>,
         );
       }
@@ -137,8 +138,8 @@ export function LiquityV1PositionExplanation({
           {chain.queueDebtTotal != null && chain.queueDebtTotal > 0 && (
             <>
               {" "}
-              That is <H>{pct(Math.min(1, chain.debtInFront / chain.queueDebtTotal))}</H> of the queue&rsquo;s total
-              debt.
+              That is <H>{pct(Math.min(1, chain.debtInFront / chain.queueDebtTotal))}</H> of all the debt in the queue,
+              so a redemption reaches this Trove only after that share has been redeemed.
             </>
           )}
         </span>,
@@ -156,18 +157,29 @@ export function LiquityV1PositionExplanation({
     );
   }
 
-  if (chain.recoveryMode) {
+  // Recovery Mode, named with the system's ratio now, and the modal that
+  // explains it with liquidation and the Stability Pool.
+  const howLiquidation = (
+    <span className="ml-1 inline-flex align-middle">
+      <LearnMore inline content={liquityV1LiquidationContent()} />
+    </span>
+  );
+  if (chain.tcr > 0) {
     bullets.push(
-      <span key="recovery">
-        The system is in <H>recovery mode</H> — the total collateral ratio (<H>{(chain.tcr * 100).toFixed(1)}%</H>) is
-        below the {(chain.ccr * 100).toFixed(0)}% critical threshold, tightening liquidation conditions system-wide.
-      </span>,
-    );
-  } else if (chain.tcr > 0) {
-    bullets.push(
-      <span key="system-ratio">
-        The system as a whole stands at a <H>{(chain.tcr * 100).toFixed(1)}%</H> total collateral ratio.
-      </span>,
+      chain.recoveryMode ? (
+        <span key="recovery">
+          The system is in <H>Recovery Mode</H>: the total collateral ratio of all Troves is{" "}
+          <H>{(chain.tcr * 100).toFixed(1)}%</H>, below {(chain.ccr * 100).toFixed(0)}%. Until it recovers, a Trove
+          below that ratio can be liquidated, collateral cannot be withdrawn, and new debt needs a{" "}
+          {(chain.ccr * 100).toFixed(0)}% ratio.{howLiquidation}
+        </span>
+      ) : (
+        <span key="system-ratio">
+          Recovery Mode is off: the total collateral ratio of all Troves is <H>{(chain.tcr * 100).toFixed(1)}%</H>,
+          above the {(chain.ccr * 100).toFixed(0)}% below which Recovery Mode starts. In Recovery Mode a Trove below the
+          system&rsquo;s ratio can be liquidated, even above 110%.{howLiquidation}
+        </span>
+      ),
     );
   }
 
@@ -243,6 +255,7 @@ export function LiquityV1ClosedEpochExplanation({
   v,
   openedAt,
   lastAction,
+  surplus,
 }: {
   v: LiquityV1PositionView;
   /** Unix seconds of the life's first captured event — the "active from"
@@ -252,6 +265,8 @@ export function LiquityV1ClosedEpochExplanation({
    *  the timeline loads; the lead falls back to the owner-exit reading (the
    *  majority mechanism for closed lives). */
   lastAction?: string | null;
+  /** ETH the closing left in the CollSurplusPool, with its claim status. */
+  surplus?: LiquityV1Surplus | null;
 }) {
   if (v.status !== "closed" && v.status !== "liquidated") return null;
   const liquidated = v.status === "liquidated";
@@ -283,20 +298,49 @@ export function LiquityV1ClosedEpochExplanation({
   bullets.push(
     liquidated ? (
       <span key="outcome">
-        Its collateral ratio fell below the protocol&rsquo;s liquidation threshold — the ETH collateral was seized and
-        the LUSD debt cancelled, absorbed by the Stability Pool or redistributed to other Troves.
+        Its collateral ratio fell below the level at which it could be liquidated: the ETH collateral was seized and the
+        LUSD debt cancelled, by the Stability Pool or shared out to other Troves. The owner kept the LUSD borrowed.
       </span>
     ) : redeemed ? (
       <span key="outcome">
-        A redemption cancelled the last of its LUSD debt at $1 face value, taking ETH collateral of equal value — the
-        collateral that remained moved to the CollSurplusPool, where it stays claimable by the owner.
+        A redemption cancelled the last of its LUSD debt at $1 per LUSD and took ETH of equal value; the 200 LUSD
+        liquidation reserve was burned, and the ETH that remained moved to the CollSurplusPool for the owner.
       </span>
     ) : (
       <span key="outcome">
-        The owner repaid the LUSD debt and withdrew the ETH collateral, ending the life by their own transaction.
+        The owner repaid the LUSD debt less the 200 LUSD liquidation reserve, which was burned, and took back the ETH
+        collateral.
       </span>
     ),
   );
+
+  if (surplus) {
+    bullets.push(
+      <span key="surplus">
+        {surplus.claimed ? (
+          <>
+            The{" "}
+            <Prov info={surplusClaimableProv(surplus)}>
+              <H>
+                <AmountText value={surplus.surplus} /> ETH
+              </H>
+            </Prov>{" "}
+            left in the CollSurplusPool was claimed by the owner
+            {surplus.claimed.timestamp != null && <> on {formatDate(surplus.claimed.timestamp)}</>}.
+          </>
+        ) : (
+          <>
+            <Prov info={surplusClaimableProv(surplus)}>
+              <H>
+                <AmountText value={surplus.claimable} /> ETH
+              </H>
+            </Prov>{" "}
+            is still in the CollSurplusPool, waiting for the owner to claim it.
+          </>
+        )}
+      </span>,
+    );
+  }
 
   if (v.peakCollateral > 0 || v.peakDebt > 0) {
     bullets.push(
