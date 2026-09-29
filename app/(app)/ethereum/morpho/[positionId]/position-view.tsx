@@ -302,6 +302,15 @@ export default function MorphoPositionView({
     return servedFolders && servedFolders.length > 0 ? withFolderActors(withOpening, servedFolders) : withOpening;
   }, [externalActivity, opening, servedFolders]);
 
+  // The liquidations in the whole history: the loaded rows plus the members
+  // of any served liquidation folder.
+  const liquidationCount = useMemo(
+    () =>
+      morphoEvents.filter((e) => e.context.data.eventType === "liquidation").length +
+      (servedFolders ?? []).reduce((n, f) => n + (f.counts.find((c) => c.key === "liquidation")?.count ?? 0), 0),
+    [morphoEvents, servedFolders],
+  );
+
   // Upgrade the card's current-debt figure to the live head read when the chain
   // lane agrees with the index wei-exact on borrow shares (the verified normal
   // case — scripts/verify-morpho-chain.mjs) — the same toAssetsUp conversion,
@@ -312,6 +321,7 @@ export default function MorphoPositionView({
     if (chain.borrowSharesRaw !== view.borrowSharesRaw || chain.currentDebt <= 0) return view;
     return {
       ...view,
+      borrowApr: chain.borrowApr,
       currentDebt: {
         amount: chain.currentDebt,
         accruedAmount: Math.max(0, chain.currentDebt - view.borrowed),
@@ -426,6 +436,9 @@ export default function MorphoPositionView({
                   <MorphoPositionExplanation
                     chain={chain}
                     txCount={liveView.txCount}
+                    {...(historyWindow.state === "whole"
+                      ? { eventCount: liveView.eventCount, liquidationCount: liquidationCount }
+                      : {})}
                     everLiquidated={liveView.everLiquidated}
                     externalActivity={externalActivityWithOpening}
                   />
@@ -439,7 +452,10 @@ export default function MorphoPositionView({
               return (
                 <ChainTruthTower
                   data={towerData}
-                  explanation={morphoEconomicsExplanation(towerData)}
+                  explanation={morphoEconomicsExplanation(towerData, {
+                    lltv: liveView.lltv,
+                    badDebt: liveView.badDebt,
+                  })}
                   learnMore={morphoEconomicsContent()}
                 />
               );

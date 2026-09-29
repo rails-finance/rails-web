@@ -98,8 +98,7 @@ export function MorphoOraclePrice({
             )}
           >
             {age.published}
-          </Prov>{" "}
-          ({age.age} before this read)
+          </Prov>
         </>
       )}
     </>

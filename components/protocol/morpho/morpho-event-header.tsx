@@ -8,7 +8,13 @@
 import type { AssetFlow, MorphoContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
-import { assetsDeltaProv, externalActorProv, type MorphoCoords } from "@/lib/morpho/event-provenance";
+import {
+  assetsDeltaProv,
+  externalActorProv,
+  liqClearedValueProv,
+  type MorphoCoords,
+} from "@/lib/morpho/event-provenance";
+import { formatNumber } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 
@@ -64,6 +70,16 @@ export function MorphoEventHeader({
             prov: assetsDeltaProv(sym, ctx.side, coords, ctx.eventType),
           },
         ];
+  // A liquidation moves both sides: the collateral seized, and the debt it
+  // cleared (the Liquidate log's repaid assets plus any bad debt).
+  const cleared = ctx.eventType === "liquidation" ? Number(ctx.loanRepaid) : 0;
+  if (Number.isFinite(cleared) && cleared > 0)
+    deltas.push({
+      value: -cleared,
+      symbol: ctx.loanSymbol,
+      address: soleFlowAddress(flows, ctx.loanSymbol),
+      prov: liqClearedValueProv(ctx.loanSymbol, coords, { amount: formatNumber(cleared) }),
+    });
 
   return (
     <ChainTruthRow

@@ -74,6 +74,10 @@ export interface MorphoTowerLifetime {
   collateralLiquidated: number;
   borrowed: number;
   repaid: number;
+  /** The debt liquidations cleared (Σ each Liquidate log's repaid assets plus
+   *  any bad debt), where the rows carry it. Undefined on a lane that does
+   *  not, and the debt side then reconciles without it or not at all. */
+  debtLiquidated?: number;
   /** Interest the debt accrued between rows (Σ each row's interest since the
    *  previous one), where the rows carry the chain debt. Undefined where they do
    *  not (the swept Base lane), so no lifetime interest is stated. */
@@ -118,9 +122,13 @@ function reduceLifetime(events: BaseActivityEvent[]): MorphoTowerLifetime {
       case "withdraw_collateral":
         out.collateralWithdrawn += amt;
         break;
-      case "liquidation":
+      case "liquidation": {
         out.collateralLiquidated += amt;
+        const cleared = Number(ctx.loanRepaid);
+        if (Number.isFinite(cleared) && cleared > 0 && !unreadToken(ev, ctx.loanSymbol))
+          out.debtLiquidated = (out.debtLiquidated ?? 0) + cleared;
         break;
+      }
       case "borrow":
         out.borrowed += amt;
         break;
@@ -162,7 +170,7 @@ export function morphoLifetimeWithOpening(
   // (bucket key, summary leg) → the MorphoTowerLifetime field it lands on.
   const FIELD: Record<string, Partial<Record<string, keyof MorphoTowerLifetime>>> = {
     collateral: { deposited: "deposited", withdrawn: "collateralWithdrawn", liquidated: "collateralLiquidated" },
-    debt: { borrowed: "borrowed", repaid: "repaid", interest: "interest" },
+    debt: { borrowed: "borrowed", repaid: "repaid", interest: "interest", liquidated: "debtLiquidated" },
   };
   for (const bucket of mergeFlowBuckets(opening?.flows, folderFlows(folders))) {
     const fields = FIELD[bucket.key];
@@ -208,6 +216,7 @@ export function computeMorphoEconomics(
     collateralLiquidated: cLiquidated,
     borrowed,
     repaid,
+    debtLiquidated = 0,
     interest: rowInterest,
     lastDebtAfter,
   } = precomputedLifetime ?? reduceLifetime(events);
@@ -220,7 +229,8 @@ export function computeMorphoEconomics(
   // one can be complete while the other isn't.
   const collComplete =
     !collUnread && flowsReconcile(deposited - cWithdrawn - cLiquidated, coll, deposited + cWithdrawn + cLiquidated);
-  const debtComplete = !loanUnread && flowsReconcile(borrowed - repaid, principal, borrowed + repaid);
+  const debtComplete =
+    !loanUnread && flowsReconcile(borrowed - repaid - debtLiquidated, principal, borrowed + repaid + debtLiquidated);
   // Every tower line carries the token's own address beside its symbol. Morpho
   // Blue is permissionless — the market params ARE two addresses — so the
   // symbol alone leaves the icon chip to guess from the 88-entry house table,
@@ -235,8 +245,21 @@ export function computeMorphoEconomics(
     address: string | undefined,
     flow: "withdrawn" | "liquidated" | "repaid",
     complete: boolean,
+    flowLabel?: string,
   ): TowerLine[] =>
-    complete && amt > DUST ? [{ key, symbol: sym, amount: amt, address, usd: null, prov: vocab.flow(flow, sym) }] : [];
+    complete && amt > DUST
+      ? [
+          {
+            key,
+            symbol: sym,
+            amount: amt,
+            address,
+            usd: null,
+            prov: vocab.flow(flow, sym),
+            ...(flowLabel ? { flowLabel } : {}),
+          },
+        ]
+      : [];
 
   return {
     valued: false,
@@ -295,8 +318,10 @@ export function computeMorphoEconomics(
       exited: flowLine("debt-repaid", repaid, view.loanSymbol, loanAddr, "repaid", debtComplete),
       // The interest the debt accrued over its life: Σ each row's interest
       // since the previous one, plus the head read less the newest row's debt.
+      // Where the accrued-interest segment is drawn it is this same interest,
+      // so the row is left out rather than stated twice.
       costs:
-        lifetimeInterest != null && lifetimeInterest > DUST
+        !(cd && accrued > 0) && lifetimeInterest != null && lifetimeInterest > DUST
           ? [
               {
                 key: "debt-interest-accrued",
@@ -309,7 +334,15 @@ export function computeMorphoEconomics(
               },
             ]
           : [],
-      liquidated: [],
+      liquidated: flowLine(
+        "debt-liquidated",
+        debtLiquidated,
+        view.loanSymbol,
+        loanAddr,
+        "liquidated",
+        debtComplete,
+        "Cleared by liquidation",
+      ),
       lifetimeInflow: debtComplete ? borrowed : 0,
     },
     interestNote:

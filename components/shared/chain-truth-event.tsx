@@ -239,6 +239,9 @@ export interface ChainTruthTransition {
   /** Full-precision signed change for the tooltip + provenance trace. */
   changeExact: string;
   changeProv: Provenance;
+  /** `before` and `change` are already at the family's own precision and are
+   *  shown as they are (no small-figure rewrite). */
+  shownAsIs?: boolean;
 }
 
 /** One snapshot stat — the resulting on-chain state after the event. */
@@ -284,6 +287,9 @@ export interface ChainTruthStat {
     /** The line's words where the gap is not interest alone (f(x): funding,
      *  rebalances). Default "Interest since previous event". */
     label?: string;
+    /** The figure as shown, where the family states its amounts at its own
+     *  precision. Default: formatNumber of `value`. */
+    display?: string;
   };
   /** Show the USD chip whatever the timeline's USD-values flag says — the
    *  Liquity V2 grid's rule for the collateral's value at the event's price,
@@ -699,7 +705,11 @@ export function ChainTruthDetail({
                       <Prov info={s.transition.beforeProv} value={s.transition.beforeExact}>
                         <ExactTip
                           always
-                          text={transitionFigure(s.transition.before, s.transition.beforeExact, false)}
+                          text={
+                            s.transition.shownAsIs
+                              ? s.transition.before
+                              : transitionFigure(s.transition.before, s.transition.beforeExact, false)
+                          }
                           exact={s.transition.beforeExact}
                           symbol={s.symbol}
                         />
@@ -709,7 +719,11 @@ export function ChainTruthDetail({
                       <Prov info={s.transition.changeProv} value={s.transition.changeExact}>
                         <ExactTip
                           always
-                          text={transitionFigure(s.transition.change, s.transition.changeExact)}
+                          text={
+                            s.transition.shownAsIs
+                              ? s.transition.change
+                              : transitionFigure(s.transition.change, s.transition.changeExact)
+                          }
                           exact={s.transition.changeExact}
                           symbol={s.symbol}
                         />
@@ -744,10 +758,13 @@ export function ChainTruthDetail({
                   <Prov info={s.interestSincePrevious.prov} value={s.interestSincePrevious.value} symbol={s.symbol}>
                     <ExactTip
                       always
-                      text={transitionFigure(
-                        formatNumber(Number(s.interestSincePrevious.value)),
-                        s.interestSincePrevious.value,
-                      )}
+                      text={
+                        s.interestSincePrevious.display ??
+                        transitionFigure(
+                          formatNumber(Number(s.interestSincePrevious.value)),
+                          s.interestSincePrevious.value,
+                        )
+                      }
                       exact={s.interestSincePrevious.value}
                       symbol={s.symbol}
                     />

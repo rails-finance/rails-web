@@ -21,10 +21,16 @@ import { AmountText } from "@/components/shared/amount-text";
 export function MorphoPositionExplanation({
   chain,
   txCount,
+  eventCount,
+  liquidationCount,
   everLiquidated,
   externalActivity,
 }: {
   chain: MorphoChainPositionResponse;
+  /** The timeline's event count, and how many of those are liquidations.
+   *  Omit where the page cannot count the whole history. */
+  eventCount?: number;
+  liquidationCount?: number;
   /** The card's own-transaction count (the activity chip's figure — DISTINCT
    *  txs excluding liquidation rows). Omit to skip. */
   txCount?: number;
@@ -45,7 +51,7 @@ export function MorphoPositionExplanation({
   const hasColl = chain.collateral > 0;
   const hf = chain.healthFactor;
   const dropPct = hf != null && hf > 1 ? Math.round((1 - 1 / hf) * 100) : null;
-  const penaltyPct = ((chain.lif - 1) * 100).toFixed(1);
+  const penaltyPct = ((chain.lif - 1) * 100).toFixed(2);
 
   // ── the status lead — subject-first, one sentence, ≤2 figures, colon-
   // terminated: the lead-in to the bullets (charter §4) ─────────────────────
@@ -115,7 +121,7 @@ export function MorphoPositionExplanation({
         ) : (
           <>was published </>
         )}
-        {age.published}, {age.age} before this read.
+        {age.published}.
       </span>,
     );
   }
@@ -139,20 +145,29 @@ export function MorphoPositionExplanation({
 
   if (hasDebt) {
     if (hf != null) {
-      // No health-factor stat on the card (the runway carries the risk read),
-      // so the figure stays muted.
+      // One distance, three readings: the capacity bar's share of the line
+      // used is 1 ÷ HF, and the price fall to the line is 1 − 1 ÷ HF.
+      const usedPct = (100 / hf).toFixed(1);
       bullets.push(
         <span key="hf">
-          Its health factor is {hf.toFixed(2)} — the LLTV-weighted collateral value is {hf.toFixed(2)}× the debt, and at
-          1.0 the position becomes liquidatable.
+          Its health factor is {hf.toFixed(2)}: the collateral&rsquo;s value × the LLTV is {hf.toFixed(2)} times the
+          debt, and at 1 the position can be liquidated. The {usedPct}% of borrow capacity used
+          {dropPct != null && dropPct > 0 ? (
+            <>
+              , the <H>{dropPct}%</H> fall in the {chain.collateralSymbol} price (in {chain.loanSymbol}) that would
+              reach the line
+            </>
+          ) : null}{" "}
+          and the health factor are three views of that one distance.
         </span>,
       );
     }
-    if (dropPct != null && dropPct > 0) {
+    if (chain.borrowApr > 0) {
       bullets.push(
-        <span key="drop">
-          The {chain.collateralSymbol} price, in {chain.loanSymbol} terms, can fall about <H>{dropPct}%</H> before
-          liquidation begins.
+        <span key="rate">
+          The market&rsquo;s borrow rate is {(chain.borrowApr * 100).toFixed(2)}% APR, about{" "}
+          <AmountText value={chain.currentDebt * chain.borrowApr} /> {chain.loanSymbol} a year on this debt; the
+          market&rsquo;s rate model moves it with how much of the market is lent out.
         </span>,
       );
     }
@@ -166,20 +181,41 @@ export function MorphoPositionExplanation({
     }
     bullets.push(
       <span key="liq-model">
-        Past the line, a liquidator repays debt and seizes collateral at a {penaltyPct}% discount. If the collateral
-        runs out, the shortfall is written off against this market&rsquo;s lenders as bad debt.
+        Past the line, a liquidator can repay debt and seize collateral worth {penaltyPct}% more than it repays. If the
+        collateral runs out, the shortfall is written off against this market&rsquo;s lenders as bad debt.
       </span>,
     );
   }
 
-  // The chip's own figure: DISTINCT transactions of the position's own — a
-  // bundler tx lands several event rows, and seizures are done TO the position.
+  // The counts, said plainly: the timeline's events, the owner's transactions
+  // behind them (one transaction can carry several events), and the
+  // liquidations, which are done TO the position.
   const countedTxs = txCount != null && txCount > 0;
   if (countedTxs) {
+    const liq = liquidationCount ?? 0;
+    const ownEvents = eventCount != null ? eventCount - liq : null;
     bullets.push(
       <span key="tx-count">
-        The position has recorded <H>{txCount.toLocaleString("en-US")}</H> transaction{txCount === 1 ? "" : "s"} of its
-        own to date{everLiquidated ? ", and its record also carries liquidation seizures" : ""}.
+        {eventCount != null && ownEvents != null && ownEvents >= txCount ? (
+          <>
+            Its timeline lists {eventCount.toLocaleString("en-US")} events: {ownEvents.toLocaleString("en-US")} from{" "}
+            <H>{txCount.toLocaleString("en-US")}</H> transaction{txCount === 1 ? "" : "s"} by the owner
+            {ownEvents > txCount
+              ? " (one transaction can carry several events, such as adding collateral and borrowing)"
+              : ""}
+            {liq > 0 ? (
+              <>
+                , and {liq.toLocaleString("en-US")} liquidation{liq === 1 ? "" : "s"}
+              </>
+            ) : null}
+            .
+          </>
+        ) : (
+          <>
+            The owner has made <H>{txCount.toLocaleString("en-US")}</H> transaction{txCount === 1 ? "" : "s"} on this
+            position{everLiquidated ? ", and it has been liquidated at least once" : ""}.
+          </>
+        )}
       </span>,
     );
   }

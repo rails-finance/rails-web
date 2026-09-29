@@ -568,3 +568,108 @@ export const morphoAccruedProv = (sym: string): Provenance => ({
     { label: "principal", kind: "chain", pclass: "indexed", note: "replayed Σ(borrow − repay) assets" },
   ],
 });
+
+// ── The market around an event (/api/chain/morpho/at-block) ─────────────────
+
+const oracleReadVerify = (block: number): ProvVerify => ({
+  kind: "recompute",
+  text: `Re-run the market oracle's price() eth_call at block ${block} against an archive node (the oracle address is in the market's immutable params)`,
+});
+
+/** The health factor or LTV either side of an event: the row's collateral and
+ *  debt, both valued at the market oracle at the end of the block before. */
+export const morphoHealthAtEventProv = (
+  metric: "health factor" | "LTV",
+  side: "before" | "after",
+  collSym: string,
+  loanSym: string,
+  coords: MorphoCoords,
+  vals: { collateral: string; debt: string; price: number; priceBlock: number; lltv: number },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  verify: oracleReadVerify(vals.priceBlock),
+  summary: `The position's ${metric} ${side} this event: its ${collSym} collateral and ${loanSym} debt ${side} the event, as this row states them, with the collateral valued at the market's own oracle at the end of block ${vals.priceBlock}. Both sides use that one price, so the move is the event's alone.`,
+  contract: MORPHO,
+  via: `market oracle price() at block ${vals.priceBlock} · row collateral and debt`,
+  formula: metric === "health factor" ? "collateral × price × LLTV ÷ debt" : "debt ÷ (collateral × price)",
+  inputs: [
+    { label: "collateral", value: `${vals.collateral} ${collSym}`, kind: "chain", note: `row, ${side} the event` },
+    { label: "debt", value: `${vals.debt} ${loanSym}`, kind: "chain", note: `row, ${side} the event` },
+    { label: "price", value: `${vals.price} ${loanSym}`, kind: "chain", note: `oracle, block ${vals.priceBlock}` },
+    ...(metric === "health factor"
+      ? [{ label: "LLTV", value: String(vals.lltv), kind: "chain" as const, note: "market params" }]
+      : []),
+    ...eventInputs(coords),
+  ],
+});
+
+/** The market's borrow rate at the end of the event's block. */
+export const morphoBorrowRateAtBlockProv = (coords: MorphoCoords, block: number, apr: number): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  verify: {
+    kind: "recompute",
+    text: `Re-run the market IRM's borrowRateView eth_call at block ${block}, with the market's params and its market() slots at that block`,
+  },
+  summary: `The market's borrow rate at the end of block ${block}: the interest rate model's per-second rate for the market's state there, times the seconds in a year. It moves with the market's utilization, so the debt accrued at this rate only until the next change.`,
+  contract: MORPHO,
+  via: `market IRM · borrowRateView at block ${block} · × 31,536,000`,
+  formula: "rate per second × seconds per year",
+  inputs: [
+    { label: "APR", value: `${(apr * 100).toFixed(2)}%`, kind: "chain", note: `block ${block}` },
+    ...eventInputs(coords),
+  ],
+});
+
+/** The market's liquidation incentive factor, from its LLTV. */
+export const morphoLifProv = (coords: MorphoCoords, lltv: number, lif: number): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: txVerify(coords),
+  summary: `Liquidation incentive — the collateral a liquidator may seize per unit of debt repaid, fixed by the market's LLTV. The whole bonus goes to the liquidator.`,
+  contract: MORPHO,
+  via: "Morpho Blue liquidate() · min(1.15, 1 ÷ (0.3 × LLTV + 0.7))",
+  formula: "min(1.15, 1 ÷ (0.3 × LLTV + 0.7))",
+  inputs: [
+    { label: "LLTV", value: String(lltv), kind: "chain", note: "market params" },
+    { label: "incentive", value: String(lif), kind: "chain", note: "derived" },
+    ...eventInputs(coords),
+  ],
+});
+
+/** The oracle price a liquidation ran on: of the reads at the end of the block
+ *  before and of its own block, the one that reproduces seized = repaid ×
+ *  incentive ÷ price. */
+export const liqPriceUsedProv = (
+  collSym: string,
+  loanSym: string,
+  coords: MorphoCoords,
+  price: number,
+  block: number,
+): Provenance => ({
+  kind: "chain",
+  pclass: "oracle",
+  verify: oracleReadVerify(block),
+  summary:
+    coords.blockNumber != null && block !== coords.blockNumber
+      ? `${collSym} priced in ${loanSym} by the market's own oracle at the end of block ${block}, the block before the liquidation. The oracle updated later in block ${coords.blockNumber}, after the liquidation had run; this earlier price is the one that reproduces the seized amount from the repaid amount and the market's incentive.`
+      : `${collSym} priced in ${loanSym} by the market's own oracle at the end of block ${block}, the liquidation's block. It reproduces the seized amount from the repaid amount and the market's incentive.`,
+  contract: MORPHO,
+  via: `market oracle · price() eth_call at block ${block} · 1e36-scaled, decimals-adjusted`,
+  inputs: [
+    { label: `${collSym} price`, value: `${price} ${loanSym}`, kind: "chain", note: `oracle price(), block ${block}` },
+    ...eventInputs(coords),
+  ],
+});
+
+/** The market's borrow rate now, from the live chain read. */
+export const morphoBorrowRateNowProv = (apr: number): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  summary: `Borrow rate now — the market's interest rate model's per-second rate for the market's current state (borrowRateView), times the seconds in a year. It moves with the market's utilization; the yearly cost beside it is the debt now × this rate, which holds only while the rate does.`,
+  contract: MORPHO,
+  via: "market IRM · borrowRateView at head · × 31,536,000",
+  formula: "rate per second × seconds per year",
+  inputs: [{ label: "APR", value: `${(apr * 100).toFixed(2)}%`, kind: "chain", note: "live read" }],
+});

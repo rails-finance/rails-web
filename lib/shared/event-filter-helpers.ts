@@ -264,14 +264,17 @@ const AAVE_V4_OP_LABELS: Record<string, string> = {
   collateral: "Collateral toggle",
 };
 
+// Morpho's filter reads the timeline rows' own labels (the index's wire
+// `al`: "Remove Collateral", "Liquidation"), so a filter entry and the row it
+// selects say the same words.
 const MORPHO_OP_LABELS: Record<string, string> = {
   supply_collateral: "Add Collateral",
-  withdraw_collateral: "Withdraw Collateral",
+  withdraw_collateral: "Remove Collateral",
   borrow: "Borrow",
   repay: "Repay",
   supply: "Supply",
   withdraw: "Withdraw",
-  liquidation: "Liquidated",
+  liquidation: "Liquidation",
 };
 
 // Maker keys ARE already labels (see getEventActionKey), so they map to

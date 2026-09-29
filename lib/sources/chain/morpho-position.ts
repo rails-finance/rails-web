@@ -363,3 +363,95 @@ export async function loadMorphoPositionFromChain(
     return stub(marketId, userRaw.toLowerCase());
   }
 }
+
+/** One end of an event's market read: the oracle price and the borrow rate at
+ *  the end of a block. */
+export interface MorphoMarketBlockRead {
+  block: number;
+  /** Loan token per one collateral token (human units), 0 where the oracle
+   *  did not answer. */
+  price: number;
+  /** The IRM's borrowRateView over the market's slots at this block, as an
+   *  APR (rate per second × seconds per year). Null where the IRM is unset or
+   *  did not answer. */
+  borrowApr: number | null;
+}
+
+export interface MorphoMarketAtBlockResponse {
+  marketId: string;
+  lltv: number;
+  lif: number;
+  /** End of the block before the event: the state the event's transaction
+   *  started from, unless an earlier transaction in the same block moved it. */
+  prev: MorphoMarketBlockRead;
+  /** End of the event's own block. */
+  at: MorphoMarketBlockRead;
+}
+
+/**
+ * The market around one event: its oracle price and borrow rate at the end of
+ * block N − 1 and of block N. A market's params are immutable, so they are read
+ * once; the oracle and the market slots are read at each block. Throws on a
+ * failed read; the route turns that into an error the card treats as a miss.
+ */
+export async function loadMorphoMarketAtBlock(
+  marketRaw: string,
+  blockNumber: number,
+  deployment: MorphoDeployment = MORPHO_DEPLOYMENT,
+): Promise<MorphoMarketAtBlockResponse> {
+  const marketId = (marketRaw.startsWith("0x") ? marketRaw : `0x${marketRaw}`).toLowerCase() as `0x${string}`;
+  const client = chainClient(deployment.chainId);
+  const MORPHO = deployment.blue as `0x${string}`;
+  const [loanToken, collateralToken, oracle, irm, lltv] = await client.readContract({
+    address: MORPHO,
+    abi: MORPHO_ABI,
+    functionName: "idToMarketParams",
+    args: [marketId],
+  });
+  const metas = await resolveErc20Meta([loanToken.toLowerCase(), collateralToken.toLowerCase()], deployment.chainId);
+  assertDecimalsRead(metas, [loanToken, collateralToken]);
+  const loanDecimals = metas.get(loanToken.toLowerCase())?.decimals ?? 18;
+  const collateralDecimals = metas.get(collateralToken.toLowerCase())?.decimals ?? 18;
+  const paramsStruct = { loanToken, collateralToken, oracle, irm, lltv };
+
+  const readAt = async (block: number): Promise<MorphoMarketBlockRead> => {
+    const bn = BigInt(block);
+    const [priceRes, mktRes] = await client.multicall({
+      allowFailure: true,
+      blockNumber: bn,
+      contracts: [
+        { address: oracle, abi: ORACLE_ABI, functionName: "price" },
+        { address: MORPHO, abi: MORPHO_ABI, functionName: "market", args: [marketId] },
+      ],
+    });
+    const priceRaw = priceRes.status === "success" ? (priceRes.result as bigint) : ZERO;
+    let borrowApr: number | null = null;
+    if (mktRes.status === "success" && irm.toLowerCase() !== ZERO_ADDR) {
+      const [totalSupplyAssets, totalSupplyShares, totalBorrowAssets, totalBorrowShares, lastUpdate, fee] =
+        mktRes.result as readonly [bigint, bigint, bigint, bigint, bigint, bigint];
+      try {
+        const rate = await client.readContract({
+          address: irm,
+          abi: IRM_ABI,
+          functionName: "borrowRateView",
+          args: [
+            paramsStruct,
+            { totalSupplyAssets, totalSupplyShares, totalBorrowAssets, totalBorrowShares, lastUpdate, fee },
+          ],
+          blockNumber: bn,
+        });
+        borrowApr = (Number(rate) / 1e18) * SECONDS_PER_YEAR;
+      } catch {
+        borrowApr = null;
+      }
+    }
+    return {
+      block,
+      price: priceRaw > ZERO ? Number(priceRaw) / 10 ** (36 + loanDecimals - collateralDecimals) : 0,
+      borrowApr,
+    };
+  };
+
+  const [prev, at] = await Promise.all([readAt(blockNumber - 1), readAt(blockNumber)]);
+  return { marketId, lltv: Number(lltv) / 1e18, lif: lifOf(lltv), prev, at };
+}

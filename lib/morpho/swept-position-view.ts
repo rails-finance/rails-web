@@ -71,6 +71,7 @@ export function morphoViewFromSweep(
     ...(pos.peaksPartial ? { peaksPartial: true } : {}),
     borrowSharesRaw: pos.borrowSharesRaw,
     currentDebt,
+    ...(live && currentDebt ? { borrowApr: live.borrowApr } : {}),
     lltv: pos.lltv,
     eventCount: pos.eventCount,
     txCount: pos.txCount,

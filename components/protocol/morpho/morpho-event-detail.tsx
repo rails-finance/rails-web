@@ -8,7 +8,12 @@
 // didn't touch is muted.
 
 import type { AssetFlow, MorphoContext } from "@/lib/shared/types/event-shape";
-import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import {
+  ChainTruthDetail,
+  reconstructTransition,
+  type ChainTruthStat,
+  type ChainTruthTransition,
+} from "@/components/shared/chain-truth-event";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
 import {
   collateralAfterProv,
@@ -30,8 +35,26 @@ import {
   liqSeizedValueProv,
   liqClearedValueProv,
   liqPremiumProv,
+  liqPriceUsedProv,
+  morphoHealthAtEventProv,
+  morphoBorrowRateAtBlockProv,
+  morphoLifProv,
   type MorphoCoords,
 } from "@/lib/morpho/event-provenance";
+import { Prov } from "@/components/shared/provenance";
+import { StatCard, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
+import {
+  useMorphoAtBlock,
+  morphoHealthMove,
+  morphoLiquidationPrice,
+  fmtMorphoAmount,
+  fmtMorphoPart,
+  fmtMorphoHf,
+  fmtMorphoPrice,
+  subDecimal,
+  type MorphoAtBlock,
+  type MorphoHealthMove,
+} from "@/lib/morpho/use-market-at-block";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
@@ -53,34 +76,57 @@ const fmt = (human: string): string => formatNumber(Number(human));
 /** A running balance the answer did not carry is stated, never filled in. */
 const fmtAfter = (human: string | undefined): string => (human == null ? "Not loaded" : fmt(human));
 
+/** The transition at the row's precision: the before is the row's own exact
+ *  figure (never the float after − change), and both figures are written as
+ *  the timeline row writes amounts. */
+function atPrecision(
+  t: ChainTruthTransition | undefined,
+  before: string | undefined,
+  change: string | undefined,
+): ChainTruthTransition | undefined {
+  if (!t || before == null || change == null) return t;
+  const c = Number(change);
+  return {
+    ...t,
+    before: fmtMorphoAmount(before),
+    beforeExact: before,
+    change: `${c >= 0 ? "+" : "−"}${fmtMorphoAmount(Math.abs(c))}`,
+    shownAsIs: true,
+  };
+}
+
 /** The forensics for a Morpho liquidation — the loan-token-denominated variant
  *  of the shared two-leg block (Morpho prices in the loan token by design; no
  *  USD is asserted anywhere). Seized = |assetsDelta| (the Liquidate log's
- *  seizedAssets) valued at the market's OWN oracle price captured at the block
- *  (mig 112); cleared = loanRepaid (repaid + any bad debt), already loan
- *  units. The premium reproduces the market's Liquidation Incentive Factor as
- *  realized. Undefined until the block is priced; token-only meanwhile. */
+ *  seizedAssets) valued at the oracle price the liquidation ran on
+ *  (morphoLiquidationPrice); cleared = loanRepaid (repaid + any bad debt),
+ *  already loan units. The premium then reproduces the market's incentive,
+ *  shown beneath it. Undefined until the price is in hand. */
 function buildMorphoLiqForensics(
   ctx: MorphoContext,
   coords: MorphoCoords,
   flows: AssetFlow[] | undefined,
+  read: MorphoAtBlock,
 ): LiquidationForensicsProps | undefined {
-  const price = ctx.oraclePriceAtBlock;
+  const used = morphoLiquidationPrice(ctx, read, coords.blockNumber);
   const seizedAmt = Math.abs(Number(ctx.assetsDelta));
   const clearedAmt = Number(ctx.loanRepaid);
-  if (!price || !Number.isFinite(seizedAmt) || !Number.isFinite(clearedAmt) || seizedAmt <= 0 || clearedAmt <= 0)
+  if (!used || !Number.isFinite(seizedAmt) || !Number.isFinite(clearedAmt) || seizedAmt <= 0 || clearedAmt <= 0)
     return undefined;
+  const price = used.price;
   const collSym = ctx.collateralSymbol;
   const loanSym = ctx.loanSymbol;
-  const seizedValue = seizedAmt * price.loanPerCollateral;
-  const inLoan = (n: number) => `${formatNumber(n)} ${loanSym}`;
+  const seizedValue = seizedAmt * price;
+  const inLoan = (n: number) => `${fmtMorphoAmount(n)} ${loanSym}`;
+  const priceBlock = used.block;
   return {
     seized: {
       symbol: collSym,
       usd: seizedValue,
+      amount: `${fmtMorphoAmount(seizedAmt)} ${collSym}`,
       usdProv: liqSeizedValueProv(collSym, loanSym, coords, {
         amount: fmt(String(seizedAmt)),
-        price: price.loanPerCollateral,
+        price,
       }),
     },
     cleared: {
@@ -88,30 +134,154 @@ function buildMorphoLiqForensics(
       usd: clearedAmt,
       usdProv: liqClearedValueProv(loanSym, coords, { amount: fmt(String(clearedAmt)) }),
     },
+    seizedLabel: "Collateral seized",
+    clearedLabel: "Debt cleared",
     premium: seizedValue / clearedAmt - 1,
     premiumProv: liqPremiumProv(loanSym, coords, { seized: inLoan(seizedValue), cleared: inLoan(clearedAmt) }),
+    ...(used.lif != null && read.status === "ok"
+      ? {
+          premiumReference: {
+            label: "Market incentive",
+            value: `+${((used.lif - 1) * 100).toFixed(2)}%`,
+            prov: morphoLifProv(coords, read.lltv, used.lif),
+          },
+        }
+      : {}),
     pricePills: [
       {
         symbol: collSym,
         address: soleFlowAddress(flows, collSym),
-        priceUsd: price.loanPerCollateral,
-        priceProv: atBlockOraclePriceProv(collSym, loanSym, coords, price.loanPerCollateral),
-        note: "market oracle at block",
+        priceUsd: price,
+        priceProv:
+          priceBlock != null
+            ? liqPriceUsedProv(collSym, loanSym, coords, price, priceBlock)
+            : atBlockOraclePriceProv(collSym, loanSym, coords, price),
+        note: priceBlock != null ? `market oracle at block ${priceBlock.toLocaleString("en-US")}` : "market oracle",
       },
     ],
     // Everything on this card is loan-token denominated — Morpho's own unit.
-    format: { value: inLoan, price: inLoan },
+    format: { value: inLoan, price: (n: number) => `${fmtMorphoPrice(n)} ${loanSym}` },
   };
 }
 
+/** The before → after pair of one figure, in the grid's stat look. */
+function MoveCard({
+  label,
+  before,
+  after,
+  beforeProv,
+  afterProv,
+  note,
+}: {
+  label: string;
+  before: string;
+  after: string;
+  beforeProv: Parameters<typeof Prov>[0]["info"];
+  afterProv: Parameters<typeof Prov>[0]["info"];
+  note?: React.ReactNode;
+}) {
+  return (
+    <StatCard label={label}>
+      <StateTransition>
+        <span className="text-sm font-semibold tabular-nums text-rb-500">
+          <Prov info={beforeProv}>{before}</Prov>
+        </span>
+        <TransitionArrow size="sm" />
+        <span className="text-sm font-semibold tabular-nums">
+          <Prov info={afterProv}>{after}</Prov>
+        </span>
+      </StateTransition>
+      {note && <div className="mt-0.5 text-xs text-rb-500">{note}</div>}
+    </StatCard>
+  );
+}
+
+/** Health factor, LTV and the borrow rate around the event — the market read
+ *  at the end of block N − 1 (price) and N (rate). A cell holds its place while
+ *  the read is in flight; a failed read draws nothing. */
+function MorphoRiskCards({
+  ctx,
+  coords,
+  read,
+  move,
+}: {
+  ctx: MorphoContext;
+  coords: MorphoCoords;
+  read: MorphoAtBlock;
+  move: MorphoHealthMove | null;
+}) {
+  const debtSide = ctx.eventType === "borrow" || ctx.eventType === "repay";
+  const anyDebt = Number(ctx.debtBefore ?? 0) > 1e-6 || Number(ctx.debtAfter ?? ctx.borrowedAfter ?? 0) > 1e-6;
+  if (!anyDebt || ctx.debtAfter == null) return null;
+  if (read.status === "loading")
+    return (
+      <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:grid-cols-2">
+        <StatCard label="Health factor">
+          <span className="inline-block h-[1em] w-24 rounded-md bg-skeleton animate-pulse" aria-hidden="true" />
+        </StatCard>
+      </div>
+    );
+  if (read.status !== "ok" || !move) return null;
+  const collSym = ctx.collateralSymbol;
+  const loanSym = ctx.loanSymbol;
+  const vals = (side: "before" | "after") => ({
+    collateral: String(side === "before" ? move.collBefore : move.collAfter),
+    debt: String(side === "before" ? move.debtBefore : move.debtAfter),
+    price: move.price,
+    priceBlock: move.priceBlock,
+    lltv: move.lltv,
+  });
+  const hfText = (hf: number | null) => (hf == null ? "no debt" : fmtMorphoHf(hf));
+  const ltvText = (l: number | null) =>
+    l == null ? "no debt" : l > 0 && l < 0.001 ? "<0.1%" : `${(l * 100).toFixed(1)}%`;
+  const priceNote = (
+    <>
+      at {collSym} {fmtMorphoPrice(move.price)} {loanSym}, the market oracle at block{" "}
+      {move.priceBlock.toLocaleString("en-US")}
+    </>
+  );
+  const apr = read.at.borrowApr;
+  return (
+    <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:grid-cols-2">
+      <MoveCard
+        label="Health factor"
+        before={hfText(move.hfBefore)}
+        after={hfText(move.hfAfter)}
+        beforeProv={morphoHealthAtEventProv("health factor", "before", collSym, loanSym, coords, vals("before"))}
+        afterProv={morphoHealthAtEventProv("health factor", "after", collSym, loanSym, coords, vals("after"))}
+        note={priceNote}
+      />
+      <MoveCard
+        label={`LTV (liquidation at ${(move.lltv * 100).toFixed(1)}%)`}
+        before={ltvText(move.ltvBefore)}
+        after={ltvText(move.ltvAfter)}
+        beforeProv={morphoHealthAtEventProv("LTV", "before", collSym, loanSym, coords, vals("before"))}
+        afterProv={morphoHealthAtEventProv("LTV", "after", collSym, loanSym, coords, vals("after"))}
+      />
+      {debtSide && apr != null && (
+        <StatCard label="Market borrow rate">
+          <span className="text-sm font-semibold tabular-nums">
+            <Prov info={morphoBorrowRateAtBlockProv(coords, read.at.block, apr)}>{(apr * 100).toFixed(2)}% APR</Prov>
+          </span>
+          <div className="mt-0.5 text-xs text-rb-500">
+            at the end of block {read.at.block.toLocaleString("en-US")}; it moves with the market&rsquo;s utilization
+          </div>
+        </StatCard>
+      )}
+    </div>
+  );
+}
+
 export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEventDetailProps) {
+  const chainId = useChainId();
   const coords: MorphoCoords = {
     txHash,
     blockNumber,
     marketId: ctx.marketId,
-    chainId: useChainId(),
+    chainId,
     source: useCaptureSource(),
   };
+  const read = useMorphoAtBlock(ctx.marketId, blockNumber, chainId);
   // The address for each axis, read off the event's own flows under the
   // single-match rule (soleFlowAddress): a symbol two flows share resolves to
   // nothing rather than to whichever contract happened to come first. Only the
@@ -133,14 +303,19 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
       address: collAddr,
       prov: collateralAfterProv(ctx.collateralSymbol, coords),
       changed: collActive,
+      display: ctx.collateralAfter != null ? fmtMorphoAmount(ctx.collateralAfter) : undefined,
       transition:
         ctx.side === "collateral"
-          ? reconstructTransition({
-              after: ctx.collateralAfter,
-              change: ctx.assetsDelta,
-              changeProv: assetsDeltaProv(ctx.collateralSymbol, "collateral", coords, ctx.eventType),
-              beforeProv: collateralBeforeProv(ctx.collateralSymbol, coords),
-            })
+          ? atPrecision(
+              reconstructTransition({
+                after: ctx.collateralAfter,
+                change: ctx.assetsDelta,
+                changeProv: assetsDeltaProv(ctx.collateralSymbol, "collateral", coords, ctx.eventType),
+                beforeProv: collateralBeforeProv(ctx.collateralSymbol, coords),
+              }),
+              ctx.collateralAfter != null ? subDecimal(ctx.collateralAfter, ctx.assetsDelta) : undefined,
+              ctx.assetsDelta,
+            )
           : undefined,
     },
     ctx.debtAfter != null
@@ -150,22 +325,28 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
           // the gap from the previous row's after is the interest between.
           label: "Debt",
           value: fmt(ctx.debtAfter),
+          display: fmtMorphoAmount(ctx.debtAfter),
           symbol: ctx.loanSymbol,
           address: loanAddr,
           prov: debtAfterProv(ctx.loanSymbol, coords),
           changed: borrActive || Boolean(ctx.interestSincePrevious),
           transition: borrActive
-            ? reconstructTransition({
-                after: ctx.debtAfter,
-                change: ctx.debtChange,
-                changeProv: debtChangeProv(ctx.loanSymbol, coords),
-                beforeProv: debtBeforeProv(ctx.loanSymbol, coords),
-              })
+            ? atPrecision(
+                reconstructTransition({
+                  after: ctx.debtAfter,
+                  change: ctx.debtChange,
+                  changeProv: debtChangeProv(ctx.loanSymbol, coords),
+                  beforeProv: debtBeforeProv(ctx.loanSymbol, coords),
+                }),
+                ctx.debtBefore,
+                ctx.debtChange,
+              )
             : undefined,
           ...(ctx.interestSincePrevious
             ? {
                 interestSincePrevious: {
                   value: ctx.interestSincePrevious,
+                  display: fmtMorphoPart(ctx.interestSincePrevious, ctx.debtBefore ?? ctx.debtAfter),
                   prov: interestSincePreviousProv(ctx.loanSymbol, coords),
                 },
               }
@@ -243,11 +424,15 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
     });
   }
 
-  const forensics = ctx.eventType === "liquidation" ? buildMorphoLiqForensics(ctx, coords, flows) : undefined;
+  const forensics = ctx.eventType === "liquidation" ? buildMorphoLiqForensics(ctx, coords, flows, read) : undefined;
+  const move = morphoHealthMove(ctx, read);
 
   return (
     <>
       <ChainTruthDetail stats={stats} />
+      {ctx.eventType !== "supply" && ctx.eventType !== "withdraw" && (
+        <MorphoRiskCards ctx={ctx} coords={coords} read={read} move={move} />
+      )}
       {forensics && <LiquidationForensics {...forensics} />}
     </>
   );

@@ -57,7 +57,16 @@ import {
   type MorphoCoords,
 } from "@/lib/morpho/event-provenance";
 import { formatNumber } from "@/lib/utils/format";
-import { AmountText } from "@/components/shared/amount-text";
+import {
+  fmtMorphoAmount,
+  fmtMorphoPart,
+  fmtMorphoHf,
+  fmtMorphoPrice,
+  morphoHealthMove,
+  morphoLiquidationPrice,
+  type MorphoAtBlock,
+  type MorphoHealthMove,
+} from "@/lib/morpho/use-market-at-block";
 
 /** A magnitude below this is a rounding leftover, not a real balance.
  *
@@ -134,11 +143,9 @@ function Fig({
   );
 }
 
-const fmtAbs = (h?: string): string => formatNumber(Math.abs(Number(h)));
-
 // ── the variant table ────────────────────────────────────────────────────────
 
-function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventProseSlots {
+function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords, read?: MorphoAtBlock): EventProseSlots {
   // Every sentence below reads the position after the event. Without the
   // index's running state for this row there is nothing true to say about it.
   if (ctx.collateralAfter == null || ctx.borrowedAfter == null) {
@@ -149,6 +156,7 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
   const rs = resultingState(ctx);
   const delta = Number(ctx.assetsDelta) || 0;
   const movedSym = ctx.side === "collateral" ? collSym : loanSym;
+  const amt = (n: number | string) => fmtMorphoAmount(n);
 
   // The moved amount echoes the event header's signed-delta receipt (same prov
   // vocabulary + coords + signed value → same entry key).
@@ -159,16 +167,16 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
       value={chainTruthDeltaValue(delta, false)}
       symbol={movedSym}
     >
-      {fmtAbs(ctx.assetsDelta)} {movedSym}
+      {amt(Math.abs(delta))} {movedSym}
     </Fig>
   );
-  // After-balances echo the detail grid's Collateral / Borrowed stats. The
-  // shared ChainTruthDetail registers those receipts with NO symbol (the ticker
-  // rides an icon, not a `symbol` prop), so these echoes omit `symbol` too — the
+  // After-balances echo the detail grid's Collateral / Debt stats. The shared
+  // ChainTruthDetail registers those receipts with NO symbol (the ticker rides
+  // an icon, not a `symbol` prop), so these echoes omit `symbol` too — the
   // entry key is label|value|"" on both sides, and the locator link resolves.
   const collAfterFig = () => (
     <Fig echo info={collateralAfterProv(collSym, coords)} value={formatNumber(Number(ctx.collateralAfter))}>
-      <AmountText value={Number(ctx.collateralAfter)} /> {collSym}
+      {amt(ctx.collateralAfter ?? 0)} {collSym}
     </Fig>
   );
   const borrowedAfterFig = () => (
@@ -177,9 +185,110 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
       info={rs.debtIsChain ? debtAfterProv(loanSym, coords) : borrowedAfterProv(loanSym, coords)}
       value={formatNumber(rs.borrowedAfter)}
     >
-      <AmountText value={rs.borrowedAfter} /> {loanSym}
+      {amt(rs.borrowedAfter)} {loanSym}
     </Fig>
   );
+  const b = (text: string) => <strong className="font-semibold text-foreground">{text}</strong>;
+
+  // The debt, reconciled from the previous event's figure: previous + interest
+  // since = before; ± this event = after. Rows that carry the chain debt only.
+  const interest = Number(ctx.interestSincePrevious ?? 0) || 0;
+  const debtBefore = ctx.debtBefore != null ? Number(ctx.debtBefore) : null;
+  const prevDebt = debtBefore != null ? debtBefore - interest : null;
+  const debtLine = (verb: "borrowed" | "repaid"): ClauseInput => {
+    if (!rs.debtIsChain || debtBefore == null || prevDebt == null) return null;
+    const moved = Math.abs(Number(ctx.debtChange ?? delta));
+    if (prevDebt <= 1e-6 && interest === 0) return null;
+    const part = (n: number) => fmtMorphoPart(n, debtBefore);
+    return clause(
+      <>
+        The debt reconciles: {part(prevDebt)} {loanSym} after the previous event
+        {interest > 0 ? (
+          <>
+            , plus {part(interest)} of interest since, is {part(debtBefore)}
+          </>
+        ) : null}
+        ; {verb === "borrowed" ? "plus" : "less"} the {part(moved)} {verb}, {part(rs.borrowedAfter)} {loanSym}.
+      </>,
+    );
+  };
+
+  // The health factor either side of the event, at the oracle price going
+  // into the block — one sentence per event, graded near the line.
+  const move = read ? morphoHealthMove(ctx, read) : null;
+  const priceAt = move ? (
+    <>
+      at {collSym} {fmtMorphoPrice(move.price)} {loanSym} (the market oracle at block{" "}
+      {move.priceBlock.toLocaleString("en-US")})
+    </>
+  ) : null;
+  const grade = (hf: number): ReactNode =>
+    hf < 1
+      ? ", below 1, where the position can be liquidated"
+      : hf < 1.1
+        ? ", close to the liquidation line at 1"
+        : hf < 1.2
+          ? `; a ${Math.round((1 - 1 / hf) * 100)}% fall in the ${collSym} price would reach the liquidation line`
+          : "";
+  const hfSentence = (extra?: ReactNode): ClauseInput => {
+    if (!move) return null;
+    const { hfBefore, hfAfter } = move;
+    if (hfBefore == null && hfAfter == null) return null;
+    if (hfAfter == null)
+      return clause(
+        <>With no debt left, the position has no health factor and none of its collateral can be seized.</>,
+      );
+    // A dust debt puts the factor far past any meaningful reading.
+    if (hfAfter >= 100 && (hfBefore == null || hfBefore >= 100))
+      return clause(
+        <>
+          With {amt(move.debtAfter)} {loanSym} of debt the health factor is over 100: the collateral is nowhere near the
+          liquidation line.
+        </>,
+      );
+    if (hfBefore == null)
+      return clause(
+        <>
+          {priceAt ? <>Priced {priceAt}, it</> : "It"} starts with a health factor of {b(fmtMorphoHf(hfAfter))}
+          {grade(hfAfter)}.
+        </>,
+      );
+    const dir = hfAfter < hfBefore ? "fell" : hfAfter > hfBefore ? "rose" : "stayed";
+    return clause(
+      <>
+        {priceAt ? <>Priced {priceAt}, the</> : "The"} health factor {dir}{" "}
+        {dir === "stayed" ? (
+          <>at {b(fmtMorphoHf(hfAfter))}</>
+        ) : (
+          <>
+            from {b(fmtMorphoHf(hfBefore))} to {b(fmtMorphoHf(hfAfter))}
+          </>
+        )}
+        {extra}
+        {grade(hfAfter)}.
+      </>,
+    );
+  };
+  const liqPriceMove = (): ReactNode =>
+    move && move.liqPriceBefore != null && move.liqPriceAfter != null && move.hfAfter != null && move.hfAfter < 100 ? (
+      <>
+        {" "}
+        and moved the liquidation price {move.liqPriceAfter > move.liqPriceBefore ? "closer" : "further away"}, from{" "}
+        {fmtMorphoPrice(move.liqPriceBefore)} to {fmtMorphoPrice(move.liqPriceAfter)} {loanSym} per {collSym}
+      </>
+    ) : null;
+
+  // The rate in force after the event and what it costs a year on this debt.
+  const rateLine = (): ClauseInput => {
+    if (!read || read.status !== "ok" || read.at.borrowApr == null || !rs.hasDebt || !rs.debtIsChain) return null;
+    const apr = read.at.borrowApr;
+    return clause(
+      <>
+        The market&rsquo;s borrow rate at the end of the block was {b(`${(apr * 100).toFixed(2)}%`)} APR, about{" "}
+        {amt(rs.borrowedAfter * apr)} {loanSym} a year on this debt while it holds.
+      </>,
+    );
+  };
 
   // Forward paths (charter §5.3) — the possibility space of a named state, never
   // advice. Collateral with no debt: the doors are withdraw or borrow again.
@@ -192,15 +301,6 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
           </>,
         )
       : null;
-
-  // Morpho's isolation and its single LLTV line — event-relevant mechanics kept
-  // as plain meansNow clauses (charter §7 morals triage).
-  const isolationMechanic = clause(
-    <>
-      Morpho collateral earns nothing and backs only this market&rsquo;s {loanSym} loan; nothing outside the market can
-      touch it.
-    </>,
-  );
 
   switch (ctx.eventType) {
     case "borrow": {
@@ -218,7 +318,8 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
       );
       return {
         happened: [clause(happened)],
-        meansNow: [],
+        changed: [firstBorrow ? null : debtLine("borrowed")],
+        meansNow: [hfSentence(), rateLine()],
       };
     }
 
@@ -230,26 +331,32 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
         : rs.debtIsChain
           ? cont(<>, leaving {borrowedAfterFig()} owed.</>)
           : cont(<>, leaving {borrowedAfterFig()} of principal outstanding.</>);
-      // The general debt-as-shares rule is Layer-2 material — the "?" modal
-      // (morphoMarketContent's "Debt as shares") carries it verbatim; the
-      // state-gated overshoot caveat below stays (§2 misleading-figure).
-      const meansNow: ClauseInput[] = [];
-      // §2 misleading-figure exception, in plain words: a full repay can return
-      // more of the loan token than was ever drawn — the excess is the interest.
-      if (rs.debtCleared && rs.principalOvershoot) {
-        meansNow.push(
-          clause(
-            <>
-              Clearing the debt in full returned more {loanSym} than was ever drawn; the difference is the interest
-              paid.
-            </>,
-          ),
-        );
-      }
-      meansNow.push(collateralOnlyPath());
+      // A full repay: what the payment covered, owed before plus the interest
+      // since. Morpho keeps no principal/interest split on a partial one — the
+      // debt is one balance of shares — so a partial repay reconciles instead.
+      const covered: ClauseInput =
+        rs.debtCleared && rs.debtIsChain && prevDebt != null && interest > 0
+          ? clause(
+              <>
+                The {fmtMorphoPart(Math.abs(delta), delta)} {loanSym} repaid is the {fmtMorphoPart(prevDebt, delta)}{" "}
+                owed after the previous event plus {b(fmtMorphoPart(interest, delta))} {loanSym} of interest accrued
+                since.
+              </>,
+            )
+          : rs.debtCleared && rs.principalOvershoot
+            ? clause(
+                <>
+                  Clearing the debt in full returned more {loanSym} than was ever drawn; the difference is the interest
+                  paid.
+                </>,
+              )
+            : rs.debtCleared
+              ? null
+              : debtLine("repaid");
       return {
         happened: [clause(<>Repaid {deltaFig()} of the position&rsquo;s debt</>), ending],
-        meansNow,
+        changed: [covered],
+        meansNow: [rs.debtCleared ? collateralOnlyPath() : hfSentence(), rs.debtCleared ? null : rateLine()],
       };
     }
 
@@ -274,7 +381,7 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
       );
       return {
         happened: [clause(happened)],
-        meansNow: [isolationMechanic, collateralOnlyPath()],
+        meansNow: [rs.hasDebt ? hfSentence(liqPriceMove()) : null, collateralOnlyPath()],
       };
     }
 
@@ -283,42 +390,19 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
         ? cont(<>, emptying the position&rsquo;s collateral.</>)
         : rs.collateralOnly
           ? cont(<>, leaving {collAfterFig()} in the market.</>)
-          : cont(<>, reducing the cover behind its {borrowedAfterFig()} of debt.</>);
-      const meansNow: ClauseInput[] = [collateralOnlyPath()];
+          : cont(
+              <>
+                , leaving {collAfterFig()} behind its {borrowedAfterFig()} of debt.
+              </>,
+            );
       return {
         happened: [clause(<>Withdrew {deltaFig()} of collateral</>), ending],
-        meansNow,
+        meansNow: [rs.hasDebt ? hfSentence(liqPriceMove()) : null, collateralOnlyPath()],
       };
     }
 
-    case "liquidation": {
-      const changed: ClauseInput = rs.emptied
-        ? clause(<>The seizure emptied the position&rsquo;s collateral.</>)
-        : clause(<>The position keeps {collAfterFig()} of collateral.</>);
-      const meansNow: ClauseInput[] = [liquidationValued(ctx, coords, collSym, loanSym)];
-      if (rs.emptied) {
-        meansNow.push(
-          clause(
-            <>
-              When a seizure doesn&rsquo;t cover the whole debt, the shortfall is written off against this
-              market&rsquo;s lenders as bad debt.
-            </>,
-          ),
-        );
-      }
-      return {
-        happened: [
-          clause(
-            <>
-              The debt crossed the market&rsquo;s LLTV line and a liquidator repaid debt and seized collateral in
-              exchange, at the market&rsquo;s fixed liquidation discount.
-            </>,
-          ),
-        ],
-        changed: [changed],
-        meansNow,
-      };
-    }
+    case "liquidation":
+      return liquidationSlots(ctx, coords, read, { move, amt, b, collAfterFig, borrowedAfterFig, rs });
 
     case "supply":
     case "withdraw": {
@@ -353,6 +437,144 @@ function morphoEventSlotsBase(ctx: MorphoContext, coords: MorphoCoords): EventPr
     default:
       return { happened: [] };
   }
+}
+
+/** A liquidation, told in the order a reader asks: what the liquidator did,
+ *  why it could, at what price, what it cost the borrower, and what is left. */
+function liquidationSlots(
+  ctx: MorphoContext,
+  coords: MorphoCoords,
+  read: MorphoAtBlock | undefined,
+  h: {
+    move: MorphoHealthMove | null;
+    amt: (n: number | string) => string;
+    b: (t: string) => ReactNode;
+    collAfterFig: () => ReactNode;
+    borrowedAfterFig: () => ReactNode;
+    rs: MorphoResultingState;
+  },
+): EventProseSlots {
+  const { amt, b, rs } = h;
+  const collSym = ctx.collateralSymbol;
+  const loanSym = ctx.loanSymbol;
+  const seizedAmt = Math.abs(Number(ctx.assetsDelta));
+  const clearedAmt = Number(ctx.loanRepaid);
+  const legs = Number.isFinite(seizedAmt) && Number.isFinite(clearedAmt) && seizedAmt > 0 && clearedAmt > 0;
+  const used = read ? morphoLiquidationPrice(ctx, read, coords.blockNumber) : null;
+
+  const happened: ClauseInput = legs
+    ? clause(
+        <>
+          A liquidator repaid {b(`${amt(clearedAmt)} ${loanSym}`)} of the position&rsquo;s debt and seized{" "}
+          {b(`${amt(seizedAmt)} ${collSym}`)} of its collateral in exchange.
+        </>,
+      )
+    : clause(<>A liquidator repaid part of the position&rsquo;s debt and seized collateral in exchange.</>);
+
+  const changed: ClauseInput[] = [];
+  if (used) {
+    const priceText = `${collSym} ${fmtMorphoPrice(used.price)} ${loanSym}`;
+    const hfBefore =
+      h.move && ctx.debtBefore != null && used.price > 0 && read?.status === "ok"
+        ? (h.move.collBefore * used.price * read.lltv) / Number(ctx.debtBefore)
+        : null;
+    changed.push(
+      clause(
+        <>
+          It ran at {b(priceText)}, the market oracle at block{" "}
+          {used.block != null ? used.block.toLocaleString("en-US") : "the liquidation"}
+          {hfBefore != null ? (
+            <>
+              , where the position&rsquo;s health factor was {b(fmtMorphoHf(hfBefore))}: below 1, so anyone could
+              liquidate it
+            </>
+          ) : null}
+          .
+        </>,
+      ),
+    );
+    if (read?.status === "ok" && used.block != null && coords.blockNumber != null && used.block < coords.blockNumber)
+      changed.push(
+        clause(
+          <>
+            The oracle updated later in block {coords.blockNumber.toLocaleString("en-US")}, to{" "}
+            {fmtMorphoPrice(read.at.price)} {loanSym}, after the liquidation had run.
+          </>,
+        ),
+      );
+    if (legs) {
+      const seizedValue = seizedAmt * used.price;
+      const premium = (seizedValue / clearedAmt - 1) * 100;
+      const net = seizedValue - clearedAmt;
+      changed.push(
+        clause(
+          <>
+            At that price the seized collateral was worth{" "}
+            <Fig
+              echo
+              info={liqSeizedValueProv(collSym, loanSym, coords, {
+                amount: formatNumber(seizedAmt),
+                price: used.price,
+              })}
+              value={`${formatNumber(seizedValue)} ${loanSym}`}
+              symbol={collSym}
+            >
+              {amt(seizedValue)} {loanSym}
+            </Fig>{" "}
+            against{" "}
+            <Fig
+              echo
+              info={liqClearedValueProv(loanSym, coords, { amount: formatNumber(clearedAmt) })}
+              value={`${formatNumber(clearedAmt)} ${loanSym}`}
+              symbol={loanSym}
+            >
+              {amt(clearedAmt)} {loanSym}
+            </Fig>{" "}
+            of debt cleared, a {b(`${premium >= 0 ? "+" : "−"}${Math.abs(premium).toFixed(2)}%`)} premium
+            {used.lif != null ? <> (the market&rsquo;s incentive is {((used.lif - 1) * 100).toFixed(2)}%)</> : null},
+            all of it to the liquidator.
+          </>,
+        ),
+      );
+      if (net > 0)
+        changed.push(
+          clause(
+            <>
+              The borrower&rsquo;s net cost: {amt(seizedValue)} − {amt(clearedAmt)} = {b(`${amt(net)} ${loanSym}`)} of
+              collateral given up beyond the debt it cleared.
+            </>,
+          ),
+        );
+    }
+  }
+
+  const meansNow: ClauseInput[] = [];
+  if (rs.emptied) {
+    meansNow.push(clause(<>The seizure emptied the position&rsquo;s collateral and cleared its debt.</>));
+  } else if (!rs.hasColl && rs.hasDebt) {
+    meansNow.push(
+      clause(
+        <>
+          The seizure took all the collateral and left {h.borrowedAfterFig()} of debt with nothing behind it; the
+          shortfall is written off against this market&rsquo;s lenders as bad debt.
+        </>,
+      ),
+    );
+  } else {
+    meansNow.push(
+      clause(
+        <>
+          Left afterwards: {h.collAfterFig()} of collateral and{" "}
+          {rs.hasDebt ? <>{h.borrowedAfterFig()} of debt</> : <>no debt</>}
+          {rs.hasDebt && rs.borrowedAfter < 0.01
+            ? ", a remainder the liquidator did not repay; the position stayed open and can keep borrowing"
+            : ""}
+          .
+        </>,
+      ),
+    );
+  }
+  return { happened: [happened], changed, meansNow };
 }
 
 /** Third-party execution as a mechanic clause — the protocol fact behind the
@@ -395,54 +617,11 @@ function authorisedActorMechanic(ctx: MorphoContext): ClauseInput {
   );
 }
 
-export function morphoEventSlots(ctx: MorphoContext, coords: MorphoCoords): EventProseSlots {
-  const slots = morphoEventSlotsBase(ctx, coords);
+export function morphoEventSlots(ctx: MorphoContext, coords: MorphoCoords, read?: MorphoAtBlock): EventProseSlots {
+  const slots = morphoEventSlotsBase(ctx, coords, read);
   const authorised = authorisedActorMechanic(ctx);
   if (!authorised) return slots;
   return { ...slots, meansNow: [...(slots.meansNow ?? []), authorised] };
-}
-
-/** The valued sentence — the market's own oracle at the block, in the loan token
- *  (Morpho runs no USD feed). Drops WHOLE when the block is unpriced or a leg's
- *  figures don't resolve — the never-empty floor. Both legs echo the forensics
- *  block's Seized / Cleared receipts. */
-function liquidationValued(ctx: MorphoContext, coords: MorphoCoords, collSym: string, loanSym: string): ClauseInput {
-  const price = ctx.oraclePriceAtBlock?.loanPerCollateral;
-  if (price == null) return null;
-  const seizedAmt = Math.abs(Number(ctx.assetsDelta));
-  const clearedAmt = Number(ctx.loanRepaid);
-  if (!Number.isFinite(seizedAmt) || !Number.isFinite(clearedAmt) || seizedAmt <= 0 || clearedAmt <= 0) return null;
-  const seizedValue = seizedAmt * price;
-  const inLoan = (n: number) => `${formatNumber(n)} ${loanSym}`;
-  const seizedFig = (
-    <Fig
-      echo
-      info={liqSeizedValueProv(collSym, loanSym, coords, { amount: formatNumber(seizedAmt), price })}
-      value={inLoan(seizedValue)}
-      symbol={collSym}
-    >
-      {inLoan(seizedValue)}
-    </Fig>
-  );
-  const clearedFig = (
-    <Fig
-      echo
-      info={liqClearedValueProv(loanSym, coords, { amount: formatNumber(clearedAmt) })}
-      value={inLoan(clearedAmt)}
-      symbol={loanSym}
-    >
-      {inLoan(clearedAmt)}
-    </Fig>
-  );
-  const premium = (seizedValue / clearedAmt - 1) * 100;
-  const premiumStr = `${premium >= 0 ? "+" : "−"}${Math.abs(premium).toFixed(2)}%`;
-  return clause(
-    <>
-      At the market&rsquo;s own oracle price at the time, the seized collateral was worth {seizedFig} against{" "}
-      {clearedFig} cleared — a <strong className="font-semibold text-foreground">{premiumStr}</strong> premium to the
-      liquidator. Morpho quotes everything in the loan token — it uses no dollar prices.
-    </>,
-  );
 }
 
 /** The teaser = the lead of the composed arc (the first sentence plus its

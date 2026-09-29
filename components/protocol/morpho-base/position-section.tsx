@@ -237,6 +237,13 @@ export function MorphoBasePositionSection({
               <MorphoPositionExplanation
                 chain={live}
                 txCount={view.txCount}
+                // The counts are stated only where the drawn rows are the whole history.
+                {...(events.length === view.eventCount && !servedFolders?.length
+                  ? {
+                      eventCount: view.eventCount,
+                      liquidationCount: events.filter((e) => e.context.data.eventType === "liquidation").length,
+                    }
+                  : {})}
                 everLiquidated={view.everLiquidated}
                 externalActivity={externalActivity}
               />
@@ -248,7 +255,7 @@ export function MorphoBasePositionSection({
       {sweptClean && towerData && (
         <ChainTruthTower
           data={towerData}
-          explanation={morphoEconomicsExplanation(towerData, { onBase: true })}
+          explanation={morphoEconomicsExplanation(towerData, { onBase: true, lltv: view.lltv, badDebt: view.badDebt })}
           learnMore={morphoEconomicsContent({ onBase: true })}
         />
       )}

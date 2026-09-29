@@ -27,6 +27,7 @@ import {
   morphoAccruedProv,
   morphoPeakCollateralProv,
   morphoPeakBorrowedProv,
+  morphoBorrowRateNowProv,
 } from "@/lib/morpho/event-provenance";
 import { formatNumber } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
@@ -86,6 +87,9 @@ export interface MorphoPositionView {
    *  the position has no open debt / index. */
   currentDebt: MorphoCurrentDebt | null;
   lltv: number;
+  /** The market's borrow rate now (APR), from the live chain read; set on the
+   *  detail page only. */
+  borrowApr?: number;
   /** Activity-meta: event count, own-transaction count (DISTINCT txs excluding
    *  liquidation rows — what the chip's title claims), last-event unix seconds,
    *  ever-liquidated flag. */
@@ -439,17 +443,12 @@ export function MorphoPositionCard({
               <StatDash />
             ),
           },
+          // One debt figure: what is owed now, interest included (the borrow
+          // shares at the market's totals, accrued to the read). The
+          // borrowed-minus-repaid principal is not shown: repayments settle
+          // interest too, so it is not what was borrowed and still owed.
           {
             label: CARD_VOCAB.debt,
-            value: (
-              <StatValue>
-                <Prov info={positionBorrowedProv(v.loanSymbol, v.atBlock, coords)}>{loanFigure(v.borrowed)}</Prov>
-              </StatValue>
-            ),
-            footnote: <StatFootnote>principal (ex-interest)</StatFootnote>,
-          },
-          {
-            label: "Current debt",
             value: v.currentDebt ? (
               <StatValue>
                 <Prov
@@ -465,6 +464,10 @@ export function MorphoPositionCard({
                   {loanFigure(v.currentDebt.amount)}
                 </Prov>
               </StatValue>
+            ) : morphoHasDebt(v.borrowSharesRaw) ? (
+              <StatValue>
+                <Prov info={positionBorrowedProv(v.loanSymbol, v.atBlock, coords)}>{loanFigure(v.borrowed)}</Prov>
+              </StatValue>
             ) : (
               <StatDash />
             ),
@@ -472,7 +475,7 @@ export function MorphoPositionCard({
               v.currentDebt && !v.loanDecimalsUnread ? (
                 <StatFootnote>
                   <Prov info={morphoAccruedProv(v.loanSymbol)}>
-                    +<AmountText value={v.currentDebt.accruedAmount} /> accrued
+                    includes <AmountText value={v.currentDebt.accruedAmount} /> interest accrued over its life
                   </Prov>
                   {v.currentDebt.index?.stale && (
                     <div>
@@ -481,8 +484,27 @@ export function MorphoPositionCard({
                     </div>
                   )}
                 </StatFootnote>
+              ) : morphoHasDebt(v.borrowSharesRaw) ? (
+                <StatFootnote>borrowed less repaid; interest not read</StatFootnote>
               ) : undefined,
           },
+          ...(v.borrowApr != null && v.currentDebt && !v.loanDecimalsUnread
+            ? [
+                {
+                  label: "Borrow rate",
+                  value: (
+                    <StatValue>
+                      <Prov info={morphoBorrowRateNowProv(v.borrowApr)}>{(v.borrowApr * 100).toFixed(2)}% APR</Prov>
+                    </StatValue>
+                  ),
+                  footnote: (
+                    <StatFootnote>
+                      ~<AmountText value={v.currentDebt.amount * v.borrowApr} /> {v.loanSymbol} / year at this rate
+                    </StatFootnote>
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
     </PositionCardShell>

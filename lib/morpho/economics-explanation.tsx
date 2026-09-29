@@ -5,8 +5,8 @@
 // (components/protocol/liquity/trove-economics.tsx, aaveV4EconomicsContent in
 // lib/shared/learn-more-content.ts).
 //
-// Morpho carries no oracle at this tier — the tower is token units, not USD —
-// and every position is one isolated market, so `collateralUnit`/`debtUnit`
+// Morpho prices in each market's loan token and has no USD price, so the tower
+// is in token units, and every position is one isolated market, so `collateralUnit`/`debtUnit`
 // name the two tokens directly. Reused verbatim by Morpho Blue on Base
 // (opts.onBase); same machine, only the deployment's name changes in the prose.
 
@@ -39,6 +39,11 @@ function scalarFig(amount: number, unit: string | undefined): ReactNode | null {
 
 export interface MorphoEconomicsOpts {
   onBase?: boolean;
+  /** The market's LLTV, for the liquidation incentive, and the bad debt its
+   *  liquidations wrote off: with none, the collateral a liquidation seized
+   *  was worth the debt it cleared × the incentive. */
+  lltv?: number;
+  badDebt?: number;
 }
 
 export function morphoEconomicsExplanation(data: ChainTruthTowerData, opts: MorphoEconomicsOpts = {}): ReactNode {
@@ -74,7 +79,23 @@ export function morphoEconomicsExplanation(data: ChainTruthTowerData, opts: Morp
 
   const borrowedFig = scalarFig(debt.lifetimeInflow, debtUnit);
   const repaidFig = sumFig(debt.exited, debtUnit);
-  if (borrowedFig || repaidFig) {
+  const clearedAmt = debt.liquidated.reduce((a, l) => a + l.amount, 0);
+  const clearedFig = scalarFig(clearedAmt, debtUnit);
+  const interestAmt = debt.interest?.amount ?? 0;
+  const owedNow = debt.current.reduce((a, l) => a + l.amount, 0) + interestAmt;
+  if (borrowedFig && (repaidFig || clearedFig)) {
+    // The debt column reconciled: borrowed − repaid − cleared + interest = owed.
+    bullets.push(
+      <span key="borrow">
+        It borrowed {borrowedFig}
+        {repaidFig && <>, repaid {repaidFig}</>}
+        {clearedFig && <>, had {clearedFig} cleared by liquidation</>}
+        {interestAmt > 1e-9 && <> and accrued {scalarFig(interestAmt, debtUnit)} of interest</>}, which leaves{" "}
+        {scalarFig(owedNow, debtUnit) ?? fig(`0 ${debtUnit ?? ""}`)} owed. Repayments settle interest as well as the
+        amount borrowed, which is why the column&apos;s {debtUnit} bar is the borrowed amount less everything paid back.
+      </span>,
+    );
+  } else if (borrowedFig || repaidFig) {
     bullets.push(
       <span key="borrow">
         {borrowedFig ? (
@@ -104,26 +125,31 @@ export function morphoEconomicsExplanation(data: ChainTruthTowerData, opts: Morp
     bullets.push(<span key="current">It now owes {currentDebtFig} of debt.</span>);
   }
 
-  if (debt.interest && debt.interest.amount > 0) {
-    const interestFig = scalarFig(debt.interest.amount, debtUnit);
-    if (interestFig) {
-      bullets.push(
-        <span key="interest">
-          {interestFig} of that debt is interest accrued in the market&apos;s own loan token since it was borrowed.
-        </span>,
-      );
-    }
-  }
-
   const liqFig = sumFig(collateral.liquidated, collateralUnit);
   if (liqFig) {
-    bullets.push(<span key="liq">{liqFig} of collateral was seized in liquidation.</span>);
+    // With no bad debt written off, a liquidation seized collateral worth the
+    // debt it cleared × the market's incentive factor, at the price it ran on.
+    const lif = opts.lltv && opts.lltv > 0 ? Math.min(1.15, 1 / (0.3 * opts.lltv + 0.7)) : null;
+    const net = lif != null && clearedAmt > 0 && !(opts.badDebt && opts.badDebt > 0) ? clearedAmt * (lif - 1) : null;
+    bullets.push(
+      <span key="liq">
+        Liquidation seized {liqFig} of collateral
+        {clearedFig ? <> to clear {clearedFig} of debt</> : null}
+        {net != null && lif != null ? (
+          <>
+            ; at the market&apos;s {((lif - 1) * 100).toFixed(2)}% incentive that collateral was worth{" "}
+            {scalarFig(clearedAmt * lif, debtUnit)}, a net cost to the position of {scalarFig(net, debtUnit)}
+          </>
+        ) : null}
+        .
+      </span>,
+    );
   }
 
   bullets.push(
     <span key="unvalued">
-      Bars are shown in token units rather than USD — {name} has no oracle at this level, so collateral and debt each
-      stack in their own token.
+      Bars are in token units: each {name} market&apos;s oracle prices the collateral in the loan token and there is no
+      USD price, so collateral and debt each stack in their own token.
     </span>,
   );
 
@@ -141,7 +167,7 @@ export function morphoEconomicsExplanation(data: ChainTruthTowerData, opts: Morp
       <p className="leading-relaxed">
         These figures total this position&apos;s lifetime flows on {name} across every event in its captured history.
       </p>
-      {bullets.slice(0, 6).map((item, i) => (
+      {bullets.slice(0, 8).map((item, i) => (
         <div key={i} className="flex items-start gap-2 leading-relaxed">
           <span className="select-none text-rb-500">•</span>
           <span>{item}</span>
@@ -155,12 +181,12 @@ export function morphoEconomicsContent(opts: MorphoEconomicsOpts = {}): LearnMor
   const name = opts.onBase ? "Morpho Blue on Base" : "Morpho Blue";
   return {
     title: "About the Economics",
-    intro: `This section replays every supply, withdrawal, borrow and repay ${name} has recorded for the position's market, and shows what it holds and owes now.`,
+    intro: `This section adds up every Add Collateral, Remove Collateral, Borrow, Repay and Liquidation event ${name} has recorded for the position, and shows what it holds and owes now.`,
     stepsHeading: "How it's built:",
     steps: [
-      "Every flow is replayed from the position's own SupplyCollateral, WithdrawCollateral, Borrow and Repay events on the market.",
-      "Current debt comes from the market's own borrow shares, converted to assets at the market's live index — the accrued segment is that figure minus the net principal borrowed.",
-      "There is no USD conversion at this tier: Morpho keeps no protocol-wide oracle, so both bars are drawn in their own token.",
+      "Collateral: added, less removed, less seized by liquidation, is what the position holds.",
+      "Debt: borrowed, less repaid, less cleared by liquidation, plus the interest accrued, is what the position owes. The owed figure is the position's borrow shares at the market's totals, read from the chain.",
+      "Everything is in token units: each market's oracle prices the collateral in the loan token, and Morpho has no USD price.",
     ],
     detailsHeading: "Key concepts:",
     details: [

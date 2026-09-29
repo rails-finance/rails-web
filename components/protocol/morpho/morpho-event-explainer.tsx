@@ -19,6 +19,7 @@ import {
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { morphoEventSlots } from "@/lib/morpho/explainer-clauses";
 import { useChainId } from "@/lib/shared/chain-context";
+import { useMorphoAtBlock } from "@/lib/morpho/use-market-at-block";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 
 export interface MorphoEventExplainerProps {
@@ -48,14 +49,17 @@ export function morphoLearnMoreContent(ctx: MorphoContext): LearnMoreContent {
 }
 
 export function MorphoEventExplainer({ ctx, txHash, blockNumber, skipLead }: MorphoEventExplainerProps) {
+  const chainId = useChainId();
   const coords: MorphoCoords = {
     txHash,
     blockNumber,
     marketId: ctx.marketId,
-    chainId: useChainId(),
+    chainId,
     source: useCaptureSource(),
   };
-  const clauses = eventClauses(morphoEventSlots(ctx, coords));
+  // The same request the opened card's grid makes (shared cache).
+  const read = useMorphoAtBlock(ctx.marketId, blockNumber, chainId);
+  const clauses = eventClauses(morphoEventSlots(ctx, coords, read));
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;
