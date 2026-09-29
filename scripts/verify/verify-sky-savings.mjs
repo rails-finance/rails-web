@@ -12,7 +12,11 @@
 //   C. The pages: the card's balance and interest earned carry the api's exact
 //      figures, the rate is the api's, the scrubber draws one bar, every
 //      referral code is on its row, the listing opens on the largest holder,
-//      and the rate history lists every change.
+//      and the rate history lists every change. The words: the balance names
+//      sUSDS, every Full breakdown row names its unit, the scrubber's
+//      balancing item reads "Interest earned" at every stop, its last stop
+//      states the header's block, and at 390px consecutive Savings Rate
+//      changes draw as one row that counts them.
 //
 // Run: BASE=http://localhost:3916 node scripts/verify/verify-sky-savings.mjs
 // Needs ALCHEMY_URL, RAILS_API_URL and API_BEARER_TOKEN in .env.local (read,
@@ -186,6 +190,87 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
   if (name === "mixed")
     for (const code of mixedCodes)
       check(`mixed page: referral ${code} on its row`, got.text.includes(`Referral ${code}`));
+
+  // The words (newcomer round 2).
+  check(`${name} page: the check line ends "holding sUSDS"`, /of them holding sUSDS/.test(got.text));
+  const words = await page.evaluate(() => {
+    const bal = document.querySelector('[data-prov-symbol="sUSDS"]')?.parentElement?.innerText ?? "";
+    const live = document.querySelector("p[aria-live=polite]")?.innerText ?? "";
+    return { bal, live };
+  });
+  check(`${name} page: the balance names sUSDS`, /sUSDS/.test(words.bal), words.bal);
+  if (pos.data.status === "open")
+    check(
+      `${name} page: the scrubber's last stop is the header's block`,
+      words.live === `Position at block ${Number(pos.asOf.block).toLocaleString("en-US")}`,
+      words.live,
+    );
+  await page
+    .getByRole("button", { name: /Full breakdown/ })
+    .first()
+    .click();
+  await page.locator('button[aria-controls="flows-collateral-zoom"]').click();
+  await page.waitForTimeout(300);
+  const zoomAt = () => page.locator("#flows-collateral-zoom").innerText();
+  // The Full breakdown's rows: from its heading to its first bullet or the
+  // timeline's eyebrow.
+  const breakdown = await page.evaluate(() => {
+    const t = document.body.innerText;
+    const at = t.indexOf("Full breakdown");
+    const ends = ["•", "\nHolding since", "\nHeld "].map((w) => t.indexOf(w, at)).filter((i) => i > at);
+    return t.slice(at, Math.min(...ends, t.length));
+  });
+  const rowCount = [...breakdown.matchAll(/^(Deposited \(all.time\)|Worth now)$/gm)].length;
+  check(`${name} page: the Full breakdown opened`, rowCount > 0, breakdown.slice(0, 120));
+  const unitless = [
+    ...breakdown.matchAll(
+      /^(Deposited \(all.time\)|Received|Interest earned|Withdrawn|Sent|Worth now)\n\s*([^\n]+)$/gm,
+    ),
+  ]
+    .filter((m) => /^[0-9.,KMB]+$/.test(m[2].trim()))
+    .map((m) => `${m[1]} ${m[2].trim()}`);
+  check(`${name} page: every Full breakdown row names its unit`, unitless.length === 0, unitless.join("; "));
+  const stops = [await zoomAt()];
+  await page.getByRole("button", { name: "Previous event", exact: true }).click();
+  await page.waitForTimeout(300);
+  stops.push(await zoomAt());
+  check(
+    `${name} page: the balancing item reads Interest earned at the last stop and the one before`,
+    stops.every((z) => z.includes("Interest earned") && !/Market move|Price change/.test(z)),
+    stops.map((z) => z.replace(/\s+/g, " ").slice(0, 160)).join(" || "),
+  );
+}
+
+// At 390px, consecutive Savings Rate changes draw as one row that counts them.
+{
+  const phone = await browser.newPage({ viewport: { width: 390, height: 900 } });
+  const pos = positions.small;
+  await phone.goto(`${BASE}/ethereum/sky-savings/${HOLDERS.small}`, { waitUntil: "networkidle", timeout: 120000 });
+  const got = await phone.evaluate(() => ({
+    runs: [...document.querySelectorAll("[data-phone-note-run]")].map((e) => ({
+      n: Number(e.getAttribute("data-phone-note-run")),
+      text: e.innerText.split("\n")[0],
+    })),
+    single: document.querySelectorAll("[data-market-note]").length,
+    width: document.documentElement.scrollWidth,
+  }));
+  const changes = rates.data.ssr.filter(
+    (r) => r.blockNumber > pos.data.activity.firstBlock && r.blockNumber <= pos.asOf.block,
+  ).length;
+  const inRuns = got.runs.reduce((a, r) => a + r.n, 0);
+  check("small page at 390: rate changes draw as run rows", got.runs.length > 0, JSON.stringify(got.runs));
+  check(
+    "small page at 390: every rate change is in a run or its own row",
+    inRuns + got.single === changes,
+    `${inRuns} in runs + ${got.single} rows of ${changes}`,
+  );
+  check(
+    "small page at 390: each run row names its count",
+    got.runs.every((r) => r.text.startsWith(`${r.n} Savings Rate changes, `)),
+    JSON.stringify(got.runs),
+  );
+  check("small page at 390: no horizontal overflow", got.width <= 390, `${got.width}`);
+  await phone.close();
 }
 
 const top = await api(`/positions?sortBy=value&limit=1`);

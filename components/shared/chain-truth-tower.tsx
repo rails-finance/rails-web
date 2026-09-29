@@ -246,10 +246,11 @@ function groupSide(side: TowerSideData, valued: boolean): TowerSideData {
     exited: flows(side.exited, "exited"),
     liquidated: flows(side.liquidated, "liq"),
     received: side.received ? flows(side.received, "recv") : side.received,
+    inflowLines: side.inflowLines ? mergeBucket(side.inflowLines, valued, "inflow") : side.inflowLines,
     claimable: side.claimable ? flows(side.claimable, "claim") : side.claimable,
     costs: side.costs ? flows(side.costs, "cost") : side.costs,
     ...(side.bars ? { bars: side.bars.map((b) => groupSide(b, valued)) } : {}),
-    // interest, the eventless lines and lifetimeInflow never merge.
+    // interest, the eventless lines and the lifetimeInflow total never merge.
   };
 }
 
@@ -260,6 +261,7 @@ function sideCanGroup(side: TowerSideData, valued: boolean): boolean {
     flowBuckets(side.exited).some((b) => bucketMergeable(b, valued)) ||
     flowBuckets(side.liquidated).some((b) => bucketMergeable(b, valued)) ||
     flowBuckets(side.received ?? []).some((b) => bucketMergeable(b, valued)) ||
+    bucketMergeable(side.inflowLines ?? [], valued) ||
     flowBuckets(side.claimable ?? []).some((b) => bucketMergeable(b, valued)) ||
     flowBuckets(side.costs ?? []).some((b) => bucketMergeable(b, valued))
   );
@@ -386,6 +388,8 @@ function buildSide(
     fullAmounts?: boolean;
     /** Wrap the breakdown labels (ChainTruthTowerData.wrapFlowLabels). */
     wrapLabels?: boolean;
+    /** Every token-mode row names its token (ChainTruthTowerData.unitOnEveryRow). */
+    unitAll?: boolean;
   },
 ): TowerSide {
   const {
@@ -404,9 +408,10 @@ function buildSide(
   } = opts;
   const sc = (l: TowerLine) => Math.max(0, lineScalar(l, valued));
   const cmp = (n: number) => (opts.fullAmounts ? formatNumber(n) : formatCompact(n));
-  // Full token amounts (a Morpho-only opt-in) name their token on every row.
+  // Full token amounts (a Morpho-only opt-in) name their token on every row,
+  // as does a tower that opts into `unitOnEveryRow`.
   const cmpUnit = (n: number, symbol: string | undefined) =>
-    opts.fullAmounts && symbol ? `${cmp(n)} ${symbol}` : cmp(n);
+    (opts.fullAmounts || opts.unitAll) && symbol ? `${cmp(n)} ${symbol}` : cmp(n);
   const interestLine = withInterest && side.interest && side.interest.amount > 0 ? side.interest : null;
   const receivedLines = side.received ?? [];
   const receivedTotal = receivedLines.reduce((s, l) => s + sc(l), 0);
@@ -545,7 +550,23 @@ function buildSide(
   // exactly the mistake the letter glyph exists to avoid.
   const sideAddress = sideSymbol ? soleAddress(sideLines) : undefined;
   const rows: BreakdownRow[] = [];
-  if (hasFlows && side.lifetimeInflow > 0) {
+  const inflowLines = (side.inflowLines ?? []).filter((l) => sc(l) > 0);
+  if (hasFlows && side.lifetimeInflow > 0 && inflowLines.length > 0) {
+    // One row per asset, as the outflows have; a single row (one asset, or
+    // the assets grouped) keeps the "(all time)" caption.
+    inflowLines.forEach((line) => {
+      const l = line as DisplayLine;
+      rows.push({
+        sign: "",
+        label: inflowLines.length === 1 ? `${inflowLabel} (all time)` : inflowLabel,
+        amount: l.mergedParts && !l.symbol ? formatCompactUsd(l.usd ?? 0) : fmt(l),
+        exact: l.mergedParts && !l.symbol ? formatUsdValue(l.usd ?? 0) : fmtExact(l),
+        icon: flowIcon(l),
+        swatchStyle: { backgroundColor: flowColor },
+        prov: l.prov,
+      });
+    });
+  } else if (hasFlows && side.lifetimeInflow > 0) {
     rows.push({
       sign: "",
       // "(all time)" stays one piece when a wrapping label breaks.
@@ -892,6 +913,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     flowsPricedAtEvents: data.flowsPricedAtEvents,
     fullAmounts: data.fullTokenAmounts,
     wrapLabels: data.wrapFlowLabels,
+    unitAll: data.unitOnEveryRow,
   });
   const right = build(debtParts, d, {
     solid: DEBT_SOLID,
@@ -907,6 +929,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     flowsPricedAtEvents: data.flowsPricedAtEvents,
     fullAmounts: data.fullTokenAmounts,
     wrapLabels: data.wrapFlowLabels,
+    unitAll: data.unitOnEveryRow,
   });
   // A position with no debt axis (a lender, a saver) draws its one tower.
   const noDebt = data.debtAxisAbsent && data.debt.current.length === 0 && data.debt.exited.length === 0;

@@ -152,6 +152,12 @@ export interface FlowWords {
   totalIn?: string;
   /** The smallest interest, in USD, that gets its own source row (0.5). */
   interestMin?: number;
+  /** One name for the supplied side's balancing item at every stop, with no
+   *  price-change row: for a bar whose dollar axis is a fixed rate, where
+   *  everything past what came in is interest. Unset, a past stop reads
+   *  "Market move and interest" and the last stop splits interest from
+   *  price change where the ledger states both. */
+  rest?: string;
 }
 
 /** A held asset whose price, at some date, is older than the gap allowed. */
@@ -664,8 +670,10 @@ function sideState(
     return { key: b.key, label: b.label, short: b.short, fill: "in", light: b.light, width: v, value: v };
   });
   const rest = total - exact.reduce((s, x) => s + x.value, 0);
-  const balancing =
-    interest != null
+  const oneRest = side === "collateral" ? m.words.rest : undefined;
+  const balancing = oneRest
+    ? [{ key: interest != null ? `${side}-interest` : `${side}-market`, label: oneRest, value: interest ?? rest }]
+    : interest != null
       ? [
           ...(Math.abs(interest) >= (m.words.interestMin ?? 0.5)
             ? [

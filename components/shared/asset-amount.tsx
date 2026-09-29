@@ -33,9 +33,20 @@ export interface AssetAmountProps {
    *
    *  Pass it wherever the data carries it. The address is what the CDNs key on. */
   address?: string;
+  /** Name the ticker after the number ("83.173 sUSDS"), for a headline whose
+   *  glyph alone reads as a dollar figure. */
+  unit?: boolean;
 }
 
-export function AssetAmount({ value, symbol, exact, iconSize = 28, address, signed = false }: AssetAmountProps) {
+export function AssetAmount({
+  value,
+  symbol,
+  exact,
+  iconSize = 28,
+  address,
+  signed = false,
+  unit = false,
+}: AssetAmountProps) {
   // Full pipeline precision (String(n) round-trip, no 3-dp re-rounding) — the
   // strict-truth figure behind the compact headline, for both the hover tip and
   // the provenance trace.
@@ -52,6 +63,11 @@ export function AssetAmount({ value, symbol, exact, iconSize = 28, address, sign
       <span data-prov-exact={full} data-prov-symbol={symbol}>
         {compact}
       </span>
+      {unit && (
+        <span data-prov-hidden="" className="text-[0.55em] font-medium text-rb-500">
+          {symbol}
+        </span>
+      )}
       <span data-prov-hidden="" className="inline-flex items-center justify-center rounded-full bg-raised p-0.5">
         <TokenChipIcon symbol={symbol} address={address} size={iconSize} filterable={false} />
       </span>

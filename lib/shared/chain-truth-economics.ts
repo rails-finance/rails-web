@@ -92,6 +92,11 @@ export interface TowerSideData {
   /** Lifetime gross inflow magnitude for the faded side bar (Σ deposited /
    *  Σ borrowed), in this side's scalar (USD when valued, else token amount). */
   lifetimeInflow: number;
+  /** `lifetimeInflow` per asset, where the feeder states it (the Aave V3
+   *  family's debt side): the breakdown gives each asset its own row, merged
+   *  as the other flow rows are when assets are grouped. Its sum is
+   *  `lifetimeInflow`. Unset: one "(all time)" row. */
+  inflowLines?: TowerLine[];
   /** DEBT SIDE ONLY: further accrual breakdown rows sitting beside `interest`
    *  (Liquity V2's upfront + delegate fees) — the FEE_SOLID swatch, indented
    *  under Accrued interest, so a reader sees the full cost-of-carry
@@ -207,6 +212,9 @@ export interface ChainTruthTowerData {
    *  ("2.94K"), so a small accrued-interest row visibly changes the total
    *  beneath it. Unset: compact, as every other feeder renders. */
   fullTokenAmounts?: boolean;
+  /** Token-mode rows name their token after the figure ("5.09K USDS") on
+   *  every row, compact or full. Unset: only `fullTokenAmounts` names it. */
+  unitOnEveryRow?: boolean;
 }
 
 /** The scalar a tower stacks by: USD when valued, else the token amount. */

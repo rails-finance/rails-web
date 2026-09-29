@@ -34,7 +34,13 @@ function balanceColumn(p: SkyPosition, block: number, withWorth: boolean): OpenP
       shares > 0 ? (
         <StatValue>
           <Prov info={sharesHeldProv(p.holder, block, p.shares.raw)}>
-            <AssetAmount value={shares} symbol={SUSDS.symbol} address={SUSDS.address} exact={exact(p.shares.raw)} />
+            <AssetAmount
+              value={shares}
+              symbol={SUSDS.symbol}
+              address={SUSDS.address}
+              exact={exact(p.shares.raw)}
+              unit
+            />
           </Prov>
         </StatValue>
       ) : (

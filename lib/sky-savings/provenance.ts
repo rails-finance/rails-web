@@ -238,7 +238,7 @@ export const eventRateProv = (c: SkyEventCoords, ssr: string, annual: string): P
 export const eventReferralProv = (c: SkyEventCoords, code: number): Provenance => ({
   kind: "chain",
   pclass: "emitted",
-  summary: `Referral code ${code} — the referral topic of this transaction's Referral log, emitted beside the Deposit. No registry names the front end behind a code.`,
+  summary: `Referral code ${code} — the referral topic of this transaction's Referral log, emitted beside the Deposit. The code changes no figure and pays the depositor nothing on chain. No registry names the front end behind a code.`,
   contract: SUSDS_CONTRACT,
   source: src(c),
 });

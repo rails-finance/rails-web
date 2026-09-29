@@ -89,6 +89,7 @@ import {
   type TimelineDisplayItem,
 } from "@/components/shared/timeline-toolbar";
 import { MarketNoteRow } from "@/components/shared/market-note-row";
+import { PhoneNoteRun, type PhoneNoteRunWords } from "@/components/shared/phone-note-run";
 import { ListNoteGap, SpineNoteGap } from "@/components/shared/spine-note-markers";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
@@ -352,6 +353,10 @@ export interface ChainTruthTimelineProps {
    *  or no live quantity exists); see `liveNotesPending` for the in-flight
    *  state. */
   liveNotes?: MarketNote[];
+  /** In the phone list view, two or more notes in one gap draw as one row
+   *  that names how many and the dates they span, and opens to each note
+   *  (components/shared/phone-note-run.tsx). Unset: every note is its own row. */
+  phoneNoteRun?: PhoneNoteRunWords;
   /** True while this OPEN position's live reads are still in flight —
    *  reserves the live-note slot's height (`LIVE_NOTE_SKELETON_HEIGHT`) so
    *  the list does not shift under a reader once they land. Never pass this
@@ -628,6 +633,7 @@ function ChainTruthTimelineBody({
   notes,
   liveNotes,
   liveNotesPending,
+  phoneNoteRun,
   liveWindow,
   footer,
   notice,
@@ -662,6 +668,14 @@ function ChainTruthTimelineBody({
   // rows. Read after mount; the server draws the desktop markers, which are
   // hidden below 640px by class.
   const phone = useMediaQuery(PHONE_QUERY);
+  /** The phone list view's notes in one gap: each its own row, or one run
+   *  row where the timeline opts in. */
+  const phoneNoteRows = (list: MarketNote[], key: string, one: (note: MarketNote, i: number) => ReactNode) =>
+    phoneNoteRun && list.length > 1 ? (
+      <PhoneNoteRun key={`noterun_${key}`} notes={list} words={phoneNoteRun} renderNote={one} />
+    ) : (
+      list.map(one)
+    );
   // Turning the collapse off leaves the `asOneEvent` specs standing: they draw
   // one transaction as one card and hide nothing, so there is nothing for the
   // choice to give back.
@@ -1513,7 +1527,7 @@ function ChainTruthTimelineBody({
               {liveSlotAtTop &&
                 !spineActive &&
                 phone &&
-                topNotes.map((note, i) => (
+                phoneNoteRows(topNotes, "head", (note, i) => (
                   <SpineTipContext.Provider
                     key={`live_${note.id}`}
                     value={i === 0 && !liveWindowAtTop ? tipSide : null}
@@ -1611,7 +1625,7 @@ function ChainTruthTimelineBody({
                     onToggle={toggleNote}
                   />
                 ) : (
-                  rowNotes.map((note) => (
+                  phoneNoteRows(rowNotes, `row_${rowLastIdx}`, (note) => (
                     <MarketNoteRow
                       key={`note_${note.id}`}
                       note={note}
@@ -1709,7 +1723,7 @@ function ChainTruthTimelineBody({
                         head={{ tip: null, above: false, below: false }}
                       />
                     ) : (
-                      topNotes.map((note) => (
+                      phoneNoteRows(topNotes, "filtered", (note) => (
                         <MarketNoteRow key={`note_${note.id}`} note={note} datePrefix={headDatePrefix(note)} />
                       ))
                     )}

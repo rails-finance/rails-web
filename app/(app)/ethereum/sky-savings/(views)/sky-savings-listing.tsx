@@ -69,16 +69,23 @@ export function SkySavingsListing({ initialItems, initialTotal, initialKey, init
       sortOptions={skySortOptions}
       searchPlaceholder="Address or ENS"
       renderCard={(p) => <SkySavingsPositionCard p={p} asOf={p.asOf} surface="listing" />}
-      renderAbove={({ items }) => {
+      renderAbove={({ items, total, filters }) => {
         const c = items[0]?.counts;
         if (!c) return null;
         const n = (v: number) => v.toLocaleString("en-US");
+        // The open list's count, where it is the holders less the contracts.
+        const openList =
+          !filters.q && (filters.status.length === 0 || (filters.status.length === 1 && filters.status[0] === "open"));
+        const listed = openList && c.excluded > 0 && total === c.holdersOpen - c.excluded;
         return (
           <p className="mb-3 text-xs leading-relaxed text-rb-500">
             An open position is an address that holds sUSDS now; a closed one held some and holds none. At block{" "}
             {n(c.block)}, {n(c.holdersEver)} addresses had held sUSDS and {n(c.holdersOpen)} held some.
             {c.excluded > 0
               ? ` The list leaves out ${n(c.excluded)} contracts that hold sUSDS for others (${c.excludedWords}); they open by address.`
+              : ""}
+            {listed
+              ? ` Its ${n(total)} positions are the ${n(c.holdersOpen)} holders less those ${n(c.excluded)}.`
               : ""}{" "}
             The last check against the contract ran at block {n(c.gateBlock)}.
           </p>

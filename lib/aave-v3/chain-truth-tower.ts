@@ -971,9 +971,14 @@ export function computeAaveV3Economics(
         );
         const decimals = held?.decimals ?? decimalsOf(events, lane.reserve);
         if (!f || decimals == null || leftOut.has(f.symbol)) return [];
+        // A reserve still held: its balance now less the lane's net, so the
+        // interest since the lane's last move is in it too and the lines
+        // reach what is held or owed.
         let raw: bigint;
         try {
-          raw = BigInt(lane.interest.split(".")[0]);
+          raw = held
+            ? BigInt(held.amountRaw.split(".")[0]) - BigInt(lane.net.split(".")[0])
+            : BigInt(lane.interest.split(".")[0]);
         } catch {
           return [];
         }
@@ -1034,13 +1039,28 @@ export function computeAaveV3Economics(
   );
   const debtEarned = laneInterest ? lifeInterest("debt", debtCovered) : [];
 
-  if (!interest && lifetime && debtLines.length === 1) {
+  // One debt asset and no lane: the events' net beside the balance. Where the
+  // repayments exceed the borrowing, the interest they covered is its own
+  // "Interest accrued" row and the balance stays whole, so no principal line
+  // goes below zero; otherwise the balance splits into principal and interest.
+  if (!interest && lifetime && debtLines.length === 1 && !debtEarned.some((l) => l.symbol === debtLines[0].symbol)) {
     const cur = debtLines[0];
     const f = lifetime.get(cur.symbol);
     if (f) {
       const net = f.borrowed - debtOut(f);
       const amt = legInterest(cur.amount, net, f.borrowed);
-      if (amt > 0) {
+      if (amt > 0 && net < 0) {
+        debtEarned.push({
+          key: `debt-earned-${cur.symbol}`,
+          symbol: cur.symbol,
+          address: cur.key.toLowerCase(),
+          amount: amt,
+          usd: usdOf(cur.key, amt),
+          prov: vocab.debtInterest(cur.symbol),
+          flowLabel: "Interest accrued",
+        });
+        debtInterestBy.set(cur.symbol, amt);
+      } else if (amt > 0) {
         interest = {
           key: "debt-interest",
           symbol: cur.symbol,
@@ -1159,6 +1179,7 @@ export function computeAaveV3Economics(
       exited: debtExited,
       liquidated: [...debtLiquidated, ...debtWrittenOff],
       lifetimeInflow: debtInflow,
+      inflowLines: flowLines("borrowed", "borrowed", "debt-borrowed"),
       priceChange: priceChange("debt"),
     },
     interestNote:

@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { H } from "@/lib/shared/explainer-prose";
 import type { SkySavingsContext } from "@/lib/shared/types/event-shape";
 import { formatDate } from "@/lib/date";
-import { annualRate, exact, fixed6, pct, rayNumber, skyTransition } from "@/lib/sky-savings/math";
+import { annualRate, exact, fixed6, pct, pctString, rayNumber, skyTransition } from "@/lib/sky-savings/math";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const abs = (v: bigint) => (v < BigInt(0) ? -v : v);
@@ -21,6 +21,9 @@ export interface SkyPreviousEvent {
   ctx: SkySavingsContext;
   timestamp: number;
   blockNumber: number;
+  /** The Savings Rate changes after the previous event and up to this one:
+   *  how many, the rate before the first ("0.040000") and after the last. */
+  rateChanges?: { count: number; from: string; to: string };
 }
 
 /** Interest the balance earned between the previous event and this one: the
@@ -60,7 +63,14 @@ export function skyEventBullets(c: SkySavingsContext, prev?: SkyPreviousEvent | 
       <>
         Since the previous event ({formatDate(prev.timestamp)}), the <H>{from} sUSDS</H> held earned{" "}
         <H>{fixed6(since)} USDS</H> of interest: their worth rose from <H>{fixed6(prev.ctx.valueAfter)}</H> to{" "}
-        <H>{fixed6(t.valueBefore)} USDS</H> as the share price rose to <H>{price} USDS</H>.
+        <H>{fixed6(t.valueBefore)} USDS</H> as the share price rose to <H>{price} USDS</H>
+        {prev.rateChanges && prev.rateChanges.count > 0 ? (
+          <>
+            , across {prev.rateChanges.count} Savings Rate change{prev.rateChanges.count === 1 ? "" : "s"},{" "}
+            <H>{pctString(prev.rateChanges.from)}</H> &rarr; <H>{pctString(prev.rateChanges.to)}</H>
+          </>
+        ) : null}
+        .
       </>,
     );
   else
@@ -89,11 +99,14 @@ export function skyEventBullets(c: SkySavingsContext, prev?: SkyPreviousEvent | 
           <H>{from}</H> to <H>{to} sUSDS</H>, worth <H>{fixed6(t.valueAfter)} USDS</H>.
         </>,
       );
+      if (other && other !== holder)
+        out.push(<>Any address can deposit into any other, and this address did not have to act.</>);
       if (c.referral != null)
         out.push(
           <>
             The deposit carried referral code <H>{c.referral}</H>, a number the front end that sent it chose
-            {c.referral === 0 ? "; 0 is a code like any other, and a deposit sent without a code shows none" : ""}.
+            {c.referral === 0 ? "; 0 is a code like any other, and a deposit sent without a code shows none" : ""}. The
+            code changes no figure and pays the depositor nothing on chain.
           </>,
         );
       break;
