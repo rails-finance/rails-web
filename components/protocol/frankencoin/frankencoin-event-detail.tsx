@@ -30,23 +30,64 @@ import {
   ownershipProv,
   openedProv,
   receiptLegProv,
+  challengeReceiptProv,
   type FrankencoinCoords,
 } from "@/lib/frankencoin/event-provenance";
 import { formatExact, formatNumber } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
-import { shortAddress } from "@/lib/frankencoin/asset-catalog";
-import { fmtFcColl, fmtFcPrice, fmtZchf } from "@/lib/frankencoin/figures";
+import { hubAddress, shortAddress } from "@/lib/frankencoin/asset-catalog";
+import { fmtFcColl, fmtFcPct, fmtFcPrice, fmtZchf, termText } from "@/lib/frankencoin/figures";
 import { frankencoinZchfSplit, useFrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
+import { dateTimeText, phaseText, spanText, useFrankencoinPageFacts } from "@/lib/frankencoin/page-facts";
+import { formatDate } from "@/lib/date";
 
 export interface FrankencoinEventDetailProps {
   ctx: FrankencoinContext;
   txHash?: string;
   blockNumber?: number;
+  /** The event id, whose log index isolates this event's receipt logs. */
+  eventId?: string;
+  timestamp?: number;
 }
 
-const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Math.abs(Number(human))));
-
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
+
+const num = (s?: string): number => {
+  const n = Number(s ?? "0");
+  return Number.isFinite(n) ? n : 0;
+};
+
+/** A raw integer string scaled by 10^decimals. */
+const scaled = (raw: string, decimals: number): number => Number(raw) / 10 ** decimals;
+
+/** Who a party is, from the position's side. */
+function partyKind(addr: string, owner: string | null, isContract: boolean | null, challenger: string | null): string {
+  if (owner && addr === owner) return "the owner";
+  if (challenger && addr === challenger) return "the challenger, withdrawing its own challenge";
+  return isContract === true
+    ? "a contract, not the owner"
+    : isContract === false
+      ? "a wallet, not the owner"
+      : "not the owner";
+}
+
+/** " · 19 min into phase 2" — how far into the falling-price phase a bid came. */
+function phaseClause(at: number, start: number, phase: number): string {
+  const into = at - (start + phase);
+  return into >= 0 ? ` · ${spanText(into)} into phase 2` : "";
+}
+
+/** A placeholder tile while the receipt read is in flight. */
+function readingStat(coords: FrankencoinCoords, sym: string): ChainTruthStat {
+  return {
+    label: "From the receipt",
+    value: "",
+    display: "reading…",
+    symbol: "",
+    prov: challengeReceiptProv("debtCleared", sym, coords, ""),
+    changed: false,
+  };
+}
 
 function transitionOf(
   after: string | undefined,
@@ -74,56 +115,186 @@ function transitionOf(
   };
 }
 
-export function FrankencoinEventDetail({ ctx, txHash, blockNumber }: FrankencoinEventDetailProps) {
+export function FrankencoinEventDetail({ ctx, txHash, blockNumber, eventId, timestamp }: FrankencoinEventDetailProps) {
   const coords: FrankencoinCoords = { txHash, blockNumber, position: ctx.position, hub: ctx.hub };
   const sym = ctx.collateralSymbol;
   const dec = ctx.collateralDecimals;
-  const read = useFrankencoinEventRead(ctx, txHash);
+  const { read, pending } = useFrankencoinEventRead(ctx, txHash, eventId);
+  const facts = useFrankencoinPageFacts();
 
   const stats: ChainTruthStat[] = [];
 
   switch (ctx.eventType) {
-    case "challenge_started":
-    case "challenge_averted": {
-      const phase = ctx.eventType === "challenge_started" ? "started" : "averted";
+    case "challenge_started": {
       if (ctx.challengeSize != null)
         stats.push({
-          label: phase === "started" ? "Collateral challenged" : "Challenge averted",
-          value: fmt(ctx.challengeSize),
+          label: "Collateral challenged",
+          value: fmtFcColl(num(ctx.challengeSize)),
+          display: fmtFcColl(num(ctx.challengeSize)),
           symbol: sym,
-          prov: challengeFigureProv("size", phase, sym, coords, ctx.raw?.size),
+          prov: challengeFigureProv("size", "started", sym, coords, ctx.raw?.size),
+          sub: facts?.challengePeriod ? (
+            <>posted by the challenger · phase 1 runs {phaseText(facts.challengePeriod)}</>
+          ) : undefined,
         });
       break;
     }
+    case "challenge_averted": {
+      const a = read?.challenge?.kind === "averted" ? read.challenge : null;
+      if (ctx.challengeSize != null)
+        stats.push({
+          label: "Bought from the challenger",
+          value: fmtFcColl(num(ctx.challengeSize)),
+          display: fmtFcColl(num(ctx.challengeSize)),
+          symbol: sym,
+          prov: challengeFigureProv("size", "averted", sym, coords, ctx.raw?.size),
+        });
+      if (a) {
+        const paid = Number(a.paid);
+        const bought = scaled(a.boughtRaw, dec);
+        stats.push({
+          label: "Paid to the challenger",
+          value: fmtZchf(paid),
+          display: fmtZchf(paid),
+          symbol: "ZCHF",
+          prov: challengeReceiptProv("paidChallenger", sym, coords, a.paid),
+          sub:
+            paid > 0 && bought > 0 ? (
+              <>
+                {fmtFcPrice(paid / bought)} ZCHF/{sym}
+                {a.liqPriceRaw != null && Math.abs(paid / bought - scaled(a.liqPriceRaw, 36 - dec)) < 0.01
+                  ? ", the declared price"
+                  : null}
+              </>
+            ) : undefined,
+        });
+        if (a.buyer)
+          stats.push({
+            label: "Buyer",
+            value: a.buyer,
+            display: shortAddress(a.buyer),
+            symbol: "",
+            prov: challengeReceiptProv("buyer", sym, coords, a.buyer),
+            sub: <>{partyKind(a.buyer, a.owner, a.buyerIsContract, a.challenger)}</>,
+          });
+        if (a.cooldownUntil != null && a.cooldownUntil > (timestamp ?? 0))
+          stats.push({
+            label: "Minting paused until",
+            value: dateTimeText(a.cooldownUntil),
+            display: formatDate(a.cooldownUntil),
+            symbol: "",
+            prov: challengeReceiptProv("cooldown", sym, coords, String(a.cooldownUntil)),
+            sub: timestamp != null ? <>{spanText(a.cooldownUntil - timestamp)} after the purchase</> : undefined,
+          });
+      } else if (pending) stats.push(readingStat(coords, sym));
+      break;
+    }
     case "challenge_succeeded": {
+      const c = read?.challenge?.kind === "succeeded" ? read.challenge : null;
+      const bid = num(ctx.bid);
+      const acquired = num(ctx.acquiredCollateral);
+      const liq = c?.liqPriceRaw != null ? scaled(c.liqPriceRaw, 36 - dec) : null;
       if (ctx.acquiredCollateral != null)
         stats.push({
           label: "Collateral sold",
-          value: fmt(ctx.acquiredCollateral),
+          value: fmtFcColl(acquired),
+          display: fmtFcColl(acquired),
           symbol: sym,
           prov: challengeFigureProv("acquiredCollateral", "succeeded", sym, coords, ctx.raw?.acquiredCollateral),
+          sub: c?.bidder ? <>to {shortAddress(c.bidder)}</> : undefined,
         });
       if (ctx.bid != null)
         stats.push({
           label: "Bid paid",
-          value: fmt(ctx.bid),
+          value: fmtZchf(bid),
+          display: fmtZchf(bid),
           symbol: "ZCHF",
           prov: challengeFigureProv("bid", "succeeded", sym, coords, ctx.raw?.bid),
+          sub:
+            acquired > 0 ? (
+              <Prov
+                info={challengeReceiptProv("clearedPrice", sym, coords, String(bid / acquired))}
+                value={fmtFcPrice(bid / acquired)}
+              >
+                <span className="tabular-nums">
+                  {fmtFcPrice(bid / acquired)} ZCHF/{sym}
+                  {liq != null && liq > 0 ? <> · {fmtFcPct(bid / acquired / liq)} of the declared price</> : null}
+                  {c?.challengeStart != null && c.phase != null && timestamp != null
+                    ? phaseClause(timestamp, c.challengeStart, c.phase)
+                    : null}
+                </span>
+              </Prov>
+            ) : undefined,
         });
-      if (ctx.challengeSize != null)
+      if (ctx.challengeSize != null && Math.abs(num(ctx.challengeSize) - acquired) > 1e-12)
         stats.push({
           label: "Slice of challenge",
-          value: fmt(ctx.challengeSize),
+          value: fmtFcColl(num(ctx.challengeSize)),
+          display: fmtFcColl(num(ctx.challengeSize)),
           symbol: sym,
           prov: challengeFigureProv("challengeSize", "succeeded", sym, coords, ctx.raw?.challengeSize),
         });
+      if (c) {
+        const reward = Number(c.reward);
+        stats.push({
+          label: "Challenger's reward",
+          value: fmtZchf(reward),
+          display: fmtZchf(reward),
+          symbol: "ZCHF",
+          prov: challengeReceiptProv("reward", sym, coords, c.reward),
+          sub: bid > 0 && reward > 0 ? <>{fmtFcPct(reward / bid)} of the bid</> : undefined,
+        });
+        const back = scaled(c.challengerReturnedRaw, dec);
+        if (back > 0)
+          stats.push({
+            label: "Returned to the challenger",
+            value: fmtFcColl(back),
+            display: fmtFcColl(back),
+            symbol: sym,
+            prov: challengeReceiptProv("challengerReturned", sym, coords, c.challengerReturnedRaw),
+            sub: <>{c.challengerReturnPostponed ? "booked for later collection" : "the collateral it posted"}</>,
+          });
+        stats.push({
+          label: "Debt cleared",
+          value: fmtZchf(Number(c.debtCleared)),
+          display: fmtZchf(Number(c.debtCleared)),
+          symbol: "ZCHF",
+          prov: challengeReceiptProv("debtCleared", sym, coords, c.debtCleared),
+        });
+        const shortfall = Number(c.shortfall);
+        if (shortfall > 0)
+          stats.push({
+            label: "Shortfall",
+            value: fmtZchf(shortfall),
+            display: fmtZchf(shortfall),
+            symbol: "ZCHF",
+            prov: challengeReceiptProv("shortfall", sym, coords, c.shortfall),
+            sub:
+              c.reserveReleased != null && Number(c.reserveReleased) > 0 ? (
+                <>
+                  from the reserve, out of this position&rsquo;s {fmtZchf(Number(c.reserveReleased))} ZCHF reserve share
+                </>
+              ) : (
+                <>from the reserve</>
+              ),
+          });
+        stats.push({
+          label: "Owner received",
+          value: fmtZchf(Number(c.ownerReceived)),
+          display: fmtZchf(Number(c.ownerReceived)),
+          symbol: "ZCHF",
+          prov: challengeReceiptProv("ownerReceived", sym, coords, c.ownerReceived),
+          changed: Number(c.ownerReceived) > 0,
+        });
+      } else if (pending) stats.push(readingStat(coords, sym));
       break;
     }
     case "forced_sale": {
       if (ctx.forcedSaleAmount != null)
         stats.push({
           label: "Collateral sold",
-          value: fmt(ctx.forcedSaleAmount),
+          value: fmtFcColl(num(ctx.forcedSaleAmount)),
+          display: fmtFcColl(num(ctx.forcedSaleAmount)),
           symbol: sym,
           prov: forcedSaleProv(sym, coords, ctx.raw?.size),
         });
@@ -151,6 +322,21 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber }: Frankencoin
           display: shortAddress(ctx.newOwner),
           symbol: "",
           prov: ownershipProv(coords),
+          sub:
+            read?.newOwnerIsContract != null ? (
+              <Prov
+                info={challengeReceiptProv("ownerKind", sym, coords, ctx.newOwner)}
+                value={read.newOwnerIsContract ? "contract" : "wallet"}
+              >
+                <span>
+                  {ctx.newOwner === hubAddress(ctx.hub).toLowerCase()
+                    ? "the MintingHub, a contract"
+                    : read.newOwnerIsContract
+                      ? "a contract"
+                      : "a wallet (no contract code)"}
+                </span>
+              </Prov>
+            ) : undefined,
         });
       break;
     }
@@ -163,6 +349,12 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber }: Frankencoin
           display: shortAddress(ctx.original),
           symbol: "",
           prov: openedProv(coords),
+          sub:
+            facts?.familyOriginal && facts.familyOriginal !== ctx.original ? (
+              <>a clone of the family&rsquo;s original {shortAddress(facts.familyOriginal)}</>
+            ) : facts?.familyOriginal === ctx.original ? (
+              <>the family&rsquo;s original</>
+            ) : undefined,
         });
       if (ctx.collateral == null && ctx.minted == null) break;
     }
@@ -201,7 +393,9 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber }: Frankencoin
           prov: mintedAfterProv(coords, ctx.raw?.minted),
           transition: transitionOf(ctx.minted, ctx.mintedBefore, "minted", sym, coords, fmtZchf, ctx.raw?.mintedBefore),
           changed: ctx.minted !== ctx.mintedBefore,
-          sub: zchfSplitLine(read ? frankencoinZchfSplit(read, dMint) : null, coords),
+          sub:
+            zchfSplitLine(read ? frankencoinZchfSplit(read, dMint) : null, coords, sym) ??
+            (pending ? <span className="text-rb-400">reading the receipt…</span> : undefined),
         });
       }
       if (ctx.liqPrice != null)
@@ -234,6 +428,7 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber }: Frankencoin
 function zchfSplitLine(
   split: ReturnType<typeof frankencoinZchfSplit>,
   coords: FrankencoinCoords,
+  sym: string,
 ): ReactNode | undefined {
   if (!split) return undefined;
   const P = ({ leg, n }: { leg: Parameters<typeof receiptLegProv>[0]; n: number }) => (
@@ -255,6 +450,19 @@ function zchfSplitLine(
           <>
             {" "}
             · interest <P leg="interest" n={split.interest} />
+          </>
+        )}
+        {split.ratePct != null && (
+          <>
+            {" "}
+            (
+            <Prov
+              info={challengeReceiptProv("rate", sym, coords, String(split.ratePct))}
+              value={`${split.ratePct.toFixed(2)}%`}
+            >
+              <span className="tabular-nums">{split.ratePct.toFixed(2)}% a year</span>
+            </Prov>
+            {split.termDays != null && <> for {termText(split.termDays)}</>})
           </>
         )}
       </>

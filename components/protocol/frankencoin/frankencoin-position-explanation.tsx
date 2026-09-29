@@ -14,7 +14,10 @@
 // none are shown.
 
 import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-position";
-import { ppmToPct } from "@/lib/frankencoin/asset-catalog";
+import type { BaseActivityEvent, FrankencoinContext } from "@/lib/shared/types/event-shape";
+import { ppmToPct, shortAddress } from "@/lib/frankencoin/asset-catalog";
+import { frankencoinZchfSplit, useFrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
+import { termText } from "@/lib/frankencoin/figures";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { formatDate } from "@/lib/date";
 import { AmountText } from "@/components/shared/amount-text";
@@ -38,8 +41,15 @@ export function FrankencoinPositionExplanation({
   denied,
   txCount,
   eventTally,
+  cloneParent,
+  lastMint,
 }: {
   chain: FrankencoinChainResponse;
+  /** The position a clone was cloned from (the timeline's PositionOpened
+   *  parent); `chain.original` is the family's original. */
+  cloneParent?: string | null;
+  /** The position's latest mint, whose receipt read gives the rate it paid. */
+  lastMint?: (BaseActivityEvent & { context: { protocol: "frankencoin"; data: FrankencoinContext } }) | null;
   /** The PositionOpened timestamp from the index — lets the narration state
    *  the veto window (start − opened). Omit to skip the bullet. */
   openedAt?: number | null;
@@ -56,6 +66,24 @@ export function FrankencoinPositionExplanation({
 }) {
   const sym = chain.collateralSymbol ?? "collateral";
   const now = Date.now() / 1000;
+  const lastMintCtx = lastMint?.context.data;
+  const { read: lastMintRead } = useFrankencoinEventRead(
+    lastMintCtx ?? ({ eventType: "open", position: chain.position, hub: chain.hub } as FrankencoinContext),
+    lastMint?.txHash,
+    lastMint?.id,
+  );
+  const lastSplit =
+    lastMintCtx && lastMintRead
+      ? frankencoinZchfSplit(lastMintRead, Number(lastMintCtx.minted ?? 0) - Number(lastMintCtx.mintedBefore ?? 0))
+      : null;
+  const lastMintRate =
+    lastMint && lastSplit?.ratePct != null ? (
+      <>
+        {" "}
+        Its last mint, on {dateOf(lastMint.timestamp)}, paid <H>{lastSplit.ratePct.toFixed(2)}%</H> a year
+        {lastSplit.termDays != null ? <> for the {termText(lastSplit.termDays)} left to expiry</> : null}.
+      </>
+    ) : null;
 
   // Subject-first status lead (charter §4): the composition verdict in one
   // sentence, ≤2 figures, colon-terminated — the lead-in to the bullets. The
@@ -133,10 +161,12 @@ export function FrankencoinPositionExplanation({
     );
   }
 
-  if (chain.annualInterestPPM != null) {
+  if (chain.annualInterestPPM != null && !chain.isClosed) {
+    // Today's terms: what a mint made now would pay. Each earlier mint paid
+    // the rate in force at its block (the base rate moves with governance).
     bullets.push(
       <span key="interest">
-        The annual interest rate is <H>{ppmToPct(chain.annualInterestPPM).toFixed(2)}%</H>
+        On today&rsquo;s terms a mint pays <H>{ppmToPct(chain.annualInterestPPM).toFixed(2)}%</H> a year
         {chain.hub === "v2" && chain.riskPremiumPPM != null ? (
           <>
             {" "}
@@ -144,8 +174,16 @@ export function FrankencoinPositionExplanation({
             {ppmToPct(chain.riskPremiumPPM).toFixed(2)}% risk premium)
           </>
         ) : null}
-        , paid <H>at each mint</H> for the time left to expiry and taken from the minted amount. Nothing accrues after
+        , charged <H>at the mint</H> for the time left to expiry and taken from the minted amount. Nothing accrues after
         that, so the debt changes only when the owner mints or repays.
+        {lastMintRate}
+      </span>,
+    );
+  } else if (chain.isClosed && lastMintRate) {
+    bullets.push(
+      <span key="interest">
+        Interest was charged at each mint for the time left to expiry, at the rate in force then.
+        {lastMintRate}
       </span>,
     );
   }
@@ -184,11 +222,16 @@ export function FrankencoinPositionExplanation({
     );
   }
 
-  if (chain.expiration != null && chain.expiration > 0 && !chain.isClosed) {
+  if (chain.expiration != null && chain.expiration > 0) {
     const days = Math.round((chain.expiration - now) / 86400);
     bullets.push(
       <span key="expiry">
-        {chain.expired ? (
+        {chain.isClosed ? (
+          <>
+            Its terms ran to {dateOf(chain.expiration)}
+            {chain.expiration < now ? <>, a date now past</> : null}; it closed before then.
+          </>
+        ) : chain.expired ? (
           <>
             The position <H>expired</H> on {dateOf(chain.expiration)}. Its minting window has closed
             {chain.hub === "v2" ? (
@@ -221,10 +264,22 @@ export function FrankencoinPositionExplanation({
   }
 
   if (chain.isClone && chain.original) {
+    const parent = cloneParent && cloneParent !== chain.original ? cloneParent : null;
     bullets.push(
       <span key="clone">
-        A <H>clone</H> of {chain.original.slice(0, 6)}…{chain.original.slice(-4)}: a position of its own on that
-        original&rsquo;s terms, sharing its minting limit. It skipped the veto window an original waits out.
+        {parent ? (
+          <>
+            A <H>clone</H>: cloned from {shortAddress(parent)}, a clone of the family&rsquo;s original{" "}
+            {shortAddress(chain.original)}. It is a position of its own that started at {shortAddress(parent)}&rsquo;s
+            declared price, runs on the original&rsquo;s other terms and shares the family&rsquo;s minting limit.
+          </>
+        ) : (
+          <>
+            A <H>clone</H> of {shortAddress(chain.original)}: a position of its own on that original&rsquo;s terms,
+            sharing its minting limit.
+          </>
+        )}{" "}
+        It skipped the veto window an original waits out.
       </span>,
     );
   }
@@ -264,10 +319,12 @@ export function FrankencoinPositionExplanation({
     );
   }
 
-  if (txCount != null && txCount > 0 && !chain.isClosed) {
+  if (txCount != null && txCount > 0) {
     bullets.push(
       <span key="tx-count">
-        The position has recorded <H>{txCount}</H> transaction{txCount === 1 ? "" : "s"} to date
+        The position {chain.isClosed ? "recorded" : "has recorded"} <H>{txCount}</H> transaction
+        {txCount === 1 ? "" : "s"}
+        {chain.isClosed ? "" : " to date"}
         {eventTally && eventTally.total !== txCount ? (
           <>
             ; the timeline lists {eventTally.total} events because one transaction can record several

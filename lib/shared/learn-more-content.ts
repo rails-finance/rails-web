@@ -3535,44 +3535,46 @@ export function pwnEventFallbackContent(): LearnMoreContent {
 // One modal per kind of event, each with the docs pages it rests on.
 
 const FRANKENCOIN_DOC_URL = "https://docs.frankencoin.com";
-const FC_DOCS = {
-  positions: { label: "Collateralized minting", url: `${FRANKENCOIN_DOC_URL}/positions` },
-  open: { label: "Opening new positions", url: `${FRANKENCOIN_DOC_URL}/positions/open` },
-  clone: { label: "Cloning existing positions", url: `${FRANKENCOIN_DOC_URL}/positions/clone` },
-  adjust: { label: "Adjusting a position", url: `${FRANKENCOIN_DOC_URL}/positions/adjust` },
-  auctions: { label: "Challenges and auctions", url: `${FRANKENCOIN_DOC_URL}/positions/auctions` },
-  reserve: { label: "Reserve", url: `${FRANKENCOIN_DOC_URL}/reserve` },
-  governance: { label: "FCS governance", url: `${FRANKENCOIN_DOC_URL}/governance` },
-  risks: { label: "Risks", url: `${FRANKENCOIN_DOC_URL}/risks` },
+const FC_PAGE = {
+  positions: `${FRANKENCOIN_DOC_URL}/positions`,
+  open: `${FRANKENCOIN_DOC_URL}/positions/open`,
+  clone: `${FRANKENCOIN_DOC_URL}/positions/clone`,
+  adjust: `${FRANKENCOIN_DOC_URL}/positions/adjust`,
+  auctions: `${FRANKENCOIN_DOC_URL}/positions/auctions`,
+  reserve: `${FRANKENCOIN_DOC_URL}/reserve`,
+  governance: `${FRANKENCOIN_DOC_URL}/governance`,
+  risks: `${FRANKENCOIN_DOC_URL}/risks`,
 } as const;
+/** One source per claim, each labelled by what it backs up. */
+const fcSource = (label: string, page: keyof typeof FC_PAGE): LearnMoreLink => ({ label, url: FC_PAGE[page] });
 
 /** Mint, repay, a combined adjust, a close — the ZCHF side of a position. */
 export function frankencoinMintingContent(): LearnMoreContent {
   return {
     title: "How Minting and Repaying Work",
     intro:
-      "A Frankencoin position mints new ZCHF against the collateral it holds; nothing is lent out of a pool. The debt is the gross amount minted, and the owner can mint more, repay, or move collateral at any time the position's limits allow.",
+      "A Frankencoin position mints new ZCHF against the collateral it holds; nothing is lent out of a pool. The debt is the gross amount minted, and the owner can mint more, repay, add or withdraw collateral whenever the position's limits allow.",
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "Gross debt",
         text: "a mint adds its whole amount to the debt. The wallet receives it less the position's reserve share and the interest for the remaining term.",
-        sources: [FC_DOCS.adjust],
+        sources: [fcSource("what a mint pays out", "adjust")],
       },
       {
         bold: "Interest up front",
-        text: "the annual rate (the base rate plus the position's risk premium) is charged at each mint for the time left to expiry, and is not returned. Nothing accrues afterwards, so the debt changes only when the owner mints or repays.",
-        sources: [FC_DOCS.positions],
+        text: "the annual rate in force when the mint is made (the system base rate plus the position's risk premium) is charged for the time left to expiry, and is not returned. Nothing accrues afterwards, so the debt changes only when the owner mints or repays. The base rate moves with governance, so two mints on one position can pay different rates.",
+        sources: [fcSource("interest on positions", "positions")],
       },
       {
         bold: "Reserve share",
-        text: "a fixed share of each mint stays in the system reserve against the position's debt. Repaying releases it: in full while the reserve covers every position's share, in proportion when losses have drawn it down.",
-        sources: [FC_DOCS.reserve, FC_DOCS.adjust],
+        text: "a percentage set in the terms of the family's original stays in the system reserve against the position's debt; the reserve is the buffer that covers losses from challenge sales. Repaying releases it: in full while the reserve covers every position's share, in proportion when losses have drawn it down.",
+        sources: [fcSource("the reserve", "reserve")],
       },
       {
         bold: "The limit",
-        text: "the debt may not exceed collateral × the declared liquidation price, and a clone shares its original's minting limit.",
-        sources: [FC_DOCS.adjust, FC_DOCS.clone],
+        text: "the debt may not exceed collateral × the declared liquidation price, and a clone shares its family's minting limit.",
+        sources: [fcSource("the minting limit", "clone")],
       },
     ],
     links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],
@@ -3590,22 +3592,22 @@ export function frankencoinPriceContent(): LearnMoreContent {
       {
         bold: "What it limits",
         text: "collateral × the declared price is the most debt the position may carry.",
-        sources: [FC_DOCS.adjust],
+        sources: [fcSource("the price limit", "adjust")],
       },
       {
         bold: "Lowering",
         text: "applies at once, as long as the debt still fits under the new price.",
-        sources: [FC_DOCS.adjust],
+        sources: [fcSource("lowering the price", "adjust")],
       },
       {
         bold: "Raising",
         text: "pauses minting for three days, so the new price can be challenged before it backs new ZCHF. In a combined adjust the mint runs before the price change, at the old price.",
-        sources: [FC_DOCS.adjust],
+        sources: [fcSource("the three-day cooldown", "adjust")],
       },
       {
         bold: "Challenges",
         text: "a challenger who thinks the price is too high posts collateral of the same kind and starts a two-phase auction.",
-        sources: [FC_DOCS.auctions],
+        sources: [fcSource("challenges", "auctions")],
       },
     ],
     links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],
@@ -3618,24 +3620,29 @@ export function frankencoinCreationContent(kind: "open" | "clone" | "handover"):
   const handover = {
     bold: "The handover",
     text: "the creating transaction can pass ownership through the MintingHub and a helper contract before it reaches the owner. Each step is its own event; together they are one creation.",
-    sources: [FC_DOCS.clone],
+    sources: [fcSource("creating a clone", "clone")],
   };
   return {
     title: "How a Position Is Created",
     intro:
-      "Every Frankencoin position is its own contract with its own owner, collateral and debt. It starts either as a new original, which proposes new terms, or as a clone of an original that is already accepted.",
+      "Every Frankencoin position is its own contract with its own owner, collateral and debt. It starts either as a new original, which proposes new terms, or as a clone of a position in an accepted family.",
     detailsHeading: "Key concepts:",
     details: [
       ...(kind === "handover" ? [handover] : []),
       {
         bold: "Original",
-        text: "proposes its own collateral, price, rate and limits, costs a 1,000 ZCHF opening fee, and waits out a veto window of at least three days before it can mint. Holders of more than 1% of the governance votes (FCS, or the FPS it wraps) can deny it in that window.",
-        sources: [FC_DOCS.open, FC_DOCS.governance],
+        text: "proposes its own collateral, price, rate and limits, costs a 1,000 ZCHF opening fee, and waits out a veto window of at least three days before it can mint.",
+        sources: [fcSource("opening an original", "open")],
+      },
+      {
+        bold: "Veto",
+        text: "in that window, holders of more than 1% of the governance votes (FCS, or the FPS it wraps) can deny the new original.",
+        sources: [fcSource("the veto", "governance")],
       },
       {
         bold: "Clone",
-        text: "a new position on an accepted original's terms (rate, reserve share, challenge period, an expiry no later than the original's), starting at the original's declared price. It skips the veto window, can deposit and mint in the same transaction, and shares the original's minting limit.",
-        sources: [FC_DOCS.clone],
+        text: "a new position cloned from any position of an accepted family. It starts at that position's declared price and takes the family original's other terms (rate, reserve share, challenge period, an expiry no later than the original's). It skips the veto window, can deposit and mint in the same transaction, and shares the family's minting limit.",
+        sources: [fcSource("cloning a position", "clone")],
       },
     ],
     links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],
@@ -3653,28 +3660,71 @@ export function frankencoinOwnershipContent(): LearnMoreContent {
       {
         bold: "Only the owner acts",
         text: "minting, repaying, moving collateral and changing the declared price are the owner's alone. A challenge or an expiry sale needs no owner.",
-        sources: [FC_DOCS.adjust, FC_DOCS.auctions],
+        sources: [fcSource("adjusting a position", "adjust")],
       },
     ],
     links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],
   };
 }
 
-export function frankencoinChallengeContent(): LearnMoreContent {
+/** A phase-2 sale on the position the modal is opened from, for a worked
+ *  example. Structurally the page's FrankencoinSaleExample. */
+interface FrankencoinModalSale {
+  number: string;
+  symbol: string;
+  liqPrice: number;
+  phase: number;
+  startedAt: number;
+  soldAt: number;
+  bid: number;
+  sold: number;
+}
+
+const fcNum = (n: number, max = 2, min = 0): string =>
+  n.toLocaleString("en-US", { minimumFractionDigits: min, maximumFractionDigits: max });
+const fcDays = (seconds: number): string => {
+  if (seconds % 86400 === 0) {
+    const d = seconds / 86400;
+    return `${d} day${d === 1 ? "" : "s"}`;
+  }
+  const h = Math.round(seconds / 3600);
+  return `${h} h`;
+};
+const fcMinutes = (seconds: number): string => {
+  const m = Math.round(seconds / 60);
+  return m >= 120 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
+};
+
+export function frankencoinChallengeContent(
+  opts: { phase?: number | null; example?: FrankencoinModalSale | null } = {},
+): LearnMoreContent {
+  const phase = opts.phase ?? null;
+  const len = phase != null && phase > 0 ? ` (${fcDays(phase)} on this position)` : "";
+  const ex = opts.example ?? null;
+  const example: string[] = [];
+  if (ex) {
+    const into = ex.soldAt - (ex.startedAt + ex.phase);
+    const unit = ex.bid / ex.sold;
+    example.push(
+      `On this position: challenge #${ex.number} ran into phase 2, because nobody bought the challenger's ${ex.symbol} at the declared ${fcNum(ex.liqPrice)} ZCHF per ${ex.symbol} in phase 1's ${fcDays(ex.phase)}. In phase 2 the price fell from ${fcNum(ex.liqPrice)} toward zero over ${fcDays(ex.phase)}; ${fcMinutes(into)} in, it stood at ${fcNum(unit)} ZCHF per ${ex.symbol} (${fcNum((unit / ex.liqPrice) * 100)}% of the declared price), and a bidder bought ${fcNum(ex.sold, 8)} ${ex.symbol} for ${fcNum(ex.bid, 2, 2)} ZCHF. The Challenge Succeeded row shows where that ZCHF went.`,
+    );
+  }
   return {
     title: "How Frankencoin Challenges Work",
     intro:
-      "Frankencoin has no oracle and no liquidation threshold. A challenger who thinks a position's declared price is too high posts collateral of the same kind (not ZCHF) and starts a two-phase auction against it.",
+      "Frankencoin has no oracle and no liquidation threshold. A challenger who thinks a position's declared price is too high posts collateral of the same kind (not ZCHF) and starts a two-phase auction against it. Each phase lasts the position's challenge period.",
     stepsHeading: "The two phases:",
     steps: [
-      "Phase 1, fixed price: the challenger's posted collateral is offered at the position's declared liquidation price. If someone (usually the owner) buys it, the challenge is averted and the position keeps its collateral.",
-      "Phase 2, declining price: if nobody bought, the position's own collateral goes to an auction whose price falls to zero. Bidders pay ZCHF; the proceeds repay the position's debt, the challenger earns a reward, and a shortfall is covered first by the position's reserve share, then by equity.",
-      "One challenge can settle in several slices: each bid in phase 2 is its own settlement under the same challenge number.",
+      `Phase 1, fixed price${len}: the challenger's posted collateral is on offer at the position's declared liquidation price. Anyone can buy it, the owner included. A purchase averts the challenge: the position keeps its collateral and debt, and its minting pauses for one day.`,
+      `Phase 2, falling price${len}: if nobody bought, the position's collateral is sold at a price that starts at the declared price and falls in a straight line to zero by the end of the phase. The first bid buys at that moment's price.`,
+      "Where the bid goes: 2% of it is the challenger's reward, and the challenger gets back the collateral it posted. The rest repays the debt on the collateral sold. A shortfall is paid from the reserve, first out of the position's reserve share, then from equity; an excess is shared between the reserve, at the position's reserve percentage, and the owner.",
+      "One challenge can settle in several slices: each phase-2 bid is its own settlement under the same challenge number, and a position left with collateral stays open.",
     ],
-    extraParagraphs: [
-      "A challenged position can survive: averted outright, or left standing after a partial phase-2 sale.",
+    extraParagraphs: example,
+    links: [
+      { label: "Challenges and auctions (Frankencoin docs)", url: FC_PAGE.auctions },
+      { label: "How the reserve covers losses (Frankencoin docs)", url: FC_PAGE.reserve },
     ],
-    links: [FC_DOCS.auctions, FC_DOCS.reserve],
   };
 }
 
@@ -3688,22 +3738,22 @@ export function frankencoinLifecycleContent(): LearnMoreContent {
       {
         bold: "Veto window",
         text: "a new original position waits an owner-chosen period (3 days minimum) before its first mint; holders of more than 1% of the governance votes (FCS, or the FPS it wraps) can deny it in that window, which disables minting for good.",
-        sources: [FC_DOCS.open, FC_DOCS.governance],
+        sources: [fcSource("the veto window", "governance")],
       },
       {
         bold: "Cooldown",
         text: "raising the declared liquidation price pauses minting for 3 days, the window in which anyone can challenge the new price before it backs new ZCHF.",
-        sources: [FC_DOCS.adjust],
+        sources: [fcSource("the price-raise cooldown", "adjust")],
       },
       {
         bold: "Expiration",
         text: "past its expiration a position cannot mint, and on MintingHub V2 anyone can buy its collateral through the hub at a declining price, the proceeds repaying the debt.",
-        sources: [FC_DOCS.risks],
+        sources: [fcSource("expiry and the forced sale", "risks")],
       },
       {
         bold: "Closing",
         text: "a position closes when its collateral and debt are both gone; the final repayment releases its reserve share, in full while the reserve covers every position's share.",
-        sources: [FC_DOCS.reserve],
+        sources: [fcSource("the reserve on repayment", "reserve")],
       },
     ],
     links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],
@@ -3720,7 +3770,7 @@ export function frankencoinEventFallbackContent(): LearnMoreContent {
       {
         bold: "Positions are contracts",
         text: "every borrower owns a Position contract; its address is its identity, and its owner can change by transfer.",
-        sources: [FC_DOCS.positions],
+        sources: [fcSource("positions", "positions")],
       },
       {
         bold: "Native units",
@@ -3729,7 +3779,7 @@ export function frankencoinEventFallbackContent(): LearnMoreContent {
       {
         bold: "No health factor",
         text: "risk is challenge status, the declared price, the expiry countdown and the cooldown.",
-        sources: [FC_DOCS.risks],
+        sources: [fcSource("the risks", "risks")],
       },
     ],
     links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],

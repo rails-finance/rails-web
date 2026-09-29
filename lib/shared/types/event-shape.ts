@@ -2120,7 +2120,11 @@ export interface FrankencoinContext {
   collateralBefore?: string;
   mintedBefore?: string;
   liqPriceBefore?: string;
-  /** open/clone rows — the clone lineage (original ≠ position ⇒ clone). */
+  /** The position PositionOpened names as the parent: on a clone, the position
+   *  it was cloned from (its starting price came from there), which can itself
+   *  be a clone. The family's original, the position `original()` returns on
+   *  chain, is a different fact and lives on the chain read. On an original
+   *  this is the position itself. */
   original?: string;
   /** Challenge rows. */
   challenger?: string;

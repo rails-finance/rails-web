@@ -246,7 +246,7 @@ export const openedProv = (coords: FrankencoinCoords): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `The position's creation — the hub's own PositionOpened log${atBlock(coords)}, naming the new Position contract and the original whose terms it uses (itself, for an original).`,
+  summary: `The position's creation — the hub's own PositionOpened log${atBlock(coords)}, naming the new Position contract and the position it was cloned from (itself, for an original). A clone takes its starting price from that position and its other terms from the family's original.`,
   contract: hubContract(coords),
   via: `${FRANKENCOIN_VIA} · PositionOpened · original`,
   inputs: eventInputs(coords),
@@ -299,6 +299,146 @@ export const receiptLegProv = (leg: FrankencoinReceiptLeg, coords: FrankencoinCo
     verify: txVerify(coords),
     summary: def.summary,
     contract: ZCHF_TOKEN,
+    via: `${RECEIPT_VIA} · ${def.via}`,
+    inputs: [{ label: leg, value, kind: "chain", pclass: "emitted" }, ...eventInputs(coords)],
+  };
+};
+
+// ── the receipt's challenge legs and at-block reads ─────────────────────────
+
+export type FrankencoinChallengeLeg =
+  | "boughtFromChallenger"
+  | "paidChallenger"
+  | "buyer"
+  | "cooldown"
+  | "bidder"
+  | "reward"
+  | "challengerReturned"
+  | "debtCleared"
+  | "shortfall"
+  | "reserveReleased"
+  | "ownerReceived"
+  | "clearedPrice"
+  | "rate"
+  | "ownerKind";
+
+const CHALLENGE_LEG: Record<
+  FrankencoinChallengeLeg,
+  {
+    summary: (sym: string) => string;
+    via: string;
+    derived?: boolean;
+    token?: "zchf" | "collateral" | "hub" | "position";
+  }
+> = {
+  boughtFromChallenger: {
+    summary: (sym) =>
+      `${sym} the buyer took from the challenger — the collateral token's Transfer from the hub to the buyer in this transaction. In phase 1 the hub hands the challenger's posted collateral to whoever pays the declared price for it.`,
+    via: "Transfer(hub → buyer) on the collateral token",
+    token: "collateral",
+  },
+  paidChallenger: {
+    summary: () =>
+      "ZCHF the buyer paid the challenger — the ZCHF token's Transfer from the buyer to the challenger in this transaction: the challenged amount at the declared price.",
+    via: "Transfer(buyer → challenger) · ÷10^18",
+    token: "zchf",
+  },
+  buyer: {
+    summary: () =>
+      "Who bought the challenger's collateral — the recipient of the hub's collateral Transfer in this transaction; whether it holds contract code is read from the chain now.",
+    via: "Transfer(hub → buyer) · eth_getCode(buyer)",
+    token: "collateral",
+  },
+  cooldown: {
+    summary: () =>
+      "The end of the position's minting pause — the position's cooldown() read at this block. An averted challenge pauses minting for one day, so the same challenge can be repeated before the owner mints more.",
+    via: "Position.cooldown() at the event block",
+    token: "position",
+  },
+  bidder: {
+    summary: () =>
+      "Who bought the position's collateral — the recipient of the position's collateral Transfer in this transaction; whether it holds contract code is read from the chain now.",
+    via: "Transfer(position → bidder) · eth_getCode(bidder)",
+    token: "collateral",
+  },
+  reward: {
+    summary: () =>
+      "The challenger's reward — the ZCHF token's Transfer from the hub to the challenger in this transaction. MintingHubV2 pays the challenger 2% of the bid (CHALLENGER_REWARD = 20,000 ppm).",
+    via: "Transfer(hub → challenger) · ÷10^18",
+    token: "zchf",
+  },
+  challengerReturned: {
+    summary: (sym) =>
+      `${sym} the challenger got back — the collateral token's Transfer from the hub to the challenger (or the hub's PostPonedReturn) in this transaction. A challenger who is outbid in phase 2 takes back the collateral it posted.`,
+    via: "Transfer(hub → challenger) + PostPonedReturn on the collateral token",
+    token: "collateral",
+  },
+  debtCleared: {
+    summary: () =>
+      "Debt the sale cleared — the ZCHF the hub burned in this transaction: the position's debt in proportion to the collateral sold.",
+    via: "Transfer(hub → 0x0) · ÷10^18",
+    token: "zchf",
+  },
+  shortfall: {
+    summary: () =>
+      "The shortfall the reserve covered — the ZCHF contract's Loss log for the hub in this transaction: the debt the bid, less the reward, did not cover. The reserve (the Equity contract) sent that much to the hub; if it runs short, new ZCHF is minted for the rest.",
+    via: "Loss(reportingMinter = hub, amount) · Transfer(Equity → hub) · ÷10^18",
+    token: "zchf",
+  },
+  reserveReleased: {
+    summary: () =>
+      "This position's reserve share released by the sale — the Profit the ZCHF contract reported when the hub burned the debt (Frankencoin.burnWithoutReserve): the part of the reserve held against this debt becomes equity.",
+    via: "Profit(reportingMinter = hub) after the burn · ÷10^18",
+    token: "zchf",
+  },
+  ownerReceived: {
+    summary: () =>
+      "ZCHF paid to the owner — the ZCHF token's Transfers from the hub to anyone but the challenger, the reserve and the zero address in this transaction. The owner is paid only when the bid, less the reward, exceeds the debt cleared.",
+    via: "Transfer(hub → owner) · ÷10^18",
+    token: "zchf",
+  },
+  clearedPrice: {
+    summary: (sym) =>
+      `The price the sale cleared at, ZCHF per ${sym} — the bid over the collateral sold, both from the ChallengeSucceeded log; the declared price and the challenge start are read from the position and the hub one block earlier.`,
+    via: "bid ÷ acquiredCollateral · Position.challengeData() · MintingHub.challenges(n)",
+    derived: true,
+    token: "hub",
+  },
+  rate: {
+    summary: () =>
+      "The annual interest rate in force for this mint — the position's annualInterestPPM() read at this block (the system base rate plus the position's risk premium). The interest is that rate for the time left to expiry, charged at minting.",
+    via: "Position.annualInterestPPM() · expiration() · start() at the event block",
+    token: "position",
+  },
+  ownerKind: {
+    summary: () =>
+      "Whether the new owner is a wallet or a contract — eth_getCode on the address now: no code is a wallet (an externally owned account), code is a contract.",
+    via: "eth_getCode(newOwner) at the latest block",
+    token: "position",
+  },
+};
+
+/** One figure of a challenge's receipt, or a value read at the event block. */
+export const challengeReceiptProv = (
+  leg: FrankencoinChallengeLeg,
+  sym: string,
+  coords: FrankencoinCoords,
+  value: string,
+): Provenance => {
+  const def = CHALLENGE_LEG[leg];
+  return {
+    kind: def.derived ? "chain-derived" : "chain",
+    pclass: def.token === "position" ? "state" : "emitted",
+    verify: txVerify(coords),
+    summary: def.summary(sym),
+    contract:
+      def.token === "zchf"
+        ? ZCHF_TOKEN
+        : def.token === "position"
+          ? positionContract(coords)
+          : def.token === "hub"
+            ? hubContract(coords)
+            : { name: `${sym} token` },
     via: `${RECEIPT_VIA} · ${def.via}`,
     inputs: [{ label: leg, value, kind: "chain", pclass: "emitted" }, ...eventInputs(coords)],
   };

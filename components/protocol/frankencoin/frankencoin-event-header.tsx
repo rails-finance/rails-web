@@ -162,7 +162,9 @@ export function FrankencoinEventHeader({
       break;
     case "auction_settlement":
       // The protocol writing the auction down — labeled magnitudes, no signs
-      // that could read as acts of the owner.
+      // that could read as acts of the owner. The warning spine draws no token
+      // flank on this row or on the challenge / forced-sale rows below, so
+      // their amounts stay in the row at every width (noSpineCounterpart).
       if (dColl != null && dColl !== 0)
         deltas.push({
           value: dColl,
@@ -170,6 +172,7 @@ export function FrankencoinEventHeader({
           address: collAddr,
           label: "Collateral",
           tone: "caution",
+          noSpineCounterpart: true,
           prov: changeProv("collateral", sym, coords),
         });
       if (dMint != null && dMint !== 0)
@@ -179,6 +182,7 @@ export function FrankencoinEventHeader({
           address: zchfAddr,
           label: "Debt cleared",
           tone: "caution",
+          noSpineCounterpart: true,
           prov: changeProv("minted", sym, coords),
         });
       break;
@@ -194,6 +198,7 @@ export function FrankencoinEventHeader({
           address: collAddr,
           label: "Challenged",
           tone: "caution",
+          noSpineCounterpart: true,
           prov: challengeFigureProv("size", "started", sym, coords, ctx.raw?.size),
         });
       break;
@@ -204,6 +209,7 @@ export function FrankencoinEventHeader({
           symbol: sym,
           address: collAddr,
           label: "Averted",
+          noSpineCounterpart: true,
           prov: challengeFigureProv("size", "averted", sym, coords, ctx.raw?.size),
         });
       break;
@@ -233,6 +239,7 @@ export function FrankencoinEventHeader({
           address: collAddr,
           label: "Sold",
           tone: "caution",
+          noSpineCounterpart: true,
           prov: forcedSaleProv(sym, coords, ctx.raw?.size),
         });
       break;
