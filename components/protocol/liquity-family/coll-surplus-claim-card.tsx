@@ -64,7 +64,7 @@ export function CollSurplusClaimCard({
   const amountProv = claimAmountProv(d, at);
   const others = claimOthers(d);
   const v1 = d.family === "liquity-v1";
-  const pool = v1 ? `${d.protocolName}'s CollSurplusPool` : `the ${d.symbol} branch's CollSurplusPool`;
+  const pool = v1 ? `${d.protocolName}'s surplus pool` : `the ${d.symbol} branch's CollSurplusPool`;
   const credit = d.creditKind === "redemption" ? "fully redeemed" : "liquidated";
 
   const stats: ChainTruthStat[] = [

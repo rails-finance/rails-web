@@ -43,6 +43,7 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { LiquityV1EventCard } from "@/components/protocol/liquity-v1/liquity-v1-event-card";
 import { LiquityV1PositionCard, viewFromSummary } from "@/components/protocol/liquity-v1/liquity-v1-position-card";
+import { redemptionSplit } from "@/lib/liquity-v1/event-figures";
 import {
   LiquityV1PositionExplanation,
   LiquityV1ClosedEpochExplanation,
@@ -339,6 +340,21 @@ export default function LiquityV1TroveView({
     [liquidatedWhole, outcomeReads, events, selectedEpoch],
   );
   const priceNow = chain && !chain.chainStale && chain.price > 0 ? chain.price : null;
+  // The redemption outcome needs every redemption row of the life, so it is
+  // stated only on a page holding the whole history.
+  const redemptions = historyWindow.state === "whole" ? liquityV1RedemptionTotals(v1Events, selectedEpoch) : null;
+  // How a closed life ended, and the ETH that ending sent back to the owner:
+  // all of it at an owner close, the surplus on a full redemption.
+  const lastType = lastRow?.context.data.eventType ?? null;
+  const endedBy = view?.status === "closed" ? (lastType === "redemption" ? "redemption" : "owner") : null;
+  const ethBack =
+    view?.status !== "closed" || !lastRow
+      ? null
+      : lastType === "closeTrove"
+        ? Math.abs(Math.min(Number(lastRow.context.data.collDelta) || 0, 0))
+        : lastType === "redemption"
+          ? (surplus?.surplus ?? redemptionSplit(lastRow.context.data)?.ethSurplus ?? null)
+          : null;
 
   const chainLive = view?.status === "open" && chain != null && chain.troveStatus === "active" ? chain : null;
   const faceView =
@@ -405,6 +421,7 @@ export default function LiquityV1TroveView({
               viewHref={tl.viewHref}
               surplus={surplus}
               priceUsd={priceNow}
+              endedBy={lastRow ? endedBy : null}
               // The risk slot rides the card's heading-button row (the Aave V3
               // treatment): the Display menu plus the chosen risk picture —
               // liquidation runway (default) or the collateral-ratio card —
@@ -440,6 +457,9 @@ export default function LiquityV1TroveView({
                     surplus={surplus}
                     ownerOutcome={ownerOutcome}
                     outcomePending={liquidatedWhole && outcomeReads == null}
+                    redemptions={redemptions}
+                    priceNow={priceNow}
+                    ethBack={ethBack}
                   />
                 ) : chain && chain.troveStatus !== "active" ? (
                   // Index says open, the chain says the Trove has since closed
@@ -462,10 +482,6 @@ export default function LiquityV1TroveView({
           {view &&
             (() => {
               const towerData = computeLiquityV1Economics(view, lifetimeEvents, chain, precomputedLifetime);
-              // The redemption outcome needs every redemption row of the life,
-              // so it is stated only on a page holding the whole history.
-              const redemptions =
-                historyWindow.state === "whole" ? liquityV1RedemptionTotals(v1Events, selectedEpoch) : null;
               return (
                 <ChainTruthTower
                   data={towerData}

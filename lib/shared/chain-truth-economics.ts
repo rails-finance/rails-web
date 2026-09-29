@@ -167,6 +167,9 @@ export interface ChainTruthTowerData {
    *  than wearing the debt side's word. */
   collateralInflowLabel?: string;
   debtInflowLabel?: string;
+  /** Let the breakdown labels wrap rather than truncate ("Deposited (all
+   *  time)" beside a token chip clips at desktop width). Opt-in per tower. */
+  wrapFlowLabels?: boolean;
   /** Caption shown beneath the debt tower when the interest split is gated off
    *  (no chain-state current debt) — e.g. "accrued interest needs the live
    *  market index". */

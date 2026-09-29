@@ -356,7 +356,7 @@ export function liquityV1EventSlots(
           clause(
             <>
               The debt was {muted(`${fmtLusd(Math.abs(debt))} ${DEBT_SYMBOL}`)}. The owner&rsquo;s LUSD cancelled all of
-              it except the {LIQUITY_V1_RESERVE} LUSD liquidation reserve, which the GasPool burned in the same
+              it except the {LIQUITY_V1_RESERVE} LUSD liquidation reserve, which the reserve pool burned in the same
               transaction.
             </>,
           ),
@@ -393,7 +393,7 @@ export function liquityV1EventSlots(
                         <Fig info={liqRouteProv(coords, "surplus")} symbol={COLLATERAL_SYMBOL}>
                           {fmtEth(n(l.surplusEth))} {COLLATERAL_SYMBOL}
                         </Fig>{" "}
-                        was left in the CollSurplusPool for the owner
+                        was left in the surplus pool for the owner
                         {surplus?.claimed ? <>, who has since claimed it</> : <> to claim</>}.
                       </>
                     )}
@@ -564,7 +564,7 @@ export function liquityV1EventSlots(
               <>
                 The redeemer&rsquo;s {muted(`${fmtLusd(split.lusdRedeemed)} ${DEBT_SYMBOL}`)} bought that ETH at{" "}
                 {priceFig(split.price)} per ETH. The last {LIQUITY_V1_RESERVE} LUSD of the debt was the liquidation
-                reserve, which the GasPool burned.
+                reserve, which the reserve pool burned.
               </>,
             ),
             clause(
@@ -578,7 +578,7 @@ export function liquityV1EventSlots(
                 >
                   {fmtEth(split.ethSurplus)} {COLLATERAL_SYMBOL}
                 </Fig>{" "}
-                of collateral moved to the CollSurplusPool{claimNote}.
+                of collateral moved to the surplus pool{claimNote}.
               </>,
             ),
           ],
@@ -690,8 +690,9 @@ function valuedLiquidationSentence(ctx: LiquityV1Context, coords: LiquityV1Coord
   );
   return clause(
     <>
-      At the PriceFeed price at the time (${priceFig} per ETH), the seized collateral was worth {seizedFig} against{" "}
-      {clearedFig} of debt counted at $1 per LUSD, a {premiumFig} premium for whoever absorbed the debt.
+      At the ETH price from Liquity&rsquo;s price feed at the time (${priceFig} per ETH), the seized collateral was
+      worth {seizedFig} against {clearedFig} of debt counted at $1 per LUSD, a {premiumFig} premium for whoever absorbed
+      the debt.
     </>,
   );
 }

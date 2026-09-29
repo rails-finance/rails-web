@@ -29,7 +29,12 @@ import { positionCollateralProv, positionDebtProv, lifetimeFlowProv } from "@/li
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
 import { flowsReconcile, type ChainTruthTowerData, type TowerLine } from "@/lib/shared/chain-truth-economics";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
-import { LIQUIDATION_COLL_VERB, LIQUIDATION_DEBT_VERB, redemptionSplit } from "@/lib/liquity-v1/event-figures";
+import {
+  LIQUIDATION_COLL_VERB,
+  LIQUIDATION_DEBT_VERB,
+  LIQUITY_V1_RESERVE,
+  redemptionSplit,
+} from "@/lib/liquity-v1/event-figures";
 
 const DUST = 1e-9;
 
@@ -38,7 +43,10 @@ const DUST = 1e-9;
  *  voluntary flows — each is its own legend row. */
 export interface TroveFlows {
   deposited: number; // ETH in (open / adjust)
-  withdrawn: number; // ETH out, voluntary (adjust / close)
+  withdrawn: number; // ETH out, voluntary (adjust)
+  /** ETH the owner took back by closing the Trove. Summed from the loaded rows
+   *  only (a close is a life's last event, so it is always in the window). */
+  returnedAtClose: number;
   collLiquidated: number; // ETH seized by liquidation
   collRedeemed: number; // ETH that went to redeemers
   /** ETH a full redemption moved to the CollSurplusPool for the owner. Summed
@@ -46,20 +54,25 @@ export interface TroveFlows {
    *  a windowed page a surplus below the cut stays inside collRedeemed. */
   collSurplus: number;
   borrowed: number; // debt taken on (LUSD received + one-time fees + the 200 LUSD reserve)
-  repaid: number; // LUSD repaid, voluntary
+  repaid: number; // LUSD repaid by the owner (a close counts the debt less the reserve)
+  /** The 200 LUSD reserve burned when the owner closed the Trove or a
+   *  redemption cancelled the last of its debt. Loaded rows only, as above. */
+  reserveBurned: number;
   debtLiquidated: number; // LUSD cleared by liquidation
-  debtRedeemed: number; // LUSD repaid by redemptions
+  debtRedeemed: number; // LUSD the redeemers paid (a full redemption's reserve is in reserveBurned)
 }
 
 function replayLifetime(events: BaseActivityEvent[], epoch: number | null): TroveFlows {
   const f: TroveFlows = {
     deposited: 0,
     withdrawn: 0,
+    returnedAtClose: 0,
     collLiquidated: 0,
     collRedeemed: 0,
     collSurplus: 0,
     borrowed: 0,
     repaid: 0,
+    reserveBurned: 0,
     debtLiquidated: 0,
     debtRedeemed: 0,
   };
@@ -77,12 +90,28 @@ function replayLifetime(events: BaseActivityEvent[], epoch: number | null): Trov
     if (ctx.eventType === "redemption") {
       // A full redemption splits the collateral: the redeemer's ETH, and the
       // rest left to the owner in the CollSurplusPool.
+      // The last 200 LUSD of a fully redeemed debt is the reserve the gas
+      // pool burns, so the redeemers paid the rest.
       const split = redemptionSplit(ctx);
+      const cancelled = Math.abs(Math.min(debtDelta, 0));
+      const full = Number(ctx.debtAfter) <= DUST && cancelled > DUST;
       if (split?.full) {
         f.collRedeemed += split.ethToRedeemer;
         f.collSurplus += split.ethSurplus;
       } else f.collRedeemed += Math.abs(Math.min(collDelta, 0));
-      f.debtRedeemed += Math.abs(Math.min(debtDelta, 0));
+      const reserve = full ? Math.min(LIQUITY_V1_RESERVE, cancelled) : 0;
+      f.reserveBurned += reserve;
+      f.debtRedeemed += cancelled - reserve;
+      continue;
+    }
+    if (ctx.eventType === "closeTrove") {
+      // Closing: the owner pays the debt less the reserve, the gas pool burns
+      // the reserve, and all the ETH goes back to the owner.
+      const cancelled = Math.abs(Math.min(debtDelta, 0));
+      const reserve = Math.min(LIQUITY_V1_RESERVE, cancelled);
+      f.returnedAtClose += Math.abs(Math.min(collDelta, 0));
+      f.reserveBurned += reserve;
+      f.repaid += cancelled - reserve;
       continue;
     }
     if (collDelta > 0) f.deposited += collDelta;
@@ -203,14 +232,14 @@ export function computeLiquityV1Economics(
   const reconciles =
     f != null &&
     flowsReconcile(
-      f.deposited - f.withdrawn - f.collLiquidated - f.collRedeemed - f.collSurplus,
+      f.deposited - f.withdrawn - f.returnedAtClose - f.collLiquidated - f.collRedeemed - f.collSurplus,
       view.collateral,
-      f.deposited + f.withdrawn + f.collLiquidated + f.collRedeemed + f.collSurplus,
+      f.deposited + f.withdrawn + f.returnedAtClose + f.collLiquidated + f.collRedeemed + f.collSurplus,
     ) &&
     flowsReconcile(
-      f.borrowed - f.repaid - f.debtLiquidated - f.debtRedeemed,
+      f.borrowed - f.repaid - f.reserveBurned - f.debtLiquidated - f.debtRedeemed,
       view.debt,
-      f.borrowed + f.repaid + f.debtLiquidated + f.debtRedeemed,
+      f.borrowed + f.repaid + f.reserveBurned + f.debtLiquidated + f.debtRedeemed,
     );
 
   const flowLine = (
@@ -225,6 +254,7 @@ export function computeLiquityV1Economics(
 
   const collExited = [
     ...flowLine(f?.withdrawn ?? 0, COLLATERAL_SYMBOL, "coll-withdrawn", "withdrawn"),
+    ...flowLine(f?.returnedAtClose ?? 0, COLLATERAL_SYMBOL, "coll-returned", "returned at close", "Returned at close"),
     ...flowLine(f?.collSurplus ?? 0, COLLATERAL_SYMBOL, "coll-surplus", "surplus collateral", "To surplus pool"),
   ];
   const collLiquidated = [
@@ -238,7 +268,10 @@ export function computeLiquityV1Economics(
       "redeemed",
     ),
   ];
-  const debtExited = flowLine(f?.repaid ?? 0, DEBT_SYMBOL, "debt-repaid", "repaid");
+  const debtExited = [
+    ...flowLine(f?.repaid ?? 0, DEBT_SYMBOL, "debt-repaid", "repaid"),
+    ...flowLine(f?.reserveBurned ?? 0, DEBT_SYMBOL, "debt-reserve", "reserve burned", "Reserve burned"),
+  ];
   const debtLiquidated = [
     ...flowLine(f?.debtLiquidated ?? 0, DEBT_SYMBOL, "debt-liq", "liquidated debt", LIQUIDATION_DEBT_VERB),
     ...flowLine(f?.debtRedeemed ?? 0, DEBT_SYMBOL, "debt-redeemed", "redeemed debt", "Redeemed", "redeemed"),
@@ -274,6 +307,10 @@ export function computeLiquityV1Economics(
       liquidated: debtLiquidated,
       lifetimeInflow: inflow(f?.borrowed ?? 0, DEBT_SYMBOL),
     },
+    // "Debt taken on": the draws include the fees and the reserve, so the
+    // total is more than the LUSD the owner received.
+    debtInflowLabel: "Debt taken on",
+    wrapFlowLabels: true,
     collateralListLabel: "Collateral · ETH",
     debtListLabel: "Debt · LUSD",
     interestNote: valued

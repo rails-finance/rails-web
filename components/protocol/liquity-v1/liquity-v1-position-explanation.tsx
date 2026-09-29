@@ -26,7 +26,8 @@ import { surplusClaimableProv } from "@/lib/liquity-v1/event-provenance";
 import type { LiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
 import type { LiquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
 import { liquityV1OutcomeSentences, liquityV1RouteSentences } from "@/lib/liquity-v1/explainer-clauses";
-import { fmtPct } from "@/lib/liquity-v1/event-figures";
+import { fmtEth, fmtPct, fmtUsdSigned } from "@/lib/liquity-v1/event-figures";
+import type { LiquityV1RedemptionTotals } from "@/lib/liquity-v1/economics";
 
 const DUST = 1e-9;
 
@@ -75,7 +76,7 @@ export function LiquityV1PositionExplanation({
     // The USD value has no stat-row twin on this card, so it stays muted.
     bullets.push(
       <span key="worth">
-        At the PriceFeed&rsquo;s ETH price now, that collateral is worth {fmtUsd(collUsd).display}.
+        At the ETH price from Liquity&rsquo;s price feed now, that collateral is worth {fmtUsd(collUsd).display}.
       </span>,
     );
   }
@@ -261,6 +262,9 @@ export function LiquityV1ClosedEpochExplanation({
   surplus,
   ownerOutcome,
   outcomePending,
+  redemptions,
+  priceNow,
+  ethBack,
 }: {
   v: LiquityV1PositionView;
   /** Unix seconds of the life's first captured event — the "active from"
@@ -277,15 +281,44 @@ export function LiquityV1ClosedEpochExplanation({
   ownerOutcome?: LiquityV1OwnerOutcome | null;
   /** The outcome's reads are still on their way. */
   outcomePending?: boolean;
+  /** The life's redemptions, for the closed lead's net outcome. Null on a
+   *  windowed page or with an unpriced row: the clause drops. */
+  redemptions?: LiquityV1RedemptionTotals | null;
+  /** The price feed's ETH price now (the net against having held the ETH). */
+  priceNow?: number | null;
+  /** ETH the ending sent back to the owner: all of it at an owner close, the
+   *  surplus on a full redemption. */
+  ethBack?: number | null;
 }) {
   if (v.status !== "closed" && v.status !== "liquidated") return null;
   const liquidated = v.status === "liquidated";
   const redeemed = !liquidated && lastAction === "redemption";
   const endedOn = v.lastActivityAt > 0 ? formatDate(v.lastActivityAt) : null;
 
-  // Status lead (charter §4) — the life's outcome is the one-sentence verdict,
-  // colon-terminated; the what-that-meant detail and the enumerable facts
-  // (peaks, tenure, the live-surface note) are bullets.
+  // Status lead (charter §4). A closed life's lead tells its story in figures:
+  // how it ended, the ETH redemptions took and their net for the owner, and
+  // the ETH that went back to the owner. The bullets then carry what is not
+  // in it. A liquidated life's route is its own bullet set.
+  const claimed = surplus?.claimed ?? null;
+  const netThen = redemptions ? redemptions.lusdRedeemed - redemptions.ethValueAtRedemption : null;
+  const netNow =
+    redemptions && priceNow != null && priceNow > 0 ? redemptions.lusdRedeemed - redemptions.ethTaken * priceNow : null;
+  const redemptionClause = redemptions ? (
+    <>
+      {redemptions.count === 1 ? "a redemption" : "redemptions"} took {fmtEth(redemptions.ethTaken)} ETH (net{" "}
+      {fmtUsdSigned(netThen != null && Math.abs(netThen) < 0.005 ? 0 : (netThen as number))} to the owner at the
+      redemption price{redemptions.count === 1 ? "" : "s"}
+      {netNow != null && <>, {fmtUsdSigned(netNow)} against having held the ETH</>})
+    </>
+  ) : null;
+  const backFig =
+    ethBack != null && ethBack > DUST ? (
+      redeemed && surplus ? (
+        <Prov info={surplusClaimableProv(surplus)}>{fmtEth(surplus.surplus)} ETH</Prov>
+      ) : (
+        <>{fmtEth(ethBack)} ETH</>
+      )
+    ) : null;
   const lead = liquidated ? (
     <>
       This Trove life ended in <H>liquidation</H>
@@ -294,12 +327,32 @@ export function LiquityV1ClosedEpochExplanation({
   ) : redeemed ? (
     <>
       This Trove life ended <H>fully redeemed</H>
-      {endedOn ? <> on {endedOn}</> : null}:
+      {endedOn ? <> on {endedOn}</> : null}
+      {redemptionClause && <>, after {redemptionClause}</>}
+      {backFig && (
+        <>
+          , and the other {backFig} went to the surplus pool for the owner
+          {claimed ? (
+            <>, who claimed it{claimed.timestamp != null && <> on {formatDate(claimed.timestamp)}</>}</>
+          ) : surplus && surplus.claimable > DUST ? (
+            <>, where it waits to be claimed</>
+          ) : null}
+        </>
+      )}
+      :
     </>
   ) : (
     <>
       This Trove life was <H>closed by its owner</H>
-      {endedOn ? <> on {endedOn}</> : null}:
+      {endedOn ? <> on {endedOn}</> : null}
+      {redemptionClause && <>, after {redemptionClause}</>}
+      {backFig && (
+        <>
+          , and the owner took back {redemptionClause ? "the remaining " : ""}
+          {backFig}
+        </>
+      )}
+      :
     </>
   );
 
@@ -336,22 +389,32 @@ export function LiquityV1ClosedEpochExplanation({
     ) : redeemed ? (
       <span key="outcome">
         A redemption cancelled the last of its LUSD debt at $1 per LUSD and took ETH of equal value; the 200 LUSD
-        liquidation reserve was burned, and the ETH that remained moved to the CollSurplusPool for the owner.
+        liquidation reserve was burned.
       </span>
     ) : (
       <span key="outcome">
-        The owner repaid the LUSD debt less the 200 LUSD liquidation reserve, which was burned, and took back the ETH
-        collateral.
+        The owner repaid the LUSD debt less the 200 LUSD liquidation reserve, which was burned
+        {backFig ? null : <>, and took back the ETH collateral</>}.
       </span>
     ),
   );
+
+  if (redeemed && backFig && surplus && !claimed && surplus.claimable > DUST) {
+    bullets.push(
+      <span key="claim-how">
+        The owner&apos;s wallet claims the surplus in one transaction, which pays out the whole balance.
+      </span>,
+    );
+  }
 
   if (liquidated && ownerOutcome)
     liquityV1OutcomeSentences(ownerOutcome, hl).forEach((sentence, i) =>
       bullets.push(<span key={`owner-${i}`}>{sentence}</span>),
     );
 
-  if (surplus) {
+  // A redeemed life's surplus is in the lead; a liquidation's (a capped
+  // Recovery Mode liquidation) is stated here.
+  if (surplus && (liquidated || !backFig)) {
     bullets.push(
       <span key="surplus">
         {surplus.claimed ? (
@@ -362,7 +425,7 @@ export function LiquityV1ClosedEpochExplanation({
                 <AmountText value={surplus.surplus} /> ETH
               </H>
             </Prov>{" "}
-            left in the CollSurplusPool was claimed by the owner
+            left in the surplus pool was claimed by the owner
             {surplus.claimed.timestamp != null && <> on {formatDate(surplus.claimed.timestamp)}</>}.
           </>
         ) : (
@@ -372,8 +435,8 @@ export function LiquityV1ClosedEpochExplanation({
                 <AmountText value={surplus.claimable} /> ETH
               </H>
             </Prov>{" "}
-            is still in the CollSurplusPool, waiting for the owner to claim it: the owner&apos;s wallet calls
-            claimCollateral() on BorrowerOperations, which pays out the whole balance.
+            is still in the surplus pool, waiting for the owner to claim it: the owner&apos;s wallet claims it in one
+            transaction, which pays out the whole balance.
           </>
         )}
       </span>,
@@ -429,13 +492,6 @@ export function LiquityV1ClosedEpochExplanation({
       </span>,
     );
   }
-
-  bullets.push(
-    <span key="no-live">
-      The live risk surfaces (collateral ratio, liquidation runway, redemption queue) describe the current on-chain
-      Trove, so a past life shows its recorded history alone.
-    </span>,
-  );
 
   return <ProseExplainer paragraph={lead} items={bullets} />;
 }

@@ -26,7 +26,7 @@ import {
 } from "@/lib/liquity-v1/event-provenance";
 import { entireCollateralProv, entireDebtProv } from "@/lib/liquity-v1/position-provenance";
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
-import { liquityV1PositionContent } from "@/lib/liquity-v1/position-content";
+import { liquityV1PositionContent, type LiquityV1EndedBy } from "@/lib/liquity-v1/position-content";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
@@ -65,6 +65,7 @@ export function LiquityV1PositionCard({
   viewHref,
   surplus,
   priceUsd,
+  endedBy,
 }: {
   v: LiquityV1PositionView;
   receipts?: boolean;
@@ -89,6 +90,9 @@ export function LiquityV1PositionCard({
   surplus?: LiquityV1Surplus | null;
   /** The PriceFeed price now, to value the claimable ETH. */
   priceUsd?: number | null;
+  /** How a closed life ended, from its final event: the owner closed it, or a
+   *  redemption cancelled the last of its debt. Unset reads as an owner close. */
+  endedBy?: LiquityV1EndedBy | null;
 }) {
   // The protocol name is redundant inside the Liquity V1 explorer, so the
   // wallet pill leads (facehash + copy + bookmark — buttons, not anchors, so
@@ -120,10 +124,11 @@ export function LiquityV1PositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={liquityV1PositionContent({ status: v.status })}
+        learnMore={liquityV1PositionContent({ status: v.status, endedBy })}
       >
         <ClosedPositionStats
           outcome={v.status}
+          outcomeLabel={v.status === "closed" && endedBy === "redemption" ? "Fully redeemed" : undefined}
           leadingIdentity={walletId}
           identity={meta}
           closedAt={v.lastActivityAt}

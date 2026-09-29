@@ -44,6 +44,10 @@ export interface ClosedPositionStatsProps {
   debtAssetIcons?: ReactNode;
   collateralFootnote?: ReactNode;
   debtFootnote?: ReactNode;
+  /** The Outcome column's word when the protocol names how the position
+   *  ended more finely than `outcome` (Liquity V1's "Fully redeemed"). The
+   *  badge and colour still follow `outcome`. */
+  outcomeLabel?: string;
   /** Unix timestamp of closure — shown as date beneath Outcome */
   closedAt?: number;
   /** Optional 4th column (rate slot) — keeps closed cards the same width as open */
@@ -68,6 +72,7 @@ export function ClosedPositionStats({
   collateral,
   debt,
   outcomeFollows,
+  outcomeLabel,
   collateralLabel = CARD_VOCAB.peakCollateral,
   debtLabel = CARD_VOCAB.peakDebt,
   collateralIcon,
@@ -143,7 +148,7 @@ export function ClosedPositionStats({
         )}
         <div>
           <div className="text-rb-500 text-xs font-semibold">Outcome</div>
-          <div className={`text-lg font-bold mt-2 ${color}`}>{label}</div>
+          <div className={`text-lg font-bold mt-2 ${color}`}>{outcomeLabel ?? label}</div>
           {closure && <div className="text-xs text-rb-500 mt-0.5">{closure}</div>}
         </div>
         {extra ? (

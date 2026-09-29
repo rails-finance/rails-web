@@ -271,8 +271,10 @@ export const positionCollateralProv = (atBlockNum?: number): Provenance => ({
 export type LiquityV1LifetimeFlow =
   | "deposited"
   | "withdrawn"
+  | "returned at close"
   | "borrowed"
   | "repaid"
+  | "reserve burned"
   | "liquidated collateral"
   | "liquidated debt"
   | "redeemed collateral"
@@ -282,13 +284,18 @@ export type LiquityV1LifetimeFlow =
 const FLOW_STORY: Record<LiquityV1LifetimeFlow, string> = {
   deposited: "ETH added to the Trove (open + top-ups)",
   withdrawn: "ETH voluntarily withdrawn from the Trove",
+  "returned at close": "ETH returned to the owner when the owner closed the Trove (BorrowerOperations.closeTrove)",
   borrowed:
     "debt taken on against the Trove (the LUSD received, plus the one-time borrowing fees and the 200 LUSD liquidation reserve)",
-  repaid: "LUSD voluntarily repaid",
+  repaid:
+    "LUSD voluntarily repaid, a close counting the debt less the 200 LUSD liquidation reserve (the reserve is its own row)",
+  "reserve burned":
+    "the 200 LUSD liquidation reserve the GasPool burned when the owner closed the Trove or a redemption cancelled the last of its debt",
   "liquidated collateral": "ETH seized when the Trove was liquidated",
   "liquidated debt": "LUSD debt cleared when the Trove was liquidated",
   "redeemed collateral": "ETH that went to redeemers (LUSD holders redeeming at $1 against the lowest-ratio troves)",
-  "redeemed debt": "LUSD debt cancelled by redemptions, including the 200 LUSD reserve a full redemption burns",
+  "redeemed debt":
+    "LUSD debt the redeemers' LUSD cancelled (a full redemption's last 200 LUSD is the reserve, counted in its own row)",
   "surplus collateral":
     "ETH a full redemption left over, moved to the CollSurplusPool for the owner (the collateral less the redeemer's ETH at the redemption's PriceFeed price)",
 };

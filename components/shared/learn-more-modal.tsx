@@ -213,17 +213,25 @@ export function LearnMoreModal({ content, onClose }: { content: LearnMoreContent
               <div className="mt-4">
                 <p className="font-semibold  mb-2">Quick Links</p>
                 <div className="space-y-1">
-                  {content.links.map((link, i) => (
-                    <a
-                      key={i}
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block text-xs link-external hover:underline"
-                    >
-                      ↗ {link.label}
-                    </a>
-                  ))}
+                  {content.links.map((link, i) =>
+                    // A path on this site (an explorer's info page) opens in
+                    // place; everything else is an outside source.
+                    link.url.startsWith("/") ? (
+                      <a key={i} href={link.url} className="block text-xs link-external hover:underline">
+                        → {link.label}
+                      </a>
+                    ) : (
+                      <a
+                        key={i}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs link-external hover:underline"
+                      >
+                        ↗ {link.label}
+                      </a>
+                    ),
+                  )}
                 </div>
               </div>
             )}

@@ -4253,7 +4253,7 @@ export function liquityCollSurplusClaimContent(
   return {
     title: "How Claiming Collateral Works",
     intro: v1
-      ? `When a liquidation in Recovery Mode takes less than all of a Trove's ETH, or redemptions cancel its whole debt, the ETH left over does not go back to the owner's wallet. ${name} credits it to the owner in the CollSurplusPool, which holds it until the owner calls claimCollateral() on BorrowerOperations.`
+      ? `When a liquidation in Recovery Mode takes less than all of a Trove's ETH, or redemptions cancel its whole debt, the ETH left over does not go back to the owner's wallet. ${name} credits it to the owner in a surplus pool, which holds it until the owner claims it.`
       : `When a liquidation takes less collateral than the Trove holds, the rest does not go back to the owner's wallet. ${name} credits it to the owner in the collateral branch's CollSurplusPool, which holds it until the owner calls claimCollateral() on BorrowerOperations.`,
     stepsHeading: "How the pool pays out:",
     steps: [

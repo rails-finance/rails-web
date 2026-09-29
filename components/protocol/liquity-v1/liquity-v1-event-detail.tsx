@@ -133,7 +133,7 @@ function buildV1LiquidationForensics(
         symbol: COLLATERAL_SYMBOL,
         priceUsd: price.usd,
         priceProv: atBlockPriceProv(coords, price.usd),
-        note: "PriceFeed at block",
+        note: "Liquity's price feed at block",
       },
     ],
   };
@@ -404,7 +404,7 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
             ) : (
               <span className="text-sm font-semibold text-rb-500">…</span>
             )}
-            <StatSubline>PriceFeed, at this block</StatSubline>
+            <StatSubline>Liquity&apos;s price feed, at this block</StatSubline>
           </StatCard>
         </div>
       </div>
@@ -458,7 +458,7 @@ function RedemptionOutcome({
         for {fmtLusd(split.lusdRedeemed)} {DEBT_SYMBOL}
       </Row>
       {split.full && (
-        <Row label="ETH left to the owner (CollSurplusPool)">
+        <Row label="ETH left to the owner (surplus pool)">
           <P info={redemptionLegProv(coords, "surplus", legVals)}>
             {fmtEth(surplus?.surplus ?? split.ethSurplus)} {COLLATERAL_SYMBOL}
           </P>
@@ -566,7 +566,7 @@ function LiquidationRoute({
         </P>
       </Row>
       {n(l.surplusEth) > EPS && (
-        <Row label="Left to the owner (CollSurplusPool)">
+        <Row label="Left to the owner (surplus pool)">
           <P info={liqRouteProv(coords, "surplus")}>
             {fmtEth(n(l.surplusEth))} {COLLATERAL_SYMBOL}
           </P>

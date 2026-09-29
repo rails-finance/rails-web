@@ -20,6 +20,10 @@ const LIQUITY_V1_FAQ = {
   GENERAL: "https://docs.liquity.org/liquity-v1/faq/general",
 } as const;
 
+/** This explorer's info page: the terms and sources for Liquity V1, one click
+ *  from any Trove. */
+const INFO_LINK = { label: "About Liquity V1: terms and sources", url: "/ethereum/liquity-v1/info" };
+
 const RESERVE_DETAIL = {
   bold: "Liquidation reserve",
   text: "200 LUSD of the debt is minted to a gas pool when the Trove opens. Closing repays the debt less 200 LUSD and the reserve is burned; a full redemption burns it too; a liquidation pays it to the liquidator.",
@@ -35,8 +39,14 @@ const LIQUIDATION_DETAIL = {
   ],
 };
 
-export function liquityV1PositionContent(opts: { status: "open" | "closed" | "liquidated" }): LearnMoreContent {
-  const { status } = opts;
+/** How a closed Trove life ended, from its final event. */
+export type LiquityV1EndedBy = "owner" | "redemption";
+
+export function liquityV1PositionContent(opts: {
+  status: "open" | "closed" | "liquidated";
+  endedBy?: LiquityV1EndedBy | null;
+}): LearnMoreContent {
+  const { status, endedBy } = opts;
 
   if (status === "liquidated") {
     return {
@@ -56,11 +66,12 @@ export function liquityV1PositionContent(opts: { status: "open" | "closed" | "li
         },
         {
           bold: "Recovery Mode",
-          text: "a liquidation in Recovery Mode of a Trove above 110% takes collateral worth 110% of its debt and leaves the rest in the CollSurplusPool for the owner.",
+          text: "a liquidation in Recovery Mode of a Trove above 110% takes collateral worth 110% of its debt and leaves the rest in a surplus pool for the owner to claim.",
           sources: [{ label: "Recovery Mode FAQ", url: LIQUITY_V1_FAQ.RECOVERY_MODE }],
         },
       ],
       links: [
+        INFO_LINK,
         { label: "Stability Pool and liquidations FAQ", url: LIQUITY_V1_FAQ.LIQUIDATIONS },
         { label: "Recovery Mode FAQ", url: LIQUITY_V1_FAQ.RECOVERY_MODE },
       ],
@@ -68,25 +79,26 @@ export function liquityV1PositionContent(opts: { status: "open" | "closed" | "li
   }
 
   if (status === "closed") {
+    const closing = {
+      bold: "Closing",
+      text: "the owner repays the debt less the 200 LUSD reserve, the reserve is burned, and all the ETH returns to the owner.",
+      sources: [{ label: "Borrowing FAQ", url: LIQUITY_V1_FAQ.BORROWING }],
+    };
+    const fullRedemption = {
+      bold: "Full redemption",
+      text: "when redemptions cancel the whole debt, the Trove closes and the ETH left over moves to a surplus pool, where the owner claims it.",
+      sources: [{ label: "Redemptions FAQ", url: LIQUITY_V1_FAQ.REDEMPTIONS }],
+    };
+    const redeemed = endedBy === "redemption";
     return {
       title: "About This Position",
-      intro:
-        "This Trove is closed: its owner repaid it, or a redemption cancelled the last of its debt. The card shows the most ETH and LUSD debt it held, or, when a redemption left ETH the owner has not claimed, that ETH.",
+      intro: redeemed
+        ? "Redemptions cancelled the whole of this Trove's debt, which closed it. The card shows the ETH left for the owner in the surplus pool while it is unclaimed, and otherwise the most ETH and LUSD debt the Trove held."
+        : "The owner closed this Trove: they repaid its debt and took back all its ETH. The card shows the most ETH and LUSD debt it held.",
       detailsHeading: "Key concepts:",
-      details: [
-        {
-          bold: "Closing",
-          text: "the owner repays the debt less the 200 LUSD reserve, the reserve is burned, and all the ETH returns to the owner.",
-          sources: [{ label: "Borrowing FAQ", url: LIQUITY_V1_FAQ.BORROWING }],
-        },
-        {
-          bold: "Full redemption",
-          text: "when redemptions cancel the whole debt, the Trove closes and the ETH left over moves to the CollSurplusPool, where the owner claims it.",
-          sources: [{ label: "Redemptions FAQ", url: LIQUITY_V1_FAQ.REDEMPTIONS }],
-        },
-        RESERVE_DETAIL,
-      ],
+      details: redeemed ? [fullRedemption, closing, RESERVE_DETAIL] : [closing, fullRedemption, RESERVE_DETAIL],
       links: [
+        INFO_LINK,
         { label: "Borrowing FAQ", url: LIQUITY_V1_FAQ.BORROWING },
         { label: "Liquity V1 FAQ", url: LIQUITY_V1_FAQ.GENERAL },
       ],
@@ -118,6 +130,7 @@ export function liquityV1PositionContent(opts: { status: "open" | "closed" | "li
       RESERVE_DETAIL,
     ],
     links: [
+      INFO_LINK,
       { label: "Redemptions FAQ", url: LIQUITY_V1_FAQ.REDEMPTIONS },
       { label: "Stability Pool and liquidations FAQ", url: LIQUITY_V1_FAQ.LIQUIDATIONS },
       { label: "Recovery Mode FAQ", url: LIQUITY_V1_FAQ.RECOVERY_MODE },

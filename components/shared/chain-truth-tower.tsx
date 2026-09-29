@@ -384,6 +384,8 @@ function buildSide(
     flowsPricedAtEvents?: boolean;
     /** Token amounts in full rather than compact (ChainTruthTowerData.fullTokenAmounts). */
     fullAmounts?: boolean;
+    /** Wrap the breakdown labels (ChainTruthTowerData.wrapFlowLabels). */
+    wrapLabels?: boolean;
   },
 ): TowerSide {
   const {
@@ -546,7 +548,8 @@ function buildSide(
   if (hasFlows && side.lifetimeInflow > 0) {
     rows.push({
       sign: "",
-      label: `${inflowLabel} (all time)`,
+      // "(all time)" stays one piece when a wrapping label breaks.
+      label: `${inflowLabel} (all\u00a0time)`,
       // Full token amounts (a Morpho-only opt-in) name their token, as the
       // other rows do, and the label wraps rather than clipping beside them.
       amount: valued ? formatCompactUsd(side.lifetimeInflow) : cmpUnit(side.lifetimeInflow, sideSymbol ?? undefined),
@@ -810,7 +813,7 @@ function buildSide(
     segments,
     // Full token amounts (a Morpho-only opt-in) run long: their rows wrap
     // rather than clip.
-    breakdownRows: opts.fullAmounts ? rows.map((r) => ({ ...r, wrapLabel: true })) : rows,
+    breakdownRows: opts.fullAmounts || opts.wrapLabels ? rows.map((r) => ({ ...r, wrapLabel: true })) : rows,
     sideBar,
     placeholder: segments.length === 0 ? <EmptyTower label={`No ${resultLabel.toLowerCase()}`} /> : undefined,
   };
@@ -888,6 +891,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     resultLabel: data.collateralTitle ?? "Collateral",
     flowsPricedAtEvents: data.flowsPricedAtEvents,
     fullAmounts: data.fullTokenAmounts,
+    wrapLabels: data.wrapFlowLabels,
   });
   const right = build(debtParts, d, {
     solid: DEBT_SOLID,
@@ -902,6 +906,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     resultLabel: data.debtTitle ?? "Current debt",
     flowsPricedAtEvents: data.flowsPricedAtEvents,
     fullAmounts: data.fullTokenAmounts,
+    wrapLabels: data.wrapFlowLabels,
   });
   return <DualTowerChart left={left} right={right} height={TOWER_H} maxValue={towerMax} className="mb-1" />;
 }
