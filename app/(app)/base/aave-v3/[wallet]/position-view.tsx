@@ -51,6 +51,7 @@ import {
 import { AaveV3PoolNotes } from "@/components/protocol/aave-v3/aave-v3-pool-notes";
 import { AaveV3RiskSlot } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
+import { aaveV3Neighbours, type AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -180,6 +181,8 @@ export default function AaveV3BasePositionView({
     timelineSeeded ? "ready" : "loading",
   );
   const [prices, setPrices] = useState<Record<string, number>>({});
+  // The card holds its USD headlines' space until the oracle has answered.
+  const [pricesSettled, setPricesSettled] = useState(false);
 
   // ── 1. The Pool ───────────────────────────────────────────────────────────
   // Only when the server could not answer. A seeded view has the card's
@@ -237,6 +240,21 @@ export default function AaveV3BasePositionView({
 
   const events = useMemo<BaseActivityEvent[]>(() => timeline?.events ?? [], [timeline]);
   const aaveEvents = useMemo(() => events.filter(isAaveV3Event), [events]);
+  // Each card's same-transaction rows and the transaction before it: the open
+  // card reads the account at blocks N−1 and N (the Base lane's position
+  // state), and the explanation chains from the previous transaction's read.
+  const neighbours = useMemo(() => aaveV3Neighbours(aaveEvents as AaveV3TimelineEvent[]), [aaveEvents]);
+  // A block holding two of the owner's transactions has no N−1 read that is
+  // "immediately before" the second: those cards keep the row's own figures.
+  const sharedBlocks = useMemo(() => {
+    const txs = new Map<number, Set<string>>();
+    for (const e of aaveEvents) {
+      const set = txs.get(e.blockNumber) ?? new Set<string>();
+      set.add((e.txHash ?? e.id).toLowerCase());
+      txs.set(e.blockNumber, set);
+    }
+    return new Set([...txs].filter(([, s]) => s.size > 1).map(([b]) => b));
+  }, [aaveEvents]);
 
   // The served list as ROWS, when the route grouped it; the plan and the
   // events it interleaves come from one answer.
@@ -309,23 +327,27 @@ export default function AaveV3BasePositionView({
   const pricedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!data || data.chainStale) return;
-    if (pricedRef.current === wallet) return;
     const view = v3ViewFromChain(data, "base", undefined, events);
     const wanted = new Set<string>(view.supplies.concat(view.borrows).map((r) => r.address.toLowerCase()));
     for (const a of unpricedAaveV3FlowAddresses(view, events, timeline?.lifetime)) wanted.add(a);
-    if (wanted.size === 0) return;
-    pricedRef.current = wallet;
-    let cancelled = false;
+    if (wanted.size === 0) {
+      setPricesSettled(true);
+      return;
+    }
+    // One read per set of reserves: the history arriving can name more, and
+    // an answer that lands after it is still this wallet's, so it is kept.
+    const key = `${wallet}:${[...wanted].sort().join(",")}`;
+    if (pricedRef.current === key) return;
+    pricedRef.current = key;
     fetchBasePrices([...wanted])
       .then((p) => {
-        if (!cancelled && Object.keys(p).length > 0) setPrices(p);
+        if (pricedRef.current?.startsWith(`${wallet}:`) && Object.keys(p).length > 0)
+          setPrices((prev) => ({ ...prev, ...p }));
       })
       .catch(() => {
         // The tower stays on the token-only list, which is what no price means.
-      });
-    return () => {
-      cancelled = true;
-    };
+      })
+      .finally(() => setPricesSettled(true));
   }, [data, events, timeline, wallet]);
 
   const view = useMemo(
@@ -458,11 +480,17 @@ export default function AaveV3BasePositionView({
   // shorter "all time" quietly standing in for the real one.
   const towerData = useMemo(() => {
     if (!view) return null;
+    // Every row in hand (no folder, nothing trimmed): the flows reduce from the
+    // rows, as on Ethereum, so swaps and transfers take their own rows. The
+    // route's lifetime sums carry no swap legs, so they stand in only where
+    // rows are missing (rails-ops TO-DO-ui-jobs: a server summary of them).
+    const wholeRows =
+      sweptClean && (servedFolders?.length ?? 0) === 0 && (timeline?.coverage.omitted?.count ?? 0) === 0;
     const built = computeAaveV3Economics(
       view,
-      undefined,
+      wholeRows ? aaveEvents : undefined,
       AAVE_V3_BASE_TOWER_VOCABULARY,
-      sweptClean ? lifetime : undefined,
+      sweptClean && !wholeRows ? lifetime : undefined,
       // Each lane's net moved beside its chain balance (decision 0033): a side
       // holding one reserve splits into that net and the interest on top.
       sweptClean ? laneInterest : undefined,
@@ -474,7 +502,7 @@ export default function AaveV3BasePositionView({
           flowsNote:
             "Lifetime flows are hidden because the history sweep did not read every block of this position's life — see the note under the timeline for where it stopped or what it missed. Summing what did arrive would label a partial history “all time”. The current balances above are unaffected: they are read from the Pool, not replayed from the events.",
         };
-  }, [view, lifetime, sweptClean, laneInterest]);
+  }, [view, lifetime, sweptClean, laneInterest, servedFolders, timeline, aaveEvents]);
 
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
     if (!view) return [];
@@ -554,6 +582,7 @@ export default function AaveV3BasePositionView({
                   receipts
                   viewHref={tl.viewHref}
                   deployment={AAVE_V3_BASE_LIVE_CARD_DEPLOYMENT}
+                  pricesPending={!pricesSettled}
                   captions={captions ?? undefined}
                   // The risk slot rides the card's heading-button row (the L1
                   // treatment): the liquidation runway and the loan-to-value
@@ -598,7 +627,7 @@ export default function AaveV3BasePositionView({
                 <ChainTruthTower
                   data={towerData}
                   explanation={aaveV3EconomicsExplanation(towerData, { label: "Aave V3 on Base" })}
-                  learnMore={aaveV3EconomicsContent({ label: "Aave V3 on Base" })}
+                  learnMore={aaveV3EconomicsContent({ label: "Aave V3 on Base" }, towerData)}
                 />
               )}
 
@@ -657,6 +686,9 @@ export default function AaveV3BasePositionView({
                           eventNumber={meta.eventNumber}
                           isFirst={meta.isFirst}
                           isLast={meta.isLast}
+                          market={sharedBlocks.has(event.blockNumber) ? undefined : "base"}
+                          siblings={neighbours.get(event.id)?.siblings}
+                          previous={neighbours.get(event.id)?.previous}
                         />
                       ) : null
                     }

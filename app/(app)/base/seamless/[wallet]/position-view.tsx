@@ -570,7 +570,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                 <ChainTruthTower
                   data={towerData}
                   explanation={aaveV3EconomicsExplanation(towerData, { label: "Seamless" })}
-                  learnMore={aaveV3EconomicsContent({ label: "Seamless" })}
+                  learnMore={aaveV3EconomicsContent({ label: "Seamless" }, towerData)}
                 />
               )}
 

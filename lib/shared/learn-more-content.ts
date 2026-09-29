@@ -1239,6 +1239,9 @@ const AAVE_V3_SWAP_SOURCES = {
     "https://github.com/aave/aave-v3-periphery/blob/master/contracts/adapters/paraswap/ParaSwapRepayAdapter.sol",
   WITHDRAW_SWAP_ADAPTER:
     "https://github.com/aave/aave-v3-periphery/blob/master/contracts/adapters/paraswap/ParaSwapWithdrawSwapAdapter.sol",
+  LIQUIDITY_SWAP_ADAPTER:
+    "https://github.com/aave/aave-v3-periphery/blob/master/contracts/adapters/paraswap/ParaSwapLiquiditySwapAdapter.sol",
+  DEBT_SWAP_ADAPTER: "https://github.com/bgd-labs/aave-debt-swap",
 } as const;
 
 export function aaveV3RepayWithCollateralContent(): LearnMoreContent {
@@ -1267,6 +1270,94 @@ export function aaveV3RepayWithCollateralContent(): LearnMoreContent {
     ],
     links: [
       { label: "ParaSwap repay adapter (Aave source)", url: AAVE_V3_SWAP_SOURCES.REPAY_ADAPTER },
+      { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
+      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
+    ],
+  };
+}
+
+/** How a swap reached the market: an Aave ParaSwap adapter, or a CoW Protocol
+ *  order (the Aave app's one-order contract). */
+export type AaveV3SwapVenue = "paraswap" | "cow";
+
+export function aaveV3CollateralSwapContent(venue: AaveV3SwapVenue = "paraswap"): LearnMoreContent {
+  const para = venue === "paraswap";
+  return {
+    title: "How a Collateral Swap Works",
+    intro:
+      "A collateral swap trades one supplied asset for another without either leaving the position: in one transaction, part of a supplied balance is withdrawn, swapped, and the asset bought is supplied back to the same account.",
+    detailsHeading: "Key concepts:",
+    details: [
+      {
+        bold: "One transaction",
+        text: para
+          ? "Aave's liquidity swap adapter takes the owner's aTokens (the owner approves it or signs a permit), withdraws the underlying, sells it through ParaSwap and supplies what it bought on the owner's behalf. Where the account needs that collateral to stay healthy while it moves, the adapter can use a flash loan, a loan taken and returned inside the same transaction, repaid from the owner's aTokens."
+          : "The owner signs a CoW Protocol order. CoW Protocol's settlement takes the owner's aTokens (directly, or through a one-order contract the Aave app creates), sells them, and the asset bought is supplied back to the account.",
+      },
+      {
+        bold: "Slippage",
+        text: para
+          ? "the owner sets how much of the new asset must arrive at least (minAmountToReceive); the swap reverts if the trade would deliver less. The price and slippage of the trade are paid out of the asset sold."
+          : "the order names the least the owner accepts for the asset sold; it settles at that or better, or not at all.",
+      },
+      {
+        bold: "Health factor",
+        text: "the debt does not move, and the collateral's value changes only by the trade's cost, so the health factor moves little. It moves more where the two assets have different liquidation thresholds: the new asset's threshold replaces the old one's for the amount swapped.",
+      },
+      {
+        bold: "Why do it",
+        text: "to change which asset backs the debt without repaying it: to move into an asset with a higher supply rate or loan-to-value, to change exposure (out of BTC into a stablecoin, or back), or to leave an asset whose settings governance is changing.",
+      },
+    ],
+    links: [
+      ...(para
+        ? [{ label: "ParaSwap liquidity swap adapter (Aave source)", url: AAVE_V3_SWAP_SOURCES.LIQUIDITY_SWAP_ADAPTER }]
+        : []),
+      { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
+      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
+    ],
+  };
+}
+
+export function aaveV3DebtSwapContent(venue: AaveV3SwapVenue = "paraswap"): LearnMoreContent {
+  const para = venue === "paraswap";
+  return {
+    title: "How a Debt Swap Works",
+    intro:
+      "A debt swap changes which asset the position owes: in one transaction a new debt is opened in another asset, swapped for the old debt's asset, and used to repay the old debt. The collateral does not move.",
+    detailsHeading: "Key concepts:",
+    details: [
+      {
+        bold: "One transaction",
+        text: para
+          ? "Aave's debt swap adapter opens the new debt in the owner's name with a flash loan that stays open as variable debt (the owner gives it credit delegation for that asset, usually by a signed permit), buys exactly the old debt's asset through ParaSwap, and repays the old debt with it."
+          : "The owner signs a CoW Protocol order; a one-order contract the Aave app creates borrows the new asset on the owner's behalf, sells it in CoW Protocol's settlement for the old debt's asset and repays the old debt.",
+      },
+      {
+        bold: "Borrowed to fund it, returned unused",
+        text: para
+          ? "the trade buys an exact amount, so the adapter borrows a little more of the new asset than the trade is expected to need (the owner's slippage allowance, capped by maxNewDebtAmount). What the trade did not use repays part of the new debt at once, so the new debt that stays is what was borrowed less that return."
+          : "the order names the most of the new asset the owner will sell; what the settlement did not use is not borrowed.",
+      },
+      {
+        bold: "Health factor",
+        text: para
+          ? "the new debt is worth about what the old debt was, plus the trade's cost, so the health factor moves little at the time. Where the account is close to its borrowing limit, the adapter can also flash-borrow collateral for the length of the transaction so the Pool accepts the new debt."
+          : "the new debt is worth about what the old debt was, plus the trade's cost, so the health factor moves little at the time.",
+      },
+      {
+        bold: "What it changes",
+        text: "the position now owes the new asset. Its dollar value follows that asset's price from here: owing BTC in place of a stablecoin means the debt, and with it the health factor, moves with BTC, and the variable rate is the new asset's.",
+      },
+      {
+        bold: "Why do it",
+        text: "to move to a lower borrow rate, to take a view on prices (owing an asset the owner expects to fall), or to hedge collateral held in the same asset.",
+      },
+    ],
+    links: [
+      ...(para
+        ? [{ label: "ParaSwap debt swap adapter (Aave source)", url: AAVE_V3_SWAP_SOURCES.DEBT_SWAP_ADAPTER }]
+        : []),
       { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
       { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
     ],

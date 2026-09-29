@@ -30,10 +30,9 @@ export interface AaveV3CtEventCardProps {
   isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
-  /** The served market key (core / prime / etherfi). The Ethereum explorer sets
-   *  it, and its presence is what reads the position state when the card opens;
-   *  Base and Seamless leave it unset and keep the replayed principal line
-   *  (rails-ops TO-DO-ui-jobs §19). */
+  /** The served market key (core / prime / etherfi, or "base"). Its presence is
+   *  what reads the position state when the card opens; Seamless leaves it
+   *  unset and keeps the replayed principal line (rails-ops TO-DO-ui-jobs §19). */
   market?: string;
   /** The rows of this event's transaction, this one included (a liquidation
    *  and its fee transfer to the treasury share one). */

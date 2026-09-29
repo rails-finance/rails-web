@@ -5,8 +5,9 @@
 // shows both sides (collateral seized + debt cleared), a swap both legs.
 //
 // Two lanes, decided by whether the card carries its market:
-//   • Ethereum (Core / Prime / EtherFi) reads the position state around the
-//     event's transaction when the card opens (rails-ops TO-DO-ui-jobs §19): the
+//   • Ethereum (Core / Prime / EtherFi) and Base read the position state around
+//     the event's transaction when the card opens (rails-ops TO-DO-ui-jobs §19;
+//     Base from the chain at blocks N−1 and N): the
 //     touched balance's exact before → after, interest included, and the whole
 //     account beneath the grid (AaveV3PositionStateBlock). While that is read,
 //     and where it cannot be, a stat shows the event's own change and no balance.
@@ -19,7 +20,8 @@
 //     decision 0033) states that balance from the row itself while the read is
 //     pending or unavailable, and the interest the lane accrued since the
 //     transaction that last moved it.
-//   • Base and Seamless state the row's balance, before → after: the chain
+//   • Seamless, and a Base event sharing its block with another of the
+//     owner's transactions, state the row's balance, before → after: the chain
 //     balance where the replay valued it, else the principal replayed from the
 //     per-reserve deltas.
 // USD rides the oracle price at the event's block — the at-block read on the
@@ -78,6 +80,7 @@ import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
 import { findReserve, groupExact, humanOf, legChange, legHeld, sincePrevious } from "@/lib/aave-v3/position-state";
 import { AmountText } from "@/components/shared/amount-text";
+import { fmtPositionAmount } from "@/components/shared/position-row";
 import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
 
 export interface AaveV3CtEventDetailProps {
@@ -86,7 +89,7 @@ export interface AaveV3CtEventDetailProps {
   blockNumber?: number;
   /** The position's owner. */
   wallet?: string;
-  /** The served market key. Set on Ethereum only; its presence selects the
+  /** The served market key. Set on Ethereum and Base; its presence selects the
    *  position-state lane (see AaveV3CtEventCard). */
   market?: string;
   /** This transfer is the protocol fee of that liquidation (same transaction):
@@ -179,7 +182,12 @@ export function AaveV3CtEventDetail({
   });
   const prevReady = prevState?.status === "ready" ? prevState.data : undefined;
   // The position-state receipts also name the owner.
-  const stateCoords: V3Coords = wallet ? { ...coords, wallet: wallet.toLowerCase() } : coords;
+  // The Base lane's reads are chain reads at the block, and say so.
+  const stateCoords: V3Coords = {
+    ...coords,
+    ...(wallet ? { wallet: wallet.toLowerCase() } : {}),
+    ...(ready?.sources.balances === "chain-read-at-block" ? { stateRead: "chain-at-block" as const } : {}),
+  };
 
   // Reserves the block below always draws a row for, dust or not, because the
   // grid gives way to that row for the same balance (§47, §52).
@@ -192,7 +200,9 @@ export function AaveV3CtEventDetail({
    *  they are not in hand, the row's own figure, which runs from the last
    *  transaction that moved this balance and is labelled so. */
   const interestOf = (a: Axis): ChainTruthStat["interestSincePrevious"] => {
-    const since = ready ? sincePrevious(ready, prevReady, a.reserve, a.side) : undefined;
+    // A Base row names its reserve by symbol only; the read names it by address.
+    const reserve = ready ? (findReserve(ready, a.reserve, a.symbol)?.reserve ?? a.reserve) : a.reserve;
+    const since = ready ? sincePrevious(ready, prevReady, reserve, a.side) : undefined;
     // Interest under a millionth of a token is below what the line can show.
     if (since && Number(since.interest) < 1e-6) return undefined;
     if (since) return { value: since.interest, prov: prevEventInterestProv(a.symbol, a.side, stateCoords) };
@@ -386,8 +396,9 @@ export function AaveV3CtEventDetail({
       changeProv: Provenance,
     ): ChainTruthStat | null => {
       const debt = action === "repay" || action === "borrow";
+      // Named for the balance: two legs of one swap are two reserves.
       return statFor({
-        label: debt ? "Borrowed" : "Supplied",
+        label: debt ? `${symbol} debt` : `${symbol} supplied`,
         symbol,
         reserve,
         side: debt ? "debt" : "supply",
@@ -466,14 +477,24 @@ export function AaveV3CtEventDetail({
         ),
       });
     for (const e of s.events ?? []) {
+      // A debt swap's repay of the old debt is the old debt's own change, stated
+      // above (or in the position block): its row would say it twice.
+      if (s.kind === "debt_swap" && e.leg === "given" && e.action === "repay") continue;
       const eSym = e.symbol ?? "—";
       stats.push({
         label: e.leftover
           ? e.action === "repay"
-            ? "Repaid back unused"
+            ? s.kind === "debt_swap"
+              ? "Returned unused"
+              : "Repaid back unused"
             : "Supplied back unused"
-          : SWAP_ROW_LABEL[e.action],
-        value: fmt(e.amount),
+          : s.kind === "debt_swap" && e.action === "borrow"
+            ? "Borrowed to fund the swap"
+            : SWAP_ROW_LABEL[e.action],
+        // The precision the position block's rows use, so one figure reads the
+        // same in T1, T2 and T3 (0.0614).
+        value: String(Math.abs(Number(e.amount ?? "0"))),
+        display: fmtPositionAmount(Math.abs(Number(e.amount ?? "0"))),
         symbol: eSym,
         address: e.asset,
         prov:

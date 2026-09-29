@@ -82,8 +82,10 @@ export interface AaveV3PositionState {
   /** Null unless complete. */
   account: { before: AaveV3AccountSide; after: AaveV3AccountSide } | null;
   sources: {
-    balances: "scaled-deltas";
-    settings: "pool-events" | null;
+    /** "chain-read-at-block": the Base lane, read from the chain at the end
+     *  of blocks N−1 and N (lib/sources/chain/aave-v3-position-state-at-block). */
+    balances: "scaled-deltas" | "chain-read-at-block";
+    settings: "pool-events" | "chain-read-at-block" | null;
     market: "chain-read-at-block" | null;
     marketReadBlock: number | null;
     poolRevision: number | null;

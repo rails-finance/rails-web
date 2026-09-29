@@ -117,6 +117,9 @@ export interface ReserveFlows {
   transferredOut?: number;
   /** aTokens a collateral swap's order bought into this reserve. */
   swappedIn?: number;
+  /** Debt a debt swap repaid: the old debt the swap paid off, and the part of
+   *  the new debt the adapter returned unused. Loaded rows only. */
+  repaidBySwap?: number;
   /** Per leg, the part of its amount whose events carried an oracle price at
    *  their block, and that part's value at those prices. A leg summed
    *  elsewhere (an opening balance, a folder) has none; the tower values the
@@ -143,7 +146,8 @@ export type FlowLeg =
   | "swappedOut"
   | "transferredIn"
   | "transferredOut"
-  | "swappedIn";
+  | "swappedIn"
+  | "repaidBySwap";
 
 /** Adds `amount` to one leg, and its value at the event's oracle price where
  *  the event carries one. */
@@ -179,6 +183,7 @@ const WINDOW_LEGS = [
   "transferredIn",
   "transferredOut",
   "swappedIn",
+  "repaidBySwap",
 ] as const;
 
 const legOf = (r: ReserveFlows, k: (typeof WINDOW_LEGS)[number]): number => r[k] ?? 0;
@@ -193,6 +198,9 @@ const supplyOut = (r: ReserveFlows): number =>
   legOf(r, "withdrawnSwapped") +
   legOf(r, "swappedOut") +
   legOf(r, "transferredOut");
+
+/** Everything that left one reserve's debt, interest aside. */
+const debtOut = (r: ReserveFlows): number => r.repaid + legOf(r, "repaidBySwap") + r.liquidatedDebt + r.writtenOff;
 
 function foldAaveV3Lifetime(events: BaseActivityEvent[]): Map<string, ReserveFlows> {
   const flows = new Map<string, ReserveFlows>();
@@ -256,11 +264,15 @@ function foldAaveV3Lifetime(events: BaseActivityEvent[]): Map<string, ReserveFlo
     const r = get(ctx.reserveSymbol, ev.flows[0]?.token);
     if (ctx.eventType === "swap") {
       const s = ctx.swap;
+      // A debt swap's repays (the old debt, and the new debt's unused part)
+      // are their own row, so "Repaid" keeps the owner's own repayments.
       const add = (into: ReserveFlows, action: string | undefined, amount: number, price?: number) => {
         if (!Number.isFinite(amount)) return;
-        if (action === "supply") addLeg(into, "supplied", amount, price);
+        // What a collateral swap bought and supplied is its own row too, so
+        // "Deposited" keeps what came from the wallet.
+        if (action === "supply") addLeg(into, s?.kind === "collateral_swap" ? "swappedIn" : "supplied", amount, price);
         else if (action === "borrow") addLeg(into, "borrowed", amount, price);
-        else if (action === "repay") addLeg(into, "repaid", amount, price);
+        else if (action === "repay") addLeg(into, s?.kind === "debt_swap" ? "repaidBySwap" : "repaid", amount, price);
       };
       // The given leg: supplied collateral that left under the owner's order
       // (an aToken transfer to the adapter or settlement) counts as leaving
@@ -478,7 +490,7 @@ export function unpricedAaveV3FlowAddresses(
     const a = f.address.toLowerCase();
     const p = view.priceByAddress?.[a];
     if (typeof p === "number" && p > 0) continue;
-    const flows = supplyIn(f) + supplyOut(f) + f.borrowed + f.repaid + f.liquidatedDebt + f.writtenOff;
+    const flows = supplyIn(f) + supplyOut(f) + f.borrowed + debtOut(f);
     if (flows > DUST) out.add(a);
   }
   return [...out];
@@ -555,8 +567,7 @@ function sideInterestUsd(
     const f = lifetime.get(cur.symbol);
     if (!f) return null;
     const gross = side === "supply" ? supplyIn(f) : f.borrowed;
-    const net =
-      side === "supply" ? supplyIn(f) - supplyOut(f) : f.borrowed - f.repaid - f.liquidatedDebt - f.writtenOff;
+    const net = side === "supply" ? supplyIn(f) - supplyOut(f) : f.borrowed - debtOut(f);
     if (gross <= 0) return null;
     const interest = cur.amount - net;
     if (interest < -DUST || interest > gross) return null;
@@ -762,7 +773,10 @@ export function computeAaveV3Economics(
     ...labelled(flowLines("swappedIn", "swapped in", "coll-swapped-in"), "Swapped in"),
   ];
   const collLiquidated = flowLines("liquidatedCollateral", "liquidated collateral", "coll-liq");
-  const debtExited = flowLines("repaid", "repaid", "debt-repaid");
+  const debtExited = [
+    ...flowLines("repaid", "repaid", "debt-repaid"),
+    ...labelled(flowLines("repaidBySwap", "repaid by a debt swap", "debt-repaid-swap"), "Repaid by a debt swap"),
+  ];
   const debtLiquidated = flowLines("liquidatedDebt", "liquidated debt", "debt-liq");
   // Written off: involuntary like a liquidation cover (the same hatch, the
   // same bucket), captioned as what it is rather than "Liquidated".
@@ -929,7 +943,7 @@ export function computeAaveV3Economics(
     const cur = debtLines[0];
     const f = lifetime.get(cur.symbol);
     if (f) {
-      const net = f.borrowed - f.repaid - f.liquidatedDebt - f.writtenOff;
+      const net = f.borrowed - debtOut(f);
       const amt = legInterest(cur.amount, net, f.borrowed);
       if (amt > 0) {
         interest = {
@@ -996,7 +1010,7 @@ export function computeAaveV3Economics(
       const r = lifetime.get(sym);
       const held = heldRows.find((h) => h.symbol === sym)?.amount ?? 0;
       const inn = r ? (side === "supply" ? supplyIn(r) : r.borrowed) : 0;
-      const out = r ? (side === "supply" ? supplyOut(r) : r.repaid + r.liquidatedDebt + r.writtenOff) : 0;
+      const out = r ? (side === "supply" ? supplyOut(r) : debtOut(r)) : 0;
       const int = (side === "supply" ? supplyInterestBy : debtInterestBy).get(sym) ?? 0;
       if (Math.abs(inn + int - out - held) > Math.max(1e-6, (inn + held) * 1e-6)) return null;
     }

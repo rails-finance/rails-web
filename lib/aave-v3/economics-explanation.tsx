@@ -56,10 +56,23 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
   const debtSym = sideSymbol(data.debt);
 
   const collSupplied = data.collateral.lifetimeInflow;
-  const collReceived = sumScalar(data.collateral.received ?? [], valued);
+  const received = data.collateral.received ?? [];
+  const collSwappedIn = sumScalar(
+    received.filter((l) => l.flowLabel === "Swapped in"),
+    valued,
+  );
+  const collReceived = sumScalar(
+    received.filter((l) => l.flowLabel !== "Swapped in"),
+    valued,
+  );
   const collEarned = sumScalar(data.collateral.earned ?? [], valued);
   const debtBorrowed = data.debt.lifetimeInflow;
   const debtRepaid = sumScalar(data.debt.exited, valued);
+  // Of it, what debt swaps repaid (the old debt, and the new debt's unused part).
+  const debtRepaidBySwap = sumScalar(
+    data.debt.exited.filter((l) => l.flowLabel === "Repaid by a debt swap"),
+    valued,
+  );
   const interest = data.debt.interest && data.debt.interest.amount > 0 ? data.debt.interest : null;
   // Interest over the life: what is still owed on top of the principal, and
   // what the lanes no longer held (or held beside others) accrued and repaid.
@@ -107,9 +120,14 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
     items.push(
       <span key="coll-flow">
         Supplied <Fig>{fmt(collSupplied, valued, collSym)}</Fig> over the position&apos;s life
+        {collSwappedIn > 0 && (
+          <>
+            , bought <Fig>{fmt(collSwappedIn, valued, collSym)}</Fig> more with collateral swaps
+          </>
+        )}
         {collReceived > 0 && (
           <>
-            , received <Fig>{fmt(collReceived, valued, collSym)}</Fig> more
+            , received <Fig>{fmt(collReceived, valued, collSym)}</Fig> more by transfer
           </>
         )}
         {collEarned > 0 && (
@@ -171,6 +189,17 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
         {debtRepaid > 0 && (
           <>
             , then <Fig>{fmt(debtRepaid, valued, debtSym)}</Fig> repaid
+            {debtRepaidBySwap > 0 ? (
+              debtRepaidBySwap >= debtRepaid - 0.005 ? (
+                <> by debt swaps, which borrow one asset to pay off another</>
+              ) : (
+                <>
+                  {" "}
+                  (<Fig>{fmt(debtRepaidBySwap, valued, debtSym)}</Fig> of it by debt swaps, which borrow one asset to
+                  pay off another)
+                </>
+              )
+            ) : null}
           </>
         )}
         {debtLiquidated > 0 && (
@@ -280,8 +309,17 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
   );
 }
 
-export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}): LearnMoreContent {
+/** The modal names only the rows the panel shows, where it is given the
+ *  panel's data. */
+export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}, data?: AaveV3TowerData): LearnMoreContent {
   const label = opts.label ?? "Aave V3";
+  const shows = (flag: boolean) => data == null || flag;
+  const exitedLabels = new Set((data?.collateral.exited ?? []).map((l) => l.flowLabel ?? "Withdrawn"));
+  const hasPriceChange = !!(data?.collateral.priceChange || data?.debt.priceChange);
+  const hasOtherOut = [...exitedLabels].some((l) => l !== "Withdrawn");
+  const hasSwapIn = (data?.collateral.received ?? []).some((l) => l.flowLabel === "Swapped in");
+  const hasSwapRepaid = (data?.debt.exited ?? []).some((l) => l.flowLabel === "Repaid by a debt swap");
+  const hasLiquidated = (data?.collateral.liquidated.length ?? 0) > 0 || (data?.debt.liquidated.length ?? 0) > 0;
   const isSeamless = label === "Seamless";
   const isBase = label === "Aave V3 on Base";
   return {
@@ -298,24 +336,44 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}): LearnMor
     details: [
       {
         bold: "Lifetime flows",
-        text: "the bars show every supply, withdrawal, borrow and repayment over the position's life. In tokens, deposited plus interest less everything that left equals what is held now.",
+        text: "the bars show every supply, withdrawal, borrow and repayment over the position's life. In tokens, what came in plus interest less everything that left equals what is held now.",
       },
-      {
-        bold: "Price change",
-        text: "in dollars, each flow is valued at the oracle price at its block and what is held at today's price. The Price change row is the difference, so deposited plus interest less everything that left, plus the price change, equals what is held now.",
-      },
-      {
-        bold: "Other ways out",
-        text: "collateral sold in a repay with collateral, withdrawn and swapped, or sent to another account as an aToken transfer has a separate row. A transfer to the WETH gateway counts as withdrawn: the gateway withdraws it as ETH in the same transaction.",
-      },
+      ...(shows(hasPriceChange)
+        ? [
+            {
+              bold: "Price change",
+              text: "in dollars, each flow is valued at the oracle price at its block and what is held at today's price. The Price change row is the difference, so deposited plus interest less everything that left, plus the price change, equals what is held now.",
+            },
+          ]
+        : []),
+      ...(shows(hasOtherOut)
+        ? [
+            {
+              bold: "Other ways out",
+              text: "collateral swapped into another asset, sold in a repay with collateral, withdrawn and swapped, or sent to another account as an aToken transfer has a separate row. A transfer to the WETH gateway counts as withdrawn: the gateway withdraws it as ETH in the same transaction.",
+            },
+          ]
+        : []),
+      ...(shows(hasSwapIn || hasSwapRepaid)
+        ? [
+            {
+              bold: "Swaps",
+              text: 'a collateral swap is two rows: what it sold leaves as "Swapped to another asset" and what it bought arrives as "Swapped in". A debt swap borrows the new asset (counted in borrowed) and repays the old debt with it, a "Repaid by a debt swap" row with the part of the new debt returned unused.',
+            },
+          ]
+        : []),
       {
         bold: "Interest",
         text: "supplied balances earn interest and debts accrue it without an event. On the supply side each asset's interest is a separate row beside what was deposited, valued at today's price; on the debt side, interest still owed is a segment of the debt bar and interest already repaid is a row beside what was borrowed.",
       },
-      {
-        bold: "Liquidated",
-        text: "the collateral a liquidation took (the liquidator's share and the treasury's fee) and the debt it cleared, valued at the prices when it happened.",
-      },
+      ...(shows(hasLiquidated)
+        ? [
+            {
+              bold: "Liquidated",
+              text: "the collateral a liquidation took (the liquidator's share and the treasury's fee) and the debt it cleared, valued at the prices when it happened.",
+            },
+          ]
+        : []),
     ],
     links: [
       ...(isSeamless ? [{ label: "Seamless docs", url: SEAMLESS_DOCS_URL }] : []),

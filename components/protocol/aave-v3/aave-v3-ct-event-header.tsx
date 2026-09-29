@@ -104,9 +104,20 @@ export function AaveV3CtEventHeader({
     pool: useV3Pool(),
   };
   const deltas: ChainTruthDelta[] = [];
+  // A swap names its direction, sold → bought ("Debt swap GHO → cbBTC"); a
+  // supply from a swap sold the received side for the given.
+  const sw = ctx.swap;
+  const direction =
+    sw && ctx.reserveSymbol && sw.receivedSymbol
+      ? sw.kind === "supply_from_swap"
+        ? `${sw.receivedSymbol} → ${ctx.reserveSymbol}`
+        : `${ctx.reserveSymbol} → ${sw.receivedSymbol}`
+      : null;
   const label = feeOf
     ? "Liquidation fee"
-    : ((ctx.swap && AAVE_V3_SWAP_LABELS[ctx.swap.kind]) ?? LABELS[ctx.eventType] ?? ctx.eventType);
+    : sw && AAVE_V3_SWAP_LABELS[sw.kind]
+      ? `${AAVE_V3_SWAP_LABELS[sw.kind]}${direction ? ` ${direction}` : ""}`
+      : (LABELS[ctx.eventType] ?? ctx.eventType);
   // A liquidation's fee reads as an act with its verb, not as a custody move.
   const isTransferRow = !feeOf && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out");
 

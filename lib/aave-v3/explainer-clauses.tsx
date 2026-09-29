@@ -33,7 +33,14 @@ import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
-import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots } from "@/lib/shared/explainer-prose";
+import {
+  H,
+  clause,
+  eventClauses,
+  splitLead,
+  type ClauseInput,
+  type EventProseSlots,
+} from "@/lib/shared/explainer-prose";
 import {
   assetsDeltaProv,
   transferDeltaProv,
@@ -54,8 +61,10 @@ import { v3Brand, v3Possessive, v3Protocol, type V3Protocol } from "./protocol-n
 import { AAVE_V3_SWAP_LABELS } from "./swap-kinds";
 import { externalActor } from "@/lib/shared/external-actor";
 import { hfLabelV4, fmtUnitPrice } from "@/lib/aave-v4/format";
+import { fmtPositionAmount } from "@/components/shared/position-row";
 import {
   baseToUsd,
+  findReserve,
   humanOf,
   sincePrevious,
   stateEmptyAfter,
@@ -100,6 +109,9 @@ function Fig({
 }
 
 const fmtAmt = (s: string | undefined): string => formatNumber(Math.abs(Number(s ?? "0")));
+/** A swap's figures at the precision its card's rows show them (0.0609
+ *  cbBTC), so T1, T2 and T3 state one number. */
+const fmtSwapAmt = (s: string | undefined): string => fmtPositionAmount(Math.abs(Number(s ?? "0")));
 
 // ── the variant table ────────────────────────────────────────────────────────
 
@@ -180,8 +192,13 @@ export function v3StateRead(
 ): V3StateRead | undefined {
   if (!here?.account) return undefined;
   const hfOf = (wad: string | null): number | null => (wad == null ? null : wadToNumber(wad));
-  const reserve = (ctx.eventType === "liquidation" ? ctx.collateralAsset : ctx.reserve)?.toLowerCase();
-  const own = here.reserves.find((r) => r.reserve.toLowerCase() === reserve);
+  // A Base row names its reserve by symbol only; the read names it by address.
+  const own = findReserve(
+    here,
+    ctx.eventType === "liquidation" ? ctx.collateralAsset : ctx.reserve,
+    ctx.eventType === "liquidation" ? ctx.collateralSymbol : ctx.reserveSymbol,
+  );
+  const reserve = own?.reserve.toLowerCase();
   const debtSide = ctx.eventType === "borrow" || ctx.eventType === "repay";
   const since = sincePrevious(here, prev, reserve, debtSide ? "debt" : "supply");
   const out: V3StateRead = {
@@ -408,7 +425,13 @@ function reconcileLine(
   return clause(
     <>
       {label}: {recFmt(prev, d)} {terms.start ?? "at the previous event"}
-      {r(interest) > 0 ? <> + {recFmt(interest, d)} interest since</> : null}
+      {/* The before figure T2 shows, reached first, so the two read as one chain. */}
+      {r(interest) > 0 ? (
+        <>
+          {" "}
+          + {recFmt(interest, d)} interest since = {recFmt(r(prev + r(interest)), d)} just before this event;
+        </>
+      ) : null}
       {moves.map((m, i) => (
         <span key={i}>
           {" "}
@@ -473,7 +496,7 @@ export interface V3SlotOpts {
   owner?: string;
   /** This transaction's rows (a liquidation and its fee transfer). */
   siblings?: readonly AaveV3TimelineEvent[];
-  /** The position state around this event (Ethereum only). */
+  /** The position state around this event (Ethereum and Base). */
   state?: V3StateRead;
   /** The last row of the previous transaction on the timeline, and this
    *  event's own time: a repay reads whether a swap just before funded it. */
@@ -690,7 +713,7 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
           value={chainTruthDeltaValue(swapLegSign(s.givenAction) * given, false)}
           symbol={sym}
         >
-          {fmtAmt(ctx.amount)} {sym}
+          {fmtSwapAmt(ctx.amount)} {sym}
         </Fig>
       );
       const receivedFig = (
@@ -708,7 +731,7 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
           value={chainTruthDeltaValue(swapLegSign(s.receivedAction, s.kind) * received, false)}
           symbol={rSym}
         >
-          {fmtAmt(s.receivedAmount)} {rSym}
+          {fmtSwapAmt(s.receivedAmount)} {rSym}
         </Fig>
       );
       const adapter = s.route === "cow_adapter";
@@ -726,29 +749,27 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
             back.raw,
             back.origin,
           )}
-          value={fmtAmt(back.amount)}
+          value={String(Math.abs(Number(back.amount ?? "0")))}
           symbol={back.symbol}
         >
-          {fmtAmt(back.amount)} {back.symbol}
+          {fmtSwapAmt(back.amount)} {back.symbol}
         </Fig>
       ) : null;
 
-      if (s.kind === "debt_swap")
+      if (s.kind === "debt_swap") {
+        // The adapter's own rows: what it borrowed to fund the swap and what it
+        // returned unused; the card's received figure is the difference.
+        const funded = s.events?.find((e) => e.action === "borrow" && !e.leftover);
         return {
           happened: [
             clause(
               <>
-                Repaid {givenFig} of {sym} debt and borrowed {receivedFig} of {rSym} in a debt swap {through}.
+                Repaid {givenFig} of {sym} debt and took on {receivedFig} of {rSym} debt in its place, a debt swap{" "}
+                {through}.
               </>,
             ),
           ],
           meansNow: [
-            clause(
-              <>
-                The debt moved from {sym} to {rSym}: {rSym} borrowed against this position paid for the {sym} that
-                repaid its old debt.
-              </>,
-            ),
             adapter
               ? clause(
                   <>
@@ -759,21 +780,36 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
               : null,
             paraswap
               ? clause(
-                  <>
-                    ParaSwap&rsquo;s debt swap adapter borrowed the {rSym} on this position&rsquo;s behalf, swapped it
-                    through ParaSwap and repaid the {sym} debt, in the same transaction.
-                    {backFig ? (
-                      <>
-                        {" "}
-                        It repaid {backFig} at once, the part the swap did not use, so the figure is the {rSym} that
-                        stays borrowed.
-                      </>
-                    ) : null}
-                  </>,
+                  funded && backFig ? (
+                    <>
+                      ParaSwap&rsquo;s debt swap adapter borrowed{" "}
+                      <H>
+                        {fmtSwapAmt(funded.amount)} {rSym}
+                      </H>{" "}
+                      on this position&rsquo;s behalf, swapped it through ParaSwap for the {sym} that repaid the old
+                      debt, and returned {backFig} it did not use, leaving{" "}
+                      <H>
+                        {fmtSwapAmt(s.receivedAmount)} {rSym}
+                      </H>{" "}
+                      of new debt.
+                    </>
+                  ) : (
+                    <>
+                      ParaSwap&rsquo;s debt swap adapter borrowed the {rSym} on this position&rsquo;s behalf, swapped it
+                      through ParaSwap and repaid the {sym} debt, in the same transaction.
+                    </>
+                  ),
                 )
               : null,
+            clause(
+              <>
+                The {rSym} debt is the lasting result: the position now owes {rSym} in place of {sym}, so what it owes
+                in dollars moves with the {rSym} price.
+              </>,
+            ),
           ],
         };
+      }
 
       if (s.kind === "repay_with_collateral") {
         // With a leftover, the figure on the card is the net: what the adapter
@@ -811,8 +847,8 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
                     {backFig && sent ? (
                       <>
                         {" "}
-                        It took {fmtAmt(sent.amount)} {sym} and supplied {backFig} back unused, so {fmtAmt(ctx.amount)}{" "}
-                        {sym} net left the position.
+                        It took {fmtSwapAmt(sent.amount)} {sym} and supplied {backFig} back unused, so{" "}
+                        {fmtSwapAmt(ctx.amount)} {sym} net left the position.
                       </>
                     ) : null}
                   </>,

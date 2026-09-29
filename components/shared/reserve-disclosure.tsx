@@ -46,10 +46,14 @@ export function ReserveDisclosureToggle({
   disclosure,
   count,
   group = "proto",
+  closedLabel,
 }: {
   disclosure: ReserveDisclosure;
   count: number;
   group?: string;
+  /** Text the closed toggle carries before its chevron (the split, "12.2K GHO
+   *  · 3.1K USDC"), so the list's contents read without opening it. */
+  closedLabel?: ReactNode;
 }) {
   if (!disclosure.collapsible) return null;
   return (
@@ -59,8 +63,11 @@ export function ReserveDisclosureToggle({
       aria-expanded={disclosure.open}
       aria-label={disclosure.open ? "Hide reserves" : `Show ${count} reserves`}
       onClick={disclosure.toggle}
-      className="inline-flex items-center cursor-pointer"
+      className="inline-flex items-center gap-1 cursor-pointer"
     >
+      {closedLabel && !disclosure.open ? (
+        <span className="text-xs font-normal text-rb-500 tabular-nums">{closedLabel}</span>
+      ) : null}
       <ExpandChevron isOpen={disclosure.open} group={group} />
     </button>
   );

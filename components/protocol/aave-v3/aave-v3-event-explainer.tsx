@@ -20,6 +20,8 @@ import {
   aaveV3EventFallbackContent,
   aaveV3RepayWithCollateralContent,
   aaveV3WithdrawAndSwapContent,
+  aaveV3CollateralSwapContent,
+  aaveV3DebtSwapContent,
 } from "@/lib/shared/learn-more-content";
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { aaveV3EventSlots, v3StateRead } from "@/lib/aave-v3/explainer-clauses";
@@ -71,9 +73,13 @@ export function aaveV3LearnMoreContent(ctx: AaveV3Context, protocol: V3Protocol 
     case "transfer_in":
     case "transfer_out":
       return aaveV3TransferContent(protocol);
-    // The two ParaSwap adapter kinds have their own modals; the other swap
-    // kinds and routes keep the general one.
+    // Each swap kind has its own modal; the CoW Protocol routes of a
+    // collateral or debt swap read the same one under that venue.
     case "swap":
+      if (ctx.swap?.kind === "collateral_swap")
+        return aaveV3CollateralSwapContent(ctx.swap.route === "paraswap" ? "paraswap" : "cow");
+      if (ctx.swap?.kind === "debt_swap")
+        return aaveV3DebtSwapContent(ctx.swap.route === "paraswap" ? "paraswap" : "cow");
       if (ctx.swap?.route === "paraswap" && ctx.swap.kind === "repay_with_collateral")
         return aaveV3RepayWithCollateralContent();
       if (ctx.swap?.route === "paraswap" && ctx.swap.kind === "withdraw_and_swap")

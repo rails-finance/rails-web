@@ -1,6 +1,6 @@
 "use client";
 
-// The position state around one Aave V3 Ethereum event's transaction, read when
+// The position state around one Aave V3 event's transaction (Ethereum, Base), read when
 // its card opens (rails-ops TO-DO-ui-jobs §19).
 //
 // The detail mounts on open and remounts on every reopen, and a card restored
@@ -29,9 +29,14 @@ const inFlight = new Map<string, Promise<Settled>>();
 const LASTING_REFUSALS = new Set([400, 404]);
 const LOADING: AaveV3PositionStateResult = { status: "loading" };
 
-async function read(key: string, qs: string): Promise<Settled> {
+/** The Ethereum markets read the index's answer; Base reads the chain at the
+ *  block (app/api/chain/aave-v3-base/position-state), same wire shape. */
+const routeFor = (market: string): string =>
+  market === "base" ? "/api/chain/aave-v3-base/position-state" : "/api/aave-v3/timeline/position-state";
+
+async function read(key: string, qs: string, market: string): Promise<Settled> {
   try {
-    const res = await fetch(`/api/aave-v3/timeline/position-state?${qs}`);
+    const res = await fetch(`${routeFor(market)}?${qs}`);
     const body = (await res.json().catch(() => null)) as (AaveV3PositionState & { code?: string }) | null;
     if (res.ok && body && Array.isArray(body.reserves)) {
       const ready: Settled = { status: "ready", data: body };
@@ -62,10 +67,11 @@ export function prefetchAaveV3PositionState(args: {
   const key = `${wallet.toLowerCase()}:${market}:${block}:${txHash.toLowerCase()}`;
   if (settled.has(key) || inFlight.has(key)) return;
   const qs = new URLSearchParams({ wallet, market, block: String(block), tx: txHash }).toString();
-  inFlight.set(key, read(key, qs));
+  inFlight.set(key, read(key, qs, market));
 }
 
-/** Null when the card carries no market (Base, Seamless): those keep the
+/** Null when the card carries no market (Seamless, and a Base event sharing
+ *  its block with another of the owner's transactions): those keep the
  *  replayed principal line and never ask. */
 export function useAaveV3PositionState(args: {
   wallet?: string;
@@ -90,7 +96,7 @@ export function useAaveV3PositionState(args: {
     let pending = inFlight.get(key);
     if (!pending) {
       const qs = new URLSearchParams({ wallet, market, block: String(block), tx: txHash }).toString();
-      pending = read(key, qs);
+      pending = read(key, qs, market);
       inFlight.set(key, pending);
     }
     pending.then((r) => {

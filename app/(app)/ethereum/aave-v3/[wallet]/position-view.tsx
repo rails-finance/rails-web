@@ -689,7 +689,7 @@ export default function AaveV3PositionDetail({
               <ChainTruthTower
                 data={towerData}
                 explanation={aaveV3EconomicsExplanation(towerData)}
-                learnMore={aaveV3EconomicsContent()}
+                learnMore={aaveV3EconomicsContent({}, towerData)}
               />
             )}
             <ChainTruthTimeline

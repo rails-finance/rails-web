@@ -79,6 +79,9 @@ export interface V3Coords {
    *  the receipt's custody line differs — the value is the same log either
    *  way. */
   source?: "index" | "sweep";
+  /** Set on the position-state receipts of the Base lane, whose account is
+   *  read from the chain at the end of blocks N−1 and N. */
+  stateRead?: "chain-at-block";
 }
 
 /** Log-anatomy via segment: `field: <raw>` when the index delivered the log's
@@ -816,6 +819,49 @@ const ACCOUNT_RULE = "Aave's own account arithmetic (GenericLogic.calculateUserA
 const upTo = (when: "before" | "after"): string => (when === "before" ? "before" : "up to and including");
 const orderCut = (when: "before" | "after"): string => (when === "before" ? "<" : "≤");
 
+/** The Base lane's version of a position-state receipt (coords.stateRead):
+ *  the same figure, read from the chain at the end of block N−1 (before) or N
+ *  (after) instead of reduced from the index. */
+function atBlockLane(
+  coords: V3Coords,
+  when: "before" | "after",
+  read: string,
+  leg: { raw: string; scaled: string; index: string; decimals: number } | null,
+  prov: Provenance,
+): Provenance {
+  if (coords.stateRead !== "chain-at-block") return prov;
+  const n = coords.blockNumber;
+  const at = n == null ? "the event's block" : `block ${when === "before" ? n - 1 : n}`;
+  const base = { ...prov, kind: "chain" as const, pclass: "state" as const };
+  if (!leg)
+    return {
+      ...base,
+      via: `${read}, read at the end of ${at}${when === "before" ? ", the block before this event's" : ""}`,
+    };
+  return {
+    ...base,
+    summary: `${prov.summary.split(" — ")[0]} — the scaled balance at the end of ${at}, times the reserve's index at this event's block, so the figures before and after stand at one index and their difference is this transaction's. Interest to this moment is inside the figure.`,
+    via: `${read}; scaled balance read at the end of ${at} = ${leg.scaled} · index = ${leg.index} · ÷10^${leg.decimals} = ${leg.raw}`,
+    formula: "scaled × index",
+    inputs: eventInputs(coords, [
+      {
+        label: "scaled",
+        value: leg.scaled,
+        kind: "chain",
+        pclass: "state",
+        note: `scaledBalanceOf at the end of ${at}`,
+      },
+      {
+        label: "index",
+        value: leg.index,
+        kind: "chain",
+        pclass: "state",
+        note: "the reserve's normalized index at this event's block",
+      },
+    ]),
+  };
+}
+
 /** The inputs one exact balance is built from. */
 export interface V3ExactLeg {
   /** The balance itself, raw underlying units. */
@@ -840,38 +886,45 @@ export const exactBalanceProv = (
   when: "before" | "after",
   coords: V3Coords,
   leg: V3ExactLeg,
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  verify: txVerify(coords),
-  summary: `${side === "supply" ? "Supplied" : "Borrowed"} ${sym} ${when} this transaction — the position's scaled balance ${upTo(when)} this transaction, times the reserve's ${SIDE_INDEX[side]} carried forward to this block's timestamp. ${SCALED_ROSTER[side]} The interest to this moment is inside the figure: it is the balance the ${SIDE_TOKEN[side]} reported then.${when === "after" ? " Every event in the same transaction shares it." : ""}`,
-  contract: poolOf(coords),
-  via: `${V3_INDEX_VIA} · Σ scaled deltas ${orderCut(when)} (block, tx index) × ${SIDE_INDEX[side]} accrued · ÷10^${leg.decimals} = ${leg.raw}`,
-  formula: "scaled × index accrued to block time",
-  inputs: eventInputs(coords, [
+): Provenance =>
+  atBlockLane(
+    coords,
+    when,
+    `${SIDE_TOKEN[side]} scaledBalanceOf × Pool ${side === "supply" ? "getReserveNormalizedIncome" : "getReserveNormalizedVariableDebt"} at block ${coords.blockNumber ?? "of the event"}`,
+    leg,
     {
-      label: "scaled",
-      value: leg.scaled,
       kind: "chain-derived",
       pclass: "indexed",
-      note: `Σ the position's scaled ${SIDE_TOKEN[side]} changes ${upTo(when)} this transaction, ordered by block and transaction index`,
+      verify: txVerify(coords),
+      summary: `${side === "supply" ? "Supplied" : "Borrowed"} ${sym} ${when} this transaction — the position's scaled balance ${upTo(when)} this transaction, times the reserve's ${SIDE_INDEX[side]} carried forward to this block's timestamp. ${SCALED_ROSTER[side]} The interest to this moment is inside the figure: it is the balance the ${SIDE_TOKEN[side]} reported then.${when === "after" ? " Every event in the same transaction shares it." : ""}`,
+      contract: poolOf(coords),
+      via: `${V3_INDEX_VIA} · Σ scaled deltas ${orderCut(when)} (block, tx index) × ${SIDE_INDEX[side]} accrued · ÷10^${leg.decimals} = ${leg.raw}`,
+      formula: "scaled × index accrued to block time",
+      inputs: eventInputs(coords, [
+        {
+          label: "scaled",
+          value: leg.scaled,
+          kind: "chain-derived",
+          pclass: "indexed",
+          note: `Σ the position's scaled ${SIDE_TOKEN[side]} changes ${upTo(when)} this transaction, ordered by block and transaction index`,
+        },
+        {
+          label: "index accrued to block time",
+          value: leg.index,
+          kind: "chain-derived",
+          pclass: "emitted",
+          note: `ReserveDataUpdated ${side === "supply" ? "liquidityIndex" : "variableBorrowIndex"} at block ${leg.rduBlock}, ${side === "supply" ? "linearly" : "compounded"} over ${Math.max(0, leg.blockTimestamp - leg.rduTimestamp)}s at rate ${leg.rate} (ray)`,
+        },
+        {
+          label: "index update",
+          value: leg.rduTxHash,
+          kind: "chain",
+          pclass: "emitted",
+          note: `the reserve's ReserveDataUpdated log at block ${leg.rduBlock}`,
+        },
+      ]),
     },
-    {
-      label: "index accrued to block time",
-      value: leg.index,
-      kind: "chain-derived",
-      pclass: "emitted",
-      note: `ReserveDataUpdated ${side === "supply" ? "liquidityIndex" : "variableBorrowIndex"} at block ${leg.rduBlock}, ${side === "supply" ? "linearly" : "compounded"} over ${Math.max(0, leg.blockTimestamp - leg.rduTimestamp)}s at rate ${leg.rate} (ray)`,
-    },
-    {
-      label: "index update",
-      value: leg.rduTxHash,
-      kind: "chain",
-      pclass: "emitted",
-      note: `the reserve's ReserveDataUpdated log at block ${leg.rduBlock}`,
-    },
-  ]),
-});
+  );
 
 /** The change in one balance across this event's transaction — after − before,
  *  both exact at the same block's index. */
@@ -928,20 +981,16 @@ export const positionUsdProv = (
 
 /** Whether a reserve counted as collateral — the Pool's own collateral switch
  *  events for this position and reserve. */
-export const collateralFlagProv = (
-  sym: string,
-  when: "before" | "after",
-  on: boolean,
-  coords: V3Coords,
-): Provenance => ({
-  kind: "chain",
-  pclass: "emitted",
-  verify: txVerify(coords),
-  summary: `${sym} as collateral ${when} this transaction — ${on ? "on" : "off"}, the way the position's collateral switch for this reserve stood ${upTo(when)} this transaction. A reserve counts toward borrowing power and the health factor only while its switch is on.`,
-  contract: poolOf(coords),
-  via: `${V3_INDEX_VIA} · last ReserveUsedAsCollateralEnabled / ReserveUsedAsCollateralDisabled log ${orderCut(when)} (block, tx index)`,
-  inputs: eventInputs(coords),
-});
+export const collateralFlagProv = (sym: string, when: "before" | "after", on: boolean, coords: V3Coords): Provenance =>
+  atBlockLane(coords, when, "Pool getUserConfiguration, bit 2 × reserve id + 1", null, {
+    kind: "chain",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary: `${sym} as collateral ${when} this transaction — ${on ? "on" : "off"}, the way the position's collateral switch for this reserve stood ${upTo(when)} this transaction. A reserve counts toward borrowing power and the health factor only while its switch is on.`,
+    contract: poolOf(coords),
+    via: `${V3_INDEX_VIA} · last ReserveUsedAsCollateralEnabled / ReserveUsedAsCollateralDisabled log ${orderCut(when)} (block, tx index)`,
+    inputs: eventInputs(coords),
+  });
 
 /** The position's eMode category — its own UserEModeSet events; the category's
  *  label is read from the Pool at the block. */
@@ -949,34 +998,35 @@ export const emodeCategoryProv = (
   when: "before" | "after",
   vals: { id: number; name: string; generation: "bitmap" | "legacy" | null },
   coords: V3Coords,
-): Provenance => ({
-  kind: "chain",
-  pclass: "emitted",
-  verify: txVerify(coords),
-  summary: `eMode ${when} this transaction — ${vals.id === 0 ? "no category" : vals.name}: the efficiency-mode category the position had chosen ${upTo(when)} this transaction. A reserve in the category is borrowed against at the category's loan-to-value and liquidation threshold, in place of the ones set on the reserve.`,
-  contract: poolOf(coords),
-  via: `${V3_INDEX_VIA} · last UserEModeSet log ${orderCut(when)} (block, tx index)${vals.id === 0 ? "" : ` · label: Pool ${vals.generation === "legacy" ? "getEModeCategoryData" : "getEModeCategoryLabel"} read at the block`}`,
-  inputs: eventInputs(coords, [
-    {
-      label: "categoryId",
-      value: String(vals.id),
-      kind: "chain",
-      pclass: "emitted",
-      note: "UserEModeSet `categoryId`",
-    },
-    ...(vals.id === 0
-      ? []
-      : [
-          {
-            label: "label",
-            value: vals.name,
-            kind: "chain" as const,
-            pclass: "state" as const,
-            note: "the category's label, read from the Pool at the block",
-          },
-        ]),
-  ]),
-});
+): Provenance =>
+  atBlockLane(coords, when, "Pool getUserEMode", null, {
+    kind: "chain",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary: `eMode ${when} this transaction — ${vals.id === 0 ? "no category" : vals.name}: the efficiency-mode category the position had chosen ${upTo(when)} this transaction. A reserve in the category is borrowed against at the category's loan-to-value and liquidation threshold, in place of the ones set on the reserve.`,
+    contract: poolOf(coords),
+    via: `${V3_INDEX_VIA} · last UserEModeSet log ${orderCut(when)} (block, tx index)${vals.id === 0 ? "" : ` · label: Pool ${vals.generation === "legacy" ? "getEModeCategoryData" : "getEModeCategoryLabel"} read at the block`}`,
+    inputs: eventInputs(coords, [
+      {
+        label: "categoryId",
+        value: String(vals.id),
+        kind: "chain",
+        pclass: "emitted",
+        note: "UserEModeSet `categoryId`",
+      },
+      ...(vals.id === 0
+        ? []
+        : [
+            {
+              label: "label",
+              value: vals.name,
+              kind: "chain" as const,
+              pclass: "state" as const,
+              note: "the category's label, read from the Pool at the block",
+            },
+          ]),
+    ]),
+  });
 
 /** The account's total collateral or total debt in USD — Aave's own sum over
  *  the exact balances, the switches and the prices and settings at the block. */
@@ -985,43 +1035,50 @@ export const accountTotalProv = (
   when: "before" | "after",
   coords: V3Coords,
   vals: { base: string; poolRevision: number | null },
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  summary: `Total ${what} ${when} this transaction — ${
-    what === "collateral"
-      ? `every reserve the position has a balance in and its collateral switch on, valued at the oracle's price at this block and added up in US dollars${vals.poolRevision != null && vals.poolRevision < 10 ? ", leaving out a reserve whose liquidation threshold is zero" : ""}`
-      : "every borrowed balance valued at the oracle's price at this block and added up in US dollars; variable-rate debt only, because the Pool's stable-rate debt is not modelled here"
-  }, the way ${ACCOUNT_RULE} adds it. The total is carried in US dollars with 8 decimal places.`,
-  contract: poolOf(coords),
-  via: `Σ exact balance × price ÷ 10^decimals over the position's reserves${vals.poolRevision != null ? `, Pool revision ${vals.poolRevision}` : ""} = ${vals.base} (8-decimal USD)`,
-  formula: what === "collateral" ? "Σ collateral × price" : "Σ debt × price",
-  inputs: eventInputs(coords, [
+): Provenance =>
+  atBlockLane(
+    coords,
+    when,
+    `Pool getUserAccountData ${what === "collateral" ? "totalCollateralBase" : "totalDebtBase"}`,
+    null,
     {
-      label: what === "collateral" ? "collateral balances" : "debt balances",
       kind: "chain-derived",
-      pclass: "indexed",
-      note: "exact balances, scaled × index",
+      pclass: "oracle",
+      summary: `Total ${what} ${when} this transaction — ${
+        what === "collateral"
+          ? `every reserve the position has a balance in and its collateral switch on, valued at the oracle's price at this block and added up in US dollars${vals.poolRevision != null && vals.poolRevision < 10 ? ", leaving out a reserve whose liquidation threshold is zero" : ""}`
+          : "every borrowed balance valued at the oracle's price at this block and added up in US dollars; variable-rate debt only, because the Pool's stable-rate debt is not modelled here"
+      }, the way ${ACCOUNT_RULE} adds it. The total is carried in US dollars with 8 decimal places.`,
+      contract: poolOf(coords),
+      via: `Σ exact balance × price ÷ 10^decimals over the position's reserves${vals.poolRevision != null ? `, Pool revision ${vals.poolRevision}` : ""} = ${vals.base} (8-decimal USD)`,
+      formula: what === "collateral" ? "Σ collateral × price" : "Σ debt × price",
+      inputs: eventInputs(coords, [
+        {
+          label: what === "collateral" ? "collateral balances" : "debt balances",
+          kind: "chain-derived",
+          pclass: "indexed",
+          note: "exact balances, scaled × index",
+        },
+        { label: "prices", kind: "chain", pclass: "oracle", note: "IAaveOracle getAssetPrice read at the block" },
+        ...(what === "collateral"
+          ? [
+              {
+                label: "collateral switches",
+                kind: "chain" as const,
+                pclass: "emitted" as const,
+                note: "the position's collateral switch events",
+              },
+              {
+                label: "liquidation thresholds",
+                kind: "chain" as const,
+                pclass: "state" as const,
+                note: "each reserve's configuration, or its eMode category's, read at the block",
+              },
+            ]
+          : []),
+      ]),
     },
-    { label: "prices", kind: "chain", pclass: "oracle", note: "IAaveOracle getAssetPrice read at the block" },
-    ...(what === "collateral"
-      ? [
-          {
-            label: "collateral switches",
-            kind: "chain" as const,
-            pclass: "emitted" as const,
-            note: "the position's collateral switch events",
-          },
-          {
-            label: "liquidation thresholds",
-            kind: "chain" as const,
-            pclass: "state" as const,
-            note: "each reserve's configuration, or its eMode category's, read at the block",
-          },
-        ]
-      : []),
-  ]),
-});
+  );
 
 /** The account's loan-to-value as it stands: total debt ÷ total collateral. */
 export const currentLtvProv = (
@@ -1044,23 +1101,35 @@ export const accountRatioProv = (
   when: "before" | "after",
   coords: V3Coords,
   vals: { bps: number; emode: boolean },
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary: `${which === "ltv" ? "Loan to value" : "Liquidation threshold"} ${when} this transaction — each collateral reserve's ${which === "ltv" ? "loan-to-value" : "liquidation threshold"} averaged by what that reserve is worth in US dollars, the way ${ACCOUNT_RULE} averages it.${vals.emode ? " A reserve in the position's eMode category counts at the category's figure." : ""} ${which === "ltv" ? "It is the share of the collateral the position could borrow against." : "Debt above this share of the collateral makes the position liquidatable."} The Pool writes the share in hundredths of a percent, so ${vals.bps} stands for ${(vals.bps / 100).toFixed(2).replace(/\.?0+$/, "")}%.`,
-  contract: poolOf(coords),
-  via: `Σ (collateral value × ${which === "ltv" ? "LTV" : "liquidation threshold"}) ÷ Σ collateral value, configuration read at the block = ${vals.bps} bps`,
-  formula: which === "ltv" ? "Σ value × LTV ÷ Σ value" : "Σ value × threshold ÷ Σ value",
-  inputs: eventInputs(coords, [
-    { label: "collateral values", kind: "chain-derived", pclass: "oracle", note: "exact balance × price at the block" },
+): Provenance =>
+  atBlockLane(
+    coords,
+    when,
+    `Pool getUserAccountData ${which === "ltv" ? "ltv" : "currentLiquidationThreshold"}`,
+    null,
     {
-      label: which === "ltv" ? "LTVs" : "liquidation thresholds",
-      kind: "chain",
+      kind: "chain-derived",
       pclass: "state",
-      note: "each reserve's configuration, or its eMode category's, read at the block",
+      summary: `${which === "ltv" ? "Loan to value" : "Liquidation threshold"} ${when} this transaction — each collateral reserve's ${which === "ltv" ? "loan-to-value" : "liquidation threshold"} averaged by what that reserve is worth in US dollars, the way ${ACCOUNT_RULE} averages it.${vals.emode ? " A reserve in the position's eMode category counts at the category's figure." : ""} ${which === "ltv" ? "It is the share of the collateral the position could borrow against." : "Debt above this share of the collateral makes the position liquidatable."} The Pool writes the share in hundredths of a percent, so ${vals.bps} stands for ${(vals.bps / 100).toFixed(2).replace(/\.?0+$/, "")}%.`,
+      contract: poolOf(coords),
+      via: `Σ (collateral value × ${which === "ltv" ? "LTV" : "liquidation threshold"}) ÷ Σ collateral value, configuration read at the block = ${vals.bps} bps`,
+      formula: which === "ltv" ? "Σ value × LTV ÷ Σ value" : "Σ value × threshold ÷ Σ value",
+      inputs: eventInputs(coords, [
+        {
+          label: "collateral values",
+          kind: "chain-derived",
+          pclass: "oracle",
+          note: "exact balance × price at the block",
+        },
+        {
+          label: which === "ltv" ? "LTVs" : "liquidation thresholds",
+          kind: "chain",
+          pclass: "state",
+          note: "each reserve's configuration, or its eMode category's, read at the block",
+        },
+      ]),
     },
-  ]),
-});
+  );
 
 /** The account's health factor — collateral × weighted liquidation threshold ÷
  *  debt, Aave's own formula over the figures above. */
@@ -1068,31 +1137,38 @@ export const healthFactorProv = (
   when: "before" | "after",
   coords: V3Coords,
   vals: { wad: string | null; collateralBase: string; debtBase: string; thresholdBps: number },
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary: `Health factor ${when} this transaction — the total collateral times the weighted liquidation threshold, divided by the total debt, the way ${ACCOUNT_RULE} works it out. Below 1 the position can be liquidated.${vals.wad == null ? " The position had no debt, so the factor has no finite value." : " The Pool writes a health factor with 18 decimal places, so 10^18 stands for a factor of 1."}`,
-  contract: poolOf(coords),
-  via: `collateral.percentMul(threshold).wadDiv(debt)${vals.wad != null ? ` = ${vals.wad}, ÷10^18` : ""}`,
-  formula: "collateral × threshold ÷ debt",
-  inputs: eventInputs(coords, [
-    {
-      label: "collateral",
-      value: vals.collateralBase,
-      kind: "chain-derived",
-      pclass: "oracle",
-      note: "total collateral, 8-decimal USD",
-    },
-    {
-      label: "threshold",
-      value: `${vals.thresholdBps} bps`,
-      kind: "chain-derived",
-      pclass: "state",
-      note: "weighted liquidation threshold",
-    },
-    { label: "debt", value: vals.debtBase, kind: "chain-derived", pclass: "oracle", note: "total debt, 8-decimal USD" },
-  ]),
-});
+): Provenance =>
+  atBlockLane(coords, when, "Pool getUserAccountData healthFactor", null, {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `Health factor ${when} this transaction — the total collateral times the weighted liquidation threshold, divided by the total debt, the way ${ACCOUNT_RULE} works it out. Below 1 the position can be liquidated.${vals.wad == null ? " The position had no debt, so the factor has no finite value." : " The Pool writes a health factor with 18 decimal places, so 10^18 stands for a factor of 1."}`,
+    contract: poolOf(coords),
+    via: `collateral.percentMul(threshold).wadDiv(debt)${vals.wad != null ? ` = ${vals.wad}, ÷10^18` : ""}`,
+    formula: "collateral × threshold ÷ debt",
+    inputs: eventInputs(coords, [
+      {
+        label: "collateral",
+        value: vals.collateralBase,
+        kind: "chain-derived",
+        pclass: "oracle",
+        note: "total collateral, 8-decimal USD",
+      },
+      {
+        label: "threshold",
+        value: `${vals.thresholdBps} bps`,
+        kind: "chain-derived",
+        pclass: "state",
+        note: "weighted liquidation threshold",
+      },
+      {
+        label: "debt",
+        value: vals.debtBase,
+        kind: "chain-derived",
+        pclass: "oracle",
+        note: "total debt, 8-decimal USD",
+      },
+    ]),
+  });
 
 /** Position-card supplied balance for one reserve — the scaled-balance reduction
  *  (0008/0011): every leg a chain event or the on-chain index formula, so
@@ -1185,7 +1261,8 @@ export type AaveV3LifetimeFlow =
   | "swapped out"
   | "swapped in"
   | "transferred in"
-  | "transferred out";
+  | "transferred out"
+  | "repaid by a debt swap";
 
 /** The verb a lifetime-flow receipt uses for its Σ. */
 export const lifetimeFlowVerb = (flow: AaveV3LifetimeFlow): string =>
@@ -1199,7 +1276,10 @@ export const lifetimeFlowVerb = (flow: AaveV3LifetimeFlow): string =>
     "sold to repay": "sold in a repay with collateral, net of what the adapter supplied back unused",
     "withdrawn and swapped": "withdrew and swapped to the wallet in a withdraw and swap",
     "swapped out": "swapped into another reserve under an order the owner signed",
-    "swapped in": "received as aTokens from a swap order the owner signed",
+    "swapped in":
+      "bought into this reserve by a swap the owner signed (a collateral swap, or aTokens from a swap order)",
+    "repaid by a debt swap":
+      "repaid in a debt swap: the old debt the swap paid off, and the part of the new debt the adapter returned unused",
     "transferred in": "received as aToken transfers from another account",
     "transferred out": "sent as aToken transfers to another account",
   })[flow];
