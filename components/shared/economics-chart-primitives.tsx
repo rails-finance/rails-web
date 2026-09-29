@@ -370,10 +370,18 @@ export function BreakdownTable({ rows }: { rows: BreakdownRow[] }) {
                 {/* Label truncates; the token chip never clips away (long
                     labels like "Deposited (all time)" would otherwise swallow
                     it inside the ellipsizing cell). */}
-                <span className="flex min-w-0 items-center">
-                  <span className={row.wrapLabel ? "min-w-0" : "truncate"}>{row.label}</span>
-                  {row.icon && <span className="ml-1 inline-flex shrink-0 align-middle">{row.icon}</span>}
-                </span>
+                {row.wrapLabel ? (
+                  // A wrapping label keeps the chip beside its last word.
+                  <span className="min-w-0">
+                    {row.label}
+                    {row.icon && <span className="ml-1 inline-flex shrink-0 align-middle">{row.icon}</span>}
+                  </span>
+                ) : (
+                  <span className="flex min-w-0 items-center">
+                    <span className="truncate">{row.label}</span>
+                    {row.icon && <span className="ml-1 inline-flex shrink-0 align-middle">{row.icon}</span>}
+                  </span>
+                )}
               </td>
               <td
                 className={`py-1 pl-3 text-right tabular-nums whitespace-nowrap ${row.wrapLabel ? "max-sm:whitespace-normal" : ""} ${cellBorder}`}

@@ -97,7 +97,7 @@ const stateProv = (v: LlamalendPositionView, sym: string, which: "collateral" | 
   v.stateBasis === "chain" ? positionStateProv(sym, which, v.controller) : positionIndexProv(sym, which, v.controller);
 
 /** The kind of market beside the pair: mint (crvUSD minted against the loan)
- *  or lend (borrowed from lenders' deposits); V2 keeps its badge. */
+ *  or lend (borrowed from lenders' deposits); a V2 market says V2. */
 const MARKET_KIND: Partial<Record<LlamalendFactoryKind, string>> = { crvusd: "mint market", oneway: "lend market" };
 
 /** The position + market identity: whose position, in which isolated market. */
@@ -109,7 +109,7 @@ function PositionIdentity({ v }: { v: LlamalendPositionView }) {
       <span className="text-xs text-rb-500">
         {v.marketLabel}
         {kind && <span data-llamalend-market-kind=""> · {kind}</span>}
-        {v.version === "v2" && <span className="ml-1 rounded-sm bg-rb-300 px-1 text-[10px] dark:bg-rb-700">V2</span>}
+        {v.version === "v2" && <span data-llamalend-market-kind=""> · V2 market</span>}
       </span>
     </span>
   );

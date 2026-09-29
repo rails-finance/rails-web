@@ -460,3 +460,48 @@ export const llamalendSoldProv = (sym: string, controller?: string): Provenance 
     { label: "held now", kind: "chain", pclass: "state", note: "user_state(user)[0] @ head" },
   ],
 });
+
+/** The debt still owed on what was drawn: borrowed less repaid less cleared in
+ *  liquidation. The interest that built up on it is a separate line. */
+export const llamalendNetBorrowedProv = (sym: string, controller?: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `${sym} drawn and not yet repaid: everything the position's events borrowed, less everything they repaid or cleared. Interest that built up on it is the line below.`,
+  formula: "borrowed − repaid − cleared in liquidation",
+  contract: { name: "LlamaLend Controller", address: controller ?? "" },
+  via: `${LLAMALEND_VIA} · Σ emitted debt amounts`,
+  inputs: [
+    { label: "borrowed", kind: "chain", pclass: "emitted", note: "Σ debt added in the position's events" },
+    { label: "repaid", kind: "chain", pclass: "emitted", note: "Σ debt removed in the position's events" },
+  ],
+});
+
+/** Interest accrued on an open loan: the debt now less what was borrowed and
+ *  not repaid. */
+export const llamalendAccruedInterestProv = (sym: string, controller?: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `${sym} of interest the debt has built up: what the position owes now, less what its events borrowed and did not repay. The market's rate policy sets the per-second rate.`,
+  formula: "debt now − (borrowed − repaid)",
+  contract: { name: "LlamaLend Controller", address: controller ?? "" },
+  via: `${LLAMALEND_VIA} · Controller.debt(user) @ head · Σ emitted debt amounts`,
+  inputs: [
+    { label: "debt now", kind: "chain", pclass: "state", note: "Controller.debt(user) @ head" },
+    { label: "borrowed − repaid", kind: "chain", pclass: "emitted", note: "Σ debt amounts in the position's events" },
+  ],
+});
+
+/** Interest paid on a closed loan: what its repayments returned, less what it
+ *  drew. */
+export const llamalendInterestPaidProv = (sym: string, controller?: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "emitted",
+  summary: `${sym} the borrower paid beyond what was drawn: everything repaid, less everything borrowed. The loan closed with no debt left and no liquidation, so the difference is interest.`,
+  formula: "repaid − borrowed",
+  contract: { name: "LlamaLend Controller", address: controller ?? "" },
+  via: `${LLAMALEND_VIA} · Σ emitted debt amounts`,
+  inputs: [
+    { label: "repaid", kind: "chain", pclass: "emitted", note: "Σ debt removed in the position's events" },
+    { label: "borrowed", kind: "chain", pclass: "emitted", note: "Σ debt added in the position's events" },
+  ],
+});

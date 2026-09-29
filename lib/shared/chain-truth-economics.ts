@@ -44,6 +44,9 @@ export interface TowerLine {
    *  mechanic — e.g. Liquity redemptions, which are involuntary but not
    *  liquidations. Ignored on `current` lines (those caption by symbol). */
   flowLabel?: string;
+  /** Name for a cross-symbol merged `current` row in place of "N assets"
+   *  ("WETH and converted crvUSD"). Read from the first line that sets one. */
+  groupLabel?: string;
   /** Mechanic tag for a FLOW line that the side's default hatch would misname
    *  visually: both values draw the shared pink checker (another party's act
    *  on the position) instead of the bucket's liquidation/exit pattern.

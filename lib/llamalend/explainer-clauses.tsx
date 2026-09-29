@@ -166,6 +166,7 @@ export function llamalendEventSlots(
   const collSym = ctx.collateralSymbol;
   const debtSym = ctx.borrowedSymbol;
   const rs = resultingState(ctx);
+  const health = healthMoveClause(f);
   const bands = bandMoveClause(ctx, f);
   const inBand = inBandRepayClause(ctx, f);
   const distance = distanceClause(ctx, f);
@@ -256,7 +257,7 @@ export function llamalendEventSlots(
           : null;
       return {
         happened: [clause(happened)],
-        changed: [changed, bands, distance],
+        changed: [changed, health, bands, distance],
         meansNow: [],
       };
     }
@@ -272,7 +273,7 @@ export function llamalendEventSlots(
           : null;
       return {
         happened: [clause(<>Added {collDeltaFig()} of collateral without changing the debt.</>)],
-        changed: [changed, bands, distance],
+        changed: [changed, health, bands, distance],
         meansNow: [],
       };
     }
@@ -296,7 +297,7 @@ export function llamalendEventSlots(
           : cont(<>.</>);
       return {
         happened: [clause(<>Repaid {debtDeltaFig()} of the position&rsquo;s debt</>), ending],
-        changed: [inBand, bands, distance],
+        changed: [inBand, health, bands, distance],
         meansNow: [],
       };
     }
@@ -312,7 +313,7 @@ export function llamalendEventSlots(
           : null;
       return {
         happened: [clause(<>Withdrew {collDeltaFig()} of collateral from the position&rsquo;s bands.</>)],
-        changed: [changed, bands, distance],
+        changed: [changed, health, bands, distance],
         meansNow: [],
       };
     }
@@ -634,6 +635,20 @@ function bandMoveClause(ctx: LlamalendContext, f?: LlamalendEventFigures | null)
   return clause(
     <>
       {who} moved the bands {n} {k > 0 ? "down" : "up"} in price, to {f.n1After}…{f.n2After}.
+    </>,
+  );
+}
+
+/** Health before and after, in words: the grid's tile shows the pair as
+ *  before → after with the before muted, and the sentence says which way it
+ *  went. */
+function healthMoveClause(f?: LlamalendEventFigures | null): ClauseInput {
+  if (!f || !f.hadLoan || !f.hasLoan || f.healthBefore == null || f.healthAfter == null) return null;
+  if (Math.abs(f.healthAfter - f.healthBefore) < 5e-5) return null;
+  const fell = f.healthAfter < f.healthBefore;
+  return clause(
+    <>
+      Health {fell ? "fell" : "rose"} from {fmtHealth(f.healthBefore)} to {fmtHealth(f.healthAfter)}.
     </>,
   );
 }

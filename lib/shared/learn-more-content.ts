@@ -2056,6 +2056,9 @@ export function llamalendBorrowContent(kind: "borrow" | "add_collateral"): Learn
         text: "each market has one collateral and one borrowed token; positions in different markets never share collateral and are liquidated independently.",
       },
     ],
+    extraParagraphs: [
+      "If the price falls into the bands, soft-liquidation starts: the AMM sells collateral for the borrowed token as the price falls and buys it back as the price rises, and the owner keeps the position. If health falls below 0, hard liquidation becomes possible: a liquidator repays the debt and takes what the position holds. The owner receives nothing from a hard liquidation and keeps the tokens they borrowed.",
+    ],
     links: [{ label: "Curve lending docs", url: LLAMALEND_DOC_URL }],
   };
 }

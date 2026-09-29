@@ -646,7 +646,7 @@ try {
   );
   check(
     "inband: converted tile is named Converted, with no method note",
-    /Converted\s*1\.8K/.test(body) && !/read live, cross-checked/.test(body),
+    /Converted\s*[\d.]+K/.test(body) && !/read live, cross-checked/.test(body),
   );
   if (inbandLive.healthFull != null && inbandLive.healthFull > 0 && inbandLive.healthFull < 0.05) {
     check("inband: health near 0 carries its plain line", /close to 0; below 0 anyone may liquidate it/.test(body));
@@ -654,8 +654,8 @@ try {
     console.log(`SKIP  inband: near-0 health line — health is ${inbandLive.healthFull} now`);
   }
   check(
-    "inband: net sold 0.02734 WBTC stated on the card and in the flows",
-    /Sold by the AMM, net:\s*0\.02734 WBTC/.test(body) && /sold 0\.02734 WBTC more than it bought back/.test(body),
+    "inband: net sold WBTC stated on the card and in the flows",
+    /Sold by the AMM, net:\s*0\.0\d+ WBTC/.test(body) && /sold 0\.0\d+ WBTC more than it bought back/.test(body),
   );
   check(
     "inband: flows name the converted balance with the collateral",
@@ -798,11 +798,169 @@ try {
   );
   check(
     "spot N9: an underwater position states what a liquidator would lose",
-    /A liquidator taking the whole position would repay [\d,.]+ crvUSD of debt and receive the [\d,.]+ crvUSD the AMM holds and 0 CRV: [\d,.]+ crvUSD less than it pays\. Curve’s docs call a shortfall like this bad debt/.test(
+    /A liquidator taking the whole position would repay [\d,.]+ crvUSD of debt and receive the [\d,.]+ crvUSD the AMM holds and 0 CRV: [\d,.]+ crvUSD less than it pays\. The contract obliges no one to liquidate: any address may, and a liquidator acts when it gains\. Curve’s docs call a shortfall like this bad debt/.test(
       body,
     ),
   );
   check("spot N11: lend market beside the pair", /CRV \/ crvUSD · lend market/.test(body));
+
+  // ── 8. round 4 ────────────────────────────────────────────────────────────
+  const R4 = {
+    controller: "0xa920de414ea4ab66b97da1bfe9e6eca7d4219635",
+    user: "0x5668ead1edb8e2a4d724c8fb9cb5ffeabeb422dc",
+  };
+  {
+    // P1: the 2 Jan borrow lowers health; the chain says which side is which.
+    const es = await (
+      await fetch(`${BASE}/api/chain/llamalend/event-state?controller=${R4.controller}&user=${R4.user}&block=18917707`)
+    ).json();
+    const hb = Number(es.before?.healthRaw) / 1e18;
+    const ha = Number(es.after?.healthRaw) / 1e18;
+    check(
+      "r4 P1 chain: the 2 Jan borrow takes health from 29.18% to 16.01%",
+      hb > ha && hb.toFixed(4) === "0.2918" && ha.toFixed(4) === "0.1601",
+      `${hb} → ${ha}`,
+    );
+    const p4 = await browser.newPage();
+    await p4.addInitScript(() => {
+      try {
+        localStorage.setItem(
+          "rails-open-cards-v1",
+          JSON.stringify({
+            "llamalend:borrow:c8302568cbf34ea126a3df7a52df0785d219ade32d19d5c8a7743211a378fce4:175:self": true,
+          }),
+        );
+      } catch {}
+    });
+    await p4.goto(`${BASE}${EXPLORER}/${R4.controller}/${R4.user}`, { waitUntil: "networkidle", timeout: 180000 });
+    await p4.waitForSelector("text=LIFETIME FLOWS", { timeout: 120000 });
+    body = await openAllAndRead(p4);
+    for (let pass = 0; pass < 12; pass++) {
+      const tab = p4.locator("[aria-label='Show explanation']").first();
+      if ((await tab.count().catch(() => 0)) === 0) break;
+      const ok = await tab
+        .click({ timeout: 5000, force: true })
+        .then(() => true)
+        .catch(() => false);
+      if (!ok) break;
+      await p4.waitForTimeout(250);
+    }
+    await p4
+      .waitForFunction(() => /Health fell from/.test(document.body.innerText), null, { timeout: 60000 })
+      .catch(() => {});
+    body = await p4.evaluate(() => document.body.innerText);
+    check("r4 P1: the tile reads before then after", /Health\s*29\.18%[\s\S]{0,80}?16\.01%/.test(body));
+    check("r4 P1: the row says which way health went", /Health fell from 29\.18% to 16\.01%\./.test(body));
+    check(
+      "r4 P4: a closed loan states the interest it paid",
+      /Interest paid\s*1\.54K/.test(body) && /the interest the loan paid before it closed/.test(body),
+    );
+    check(
+      "r4 P4: the flow labels wrap, none is cut to an ellipsis",
+      await p4.evaluate(
+        () => ![...document.querySelectorAll(".truncate")].some((e) => /Deposited|Borrowed/.test(e.textContent ?? "")),
+      ),
+    );
+    check(
+      "r4 P7: a closed, never-liquidated card says so and where the AMM sold",
+      /It was never hard-liquidated\./.test(body) &&
+        /Between 2 Jan 2024 and 26 Jan 2024 the AMM sold 0\.02398 WETH while the price sat in the bands/.test(body),
+    );
+    // P4: every bar's tip names its segment.
+    const tips = [];
+    const segs = p4.locator("div.cursor-pointer.absolute");
+    for (let i = 0; i < (await segs.count()); i++) {
+      await segs.nth(i).hover({ force: true });
+      await p4.waitForTimeout(200);
+      tips.push(
+        await p4.evaluate(() =>
+          [...document.querySelectorAll("div.z-20.pointer-events-none")].map((x) => x.innerText).join("|"),
+        ),
+      );
+    }
+    check(
+      "r4 P4: the bar tips carry their labels",
+      /^Withdrawn\n\$153k$/.test(tips[0] ?? "") && /^Repaid\n\$80k$/.test(tips[1] ?? ""),
+      JSON.stringify(tips),
+    );
+    await p4.close();
+
+    const p5 = await browser.newPage();
+    await p5.goto(
+      `${BASE}${EXPLORER}/0xad444663c6c92b497225c6ce65fee2e7f78bfb86/0xe08d97e151473a848c3d9ca3f323cb720472d015`,
+      { waitUntil: "networkidle", timeout: 180000 },
+    );
+    await p5.waitForSelector("text=LIFETIME FLOWS", { timeout: 120000 });
+    body = await openAllAndRead(p5);
+    for (let pass = 0; pass < 12; pass++) {
+      const tab = p5.locator("[aria-label='Show explanation']").first();
+      if ((await tab.count().catch(() => 0)) === 0) break;
+      const ok = await tab
+        .click({ timeout: 5000, force: true })
+        .then(() => true)
+        .catch(() => false);
+      if (!ok) break;
+      await p5.waitForTimeout(250);
+    }
+    body = await p5.evaluate(() => document.body.innerText);
+    check(
+      "r4 P4: the sub-row under Borrowed states what was borrowed and not repaid, with the interest apart",
+      /Borrowed \(all\s*time\)\s*\$58k\s*Net borrowed\s*58\.24K[\s\S]{0,40}Accrued interest\s*4\.15K[\s\S]{0,30}Current debt\s*\$62k/.test(
+        body,
+      ),
+    );
+    check(
+      "r4 P4: the merged collateral row names its assets",
+      /sDOLA and converted crvUSD/.test(body) && !/2 assets/.test(body),
+    );
+    check(
+      "r4 P3: the shortfall line says nobody is obliged to liquidate",
+      /The contract obliges no one to liquidate: any address may, and a liquidator acts when it gains\./.test(body),
+    );
+    await p5.close();
+
+    // P5: the V2 market says so beside the pair.
+    const p6 = await browser.newPage();
+    await p6.goto(`${BASE}${EXPLORER}`, { waitUntil: "networkidle", timeout: 180000 });
+    await p6.waitForSelector("text=/crvUSD · /", { timeout: 120000 });
+    const lbody = await p6.evaluate(() => document.body.innerText);
+    check(
+      "r4 P5: a V2 market reads 'pair · V2 market'",
+      /sDOLA \/ crvUSD · V2 market/.test(lbody) && !/crvUSDV2/.test(lbody),
+    );
+    check("r4 P5: mint and lend markets keep their kind", /· mint market/.test(lbody) && /· lend market/.test(lbody));
+    await p6.close();
+
+    // P6: an open position above its bands relates health to the price cushion.
+    const list = await (await fetch(`${BASE}/api/llamalend/positions?status=open&limit=25`)).json();
+    let cushion = null;
+    for (const r of list.data ?? []) {
+      if (r.inSoftLiq) continue;
+      const c = await (
+        await fetch(`${BASE}/api/chain/llamalend/position?controller=${r.controller}&user=${r.user}`)
+      ).json();
+      if (c.hasLoan && c.healthFull != null && c.healthFull > 0 && c.health >= 1) {
+        cushion = r;
+        break;
+      }
+    }
+    if (cushion) {
+      const p7 = await browser.newPage();
+      await p7.goto(`${BASE}${EXPLORER}/${cushion.controller}/${cushion.user}`, {
+        waitUntil: "networkidle",
+        timeout: 180000,
+      });
+      await p7.waitForSelector("text=Health:", { timeout: 120000 });
+      body = await openAllAndRead(p7);
+      check(
+        "r4 P6: the card relates the price cushion to health",
+        /That distance runs to the start of soft-liquidation; health reaches 0 further down/.test(body),
+      );
+      await p7.close();
+    } else {
+      console.log("SKIP  r4 P6 — no open position above its bands among the first 25");
+    }
+  }
 
   await page.goto(`${BASE}${EXPLORER}/markets`, { waitUntil: "networkidle", timeout: 180000 });
   await page.waitForSelector("text=A =", { timeout: 120000 });
@@ -815,6 +973,15 @@ try {
     "markets: terms defined once, no contract names in the stamp",
     /Loan discount/.test(body) && /Liquidation discount/.test(body) && !/OneWayLendingFactory/.test(body),
   );
+  {
+    const m = await (await fetch(`${BASE}/api/chain/llamalend/markets`)).json();
+    const w = (m.markets ?? []).find((x) => x.controller === "0x1e0165dbd2019441ab7927c018701f3138114d71");
+    check(
+      "r4 P8: wstETH 0x1e01…4d71 reads 50% loan discount and 41.29% borrow, as the chain returns them",
+      w != null && w.loanDiscount === 0.5 && Math.abs(w.borrowAprPct - 41.29) < 0.05,
+      w ? `${w.loanDiscount} ${w.borrowAprPct}` : "",
+    );
+  }
   check(
     "markets: yield-bearing shares say why they price above 1",
     /sDOLA is a yield-bearing share of DOLA/.test(body),

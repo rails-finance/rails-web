@@ -31,6 +31,9 @@ import {
   llamalendLostProv,
   llamalendSoldBeforeLiqProv,
   llamalendConvertedInProv,
+  llamalendNetBorrowedProv,
+  llamalendAccruedInterestProv,
+  llamalendInterestPaidProv,
 } from "@/lib/llamalend/event-provenance";
 import { llamalendConvertedProv } from "@/lib/llamalend/live-provenance";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
@@ -222,6 +225,7 @@ export function computeLlamalendEconomics(
       amount: view.collateral,
       usd: collUsd(view.collateral),
       prov: collProv,
+      groupLabel: `${view.collateralSymbol} and converted ${view.borrowedSymbol}`,
     });
   }
   // The converted line — soft-liquidation holdings, chain-only.
@@ -231,6 +235,7 @@ export function computeLlamalendEconomics(
       symbol: `${view.borrowedSymbol} (converted)`,
       amount: view.converted,
       usd: debtUsd(view.converted),
+      groupLabel: `${view.collateralSymbol} and converted ${view.borrowedSymbol}`,
       prov: llamalendConvertedProv(
         view.borrowedSymbol,
         view.convertedCrossCheckExact ?? null,
@@ -240,20 +245,64 @@ export function computeLlamalendEconomics(
     });
   }
 
+  const lifetime = precomputedLifetime ?? (events && events.length > 0 ? replayLlamalendLifetime(events) : null);
+  // Once the events say what was drawn and not repaid, the debt line is that
+  // net and the interest that built up on it is its own line; the "Current
+  // debt" total is their sum. Where the events cannot say (no lifetime, or the
+  // repayments already exceed the draws) the line stays the whole debt.
+  const netBorrowed = lifetime ? lifetime.borrowed - lifetime.repaid - lifetime.liquidatedDebt : null;
+  const accrued = netBorrowed != null ? view.debt - netBorrowed : null;
+  const splitInterest =
+    netBorrowed != null && accrued != null && netBorrowed > DUST && accrued > Math.max(DUST, netBorrowed * 1e-9);
   const debtLines: TowerLine[] =
     view.debt > DUST
       ? [
+          splitInterest
+            ? {
+                key: "debt",
+                symbol: view.borrowedSymbol,
+                amount: netBorrowed,
+                usd: debtUsd(netBorrowed),
+                prov: llamalendNetBorrowedProv(view.borrowedSymbol, view.controller),
+                heldLabel: "Net borrowed",
+              }
+            : {
+                key: "debt",
+                symbol: view.borrowedSymbol,
+                amount: view.debt,
+                usd: debtUsd(view.debt),
+                prov: debtProv,
+              },
+        ]
+      : [];
+  const debtInterest: TowerLine | null = splitInterest
+    ? {
+        key: "interest-accrued",
+        symbol: view.borrowedSymbol,
+        amount: accrued,
+        usd: debtUsd(accrued),
+        prov: llamalendAccruedInterestProv(view.borrowedSymbol, view.controller),
+      }
+    : null;
+  // A loan closed by repayment alone returned more than it drew: the excess is
+  // the interest it paid.
+  const interestPaid =
+    lifetime && view.debt <= DUST && view.status === "closed" && lifetime.liquidatedDebt <= DUST
+      ? lifetime.repaid - lifetime.borrowed
+      : 0;
+  const debtCosts: TowerLine[] =
+    lifetime && interestPaid > Math.max(DUST, lifetime.borrowed * 1e-9)
+      ? [
           {
-            key: "debt",
+            key: "debt-interest-paid",
             symbol: view.borrowedSymbol,
-            amount: view.debt,
-            usd: debtUsd(view.debt),
-            prov: debtProv,
+            amount: interestPaid,
+            usd: debtUsd(interestPaid),
+            prov: llamalendInterestPaidProv(view.borrowedSymbol, view.controller),
+            flowLabel: "Interest paid",
           },
         ]
       : [];
-
-  const lifetime = precomputedLifetime ?? (events && events.length > 0 ? replayLlamalendLifetime(events) : null);
   const flowLine = (
     amount: number,
     symbol: string,
@@ -376,6 +425,8 @@ export function computeLlamalendEconomics(
     ...collReceived,
     ...collateralLines,
     ...debtLines,
+    ...(debtInterest ? [debtInterest] : []),
+    ...debtCosts,
     ...collExited,
     ...collLiquidated,
     ...debtExited,
@@ -420,8 +471,10 @@ export function computeLlamalendEconomics(
     // The side counts the converted balance with the collateral token, so its
     // title says so where there is one.
     ...((view.converted != null && view.converted > DUST) || ledger
-      ? { collateralTitle: "Collateral and converted", wrapFlowLabels: true }
+      ? { collateralTitle: "Collateral and converted" }
       : {}),
+    // A row's label wraps and keeps its chip beside the last word.
+    wrapFlowLabels: true,
     // crvUSD (~$1) through the AMM's own oracle → chain-derived; survives
     // the render gate.
     priceKind: valued ? "chain-derived" : undefined,
@@ -436,12 +489,13 @@ export function computeLlamalendEconomics(
     },
     debt: {
       current: debtLines,
-      interest: null,
+      interest: debtInterest,
+      costs: debtCosts,
       exited: debtExited,
       liquidated: debtLiquidated,
       lifetimeInflow: lifetime ? inflow(lifetime.borrowed, debtUsd(lifetime.borrowed)) : 0,
     },
-    interestNote: `Current figures are the position's live balances where the latest read landed, and its last recorded balances otherwise; each line's receipt says which. Debt grows every second, so no stored figure stays current for long. The "(converted)" collateral line is the soft-liquidation surface — collateral the AMM has already turned into ${view.borrowedSymbol}, a live balance that no past event records. The lifetime flows add up the position's own transactions, so interest that built up between events isn't counted there, and no split between principal and interest is drawn.${
+    interestNote: `Current figures are the position's live balances where the latest read landed, and its last recorded balances otherwise; each line's receipt says which. Debt grows every second, so no stored figure stays current for long. The "(converted)" collateral line is the soft-liquidation surface — collateral the AMM has already turned into ${view.borrowedSymbol}, a live balance that no past event records. The lifetime flows add up the position's own transactions. On an open loan, accrued interest is the debt now less what was borrowed and not repaid; on a loan closed by repayment, interest paid is what was repaid less what was borrowed.${
       view.borrowedIsCrvusd
         ? " This market's debt is crvUSD, worth about a dollar, so the dollar figures use the market's own prices."
         : ` This market borrows ${view.borrowedSymbol}, not a dollar stablecoin — amounts stay in their own tokens and no dollar value is shown.`

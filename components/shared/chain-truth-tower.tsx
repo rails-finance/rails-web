@@ -212,7 +212,7 @@ function mergeBucket(lines: TowerLine[], valued: boolean, keyPrefix: string): Di
         flowLabel: lines[0].flowLabel,
         flowKind: lines[0].flowKind,
         mergedParts: lines,
-        mergedLabel: `${lines.length} assets`,
+        mergedLabel: lines.find((l) => l.groupLabel)?.groupLabel ?? `${lines.length} assets`,
       },
     ];
   }

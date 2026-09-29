@@ -67,6 +67,19 @@ export function llamalendEconomicsExplanation(
     bullets.push(`It has also had ${parts.join(" and ")}.`);
   }
 
+  const paidInterest = data.debt.costs?.find((l) => l.key === "debt-interest-paid");
+  if (paidInterest) {
+    bullets.push(
+      `The repayments exceed the borrowing by ${lineFig(paidInterest, valued)}${valued ? "" : ` ${paidInterest.symbol}`}: that is the interest the loan paid before it closed.`,
+    );
+  }
+  const accruedInterest = data.debt.interest;
+  if (accruedInterest) {
+    bullets.push(
+      `${fmt(accruedInterest.amount, false, accruedInterest.symbol)}${valued && accruedInterest.usd != null ? ` (${formatCompactUsd(accruedInterest.usd)})` : ""} of interest has built up on what was borrowed and not repaid.`,
+    );
+  }
+
   const lost = lostLines[0];
   if (lost) {
     bullets.push(
@@ -117,7 +130,7 @@ export function llamalendEconomicsExplanation(
   }
 
   const currentColl = sideTotal(data.collateral.current, valued);
-  const currentDebt = sideTotal(data.debt.current, valued);
+  const currentDebt = sideTotal([...data.debt.current, ...(data.debt.interest ? [data.debt.interest] : [])], valued);
   if (currentColl > 0 || currentDebt > 0) {
     const coll = fmt(currentColl, valued, soleSymbol(data.collateral.current));
     const debt = currentDebt > 0 ? ` against ${fmt(currentDebt, valued, soleSymbol(data.debt.current))} of debt` : "";

@@ -116,7 +116,8 @@ export function LlamalendPositionExplanation({
           ) : (
             <>0 {chain.collateralSymbol}</>
           )}
-          : <H>{formatNumber(short)}</H> {chain.borrowedSymbol} less than it pays.
+          : <H>{formatNumber(short)}</H> {chain.borrowedSymbol} less than it pays. The contract obliges no one to
+          liquidate: any address may, and a liquidator acts when it gains.
           {factory === "oneway" ? (
             <>
               {" "}
@@ -170,6 +171,13 @@ export function LlamalendPositionExplanation({
           <>
             A fall of about {Math.round((1 - 1 / chain.health) * 100)}% would put the position inside its band and begin
             conversion.
+            {chain.healthFull != null ? (
+              <>
+                {" "}
+                That distance runs to the start of soft-liquidation; health reaches 0 further down, and the losses in
+                the bands bring it nearer.
+              </>
+            ) : null}
           </>
         ) : (
           <>The price is already inside or beneath the band.</>
@@ -319,6 +327,28 @@ function marketKindLine(factory: LlamalendFactoryKind | null | undefined, borrow
   return null;
 }
 
+/** Where one row's stated collateral, less what it moved, sits below the
+ *  balance the previous row stated: the AMM sold that much in between. */
+function ammSalesBetweenRows(rows: BaseActivityEvent[]) {
+  const out: { from: BaseActivityEvent; to: BaseActivityEvent; sold: number }[] = [];
+  let prev: { after: number; ev: BaseActivityEvent } | null = null;
+  for (const ev of rows) {
+    if (!isLlamalendEvent(ev)) continue;
+    const c = ev.context.data;
+    if (c.collateralAfter == null) {
+      if (Number(c.collateralDelta ?? 0) !== 0) prev = null;
+      continue;
+    }
+    const after = Number(c.collateralAfter);
+    const before = after - Number(c.collateralDelta ?? 0);
+    if (prev && prev.after - before > Math.max(prev.after * 1e-9, 1e-12)) {
+      out.push({ from: prev.ev, to: ev, sold: prev.after - before });
+    }
+    prev = { after, ev };
+  }
+  return out;
+}
+
 /** A closed position: when it opened and closed, and each hard liquidation's
  *  figures, from its events. */
 function ClosedExplanation({
@@ -347,6 +377,21 @@ function ClosedExplanation({
     </span>,
   ];
   const abs = (h?: string) => Math.abs(Number(h ?? 0));
+  if (liqs.length === 0 && view.status !== "liquidated") {
+    const sales = ammSalesBetweenRows(rows);
+    bullets.push(<span key="never-liquidated">It was never hard-liquidated.</span>);
+    for (const w of sales) {
+      bullets.push(
+        <span key={`sold-${w.to.id}`}>
+          Between {formatDate(w.from.timestamp)} and {formatDate(w.to.timestamp)} the AMM sold{" "}
+          <H>
+            {fmtColl(w.sold)} {cSym}
+          </H>{" "}
+          while the price sat in the bands, and the buy-back did not restore it.
+        </span>,
+      );
+    }
+  }
   liqs.forEach((e, i) => {
     const c = e.context.data;
     const conv = abs(c.convertedTaken);
