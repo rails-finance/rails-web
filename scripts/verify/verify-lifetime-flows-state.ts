@@ -14,7 +14,11 @@
 // fixture's rows. The SparkLend ledger (computeSparkEconomics) is held to the
 // route's buckets at the live stop, row by row, on 0x685f…128c (33 treasury
 // fees) and 0xe431…239e (spToken transfers), from the rows and from the
-// route's `lifetime`.
+// route's `lifetime`. An Aave V3 page served as folders (0xeca2…42dc,
+// lifetime-flows-aave-v3-folders-eca2.json, read 2026-09-29) meets the bars
+// row by row from the route's `lifetime`, where its own rows do not. On
+// 0x685f…128c, whose repayments exceed its borrowing, the debt states no
+// negative principal and its lines add to what is owed.
 //
 //   npx tsx --test scripts/verify/verify-lifetime-flows-state.ts
 import { test } from "node:test";
@@ -24,7 +28,8 @@ import { join } from "node:path";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AaveV3PositionView } from "@/components/protocol/aave-v3/aave-v3-position-card";
 import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
-import { computeAaveV3Economics } from "@/lib/aave-v3/chain-truth-tower";
+import { aaveV3LifetimeWithOpening, computeAaveV3Economics } from "@/lib/aave-v3/chain-truth-tower";
+import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import {
   AAVE_V3_FLOW_BUCKETS,
   aaveV3FlowEvents,
@@ -376,12 +381,66 @@ test("SparkLend: the route's day rows reproduce the event-level answer at every 
   }
 });
 
-test("SparkLend: the ledger's in and out meet the route's buckets at the live stop, transfers and the treasury fee included", () => {
+/** One SparkLend case from the shared flow-legs fixture: its events, the
+ *  route's answer, today's prices and what the position holds and owes after
+ *  its last row. */
+function sparkCase(wallet: string, file: string) {
   const legs = readJson<{
     tokens: Record<string, { symbol: string; decimals: number }>;
     cases: { wallet: string; rows: Parameters<typeof sparkRowsToEvents>[0] }[];
   }>("spark-flow-legs.json");
   const metas = new Map(Object.entries(legs.tokens).map(([address, t]) => [address, { address, ...t, named: true }]));
+  const c = legs.cases.find((x) => x.wallet === wallet)!;
+  const events = sparkRowsToEvents(c.rows, wallet, metas).events;
+  const series = readJson<FlowSeries>(file);
+  // Today's prices: the series' latest per asset, else the last event's.
+  const prices: Record<string, number> = {};
+  for (const d of series.days) for (const [asset, usd] of d[5]) prices[asset] = usd;
+  for (const [asset, p] of Object.entries(series.prices)) prices[asset] = p.obs[p.obs.length - 1][1];
+  // What the position holds and owes: each reserve's balance after its last row.
+  const held = new Map<string, { side: "supply" | "debt"; raw: string }>();
+  for (const r of c.rows as unknown as Record<string, string | null>[]) {
+    const set = (side: "supply" | "debt", asset: string | null, raw: string | null) => {
+      if (asset && raw != null) held.set(`${side}:${asset}`, { side, raw });
+    };
+    if (r.action === "liquidation") {
+      set("supply", r.collateral_asset, r.supply_after);
+      set("debt", r.debt_asset ?? r.reserve, r.debt_after);
+    } else if (["supply", "withdraw", "transfer_in", "transfer_out"].includes(r.action ?? ""))
+      set("supply", r.reserve, r.supply_after);
+    else set("debt", r.reserve, r.debt_after);
+  }
+  const reserves = (side: "supply" | "debt") =>
+    [...held]
+      .filter(([, v]) => v.side === side && v.raw !== "0")
+      .map(([k, v]) => {
+        const address = k.slice(k.indexOf(":") + 1);
+        const t = legs.tokens[address];
+        return {
+          symbol: t.symbol,
+          address,
+          decimals: t.decimals,
+          amount: Number(v.raw) / 10 ** t.decimals,
+          amountRaw: v.raw,
+          balanceSource: "reduced" as const,
+        };
+      });
+  const view: SparkPositionView = {
+    wallet,
+    status: "open",
+    supplies: reserves("supply"),
+    borrows: reserves("debt"),
+    peakSupplies: [],
+    peakBorrows: [],
+    liquidationCount: 0,
+    txCount: 0,
+    lastActivityAt: 0,
+    priceByAddress: prices,
+  };
+  return { events, series, prices, view };
+}
+
+test("SparkLend: the ledger's in and out meet the route's buckets at the live stop, transfers and the treasury fee included", () => {
   const LEDGER_BUCKET: Record<string, string> = {
     "Sent to another account": "sent",
     "Received by transfer": "received",
@@ -392,53 +451,7 @@ test("SparkLend: the ledger's in and out meet the route's buckets at the live st
     // spToken transfers in and out.
     ["0xe4317db5791ea5de9209b9839898ef65522b239e", "lifetime-flows-series-spark-e431.json"],
   ]) {
-    const c = legs.cases.find((x) => x.wallet === wallet)!;
-    const events = sparkRowsToEvents(c.rows, wallet, metas).events;
-    const series = readJson<FlowSeries>(file);
-    // Today's prices: the series' latest per asset, else the last event's.
-    const prices: Record<string, number> = {};
-    for (const d of series.days) for (const [asset, usd] of d[5]) prices[asset] = usd;
-    for (const [asset, p] of Object.entries(series.prices)) prices[asset] = p.obs[p.obs.length - 1][1];
-    // What the position holds and owes: each reserve's balance after its last row.
-    const held = new Map<string, { side: "supply" | "debt"; raw: string }>();
-    for (const r of c.rows as unknown as Record<string, string | null>[]) {
-      const set = (side: "supply" | "debt", asset: string | null, raw: string | null) => {
-        if (asset && raw != null) held.set(`${side}:${asset}`, { side, raw });
-      };
-      if (r.action === "liquidation") {
-        set("supply", r.collateral_asset, r.supply_after);
-        set("debt", r.debt_asset ?? r.reserve, r.debt_after);
-      } else if (["supply", "withdraw", "transfer_in", "transfer_out"].includes(r.action ?? ""))
-        set("supply", r.reserve, r.supply_after);
-      else set("debt", r.reserve, r.debt_after);
-    }
-    const reserves = (side: "supply" | "debt") =>
-      [...held]
-        .filter(([, v]) => v.side === side && v.raw !== "0")
-        .map(([k, v]) => {
-          const address = k.slice(k.indexOf(":") + 1);
-          const t = legs.tokens[address];
-          return {
-            symbol: t.symbol,
-            address,
-            decimals: t.decimals,
-            amount: Number(v.raw) / 10 ** t.decimals,
-            amountRaw: v.raw,
-            balanceSource: "reduced" as const,
-          };
-        });
-    const view: SparkPositionView = {
-      wallet,
-      status: "open",
-      supplies: reserves("supply"),
-      borrows: reserves("debt"),
-      peakSupplies: [],
-      peakBorrows: [],
-      liquidationCount: 0,
-      txCount: 0,
-      lastActivityAt: 0,
-      priceByAddress: prices,
-    };
+    const { events, series, prices, view } = sparkCase(wallet, file);
     // The ledger from the page's rows, and from the route's whole-history sums
     // (what a folder-served or windowed page reads).
     for (const from of ["rows", "route"] as const) {
@@ -490,6 +503,186 @@ test("SparkLend: the ledger's in and out meet the route's buckets at the live st
         assert.ok((cl.received ?? []).length > 0 && cl.exited.some((l) => l.flowLabel === "Sent to another account"));
     }
   }
+});
+
+// ── The Aave V3 family ledger: folder-served pages and the debt's lines ─────
+
+/** Each ledger row's bucket on the bars. */
+const LEDGER_ROW_BUCKETS: Record<string, string[]> = {
+  withdrawn: ["withdrawn"],
+  "Sold to repay": ["soldToRepay"],
+  "Withdrawn and swapped": ["withdrawnSwapped"],
+  "Swapped to another asset": ["swappedOut"],
+  "Sent to another account": ["sent"],
+  "Received by transfer": ["received"],
+  "Swapped in": ["swappedIn"],
+  repaid: ["repaid", "repaidWithCollateral"],
+  "Repaid by a debt swap": ["repaidBySwap"],
+  liquidatedCollateral: ["liquidatedCollateral"],
+  liquidatedDebt: ["liquidatedDebt"],
+  "Written off": ["writtenOff"],
+  borrowed: ["borrowed"],
+};
+
+/** The ledger's rows against the bars' buckets at the live stop, asset by
+ *  asset; the number of rows that differ. */
+function ledgerAgainstBars(
+  ledger: ReturnType<typeof computeAaveV3Economics>,
+  series: FlowSeries,
+  prices: Record<string, number>,
+) {
+  const route = aaveV3FlowSeriesTimeline(series, ledger, prices);
+  assert.ok(route, "the bars draw");
+  const m = buildFlowModel(route) as FlowModel;
+  const parts = assetsAt(m, m.liveStop).flows;
+  const rows: [string, TowerLine[]][] = [
+    ["withdrawn", ledger.collateral.exited],
+    ["received", ledger.collateral.received ?? []],
+    ["liquidatedCollateral", ledger.collateral.liquidated],
+    ["repaid", ledger.debt.exited],
+    ["liquidatedDebt", ledger.debt.liquidated],
+    ["borrowed", ledger.debt.inflowLines ?? []],
+  ];
+  const off: string[] = [];
+  let checked = 0;
+  for (const [kind, lines] of rows)
+    for (const l of lines) {
+      const buckets = LEDGER_ROW_BUCKETS[l.flowLabel ?? kind] ?? LEDGER_ROW_BUCKETS[kind];
+      const usd = buckets.reduce((a, b) => a + (parts.get(b)?.find((p) => p.symbol === l.symbol)?.usd ?? 0), 0);
+      if (!near(usd, l.usd ?? NaN)) off.push(`${buckets[0]} ${l.symbol}: bars ${usd}, ledger ${l.usd}`);
+      checked++;
+    }
+  const s = stateAt(m, m.liveStop);
+  if (!near(seg(s.collateral, "deposited"), ledger.collateral.lifetimeInflow)) off.push("deposited");
+  if (!near(s.collateral.out, usdSum(ledger.collateral.exited) + usdSum(ledger.collateral.liquidated)))
+    off.push("collateral out");
+  if (!near(s.debt.out, usdSum(ledger.debt.exited) + usdSum(ledger.debt.liquidated))) off.push("debt out");
+  return { off, checked };
+}
+
+test("Aave V3, served as folders: the ledger reads the route's totals and meets the bars row by row (0xeca2…42dc)", () => {
+  const f = readJson<{
+    view: AaveV3PositionView;
+    laneInterest: AaveLaneInterest[];
+    events: BaseActivityEvent[];
+    folders: ServedFolder[];
+    series: FlowSeries;
+  }>("lifetime-flows-aave-v3-folders-eca2.json");
+  assert.ok(f.folders.length > 0, "the page is served as folders");
+  const prices: Record<string, number> = { ...f.view.priceByAddress };
+  for (const [asset, p] of Object.entries(f.series.prices)) prices[asset] ??= p.obs[p.obs.length - 1][1];
+  const view = { ...f.view, priceByAddress: prices };
+  // The page's rows and the folders' sums: a folder's transfers are not in
+  // them, so this ledger's withdrawals fall short of the bars.
+  const fromPage = computeAaveV3Economics(
+    view,
+    f.events,
+    undefined,
+    aaveV3LifetimeWithOpening(f.events, null, f.folders),
+    f.laneInterest,
+  );
+  assert.ok(ledgerAgainstBars(fromPage, f.series, prices).off.length > 0, "the page's own rows differ from the bars");
+  // The route's whole-history totals: every row meets its bucket.
+  const lifetime = lifetimeFromSeries(f.series);
+  assert.ok(lifetime, "the route states its totals");
+  const ledger = computeAaveV3Economics(view, f.events, undefined, lifetime, f.laneInterest);
+  assert.ok(ledger.valued, "valued");
+  const { off, checked } = ledgerAgainstBars(ledger, f.series, prices);
+  assert.deepEqual(off, []);
+  assert.ok(checked >= 5, `${checked} rows checked`);
+  // With the flows whole, the collateral column states its price change.
+  assert.ok(ledger.collateral.priceChange != null, "a collateral price change");
+});
+
+/** The debt column adds up to what is owed: in + interest − out ± price change. */
+function debtAddsUp(ledger: ReturnType<typeof computeAaveV3Economics>): void {
+  const d = ledger.debt;
+  const owed = usdSum(d.current) + (d.interest?.usd ?? 0);
+  const column =
+    d.lifetimeInflow +
+    usdSum(d.earned) +
+    (d.interest?.usd ?? 0) -
+    usdSum(d.exited) -
+    usdSum(d.liquidated) +
+    (d.priceChange?.usd ?? 0);
+  assert.ok(near(column, usdSum(d.current) + (d.interest?.usd ?? 0), 0.01), `column ${column}, owed ${owed}`);
+  assert.ok(near(usdSum(d.inflowLines), d.lifetimeInflow), "the borrowed rows sum to the all-time figure");
+}
+
+test("SparkLend 0x685f…128c: repayments over borrowing leave no negative principal, and the debt lines add to what is owed", () => {
+  const c = sparkCase("0x685ffd82e8395229974a4dc4e9034fe6108f128c", "lifetime-flows-series-spark-685f.json");
+  const { events, series, prices } = c;
+  // The rows' last debt_after reads zero; what it owes now is the interest
+  // since (the listing's DAI debt, read 2026-09-29).
+  const dai = {
+    symbol: "DAI",
+    address: "0x6b175474e89094c44da98b954eedeac495271d0f",
+    decimals: 18,
+    amount: 1.1128204165647717,
+    amountRaw: "1112820416564771664",
+    balanceSource: "reduced" as const,
+  };
+  const view = { ...c.view, borrows: [dai] };
+  const lifetime = lifetimeFromSeries(series)!;
+  const f = lifetime.find((r) => r.symbol === "DAI")!;
+  const net = f.borrowed - f.repaid - f.liquidatedDebt - f.writtenOff - (f.repaidBySwap ?? 0);
+  assert.ok(net < 0, `DAI: the events took out ${-net} more than they borrowed`);
+  // Lanes as the api states them, one per debt reserve the position moved:
+  // the net its events moved, and the interest (balance less net).
+  const lanes: AaveLaneInterest[] = lifetime
+    .filter((r) => r.borrowed > 0 && r.address)
+    .map((r) => {
+      const decimals = r.symbol === "USDC" || r.symbol === "USDT" ? 6 : 18;
+      const netRaw = BigInt(
+        Math.round((r.borrowed - r.repaid - r.liquidatedDebt - r.writtenOff - (r.repaidBySwap ?? 0)) * 10 ** decimals),
+      );
+      const balance = r.symbol === "DAI" ? BigInt(dai.amountRaw) : BigInt(0);
+      return {
+        market: "spark",
+        reserve: r.address!.toLowerCase(),
+        axis: "debt" as const,
+        balance: balance.toString(),
+        net: netRaw.toString(),
+        interest: (balance - netRaw).toString(),
+        block: 0,
+      };
+    });
+  for (const [name, ledger] of [
+    ["rows", computeSparkEconomics(view, events)],
+    ["route", computeSparkEconomics(view, undefined, lifetime)],
+    ["route, lanes", computeSparkEconomics(view, events, lifetime, lanes)],
+  ] as const) {
+    const d = ledger.debt;
+    assert.ok(ledger.valued, name);
+    assert.ok(
+      d.current.every((l) => l.amount >= 0),
+      `${name}: no negative principal`,
+    );
+    // The whole DAI balance is its row; the interest is one row of its own.
+    assert.ok(near(d.current[0].amount, dai.amount, 1e-9), `${name}: DAI owed`);
+    assert.equal(d.interest ?? null, null, name);
+    const interest = (d.earned ?? []).filter((l) => l.symbol === "DAI");
+    assert.equal(interest.length, 1, `${name}: one DAI interest row`);
+    assert.ok(near(interest[0].amount, dai.amount - net, 1e-6), `${name}: interest ${interest[0].amount}`);
+    // With every lane's interest the token sums reconcile, the column states
+    // its price change and adds up to what is owed.
+    if (name !== "route, lanes") continue;
+    assert.ok(d.priceChange != null, "a price change");
+    debtAddsUp(ledger);
+    // The bars' interest and owed are the ledger's.
+    const m = buildFlowModel(sparkFlowSeriesTimeline(series, ledger, prices)!) as FlowModel;
+    const s = stateAt(m, m.liveStop);
+    assert.ok(near(s.debt.now, usdSum(d.current)), `${name}: owed`);
+    assert.ok(near(seg(s.debt, "debt-interest"), usdSum(d.earned)), `${name}: interest`);
+  }
+});
+
+test("where the debt's principal stays above zero it keeps the principal and interest split", () => {
+  // 0xfb93…2a71 owes USDT and USDC, each under its lane: net plus interest.
+  const d = tower.debt;
+  assert.ok(d.current.length > 0 && d.current.every((l) => l.amount > 0), "principal above zero");
+  assert.ok((d.interest?.amount ?? 0) > 0, "interest on top");
+  debtAddsUp(tower);
 });
 
 test("Aave V4: the route's day rows reproduce the event-level answer at every event day, one spoke position", () => {

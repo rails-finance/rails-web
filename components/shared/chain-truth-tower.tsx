@@ -246,10 +246,11 @@ function groupSide(side: TowerSideData, valued: boolean): TowerSideData {
     exited: flows(side.exited, "exited"),
     liquidated: flows(side.liquidated, "liq"),
     received: side.received ? flows(side.received, "recv") : side.received,
+    inflowLines: side.inflowLines ? mergeBucket(side.inflowLines, valued, "inflow") : side.inflowLines,
     claimable: side.claimable ? flows(side.claimable, "claim") : side.claimable,
     costs: side.costs ? flows(side.costs, "cost") : side.costs,
     ...(side.bars ? { bars: side.bars.map((b) => groupSide(b, valued)) } : {}),
-    // interest, the eventless lines and lifetimeInflow never merge.
+    // interest, the eventless lines and the lifetimeInflow total never merge.
   };
 }
 
@@ -260,6 +261,7 @@ function sideCanGroup(side: TowerSideData, valued: boolean): boolean {
     flowBuckets(side.exited).some((b) => bucketMergeable(b, valued)) ||
     flowBuckets(side.liquidated).some((b) => bucketMergeable(b, valued)) ||
     flowBuckets(side.received ?? []).some((b) => bucketMergeable(b, valued)) ||
+    bucketMergeable(side.inflowLines ?? [], valued) ||
     flowBuckets(side.claimable ?? []).some((b) => bucketMergeable(b, valued)) ||
     flowBuckets(side.costs ?? []).some((b) => bucketMergeable(b, valued))
   );
@@ -545,7 +547,23 @@ function buildSide(
   // exactly the mistake the letter glyph exists to avoid.
   const sideAddress = sideSymbol ? soleAddress(sideLines) : undefined;
   const rows: BreakdownRow[] = [];
-  if (hasFlows && side.lifetimeInflow > 0) {
+  const inflowLines = (side.inflowLines ?? []).filter((l) => sc(l) > 0);
+  if (hasFlows && side.lifetimeInflow > 0 && inflowLines.length > 0) {
+    // One row per asset, as the outflows have; a single row (one asset, or
+    // the assets grouped) keeps the "(all time)" caption.
+    inflowLines.forEach((line) => {
+      const l = line as DisplayLine;
+      rows.push({
+        sign: "",
+        label: inflowLines.length === 1 ? `${inflowLabel} (all time)` : inflowLabel,
+        amount: l.mergedParts && !l.symbol ? formatCompactUsd(l.usd ?? 0) : fmt(l),
+        exact: l.mergedParts && !l.symbol ? formatUsdValue(l.usd ?? 0) : fmtExact(l),
+        icon: flowIcon(l),
+        swatchStyle: { backgroundColor: flowColor },
+        prov: l.prov,
+      });
+    });
+  } else if (hasFlows && side.lifetimeInflow > 0) {
     rows.push({
       sign: "",
       // "(all time)" stays one piece when a wrapping label breaks.
