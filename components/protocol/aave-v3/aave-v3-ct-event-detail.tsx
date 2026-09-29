@@ -71,7 +71,7 @@ import {
 } from "@/components/shared/liquidation-forensics";
 import { signedAmount } from "./aave-v3-ct-event-header";
 import { AaveV3PositionStateBlock, exactLeg, exactUsd, reserveSymbol, type TouchedLeg } from "./aave-v3-position-state";
-import { formatCompact, formatNumber } from "@/lib/utils/format";
+import { formatCompact, formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
@@ -557,7 +557,7 @@ export function AaveV3CtEventDetail({
   const legged = built
     ? {
         ...built,
-        seizedLabel: "Collateral seized",
+        seizedLabel: fee ? "Collateral to the liquidator" : "Collateral seized",
         clearedLabel: "Debt cleared",
         premiumLabel: "Liquidator's premium",
         seized: { ...built.seized, amount: `${fmt2(ctx.liquidatedCollateralAmount)} ${ctx.collateralSymbol ?? ""}` },
@@ -635,8 +635,17 @@ export function AaveV3CtEventDetail({
       {forensics && <LiquidationForensics {...forensics} />}
       {fee && ctx.collateralSymbol && (
         <div className="px-5 pb-2 text-xs text-rb-500">
-          The collateral taken includes {fmt2(fee.amount)} {ctx.collateralSymbol} to the Aave treasury, the
-          liquidation&rsquo;s protocol fee.
+          {fmt2(ctx.liquidatedCollateralAmount)} {ctx.collateralSymbol} to the liquidator + {fmt2(fee.amount)}{" "}
+          {ctx.collateralSymbol} to the Aave treasury ={" "}
+          {fmt2(String(Math.abs(Number(ctx.liquidatedCollateralAmount)) + Math.abs(Number(fee.amount))))}{" "}
+          {ctx.collateralSymbol} removed from the position; the treasury&rsquo;s share is the liquidation&rsquo;s
+          protocol fee, a separate row in the timeline.
+        </div>
+      )}
+      {ctx.eventType === "transfer_out" && !feeOf && ctx.price && ctx.reserveSymbol && (
+        <div className="px-5 pb-2 text-xs text-rb-500">
+          The {fmt(ctx.amount)} {ctx.reserveSymbol} sent was worth{" "}
+          {formatUsdValue(Math.abs(Number(ctx.amount)) * ctx.price.usd)} at the block&rsquo;s oracle price.
         </div>
       )}
       {feeOf && (

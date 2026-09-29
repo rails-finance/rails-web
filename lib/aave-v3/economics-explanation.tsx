@@ -78,6 +78,10 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
   const currentColl =
     sumScalar(data.collateral.current, valued) +
     (data.collateral.interest ? sumScalar([data.collateral.interest], valued) : 0);
+  // Flows at their events' prices, holdings at today's: the difference.
+  const collPrice = valued ? (data.collateral.priceChange?.usd ?? 0) : 0;
+  const debtPrice = valued ? (data.debt.priceChange?.usd ?? 0) : 0;
+  const earnedLines = (data.collateral.earned ?? []).filter((l) => (valued ? (l.usd ?? 0) : l.amount) > 0);
   const currentDebt =
     sumScalar(data.debt.current, valued) + (interest ? (valued ? (interest.usd ?? 0) : interest.amount) : 0);
 
@@ -112,6 +116,9 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
           <>
             {" "}
             and earned <Fig>{fmt(collEarned, valued, collSym)}</Fig> of interest on it
+            {valued && earnedLines.length > 1 ? (
+              <> ({earnedLines.map((l) => `${formatCompactUsd(l.usd ?? 0)} on ${l.symbol}`).join(" and ")})</>
+            ) : null}
           </>
         )}
         {outParts.length > 0 && (
@@ -129,6 +136,12 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
           <>
             {outParts.length > 0 ? ", with " : "; then "}
             <Fig>{fmt(collLiquidated, valued, collSym)}</Fig> taken by liquidation
+          </>
+        )}
+        {Math.abs(collPrice) >= 0.5 && (
+          <>
+            ; price moves while the tokens were held {collPrice > 0 ? "add" : "take away"}{" "}
+            <Fig>{formatCompactUsd(Math.abs(collPrice))}</Fig>
           </>
         )}
         {currentColl > 0 ? (
@@ -166,6 +179,12 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
             <Fig>{fmt(debtLiquidated, valued, debtSym)}</Fig> cleared by liquidation
           </>
         )}
+        {Math.abs(debtPrice) >= 0.5 && (
+          <>
+            ; price moves while the debt was owed {debtPrice > 0 ? "add" : "take away"}{" "}
+            <Fig>{formatCompactUsd(Math.abs(debtPrice))}</Fig>
+          </>
+        )}
         {currentDebt > 0 ? (
           <>
             , leaving <Fig>{fmt(currentDebt, valued, debtSym)}</Fig> owed.
@@ -187,13 +206,26 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
   }
   if (collLiquidated > 0 && debtLiquidated > 0 && valued) {
     const net = debtLiquidated - collLiquidated;
+    const treasury = label === "Seamless" ? "Seamless" : "Aave";
+    // The collateral that left, as the liquidation card states it: the
+    // liquidator's share plus the treasury's fee.
+    const split = data.liquidationSplit ?? [];
+    const taken =
+      split.length > 0 && split.length === data.collateral.liquidated.length
+        ? split
+            .map(
+              (x) =>
+                `${fmt2(String(x.total - x.fee))} ${x.symbol} to the liquidator + ${fmt2(String(x.fee))} ${x.symbol} to the ${treasury} treasury = ${fmt2(String(x.total))} ${x.symbol}`,
+            )
+            .join(" and ")
+        : tokenList(data.collateral.liquidated);
     items.push(
       <span key="liq-net">
-        Liquidations took {tokenList(data.collateral.liquidated)} of collateral to clear{" "}
+        Liquidations took {taken} of collateral to clear{" "}
         {tokenList(data.debt.liquidated.filter((l) => !isWrittenOff(l)))} of debt:{" "}
         <Fig>{fmt(collLiquidated, valued, collSym)}</Fig> against <Fig>{fmt(debtLiquidated, valued, debtSym)}</Fig>
-        {data.liquidatedAtEventPrices ? " at the prices of the day" : ""}, a net {signedUsd(net)} to the borrower: the
-        liquidation bonus, part of which went to the {label === "Seamless" ? "Seamless" : "Aave"} treasury.
+        {data.flowsPricedAtEvents ? " at the prices of the day" : ""}, a net {signedUsd(net)} to the borrower: the
+        liquidation bonus, part of which went to the {treasury} treasury.
       </span>,
     );
   } else if (collLiquidated > 0) {
@@ -203,11 +235,14 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
       </span>,
     );
   }
-  if (data.liquidatedAtEventPrices && valued) {
+  if (valued && (Math.abs(collPrice) >= 0.5 || Math.abs(debtPrice) >= 0.5)) {
     items.push(
       <span key="price-basis">
-        Supplied, withdrawn, borrowed, repaid and interest are valued at today&apos;s prices, and the liquidated amounts
-        at the prices when each liquidation happened.
+        {data.flowsPricedAtEvents
+          ? "Each flow is valued at the oracle price at its block, interest and what is held now at today's price"
+          : "Flows are valued at the oracle price at their block where the event carries one, the rest, interest and what is held now at today's price"}
+        ; the Price change row is the difference, what the tokens gained or lost in value while the position held them.
+        In tokens, what came in plus interest less what left equals what is held now.
       </span>,
     );
   }
@@ -263,7 +298,11 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}): LearnMor
     details: [
       {
         bold: "Lifetime flows",
-        text: "the bars show every supply, withdrawal, borrow and repayment over the position's life, so deposited plus interest less everything that left equals what is held now.",
+        text: "the bars show every supply, withdrawal, borrow and repayment over the position's life. In tokens, deposited plus interest less everything that left equals what is held now.",
+      },
+      {
+        bold: "Price change",
+        text: "in dollars, each flow is valued at the oracle price at its block and what is held at today's price. The Price change row is the difference, so deposited plus interest less everything that left, plus the price change, equals what is held now.",
       },
       {
         bold: "Other ways out",
@@ -271,7 +310,7 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}): LearnMor
       },
       {
         bold: "Interest",
-        text: "supplied balances earn interest and debts accrue it without an event. On the supply side it is a separate row beside what was deposited; on the debt side, interest still owed is a segment of the debt bar and interest already repaid is a row beside what was borrowed.",
+        text: "supplied balances earn interest and debts accrue it without an event. On the supply side each asset's interest is a separate row beside what was deposited, valued at today's price; on the debt side, interest still owed is a segment of the debt bar and interest already repaid is a row beside what was borrowed.",
       },
       {
         bold: "Liquidated",

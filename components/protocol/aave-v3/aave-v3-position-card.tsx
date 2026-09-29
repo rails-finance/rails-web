@@ -15,6 +15,7 @@
 // a position, and risk is read live on the position page — whose own Pool
 // getUserAccountData read is the only HF this card ever shows.
 
+import type { AaveV3CountNote } from "@/lib/aave-v3/event-neighbours";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
@@ -338,7 +339,7 @@ export function AaveV3PositionCard({
   receipts?: boolean;
   /** Why the timeline's event count differs from the transaction count
    *  (aaveV3CountSentence), where the page holds the whole history. */
-  countNote?: string | null;
+  countNote?: AaveV3CountNote | null;
   /** Which deployment the row describes — its session, market label and the
    *  receipts behind every figure. Ethereum's indexed lane by default; a Base
    *  lender passes its own (lib/aave-v3/card-deployment.tsx). */
@@ -404,7 +405,7 @@ function AaveV3PositionCardBody({
 }: {
   v: AaveV3PositionView;
   receipts?: boolean;
-  countNote?: string | null;
+  countNote?: AaveV3CountNote | null;
   rowExtra?: React.ReactNode;
   explanation?: React.ReactNode;
   /** Copy-this-view control, forwarded straight through to `PositionCardShell`
@@ -422,7 +423,7 @@ function AaveV3PositionCardBody({
   const marketTitle = marketLabel
     ? `${marketLabel} is one of the Aave V3 markets on Ethereum. Each market is a separate account with a separate health factor.`
     : undefined;
-  const countTitle = [txCountTitle(v, dep.session === "aave-v3"), countNote].filter(Boolean).join(". ");
+  const countTitle = [txCountTitle(v, dep.session === "aave-v3"), countNote?.text].filter(Boolean).join(". ");
   const collUsd = totalUsd(v, v.supplies);
   const debtUsd = totalUsd(v, v.borrows);
   // `receipts` is the render-site switch (listing defaults false; only the

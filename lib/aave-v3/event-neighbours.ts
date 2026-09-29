@@ -6,6 +6,7 @@
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
+import { isAaveCollector } from "./liquidation-fee";
 
 export type AaveV3TimelineEvent = BaseActivityEvent & { context: { protocol: "aave-v3"; data: AaveV3Context } };
 
@@ -60,6 +61,8 @@ export interface AaveV3CountSplit {
   liquidations: number;
   /** Rows beyond the first in a transaction (a liquidation's fee row). */
   sharedTxRows: number;
+  /** Of those, a liquidation's fee to the Aave treasury. */
+  feeRows: number;
 }
 
 const hasPoolCall = (e: AaveV3TimelineEvent): boolean => {
@@ -99,6 +102,66 @@ export function aaveV3CountSplit(
     transferOnly: [...kinds].map(([kind, count]) => ({ kind, count })),
     liquidations: events.filter((e) => e.context.data.eventType === "liquidation").length,
     sharedTxRows: events.length - byTx.size,
+    feeRows: [...byTx.values()].reduce(
+      (n, rows) =>
+        rows.some((r) => r.context.data.eventType === "liquidation")
+          ? n +
+            rows.filter(
+              (r) => r.context.data.eventType === "transfer_out" && isAaveCollector(r.context.data.counterparty),
+            ).length
+          : n,
+      0,
+    ),
+  };
+}
+
+/** The count badge's and the card's statement of the rows: the total, and
+ *  one line per kind after the owner's transactions (which the card words,
+ *  knowing who sent them). `parts` is empty where the kinds do not add
+ *  up to the total; `text` then carries the older sentence. */
+export interface AaveV3CountNote {
+  text: string;
+  total: number;
+  txCount: number;
+  parts: string[];
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const TRANSFER_WORDS: Record<string, [string, string]> = {
+  "an aToken transfer out": ["transfer out", "transfers out"],
+  "an aToken transfer in": ["transfer in", "transfers in"],
+  "a withdrawal through the WETH gateway": [
+    "withdrawal through the WETH gateway",
+    "withdrawals through the WETH gateway",
+  ],
+  "a withdraw and swap": ["withdraw and swap", "withdraws and swaps"],
+  "a supply from a swap": ["supply from a swap", "supplies from swaps"],
+};
+
+export function aaveV3CountNote(split: AaveV3CountSplit, txCount: number): AaveV3CountNote | null {
+  const text = aaveV3CountSentence(split, txCount);
+  if (text == null) return null;
+  const parts: string[] = [];
+  if (split.liquidations > 0)
+    parts.push(plural(split.liquidations, "liquidation by a liquidator", "liquidations by liquidators"));
+  if (split.feeRows > 0) parts.push(plural(split.feeRows, "treasury fee row", "treasury fee rows"));
+  for (const k of split.transferOnly) {
+    const w = TRANSFER_WORDS[k.kind] ?? [k.kind.replace(/^an? /, ""), k.kind.replace(/^an? /, "")];
+    parts.push(plural(k.count, w[0], w[1]));
+  }
+  const otherShared = split.sharedTxRows - split.feeRows;
+  if (otherShared > 0)
+    parts.push(
+      plural(otherShared, "more row in a transaction already counted", "more rows in transactions already counted"),
+    );
+  const t = split.transferOnly.reduce((n, k) => n + k.count, 0);
+  const adds = txCount + split.liquidations + split.feeRows + t + Math.max(0, otherShared) === split.events;
+  if (!adds) return { text, total: split.events, txCount, parts: [] };
+  return {
+    text: `${split.events} rows: ${[`${plural(txCount, "transaction", "transactions")} by or for the owner`, ...parts].join(", ")}.`,
+    total: split.events,
+    txCount,
+    parts,
   };
 }
 

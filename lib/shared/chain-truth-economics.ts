@@ -114,6 +114,12 @@ export interface TowerSideData {
    *  of `current`'s segment into a hatched one above it, one "−" row per line;
    *  the held total is `current` less these. Decision 0022. */
   eventlessLosses?: TowerLine[];
+  /** EITHER SIDE, valued towers: where flows are valued at each event's
+   *  price and the held figure at today's, the signed difference in USD
+   *  (`usd`, and `amount` the same figure). A "+" or "−" row after the
+   *  outflows, so the column reaches the held figure; a gain also joins the
+   *  faded inflow bar. Feeders that never set this render identically. */
+  priceChange?: TowerLine | null;
   /** Draw this side as one bar per entry, each a side of its own in ONE token,
    *  scaled to its own base in token mode (a deposit's paid-in side: the
    *  collateral and the yield it was paid). When set, the side's own lines stay
@@ -132,6 +138,9 @@ export interface ChainTruthTowerData {
   priceKind?: ProvKind;
   collateral: TowerSideData;
   debt: TowerSideData;
+  /** True when every flow row is valued at its event's price; the all-time
+   *  rows' receipts say so. Unset: today's price. */
+  flowsPricedAtEvents?: boolean;
   /** Token-mode unit labels (e.g. collateral "WBTC", debt "USDC"). */
   collateralUnit?: string;
   debtUnit?: string;

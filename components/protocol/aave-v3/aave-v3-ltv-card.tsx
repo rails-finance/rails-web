@@ -45,22 +45,20 @@ export function AaveV3LtvView({ chain }: { chain: AaveV3PositionChainResponse })
   const liqProv = accountDataProv("Liquidation threshold", "currentLiquidationThreshold", pool);
   const availProv = accountDataProv("Available to borrow", "availableBorrowsBase", pool);
 
-  // Three label-led clusters on the shared risk footer strip (design-grammar
-  // rule) — every <Prov> moved verbatim from the stacked layout: same info
-  // builder, same format call, same value text.
+  // One plain loan-to-value line (now, where borrowing stops, where
+  // liquidation starts) and the headroom, on the shared risk footer strip.
   return (
     <>
-      <RiskFigure label="Loan-to-value">
+      <RiskFigure>
+        LTV{" "}
         <Prov info={currentProv}>
           <RiskStrong>{pct(currentLtv)}</RiskStrong>
         </Prov>{" "}
-        of <Prov info={capProv}>{pct(maxLtv)}</Prov> cap
+        now; borrowing stops at <Prov info={capProv}>{pct(maxLtv)}</Prov>; liquidation at{" "}
+        <Prov info={liqProv}>{pct(liqThreshold)}</Prov>
       </RiskFigure>
       <RiskFigure>
         <Prov info={availProv}>{fmtUsd(chain.availableBorrowsUsd).display}</Prov> more to borrow
-      </RiskFigure>
-      <RiskFigure>
-        liquidation at <Prov info={liqProv}>{pct(liqThreshold)}</Prov>
       </RiskFigure>
     </>
   );

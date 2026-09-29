@@ -135,10 +135,12 @@ interface Figure {
 }
 
 /** before → after, or the after alone where nothing changed. */
-function BeforeAfter({ before, after }: { before: Figure; after: Figure }) {
+/** Before → after; one figure where the two agree, unless `always` (the
+ *  health factor, which every event states as a pair). */
+function BeforeAfter({ before, after, always = false }: { before: Figure; after: Figure; always?: boolean }) {
   return (
     <StateTransition>
-      {before.value !== after.value && (
+      {(always || before.value !== after.value) && (
         <>
           <span className="text-sm font-semibold tabular-nums text-rb-500">
             <Prov info={before.prov} value={before.value}>
@@ -369,9 +371,9 @@ export function AaveV3PositionStateBlock({
   const { account, emode, sources } = state;
   const touchedOn = (side: Side): Set<string> => new Set(touched.filter((t) => t.side === side).map((t) => t.reserve));
 
-  const accountCard = (figure: (side: AaveV3AccountSide, when: When) => Figure) =>
+  const accountCard = (figure: (side: AaveV3AccountSide, when: When) => Figure, always = false) =>
     account ? (
-      <BeforeAfter before={figure(account.before, "before")} after={figure(account.after, "after")} />
+      <BeforeAfter before={figure(account.before, "before")} after={figure(account.after, "after")} always={always} />
     ) : (
       <NotAvailable />
     );
@@ -421,16 +423,19 @@ export function AaveV3PositionStateBlock({
     {
       key: "health-factor",
       label: "Health factor",
-      body: accountCard((a, when) => ({
-        text: hfLabelV4(a.healthFactor == null ? null : wadToNumber(a.healthFactor)),
-        value: a.healthFactor == null ? "∞" : groupExact(humanOf(a.healthFactor, 18)),
-        prov: healthFactorProv(when, coords, {
-          wad: a.healthFactor,
-          collateralBase: a.totalCollateralBase,
-          debtBase: a.totalDebtBase,
-          thresholdBps: a.liquidationThresholdBps,
+      body: accountCard(
+        (a, when) => ({
+          text: hfLabelV4(a.healthFactor == null ? null : wadToNumber(a.healthFactor)),
+          value: a.healthFactor == null ? "∞" : groupExact(humanOf(a.healthFactor, 18)),
+          prov: healthFactorProv(when, coords, {
+            wad: a.healthFactor,
+            collateralBase: a.totalCollateralBase,
+            debtBase: a.totalDebtBase,
+            thresholdBps: a.liquidationThresholdBps,
+          }),
         }),
-      })),
+        account?.before.healthFactor != null && account.after.healthFactor != null,
+      ),
     },
     // Debt as a share of collateral, the loan-to-value the account stands at.
     {

@@ -55,7 +55,7 @@ import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-f
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
-import { aaveV3CountSentence, aaveV3CountSplit, aaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
+import { aaveV3CountNote, aaveV3CountSplit, aaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
 import {
   AaveV3PositionCard,
   viewFromSummary,
@@ -347,7 +347,7 @@ export default function AaveV3PositionDetail({
   const countNote = useMemo(
     () =>
       view && historyWindow.state === "whole" && (servedFolders?.length ?? 0) === 0
-        ? aaveV3CountSentence(aaveV3CountSplit(aaveEvents as AaveV3Event[], isWethGateway), view.txCount)
+        ? aaveV3CountNote(aaveV3CountSplit(aaveEvents as AaveV3Event[], isWethGateway), view.txCount)
         : null,
     [view, historyWindow.state, servedFolders, aaveEvents],
   );

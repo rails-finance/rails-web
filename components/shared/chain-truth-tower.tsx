@@ -349,7 +349,9 @@ function sideScalars(side: TowerSideData, valued: boolean) {
   // Interest earned over the life follows the same rule: it is inside
   // `current` or `exited`, so it grows the reference bar only.
   const earned = (side.earned ?? []).reduce((s, l) => s + sc(l), 0);
-  const inflow = side.lifetimeInflow + received + earned;
+  // A price gain grows the reference bar the same way (a loss draws nothing).
+  const gain = valued && side.priceChange ? Math.max(0, side.priceChange.usd ?? 0) : 0;
+  const inflow = side.lifetimeInflow + received + earned + gain;
   return { stack, inflow, base: Math.max(stack, inflow) };
 }
 
@@ -378,6 +380,8 @@ function buildSide(
     towerMax: number;
     hideHistorical: boolean;
     height: number;
+    /** The flows are valued at each event's price (the all-time receipt says so). */
+    flowsPricedAtEvents?: boolean;
   },
 ): TowerSide {
   const {
@@ -402,7 +406,8 @@ function buildSide(
   const earnedTotal = earnedLines.reduce((s, l) => s + sc(l), 0);
   // The faded inflow bar spans real deposits + custody received by transfer +
   // interest earned over the life.
-  const totalInflow = side.lifetimeInflow + receivedTotal + earnedTotal;
+  const priceLine = valued && side.priceChange && side.priceChange.usd != null ? side.priceChange : null;
+  const totalInflow = side.lifetimeInflow + receivedTotal + earnedTotal + Math.max(0, priceLine?.usd ?? 0);
   const hasFlows =
     !hideHistorical &&
     (side.exited.length > 0 ||
@@ -544,7 +549,7 @@ function buildSide(
       prov: {
         kind: "chain-derived",
         summary: valued
-          ? `${inflowLabel} over the position's life — every inflow the position's events record, added up per token and valued at the price the protocol uses for that token now.`
+          ? `${inflowLabel} over the position's life — every inflow the position's events record, added up per token and valued at ${opts.flowsPricedAtEvents ? "the price the protocol used for that token at each event's block" : "the price the protocol uses for that token now"}.`
           : `${inflowLabel} over the position's life — every inflow the position's events record, added up.`,
         formula: "Σ inflows",
       },
@@ -613,6 +618,18 @@ function buildSide(
         indent: true,
       }),
     );
+  // "± Price change" — flows valued at their events' prices against what is
+  // held at today's: the row that lets the column reach the held figure.
+  if (hasFlows && priceLine)
+    rows.push({
+      sign: (priceLine.usd ?? 0) < 0 ? "−" : "+",
+      label: priceLine.flowLabel ?? "Price change",
+      amount: formatCompactUsd(Math.abs(priceLine.usd ?? 0)),
+      exact: formatUsdValue(Math.abs(priceLine.usd ?? 0)),
+      swatchStyle: { backgroundColor: flowColor },
+      prov: priceLine.prov,
+      indent: true,
+    });
   const hintUsd = (l: TowerLine) => (valued && l.usd != null ? l.usd : null);
   side.current.forEach((line) => {
     const l = line as DisplayLine;
@@ -860,6 +877,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     withInterest: false,
     valued,
     resultLabel: data.collateralTitle ?? "Collateral",
+    flowsPricedAtEvents: data.flowsPricedAtEvents,
   });
   const right = build(debtParts, d, {
     solid: DEBT_SOLID,
@@ -872,6 +890,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     interestLabel: data.interestLabel,
     valued,
     resultLabel: data.debtTitle ?? "Current debt",
+    flowsPricedAtEvents: data.flowsPricedAtEvents,
   });
   return <DualTowerChart left={left} right={right} height={TOWER_H} maxValue={towerMax} className="mb-1" />;
 }

@@ -180,6 +180,9 @@ export interface ChainTruthRowSpec {
    *  spine draws no flank on a custody row, so there is nothing to hand off
    *  to (see SpineTokenRow.direction). */
   custody?: boolean;
+  /** A custody row that keeps its action label before the amounts (Aave V3's
+   *  "Transferred out"); the amounts stay bare. Unset: no label, as above. */
+  custodyLabel?: boolean;
   /** A rate the position holder (or a delegate acting for them) CHOSE — never a
    *  utilization rate. Renders as the same lozenge Liquity V2 uses (individual
    *  rb-500, or party-pink `tone: "delegate"` with the people glyph), and echoes
@@ -451,7 +454,7 @@ export function ChainTruthRow({
         <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-positive/20 text-positive">
           {spec.label}
         </span>
-      ) : spec.label && !spec.custody ? (
+      ) : spec.label && (!spec.custody || spec.custodyLabel) ? (
         <span
           className={`max-w-full shrink-0 text-sm font-medium ${spec.critical ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}
         >

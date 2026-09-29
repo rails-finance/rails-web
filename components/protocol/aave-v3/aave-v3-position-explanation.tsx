@@ -15,6 +15,7 @@
 // rule: bold only chrome-mirrored figures, and every chrome figure appears
 // bold somewhere here — reverse-completeness).
 
+import type { AaveV3CountNote } from "@/lib/aave-v3/event-neighbours";
 import type { AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
 import type { AaveV3PositionView } from "@/components/protocol/aave-v3/aave-v3-position-card";
 import { aaveV3LiquidationRead, type AaveV3CardCaptions } from "@/lib/aave-v3/chain-truth-tower";
@@ -59,7 +60,7 @@ export function AaveV3PositionExplanation({
    *  market is. Omitted on the single-Pool deployments. */
   marketName?: string;
   /** Why the timeline lists more events than the count (aaveV3CountSentence). */
-  countNote?: string | null;
+  countNote?: AaveV3CountNote | null;
 }) {
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
@@ -218,7 +219,24 @@ export function AaveV3PositionExplanation({
     }
   }
 
-  if (view != null && view.txCount > 0) {
+  if (view != null && view.txCount > 0 && countNote && countNote.parts.length > 0) {
+    // The rows, one kind per line: the owner's transactions first.
+    const by = externalActivity && externalActivity.external > 0 ? "by or for the owner" : "by the owner";
+    bullets.push(
+      <span key="tx-count">
+        The timeline lists <H>{countNote.total}</H> rows:
+        <span className="mt-1 block space-y-0.5">
+          {[`${countNote.txCount} transaction${countNote.txCount === 1 ? "" : "s"} ${by}`, ...countNote.parts].map(
+            (line) => (
+              <span key={line} className="block pl-3">
+                {line}
+              </span>
+            ),
+          )}
+        </span>
+      </span>,
+    );
+  } else if (view != null && view.txCount > 0) {
     const liq = view.liquidationCount;
     bullets.push(
       <span key="tx-count">
@@ -231,7 +249,7 @@ export function AaveV3PositionExplanation({
             ) : null}
           </>
         ) : null}
-        .{countNote ? <> {countNote}</> : null}
+        .{countNote ? <> {countNote.text}</> : null}
       </span>,
     );
   }
@@ -338,7 +356,7 @@ export function AaveV3ClosedPositionExplanation({
 }: {
   v: AaveV3PositionView;
   /** Why the timeline lists more events than the count (aaveV3CountSentence). */
-  countNote?: string | null;
+  countNote?: AaveV3CountNote | null;
   /** The account's timeline (Aave V3 Pool events, ascending) — the pane reads
    *  how the record ended from the rows already fetched. */
   events: BaseActivityEvent[];
@@ -469,7 +487,7 @@ export function AaveV3ClosedPositionExplanation({
       ) : aave.length > 0 ? (
         <>; the liquidation calls are its only recorded events, so it counts no transactions of its own</>
       ) : null}
-      .{countNote ? <> {countNote}</> : null}
+      .{countNote ? <> {countNote.text}</> : null}
     </span>,
   );
 

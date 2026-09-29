@@ -163,9 +163,14 @@ export interface V3StateRead {
   reserveLtvBps?: number | null;
   /** The account held nothing and owed nothing once the transaction had run. */
   emptyAfter?: boolean;
+  /** The assets on as collateral once the transaction had run. */
+  collateralSymbols?: string[];
 }
 
-/** A health factor under this is close enough to 1 for the prose to say so. */
+/** The graded near-liquidation rule: under CLOSE the prose says the account
+ *  is close to the liquidation line; from CLOSE to NEAR it states the fall in
+ *  the collateral that would liquidate it, without "close". */
+export const CLOSE_LIQUIDATION_HF = 1.1;
 export const NEAR_LIQUIDATION_HF = 1.2;
 
 export function v3StateRead(
@@ -186,6 +191,9 @@ export function v3StateRead(
     sincePrev: since ? { prevAfter: Number(since.prevAfter), interest: Number(since.interest) } : undefined,
     reserveLtvBps: own?.ltvBps ?? null,
     emptyAfter: stateEmptyAfter(here),
+    collateralSymbols: here.reserves
+      .filter((r) => r.collateral?.after && r.decimals != null && Number(humanOf(r.supply.after, r.decimals)) > 0)
+      .map((r) => r.symbol ?? r.reserve.slice(0, 6)),
     debtUsdBefore: baseToUsd(here.account.before.totalDebtBase),
     left: here.reserves.flatMap((r) => {
       const dec = r.decimals;
@@ -233,21 +241,24 @@ function healthFactorLine(state: V3StateRead | undefined, withdraw = false): Cla
       ? null
       : clause(<>With no debt left, the account has no health factor and cannot be liquidated.</>);
   }
-  // Close to the line after the event, or only before it (a repay that
-  // lifted the account clear of it).
-  const nearAfter = a < NEAR_LIQUIDATION_HF;
-  const nearBefore = b != null && b < NEAR_LIQUIDATION_HF;
-  const drop = nearAfter && a > 1 ? Math.round((1 - 1 / a) * 100) : null;
-  const tail = nearAfter ? (
+  // The graded rule, on the figure after the event (or before it, where the
+  // event lifted the account clear): under 1.1 "close to the liquidation
+  // line"; from 1.1 to 1.2 the fall that would liquidate it, without "close".
+  const coll = state.collateralSymbols?.length === 1 ? state.collateralSymbols[0] : null;
+  const fall = (hf: number) => (
     <>
-      , close to the liquidation line at 1
-      {drop != null ? (
-        <>: a fall of about {drop}% in the collateral&rsquo;s value would have made the account liquidatable</>
-      ) : null}
+      a fall of about {Math.round((1 - 1 / hf) * 100)}% in{" "}
+      {coll ? <>{coll}&rsquo;s price</> : <>the collateral&rsquo;s value</>} would have made the account liquidatable
     </>
-  ) : nearBefore ? (
-    <>: the account started this transaction close to the liquidation line at 1</>
-  ) : null;
+  );
+  const tail =
+    a < CLOSE_LIQUIDATION_HF ? (
+      <>, close to the liquidation line at 1{a > 1 ? <>: {fall(a)}</> : null}</>
+    ) : a < NEAR_LIQUIDATION_HF ? (
+      <>: {fall(a)}</>
+    ) : b != null && b < CLOSE_LIQUIDATION_HF ? (
+      <>: the account started this transaction close to the liquidation line at 1</>
+    ) : null;
   const allowed = withdraw ? (
     <>. The Pool allows a withdrawal only while the health factor stays at or above 1</>
   ) : null;
@@ -526,6 +537,19 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
   switch (ctx.eventType) {
     case "supply": {
       const coll = state?.collateral;
+      const hfSteady =
+        state?.hfBefore != null && state.hfAfter != null && Math.abs(state.hfAfter - state.hfBefore) < 0.005;
+      // The first "Collateral off" group on the page: the supply that put an
+      // asset there says what the heading means.
+      const offDefinition: ClauseInput =
+        coll && !coll.after && !coll.before && (numOf(ctx.supplyBefore) ?? 0) <= 0
+          ? clause(
+              <>
+                &ldquo;Collateral off&rdquo; in the position state lists supplied assets that earn interest but do not
+                count toward the health factor, back no debt and cannot be seized in a liquidation.
+              </>,
+            )
+          : null;
       const collateralLine: ClauseInput =
         coll && !coll.before && coll.after
           ? clause(
@@ -546,8 +570,11 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
               ? state?.reserveLtvBps === 0
                 ? clause(
                     <>
-                      {sym} cannot back borrowing in this market: its loan-to-value at this block is 0%. This supply
-                      earns the supply rate and backs no debt.
+                      {sym} cannot back borrowing in this market: its loan-to-value at this block is 0%, and the Pool
+                      does not let an asset with a 0% loan-to-value be switched on, so
+                      {(numOf(ctx.supplyBefore) ?? 0) <= 0 ? <> it was never on as collateral</> : <> it stays off</>}.
+                      This supply earns the supply rate, backs no debt
+                      {hfSteady ? <> and did not change the health factor</> : null}.
                     </>,
                   )
                 : clause(
@@ -556,8 +583,9 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
                       {state?.reserveLtvBps != null ? (
                         <> (its loan-to-value at this block was {state.reserveLtvBps / 100}%)</>
                       ) : null}
-                      , but it stayed off as collateral, so this supply backs no debt and only earns the supply rate.
-                      The Pool switches an asset on automatically at a first supply only where the account may use it as
+                      , but it stayed off as collateral, so this supply backs no debt
+                      {hfSteady ? <>, did not change the health factor</> : null} and only earns the supply rate. The
+                      Pool switches an asset on automatically at a first supply only where the account may use it as
                       collateral (an asset in isolation mode, for one, stays off while other collateral is on);
                       otherwise the owner switches it on.
                     </>,
@@ -577,6 +605,7 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
         meansNow: [
           clause(<>It earns {brandOwns} variable supply rate, paid into the balance as it accrues.</>),
           collateralLine,
+          offDefinition,
           healthFactorLine(state),
           priorMoveLine(state),
         ],
@@ -973,16 +1002,29 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
             closedLine(ctx, state, sym, "withdrawn"),
           ],
         };
+      const sentUsd = ctx.price ? Math.abs(Number(ctx.amount)) * ctx.price.usd : null;
       return {
-        happened: [clause(happened)],
+        happened: [
+          clause(
+            <>
+              Sent {transferFig}
+              {sentUsd != null ? <> ({formatUsdValue(sentUsd)} at the block&rsquo;s oracle price)</> : null} of supplied{" "}
+              {sym} to {recipient} as an aToken transfer.
+            </>,
+          ),
+        ],
         meansNow: [
           named ? clause(<>The recipient is {named.role}.</>) : null,
           clause(
             <>
               This is a position move between accounts, not a withdrawal to a wallet: custody moved to the receiving
               account and the tokens stayed inside the Pool.
+              {named ? null : <> The chain does not say whether that account belongs to the same owner.</>}
             </>,
           ),
+          switchedOffLine(state, sym),
+          healthFactorLine(state),
+          priorMoveLine(state),
         ],
       };
     }
@@ -1079,15 +1121,23 @@ function liquidationSlots(ctx: AaveV3Context, coords: V3Coords, debtSym: string,
     ) : (
       <>The account&rsquo;s health factor fell below 1.0</>
     );
-  const happened = (
-    <>
-      {fell}, so a liquidator repaid {clearedFig} of its debt and took {seizedFig} of its collateral.
-    </>
-  );
-
   // The two balances reconciled. The Pool sends the fee after the seizure, and
   // the timeline's fee row sits in the same transaction.
   const feeAmt = fee ? Math.abs(Number(fee.amount)) || 0 : 0;
+  const removed = Math.abs(Number(ctx.liquidatedCollateralAmount)) + feeAmt;
+  // One statement of what left, used on the card, here and in the flows:
+  // the liquidator's share + the treasury's fee = the collateral removed.
+  const happened =
+    feeAmt > 0 ? (
+      <>
+        {fell}, so a liquidator repaid {clearedFig} of its debt and took its collateral: {seizedFig} to the liquidator +{" "}
+        {fmt2(String(feeAmt))} {collSym} to the Aave treasury = {fmt2(String(removed))} {collSym} removed.
+      </>
+    ) : (
+      <>
+        {fell}, so a liquidator repaid {clearedFig} of its debt and took {seizedFig} of its collateral.
+      </>
+    );
   const collAfter = numOf(ctx.supplyAfter);
   const debtAfter = numOf(ctx.debtAfter);
   const collLine: ClauseInput =
@@ -1098,10 +1148,10 @@ function liquidationSlots(ctx: AaveV3Context, coords: V3Coords, debtSym: string,
           {
             after: collAfter,
             start: "before",
-            moves: [
-              { amount: Number(ctx.liquidatedCollateralAmount), sign: -1, what: "to the liquidator" },
-              ...(feeAmt > 0 ? [{ amount: feeAmt, sign: -1 as const, what: "to the Aave treasury" }] : []),
-            ],
+            moves:
+              feeAmt > 0
+                ? [{ amount: removed, sign: -1, what: "removed" }]
+                : [{ amount: Number(ctx.liquidatedCollateralAmount), sign: -1, what: "to the liquidator" }],
           },
           2,
         )
@@ -1212,7 +1262,8 @@ function feeSlots(ctx: AaveV3Context, coords: V3Coords, sym: string, liq: AaveV3
       clause(
         <>
           Sent {transferFig} of supplied {sym} to the Aave treasury as the protocol fee of the liquidation in the same
-          transaction.
+          transaction: {fmt2(liq.liquidatedCollateralAmount)} {sym} to the liquidator + {fmt2(ctx.amount)} {sym} to the
+          Aave treasury = {fmt2(String(Math.abs(Number(liq.liquidatedCollateralAmount)) + feeAmt))} {sym} removed.
         </>,
       ),
     ],
@@ -1226,7 +1277,7 @@ function feeSlots(ctx: AaveV3Context, coords: V3Coords, sym: string, liq: AaveV3
               start: "after the liquidator’s share",
               moves: [{ amount: feeAmt, sign: -1, what: "fee" }],
             },
-            2,
+            4,
           )
         : null,
     ],
@@ -1327,7 +1378,7 @@ function valuedSentences(
                 ({fmt2(fee?.amount)} {collSym})
               </>
             ) : null}{" "}
-            goes to the Aave treasury
+            goes to the Aave treasury, which leaves the liquidator {pctPlain(b.bonus * (1 - b.feeShare))}
           </>
         ) : null}
         .{" "}
