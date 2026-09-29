@@ -173,15 +173,6 @@ function SupplyInterestFootnote({ spoke }: { spoke: AaveSpokeCardInfo }) {
   );
 }
 
-/** The activity badge's hover label: the count is the holder's transactions,
- *  and the liquidations beside it were sent by liquidators. */
-function txCountTitle(spoke: AaveSpokeCardInfo): string {
-  const tx = `${spoke.txCount} transaction${spoke.txCount === 1 ? "" : "s"} by or for the owner`;
-  return spoke.liquidationCount > 0
-    ? `${tx}; the ${spoke.liquidationCount} liquidation${spoke.liquidationCount === 1 ? "" : "s"} beside it ${spoke.liquidationCount === 1 ? "was" : "were"} sent by liquidators`
-    : tx;
-}
-
 const YEARLY_COST_PROV: Provenance = {
   kind: "derived",
   summary:
@@ -341,13 +332,7 @@ function AaveV4SpokeCard({
             // and the backend's status column (migration 057, rewritten for
             // this rule; rails-ops TO-DO-ui-jobs.md item 97, Miles 2026-09-28).
             outcome={spoke.wasLiquidated ? "liquidated" : "closed"}
-            identity={
-              <PositionCardMeta
-                eventCount={spoke.txCount}
-                eventCountTitle={txCountTitle(spoke)}
-                liquidationCount={spoke.liquidationCount}
-              />
-            }
+            identity={<PositionCardMeta eventCount={spoke.txCount} liquidationCount={spoke.liquidationCount} />}
             collateralAssetIcons={
               spoke.supplyingSymbols.length > 0 ? <InlineAssetCluster symbols={spoke.supplyingSymbols} /> : undefined
             }
@@ -402,11 +387,7 @@ function AaveV4SpokeCard({
               // the page is already scoped to one wallet. txCount counts distinct
               // non-liquidation transactions, so it isn't inflated by the
               // supply+enable merge and doesn't double-count the triangle beside it.
-              <PositionCardMeta
-                eventCount={spoke.txCount}
-                eventCountTitle={txCountTitle(spoke)}
-                liquidationCount={spoke.liquidationCount}
-              />
+              <PositionCardMeta eventCount={spoke.txCount} liquidationCount={spoke.liquidationCount} />
             }
             columns={
               supplyOnly

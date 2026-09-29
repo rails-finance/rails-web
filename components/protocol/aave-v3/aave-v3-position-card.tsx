@@ -15,7 +15,6 @@
 // a position, and risk is read live on the position page — whose own Pool
 // getUserAccountData read is the only HF this card ever shows.
 
-import type { AaveV3CountNote } from "@/lib/aave-v3/event-neighbours";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
@@ -333,7 +332,6 @@ export function AaveV3PositionCard({
   captions,
   deployment,
   peaks = true,
-  countNote,
   pricesPending = false,
 }: {
   v: AaveV3PositionView;
@@ -341,9 +339,6 @@ export function AaveV3PositionCard({
   /** The page is still reading the oracle prices: the USD headlines hold
    *  their space with a placeholder, so nothing moves when the dollars land. */
   pricesPending?: boolean;
-  /** Why the timeline's event count differs from the transaction count
-   *  (aaveV3CountSentence), where the page holds the whole history. */
-  countNote?: AaveV3CountNote | null;
   /** Which deployment the row describes — its session, market label and the
    *  receipts behind every figure. Ethereum's indexed lane by default; a Base
    *  lender passes its own (lib/aave-v3/card-deployment.tsx). */
@@ -378,7 +373,6 @@ export function AaveV3PositionCard({
           viewHref={viewHref}
           captions={captions}
           peaks={peaks}
-          countNote={countNote}
           pricesPending={pricesPending}
         />
       </AaveV3CardDeploymentProvider>
@@ -393,7 +387,6 @@ export function AaveV3PositionCard({
       viewHref={viewHref}
       captions={captions}
       peaks={peaks}
-      countNote={countNote}
       pricesPending={pricesPending}
     />
   );
@@ -407,13 +400,11 @@ function AaveV3PositionCardBody({
   viewHref,
   captions,
   peaks = true,
-  countNote,
   pricesPending = false,
 }: {
   v: AaveV3PositionView;
   receipts?: boolean;
   pricesPending?: boolean;
-  countNote?: AaveV3CountNote | null;
   rowExtra?: React.ReactNode;
   explanation?: React.ReactNode;
   /** Copy-this-view control, forwarded straight through to `PositionCardShell`
@@ -431,7 +422,6 @@ function AaveV3PositionCardBody({
   const marketTitle = marketLabel
     ? `${marketLabel} is one of the Aave V3 markets on Ethereum. Each market is a separate account with a separate health factor.`
     : undefined;
-  const countTitle = [txCountTitle(v, dep.session === "aave-v3"), countNote?.text].filter(Boolean).join(". ");
   const collUsd = totalUsd(v, v.supplies);
   const debtUsd = totalUsd(v, v.borrows);
   // Prices still loading: each side draws as priced, with a placeholder where
@@ -499,7 +489,6 @@ function AaveV3PositionCardBody({
             <PositionCardMeta
               lastActivityAt={v.lastActivityAt}
               eventCount={v.txCount}
-              eventCountTitle={countTitle}
               liquidationCount={v.liquidationCount}
             />
           }
@@ -578,7 +567,6 @@ function AaveV3PositionCardBody({
           <PositionCardMeta
             lastActivityAt={v.lastActivityAt}
             eventCount={v.txCount}
-            eventCountTitle={countTitle}
             liquidationCount={v.liquidationCount}
           />
         }
@@ -710,18 +698,6 @@ function UsdPlaceholder() {
       />
     </StatValue>
   );
-}
-
-/** The count badge's hover label: the owner's transactions, and the
- *  liquidations beside them, sent by liquidators. On Ethereum a liquidation's
- *  protocol fee is a second timeline row in its transaction. */
-function txCountTitle(v: AaveV3PositionView, feeRows: boolean): string {
-  const tx = `${v.txCount} transaction${v.txCount === 1 ? "" : "s"} sent by or for the owner`;
-  if (v.liquidationCount <= 0) return tx;
-  const n = v.liquidationCount;
-  return `${tx}; the ${n} liquidation${n === 1 ? "" : "s"} beside ${n === 1 ? "it was" : "them were"} sent by liquidators${
-    feeRows ? `, and each liquidation's fee to the Aave treasury is its own row in the timeline` : ""
-  }`;
 }
 
 function statusOf(hasOpen: boolean, liquidationCount: number): AaveV3PositionView["status"] {
