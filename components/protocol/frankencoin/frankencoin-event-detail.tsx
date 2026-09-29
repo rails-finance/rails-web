@@ -49,6 +49,7 @@ import {
 import { frankencoinZchfSplit, useFrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
 import { dateTimeText, phaseText, spanText, useFrankencoinPageFacts } from "@/lib/frankencoin/page-facts";
 import { formatDate } from "@/lib/date";
+import type { FrankencoinOpeningRead } from "@/lib/sources/chain/frankencoin-event";
 
 export interface FrankencoinEventDetailProps {
   ctx: FrankencoinContext;
@@ -106,6 +107,7 @@ function transitionOf(
   coords: FrankencoinCoords,
   f: (n: number) => string,
   rawBefore?: string,
+  readBefore = false,
 ): ChainTruthTransition | undefined {
   const afterN = after != null ? Number(after) : null;
   const beforeN = before != null ? Number(before) : null;
@@ -116,7 +118,7 @@ function transitionOf(
   return {
     before: f(beforeN),
     beforeExact: formatExact(beforeN),
-    beforeProv: beforeProv(what, sym, coords, rawBefore),
+    beforeProv: beforeProv(what, sym, coords, rawBefore, readBefore && what !== "minted"),
     change: `${sign}${f(changeN)}`,
     changeExact: `${sign}${f(changeN)}`,
     changeProv: changeProv(what, sym, coords),
@@ -440,6 +442,17 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber, eventId, time
     }
     case "open":
     case "clone": {
+      // An original's opening: what the transaction moved and the terms it
+      // set, from the page's opening read.
+      const o = ctx.eventType === "open" ? (facts?.opening ?? null) : null;
+      if (o) {
+        stats.push(...openingStats(o, ctx, coords, timestamp, facts?.deniedAt ?? null));
+        break;
+      }
+      if (ctx.eventType === "open" && facts?.openingPending) {
+        stats.push(readingStat(coords, sym));
+        break;
+      }
       if (ctx.eventType === "clone" && ctx.original)
         stats.push({
           label: "Cloned from",
@@ -478,6 +491,7 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber, eventId, time
             coords,
             fmtFcColl,
             ctx.raw?.collateralBefore,
+            ctx.beforeReadAtBlock,
           ),
           changed: ctx.collateral !== ctx.collateralBefore,
         });
@@ -511,6 +525,7 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber, eventId, time
             coords,
             fmtFcPrice,
             ctx.raw?.priceBefore,
+            ctx.beforeReadAtBlock,
           ),
           changed: ctx.liqPrice !== ctx.liqPriceBefore,
         });
@@ -580,4 +595,121 @@ function zchfSplitLine(
     );
   }
   return undefined;
+}
+
+/** An original's Open row: the collateral and fee its transaction moved and
+ *  the terms it was opened with, read at the opening block. */
+function openingStats(
+  o: FrankencoinOpeningRead,
+  ctx: FrankencoinContext,
+  coords: FrankencoinCoords,
+  openedAt: number | undefined,
+  deniedAt: number | null,
+): ChainTruthStat[] {
+  const sym = ctx.collateralSymbol;
+  const dec = ctx.collateralDecimals;
+  const out: ChainTruthStat[] = [];
+  const term = (value: string) => challengeReceiptProv("openTerms", sym, coords, value);
+  const deposited = scaled(o.depositedRaw, dec);
+  const minimum = o.minimumCollateralRaw != null ? scaled(o.minimumCollateralRaw, dec) : null;
+  if (deposited > 0)
+    out.push({
+      label: "Collateral deposited",
+      value: groupExact(formatUnitsExact(o.depositedRaw, dec)),
+      display: fmtFcColl(deposited),
+      symbol: sym,
+      prov: challengeReceiptProv("openDeposit", sym, coords, o.depositedRaw),
+      sub:
+        minimum != null ? (
+          minimum === deposited ? (
+            <>the minimum the position must hold</>
+          ) : (
+            <>
+              minimum {fmtFcColl(minimum)} {sym}
+            </>
+          )
+        ) : undefined,
+    });
+  if (o.priceRaw != null)
+    out.push({
+      label: `Liq. price · ZCHF per ${sym}, owner-declared`,
+      value: fmtFcPrice(scaled(o.priceRaw, 36 - dec)),
+      display: fmtFcPrice(scaled(o.priceRaw, 36 - dec)),
+      symbol: "",
+      prov: term(o.priceRaw),
+    });
+  const fee = Number(o.fee);
+  if (fee > 0)
+    out.push({
+      label: "Opening fee",
+      value: groupExact(o.fee),
+      display: fmtZchf(fee),
+      symbol: "ZCHF",
+      prov: challengeReceiptProv("openFee", sym, coords, o.fee),
+      sub: <>paid to the system reserve</>,
+    });
+  if (o.limit != null)
+    out.push({
+      label: "Minting limit",
+      value: groupExact(o.limit),
+      display: fmtZchf(Number(o.limit)),
+      symbol: "ZCHF",
+      prov: term(o.limit),
+      sub: <>for this original and its clones together</>,
+    });
+  if (o.start != null && openedAt != null && o.start > openedAt)
+    out.push({
+      label: "Veto window",
+      value: `${dateTimeText(openedAt)} → ${dateTimeText(o.start)}`,
+      display: `${formatDate(openedAt)} → ${formatDate(o.start)}`,
+      symbol: "",
+      prov: term(String(o.start)),
+      sub: <>{deniedAt != null && deniedAt < o.start ? `denied ${formatDate(deniedAt)}` : "not vetoed"}</>,
+    });
+  if (o.expiration != null)
+    out.push({
+      label: "Expires",
+      value: dateTimeText(o.expiration),
+      display: formatDate(o.expiration),
+      symbol: "",
+      prov: term(String(o.expiration)),
+      sub:
+        o.start != null && o.expiration > o.start ? (
+          <>{Math.round((o.expiration - o.start) / 86400).toLocaleString("en-US")} days after the veto window</>
+        ) : undefined,
+    });
+  if (o.challengePeriod != null)
+    out.push({
+      label: "Challenge period",
+      value: phaseText(o.challengePeriod),
+      display: phaseText(o.challengePeriod),
+      symbol: "",
+      prov: term(String(o.challengePeriod)),
+      sub: <>the length of each of a challenge&rsquo;s two phases</>,
+    });
+  if (o.reservePPM != null)
+    out.push({
+      label: "Reserve share",
+      value: fmtFcPct(o.reservePPM / 1_000_000),
+      display: fmtFcPct(o.reservePPM / 1_000_000),
+      symbol: "",
+      prov: term(String(o.reservePPM)),
+      sub: <>of each mint, held in the system reserve</>,
+    });
+  if (o.annualInterestPPM != null)
+    out.push({
+      label: "Interest",
+      value: `${(o.annualInterestPPM / 10_000).toFixed(2)}% a year`,
+      display: `${(o.annualInterestPPM / 10_000).toFixed(2)}% a year`,
+      symbol: "",
+      prov: term(String(o.annualInterestPPM)),
+      sub:
+        o.riskPremiumPPM != null ? (
+          <>
+            base rate {((o.annualInterestPPM - o.riskPremiumPPM) / 10_000).toFixed(2)}% + risk premium{" "}
+            {(o.riskPremiumPPM / 10_000).toFixed(2)}%
+          </>
+        ) : undefined,
+    });
+  return out;
 }

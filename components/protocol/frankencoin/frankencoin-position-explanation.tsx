@@ -19,7 +19,8 @@ import { ppmToPct, shortAddress } from "@/lib/frankencoin/asset-catalog";
 import { frankencoinZchfSplit, useFrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
 import { termText } from "@/lib/frankencoin/figures";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { dateTimeText, spanText } from "@/lib/frankencoin/figures";
+import { dateTimeText, phaseText, spanText } from "@/lib/frankencoin/figures";
+import Link from "next/link";
 import type { FrankencoinEnding } from "./frankencoin-position-card";
 import { formatDate } from "@/lib/date";
 import { AmountText } from "@/components/shared/amount-text";
@@ -87,12 +88,24 @@ export function FrankencoinPositionExplanation({
     lastMintCtx && lastMintRead
       ? frankencoinZchfSplit(lastMintRead, Number(lastMintCtx.minted ?? 0) - Number(lastMintCtx.mintedBefore ?? 0))
       : null;
+  const lastGross = lastMintCtx ? Number(lastMintCtx.minted ?? 0) - Number(lastMintCtx.mintedBefore ?? 0) : 0;
+  // What a mint made now gives up as interest: the annual rate for the years
+  // left to expiry (PositionV2.calculateFee).
+  const feeFrom = chain.start != null ? Math.max(now, chain.start) : now;
+  const todayFeePct =
+    chain.annualInterestPPM != null && chain.expiration != null && chain.expiration > feeFrom && !chain.isClosed
+      ? Math.min(100, (chain.annualInterestPPM / 10_000) * ((chain.expiration - feeFrom) / (365 * 86400)))
+      : null;
   const lastMintRate =
     lastMint && lastSplit?.ratePct != null ? (
       <>
         {" "}
         Its last mint, on {dateOf(lastMint.timestamp)}, paid <H>{lastSplit.ratePct.toFixed(2)}%</H> a year
-        {lastSplit.termDays != null ? <> for the {termText(lastSplit.termDays)} left to expiry</> : null}.
+        {lastSplit.termDays != null ? <> for the {termText(lastSplit.termDays)} left to expiry</> : null}
+        {lastSplit.interest != null && lastGross > 0 ? (
+          <>, {((lastSplit.interest / lastGross) * 100).toFixed(2)}% of the amount</>
+        ) : null}
+        .
       </>
     ) : null;
 
@@ -138,6 +151,14 @@ export function FrankencoinPositionExplanation({
 
   const bullets: React.ReactNode[] = [];
 
+  if (chain.collateralName && chain.collateralSymbol) {
+    bullets.push(
+      <span key="token">
+        {sym} is the token whose contract names it &ldquo;{chain.collateralName}&rdquo;.
+      </span>,
+    );
+  }
+
   if (chain.liqPrice != null && chain.liqPrice > 0) {
     bullets.push(
       <span key="price">
@@ -152,7 +173,13 @@ export function FrankencoinPositionExplanation({
             {" "}
             At this price the collateral backs up to <AmountText value={chain.mintCeiling} /> ZCHF of debt
             {hasMint && Math.abs(chain.mintCeiling - (chain.minted as number)) < 0.005 ? (
-              <>, the debt it carries</>
+              <>
+                , the debt it carries, so the headroom is zero: a further mint needs more collateral or a higher price
+              </>
+            ) : hasMint && chain.mintCeiling > (chain.minted as number) && !chain.isClosed ? (
+              <>
+                , a headroom of <AmountText value={chain.mintCeiling - (chain.minted as number)} /> ZCHF over its debt
+              </>
             ) : null}
             .
           </>
@@ -167,7 +194,16 @@ export function FrankencoinPositionExplanation({
         The debt is gross: <AmountText value={chain.reserveHeld} /> ZCHF of it (
         {ppmToPct(chain.reserveContributionPPM).toFixed(0)}%) is this position&rsquo;s reserve share, held in the system
         reserve. Repaying releases it: in full while the reserve covers every position&rsquo;s share, in proportion when
-        losses have drawn it down.
+        losses have drawn it down. While it covers them, clearing the whole debt takes{" "}
+        <H>
+          <AmountText value={(chain.minted as number) - chain.reserveHeld} /> ZCHF
+        </H>
+        . The reserve shares of all positions make up the borrowers&rsquo; reserve, which with the FPS holders&rsquo;
+        equity forms the system reserve (both on the{" "}
+        <Link href="/ethereum/frankencoin/system" className="text-blue-500 hover:underline">
+          system page
+        </Link>
+        ).
       </span>,
     );
   }
@@ -185,8 +221,14 @@ export function FrankencoinPositionExplanation({
             {ppmToPct(chain.riskPremiumPPM).toFixed(2)}% risk premium)
           </>
         ) : null}
-        , charged <H>at the mint</H> for the time left to expiry and taken from the minted amount. Nothing accrues after
-        that, so the debt changes only when the owner mints or repays.
+        , charged <H>at the mint</H> for the time left to expiry and taken from the minted amount: the rate times the
+        years left
+        {todayFeePct != null ? (
+          <>
+            , so a mint today gives up <H>{todayFeePct.toFixed(2)}%</H> of the amount
+          </>
+        ) : null}
+        . Nothing accrues after that, so the debt changes only when the owner mints or repays.
         {lastMintRate}
       </span>,
     );
@@ -335,6 +377,13 @@ export function FrankencoinPositionExplanation({
         ) : (
           <>
             It has <H>never been challenged</H>.
+            {chain.challengePeriod != null && chain.challengePeriod > 0 ? (
+              <>
+                {" "}
+                A challenge here would run in two phases of {phaseText(chain.challengePeriod)} each, its challenge
+                period.
+              </>
+            ) : null}
           </>
         )}
       </span>,
@@ -347,6 +396,35 @@ export function FrankencoinPositionExplanation({
         The position has been challenged <H>{challengeCount}</H> time{challengeCount === 1 ? "" : "s"} and remains open
         — a challenge is an event in a position&rsquo;s life, not its end: averted outright, or survived past a partial
         sale.
+      </span>,
+    );
+  }
+
+  if (chain.isClosed && ending?.closedByChallenge) {
+    const minimum =
+      chain.minimumCollateralRaw != null && chain.collateralDecimals != null
+        ? Number(chain.minimumCollateralRaw) / 10 ** chain.collateralDecimals
+        : null;
+    bullets.push(
+      <span key="closed-by-sale">
+        A challenge sale
+        {closedAt != null ? <> on {dateOf(closedAt)}</> : null} took
+        {ending.soldMost != null ? (
+          <>
+            {" "}
+            <AmountText value={ending.soldMost} /> {sym}
+          </>
+        ) : (
+          " its collateral"
+        )}{" "}
+        and left less than the position&rsquo;s minimum
+        {minimum != null ? (
+          <>
+            {" "}
+            of <AmountText value={minimum} /> {sym}
+          </>
+        ) : null}
+        , which <H>closed it</H>.
       </span>,
     );
   }

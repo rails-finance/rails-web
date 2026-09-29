@@ -47,6 +47,7 @@ function stub(position: string): FrankencoinChainResponse {
     isClone: false,
     collateralToken: null,
     collateralSymbol: null,
+    collateralName: null,
     collateralDecimals: null,
     collateralRaw: null,
     collateral: null,
@@ -93,6 +94,23 @@ const FNS = [
   "reserveContribution",
 ] as const;
 
+// A token's name never changes: read once per token per process.
+const names = new Map<string, Promise<string | null>>();
+function tokenName(token: string): Promise<string | null> {
+  let p = names.get(token);
+  if (!p) {
+    p = alchemyClient()
+      .readContract({ address: getAddress(token), abi: erc20Abi, functionName: "name" })
+      .then((v) => (typeof v === "string" && v.trim() ? v.trim() : null))
+      .catch(() => null);
+    p.then((v) => {
+      if (v == null) names.delete(token);
+    });
+    names.set(token, p);
+  }
+  return p;
+}
+
 /**
  * Read one Frankencoin Position contract live at head. Returns a `chainStale`
  * stub on RPC failure so callers fall back to their indexed figures (the risk
@@ -131,7 +149,7 @@ export async function loadFrankencoinPositionFromChain(positionRaw: string): Pro
     const isV2 = riskPremiumRes?.status === "success";
 
     const tokenAddr = collateralToken.toLowerCase();
-    const [meta, balanceRes] = await Promise.all([
+    const [meta, balanceRes, collateralName] = await Promise.all([
       resolveErc20Meta([tokenAddr]),
       client
         .readContract({
@@ -142,6 +160,7 @@ export async function loadFrankencoinPositionFromChain(positionRaw: string): Pro
         })
         .then((v) => v as bigint)
         .catch(() => null),
+      tokenName(tokenAddr),
     ]);
     // Collateral and the stored price both scale by these decimals: without
     // them the read fails whole rather than state figures scaled by the 18 stand-in.
@@ -185,6 +204,7 @@ export async function loadFrankencoinPositionFromChain(positionRaw: string): Pro
       isClone: original != null && original.toLowerCase() !== key,
       collateralToken: tokenAddr,
       collateralSymbol: tokenMeta?.symbol ?? null,
+      collateralName,
       collateralDecimals: decimals,
       collateralRaw: balanceRes != null ? balanceRes.toString() : null,
       collateral,

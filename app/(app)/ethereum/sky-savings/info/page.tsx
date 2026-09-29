@@ -14,7 +14,8 @@ const intro = (
       Sky Savings is the savings module of Sky, the protocol that was MakerDAO. A saver deposits USDS, Sky&rsquo;s
       stablecoin, and receives sUSDS, a share token. The number of shares stays the same while they are held, and what
       each share redeems for rises every second at the Savings Rate, which Sky governance sets. Withdrawing burns the
-      shares and pays out the USDS they are worth at that moment.
+      shares and pays out the USDS they are worth at that moment. Sky mints the interest as new USDS and books the same
+      amount as debt at the Vow, its surplus buffer, where borrowers&rsquo; stability fees on Sky vaults are paid in.
     </p>
     <p>
       Each row of the listing is one address that holds or has held sUSDS on Ethereum: its balance, what the balance is
@@ -25,8 +26,9 @@ const intro = (
     </p>
     <p>
       Every figure is stated at one sealed block, and a check every six hours compares the ledger with the sUSDS
-      contract for every holder. A page shows no figure until that check has passed. Sky runs no USDS price feed, so
-      figures are in USDS; the dollar axis of Lifetime flows values USDS at the PSM&rsquo;s exit rate, one USDC for the
+      contract for every holder. A page shows no figure unless the latest check passed, and each position&rsquo;s card
+      names the check&rsquo;s block. Sky runs no USDS price feed, so figures are in USDS; the dollar axis of Lifetime
+      flows values USDS at the exit rate of the PSM, Sky&rsquo;s contract that swaps USDS and USDC: one USDC for the
       whole life of sUSDS. Referral codes appear as numbers, because no public list names the front ends behind them.
     </p>
     <p>

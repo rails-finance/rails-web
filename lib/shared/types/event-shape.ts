@@ -2164,6 +2164,10 @@ export interface FrankencoinContext {
   /** The position's first MintingUpdate: its collateral and debt before are
    *  zero (the opening deposit and mint), and its price has no before. */
   firstState?: boolean;
+  /** The first ledger row after an opening that recorded none: its collateral
+   *  and price before were read from the chain one block earlier (the page's
+   *  opening read), and replace the index's zero. */
+  beforeReadAtBlock?: boolean;
   /** Exact integer twins of the scaled fields above. */
   raw?: FrankencoinContextRaw;
   /** True for the position's first event. */

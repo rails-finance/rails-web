@@ -48,6 +48,15 @@
 //     whole price goes to the owner). The terms that set the price — declared
 //     price, expiration, challenge period — and the debt and reserve
 //     percentage are read one block earlier, in one multicall.
+//   • opening (an original's PositionOpened row): the collateral the opening
+//     transaction moved into the position, the opening fee (the Profit the hub
+//     reported when it collected it, and who paid), and the terms read at the
+//     opening block in one multicall. MintingHub.openPosition transfers the
+//     opening collateral without a MintingUpdate, so the index starts the
+//     position's ledger at zero (rails-ops item 158). With `firstBlock` — the
+//     block of the position's first ledger row, in a later transaction — the
+//     position's collateral balance and declared price are also read one block
+//     before it, which is what that row changed from.
 //
 // A mined receipt never changes, so the route caches the answer hard.
 //
@@ -82,6 +91,19 @@ const POSITION_V2_TERMS = parseAbi([
   "function owner() view returns (address)",
   "function collateral() view returns (address)",
 ]);
+const POSITION_OPENING_TERMS = parseAbi([
+  "function price() view returns (uint256)",
+  "function minimumCollateral() view returns (uint256)",
+  "function limit() view returns (uint256)",
+  "function challengePeriod() view returns (uint256)",
+  "function start() view returns (uint256)",
+  "function expiration() view returns (uint256)",
+  "function riskPremiumPPM() view returns (uint24)",
+  "function reserveContribution() view returns (uint256)",
+  "function annualInterestPPM() view returns (uint256)",
+  "function collateral() view returns (address)",
+]);
+const ERC20_BALANCE = parseAbi(["function balanceOf(address) view returns (uint256)"]);
 const HUB_V2_READS = parseAbi([
   "function challenges(uint256) view returns (address challenger, uint40 start, address position, uint256 size)",
   "function roller() view returns (address)",
@@ -208,6 +230,31 @@ export interface FrankencoinForcedSaleRead {
   reservePPM: number | null;
 }
 
+/** An original's opening transaction and the terms it was born with. */
+export interface FrankencoinOpeningRead {
+  collateralToken: string | null;
+  /** Collateral the opening transaction moved into the position, raw. */
+  depositedRaw: string;
+  depositFrom: string | null;
+  /** The opening fee: the Profit the hub reported, and the account it came from. */
+  fee: string;
+  feePayer: string | null;
+  /** Read at the opening block; null where the getter does not answer (V1). */
+  priceRaw: string | null;
+  minimumCollateralRaw: string | null;
+  limit: string | null;
+  challengePeriod: number | null;
+  start: number | null;
+  expiration: number | null;
+  riskPremiumPPM: number | null;
+  reservePPM: number | null;
+  annualInterestPPM: number | null;
+  /** The position's first ledger row, when a later transaction wrote it: its
+   *  block, and the position's collateral balance and declared price one block
+   *  earlier. */
+  firstBefore: { block: number; collateralRaw: string | null; priceRaw: string | null } | null;
+}
+
 export interface FrankencoinEventRead {
   txHash: string;
   blockNumber: number;
@@ -244,6 +291,7 @@ export interface FrankencoinEventRead {
   rate: { annualInterestPPM: number; expiration: number; start: number } | null;
   challenge: FrankencoinAvertRead | FrankencoinSaleRead | null;
   forced: FrankencoinForcedSaleRead | null;
+  opening: FrankencoinOpeningRead | null;
   /** A creation handover: whether the new owner holds contract code now. */
   newOwnerIsContract: boolean | null;
 }
@@ -255,6 +303,9 @@ export interface FrankencoinEventReadOptions {
   logIndex?: number;
   /** An ownership row's new owner. */
   newOwner?: string;
+  /** An opening row: the block of the position's first ledger row, when a
+   *  later transaction wrote it. */
+  firstBlock?: number;
 }
 
 const eq = (a: string | undefined | null, b: string) => (a ?? "").toLowerCase() === b.toLowerCase();
@@ -460,13 +511,16 @@ export async function readFrankencoinEvent(
 
   const rollerP = others.size > 0 ? v2Roller() : Promise.resolve(null);
 
-  const [blockTimestamp, rate, challenge, forced, newOwnerIsContract, roller] = await Promise.all([
+  const openingP = kind === "open" ? readOpening(receipt.logs, position, block, opts.firstBlock) : null;
+
+  const [blockTimestamp, rate, challenge, forced, newOwnerIsContract, roller, opening] = await Promise.all([
     blockP,
     rateP,
     challengeP ?? Promise.resolve(null),
     forcedP ?? Promise.resolve(null),
     ownerP,
     rollerP,
+    openingP ?? Promise.resolve(null),
   ]);
 
   return {
@@ -493,8 +547,102 @@ export async function readFrankencoinEvent(
     rate,
     challenge,
     forced,
+    opening,
     newOwnerIsContract,
   };
+
+  // An original's opening: MintingHub.openPosition collects the opening fee
+  // (Frankencoin.collectProfits: a Transfer to the reserve and a Profit for
+  // the hub) and transfers the opening collateral into the new position; the
+  // terms are the position's getters at the opening block.
+  async function readOpening(
+    all: Log[],
+    pos: string,
+    blk: bigint,
+    firstBlock: number | undefined,
+  ): Promise<FrankencoinOpeningRead> {
+    const addr = getAddress(pos);
+    const names = [
+      "price",
+      "minimumCollateral",
+      "limit",
+      "challengePeriod",
+      "start",
+      "expiration",
+      "riskPremiumPPM",
+      "reserveContribution",
+      "annualInterestPPM",
+      "collateral",
+    ] as const;
+    const termsP = alchemyClient()
+      .multicall({
+        contracts: names.map((functionName) => ({ address: addr, abi: POSITION_OPENING_TERMS, functionName })),
+        blockNumber: blk,
+        allowFailure: true,
+      })
+      .catch(() => null);
+    const terms = await termsP;
+    const at = <T>(i: number): T | null => (terms && terms[i]?.status === "success" ? (terms[i].result as T) : null);
+    const big = (i: number) => at<bigint>(i);
+    const n = (i: number) => (big(i) != null ? Number(big(i)) : null);
+    const collToken = at<string>(9)?.toLowerCase() ?? null;
+
+    // The first ledger row's starting point, one block before it: the balance
+    // is the position's collateral (PositionV2 holds it as its token balance).
+    let firstBefore: FrankencoinOpeningRead["firstBefore"] = null;
+    if (firstBlock != null && BigInt(firstBlock) > blk) {
+      type Res = { status: "success" | "failure"; result?: unknown };
+      const before = (await alchemyClient()
+        .multicall({
+          contracts: [
+            { address: addr, abi: POSITION_OPENING_TERMS, functionName: "price" },
+            ...(collToken
+              ? [{ address: getAddress(collToken), abi: ERC20_BALANCE, functionName: "balanceOf", args: [addr] }]
+              : []),
+          ] as never,
+          blockNumber: BigInt(firstBlock) - BigInt(1),
+          allowFailure: true,
+        })
+        .catch(() => null)) as Res[] | null;
+      const r = (i: number): string | null =>
+        before && before[i]?.status === "success" ? String(before[i].result as bigint) : null;
+      firstBefore = { block: firstBlock, priceRaw: r(0), collateralRaw: collToken ? r(1) : null };
+    }
+
+    const deposits = collToken ? transfersOf(all, collToken).filter((t) => eq(t.to, pos)) : [];
+    const from = [...new Set(deposits.map((t) => t.from))];
+    const zl = decodeZchf(all);
+    const isHub = (a: string) => eq(a, FRANKENCOIN_ADDRESSES.HUB_V2) || eq(a, FRANKENCOIN_ADDRESSES.HUB_V1);
+    const feeLogs = zl.filter((d) => d.name === "Profit" && isHub(d.args.reportingMinter as string));
+    const fee = feeLogs.reduce((s, d) => s + (d.args.amount as bigint), ZERO);
+    // The fee's Transfer to the reserve sits right before its Profit.
+    const feeMoves = feeLogs
+      .map(
+        (p) =>
+          zl
+            .filter((d) => d.name === "Transfer" && d.logIndex < p.logIndex && eq(d.args.to as string, reserve))
+            .sort((a, b) => b.logIndex - a.logIndex)[0],
+      )
+      .filter((d): d is Decoded => d != null);
+    const payers = [...new Set(feeMoves.map((d) => (d.args.from as string).toLowerCase()))];
+    return {
+      collateralToken: collToken,
+      depositedRaw: sumOf(deposits).toString(),
+      depositFrom: from.length === 1 ? from[0] : null,
+      fee: units(fee),
+      feePayer: payers.length === 1 ? payers[0] : null,
+      priceRaw: big(0)?.toString() ?? null,
+      minimumCollateralRaw: big(1)?.toString() ?? null,
+      limit: big(2) != null ? units(big(2) as bigint) : null,
+      challengePeriod: n(3),
+      start: n(4),
+      expiration: n(5),
+      riskPremiumPPM: n(6),
+      reservePPM: n(7),
+      annualInterestPPM: n(8),
+      firstBefore,
+    };
+  }
 
   // Hoisted below the return for reading order; a function declaration.
   async function readChallenge(

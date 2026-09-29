@@ -15,8 +15,30 @@ import { RECENT_ACTIVITY_LABEL } from "@/components/shared/filter-bar/sort-contr
 import type { BaseListFilters, SerializableDimension } from "@/lib/shared/list-filter";
 import type { SkyAsOf, SkyPosition, SkyPositionsPage } from "@/lib/sky-savings/types";
 
+/** What the listing states about its counts: the last check and the
+ *  contracts left out of the list. */
+export interface SkyListCounts {
+  block: number;
+  gateBlock: number;
+  holdersEver: number;
+  holdersOpen: number;
+  /** The contracts left out of the list, in words ("Morpho Blue and 3 Sky
+   *  bridge escrows"), and how many. */
+  excluded: number;
+  excludedWords: string;
+}
+
+function excludedWords(ex: { label: string; kind: string }[]): string {
+  const escrows = ex.filter((e) => e.kind === "bridge_escrow").length;
+  const parts = [
+    ...ex.filter((e) => e.kind !== "bridge_escrow").map((e) => e.label),
+    ...(escrows > 0 ? [`${escrows} Sky bridge escrow${escrows === 1 ? "" : "s"}`] : []),
+  ];
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : (parts[0] ?? "");
+}
+
 /** A listing row with the sealed block its figures are stated at. */
-export type SkyListRow = SkyPosition & { asOf: SkyAsOf };
+export type SkyListRow = SkyPosition & { asOf: SkyAsOf; counts?: SkyListCounts };
 
 export const SKY_ITEMS_PER_PAGE = 20;
 
@@ -134,5 +156,16 @@ export async function fetchSkyListingPage(
   const json = (await res.json()) as SkyPositionsPage;
   if (!json.gate) throw new SkyGateError("missing");
   if (json.gate.ok !== true) throw new SkyGateError("failed");
-  return { data: (json.data ?? []).map((p) => ({ ...p, asOf: json.asOf })), total: json.pagination?.total ?? 0 };
+  const counts: SkyListCounts = {
+    block: json.asOf.block,
+    gateBlock: json.gate.block,
+    holdersEver: json.coverage.holdersEver,
+    holdersOpen: json.coverage.holdersOpen,
+    excluded: json.excluded?.length ?? 0,
+    excludedWords: excludedWords(json.excluded ?? []),
+  };
+  return {
+    data: (json.data ?? []).map((p) => ({ ...p, asOf: json.asOf, counts })),
+    total: json.pagination?.total ?? 0,
+  };
 }

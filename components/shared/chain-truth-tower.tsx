@@ -40,7 +40,7 @@
 
 import { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { ChartColumnBig, ChevronDown } from "lucide-react";
+import { ChartBarBig, ChevronDown } from "lucide-react";
 import {
   DualTowerChart,
   formatCompactUsd,
@@ -1232,7 +1232,7 @@ export function ChainTruthTower({
             >
               <span className="flex w-full min-w-0 items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <ChartColumnBig size={14} aria-hidden />
+                  <ChartBarBig size={14} aria-hidden />
                   <span className={`${OVERLAY_HEADING} truncate`}>{title}</span>
                 </span>
                 <ChevronDown size={16} className={collapsed ? "" : "rotate-180"} aria-hidden />

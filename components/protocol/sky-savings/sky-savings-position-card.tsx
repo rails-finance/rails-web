@@ -22,8 +22,8 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { withRealMinus } from "@/lib/utils/format";
 import { skyPositionContent } from "@/lib/sky-savings/learn-more";
 import { SUSDS, USDS } from "@/lib/sky-savings/constants";
-import { exact, pctString, rayExact, rayNumber, units } from "@/lib/sky-savings/math";
-import { chiProv, earnedProv, rateProv, sharesHeldProv, valueProv } from "@/lib/sky-savings/provenance";
+import { exact, pctString, rayExact, rayNumber, skyYearlyEarnings, units, yearlyText } from "@/lib/sky-savings/math";
+import { chiProv, earnedProv, rateProv, sharesHeldProv, valueProv, yearlyProv } from "@/lib/sky-savings/provenance";
 import type { SkyAsOf, SkyPosition } from "@/lib/sky-savings/types";
 
 function balanceColumn(p: SkyPosition, block: number, withWorth: boolean): OpenPositionStatsColumn {
@@ -72,8 +72,9 @@ function worthColumn(p: SkyPosition, asOf: SkyAsOf): OpenPositionStatsColumn {
   };
 }
 
-function earnedColumn(p: SkyPosition, block: number): OpenPositionStatsColumn {
+function earnedColumn(p: SkyPosition, block: number, asOf?: SkyAsOf): OpenPositionStatsColumn {
   if (!p.earned) return { label: "Interest earned", value: <StatDash /> };
+  const yearly = asOf ? skyYearlyEarnings(p, asOf) : null;
   const e = units(p.earned.raw);
   const full = withRealMinus(exact(p.earned.raw));
   return {
@@ -91,6 +92,20 @@ function earnedColumn(p: SkyPosition, block: number): OpenPositionStatsColumn {
         </Prov>
       </StatValue>
     ),
+    footnote:
+      yearly != null && asOf ? (
+        <StatFootnote>
+          <Prov
+            info={yearlyProv(asOf.block, p.value!.raw, pctString(asOf.ssrAnnual))}
+            value={yearly.toFixed(2)}
+            symbol={USDS.symbol}
+          >
+            <span className="tabular-nums">
+              about {yearlyText(yearly)} {USDS.symbol} a year at {pctString(asOf.ssrAnnual)}
+            </span>
+          </Prov>
+        </StatFootnote>
+      ) : undefined,
   };
 }
 
@@ -147,16 +162,10 @@ export function SkySavingsPositionCard({
 }) {
   const detail = surface === "detail";
   const open = p.status === "open";
-  const statusPill =
-    detail && open ? (
-      <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-        Saving
-      </span>
-    ) : (
-      <LifecyclePill status={open ? "open" : "closed"} />
-    );
+  // One status word on every surface: the listing's OPEN / CLOSED.
+  const statusPill = <LifecyclePill status={open ? "open" : "closed"} />;
   const columns = detail
-    ? [balanceColumn(p, asOf.block, true), earnedColumn(p, asOf.block), rateColumn(asOf)]
+    ? [balanceColumn(p, asOf.block, true), earnedColumn(p, asOf.block, asOf), rateColumn(asOf)]
     : [balanceColumn(p, asOf.block, false), worthColumn(p, asOf), earnedColumn(p, asOf.block)];
   return (
     <PositionCardShell
