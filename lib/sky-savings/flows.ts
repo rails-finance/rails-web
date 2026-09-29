@@ -21,7 +21,7 @@ import type { SkySavingsContext } from "@/lib/shared/types/event-shape";
 
 const BUCKETS: FlowBucket[] = [
   { key: "deposited", label: "Deposited", side: "collateral", dir: "in" },
-  { key: "received", label: "Received", side: "collateral", dir: "in", light: true },
+  { key: "received", label: "Received", side: "collateral", dir: "in" },
   { key: "withdrawn", label: "Withdrawn", side: "collateral", dir: "out" },
   { key: "sent", label: "Sent", side: "collateral", dir: "out" },
 ];
@@ -88,7 +88,6 @@ export function skyFlowTimeline(
       collateralUsd: units(position.value?.raw) * usdcNow,
       debtUsd: 0,
       collateralInterestUsd: position.earned ? units(position.earned.raw) * usdcNow : null,
-      debtInterestUsd: null,
     },
     dailyPrices: { [SUSDS.address]: dailyPrices },
     todayPrices: asOf.chi ? { [SUSDS.address]: rayNumber(asOf.chi) * usdcNow } : undefined,
@@ -101,9 +100,6 @@ export function skyFlowTimeline(
     words: {
       held: "Still saved",
       live: `At block ${asOf.block.toLocaleString("en-US")}`,
-      priceNote:
-        "Flows are valued at the PSM rate at their block, one USDC per USDS for the whole life of sUSDS; what is held on a day is its sUSDS times that day's closing share price.",
-      totalIn: " in with interest, ",
       rest: "Interest earned",
     },
   };

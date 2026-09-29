@@ -41,7 +41,7 @@ interface Fixture {
   cases: Case[];
 }
 
-const NO_LIVE = { collateralUsd: 0, debtUsd: 0, collateralInterestUsd: null, debtInterestUsd: null };
+const NO_LIVE = { collateralUsd: 0, debtUsd: 0 };
 
 function answer(c: Case): { legs: Record<string, AaveV4EventLeg[]>; days: DayState[] } {
   const legs: Record<string, AaveV4EventLeg[]> = {};

@@ -189,9 +189,9 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     text: document.body.innerText,
     gate: document.querySelector("[data-sky-gate]") != null,
     asof: document.querySelector("[data-sky-asof]")?.getAttribute("data-sky-asof"),
-    bars: [...document.querySelectorAll("button[aria-label]")]
+    bars: [...document.querySelectorAll('[role="img"][aria-label]')]
       .map((b) => b.getAttribute("aria-label"))
-      .filter((l) => / show what came in, what left and each asset$/.test(l)),
+      .filter((l) => /, of .* (that came in|owed in all);/.test(l)),
     saved: [...document.querySelectorAll("[aria-label]")].some((e) =>
       /^Balance: .* still saved, of /.test(e.getAttribute("aria-label") ?? ""),
     ),
@@ -276,9 +276,8 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     .getByRole("button", { name: /Full breakdown/ })
     .first()
     .click();
-  await page.locator('button[aria-controls="flows-collateral-zoom"]').click();
   await page.waitForTimeout(300);
-  const zoomAt = () => page.locator("#flows-collateral-zoom").innerText();
+  const lineAt = () => page.locator('[data-flow-sources="collateral"]').innerText();
   // The Full breakdown's rows: from its heading to its first bullet or the
   // timeline's eyebrow.
   const breakdown = await page.evaluate(() => {
@@ -297,13 +296,13 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     .filter((m) => /^[0-9.,KMB]+$/.test(m[2].trim()))
     .map((m) => `${m[1]} ${m[2].trim()}`);
   check(`${name} page: every Full breakdown row names its unit`, unitless.length === 0, unitless.join("; "));
-  const stops = [await zoomAt()];
+  const stops = [await lineAt()];
   await page.getByRole("button", { name: "Previous event", exact: true }).click();
   await page.waitForTimeout(300);
-  stops.push(await zoomAt());
+  stops.push(await lineAt());
   check(
     `${name} page: the balancing item reads Interest earned at the last stop and the one before`,
-    stops.every((z) => z.includes("Interest earned") && !/Market move|Price change/.test(z)),
+    stops.every((z) => /interest earned/i.test(z) && !/market move|price change/i.test(z)),
     stops.map((z) => z.replace(/\s+/g, " ").slice(0, 160)).join(" || "),
   );
 }

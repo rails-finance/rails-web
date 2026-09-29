@@ -37,8 +37,6 @@ export interface FlowBucket {
   dir: "in" | "out";
   /** Outflows: the hatch. Default "exit". */
   tone?: FlowTone;
-  /** Inflows: drawn in the lighter hue (a transfer in, a swap in). */
-  light?: boolean;
   /** Buckets sharing a link are one on-chain act seen from both sides (a
    *  repay with collateral, a liquidation): hovering one highlights all. */
   link?: string;
@@ -77,11 +75,9 @@ export interface FlowLive {
    *  ledger values them. */
   collateralUsd: number;
   debtUsd: number;
-  /** Interest the ledger states for each side (earned; accrued), or null
-   *  where it states none. At the live stop the balancing segment splits
-   *  into this and a price change. */
-  collateralInterestUsd: number | null;
-  debtInterestUsd: number | null;
+  /** The interest earned now, for a bar that names its balancing item with
+   *  `words.rest`: at the live stop that item states this figure. */
+  collateralInterestUsd?: number | null;
   /** Each asset held and owed now, as the ledger values it, for the zoom
    *  view; absent, the last day's balances at today's prices. */
   assets?: FlowAssetHeld[];
@@ -146,17 +142,11 @@ export interface FlowWords {
   held?: string;
   /** The date label at the last stop ("Today, live prices"). */
   live?: string;
-  /** The footnote's sentence on how flows and holdings are valued. */
-  priceNote?: string;
-  /** The zoom's total line after the in-figure (" in, "). */
-  totalIn?: string;
-  /** The smallest interest, in USD, that gets its own source row (0.5). */
-  interestMin?: number;
-  /** One name for the supplied side's balancing item at every stop, with no
-   *  price-change row: for a bar whose dollar axis is a fixed rate, where
-   *  everything past what came in is interest. Unset, a past stop reads
-   *  "Market move and interest" and the last stop splits interest from
-   *  price change where the ledger states both. */
+  /** The supplied side's balancing item, for a bar whose dollar axis is a
+   *  fixed rate, where everything past what came in is interest. Unset, each
+   *  side's balancing item reads "Market move and interest" at every stop:
+   *  interest and price change are told apart only at the live stop, so no
+   *  stop splits them (rails-ops reference/lifetime-flows-scrubber.md). */
   rest?: string;
 }
 
@@ -231,16 +221,18 @@ export interface FlowSegment {
   key: string;
   label: string;
   short?: string;
-  /** "held" solid, "out" hatched, "in" solid source, "estimate" dashed. */
+  /** "held" solid and "out" hatched on the bar; "in" an exact source and
+   *  "estimate" the balancing item on the line under it. */
   fill: "held" | "out" | "in" | "estimate";
   tone?: FlowTone;
   hatch?: FlowHatch;
-  light?: boolean;
   link?: string;
   /** Drawn width in USD (clamped so the strip never overruns its bar). */
   width: number;
-  /** The figure the legend states (signed for a balancing item). */
+  /** The figure the line under the bar states (signed for a balancing item). */
   value: number;
+  /** A balancing item that can go either way: its figure carries a sign. */
+  signed?: boolean;
 }
 
 export interface FlowSideState {
@@ -252,8 +244,8 @@ export interface FlowSideState {
   out: number;
   /** The bar: held first, then each outflow. */
   bar: FlowSegment[];
-  /** The drill-down strip: exact inflows, then the balancing item(s). Same
-   *  total length as the bar. */
+  /** The line under the bar: exact inflows, then the balancing item. They
+   *  add up to the bar's length. */
   sources: FlowSegment[];
 }
 
@@ -606,13 +598,12 @@ function rowAt(m: FlowModel, stop: number): number {
   return found;
 }
 
-/** Lay exact sources end to end within `total`, then the balancing item(s).
- *  Each width is clamped to what the bar has left; the legend keeps the true
- *  signed value. */
+/** Lay exact sources end to end within `total`, then the balancing item.
+ *  Each width is clamped to what the bar has left; the value stays signed. */
 function sourcesFor(
   exact: FlowSegment[],
   total: number,
-  balancing: { key: string; label: string; value: number }[],
+  balancing: { key: string; label: string; value: number; signed?: boolean },
 ): FlowSegment[] {
   let left = Math.max(0, total);
   const out: FlowSegment[] = [];
@@ -621,11 +612,8 @@ function sourcesFor(
     left -= w;
     out.push({ ...s, width: w });
   }
-  for (const b of balancing) {
-    const w = Math.min(Math.max(0, b.value), left);
-    left -= w;
-    out.push({ key: b.key, label: b.label, fill: "estimate", width: w, value: b.value });
-  }
+  const w = Math.min(Math.max(0, balancing.value), left);
+  out.push({ ...balancing, fill: "estimate", width: w });
   return out;
 }
 
@@ -667,32 +655,13 @@ function sideState(
   ];
   const exact: FlowSegment[] = ins.map((b) => {
     const v = cum[b.key] ?? 0;
-    return { key: b.key, label: b.label, short: b.short, fill: "in", light: b.light, width: v, value: v };
+    return { key: b.key, label: b.label, short: b.short, fill: "in", width: v, value: v };
   });
   const rest = total - exact.reduce((s, x) => s + x.value, 0);
   const oneRest = side === "collateral" ? m.words.rest : undefined;
   const balancing = oneRest
-    ? [{ key: interest != null ? `${side}-interest` : `${side}-market`, label: oneRest, value: interest ?? rest }]
-    : interest != null
-      ? [
-          ...(Math.abs(interest) >= (m.words.interestMin ?? 0.5)
-            ? [
-                {
-                  key: `${side}-interest`,
-                  label: side === "collateral" ? "Interest earned" : "Interest accrued",
-                  value: interest,
-                },
-              ]
-            : []),
-          { key: `${side}-price`, label: "Price change", value: rest - interest },
-        ]
-      : [
-          {
-            key: `${side}-market`,
-            label: side === "collateral" ? "Market move and interest" : "Interest and price change",
-            value: rest,
-          },
-        ];
+    ? { key: interest != null ? `${side}-interest` : `${side}-market`, label: oneRest, value: interest ?? rest }
+    : { key: `${side}-market`, label: "Market move and interest", value: rest, signed: true };
   return { now: heldNow, total, out, bar, sources: sourcesFor(exact, total, balancing) };
 }
 
@@ -711,8 +680,8 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
     isLive,
     count: row?.events ?? 0,
     txs: m.totalTxs == null ? null : (row?.txs ?? 0),
-    collateral: sideState(m, "collateral", cum, collNow, isLive ? m.live.collateralInterestUsd : null),
-    debt: sideState(m, "debt", cum, debtNow, isLive ? m.live.debtInterestUsd : null),
+    collateral: sideState(m, "collateral", cum, collNow, isLive ? (m.live.collateralInterestUsd ?? null) : null),
+    debt: sideState(m, "debt", cum, debtNow, null),
     stale: isLive ? [] : (m.stale.get(stop) ?? []),
   };
 }

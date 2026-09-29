@@ -106,16 +106,20 @@ test("the live stop states the ledger's figures", () => {
   assert.ok(near(s.debt.now, usdSum(d.current) + (d.interest?.usd ?? 0)));
   assert.ok(near(seg(s.collateral, "deposited"), c.lifetimeInflow));
   assert.ok(near(seg(s.collateral, "received"), usdSum(c.received)));
-  assert.ok(near(seg(s.collateral, "collateral-interest"), usdSum(c.earned)));
-  assert.ok(near(seg(s.collateral, "collateral-price"), c.priceChange?.usd ?? NaN, 0.5));
+  // One balancing item at every stop: at the live stop it is the ledger's
+  // interest and price change added.
+  assert.ok(near(seg(s.collateral, "collateral-market"), usdSum(c.earned) + (c.priceChange?.usd ?? NaN), 0.5));
   assert.ok(near(s.collateral.out, usdSum(c.exited) + usdSum(c.liquidated)));
   assert.ok(near(seg(s.debt, "borrowed"), d.lifetimeInflow));
-  assert.ok(near(seg(s.debt, "debt-interest"), (d.interest?.usd ?? 0) + usdSum(d.earned)));
-  assert.ok(near(seg(s.debt, "debt-price"), d.priceChange?.usd ?? NaN, 0.5));
+  assert.ok(
+    near(seg(s.debt, "debt-market"), (d.interest?.usd ?? 0) + usdSum(d.earned) + (d.priceChange?.usd ?? NaN), 0.5),
+  );
   assert.ok(near(s.debt.out, usdSum(d.exited) + usdSum(d.liquidated)));
-  // The brief's prototype read 5.5k of debt interest off the balancing item;
-  // the ledger's method gives 5.2k.
-  assert.equal(formatFlowUsd(seg(s.debt, "debt-interest")), "$5.2k");
+  for (const side of [s.collateral, s.debt])
+    assert.deepEqual(
+      side.sources.filter((x) => x.fill === "estimate").map((x) => x.label),
+      ["Market move and interest"],
+    );
 });
 
 test("9 Nov 2025 reads as Miles's screenshot of the prototype", () => {
@@ -265,7 +269,7 @@ test("the route's day rows reproduce the event-level answer at every event day: 
   );
   const flows = aaveV3FlowEvents(aaveV3RowsToEvents(c.rows, c.wallet, metas).events, undefined);
   assert.ok(flows);
-  const live = { collateralUsd: 0, debtUsd: 0, collateralInterestUsd: null, debtInterestUsd: null };
+  const live = { collateralUsd: 0, debtUsd: 0 };
   const reference: FlowTimeline = {
     buckets: AAVE_V3_FLOW_BUCKETS.filter((b) => flows.used.has(b.key)),
     days: daysFromEvents(
@@ -324,7 +328,7 @@ test("a gap past SERIES_GAP_DAYS keeps the older price and marks the refresh", (
         prices: [{ asset: "0xa", usd: 100, ts: 1000 * 86_400 + 60 }],
       },
     ],
-    live: { collateralUsd: 300, debtUsd: 0, collateralInterestUsd: null, debtInterestUsd: null },
+    live: { collateralUsd: 300, debtUsd: 0 },
     dailyPrices: {
       "0xa": [
         [1000, 100],
@@ -359,7 +363,7 @@ test("SparkLend: the route's day rows reproduce the event-level answer at every 
     const c = legs.cases.find((x) => x.wallet === wallet)!;
     const flows = sparkFlowEvents(sparkRowsToEvents(c.rows, wallet, metas).events, undefined);
     assert.ok(flows);
-    const live = { collateralUsd: 0, debtUsd: 0, collateralInterestUsd: null, debtInterestUsd: null };
+    const live = { collateralUsd: 0, debtUsd: 0 };
     const reference: FlowTimeline = {
       buckets: AAVE_V3_FLOW_BUCKETS.filter((b) => flows.used.has(b.key)),
       days: daysFromEvents(
@@ -669,11 +673,15 @@ test("SparkLend 0x685f…128c: repayments over borrowing leave no negative princ
     if (name !== "route, lanes") continue;
     assert.ok(d.priceChange != null, "a price change");
     debtAddsUp(ledger);
-    // The bars' interest and owed are the ledger's.
+    // The bars' owed is the ledger's, and the balancing item is its interest
+    // and price change added.
     const m = buildFlowModel(sparkFlowSeriesTimeline(series, ledger, prices)!) as FlowModel;
     const s = stateAt(m, m.liveStop);
     assert.ok(near(s.debt.now, usdSum(d.current)), `${name}: owed`);
-    assert.ok(near(seg(s.debt, "debt-interest"), usdSum(d.earned)), `${name}: interest`);
+    assert.ok(
+      near(seg(s.debt, "debt-market"), usdSum(d.earned) + (d.priceChange?.usd ?? NaN), 0.5),
+      `${name}: interest and price change`,
+    );
   }
 });
 
@@ -689,7 +697,7 @@ test("Aave V4: the route's day rows reproduce the event-level answer at every ev
   const legs = readJson<{ cases: { wallet: string; spoke: string; events: BaseActivityEvent[] }[] }>(
     "aave-v4-flow-legs.json",
   );
-  const live = { collateralUsd: 0, debtUsd: 0, collateralInterestUsd: null, debtInterestUsd: null };
+  const live = { collateralUsd: 0, debtUsd: 0 };
   for (const [wallet, file] of [
     ["0xb0dd3df3f4f9b4767e5cc68de3a41c91624bff76", "lifetime-flows-series-v4-b0dd.json"],
     ["0x0fc9b8b7a341da6b41638c2f58cd1509bfa0afd3", "lifetime-flows-series-v4-0fc9.json"],

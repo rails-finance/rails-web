@@ -13,7 +13,7 @@
 // `aaveV3FlowTimeline` builds the same day rows from a page's events, with
 // the legs `aaveV3EventLegs` gives: the reference the route is tested against,
 // valued the way the ledger values its flows (the oracle price the event
-// carries, else today's). The live stop takes held, owed and interest from the
+// carries, else today's). The live stop takes held and owed from the
 // ledger in both, so at the live stop the scrubber states the ledger's figures.
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -41,8 +41,8 @@ import {
 /** Every bucket an Aave-family position can fill, in drawing order. */
 export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
   { key: "deposited", label: "Deposited", side: "collateral", dir: "in" },
-  { key: "received", label: "Received by transfer", short: "Received", side: "collateral", dir: "in", light: true },
-  { key: "swappedIn", label: "Swapped in", side: "collateral", dir: "in", light: true },
+  { key: "received", label: "Received by transfer", short: "Received", side: "collateral", dir: "in" },
+  { key: "swappedIn", label: "Swapped in", side: "collateral", dir: "in" },
   { key: "withdrawn", label: "Withdrawn", side: "collateral", dir: "out", hatch: "reverse" },
   {
     key: "soldToRepay",
@@ -389,17 +389,13 @@ export function flowEventsFromLegs<E extends BaseActivityEvent>(
   return { events: out, used };
 }
 
-/** Held, owed and each side's interest now, as the ledger states them. */
+/** Held and owed now, as the ledger states them. */
 export function aaveV3FlowLive(tower: ChainTruthTowerData): FlowLive {
   const c = tower.collateral;
   const d = tower.debt;
-  // The ledger states a price change only where its token sums reconcile;
-  // elsewhere the balancing segment stays one item, interest and prices.
   return {
     collateralUsd: Math.max(0, usdOf(c.current)),
     debtUsd: Math.max(0, usdOf(d.current) + (d.interest?.usd ?? 0)),
-    collateralInterestUsd: c.priceChange != null ? usdOf(c.earned) : null,
-    debtInterestUsd: d.priceChange != null ? (d.interest?.usd ?? 0) + usdOf(d.earned) : null,
     assets: towerAssets(tower, false),
   };
 }
@@ -440,7 +436,7 @@ export function towerAssets(tower: ChainTruthTowerData, collateralInterest: bool
  * The scrubber's timeline from the index's day rows, or null where there is
  * nothing to draw. `tower` supplies the live stop when the ledger is valued;
  * otherwise the route's own live figures (balances after the last event at the
- * latest recorded price) stand, with no interest split.
+ * latest recorded price) stand.
  */
 export function aaveV3FlowSeriesTimeline(
   series: FlowSeries,
@@ -457,7 +453,7 @@ export function aaveV3FlowSeriesTimeline(
 
 /** Any family's day rows as the scrubber's timeline. `live` is the ledger's
  *  live stop; null takes the route's (balances after the last event at the
- *  latest recorded price), with no interest split. */
+ *  latest recorded price). */
 export function flowSeriesTimeline(
   series: FlowSeries,
   bucketDefs: FlowBucket[],
@@ -480,12 +476,7 @@ export function flowSeriesTimeline(
   return {
     buckets: bucketDefs.filter((b) => used.has(b.key)),
     days,
-    live: live ?? {
-      collateralUsd: series.live.collateralUsd,
-      debtUsd: series.live.debtUsd,
-      collateralInterestUsd: null,
-      debtInterestUsd: null,
-    },
+    live: live ?? { collateralUsd: series.live.collateralUsd, debtUsd: series.live.debtUsd },
     todayPrices,
     dailyPrices: Object.fromEntries(Object.entries(series.prices).map(([a, p]) => [a, p.obs])),
     today: series.today,

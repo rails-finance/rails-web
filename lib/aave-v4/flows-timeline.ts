@@ -117,9 +117,7 @@ export function isAaveV4PositionEvent(ev: BaseActivityEvent, wallet: string, spo
   return c.eventType === "liquidation" ? c.liquidator?.toLowerCase() !== w : (c.owner ?? w) === w;
 }
 
-/** Held, owed and each side's interest now, as the ledger states them. The
- *  ledger states no price change (a price move sits in its Deposited and
- *  Borrowed), so the balancing segment stays one item. */
+/** Held and owed now, as the ledger states them. */
 export function aaveV4FlowLive(
   totals: AaveLifetimeTotals,
   reserves: ReserveStats[],
@@ -137,8 +135,6 @@ export function aaveV4FlowLive(
   return {
     collateralUsd: Math.max(0, totals.inProtocolUsd),
     debtUsd: Math.max(0, totals.outstandingUsd),
-    collateralInterestUsd: null,
-    debtInterestUsd: null,
     assets,
   };
 }
