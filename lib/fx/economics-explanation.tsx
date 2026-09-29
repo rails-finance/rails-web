@@ -51,15 +51,15 @@ export function fxEconomicsExplanation(data: ChainTruthTowerData): ReactNode {
   if (socialized) {
     bullets.push(
       <span key="socialized">
-        {fig(socialized.amount, "fxUSD")} of debt left this position with no event of its own — tick rebalances or a
-        bad-debt write-off, absorbed through f(x)&apos;s socialized accounting.
+        {fig(socialized.amount, "fxUSD")} of debt left this position without the owner&apos;s transaction: rebalances
+        cleared it, net of other positions&apos; bad debt that the pool adds to every position.
       </span>,
     );
   } else if (socializedAccrual) {
     bullets.push(
       <span key="socialized-accrual">
-        {fig(socializedAccrual.amount, "fxUSD")} of debt accrued beyond what this position&apos;s own events recorded —
-        bad debt socialized from other positions&apos; liquidations, not interest in the usual sense.
+        {fig(socializedAccrual.amount, "fxUSD")} of debt arrived without the owner&apos;s transaction: other
+        positions&apos; bad debt, which the pool adds to every position through its debt index.
       </span>,
     );
   }
@@ -120,13 +120,13 @@ export function fxEconomicsContent(): LearnMoreContent {
     steps: [
       "Current collateral and debt are the pool's own settled reading at a named block — funding and rebalances already applied.",
       "Borrowed and repaid fxUSD are summed from the position's own Operate events.",
-      "The gap between the event-implied debt and the settled debt is drawn as its own segment — socialized rebalances, a write-off, or bad debt socialized from other positions' liquidations, none of which leave a per-position record.",
+      "The gap between what the transactions add up to and the pool's reading is drawn as its own segment: debt cleared by rebalances, or other positions' bad debt added through the pool's debt index. Neither leaves an event on the position.",
     ],
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "The tick tree",
-        text: "positions are grouped by debt ratio into ticks; protocol-level rebalances operate on whole ticks at once, socializing the adjustment across every position inside.",
+        text: "positions are grouped by debt ratio into ticks; rebalances work on whole ticks, so every position in a rebalanced tick loses collateral and debt in proportion.",
       },
       {
         bold: "fxUSD",

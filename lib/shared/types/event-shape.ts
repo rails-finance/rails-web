@@ -2453,7 +2453,10 @@ export interface FxContext {
   debtDelta: string;
   /** operate only — protocol fee charged (normalized collateral units, human). */
   protocolFees?: string;
-  /** liquidation only — collateral seized (NORMALIZED units, human-readable). */
+  /** liquidation only — collateral sent to the liquidator, in the pool's
+   *  TOKEN units (wstETH / WBTC, human-readable): the manager scales the
+   *  seizure down to the token and subtracts the protocol's share of the bonus
+   *  before the transfer (PoolManager `_afterRebalanceOrLiquidate`). */
   liqColls?: string;
   /** liquidation only — fxUSD debt repaid by the liquidator (human-readable). */
   liqFxusdDebts?: string;
@@ -2491,6 +2494,11 @@ export interface FxContext {
   /** True when the same-tx snapshot shows zero collateral shares — this touch
    *  emptied the position (own close or full liquidation). */
   emptiesPosition?: boolean;
+  /** Which loan on this NFT the row belongs to (1-based): an emptied position
+   *  keeps its NFT, and a later deposit funds the same id again. */
+  loanNumber?: number;
+  /** The first row of loan 2 onward — the NFT funded again after emptying. */
+  reopens?: boolean;
   /** The transaction sender (signer), lowercased — when the index has it. */
   txFrom?: string;
 
@@ -2512,16 +2520,23 @@ export interface FxContext {
    *  Undefined = contract-ness not yet checked → no marking. */
   ownerAtIsContract?: boolean;
 
-  // ── socialized lane (derived: tick-lineage replay of RebalanceTick) ───────
-  // Amounts are TICK-level facts — the whole tick's clear, socialized across
-  // every position inside; the per-position slice is NOT provable from these
-  // logs (the settled reconciliation carries the exact per-position drift).
+  // ── socialized lane (derived: tick-lineage replay of RebalanceTick and the
+  // pool-wide Rebalance) ────────────────────────────────────────────────────
+  // Amounts are TICK- or POOL-level facts, shared across every position
+  // inside; the position's own change is read per row (getPosition at
+  // block − 1 and at the block, /api/chain/fx/event-state).
+
+  /** tickRebalance only — the pool-wide `Rebalance` (every tick above the
+   *  line, top down), not a one-tick `RebalanceTick`. The amounts are then the
+   *  whole pool's. */
+  poolWide?: boolean;
 
   /** tickRebalance only — the tick that was rebalanced while this position's
    *  shares sat in it (walked via PositionSnapshot anchors + TickMovement). */
   rebalancedTick?: number;
-  /** tickRebalance only — collateral the WHOLE TICK gave up (NORMALIZED
-   *  units, human-readable). */
+  /** tickRebalance only — collateral the WHOLE TICK (or pool) gave up to
+   *  the keeper, in TOKEN units net of the protocol's share of the bonus
+   *  (human-readable). */
   tickRebColls?: string;
   /** tickRebalance only — fxUSD debt the WHOLE TICK cleared (human). */
   tickRebFxusdDebts?: string;

@@ -5,20 +5,35 @@
 // Module scope matters: ChainTruthTimeline memoises its rows on this array's
 // identity, so a fresh one per render would recompute every row.
 
-import { isFxEvent } from "@/lib/shared/types/event-shape";
+import { isFxEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { TimelineRunCard } from "@/components/shared/timeline-run-card";
 import { renderRunFolders, CAUTION_FOLDER_BADGE } from "@/lib/shared/run-folders";
 
+/** "5 tick rebalances", "7 pool-wide rebalances", or "9 rebalances" for a mix.
+ *  Below sm the run card already prints the count before the lead, so the
+ *  lead drops it there. */
+function RunWords({ events }: { events: BaseActivityEvent[] }) {
+  const pool = events.filter((e) => isFxEvent(e) && e.context.data.poolWide === true).length;
+  const kind = pool === 0 ? "tick rebalance" : pool === events.length ? "pool-wide rebalance" : "rebalance";
+  return (
+    // data-prov-exempt: a row count, like the run card's own count pill.
+    <span data-prov-exempt="" className="text-sm font-medium text-foreground">
+      <span className="hidden sm:inline">{events.length} </span>
+      {kind}
+      {events.length === 1 ? "" : "s"}
+    </span>
+  );
+}
+
 /** Runs shorter than this stay as individual cards. */
 const MIN_TICK_REBALANCE_RUN = 3;
 
-// Consecutive tick rebalances collapse into one expandable run row — the same
+// Consecutive rebalances collapse into one expandable run row — the same
 // client-side de-noising as the redemption/liquidation runs elsewhere, via
-// ChainTruthTimeline's runs seam. Count-only: tickRebColls/tickRebFxusdDebts
-// are whole-TICK facts, not provable per-position (event-shape.ts:1687–1693),
-// so a Σ pair here would misstate this position's own delta. Module-scope so
-// the timeline's row memo keeps a stable identity.
+// ChainTruthTimeline's runs seam. The row names its members in words; it sums
+// nothing, because each member's amounts are the whole tick's (or pool's).
+// Module-scope so the timeline's row memo keeps a stable identity.
 export const FX_TICK_REBALANCE_RUNS: TimelineRunSpec[] = [
   {
     match: (e) => isFxEvent(e) && e.context.data.eventType === "tickRebalance",
@@ -28,7 +43,8 @@ export const FX_TICK_REBALANCE_RUNS: TimelineRunSpec[] = [
         <TimelineRunCard
           key={folder.key}
           count={events.length}
-          memberNoun="tick rebalance"
+          memberNoun="rebalance"
+          lead={<RunWords events={events} />}
           tone="caution"
           warningLabel="Rebalance"
           folder

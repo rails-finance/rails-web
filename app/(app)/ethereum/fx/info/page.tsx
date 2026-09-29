@@ -11,9 +11,10 @@ export const metadata = infoMetadata("fx");
 const intro = (
   <>
     <p>
-      f(x) Protocol V2 offers leveraged positions on wstETH and WBTC, funded by fxUSD debt. The protocol does not act on
-      positions one at a time: funding fees, rebalances and liquidations consume whole ticks — narrow buckets of
-      positions grouped by debt ratio — and a position is shares in its tick.
+      f(x) Protocol V2 offers leveraged long positions on wstETH and WBTC, funded by fxUSD debt; its short positions sit
+      on a separate manager and are not covered here. The protocol does not act on positions one at a time: funding
+      fees, rebalances and liquidations consume whole ticks — narrow buckets of positions grouped by debt ratio — and a
+      position is shares in its tick.
     </p>
     <p>
       Each row of the listing is one position (an NFT): its collateral, its fxUSD debt, and its standing after every

@@ -139,6 +139,7 @@ export function computeFxEconomics(
             amount: settledColls,
             usd: null,
             prov: settledCollateralProv(position.normalizedSymbol, settledBlock),
+            tipLabel: "Collateral held",
           },
         ]
       : [];
@@ -158,6 +159,7 @@ export function computeFxEconomics(
         amount: settledDebts,
         usd: null,
         prov: settledDebtProv(settledBlock),
+        tipLabel: "Debt now",
       });
     }
 
@@ -171,7 +173,11 @@ export function computeFxEconomics(
         amount: socialized,
         usd: null,
         prov: socializedDebtProv("cleared", settledBlock),
-        flowLabel: "Socialized rebalances, write-offs & bad debt",
+        // Short enough for the legend column; the tip says the rest.
+        flowLabel: "Rebalances",
+        tipLabel: position.everLiquidated
+          ? "Cleared by rebalances and left unpaid at liquidation"
+          : "Cleared by rebalances, net of others' bad debt",
       });
     } else if (socialized < -DUST) {
       // Settled exceeds implied: debt accrued beyond the event record. The
@@ -193,6 +199,7 @@ export function computeFxEconomics(
           amount: principal,
           usd: null,
           prov: impliedDebtProv(),
+          tipLabel: "What its transactions add up to",
         });
       }
       debtInterest = {
@@ -201,6 +208,7 @@ export function computeFxEconomics(
         amount: Math.min(-socialized, settledDebts),
         usd: null,
         prov: socializedDebtProv("accrued", settledBlock, implied < 0),
+        tipLabel: "Added by others' bad debt",
       };
     }
 
@@ -217,6 +225,7 @@ export function computeFxEconomics(
             amount: flows.repaid,
             usd: null,
             prov: fxLifetimeFlowProv("repaid"),
+            tipLabel: "Repaid",
           });
         }
         if (flows.liquidated > DUST) {
@@ -226,6 +235,7 @@ export function computeFxEconomics(
             amount: flows.liquidated,
             usd: null,
             prov: fxLifetimeFlowProv("liquidated debt"),
+            tipLabel: "Repaid in liquidation",
           });
         }
         debtInflow = flows.borrowed;
@@ -263,12 +273,12 @@ export function computeFxEconomics(
     debtListLabel: "Debt · settled (fxUSD)",
     // The eventless growth riding the interest segment is f(x)'s socialized
     // lane, not interest — the caption names the page's own vocabulary.
-    interestLabel: "Socialized accrual",
+    interestLabel: "Others' bad debt",
     interestNote:
       debtInterest != null
         ? undefined
         : preSweep
           ? "This position's current collateral and debt aren't in yet — f(x) reads them straight from the pool. Its own events can't stand in for them: funding on collateral, and rebalances and write-offs on debt, all change the real amounts with no per-position record, so the event-implied running debt is history, never the live figure."
-          : "The current lines are read straight from the pool, funding and rebalances already applied. The hatched segment is the gap between what this position's own events add up to and that live figure: tick and pool rebalances, bad-debt write-offs, and bad debt socialized from other positions' liquidations, none of which leave a per-position record. Debt is shown in fxUSD tokens. fxUSD is not pinned to a dollar, so it is never restated as USD.",
+          : "The current lines are the pool's reading, funding and rebalances applied. The hatched segment is the gap between what this position's transactions add up to and that reading: debt cleared by rebalances, net of other positions' bad debt that the pool adds to every position. Debt is shown in fxUSD; fxUSD is not pinned to a dollar, so it is never restated as USD.",
   };
 }

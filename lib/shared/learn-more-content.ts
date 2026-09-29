@@ -2166,10 +2166,11 @@ export function fxLiquidationContent(): LearnMoreContent {
   return {
     title: "How Liquidations & Rebalances Work",
     intro:
-      "f(x) defends fxUSD with two mechanisms. Rebalances trim whole ticks of positions back to a safer debt ratio when the price moves against them — socialized across every position in the tick, with no per-position event. Liquidations close individual positions whose debt ratio breaches the liquidation threshold.",
+      "f(x) positions sit in ticks: buckets of positions with nearly the same debt ratio. When a tick's debt ratio reaches the pool's rebalance line, a keeper can rebalance it; when it reaches the higher liquidation line, a keeper can liquidate. Keepers are any address that calls the manager; they are paid by the bonus.",
     extraParagraphs: [
-      "A liquidation event records the collateral seized and the debt actually repaid by the liquidator. When a position's collateral runs out before its debt, the difference is written off against the protocol's reserve — that write-off appears in no event, which is why the explorer reconciles every position against the pool's settled reading.",
-      "Because rebalances and redemptions socialize across ticks, a position's collateral and debt can shrink between its own transactions. The dashboard's reconciliation line quantifies exactly how much of the position's history arrived this way.",
+      "A rebalance repays part of the tick's fxUSD debt and takes collateral worth that debt plus the rebalance bonus, bringing the tick back to the rebalance line. Every position in the tick loses collateral and debt in proportion and stays open. The position has no event of its own for it; the timeline places the rebalance on its history and reads the position before and after.",
+      "A liquidation repays the position's debt and takes collateral worth it plus the liquidation bonus. Collateral beyond that stays in the position for the owner. When the collateral cannot cover the debt and the bonus, the liquidator takes all of it, and the debt it did not cover is added to every other position in the pool through the pool's debt index.",
+      "Of each bonus the protocol keeps a share (getLiquidationExpenseRatio: 10% on both pools in September 2026), so the collateral the keeper receives is less than what the position lost. The owner keeps the fxUSD they borrowed.",
     ],
     links: [{ label: "f(x) docs", url: FX_DOC_URL }],
   };

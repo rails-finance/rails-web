@@ -367,7 +367,7 @@ function timelineTable(
       case "liquidation": {
         // Liquidation figures are NORMALIZED units (unlike an operate's).
         action = "Liquidated";
-        colD = d.liqColls && Number(d.liqColls) > 0 ? `−${amt(Number(d.liqColls))} ${colSym}` : "—";
+        colD = d.liqColls && Number(d.liqColls) > 0 ? `−${amt(Number(d.liqColls))} ${tokenSym} to the liquidator` : "—";
         break;
       }
       case "tickRebalance": {
@@ -376,16 +376,22 @@ function timelineTable(
         // amount. When the stretch holding the rebalance has been read, the
         // position's OWN drift over that stretch follows in the same cell,
         // labeled as such (one rebalance in the stretch = its exact slice).
-        action = `Tick ${d.rebalancedTick} rebalanced (whole tick)`;
-        colD = d.tickRebColls && Number(d.tickRebColls) > 0 ? `−${amt(Number(d.tickRebColls))} ${colSym} (tick)` : "—";
+        const scope = d.poolWide ? "pool" : "tick";
+        action = d.poolWide
+          ? `Pool-wide rebalance (moved tick ${d.rebalancedTick})`
+          : `Tick ${d.rebalancedTick} rebalanced (whole tick)`;
+        colD =
+          d.tickRebColls && Number(d.tickRebColls) > 0 ? `−${amt(Number(d.tickRebColls))} ${tokenSym} (${scope})` : "—";
         debtD =
-          d.tickRebFxusdDebts && Number(d.tickRebFxusdDebts) > 0 ? `−${amt(Number(d.tickRebFxusdDebts))} (tick)` : "—";
+          d.tickRebFxusdDebts && Number(d.tickRebFxusdDebts) > 0
+            ? `−${amt(Number(d.tickRebFxusdDebts))} (${scope})`
+            : "—";
         const iv = e.blockNumber != null ? driftIntervalAt(drift, e.blockNumber) : undefined;
         if (iv) {
           const shared = rebalancesIn(iv, events);
-          const scope = shared > 1 ? `over a stretch shared by ${shared} rebalances` : "over its stretch";
-          colD += `; this position ${driftCell(iv.collsDrift, colSym)} ${scope}`;
-          debtD += `; this position ${driftCell(iv.debtsDrift, "fxUSD")} ${scope}`;
+          const stretch = shared > 1 ? `over a stretch shared by ${shared} rebalances` : "over its stretch";
+          colD += `; this position ${driftCell(iv.collsDrift, colSym)} ${stretch}`;
+          debtD += `; this position ${driftCell(iv.debtsDrift, "fxUSD")} ${stretch}`;
         }
         impliedCell = "—";
         break;

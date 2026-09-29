@@ -49,14 +49,6 @@ export interface FxDriftResult {
   stalled: string | null;
 }
 
-/** A rebalance card's own-position slice: the interval holding the rebalance
- *  and how many rebalances share it (one = the debt leg is this position's
- *  exact slice of the tick's clear). */
-export interface FxDriftSlice {
-  interval: FxDriftInterval;
-  rebalances: number;
-}
-
 /** A failure the route could name (never the provider URL). */
 export class FxDriftError extends Error {
   constructor(

@@ -19,11 +19,14 @@ import {
 } from "@/lib/shared/learn-more-content";
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { fxEventSlots } from "@/lib/fx/explainer-clauses";
+import { fxBeforeAfter, useFxEventState } from "@/lib/fx/use-event-state";
 
 export interface FxEventExplainerProps {
   ctx: FxContext;
   txHash?: string;
   blockNumber?: number;
+  /** Rebalance rows of this position sharing the block. */
+  blockPeers?: number;
   /** The card shows the lead sentence as the teaser; render only the rest here. */
   skipLead?: boolean;
 }
@@ -51,7 +54,8 @@ export function fxLearnMoreContent(ctx: FxContext): LearnMoreContent {
               : fxEventFallbackContent();
 }
 
-export function FxEventExplainer({ ctx, txHash, blockNumber, skipLead }: FxEventExplainerProps) {
+export function FxEventExplainer({ ctx, txHash, blockNumber, blockPeers, skipLead }: FxEventExplainerProps) {
+  const state = useFxEventState(ctx, blockNumber, txHash);
   const meta = isFxPoolKey(ctx.pool) ? FX_POOLS[ctx.pool] : undefined;
   const coords: FxCoords = {
     txHash,
@@ -60,7 +64,14 @@ export function FxEventExplainer({ ctx, txHash, blockNumber, skipLead }: FxEvent
     poolLabel: ctx.poolSymbol,
     positionId: ctx.positionId,
   };
-  const clauses = eventClauses(fxEventSlots(ctx, coords));
+  const clauses = eventClauses(
+    fxEventSlots(ctx, coords, {
+      ...fxBeforeAfter(state, blockNumber),
+      fees: state?.fees,
+      expenseRatio: state?.expenseRatio,
+      blockPeers,
+    }),
+  );
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;

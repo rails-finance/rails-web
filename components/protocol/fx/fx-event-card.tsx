@@ -3,10 +3,8 @@
 // Composer: wires the f(x) header / detail / explainer into the universal
 // EventCard shell (the plain-English explainer rides its own second-tier slot).
 //
-// f(x) V2 events carry ONE of two unit systems per amount and the spine chips
-// respect that: an operate's collateral delta is the TOKEN as transferred
-// (wstETH / WBTC), a liquidation's seizure is NORMALIZED 1e18 units (the
-// pool's stETH-equivalent) — each chip carries its own symbol, never mixed.
+// Collateral on the spine chips and in the header is the TOKEN as transferred
+// (wstETH / WBTC); the detail grid adds the pool's stETH-equivalent.
 //
 // Third-party marking is TWO-fact here, like the actor protocols but with a
 // different second fact: f(x)'s Operate carries no caller param, so the
@@ -25,7 +23,6 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { collDeltaProv, debtDeltaProv, type FxCoords } from "@/lib/fx/event-provenance";
 import { fxExplainerTeaser } from "@/lib/fx/explainer-clauses";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
-import type { FxDriftSlice } from "@/lib/sources/api/fx-drift";
 import { FxEventHeader } from "./fx-event-header";
 import { FxEventDetail } from "./fx-event-detail";
 import { FxEventExplainer, fxLearnMoreContent } from "./fx-event-explainer";
@@ -36,11 +33,9 @@ export interface FxEventCardProps {
   isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
-  /** tickRebalance rows only — this position's OWN drift over the quiet
-   *  stretch holding the rebalance (the page's per-interval archive reads),
-   *  the per-position figure the tick-level amounts can never state. Absent
-   *  while that stretch is unread. */
-  driftSlice?: FxDriftSlice;
+  /** tickRebalance rows only — how many of the position's rebalance rows share
+   *  this block (the row's getPosition read then covers them together). */
+  blockPeers?: number;
 }
 
 // The two-fact f(x) external-actor verdict now lives in lib/fx/external-actor.ts
@@ -48,7 +43,7 @@ export interface FxEventCardProps {
 // SAME predicate over the whole history for the Explanation's operator bullet,
 // so it cannot stay a file-local helper here.
 
-export function FxEventCard({ event, isFirst, isLast, eventNumber, driftSlice }: FxEventCardProps) {
+export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }: FxEventCardProps) {
   const ctx = event.context.data;
   const isLiq = ctx.eventType === "liquidation";
   const isTransfer = ctx.eventType === "transfer";
@@ -169,7 +164,6 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, driftSlice }:
           txHash={event.txHash}
           blockNumber={event.blockNumber}
           eventNumber={eventNumber}
-          normalizedSymbol={meta?.normalizedSymbol ?? ctx.poolSymbol}
           externalBy={extBy ?? undefined}
           flows={event.flows}
         />
@@ -180,11 +174,19 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, driftSlice }:
           txHash={event.txHash}
           blockNumber={event.blockNumber}
           normalizedSymbol={meta?.normalizedSymbol ?? ctx.poolSymbol}
-          driftSlice={driftSlice}
+          blockPeers={blockPeers}
         />
       }
       detailLabel="Position state"
-      explainer={<FxEventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} skipLead />}
+      explainer={
+        <FxEventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          blockPeers={blockPeers}
+          skipLead
+        />
+      }
       explainerLabel="Plain English"
       explainerTeaser={fxExplainerTeaser(ctx, coords)}
       txHash={event.txHash}

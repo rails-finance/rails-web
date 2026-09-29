@@ -23,6 +23,7 @@ import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { AmountText } from "@/components/shared/amount-text";
+import { useFxPoolTerms } from "@/lib/fx/use-event-state";
 
 export function FxPositionExplanation({
   v,
@@ -42,6 +43,7 @@ export function FxPositionExplanation({
   // Hooks first — the pane has several early returns below.
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
+  const terms = useFxPoolTerms(v.status === "open" ? v.pool : null);
 
   const isClosed = v.status === "closed";
   const hasEvents = v.activity.eventCount > 0;
@@ -76,29 +78,23 @@ export function FxPositionExplanation({
             <H>
               <AmountText value={implied} /> fxUSD
             </H>{" "}
-            — the timeline recorded more debt leaving than arriving, because bad debt socialized from other
-            positions&rsquo; liquidations raised its debt with no event of the position&rsquo;s own and the recorded
-            repayments and liquidation clears removed that too. The{" "}
-            <H>
-              <AmountText value={diff} /> fxUSD
-            </H>{" "}
-            marked socialized is all of that silent movement at once.
+            — more debt left through its transactions than arrived, because other positions&rsquo; bad debt, which the
+            pool adds to every position, raised its debt with no transaction of its own and its repayments and
+            liquidation cleared that too. The <AmountText value={Math.abs(diff)} /> fxUSD difference is that debt.
           </span>,
         );
       } else if (Math.abs(diff) > 1e-9) {
         bullets.push(
           <span key="socialized">
-            Its own events still add up to{" "}
+            Its transactions add up to{" "}
             <H>
               <AmountText value={implied} /> fxUSD
             </H>{" "}
-            of debt. The{" "}
-            <H>
-              <AmountText value={diff} /> fxUSD
-            </H>{" "}
-            marked socialized cleared with no event of the position&rsquo;s own —
-            {v.everLiquidated ? " tick rebalances and the bad-debt write-off at liquidation" : " tick rebalances"} that
-            f(x) applies pool-wide — which is how the event record and the empty settled figures reconcile.
+            of debt, and all of it left without the owner&rsquo;s transaction
+            {v.everLiquidated
+              ? ": rebalances cleared it, and at liquidation the debt the collateral could not cover was added to the other positions"
+              : ", cleared by rebalances"}
+            .
           </span>,
         );
       }
@@ -193,18 +189,40 @@ export function FxPositionExplanation({
     if (v.settled.collUsd != null) {
       bullets.push(
         <span key="usd">
-          At the pool&rsquo;s own oracle price, that collateral is worth <H>{formatUsd(v.settled.collUsd)}</H>.
+          At the oracle&rsquo;s min price
+          {v.oracle.priceUsd != null ? (
+            <>
+              , {formatUsd(v.oracle.priceUsd)} per {v.normalizedSymbol},
+            </>
+          ) : null}{" "}
+          that collateral is worth <H>{formatUsd(v.settled.collUsd)}</H>.
         </span>,
       );
     }
 
-    if (hasDebt && v.settled.debtRatio != null) {
+    if (hasDebt && v.settled.debtRatio != null && colls != null && colls > 0) {
+      const ratio = v.settled.debtRatio;
+      const anchor = debts / (colls * ratio);
       bullets.push(
         <span key="ratio">
-          The pool puts the debt ratio at <H>{(v.settled.debtRatio * 100).toFixed(1)}%</H> — the debt is that share of
-          the collateral&rsquo;s value at the price the pool itself judges positions by.
+          The pool puts the debt ratio at <H>{(ratio * 100).toFixed(1)}%</H>: the debt as a share of the
+          collateral&rsquo;s value at the oracle&rsquo;s anchor price, <H>{formatUsd(anchor)}</H> per{" "}
+          {v.normalizedSymbol}.
         </span>,
       );
+      if (terms && ratio < terms.rebalanceRatio) {
+        const line = (r: number) => `${(r * 100).toFixed(1).replace(/\.0$/, "")}%`;
+        bullets.push(
+          <span key="lines">
+            Rebalancing starts at <H>{line(terms.rebalanceRatio)}</H> and liquidation at{" "}
+            <H>{line(terms.liquidateRatio)}</H>. With today&rsquo;s collateral and debt the ratio reaches{" "}
+            {line(terms.rebalanceRatio)} if the anchor price falls to{" "}
+            <H>{formatUsd(anchor * (ratio / terms.rebalanceRatio))}</H>,{" "}
+            {((1 - ratio / terms.rebalanceRatio) * 100).toFixed(1)}% below now; funding keeps taking collateral, which
+            moves that price up slowly.
+          </span>,
+        );
+      }
     }
 
     if (!hasDebt && colls != null) {
@@ -226,38 +244,32 @@ export function FxPositionExplanation({
           <H>
             <AmountText value={implied} /> fxUSD
           </H>{" "}
-          — the timeline recorded more debt leaving than arriving, because bad debt socialized from other
-          positions&rsquo; liquidations raised its debt with no event of the position&rsquo;s own and the recorded
-          repayments and liquidation clears removed that too. The{" "}
-          <H>
-            <AmountText value={diff} /> fxUSD
-          </H>{" "}
-          marked socialized is all of that silent movement at once: the gap between the event record and the settled
-          debt above.
+          — more debt left through its transactions than arrived, because other positions&rsquo; bad debt, which the
+          pool adds to every position, raised its debt with no transaction of its own and its repayments and liquidation
+          cleared that too. The <AmountText value={Math.abs(diff)} /> fxUSD difference is that debt.
         </span>,
       );
     } else if (hasEvents) {
       const diff = v.socializedDebt ?? implied - debts;
       bullets.push(
         <span key="socialized">
-          The position&rsquo;s own events add up to{" "}
+          The position&rsquo;s transactions add up to{" "}
           <H>
             <AmountText value={implied} /> fxUSD
           </H>{" "}
-          of debt. The{" "}
-          <H>
-            <AmountText value={diff} /> fxUSD
-          </H>{" "}
-          marked socialized is the difference — tick rebalances, bad-debt write-offs and bad debt socialized from other
-          positions&rsquo; liquidations that f(x) applies pool-wide, with no event of the position&rsquo;s own.
-          {diff < 0 ? (
+          of debt.
+          {diff > 0 ? (
             <>
               {" "}
-              It reads negative because bad debt socialized from other positions&rsquo; liquidations added debt beyond
-              what the events show.
+              It owes <AmountText value={diff} /> fxUSD less, because debt left without the owner&rsquo;s transaction:
+              rebalances cleared it, net of other positions&rsquo; bad debt, which the pool adds to every position.
             </>
-          ) : diff > 0 ? (
-            <> It reads positive because rebalances and write-offs cleared debt below what the events show.</>
+          ) : diff < 0 ? (
+            <>
+              {" "}
+              It owes <AmountText value={-diff} /> fxUSD more, because other positions&rsquo; bad debt, which the pool
+              adds to every position, raised it without the owner&rsquo;s transaction.
+            </>
           ) : null}
         </span>,
       );
@@ -298,8 +310,8 @@ export function FxPositionExplanation({
         {extras > 0 ? (
           <>
             {" "}
-            The timeline below carries {timelineRows} rows — the additional {extras} are pool-level tick rebalances and
-            ownership handovers placed on its history.
+            The timeline below carries {timelineRows} rows; the other {extras} are rebalances run by keepers and
+            ownership handovers, placed on its history.
           </>
         ) : null}
       </span>,

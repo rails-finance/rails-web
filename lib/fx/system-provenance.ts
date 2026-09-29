@@ -208,6 +208,27 @@ export const pausedProv = (which: "borrow" | "redeem", label: string, address: s
   verify: STATE_VERIFY,
 });
 
+/** The manager's redemption gate — PoolConfiguration.isRedeemAllowed. */
+export const redeemGateProv = (label: string, address: string): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  summary: `Whether redemption is open — PoolConfiguration.isRedeemAllowed(), read at the pinned block for the ${label}'s configuration. It answers true only while the fxUSD oracle price sits below its peg by more than the allowed deviation; PoolManager.redeem reverts otherwise.`,
+  contract: pool(label, address),
+  via: `${SYSTEM_VIA} · PoolConfiguration.isRedeemAllowed()`,
+  verify: STATE_VERIFY,
+});
+
+/** The pool's default fee schedule — PoolConfiguration.getPoolFeeRatio with no
+ *  per-caller entry. */
+export const defaultFeesProv = (label: string, address: string): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  summary: `The pool's default fees — PoolConfiguration.getPoolFeeRatio(pool, 0x0) at the pinned block: the schedule for any caller without its own entry, as fractions of each deposit, withdrawal, borrow and repayment. A router can carry its own entry.`,
+  contract: pool(label, address),
+  via: `${SYSTEM_VIA} · PoolConfiguration.getPoolFeeRatio(pool, 0x0)`,
+  verify: STATE_VERIFY,
+});
+
 // ── The manager's book (capacity; TOKEN units) ───────────────────────────────
 
 export const capacityProv = (side: "collateral" | "debt", label: string, tokenSym: string): Provenance => ({

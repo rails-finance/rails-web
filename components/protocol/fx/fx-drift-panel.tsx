@@ -19,6 +19,7 @@
 // page-level provenance inspector can open, and the dev prov-coverage
 // tripwire sweeps the panel like any other receipted surface.
 
+import { formatDate } from "@/lib/date";
 import { formatNumber } from "@/lib/utils/format";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { driftIntervalProv, driftValueProv } from "@/lib/fx/event-provenance";
@@ -45,6 +46,7 @@ export function FxDriftPanel({
   reason,
   onLoad,
   normalizedSymbol,
+  blockDates,
 }: {
   /** The intervals in hand (the newest suffix), or null before the first
    *  answer. */
@@ -57,7 +59,14 @@ export function FxDriftPanel({
    *  intervals. */
   onLoad: () => void;
   normalizedSymbol: string;
+  /** Block → unix time for the position's event blocks (the stretches'
+   *  bounds), so each row carries its dates. */
+  blockDates?: Map<number, number>;
 }) {
+  const dateOf = (b: number): string | null => {
+    const t = blockDates?.get(b);
+    return t != null ? formatDate(t) : null;
+  };
   const registry = useReceiptRegistry();
   const loading = state === "loading";
 
@@ -65,14 +74,13 @@ export function FxDriftPanel({
     <ProvReceiptsScope registry={registry}>
       <div className="rounded-xl bg-raised px-4 py-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <span className="text-sm font-semibold">Socialized drift · by interval</span>
+          <span className="text-sm font-semibold">Moved without a transaction · by stretch</span>
           {!drift && loading && <span className="text-xs text-rb-500">Reading boundary states…</span>}
         </div>
         <p className="mt-1 text-xs text-rb-500">
-          Funding, socialized rebalances and bad debt move this position between its own events with no per-position log
-          — funding on the collateral side, rebalances on both, bad debt on the debt side. Each row below is one quiet
-          stretch: the pool&rsquo;s <code>getPosition</code> read at its start and end blocks, and their difference —
-          the drift that stretch contributed to the position card&rsquo;s reconciliation lines.
+          Between the owner&rsquo;s transactions, funding takes collateral, rebalances take collateral and debt, and
+          other positions&rsquo; bad debt adds debt. Each row is one stretch between two transactions: the pool&rsquo;s{" "}
+          <code>getPosition</code> at its start and end, and the difference.
         </p>
         {state === "error" && (
           <p className="mt-2 text-xs text-rb-500">
@@ -96,7 +104,7 @@ export function FxDriftPanel({
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-rb-500">
-                    <th className="py-1 pr-4 font-semibold">Interval · blocks</th>
+                    <th className="py-1 pr-4 font-semibold">Stretch · dates and blocks</th>
                     <th className="py-1 pr-4 font-semibold">Collateral drift</th>
                     <th className="py-1 pr-4 font-semibold">Debt drift</th>
                   </tr>
@@ -113,7 +121,11 @@ export function FxDriftPanel({
                           value={`${iv.fromBlock} → ${iv.toBlock}`}
                         >
                           <span>
-                            {iv.fromBlock} → {iv.toHead ? `settled (${iv.toBlock})` : iv.toBlock}
+                            {dateOf(iv.fromBlock) ?? iv.fromBlock} →{" "}
+                            {iv.toHead ? "now" : (dateOf(iv.toBlock) ?? iv.toBlock)}
+                            <span className="block text-[10px] text-rb-400">
+                              {iv.fromBlock} → {iv.toHead ? `settled (${iv.toBlock})` : iv.toBlock}
+                            </span>
                           </span>
                         </Prov>
                       </td>
@@ -145,8 +157,8 @@ export function FxDriftPanel({
             {drift.unread > 0 && (
               <p className="mt-2 text-xs text-rb-500">
                 {drift.unread} older stretch{drift.unread === 1 ? "" : "es"} not read yet
-                {drift.stalled ? ` (${drift.stalled})` : ""} — the card&rsquo;s debt-side socialized figure covers the
-                whole history regardless; its collateral line says how much it covers.{" "}
+                {drift.stalled ? ` (${drift.stalled})` : ""} — the card&rsquo;s debt line covers the whole history
+                regardless; its collateral line says how much it covers.{" "}
                 <button
                   onClick={onLoad}
                   disabled={loading}

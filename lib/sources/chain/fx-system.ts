@@ -68,7 +68,12 @@ const POOL_ABI = parseAbi([
   "function tickTreeData(uint256) view returns (bytes32,bytes32)",
 ]);
 const ORACLE_ABI = parseAbi(["function getPrice() view returns (uint256,uint256,uint256)"]);
-const CONFIG_ABI = parseAbi(["function getLongPoolFundingRatio(address) view returns (uint256)"]);
+const CONFIG_ABI = parseAbi([
+  "function getLongPoolFundingRatio(address) view returns (uint256)",
+  "function getPoolFeeRatio(address,address) view returns (uint256,uint256,uint256,uint256)",
+  "function isRedeemAllowed() view returns (bool)",
+]);
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
 const PM_ABI = parseAbi([
   "function getPoolInfo(address) view returns (uint256 collateralCapacity, uint256 collateralBalance, uint256 rawCollateral, uint256 debtCapacity, uint256 debtBalance)",
 ]);
@@ -150,6 +155,13 @@ export interface FxPoolSystem {
   maxRedeemPerTick: number;
   borrowPaused: boolean;
   redeemPaused: boolean;
+  /** The manager's redemption gate (PoolConfiguration.isRedeemAllowed): true
+   *  only while fxUSD trades below its peg by more than the allowed deviation.
+   *  Protocol-wide, and separate from the pool's own pause flag. */
+  redeemAllowed: boolean;
+  /** The pool's DEFAULT fee schedule (getPoolFeeRatio with no per-caller
+   *  entry), fractions: a router can carry its own schedule. */
+  defaultFees: { supply: number; withdraw: number; borrow: number; repay: number };
 
   /** The PoolManager's book: caps in TOKEN units / fxUSD, plus its token-unit
    *  balance — the other unit system, named as such. */
@@ -263,7 +275,7 @@ async function loadPool(key: FxPoolKey, blockNumber: bigint): Promise<FxPoolSyst
   const [rebalanceRatio, rebalanceBonus] = rebalancePair;
   const [liquidateRatio, liquidateBonus] = liquidatePair;
 
-  const [[anchor, minPrice, maxPrice], fundingRatio] = await Promise.all([
+  const [[anchor, minPrice, maxPrice], fundingRatio, feeRatios, redeemAllowed] = await Promise.all([
     client.readContract({ address: oracle, abi: ORACLE_ABI, functionName: "getPrice", ...at }),
     client.readContract({
       address: configuration,
@@ -272,6 +284,14 @@ async function loadPool(key: FxPoolKey, blockNumber: bigint): Promise<FxPoolSyst
       args: [address],
       ...at,
     }),
+    client.readContract({
+      address: configuration,
+      abi: CONFIG_ABI,
+      functionName: "getPoolFeeRatio",
+      args: [address, ZERO_ADDRESS],
+      ...at,
+    }),
+    client.readContract({ address: configuration, abi: CONFIG_ABI, functionName: "isRedeemAllowed", ...at }),
   ]);
 
   // ── The bitmap sweep: which ticks hold debt ────────────────────────────────
@@ -367,6 +387,13 @@ async function loadPool(key: FxPoolKey, blockNumber: bigint): Promise<FxPoolSyst
     maxRedeemPerTick: Number(maxRedeemRaw) / 1e9,
     borrowPaused,
     redeemPaused,
+    redeemAllowed,
+    defaultFees: {
+      supply: Number(feeRatios[0]) / 1e9,
+      withdraw: Number(feeRatios[1]) / 1e9,
+      borrow: Number(feeRatios[2]) / 1e9,
+      repay: Number(feeRatios[3]) / 1e9,
+    },
 
     collateralCapacityToken: Number(poolInfo[0]) / 10 ** meta.tokenDecimals,
     collateralBalanceToken: Number(poolInfo[1]) / 10 ** meta.tokenDecimals,

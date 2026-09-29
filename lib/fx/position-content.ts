@@ -4,31 +4,81 @@
 // event-level modals in lib/shared/learn-more-content.ts (fxOperateContent,
 // fxLiquidationContent), which explain individual actions.
 //
-// URL matches the one already verified in lib/shared/learn-more-content.ts's
-// FX_DOC_URL (fxprotocol.gitbook.io).
+// The pool's terms (lines, bonuses, funding, default fees) come from the
+// card's head read (/api/chain/fx/terms); while it is in flight the bullets
+// state the mechanics without the numbers.
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import type { FxPoolTerms } from "@/lib/sources/chain/fx-terms";
+import { formatNumber } from "@/lib/utils/format";
 
 const FX_DOC_URL = "https://fxprotocol.gitbook.io/fx-docs";
 
-export function fxPositionContent(opts: { status: "open" | "closed" | "liquidated"; pool: string }): LearnMoreContent {
+const pct = (r: number): string => `${(r * 100).toFixed(2).replace(/\.?0+$/, "")}%`;
+
+function mechanics(pool: string, t: FxPoolTerms | null): { bold: string; text: string }[] {
+  return [
+    {
+      bold: "Debt ratio",
+      text: t
+        ? `fxUSD debt divided by the collateral's value at the oracle's anchor price. Borrowing and withdrawing stop at ${pct(t.maxBorrowRatio)}; from ${pct(t.rebalanceRatio)} a keeper can rebalance the position's tick, and from ${pct(t.liquidateRatio)} liquidate it.`
+        : `fxUSD debt divided by the collateral's value at the oracle's anchor price. Past the ${pool} pool's rebalance line a keeper can rebalance the position's tick, and past its liquidation line liquidate it.`,
+    },
+    {
+      bold: "Who acts",
+      text: t
+        ? `rebalances and liquidations are run by keepers: any address may call them, and the bonus pays them (${pct(t.rebalanceBonus)} of the collateral taken on a rebalance, ${pct(t.liquidateBonus)} on a liquidation). The protocol keeps ${pct(t.expenseRatio)} of each bonus.`
+        : "rebalances and liquidations are run by keepers: any address may call them, and a bonus in collateral pays them. The protocol keeps a share of each bonus.",
+    },
+    {
+      bold: "Rebalance",
+      text: "the keeper repays part of the tick's debt and takes collateral worth that debt plus the bonus. Every position in the tick keeps less of both and stays open, back at the rebalance line.",
+    },
+    {
+      bold: "Liquidation",
+      text: "the keeper repays the debt and takes collateral worth it plus the bonus; collateral beyond that stays in the position for the owner. When the collateral falls short, the keeper takes all of it and the unpaid debt is added to every other position. The owner keeps the fxUSD borrowed.",
+    },
+  ];
+}
+
+function costs(t: FxPoolTerms | null, colls?: number | null, sym?: string): { bold: string; text: string } | null {
+  if (!t) return null;
+  const perYear =
+    colls != null && colls > 0 && sym
+      ? ` About ${formatNumber(colls * t.fundingRatio)} ${sym} a year on this position's ${formatNumber(colls)} ${sym}, at today's rate.`
+      : "";
+  const fees = [
+    t.fees.supply > 0 ? `${pct(t.fees.supply)} of each deposit` : null,
+    t.fees.withdraw > 0 ? `${pct(t.fees.withdraw)} of each withdrawal` : null,
+    t.fees.borrow > 0 ? `${pct(t.fees.borrow)} of each borrow` : null,
+    t.fees.repay > 0 ? `${pct(t.fees.repay)} of each repayment` : null,
+  ].filter(Boolean);
+  return {
+    bold: "Cost",
+    text: `funding at ${pct(t.fundingRatio)} a year, taken from collateral with no event.${perYear} The pool's default fee schedule charges ${fees.length ? fees.join(" and ") : "nothing"}; a router can carry its own schedule, and each timeline row states what its transaction paid.`,
+  };
+}
+
+export function fxPositionContent(opts: {
+  status: "open" | "closed" | "liquidated";
+  pool: string;
+  terms?: FxPoolTerms | null;
+  colls?: number | null;
+  normalizedSymbol?: string;
+}): LearnMoreContent {
   const { status, pool } = opts;
+  const t = opts.terms ?? null;
+  const nft = {
+    bold: "The NFT",
+    text: "the position is an NFT the pool mints. Closing or liquidating leaves the NFT with its owner, who can fund it again.",
+  };
 
   if (status === "liquidated") {
     return {
       title: "About This Position",
-      intro: `This position was liquidated when its debt ratio breached the ${pool} pool's threshold. The debt footnote above reconciles what events implied against the pool's own settled reading at the point it closed.`,
+      intro: `This position was liquidated when its debt ratio reached the ${pool} pool's liquidation line. The debt line above compares what its transactions add up to with the pool's final reading.`,
       detailsHeading: "Key concepts:",
-      details: [
-        {
-          bold: "Liquidations vs rebalances",
-          text: "a liquidation closes one position outright; it's distinct from a rebalance, which trims a whole tick of positions back to a safer ratio and touches no single position's own event log.",
-        },
-        {
-          bold: "Write-offs",
-          text: "when collateral runs out before debt is cleared, the shortfall is written off against the protocol's reserve — a change with no event of its own, which is exactly what the reconciliation line above accounts for.",
-        },
-      ],
+      details: [...mechanics(pool, t), nft],
       links: [{ label: "f(x) docs", url: FX_DOC_URL }],
     };
   }
@@ -37,48 +87,40 @@ export function fxPositionContent(opts: { status: "open" | "closed" | "liquidate
     return {
       title: "About This Position",
       intro:
-        "This position has been closed. Its settled collateral and debt have emptied, and the debt footnote above reconciles what its own events implied against the pool's final settled reading.",
+        "This position has been closed. Its collateral and debt are zero in the pool's reading, and the debt line above compares what its transactions added up to with that reading.",
       detailsHeading: "Key concepts:",
       details: [
         {
-          bold: "Settled vs implied",
-          text: "socialized changes (tick rebalances, write-offs, bad debt socialized from other positions' liquidations) emit no per-position event, so the pool's own settled reading is the primary truth; the implied figure from this position's own events is shown alongside it as a check.",
+          bold: "Debt that moved without a transaction",
+          text: "rebalances and other positions' bad debt change a position's debt with no event of its own, so the pool's reading is the current figure and the sum of the transactions is shown beside it.",
         },
         {
-          bold: "Two unit systems",
-          text: `operation amounts were in the deposit token as transferred; the settled figures above are rate-normalized for the ${pool} pool — the receipts name which is which.`,
+          bold: "Two units",
+          text: `the timeline's amounts are the ${pool} transferred; the figures above are in the pool's rate-adjusted unit.`,
         },
+        nft,
       ],
       links: [{ label: "f(x) docs", url: FX_DOC_URL }],
     };
   }
 
-  // Open position — the live, interactive case.
+  const cost = costs(t, opts.colls, opts.normalizedSymbol);
   return {
     title: "About This Position",
-    intro: `This panel explains the position's live state in plain language — what the ${pool} pool's own settled reading shows right now, and how that compares to what this position's own events imply.`,
+    intro: `This panel describes the position as the ${pool} pool reads it now, and how that compares with what its own transactions add up to.`,
     detailsHeading: "Key concepts:",
     details: [
+      ...mechanics(pool, t),
+      ...(cost ? [cost] : []),
       {
         bold: "Tick-tree shares",
-        text: "a position's stored value is a share count in the pool's tick tree — the collateral and debt above are resolved from that share through the pool's own getPosition view at a named block.",
-      },
-      {
-        bold: "Funding costs",
-        text: "leverage is financed through Aave: the pool passes Aave's borrow rate through as a continuous funding charge on collateral, with no per-position event.",
-      },
-      {
-        bold: "Debt ratio",
-        text: "the pool's own risk figure for this position — the closest analogue to a collateral ratio here — read in the same settled sweep as the collateral and debt above.",
+        text: "the pool stores a position as shares of a tick; the collateral and debt above are the pool's getPosition reading of those shares at a named block.",
       },
       {
         bold: "On fx.aladdin.club",
-        text: "this is the xPOSITION the app shows on its Trade tab: the app's Current Size − xPOSITION Size equals the fxUSD debt above, and its Funding History is the collateral drift Rails reads between this position's own events — funding is charged on collateral, so it never appears in the debt-side socialized figure.",
+        text: "this is the xPOSITION the app shows on its Trade tab: the app's Current Size − xPOSITION Size equals the fxUSD debt above, and its Funding History is the collateral this page reads leaving between the position's transactions.",
       },
-      {
-        bold: "Socialized reconciliation",
-        text: "the debt footnote compares what this position's own events imply against the pool's settled figure; the gap is exactly what rebalances, write-offs and socialized bad debt moved with no event of their own.",
-      },
+      nft,
     ],
     links: [{ label: "f(x) docs", url: FX_DOC_URL }],
   };

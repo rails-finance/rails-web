@@ -453,7 +453,8 @@ const LIQUITY_FORK_OP_LABELS: Record<string, string> = {
 // deltas (open / adjust / close); liquidations are involuntary.
 const FX_OP_LABELS: Record<string, string> = {
   openPosition: "Open",
-  adjustPosition: "Adjust",
+  // Named in full: "Adjust" alone did not say what an adjust is.
+  adjustPosition: "Adjust collateral or debt",
   closePosition: "Close",
   liquidatePosition: "Liquidated",
   // The ownership lane (pool ERC721 Transfer logs): standalone mints anchor

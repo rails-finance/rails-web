@@ -2,11 +2,10 @@
 
 // f(x) event header — adapter onto the shared ChainTruthRow grammar. Maps the
 // signed amount(s) this event moved into the shared row spec; traces via
-// <Prov>. Units are the point and each delta names its own: an operate's
-// collateral delta is the TOKEN as transferred (wstETH / WBTC), a
-// liquidation's seizure is NORMALIZED 1e18 units (stETH-equivalent for the
-// wstETH pool) and carries the normalized symbol; debt is fxUSD everywhere —
-// rendered as fxUSD, never equated to dollars.
+// <Prov>. Collateral on every row is the TOKEN (wstETH / WBTC) — an operate's
+// delta, what a liquidation or rebalance sent to the keeper; the detail grid
+// states the stETH-equivalent. Debt is fxUSD everywhere, never equated to
+// dollars.
 
 import type { AssetFlow, FxContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -30,19 +29,10 @@ export interface FxEventHeaderProps {
   txHash?: string;
   blockNumber?: number;
   eventNumber?: number;
-  /** The pool's rate-normalized unit symbol (stETH / WBTC) — liquidation
-   *  seizures are quoted in it, not the token symbol. */
-  normalizedSymbol: string;
   /** The verdict-passing third-party signer (fx-event-card's two-fact
    *  predicate) — presence renders the pink external-actor chip. */
   externalBy?: string;
-  /** The event's flows, read for the contract behind each delta's symbol. Units
-   *  are the point on this explorer and the addresses follow them: the pool
-   *  token and fxUSD are the assets that actually moved and the flows name
-   *  them, while `normalizedSymbol` is a rate-normalized UNIT rather than a
-   *  transferred token — the lookup for it answers only in the case where a
-   *  flow really did carry that asset, and otherwise leaves the chip to its
-   *  symbol, which is the correct outcome for a unit nothing transferred. */
+  /** The event's flows, read for the contract behind each delta's symbol. */
   flows?: AssetFlow[];
 }
 
@@ -53,13 +43,13 @@ export function FxEventHeader({
   txHash,
   blockNumber,
   eventNumber,
-  normalizedSymbol,
   externalBy,
   flows,
 }: FxEventHeaderProps) {
-  const normAddr = soleFlowAddress(flows, normalizedSymbol);
-  const fxusdAddr = soleFlowAddress(flows, "fxUSD");
   const meta = isFxPoolKey(ctx.pool) ? FX_POOLS[ctx.pool] : undefined;
+  const tokenSym = meta?.tokenSymbol ?? ctx.poolSymbol;
+  const tokenAddr = meta?.tokenAddress ?? soleFlowAddress(flows, tokenSym);
+  const fxusdAddr = soleFlowAddress(flows, "fxUSD");
   const coords: FxCoords = {
     txHash,
     blockNumber,
@@ -75,7 +65,7 @@ export function FxEventHeader({
   // merged "Deposit & Borrow" verb. `ctx.isOpen` already rides the context. A
   // close (emptiesPosition) keeps its "Close Position" label; liquidations,
   // rebalances and transfers keep their own grammar. No rate pill (no chosen rate).
-  const isOpen = !!ctx.isOpen;
+  const isOpen = !!ctx.isOpen || !!ctx.reopens;
   const isAdjust = ctx.eventType === "operate" && !isOpen && !ctx.emptiesPosition;
   const perAxis = isOpen || isAdjust;
 
@@ -93,14 +83,15 @@ export function FxEventHeader({
     // proceeds), never "Tick cleared … Tick cleared …" and never "−140.58 ◊".
     // The detail grid repeats the same figures under their "· whole tick"
     // captions, beside this position's own slice when its stretch is read.
+    const scope = ctx.poolWide ? "Pool" : "Tick";
     const colls = Number(ctx.tickRebColls ?? "0") || 0;
     if (colls !== 0)
       deltas.push({
         value: -colls,
-        symbol: normalizedSymbol,
-        address: normAddr,
-        prov: tickRebAmountProv("colls", normalizedSymbol, coords, undefined),
-        label: "Tick cleared",
+        symbol: tokenSym,
+        address: tokenAddr,
+        prov: tickRebAmountProv("colls", tokenSym, coords, undefined, ctx.poolWide),
+        label: `${scope} cleared`,
         tone: "caution",
       });
     const debt = Number(ctx.tickRebFxusdDebts ?? "0") || 0;
@@ -109,22 +100,21 @@ export function FxEventHeader({
         value: -debt,
         symbol: "fxUSD",
         address: fxusdAddr,
-        prov: tickRebAmountProv("fxusd", "fxUSD", coords, undefined),
-        // The collateral delta already scopes the clause to the tick; a
-        // second "Tick" would only repeat it.
-        label: colls !== 0 ? "Repaid" : "Tick repaid",
+        prov: tickRebAmountProv("fxusd", "fxUSD", coords, undefined, ctx.poolWide),
+        // The collateral delta already scopes the clause; a second scope word
+        // would only repeat it.
+        label: colls !== 0 ? "Repaid" : `${scope} repaid`,
         tone: "caution",
       });
   } else if (ctx.eventType === "liquidation") {
-    // Seized collateral — NORMALIZED units (the LiquidatePosition event's own
-    // basis), so it carries the normalized symbol.
+    // Collateral sent to the liquidator — token units.
     const seized = Number(ctx.liqColls ?? "0") || 0;
     if (seized !== 0)
       deltas.push({
         value: -seized,
-        symbol: normalizedSymbol,
-        address: normAddr,
-        prov: liqCollsProv(normalizedSymbol, coords),
+        symbol: tokenSym,
+        address: tokenAddr,
+        prov: liqCollsProv(tokenSym, coords),
       });
     // The combined debt cleared (fxUSD-side + stable-side), signed negative —
     // the detail grid splits the two lanes.
@@ -164,7 +154,7 @@ export function FxEventHeader({
   return (
     <ChainTruthRow
       spec={{
-        label: isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : actionLabel,
+        label: ctx.reopens ? "Opened again" : isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : actionLabel,
         status: isOpen ? "open" : undefined,
         critical: ctx.eventType === "liquidation",
         // Rebalance rows follow the redemption grammar: the spine's caution

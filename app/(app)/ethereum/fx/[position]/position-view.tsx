@@ -36,16 +36,12 @@ import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { FxEventCard } from "@/components/protocol/fx/fx-event-card";
 import { FxPositionCard, viewFromSummary, type FxPositionView } from "@/components/protocol/fx/fx-position-card";
 import { FxPositionExplanation } from "@/components/protocol/fx/fx-position-explanation";
+import { FxLoansLine } from "@/components/protocol/fx/fx-loans-line";
+import { fxLoans } from "@/lib/fx/loans";
 import { summariseFxExternalActors } from "@/lib/fx/external-actor";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { FxDriftPanel } from "@/components/protocol/fx/fx-drift-panel";
-import {
-  driftIntervalAt,
-  fetchFxDrift,
-  FxDriftError,
-  type FxDriftResult,
-  type FxDriftSlice,
-} from "@/lib/sources/api/fx-drift";
+import { fetchFxDrift, FxDriftError, type FxDriftResult } from "@/lib/sources/api/fx-drift";
 import { computeFxEconomics, fxDebtFlowsWithOpening } from "@/lib/fx/economics";
 import { fxEconomicsExplanation, fxEconomicsContent } from "@/lib/fx/economics-explanation";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
@@ -185,24 +181,32 @@ export default function FxPositionView({
     void loadDrift();
   }, [loading, hasOwnEvents, loadDrift]);
 
-  // Each rebalance card's own-position slice: the interval whose block range
-  // holds the rebalance, and how many rebalances share it (the stretch's drift
-  // is their joint figure — one rebalance means the fxUSD leg is exact).
-  const driftSlices = useMemo(() => {
-    const slices = new Map<string, FxDriftSlice>();
-    if (!drift) return slices;
-    const perInterval = new Map<number, number>();
-    const rebalances = fxEvents.filter((e) => e.context.data.eventType === "tickRebalance");
-    for (const e of rebalances) {
-      const iv = driftIntervalAt(drift, e.blockNumber);
-      if (iv) perInterval.set(iv.fromBlock, (perInterval.get(iv.fromBlock) ?? 0) + 1);
-    }
-    for (const e of rebalances) {
-      const iv = driftIntervalAt(drift, e.blockNumber);
-      if (iv) slices.set(e.id, { interval: iv, rebalances: perInterval.get(iv.fromBlock) ?? 1 });
-    }
-    return slices;
-  }, [drift, fxEvents]);
+  // Rebalance rows sharing a block: the row's getPosition read (block − 1 to
+  // the block) covers them together, and the row says so.
+  const blockPeers = useMemo(() => {
+    const perBlock = new Map<number, number>();
+    for (const e of fxEvents)
+      if (e.context.data.eventType === "tickRebalance")
+        perBlock.set(e.blockNumber, (perBlock.get(e.blockNumber) ?? 0) + 1);
+    return perBlock;
+  }, [fxEvents]);
+
+  // The rebalance rows, for the card's debt line (what they cleared, read per
+  // block), and the loans this NFT has carried.
+  const rebalanceRows = useMemo(() => {
+    const reb = fxEvents.filter((e) => e.context.data.eventType === "tickRebalance");
+    if (reb.length === 0) return undefined;
+    return {
+      blocks: reb.map((e) => e.blockNumber),
+      firstTs: reb[0].timestamp,
+      lastTs: reb[reb.length - 1].timestamp,
+      ownEventBlocks: fxEvents
+        .filter((e) => e.context.data.eventType === "operate" || e.context.data.eventType === "liquidation")
+        .map((e) => e.blockNumber),
+    };
+  }, [fxEvents]);
+  const loans = useMemo(() => fxLoans(fxEvents), [fxEvents]);
+  const blockDates = useMemo(() => new Map(fxEvents.map((e) => [e.blockNumber, e.timestamp])), [fxEvents]);
 
   const tl = useTimelineEvents(fxEvents, { storageKey: `fx-${slug}`, protocolKey: "fx", window: historyWindow });
 
@@ -292,6 +296,10 @@ export default function FxPositionView({
               receipts
               viewHref={tl.viewHref}
               drift={drift}
+              rebalanceRows={historyWindow.state === "whole" ? rebalanceRows : undefined}
+              bodyExtra={
+                loans.length > 1 || loans.at(-1)?.ending === "liquidated" ? <FxLoansLine loans={loans} /> : undefined
+              }
               explanation={
                 <FxPositionExplanation
                   v={view}
@@ -327,6 +335,7 @@ export default function FxPositionView({
               reason={driftReason}
               onLoad={() => void loadDrift()}
               normalizedSymbol={view.normalizedSymbol}
+              blockDates={blockDates}
             />
           )}
           {/* Chain-only positions: the contract minted them via a path that
@@ -358,6 +367,11 @@ export default function FxPositionView({
                   // does.
                   firstAt={opening?.firstTimestamp}
                   tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                  reopenedAt={
+                    loans.length > 1 && loans[loans.length - 1].closedAt == null
+                      ? loans[loans.length - 1].openedAt
+                      : null
+                  }
                 />
               ) : undefined
             }
@@ -368,7 +382,9 @@ export default function FxPositionView({
                   eventNumber={meta.eventNumber}
                   isFirst={meta.isFirst}
                   isLast={meta.isLast}
-                  driftSlice={driftSlices.get(event.id)}
+                  blockPeers={
+                    event.context.data.eventType === "tickRebalance" ? blockPeers.get(event.blockNumber) : undefined
+                  }
                 />
               ) : null
             }

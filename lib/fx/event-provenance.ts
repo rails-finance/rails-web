@@ -20,12 +20,14 @@
 //     lane, rendered as an explicit reconciliation (spike-verified: wstETH
 //     #285 implied 25,178 fxUSD vs settled 0).
 //
-// TWO COLLATERAL UNIT SYSTEMS, never mixed (chain-verified 2026-07-14):
-// Operate.deltaColls is TOKEN units (wstETH 18 dp / WBTC 8 dp);
-// getPosition.rawColls / LiquidatePosition.colls / the snapshot oracle price
-// are RATE-NORMALIZED 1e18 units (wstETH pool: stETH-equivalent via
-// stEthPerToken; WBTC pool: the same quantity in 18 dp). Every summary names
-// which system its value is in.
+// TWO COLLATERAL UNIT SYSTEMS, never mixed (chain-verified 2026-07-14, and
+// for the seizure fields 2026-09-29): Operate.deltaColls / protocolFees,
+// LiquidatePosition.colls and RebalanceTick/Rebalance colls are TOKEN units
+// (wstETH 18 dp / WBTC 8 dp) — the manager scales a seizure down to the token
+// and subtracts its share of the bonus before it emits; getPosition.rawColls
+// and the snapshot oracle price are RATE-NORMALIZED 1e18 units (wstETH pool:
+// stETH-equivalent via stEthPerToken; WBTC pool: the same quantity in 18 dp).
+// Every summary names which system its value is in.
 //
 // Values replay the captured fx_* events. The `contract` is the per-pool
 // AaveFundingPool (passed in as `coords.pool`) — each pool is its own
@@ -123,25 +125,25 @@ export const debtDeltaProv = (coords: FxCoords, raw?: string | null): Provenance
   inputs: eventInputs(coords),
 });
 
-/** Protocol fee this operate charged — Operate.protocolFees, in NORMALIZED
- *  collateral units. */
-export const protocolFeesProv = (normalizedSym: string, coords: FxCoords, raw?: string | null): Provenance => ({
+/** Protocol fee this operate charged — Operate.protocolFees, in TOKEN units
+ *  (the manager scales the pool's fee down to the token before it emits). */
+export const protocolFeesProv = (tokenSym: string, coords: FxCoords, raw?: string | null): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `The protocol fee this operation charged — the field the Operate event itself carries, exactly as the pool emitted it${atBlock(coords)}. NORMALIZED collateral units (${normalizedSym}, 1e18) — the rate-converted system the pool accounts in, not the token as transferred.`,
+  summary: `The protocol fee this operation charged — the Operate event's protocolFees field${atBlock(coords)}, in ${tokenSym} as transferred (the manager scales the pool's fee to the token before it emits). The manager of September 2025 onward emits zero here and charges its fee schedule instead.`,
   contract: poolContract(coords),
   via: `${FX_VIA} · Operate log · ${fieldSeg("protocolFees", raw)}`,
   inputs: eventInputs(coords),
 });
 
-/** Collateral seized in a liquidation — LiquidatePosition.colls, NORMALIZED
- *  units. */
-export const liqCollsProv = (normalizedSym: string, coords: FxCoords, raw?: string | null): Provenance => ({
+/** Collateral sent to the liquidator — LiquidatePosition.colls, TOKEN units
+ *  net of the protocol's share of the bonus. */
+export const liqCollsProv = (tokenSym: string, coords: FxCoords, raw?: string | null): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `Collateral seized in this liquidation — the amount the LiquidatePosition event itself carries, exactly as the pool emitted it${atBlock(coords)}. NORMALIZED units (${normalizedSym}, 1e18 — rate-converted via the pool's token-rate provider), NOT the token-as-transferred unit an operate's deltaColls is in; the two systems never mix or sum.`,
+  summary: `Collateral sent to the liquidator — the LiquidatePosition event's colls field${atBlock(coords)}, in ${tokenSym} as transferred. The manager scales the seized amount down to the token and subtracts the protocol's share of the bonus before it emits and transfers it (PoolManager _afterRebalanceOrLiquidate).`,
   contract: poolContract(coords),
   via: `${FX_VIA} · LiquidatePosition log · ${fieldSeg("colls", raw)}`,
   inputs: eventInputs(coords),
@@ -252,13 +254,15 @@ export const fxExternalActorProv = (facts: { owner: string; txFrom: string }, co
 // ── the socialized lane (derived: tick-lineage replay) ───────────────────────
 
 /** The attribution itself — why this rebalance appears on THIS timeline. */
-export const tickRebalanceHitProv = (tick: number | undefined, coords: FxCoords): Provenance => ({
+export const tickRebalanceHitProv = (tick: number | undefined, coords: FxCoords, poolWide = false): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
   verify: txVerify(coords),
-  summary: `This position's shares sat in tick ${tick ?? "?"} when the pool rebalanced it${atBlock(coords)} — attributed by replaying the position's own PositionSnapshot tick anchors forward through every TickMovement (a tick's surviving shares migrate wholesale, with no position list), then matching the RebalanceTick log against the walked tick. The rebalance socialized its clear across every position in the tick with no per-position event; this derived row is that event, placed on the timeline it silently touched.`,
+  summary: `This position's shares sat in tick ${tick ?? "?"} when the ${poolWide ? "pool-wide rebalance moved it" : "pool rebalanced it"}${atBlock(coords)} — attributed by replaying the position's PositionSnapshot tick anchors forward through every TickMovement in (block, transaction, log) order, then matching ${poolWide ? "a TickMovement of that tick earlier in the transaction of the pool-wide Rebalance log" : "the RebalanceTick log against the walked tick"}.`,
   contract: poolContract(coords),
-  via: "PositionSnapshot anchors → TickMovement chain → RebalanceTick match",
+  via: poolWide
+    ? "PositionSnapshot anchors → TickMovement chain → same-tx Rebalance"
+    : "PositionSnapshot anchors → TickMovement chain → RebalanceTick match",
   inputs: eventInputs(coords),
 });
 
@@ -268,13 +272,14 @@ export const tickRebAmountProv = (
   unit: string,
   coords: FxCoords,
   raw?: string | null,
+  poolWide = false,
 ): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `The ${unit} the WHOLE TICK gave up in this rebalance — the RebalanceTick event's own ${which === "colls" ? "collateral" : which === "fxusd" ? "fxUSD debt" : "stable-side debt"} field, exactly as the pool emitted it${atBlock(coords)}. A TICK-level amount socialized across every position inside — NOT this position's slice, which no log states; the position card's settled reconciliation carries the exact per-position drift.`,
+  summary: `The ${unit} the whole ${poolWide ? "pool" : "tick"} gave up in this rebalance — the ${poolWide ? "Rebalance" : "RebalanceTick"} event's ${which === "colls" ? "collateral field, in the token as transferred to the keeper, net of the protocol's share of the bonus" : which === "fxusd" ? "fxUSD debt field" : "stable-side debt field"}${atBlock(coords)}. Shared across every position ${poolWide ? "the sweep touched" : "in the tick"}; this position's change is the getPosition read beside it.`,
   contract: poolContract(coords),
-  via: `captured RebalanceTick log · ${fieldSeg(which === "colls" ? "colls" : which === "fxusd" ? "fxUSDDebts" : "stableDebts", raw)}`,
+  via: `captured ${poolWide ? "Rebalance" : "RebalanceTick"} log · ${fieldSeg(which === "colls" ? "colls" : which === "fxusd" ? "fxUSDDebts" : "stableDebts", raw)}`,
   inputs: eventInputs(coords),
 });
 
@@ -514,61 +519,6 @@ export const lifetimeCollateralDriftProv = (
   ],
 });
 
-/** A rebalance card's own-position slice — this position's drift over the
- *  quiet stretch that holds the rebalance, one leg. With one rebalance in the
- *  stretch the debt leg is the position's exact slice of the tick's clear;
- *  the collateral leg also carries the funding charged over the stretch. */
-export const driftSliceProv = (
-  leg: "colls" | "debts",
-  unit: string,
-  fromBlock: number,
-  toBlock: number,
-  toHead: boolean,
-  rebalances: number,
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  verify: {
-    kind: "recompute",
-    text: `Re-run pool.getPosition at blocks ${fromBlock} and ${toBlock} against an archive node and subtract`,
-  },
-  summary: `This position's own ${leg === "colls" ? `collateral drift (NORMALIZED ${unit} units)` : "fxUSD debt drift"} over the stretch holding this rebalance — the pool's own \`getPosition\` view at block ${toBlock}${
-    toHead ? " (the settled sweep)" : ""
-  } minus the same read at block ${fromBlock}, the position's share of what moved with no event of its own. ${
-    rebalances === 1
-      ? leg === "debts"
-        ? "This is the only rebalance in the stretch, so the figure is this position's exact slice of the tick's debt clear."
-        : "This is the only rebalance in the stretch, so the figure is this position's slice of the tick's collateral clear plus the funding charged over the stretch."
-      : `${rebalances} rebalances sit in this stretch, so the figure is their joint slice${
-          leg === "colls" ? " plus the funding charged over the stretch" : ""
-        } — the logs never split it per rebalance.`
-  } The whole tick's amounts beside it are a different quantity: every position caught in the tick, not this one's share.`,
-  contract: { name: "AaveFundingPool", address: "" },
-  via: `pool getPosition (archive eth_call ×2) · ${leg === "colls" ? "rawColls" : "rawDebts"} difference over the stretch`,
-  formula: "end read − start read",
-  inputs: [
-    {
-      label: "start read",
-      kind: "chain",
-      pclass: "state",
-      note: `pool getPosition ${leg === "colls" ? "rawColls" : "rawDebts"} at block ${fromBlock}`,
-    },
-    {
-      label: "end read",
-      kind: "chain",
-      pclass: "state",
-      note: `pool getPosition ${leg === "colls" ? "rawColls" : "rawDebts"} at block ${toBlock}${toHead ? " (the settled sweep)" : ""}`,
-    },
-    {
-      label: "rebalances in stretch",
-      value: String(rebalances),
-      kind: "chain-derived",
-      pclass: "indexed",
-      note: "tick-lineage replay hits inside the stretch",
-    },
-  ],
-});
-
 // ── USD (chain oracle at a named block) ──────────────────────────────────────
 
 /** Position collateral valued in USD — settled colls (NORMALIZED units) × the
@@ -589,4 +539,166 @@ export const fxPositionUsdProv = (normalizedSym: string, priceBlock?: number | n
       note: `pool oracle min (liquidate) leg — USD per ${normalizedSym}${priceBlock != null ? ` at block ${priceBlock}` : ""}`,
     },
   ],
+});
+
+// ── per-row reads (getPosition at block − 1 and at the block) ────────────────
+
+const rowReadVerify = (block?: number): ProvVerify => ({
+  kind: "recompute",
+  text:
+    block != null
+      ? `Re-run the pool.getPosition / getPositionDebtRatio eth_calls at blocks ${block - 1} and ${block} against an archive node`
+      : "Re-run the pool.getPosition eth_call at the block and the block before",
+});
+
+/** The position before or after a row: getPosition / getPositionDebtRatio at
+ *  block − 1 or at the block, read when the row is opened. */
+export const rowStateProv = (
+  side: "coll" | "debt" | "ratio",
+  when: "before" | "after",
+  sym: string,
+  coords: FxCoords,
+): Provenance => {
+  const block = coords.blockNumber != null ? (when === "before" ? coords.blockNumber - 1 : coords.blockNumber) : null;
+  const what =
+    side === "coll" ? `Collateral (${sym})` : side === "debt" ? "fxUSD debt" : "Debt ratio (anchor oracle price)";
+  return {
+    kind: "chain",
+    pclass: "state",
+    verify: rowReadVerify(coords.blockNumber),
+    summary: `${what} ${when === "before" ? "just before" : "after"} this row — the pool's ${side === "ratio" ? "getPositionDebtRatio" : `getPosition ${side === "coll" ? "rawColls" : "rawDebts"}`} for position #${coords.positionId ?? "?"}${block != null ? ` at block ${block}` : ""}.`,
+    contract: poolContract(coords),
+    via: `archive eth_call · ${side === "ratio" ? "getPositionDebtRatio" : "getPosition"} at block${when === "before" ? " − 1" : ""}`,
+    inputs: eventInputs(coords),
+  };
+};
+
+/** A change across a row: the read at the block less the read at block − 1. */
+export const rowChangeProv = (side: "coll" | "debt" | "ratio", sym: string, coords: FxCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: rowReadVerify(coords.blockNumber),
+  summary: `${side === "coll" ? `Collateral (${sym})` : side === "debt" ? "fxUSD debt" : "Debt ratio"} this row moved — getPosition${side === "ratio" ? "DebtRatio" : ""} at the block less the same read at the block before. Everything else in the block that touched the position is in it.`,
+  contract: poolContract(coords),
+  via: "read at the block − read at block − 1",
+  formula: "after − before",
+  inputs: eventInputs(coords),
+});
+
+/** wstETH → stETH at a block: wstETH.stEthPerToken. */
+export const wstethRateProv = (coords: FxCoords): Provenance => ({
+  kind: "chain",
+  pclass: "oracle",
+  verify: {
+    kind: "recompute",
+    text: `Re-run wstETH.stEthPerToken()${coords.blockNumber != null ? ` at block ${coords.blockNumber}` : ""}`,
+  },
+  summary: `stETH per wstETH at this block — wstETH's stEthPerToken()${atBlock(coords)}, the rate the pool converts wstETH by (its registered rate provider).`,
+  contract: { name: "wstETH", address: "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0" },
+  via: "archive eth_call · wstETH.stEthPerToken",
+  inputs: eventInputs(coords),
+});
+
+/** A token amount restated in the pool's stETH-equivalent unit. */
+export const stethEquivalentProv = (what: string, coords: FxCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `${what} in stETH — the wstETH amount times stEthPerToken at this block, the conversion the pool applies to every wstETH amount.`,
+  contract: { name: "wstETH", address: "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0" },
+  via: "wstETH amount × stEthPerToken",
+  formula: "wstETH × rate",
+  inputs: eventInputs(coords),
+});
+
+/** What the protocol kept of a seizure: the position's collateral change less
+ *  what reached the keeper. */
+export const protocolShareProv = (sym: string, coords: FxCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `The protocol's share of the bonus — the collateral the position lost (getPosition at block − 1 less at the block) minus what reached the keeper, both in ${sym}. The manager keeps getLiquidationExpenseRatio of the bonus.`,
+  contract: poolContract(coords),
+  via: "collateral lost − collateral sent to the keeper",
+  formula: "(before − after) − sent",
+  inputs: eventInputs(coords),
+});
+
+/** fxUSD debt a liquidation left unpaid, spread over every other position. */
+export const unpaidDebtProv = (coords: FxCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `Debt the collateral did not cover — the position's debt just before (getPosition at block − 1) less the debt the liquidator repaid. The pool removed it from the position and raised its debt index, so every remaining position owes a share of it.`,
+  contract: poolContract(coords),
+  via: "debt before − fxUSD repaid − stable repaid",
+  formula: "before − repaid",
+  inputs: eventInputs(coords),
+});
+
+/** The fee schedule the manager applied to this transaction's caller. */
+export const feeScheduleProv = (caller: string, coords: FxCoords): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  verify: {
+    kind: "recompute",
+    text: `Re-run PoolConfiguration.getPoolFeeRatio(pool, ${caller})${coords.blockNumber != null ? ` at block ${coords.blockNumber - 1}` : ""}`,
+  },
+  summary: `Fees the pool charged this caller — PoolConfiguration.getPoolFeeRatio(pool, ${caller}) at the block before, the caller being the contract the transaction called (the router), and the fee the ratio times the amount on each leg.`,
+  contract: poolContract(coords),
+  via: "archive eth_call · PoolConfiguration.getPoolFeeRatio",
+  inputs: eventInputs(coords),
+});
+
+// ── the card's thresholds, trigger price and rebalance split ─────────────────
+
+/** The anchor oracle price the debt ratio was judged at, recovered from the
+ *  settled sweep: getPositionDebtRatio = debts ÷ (colls × anchor price). */
+export const anchorPriceProv = (sym: string, block?: number | null): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  summary: `The anchor price the debt ratio uses — the settled debt divided by the settled collateral times the debt ratio, all three from the pool's getPosition and getPositionDebtRatio${block != null ? ` at block ${block}` : ""}. The ratio is debts × 1e36 ÷ (colls × anchor price) on chain (scripts/verify-fx-chain.mjs check 5), so this recovers the anchor leg in USD per ${sym}.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "settled debts ÷ (settled colls × settled debt ratio)",
+  formula: "debts ÷ (colls × ratio)",
+});
+
+/** A pool line: rebalance or liquidation debt ratio, with its bonus. */
+export const poolLineProv = (which: "rebalance" | "liquidate", block?: number | null): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  verify: stateVerify(which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios", block ?? null),
+  summary: `The pool's ${which === "rebalance" ? "rebalance" : "liquidation"} line — the debt ratio from which a keeper may ${which === "rebalance" ? "rebalance a tick" : "liquidate"}, and its bonus: the pool's ${which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios"}${block != null ? ` at block ${block}` : ""}.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: `pool ${which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios"} (eth_call)`,
+});
+
+/** The anchor price at which the position's debt ratio reaches a line, with
+ *  collateral and debt held where they are. */
+export const triggerPriceProv = (line: string, sym: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  summary: `Price at which this position reaches ${line} — the anchor price times the debt ratio divided by ${line}, in USD per ${sym}. It holds collateral and debt where they are now; funding keeps taking collateral, which raises the ratio slowly.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "anchor price × debt ratio ÷ line",
+  formula: "anchor × ratio ÷ line",
+});
+
+/** What rebalances cleared from the position: its debt at block − 1 less at the
+ *  block, summed over the rebalance rows' blocks. */
+export const rebalanceClearedProv = (count: number): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: { kind: "recompute", text: "Re-run getPosition at each rebalance row's block and the block before" },
+  summary: `Debt cleared by rebalances — the position's getPosition debt at the block before each of its ${count} rebalance row${count === 1 ? "" : "s"} less the debt at that block, summed. The rows are the rebalances the tick replay placed on this position.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "Σ (getPosition debt at block − 1 − at block) over the rebalance blocks",
+  formula: "Σ (before − after)",
+});
+
+/** The rest of the debt that moved without the owner's transaction. */
+export const otherDebtMovesProv = (): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `Debt added without the owner's transaction outside the rebalances — the settled debt less (the event-implied debt minus what rebalances cleared). It holds other positions' bad debt, which the pool adds to every position through its debt index, and any other pool-wide change to the position's debt.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "settled debt − (implied debt − rebalance-cleared debt)",
+  formula: "settled − implied + cleared",
 });

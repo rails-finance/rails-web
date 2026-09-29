@@ -35,7 +35,14 @@ import {
   impliedDebtProv,
   socializedDebtProv,
   lifetimeCollateralDriftProv,
+  anchorPriceProv,
+  poolLineProv,
+  triggerPriceProv,
+  rebalanceClearedProv,
+  otherDebtMovesProv,
 } from "@/lib/fx/event-provenance";
+import { useFxPoolTerms, useFxRebalanceReads, type FxPoolTerms } from "@/lib/fx/use-event-state";
+import { formatDate } from "@/lib/date";
 import { FX_POOLS } from "@/lib/fx/asset-catalog";
 import { fxPositionContent } from "@/lib/fx/position-content";
 import { formatNumber, formatUnitsExact } from "@/lib/utils/format";
@@ -62,17 +69,46 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 
 const short = (a: string | null): string => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 
-/** THE SOCIALIZED RECONCILIATION LINE — event-implied debt vs settled debt,
- *  the difference being what funding, socialized rebalances and write-offs
- *  moved with no per-position event. Rendered whenever the settled lane
- *  exists (a zero gap is itself the reconciliation holding); pre-sweep it
- *  states the implied figure as implied, with the settled read pending. */
-function SocializedLine({ v }: { v: FxPositionView }) {
+/** The rebalance rows a detail page holds, for the debt line's split. */
+export interface FxRebalanceRows {
+  blocks: number[];
+  firstTs: number;
+  lastTs: number;
+  /** Blocks that also carry one of the position's own events: a block read
+   *  there mixes the two, so the split is not stated. */
+  ownEventBlocks: number[];
+}
+
+/** Debt cleared by the rebalance rows: Σ over their blocks of the position's
+ *  debt at block − 1 less at the block. Null until every block has read. */
+function useRebalanceCleared(v: FxPositionView, rows?: FxRebalanceRows): number | null {
+  const blocks = rows && rows.blocks.length <= 60 ? rows.blocks : [];
+  const reads = useFxRebalanceReads(v.pool, v.positionId, blocks);
+  if (!rows || blocks.length === 0 || !reads) return null;
+  if (blocks.some((b) => rows.ownEventBlocks.includes(b))) return null;
+  let cleared = 0;
+  for (const b of new Set(blocks)) {
+    const before = reads.reads[String(b - 1)]?.debts;
+    const after = reads.reads[String(b)]?.debts;
+    if (before == null || after == null) return null;
+    cleared += (Number(before) - Number(after)) / 1e18;
+  }
+  return cleared;
+}
+
+const dateSpan = (a: number, b: number): string =>
+  formatDate(a) === formatDate(b) ? formatDate(a) : `${formatDate(a)} – ${formatDate(b)}`;
+
+/** THE DEBT RECONCILIATION LINE — the debt the position's transactions add up
+ *  to, and what moved it without the owner's transaction: on a detail page,
+ *  what the rebalance rows cleared (read per row) and the rest, which is other
+ *  positions' bad debt added through the debt index; on the listing, the net. */
+function SocializedLine({ v, rows }: { v: FxPositionView; rows?: FxRebalanceRows }) {
+  const cleared = useRebalanceCleared(v, rows);
   const impliedHuman = formatNumber(v.impliedDebt.amount);
   if (v.activity.eventCount === 0) {
     // Chain-only position: the contract minted it via a path that emits no
-    // Operate, so there is nothing to reconcile against — say that, rather
-    // than presenting a zero implied sum as if events had been replayed.
+    // Operate, so there is nothing to reconcile against.
     return (
       <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
         no recorded events — this position was created by a path that logs nothing; only the pool&apos;s own current
@@ -83,20 +119,97 @@ function SocializedLine({ v }: { v: FxPositionView }) {
   if (v.settled.debts == null) {
     return (
       <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-        events imply <Prov info={impliedDebtProv()}>{impliedHuman} fxUSD</Prov> — awaiting the pool&apos;s own figure
+        its transactions add up to <Prov info={impliedDebtProv()}>{impliedHuman} fxUSD</Prov> — awaiting the pool&apos;s
+        own figure
       </div>
     );
   }
   const diff = v.socializedDebt ?? v.impliedDebt.amount - v.settled.debts;
+  if (Math.abs(diff) <= 1e-9) {
+    return (
+      <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+        its transactions add up to <Prov info={impliedDebtProv()}>{impliedHuman} fxUSD</Prov>
+      </div>
+    );
+  }
+  const n = rows ? new Set(rows.blocks).size : 0;
+  if (cleared != null && rows && cleared > 0) {
+    // settled = implied − cleared + other  →  other = cleared − diff
+    const other = cleared - diff;
+    return (
+      <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+        its transactions add up to <Prov info={impliedDebtProv()}>{impliedHuman} fxUSD</Prov>
+        {" · "}
+        <Prov info={rebalanceClearedProv(n)}>
+          <AmountText value={cleared} /> fxUSD
+        </Prov>{" "}
+        cleared by rebalances without the owner&apos;s transaction ({dateSpan(rows.firstTs, rows.lastTs)})
+        {Math.abs(other) > 0.005 ? (
+          <>
+            {" · "}
+            <Prov info={otherDebtMovesProv()}>
+              {other > 0 ? "+" : "−"}
+              <AmountText value={Math.abs(other)} /> fxUSD
+            </Prov>{" "}
+            {other > 0
+              ? "of other positions' bad debt"
+              : v.everLiquidated
+                ? "left unpaid at liquidation and spread over other positions, net"
+                : "by other pool-wide changes"}
+          </>
+        ) : null}
+      </div>
+    );
+  }
   return (
     <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-      events imply <Prov info={impliedDebtProv()}>{impliedHuman} fxUSD</Prov>
+      its transactions add up to <Prov info={impliedDebtProv()}>{impliedHuman} fxUSD</Prov>
       {" · "}
       <Prov info={socializedDebtProv(diff >= 0 ? "cleared" : "accrued", v.settled.block)}>
-        <AmountText value={diff} /> fxUSD
+        {diff >= 0 ? "" : "+"}
+        <AmountText value={Math.abs(diff)} /> fxUSD
       </Prov>{" "}
-      socialized (rebalances, write-offs, bad debt from other positions)
+      {diff >= 0
+        ? "of debt cleared without the owner's transaction, by rebalances net of other positions' bad debt"
+        : "of debt added without the owner's transaction, by other positions' bad debt"}
     </div>
+  );
+}
+
+/** Beside the debt ratio: the price it is judged at, the pool's lines, and the
+ *  price at which this position reaches the rebalance line. */
+function RatioFootnote({ v, terms }: { v: FxPositionView; terms: FxPoolTerms | null }) {
+  const { colls, debts, debtRatio } = v.settled;
+  if (colls == null || debts == null || debtRatio == null || colls <= 0 || debtRatio <= 0) return null;
+  const anchor = debts / (colls * debtRatio);
+  const sym = v.normalizedSymbol;
+  const pctLine = (r: number) => `${(r * 100).toFixed(1).replace(/\.0$/, "")}%`;
+  const trigger = terms ? anchor * (debtRatio / terms.rebalanceRatio) : null;
+  return (
+    <>
+      <StatFootnote>
+        at the anchor price <Prov info={anchorPriceProv(sym, v.settled.block)}>{formatUsd(anchor)}</Prov> per {sym}
+      </StatFootnote>
+      {terms && trigger != null ? (
+        <>
+          <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+            rebalancing from <Prov info={poolLineProv("rebalance", terms.block)}>{pctLine(terms.rebalanceRatio)}</Prov>,
+            liquidation from <Prov info={poolLineProv("liquidate", terms.block)}>{pctLine(terms.liquidateRatio)}</Prov>
+          </div>
+          <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+            {debtRatio >= terms.rebalanceRatio ? (
+              <>at or past the rebalance line now</>
+            ) : (
+              <>
+                reaches {pctLine(terms.rebalanceRatio)} if the anchor price falls to{" "}
+                <Prov info={triggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>{formatUsd(trigger)}</Prov> (−
+                {((1 - debtRatio / terms.rebalanceRatio) * 100).toFixed(1)}%)
+              </>
+            )}
+          </div>
+        </>
+      ) : null}
+    </>
   );
 }
 
@@ -112,7 +225,7 @@ function CollateralDriftLine({ v, drift }: { v: FxPositionView; drift: FxDriftRe
   if (drift.intervals.length === 0) return null;
   const s = summariseFxDrift(drift);
   const scope = s.complete
-    ? "with no event of its own"
+    ? "without the owner's transaction"
     : `over the latest ${s.intervals} stretch${s.intervals === 1 ? "" : "es"} read so far`;
   const prov = lifetimeCollateralDriftProv(v.normalizedSymbol, s.intervals, s.complete, drift.headBlock);
   if (Math.abs(s.collsDrift) <= DUST) {
@@ -140,7 +253,8 @@ function CollateralUsdFootnote({ v }: { v: FxPositionView }) {
   if (v.settled.collUsd == null || v.settled.colls == null || v.oracle.priceUsd == null) return null;
   return (
     <StatFootnote>
-      <Prov info={fxPositionUsdProv(v.normalizedSymbol, v.oracle.priceBlock)}>{formatUsd(v.settled.collUsd)}</Prov>
+      <Prov info={fxPositionUsdProv(v.normalizedSymbol, v.oracle.priceBlock)}>{formatUsd(v.settled.collUsd)}</Prov> at
+      the min price {formatUsd(v.oracle.priceUsd)}
       {v.oracle.priceBlock != null ? (
         <>
           {" "}
@@ -158,6 +272,8 @@ export function FxPositionCard({
   explanation,
   viewHref,
   drift,
+  rebalanceRows,
+  bodyExtra,
 }: {
   v: FxPositionView;
   receipts?: boolean;
@@ -172,9 +288,15 @@ export function FxPositionCard({
    *  gives the collateral column its reconciliation line. The listing render
    *  passes nothing and the column keeps its USD footnote only. */
   drift?: FxDriftResult | null;
+  /** The detail page's rebalance rows — the debt line splits what they
+   *  cleared from the rest. */
+  rebalanceRows?: FxRebalanceRows;
+  /** Lines under the card's figures (the loans this NFT has carried). */
+  bodyExtra?: React.ReactNode;
 }) {
   const st = STATUS[v.status] ?? STATUS.unknown;
   const poolMeta = FX_POOLS[v.pool];
+  const terms = useFxPoolTerms(receipts ? v.pool : null);
 
   const identityLead = (
     <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
@@ -218,6 +340,7 @@ export function FxPositionCard({
         learnMore={fxPositionContent({
           status: v.everLiquidated ? "liquidated" : "closed",
           pool: poolMeta.tokenSymbol,
+          terms,
         })}
       >
         <ClosedPositionStats
@@ -258,8 +381,9 @@ export function FxPositionCard({
             )
           }
           collateralFootnote={drift ? <CollateralDriftLine v={v} drift={drift} /> : undefined}
-          debtFootnote={<SocializedLine v={v} />}
+          debtFootnote={<SocializedLine v={v} rows={rebalanceRows} />}
         />
+        {bodyExtra && <div className="mt-3 border-t border-rb-300/40 pt-3 dark:border-rb-700/40">{bodyExtra}</div>}
       </PositionCardShell>
     );
   }
@@ -277,7 +401,13 @@ export function FxPositionCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={fxPositionContent({ status: "open", pool: poolMeta.tokenSymbol })}
+      learnMore={fxPositionContent({
+        status: "open",
+        pool: poolMeta.tokenSymbol,
+        terms,
+        colls: v.settled.colls,
+        normalizedSymbol: v.normalizedSymbol,
+      })}
     >
       <OpenPositionStats
         statusPill={
@@ -334,7 +464,7 @@ export function FxPositionCard({
               ) : (
                 <StatDash />
               ),
-            footnote: <SocializedLine v={v} />,
+            footnote: <SocializedLine v={v} rows={rebalanceRows} />,
           },
           {
             // getPositionDebtRatio, 0–1 scaled to a percentage — the pool's
@@ -348,9 +478,11 @@ export function FxPositionCard({
               ) : (
                 <StatDash />
               ),
+            footnote: receipts ? <RatioFootnote v={v} terms={terms} /> : undefined,
           },
         ]}
       />
+      {bodyExtra && <div className="mt-3 border-t border-rb-300/40 pt-3 dark:border-rb-700/40">{bodyExtra}</div>}
     </PositionCardShell>
   );
 }

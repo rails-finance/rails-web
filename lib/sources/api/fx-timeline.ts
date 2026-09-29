@@ -6,10 +6,11 @@
 // meta with the settled chain state. This builder shapes each
 // BaseActivityEvent + FxContext.
 //
-// UNITS: an operate's collateral delta is the TOKEN as transferred (wstETH
-// 18 dp / WBTC 8 dp); a liquidation's seized collateral is NORMALIZED 1e18
-// units (stETH-equivalent / WBTC-18dp) — the two never mix in one field, and
-// flows carry each with its own symbol. Debt is fxUSD everywhere. The running
+// UNITS: an operate's collateral delta, a liquidation's seizure and a
+// rebalance's collateral are all TOKEN units (wstETH 18 dp / WBTC 8 dp): the
+// manager scales a seizure down to the token before it emits and transfers it
+// (PoolManager `_afterRebalanceOrLiquidate`), net of the protocol's share of
+// the bonus. getPosition reads are NORMALIZED 1e18 (stETH-equivalent). Debt is fxUSD everywhere. The running
 // implied debt is event-replay only — its gap vs the settled debt is the
 // socialized lane (funding / rebalances / write-offs), shown as an explicit
 // reconciliation, never hidden.
@@ -114,20 +115,23 @@ export interface RawFxTransferRow {
   to_is_contract: boolean | null;
 }
 
-/** One socialized-lane row — a tick-level rebalance the route's tick-lineage
- *  replay attributed to this position (fx_v2_rebalance_tick, amounts are the
- *  WHOLE tick's clear). */
+/** One socialized-lane row — a rebalance the route's tick-lineage replay
+ *  attributed to this position: a one-tick `RebalanceTick` (kind "tick") or
+ *  the pool-wide `Rebalance` (kind "pool", no tick). Amounts are the whole
+ *  tick's (or pool's) clear; collateral in token units. */
 export interface RawFxSocializedRow {
   block_number: string;
   block_timestamp: string | null;
   log_index: number;
   tx_hash: string;
   tx_from: string | null;
-  tick: string;
+  tick: string | null;
   position_tick: string;
   colls: string;
   fx_usd_debts: string;
   stable_debts: string;
+  /** Absent on a payload from before the route sent it: a one-tick row. */
+  kind?: "tick" | "pool";
 }
 
 /** The rails timeline response envelope. */
@@ -277,13 +281,13 @@ export function buildFxTimeline(resp: RawFxTimelineResponse): FxTimelineResult {
       });
     }
     if (isLiq && r.liq_colls != null && BigInt(r.liq_colls) !== ZERO) {
-      // Seized collateral — NORMALIZED units, so it carries the normalized symbol.
+      // Collateral sent to the liquidator — token units.
       flows.push({
         token: meta.tokenAddress,
-        tokenSymbol: meta.normalizedSymbol,
-        tokenDecimals: 18,
+        tokenSymbol: meta.tokenSymbol,
+        tokenDecimals: meta.tokenDecimals,
         amount: r.liq_colls,
-        amountFormatted: numUnits(r.liq_colls, 18),
+        amountFormatted: numUnits(r.liq_colls, meta.tokenDecimals),
         direction: "out",
       });
     }
@@ -309,7 +313,7 @@ export function buildFxTimeline(resp: RawFxTimelineResponse): FxTimelineResult {
       positionId: position.positionId,
       ...(isLiq
         ? {
-            liqColls: r.liq_colls != null ? fmtUnits(r.liq_colls, 18) : undefined,
+            liqColls: r.liq_colls != null ? fmtUnits(r.liq_colls, meta.tokenDecimals) : undefined,
             liqFxusdDebts: r.liq_fxusd_debts != null ? fmtUnits(r.liq_fxusd_debts, 18) : undefined,
             liqStableDebts: r.liq_stable_debts != null ? fmtUnits(r.liq_stable_debts, 18) : undefined,
           }
@@ -387,12 +391,13 @@ export function buildFxTimeline(resp: RawFxTimelineResponse): FxTimelineResult {
       context: { protocol: "fx" as const, data: context },
     });
   }
-  // ── Socialized lane: tick-rebalance hits as derived rows ───────────────────
-  // These are the Maker-fork-style derived events: the replay proves THIS
-  // position's shares sat in the rebalanced tick; the amounts stay the whole
-  // tick's clear (per-position slices aren't provable from the logs), so the
-  // card labels them tick-level and carries no position flows.
+  // ── Socialized lane: rebalance hits as derived rows ────────────────────────
+  // The replay proves THIS position's shares sat in the rebalanced tick; the
+  // amounts stay the whole tick's (or pool's) clear, so the card labels them
+  // that way, carries no position flows, and reads the position's own change
+  // when the row is opened.
   for (const s of resp.socialized ?? []) {
+    const poolWide = s.kind === "pool";
     const context: FxContext = {
       eventType: "tickRebalance",
       pool: position.pool,
@@ -401,7 +406,8 @@ export function buildFxTimeline(resp: RawFxTimelineResponse): FxTimelineResult {
       debtDelta: "0",
       impliedDebtAfter: "0",
       rebalancedTick: Number(s.position_tick),
-      tickRebColls: fmtUnits(s.colls, 18),
+      ...(poolWide ? { poolWide: true } : {}),
+      tickRebColls: fmtUnits(s.colls, meta.tokenDecimals),
       tickRebFxusdDebts: fmtUnits(s.fx_usd_debts, 18),
       tickRebStableDebts: fmtUnits(s.stable_debts, 18),
       ...(s.tx_from ? { txFrom: s.tx_from.toLowerCase() } : {}),
@@ -414,7 +420,7 @@ export function buildFxTimeline(resp: RawFxTimelineResponse): FxTimelineResult {
       timestamp: s.block_timestamp != null ? Number(s.block_timestamp) : 0,
       wallet,
       actionType: "tickRebalance",
-      actionLabel: "Tick Rebalance",
+      actionLabel: poolWide ? "Pool Rebalance" : "Tick Rebalance",
       flows: [],
       etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", s.tx_hash),
       context: { protocol: "fx" as const, data: context },
@@ -424,6 +430,23 @@ export function buildFxTimeline(resp: RawFxTimelineResponse): FxTimelineResult {
   events.sort(
     (a, b) => orderKey(a.blockNumber, Number(a.id.split(":")[1])) - orderKey(b.blockNumber, Number(b.id.split(":")[1])),
   );
+
+  // Loans on one NFT: closing or liquidating empties the position but keeps
+  // the NFT, and a later deposit funds the same id again (wsteth-137 closed
+  // 18 Jan 2025 and borrowed again on 20 Jan). A windowed response does not
+  // start at the first loan, so it is not numbered.
+  let loan = 0;
+  let emptied = true;
+  for (const e of resp.cutoffBlock == null ? events : []) {
+    const d = (e.context as { data: FxContext }).data;
+    if (d.eventType !== "operate" && d.eventType !== "liquidation") continue;
+    if (emptied && d.eventType === "operate") {
+      loan += 1;
+      if (loan > 1) d.reopens = true;
+    }
+    if (loan > 0) d.loanNumber = loan;
+    emptied = d.emptiesPosition === true;
+  }
 
   return { position, events, totalEvents: resp.totalEvents ?? events.length };
 }

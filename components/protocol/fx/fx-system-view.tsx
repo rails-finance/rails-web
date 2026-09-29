@@ -53,6 +53,8 @@ import {
   rungProv,
   maxRedeemProv,
   pausedProv,
+  redeemGateProv,
+  defaultFeesProv,
   capacityProv,
   occupiedTicksProv,
   topTickProv,
@@ -105,21 +107,22 @@ function PoolStateCard({ p }: { p: FxPoolSystem }) {
     <div className="rounded-xl bg-raised px-4 py-3.5">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-semibold text-foreground">The pool&rsquo;s own book</span>
-        <span className="text-[11px] text-rb-500">
-          {p.borrowPaused && (
-            <Prov info={pausedProv("borrow", label, p.address)}>
-              <span>borrow paused</span>
-            </Prov>
-          )}
-          {p.borrowPaused && p.redeemPaused && " · "}
-          {p.redeemPaused && (
+        <span className="text-right text-[11px] text-rb-500">
+          <Prov info={pausedProv("borrow", label, p.address)}>
+            <span>{p.borrowPaused ? "borrow paused" : "borrow open"}</span>
+          </Prov>
+          {" · "}
+          {p.redeemPaused ? (
             <Prov info={pausedProv("redeem", label, p.address)}>
               <span>redeem paused</span>
             </Prov>
-          )}
-          {!p.borrowPaused && !p.redeemPaused && (
-            <Prov info={pausedProv("borrow", label, p.address)}>
-              <span>borrow &amp; redeem open</span>
+          ) : (
+            <Prov info={redeemGateProv(label, p.address)}>
+              <span>
+                {p.redeemAllowed
+                  ? "redemption open (fxUSD below its peg)"
+                  : "redemption closed: it opens only while fxUSD trades below its peg"}
+              </span>
             </Prov>
           )}
         </span>
@@ -214,6 +217,21 @@ function FundingCard({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
         <Stat label="Funding rate (annual, on collateral)">
           <Prov info={fundingRateProv(label, p.address)} value={formatExact(p.fundingRatioAnnual * 100)}>
             {pctOf(p.fundingRatioAnnual, 2)}
+          </Prov>
+        </Stat>
+        <Stat label="Default fees (a router can set its own)">
+          <Prov
+            info={defaultFeesProv(label, p.address)}
+            value={`${formatExact(p.defaultFees.borrow * 100)} / ${formatExact(p.defaultFees.repay * 100)}`}
+          >
+            {[
+              p.defaultFees.supply > 0 ? `deposit ${pctOf(p.defaultFees.supply, 1)}` : null,
+              p.defaultFees.withdraw > 0 ? `withdraw ${pctOf(p.defaultFees.withdraw, 1)}` : null,
+              `borrow ${pctOf(p.defaultFees.borrow, 1)}`,
+              `repay ${pctOf(p.defaultFees.repay, 1)}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </Prov>
         </Stat>
         <Stat label="Redemption per-tick cap">
@@ -708,6 +726,10 @@ export function FxSystemView({ data }: { data: FxSystemChainResponse }) {
           },
         ]}
       />
+
+      <p className="mt-3 text-xs text-rb-500">
+        These are f(x)&rsquo;s long pools. Its short positions sit on a separate manager and are not covered here.
+      </p>
 
       {data.pools.map((p) => (
         <PoolSection key={p.key} p={p} blockTs={data.blockTimestamp} />
