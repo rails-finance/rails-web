@@ -119,11 +119,12 @@ export function frankencoinEconomicsExplanation(data: ChainTruthTowerData, hub?:
 const FRANKENCOIN_DOC_URL = "https://docs.frankencoin.com";
 
 /** The tower's "?" FAQ for Frankencoin. */
-export function frankencoinEconomicsContent(): LearnMoreContent {
+export function frankencoinEconomicsContent(open: boolean): LearnMoreContent {
   return {
     title: "About Lifetime Flows",
-    intro:
-      "This panel adds up every change the position's own events record: collateral deposited and withdrawn on one side, ZCHF minted and repaid on the other, and what is held and owed now. Frankencoin has no price oracle, so each side stays in its own unit.",
+    intro: open
+      ? "This panel adds up every change the position's events record: collateral deposited and withdrawn on one side, ZCHF minted and repaid on the other, and what is held and owed now. Frankencoin has no price oracle, so each side stays in its own unit."
+      : "This panel adds up every change the position's events record: collateral deposited and withdrawn on one side, ZCHF minted and repaid on the other. Frankencoin has no price oracle, so each side stays in its own unit.",
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -133,7 +134,7 @@ export function frankencoinEconomicsContent(): LearnMoreContent {
       },
       {
         bold: "Interest up front",
-        text: "interest for the remaining term is paid at each mint, at the rate in force then, and is not returned; nothing accrues afterwards.",
+        text: "interest for the remaining term is paid at each mint, at the rate in force then, and is not returned; nothing accrues afterwards. It goes to the system reserve as equity, owned by FPS holders.",
         sources: [{ label: "interest on positions", url: `${FRANKENCOIN_DOC_URL}/positions` }],
       },
       {

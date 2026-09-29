@@ -3563,7 +3563,7 @@ export function frankencoinMintingContent(): LearnMoreContent {
       },
       {
         bold: "Interest up front",
-        text: "the annual rate in force when the mint is made (the system base rate plus the position's risk premium) is charged for the time left to expiry, and is not returned. Nothing accrues afterwards, so the debt changes only when the owner mints or repays. The base rate moves with governance, so two mints on one position can pay different rates.",
+        text: "the annual rate in force when the mint is made (the system base rate plus the position's risk premium) is charged for the time left to expiry, and is not returned. It goes to the system reserve as equity, owned by FPS holders. Nothing accrues afterwards, so the debt changes only when the owner mints or repays. The base rate moves with governance, so two mints on one position can pay different rates.",
         sources: [fcSource("interest on positions", "positions")],
       },
       {
@@ -3656,7 +3656,7 @@ export function frankencoinPriceContent(): LearnMoreContent {
       },
       {
         bold: "Raising",
-        text: "pauses minting for three days, so the new price can be challenged before it backs new ZCHF. In a combined adjust the mint runs before the price change, at the old price.",
+        text: "pauses minting and collateral withdrawals for three days, so the new price can be challenged before it backs new ZCHF. Lowering the price again does not end the pause. In a combined adjust the mint runs before the price change, at the old price.",
         sources: [fcSource("the three-day cooldown", "adjust")],
       },
       {

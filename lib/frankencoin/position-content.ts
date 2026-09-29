@@ -84,7 +84,7 @@ export function frankencoinPositionContent(opts: {
       details: [
         {
           bold: "Interest up front",
-          text: "each mint paid interest at the rate in force when it was made, for the time left to expiry. The minted figure never grew on its own between mints.",
+          text: "each mint paid interest at the rate in force when it was made, for the time left to expiry. The interest went to the system reserve as equity, owned by FPS holders. The minted figure never grew on its own between mints.",
         },
         {
           bold: "Reserve contribution",
@@ -106,12 +106,12 @@ export function frankencoinPositionContent(opts: {
     details: [
       {
         bold: "Owner-declared price",
-        text: "Frankencoin has no oracle: the liquidation price is a value the owner sets and can adjust, and collateral × price is the most debt the position may carry. Raising it pauses minting for 3 days.",
+        text: "Frankencoin has no oracle: the liquidation price is a value the owner sets and can adjust, and collateral × price is the most debt the position may carry. Raising it pauses minting and collateral withdrawals for 3 days.",
         sources: [{ label: "the declared price", url: `${FRANKENCOIN_DOC_URL}/positions/adjust` }],
       },
       {
         bold: "Interest up front",
-        text: "each mint pays interest for the remaining term at once, at the rate in force when it is made, so the debt moves only when the owner mints or repays. The rate on the card is today's; an opened mint shows the rate it paid. The debt is gross: the wallet received each mint less the interest and the reserve share.",
+        text: "each mint pays interest for the remaining term at once, at the rate in force when it is made, so the debt moves only when the owner mints or repays. The interest goes to the system reserve as equity, owned by FPS holders. The rate on the card is today's; an opened mint shows the rate it paid. The debt is gross: the wallet received each mint less the interest and the reserve share.",
         sources: [{ label: "interest on positions", url: `${FRANKENCOIN_DOC_URL}/positions` }],
       },
       {

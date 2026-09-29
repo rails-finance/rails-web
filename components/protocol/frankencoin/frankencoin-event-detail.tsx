@@ -117,7 +117,9 @@ function transitionOf(
   const sign = changeN >= 0 ? "+" : "−";
   return {
     before: f(beforeN),
-    beforeExact: formatExact(beforeN),
+    // The API's decimal string where it is one: a float drops ZCHF's 18th
+    // decimals and invents digits of its own.
+    beforeExact: before != null && /^\d+(\.\d+)?$/.test(before) ? groupExact(before) : formatExact(beforeN),
     beforeProv: beforeProv(what, sym, coords, rawBefore, readBefore && what !== "minted"),
     change: `${sign}${f(changeN)}`,
     changeExact: `${sign}${f(changeN)}`,

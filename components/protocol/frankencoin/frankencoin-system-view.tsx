@@ -42,6 +42,7 @@ import {
   openMintedProv,
 } from "@/lib/frankencoin/system-provenance";
 import { ppmToPct } from "@/lib/frankencoin/asset-catalog";
+import { fmtZchf } from "@/lib/frankencoin/figures";
 import { Stat } from "@/components/shared/stat";
 import { formatExact } from "@/lib/utils/format";
 import type { FrankencoinSystemChainResponse } from "@/lib/sources/chain/frankencoin-system";
@@ -186,7 +187,8 @@ function RatesCard({ data }: { data: FrankencoinSystemChainResponse }) {
 }
 
 /** The minting book — the roster this system has written. */
-function BookCard({ book }: { book: FrankencoinBook }) {
+function BookCard({ book, supply }: { book: FrankencoinBook; supply: number }) {
+  const overSupply = book.openMintedZchf - supply;
   return (
     <div className="rounded-xl bg-raised px-4 py-3.5">
       <div className="flex items-center gap-2">
@@ -233,6 +235,14 @@ function BookCard({ book }: { book: FrankencoinBook }) {
             </Stat>
           </div>
 
+          <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
+            Minted by the open book is what the open positions owe, gross: each mint counted in full, including the
+            reserve share and the interest that went to the reserve. ZCHF in existence is the token&rsquo;s supply, from
+            every minter.
+            {overSupply > 0.005 && (
+              <> On this page&rsquo;s figures the open book owes {fmtZchf(overSupply)} ZCHF more than the supply.</>
+            )}
+          </p>
           <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
             Anyone can open a position on any ERC-20 — {book.clones} of the {book.total} are clones reusing an
             already-vetted original&rsquo;s terms. The tokens are counted rather than summed:{" "}
@@ -342,7 +352,7 @@ export function FrankencoinSystemView({ data, book }: { data: FrankencoinSystemC
       <section className="mt-8">
         <h2 className="text-sm font-semibold text-foreground">The book &amp; its enforcement</h2>
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <BookCard book={book} />
+          <BookCard book={book} supply={data.zchfSupply} />
           <EnforcementCard book={book} />
         </div>
       </section>

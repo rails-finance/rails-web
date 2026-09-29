@@ -254,8 +254,8 @@ export function FrankencoinPositionExplanation({
   if (chain.cooldownActive && chain.cooldownUntil != null) {
     bullets.push(
       <span key="cooldown">
-        Minting is <H>paused</H> until {dateOf(chain.cooldownUntil)} — the cooldown that follows a declared-price raise,
-        the window in which the new price can be challenged before it backs fresh ZCHF.
+        Minting and collateral withdrawals are <H>paused</H> until {dateOf(chain.cooldownUntil)} — the cooldown that
+        follows a declared-price raise, the window in which the new price can be challenged before it backs fresh ZCHF.
       </span>,
     );
   }

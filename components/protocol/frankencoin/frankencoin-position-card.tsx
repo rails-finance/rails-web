@@ -35,7 +35,14 @@ import { formatUnitsExact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { soldPeakProv, latestAbsoluteProv, peakAbsoluteProv } from "@/lib/frankencoin/event-provenance";
+import {
+  soldPeakProv,
+  latestAbsoluteProv,
+  peakAbsoluteProv,
+  lifetimeFlowProv,
+} from "@/lib/frankencoin/event-provenance";
+import type { TowerSideData } from "@/lib/shared/chain-truth-economics";
+import { fmtZchf } from "@/lib/frankencoin/figures";
 import {
   liveMintedProv,
   liveCollateralProv,
@@ -230,6 +237,36 @@ function expiryText(expiration: number | null): string | null {
   return `expires in ${Math.round(days)}d`;
 }
 
+/** A closed card's lifetime line: the peak above is one moment, this is the
+ *  whole life (the Lifetime flows panel's debt side). */
+function LifetimeDebtLine({ side }: { side: TowerSideData }) {
+  const minted = side.lifetimeInflow;
+  if (!(minted > 0)) return null;
+  const repaid = side.exited.reduce((s, l) => s + l.amount, 0);
+  const cleared = side.liquidated[0];
+  const allRepaid = !cleared && Math.abs(repaid - minted) <= Math.max(1e-9, minted * 1e-12);
+  return (
+    <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+      <Prov info={lifetimeFlowProv("minted", "ZCHF")}>
+        <span>{fmtZchf(minted)} ZCHF</span>
+      </Prov>{" "}
+      minted over its life
+      {allRepaid ? (
+        <>, all repaid</>
+      ) : (
+        <>
+          : {fmtZchf(repaid)} repaid
+          {cleared && (
+            <>
+              , {fmtZchf(cleared.amount)} {(cleared.flowLabel ?? "cleared by sale").toLowerCase()}
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 /** A closed card's expiry: the date its terms ran to. */
 function closedExpiryText(expiration: number | null): string | null {
   if (expiration == null || expiration <= 0) return null;
@@ -245,7 +282,10 @@ export function FrankencoinPositionCard({
   surface = "detail",
   cloneParent,
   ending,
+  lifetimeDebt,
 }: {
+  /** The Lifetime flows panel's debt side, for a closed card's lifetime line. */
+  lifetimeDebt?: TowerSideData | null;
   /** How a terminal position ended, where the timeline says. */
   ending?: FrankencoinEnding | null;
   v: FrankencoinPositionView;
@@ -355,6 +395,7 @@ export function FrankencoinPositionCard({
           debtFootnote={
             <>
               <StatFootnote>minted ZCHF</StatFootnote>
+              {v.status === "closed" && lifetimeDebt && <LifetimeDebtLine side={lifetimeDebt} />}
               {closedExpiryText(v.expiration) && (
                 <div className="text-xs mt-0.5 text-rb-500">{closedExpiryText(v.expiration)}</div>
               )}

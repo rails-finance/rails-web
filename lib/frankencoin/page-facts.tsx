@@ -69,6 +69,12 @@ export interface FrankencoinPageFacts {
    *  at the opening block (the position page supplies it). */
   opening?: FrankencoinOpeningRead | null;
   openingPending?: boolean;
+  /** When the declared price was raised (each raise pauses minting and
+   *  withdrawals for three days), oldest first. */
+  priceRaises: number[];
+  /** When collateral left the position by the owner's hand (a withdrawal, an
+   *  adjust or a close), oldest first. */
+  withdrawals: number[];
 }
 
 const FactsContext = createContext<FrankencoinPageFacts | null>(null);
@@ -93,8 +99,21 @@ export function frankencoinPageFacts(
   const txSold: Record<string, number> = {};
   let deniedAt: number | null = null;
   let createdFor: string | null = null;
+  const priceRaises: number[] = [];
+  const withdrawals: number[] = [];
   for (const e of events) {
     const ctx = e.context.data;
+    const priceBefore = Number(ctx.liqPriceBefore ?? NaN);
+    const priceAfter = Number(ctx.liqPrice ?? NaN);
+    if (!ctx.firstState && priceBefore > 0 && priceAfter > priceBefore) priceRaises.push(e.timestamp);
+    const collBefore = Number(ctx.collateralBefore ?? NaN);
+    const collAfter = Number(ctx.collateral ?? NaN);
+    if (
+      (ctx.eventType === "withdraw_collateral" || ctx.eventType === "adjust" || ctx.eventType === "close") &&
+      !ctx.collateralUnderstated &&
+      collAfter < collBefore
+    )
+      withdrawals.push(e.timestamp);
     if (ctx.eventType === "ownership_transferred" && ctx.initialization)
       createdFor = ctx.handoverOwner ?? ctx.newOwner ?? createdFor;
     if (ctx.eventType === "denied" && deniedAt == null) deniedAt = e.timestamp;
@@ -146,7 +165,11 @@ export function frankencoinPageFacts(
     }
   }
   forcedSales.sort((a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp);
+  priceRaises.sort((a, b) => a - b);
+  withdrawals.sort((a, b) => a - b);
   return {
+    priceRaises,
+    withdrawals,
     challengePeriod,
     familyOriginal,
     challenges,

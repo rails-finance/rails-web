@@ -388,6 +388,8 @@ export default function FrankencoinPositionView({
     ];
   }, [view, chain]);
 
+  const towerData = view ? computeFrankencoinEconomics(view, lifetimeEvents, precomputedLifetime) : null;
+
   return (
     <div className="py-8 space-y-6">
       <DetailTopRow
@@ -423,6 +425,7 @@ export default function FrankencoinPositionView({
               v={view}
               cloneParent={cloneParent}
               ending={ending}
+              lifetimeDebt={towerData?.debt}
               receipts
               viewHref={tl.viewHref}
               // The context strip riding the heading-button row: the live
@@ -480,16 +483,13 @@ export default function FrankencoinPositionView({
               }
             />
 
-            {(() => {
-              const towerData = computeFrankencoinEconomics(view, lifetimeEvents, precomputedLifetime);
-              return (
-                <ChainTruthTower
-                  data={towerData}
-                  explanation={frankencoinEconomicsExplanation(towerData, view.hub)}
-                  learnMore={frankencoinEconomicsContent()}
-                />
-              );
-            })()}
+            {towerData && (
+              <ChainTruthTower
+                data={towerData}
+                explanation={frankencoinEconomicsExplanation(towerData, view.hub)}
+                learnMore={frankencoinEconomicsContent(view.status === "open")}
+              />
+            )}
 
             {/* The challenge forensics card — grouped by (hub, challenge
               number), slices within; renders only when history carries

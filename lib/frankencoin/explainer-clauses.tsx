@@ -292,6 +292,9 @@ export function frankencoinEventSlots(
               </>
             )}
             .
+            {split.interest != null && split.interest > 0 && (
+              <> The interest went to the system reserve as equity, owned by FPS holders.</>
+            )}
           </>,
         )
       : clause(
@@ -362,20 +365,48 @@ export function frankencoinEventSlots(
     );
   };
 
-  // The price move's consequence: a raise pauses minting three days, a cut
-  // applies at once.
+  // The latest raise before this event and the end of its pause (PositionV1/V2
+  // `adjustPrice`: a raise pushes `cooldown` three days out; a lower never
+  // shortens it; minting and withdrawals revert while it runs).
+  const RAISE_PAUSE = 3 * 86400;
+  const lastRaise = ts != null ? [...(facts?.priceRaises ?? [])].reverse().find((r) => r < ts) : undefined;
+  const raisePauseEnd = lastRaise != null ? lastRaise + RAISE_PAUSE : null;
+
+  // The price move's consequence: a raise pauses minting and withdrawals three
+  // days, a cut applies at once and leaves a running pause in place.
   const priceRule = (): ClauseInput =>
     !priceMoved
       ? null
       : raised
         ? clause(
             <>
-              A raise pauses minting for three days,{" "}
-              {extras.timestamp != null && <>here until {formatDate(extras.timestamp + 3 * 86400)}, </>}so the new price
-              can be challenged before it backs new ZCHF.
+              A raise pauses minting and collateral withdrawals for three days,{" "}
+              {ts != null && <>here until {dateTimeText(ts + RAISE_PAUSE)}, </>}so the new price can be challenged
+              before it backs new ZCHF.
             </>,
           )
-        : clause(<>The lower price took effect at once; no cooldown started.</>);
+        : lastRaise != null && raisePauseEnd != null && ts != null && raisePauseEnd > ts
+          ? clause(
+              <>
+                The lower price took effect at once and started no new pause. The pause from the raise on{" "}
+                {formatDate(lastRaise)} still runs to {dateTimeText(raisePauseEnd)}; lowering the price does not end it.
+              </>,
+            )
+          : clause(<>The lower price took effect at once; no cooldown started.</>);
+
+  // A withdrawal that came after a raise's pause: the first one since the
+  // raise names when the pause ended.
+  const pauseEndedClause = (): ClauseInput => {
+    if (dColl == null || dColl >= 0 || lastRaise == null || raisePauseEnd == null || ts == null) return null;
+    if (raisePauseEnd > ts) return null;
+    if ((facts?.withdrawals ?? []).some((w) => w > lastRaise && w < ts)) return null;
+    return clause(
+      <>
+        The pause from the raise on {formatDate(lastRaise)} ended on {dateTimeText(raisePauseEnd)}, before this
+        withdrawal.
+      </>,
+    );
+  };
 
   // An original's opening, from its receipt and the terms read at its block.
   const openingSlots = (o: FrankencoinOpeningRead, deposited: number): EventProseSlots => {
@@ -620,7 +651,7 @@ export function frankencoinEventSlots(
       return {
         happened: [clause(<>Withdrew {collDeltaFig(delta, true)} of collateral.</>)],
         changed: [changed, limitClause],
-        meansNow: [understatedCaveat()],
+        meansNow: [pauseEndedClause(), understatedCaveat()],
       };
     }
 
@@ -695,6 +726,7 @@ export function frankencoinEventSlots(
           dMint != null && dMint > 0 ? rollClause() : null,
           priceRule(),
           mintBeforeRaise,
+          pauseEndedClause(),
           understatedCaveat(),
         ],
       };
@@ -772,7 +804,7 @@ export function frankencoinEventSlots(
     case "close":
       return {
         happened: [clause(<>Closed the position — collateral and its ZCHF debt both returned to zero.</>)],
-        meansNow: [dMint != null && dMint < 0 ? repaySplit() : null],
+        meansNow: [dMint != null && dMint < 0 ? repaySplit() : null, pauseEndedClause()],
       };
 
     case "denied": {
