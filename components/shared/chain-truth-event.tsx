@@ -661,8 +661,12 @@ function PartyChip({ party }: { party: NonNullable<ChainTruthRowSpec["party"]> }
 export function ChainTruthDetail({
   stats,
   symbolText = false,
+  extra,
 }: {
   stats: ChainTruthStat[];
+  /** One more cell after the stats, for a figure that is not an amount (an
+   *  event's price at its block). */
+  extra?: ReactNode;
   /** Print the symbol as a word after each figure, beside its icon. For a
    *  protocol whose figures carry units a reader could confuse (a vault share
    *  count beside the asset underneath it). Off everywhere else. */
@@ -777,6 +781,7 @@ export function ChainTruthDetail({
           </div>
         );
       })}
+      {extra != null && <div className="h-full">{extra}</div>}
     </div>
   );
 }

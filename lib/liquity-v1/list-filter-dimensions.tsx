@@ -40,7 +40,7 @@ export interface LiquityV1ListFilters extends BaseListFilters {
 // Resting view = the live Troves (84 of ~7,239). Status defaults to ["open"] as an
 // ACTIVE selection (a clearable chip, not the dimension's inactive default), so the
 // listing renders the open set at rest and only broadens when the user opts in.
-export const LIQUITY_V1_LIST_DEFAULTS: LiquityV1ListFilters = {
+const LIQUITY_V1_LIST_DEFAULTS: LiquityV1ListFilters = {
   q: "",
   sortBy: "recent",
   sortOrder: "desc",
@@ -48,6 +48,18 @@ export const LIQUITY_V1_LIST_DEFAULTS: LiquityV1ListFilters = {
   liquidations: [],
   redemptions: [],
 };
+
+// A search for a wallet asks about that wallet's Troves, and most of them are
+// closed: the listing a wallet chip opens (`?q=<address>`) drops the Open
+// default and shows every life, whatever its status. A status the reader picks
+// still applies.
+const LIQUITY_V1_WALLET_DEFAULTS: LiquityV1ListFilters = { ...LIQUITY_V1_LIST_DEFAULTS, status: [] };
+const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+
+/** The resting selection for a search: every status when it names a wallet. */
+export function liquityV1ListDefaults(q: string): LiquityV1ListFilters {
+  return ADDRESS.test(q.trim()) ? LIQUITY_V1_WALLET_DEFAULTS : LIQUITY_V1_LIST_DEFAULTS;
+}
 
 export const LIQUITY_V1_SORT_OPTIONS: SortOption[] = [
   { value: "recent", label: RECENT_ACTIVITY_LABEL },

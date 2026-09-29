@@ -26,7 +26,7 @@ import { surplusClaimableProv } from "@/lib/liquity-v1/event-provenance";
 import type { LiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
 import type { LiquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
 import { liquityV1OutcomeSentences, liquityV1RouteSentences } from "@/lib/liquity-v1/explainer-clauses";
-import { fmtEth, fmtPct, fmtUsdSigned } from "@/lib/liquity-v1/event-figures";
+import { fmtEth, fmtLusd, fmtPct, fmtUsdSigned } from "@/lib/liquity-v1/event-figures";
 import type { LiquityV1RedemptionTotals } from "@/lib/liquity-v1/economics";
 
 const DUST = 1e-9;
@@ -265,6 +265,7 @@ export function LiquityV1ClosedEpochExplanation({
   redemptions,
   priceNow,
   ethBack,
+  eventTally,
 }: {
   v: LiquityV1PositionView;
   /** Unix seconds of the life's first captured event — the "active from"
@@ -289,26 +290,25 @@ export function LiquityV1ClosedEpochExplanation({
   /** ETH the ending sent back to the owner: all of it at an owner close, the
    *  surplus on a full redemption. */
   ethBack?: number | null;
+  /** How the timeline's events divide, to say what the counter counts. Null
+   *  on a windowed page. */
+  eventTally?: { total: number; owner: number; claim: boolean } | null;
 }) {
   if (v.status !== "closed" && v.status !== "liquidated") return null;
   const liquidated = v.status === "liquidated";
   const redeemed = !liquidated && lastAction === "redemption";
   const endedOn = v.lastActivityAt > 0 ? formatDate(v.lastActivityAt) : null;
 
-  // Status lead (charter §4). A closed life's lead tells its story in figures:
-  // how it ended, the ETH redemptions took and their net for the owner, and
-  // the ETH that went back to the owner. The bullets then carry what is not
-  // in it. A liquidated life's route is its own bullet set.
+  // Status lead (charter §4): how the life ended, with at most two figures,
+  // the ETH redemptions took and the ETH that went back to the owner. The net
+  // of the redemptions for the owner is the first bullet.
   const claimed = surplus?.claimed ?? null;
   const netThen = redemptions ? redemptions.lusdRedeemed - redemptions.ethValueAtRedemption : null;
   const netNow =
     redemptions && priceNow != null && priceNow > 0 ? redemptions.lusdRedeemed - redemptions.ethTaken * priceNow : null;
   const redemptionClause = redemptions ? (
     <>
-      {redemptions.count === 1 ? "a redemption" : "redemptions"} took {fmtEth(redemptions.ethTaken)} ETH (net{" "}
-      {fmtUsdSigned(netThen != null && Math.abs(netThen) < 0.005 ? 0 : (netThen as number))} to the owner at the
-      redemption price{redemptions.count === 1 ? "" : "s"}
-      {netNow != null && <>, {fmtUsdSigned(netNow)} against having held the ETH</>})
+      {redemptions.count === 1 ? "a redemption" : "redemptions"} took {fmtEth(redemptions.ethTaken)} ETH
     </>
   ) : null;
   const backFig =
@@ -331,7 +331,8 @@ export function LiquityV1ClosedEpochExplanation({
       {redemptionClause && <>, after {redemptionClause}</>}
       {backFig && (
         <>
-          , and the other {backFig} went to the surplus pool for the owner
+          {redemptionClause ? ", and the other " : ", and "}
+          {backFig} went to the surplus pool for the owner
           {claimed ? (
             <>, who claimed it{claimed.timestamp != null && <> on {formatDate(claimed.timestamp)}</>}</>
           ) : surplus && surplus.claimable > DUST ? (
@@ -360,6 +361,17 @@ export function LiquityV1ClosedEpochExplanation({
 
   const hl = (children: React.ReactNode) => <H>{children}</H>;
   const route = ownerOutcome?.route ?? null;
+  if (!liquidated && redemptions && netThen != null) {
+    const plural = redemptions.count === 1 ? "" : "s";
+    bullets.push(
+      <span key="net">
+        {redemptions.count === 1 ? "The redemption" : "The redemptions"} cancelled LUSD debt at $1 per LUSD and took ETH
+        of equal value: a net of {fmtUsdSigned(Math.abs(netThen) < 0.005 ? 0 : netThen)} to the owner at the redemption
+        price{plural}
+        {netNow != null && <>, and {fmtUsdSigned(netNow)} against having held the ETH</>}.
+      </span>,
+    );
+  }
   bullets.push(
     liquidated && ownerOutcome && route ? (
       <span key="outcome">
@@ -386,6 +398,8 @@ export function LiquityV1ClosedEpochExplanation({
         Its collateral ratio fell below the level at which it could be liquidated: the ETH collateral was seized and the
         LUSD debt cleared, by the Stability Pool or shared out to other Troves. The owner kept the LUSD borrowed.
       </span>
+    ) : redeemed && redemptions ? (
+      <span key="outcome">The last 200 LUSD of its debt, the liquidation reserve, was burned.</span>
     ) : redeemed ? (
       <span key="outcome">
         A redemption cancelled the last of its LUSD debt at $1 per LUSD and took ETH of equal value; the 200 LUSD
@@ -448,15 +462,11 @@ export function LiquityV1ClosedEpochExplanation({
       <span key="peaks">
         At its height it held{" "}
         <Prov info={peakCollateralProv()}>
-          <H>
-            <AmountText value={v.peakCollateral} /> ETH
-          </H>
+          <H>{fmtEth(v.peakCollateral)} ETH</H>
         </Prov>{" "}
         against{" "}
         <Prov info={peakDebtProv()}>
-          <H>
-            <AmountText value={v.peakDebt} /> LUSD
-          </H>
+          <H>{fmtLusd(v.peakDebt)} LUSD</H>
         </Prov>{" "}
         of debt — the highest figures this life recorded, each its own lifetime maximum.
       </span>,
@@ -470,25 +480,53 @@ export function LiquityV1ClosedEpochExplanation({
         {tenure ? (
           <>
             It was active for <H>{formatDuration(openedAt as number, v.lastActivityAt)}</H>, from{" "}
-            {formatDate(openedAt as number)} to {formatDate(v.lastActivityAt)}, and
+            {formatDate(openedAt as number)} to {formatDate(v.lastActivityAt)}, with
           </>
         ) : (
-          <>Over this life it</>
+          <>Over this life it recorded</>
         )}{" "}
         {v.txCount > 0 ? (
           <>
-            recorded <H>{v.txCount}</H> transaction{v.txCount === 1 ? "" : "s"}
+            <H>{v.txCount}</H> owner transaction{v.txCount === 1 ? "" : "s"}
           </>
         ) : (
-          <>recorded no owner transactions beyond its closing event</>
+          <>no owner transactions beyond its closing event</>
         )}
         {v.redemptionCount > 0 ? (
           <>
             {" "}
-            and was redeemed against <H>{v.redemptionCount}</H> time{v.redemptionCount === 1 ? "" : "s"}
+            and <H>{v.redemptionCount}</H> redemption{v.redemptionCount === 1 ? "" : "s"}
           </>
         ) : null}
         .
+      </span>,
+    );
+  }
+
+  // The counter counts owner transactions; the timeline also lists the
+  // redemptions, the liquidation and the surplus claim, and one transaction
+  // can change the Trove more than once. Said where the two numbers differ.
+  if (eventTally && v.txCount > 0 && eventTally.total !== v.txCount) {
+    const parts: string[] = [];
+    const many = eventTally.owner > v.txCount;
+    parts.push(
+      many
+        ? `${eventTally.owner} changes the owner made in ${v.txCount === 1 ? "that one transaction" : `those ${v.txCount} transactions`} (one transaction can change the Trove more than once)`
+        : v.txCount === 1
+          ? "that transaction"
+          : `those ${v.txCount} transactions`,
+    );
+    if (v.redemptionCount > 0)
+      parts.push(v.redemptionCount === 1 ? "the redemption" : `the ${v.redemptionCount} redemptions`);
+    if (v.liquidationCount > 0) parts.push("the liquidation");
+    if (eventTally.claim) parts.push("the surplus claim");
+    const list =
+      parts.length === 1
+        ? parts[0]
+        : `${parts.slice(0, -1).join(", ")}${parts.length > 2 ? "," : ""} and ${parts[parts.length - 1]}`;
+    bullets.push(
+      <span key="tally">
+        The timeline&rsquo;s {eventTally.total} events are {list}.
       </span>,
     );
   }

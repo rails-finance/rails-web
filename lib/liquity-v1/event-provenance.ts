@@ -394,6 +394,20 @@ export const collUsdAtBlockProv = (
   ],
 });
 
+/** What a surplus claim paid the owner, valued at the price at the claim's block. */
+export const claimPaidUsdProv = (coords: LiquityV1Coords, vals: { eth: number; priceUsd: number }): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  summary:
+    "ETH the claim paid the owner, in USD — the amount the CollSurplusPool sent, times the PriceFeed price at the claim's block.",
+  formula: "ETH paid × price at block",
+  inputs: [
+    { label: "ETH paid", value: formatExact(vals.eth), kind: "chain" },
+    { label: "price at block", value: formatExact(vals.priceUsd), kind: "chain", pclass: "oracle" },
+    ...eventInputs(coords),
+  ],
+});
+
 /** Collateral ratio either side of the event, both at this block's price. */
 export const ratioAtBlockProv = (
   coords: LiquityV1Coords,
