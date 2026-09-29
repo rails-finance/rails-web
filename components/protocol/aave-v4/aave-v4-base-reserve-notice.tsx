@@ -17,7 +17,7 @@
 
 import { useEffect, useState } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { publishedText, ageText } from "@/lib/morpho/oracle-age";
+import { publishedText, ageClauseText } from "@/lib/morpho/oracle-age";
 import { useAaveV4OracleRead } from "@/lib/aave-v4/use-oracle-prices";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import type { AaveV4SpokeChainReserve } from "@/lib/api/fetch-aave-v4-spoke-position";
@@ -62,7 +62,7 @@ export function AaveV4BaseReserveNotice({ reserves }: { reserves: AaveV4SpokeCha
   const readTs = oracle?.blockTimestamp ?? null;
   const rows = held.flatMap((r) => {
     const p = oracle?.prices[r.address.toLowerCase()];
-    if (!p || p.updatedAt == null || readTs == null) return [];
+    if (!p || p.updatedAt == null || readTs == null || oracle?.blockNumber == null) return [];
     const prov: Provenance = {
       kind: "chain",
       pclass: "oracle",
@@ -76,7 +76,7 @@ export function AaveV4BaseReserveNotice({ reserves }: { reserves: AaveV4SpokeCha
         <Prov info={prov}>
           {r.symbol} <AmountText value={p.usd} /> USD
         </Prov>
-        , published {publishedText(p.updatedAt, readTs)} ({ageText(readTs - p.updatedAt)} before this read)
+        , published {publishedText(p.updatedAt, readTs)} {ageClauseText(p.updatedAt, readTs, oracle.blockNumber)}
       </li>,
     ];
   });

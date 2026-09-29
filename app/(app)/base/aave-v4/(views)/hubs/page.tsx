@@ -15,7 +15,7 @@ import { aaveV4BaseHubContent } from "@/lib/shared/learn-more-content";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { explorerUrl, BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { formatNumber } from "@/lib/utils/format";
-import { publishedText, ageText } from "@/lib/morpho/oracle-age";
+import { publishedText, ageClauseText } from "@/lib/morpho/oracle-age";
 import { AAVE_V4_BASE_API_ROOT } from "@/lib/aave-v4/deployment-routes";
 import { BlockRef } from "@/components/shared/block-ref";
 
@@ -209,7 +209,7 @@ export default function AaveV4BaseHubPage() {
                         <td className="px-4 py-3 text-right tabular-nums text-foreground">${formatNumber(price)}</td>
                         <td className="px-4 py-3 text-rb-500 whitespace-nowrap">
                           {r.feedUpdatedAt != null && readTs != null
-                            ? `${publishedText(r.feedUpdatedAt, readTs)} (${ageText(readTs - r.feedUpdatedAt)} before this read)`
+                            ? `${publishedText(r.feedUpdatedAt, readTs)} ${ageClauseText(r.feedUpdatedAt, readTs, r.blockNumber)}`
                             : "—"}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">

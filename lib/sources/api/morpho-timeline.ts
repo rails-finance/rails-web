@@ -100,7 +100,7 @@ export const MORPHO_EVENT_LABEL: Record<MorphoEventType, string> = {
   repay: "Repay",
   supply_collateral: "Add Collateral",
   withdraw_collateral: "Remove Collateral",
-  liquidation: "Liquidation",
+  liquidation: "Liquidated",
 };
 
 function bigintOf(raw: string | null): bigint {
