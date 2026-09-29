@@ -461,7 +461,7 @@ export function VaultPositionCard({
             <PositionCardMeta
               lastActivityAt={row.lastActivityAt}
               eventCount={row.census.transferCount}
-              eventCountTitle={`Transfers of this vault naming this address, counted by the census at block ${n(row.census.block)}`}
+              eventCountNoun="transfer"
             />
           }
           columns={columns}

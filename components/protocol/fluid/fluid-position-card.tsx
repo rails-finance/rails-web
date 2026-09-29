@@ -203,12 +203,7 @@ export function FluidPositionCard({
 }) {
   const pairText = fluidPairText(v, chain);
   const identityMeta = (
-    <PositionCardMeta
-      lastActivityAt={v.lastActivityAt}
-      eventCount={v.txCount}
-      eventCountTitle={`${v.txCount} transaction${v.txCount === 1 ? "" : "s"} on this position, liquidations excluded. The timeline counts events, and one transaction can carry several.`}
-      liquidationCount={v.liquidationCount}
-    />
+    <PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} liquidationCount={v.liquidationCount} />
   );
 
   // The owner pill (facehash + copy + bookmark) leads; the pair rides
