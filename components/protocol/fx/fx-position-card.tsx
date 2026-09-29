@@ -237,7 +237,7 @@ function SocializedLine({ v, rows }: { v: FxPositionView; rows?: FxRebalanceRows
         <Prov info={rebalanceClearedProv(n)}>
           <AmountText value={cleared} /> fxUSD
         </Prov>{" "}
-        cleared by {rowsNoun(rows)} without the owner&apos;s transaction ({dateSpan(rows.firstTs, rows.lastTs)})
+        moved by the pool, cleared by {rowsNoun(rows)} ({dateSpan(rows.firstTs, rows.lastTs)})
         {Math.abs(other) > 0.005 ? (
           <>
             {" · "}
@@ -264,8 +264,8 @@ function SocializedLine({ v, rows }: { v: FxPositionView; rows?: FxRebalanceRows
         <AmountText value={Math.abs(diff)} /> fxUSD
       </Prov>{" "}
       {diff >= 0
-        ? "of debt cleared without the owner's transaction, by rebalances net of other positions' bad debt"
-        : "of debt added without the owner's transaction, by other positions' bad debt"}
+        ? "moved by the pool, net (the position's page names each part)"
+        : "added by the pool: other positions' bad debt"}
     </div>
   );
 }
