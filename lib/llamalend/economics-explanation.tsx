@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { formatCompact, formatNumber } from "@/lib/utils/format";
-import { fmtColl } from "@/lib/llamalend/event-figures";
+import { fmtColl, fmtPrice } from "@/lib/llamalend/event-figures";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
 
 const LLAMALEND_DOC_URL = "https://docs.curve.finance/lending/overview/";
@@ -46,7 +46,7 @@ export function llamalendEconomicsExplanation(
   const deposited = data.collateral.lifetimeInflow;
   const lostLines = data.collateral.exited.filter((l) => l.key === "coll-lost");
   const withdrawn = sideTotal(
-    data.collateral.exited.filter((l) => l.key !== "coll-lost"),
+    data.collateral.exited.filter((l) => l.key !== "coll-lost" && l.key !== "coll-sold"),
     valued,
   );
   if (deposited > 0 || withdrawn > 0) {
@@ -75,7 +75,36 @@ export function llamalendEconomicsExplanation(
   }
 
   const liquidated = sideTotal(data.collateral.liquidated, valued) + sideTotal(data.debt.liquidated, valued);
-  if (liquidated > 0) {
+  // A liquidated position's collateral side, token by token: deposited =
+  // sold by the AMM + taken + withdrawn + held, and the borrowed token the
+  // sales left in the position = taken with it + held.
+  const soldLine = data.collateral.exited.find((l) => l.key === "coll-sold");
+  const convInLine = (data.collateral.received ?? []).find((l) => l.key === "converted-in");
+  if (soldLine && convInLine) {
+    const cSym = soldLine.symbol;
+    const bSym = convInLine.symbol;
+    const amt = (lines: TowerLine[], key: string) =>
+      lines.filter((l) => l.key === key).reduce((t, l) => t + l.amount, 0);
+    const taken = amt(data.collateral.liquidated, "coll-taken");
+    const convTaken = amt(data.collateral.liquidated, "converted-taken");
+    const withdrawnC = amt(data.collateral.exited, "coll-withdrawn");
+    const heldC = amt(data.collateral.current, "collateral");
+    const heldB = amt(data.collateral.current, "converted");
+    const deposited = soldLine.amount + taken + withdrawnC + heldC;
+    const cParts = [
+      `${fmtColl(soldLine.amount)} sold by the AMM`,
+      ...(taken > 0 ? [`${fmtColl(taken)} taken in liquidation`] : []),
+      ...(withdrawnC > 0 ? [`${fmtColl(withdrawnC)} withdrawn`] : []),
+      ...(heldC > 0 ? [`${fmtColl(heldC)} held now`] : []),
+    ];
+    bullets.push(
+      `In ${cSym}, the ${fmtColl(deposited)} deposited is ${cParts.join(" + ")}. The AMM's sales left ${formatNumber(convInLine.amount)} ${bSym} in the position, ${heldB > 0 ? `${formatNumber(convTaken)} taken in liquidation and ${formatNumber(heldB)} held now` : "all taken in liquidation"}.${
+        valued
+          ? ` The bars value the ${cSym} at today's price and the ${bSym} at about a dollar, so the sold ${cSym} and the ${bSym} it became differ by the price move since the sales.`
+          : ""
+      }`,
+    );
+  } else if (liquidated > 0) {
     bullets.push("Part of this position's collateral and debt was taken in a hard liquidation.");
   }
 
@@ -116,7 +145,7 @@ export function llamalendEconomicsExplanation(
 
   if (valued && pricing) {
     bullets.push(
-      `Collateral amounts are valued at today's ${pricing.collateralSymbol} price, ${Math.round(pricing.price).toLocaleString("en-US")} ${pricing.borrowedSymbol}; a liquidation card values what it took at the price in its block.`,
+      `Collateral amounts are valued at today's ${pricing.collateralSymbol} price, ${pricing.price >= 1 ? Math.round(pricing.price).toLocaleString("en-US") : fmtPrice(pricing.price)} ${pricing.borrowedSymbol}; a liquidation card values what it took at the price in its block.`,
     );
   }
 

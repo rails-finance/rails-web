@@ -25,7 +25,7 @@ import { LlamalendEventHeader } from "./llamalend-event-header";
 import { LlamalendEventDetail } from "./llamalend-event-detail";
 import { LlamalendEventExplainer, llamalendLearnMoreContent } from "./llamalend-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import type { LlamalendLoanMark, LlamalendPreviousStated } from "@/lib/llamalend/event-figures";
+import type { LlamalendLoanMark, LlamalendNextRow, LlamalendPreviousStated } from "@/lib/llamalend/event-figures";
 
 export interface LlamalendEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "llamalend"; data: LlamalendContext } };
@@ -37,6 +37,10 @@ export interface LlamalendEventCardProps {
   previousStated?: LlamalendPreviousStated | null;
   /** Where the event sits among the page's loans (llamalendLoanMarks). */
   loanMark?: LlamalendLoanMark | null;
+  /** The market's liquidation discount now (the page's live read). */
+  marketDiscount?: number | null;
+  /** The loan's next row (llamalendNextRowMap). */
+  next?: LlamalendNextRow | null;
 }
 
 export function LlamalendEventCard({
@@ -46,6 +50,8 @@ export function LlamalendEventCard({
   eventNumber,
   previousStated,
   loanMark,
+  marketDiscount,
+  next,
 }: LlamalendEventCardProps) {
   const ctx = event.context.data;
   // Only the BORROWER's leg of a third-party liquidation is a passive loss;
@@ -163,6 +169,8 @@ export function LlamalendEventCard({
           wallet={event.wallet}
           skipLead
           loanMark={loanMark}
+          marketDiscount={marketDiscount}
+          next={next}
         />
       }
       explainerLabel="Plain English"

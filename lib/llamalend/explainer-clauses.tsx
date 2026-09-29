@@ -60,7 +60,15 @@ import {
   type LlamalendCoords,
 } from "@/lib/llamalend/event-provenance";
 import { formatNumber } from "@/lib/utils/format";
-import { fmtColl, fmtHealth, type LlamalendEventFigures, type LlamalendLoanMark } from "@/lib/llamalend/event-figures";
+import {
+  fmtColl,
+  fmtHealth,
+  fmtPrice,
+  type LlamalendEventFigures,
+  type LlamalendLoanMark,
+  type LlamalendNextRow,
+} from "@/lib/llamalend/event-figures";
+import { formatDate } from "@/lib/date";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 /** A balance below this is arithmetic dust, not a real leg. Mirrors economics.ts. */
@@ -151,12 +159,16 @@ export function llamalendEventSlots(
   f?: LlamalendEventFigures | null,
   /** Where the event sits among the page's loans (llamalendLoanMarks). */
   mark?: LlamalendLoanMark | null,
+  /** A liquidation row's context beyond its own reads: the market's current
+   *  liquidation discount, and the loan's next row with the health before it. */
+  liq?: LlamalendLiquidationContext | null,
 ): EventProseSlots {
   const collSym = ctx.collateralSymbol;
   const debtSym = ctx.borrowedSymbol;
   const rs = resultingState(ctx);
   const bands = bandMoveClause(ctx, f);
   const inBand = inBandRepayClause(ctx, f);
+  const distance = distanceClause(ctx, f);
 
   // Emitted-delta figures echo the header row (the bare magnitude its verb
   // label carries, same prov vocabulary + coords → same entry key). Only the
@@ -244,7 +256,7 @@ export function llamalendEventSlots(
           : null;
       return {
         happened: [clause(happened)],
-        changed: [changed, bands],
+        changed: [changed, bands, distance],
         meansNow: [],
       };
     }
@@ -260,7 +272,7 @@ export function llamalendEventSlots(
           : null;
       return {
         happened: [clause(<>Added {collDeltaFig()} of collateral without changing the debt.</>)],
-        changed: [changed, bands],
+        changed: [changed, bands, distance],
         meansNow: [],
       };
     }
@@ -284,7 +296,7 @@ export function llamalendEventSlots(
           : cont(<>.</>);
       return {
         happened: [clause(<>Repaid {debtDeltaFig()} of the position&rsquo;s debt</>), ending],
-        changed: [inBand, bands],
+        changed: [inBand, bands, distance],
         meansNow: [],
       };
     }
@@ -300,13 +312,13 @@ export function llamalendEventSlots(
           : null;
       return {
         happened: [clause(<>Withdrew {collDeltaFig()} of collateral from the position&rsquo;s bands.</>)],
-        changed: [changed, bands],
+        changed: [changed, bands, distance],
         meansNow: [],
       };
     }
 
     case "liquidation":
-      return liquidationSlots(ctx, coords, collSym, debtSym, rs, f);
+      return liquidationSlots(ctx, coords, collSym, debtSym, rs, f, liq);
 
     default:
       return { happened: [] };
@@ -320,6 +332,7 @@ function liquidationSlots(
   debtSym: string,
   rs: LlamalendResultingState,
   f?: LlamalendEventFigures | null,
+  liq?: LlamalendLiquidationContext | null,
 ): EventProseSlots {
   // Match the header's echo role exactly (`ctx.role ?? "borrower"`), so the
   // liquidation figures twin the header's liquidationProv primary.
@@ -412,51 +425,110 @@ function liquidationSlots(
       ? cont(
           <>
             {" "}
-            and {liqCollFig()} taken, along with {conv} {debtSym} the AMM had already converted — a hard liquidation
-            seizes both legs of the position&rsquo;s holding.
+            and {liqCollFig()} taken, along with {conv} {debtSym} the AMM had converted.
           </>,
         )
       : cont(<> and {liqCollFig()} taken.</>)
     : conv
       ? cont(
           <>
-            , along with {conv} {debtSym} the AMM had already converted — a hard liquidation seizes both legs of the
-            position&rsquo;s holding.
+            , along with {conv} {debtSym} the AMM had converted.
           </>,
         )
       : cont(<>.</>);
 
-  // Why others could liquidate it, from the read at block − 1, and how the
-  // discount and the premium differ.
-  const healthBefore: ClauseInput =
-    f?.healthBefore != null
-      ? clause(
-          <>
-            Health was {fmtHealth(f.healthBefore)} in the block before. Once health is below 0 anyone may liquidate a
-            position; its owner, or an address the owner approved, may do so at any health.
-          </>,
-        )
-      : clause(
-          <>
-            Once health is below 0 anyone may liquidate a position; its owner, or an address the owner approved, may do
-            so at any health.
-          </>,
-        );
+  // Why a third party could liquidate it: health at the end of the block
+  // before, and where that was still positive, at the start of this block
+  // (the oracle price moves with time).
+  const hb = f?.healthBefore;
+  const hs = f?.healthStart;
+  const eligibility: ClauseInput =
+    hb == null
+      ? clause(<>Once health is below 0 anyone may liquidate a position.</>)
+      : hb < 0
+        ? clause(<>Health was {fmtHealth(hb)} in the block before: below 0, where anyone may liquidate.</>)
+        : hs != null && hs < 0
+          ? clause(
+              <>
+                Health was {fmtHealth(hb)} at the end of the block before. By this block&rsquo;s time the oracle price
+                had moved
+                {f?.priceBefore != null && f.priceStart != null ? (
+                  <>
+                    {" "}
+                    from {fmtPrice(f.priceBefore)} to {fmtPrice(f.priceStart)} {debtSym}
+                  </>
+                ) : null}
+                , and health stood at {fmtHealth(hs)} before the block&rsquo;s transactions ran: below 0, where anyone
+                may liquidate.
+              </>,
+            )
+          : clause(
+              <>
+                Health was {fmtHealth(hb)} in the block before
+                {hs != null ? <> and {fmtHealth(hs)} at the start of this block</> : null}, and the liquidator was not
+                the owner.
+              </>,
+            );
+  // The position's discount is copied from the market's when the owner opens
+  // or adds to the loan (Controller _create_loan, _add_collateral_borrow).
+  const mkt = liq?.marketDiscount;
   const discountVsPremium: ClauseInput =
     f?.discountBefore != null
       ? clause(
           <>
-            The liquidation discount ({pct(f.discountBefore)} on this position) is taken off the collateral&rsquo;s
-            value inside health, so it sets how early health reaches 0. The realized premium is what this liquidator
-            received above the debt it cleared.
+            The liquidation discount on this position was {pct(f.discountBefore)}, copied from the market&rsquo;s when
+            the owner opened or added to the loan
+            {mkt != null && Math.abs(mkt - f.discountBefore) > 1e-9 ? (
+              <>; the market&rsquo;s is {pct(mkt)} now</>
+            ) : null}
+            . It is taken off the collateral&rsquo;s value inside health, so it sets how early health reaches 0. The
+            realized premium is what this liquidator received above the debt it cleared.
           </>,
         )
       : null;
-  const takingFraming = clause(
-    <>The balances were taken under the protocol&rsquo;s rules, not moved by the borrower.</>,
+  // Controller _liquidate: the converted token goes toward the debt, the
+  // liquidator pays any rest and receives the collateral, and converted token
+  // above the debt; nothing goes back to the owner.
+  const convN = Math.abs(Number(ctx.convertedTaken ?? 0));
+  const debtN = Math.abs(Number(ctx.debtDelta ?? 0));
+  const collN = Math.abs(Number(ctx.collateralDelta ?? 0));
+  const split: ReactNode =
+    convN > 0 && debtN > convN ? (
+      <>
+        The {formatNumber(convN)} {debtSym} converted went toward the debt; the liquidator paid the other{" "}
+        {formatNumber(debtN - convN)} {debtSym}
+        {collN > 0 ? (
+          <>
+            {" "}
+            and received the {fmtColl(collN)} {collSym}
+          </>
+        ) : null}
+        .
+      </>
+    ) : convN > 0 ? (
+      <>
+        The converted {debtSym} covered the debt; the liquidator received{" "}
+        {collN > 0 ? (
+          <>
+            the {fmtColl(collN)} {collSym} and{" "}
+          </>
+        ) : null}
+        the {formatNumber(convN - debtN)} {debtSym} above it.
+      </>
+    ) : collN > 0 ? (
+      <>
+        The liquidator paid the debt and received the {fmtColl(collN)} {collSym}.
+      </>
+    ) : null;
+  const ownerOutcome = clause(
+    <>
+      {split}
+      {split ? " " : null}The owner receives nothing from a hard liquidation and keeps the {debtSym} they borrowed.
+    </>,
   );
   // A liquidation can take a fraction of the loan (liquidate_extended); the
   // Controller then logs no after-state, and the read at this block states it.
+  const next = liq?.next ?? null;
   const partialPath: ClauseInput =
     f && f.hasLoan && f.debtAfter != null
       ? clause(
@@ -469,26 +541,66 @@ function liquidationSlots(
                 and {formatNumber(f.convAfter ?? 0)} {debtSym} converted
               </>
             ) : null}
-            , for a later liquidation or repay to clear.
+            .{" "}
+            {next == null ? (
+              <>That remainder is still open.</>
+            ) : next.eventType === "liquidation" ? (
+              <>
+                The remainder stayed open until {formatDate(next.timestamp)}, when
+                {next.healthBefore != null ? (
+                  <> its health had fallen to {fmtHealth(next.healthBefore)} and</>
+                ) : null}{" "}
+                {next.closes ? "a second liquidation cleared it" : "a second liquidation took more of it"}.
+              </>
+            ) : (
+              <>The remainder stayed open; the next event on it is on {formatDate(next.timestamp)}.</>
+            )}
           </>,
         )
-      : rs.unstated
-        ? clause(
-            <>
-              A partial liquidation doesn&rsquo;t record the position&rsquo;s end balances, so its remaining collateral
-              and debt aren&rsquo;t shown here; they settle on its next event, and the loan may still be open.
-            </>,
-          )
-        : null;
+      : rs.closedLoan
+        ? clause(<>The debt is cleared and the loan closed.</>)
+        : rs.unstated
+          ? clause(
+              <>
+                A partial liquidation doesn&rsquo;t record the position&rsquo;s end balances, so its remaining
+                collateral and debt aren&rsquo;t shown here; they settle on its next event, and the loan may still be
+                open.
+              </>,
+            )
+          : null;
 
   return {
     happened: [clause(opener), seizeTail],
-    changed: [healthBefore, discountVsPremium],
-    meansNow: [takingFraming, partialPath],
+    changed: [eligibility, discountVsPremium],
+    meansNow: [ownerOutcome, partialPath],
   };
 }
 
 const pct = (fraction: number): string => `${(fraction * 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
+
+/** What a liquidation row states beyond its own reads. */
+export interface LlamalendLiquidationContext {
+  /** The market's liquidation discount now (fraction), from the live read. */
+  marketDiscount?: number | null;
+  /** The loan's next row, with the health at the end of the block before it. */
+  next?: (LlamalendNextRow & { healthBefore: number | null }) | null;
+}
+
+/** How far the oracle price stood above the bands after the event, from the
+ *  read at its block. */
+function distanceClause(ctx: LlamalendContext, f?: LlamalendEventFigures | null): ClauseInput {
+  if (!f || !f.hasLoan || f.pUpAfter == null || f.priceAfter == null || f.pUpAfter <= 0) return null;
+  if ((f.convAfter ?? 0) > 0) return null;
+  if (f.priceAfter <= f.pUpAfter) return clause(<>At this block the oracle price sat inside the bands.</>);
+  const fall = (1 - f.pUpAfter / f.priceAfter) * 100;
+  const shown = fall < 1 ? fall.toLocaleString("en-US", { maximumFractionDigits: 1 }) : String(Math.round(fall));
+  return clause(
+    <>
+      At this block the oracle price was {fmtPrice(f.priceAfter)} {ctx.borrowedSymbol}, so the price could fall {shown}%
+      before the bands.
+    </>,
+  );
+}
 
 /** Where the event placed the bands, from the ticks at block − 1 and after:
  *  how many bands, and which way in price (a higher band number is a lower
@@ -544,5 +656,5 @@ export function llamalendExplainerTeaser(
   coords: LlamalendCoords,
   mark?: LlamalendLoanMark | null,
 ): ReactNode | null {
-  return splitLead(eventClauses(llamalendEventSlots(ctx, coords, null, mark))).lead;
+  return splitLead(eventClauses(llamalendEventSlots(ctx, coords, null, mark, null))).lead;
 }

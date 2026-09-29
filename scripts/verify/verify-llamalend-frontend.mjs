@@ -518,7 +518,7 @@ try {
       `${perRow.length} opened rows (wire ${WIRE.liqRows}, ${WIRE.liqNoAfterImage} with no after-image)`,
     );
   }
-  check("liq detail: converted-taken stated (both AMM legs seized)", /already converted/.test(body));
+  check("liq detail: converted-taken stated (both AMM legs seized)", /the AMM had converted/.test(body));
   check("liq detail: no page errors", pageErrors.length === 0, pageErrors.join(" | "));
 
   // ── 5. detail — add-collateral rendering (borrow with loan=0) ───────────────
@@ -714,6 +714,95 @@ try {
     "spot: liquidation row states the converted leg and the debt apart",
     /converted/.test(body) && /debt/.test(body),
   );
+  // Round 3: open every row and its explanation, wait for the reads.
+  {
+    const cards = page.locator("div.flex.w-full.items-start.relative.rounded-xl");
+    const nc = await cards.count();
+    for (let i = 0; i < nc; i++) {
+      await cards
+        .nth(i)
+        .locator('[role="button"], button')
+        .first()
+        .click({ timeout: 3000 })
+        .catch(() => {});
+      await page.waitForTimeout(200);
+    }
+    for (let pass = 0; pass < 20; pass++) {
+      const tab = page.locator("[aria-label='Show explanation']").first();
+      if ((await tab.count().catch(() => 0)) === 0) break;
+      const ok = await tab
+        .click({ timeout: 5000, force: true })
+        .then(() => true)
+        .catch(() => false);
+      if (!ok) break;
+      await page.waitForTimeout(250);
+    }
+    await page
+      .waitForFunction(() => /before the bands/.test(document.body.innerText), null, { timeout: 60000 })
+      .catch(() => {});
+    await page.waitForTimeout(2000);
+  }
+  body = await page.evaluate(() => document.body.innerText);
+  check("spot N1: a positive health near 0 keeps its digits", /0\.0019%/.test(body) && !/Health\s*0\.00%/.test(body));
+  check(
+    "spot N1: liquidation 1 states why it was eligible",
+    /Health was 0\.0019% at the end of the block before\. By this block’s time the oracle price had moved from [\d,.]+ to [\d,.]+ crvUSD, and health stood at −0\.0058% before the block’s transactions ran: below 0/.test(
+      body,
+    ),
+  );
+  check("spot N1: the grid states health at the start of the block", /−0\.0058% at the start of this block/.test(body));
+  check(
+    "spot N2: the owner's outcome on the card and in the row",
+    /For the owner: kept the 95,000 crvUSD borrowed; lost the 36\.4374 WETH deposited\./.test(body) &&
+      /The owner receives nothing from a hard liquidation and keeps the crvUSD they borrowed\./.test(body) &&
+      /the liquidator paid the other 39,794\.17\d? crvUSD and received the 16\.323\d? WETH/.test(body),
+  );
+  {
+    const m = body.match(
+      /In WETH, the ([\d.]+) deposited is ([\d.]+) sold by the AMM \+ ([\d.]+) taken in liquidation\./,
+    );
+    const ok =
+      m && Math.abs(Number(m[1]) - Number(m[2]) - Number(m[3])) < 0.0002 && Math.abs(Number(m[1]) - 36.4374) < 0.0001;
+    check("spot N3: the collateral side adds up in WETH", !!ok, m ? m[0] : "no ledger sentence");
+    check(
+      "spot N3: sold, taken and the converted crvUSD are their own rows",
+      /Converted by the AMM/.test(body) && /Sold by the AMM/.test(body) && /Converted, taken in liquidation/.test(body),
+    );
+  }
+  check("spot N4: each liquidation figure is named", /−16\.32\s*taken\s*−57K\s*converted\s*−96K\s*cleared/.test(body));
+  check(
+    "spot N5: the borrow row states the distance to the bands",
+    /the price could fall 24% before the bands/.test(body),
+  );
+  check(
+    "spot N6: the position's discount beside the market's",
+    /liquidation discount on this position was 6%, copied from the market’s when the owner opened or added to the loan; the market’s is 9\.21% now/.test(
+      body,
+    ),
+  );
+  check(
+    "spot N8: the remainder and the close are stated",
+    /The remainder stayed open until 6 Dec 2025, when its health had fallen to −3\.41% and a second liquidation cleared it\./.test(
+      body,
+    ) && /The debt is cleared and the loan closed\./.test(body),
+  );
+  check("spot N11: market kind beside the pair", /WETH \/ crvUSD · mint market/.test(body));
+
+  const CRVSPOT = "/0xeda215b7666936ded834f76f3fbc6f323295110a/0xcbce52b5576771c7c8f5c21e29640d29e9636a8f";
+  await page.goto(`${BASE}${EXPLORER}${CRVSPOT}`, { waitUntil: "networkidle", timeout: 180000 });
+  await page.waitForSelector("text=Health:", { timeout: 120000 });
+  body = await openAllAndRead(page);
+  check(
+    "spot N7: a price under 1 keeps its digits",
+    /today's CRV price, 0\.\d{3,4} crvUSD/.test(body) && !/today's CRV price, 0 crvUSD/.test(body),
+  );
+  check(
+    "spot N9: an underwater position states what a liquidator would lose",
+    /A liquidator taking the whole position would repay [\d,.]+ crvUSD of debt and receive the [\d,.]+ crvUSD the AMM holds and 0 CRV: [\d,.]+ crvUSD less than it pays\. Curve’s docs call a shortfall like this bad debt/.test(
+      body,
+    ),
+  );
+  check("spot N11: lend market beside the pair", /CRV \/ crvUSD · lend market/.test(body));
 
   await page.goto(`${BASE}${EXPLORER}/markets`, { waitUntil: "networkidle", timeout: 180000 });
   await page.waitForSelector("text=A =", { timeout: 120000 });

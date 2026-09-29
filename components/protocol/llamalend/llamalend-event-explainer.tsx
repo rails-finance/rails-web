@@ -23,7 +23,7 @@ import {
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { llamalendEventSlots } from "@/lib/llamalend/explainer-clauses";
 import { useLlamalendEventState } from "@/lib/llamalend/use-event-state";
-import { llamalendEventFigures, type LlamalendLoanMark } from "@/lib/llamalend/event-figures";
+import { llamalendEventFigures, type LlamalendLoanMark, type LlamalendNextRow } from "@/lib/llamalend/event-figures";
 
 export interface LlamalendEventExplainerProps {
   ctx: LlamalendContext;
@@ -34,6 +34,10 @@ export interface LlamalendEventExplainerProps {
   skipLead?: boolean;
   /** Where the event sits among the page's loans. */
   loanMark?: LlamalendLoanMark | null;
+  /** The market's liquidation discount now, from the page's live read. */
+  marketDiscount?: number | null;
+  /** The loan's next row (a partial liquidation states what became of the rest). */
+  next?: LlamalendNextRow | null;
 }
 
 /** Mechanic modal content for this event — never-empty floor: every event type
@@ -61,12 +65,29 @@ export function LlamalendEventExplainer({
   wallet,
   skipLead,
   loanMark,
+  marketDiscount,
+  next,
 }: LlamalendEventExplainerProps) {
   const coords: LlamalendCoords = { txHash, blockNumber, controller: ctx.controller, user: wallet };
   // The same before/after read the grid uses (one request, shared).
   const state = useLlamalendEventState(ctx, blockNumber, wallet);
   const f = state ? llamalendEventFigures(ctx, state) : null;
-  const clauses = eventClauses(llamalendEventSlots(ctx, coords, f, loanMark));
+  // After a partial liquidation, the next row's read gives the health the
+  // remainder had fallen to (the same request that row's card makes).
+  const isLiq = ctx.eventType === "liquidation";
+  const nextState = useLlamalendEventState(
+    next?.ctx ?? ctx,
+    isLiq && f?.hasLoan && next ? next.blockNumber : undefined,
+    wallet,
+  );
+  const nextF = nextState && next ? llamalendEventFigures(next.ctx, nextState) : null;
+  const liq = isLiq
+    ? {
+        marketDiscount: marketDiscount ?? null,
+        next: next ? { ...next, healthBefore: nextF?.healthBefore ?? null } : null,
+      }
+    : null;
+  const clauses = eventClauses(llamalendEventSlots(ctx, coords, f, loanMark, liq));
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;

@@ -75,6 +75,9 @@ export function LlamalendEventHeader({
   if (coll !== 0) {
     deltas.push({
       ...verb("coll", coll),
+      // The borrower's liquidation row names each figure: taken, converted,
+      // cleared.
+      ...(borrowerLoss ? { suffix: "taken" } : {}),
       value: coll,
       symbol: ctx.collateralSymbol,
       address: soleFlowAddress(flows, ctx.collateralSymbol),
@@ -84,8 +87,8 @@ export function LlamalendEventHeader({
     });
   }
   // A hard liquidation takes both legs of the AMM holding: the borrower's row
-  // states the converted borrowed token beside the collateral, and tags the
-  // debt so the two borrowed-token figures read apart.
+  // states the converted borrowed token beside the collateral, and tags each
+  // figure so the two borrowed-token figures read apart.
   const convTaken = Number(ctx.convertedTaken ?? "0") || 0;
   if (borrowerLoss && convTaken > 0) {
     deltas.push({
@@ -99,7 +102,7 @@ export function LlamalendEventHeader({
   }
   if (debt !== 0) {
     deltas.push({
-      ...(borrowerLoss ? { suffix: "debt" } : {}),
+      ...(borrowerLoss ? { suffix: "cleared" } : {}),
       ...verb("debt", debt),
       value: debt,
       symbol: ctx.borrowedSymbol,

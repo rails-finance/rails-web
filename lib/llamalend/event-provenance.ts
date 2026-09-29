@@ -412,6 +412,38 @@ export const llamalendLostProv = (sym: string, controller?: string): Provenance 
   ],
 });
 
+/** On a position with hard liquidations: collateral the AMM sold net of
+ *  buy-backs, deposited − withdrawn − taken in liquidation − held now. */
+export const llamalendSoldBeforeLiqProv = (sym: string, controller?: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `${sym} the AMM sold from this position and did not buy back: everything deposited, less everything withdrawn, less what hard liquidations took, less what the position holds now. The converted balance it sold for is the line above the flows.`,
+  formula: "deposited − withdrawn − taken in liquidation − held now",
+  contract: { name: "LlamaLend Controller", address: controller ?? "" },
+  via: `${LLAMALEND_VIA} · Σ emitted collateral amounts · Liquidate collateral_received · user_state @ head`,
+  inputs: [
+    { label: "deposited", kind: "chain", pclass: "emitted", note: "Σ collateral added in the position's events" },
+    { label: "withdrawn", kind: "chain", pclass: "emitted", note: "Σ collateral removed in the position's events" },
+    { label: "taken", kind: "chain", pclass: "emitted", note: "Σ Liquidate collateral_received" },
+    { label: "held now", kind: "chain", pclass: "state", note: "user_state(user)[0] @ head; 0 on a closed loan" },
+  ],
+});
+
+/** On a position with hard liquidations: the borrowed token the AMM's sales
+ *  put into the position, net of buy-backs — taken in liquidation + held now. */
+export const llamalendConvertedInProv = (sym: string, controller?: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `${sym} the AMM's sales of this position's collateral left in it, net of buy-backs: what hard liquidations took of it plus what the position holds now. It enters the position only by those sales, and leaves by a buy-back or a liquidation.`,
+  formula: "converted taken in liquidation + converted held now",
+  contract: { name: "LlamaLend Controller", address: controller ?? "" },
+  via: `${LLAMALEND_VIA} · Σ Liquidate stablecoin_received · user_state @ head`,
+  inputs: [
+    { label: "taken", kind: "chain", pclass: "emitted", note: "Σ Liquidate stablecoin_received" },
+    { label: "held now", kind: "chain", pclass: "state", note: "user_state(user)[1] @ head; 0 on a closed loan" },
+  ],
+});
+
 /** Collateral the AMM has sold net of buy-backs on a position in its bands
  *  now: deposited − withdrawn − held, the converted balance being what it
  *  holds for it. */

@@ -29,6 +29,8 @@ import {
   positionIndexProv,
   llamalendLifetimeFlowProv,
   llamalendLostProv,
+  llamalendSoldBeforeLiqProv,
+  llamalendConvertedInProv,
 } from "@/lib/llamalend/event-provenance";
 import { llamalendConvertedProv } from "@/lib/llamalend/live-provenance";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
@@ -164,6 +166,26 @@ export function llamalendSoldInBands(view: LlamalendPositionView, lifetime: Life
   return gap;
 }
 
+/**
+ * On a position with hard liquidations, the collateral side as a ledger in
+ * each token: what the AMM sold net of buy-backs (deposited − withdrawn −
+ * taken − held) and the borrowed token those sales left in the position
+ * (converted taken + converted held). Deposited + converted in then equals
+ * held + withdrawn + sold + taken, token by token. A closed loan holds 0 of
+ * both; an open one needs the live read.
+ */
+export function llamalendLiquidatedLedger(view: LlamalendPositionView, lifetime: LifetimeFlows | null | undefined) {
+  if (!lifetime || (lifetime.collateralTaken <= DUST && lifetime.convertedTaken <= DUST)) return null;
+  const closed = view.status !== "open";
+  const heldColl = closed ? 0 : view.stateBasis === "chain" ? view.collateral : null;
+  const heldConv = closed ? 0 : view.stateBasis === "chain" ? view.converted : null;
+  if (heldColl == null || heldConv == null) return null;
+  const sold = lifetime.collateralAdded - lifetime.collateralWithdrawn - lifetime.collateralTaken - heldColl;
+  const convertedIn = lifetime.convertedTaken + heldConv;
+  if (sold <= Math.max(lifetime.collateralAdded * 1e-9, DUST) || convertedIn <= DUST) return null;
+  return { sold, convertedIn };
+}
+
 export function computeLlamalendEconomics(
   view: LlamalendPositionView,
   events?: BaseActivityEvent[],
@@ -174,6 +196,8 @@ export function computeLlamalendEconomics(
    *  NEITHER — the lifetime layer states nothing rather than a window's
    *  arithmetic. */
   precomputedLifetime?: LifetimeFlows,
+  /** The two tokens' contracts (from the events' flows), for the icon chips. */
+  addresses?: { collateral?: string; borrowed?: string },
 ): ChainTruthTowerData {
   const isCrvusd = view.borrowedIsCrvusd;
   const price = view.priceOracle; // borrowed per collateral (chain overlay)
@@ -240,6 +264,22 @@ export function computeLlamalendEconomics(
     amount > DUST ? [{ key, symbol, amount, usd, prov: llamalendLifetimeFlowProv(flow, symbol, view.controller) }] : [];
 
   const lost = llamalendLostToSoftLiq(view, lifetime);
+  const ledger = llamalendLiquidatedLedger(view, lifetime);
+  // The borrowed token the AMM's sales put into the position: a "+" row under
+  // Deposited, so the side reconciles in each token.
+  const collReceived: TowerLine[] = ledger
+    ? [
+        {
+          key: "converted-in",
+          symbol: view.borrowedSymbol,
+          amount: ledger.convertedIn,
+          usd: debtUsd(ledger.convertedIn),
+          prov: llamalendConvertedInProv(view.borrowedSymbol, view.controller),
+          flowLabel: "Converted by the AMM",
+          tipLabel: "Converted by the AMM",
+        },
+      ]
+    : [];
   const collExited = lifetime
     ? [
         ...flowLine(
@@ -264,8 +304,24 @@ export function computeLlamalendEconomics(
               },
             ]
           : []),
+        ...(ledger
+          ? [
+              {
+                key: "coll-sold",
+                symbol: view.collateralSymbol,
+                amount: ledger.sold,
+                usd: collUsd(ledger.sold),
+                prov: llamalendSoldBeforeLiqProv(view.collateralSymbol, view.controller),
+                flowLabel: "Sold by the AMM",
+                flowKind: "external" as const,
+              },
+            ]
+          : []),
       ]
     : [];
+  // Each leg keeps its own row (distinct captions never merge): the
+  // collateral taken, and the converted borrowed token taken with it (the
+  // log's stablecoin_received).
   const collLiquidated = lifetime
     ? [
         ...flowLine(
@@ -274,16 +330,14 @@ export function computeLlamalendEconomics(
           collUsd(lifetime.collateralTaken),
           "collateral taken",
           "coll-taken",
-        ),
-        // The AMM holding's other leg — already-converted borrowed token,
-        // seized in the same liquidations (the log's stablecoin_received).
+        ).map((l) => ({ ...l, flowLabel: "Taken in liquidation" })),
         ...flowLine(
           lifetime.convertedTaken,
           view.borrowedSymbol,
           debtUsd(lifetime.convertedTaken),
           "collateral taken",
           "converted-taken",
-        ),
+        ).map((l) => ({ ...l, flowLabel: "Converted, taken in liquidation" })),
       ]
     : [];
   const debtExited = lifetime
@@ -302,7 +356,24 @@ export function computeLlamalendEconomics(
   // Value the tower only when EVERY contributing line carries USD — the
   // strict guard: a non-crvUSD market (or a missing oracle read) drops the
   // whole tower to token lines rather than assert a partial dollar.
+  // The deposit row names its token: the side's other lines can speak a
+  // second one (the converted borrowed token), and the row's chip would
+  // otherwise follow them.
+  const collInflowLines: TowerLine[] =
+    lifetime && lifetime.collateralAdded > DUST
+      ? [
+          {
+            key: "coll-deposited",
+            symbol: view.collateralSymbol,
+            amount: lifetime.collateralAdded,
+            usd: collUsd(lifetime.collateralAdded),
+            prov: llamalendLifetimeFlowProv("collateral added", view.collateralSymbol, view.controller),
+          },
+        ]
+      : [];
   const contributing = [
+    ...collInflowLines,
+    ...collReceived,
     ...collateralLines,
     ...debtLines,
     ...collExited,
@@ -321,16 +392,34 @@ export function computeLlamalendEconomics(
   const label = (lines: TowerLine[], text: string) => lines.forEach((l) => (l.tipLabel = text));
   collateralLines.forEach((l) => (l.tipLabel = l.key === "converted" ? "Converted" : "Collateral held"));
   label(debtLines, "Debt now");
-  collExited.forEach((l) => (l.tipLabel = l.key === "coll-lost" ? "Lost to soft-liquidation" : "Withdrawn"));
-  label(collLiquidated, "Taken in liquidation");
+  collExited.forEach(
+    (l) =>
+      (l.tipLabel =
+        l.key === "coll-lost" ? "Lost to soft-liquidation" : l.key === "coll-sold" ? "Sold by the AMM" : "Withdrawn"),
+  );
+  collLiquidated.forEach(
+    (l) => (l.tipLabel = l.key === "converted-taken" ? "Converted, taken in liquidation" : "Taken in liquidation"),
+  );
   label(debtExited, "Repaid");
   label(debtLiquidated, "Cleared in liquidation");
+  // Each line carries its token's contract, so the chip draws the token's mark.
+  if (addresses) {
+    for (const l of contributing) {
+      const a =
+        l.symbol === view.collateralSymbol
+          ? addresses.collateral
+          : l.symbol.startsWith(view.borrowedSymbol)
+            ? addresses.borrowed
+            : undefined;
+      if (a && !l.address) l.address = a;
+    }
+  }
 
   return {
     valued,
     // The side counts the converted balance with the collateral token, so its
     // title says so where there is one.
-    ...(view.converted != null && view.converted > DUST
+    ...((view.converted != null && view.converted > DUST) || ledger
       ? { collateralTitle: "Collateral and converted", wrapFlowLabels: true }
       : {}),
     // crvUSD (~$1) through the AMM's own oracle → chain-derived; survives
@@ -341,6 +430,8 @@ export function computeLlamalendEconomics(
       interest: null,
       exited: collExited,
       liquidated: collLiquidated,
+      ...(collReceived.length > 0 ? { received: collReceived } : {}),
+      ...(collInflowLines.length > 0 ? { inflowLines: collInflowLines } : {}),
       lifetimeInflow: lifetime ? inflow(lifetime.collateralAdded, collUsd(lifetime.collateralAdded)) : 0,
     },
     debt: {

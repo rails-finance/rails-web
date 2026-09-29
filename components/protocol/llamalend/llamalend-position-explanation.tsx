@@ -16,7 +16,7 @@ import type { LlamalendChainResponse } from "@/lib/api/fetch-llamalend-position"
 import { formatNumber } from "@/lib/utils/format";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { AmountText } from "@/components/shared/amount-text";
-import { fmtColl, fmtHealth } from "@/lib/llamalend/event-figures";
+import { fmtColl, fmtHealth, fmtPrice } from "@/lib/llamalend/event-figures";
 import { formatDate } from "@/lib/date";
 import { isLlamalendEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { LlamalendPositionView } from "./llamalend-position-card";
@@ -50,7 +50,7 @@ export function LlamalendPositionExplanation({
   /** A closed position's story, from its events. */
   closed?: { view: LlamalendPositionView; events: BaseActivityEvent[] } | null;
 }) {
-  if (closed) return <ClosedExplanation view={closed.view} events={closed.events} />;
+  if (closed) return <ClosedExplanation view={closed.view} events={closed.events} factory={factory ?? null} />;
   if (!chain || chain.chainStale || !chain.hasLoan) return null;
 
   const unit = chain.borrowedIsCrvusd ? `${chain.borrowedSymbol} (~$1)` : chain.borrowedSymbol;
@@ -80,6 +80,63 @@ export function LlamalendPositionExplanation({
     );
   }
 
+  // Below 0 with nothing left to make a liquidator whole: what taking the
+  // position would pay and return (Controller _liquidate: the liquidator repays
+  // the debt and receives the collateral and the converted token).
+  if (chain.healthFull != null && chain.healthFull < 0 && chain.debt != null && chain.priceOracle != null) {
+    const coll = chain.collateral ?? 0;
+    const conv = chain.converted ?? 0;
+    const back = coll * chain.priceOracle + conv;
+    const short = chain.debt - back;
+    if (short > 0) {
+      bullets.push(
+        <span key="shortfall">
+          A liquidator taking the whole position would repay{" "}
+          <H>
+            {formatNumber(chain.debt)} {chain.borrowedSymbol}
+          </H>{" "}
+          of debt and receive{" "}
+          {conv > 0 ? (
+            <>
+              the{" "}
+              <H>
+                {formatNumber(conv)} {chain.borrowedSymbol}
+              </H>{" "}
+              the AMM holds
+            </>
+          ) : null}
+          {conv > 0 ? " and " : null}
+          {coll > 0 ? (
+            <>
+              <H>
+                {fmtColl(coll)} {chain.collateralSymbol}
+              </H>{" "}
+              (worth {formatNumber(coll * chain.priceOracle)} {chain.borrowedSymbol} at the oracle price)
+            </>
+          ) : (
+            <>0 {chain.collateralSymbol}</>
+          )}
+          : <H>{formatNumber(short)}</H> {chain.borrowedSymbol} less than it pays.
+          {factory === "oneway" ? (
+            <>
+              {" "}
+              Curve&rsquo;s docs call a shortfall like this{" "}
+              <a
+                href={BAD_DEBT_DOC_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline"
+              >
+                bad debt
+              </a>
+              : the lenders in this market are exposed to it.
+            </>
+          ) : null}
+        </span>,
+      );
+    }
+  }
+
   bullets.push(
     <span key="isolated">
       It sits in one of LlamaLend&rsquo;s isolated markets: this pair alone decides its fate, whatever the same address
@@ -90,15 +147,8 @@ export function LlamalendPositionExplanation({
   if (chain.pUp != null && chain.pDown != null) {
     bullets.push(
       <span key="band">
-        The collateral spreads across <H>{chain.bands}</H> price bands, from{" "}
-        <H>
-          <AmountText value={chain.pUp} />
-        </H>{" "}
-        down to{" "}
-        <H>
-          <AmountText value={chain.pDown} />
-        </H>{" "}
-        {unit}
+        The collateral spreads across <H>{chain.bands}</H> price bands, from <H>{fmtPrice(chain.pUp)}</H> down to{" "}
+        <H>{fmtPrice(chain.pDown)}</H> {unit}
         {chain.n1 != null && chain.n2 != null ? (
           <>
             , bands {chain.n1}…{chain.n2} (a higher band number is a lower price)
@@ -114,7 +164,7 @@ export function LlamalendPositionExplanation({
   if (chain.health != null && chain.pUp != null) {
     bullets.push(
       <span key="health">
-        The oracle price stands at <H>{chain.priceOracle != null ? formatNumber(chain.priceOracle) : "—"}</H> {unit},{" "}
+        The oracle price stands at <H>{chain.priceOracle != null ? fmtPrice(chain.priceOracle) : "—"}</H> {unit},{" "}
         <H>{chain.health.toFixed(3)}×</H> the soft-liquidation onset price.{" "}
         {chain.health >= 1 ? (
           <>
@@ -181,22 +231,8 @@ export function LlamalendPositionExplanation({
     );
   }
 
-  if (factory === "crvusd") {
-    bullets.push(
-      <span key="market-kind">
-        This is a mint market: the {chain.borrowedSymbol} is minted against the loan by Curve&rsquo;s crvUSD system, up
-        to the market&rsquo;s debt ceiling. The rate moves with crvUSD&rsquo;s price and the size of the Peg
-        Stabilization Reserve.
-      </span>,
-    );
-  } else if (factory === "oneway") {
-    bullets.push(
-      <span key="market-kind">
-        This is a lend market: the {chain.borrowedSymbol} is lent from a vault of lenders&rsquo; deposits, all the
-        interest goes to those lenders, and the rate rises with the share of the vault that is lent.
-      </span>,
-    );
-  }
+  const kindLine = marketKindLine(factory, chain.borrowedSymbol);
+  if (kindLine) bullets.push(<span key="market-kind">{kindLine}</span>);
 
   if (lost != null && lost > 0) {
     bullets.push(
@@ -259,9 +295,41 @@ export function LlamalendPositionExplanation({
 
 const pct = (fraction: number): string => `${(fraction * 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
 
+const BAD_DEBT_DOC_URL = "https://docs.curve.finance/user/llamalend/bad-debt/";
+
+/** The market kind in one sentence (mint or lend). */
+function marketKindLine(factory: LlamalendFactoryKind | null | undefined, borrowedSymbol: string): React.ReactNode {
+  if (factory === "crvusd") {
+    return (
+      <>
+        This is a mint market: the {borrowedSymbol} is minted against the loan by Curve&rsquo;s crvUSD system, up to the
+        market&rsquo;s debt ceiling. The rate moves with crvUSD&rsquo;s price and the size of the Peg Stabilization
+        Reserve.
+      </>
+    );
+  }
+  if (factory === "oneway") {
+    return (
+      <>
+        This is a lend market: the {borrowedSymbol} is lent from a vault of lenders&rsquo; deposits, all the interest
+        goes to those lenders, and the rate rises with the share of the vault that is lent.
+      </>
+    );
+  }
+  return null;
+}
+
 /** A closed position: when it opened and closed, and each hard liquidation's
  *  figures, from its events. */
-function ClosedExplanation({ view, events }: { view: LlamalendPositionView; events: BaseActivityEvent[] }) {
+function ClosedExplanation({
+  view,
+  events,
+  factory,
+}: {
+  view: LlamalendPositionView;
+  events: BaseActivityEvent[];
+  factory: LlamalendFactoryKind | null;
+}) {
   const rows = events
     .filter(isLlamalendEvent)
     .filter((e) => e.context.data.role !== "liquidator")
@@ -315,6 +383,8 @@ function ClosedExplanation({ view, events }: { view: LlamalendPositionView; even
       </span>,
     );
   });
+  const kindLine = marketKindLine(factory, bSym);
+  if (kindLine) bullets.push(<span key="market-kind">{kindLine}</span>);
   const firstPartial = liqs.length > 1 && liqs[0].context.data.collateralAfter == null;
   const lead =
     view.status === "liquidated" && liqs.length > 0 ? (

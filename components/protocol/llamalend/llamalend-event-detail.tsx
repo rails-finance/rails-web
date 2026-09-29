@@ -31,6 +31,7 @@ import {
   fmtBandPrice,
   fmtColl,
   fmtHealth,
+  fmtPrice,
   llamalendEventFigures,
   soldSincePrevious,
   type LlamalendPreviousStated,
@@ -120,7 +121,7 @@ function buildLlamalendLiqForensics(
 
   const seizedParts = {
     collateral: formatNumber(collSeized),
-    ...(collSeized > 0 ? { price: formatNumber(price) } : {}),
+    ...(collSeized > 0 ? { price: fmtPrice(price) } : {}),
     converted: formatNumber(converted),
   };
 
@@ -159,7 +160,7 @@ function buildLlamalendLiqForensics(
             },
           ]
         : [],
-    format: { value: inBorrowed, price: inBorrowed },
+    format: { value: inBorrowed, price: (n: number) => `${fmtPrice(n)} ${bSym}` },
   };
 }
 
@@ -307,7 +308,21 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
   }
 
   // Health on each side: Controller.health(user, true). Below 0 anyone may
-  // liquidate the position.
+  // liquidate the position. Where health crossed 0 between the end of the
+  // block before and the start of this one (a liquidation row's `start`
+  // read), the grid says so under the figure.
+  const startSub =
+    f && f.healthStart != null && f.healthBefore != null && f.healthStart < 0 !== f.healthBefore < 0 ? (
+      <>
+        <Prov
+          info={stateAtBlockProv("Health", "Controller.health(user, true)", block, coords)}
+          value={`${f.healthStart * 100}%`}
+        >
+          {fmtHealth(f.healthStart)}
+        </Prov>{" "}
+        at the start of this block.
+      </>
+    ) : undefined;
   if (f && state && f.healthAfter == null && f.healthBefore != null) {
     // The event closed the loan: health before it, and no loan after.
     stats.push({
@@ -317,6 +332,7 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
       symbol: "",
       prov: stateAtBlockProv("Health", "Controller.health(user, true)", block - 1, coords, state.before.healthRaw),
       changed: true,
+      sub: startSub,
       transition: {
         before: fmtHealth(f.healthBefore),
         beforeExact: `${f.healthBefore * 100}%`,
@@ -348,6 +364,7 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
       symbol: "",
       prov: stateAtBlockProv("Health", "Controller.health(user, true)", block, coords, state.after.healthRaw),
       changed: t != null,
+      sub: startSub,
       transition: t
         ? {
             ...t,

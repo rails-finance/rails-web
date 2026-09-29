@@ -96,13 +96,19 @@ export interface LlamalendPositionView {
 const stateProv = (v: LlamalendPositionView, sym: string, which: "collateral" | "debt") =>
   v.stateBasis === "chain" ? positionStateProv(sym, which, v.controller) : positionIndexProv(sym, which, v.controller);
 
+/** The kind of market beside the pair: mint (crvUSD minted against the loan)
+ *  or lend (borrowed from lenders' deposits); V2 keeps its badge. */
+const MARKET_KIND: Partial<Record<LlamalendFactoryKind, string>> = { crvusd: "mint market", oneway: "lend market" };
+
 /** The position + market identity: whose position, in which isolated market. */
 function PositionIdentity({ v }: { v: LlamalendPositionView }) {
+  const kind = v.factory ? MARKET_KIND[v.factory] : undefined;
   return (
     <span className="flex items-center gap-2">
       <WalletPill wallet={v.user} ensName={null} filterProtocol="llamalend" bookmarkProtocol="llamalend" />
       <span className="text-xs text-rb-500">
         {v.marketLabel}
+        {kind && <span data-llamalend-market-kind=""> · {kind}</span>}
         {v.version === "v2" && <span className="ml-1 rounded-sm bg-rb-300 px-1 text-[10px] dark:bg-rb-700">V2</span>}
       </span>
     </span>
@@ -187,6 +193,7 @@ export function LlamalendPositionCard({
             </StatValue>
           }
         />
+        {bodyExtra && <div className="mt-3 border-t border-rb-300/40 pt-3 dark:border-rb-700/40">{bodyExtra}</div>}
       </PositionCardShell>
     );
   }

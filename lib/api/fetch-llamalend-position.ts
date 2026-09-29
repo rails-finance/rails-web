@@ -111,6 +111,9 @@ export interface LlamalendChainResponse {
    *  stored on this position when its owner last acted, which the health
    *  figure subtracts. */
   liquidationDiscount: number | null;
+  /** Controller.liquidation_discount(): the market's figure now, which a
+   *  position copies when its owner opens or adds to the loan. */
+  marketLiquidationDiscount: number | null;
 
   /** True when the chain read failed and this is an empty stub. */
   chainStale: boolean;

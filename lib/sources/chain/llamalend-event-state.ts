@@ -14,9 +14,16 @@
 // changes, so each (controller, user, block) answer is kept in process
 // memory and the route caches it at the edge.
 //
+// A liquidation row may also ask for the position at the START of its block
+// (`start`): the state at block − 1 read with the block's number and time
+// (eth_call block overrides), so health and the oracle price are what the
+// block's first transaction saw. The oracle price moves with time, so health
+// can cross 0 between the end of one block and the next. One block-header
+// read and one eth_call (Multicall3 aggregate3).
+//
 // SERVER-ONLY.
 
-import { getAddress, parseAbi } from "viem";
+import { decodeFunctionResult, encodeFunctionData, getAddress, multicall3Abi, parseAbi } from "viem";
 import { alchemyClient } from "./rpc";
 import { discoverLlamalendMarkets } from "./llamalend-markets";
 import { UnknownLlamalendMarketError } from "./llamalend-position";
@@ -51,11 +58,21 @@ export interface LlamalendStateAt {
   priceOracleRaw: string | null;
 }
 
+/** Health and the oracle price at the start of the event's block. */
+export interface LlamalendStartOfBlock {
+  block: number;
+  timestamp: number;
+  healthRaw: string | null;
+  priceOracleRaw: string | null;
+}
+
 export interface LlamalendEventState {
   controller: string;
   user: string;
   before: LlamalendStateAt;
   after: LlamalendStateAt;
+  /** Present when asked for (`start`) and the read answered. */
+  start?: LlamalendStartOfBlock | null;
 }
 
 type Res = { status: string; result?: unknown };
@@ -127,10 +144,62 @@ async function readAt(controller: `0x${string}`, amm: `0x${string}`, user: `0x${
   return out;
 }
 
+const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11" as const;
+const startCache = new Map<string, Promise<LlamalendStartOfBlock | null>>();
+
+async function readStart(
+  controller: `0x${string}`,
+  amm: `0x${string}`,
+  user: `0x${string}`,
+  block: number,
+): Promise<LlamalendStartOfBlock | null> {
+  const client = alchemyClient();
+  const header = await client.getBlock({ blockNumber: BigInt(block) });
+  const data = encodeFunctionData({
+    abi: multicall3Abi,
+    functionName: "aggregate3",
+    args: [
+      [
+        {
+          target: controller,
+          allowFailure: true,
+          callData: encodeFunctionData({ abi: CONTROLLER_ABI, functionName: "health", args: [user, true] }),
+        },
+        {
+          target: amm,
+          allowFailure: true,
+          callData: encodeFunctionData({ abi: AMM_ABI, functionName: "price_oracle" }),
+        },
+      ],
+    ],
+  });
+  const res = await client.call({
+    to: MULTICALL3,
+    data,
+    blockNumber: BigInt(block - 1),
+    blockOverrides: { number: BigInt(block), time: header.timestamp },
+  });
+  if (!res.data) return null;
+  const [h, p] = decodeFunctionResult({ abi: multicall3Abi, functionName: "aggregate3", data: res.data });
+  const health = h.success
+    ? (decodeFunctionResult({ abi: CONTROLLER_ABI, functionName: "health", data: h.returnData }) as bigint)
+    : null;
+  const price = p.success
+    ? (decodeFunctionResult({ abi: AMM_ABI, functionName: "price_oracle", data: p.returnData }) as bigint)
+    : null;
+  return {
+    block,
+    timestamp: Number(header.timestamp),
+    healthRaw: health != null ? health.toString() : null,
+    priceOracleRaw: price != null ? price.toString() : null,
+  };
+}
+
 export async function readLlamalendEventState(
   controllerRaw: string,
   userRaw: string,
   block: number,
+  withStart = false,
 ): Promise<LlamalendEventState> {
   const controller = getAddress(controllerRaw).toLowerCase();
   const user = getAddress(userRaw);
@@ -142,6 +211,26 @@ export async function readLlamalendEventState(
     const key = `${controller}:${user.toLowerCase()}:${b}`;
     return cache.get(key) ?? remember(key, readAt(c, amm, user, b));
   };
-  const [before, after] = await Promise.all([at(block - 1), at(block)]);
-  return { controller, user: user.toLowerCase(), before, after };
+  const startOf = () => {
+    const key = `${controller}:${user.toLowerCase()}:${block}`;
+    let p = startCache.get(key);
+    if (!p) {
+      if (startCache.size >= CACHE_MAX) {
+        const oldest = startCache.keys().next().value;
+        if (oldest != null) startCache.delete(oldest);
+      }
+      p = readStart(c, amm, user, block).catch(() => null);
+      p.then((v) => {
+        if (v == null) startCache.delete(key);
+      });
+      startCache.set(key, p);
+    }
+    return p;
+  };
+  const [before, after, start] = await Promise.all([
+    at(block - 1),
+    at(block),
+    withStart ? startOf() : Promise.resolve(undefined),
+  ]);
+  return { controller, user: user.toLowerCase(), before, after, ...(start !== undefined ? { start } : {}) };
 }

@@ -6,7 +6,8 @@
 // 12 Jul 2025, repaid". The Liquity V1 lives line is the model.
 
 import { formatDate, formatDayMonth } from "@/lib/date";
-import type { LlamalendLoan } from "@/lib/llamalend/event-figures";
+import { fmtColl, type LlamalendLoan } from "@/lib/llamalend/event-figures";
+import { formatNumber } from "@/lib/utils/format";
 
 function span(l: LlamalendLoan): string {
   if (l.closedAt == null) return `from ${formatDate(l.openedAt)}`;
@@ -26,6 +27,33 @@ export function LlamalendLoansLine({ loans }: { loans: LlamalendLoan[] }) {
           {loans.length > 2 ? `loan ${i + 1}` : "earlier loan"} {span(l)}, {l.ending}
         </span>
       ))}
+    </p>
+  );
+}
+
+/** A liquidated loan's outcome for its owner, in one line: the borrowed token
+ *  they kept (borrowed − repaid) and the collateral they lost (deposited −
+ *  withdrawn). A hard liquidation pays the owner nothing (Controller
+ *  _liquidate). */
+export function LlamalendOwnerOutcomeLine({
+  kept,
+  lost,
+  borrowedSymbol,
+  collateralSymbol,
+  repaidAny,
+  withdrewAny,
+}: {
+  kept: number;
+  lost: number;
+  borrowedSymbol: string;
+  collateralSymbol: string;
+  repaidAny: boolean;
+  withdrewAny: boolean;
+}) {
+  return (
+    <p className="text-xs text-rb-500" data-llamalend-owner-outcome="">
+      For the owner: kept the {formatNumber(kept)} {borrowedSymbol} borrowed{repaidAny ? " and not repaid" : ""}; lost
+      the {fmtColl(lost)} {collateralSymbol} {withdrewAny ? "left in the position" : "deposited"}.
     </p>
   );
 }

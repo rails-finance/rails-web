@@ -11,6 +11,7 @@
 //   AMM.price_oracle()                 collateral in the borrowed token
 //   Controller.health(user, true)      the protocol's health (below 0: liquidatable)
 //   Controller.liquidation_discounts(user)  the discount that health subtracts
+//   Controller.liquidation_discount()       the market's current discount
 //
 // `user_state.stablecoin` is the figure no event carries: collateral the AMM
 // has ALREADY converted for this user — soft-liquidation observed live. It is
@@ -44,6 +45,7 @@ const CONTROLLER_ABI = parseAbi([
   "function user_state(address) view returns (uint256[4])",
   "function health(address,bool) view returns (int256)",
   "function liquidation_discounts(address) view returns (uint256)",
+  "function liquidation_discount() view returns (uint256)",
 ]);
 const AMM_ABI = parseAbi([
   "function read_user_tick_numbers(address) view returns (int256[2])",
@@ -102,6 +104,7 @@ function stub(controller: string, user: string): LlamalendChainResponse {
     healthFull: null,
     healthFullRaw: null,
     liquidationDiscount: null,
+    marketLiquidationDiscount: null,
     chainStale: true,
   };
 }
@@ -142,6 +145,7 @@ export async function loadLlamalendPositionFromChain(
             functionName: "liquidation_discounts",
             args: [user],
           },
+          { address: controller as `0x${string}`, abi: CONTROLLER_ABI, functionName: "liquidation_discount" },
         ] as const,
       }) as Promise<Res[]>,
     ]);
@@ -159,6 +163,9 @@ export async function loadLlamalendPositionFromChain(
       blockNumber,
       chainStale: false,
     };
+
+    const marketDiscountRaw = ok<bigint>(reads[8]);
+    if (marketDiscountRaw != null) base.marketLiquidationDiscount = scale1e18(marketDiscountRaw);
 
     const priceOracleRaw = ok<bigint>(reads[5]);
     if (priceOracleRaw != null) {

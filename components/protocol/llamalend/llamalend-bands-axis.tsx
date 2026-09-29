@@ -152,7 +152,10 @@ export function LlamalendBandsAxis({ chain }: { chain: LlamalendChainResponse })
   // captions disagree (`1,745.17` beside `2,359.293`), which reads as different
   // precision on figures that are the same measurement.
   const width = Math.abs(pUp - pDown);
-  const dp = Math.max(2, Math.min(6, width > 0 ? Math.ceil(-Math.log10(width)) + 1 : 2));
+  // Prices under 1 keep four significant digits (0.3958).
+  const least = Math.min(pUp, pDown, price);
+  const sigDp = least > 0 && least < 1 ? Math.ceil(-Math.log10(least)) + 3 : 0;
+  const dp = Math.max(2, sigDp, Math.min(6, width > 0 ? Math.ceil(-Math.log10(width)) + 1 : 2));
   const p = (v: number): string => v.toLocaleString("en-US", { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
   // The lead figure, in the compact runway's own slot and voice. Above the band

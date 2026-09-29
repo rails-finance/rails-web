@@ -21,11 +21,26 @@ export function fmtBandPrice(n: number): string {
   return n.toLocaleString("en-US", { maximumSignificantDigits: 4 });
 }
 
-/** A 1e18 health as a percentage with two places ("5.08%", "−54.50%"). */
+/** A 1e18 health as a percentage with two places ("5.08%", "−54.50%"), and
+ *  two significant digits under 0.01% so a health on either side of 0 never
+ *  reads "0.00%" ("0.0019%", "−0.0058%"). */
 export function fmtHealth(fraction: number): string {
   const pct = fraction * 100;
-  const s = Math.abs(pct).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const a = Math.abs(pct);
+  const s =
+    a > 0 && a < 0.01
+      ? a.toLocaleString("en-US", { maximumSignificantDigits: 2 })
+      : a.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return `${pct < 0 ? "−" : ""}${s}%`;
+}
+
+/** A price in the borrowed token: formatNumber's three places from 1 up, four
+ *  significant digits below 1 ("0.3958"). */
+export function fmtPrice(n: number): string {
+  const a = Math.abs(n);
+  if (a === 0) return "0";
+  if (a < 1) return n.toLocaleString("en-US", { maximumSignificantDigits: 4 });
+  return n.toLocaleString("en-US", { maximumFractionDigits: 3 });
 }
 
 const n = (raw: string | null | undefined, decimals: number): number | null =>
@@ -53,6 +68,13 @@ export interface LlamalendEventFigures {
   pDownAfter: number | null;
   /** The stored liquidation discount at block − 1 (fraction). */
   discountBefore: number | null;
+  /** The AMM's oracle price at block − 1 and at the event's block. */
+  priceBefore: number | null;
+  priceAfter: number | null;
+  /** Health and the oracle price at the start of the event's block (a
+   *  liquidation row's `start` read); null where not read. */
+  healthStart: number | null;
+  priceStart: number | null;
 }
 
 export function llamalendEventFigures(ctx: LlamalendContext, s: LlamalendEventState): LlamalendEventFigures {
@@ -79,6 +101,10 @@ export function llamalendEventFigures(ctx: LlamalendContext, s: LlamalendEventSt
     pUpAfter: a.hasLoan ? n(a.pUpRaw, 18) : null,
     pDownAfter: a.hasLoan ? n(a.pDownRaw, 18) : null,
     discountBefore: b.hasLoan ? n(b.liquidationDiscountRaw, 18) : null,
+    priceBefore: n(b.priceOracleRaw, 18),
+    priceAfter: n(a.priceOracleRaw, 18),
+    healthStart: s.start ? n(s.start.healthRaw, 18) : null,
+    priceStart: s.start ? n(s.start.priceOracleRaw, 18) : null,
   };
 }
 
@@ -194,5 +220,46 @@ export function llamalendLoanMarks(
   }
   const out = new Map<string, LlamalendLoanMark>();
   for (const m of marks) out.set(m.id, { loan: m.loan, loans: loan, opens: m.opens, closes: m.closes });
+  return out;
+}
+
+/** The next row of the same loan after an event, for a partial liquidation's
+ *  remainder: what happened to it and when. */
+export interface LlamalendNextRow {
+  id: string;
+  blockNumber: number;
+  timestamp: number;
+  eventType: LlamalendContext["eventType"];
+  /** It left the debt at 0. */
+  closes: boolean;
+  ctx: LlamalendContext;
+}
+
+export function llamalendNextRowMap(
+  events: readonly { id: string; blockNumber: number; timestamp: number; context: { data: LlamalendContext } }[],
+): Map<string, LlamalendNextRow | null> {
+  const rows = events
+    .map((e, i) => ({ e, i }))
+    .filter(({ e }) => e.context.data.role !== "liquidator")
+    .sort((a, b) => a.e.blockNumber - b.e.blockNumber || a.i - b.i);
+  const out = new Map<string, LlamalendNextRow | null>();
+  for (let k = 0; k < rows.length; k++) {
+    const c = rows[k].e.context.data;
+    const closedHere = c.debtAfter != null && Number(c.debtAfter) <= 1e-12;
+    const n = rows[k + 1]?.e;
+    out.set(
+      rows[k].e.id,
+      closedHere || !n
+        ? null
+        : {
+            id: n.id,
+            blockNumber: n.blockNumber,
+            timestamp: n.timestamp,
+            eventType: n.context.data.eventType,
+            closes: n.context.data.debtAfter != null && Number(n.context.data.debtAfter) <= 1e-12,
+            ctx: n.context.data,
+          },
+    );
+  }
   return out;
 }

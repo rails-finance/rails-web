@@ -56,6 +56,9 @@ export function llamalendEventStateUrl(ctx: LlamalendContext, blockNumber?: numb
     user: wallet.toLowerCase(),
     block: String(blockNumber),
   });
+  // A third party's liquidation also reads the start of its block: health
+  // there is what let it run.
+  if (ctx.eventType === "liquidation" && !ctx.selfLiquidation && ctx.role !== "self") q.set("start", "1");
   return `/api/chain/llamalend/event-state?${q.toString()}`;
 }
 

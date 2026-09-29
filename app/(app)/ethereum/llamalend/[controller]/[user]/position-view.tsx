@@ -61,9 +61,15 @@ import {
 } from "@/lib/llamalend/economics";
 import { llamalendEconomicsExplanation, llamalendEconomicsContent } from "@/lib/llamalend/economics-explanation";
 import { normalizeAddressParam } from "@/lib/llamalend/asset-catalog";
-import { llamalendLoanMarks, llamalendLoans, llamalendPreviousStatedMap } from "@/lib/llamalend/event-figures";
-import { LlamalendLoansLine } from "@/components/protocol/llamalend/llamalend-loans-line";
+import {
+  llamalendLoanMarks,
+  llamalendLoans,
+  llamalendNextRowMap,
+  llamalendPreviousStatedMap,
+} from "@/lib/llamalend/event-figures";
+import { LlamalendLoansLine, LlamalendOwnerOutcomeLine } from "@/components/protocol/llamalend/llamalend-loans-line";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { soleFlowAddress } from "@/lib/shared/format-event";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -250,6 +256,20 @@ export default function LlamalendPositionView({
     return txs > liveView.txCount ? { ...liveView, txCount: txs } : liveView;
   }, [liveView, llamalendEvents, cutoffBlock]);
   const previousStated = useMemo(() => llamalendPreviousStatedMap(llamalendEvents), [llamalendEvents]);
+  const nextRows = useMemo(() => llamalendNextRowMap(llamalendEvents), [llamalendEvents]);
+  // The two tokens' contracts, from the events' flows, for the flows panel's
+  // token chips.
+  const tokenAddresses = useMemo(() => {
+    if (!liveView) return undefined;
+    const find = (sym: string) => {
+      for (const e of llamalendEvents) {
+        const a = soleFlowAddress(e.flows, sym);
+        if (a) return a;
+      }
+      return undefined;
+    };
+    return { collateral: find(liveView.collateralSymbol), borrowed: find(liveView.borrowedSymbol) };
+  }, [llamalendEvents, liveView]);
   // The loans this page holds (a closed loan and a later one share the key);
   // read only over the whole history.
   const loans = useMemo(
@@ -285,6 +305,16 @@ export default function LlamalendPositionView({
     const lifetime = precomputedLifetimeFor(liveView, llamalendEvents, opening, lifetimeKnown);
     return llamalendSoldInBands(liveView, lifetime);
   }, [liveView, llamalendEvents, opening, lifetimeKnown]);
+  // A liquidated loan's outcome for the owner, on a page holding one loan.
+  const ownerOutcome = useMemo(() => {
+    if (!liveView || liveView.status !== "liquidated" || loans.length !== 1) return null;
+    const lifetime = precomputedLifetimeFor(liveView, llamalendEvents, opening, lifetimeKnown);
+    if (!lifetime) return null;
+    const kept = lifetime.borrowed - lifetime.repaid;
+    const lost = lifetime.collateralAdded - lifetime.collateralWithdrawn;
+    if (kept <= 0 || lost <= 0) return null;
+    return { kept, lost, repaidAny: lifetime.repaid > 0, withdrewAny: lifetime.collateralWithdrawn > 0 };
+  }, [liveView, llamalendEvents, opening, lifetimeKnown, loans]);
   const precomputedLifetime = useMemo(
     () =>
       liveView
@@ -381,7 +411,17 @@ export default function LlamalendPositionView({
               // the pane, and the copy-view link at its foot, mount with the
               // card. A closed account, a read still pending or a read with no
               // loan narrates nothing.
-              bodyExtra={loans.length > 1 ? <LlamalendLoansLine loans={loans} /> : undefined}
+              bodyExtra={
+                loans.length > 1 ? (
+                  <LlamalendLoansLine loans={loans} />
+                ) : ownerOutcome ? (
+                  <LlamalendOwnerOutcomeLine
+                    {...ownerOutcome}
+                    borrowedSymbol={liveView.borrowedSymbol}
+                    collateralSymbol={liveView.collateralSymbol}
+                  />
+                ) : undefined
+              }
               explanation={
                 <LlamalendPositionExplanation
                   chain={liveView.status === "open" ? chain : null}
@@ -401,7 +441,12 @@ export default function LlamalendPositionView({
           )}
           {liveView &&
             (() => {
-              const towerData = computeLlamalendEconomics(liveView, lifetimeEvents, precomputedLifetime);
+              const towerData = computeLlamalendEconomics(
+                liveView,
+                lifetimeEvents,
+                precomputedLifetime,
+                tokenAddresses,
+              );
               return (
                 <ChainTruthTower
                   data={towerData}
@@ -458,6 +503,8 @@ export default function LlamalendPositionView({
                   isLast={meta.isLast}
                   previousStated={previousStated.get(event.id) ?? null}
                   loanMark={loanMarks?.get(event.id) ?? null}
+                  marketDiscount={chain?.marketLiquidationDiscount ?? null}
+                  next={nextRows.get(event.id) ?? null}
                 />
               ) : null
             }
