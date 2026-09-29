@@ -22,7 +22,7 @@ import { Prov } from "@/components/shared/provenance";
 import { pct } from "@/components/shared/ratio-bar";
 import { RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
 import { fmtUsd } from "@/lib/aave-v4/format";
-import { accountDataProv, accountRatioProv } from "@/lib/spark/position-provenance";
+import { accountDataProv, accountRatioProv, emodeProv } from "@/lib/spark/position-provenance";
 import type { SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
 
 export function SparkLtvView({ chain }: { chain: SparkPositionChainResponse }) {
@@ -57,6 +57,13 @@ export function SparkLtvView({ chain }: { chain: SparkPositionChainResponse }) {
       <RiskFigure>
         liquidation at <Prov info={liqProv}>{pct(liqThreshold)}</Prov>
       </RiskFigure>
+      {chain.emode && chain.emode.id > 0 && (
+        <RiskFigure label="E-mode">
+          <Prov info={emodeProv(chain.emode.label ?? `category ${chain.emode.id}`, chain.emode.ltv, chain.emode.lt)}>
+            {chain.emode.label ?? `category ${chain.emode.id}`}
+          </Prov>
+        </RiskFigure>
+      )}
     </>
   );
 }

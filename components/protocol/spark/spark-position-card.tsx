@@ -295,8 +295,12 @@ export function SparkPositionCard({
   explanation,
   viewHref,
   captions,
+  outcomeAt,
 }: {
   v: SparkPositionView;
+  /** A liquidated card's Outcome date: its last liquidation, where the page
+   *  holds it. The last activity otherwise. */
+  outcomeAt?: number;
   receipts?: boolean;
   /** Context content riding the shell's heading-button row (the detail page
    *  passes the compact liquidation runway). */
@@ -358,7 +362,7 @@ export function SparkPositionCard({
               liquidationCount={v.liquidationCount}
             />
           }
-          closedAt={v.lastActivityAt}
+          closedAt={v.status === "liquidated" && outcomeAt != null ? outcomeAt : v.lastActivityAt}
           collateral={<PeakStack reserves={v.peakSupplies} side="supply" />}
           debt={<PeakStack reserves={v.peakBorrows} side="debt" />}
         />

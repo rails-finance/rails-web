@@ -29,10 +29,15 @@ const inFlight = new Map<string, Promise<Settled>>();
 const LASTING_REFUSALS = new Set([400, 404]);
 const LOADING: AaveV3PositionStateResult = { status: "loading" };
 
-/** The Ethereum markets read the index's answer; Base reads the chain at the
- *  block (app/api/chain/aave-v3-base/position-state), same wire shape. */
+/** The Ethereum markets read the index's answer; Base and SparkLend read the
+ *  chain at the block (app/api/chain/{aave-v3-base,spark}/position-state), same
+ *  wire shape. */
 const routeFor = (market: string): string =>
-  market === "base" ? "/api/chain/aave-v3-base/position-state" : "/api/aave-v3/timeline/position-state";
+  market === "base"
+    ? "/api/chain/aave-v3-base/position-state"
+    : market === "spark"
+      ? "/api/chain/spark/position-state"
+      : "/api/aave-v3/timeline/position-state";
 
 async function read(key: string, qs: string, market: string): Promise<Settled> {
   try {

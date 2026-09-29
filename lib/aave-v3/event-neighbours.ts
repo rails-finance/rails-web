@@ -10,11 +10,14 @@ import { isAaveCollector } from "./liquidation-fee";
 
 export type AaveV3TimelineEvent = BaseActivityEvent & { context: { protocol: "aave-v3"; data: AaveV3Context } };
 
-export interface AaveV3Neighbours {
-  siblings: AaveV3TimelineEvent[];
+export interface AaveV3Neighbours<E extends NeighbourEvent = AaveV3TimelineEvent> {
+  siblings: E[];
   /** The previous transaction, and its last row on the timeline. */
-  previous?: { blockNumber: number; txHash: string; event?: AaveV3TimelineEvent };
+  previous?: { blockNumber: number; txHash: string; event?: E };
 }
+
+/** What the neighbour walk reads of a row; SparkLend's rows walk the same way. */
+type NeighbourEvent = Pick<BaseActivityEvent, "id" | "blockNumber" | "txHash">;
 
 /** The log index a served id ends with ("kind:pool:tx:logIndex"); 0 when absent. */
 const logIndexOf = (id: string): number => {
@@ -22,9 +25,11 @@ const logIndexOf = (id: string): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export function aaveV3Neighbours(events: readonly AaveV3TimelineEvent[]): Map<string, AaveV3Neighbours> {
+export function aaveV3Neighbours<E extends NeighbourEvent = AaveV3TimelineEvent>(
+  events: readonly E[],
+): Map<string, AaveV3Neighbours<E>> {
   const asc = [...events].sort((a, b) => a.blockNumber - b.blockNumber || logIndexOf(a.id) - logIndexOf(b.id));
-  const byTx = new Map<string, AaveV3TimelineEvent[]>();
+  const byTx = new Map<string, E[]>();
   for (const e of asc) {
     const tx = e.txHash?.toLowerCase();
     if (!tx) continue;
@@ -32,9 +37,9 @@ export function aaveV3Neighbours(events: readonly AaveV3TimelineEvent[]): Map<st
     list.push(e);
     byTx.set(tx, list);
   }
-  const out = new Map<string, AaveV3Neighbours>();
-  let prevTx: AaveV3Neighbours["previous"];
-  let lastTx: AaveV3Neighbours["previous"];
+  const out = new Map<string, AaveV3Neighbours<E>>();
+  let prevTx: AaveV3Neighbours<E>["previous"];
+  let lastTx: AaveV3Neighbours<E>["previous"];
   for (const e of asc) {
     const tx = e.txHash?.toLowerCase();
     if (tx && tx !== lastTx?.txHash) {

@@ -32,8 +32,16 @@ const SPARK_OPTS: AaveV3EconomicsOpts = {
   ],
 };
 
-export function sparkEconomicsExplanation(data: AaveV3TowerData): ReactNode {
-  return aaveV3EconomicsExplanation(data, SPARK_OPTS);
+/** `gatewayWithdrawals`: the page's rows hold a withdrawal as ETH through the
+ *  Spark WETH gateway, which the Withdrawn figure includes. */
+export function sparkEconomicsExplanation(data: AaveV3TowerData, gatewayWithdrawals = false): ReactNode {
+  return aaveV3EconomicsExplanation(data, {
+    ...SPARK_OPTS,
+    liquidationOnCard: true,
+    withdrawnWords: gatewayWithdrawals
+      ? "withdrawn, withdrawals as ETH through the Spark WETH gateway included"
+      : undefined,
+  });
 }
 
 /** The modal names only the rows the panel shows, where it is given the panel's data. */

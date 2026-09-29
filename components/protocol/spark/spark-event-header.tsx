@@ -19,6 +19,7 @@ import {
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { protocolIconSrc } from "@/lib/shared/protocols";
+import { isGatewayWithdrawal } from "@/lib/spark/liquidation-fee";
 
 export interface SparkEventHeaderProps {
   actionLabel: string;
@@ -38,7 +39,14 @@ export interface SparkEventHeaderProps {
    *  icon CDN anything, and the house table is the wrong place to ask when the
    *  event itself recorded the contract that moved. */
   flows?: AssetFlow[];
+  /** Set on a fee transfer: the liquidation it belongs to, among the
+   *  transaction's rows (lib/spark/liquidation-fee.ts). */
+  feeOf?: SparkContext;
 }
+
+/** A transfer's verb, kept before the amount (the custody row's label, as Aave
+ *  V3's "Transferred out"). */
+const TRANSFER_LABEL = { transfer_in: "Transfer in", transfer_out: "Transfer out" } as const;
 
 export function SparkEventHeader({
   actionLabel,
@@ -50,6 +58,7 @@ export function SparkEventHeader({
   externalBy,
   wallet,
   flows,
+  feeOf,
 }: SparkEventHeaderProps) {
   const coords: SparkCoords = { txHash, blockNumber };
   const deltas: ChainTruthDelta[] = [];
@@ -90,15 +99,32 @@ export function SparkEventHeader({
   // protocol contract (lib/shared/known-infrastructure.ts) is named with its
   // mark; any other address by ENS where it has a reverse record.
   const transferOut = ctx.eventType === "transfer_out";
-  const isTransferRow = transferOut || ctx.eventType === "transfer_in";
+  // A transfer to the Spark WETH gateway is a withdrawal to ETH (the gateway
+  // withdraws from the Pool and sends ETH on in the same transaction); one to
+  // the Spark treasury inside a liquidation is its fee. Each row names itself so.
+  const viaGateway = !feeOf && isGatewayWithdrawal(ctx);
+  // A fee and a gateway withdrawal read as acts with their verbs, the amount on
+  // the spine's outgoing flank; only a plain transfer is a custody move.
+  const isTransferRow = !feeOf && !viaGateway && (transferOut || ctx.eventType === "transfer_in");
+  const label = feeOf
+    ? "Liquidation fee"
+    : viaGateway
+      ? "Withdraw"
+      : isTransferRow
+        ? TRANSFER_LABEL[ctx.eventType as keyof typeof TRANSFER_LABEL]
+        : actionLabel;
   const named = getProtocolContract(ctx.counterparty, MAINNET_CHAIN_ID);
   const party =
     ctx.counterparty != null
       ? {
-          prefix: transferOut ? "to" : "from",
+          prefix: viaGateway ? "as ETH via" : transferOut ? "to" : "from",
           address: ctx.counterparty,
-          name: named?.name,
-          icon: named?.protocolIcon ? protocolIconSrc(named.protocolIcon) : undefined,
+          name: feeOf ? "Spark treasury" : (named?.name ?? (viaGateway ? "Spark WETH gateway" : undefined)),
+          icon: feeOf
+            ? protocolIconSrc("spark")
+            : named?.protocolIcon
+              ? protocolIconSrc(named.protocolIcon)
+              : undefined,
           prov: transferCounterpartyProv(transferOut ? "out" : "in", coords, ctx.counterparty),
           ens: true,
         }
@@ -107,11 +133,14 @@ export function SparkEventHeader({
   return (
     <ChainTruthRow
       spec={{
-        label: actionLabel,
+        label,
         critical: ctx.eventType === "liquidation",
-        // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
-        // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
+        // A transfer is a custody row: `Transfer out 400 ◎ to 0x…`, the verb
+        // kept before the amounts (Aave V3's custodyLabel).
         custody: isTransferRow,
+        custodyLabel: isTransferRow,
+        // The verb carries the direction; a liquidation keeps its signs.
+        unsignedDeltas: ctx.eventType !== "liquidation",
         deltas,
         party,
         externalActor:

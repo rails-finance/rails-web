@@ -10,18 +10,29 @@ import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { assetsDeltaProv, type SparkCoords } from "@/lib/spark/event-provenance";
+import { assetsDeltaProv, transferDeltaProv, type SparkCoords } from "@/lib/spark/event-provenance";
 import { sparkExplainerTeaser } from "@/lib/spark/explainer-clauses";
 import { SparkEventHeader } from "./spark-event-header";
 import { SparkEventDetail } from "./spark-event-detail";
 import { SparkEventExplainer, sparkLearnMoreContent } from "./spark-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import { prefetchAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
+import type { AaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
+import { isGatewayWithdrawal, sparkFeeLiquidation, type SparkTimelineEvent } from "@/lib/spark/liquidation-fee";
 
 export interface SparkEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "spark"; data: SparkContext } };
   isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
+  /** "spark" where the account state around this transaction can be read at
+   *  blocks N−1 and N; unset where another of the owner's transactions shares
+   *  the block (the read would mix the two). */
+  market?: "spark";
+  /** This transaction's rows (a liquidation and its fee transfer). */
+  siblings?: SparkTimelineEvent[];
+  /** The previous transaction, to say what moved the account between events. */
+  previous?: AaveV3Neighbours<SparkTimelineEvent>["previous"];
 }
 
 // direction "right" = token moves toward the protocol (deposit / repay),
@@ -37,8 +48,37 @@ const DIRECTION: Record<Exclude<SparkContext["eventType"], "transfer_in" | "tran
   liquidation: "left",
 };
 
-export function SparkEventCard({ event, isFirst, isLast, eventNumber }: SparkEventCardProps) {
+export function SparkEventCard({
+  event,
+  isFirst,
+  isLast,
+  eventNumber,
+  market,
+  siblings,
+  previous,
+}: SparkEventCardProps) {
   const ctx = event.context.data;
+  // A transfer to the Spark treasury in a liquidation's transaction is that
+  // liquidation's fee (lib/spark/liquidation-fee.ts): it reads the
+  // liquidation's account state, so it asks for none of its own.
+  const feeOf = sparkFeeLiquidation(ctx, siblings);
+  const stateMarket = feeOf ? undefined : market;
+  const reserveAddress = soleFlowAddress(event.flows, ctx.reserveSymbol);
+  const prefetch = () => {
+    if (!stateMarket) return;
+    prefetchAaveV3PositionState({
+      wallet: event.wallet,
+      market: stateMarket,
+      block: event.blockNumber,
+      txHash: event.txHash,
+    });
+    prefetchAaveV3PositionState({
+      wallet: event.wallet,
+      market: stateMarket,
+      block: previous?.blockNumber,
+      txHash: previous?.txHash,
+    });
+  };
   const isLiq = ctx.eventType === "liquidation";
   const mag = Math.abs(Number(ctx.assetsDelta));
   // Third-party action: the owner neither signed the tx nor made the Pool
@@ -54,12 +94,18 @@ export function SparkEventCard({ event, isFirst, isLast, eventNumber }: SparkEve
   const coords: SparkCoords = { txHash: event.txHash, blockNumber: event.blockNumber };
   // A transfer draws no flank (see `tokens` below), so it echoes nothing.
   const kind = ctx.eventType;
-  const isTransfer = kind === "transfer_in" || kind === "transfer_out";
+  // A withdrawal as ETH through the gateway, and a liquidation's fee, leave the
+  // position like a withdrawal: they draw the outgoing flank with the amount,
+  // echoing the header's transfer receipt. A plain transfer stays a custody row.
+  const outFlow = isGatewayWithdrawal(ctx) || !!feeOf;
+  const isTransfer = !outFlow && (kind === "transfer_in" || kind === "transfer_out");
   const signedDelta = Number(ctx.assetsDelta) || 0;
   const spineProv =
     !isLiq && !isTransfer && signedDelta !== 0
       ? {
-          info: assetsDeltaProv(ctx.reserveSymbol, ctx.side, coords),
+          info: outFlow
+            ? transferDeltaProv(ctx.reserveSymbol, "out", coords)
+            : assetsDeltaProv(ctx.reserveSymbol, ctx.side, coords),
           value: chainTruthDeltaValue(signedDelta, false),
           symbol: ctx.reserveSymbol,
         }
@@ -91,7 +137,7 @@ export function SparkEventCard({ event, isFirst, isLast, eventNumber }: SparkEve
             {
               symbol: ctx.reserveSymbol,
               address: soleFlowAddress(event.flows, ctx.reserveSymbol),
-              direction: DIRECTION[kind],
+              direction: outFlow ? ("left" as const) : DIRECTION[kind as keyof typeof DIRECTION],
               value: mag,
               prov: spineProv,
             },
@@ -121,19 +167,34 @@ export function SparkEventCard({ event, isFirst, isLast, eventNumber }: SparkEve
       avatar={null}
       iconColumn={iconSlot}
       header={
-        <SparkEventHeader
-          actionLabel={event.actionLabel}
+        // The pointer on the header starts the account reads the open card
+        // makes (this transaction's and the previous one's).
+        <div className="contents" onPointerOver={prefetch} onFocus={prefetch}>
+          <SparkEventHeader
+            actionLabel={event.actionLabel}
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+            externalBy={extBy ?? undefined}
+            wallet={event.wallet}
+            flows={event.flows}
+            feeOf={feeOf}
+          />
+        </div>
+      }
+      detail={
+        <SparkEventDetail
           ctx={ctx}
-          timestamp={event.timestamp}
           txHash={event.txHash}
           blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          externalBy={extBy ?? undefined}
           wallet={event.wallet}
-          flows={event.flows}
+          market={stateMarket}
+          reserveAddress={reserveAddress}
+          previous={previous}
         />
       }
-      detail={<SparkEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
       detailLabel="Position state"
       explainer={
         <SparkEventExplainer
@@ -141,13 +202,17 @@ export function SparkEventCard({ event, isFirst, isLast, eventNumber }: SparkEve
           txHash={event.txHash}
           blockNumber={event.blockNumber}
           owner={event.wallet}
+          market={stateMarket}
+          reserveAddress={reserveAddress}
+          siblings={siblings}
+          previous={previous}
           skipLead
         />
       }
       explainerLabel="Plain English"
-      explainerTeaser={sparkExplainerTeaser(ctx, coords, event.wallet)}
+      explainerTeaser={sparkExplainerTeaser(ctx, coords, { owner: event.wallet, siblings })}
       txHash={event.txHash}
-      learnMore={<LearnMore inline content={sparkLearnMoreContent(ctx)} />}
+      learnMore={<LearnMore inline content={sparkLearnMoreContent(feeOf ?? ctx)} />}
       persistKey={`spark:${event.id}`}
     />
   );

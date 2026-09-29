@@ -22,6 +22,8 @@ const SPARK_POOL = SPARK_ADDRESSES.POOL as `0x${string}`;
 const POOL_ABI = parseAbi([
   "function getUserAccountData(address user) view returns (uint256 totalCollateralBase, uint256 totalDebtBase, uint256 availableBorrowsBase, uint256 currentLiquidationThreshold, uint256 ltv, uint256 healthFactor)",
   "function getUserConfiguration(address user) view returns (uint256 data)",
+  "function getUserEMode(address user) view returns (uint256)",
+  "function getEModeCategoryData(uint8 id) view returns ((uint16 ltv, uint16 liquidationThreshold, uint16 liquidationBonus, address priceSource, string label))",
   "function getReserveData(address asset) view returns ((uint256 configuration, uint128 liquidityIndex, uint128 currentLiquidityRate, uint128 variableBorrowIndex, uint128 currentVariableBorrowRate, uint128 currentStableBorrowRate, uint40 lastUpdateTimestamp, uint16 id, address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress, address interestRateStrategyAddress, uint128 accruedToTreasury, uint128 unbacked, uint128 isolationModeTotalDebt))",
 ]);
 const ERC20_ABI = parseAbi([
@@ -83,7 +85,7 @@ export async function loadSparkPositionFromChain(
 
     // Phase 1 — aggregate account data + collateral bitmap (two scalar reads), and
     // the homogeneous per-reserve getReserveData multicall, in parallel.
-    const [blockNumber, account, userConfig, reserveStructs] = await Promise.all([
+    const [blockNumber, account, userConfig, reserveStructs, emodeId] = await Promise.all([
       client.getBlockNumber().then(Number),
       client.readContract({
         address: SPARK_POOL,
@@ -111,7 +113,24 @@ export async function loadSparkPositionFromChain(
                 }) as const,
             ),
           }) as Promise<ReserveData[]>),
+      client
+        .readContract({ address: SPARK_POOL, abi: POOL_ABI, functionName: "getUserEMode", args: [wallet] })
+        .then(Number)
+        .catch(() => null),
     ]);
+    // The wallet's e-mode category and its figures (SparkLend's Pool answers
+    // the pre-3.2 getter only).
+    const emodeCat =
+      emodeId != null && emodeId > 0
+        ? await client
+            .readContract({
+              address: SPARK_POOL,
+              abi: POOL_ABI,
+              functionName: "getEModeCategoryData",
+              args: [emodeId],
+            })
+            .catch(() => null)
+        : null;
 
     const reserveData = reserves.map((addr, i) => ({ addr, data: reserveStructs[i] }));
 
@@ -179,6 +198,10 @@ export async function loadSparkPositionFromChain(
       // curated catalog, then null.
       const ltBps = Number((data.configuration >> BigInt(16)) & BigInt(0xffff));
       const lt = ltBps > 0 ? ltBps / PRECISION_BPS : (SPARK_LT_BY_ADDR[addr] ?? null);
+      // The reserve's own max LTV (bits 0-15) and e-mode category (bits 168-175).
+      const reserveLtv = Number(data.configuration & BigInt(0xffff)) / PRECISION_BPS;
+      const inEmode =
+        emodeId != null && emodeId > 0 && Number((data.configuration >> BigInt(168)) & BigInt(0xff)) === emodeId;
       // Reserve factor — config bits 64-79 (bps); the protocol's cut of borrow
       // interest. Reserve economics, all read from the same getReserveData.
       const reserveFactor = Number((data.configuration >> BigInt(64)) & BigInt(0xffff)) / PRECISION_BPS;
@@ -203,6 +226,8 @@ export async function loadSparkPositionFromChain(
         isCollateral,
         hasBorrow,
         lt,
+        ltv: reserveLtv,
+        inEmode,
         supplyApr,
         borrowApr,
         reserveFactor,
@@ -232,6 +257,15 @@ export async function loadSparkPositionFromChain(
       debtAssetCount,
       chainStale: false,
       reserves: out,
+      emode:
+        emodeId == null
+          ? null
+          : {
+              id: emodeId,
+              label: emodeCat?.label || null,
+              ltv: emodeCat ? Number(emodeCat.ltv) / PRECISION_BPS : null,
+              lt: emodeCat ? Number(emodeCat.liquidationThreshold) / PRECISION_BPS : null,
+            },
     };
   } catch {
     return stub(wallet.toLowerCase());

@@ -49,6 +49,8 @@ import { fetchSparkGroupedTimeline, type SparkGroupedTimelineResult } from "@/li
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { SparkEventCard } from "@/components/protocol/spark/spark-event-card";
+import { aaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
+import { isGatewayWithdrawal, type SparkTimelineEvent } from "@/lib/spark/liquidation-fee";
 import {
   SparkPositionCard,
   viewFromSummary,
@@ -268,6 +270,20 @@ export default function SparkPositionDetail({
   // below) — a fresh array identity every render would cancel the in-flight
   // fetch whenever anything else (e.g. the chain read) re-rendered the page.
   const sparkEvents = useMemo(() => events.filter(isSparkEvent), [events]);
+  // Each row's same-transaction rows (a liquidation and its fee transfer) and
+  // the previous transaction, for the account read at blocks N−1 and N; a
+  // block holding two of the owner's transactions gets no read (it would mix
+  // them), as on Aave V3 Base.
+  const neighbours = useMemo(() => aaveV3Neighbours(sparkEvents as SparkTimelineEvent[]), [sparkEvents]);
+  const sharedBlocks = useMemo(() => {
+    const txs = new Map<number, Set<string>>();
+    for (const e of sparkEvents) {
+      const set = txs.get(e.blockNumber) ?? new Set<string>();
+      set.add((e.txHash ?? e.id).toLowerCase());
+      txs.set(e.blockNumber, set);
+    }
+    return new Set([...txs].filter(([, set]) => set.size > 1).map(([b]) => b));
+  }, [sparkEvents]);
 
   // The served list as ROWS. `sparkEvents` holds the grouped answer's own
   // events when one is in hand — the read above put them there — so the plan
@@ -287,6 +303,15 @@ export default function SparkPositionDetail({
     () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
     [servedRows],
   );
+  // The last liquidation, loaded or inside a served folder: a liquidated
+  // card's Outcome date.
+  const lastLiquidationAt = useMemo(() => {
+    let at: number | undefined;
+    for (const e of sparkEvents)
+      if (e.context.data.eventType === "liquidation" && (at == null || e.timestamp > at)) at = e.timestamp;
+    for (const f of servedFolders ?? []) if (f.kind === "liquidation" && (at == null || f.lastAt > at)) at = f.lastAt;
+    return at;
+  }, [sparkEvents, servedFolders]);
   /** The oldest member any folder stands for. The tenure eyebrow takes the
    *  EARLIER of its `firstAt` and its own oldest row, so a page whose oldest
    *  row is a FOLDER still dates the position from inside it rather than from
@@ -637,6 +662,7 @@ export default function SparkPositionDetail({
               v={cardView ?? liveView}
               receipts
               viewHref={tl.viewHref}
+              outcomeAt={lastLiquidationAt}
               captions={captions ?? undefined}
               // The risk slot rides the card's heading-button row (the V2 trove
               // treatment): the Display menu plus the chosen risk picture —
@@ -675,7 +701,10 @@ export default function SparkPositionDetail({
           {towerData && (
             <ChainTruthTower
               data={towerData}
-              explanation={sparkEconomicsExplanation(towerData)}
+              explanation={sparkEconomicsExplanation(
+                towerData,
+                sparkEvents.some((e) => isGatewayWithdrawal(e.context.data)),
+              )}
               learnMore={sparkEconomicsContent(towerData)}
               timeline={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : undefined}
             />
@@ -729,6 +758,9 @@ export default function SparkPositionDetail({
                   eventNumber={meta.eventNumber}
                   isFirst={meta.isFirst}
                   isLast={meta.isLast}
+                  market={sharedBlocks.has(event.blockNumber) ? undefined : "spark"}
+                  siblings={neighbours.get(event.id)?.siblings}
+                  previous={neighbours.get(event.id)?.previous}
                 />
               ) : null
             }

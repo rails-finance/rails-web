@@ -47,12 +47,20 @@ export interface AaveV3PositionStateReserve {
   liquidationThresholdBps: number | null;
   /** The reserve belongs to the wallet's eMode category at this block. */
   inEmode: boolean | null;
+  /** The reserve's liquidation bonus (10500 = 5% on top of the debt's value)
+   *  and the protocol's share of that bonus, both in bps, from its
+   *  configuration at the end of block N−1: what a liquidation in this
+   *  transaction paid. Set by the chain-at-block lane only. */
+  liquidationBonusBps?: number | null;
+  liquidationProtocolFeeBps?: number | null;
 }
 
 export interface AaveV3EmodeCategory {
   label: string | null;
   ltvBps: number;
   liquidationThresholdBps: number;
+  /** The category's liquidation bonus (bps, 10100 = 1%), where the read carries it. */
+  liquidationBonusBps?: number | null;
   priceSource: string | null;
   generation: "bitmap" | "legacy";
 }
