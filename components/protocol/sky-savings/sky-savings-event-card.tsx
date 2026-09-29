@@ -243,7 +243,7 @@ export function SkySavingsEventCard({
         : undefined,
     },
     {
-      label: "Interest earned to date",
+      label: "Interest earned since the first event",
       value: withRealMinus(exact(t.earnedAfter)),
       // A first deposit's one wei of rounding reads 0.000 here; T3 states it.
       display: t.earnedAfter < BigInt(0) && t.earnedAfter > BigInt(-1_000_000) ? "0.000" : undefined,

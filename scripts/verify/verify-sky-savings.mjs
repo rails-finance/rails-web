@@ -228,7 +228,38 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
       check(`mixed page: referral ${code} on its row`, got.text.includes(`Referral ${code}`));
 
   // The words (newcomer round 2).
-  check(`${name} page: the check line ends "holding sUSDS"`, /of them holding sUSDS/.test(got.text));
+  // Final pass: the card's check line states the block only; the population
+  // counts are the listing's, at its own block. The header says when figures
+  // are read; a gap in holding shows the days held, computed here from the api.
+  check(
+    `${name} page: the check line names the block and no population count`,
+    /Checked against the contract at block [\d,]+/.test(got.text) && !/addresses that ever held/.test(got.text),
+  );
+  check(
+    `${name} page: figures are read at the newest block when the page loads`,
+    /the newest block when the page loaded/.test(got.text),
+  );
+  check(`${name} page: no "exactly" in the copy`, !/\bexactly\b/.test(got.text));
+  if (positions[name].events.length === pos.data.activity.events) {
+    const ev = positions[name].events;
+    const endTs = pos.data.status === "open" ? Math.floor(Date.now() / 1000) : ev[ev.length - 1].timestamp;
+    let sec = 0;
+    ev.forEach((e, i) => {
+      if (BigInt(e.context.data.sharesAfter) > 0n) sec += (ev[i + 1]?.timestamp ?? endTs) - e.timestamp;
+    });
+    const held = Math.floor(sec / 86400);
+    const span = Math.floor((endTs - ev[0].timestamp) / 86400);
+    const m = got.text.match(/held on ([\d,]+) of ([\d,]+) days/);
+    if (held < span)
+      check(
+        `${name} page: days held ${held} of ${span}`,
+        !!m &&
+          Math.abs(Number(m[1].replace(/,/g, "")) - held) <= 1 &&
+          Math.abs(Number(m[2].replace(/,/g, "")) - span) <= 1,
+        m ? m[0] : "no pill",
+      );
+    else check(`${name} page: no held-days pill without a gap`, !m, m?.[0]);
+  }
   const words = await page.evaluate(() => {
     const bal = document.querySelector('[data-prov-symbol="sUSDS"]')?.parentElement?.innerText ?? "";
     const live = document.querySelector("p[aria-live=polite]")?.innerText ?? "";
@@ -357,6 +388,26 @@ check("rate history lists every change", rows === String(rates.data.ssr.length),
       "This address keeps the interest the shares earned while it held them, and from then on they earn for the recipient.",
     ),
   );
+  check(
+    'mixed page: the interest tile reads "since the first event"',
+    /Interest earned since the first event/.test(text) && !/Interest earned to date/.test(text),
+  );
+  const lm = p2.locator('button[aria-label="Learn more"]');
+  let modal = "";
+  for (let i = 0; i < (await lm.count()); i++) {
+    if (!(await lm.nth(i).isVisible())) continue;
+    await lm.nth(i).click();
+    await p2.waitForTimeout(300);
+    const t = await p2.evaluate(() => document.body.innerText);
+    if (t.includes("How Sky Savings Works")) {
+      modal = t;
+      break;
+    }
+    await p2.keyboard.press("Escape");
+  }
+  for (const t of ["chi", "rho", "ssr", "drip", "Vow", "suck", "wei"])
+    check(`learn more: defines ${t}`, modal.includes(`Term: ${t}`));
+  await p2.keyboard.press("Escape");
   check("mixed page: the inspector arms", await armInspector(p2));
   const boxes = p2.locator("span.prov-locate-box");
   const nb = await boxes.count();

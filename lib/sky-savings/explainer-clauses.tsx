@@ -177,21 +177,24 @@ export function skyEventBullets(c: SkySavingsContext, prev?: SkyPreviousEvent | 
   // 4. The running total, added up.
   const total = <H>{fixed6(t.earnedAfter)} USDS</H>;
   const exactTotal =
-    t.earnedAfter > BigInt(-1_000_000_000_000) &&
-    t.earnedAfter < BigInt(1_000_000_000_000) &&
-    t.earnedAfter !== BigInt(0)
-      ? ` (${t.earnedAfter < BigInt(0) ? "−" : ""}${exact(abs(t.earnedAfter))} exactly)`
-      : "";
+    t.earnedAfter === BigInt(-1)
+      ? " (−1 wei, the vault's rounding)"
+      : t.earnedAfter > BigInt(-1_000_000_000_000) &&
+          t.earnedAfter < BigInt(1_000_000_000_000) &&
+          t.earnedAfter !== BigInt(0)
+        ? ` (${t.earnedAfter < BigInt(0) ? "−" : ""}${exact(abs(t.earnedAfter))} USDS)`
+        : "";
   out.push(
     since != null && prev ? (
       <>
-        Interest earned to date: <H>{fixed6(prev.ctx.earnedAfter)}</H> before, plus <H>{fixed6(since)}</H> since
+        Interest earned since the first event: <H>{fixed6(prev.ctx.earnedAfter)}</H> before, plus <H>{fixed6(since)}</H>{" "}
+        since
         {rounding !== BigInt(0) ? ", with the rounding," : ""} makes {total}
         {exactTotal}. The Savings Rate was <H>{rate}</H> a year.
       </>
     ) : (
       <>
-        Interest earned to date stood at {total}
+        Interest earned since the first event stood at {total}
         {exactTotal}, with the Savings Rate at <H>{rate}</H> a year.
       </>
     ),

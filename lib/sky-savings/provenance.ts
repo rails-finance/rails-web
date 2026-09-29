@@ -134,16 +134,6 @@ export const psmPriceProv = (block: number, usdcPerUsds: string, tout: string | 
   source: { block },
 });
 
-export const gateProv = (block: number, holders: number, supply: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: `The check — at block ${n(block)} the replayed supply matched totalSupply three ways, and balanceOf matched the ledger for ${n(holders)} addresses.`,
-  contract: SUSDS_CONTRACT,
-  via: "Rails verifier · sky_savings_verify_run, every six hours",
-  inputs: [{ label: "totalSupply (raw)", value: supply, kind: "chain" }],
-  source: { block },
-});
-
 // ── one event ───────────────────────────────────────────────────────────────
 
 export interface SkyEventCoords {
@@ -255,7 +245,7 @@ export const eventEarnedProv = (c: SkyEventCoords, which: "before" | "after", ra
   pclass: "indexed",
   summary:
     which === "after"
-      ? "Interest earned to date — the worth after this log, plus the USDS that had left, less the USDS that had come in."
+      ? "Interest earned since the first event — the worth after this log, plus the USDS that had left, less the USDS that had come in."
       : "Interest earned before — the same sum with this log's USDS leg taken back out.",
   contract: SUSDS_CONTRACT,
   formula: "worth + USDS out − USDS in",
