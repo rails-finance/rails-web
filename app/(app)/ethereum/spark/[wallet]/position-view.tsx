@@ -60,6 +60,9 @@ import {
 } from "@/components/protocol/spark/spark-position-explanation";
 import { SparkRiskSlot } from "@/components/protocol/spark/spark-risk-slot";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { sparkFlowSeriesTimeline } from "@/lib/spark/flows-timeline";
+import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import {
   computeSparkEconomics,
   computeSparkCardCaptions,
@@ -540,6 +543,32 @@ export default function SparkPositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
+  // Lifetime flows over time (rails-ops reference/lifetime-flows-scrubber.md):
+  // the date scrubber leads the panel and the ledger sits one click under it.
+  // Its day rows and daily prices come from the index for the whole history,
+  // so a windowed or folder-served page draws it too. A failed read leaves the
+  // ledger alone.
+  const [flowSeries, setFlowSeries] = useState<FlowSeries | null>(null);
+  useEffect(() => {
+    const ctl = new AbortController();
+    setFlowSeries(null);
+    fetchFlowSeries("/api/spark/flows", { wallet }, ctl.signal)
+      .then(setFlowSeries)
+      .catch((err) => {
+        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
+      });
+    return () => ctl.abort();
+  }, [wallet]);
+  const flowTimeline = useMemo(
+    () => (flowSeries ? sparkFlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
+    [flowSeries, towerData, view],
+  );
+  // The card's count counts transactions; its tip gives the events too.
+  const cardView = useMemo(
+    () => (liveView && flowSeries ? { ...liveView, eventTotal: flowSeries.totalEvents } : liveView),
+    [liveView, flowSeries],
+  );
+
   // The top row's price dropdown: the on-chain oracle
   // price of each reserve the account currently holds.
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
@@ -592,7 +621,7 @@ export default function SparkPositionDetail({
         <>
           {liveView && (
             <SparkPositionCard
-              v={liveView}
+              v={cardView ?? liveView}
               receipts
               viewHref={tl.viewHref}
               captions={captions ?? undefined}
@@ -635,6 +664,7 @@ export default function SparkPositionDetail({
               data={towerData}
               explanation={sparkEconomicsExplanation(towerData)}
               learnMore={sparkEconomicsContent()}
+              timeline={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : undefined}
             />
           )}
           <ChainTruthTimeline

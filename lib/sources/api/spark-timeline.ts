@@ -220,12 +220,21 @@ export function sparkRowTokens(r: MvRow): string[] {
  * replay lives in the view; only chain-direct presentation (symbols, signs) here.
  */
 export async function buildSparkTimeline(rows: MvRow[], walletRaw: string): Promise<SparkTimelineResult> {
-  const wallet = walletRaw.toLowerCase();
-
   // One batched ERC20 multicall over every reserve referenced.
   const addrs = new Set<string>();
   for (const r of rows) for (const a of sparkRowTokens(r)) addrs.add(a);
-  const metas = await resolveErc20Meta([...addrs]);
+  return sparkRowsToEvents(rows, walletRaw, await resolveErc20Meta([...addrs]));
+}
+
+/** The transform with the tokens' metadata in hand (keyed by lowercase
+ *  address): what `buildSparkTimeline` runs after its read, and what an
+ *  offline test runs with the index's token names and decimals. */
+export function sparkRowsToEvents(
+  rows: MvRow[],
+  walletRaw: string,
+  metas: Map<string, Erc20Meta>,
+): SparkTimelineResult {
+  const wallet = walletRaw.toLowerCase();
   const fallback = (addr: string): Erc20Meta => ({
     address: addr,
     symbol: `${addr.slice(0, 6)}…${addr.slice(-4)}`,

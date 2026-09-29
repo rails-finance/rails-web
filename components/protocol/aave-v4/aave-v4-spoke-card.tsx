@@ -332,7 +332,13 @@ function AaveV4SpokeCard({
             // and the backend's status column (migration 057, rewritten for
             // this rule; rails-ops TO-DO-ui-jobs.md item 97, Miles 2026-09-28).
             outcome={spoke.wasLiquidated ? "liquidated" : "closed"}
-            identity={<PositionCardMeta eventCount={spoke.txCount} liquidationCount={spoke.liquidationCount} />}
+            identity={
+              <PositionCardMeta
+                eventCount={spoke.txCount}
+                eventTotal={spoke.eventCount}
+                liquidationCount={spoke.liquidationCount}
+              />
+            }
             collateralAssetIcons={
               spoke.supplyingSymbols.length > 0 ? <InlineAssetCluster symbols={spoke.supplyingSymbols} /> : undefined
             }

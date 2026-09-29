@@ -61,6 +61,8 @@ export interface SparkPositionView {
   liquidationCount: number;
   /** Non-liquidation transaction count (activity-meta). */
   txCount: number;
+  /** The position's events, where the page knows them: the count's tip gives both. */
+  eventTotal?: number | null;
   /** Unix seconds of the most recent event (activity-meta). */
   lastActivityAt: number;
   /** On-chain oracle USD (IAaveOracle, chain-derived) per reserve, keyed by
@@ -352,6 +354,7 @@ export function SparkPositionCard({
             <PositionCardMeta
               lastActivityAt={v.lastActivityAt}
               eventCount={v.txCount}
+              eventTotal={v.eventTotal}
               liquidationCount={v.liquidationCount}
             />
           }
@@ -410,6 +413,7 @@ export function SparkPositionCard({
           <PositionCardMeta
             lastActivityAt={v.lastActivityAt}
             eventCount={v.txCount}
+            eventTotal={v.eventTotal}
             liquidationCount={v.liquidationCount}
           />
         }
