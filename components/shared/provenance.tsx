@@ -122,6 +122,14 @@ export function shiftDecimal(raw: string, places: number): string {
   return `${neg ? "-" : ""}${int}${frac ? `.${frac}` : ""}`;
 }
 
+const SUPERSCRIPT_DIGITS = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+
+/** A power of ten in superscript characters ("10¹⁸"), so the exponent
+ *  survives copied text and a screen reader; `<sup>` markup reads "1018". */
+export function powerOfTen(places: number): string {
+  return `10${String(places).replace(/\d/g, (d) => SUPERSCRIPT_DIGITS[Number(d)])}`;
+}
+
 /** Block/tx coords for the spine's left bookend. An event card wraps its body in
  *  a `<ProvSource>` so every `<Prov>` inside inherits the tx it was recorded at;
  *  values read at head (no tx) leave it undefined and the bookend reads "latest
@@ -854,8 +862,8 @@ export function ProvReceipt({
         {info.scaling && /^-?\d+$/.test(info.scaling.raw) && (
           <p className="prov-note prov-scaling">
             {info.scaling.from === "call" ? "The contract returns" : "The log stores"} this as the whole number{" "}
-            {info.scaling.raw}. {info.scaling.why}, so dividing by 10
-            <sup>{info.scaling.places}</sup> gives {shiftDecimal(info.scaling.raw, info.scaling.places)}
+            {info.scaling.raw}. {info.scaling.why}, so dividing by {powerOfTen(info.scaling.places)} gives{" "}
+            {shiftDecimal(info.scaling.raw, info.scaling.places)}
             {info.scaling.unit ?? ""}.
           </p>
         )}

@@ -17,6 +17,12 @@
 //      balancing item reads "Interest earned" at every stop, its last stop
 //      states the header's block, and at 390px consecutive Savings Rate
 //      changes draw as one row that counts them.
+//   D. The receipts (newcomer round 3): the share price's receipt carries
+//      every operand its formula names (chi and rho read at the sealed block,
+//      rpow over them reproduces convertToAssets(1e27) to the wei), no Sky
+//      receipt shows the "Untraced input" caution, a scaling line writes its
+//      power of ten as 10¹⁸, and the Sent and Received explanations say who
+//      keeps the interest earned before the transfer.
 //
 // Run: BASE=http://localhost:3916 node scripts/verify/verify-sky-savings.mjs
 // Needs ALCHEMY_URL, RAILS_API_URL and API_BEARER_TOKEN in .env.local (read,
@@ -28,6 +34,7 @@ import { fileURLToPath } from "node:url";
 import { createPublicClient, http, parseAbi } from "viem";
 import { mainnet } from "viem/chains";
 import { chromium } from "playwright";
+import { armInspector } from "./lib/prov-inspector.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3000";
@@ -59,7 +66,22 @@ const HOLDERS = {
 const abi = parseAbi([
   "function balanceOf(address) view returns (uint256)",
   "function convertToAssets(uint256) view returns (uint256)",
+  "function chi() view returns (uint192)",
+  "function rho() view returns (uint64)",
+  "function ssr() view returns (uint256)",
 ]);
+
+/** SUsds._rpow: x^n at 27 decimals, each step rounded half up. */
+const rpow = (x, n) => {
+  let z = n % 2n === 0n ? RAY : x;
+  const half = RAY / 2n;
+  for (n /= 2n; n > 0n; n /= 2n) {
+    x = (x * x + half) / RAY;
+    if (n % 2n === 1n) z = (z * x + half) / RAY;
+  }
+  return z;
+};
+const RAY = 10n ** 27n;
 const client = createPublicClient({ chain: mainnet, transport: http(env.ALCHEMY_URL) });
 
 let pass = 0;
@@ -87,7 +109,6 @@ const exact = (raw, places = 18) => {
   return (neg ? "-" : "") + out;
 };
 
-const RAY = 10n ** 27n;
 const positions = {};
 for (const [name, holder] of Object.entries(HOLDERS)) {
   const pos = await api(`/position/${holder}`);
@@ -112,6 +133,21 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     check(`${name}: balanceOf at ${block} = shares`, bal.toString() === p.shares.raw, `${bal} vs ${p.shares.raw}`);
     check(`${name}: convertToAssets(shares) = worth`, worth.toString() === p.value.raw, `${worth} vs ${p.value.raw}`);
     check(`${name}: convertToAssets(1e27) = chi`, chi.toString() === pos.asOf.chi, `${chi} vs ${pos.asOf.chi}`);
+    if (name === "mixed") {
+      const [stored, rho, ssr, blk] = await Promise.all([
+        client.readContract({ address: SUSDS, abi, functionName: "chi", blockNumber: block }),
+        client.readContract({ address: SUSDS, abi, functionName: "rho", blockNumber: block }),
+        client.readContract({ address: SUSDS, abi, functionName: "ssr", blockNumber: block }),
+        client.getBlock({ blockNumber: block }),
+      ]);
+      const grown = blk.timestamp > rho ? (rpow(ssr, blk.timestamp - rho) * stored) / RAY : stored;
+      check(
+        "share price receipt: rpow(ssr, t − rho) × chi ÷ 10^27 = convertToAssets(1e27)",
+        grown === chi,
+        `${grown} vs ${chi}`,
+      );
+      check("share price receipt: ssr() is the api's ssr", ssr.toString() === pos.asOf.ssr, `${ssr}`);
+    }
   } catch (e) {
     check(`${name}: chain reads at the sealed block`, false, scrub(e));
   }
@@ -289,6 +325,87 @@ const rows = await page.evaluate(() =>
   document.querySelector("[data-sky-rate-history]")?.getAttribute("data-sky-rate-history"),
 );
 check("rate history lists every change", rows === String(rates.data.ssr.length), `${rows} vs ${rates.data.ssr.length}`);
+
+// ── D. the receipts and the transfer explanations (mixed holder) ──
+{
+  const pos = positions.mixed;
+  const p2 = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await p2.goto(`${BASE}/ethereum/sky-savings/${HOLDERS.mixed}`, { waitUntil: "networkidle", timeout: 120000 });
+  const heads = p2.locator('[role="button"][class*="group/evt"]');
+  const nh = await heads.count();
+  for (let i = 0; i < nh; i++) {
+    await heads.nth(i).scrollIntoViewIfNeeded();
+    await heads.nth(i).click();
+    await p2.waitForTimeout(150);
+  }
+  const explain = p2.locator('button[aria-label="Show explanation"]');
+  for (let i = (await explain.count()) - 1; i >= 0; i--) {
+    await explain.nth(i).scrollIntoViewIfNeeded();
+    await explain.nth(i).click();
+    await p2.waitForTimeout(100);
+  }
+  const text = await p2.evaluate(() => document.body.innerText);
+  check(
+    "mixed page: a Received row says the sender keeps what the shares earned",
+    text.includes(
+      "The sender keeps the interest the shares earned while it held them, and from then on they earn for this address.",
+    ),
+  );
+  check(
+    "mixed page: a Sent row says this address keeps what the shares earned",
+    text.includes(
+      "This address keeps the interest the shares earned while it held them, and from then on they earn for the recipient.",
+    ),
+  );
+  check("mixed page: the inspector arms", await armInspector(p2));
+  const boxes = p2.locator("span.prov-locate-box");
+  const nb = await boxes.count();
+  let opened = 0;
+  const untraced = [];
+  let scaling = null;
+  let share = null;
+  for (let i = 0; i < nb; i++) {
+    const bx = boxes.nth(i);
+    if (!(await bx.isVisible())) continue;
+    await bx.scrollIntoViewIfNeeded();
+    await bx.click();
+    const pop = await p2.waitForSelector(".prov-inspect-pop", { timeout: 5000 }).catch(() => null);
+    if (!pop) continue;
+    const t = await pop.innerText();
+    opened++;
+    if (/Untraced input/.test(t)) untraced.push(t.split("\n")[0]);
+    if (!scaling && /dividing by/.test(t)) scaling = t.match(/dividing by (\S+)/)[1];
+    if (!share && /^Share price\n1 sUSDS = /.test(t)) share = t;
+    await p2.keyboard.press("Escape");
+    await p2.waitForTimeout(80);
+  }
+  check(
+    `mixed page: no receipt shows "Untraced input" (${opened} opened)`,
+    opened > 50 && untraced.length === 0,
+    [...new Set(untraced)].join("; "),
+  );
+  check("mixed page: the scaling line reads 10¹⁸", scaling === "10¹⁸", `${scaling}`);
+  const blockN = BigInt(pos.asOf.block);
+  const [stored, rho] = await Promise.all([
+    client.readContract({ address: SUSDS, abi, functionName: "chi", blockNumber: blockN }),
+    client.readContract({ address: SUSDS, abi, functionName: "rho", blockNumber: blockN }),
+  ]).catch(() => [null, null]);
+  const pageBlock = share?.match(/at block ([\d,]+)/)?.[1]?.replace(/,/g, "");
+  // The page may seal a later block than the api read above; compare at the page's block.
+  const [pStored, pRho] =
+    pageBlock && pageBlock !== String(pos.asOf.block)
+      ? await Promise.all([
+          client.readContract({ address: SUSDS, abi, functionName: "chi", blockNumber: BigInt(pageBlock) }),
+          client.readContract({ address: SUSDS, abi, functionName: "rho", blockNumber: BigInt(pageBlock) }),
+        ])
+      : [stored, rho];
+  check(
+    "share price receipt: names chi at the last Drip and rho as read at its block",
+    !!share && share.includes(String(pStored)) && share.includes(String(pRho)) && /rpow/.test(share),
+    share ? share.replace(/\s+/g, " ").slice(0, 200) : "no receipt",
+  );
+  await p2.close();
+}
 
 await browser.close();
 console.log(`\n${pass} passed, ${fail} failed`);

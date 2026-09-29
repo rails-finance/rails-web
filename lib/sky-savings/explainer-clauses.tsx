@@ -156,9 +156,9 @@ export function skyEventBullets(c: SkySavingsContext, prev?: SkyPreviousEvent | 
       : c.eventType === "withdrawal"
         ? "The withdrawal paid out what the shares were worth at this block, and that payout counts as money that left, so it moved no interest."
         : c.eventType === "received"
-          ? "The shares count as money that came in at their worth on arrival, so the transfer moved no interest. What they earned before it stays with the sender."
+          ? "The shares count as money that came in at their worth on arrival, so the transfer moved no interest. The sender keeps the interest the shares earned while it held them, and from then on they earn for this address."
           : c.eventType === "sent"
-            ? "The shares count as money that left at their worth at this block, so the transfer moved no interest. What they earned while this address held them stays counted here."
+            ? "The shares count as money that left at their worth at this block, so the transfer moved no interest. This address keeps the interest the shares earned while it held them, and from then on they earn for the recipient."
             : null;
   if (still || rounding !== BigInt(0))
     out.push(

@@ -106,7 +106,14 @@ export function SkySavingsEventCard({
     kind,
     (t.sharesDelta < BigInt(0) ? -t.sharesDelta : t.sharesDelta).toString(),
   );
-  const usdsProv = eventUsdsProv(coords, kind, c.usds, c.usdsSource, c.chi);
+  const usdsProv = eventUsdsProv(
+    coords,
+    kind,
+    c.usds,
+    c.usdsSource,
+    c.chi,
+    (t.sharesDelta < BigInt(0) ? -t.sharesDelta : t.sharesDelta).toString(),
+  );
   const rateText = pct(annualRate(c.ssr));
   const isTransfer = kind === "received" || kind === "sent";
 
@@ -222,16 +229,16 @@ export function SkySavingsEventCard({
       value: exact(t.valueAfter),
       symbol: USDS.symbol,
       address: USDS.address,
-      prov: eventValueProv(coords, "after", c.valueAfter, c.chi),
+      prov: eventValueProv(coords, "after", c.valueAfter, c.sharesAfter, c.chi),
       changed: sharesChanged,
       transition: sharesChanged
         ? {
             before: formatCompact(units(t.valueBefore)),
             beforeExact: exact(t.valueBefore),
-            beforeProv: eventValueProv(coords, "before", t.valueBefore.toString(), c.chi),
+            beforeProv: eventValueProv(coords, "before", t.valueBefore.toString(), t.sharesBefore.toString(), c.chi),
             change: signedCompact(t.valueAfter - t.valueBefore),
             changeExact: signedExact(t.valueAfter - t.valueBefore),
-            changeProv: eventValueProv(coords, "after", c.valueAfter, c.chi),
+            changeProv: eventValueProv(coords, "after", c.valueAfter, c.sharesAfter, c.chi),
           }
         : undefined,
     },

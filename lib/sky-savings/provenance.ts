@@ -7,6 +7,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import type { SkySavingsEventType } from "@/lib/shared/types/event-shape";
 import { explorerUrl } from "@/lib/shared/chains";
 import { LITE_PSM, SKY_CHAIN_ID, SUSDS, USDS_PSM_WRAPPER } from "@/lib/sky-savings/constants";
+import type { SkyAsOf } from "@/lib/sky-savings/types";
 
 const SUSDS_CONTRACT = { name: "sUSDS (Savings USDS)", address: SUSDS.address };
 const LEDGER = "Rails index · sky-savings ledger, sealed at the page's block";
@@ -38,24 +39,36 @@ export const sharesHeldProv = (holder: string, block: number, raw: string): Prov
   verify: holdingsLink(holder),
 });
 
-export const valueProv = (block: number, raw: string, chi: string | null): Provenance => ({
+export const valueProv = (block: number, raw: string, shares: string, chi: string | null): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
   summary: `Worth in USDS — the sUSDS held times the share price at block ${n(block)}, rounded down as the contract's convertToAssets rounds.`,
   contract: SUSDS_CONTRACT,
   formula: "shares × chi ÷ 10^27",
-  inputs: chi ? [{ label: "chi (USDS per sUSDS, 27 decimals)", value: chi, kind: "chain-derived" }] : undefined,
+  inputs: chi
+    ? [
+        { label: "shares held (sUSDS, 18 decimals)", value: shares, kind: "chain-derived" },
+        { label: "chi (USDS per sUSDS, 27 decimals)", value: chi, kind: "chain-derived" },
+      ]
+    : undefined,
   source: { block },
   scaling: scaling18(raw),
 });
 
-export const earnedProv = (block: number, raw: string, inRaw: string, outRaw: string): Provenance => ({
+export const earnedProv = (
+  block: number,
+  raw: string,
+  worthRaw: string,
+  inRaw: string,
+  outRaw: string,
+): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
   summary: `Interest earned — what the position is worth at block ${n(block)}, plus every USDS amount that left it, less every USDS amount that came in. Shares received by transfer count at their value on arrival.`,
   contract: SUSDS_CONTRACT,
-  formula: "value + USDS out − USDS in",
+  formula: "worth + USDS out − USDS in",
   inputs: [
+    { label: "worth (USDS, 18 decimals)", value: worthRaw, kind: "chain-derived" },
     { label: "USDS in (deposits, and transfers in at the share price then)", value: inRaw, kind: "chain-derived" },
     {
       label: "USDS out (withdrawals, and transfers out at the share price then)",
@@ -67,15 +80,35 @@ export const earnedProv = (block: number, raw: string, inRaw: string, outRaw: st
   scaling: scaling18(raw),
 });
 
-export const chiProv = (block: number, chi: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: `Share price — the USDS one sUSDS redeems for at block ${n(block)}: the last Drip's chi grown at the Savings Rate to that block, with the contract's rounding.`,
-  contract: SUSDS_CONTRACT,
-  formula: "rpow(ssr, t − rho) × chi ÷ 10^27",
-  inputs: [{ label: "chi (27 decimals)", value: chi, kind: "chain-derived" }],
-  source: { block },
-});
+const utc = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 19).replace("T", " ") + " UTC";
+
+/** The share price at the sealed block. With the drip state read there, the
+ *  receipt carries every operand of the contract's convertToAssets. */
+export const chiProv = (asOf: SkyAsOf): Provenance => {
+  const { block, drip, timestamp } = asOf;
+  const traced = drip != null && timestamp != null;
+  return {
+    kind: "chain-derived",
+    pclass: "indexed",
+    summary: `Share price — the USDS one sUSDS redeems for at block ${n(block)}: the last Drip's chi grown at the Savings Rate to that block, with the contract's rounding.`,
+    contract: SUSDS_CONTRACT,
+    formula: traced ? "rpow(ssr, t − rho) × chi ÷ 10^27" : undefined,
+    inputs: traced
+      ? [
+          { label: "chi at the last Drip (27 decimals)", value: drip.chi, kind: "chain" },
+          { label: "ssr (per second, 27 decimals)", value: asOf.ssr, kind: "chain" },
+          { label: "rho, the time of the last Drip", value: String(drip.rho), note: utc(drip.rho), kind: "chain" },
+          { label: "t, this block's time", value: String(timestamp), note: utc(timestamp), kind: "chain" },
+          {
+            label: "rpow",
+            note: `ssr to the power t − rho (${n(timestamp - drip.rho)} seconds), at 27 decimals, rounded half up`,
+            kind: "chain-derived",
+          },
+        ]
+      : undefined,
+    source: { block },
+  };
+};
 
 export const rateProv = (block: number, ssr: string, annual: string): Provenance => ({
   kind: "chain",
@@ -87,14 +120,17 @@ export const rateProv = (block: number, ssr: string, annual: string): Provenance
   source: { block },
 });
 
-export const psmPriceProv = (block: number, usdcPerUsds: string): Provenance => ({
+export const psmPriceProv = (block: number, usdcPerUsds: string, tout: string | null): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   summary: `USDS in USDC — the PSM exit rate at block ${n(block)}: 1 USDS buys 1 ÷ (1 + tout) USDC. The LitePSM's fee logs set tout, and it has been 0 since the PSM was deployed.`,
   contract: { name: "LitePSM MCD_LITE_PSM_USDC_A", address: LITE_PSM },
   via: `UsdsPsmWrapper ${USDS_PSM_WRAPPER} → LitePSM File('tout') logs`,
-  formula: "1 ÷ (1 + tout)",
-  inputs: [{ label: "USDC per USDS", value: usdcPerUsds, kind: "chain" }],
+  formula: tout != null ? "1 ÷ (1 + tout)" : undefined,
+  inputs: [
+    ...(tout != null ? [{ label: "tout (the exit fee, 18 decimals)", value: tout, kind: "chain" as const }] : []),
+    { label: "USDC per USDS", value: usdcPerUsds, kind: "chain" },
+  ],
   source: { block },
 });
 
@@ -142,6 +178,7 @@ export const eventUsdsProv = (
   raw: string,
   source: "log" | "chi",
   chi: string,
+  shares: string,
 ): Provenance =>
   source === "log"
     ? {
@@ -161,7 +198,10 @@ export const eventUsdsProv = (
         summary: `Value in USDS — the shares this transfer moved at the share price of its block, rounded down as convertToAssets rounds.`,
         contract: SUSDS_CONTRACT,
         formula: "shares × chi ÷ 10^27",
-        inputs: [{ label: "chi at this block (27 decimals)", value: chi, kind: "chain-derived" }],
+        inputs: [
+          { label: "shares moved (sUSDS, 18 decimals)", value: shares, kind: "chain" },
+          { label: "chi at this block (27 decimals)", value: chi, kind: "chain-derived" },
+        ],
         source: src(c),
         scaling: scaling18(raw),
       };
@@ -187,7 +227,13 @@ export const eventSharesBeforeProv = (c: SkyEventCoords, raw: string): Provenanc
   scaling: scaling18(raw),
 });
 
-export const eventValueProv = (c: SkyEventCoords, which: "before" | "after", raw: string, chi: string): Provenance => ({
+export const eventValueProv = (
+  c: SkyEventCoords,
+  which: "before" | "after",
+  raw: string,
+  shares: string,
+  chi: string,
+): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
   summary:
@@ -196,7 +242,10 @@ export const eventValueProv = (c: SkyEventCoords, which: "before" | "after", raw
       : "Worth before — the sUSDS held before this log times the share price of its block.",
   contract: SUSDS_CONTRACT,
   formula: "shares × chi ÷ 10^27",
-  inputs: [{ label: "chi at this block (27 decimals)", value: chi, kind: "chain-derived" }],
+  inputs: [
+    { label: `shares held ${which} (sUSDS, 18 decimals)`, value: shares, kind: "chain-derived" },
+    { label: "chi at this block (27 decimals)", value: chi, kind: "chain-derived" },
+  ],
   source: src(c),
   scaling: scaling18(raw),
 });
@@ -209,7 +258,7 @@ export const eventEarnedProv = (c: SkyEventCoords, which: "before" | "after", ra
       ? "Interest earned to date — the worth after this log, plus the USDS that had left, less the USDS that had come in."
       : "Interest earned before — the same sum with this log's USDS leg taken back out.",
   contract: SUSDS_CONTRACT,
-  formula: "value + USDS out − USDS in",
+  formula: "worth + USDS out − USDS in",
   source: src(c),
   scaling: scaling18(raw),
 });
@@ -300,7 +349,7 @@ export const eventInterestSinceProv = (
   pclass: "indexed",
   summary: `Interest since the previous event — the sUSDS held since block ${n(prevBlock)} at this block's share price, less their worth just after that event. No log moved it: it is the share price's growth on a balance that stood still.`,
   contract: SUSDS_CONTRACT,
-  formula: "worth just before this event − worth just after the previous one",
+  formula: "worth just before this event − worth just after the previous event",
   inputs: [
     { label: "Worth after the previous event (raw)", value: prevValueAfter, kind: "chain-derived" },
     { label: "Worth just before this event (raw)", value: valueBefore, kind: "chain-derived" },
@@ -309,12 +358,15 @@ export const eventInterestSinceProv = (
   scaling: scaling18(raw),
 });
 
-export const yearlyProv = (block: number, valueRaw: string, annual: string): Provenance => ({
+export const yearlyProv = (block: number, valueRaw: string, ssr: string, annual: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
   summary: `A year's interest at today's rate — the worth at block ${n(block)} times the Savings Rate in force there (${annual} a year, already compounded). Governance can change the rate at any block.`,
   contract: SUSDS_CONTRACT,
   formula: "worth × (ssr ^ 31,536,000 − 1)",
-  inputs: [{ label: "Worth in USDS (raw)", value: valueRaw, kind: "chain-derived" }],
+  inputs: [
+    { label: "Worth in USDS (raw)", value: valueRaw, kind: "chain-derived" },
+    { label: "ssr (per second, 27 decimals)", value: ssr, kind: "chain" },
+  ],
   source: { block },
 });

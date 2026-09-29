@@ -18,6 +18,15 @@ export interface SkyAsOf {
   ssr: string;
   /** The ssr annualised, as a decimal string ("0.036000"). */
   ssrAnnual: string;
+  /** The stored chi and rho at the block. Not on the wire: the page reads them
+   *  from the contract (lib/sources/chain/sky-savings-drip.ts). */
+  drip?: SkyDrip | null;
+}
+
+/** sUSDS `chi()` (ray) and `rho()` (unix seconds of the last drip). */
+export interface SkyDrip {
+  chi: string;
+  rho: number;
 }
 
 /** The latest verifier run. A surface states no figure unless `ok` is true. */

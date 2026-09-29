@@ -20,6 +20,7 @@ import { positionMetadata } from "@/lib/shared/page-metadata";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { resolveEnsAddress } from "@/lib/ens/resolve-ens";
 import { readSkyFlowsDaily, readSkyPosition, readSkyRates, readSkyTimeline } from "@/lib/sources/api/sky-savings";
+import { withSkyDrip } from "@/lib/sources/chain/sky-savings-drip";
 import { skyPositionHref } from "@/lib/sky-savings/constants";
 import { skyDaysFromEvents } from "@/lib/sky-savings/flows";
 import { gateRefusal } from "@/lib/sky-savings/types";
@@ -43,10 +44,11 @@ const load = cache(async (holder: string) => {
   const readerIp = await readerIpFromHeaders();
   const position = await readSkyPosition(holder, readerIp);
   if (!position) return null;
-  const [timeline, days, rates] = await Promise.all([
+  const [timeline, days, rates, asOf] = await Promise.all([
     readSkyTimeline(holder, { limit: TIMELINE_ROWS }, readerIp),
     readSkyFlowsDaily(holder, readerIp),
     readSkyRates(readerIp).catch(() => null),
+    withSkyDrip(position.asOf),
   ]);
   // A history longer than the drawn window: the first event's time, for the
   // timeline header's tenure, from one oldest-first row.
@@ -54,7 +56,7 @@ const load = cache(async (holder: string) => {
     timeline.total > timeline.events.length && position.data.activity.firstTimestamp == null
       ? await readSkyTimeline(holder, { limit: 1, order: "asc" }, readerIp).catch(() => null)
       : null;
-  return { position, timeline, days, rates, firstAt: first?.events[0]?.timestamp ?? null };
+  return { position, timeline, days, rates, asOf, firstAt: first?.events[0]?.timestamp ?? null };
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -90,7 +92,7 @@ export default async function SkySavingsPositionPage({ params }: Props) {
     <SkySavingsPositionView
       key={holder}
       position={data.position.data}
-      asOf={data.position.asOf}
+      asOf={data.asOf}
       gate={data.position.gate!}
       events={data.timeline.events}
       totalEvents={data.timeline.total}

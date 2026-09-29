@@ -106,6 +106,14 @@ export function usdcPerUsdsAt(
   return Number.isFinite(n) ? n : null;
 }
 
+/** The LitePSM's `tout` (wad) in force at a block, or null before the first
+ *  entry. */
+export function toutAt(series: { fromBlock: number; tout: string }[] | undefined, block: number): string | null {
+  let v: string | null = null;
+  for (const s of series ?? []) if (s.fromBlock <= block) v = s.tout;
+  return v;
+}
+
 /** What the balance earns in a year at the rate in force: its worth times the
  *  yearly rate (the rate is already compounded over the year). */
 export function skyYearlyEarnings(p: SkyPosition, asOf: SkyAsOf): number | null {

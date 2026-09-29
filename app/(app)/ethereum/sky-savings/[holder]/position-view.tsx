@@ -26,7 +26,7 @@ import { isSkySavingsEvent, type BaseActivityEvent } from "@/lib/shared/types/ev
 import { vaultTermsNotes, type MarketNote } from "@/lib/shared/market-note";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { SKY_CHAIN_ID, SUSDS, USDS } from "@/lib/sky-savings/constants";
-import { pctString, rayNumber, usdcPerUsdsAt } from "@/lib/sky-savings/math";
+import { pctString, rayNumber, toutAt, usdcPerUsdsAt } from "@/lib/sky-savings/math";
 import { skyFlowTimeline, skyLifetimeTotals, skyTowerData } from "@/lib/sky-savings/flows";
 import { skyFlowsExplanation } from "@/lib/sky-savings/flows-explanation";
 import { skyFlowsContent } from "@/lib/sky-savings/learn-more";
@@ -154,7 +154,7 @@ export default function SkySavingsPositionView({
       unit: USDS.symbol,
       label: "One sUSDS in USDS, the share price at the page's block",
       tip: `The sUSDS share price: what one sUSDS redeems for in USDS at block ${asOf.block.toLocaleString("en-US")}.`,
-      info: asOf.chi ? chiProv(asOf.block, asOf.chi) : undefined,
+      info: asOf.chi ? chiProv(asOf) : undefined,
     },
     ...(usdc != null
       ? [
@@ -164,7 +164,7 @@ export default function SkySavingsPositionView({
             price: usdc,
             unit: "USDC",
             label: "One USDS in USDC, the PSM exit rate",
-            info: psmPriceProv(asOf.block, usdc.toFixed(6)),
+            info: psmPriceProv(asOf.block, usdc.toFixed(6), toutAt(rates?.psm.series, asOf.block)),
           },
         ]
       : []),
