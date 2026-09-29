@@ -225,9 +225,9 @@ export function FxPositionExplanation({
           {px ? (
             <>
               {" "}
-              The pool judges its lines at the oracle&rsquo;s min price, {formatUsd(px.min)} at the same block, where
-              the ratio is {((debts / (colls * px.min)) * 100).toFixed(1)}%. The ratios on the timeline rows are read at
-              the anchor price, so a rebalanced row can show a little under the rebalance line.
+              The pool judges its lines at the oracle&rsquo;s min price, {formatUsd(px.min)}, where the ratio is{" "}
+              {((debts / (colls * px.min)) * 100).toFixed(1)}%. The ratios on the timeline rows are read at the anchor
+              price, so a rebalanced row can show a little under the rebalance line.
             </>
           ) : null}
         </span>,
@@ -383,10 +383,10 @@ export function FxPositionExplanation({
             so the lead names its own denominator (the dolomite shape). */}
         {operatorLead(ext, null, "recorded on this position")}
         {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed by an address other than
-        the owner&rsquo;s. Anyone may add collateral to a position or repay its debt without asking. Withdrawing or
-        borrowing needs the manager&rsquo;s caller to hold the NFT at that moment: a contract the holder has approved,
-        such as f(x)&rsquo;s router or its limit-order manager, can take the NFT for one transaction and return it, and
-        each such row names who did.
+        the owner&rsquo;s. Another address may add collateral to any position or repay its debt without asking. To
+        withdraw or borrow, the manager&rsquo;s caller must hold the NFT at that moment: a contract the holder has
+        approved, such as f(x)&rsquo;s router or its limit-order manager, can take the NFT for one transaction and
+        return it, and each such row names who did.
         {ext.actors.length === 1
           ? leadName
             ? ` All of it ran through ${leadName}.`

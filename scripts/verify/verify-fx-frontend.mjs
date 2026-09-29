@@ -8,7 +8,12 @@
 //                21,763,643) in a block where two transactions share log
 //                indexes; per-hit figures read back from chain on 2026-09-29.
 //   wsteth-137 — closed 18 Jan 2025, funded again 20 Jan, liquidated 3 Feb.
-//   wbtc-484   — a 279,215.683 fxUSD debt cut by seven pool-wide rebalances.
+//   wbtc-484   — a 279,215.683 fxUSD debt cut by seven pool-wide rebalances;
+//                a borrow on 6 Feb 2026 filled from a limit order the holder
+//                signed (tx 0x901105d7…, sent by 0xaf13…dc06).
+//   wsteth-154 — its last 287.88 fxUSD written off by a pool-wide Liquidate on
+//                19 Mar 2025 (block 22,081,083; mig 369 on the server).
+//   wsteth-177 — redemptions in March 2025 took 17,745.93 fxUSD of its debt.
 
 import { chromium } from "playwright";
 
@@ -166,7 +171,7 @@ check(
   "249: the card names the lines and the trigger price",
   new RegExp(
     `rebalancing from ${Math.round(terms.rebalanceRatio * 100)}%, liquidation from ${Math.round(terms.liquidateRatio * 100)}%`,
-  ).test(p249.text) && /reaches 88% if the anchor price falls to \$[\d,]+ \(−\d+\.\d%\)/.test(p249.text),
+  ).test(p249.text) && /88% if the min price falls to \$[\d,]+ \(−\d+\.\d%\), 95% at \$[\d,]+ \(−\d+\.\d%\)/.test(p249.text),
 );
 check(
   "249: the USD figure and the ratio name their prices",
@@ -184,6 +189,82 @@ check(
   /1\.467 wstETH deposited is 1\.748 stETH at this block’s rate of 1\.1920/.test(p249.text),
 );
 check("249: a 2026 deposit states the router's 0.3% fee", /0\.3% of the deposit \(0\.001 wstETH\)/.test(p249.text));
+
+// ── round 2: one price on the card, the position's own figures first ────────
+const p484 = await openAndRead("/ethereum/fx/wbtc-484");
+check("484: no page errors", p484.errors.length === 0, p484.errors.slice(0, 2).join(" | "));
+{
+  const m = p484.text.match(/([\d.]+) WBTC\n\$([\d,]+) at the anchor price/);
+  const a = p484.text.match(/at the anchor price \$([\d,]+) per WBTC · settled @/);
+  const usd = m ? Number(m[2].replace(/,/g, "")) : NaN;
+  const anchor = a ? Number(a[1].replace(/,/g, "")) : NaN;
+  check(
+    "484: the collateral's USD is at the settled block's anchor price, the ratio's price",
+    m != null && a != null && near(usd / anchor, Number(m[1]), 0.001),
+    `${m?.[2]} ÷ ${a?.[1]} vs ${m?.[1]}`,
+  );
+}
+check(
+  "484: the min price is named where the lines are judged",
+  /[\d.]+% at the min price \$[\d,]+, the price the pool's lines are judged at/.test(p484.text),
+);
+check(
+  "484: the rebalance and liquidation prices with their falls",
+  /88% if the min price falls to \$[\d,]+ \(−\d+\.\d%\), 95% at \$[\d,]+ \(−\d+\.\d%\)/.test(p484.text),
+);
+check(
+  "484: funding apart from the rebalances",
+  /rebalances took 3\.545 WBTC and funding took 0\.2\d+ WBTC/.test(p484.text),
+);
+check("484: yearly funding in the card's explanation", /takes about [\d.]+ WBTC a year from this collateral/.test(p484.text));
+check(
+  "484: the run header states this position's total",
+  /7 pool-wide rebalances\nThis position lost\n3\.54\d*\nDebt repaid\n279K/.test(p484.text),
+);
+check(
+  "484: the 6 Feb borrow names the limit order and who held the NFT",
+  /0xaf13…dc06 sent this transaction to fill a limit order the holder \(0x860e…e5c5\) had signed/.test(p484.text),
+);
+check(
+  "484: a router row names its schedule and the default",
+  /0x3363…c708\), on the schedule the pool sets for that caller: 0\.3% of the deposit/.test(p484.text) &&
+    /The pool’s default at this block charges 0\.8% of a borrow and 0\.2% of a repayment/.test(p484.text),
+);
+check(
+  "484: the owner's own repay is on the default schedule",
+  /the owner's address \(0x860e…e5c5\), which sent the transaction, on the pool's default schedule: 0\.2% of the repayment/.test(
+    p484.text,
+  ),
+);
+check(
+  "484: a rebalance row states the min-price judgement",
+  /The pool judged the tick at the oracle’s min price, \$79,675 at the block before/.test(p484.text),
+);
+
+// ── Y10: the pool-wide Liquidate names twelve positions ─────────────────────
+{
+  const named = [154, 308, 302, 215, 116, 294, 159, 143, 174, 169, 209, 136];
+  const got = [];
+  for (const id of named) {
+    const tl = await json(`/api/fx/position/wsteth/${id}/timeline`);
+    const rows = tl.events.filter((e) => e.context.data.eventType === "liquidation" && e.context.data.poolWide);
+    if (rows.length === 1 && rows[0].context.data.emptiesPosition) got.push(id);
+  }
+  check("the pool-wide Liquidate is a row on its twelve positions", got.length === 12, got.join(","));
+}
+const p154 = await openAndRead("/ethereum/fx/wsteth-154");
+check("154: no page errors", p154.errors.length === 0, p154.errors.slice(0, 2).join(" | "));
+check(
+  "154: the 19 Mar 2025 pool-wide liquidation wrote off 287.882 fxUSD",
+  /Pool-wide liquidation · liquidated this position's tick/.test(p154.text) &&
+    /debt went from 287\.882 to 0 fxUSD/.test(p154.text),
+);
+check("154: counted among its liquidations", /Liquidated 4 times/.test(p154.text));
+{
+  const tl = await json("/api/fx/position/wsteth/177/timeline");
+  const red = tl.events.filter((e) => e.context.data.redemption);
+  check("177: the March 2025 redemptions are rows", red.length === 3, `${red.length}`);
+}
 
 const p137 = await openAndRead("/ethereum/fx/wsteth-137");
 check("137: no page errors", p137.errors.length === 0, p137.errors.slice(0, 2).join(" | "));
