@@ -60,6 +60,9 @@ export function collSurplusClaimEvent(args: {
     creditTx,
     creditKind: args.creditKind,
     creditAt: args.creditAt,
+    price: c.priceRaw ? Number(shiftDecimal(c.priceRaw, 36 - decimals)) : null,
+    priceRaw: c.priceRaw ?? null,
+    priceFeed: c.priceFeed ?? null,
   };
   return {
     id: `${c.txHash}_${c.logIndex ?? 0}`,

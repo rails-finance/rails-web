@@ -2997,6 +2997,13 @@ export interface CollSurplusClaimContext {
   creditTx: string;
   creditKind: "liquidation" | "redemption";
   creditAt: number | null;
+  /** The branch PriceFeed's lastGoodPrice at the claim's block, USD per whole
+   *  token, with its integer (scaled 1e(36 − decimals)) and the feed. Null on
+   *  Liquity V1, whose card reads its price from the event route, and when
+   *  the read failed. */
+  price?: number | null;
+  priceRaw?: string | null;
+  priceFeed?: string | null;
 }
 
 // ───────────────────────── The unified event ─────────────────────────

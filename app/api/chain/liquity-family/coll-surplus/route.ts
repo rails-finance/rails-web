@@ -12,12 +12,14 @@ import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chai
 // liquity-coll-surplus.ts). `?protocol=` names the explorer, `?branch=` the
 // collateral branch (V1 has one, so any value stands), `?owner=` the Trove's
 // last owner and `?tx=` the transaction that credited the surplus: a
-// liquidation, or on V1 also a full redemption. Node runtime, no edge caching.
+// liquidation, or on V1 also a full redemption. A V2-family branch names its
+// PriceFeed, so a claim carries the price at its block (V1's claim row reads
+// its price from the event route). Node runtime, no edge caching.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type BranchLookup = (branch: string) => { troveManager: string; decimals: number } | undefined;
+type BranchLookup = (branch: string) => { troveManager: string; decimals: number; priceFeed?: string } | undefined;
 
 const PROTOCOLS: Record<string, { chainId: ChainId; branch: BranchLookup }> = {
   "liquity-v2": { chainId: MAINNET_CHAIN_ID, branch: (b) => LIQUITY_V2_BRANCHES[b.toLowerCase()] },
@@ -52,6 +54,7 @@ export async function GET(request: NextRequest) {
       owner,
       liquidationTx: tx,
       decimals: branch.decimals,
+      priceFeed: branch.priceFeed,
     });
     return NextResponse.json(data);
   } catch (error) {

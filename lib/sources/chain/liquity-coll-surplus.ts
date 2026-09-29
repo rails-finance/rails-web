@@ -36,6 +36,8 @@ import { parseAbi, type Hex, type PublicClient } from "viem";
 import { chainClient, chainLogsClient } from "./rpc";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
 
+const PRICE_ABI = parseAbi(["function lastGoodPrice() view returns (uint256)"]);
+
 const POOL_ABI = parseAbi([
   "event CollBalanceUpdated(address indexed _account, uint256 _newBalance)",
   "function getCollateral(address _account) view returns (uint256)",
@@ -57,6 +59,11 @@ export interface CollSurplusClaim {
    *  it recorded (integer string). Above `surplusRaw` when the same claim
    *  also paid out other Troves' surplus. Null when no log dated the claim. */
   paidRaw?: string | null;
+  /** The branch PriceFeed's lastGoodPrice at the end of the claim's block
+   *  (integer string, scaled 1e(36 − collateral decimals)), and the feed read.
+   *  Absent when the caller named no feed or the read failed. */
+  priceRaw?: string | null;
+  priceFeed?: string | null;
 }
 
 export interface CollSurplusRead {
@@ -82,8 +89,11 @@ export async function readTroveCollSurplus(args: {
   owner: string;
   liquidationTx: string;
   decimals: number;
+  /** The branch's PriceFeed: when named, the claim carries its lastGoodPrice
+   *  at the claim's block. */
+  priceFeed?: string;
 }): Promise<CollSurplusRead> {
-  const { chainId, troveManager, owner, liquidationTx, decimals } = args;
+  const { chainId, troveManager, owner, liquidationTx, decimals, priceFeed } = args;
   const client = chainClient(chainId);
   const head = await client.getBlockNumber();
   const ownerTopic = pad(owner);
@@ -146,13 +156,31 @@ export async function readTroveCollSurplus(args: {
       // The balance the log before recorded is what the claim paid; the credit
       // log itself is in range, so there is always one.
       const prev = zi > 0 ? own[zi - 1].args._newBalance : null;
-      const b = await client.getBlock({ blockNumber: zeroing.blockNumber! });
+      const [b, priceRaw] = await Promise.all([
+        client.getBlock({ blockNumber: zeroing.blockNumber! }),
+        priceFeed
+          ? client
+              .readContract({
+                address: priceFeed as Hex,
+                abi: PRICE_ABI,
+                functionName: "lastGoodPrice",
+                blockNumber: zeroing.blockNumber!,
+              })
+              .catch(() => null)
+          : Promise.resolve(null),
+      ]);
       claimed = {
         block: Number(zeroing.blockNumber),
         txHash: zeroing.transactionHash!,
         timestamp: Number(b.timestamp),
         logIndex: zeroing.logIndex ?? null,
         paidRaw: prev != null ? prev.toString() : null,
+        ...(priceFeed
+          ? {
+              priceRaw: priceRaw != null && priceRaw > BigInt(0) ? priceRaw.toString() : null,
+              priceFeed: priceFeed.toLowerCase(),
+            }
+          : {}),
       };
     }
   } else if (balance < surplus) claimed = { block: null, txHash: null, timestamp: null };

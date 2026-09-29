@@ -25,13 +25,19 @@ import { LearnMore } from "@/components/shared/learn-more-modal";
 import { Prov } from "@/components/shared/provenance";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { formatDate } from "@/lib/date";
-import { formatExact } from "@/lib/utils/format";
+import { formatExact, formatUnitsExact } from "@/lib/utils/format";
 import { formatNum } from "@/lib/shared/format-event";
 import type { BaseActivityEvent, CollSurplusClaimContext } from "@/lib/shared/types/event-shape";
 import type { LiquityForkLearnMoreParams } from "@/lib/shared/learn-more-content";
 import { liquityCollSurplusClaimContent } from "@/lib/shared/learn-more-content";
 import { claimOthers } from "@/lib/shared/liquity-coll-surplus-claim";
-import { claimAmountProv, claimOthersProv, claimPaidProv } from "@/lib/shared/liquity-coll-surplus-provenance";
+import {
+  claimAmountProv,
+  claimOthersProv,
+  claimPaidProv,
+  claimPaidUsdAtBlockProv,
+  claimPriceProv,
+} from "@/lib/shared/liquity-coll-surplus-provenance";
 import { StatCard, StatSubline, StateTransition } from "@/components/shared/state-transition";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { useLiquityV1EventReadState } from "@/lib/liquity-v1/use-event-read";
@@ -71,11 +77,21 @@ export function CollSurplusClaimCard({
   const v1 = d.family === "liquity-v1";
   const pool = v1 ? `${d.protocolName}'s surplus pool` : `the ${d.symbol} branch's CollSurplusPool`;
   const credit = d.creditKind === "redemption" ? "fully redeemed" : "liquidated";
-  // Liquity V1 values every event at the PriceFeed price at its block, read
-  // from the transaction's receipt; the claim follows. The other families'
-  // claim rows carry no price yet.
+  // The claim is valued at the PriceFeed price at its block. Liquity V1 reads
+  // it with the transaction's receipt (the event route); V2 and the forks
+  // carry the branch feed's lastGoodPrice from the surplus read.
   const { read } = useLiquityV1EventReadState(v1 ? event.txHash : undefined, v1 ? d.owner : undefined);
-  const price = v1 && read?.priceUsd != null && read.priceUsd > 0 ? read.priceUsd : null;
+  const price = v1
+    ? read?.priceUsd != null && read.priceUsd > 0
+      ? read.priceUsd
+      : null
+    : d.price != null && d.price > 0
+      ? d.price
+      : null;
+  const priceProv = price == null ? null : v1 ? eventPriceProv(at, price) : claimPriceProv(d, at);
+  // V1 waits on its event read; a V2-family claim whose read carried no price
+  // shows no price cell.
+  const showPrice = v1 || price != null;
 
   const stats: ChainTruthStat[] = [
     {
@@ -85,10 +101,10 @@ export function CollSurplusClaimCard({
       prov: amountProv,
       transition: {
         before: fig(d.amount),
-        beforeExact: formatExact(d.amount),
+        beforeExact: formatUnitsExact(d.amountRaw, d.decimals),
         beforeProv: amountProv,
         change: `−${fig(d.amount)}`,
-        changeExact: `−${formatExact(d.amount)}`,
+        changeExact: `−${formatUnitsExact(d.amountRaw, d.decimals)}`,
         changeProv: amountProv,
         shownAsIs: true,
       },
@@ -103,7 +119,12 @@ export function CollSurplusClaimCard({
             prov: claimPaidProv(d, at),
             usd:
               price != null
-                ? { value: d.paid * price, prov: claimPaidUsdProv(at, { eth: d.paid, priceUsd: price }) }
+                ? {
+                    value: d.paid * price,
+                    prov: v1
+                      ? claimPaidUsdProv(at, { eth: d.paid, priceUsd: price })
+                      : claimPaidUsdAtBlockProv(d, price),
+                  }
                 : undefined,
             usdAlways: true,
             sub: others ? (
@@ -194,11 +215,11 @@ export function CollSurplusClaimCard({
         <ChainTruthDetail
           stats={stats}
           extra={
-            v1 ? (
+            showPrice ? (
               <StatCard label={`${d.symbol} price`}>
-                {price != null ? (
+                {price != null && priceProv != null ? (
                   <StateTransition>
-                    <Prov info={eventPriceProv(at, price)}>
+                    <Prov info={priceProv}>
                       <span className="text-sm font-semibold tabular-nums text-rb-500">{fmtUsd(price)}</span>
                     </Prov>
                     <TokenChipIcon symbol={d.symbol} size={16} />
@@ -206,7 +227,9 @@ export function CollSurplusClaimCard({
                 ) : (
                   <span className="text-sm font-semibold text-rb-500">…</span>
                 )}
-                <StatSubline>Liquity&apos;s price feed, at this block</StatSubline>
+                <StatSubline>
+                  {v1 ? "Liquity's price feed" : `The ${d.symbol} branch's price feed`}, at this block
+                </StatSubline>
               </StatCard>
             ) : undefined
           }
