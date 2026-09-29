@@ -16,18 +16,18 @@ const SHARE = {
 };
 const PRICE = {
   bold: "The share price is chi",
-  text: "chi is the USDS one sUSDS redeems for. It grows every second at the Savings Rate, compounding, and the contract rounds each step the same way for everyone.",
+  text: "chi is the contract's name for the share price: the USDS one sUSDS redeems for. It grows every second at the Savings Rate, compounding, and the contract rounds each step the same way for everyone.",
   sources: [link(SKY_DOCS.source)],
 };
 const RATE = {
   bold: "Sky governance sets the rate",
-  text: "The Savings Rate (SSR) is a per-second factor stored in the contract. Only an address Sky governance has authorised can change it, through the contract's file call, and each change is a public log.",
+  text: "The Savings Rate, SSR in the contract, is a per-second growth factor. Only an address Sky governance has authorised can change it, by calling the contract's file function, and each change is a public log. It can change at any block.",
   sources: [link(SKY_DOCS.source)],
 };
 const SOURCE = {
   bold: "Where the interest comes from",
-  text: "Each deposit, withdrawal or anyone's call to drip brings chi up to date. Drip creates the USDS the savers have earned since the last drip and books the same amount as debt of the Sky system, which the system's revenue covers.",
-  sources: [link(SKY_DOCS.source)],
+  text: "Sky mints the interest as new USDS. drip is the contract function that brings the share price up to date; every deposit and withdrawal calls it first, and anyone may call it. Each drip mints the USDS savers have earned since the last one and books the same amount as debt at the Vow, Sky's surplus buffer. Borrowers pay stability fees on Sky vaults into the same Vow, where debt and surplus settle against each other.",
+  sources: [link(SKY_DOCS.source), link(SKY_DOCS.vat), link(SKY_DOCS.jug), link(SKY_DOCS.vow)],
 };
 
 const LINKS = [link(SKY_DOCS.susds), link(SKY_DOCS.usds), link(SKY_DOCS.source)];
@@ -49,7 +49,7 @@ export function skyPositionContent(): LearnMoreContent {
       },
       {
         bold: "The dollar figure",
-        text: "Sky runs no USDS price feed. The PSM swaps USDS for USDC at a fixed rate less its exit fee, so one USDS is worth 1 ÷ (1 + fee) USDC. That fee has been zero for the whole life of sUSDS.",
+        text: "Sky runs no USDS price feed. The PSM (peg stability module) is Sky's contract that swaps USDS and USDC one for one, less a fee; one USDS is worth 1 ÷ (1 + exit fee) USDC. That fee has been zero for the whole life of sUSDS.",
         sources: [link(SKY_DOCS.wrapper), link(SKY_DOCS.psm)],
       },
     ],
@@ -66,8 +66,8 @@ export function skyEventContent(kind: SkySavingsEventType): LearnMoreContent {
           "A deposit hands USDS to the savings module and mints sUSDS in return, at the share price of that block.",
         stepsHeading: "What happens",
         steps: [
-          "The contract runs drip first, so the share price is current.",
-          "It takes the USDS and mints USDS ÷ share price in sUSDS, rounded down.",
+          "The contract runs drip first, the function that brings the share price up to date.",
+          "It takes the USDS and mints USDS ÷ share price in sUSDS, rounded down, so the new shares can be worth up to 1 wei less than the USDS paid.",
           "The shares go to the receiver the depositor names, which can be another address.",
           "A deposit can carry a referral code, a number a front end attaches to mark deposits it sent.",
         ],
@@ -76,7 +76,7 @@ export function skyEventContent(kind: SkySavingsEventType): LearnMoreContent {
           PRICE,
           {
             bold: "Referral codes",
-            text: "The code is a number from 0 to 65,535 in a separate Referral log. Sky publishes no list of which front end uses which code, so Rails shows the number alone.",
+            text: "The code is a number from 0 to 65,535 in a separate Referral log; 0 is a code like any other. A deposit sent without a code has no Referral log and shows none. Sky publishes no list of which front end uses which code, so Rails shows the number alone.",
             sources: [link(SKY_DOCS.referral)],
           },
         ],
@@ -88,7 +88,7 @@ export function skyEventContent(kind: SkySavingsEventType): LearnMoreContent {
         intro: "A withdrawal burns sUSDS and pays out USDS at the share price of that block.",
         stepsHeading: "What happens",
         steps: [
-          "The contract runs drip first, so the share price is current.",
+          "The contract runs drip first, the function that brings the share price up to date.",
           "It burns the shares and pays shares × share price in USDS.",
           "The USDS goes to the receiver the caller names. An address the owner approved can withdraw for the owner.",
         ],
@@ -159,11 +159,11 @@ export function skyFlowsContent(): LearnMoreContent {
       },
       {
         bold: "Interest earned",
-        text: "Still held plus out, less in. It is the dashed part of the bar: it grew inside the shares, and no transaction moved it.",
+        text: 'Still held plus out, less in. It is the dashed part of the bar: it grew inside the shares, and no transaction moved it. The bar\'s full length, the figure before "in with interest", is what came in plus this interest.',
       },
       {
         bold: "Dollars",
-        text: "USDS is valued at the PSM rate of 1 ÷ (1 + fee) USDC. The fee has been zero throughout, so one USDS counts as one dollar on the axis.",
+        text: "USDS is valued at the PSM rate of 1 ÷ (1 + exit fee) USDC; the PSM is Sky's contract that swaps USDS and USDC. The fee has been zero throughout, so one USDS counts as one dollar on the axis.",
         sources: [link(SKY_DOCS.wrapper)],
       },
     ],

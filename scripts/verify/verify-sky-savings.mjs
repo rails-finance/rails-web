@@ -137,6 +137,7 @@ const mixedCodes = positions.mixed.events
 check("mixed: the api states its referral codes", mixedCodes.length >= 2, JSON.stringify(mixedCodes));
 
 // ── C. the pages ──
+const rates = await api(`/rates`);
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 for (const [name, holder] of Object.entries(HOLDERS)) {
@@ -148,7 +149,15 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     text: document.body.innerText,
     gate: document.querySelector("[data-sky-gate]") != null,
     asof: document.querySelector("[data-sky-asof]")?.getAttribute("data-sky-asof"),
-    bars: [...document.querySelectorAll("button")].filter((b) => b.textContent?.trim() === "Where it came from").length,
+    bars: [...document.querySelectorAll("button[aria-label]")]
+      .map((b) => b.getAttribute("aria-label"))
+      .filter((l) => / show what came in, what left and each asset$/.test(l)),
+    saved: [...document.querySelectorAll("[aria-label]")].some((e) =>
+      /^Balance: .* still saved, of /.test(e.getAttribute("aria-label") ?? ""),
+    ),
+    rateMarkers: [...document.querySelectorAll("[data-note-marker]")]
+      .map((b) => b.getAttribute("aria-label") ?? "")
+      .filter((l) => l.startsWith("Savings Rate change")).length,
   }));
   check(`${name} page: no refusal while the gate passes`, !got.gate);
   check(`${name} page: states the sealed block`, got.asof === String(pos.asOf.block), `${got.asof}`);
@@ -160,7 +169,20 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
   );
   const rate = `${(Number(pos.asOf.ssrAnnual) * 100).toFixed(2)}%`;
   check(`${name} page: Savings Rate ${rate}`, got.text.includes(rate));
-  check(`${name} page: Lifetime flows draw one bar`, got.bars === 1, `${got.bars} bars`);
+  check(`${name} page: Lifetime flows draw one bar`, got.bars.length === 1, `${got.bars.length} bars`);
+  check(`${name} page: the bar reads Balance`, got.bars[0]?.startsWith("Balance:"), `${got.bars[0]}`);
+  check(`${name} page: the solid segment reads still saved`, got.saved);
+  // Every Savings Rate change from the first event to the page's block is
+  // drawn, the ones after the last event in the timeline's head.
+  const changes = rates.data.ssr.filter(
+    (r) => r.blockNumber > pos.data.activity.firstBlock && r.blockNumber <= pos.asOf.block,
+  ).length;
+  if (pos.data.activity.events <= 1000)
+    check(
+      `${name} page: every rate change since the first event is drawn`,
+      got.rateMarkers === changes,
+      `${got.rateMarkers} of ${changes}`,
+    );
   if (name === "mixed")
     for (const code of mixedCodes)
       check(`mixed page: referral ${code} on its row`, got.text.includes(`Referral ${code}`));
@@ -177,7 +199,6 @@ check(
   firstHref,
 );
 
-const rates = await api(`/rates`);
 await page.goto(`${BASE}/ethereum/sky-savings/rates`, { waitUntil: "networkidle", timeout: 120000 });
 const rows = await page.evaluate(() =>
   document.querySelector("[data-sky-rate-history]")?.getAttribute("data-sky-rate-history"),

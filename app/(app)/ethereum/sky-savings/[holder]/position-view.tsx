@@ -15,7 +15,9 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { Prov } from "@/components/shared/provenance";
 import { RiskFigure, RiskFooterStrip, RiskStrong } from "@/components/shared/risk-footer-strip";
 import { BlockRef } from "@/components/shared/block-ref";
-import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
+import { CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
+import { SkySavingsActivityHeader } from "@/components/protocol/sky-savings/sky-savings-activity-header";
+import type { SkyPreviousEvent } from "@/lib/sky-savings/explainer-clauses";
 import { SkySavingsPositionCard } from "@/components/protocol/sky-savings/sky-savings-position-card";
 import { SkySavingsPositionExplanation } from "@/components/protocol/sky-savings/sky-savings-position-explanation";
 import { SkySavingsEventCard, type SkySavingsEvent } from "@/components/protocol/sky-savings/sky-savings-event-card";
@@ -63,13 +65,32 @@ export default function SkySavingsPositionView({
     olderCount: Math.max(0, totalEvents - skyEvents.length),
   });
 
+  // Each row's previous event, for the interest earned between the two: the
+  // next row down in the newest-first list, null under the first event of a
+  // whole history, undefined under the oldest row of a longer one.
+  const previousOf = useMemo(() => {
+    const rows = [...skyEvents].sort((a, b) => b.blockNumber - a.blockNumber);
+    const whole = rows.length >= totalEvents;
+    const m = new Map<string, SkyPreviousEvent | null | undefined>();
+    rows.forEach((e, i) => {
+      const p = rows[i + 1];
+      m.set(
+        e.id,
+        p ? { ctx: p.context.data, timestamp: p.timestamp, blockNumber: p.blockNumber } : whole ? null : undefined,
+      );
+    });
+    return m;
+  }, [skyEvents, totalEvents]);
+
   // Savings Rate changes inside the holder's span, placed between the rows by
-  // block. A change applies to every holder at once, so it is a note, counted
-  // in nothing.
-  const notes: MarketNote[] = useMemo(
-    () =>
+  // block, and those after its last event (from the rate history), which have
+  // no row to sit beside and stand in the timeline's head slot. A change
+  // applies to every holder at once, so it is a note, counted in nothing.
+  const newestBlock = useMemo(() => skyEvents.reduce((m, e) => Math.max(m, e.blockNumber), 0), [skyEvents]);
+  const toNotes = useMemo(
+    () => (list: SkyRateChange[]) =>
       vaultTermsNotes(
-        rateNotes.map((r) => ({
+        list.map((r) => ({
           kind: "savings-rate",
           blockNumber: r.blockNumber,
           timestamp: r.timestamp,
@@ -83,13 +104,24 @@ export default function SkySavingsPositionView({
           return {
             headline: `${from} → ${to}`,
             quantity: "Savings Rate",
+            title: "Savings Rate change",
+            tip: `Savings Rate ${from} → ${to}`,
             statement: `Sky governance set the Savings Rate to ${to} a year, from ${from}, for every sUSDS holder`,
             prov: rateChangeProv(n.blockNumber, n.txHash, n.fields.ssr, to),
           };
         },
       ),
-    [rateNotes],
+    [],
   );
+  const notes: MarketNote[] = useMemo(
+    () => toNotes(rateNotes.filter((r) => r.blockNumber <= newestBlock)),
+    [toNotes, rateNotes, newestBlock],
+  );
+  const trailingNotes: MarketNote[] = useMemo(() => {
+    if (!open || newestBlock === 0) return [];
+    const after = (rates?.ssr ?? rateNotes).filter((r) => r.blockNumber > newestBlock && r.blockNumber <= asOf.block);
+    return toNotes([...after].sort((a, b) => b.blockNumber - a.blockNumber));
+  }, [open, rates, newestBlock, asOf.block, rateNotes, toNotes]);
 
   const totals = useMemo(() => (days ? skyLifetimeTotals(days) : null), [days]);
   const tower = useMemo(() => skyTowerData(position, totals, asOf.block), [position, totals, asOf.block]);
@@ -106,6 +138,7 @@ export default function SkySavingsPositionView({
       price: asOf.chi ? rayNumber(asOf.chi) : undefined,
       unit: USDS.symbol,
       label: "One sUSDS in USDS, the share price at the page's block",
+      tip: `The sUSDS share price: what one sUSDS redeems for in USDS at block ${asOf.block.toLocaleString("en-US")}.`,
       info: asOf.chi ? chiProv(asOf.block, asOf.chi) : undefined,
     },
     ...(usdc != null
@@ -124,11 +157,13 @@ export default function SkySavingsPositionView({
 
   const checked = (
     <RiskFooterStrip>
-      <RiskFigure label="Checked">
+      <RiskFigure>
+        Checked against the contract at block {gate.block.toLocaleString("en-US")}: all{" "}
         <Prov info={gateProv(gate.block, gate.holdersChecked, gate.totalSupply)} value={String(gate.holdersChecked)}>
           <RiskStrong>{gate.holdersChecked.toLocaleString("en-US")}</RiskStrong>
         </Prov>{" "}
-        holders against the contract
+        addresses that ever held sUSDS
+        {gate.openHoldersChecked != null ? `, ${gate.openHoldersChecked.toLocaleString("en-US")} of them holding` : ""}
       </RiskFigure>
     </RiskFooterStrip>
   );
@@ -169,8 +204,25 @@ export default function SkySavingsPositionView({
         closed={!open}
         tl={tl}
         notes={notes}
+        liveNotes={trailingNotes.length ? trailingNotes : undefined}
+        notice={
+          totalEvents > skyEvents.length ? (
+            <p className="text-xs text-rb-500">
+              This list holds the newest {skyEvents.length.toLocaleString("en-US")} of{" "}
+              {totalEvents.toLocaleString("en-US")} events. The card and Lifetime flows cover all{" "}
+              {totalEvents.toLocaleString("en-US")}.
+            </p>
+          ) : undefined
+        }
         displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-        toolbarLeading={<TimelineActivityHeader events={skyEvents} closed={!open} firstAt={firstAt ?? undefined} />}
+        toolbarLeading={
+          <SkySavingsActivityHeader
+            first={position.activity.firstTimestamp ?? firstAt}
+            last={position.activity.lastTimestamp ?? null}
+            events={skyEvents}
+            closed={!open}
+          />
+        }
         emptyLabel="No sUSDS event names this address."
         renderCard={(event, meta) =>
           isSkySavingsEvent(event) ? (
@@ -179,6 +231,7 @@ export default function SkySavingsPositionView({
               eventNumber={meta.eventNumber}
               isFirst={meta.isFirst}
               isLast={meta.isLast}
+              previous={previousOf.get(event.id)}
             />
           ) : null
         }

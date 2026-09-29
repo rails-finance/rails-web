@@ -40,7 +40,13 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
  *  this price elsewhere on the page. Absent on a view not yet wired for it;
  *  present, it traces the trigger's leading figure (the dropdown's own rows
  *  stay their own surface). */
-export type LatestPriceAsset = Omit<PriceStripAsset, "price"> & { price?: number; info?: Provenance };
+export type LatestPriceAsset = Omit<PriceStripAsset, "price"> & {
+  price?: number;
+  info?: Provenance;
+  /** The trigger's tooltip for this asset where the family words it; unset,
+   *  "<symbol>'s oracle price at the latest block". */
+  tip?: string;
+};
 
 /** The block a closed position's prices were read at: its closing row. */
 export interface PricesAt {
@@ -117,9 +123,11 @@ export function LatestPrices({
       : "";
   const tip = !first
     ? "Prices for this position."
-    : priced(first)
-      ? `${first.symbol}'s oracle price at the ${at ? "closing" : "latest"} block.${moreNote}`
-      : `${first.symbol}, held with no price stated by the protocol.${moreNote}`;
+    : first.tip
+      ? `${first.tip}${moreNote}`
+      : priced(first)
+        ? `${first.symbol}'s oracle price at the ${at ? "closing" : "latest"} block.${moreNote}`
+        : `${first.symbol}, held with no price stated by the protocol.${moreNote}`;
 
   return (
     <div ref={ref} className="relative" data-latest-prices>

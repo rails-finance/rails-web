@@ -94,6 +94,18 @@ export function skyFlowTimeline(
     todayPrices: asOf.chi ? { [SUSDS.address]: rayNumber(asOf.chi) * usdcNow } : undefined,
     today: todayDay,
     totalEvents: position.activity.events,
+    // A savings bar in the card's words (rails-ops TO-DO-sky-savings-scoping
+    // item 11). The last stop is the page's sealed block, and the dollar axis
+    // is the PSM rate: Sky runs no USDS price feed.
+    labels: { collateral: "Balance", debt: "Debt" },
+    words: {
+      held: "Still saved",
+      live: `At block ${asOf.block.toLocaleString("en-US")}`,
+      priceNote:
+        "Flows are valued at the PSM rate at their block, one USDC per USDS for the whole life of sUSDS; what is held on a day is its sUSDS times that day's closing share price.",
+      totalIn: " in with interest, ",
+      interestMin: 1e-9,
+    },
   };
 }
 

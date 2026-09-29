@@ -413,7 +413,7 @@ function SideBlock({
   const repaid = st.out - liquidated;
   const held = st.bar[0];
   const spoken = coll
-    ? `${word}: ${spokenUsd(st.now)} still supplied, of ${spokenUsd(st.total)} that came in; ${spokenUsd(st.out)} has left.`
+    ? `${word}: ${spokenUsd(st.now)} ${(model.words.held ?? "Still supplied").toLowerCase()}, of ${spokenUsd(st.total)} that came in; ${spokenUsd(st.out)} has left.`
     : `${word}: ${spokenUsd(st.now)} owed, of ${spokenUsd(st.total)} owed in all; ${spokenUsd(repaid)} repaid` +
       (liquidated > 0 ? `, ${spokenUsd(liquidated)} liquidated.` : ".");
   // Each segment's assets: held from the stop's balances, flows from the
@@ -490,7 +490,7 @@ function SideBlock({
               <Prov info={flowTotalProv(side, "in", when)}>
                 <span className="text-foreground">{formatFlowUsd(st.total)}</span>
               </Prov>
-              {coll ? " in, " : " owed in all, "}
+              {coll ? (model.words.totalIn ?? " in, ") : " owed in all, "}
               <Prov info={flowTotalProv(side, "out", when)}>
                 <span className="text-foreground">{formatFlowUsd(coll ? st.out : repaid)}</span>
               </Prov>
@@ -642,7 +642,7 @@ function ScrubberBody({ model }: { model: FlowModel }) {
   const dateText = atClose
     ? `At close, ${closeDay}`
     : s.isLive
-      ? "Today, live prices"
+      ? (model.words.live ?? "Today, live prices")
       : dayStamp(dayStart(model, stop));
   const when = atClose ? `the close on ${closeDay}` : s.isLive ? "now" : `the end of ${dateText}`;
   const dateLine = atClose
@@ -663,10 +663,12 @@ function ScrubberBody({ model }: { model: FlowModel }) {
     setStop(to);
   };
   const hint =
-    "Solid is still there; each hatch is one way value left, and a dashed fill moved no funds. The dashed outline marks where each bar ends today. Flows are valued at the oracle price at their block; " +
-    (model.daily
-      ? "what is held on a day is valued at the last oracle price recorded by that day's end."
-      : "between events an asset keeps the price of its last event.");
+    "Solid is still there; each hatch is one way value left, and a dashed fill moved no funds. The dashed outline marks where each bar ends today. " +
+    (model.words.priceNote ??
+      "Flows are valued at the oracle price at their block; " +
+        (model.daily
+          ? "what is held on a day is valued at the last oracle price recorded by that day's end."
+          : "between events an asset keeps the price of its last event."));
 
   return (
     <div className="text-sm">

@@ -31,6 +31,19 @@ export function skyFlowsExplanation(p: SkyPosition, totals: SkyLifetimeTotals | 
         transaction moved it, so the bar draws it dashed.
       </>,
     );
-  items.push(<>On the dollar axis one USDS is valued at the PSM rate, one USDC for the whole life of sUSDS.</>);
+  if (p.earned && p.value)
+    items.push(
+      <>
+        The bar&rsquo;s full length is what is still held plus what left, <H>{f(BigInt(p.value.raw) + outRaw)} USDS</H>:
+        what came in plus the interest. That is the figure the zoom states as &ldquo;in with interest&rdquo;.
+      </>,
+    );
+  items.push(
+    <>
+      The bar and its scrubber cover all <H>{p.activity.events.toLocaleString("en-US")}</H> event
+      {p.activity.events === 1 ? "" : "s"}; the last stop is the page&rsquo;s block. On the dollar axis one USDS is
+      valued at the PSM rate, one USDC for the whole life of sUSDS.
+    </>,
+  );
   return <ProseExplainer items={items} />;
 }

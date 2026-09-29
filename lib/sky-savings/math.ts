@@ -5,6 +5,7 @@
 
 import { formatUnitsExact } from "@/lib/utils/format";
 import type { SkySavingsContext } from "@/lib/shared/types/event-shape";
+import type { SkyAsOf, SkyPosition } from "@/lib/sky-savings/types";
 
 const RAY = BigInt("1000000000000000000000000000");
 const SECONDS_PER_YEAR = 31_536_000;
@@ -14,6 +15,17 @@ export const units = (raw: string | bigint | null | undefined): number => (raw =
 
 /** A raw 18-decimal integer string as its exact decimal. */
 export const exact = (raw: string | bigint): string => formatUnitsExact(String(raw), 18);
+
+/** A raw 18-decimal integer as a decimal to six places, rounded half up, with
+ *  thousands separators and a real minus: the precision T3 states. */
+export function fixed6(raw: string | bigint): string {
+  const v = BigInt(raw);
+  const neg = v < BigInt(0);
+  const scaled = ((neg ? -v : v) + BigInt(500_000_000_000)) / BigInt(1_000_000_000_000);
+  const s = scaled.toString().padStart(7, "0");
+  const whole = BigInt(s.slice(0, -6)).toLocaleString("en-US");
+  return `${neg && scaled > BigInt(0) ? "−" : ""}${whole}.${s.slice(-6)}`;
+}
 
 /** A ray (chi) as a number: USDS per sUSDS. */
 export const rayNumber = (ray: string | null | undefined): number => (ray == null ? 0 : Number(ray) / 1e27);
@@ -93,3 +105,16 @@ export function usdcPerUsdsAt(
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
+
+/** What the balance earns in a year at the rate in force: its worth times the
+ *  yearly rate (the rate is already compounded over the year). */
+export function skyYearlyEarnings(p: SkyPosition, asOf: SkyAsOf): number | null {
+  if (p.status !== "open" || !p.value) return null;
+  const v = units(p.value.raw) * Number(asOf.ssrAnnual);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+
+/** A yearly estimate as the card states it: two decimals under 1,000, whole
+ *  USDS above. */
+export const yearlyText = (v: number): string =>
+  v.toLocaleString("en-US", { maximumFractionDigits: v >= 1000 ? 0 : 2, minimumFractionDigits: v >= 1000 ? 0 : 2 });

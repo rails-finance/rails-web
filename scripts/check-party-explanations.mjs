@@ -148,6 +148,7 @@ const PARTY_ROLES = [
     ],
   },
   { role: "challenger", prefixes: ["challenged by"], phrases: [/\bchalleng(er|ed)\b/i] },
+  { role: "depositor", prefixes: ["for this address by"], phrases: [/\bdeposited\b.*\bfor this address\b/i] },
   { role: "veto", prefixes: ["vetoed by"], phrases: [/\bveto\w*/i, /\bdenied\b/i] },
   { role: "delegate", prefixes: ["delegate"], phrases: [/\bbatch manager\b/i, /\bdelegat\w*/i] },
   // "via" also names a swap's venue (Aave V3's "via CoW Protocol").
