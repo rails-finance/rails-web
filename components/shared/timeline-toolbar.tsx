@@ -295,6 +295,8 @@ export interface TimelineToolbarProps {
    *  surprising number (see ChainTruthTimelineProps.countTooltip). Unset
    *  renders identically to today. */
   countTooltip?: string;
+  /** Words after an unfiltered whole-history count (ChainTruthTimelineProps.countDetail). */
+  countDetail?: string;
   /** The page opted into the phone spine view: the count line ends in the
    *  "Timeline | List" switch below `sm`. */
   viewSwitch?: boolean;
@@ -481,6 +483,7 @@ export function TimelineToolbar({
   displayItems,
   leading,
   countTooltip,
+  countDetail,
   monthReach,
   viewSwitch,
 }: TimelineToolbarProps) {
@@ -525,7 +528,11 @@ export function TimelineToolbar({
         : dateActive
           ? `${formatDayMonth(tl.dateRange![0])} – ${formatDayMonth(tl.dateRange![1])}`
           : "Dates";
-  const countLine = eventCountLine(tl);
+  const baseCountLine = eventCountLine(tl);
+  const countLine =
+    countDetail && !tl.isFiltered && tl.historyWindow.state === "whole" && tl.olderCount === 0
+      ? `${baseCountLine}${countDetail}`
+      : baseCountLine;
   const countState = eventCountState(tl);
   // Inert until this strip's handlers are attached. A detail page is the widest
   // window on the site — it carries the most JS, so it is the last thing to come

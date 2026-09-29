@@ -21,20 +21,11 @@
 // never-empty floor).
 //
 // ── Fill-standard notes (charter §5) ─────────────────────────────────────────
-// Checklist items Maker cannot fill on ordinary vault operations, each a data
-// fact of its pipeline:
-//   • §5.1 (risk consequence per event) on frob / fork: the indexed stream
-//     carries no per-event oracle price or liquidation ratio for these, so a
-//     collateral-ratio-vs-threshold read at event time cannot be computed.
-//     Stated on grab (liquidation) only, where the seizure carries the price.
-//   • §5.2 (mechanic-why on the dust floor): the minimum-debt figure is not on
-//     the event context, so a repayment near the floor cannot be named with a
-//     number. The stability-fee mechanic on a draw IS stated.
-//   • §5.4 beyond liquidations: no per-event USD → no other valued net-outcome
-//     figure exists to derive on a frob / fork.
-// Filled: forward paths (§5.3) on collateral-only and on the liquidation
-// auction; the liquidation net-outcome cushion (§5.4); the highlight rule
-// (§5.6) via Fig.
+// The rows carry no price; the page reads the ilk at each row's block (the OSM
+// price, the minimum ratio) by chain call and hands it in as `extras`, with the
+// debt split (drawn / fee) and, on a liquidation, the auction's outcome. Each
+// clause that needs one of them is left out until it lands (the never-empty
+// floor keeps the action sentence).
 
 import type { ReactNode } from "react";
 import type { BaseActivityEvent, MakerDAOContext } from "@/lib/shared/types/event-shape";
@@ -52,17 +43,44 @@ import {
 import {
   dinkProv,
   inkAfterProv,
-  grabSeizedUsdProv,
-  grabClearedDaiProv,
-  grabCushionProv,
   giveDstProv,
   giveOwnerProv,
   debtDeltaOf,
   type MakerCoords,
 } from "@/lib/makerdao/event-provenance";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
-import { formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatNumber } from "@/lib/utils/format";
 import { AmountText } from "@/components/shared/amount-text";
+import { H } from "@/lib/shared/explainer-prose";
+import { formatDate } from "@/lib/date";
+import type { MakerAuctionRead, MakerIlkAt } from "@/lib/makerdao/chain-history-types";
+import type { MakerDebtSplit, MakerLeftoverLink } from "@/lib/makerdao/vault-history";
+
+/** What the page knows about a row beyond its own fields
+ *  (lib/makerdao/vault-history.tsx). Every clause that needs one of these is
+ *  left out until it lands. */
+export interface MakerRowExtras {
+  /** The ilk at the row's block: the OSM price, the minimum ratio. */
+  ilkAt?: MakerIlkAt | null;
+  /** The debt at the row split into DAI drawn and fee. */
+  split?: MakerDebtSplit;
+  /** The previous row's timestamp. */
+  previousAt?: number;
+  /** A row that moved collateral an auction handed back. */
+  leftover?: MakerLeftoverLink;
+  /** A liquidation row's auction. */
+  auction?: MakerAuctionRead;
+  /** A liquidation row: when the owner took the handed-back collateral out. */
+  leftoverTakenAt?: number;
+}
+
+const dai2 = (n: number): string => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const usd0 = (n: number): string => `$${Math.round(n).toLocaleString("en-US")}`;
+const usd2 = (n: number): string =>
+  `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const pct2 = (r: number): string =>
+  `${(r * 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+const matPct = (m: number): string => `${Number((m * 100).toFixed(2))}%`;
 
 /** Sub-wei magnitudes read as zero — the exact-history replay lands on clean
  *  zeros, but a defensive epsilon keeps a stray residual from reading as a
@@ -182,14 +200,18 @@ function delegatedActorMechanic(ctx: MakerDAOContext): ClauseInput {
 
 // ── the variant table ────────────────────────────────────────────────────────
 
-export function makerdaoEventSlots(ctx: MakerDAOContext, coords: MakerCoords): EventProseSlots {
-  const slots = makerdaoEventSlotsBase(ctx, coords);
+export function makerdaoEventSlots(
+  ctx: MakerDAOContext,
+  coords: MakerCoords,
+  extras: MakerRowExtras = {},
+): EventProseSlots {
+  const slots = makerdaoEventSlotsBase(ctx, coords, extras);
   const actor = delegatedActorMechanic(ctx);
   if (!actor) return slots;
   return { ...slots, meansNow: [...(slots.meansNow ?? []), actor] };
 }
 
-function makerdaoEventSlotsBase(ctx: MakerDAOContext, coords: MakerCoords): EventProseSlots {
+function makerdaoEventSlotsBase(ctx: MakerDAOContext, coords: MakerCoords, extras: MakerRowExtras): EventProseSlots {
   // Every sentence below reads the vault after the event. Without the index's
   // running state for this row there is nothing true to say about it.
   if (ctx.inkAfter == null || ctx.artAfter == null) {
@@ -233,9 +255,9 @@ function makerdaoEventSlotsBase(ctx: MakerDAOContext, coords: MakerCoords): Even
 
   switch (ctx.eventType) {
     case "frob":
-      return frobSlots(ctx, rs, dink, dart, daiAmount, colDeltaFig, colAfterFig);
+      return frobSlots(ctx, rs, dink, dart, daiAmount, colDeltaFig, colAfterFig, extras);
     case "grab":
-      return grabSlots(ctx, coords, sym, dsym, dink, dart, daiAmount, rate, colDeltaFig);
+      return grabSlots(ctx, coords, sym, dsym, dink, dart, daiAmount, rate, colDeltaFig, extras);
     case "give":
       return giveSlots(ctx, coords, colAfterFig, rs);
     case "fork-out":
@@ -252,6 +274,25 @@ function makerdaoEventSlotsBase(ctx: MakerDAOContext, coords: MakerCoords): Even
 
 // ── frob (deposit / withdraw / draw / repay, singly or combined) ──────────────
 
+/** What the row's collateral and debt mean at its block's price: the ratio,
+ *  how far the price could fall before the minimum, and the DAI the vault
+ *  could still draw. Null without the ilk read or with no debt. */
+function riskAt(rs: MakerResultingState, debtAfter: number, ilkAt?: MakerIlkAt | null) {
+  const price = ilkAt?.priceUsd ?? null;
+  const mat = ilkAt?.mat ?? null;
+  if (price == null || mat == null || !(price > 0) || !(debtAfter > 1e-9) || !(rs.inkAfter > MAKER_EPS)) return null;
+  const ratio = (rs.inkAfter * price) / debtAfter;
+  const liqPrice = (debtAfter * mat) / rs.inkAfter;
+  return {
+    price,
+    mat,
+    ratio,
+    liqPrice,
+    drop: 1 - liqPrice / price,
+    room: Math.max(0, (rs.inkAfter * price) / mat - debtAfter),
+  };
+}
+
 function frobSlots(
   ctx: MakerDAOContext,
   rs: MakerResultingState,
@@ -260,12 +301,69 @@ function frobSlots(
   daiAmount: ReactNode | null,
   colDeltaFig: () => ReactNode,
   colAfterFig: () => ReactNode,
+  extras: MakerRowExtras,
 ): EventProseSlots {
+  const sym = ctx.collateralSymbol;
+  const dsym = ilkDebtSymbol(ctx.ilk);
+  const price = extras.ilkAt?.priceUsd ?? null;
+  const debtAfter = ctx.debtAfter != null ? Number(ctx.debtAfter) : 0;
+  const debtChange = ctx.debtChange != null ? Number(ctx.debtChange) : 0;
+  const risk = riskAt(rs, debtAfter, extras.ilkAt);
+  const split = extras.split;
+  const since = split?.stretchStartAt != null ? formatDate(split.stretchStartAt) : null;
+
+  // Collateral an auction handed back: the row moves it, it is not new money.
+  const lo = extras.leftover;
+  if (lo) {
+    if (lo.role === "in") {
+      return {
+        happened: [
+          clause(
+            <>
+              This moved {colDeltaFig()} into the vault: the collateral the auction of {formatDate(lo.grabAt)} handed
+              back once it had covered the debt and the penalty. It is the same collateral, not a new deposit.
+            </>,
+          ),
+        ],
+        meansNow: [
+          clause(
+            <>
+              The auction returns what is left to the vault&rsquo;s address as free collateral; moving it into the vault
+              and out again is how the owner takes it.
+            </>,
+          ),
+        ],
+      };
+    }
+    const kept = rs.inkAfter;
+    return {
+      happened: [
+        clause(
+          <>
+            This took {colDeltaFig()} out of the vault to the owner: what the auction of {formatDate(lo.grabAt)} handed
+            back.
+          </>,
+        ),
+      ],
+      meansNow: [
+        kept > MAKER_EPS
+          ? clause(<>{colAfterFig()} stays behind; the vault owes nothing and holds nothing else.</>)
+          : clause(<>The vault is empty again.</>),
+      ],
+    };
+  }
+
+  const valueOf = (amount: number) =>
+    price != null ? <> (worth {usd0(amount * price)} at the OSM price then)</> : null;
   const collFrag: ReactNode | null =
     dink > 0 ? (
-      <>deposited {colDeltaFig()} of collateral</>
+      <>
+        deposited {colDeltaFig()} of collateral{valueOf(dink)}
+      </>
     ) : dink < 0 ? (
-      <>withdrew {colDeltaFig()} of collateral</>
+      <>
+        withdrew {colDeltaFig()} of collateral{valueOf(-dink)}
+      </>
     ) : null;
   const debtFrag: ReactNode | null =
     dart > 0 ? (
@@ -289,15 +387,73 @@ function frobSlots(
     </>,
   );
 
+  // The row's risk at its own price: how far the collateral price could fall
+  // and how much more the vault could draw.
+  const riskClause: ClauseInput = risk
+    ? clause(
+        <>
+          At <H>{usd2(risk.price)}</H> an {sym}, the vault could draw <H>{dai2(risk.room)}</H> {dsym} more before the{" "}
+          <H>{matPct(risk.mat)}</H> minimum, and {sym} could fall {Math.max(0, Math.round(risk.drop * 100))}% (to{" "}
+          {usd2(risk.liqPrice)}) before it could be liquidated.
+        </>,
+      )
+    : null;
+
+  // What the debt is made of, in the one definition the card and the flows
+  // panel use: the DAI drawn since the vault last owed nothing, and the fee.
+  const feeClause: ClauseInput = (() => {
+    if (!split || split.drawnBefore == null || split.feeBefore == null || dart === 0 || since == null) return null;
+    if (dart < 0 && rs.artAfter <= MAKER_EPS) {
+      const repaid = -debtChange;
+      const drawnPart = split.drawnBefore;
+      const feePart = Math.max(0, repaid - drawnPart);
+      if (!(feePart > 0.005)) return null;
+      const recent = ctx.interestSincePrevious != null ? Number(ctx.interestSincePrevious) : null;
+      return clause(
+        <>
+          The {dai2(repaid)} {dsym} repayment covered {dai2(drawnPart)} {dsym} drawn since {since} and {dai2(feePart)}{" "}
+          {dsym} of stability fee
+          {recent != null && recent > 0.005 && extras.previousAt != null ? (
+            <>
+              , <H>{dai2(recent)}</H> of it accrued since {formatDate(extras.previousAt)}
+            </>
+          ) : null}
+          .
+        </>,
+      );
+    }
+    if (split.drawnAfter == null || split.feeAfter == null || !(debtAfter > 1e-9) || split.feeAfter < 0.005)
+      return null;
+    return clause(
+      <>
+        The <H>{dai2(debtAfter)}</H> {dsym} now owed is {dai2(split.drawnAfter)} {dsym} drawn since {since} and{" "}
+        {dai2(split.feeAfter)} {dsym} of stability fee.
+      </>,
+    );
+  })();
+
   // The opening act reads as one self-contained sentence.
   if (ctx.isOpen) {
     const happened = (
       <>
-        The vault opened with {colDeltaFig()} of collateral
+        The vault opened with {colDeltaFig()} of collateral{valueOf(dink)}
         {dart > 0 ? <> and {daiAmount ?? "its first debt"} drawn against it</> : null}.
       </>
     );
-    return { happened: [clause(happened)], meansNow: [rs.collateralOnly ? noDebtPath : null] };
+    return {
+      happened: [clause(happened)],
+      changed: [riskClause],
+      meansNow: [
+        rs.collateralOnly
+          ? noDebtPath
+          : clause(
+              <>
+                From here the debt grows at {ctx.ilk}&rsquo;s stability fee, added to what the vault owes without any
+                action of its own.
+              </>,
+            ),
+      ],
+    };
   }
 
   // A zero-delta frob moved nothing.
@@ -327,17 +483,16 @@ function frobSlots(
       ? cont(<>, clearing the debt in full — the vault now holds collateral only.</>)
       : cont(<>.</>);
 
-  // The resulting holding, when the vault still carries debt (echoes the after-
-  // collateral figure). Empty / collateral-only states are covered by the
-  // ending and the forward path.
+  // Without the ilk read, the resulting holding (echoes the after-collateral
+  // figure) stands in for the risk sentence.
   const holding: ClauseInput =
-    rs.hasDebtAfter && rs.inkAfter > MAKER_EPS
+    !risk && rs.hasDebtAfter && rs.inkAfter > MAKER_EPS
       ? clause(<>The vault now holds {colAfterFig()} of collateral against its outstanding debt.</>)
       : null;
 
   const meansNow: ClauseInput[] = rs.collateralOnly ? [noDebtPath] : [];
 
-  return { happened: [clause(action), ending], changed: [holding], meansNow };
+  return { happened: [clause(action), ending], changed: [feeClause, riskClause, holding], meansNow };
 }
 
 // ── grab (liquidation) ───────────────────────────────────────────────────────
@@ -352,97 +507,100 @@ function grabSlots(
   daiAmount: ReactNode | null,
   rate: number | null,
   colDeltaFig: () => ReactNode,
+  extras: MakerRowExtras,
 ): EventProseSlots {
+  const price = ctx.priceAtBlock?.usd ?? extras.ilkAt?.priceUsd ?? null;
+  const a = extras.auction?.kind === "clipper" ? extras.auction : null;
+  const mat = a?.mat ?? extras.ilkAt?.mat ?? null;
+  const cleared = rate != null ? Math.abs(dart) * rate : null;
+  const ratio = price != null && cleared != null && cleared > 0 ? (Math.abs(dink) * price) / cleared : null;
+
+  const why =
+    ratio != null && mat != null && price != null ? (
+      <>
+        The vault&rsquo;s collateral ratio fell under {ctx.ilk}&rsquo;s <H>{matPct(mat)}</H> minimum (
+        <H>{pct2(ratio)}</H> at the OSM price of <H>{usd2(price)}</H>), so a keeper liquidated it:
+      </>
+    ) : (
+      <>This vault fell below its liquidation ratio and was liquidated:</>
+    );
   const happened = (
     <>
-      This vault fell below its liquidation ratio and was liquidated: {colDeltaFig()} of collateral was seized
+      {why} {colDeltaFig()} of collateral was seized
       {dart !== 0 && daiAmount ? <>, and {daiAmount} of debt cleared</> : null}.
     </>
   );
 
-  // Forward path (§5.3) — where the seizure goes and who is made whole.
-  const auction = clause(
+  if (!extras.auction || (a && !a.settled)) {
+    // Not read yet, or still running: the mechanism, without figures.
+    return {
+      happened: [clause(happened)],
+      meansNow: [
+        clause(
+          <>
+            The seized collateral goes to an auction that must raise the debt plus a liquidation penalty; whatever
+            collateral is left once that is covered goes back to the vault.
+          </>,
+        ),
+      ],
+    };
+  }
+  if (!a) {
+    return {
+      happened: [clause(happened)],
+      meansNow: [
+        clause(
+          <>
+            The seized collateral went to one of Maker&rsquo;s earlier auctions (the Flipper), whose results this page
+            does not read.
+          </>,
+        ),
+      ],
+    };
+  }
+
+  const tab = Number(a.tabDai);
+  const penalty = Number(a.penaltyDai);
+  const sold = Number(a.soldInk);
+  const left = Number(a.leftoverInk);
+  const short = Number(a.shortfallDai);
+  const when = a.settledAt != null ? formatDate(a.settledAt) : null;
+  const auctionClause = clause(
     <>
-      The seized collateral goes to an auction; any surplus over the debt plus the liquidation penalty returns to the
-      owner. The vault itself survives and can be used again.
+      The auction had to raise <H>{dai2(tab)}</H> {dsym}: the debt plus a <H>{dai2(penalty)}</H> {dsym} penalty (
+      {Math.round((a.chop - 1) * 100)}%).{" "}
+      {left > 0 ? (
+        <>
+          {when ? <>On {when} it </> : <>It </>}sold <H>{formatNumber(sold)}</H> {sym} for that and returned{" "}
+          <H>{formatNumber(left)}</H> {sym} to the vault.
+        </>
+      ) : short > 0 ? (
+        <>
+          It sold all {formatNumber(sold)} {sym} and still fell <H>{dai2(short)}</H> {dsym} short; the protocol absorbed
+          the rest and nothing came back to the vault.
+        </>
+      ) : (
+        <>
+          It sold all {formatNumber(sold)} {sym} to cover it, leaving nothing to return.
+        </>
+      )}
     </>,
   );
-
-  // The valued net-outcome (§5.4) — echoes the forensics block. Renders only
-  // once the block is priced and its legs resolve, exactly as the forensics
-  // block gates itself.
-  const meansNow: ClauseInput[] = [auction, valuedCushion(ctx, coords, sym, dsym, dink, dart, rate)];
-  return { happened: [clause(happened)], meansNow };
-}
-
-/** The valued cushion sentence — the seized collateral against the cleared debt
- *  at the vault's own oracle price that block, echoing the forensics legs. Drops
- *  whole when the block is unpriced or a leg doesn't resolve (the never-empty
- *  floor). */
-function valuedCushion(
-  ctx: MakerDAOContext,
-  coords: MakerCoords,
-  sym: string,
-  dsym: string,
-  dink: number,
-  dart: number,
-  rate: number | null,
-): ClauseInput {
-  const price = ctx.priceAtBlock;
-  const seizedAmt = Math.abs(dink);
-  const clearedArt = Math.abs(dart);
-  if (!price || rate == null || rate <= 0) return null;
-  if (!(seizedAmt > 0) || !(clearedArt > 0)) return null;
-  const seizedUsd = seizedAmt * price.usd;
-  const clearedDai = clearedArt * rate;
-  if (!Number.isFinite(seizedUsd) || !Number.isFinite(clearedDai) || clearedDai <= 0) return null;
-  const cushion = seizedUsd / clearedDai - 1;
-  const cushionStr = `${cushion >= 0 ? "+" : "−"}${(Math.abs(cushion) * 100).toFixed(2)}%`;
-  // Echo the forensics legs: seized value + symbol, cleared value + symbol, the
-  // cushion percentage. The event-time price itself lives on the forensics price
-  // pill (chrome), so the sentence names it without a figure.
-  const seizedFig = (
-    <Fig
-      echo
-      info={grabSeizedUsdProv(sym, coords, { amount: formatNumber(seizedAmt), priceUsd: price.usd })}
-      value={formatUsdValue(seizedUsd)}
-      symbol={sym}
-    >
-      {formatUsdValue(seizedUsd)}
-    </Fig>
-  );
-  const clearedFig = (
-    <Fig
-      echo
-      info={grabClearedDaiProv(coords, {
-        amount: formatNumber(clearedArt),
-        dai: `${formatNumber(clearedDai)} ${dsym}`,
-      })}
-      value={formatUsdValue(clearedDai)}
-      symbol={dsym}
-    >
-      {formatUsdValue(clearedDai)}
-    </Fig>
-  );
-  const cushionFig = (
-    <Fig
-      echo
-      info={grabCushionProv(coords, {
-        seizedUsd: formatUsdValue(seizedUsd),
-        clearedDai: `${formatNumber(clearedDai)} ${dsym}`,
-      })}
-      value={cushionStr}
-    >
-      {cushionStr}
-    </Fig>
-  );
-  return clause(
+  const outcome = clause(
     <>
-      At the vault&rsquo;s oracle price at the time, the seized collateral was worth {seizedFig} against {clearedFig} of
-      debt cleared — a {cushionFig} cushion carried into the auction, where the liquidation penalty and any owner
-      surplus settle.
+      The owner keeps the {dsym} it drew and gives up <H>{formatNumber(sold)}</H> {sym}: the debt&rsquo;s worth of
+      collateral and the penalty&rsquo;s.
+      {left > 0 && extras.leftoverTakenAt != null ? (
+        <>
+          {" "}
+          The returned {formatNumber(left)} {sym} waited at the vault&rsquo;s address until the owner took it out on{" "}
+          {formatDate(extras.leftoverTakenAt)}.
+        </>
+      ) : null}
     </>,
   );
+  void coords;
+  return { happened: [clause(happened)], changed: [auctionClause], meansNow: [outcome] };
 }
 
 // ── give (ownership transfer) ────────────────────────────────────────────────
@@ -559,6 +717,10 @@ function lseSlots(
 
 /** The teaser = the lead of the composed arc (the first sentence plus its
  *  trailing continuations). */
-export function makerdaoExplainerTeaser(ctx: MakerDAOContext, coords: MakerCoords): ReactNode | null {
-  return splitLead(eventClauses(makerdaoEventSlots(ctx, coords))).lead;
+export function makerdaoExplainerTeaser(
+  ctx: MakerDAOContext,
+  coords: MakerCoords,
+  extras: MakerRowExtras = {},
+): ReactNode | null {
+  return splitLead(eventClauses(makerdaoEventSlots(ctx, coords, extras))).lead;
 }

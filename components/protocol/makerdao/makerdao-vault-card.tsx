@@ -30,7 +30,7 @@ import {
   daiDebtProv,
   collateralUsdProv,
   collateralRatioProv,
-  stabilityFeeProv,
+  feeInDebtProv,
   stabilityFeeAprProv,
   liquidationPriceProv,
   peakInkProv,
@@ -42,7 +42,7 @@ import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { makerdaoPositionContent } from "@/lib/makerdao/position-content";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
-import { AmountText } from "@/components/shared/amount-text";
+import { formatDate } from "@/lib/date";
 
 export interface MakerVaultView {
   cdpId: string | null;
@@ -92,6 +92,12 @@ export interface MakerVaultView {
   /** LockStake Engine urn (decision 0013): cdp-less — the urn address is the
    *  identity — with SKY collateral and USDS debt. */
   lse?: boolean;
+  /** DAI drawn, net of repayments, since the vault last owed nothing
+   *  (lib/makerdao/vault-history.tsx); the debt less this is the stability fee
+   *  in it. Null where that start is not loaded. Set by the detail page. */
+  drawnDai?: number | null;
+  /** When that stretch began (unix seconds). */
+  drawnSince?: number | null;
 }
 
 /** The vault's number-or-address identity: CdpManager vaults have the friendly
@@ -126,9 +132,11 @@ export function MakerVaultCard({
   // different join mints the token (asset-catalog).
   const debtSym = ilkDebtSymbol(v.ilk);
   const ratio = v.debtDai && v.collateralUsd != null && v.debtDai > 0 ? (v.collateralUsd / v.debtDai) * 100 : null;
-  // Accrued stability fee = current DAI debt − normalized art. Both Vat reads,
-  // so the caption is read from the chain; suppressed at dust magnitudes.
-  const accruedFee = v.debtDai != null ? Math.max(0, v.debtDai - v.art) : 0;
+  // The stability fee in the debt: the debt less the DAI drawn since the
+  // vault last owed nothing (lib/makerdao/vault-history.tsx). Stated only where
+  // the page knows that start; suppressed at dust magnitudes.
+  const feeInDebt =
+    v.debtDai != null && v.drawnDai != null && v.debtDai - v.drawnDai > 0.005 ? v.debtDai - v.drawnDai : null;
 
   // Closed / liquidated: ink and art have settled to 0, so the headline is what
   // the vault held at its height — highest recorded collateral + DAI debt (the
@@ -192,7 +200,7 @@ export function MakerVaultCard({
           }
           debtFootnote={
             v.peakDebtDai != null && v.peakDebtDai > 0 ? (
-              <StatFootnote>art × rate, at recorded events</StatFootnote>
+              <StatFootnote>the most it owed at any of its events</StatFootnote>
             ) : undefined
           }
         />
@@ -292,29 +300,37 @@ export function MakerVaultCard({
                   <Prov info={vaultArtProv(v.atBlock, false, v.source)}>{artHuman} art</Prov>
                 </StatValue>
               ),
-            // Captions (the V4 stat-caption grammar): the accrued fee carried
-            // in the DAI figure + the ilk's live stability fee. Both live-
-            // overlay facts; absent on the replay-only render.
-            footnote: (
-              <StatFootnote>
-                art {artHuman}
-                {accruedFee > 0.005 && v.rate != null ? (
-                  <>
-                    {" · incl. "}
-                    <Prov info={stabilityFeeProv(artHuman, v.rate)}>
-                      <AmountText value={accruedFee} /> {debtSym}
-                    </Prov>{" "}
-                    fee
-                  </>
-                ) : null}
-                {v.stabilityFeeApr != null ? (
-                  <>
-                    {" · "}
-                    <Prov info={stabilityFeeAprProv(v.ilk)}>{(v.stabilityFeeApr * 100).toFixed(2)}%</Prov> stability fee
-                  </>
-                ) : null}
-              </StatFootnote>
-            ),
+            // Captions (the V4 stat-caption grammar): the stability fee in the
+            // debt (the debt less the DAI drawn since the vault last owed
+            // nothing) + the ilk's live stability fee.
+            footnote:
+              feeInDebt != null || v.stabilityFeeApr != null ? (
+                <StatFootnote>
+                  {feeInDebt != null ? (
+                    <>
+                      {"incl. "}
+                      <Prov
+                        info={feeInDebtProv({
+                          debt: `${formatNumber(v.debtDai ?? 0)} ${debtSym}`,
+                          drawn: `${formatNumber(v.drawnDai ?? 0)} ${debtSym}`,
+                          since: v.drawnSince != null ? `since ${formatDate(v.drawnSince)}` : undefined,
+                        })}
+                      >
+                        {feeInDebt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+                        {debtSym}
+                      </Prov>{" "}
+                      fee
+                    </>
+                  ) : null}
+                  {feeInDebt != null && v.stabilityFeeApr != null ? " · " : null}
+                  {v.stabilityFeeApr != null ? (
+                    <>
+                      <Prov info={stabilityFeeAprProv(v.ilk)}>{(v.stabilityFeeApr * 100).toFixed(2)}%</Prov> stability
+                      fee
+                    </>
+                  ) : null}
+                </StatFootnote>
+              ) : undefined,
           },
           {
             label: ratioLabel("cdp"),

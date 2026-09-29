@@ -23,11 +23,18 @@
 import type { MakerVaultView } from "@/components/protocol/makerdao/makerdao-vault-card";
 import {
   vaultInkProv,
-  vaultArtProv,
-  stabilityFeeProv,
   collateralFlowProv,
   debtFlowProv,
+  feeInDebtProv,
+  daiDebtProv,
+  drawnDaiProv,
+  lifetimeFeeProv,
+  collateralFlowAtEventsProv,
+  returnedCollateralProv,
+  collateralPriceChangeProv,
 } from "@/lib/makerdao/event-provenance";
+import type { MakerLeftoverLink } from "@/lib/makerdao/vault-history";
+import { formatDate } from "@/lib/date";
 import { formatNumber } from "@/lib/utils/format";
 import { ilkDebtSymbol, MAKER_STATUS_DUST } from "@/lib/makerdao/asset-catalog";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -60,9 +67,22 @@ export interface MakerLifetimeFlows {
   daiMovedIn: number;
   daiMovedOut: number;
   haveRate: boolean;
+  /** Collateral an auction handed back that the owner moved into the vault
+   *  (counted here, not in `deposited`). */
+  returned: number;
+  /** The collateral flows valued at the OSM price at each event's block, when
+   *  every collateral-moving event has one; null otherwise. */
+  atEvents: { deposited: number; withdrawn: number; liquidated: number; returned: number } | null;
 }
 
-function replayMakerLifetime(events: BaseActivityEvent[]): MakerLifetimeFlows {
+/** What the page knows beyond the rows: each block's OSM price and the rows
+ *  that moved an auction's leftover. */
+export interface MakerHistoryInputs {
+  priceAt?: (block: number) => number | null;
+  leftover?: Map<string, MakerLeftoverLink>;
+}
+
+function replayMakerLifetime(events: BaseActivityEvent[], inputs: MakerHistoryInputs = {}): MakerLifetimeFlows {
   //  • Collateral (exact): signed dink by kind — deposited / withdrawn / liquidated.
   //  • Debt: signed dart in NORMALIZED art (artIn/artRepay/artGrab) for the exact
   //    completeness gate, AND the same deltas valued in DAI at each event's rate
@@ -88,22 +108,45 @@ function replayMakerLifetime(events: BaseActivityEvent[]): MakerLifetimeFlows {
     daiMovedIn: 0,
     daiMovedOut: 0,
     haveRate: events.length > 0,
+    returned: 0,
+    atEvents: null,
   };
+  // Valued at each event's price only while every collateral-moving row has
+  // one; a single unpriced row sends the whole layer back to today's price.
+  let priced = inputs.priceAt != null;
+  const at = { deposited: 0, withdrawn: 0, liquidated: 0, returned: 0 };
   for (const ev of events) {
     if (!isMakerDAOEvent(ev)) continue;
     const d = ev.context.data;
     const isFork = d.eventType === "fork-out" || d.eventType === "fork-in";
     const dink = Number(d.dink);
     if (Number.isFinite(dink) && dink !== 0) {
+      const price =
+        d.eventType === "grab" && d.priceAtBlock?.usd != null
+          ? d.priceAtBlock.usd
+          : (inputs.priceAt?.(ev.blockNumber) ?? null);
       if (isFork) {
         if (dink > 0) f.movedIn += dink;
         else f.movedOut += -dink;
-      } else if (d.eventType === "grab") {
-        if (dink < 0) f.liquidated += -dink;
-      } else if (dink > 0) {
-        f.deposited += dink;
+        priced = false;
       } else {
-        f.withdrawn += -dink;
+        if (price == null) priced = false;
+        const usd = Math.abs(dink) * (price ?? 0);
+        if (d.eventType === "grab") {
+          if (dink < 0) {
+            f.liquidated += -dink;
+            at.liquidated += usd;
+          }
+        } else if (dink > 0 && inputs.leftover?.get(ev.id)?.role === "in") {
+          f.returned += dink;
+          at.returned += usd;
+        } else if (dink > 0) {
+          f.deposited += dink;
+          at.deposited += usd;
+        } else {
+          f.withdrawn += -dink;
+          at.withdrawn += usd;
+        }
       }
     }
     const dart = Number(d.dart);
@@ -134,6 +177,7 @@ function replayMakerLifetime(events: BaseActivityEvent[]): MakerLifetimeFlows {
       }
     }
   }
+  if (priced) f.atEvents = at;
   return f;
 }
 
@@ -165,35 +209,45 @@ export function makerLifetimeWithOpening(
   // below the cut, the events and the folders above it).
   if (!opening && (folders?.length ?? 0) === 0) return undefined;
   const f = replayMakerLifetime(events);
+  // Summarised history carries no per-event price.
+  f.atEvents = null;
   for (const bucket of mergeFlowBuckets(opening?.flows, folderFlows(folders))) {
     for (const [leg, raw] of Object.entries(bucket.legs)) {
-      if (!(leg in f) || leg === "haveRate") continue;
+      if (!(leg in f) || leg === "haveRate" || leg === "atEvents") continue;
       const value = scaleBaseUnits(raw, bucket.decimals);
       if (value == null) return undefined;
-      f[leg as Exclude<keyof MakerLifetimeFlows, "haveRate">] += value;
+      f[leg as Exclude<keyof MakerLifetimeFlows, "haveRate" | "atEvents">] += value;
     }
   }
   return f;
 }
 
-/** The tower data plus the stability fee the vault accrued over its life: the
- *  debt owed now (art × the live rate) less the net debt drawn (generated and
- *  moved in, less repaid, cleared and moved out, each at its block's rate). It
- *  equals the sum of every row's interest since the previous event plus the
- *  accrual since the last event. Undefined where the debt flows do not
- *  reconcile or the live rate is missing. */
-export type MakerTowerData = ChainTruthTowerData & { lifetimeInterest?: number };
+/** The tower data plus what its explanation states beside the rows: the
+ *  stability fee over the vault's life (the debt owed now less every DAI drawn
+ *  net of every repayment and liquidation, each at its block's rate) and its
+ *  parts, and today's value of the collateral the flows valued at event
+ *  prices. */
+export type MakerTowerData = ChainTruthTowerData & {
+  lifetimeInterest?: number;
+  /** The fee in today's debt (the "Stability fee owed" row). */
+  feeOwed?: number;
+  /** The fee inside the debt liquidations cleared. */
+  feeLiquidated?: number;
+  /** The liquidated collateral at today's OSM price. */
+  liquidatedNowUsd?: number;
+  /** Today's OSM price. */
+  priceNow?: number | null;
+  collateralSymbol?: string;
+};
 
 /** Build the USD dual-tower data for a Maker vault from its (chain-state) view.
- *  All three headline numbers — ink, art, art × rate — are already on the view
- *  (the detail page reads them via eth_call on the Vat). Passing the timeline
- *  adds the COLLATERAL-side lifetime flows (deposited / withdrawn / liquidated,
- *  all exact dink sums) and — once each event carries `rateAtBlock` — the
- *  DEBT-side flows (DAI generated / repaid / liquidated, each dart valued at its
- *  block's rate). Both sides are gated on `flowsReconcile`, so a partial capture
- *  suppresses rather than mislabels them; the debt side additionally needs every
- *  dart-bearing event to carry `rateAtBlock`, so it stays empty until the
- *  events-MV column lands. */
+ *  The held figures (ink, art × rate) are on the view (the detail page reads
+ *  them by eth_call on the Vat). Passing the timeline adds the collateral-side
+ *  lifetime flows (exact dink sums; each valued at its event's OSM price when
+ *  the page holds every one of them, at today's otherwise) and, once each event
+ *  carries `rateAtBlock`, the debt-side flows (each dart valued at its block's
+ *  rate). Both sides are gated on `flowsReconcile`, so a partial capture
+ *  suppresses rather than mislabels them. */
 export function computeMakerEconomics(
   view: MakerVaultView,
   events: BaseActivityEvent[] = [],
@@ -203,6 +257,7 @@ export function computeMakerEconomics(
    *  windowed page whose opening balance has not arrived passes NEITHER — the
    *  lifetime layer states nothing rather than a window's arithmetic. */
   precomputedLifetime?: MakerLifetimeFlows,
+  inputs: MakerHistoryInputs & { feeLiquidated?: number } = {},
 ): MakerTowerData {
   const ink = Math.max(0, view.ink);
   const art = Math.max(0, view.art);
@@ -211,11 +266,13 @@ export function computeMakerEconomics(
   // (never a false zero); its receipt says what the trace is.
   const terminal = view.status !== "open";
   const inkResidue = terminal && ink > 0 && ink <= MAKER_STATUS_DUST;
-  const artResidue = terminal && art > 0 && art <= MAKER_STATUS_DUST;
-  const artHuman = formatNumber(art);
-  // Accrued fee = current DAI debt − principal art. Both are Vat reads, so this
-  // is an exact chain read; null only when the rate read was unavailable.
-  const accruedFee = view.debtDai != null ? Math.max(0, view.debtDai - art) : null;
+  const debtDai = view.debtDai != null ? Math.max(0, view.debtDai) : null;
+  // The debt split (lib/makerdao/vault-history.tsx): DAI drawn since the vault
+  // last owed nothing, and the fee on it. Unknown where that start is not
+  // loaded; the debt then stands whole.
+  const drawn = debtDai != null && view.drawnDai != null ? Math.min(Math.max(0, view.drawnDai), debtDai) : null;
+  const feeOwed = debtDai != null && drawn != null ? debtDai - drawn : null;
+  const since = view.drawnSince != null ? `since ${formatDate(view.drawnSince)}` : undefined;
   const collSym = view.collateralSymbol;
   // DAI on CdpManager vaults, USDS on LockStake urns — same Vat unit, $1 axis
   // either way (asset-catalog).
@@ -228,6 +285,7 @@ export function computeMakerEconomics(
     deposited,
     withdrawn,
     liquidated,
+    returned,
     movedIn,
     movedOut,
     artIn,
@@ -241,21 +299,24 @@ export function computeMakerEconomics(
     daiMovedIn,
     daiMovedOut,
     haveRate,
-  } = precomputedLifetime ?? replayMakerLifetime(events);
+    atEvents,
+  } = precomputedLifetime ?? replayMakerLifetime(events, inputs);
   const usd = (amt: number) => (price != null ? amt * price : null);
   // Only surface lifetime flows when the captured events reconcile to the live
   // ink slot — i.e. the history is complete from open. Otherwise (old vault, only
   // a recent window captured) the sums aren't truly all-time, so we suppress them
   // rather than mislabel a partial window as chain state.
   const collComplete = flowsReconcile(
-    deposited + movedIn - withdrawn - liquidated - movedOut,
+    deposited + returned + movedIn - withdrawn - liquidated - movedOut,
     ink,
-    deposited + movedIn + withdrawn + liquidated + movedOut,
+    deposited + returned + movedIn + withdrawn + liquidated + movedOut,
   );
+  const atEventPrices = collComplete && atEvents != null && price != null;
   const flowLine = (
     key: string,
     amt: number,
     flow: "withdrawn" | "liquidated" | "moved out",
+    usdAtEvents: number | null,
     label?: string,
   ): TowerLine[] =>
     collComplete && amt > DUST
@@ -264,12 +325,47 @@ export function computeMakerEconomics(
             key,
             symbol: collSym,
             amount: amt,
-            usd: usd(amt),
-            prov: collateralFlowProv(flow, collSym),
+            usd: atEventPrices && usdAtEvents != null ? usdAtEvents : usd(amt),
+            prov:
+              atEventPrices && usdAtEvents != null && flow !== "moved out"
+                ? collateralFlowAtEventsProv(flow, collSym)
+                : collateralFlowProv(flow, collSym),
             ...(label ? { flowLabel: label } : {}),
           },
         ]
       : [];
+  const returnedLines: TowerLine[] =
+    collComplete && returned > DUST
+      ? [
+          {
+            key: "coll-returned",
+            symbol: collSym,
+            amount: returned,
+            usd: atEventPrices ? atEvents!.returned : usd(returned),
+            prov: atEventPrices ? collateralFlowAtEventsProv("returned", collSym) : returnedCollateralProv(collSym),
+            flowLabel: "Returned by auction",
+          },
+        ]
+      : [];
+  const collInflowUsd = atEventPrices
+    ? atEvents!.deposited
+    : price != null
+      ? (deposited + movedIn) * price
+      : deposited + movedIn;
+  const collPriceChange: TowerLine | null = (() => {
+    if (!atEventPrices || view.collateralUsd == null) return null;
+    const change =
+      view.collateralUsd - (atEvents!.deposited + atEvents!.returned - atEvents!.withdrawn - atEvents!.liquidated);
+    if (Math.abs(change) < 0.5) return null;
+    return {
+      key: "coll-price-change",
+      symbol: "",
+      amount: change,
+      usd: change,
+      prov: collateralPriceChangeProv(collSym),
+      flowLabel: "Price change",
+    };
+  })();
 
   // Debt-side gate is in NORMALIZED art (exact: Σ dart == art). The displayed
   // values are in DAI (each dart × rate@block) — they intentionally differ from
@@ -301,17 +397,41 @@ export function computeMakerEconomics(
         ]
       : [];
 
-  const lifetimeInterest =
-    debtComplete && view.debtDai != null
-      ? view.debtDai - (daiGenerated + daiMovedIn - daiRepaid - daiLiquidated - daiMovedOut)
-      : undefined;
+  const netDrawn = daiGenerated + daiMovedIn - daiRepaid - daiLiquidated - daiMovedOut;
+  const lifetimeInterest = debtComplete && debtDai != null ? debtDai - netDrawn : undefined;
+  // The fee over the vault's life, as a "+" row beside the all-time borrowing:
+  // its value sits inside the fee owed now and inside the repaid and
+  // liquidated rows, so borrowed + fee reaches owed + repaid + liquidated.
+  const feeEarned: TowerLine[] =
+    lifetimeInterest != null && lifetimeInterest > DUST && debtDai != null
+      ? [
+          {
+            key: "debt-fee-life",
+            symbol: debtSym,
+            amount: lifetimeInterest,
+            usd: lifetimeInterest,
+            prov: lifetimeFeeProv({
+              debt: `${formatNumber(debtDai)} ${debtSym}`,
+              net: `${formatNumber(netDrawn)} ${debtSym}`,
+            }),
+            flowLabel: "Stability fee (all time)",
+          },
+        ]
+      : [];
 
   return {
     ...(lifetimeInterest != null ? { lifetimeInterest } : {}),
+    ...(feeOwed != null ? { feeOwed } : {}),
+    ...(inputs.feeLiquidated != null ? { feeLiquidated: inputs.feeLiquidated } : {}),
+    ...(price != null && liquidated > DUST ? { liquidatedNowUsd: liquidated * price } : {}),
+    priceNow: price,
+    collateralSymbol: collSym,
     valued: true,
     // The USD scale is the on-chain OSM price (Spotter spot × mat), so the valued
     // bars are chain-derived and survive On-chain-values mode.
     priceKind: "chain-derived",
+    flowsPricedAtEvents: atEventPrices,
+    interestLabel: "Stability fee owed",
     collateral: {
       current:
         ink > 0
@@ -326,37 +446,53 @@ export function computeMakerEconomics(
             ]
           : [],
       interest: null,
+      ...(returnedLines.length > 0 ? { received: returnedLines } : {}),
       exited: [
-        ...flowLine("coll-withdrawn", withdrawn, "withdrawn"),
-        ...flowLine("coll-moved-out", movedOut, "moved out", "Moved out"),
+        ...flowLine("coll-withdrawn", withdrawn, "withdrawn", atEvents?.withdrawn ?? null),
+        ...flowLine("coll-moved-out", movedOut, "moved out", null, "Moved out"),
       ],
-      liquidated: flowLine("coll-liquidated", liquidated, "liquidated"),
-      lifetimeInflow: collComplete ? (price != null ? (deposited + movedIn) * price : deposited + movedIn) : 0,
+      liquidated: flowLine("coll-liquidated", liquidated, "liquidated", atEvents?.liquidated ?? null),
+      lifetimeInflow: collComplete ? collInflowUsd : 0,
+      priceChange: collPriceChange,
     },
     debt: {
       current:
-        art > 0
+        debtDai != null && debtDai > DUST
           ? [
-              {
-                key: "principal",
-                symbol: debtSym,
-                amount: art,
-                // DAI valued at $1 — the same axis as the OSM-priced collateral.
-                usd: art,
-                prov: vaultArtProv(view.atBlock, artResidue, view.source),
-              },
+              drawn != null
+                ? {
+                    key: "principal",
+                    symbol: debtSym,
+                    amount: drawn,
+                    // DAI valued at $1 — the same axis as the OSM-priced collateral.
+                    usd: drawn,
+                    heldLabel: "Drawn",
+                    prov: drawnDaiProv({ drawn: `${formatNumber(drawn)} ${debtSym}`, since }),
+                  }
+                : {
+                    key: "debt",
+                    symbol: debtSym,
+                    amount: debtDai,
+                    usd: debtDai,
+                    prov: daiDebtProv(formatNumber(art), view.rate ?? "", debtSym),
+                  },
             ]
           : [],
       interest:
-        accruedFee != null && accruedFee > 0 && view.rate != null
+        feeOwed != null && feeOwed > DUST
           ? {
               key: "fee",
               symbol: debtSym,
-              amount: accruedFee,
-              usd: accruedFee,
-              prov: stabilityFeeProv(artHuman, view.rate),
+              amount: feeOwed,
+              usd: feeOwed,
+              prov: feeInDebtProv({
+                debt: `${formatNumber(debtDai ?? 0)} ${debtSym}`,
+                drawn: `${formatNumber(drawn ?? 0)} ${debtSym}`,
+                since,
+              }),
             }
           : null,
+      ...(feeEarned.length > 0 ? { earned: feeEarned } : {}),
       exited: [
         ...debtFlowLine("debt-repaid", daiRepaid, "repaid"),
         ...debtFlowLine("debt-moved-out", daiMovedOut, "moved out", "Moved out"),

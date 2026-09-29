@@ -15,7 +15,7 @@ import { dinkProv, debtDeltaOf, type MakerCoords } from "@/lib/makerdao/event-pr
 import { makerdaoExplainerTeaser } from "@/lib/makerdao/explainer-clauses";
 import { MakerDAOEventHeader } from "./makerdao-event-header";
 import { MakerDAOEventDetail } from "./makerdao-event-detail";
-import { MakerDAOEventExplainer, makerdaoLearnMoreContent } from "./makerdao-event-explainer";
+import { MakerDAOEventExplainer, makerdaoLearnMoreContent, useMakerRowExtras } from "./makerdao-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 
 export interface MakerDAOEventCardProps {
@@ -54,6 +54,8 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
   const coords: MakerCoords = { txHash: event.txHash, blockNumber: event.blockNumber, urn: ctx.urn, ilk: ctx.ilk };
   const labeled = ctx.eventType === "frob";
   const debt = debtDeltaOf(ctx, ilkDebtSymbol(ctx.ilk), coords);
+  // The closed card reads only what the page holds (no chain call per row).
+  const extras = useMakerRowExtras(ctx, event.id, event.txHash, event.blockNumber, false);
 
   // Token chips: collateral (dink) + debt (dart; DAI, or USDS on LockStake
   // urns). direction "right" = toward the protocol (deposit / repay), "left" =
@@ -146,11 +148,19 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
       }
       detail={<MakerDAOEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
       detailLabel="Vault state"
-      explainer={<MakerDAOEventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} skipLead />}
+      explainer={
+        <MakerDAOEventExplainer
+          ctx={ctx}
+          eventId={event.id}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          skipLead
+        />
+      }
       explainerLabel="Plain English"
-      explainerTeaser={makerdaoExplainerTeaser(ctx, coords)}
+      explainerTeaser={makerdaoExplainerTeaser(ctx, coords, extras)}
       txHash={event.txHash}
-      learnMore={<LearnMore inline content={makerdaoLearnMoreContent(ctx)} />}
+      learnMore={<LearnMore inline content={makerdaoLearnMoreContent(ctx, extras.leftover != null)} />}
       persistKey={`makerdao:${event.id}`}
     />
   );
