@@ -115,10 +115,11 @@ export interface RawFxTransferRow {
   to_is_contract: boolean | null;
 }
 
-/** One socialized-lane row — a rebalance the route's tick-lineage replay
- *  attributed to this position: a one-tick `RebalanceTick` (kind "tick") or
- *  the pool-wide `Rebalance` (kind "pool", no tick). Amounts are the whole
- *  tick's (or pool's) clear; collateral in token units. */
+/** One socialized-lane row — a rebalance or liquidation the route's
+ *  tick-lineage replay attributed to this position: a one-tick
+ *  `RebalanceTick` (kind "tick"), the pool-wide `Rebalance` (kind "pool", no
+ *  tick) or the pool-wide `Liquidate` (kind "liquidate", no tick; mig 369).
+ *  Amounts are the whole tick's (or pool's); collateral in token units. */
 export interface RawFxSocializedRow {
   block_number: string;
   block_timestamp: string | null;
@@ -131,7 +132,10 @@ export interface RawFxSocializedRow {
   fx_usd_debts: string;
   stable_debts: string;
   /** Absent on a payload from before the route sent it: a one-tick row. */
-  kind?: "tick" | "pool";
+  kind?: "tick" | "pool" | "liquidate";
+  /** Pool-wide rows: the tick the position's shares moved to (-32768 = the
+   *  tick was liquidated whole). */
+  moved_to_tick?: string;
 }
 
 /** The rails timeline response envelope. */
@@ -397,6 +401,42 @@ export function buildFxTimeline(resp: RawFxTimelineResponse): FxTimelineResult {
   // that way, carries no position flows, and reads the position's own change
   // when the row is opened.
   for (const s of resp.socialized ?? []) {
+    if (s.kind === "liquidate") {
+      // A pool-wide Liquidate: the run liquidated this position's tick. Its
+      // amounts are the whole run's, so they ride the pool fields and the
+      // row's debtDelta stays 0 (the lifetime sums count the position's own
+      // events only); the row read states the position's change.
+      const emptied = s.moved_to_tick === "-32768";
+      const context: FxContext = {
+        eventType: "liquidation",
+        pool: position.pool,
+        poolSymbol: meta.tokenSymbol,
+        positionId: position.positionId,
+        debtDelta: "0",
+        impliedDebtAfter: "0",
+        poolWide: true,
+        rebalancedTick: Number(s.position_tick),
+        tickRebColls: fmtUnits(s.colls, meta.tokenDecimals),
+        tickRebFxusdDebts: fmtUnits(s.fx_usd_debts, 18),
+        tickRebStableDebts: fmtUnits(s.stable_debts, 18),
+        ...(emptied ? { emptiesPosition: true } : {}),
+        ...(s.tx_from ? { txFrom: s.tx_from.toLowerCase() } : {}),
+        ...ownerFacts(orderKey(s.block_number, s.log_index)),
+      };
+      events.push({
+        id: `${s.tx_hash}:${s.log_index}`,
+        txHash: s.tx_hash,
+        blockNumber: Number(s.block_number),
+        timestamp: s.block_timestamp != null ? Number(s.block_timestamp) : 0,
+        wallet,
+        actionType: "liquidatePosition",
+        actionLabel: "Pool Liquidation",
+        flows: [],
+        etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", s.tx_hash),
+        context: { protocol: "fx" as const, data: context },
+      });
+      continue;
+    }
     const poolWide = s.kind === "pool";
     const context: FxContext = {
       eventType: "tickRebalance",

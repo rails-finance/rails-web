@@ -39,10 +39,18 @@ import {
   oracleMinPriceProv,
   poolLineProv,
   triggerPriceProv,
+  oracleLegAtProv,
+  anchorUsdProv,
+  minRatioProv,
+  minTriggerPriceProv,
   rebalanceClearedProv,
   otherDebtMovesProv,
+  socializedCollTakenProv,
+  fundingTakenProv,
 } from "@/lib/fx/event-provenance";
-import { useFxPoolTerms, useFxRebalanceReads, type FxPoolTerms } from "@/lib/fx/use-event-state";
+import { useFxPoolTerms, useFxPricesAt, type FxPoolTerms } from "@/lib/fx/use-event-state";
+import { fxBlocksChange } from "@/lib/fx/socialized-reads";
+import type { FxStateAt } from "@/lib/sources/chain/fx-event-state";
 import { formatDate } from "@/lib/date";
 import { FX_POOLS } from "@/lib/fx/asset-catalog";
 import { fxPositionContent } from "@/lib/fx/position-content";
@@ -70,31 +78,36 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 
 const short = (a: string | null): string => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
 
-/** The rebalance rows a detail page holds, for the debt line's split. */
+/** The socialized rows a detail page holds (rebalances and pool-wide
+ *  liquidations), with the position read at each of their blocks
+ *  (lib/fx/socialized-reads.tsx), for the card's split. */
 export interface FxRebalanceRows {
   blocks: number[];
   firstTs: number;
   lastTs: number;
+  /** How many of the rows are pool-wide liquidations. */
+  liquidations?: number;
   /** Blocks that also carry one of the position's own events: a block read
    *  there mixes the two, so the split is not stated. */
   ownEventBlocks: number[];
+  reads?: Record<string, FxStateAt> | null;
 }
 
-/** Debt cleared by the rebalance rows: Σ over their blocks of the position's
- *  debt at block − 1 less at the block. Null until every block has read. */
-function useRebalanceCleared(v: FxPositionView, rows?: FxRebalanceRows): number | null {
-  const blocks = rows && rows.blocks.length <= 60 ? rows.blocks : [];
-  const reads = useFxRebalanceReads(v.pool, v.positionId, blocks);
-  if (!rows || blocks.length === 0 || !reads) return null;
-  if (blocks.some((b) => rows.ownEventBlocks.includes(b))) return null;
-  let cleared = 0;
-  for (const b of new Set(blocks)) {
-    const before = reads.reads[String(b - 1)]?.debts;
-    const after = reads.reads[String(b)]?.debts;
-    if (before == null || after == null) return null;
-    cleared += (Number(before) - Number(after)) / 1e18;
-  }
-  return cleared;
+/** What the socialized rows took from the position: Σ over their blocks of
+ *  getPosition at block − 1 less at the block, collateral and debt. Null until
+ *  every block has read, or where a block also holds an own event. */
+function socializedTaken(rows?: FxRebalanceRows): { coll: number; debt: number } | null {
+  if (!rows || rows.blocks.length === 0 || !rows.reads) return null;
+  if (rows.blocks.some((b) => rows.ownEventBlocks.includes(b))) return null;
+  const c = fxBlocksChange(rows.reads, rows.blocks);
+  return c ? { coll: -c.coll, debt: -c.debt } : null;
+}
+
+/** "rebalances", "liquidations" or "rebalances and liquidations". */
+function rowsNoun(rows: FxRebalanceRows): string {
+  const liq = rows.liquidations ?? 0;
+  const reb = rows.blocks.length - liq;
+  return liq === 0 ? "rebalances" : reb === 0 ? "liquidations" : "rebalances and liquidations";
 }
 
 const dateSpan = (a: number, b: number): string =>
@@ -105,7 +118,8 @@ const dateSpan = (a: number, b: number): string =>
  *  what the rebalance rows cleared (read per row) and the rest, which is other
  *  positions' bad debt added through the debt index; on the listing, the net. */
 function SocializedLine({ v, rows }: { v: FxPositionView; rows?: FxRebalanceRows }) {
-  const cleared = useRebalanceCleared(v, rows);
+  const taken = socializedTaken(rows);
+  const cleared = taken?.debt ?? null;
   const impliedHuman = formatNumber(v.impliedDebt.amount);
   if (v.activity.eventCount === 0) {
     // Chain-only position: the contract minted it via a path that emits no
@@ -144,7 +158,7 @@ function SocializedLine({ v, rows }: { v: FxPositionView; rows?: FxRebalanceRows
         <Prov info={rebalanceClearedProv(n)}>
           <AmountText value={cleared} /> fxUSD
         </Prov>{" "}
-        cleared by rebalances without the owner&apos;s transaction ({dateSpan(rows.firstTs, rows.lastTs)})
+        cleared by {rowsNoun(rows)} without the owner&apos;s transaction ({dateSpan(rows.firstTs, rows.lastTs)})
         {Math.abs(other) > 0.005 ? (
           <>
             {" · "}
@@ -177,19 +191,33 @@ function SocializedLine({ v, rows }: { v: FxPositionView; rows?: FxRebalanceRows
   );
 }
 
-/** Beside the debt ratio: the price it is judged at, the pool's lines, and the
- *  price at which this position reaches the rebalance line. */
-function RatioFootnote({ v, terms }: { v: FxPositionView; terms: FxPoolTerms | null }) {
+/** Beside the debt ratio: the anchor price it is read at, the min price the
+ *  pool's lines are judged at (both read at the settled block), the lines, and
+ *  the min price at which this position reaches each. */
+function RatioFootnote({
+  v,
+  terms,
+  px,
+}: {
+  v: FxPositionView;
+  terms: FxPoolTerms | null;
+  px: { anchor: number; min: number; block: number } | null;
+}) {
   const { colls, debts, debtRatio } = v.settled;
   if (colls == null || debts == null || debtRatio == null || colls <= 0 || debtRatio <= 0) return null;
-  const anchor = debts / (colls * debtRatio);
+  const anchor = px?.anchor ?? debts / (colls * debtRatio);
   const sym = v.normalizedSymbol;
   const pctLine = (r: number) => `${(r * 100).toFixed(1).replace(/\.0$/, "")}%`;
-  const trigger = terms ? anchor * (debtRatio / terms.rebalanceRatio) : null;
+  const fall = (p: number, from: number) => `−${((1 - p / from) * 100).toFixed(1)}%`;
+  const minRatio = px ? debts / (colls * px.min) : null;
   return (
     <>
       <StatFootnote>
-        at the anchor price <Prov info={anchorPriceProv(sym, v.settled.block)}>{formatUsd(anchor)}</Prov> per {sym}
+        at the anchor price{" "}
+        <Prov info={px ? oracleLegAtProv("anchor", sym, px.block) : anchorPriceProv(sym, v.settled.block)}>
+          {formatUsd(anchor)}
+        </Prov>{" "}
+        per {sym}
         {v.settled.block != null ? (
           <>
             {" "}
@@ -197,24 +225,51 @@ function RatioFootnote({ v, terms }: { v: FxPositionView; terms: FxPoolTerms | n
           </>
         ) : null}
       </StatFootnote>
-      {terms && trigger != null ? (
-        <>
-          <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-            rebalancing from <Prov info={poolLineProv("rebalance", terms.block)}>{pctLine(terms.rebalanceRatio)}</Prov>,
-            liquidation from <Prov info={poolLineProv("liquidate", terms.block)}>{pctLine(terms.liquidateRatio)}</Prov>
-          </div>
-          <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-            {debtRatio >= terms.rebalanceRatio ? (
-              <>at or past the rebalance line now</>
-            ) : (
-              <>
-                reaches {pctLine(terms.rebalanceRatio)} if the anchor price falls to{" "}
-                <Prov info={triggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>{formatUsd(trigger)}</Prov> (−
-                {((1 - debtRatio / terms.rebalanceRatio) * 100).toFixed(1)}%)
-              </>
-            )}
-          </div>
-        </>
+      {px && minRatio != null ? (
+        <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+          <Prov info={minRatioProv(px.block)}>{(minRatio * 100).toFixed(1)}%</Prov> at the min price{" "}
+          <Prov info={oracleLegAtProv("min", sym, px.block)}>{formatUsd(px.min)}</Prov>, the price the pool&apos;s lines
+          are judged at
+        </div>
+      ) : null}
+      {terms ? (
+        <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+          rebalancing from <Prov info={poolLineProv("rebalance", terms.block)}>{pctLine(terms.rebalanceRatio)}</Prov>,
+          liquidation from <Prov info={poolLineProv("liquidate", terms.block)}>{pctLine(terms.liquidateRatio)}</Prov>
+        </div>
+      ) : null}
+      {terms && px && minRatio != null ? (
+        <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+          {minRatio >= terms.rebalanceRatio ? (
+            <>at or past the rebalance line now</>
+          ) : (
+            <>
+              {pctLine(terms.rebalanceRatio)} if the min price falls to{" "}
+              <Prov info={minTriggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>
+                {formatUsd(debts / (colls * terms.rebalanceRatio))}
+              </Prov>{" "}
+              ({fall(debts / (colls * terms.rebalanceRatio), px.min)}), {pctLine(terms.liquidateRatio)} at{" "}
+              <Prov info={minTriggerPriceProv(pctLine(terms.liquidateRatio), sym)}>
+                {formatUsd(debts / (colls * terms.liquidateRatio))}
+              </Prov>{" "}
+              ({fall(debts / (colls * terms.liquidateRatio), px.min)})
+            </>
+          )}
+        </div>
+      ) : terms ? (
+        <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+          {debtRatio >= terms.rebalanceRatio ? (
+            <>at or past the rebalance line now</>
+          ) : (
+            <>
+              reaches {pctLine(terms.rebalanceRatio)} if the anchor price falls to{" "}
+              <Prov info={triggerPriceProv(pctLine(terms.rebalanceRatio), sym)}>
+                {formatUsd(anchor * (debtRatio / terms.rebalanceRatio))}
+              </Prov>{" "}
+              ({fall(anchor * (debtRatio / terms.rebalanceRatio), anchor)})
+            </>
+          )}
+        </div>
       ) : null}
     </>
   );
@@ -228,9 +283,29 @@ function RatioFootnote({ v, terms }: { v: FxPositionView; terms: FxPoolTerms | n
  *  ends at the same settled sweep the collateral figure comes from). Rendered
  *  once the intervals have arrived; while a long history is still being read,
  *  the line says how much of the life it covers. */
-function CollateralDriftLine({ v, drift }: { v: FxPositionView; drift: FxDriftResult }) {
+function CollateralDriftLine({ v, drift, rows }: { v: FxPositionView; drift: FxDriftResult; rows?: FxRebalanceRows }) {
   if (drift.intervals.length === 0) return null;
   const s = summariseFxDrift(drift);
+  const taken = s.complete ? socializedTaken(rows) : null;
+  const funding = taken ? -s.collsDrift - taken.coll : null;
+  // Funding and the rows apart: the rows' blocks read one by one, funding the
+  // remainder of the drift (never below zero; if it is, the line keeps the
+  // two together).
+  if (taken && rows && funding != null && funding >= -DUST && Math.abs(s.collsDrift) > DUST) {
+    const n = rows.blocks.length;
+    return (
+      <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+        without the owner&apos;s transaction, {rowsNoun(rows)} took{" "}
+        <Prov info={socializedCollTakenProv(v.normalizedSymbol, n)}>
+          <AmountText value={Math.abs(taken.coll)} /> {v.normalizedSymbol}
+        </Prov>{" "}
+        and funding took{" "}
+        <Prov info={fundingTakenProv(v.normalizedSymbol)}>
+          <AmountText value={Math.abs(funding)} /> {v.normalizedSymbol}
+        </Prov>
+      </div>
+    );
+  }
   const scope = s.complete
     ? "without the owner's transaction"
     : `over the latest ${s.intervals} stretch${s.intervals === 1 ? "" : "es"} read so far`;
@@ -253,10 +328,19 @@ function CollateralDriftLine({ v, drift }: { v: FxPositionView; drift: FxDriftRe
   );
 }
 
-/** Oracle-USD footnote for the settled collateral — the pool's own oracle
- *  price per NORMALIZED unit, with the block it was read at named in the
- *  visible caption as well as the receipt. */
-function CollateralUsdFootnote({ v }: { v: FxPositionView }) {
+/** The settled collateral in USD. On the detail page it is valued at the
+ *  anchor price of the settled block (read with the min leg beside it), so
+ *  the debt divided by it is the debt ratio; the listing keeps the sweep's
+ *  stored min-price reading and names its block. */
+function CollateralUsdFootnote({ v, px }: { v: FxPositionView; px?: { anchor: number; block: number } | null }) {
+  if (px && v.settled.colls != null) {
+    return (
+      <StatFootnote>
+        <Prov info={anchorUsdProv(v.normalizedSymbol, px.block)}>{formatUsd(v.settled.colls * px.anchor)}</Prov> at the
+        anchor price
+      </StatFootnote>
+    );
+  }
   if (v.settled.collUsd == null || v.settled.colls == null || v.oracle.priceUsd == null) return null;
   return (
     <StatFootnote>
@@ -305,6 +389,12 @@ export function FxPositionCard({
   const st = STATUS[v.status] ?? STATUS.unknown;
   const poolMeta = FX_POOLS[v.pool];
   const terms = useFxPoolTerms(receipts ? v.pool : null);
+  // The oracle's anchor and min legs at the settled block (detail page only).
+  const pxRead = useFxPricesAt(v.pool, v.positionId, receipts && v.status === "open" ? v.settled.block : null);
+  const px =
+    pxRead?.anchorPrice != null && pxRead.minPrice != null && v.settled.block != null
+      ? { anchor: Number(pxRead.anchorPrice) / 1e18, min: Number(pxRead.minPrice) / 1e18, block: v.settled.block }
+      : null;
 
   const identityLead = (
     <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
@@ -388,7 +478,7 @@ export function FxPositionCard({
               <StatDash />
             )
           }
-          collateralFootnote={drift ? <CollateralDriftLine v={v} drift={drift} /> : undefined}
+          collateralFootnote={drift ? <CollateralDriftLine v={v} drift={drift} rows={rebalanceRows} /> : undefined}
           debtFootnote={<SocializedLine v={v} rows={rebalanceRows} />}
         />
         {bodyExtra && <div className="mt-3 border-t border-rb-300/40 pt-3 dark:border-rb-700/40">{bodyExtra}</div>}
@@ -451,8 +541,8 @@ export function FxPositionCard({
               ),
             footnote: (
               <>
-                <CollateralUsdFootnote v={v} />
-                {drift ? <CollateralDriftLine v={v} drift={drift} /> : null}
+                <CollateralUsdFootnote v={v} px={px} />
+                {drift ? <CollateralDriftLine v={v} drift={drift} rows={rebalanceRows} /> : null}
               </>
             ),
           },
@@ -486,7 +576,7 @@ export function FxPositionCard({
               ) : (
                 <StatDash />
               ),
-            footnote: receipts ? <RatioFootnote v={v} terms={terms} /> : undefined,
+            footnote: receipts ? <RatioFootnote v={v} terms={terms} px={px} /> : undefined,
           },
         ]}
       />

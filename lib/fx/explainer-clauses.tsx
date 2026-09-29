@@ -67,7 +67,7 @@ import {
 } from "@/lib/fx/event-provenance";
 import type { FxSide } from "@/lib/fx/use-event-state";
 import type { FxFeeSchedule } from "@/lib/sources/chain/fx-event-state";
-import { fxRowFees } from "@/lib/fx/row-figures";
+import { fxRowFees, fxFeePct, fxScheduleWords } from "@/lib/fx/row-figures";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
 import { fxExternalActor } from "@/lib/fx/external-actor";
 import { formatExact, formatNumber, formatTinyNonZero } from "@/lib/utils/format";
@@ -120,37 +120,58 @@ const shortAddr = (a?: string): string => (a ? `${a.slice(0, 6)}…${a.slice(-4)
  *  the position's (EOA) owner — the SAME verdict fxExternalActor() decides, so
  *  the clause appears exactly where the chip does.
  *
- *  The authority is f(x)'s own and must not be borrowed from a sibling
- *  explorer. `PoolManager.operate` forwards its caller into `BasePool.operate`,
- *  which checks ownership on ONE side only:
+ *  The authority is f(x)'s own. `PoolManager.operate` forwards its caller into
+ *  `BasePool.operate`, which checks ownership on ONE side only:
  *
  *      if (ownerOf(positionId) != owner && (newRawColl < 0 || newRawDebt > 0))
  *          revert ErrorNotPositionOwner();
  *
- *  So adding collateral or repaying debt on any position skips the check
- *  entirely, while taking value out is a strict equality against the NFT
- *  holder — with NO delegation path at all. Each pool is an ERC-721 and so has
- *  `approve` / `setApprovalForAll`, but the operate path never consults them;
- *  only an outright transfer of the position changes who passes. That is why
- *  this must never read "the owner approved them".
- *
- *  ⚠️ Which is also why there is no value-REMOVING branch. A marked row cannot
- *  be a withdraw or a borrow: the caller PoolManager forwards is the immediate
- *  caller (a router is itself the caller, not a proxy for its user), and an EOA
- *  can only be that caller by sending the transaction — so on a value-removing
- *  operate an EOA owner is necessarily the signer, and the verdict declines.
- *  A zero-delta operate is likewise left unexplained rather than guessed at. */
-function permissionlessActorMechanic(ctx: FxContext): ClauseInput {
-  if (!fxExternalActor(ctx)) return null;
+ *  Adding collateral or repaying debt skips the check; taking value out needs
+ *  the manager's caller to hold the NFT at that moment. A contract the holder
+ *  has approved on the pool's ERC-721 can move the NFT to itself for one
+ *  transaction and hand it back: f(x)'s router does this for the holder who
+ *  calls it, and its Limit Order Manager for an order the holder signed
+ *  (LimitOrderManager.fillOrder, filled by anyone; wbtc-484's 6 Feb 2026
+ *  borrow, tx 0x901105d7…). So a marked withdraw or borrow means the NFT
+ *  passed through the manager's caller in the transaction; the row's read
+ *  names that caller and any filled order. */
+function permissionlessActorMechanic(ctx: FxContext, read?: FxRowRead): ClauseInput {
+  const signer = fxExternalActor(ctx);
+  if (!signer) return null;
   const coll = Number(ctx.collDelta ?? "0") || 0;
   const debt = Number(ctx.debtDelta ?? "0") || 0;
+  const takesOut = coll < 0 || debt > 0;
+  const fees = read?.fees;
+  if (fees?.limitOrder && fees.limitOrder.maker === ctx.ownerAt) {
+    return clause(
+      <>
+        {shortAddr(signer)} sent this transaction to fill a limit order the holder ({shortAddr(fees.limitOrder.maker)})
+        had signed. The f(x) Limit Order Manager, which the holder had approved to move its position NFTs, took this NFT
+        for the transaction, called the manager as its holder, and returned it; the filler (
+        {shortAddr(fees.limitOrder.taker)}) supplied the {ctx.poolSymbol} and took the fxUSD the order named. The pool
+        lets only the NFT&rsquo;s holder at the moment of the call withdraw or borrow, and here that was the Limit Order
+        Manager.
+      </>,
+    );
+  }
+  if (takesOut) {
+    return fees && fees.caller !== ctx.ownerAt
+      ? clause(
+          <>
+            {shortAddr(signer)} sent this transaction, and {shortAddr(fees.caller)} called the manager. The pool lets
+            only the NFT&rsquo;s holder at the moment of the call withdraw or borrow, so the NFT passed through{" "}
+            {shortAddr(fees.caller)} in this transaction: a contract the holder has approved can take it for one
+            transaction and return it.
+          </>,
+        )
+      : null;
+  }
   if (!(coll > 0 || debt < 0)) return null;
   return clause(
     <>
-      Someone other than the position&rsquo;s owner executed this. f(x) checks ownership only on the way out: adding
-      collateral to, or repaying the debt of, any position is open to anyone, so this needed nothing from the owner.
-      Taking value back out is the opposite — the pool compares the caller against the position&rsquo;s holder directly,
-      and no approval can stand in for being that holder.
+      Someone other than the position&rsquo;s owner executed this. Adding collateral to, or repaying the debt of, any
+      position is open to anyone, so this needed nothing from the owner. Withdrawing or borrowing needs the
+      manager&rsquo;s caller to hold the NFT at that moment.
     </>,
   );
 }
@@ -159,7 +180,7 @@ function permissionlessActorMechanic(ctx: FxContext): ClauseInput {
 
 export function fxEventSlots(ctx: FxContext, coords: FxCoords, read?: FxRowRead): EventProseSlots {
   const slots = fxEventSlotsBase(ctx, coords, read ?? { before: null, after: null });
-  const actor = permissionlessActorMechanic(ctx);
+  const actor = permissionlessActorMechanic(ctx, read);
   if (!actor) return slots;
   return { ...slots, meansNow: [...(slots.meansNow ?? []), actor] };
 }
@@ -301,29 +322,38 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
         </>,
       );
     if (!read.fees) return null;
-    const legs = fxRowFees(ctx, read.fees);
-    const charged = legs.filter((f) => f.amount > 0);
-    const caller = `${read.fees.caller.slice(0, 6)}…${read.fees.caller.slice(-4)}`;
-    if (charged.length === 0)
-      return clause(
-        <>
-          The pool&rsquo;s fee schedule for the contract this transaction called ({caller}) charged nothing on this row.
-        </>,
-      );
-    return clause(
+    const f = read.fees;
+    const legs = fxRowFees(ctx, f);
+    const charged = legs.filter((l) => l.amount > 0);
+    const who =
+      f.caller === ctx.ownerAt
+        ? `the owner's address (${shortAddr(f.caller)})${f.signer === f.caller ? ", which sent the transaction" : ""}`
+        : f.limitOrder && f.caller === f.limitOrder.manager
+          ? "the f(x) Limit Order Manager"
+          : `the contract that called the manager (${shortAddr(f.caller)})`;
+    const schedule = f.custom ? "the schedule the pool sets for that caller" : "the pool's default schedule";
+    const legList = (
       <>
-        The pool charged the contract this transaction called ({caller}){" "}
-        {charged.map((f, i) => (
-          <span key={f.leg}>
+        {charged.map((l, i) => (
+          <span key={l.leg}>
             {i > 0 ? " and " : ""}
-            {(f.ratio * 100).toFixed(2).replace(/\.?0+$/, "")}% {f.leg} (
-            <Prov echo info={feeScheduleProv(read.fees!.caller, coords)} value={String(f.amount)}>
-              {formatNumber(f.amount)} {f.symbol === "token" ? sym : "fxUSD"}
+            {fxFeePct(l.ratio)} {l.leg} (
+            <Prov echo info={feeScheduleProv(f.caller, coords)} value={String(l.amount)}>
+              {formatNumber(l.amount)} {l.symbol === "token" ? sym : "fxUSD"}
             </Prov>
             )
           </span>
         ))}
-        .
+      </>
+    );
+    const d = f.defaults;
+    const defaultNote =
+      f.custom && d ? <> The pool&rsquo;s default at this block charges {fxScheduleWords(d)}.</> : null;
+    return clause(
+      <>
+        The manager charges the account that calls it; here that was {who}, on {schedule}
+        {charged.length === 0 ? <>, which charged nothing on this row.</> : <>: {legList}.</>}
+        {defaultNote}
       </>,
     );
   };

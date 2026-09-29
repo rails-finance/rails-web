@@ -41,6 +41,8 @@ import { fxLoans } from "@/lib/fx/loans";
 import { summariseFxExternalActors } from "@/lib/fx/external-actor";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { FxDriftPanel } from "@/components/protocol/fx/fx-drift-panel";
+import { FxSocializedReadsContext } from "@/lib/fx/socialized-reads";
+import { useFxPositionReads } from "@/lib/fx/use-event-state";
 import { fetchFxDrift, FxDriftError, type FxDriftResult } from "@/lib/sources/api/fx-drift";
 import { computeFxEconomics, fxDebtFlowsWithOpening } from "@/lib/fx/economics";
 import { fxEconomicsExplanation, fxEconomicsContent } from "@/lib/fx/economics-explanation";
@@ -160,7 +162,12 @@ export default function FxPositionView({
   const [driftReason, setDriftReason] = useState<string | null>(null);
   const driftRequested = useRef(false);
   const hasOwnEvents = useMemo(
-    () => fxEvents.some((e) => e.context.data.eventType === "operate" || e.context.data.eventType === "liquidation"),
+    () =>
+      fxEvents.some(
+        (e) =>
+          e.context.data.eventType === "operate" ||
+          (e.context.data.eventType === "liquidation" && !e.context.data.poolWide),
+      ),
     [fxEvents],
   );
   const loadDrift = useCallback(async () => {
@@ -191,20 +198,51 @@ export default function FxPositionView({
     return perBlock;
   }, [fxEvents]);
 
-  // The rebalance rows, for the card's debt line (what they cleared, read per
+  // The socialized rows (rebalances, pool-wide liquidations): the position is
+  // read at each of their blocks once, for the card's split, each row's own
+  // change in its header and each run's total (lib/fx/socialized-reads.tsx).
+  const socializedRows = useMemo(
+    () =>
+      fxEvents.filter(
+        (e) =>
+          e.context.data.eventType === "tickRebalance" ||
+          (e.context.data.eventType === "liquidation" && e.context.data.poolWide === true),
+      ),
+    [fxEvents],
+  );
+  const socializedBlocks = useMemo(() => socializedRows.map((e) => e.blockNumber), [socializedRows]);
+  const socializedReadsMap = useFxPositionReads(parsed?.pool ?? "", parsed?.positionId ?? "", socializedBlocks);
+  const socializedReads = useMemo(() => {
+    const leads = new Set<string>();
+    const seen = new Set<number>();
+    for (const e of socializedRows) {
+      if (seen.has(e.blockNumber)) continue;
+      seen.add(e.blockNumber);
+      leads.add(e.id);
+    }
+    return { reads: socializedReadsMap, leads };
+  }, [socializedRows, socializedReadsMap]);
+
+  // The socialized rows, for the card's lines (what they took, read per
   // block), and the loans this NFT has carried.
   const rebalanceRows = useMemo(() => {
-    const reb = fxEvents.filter((e) => e.context.data.eventType === "tickRebalance");
+    const reb = socializedRows;
     if (reb.length === 0) return undefined;
     return {
       blocks: reb.map((e) => e.blockNumber),
       firstTs: reb[0].timestamp,
       lastTs: reb[reb.length - 1].timestamp,
+      liquidations: reb.filter((e) => e.context.data.eventType === "liquidation").length,
       ownEventBlocks: fxEvents
-        .filter((e) => e.context.data.eventType === "operate" || e.context.data.eventType === "liquidation")
+        .filter(
+          (e) =>
+            e.context.data.eventType === "operate" ||
+            (e.context.data.eventType === "liquidation" && !e.context.data.poolWide),
+        )
         .map((e) => e.blockNumber),
+      reads: socializedReadsMap,
     };
-  }, [fxEvents]);
+  }, [fxEvents, socializedRows, socializedReadsMap]);
   const loans = useMemo(() => fxLoans(fxEvents), [fxEvents]);
   const blockDates = useMemo(() => new Map(fxEvents.map((e) => [e.blockNumber, e.timestamp])), [fxEvents]);
 
@@ -347,48 +385,50 @@ export default function FxPositionView({
               pool&rsquo;s own current figures above describe it.
             </div>
           )}
-          <ChainTruthTimeline
-            csvExportCeiling={null}
-            // Matches `FxEventCard`'s own `persistKey={`fx:${event.id}`}` —
-            // lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="fx"
-            closed={view ? view.status !== "open" : undefined}
-            tl={tl}
-            runs={FX_TICK_REBALANCE_RUNS}
-            // Tenure-first header: when the position started, how long it has
-            // run, how fresh the latest activity is.
-            toolbarLeading={
-              view ? (
-                <TimelineActivityHeader
-                  events={fxEvents}
-                  closed={view.status !== "open"}
-                  // When the position actually opened, not when the window
-                  // does.
-                  firstAt={opening?.firstTimestamp}
-                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                  reopenedAt={
-                    loans.length > 1 && loans[loans.length - 1].closedAt == null
-                      ? loans[loans.length - 1].openedAt
-                      : null
-                  }
-                />
-              ) : undefined
-            }
-            renderCard={(event, meta) =>
-              isFxEvent(event) ? (
-                <FxEventCard
-                  event={event}
-                  eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                  blockPeers={
-                    event.context.data.eventType === "tickRebalance" ? blockPeers.get(event.blockNumber) : undefined
-                  }
-                />
-              ) : null
-            }
-          />
+          <FxSocializedReadsContext.Provider value={socializedReads}>
+            <ChainTruthTimeline
+              csvExportCeiling={null}
+              // Matches `FxEventCard`'s own `persistKey={`fx:${event.id}`}` —
+              // lets pinned mode (the per-event share route) force a landed
+              // card's detail panel open on its first mount.
+              persistKeyPrefix="fx"
+              closed={view ? view.status !== "open" : undefined}
+              tl={tl}
+              runs={FX_TICK_REBALANCE_RUNS}
+              // Tenure-first header: when the position started, how long it has
+              // run, how fresh the latest activity is.
+              toolbarLeading={
+                view ? (
+                  <TimelineActivityHeader
+                    events={fxEvents}
+                    closed={view.status !== "open"}
+                    // When the position actually opened, not when the window
+                    // does.
+                    firstAt={opening?.firstTimestamp}
+                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                    reopenedAt={
+                      loans.length > 1 && loans[loans.length - 1].closedAt == null
+                        ? loans[loans.length - 1].openedAt
+                        : null
+                    }
+                  />
+                ) : undefined
+              }
+              renderCard={(event, meta) =>
+                isFxEvent(event) ? (
+                  <FxEventCard
+                    event={event}
+                    eventNumber={meta.eventNumber}
+                    isFirst={meta.isFirst}
+                    isLast={meta.isLast}
+                    blockPeers={
+                      event.context.data.eventType === "tickRebalance" ? blockPeers.get(event.blockNumber) : undefined
+                    }
+                  />
+                ) : null
+              }
+            />
+          </FxSocializedReadsContext.Provider>
           {/* Ambient oracle-price pill, fixed bottom-right. */}
           <ProvInspectorLayer />
         </>

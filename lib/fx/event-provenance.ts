@@ -641,7 +641,7 @@ export const feeScheduleProv = (caller: string, coords: FxCoords): Provenance =>
     kind: "recompute",
     text: `Re-run PoolConfiguration.getPoolFeeRatio(pool, ${caller})${coords.blockNumber != null ? ` at block ${coords.blockNumber - 1}` : ""}`,
   },
-  summary: `Fees the pool charged this caller — PoolConfiguration.getPoolFeeRatio(pool, ${caller}) at the block before, the caller being the contract the transaction called (the router), and the fee the ratio times the amount on each leg.`,
+  summary: `Fees the pool charged this caller — PoolConfiguration.getPoolFeeRatio(pool, ${caller}) at the block before, the caller being the account that called the PoolManager (the transaction's sender when it called the manager, else read from the transaction's call trace), and the fee the ratio times the amount on each leg. getPoolFeeRatio falls back to the pool's default schedule when the caller has none set; getPoolFeeRatio(pool, 0x0) at the same block is that default.`,
   contract: poolContract(coords),
   via: "archive eth_call · PoolConfiguration.getPoolFeeRatio",
   inputs: eventInputs(coords),
@@ -679,6 +679,49 @@ export const poolLineProv = (which: "rebalance" | "liquidate", block?: number | 
   via: `pool ${which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios"} (eth_call)`,
 });
 
+/** One oracle leg read at the settled block (pool.priceOracle().getPrice()). */
+export const oracleLegAtProv = (leg: "anchor" | "min", sym: string, block: number): Provenance => ({
+  kind: "chain",
+  pclass: "oracle",
+  verify: { kind: "recompute", text: `Re-run pool.priceOracle().getPrice() at block ${block}` },
+  summary:
+    leg === "anchor"
+      ? `The oracle's anchor price, USD per ${sym}, at block ${block} — the same block as the collateral and debt. getPositionDebtRatio divides by it, so the debt ratio and this dollar figure agree: debt ÷ (collateral × anchor) = the ratio.`
+      : `The oracle's min price, USD per ${sym}, at block ${block} — the same block as the collateral and debt. The pool checks borrowing and withdrawing (the 85.5% ceiling), rebalancing (from 88%) and liquidation (from 95%) against it: BasePool.operate uses getExchangePrice, rebalance getPrice's min leg, liquidate getLiquidatePrice, all the min leg.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "pool.priceOracle() · getPrice() (archive eth_call at the settled block)",
+});
+
+/** The position's collateral valued at the anchor price of the settled block. */
+export const anchorUsdProv = (sym: string, block: number | null): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  summary: `The collateral in USD — the settled collateral (getPosition, ${sym}) times the oracle's anchor price${block != null ? ` at block ${block}` : ""}, the price the debt ratio uses, so the debt divided by this figure is the ratio.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "settled colls × anchor price (same block)",
+  formula: "colls × anchor",
+});
+
+/** The debt ratio at the min price: debts ÷ (colls × min). */
+export const minRatioProv = (block: number): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  summary: `The debt ratio judged at the oracle's min price — the settled debt divided by the settled collateral times the min price, all at block ${block}. The pool's lines (85.5% for borrowing, 88% rebalance, 95% liquidation) compare against this figure.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "debts ÷ (colls × min price)",
+  formula: "debts ÷ (colls × min)",
+});
+
+/** The min price at which the position reaches a line. */
+export const minTriggerPriceProv = (line: string, sym: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  summary: `The min price at which this position reaches ${line} — the debt divided by (the collateral times ${line}), in USD per ${sym}, and the fall from today's min price. It holds collateral and debt where they are now; funding keeps taking collateral, which raises this price slowly.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "debts ÷ (colls × line)",
+  formula: "debts ÷ (colls × line)",
+});
+
 /** The anchor price at which the position's debt ratio reaches a line, with
  *  collateral and debt held where they are. */
 export const triggerPriceProv = (line: string, sym: string): Provenance => ({
@@ -700,6 +743,31 @@ export const rebalanceClearedProv = (count: number): Provenance => ({
   contract: { name: "AaveFundingPool", address: "" },
   via: "Σ (getPosition debt at block − 1 − at block) over the rebalance blocks",
   formula: "Σ (before − after)",
+});
+
+/** Collateral the socialized rows took: Σ over their blocks of getPosition
+ *  collateral at block − 1 less at the block. */
+export const socializedCollTakenProv = (unit: string, count: number): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: {
+    kind: "recompute",
+    text: "Re-run getPosition at each rebalance or liquidation row's block and the block before",
+  },
+  summary: `Collateral (${unit}, rate-normalized) the rebalance and pool-wide liquidation rows took — the position's getPosition collateral at the block before each of its ${count} row${count === 1 ? "" : "s"} less the collateral at that block, summed.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "Σ (getPosition collateral at block − 1 − at block) over the rows' blocks",
+  formula: "Σ (before − after)",
+});
+
+/** Funding: the collateral drift less what the rows took. */
+export const fundingTakenProv = (unit: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `Collateral (${unit}) funding took — the collateral that moved without the owner's transaction over every quiet stretch, less what the rebalance and liquidation rows took at their blocks. Funding is charged on collateral through the pool's collateral index with no event, so it is this remainder; a redemption against the position's tick would also land here (six redemptions exist on the manager in all).`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "Σ stretch collateral drift − Σ row-block collateral change",
+  formula: "drift − rows",
 });
 
 /** The rest of the debt that moved without the owner's transaction. */

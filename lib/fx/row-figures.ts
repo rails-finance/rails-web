@@ -36,3 +36,19 @@ export function fxRowFees(ctx: FxContext, fees: FxFeeSchedule): FxRowFee[] {
   if (debt < 0) out.push({ leg: "of the repayment", ratio: fees.repay, amount: -debt * fees.repay, symbol: "fxUSD" });
   return out;
 }
+
+/** "0.3%" from 0.003. */
+export const fxFeePct = (r: number): string => `${(r * 100).toFixed(2).replace(/\.?0+$/, "")}%`;
+
+/** A schedule in words: "0.8% of a borrow and 0.2% of a repayment", or
+ *  "nothing". */
+export function fxScheduleWords(s: { supply: number; withdraw: number; borrow: number; repay: number }): string {
+  const parts = [
+    s.supply > 0 ? `${fxFeePct(s.supply)} of a deposit` : null,
+    s.withdraw > 0 ? `${fxFeePct(s.withdraw)} of a withdrawal` : null,
+    s.borrow > 0 ? `${fxFeePct(s.borrow)} of a borrow` : null,
+    s.repay > 0 ? `${fxFeePct(s.repay)} of a repayment` : null,
+  ].filter((p): p is string => p != null);
+  if (parts.length === 0) return "nothing";
+  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}

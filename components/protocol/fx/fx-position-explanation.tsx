@@ -23,7 +23,8 @@ import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { AmountText } from "@/components/shared/amount-text";
-import { useFxPoolTerms } from "@/lib/fx/use-event-state";
+import { useFxPoolTerms, useFxPricesAt } from "@/lib/fx/use-event-state";
+import { formatNumber } from "@/lib/utils/format";
 
 export function FxPositionExplanation({
   v,
@@ -44,6 +45,11 @@ export function FxPositionExplanation({
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
   const terms = useFxPoolTerms(v.status === "open" ? v.pool : null);
+  const pxRead = useFxPricesAt(v.pool, v.positionId, v.status === "open" ? v.settled.block : null);
+  const px =
+    pxRead?.anchorPrice != null && pxRead.minPrice != null
+      ? { anchor: Number(pxRead.anchorPrice) / 1e18, min: Number(pxRead.minPrice) / 1e18 }
+      : null;
 
   const isClosed = v.status === "closed";
   const hasEvents = v.activity.eventCount > 0;
@@ -186,7 +192,16 @@ export function FxPositionExplanation({
         </>
       );
 
-    if (v.settled.collUsd != null) {
+    const anchorAt =
+      px?.anchor ?? (hasDebt && v.settled.debtRatio && colls ? debts / (colls * v.settled.debtRatio) : null);
+    if (colls != null && px) {
+      bullets.push(
+        <span key="usd">
+          At the oracle&rsquo;s anchor price, {formatUsd(px.anchor)} per {v.normalizedSymbol}, that collateral is worth{" "}
+          <H>{formatUsd(colls * px.anchor)}</H>.
+        </span>,
+      );
+    } else if (v.settled.collUsd != null) {
       bullets.push(
         <span key="usd">
           At the oracle&rsquo;s min price
@@ -200,29 +215,57 @@ export function FxPositionExplanation({
       );
     }
 
-    if (hasDebt && v.settled.debtRatio != null && colls != null && colls > 0) {
+    if (hasDebt && v.settled.debtRatio != null && colls != null && colls > 0 && anchorAt != null) {
       const ratio = v.settled.debtRatio;
-      const anchor = debts / (colls * ratio);
+      const line = (r: number) => `${(r * 100).toFixed(1).replace(/\.0$/, "")}%`;
       bullets.push(
         <span key="ratio">
           The pool puts the debt ratio at <H>{(ratio * 100).toFixed(1)}%</H>: the debt as a share of the
-          collateral&rsquo;s value at the oracle&rsquo;s anchor price, <H>{formatUsd(anchor)}</H> per{" "}
-          {v.normalizedSymbol}.
+          collateral&rsquo;s value at the anchor price, {formatUsd(anchorAt)} per {v.normalizedSymbol}.
+          {px ? (
+            <>
+              {" "}
+              The pool judges its lines at the oracle&rsquo;s min price, {formatUsd(px.min)} at the same block, where
+              the ratio is {((debts / (colls * px.min)) * 100).toFixed(1)}%. The ratios on the timeline rows are read at
+              the anchor price, so a rebalanced row can show a little under the rebalance line.
+            </>
+          ) : null}
         </span>,
       );
-      if (terms && ratio < terms.rebalanceRatio) {
-        const line = (r: number) => `${(r * 100).toFixed(1).replace(/\.0$/, "")}%`;
+      if (terms && px && debts / (colls * px.min) < terms.rebalanceRatio) {
+        const p88 = debts / (colls * terms.rebalanceRatio);
+        const p95 = debts / (colls * terms.liquidateRatio);
         bullets.push(
           <span key="lines">
             Rebalancing starts at <H>{line(terms.rebalanceRatio)}</H> and liquidation at{" "}
-            <H>{line(terms.liquidateRatio)}</H>. With today&rsquo;s collateral and debt the ratio reaches{" "}
-            {line(terms.rebalanceRatio)} if the anchor price falls to{" "}
-            <H>{formatUsd(anchor * (ratio / terms.rebalanceRatio))}</H>,{" "}
-            {((1 - ratio / terms.rebalanceRatio) * 100).toFixed(1)}% below now; funding keeps taking collateral, which
-            moves that price up slowly.
+            <H>{line(terms.liquidateRatio)}</H>. With today&rsquo;s collateral and debt the position reaches{" "}
+            {line(terms.rebalanceRatio)} if the min price falls to <H>{formatUsd(p88)}</H>,{" "}
+            {((1 - p88 / px.min) * 100).toFixed(1)}% below now, and {line(terms.liquidateRatio)} at{" "}
+            <H>{formatUsd(p95)}</H>, {((1 - p95 / px.min) * 100).toFixed(1)}% below; funding keeps taking collateral,
+            which moves both prices up slowly. A rebalance takes part of the collateral and leaves the position open; a
+            liquidation repays the debt and takes collateral worth it plus the bonus.
           </span>,
         );
       }
+      if (terms) {
+        bullets.push(
+          <span key="exit">
+            Collateral can be withdrawn while the debt ratio afterwards stays at or under {line(terms.maxBorrowRatio)}{" "}
+            at the min price; past that, debt has to be repaid first. Closing repays the whole debt in fxUSD and returns
+            all the collateral.
+          </span>,
+        );
+      }
+    }
+
+    if (colls != null && colls > 0 && terms && terms.fundingRatio > 0) {
+      bullets.push(
+        <span key="funding">
+          Funding, at {(terms.fundingRatio * 100).toFixed(2).replace(/\.?0+$/, "")}% a year today, takes about{" "}
+          {formatNumber(colls * terms.fundingRatio)} {v.normalizedSymbol} a year from this collateral, with no
+          transaction.
+        </span>,
+      );
     }
 
     if (!hasDebt && colls != null) {
@@ -340,9 +383,10 @@ export function FxPositionExplanation({
             so the lead names its own denominator (the dolomite shape). */}
         {operatorLead(ext, null, "recorded on this position")}
         {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed by an address other than
-        the owner&rsquo;s. That is as far as another address can go here: anyone may add collateral to a position or
-        repay its debt without asking, while withdrawing collateral or drawing debt is checked against the holder
-        itself, and f(x) has no way to delegate it.
+        the owner&rsquo;s. Anyone may add collateral to a position or repay its debt without asking. Withdrawing or
+        borrowing needs the manager&rsquo;s caller to hold the NFT at that moment: a contract the holder has approved,
+        such as f(x)&rsquo;s router or its limit-order manager, can take the NFT for one transaction and return it, and
+        each such row names who did.
         {ext.actors.length === 1
           ? leadName
             ? ` All of it ran through ${leadName}.`

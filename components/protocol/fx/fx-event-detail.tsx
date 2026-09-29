@@ -53,7 +53,7 @@ import {
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
 import { formatExact, formatNumber, formatTinyNonZero } from "@/lib/utils/format";
 import { fxBeforeAfter, useFxEventState, type FxEventState, type FxSide } from "@/lib/fx/use-event-state";
-import { fxRowFees } from "@/lib/fx/row-figures";
+import { fxRowFees, fxFeePct } from "@/lib/fx/row-figures";
 
 export interface FxEventDetailProps {
   ctx: FxContext;
@@ -307,10 +307,11 @@ function FxEventDetailBody({
       for (const f of fxRowFees(ctx, state.fees)) {
         if (f.amount <= 0) continue;
         stats.push({
-          label: `Fee · ${(f.ratio * 100).toFixed(2).replace(/\.?0+$/, "")}% ${f.leg}`,
+          label: `Fee · ${fxFeePct(f.ratio)} ${f.leg}`,
           value: String(f.amount),
           symbol: f.symbol === "token" ? tokenSym : "fxUSD",
           prov: feeScheduleProv(state.fees.caller, coords),
+          sub: state.fees.custom ? "schedule set for the caller" : "pool default schedule",
         });
       }
     }

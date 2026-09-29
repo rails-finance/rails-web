@@ -80,14 +80,53 @@ export function useFxEventState(ctx: FxContext, blockNumber?: number, txHash?: s
   return useStateAt(fxEventStateUrl(ctx, blockNumber, txHash));
 }
 
-/** The reads at every rebalance block of a position, for the card's split. */
-export function useFxRebalanceReads(pool: string, id: string, blocks: number[]): FxEventState | null {
-  const list = [...new Set(blocks)].sort((a, b) => a - b).slice(0, 60);
+/** The position at every block of its socialized rows (rebalances, pool-wide
+ *  liquidations), in requests of 60 blocks, merged: the card's split, the
+ *  rows' own change in their headers, and the runs' totals. Null until every
+ *  request has answered; a request that fails leaves its blocks out. At most
+ *  `maxBlocks` distinct blocks are asked for. */
+export function useFxPositionReads(
+  pool: string,
+  id: string,
+  blocks: number[],
+  maxBlocks = 240,
+): Record<string, FxStateAt> | null {
+  const key = [...new Set(blocks)]
+    .sort((a, b) => a - b)
+    .slice(0, maxBlocks)
+    .join(",");
+  const [state, setState] = useState<{ key: string; value: Record<string, FxStateAt> } | null>(null);
+  useEffect(() => {
+    if (!key) return;
+    let live = true;
+    const list = key.split(",");
+    const chunks: string[][] = [];
+    for (let i = 0; i < list.length; i += 60) chunks.push(list.slice(i, i + 60));
+    Promise.all(
+      chunks.map((c) => load(`/api/chain/fx/event-state?${new URLSearchParams({ pool, id, blocks: c.join(",") })}`)),
+    ).then((all) => {
+      if (!live) return;
+      const merged: Record<string, FxStateAt> = {};
+      for (const r of all) if (r) Object.assign(merged, r.reads);
+      setState({ key, value: merged });
+    });
+    return () => {
+      live = false;
+    };
+  }, [pool, id, key]);
+  if (!key || state?.key !== key) return null;
+  return state.value;
+}
+
+/** The position and the oracle's anchor and min legs at one block (the card's
+ *  settled block). */
+export function useFxPricesAt(pool: string, id: string, block: number | null | undefined): FxStateAt | null {
   const url =
-    list.length > 0
-      ? `/api/chain/fx/event-state?${new URLSearchParams({ pool, id, blocks: list.join(",") }).toString()}`
+    block != null && block > 0
+      ? `/api/chain/fx/event-state?${new URLSearchParams({ pool, id, blocks: String(block), prices: "1" })}`
       : null;
-  return useStateAt(url);
+  const s = useStateAt(url);
+  return block != null ? (s?.reads[String(block)] ?? null) : null;
 }
 
 const WAD = 1e18;
@@ -103,6 +142,9 @@ export interface FxSide {
   /** The pool's rebalance and liquidation lines (debt ratio 0–1). */
   rebalanceLine: number | null;
   liquidateLine: number | null;
+  /** The oracle's anchor and min legs, where the read asked for them. */
+  anchorPrice: number | null;
+  minPrice: number | null;
 }
 
 export function fxSide(s: FxStateAt | undefined): FxSide | null {
@@ -114,6 +156,8 @@ export function fxSide(s: FxStateAt | undefined): FxSide | null {
     rate: num(s.rate),
     rebalanceLine: num(s.rebalanceLine),
     liquidateLine: num(s.liquidateLine),
+    anchorPrice: num(s.anchorPrice),
+    minPrice: num(s.minPrice),
   };
 }
 

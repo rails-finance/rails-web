@@ -4,9 +4,10 @@ import { isFxPoolKey } from "@/lib/fx/asset-catalog";
 
 // One f(x) position at the blocks around its timeline rows
 // (lib/sources/chain/fx-event-state.ts): getPosition, getPositionDebtRatio and
-// the wstETH rate at block − 1 and at each block; with `tx` (one block only)
-// the fee schedule the transaction's caller paid and the manager's share of a
-// bonus. A mined block never changes, so the answer is kept in process memory
+// the wstETH rate at block − 1 and at each block; with `prices` the oracle's
+// anchor and min legs there; with `tx` (one block only) the fee schedule the
+// manager's caller paid, the default beside it, a filled limit order, and the
+// manager's share of a bonus. A mined block never changes, so the answer is kept in process memory
 // and cached hard at the edge. Node runtime.
 
 export const runtime = "nodejs";
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
     .filter(Boolean)
     .map((b) => (/^\d{1,10}$/.test(b) ? Number(b) : NaN));
   const tx = sp.get("tx") ?? "";
+  const prices = sp.get("prices") === "1";
   if (
     !isFxPoolKey(pool) ||
     !/^\d{1,10}$/.test(id) ||
@@ -34,7 +36,7 @@ export async function GET(request: NextRequest) {
     );
   }
   try {
-    const data = await readFxEventState(pool, id, blocks, tx ? (tx.toLowerCase() as `0x${string}`) : undefined);
+    const data = await readFxEventState(pool, id, blocks, tx ? (tx.toLowerCase() as `0x${string}`) : undefined, prices);
     return NextResponse.json(data, { headers: { "Cache-Control": "public, max-age=86400, s-maxage=604800" } });
   } catch (error) {
     console.error("Error reading the f(x) event state:", error);
