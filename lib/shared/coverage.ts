@@ -857,6 +857,25 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
       why: "nobody in a vault holds a loan — there is no threshold to breach and nothing to seize, so there is no liquidation to trace",
     },
   }),
+  // Sky Savings (sUSDS), 2026-09-29. A savings share carries no loan, so
+  // forensics is ruled out; USD is ruled out for want of a USDS feed (the
+  // flows axis uses the PSM rate and says so). `atBlockPrices`: every row
+  // carries the share price (chi) of its block, from the sealed ledger.
+  // `views` is the Savings Rate history. `verification` is
+  // scripts/verify/verify-sky-savings.mjs, which re-reads balanceOf and
+  // convertToAssets at the sealed block for the holders it opens and checks
+  // the page's figures against the api to the wei. `dashboard` stays false:
+  // figures are at the sealed block, and no head overlay is built yet.
+  "sky-savings": explorerDepth({
+    atBlockPrices: true,
+    explainers: true,
+    verification: true,
+    views: true,
+    oracleUsd: { why: ORACLE_USD_REASON["sky-savings"] },
+    forensics: {
+      why: "nobody in the savings module holds a loan, so there is no threshold to breach and no liquidation to trace",
+    },
+  }),
   // Liquidation forensics (2026-07-14): same valued two-leg treatment as Aave
   // V3 (single market — SparkLend's own oracle at the event's block).
   // Protocol views (2026-07-15): /spark/market — the single SparkLend Pool's
@@ -1488,6 +1507,8 @@ export const VIEW_NOTES: Record<string, string> = {
   maple: "Both syrup pools' liquid/deployed split and queue coverability against liquid cash.",
   fx: "The tick ladders read off the pools' own tick storage, with tick debt shares reconciled integer-exact against the pool totals.",
   pwn: "The loan book — the outcome record, the open book by soonest deadline, what secures the loans and what they owe per token.",
+  "sky-savings":
+    "The Savings Rate over the whole life of sUSDS — every change governance made, each at the block that made it, drawn as steps.",
   polaris:
     "The two markets side by side — each one's collateral and debt, the algorithmic rate in force, its mode and reserve ratio, the stability pool's depth, and the price legs the protocol values pETH with, beside the CDP counts the index holds.",
   morpho:
@@ -1544,6 +1565,8 @@ export const COVERAGE_NOTES: Record<string, string> = {
     "Each Morpho Blue market measures everything in one token: the loan token it was created with (USDC, for example). Debt is simply a count of that token, and the market's own oracle prices the collateral in it too — the protocol never states a dollar value anywhere. So the explorer doesn't either: showing USD would add an assumption the contracts never make, that the loan token itself is worth $1. Two more limits are the protocol's rather than the roadmap's. Blue keeps no market-wide collateral total — collateral is per-position state, so a market's loan-to-value is a fact about each borrower and not about the market, and there is no such figure to plot; what a market can state about its own shape is how much of what was supplied is currently borrowed. And a market's totals are its last-settled balance rather than its balance now: Blue accrues interest only when someone touches a market, so a market left alone carries the figures from the block it was last touched, and the explorer shows them as they are stored with the current rate beside them. Projecting them forward would be the explorer's arithmetic rather than the protocol's record, and on markets untouched for months at rates the adaptive curve has driven into the hundreds of percent, that arithmetic is the loudest number on the page.",
   fx: "f(x) socializes funding, rebalances and liquidations across whole ticks without emitting per-position events. The explorer reads exact current state from the pool's own views, reconciles the socialized share explicitly, and replays tick lineage to place each tick rebalance on the timelines it touched — but those amounts are the whole tick's clear: no log states a single position's slice.",
   pwn: "PWN loans are peer-to-peer on fixed terms: the parties set the price, so there is no protocol oracle, no health factor, and no liquidation — an expired loan defaults and the lender claims the collateral. Those surfaces aren't missing; they don't exist in the protocol.",
+  "sky-savings":
+    "A Sky Savings position is an address holding sUSDS, the share token of Sky's savings module. The share count changes only on a deposit, a withdrawal or a transfer, and what each share redeems for rises at the Savings Rate. Every figure is replayed from the token's Deposit, Withdraw and Transfer logs and stated at one sealed block, and a check every six hours compares the replay with the contract for every holder; the page states no figure until that check has passed. Interest earned is exact in USDS: what the position is worth, plus what left, less what came in. Four holders are left out of the listing and still open by address: Morpho Blue, whose sUSDS is collateral in Morpho positions, and Sky's bridge escrows for Arbitrum One, Base and OP Mainnet, whose shares back sUSDS on those chains.",
   polaris:
     "Polaris runs on the Sepolia testnet, and every figure this explorer shows is a testnet figure: the pETH, USDp and GOLDp here are test tokens, the ETH/USD and gold prices come from the protocol's own testnet medianisers, and none of it is money. What the explorer states about the protocol's shape is real, though. A position is a CDP NFT in one of two markets — USDp tracks the dollar, GOLDp tracks gold — and both mint against a single collateral, pETH, the protocol's bonding-curve wrapper of ETH; a transfer of the NFT moves custody of the position without opening or closing anything, and the card names the current holder from the last such transfer. Interest is algorithmic: the market sets a primary rate on nearly every touch and adds a utilisation-driven secondary rate, so no holder ever chose a rate and no event carries one as a choice — the rate in force at each touch is stated as a fact of the row instead. A CDP's debt also moves without the holder acting: interest is charged into it at each touch, stability-pool rewards are credited against it, and the PSM's mints and redemptions are shared across every CDP as a pro-rata adjustment to both collateral and debt — every such leg is stated on the event that carried it and summed on the position's economics. Two things the protocol has are not shown yet: the reserve loans against fpETH, which the index captures but no page renders, and the stability-pool deposits, which are positions of their own kind. Since 6 September 2026 every CDP touch's own block is also read for the market's own price feed — a Sepolia lane's previewPrice() at the end of that block, the same six-call read the protocol's own mint math uses — so an ordinary row states pETH's price at its own block as a footnote, matching the PSM's own mint logs exactly except on the rare block where another user's bonding-curve write landed after the touch. The listing states a collateral ratio as an approximation, marked with a ≈: each row's last stated collateral and debt priced at the market's own feed as of one read of the market board taken when the page loaded, never a read per CDP — a CDP's own page states the contract's own getICR instead, which also carries the interest and PSM share that settle only at the next touch. Since 11 September 2026 an open CDP's page also states the window between its own last touch and the chain head, split into the only two things that can have moved it: the market's own feed, against the collateral the CDP stated at that touch, and the protocol's own pending legs — interest, the stability gain, the pETH reward and the CDP's share of every PSM mint and redemption since — valued at the feed now. The two add up to the whole change in the CDP's equity at the feed, and they can be stated as facts rather than as a choice precisely because the holder did nothing inside that window: a CDP's stated collateral and debt do not move between its own touches, so there is no basis to pick and nothing to call a profit. A wider window would need a price for the holder's own deposits, which is a decision rather than a fact, and no surface here makes it. A search that names a holder states that wallet's own CDPs at a glance above the cards — how many it holds open, closed and liquidated, all the pETH they hold and what their debts come to in one unit, and which of them sits closest to its market's minimum — and never a ratio for the wallet, because liquidation happens per CDP and an average of several would read as safety no CDP has.",
   makerdao:

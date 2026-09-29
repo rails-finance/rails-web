@@ -532,6 +532,16 @@ const AAVE_VAULT_OP_LABELS: Record<string, string> = {
   cooldown: "Cooldown started",
 };
 
+/** Sky Savings: the vault verbs (lexicon, "one verb per kind of transaction"),
+ *  keyed on the sUSDS ledger's kinds. */
+const SKY_SAVINGS_OP_LABELS: Record<string, string> = {
+  deposit: "Deposit",
+  withdrawal: "Withdrawal",
+  received: "Received",
+  sent: "Sent",
+  self: "Transfer to self",
+};
+
 /** Alchemix V3's Alchemist timeline. Registered rather than left to the global
  *  fall-through, because four of these keys mean something else on another
  *  roster: "mint" is a Fluid position NFT and a Moonwell supply, "burn",
@@ -595,6 +605,7 @@ const PROTOCOL_OP_LABELS: Record<string, Record<string, string>> = {
   frankencoin: FRANKENCOIN_OP_LABELS,
   polaris: POLARIS_OP_LABELS,
   "aave-vaults": AAVE_VAULT_OP_LABELS,
+  "sky-savings": SKY_SAVINGS_OP_LABELS,
   "alchemix-v3": ALCHEMIX_OP_LABELS,
   "alchemix-v2": ALCHEMIX_OP_LABELS,
 };

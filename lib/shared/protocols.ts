@@ -513,6 +513,21 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
   },
   {
+    // Sky Savings (sUSDS on Ethereum). Sky rebranded MakerDAO, and a saver is
+    // not a borrower, so savings are an explorer of their own, linked from
+    // MakerDAO's (rails-ops TO-DO-sky-savings-scoping §6.3). A holder's
+    // sUSDS carries no debt and no threshold, so it is left out of the home
+    // position headline (NOT_POSITION_EXPLORERS) while it lists positions.
+    id: "sky-savings",
+    session: "sky-savings",
+    label: "Sky Savings",
+    chainId: 1,
+    slug: "sky-savings",
+    tags: ["Savings"],
+    desc: "Every sUSDS holder on Ethereum — the balance, its worth in USDS and the interest earned to the wei, replayed from the token's logs and checked against the contract",
+    subPages: [{ segment: "rates", label: "Savings Rate history", tab: "Rate" }],
+  },
+  {
     id: "spark",
     session: "spark",
     label: "SparkLend",
@@ -720,6 +735,8 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   // Polaris's own noun: the position is a CDP NFT, and the protocol's
   // getters, events and analytics all say "CDP".
   polaris: "CDP",
+  // A holder address of sUSDS (rails-ops TO-DO-sky-savings-scoping §1).
+  "sky-savings": "Position",
 };
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",

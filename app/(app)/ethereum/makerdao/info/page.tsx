@@ -25,6 +25,13 @@ const intro = (
       </Link>
       .
     </p>
+    <p>
+      MakerDAO is now Sky, and its savings are a separate explorer:{" "}
+      <Link href="/ethereum/sky-savings" className="text-blue-500 hover:underline">
+        Sky Savings
+      </Link>{" "}
+      lists every address holding sUSDS, with the interest each has earned.
+    </p>
   </>
 );
 

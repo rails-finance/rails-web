@@ -523,20 +523,24 @@ function ScrubberBody({ model }: { model: FlowModel }) {
         motion={motion}
         when={when}
       />
-      <SideBlock
-        side="debt"
-        st={s.debt}
-        model={model}
-        isLive={s.isLive}
-        open={open.debt}
-        onToggle={() => setOpen((o) => ({ ...o, debt: !o.debt }))}
-        active={active}
-        pinned={pinned}
-        onHover={setHover}
-        onPin={pin}
-        motion={motion}
-        when={when}
-      />
+      {/* A one-sided position (savings, a lender) names no debt bucket and
+          draws a single bar. */}
+      {model.buckets.some((b) => b.side === "debt") && (
+        <SideBlock
+          side="debt"
+          st={s.debt}
+          model={model}
+          isLive={s.isLive}
+          open={open.debt}
+          onToggle={() => setOpen((o) => ({ ...o, debt: !o.debt }))}
+          active={active}
+          pinned={pinned}
+          onHover={setHover}
+          onPin={pin}
+          motion={motion}
+          when={when}
+        />
+      )}
 
       <div className="relative mt-2 h-4 text-[11px] tabular-nums text-rb-500" aria-hidden data-prov-exempt="">
         {model.axis.ticks.map((t) => {

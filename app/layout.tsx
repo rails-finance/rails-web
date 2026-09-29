@@ -126,7 +126,7 @@ export const metadata: Metadata = {
         // fresh rather than served stale from their cache. Bump the hash
         // (`shasum -a 256 public/og/home.png | cut -c1-8`) whenever
         // `node scripts/generate-og.mjs` changes this file's bytes.
-        url: "/og/home-c5c8c63e.png",
+        url: "/og/home-9ddcd38b.png",
         width: 1200,
         height: 630,
         alt: `Explore ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia`,
@@ -137,7 +137,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: OG_DESCRIPTION,
-    images: ["/og/home-c5c8c63e.png"],
+    images: ["/og/home-9ddcd38b.png"],
     creator: TWITTER_HANDLE,
     site: TWITTER_HANDLE,
   },

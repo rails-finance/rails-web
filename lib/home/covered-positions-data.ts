@@ -279,6 +279,10 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   // Yearn V3, here for the same reason and permanently: its whole product is
   // vaults, so every one of its rows would be a share rather than a position.
   "yearn",
+  // Sky Savings, for the same reason: an sUSDS balance carries no debt and no
+  // threshold (Miles, 2026-09-29, rails-ops TO-DO-sky-savings-scoping §6.1).
+  // It has a listing all the same; this set keeps it out of the count.
+  "sky-savings",
   // Otherwise empty since 2026-08-26. The five Base explorers (Aave V3 Base,
   // Moonwell Base, Morpho Blue Base, Compound V3 Base, Seamless) sat here from
   // 2026-08-23 for the same reason Compound V2 once did — they had positions

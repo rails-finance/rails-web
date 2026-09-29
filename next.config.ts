@@ -123,6 +123,8 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/polaris", "/sepolia/polaris"],
   ["/pwn", "/ethereum/pwn"],
   ["/seamless", "/base/seamless"],
+  // Sky Savings never had a pre-0016 path; the row is for check:routes.
+  ["/sky-savings", "/ethereum/sky-savings"],
   ["/spark", "/ethereum/spark"],
   // Yearn never had a pre-0016 path either; the row exists for the same reason
   // Polaris's does, and a bare /yearn is unambiguous — one Yearn door, and V3
