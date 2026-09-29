@@ -36,6 +36,7 @@ import {
   socializedDebtProv,
   lifetimeCollateralDriftProv,
   anchorPriceProv,
+  oracleMinPriceProv,
   poolLineProv,
   triggerPriceProv,
   rebalanceClearedProv,
@@ -189,6 +190,12 @@ function RatioFootnote({ v, terms }: { v: FxPositionView; terms: FxPoolTerms | n
     <>
       <StatFootnote>
         at the anchor price <Prov info={anchorPriceProv(sym, v.settled.block)}>{formatUsd(anchor)}</Prov> per {sym}
+        {v.settled.block != null ? (
+          <>
+            {" "}
+            · settled @ <BlockRef block={v.settled.block} />
+          </>
+        ) : null}
       </StatFootnote>
       {terms && trigger != null ? (
         <>
@@ -254,7 +261,8 @@ function CollateralUsdFootnote({ v }: { v: FxPositionView }) {
   return (
     <StatFootnote>
       <Prov info={fxPositionUsdProv(v.normalizedSymbol, v.oracle.priceBlock)}>{formatUsd(v.settled.collUsd)}</Prov> at
-      the min price {formatUsd(v.oracle.priceUsd)}
+      the min price{" "}
+      <Prov info={oracleMinPriceProv(v.normalizedSymbol, v.oracle.priceBlock)}>{formatUsd(v.oracle.priceUsd)}</Prov>
       {v.oracle.priceBlock != null ? (
         <>
           {" "}

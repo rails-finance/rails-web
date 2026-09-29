@@ -660,6 +660,15 @@ export const anchorPriceProv = (sym: string, block?: number | null): Provenance 
   formula: "debts ÷ (colls × ratio)",
 });
 
+/** The oracle's min leg, the price the collateral's USD figure uses. */
+export const oracleMinPriceProv = (sym: string, block?: number | null): Provenance => ({
+  kind: "chain",
+  pclass: "oracle",
+  summary: `The oracle's min price — USD per ${sym} from the pool oracle's min (liquidate) leg${block != null ? `, as stamped at block ${block}` : ""}, the price the collateral's dollar figure uses.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "pool oracle getPrice · min leg (the sweep's pool_oracle_price)",
+});
+
 /** A pool line: rebalance or liquidation debt ratio, with its bonus. */
 export const poolLineProv = (which: "rebalance" | "liquidate", block?: number | null): Provenance => ({
   kind: "chain",

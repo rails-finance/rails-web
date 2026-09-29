@@ -122,7 +122,7 @@ export function FxDriftPanel({
                         >
                           <span>
                             {dateOf(iv.fromBlock) ?? iv.fromBlock} →{" "}
-                            {iv.toHead ? "now" : (dateOf(iv.toBlock) ?? iv.toBlock)}
+                            {iv.toHead ? "now" : (dateOf(iv.toBlock) ?? dateOf(iv.toBlock + 1) ?? iv.toBlock)}
                             <span className="block text-[10px] text-rb-400">
                               {iv.fromBlock} → {iv.toHead ? `settled (${iv.toBlock})` : iv.toBlock}
                             </span>
