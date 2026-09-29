@@ -382,6 +382,8 @@ function buildSide(
     height: number;
     /** The flows are valued at each event's price (the all-time receipt says so). */
     flowsPricedAtEvents?: boolean;
+    /** Token amounts in full rather than compact (ChainTruthTowerData.fullTokenAmounts). */
+    fullAmounts?: boolean;
   },
 ): TowerSide {
   const {
@@ -399,6 +401,7 @@ function buildSide(
     height,
   } = opts;
   const sc = (l: TowerLine) => Math.max(0, lineScalar(l, valued));
+  const cmp = (n: number) => (opts.fullAmounts ? formatNumber(n) : formatCompact(n));
   const interestLine = withInterest && side.interest && side.interest.amount > 0 ? side.interest : null;
   const receivedLines = side.received ?? [];
   const receivedTotal = receivedLines.reduce((s, l) => s + sc(l), 0);
@@ -439,7 +442,7 @@ function buildSide(
   const carve = lossTotal > 0 && recorded > 0 ? Math.max(0, recorded - lossTotal) / recorded : 1;
   const segments: TowerSegment[] = side.current.map((l) => ({
     key: l.key,
-    label: (l as DisplayLine).mergedLabel ?? l.symbol,
+    label: (l as DisplayLine).mergedLabel ?? l.heldLabel ?? l.symbol,
     value: toTV(sc(l) * carve),
     colorClass: solid,
     tooltip: rowTip(l),
@@ -507,8 +510,7 @@ function buildSide(
   // Display compact ("11M"); the exact figure rides the tooltip + provenance
   // trace (view-tiers.md — compact is the one-step readability leeway the tier
   // allows). USD (valued) rows are already compact via formatCompactUsd.
-  const fmt = (l: TowerLine) =>
-    valued && l.usd != null ? formatCompactUsd(l.usd) : `${formatCompact(l.amount)} ${l.symbol}`;
+  const fmt = (l: TowerLine) => (valued && l.usd != null ? formatCompactUsd(l.usd) : `${cmp(l.amount)} ${l.symbol}`);
   const fmtExact = (l: TowerLine): string | undefined =>
     valued && l.usd != null ? undefined : `${formatNumber(l.amount)} ${l.symbol}`;
   // The denomination rule: a row about ONE token carries the chip (even when
@@ -542,7 +544,7 @@ function buildSide(
     rows.push({
       sign: "",
       label: `${inflowLabel} (all time)`,
-      amount: valued ? formatCompactUsd(side.lifetimeInflow) : formatCompact(side.lifetimeInflow),
+      amount: valued ? formatCompactUsd(side.lifetimeInflow) : cmp(side.lifetimeInflow),
       exact: valued ? undefined : formatNumber(side.lifetimeInflow),
       icon: sideSymbol ? chip(sideSymbol, sideAddress) : undefined,
       swatchStyle: { backgroundColor: flowColor },
@@ -648,8 +650,8 @@ function buildSide(
     }
     rows.push({
       sign: "",
-      label: l.symbol,
-      amount: formatCompact(l.amount),
+      label: l.heldLabel ?? l.symbol,
+      amount: cmp(l.amount),
       exact: formatNumber(l.amount),
       symbol: l.symbol,
       icon: chip(l.symbol, l.address),
@@ -692,7 +694,7 @@ function buildSide(
     rows.push({
       sign: "+",
       label: opts.interestLabel ?? "Accrued interest",
-      amount: formatCompact(interestLine.amount),
+      amount: cmp(interestLine.amount),
       exact: formatNumber(interestLine.amount),
       symbol: interestLine.symbol,
       usdHint: hintUsd(interestLine) != null ? formatCompactUsd(hintUsd(interestLine)!) : undefined,
@@ -709,7 +711,7 @@ function buildSide(
   const eventlessRow = (l: TowerLine, sign: string, swatch: Partial<BreakdownRow>): BreakdownRow => ({
     sign,
     label: l.flowLabel ?? l.symbol,
-    amount: formatCompact(l.amount),
+    amount: cmp(l.amount),
     exact: formatNumber(l.amount),
     symbol: l.symbol,
     icon: flowIcon(l),
@@ -734,7 +736,7 @@ function buildSide(
       rows.push({
         sign: "+",
         label: l.mergedLabel ?? l.flowLabel ?? l.symbol,
-        amount: formatCompact(l.amount),
+        amount: cmp(l.amount),
         exact: formatNumber(l.amount),
         symbol: l.symbol,
         usdHint: hintUsd(l) != null ? formatCompactUsd(hintUsd(l)!) : undefined,
@@ -770,7 +772,7 @@ function buildSide(
     rows.push({
       sign: "",
       label: resultLabel,
-      amount: `${formatCompact(tot)} ${interestLine.symbol}`,
+      amount: `${cmp(tot)} ${interestLine.symbol}`,
       exact: `${formatNumber(tot)} ${interestLine.symbol}`,
       // Token-denominated result (single symbol by construction) — carries the
       // chip; only USD result rows go chip-less (denomination rule).
@@ -787,7 +789,7 @@ function buildSide(
     rows.push({
       sign: "",
       label: resultLabel,
-      amount: `${formatCompact(tot)} ${sideSymbol}`,
+      amount: `${cmp(tot)} ${sideSymbol}`,
       exact: `${formatNumber(tot)} ${sideSymbol}`,
       icon: chip(sideSymbol, sideAddress),
       isResult: true,
@@ -878,6 +880,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     valued,
     resultLabel: data.collateralTitle ?? "Collateral",
     flowsPricedAtEvents: data.flowsPricedAtEvents,
+    fullAmounts: data.fullTokenAmounts,
   });
   const right = build(debtParts, d, {
     solid: DEBT_SOLID,
@@ -891,6 +894,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     valued,
     resultLabel: data.debtTitle ?? "Current debt",
     flowsPricedAtEvents: data.flowsPricedAtEvents,
+    fullAmounts: data.fullTokenAmounts,
   });
   return <DualTowerChart left={left} right={right} height={TOWER_H} maxValue={towerMax} className="mb-1" />;
 }

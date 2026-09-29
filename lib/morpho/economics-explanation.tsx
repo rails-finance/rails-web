@@ -13,7 +13,7 @@
 import type { ReactNode } from "react";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { formatCompact } from "@/lib/utils/format";
+import { formatNumber } from "@/lib/utils/format";
 
 const MORPHO_DOC_URLS = {
   OVERVIEW: "https://docs.morpho.org/",
@@ -29,12 +29,12 @@ function fig(text: string): ReactNode {
 function sumFig(lines: TowerLine[], unit: string | undefined): ReactNode | null {
   const amount = lines.reduce((s, l) => s + l.amount, 0);
   if (amount <= 1e-9) return null;
-  return fig(`${formatCompact(amount)} ${unit ?? lines[0]?.symbol ?? ""}`.trim());
+  return fig(`${formatNumber(amount)} ${unit ?? lines[0]?.symbol ?? ""}`.trim());
 }
 
 function scalarFig(amount: number, unit: string | undefined): ReactNode | null {
   if (amount <= 1e-9 || !unit) return null;
-  return fig(`${formatCompact(amount)} ${unit}`);
+  return fig(`${formatNumber(amount)} ${unit}`);
 }
 
 export interface MorphoEconomicsOpts {
@@ -105,7 +105,8 @@ export function morphoEconomicsExplanation(data: ChainTruthTowerData, opts: Morp
         {clearedFig && <>, had {clearedFig} cleared by liquidation</>}
         {interestAmt > 1e-9 && <> and accrued {scalarFig(interestAmt, debtUnit)} of interest</>}, which leaves{" "}
         {scalarFig(owedNow, debtUnit) ?? fig(`0 ${debtUnit ?? ""}`)} owed. Repayments settle interest as well as the
-        amount borrowed, which is why the column&apos;s {debtUnit} bar is the borrowed amount less everything paid back.
+        amount borrowed, which is why the column&apos;s Net borrowed row is the amount borrowed less everything paid
+        back.
       </span>,
     );
   } else if (borrowedFig || repaidFig) {
@@ -213,9 +214,9 @@ export function morphoEconomicsContent(opts: MorphoEconomicsOpts = {}): LearnMor
       },
     ],
     links: [
-      { label: "Morpho markets", url: MORPHO_DOC_URLS.MARKET },
-      { label: "Interest rate model", url: MORPHO_DOC_URLS.IRM },
-      { label: "Morpho docs", url: MORPHO_DOC_URLS.OVERVIEW },
+      { label: "docs.morpho.org — Markets", url: MORPHO_DOC_URLS.MARKET },
+      { label: "docs.morpho.org — Interest rate model", url: MORPHO_DOC_URLS.IRM },
+      { label: "docs.morpho.org — Overview", url: MORPHO_DOC_URLS.OVERVIEW },
     ],
   };
 }

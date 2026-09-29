@@ -276,6 +276,7 @@ export function computeMorphoEconomics(
 
   return {
     valued: false,
+    fullTokenAmounts: true,
     collateralUnit: view.collateralSymbol ?? undefined,
     debtUnit: view.loanSymbol,
     collateral: {
@@ -307,6 +308,9 @@ export function computeMorphoEconomics(
                 address: loanAddr,
                 amount: principal,
                 usd: null,
+                // Borrowed less repaid (and less any debt a liquidation
+                // cleared); the accrued interest is its own row beneath.
+                heldLabel: "Net borrowed",
                 prov: vocab.borrowed(view.loanSymbol, view.atBlock),
               },
             ]

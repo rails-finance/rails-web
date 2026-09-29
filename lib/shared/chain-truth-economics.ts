@@ -55,6 +55,10 @@ export interface TowerLine {
    *  the direction (a Polaris PSM mint-share INFLOW is another party's act
    *  too, but it is a mint, not a redemption). Ignored on `current` lines. */
   flowKind?: "redeemed" | "external";
+  /** Legend caption for a `current` line in place of its symbol, where the
+   *  held amount is not the whole balance (Morpho: the principal row under an
+   *  accrued-interest row reads "Net borrowed"). Unset: the symbol. */
+  heldLabel?: string;
 }
 
 /** One side of the tower (collateral or debt) as faithful, attributable lines. */
@@ -196,6 +200,10 @@ export interface ChainTruthTowerData {
    *  line, flow or total includes them, and the tower says so
    *  (lib/shared/decimals-unread.ts). */
   notLoaded?: UnreadToken[];
+  /** Token-mode rows print full amounts ("2,941.379") instead of compact
+   *  ("2.94K"), so a small accrued-interest row visibly changes the total
+   *  beneath it. Unset: compact, as every other feeder renders. */
+  fullTokenAmounts?: boolean;
 }
 
 /** The scalar a tower stacks by: USD when valued, else the token amount. */

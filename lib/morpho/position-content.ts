@@ -11,8 +11,8 @@ const MORPHO_DOC_URLS = {
 } as const;
 
 const LINKS: LearnMoreContent["links"] = [
-  { label: "Morpho markets", url: MORPHO_DOC_URLS.MARKET },
-  { label: "Liquidation on Morpho", url: MORPHO_DOC_URLS.LIQUIDATION },
+  { label: "docs.morpho.org — Markets", url: MORPHO_DOC_URLS.MARKET },
+  { label: "docs.morpho.org — Liquidation", url: MORPHO_DOC_URLS.LIQUIDATION },
 ];
 
 export type MorphoPositionDeployment = "morpho" | "morpho-base";

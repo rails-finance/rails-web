@@ -380,6 +380,8 @@ export interface MorphoMarketBlockRead {
    *  utilization the borrow rate follows is borrowed ÷ supplied. */
   totalSupply?: number;
   totalBorrow?: number;
+  /** The block's own time (unix seconds), where the block header read answered. */
+  timestamp?: number;
 }
 
 export interface MorphoMarketAtBlockResponse {
@@ -421,14 +423,17 @@ export async function loadMorphoMarketAtBlock(
 
   const readAt = async (block: number): Promise<MorphoMarketBlockRead> => {
     const bn = BigInt(block);
-    const [priceRes, mktRes] = await client.multicall({
-      allowFailure: true,
-      blockNumber: bn,
-      contracts: [
-        { address: oracle, abi: ORACLE_ABI, functionName: "price" },
-        { address: MORPHO, abi: MORPHO_ABI, functionName: "market", args: [marketId] },
-      ],
-    });
+    const [[priceRes, mktRes], header] = await Promise.all([
+      client.multicall({
+        allowFailure: true,
+        blockNumber: bn,
+        contracts: [
+          { address: oracle, abi: ORACLE_ABI, functionName: "price" },
+          { address: MORPHO, abi: MORPHO_ABI, functionName: "market", args: [marketId] },
+        ],
+      }),
+      client.getBlock({ blockNumber: bn }).catch(() => null),
+    ]);
     const priceRaw = priceRes.status === "success" ? (priceRes.result as bigint) : ZERO;
     let borrowApr: number | null = null;
     let totals: { totalSupply: number; totalBorrow: number } | null = null;
@@ -460,6 +465,7 @@ export async function loadMorphoMarketAtBlock(
       price: priceRaw > ZERO ? Number(priceRaw) / 10 ** (36 + loanDecimals - collateralDecimals) : 0,
       borrowApr,
       ...(totals ?? {}),
+      ...(header ? { timestamp: Number(header.timestamp) } : {}),
     };
   };
 

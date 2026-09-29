@@ -62,6 +62,7 @@ import {
   fmtMorphoPart,
   fmtMorphoHf,
   fmtMorphoPrice,
+  atBlockText,
   morphoHealthMove,
   morphoLiquidationPrice,
   type MorphoAtBlock,
@@ -230,8 +231,8 @@ function morphoEventSlotsBase(
   const move = read ? morphoHealthMove(ctx, read) : null;
   const priceAt = move ? (
     <>
-      at {collSym} {fmtMorphoPrice(move.price)} {loanSym} (the market oracle at block{" "}
-      {move.priceBlock.toLocaleString("en-US")})
+      at {collSym} {fmtMorphoPrice(move.price)} {loanSym}, the market oracle&rsquo;s price at{" "}
+      {atBlockText(move.priceBlock, move.priceBlockTime)}
     </>
   ) : null;
   // The fall in the collateral's price (in the loan token) that would take
@@ -303,14 +304,35 @@ function morphoEventSlotsBase(
       </>
     ) : null;
 
-  // The rate in force after the event and what it costs a year on this debt.
+  // The rate in force after the event and what it costs a year on this debt:
+  // the chain debt where the row carries it, the principal otherwise.
   const rateLine = (): ClauseInput => {
-    if (!read || read.status !== "ok" || read.at.borrowApr == null || !rs.hasDebt || !rs.debtIsChain) return null;
+    if (!read || read.status !== "ok" || read.at.borrowApr == null || !rs.hasDebt) return null;
     const apr = read.at.borrowApr;
     return clause(
       <>
         The market&rsquo;s borrow rate at the end of the block was {b(`${(apr * 100).toFixed(2)}%`)} APR, about{" "}
-        {amt(rs.borrowedAfter * apr)} {loanSym} a year on this debt while it holds.
+        {amt(rs.borrowedAfter * apr)} {loanSym} a year on{" "}
+        {rs.debtIsChain ? (
+          "this debt"
+        ) : (
+          <>
+            the {amt(rs.borrowedAfter)} {loanSym} of principal
+          </>
+        )}{" "}
+        at this rate.
+      </>,
+    );
+  };
+
+  // A repay that clears the debt: the rate at the event, and that none of it
+  // is owed any more.
+  const rateClearedLine = (): ClauseInput => {
+    if (!read || read.status !== "ok" || read.at.borrowApr == null) return null;
+    return clause(
+      <>
+        The market&rsquo;s borrow rate at the end of the block was {b(`${(read.at.borrowApr * 100).toFixed(2)}%`)} APR;
+        with the debt cleared, the position pays none of it.
       </>,
     );
   };
@@ -320,72 +342,77 @@ function morphoEventSlotsBase(
   // alone changed utilization (borrowed ÷ supplied), or other activity in the
   // block did too. Since the previous event: the position did nothing, so the
   // market's other users and the rate model's adjustment over time moved it.
+  // The first sentence to name utilization defines it.
   const RATE_STEP = 0.01;
   const pctRate = (r: number) => `${(r * 100).toFixed(2)}%`;
+  const utilization = (define: boolean): ReactNode =>
+    define ? <>utilization (the share of the market&rsquo;s supplied {loanSym} that is lent out)</> : <>utilization</>;
   const util = (r: { totalSupply?: number; totalBorrow?: number }) =>
     r.totalSupply && r.totalSupply > 0 && r.totalBorrow != null ? r.totalBorrow / r.totalSupply : null;
   const rateMoves = (): ClauseInput[] => {
     if (!read || read.status !== "ok") return [];
-    const out: ClauseInput[] = [];
     const prevEventApr = extra?.prevEventRead?.status === "ok" ? extra.prevEventRead.at.borrowApr : null;
     const before = read.prev.borrowApr;
+    const after = read.at.borrowApr;
+    const inBlock = before != null && after != null && Math.abs(after - before) > RATE_STEP;
+    const out: ClauseInput[] = [];
+    // The move within this block reads first, beside the rate it
+    // produced; the drift since the previous event follows it.
+    if (inBlock) {
+      const dir = after > before ? "rose" : "fell";
+      const uBefore = util(read.prev);
+      const uAfter = util(read.at);
+      const moved = ctx.eventType === "borrow" ? Math.abs(delta) : ctx.eventType === "repay" ? -Math.abs(delta) : 0;
+      // Accrued interest raises supplied and borrowed alike; what is left of the
+      // borrowed total's change after it is the borrowing and repaying in the block.
+      const dSupply = (read.at.totalSupply ?? NaN) - (read.prev.totalSupply ?? NaN);
+      const dBorrow = (read.at.totalBorrow ?? NaN) - (read.prev.totalBorrow ?? NaN);
+      const own =
+        moved !== 0 &&
+        Number.isFinite(dSupply) &&
+        Number.isFinite(dBorrow) &&
+        Math.abs(dBorrow - dSupply - moved) <= Math.abs(moved) * 0.001 + 1e-6 * (read.at.totalBorrow ?? 0) &&
+        Math.abs(dSupply) <= Math.abs(moved) * 0.01;
+      const utilText =
+        uBefore != null && uAfter != null ? (
+          <>
+            {" "}
+            from {(uBefore * 100).toFixed(1)}% to {(uAfter * 100).toFixed(1)}%
+          </>
+        ) : null;
+      out.push(
+        clause(
+          own ? (
+            <>
+              That rate was {pctRate(before)} at the end of the block before: this{" "}
+              {ctx.eventType === "borrow" ? "borrow" : "repay"} alone moved the market&rsquo;s {utilization(true)}
+              {utilText}, and the rate model sets the rate from utilization.
+            </>
+          ) : (
+            <>
+              That rate was {pctRate(before)} at the end of the block before; it {dir} as the market&rsquo;s{" "}
+              {utilization(true)} changed{utilText}
+              {moved !== 0 && Number.isFinite(dBorrow)
+                ? ", with other users' activity in the same block as well as this event"
+                : ""}
+              .
+            </>
+          ),
+        ),
+      );
+    }
     if (prevEventApr != null && before != null && Math.abs(before - prevEventApr) > RATE_STEP) {
       out.push(
         clause(
           <>
             Between the previous event and this one the rate {before > prevEventApr ? "rose" : "fell"} from{" "}
             {pctRate(prevEventApr)} to {pctRate(before)} with no action by this position: other users&rsquo; borrowing,
-            repaying and supplying changed the market&rsquo;s utilization, and the rate model also adjusts its rate over
-            time.
+            repaying and supplying changed the market&rsquo;s {utilization(!inBlock)}, and the rate model also adjusts
+            its rate over time.
           </>,
         ),
       );
     }
-    const after = read.at.borrowApr;
-    if (before == null || after == null || Math.abs(after - before) <= RATE_STEP) return out;
-    // The move within this block reads first, beside the rate it
-    // produced; the drift since the previous event follows it.
-    const dir = after > before ? "rose" : "fell";
-    const uBefore = util(read.prev);
-    const uAfter = util(read.at);
-    const moved = ctx.eventType === "borrow" ? Math.abs(delta) : ctx.eventType === "repay" ? -Math.abs(delta) : 0;
-    // Accrued interest raises supplied and borrowed alike; what is left of the
-    // borrowed total's change after it is the borrowing and repaying in the block.
-    const dSupply = (read.at.totalSupply ?? NaN) - (read.prev.totalSupply ?? NaN);
-    const dBorrow = (read.at.totalBorrow ?? NaN) - (read.prev.totalBorrow ?? NaN);
-    const own =
-      moved !== 0 &&
-      Number.isFinite(dSupply) &&
-      Number.isFinite(dBorrow) &&
-      Math.abs(dBorrow - dSupply - moved) <= Math.abs(moved) * 0.001 + 1e-6 * (read.at.totalBorrow ?? 0) &&
-      Math.abs(dSupply) <= Math.abs(moved) * 0.01;
-    const utilText =
-      uBefore != null && uAfter != null ? (
-        <>
-          {" "}
-          from {(uBefore * 100).toFixed(1)}% to {(uAfter * 100).toFixed(1)}%
-        </>
-      ) : null;
-    out.unshift(
-      clause(
-        own ? (
-          <>
-            That rate was {pctRate(before)} at the end of the block before: this{" "}
-            {ctx.eventType === "borrow" ? "borrow" : "repay"} alone moved the market&rsquo;s utilization (borrowed ÷
-            supplied){utilText}, and the rate model sets the rate from utilization.
-          </>
-        ) : (
-          <>
-            That rate was {pctRate(before)} at the end of the block before; it {dir} as the market&rsquo;s utilization
-            changed{utilText}
-            {moved !== 0 && Number.isFinite(dBorrow)
-              ? ", with other users' activity in the same block as well as this event"
-              : ""}
-            .
-          </>
-        ),
-      ),
-    );
     return out;
   };
 
@@ -457,7 +484,7 @@ function morphoEventSlotsBase(
         changed: [covered],
         meansNow: [
           rs.debtCleared ? collateralOnlyPath() : hfSentence(),
-          rs.debtCleared ? null : rateLine(),
+          rs.debtCleared ? rateClearedLine() : rateLine(),
           ...(rs.debtCleared ? [] : rateMoves()),
         ],
       };
@@ -594,8 +621,8 @@ function liquidationSlots(
     changed.push(
       clause(
         <>
-          It ran at {b(priceText)}, the market oracle at block{" "}
-          {used.block != null ? used.block.toLocaleString("en-US") : "the liquidation"}
+          It ran at {b(priceText)}, the market oracle at{" "}
+          {used.block != null ? atBlockText(used.block, used.time) : "the liquidation's block"}
           {hfBefore != null ? (
             <>
               , where the position&rsquo;s health factor was {b(fmtMorphoHf(hfBefore))}: below 1, so anyone could

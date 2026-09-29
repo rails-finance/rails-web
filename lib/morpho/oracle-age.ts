@@ -36,6 +36,24 @@ export function ageText(seconds: number): string {
   return h > 0 ? `${d} d ${h} h` : `${d} d`;
 }
 
+/** The read's own time: "03:19 UTC" on the day the price was published, the
+ *  full "Tue 29 Sep 03:19 UTC" otherwise. */
+function readAtText(readUnix: number, publishedUnix: number): string {
+  const r = new Date(readUnix * 1000);
+  const p = new Date(publishedUnix * 1000);
+  const sameDay =
+    r.getUTCFullYear() === p.getUTCFullYear() &&
+    r.getUTCMonth() === p.getUTCMonth() &&
+    r.getUTCDate() === p.getUTCDate();
+  return sameDay ? `${pad(r.getUTCHours())}:${pad(r.getUTCMinutes())} UTC` : publishedText(readUnix, readUnix);
+}
+
+/** A block's time, "Tue 29 Sep 01:33 UTC"; the year only when it is not the
+ *  current one. Client-rendered surfaces only (it reads the clock). */
+export function blockTimeText(unix: number): string {
+  return publishedText(unix, Date.now() / 1000);
+}
+
 interface OracleAge {
   /** "Fri 18 Sep 15:24 UTC". */
   published: string;
@@ -43,6 +61,8 @@ interface OracleAge {
   age: string;
   /** How many feeds the price is built from; the time is the oldest's. */
   feedCount: number;
+  /** When the page's chain read was taken (its block's time). */
+  readAt: string;
 }
 
 /** The oracle price's age, or null — say nothing — when no feed was read. Takes
@@ -56,5 +76,6 @@ export function oracleAge(
     published: publishedText(chain.oraclePublishedAt, chain.timestamp),
     age: ageText(chain.timestamp - chain.oraclePublishedAt),
     feedCount: chain.oracleFeeds.length,
+    readAt: readAtText(chain.timestamp, chain.oraclePublishedAt),
   };
 }

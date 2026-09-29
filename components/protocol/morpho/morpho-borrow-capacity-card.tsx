@@ -43,6 +43,13 @@ export function MorphoBorrowCapacityView({ chain }: { chain: MorphoChainPosition
   return (
     <>
       <RiskFigure label="Borrow capacity">
+        {chain.ltv != null && chain.ltv > 0 ? (
+          <>
+            LTV{" "}
+            <Prov info={capacityProv("Loan-to-value", "live debt ÷ collateral value", coords)}>{pct(chain.ltv)}</Prov>{" "}
+            is{" "}
+          </>
+        ) : null}
         <Prov info={capacityProv("Debt share of the liquidation line", "debt ÷ (collateral value × lltv)", coords)}>
           <RiskStrong>{share.text}</RiskStrong>
         </Prov>{" "}

@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import type { MorphoContext } from "@/lib/shared/types/event-shape";
 import type { MorphoMarketAtBlockResponse } from "@/lib/sources/chain/morpho-position";
+import { blockTimeText } from "@/lib/morpho/oracle-age";
 
 export type MorphoAtBlock =
   | { status: "loading" }
@@ -17,9 +18,9 @@ export type MorphoAtBlock =
 const cache = new Map<string, Promise<MorphoMarketAtBlockResponse | null>>();
 
 function load(marketId: string, block: number, chainId: number) {
-  // `v=2`: the answer gained the market totals; a new key keeps a cached v1
-  // answer (max-age a day) from standing in for it.
-  const url = `/api/chain/morpho/at-block?market=${marketId}&block=${block}&chain=${chainId}&v=2`;
+  // `v=3`: the answer gained each block's time (v2 the market totals); a new
+  // key keeps a cached older answer (max-age a day) from standing in for it.
+  const url = `/api/chain/morpho/at-block?market=${marketId}&block=${block}&chain=${chainId}&v=3`;
   let p = cache.get(url);
   if (!p) {
     p = fetch(url)
@@ -99,6 +100,11 @@ export function fmtMorphoHf(hf: number): string {
   return hf < 1.1 ? hf.toFixed(3) : hf.toFixed(2);
 }
 
+/** "block 51,924,215 (Tue 29 Sep 01:33 UTC)" — the time where the read carried it. */
+export function atBlockText(block: number, time?: number): string {
+  return `block ${block.toLocaleString("en-US")}${time != null ? ` (${blockTimeText(time)})` : ""}`;
+}
+
 /** An oracle price in the loan token: two decimals, grouped. */
 export function fmtMorphoPrice(p: number): string {
   if (p >= 1) return p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -110,6 +116,8 @@ export interface MorphoHealthMove {
    *  block before the event. */
   price: number;
   priceBlock: number;
+  /** That block's time (unix seconds), where the read carried it. */
+  priceBlockTime?: number;
   lltv: number;
   collBefore: number;
   collAfter: number;
@@ -150,6 +158,7 @@ export function morphoHealthMove(ctx: MorphoContext, read: MorphoAtBlock): Morph
   return {
     price,
     priceBlock: read.prev.block,
+    priceBlockTime: read.prev.timestamp,
     lltv,
     collBefore,
     collAfter,
@@ -175,17 +184,26 @@ export function morphoLiquidationPrice(
   ctx: MorphoContext,
   read: MorphoAtBlock,
   eventBlock: number | undefined,
-): { price: number; block: number | undefined; lif: number | null } | null {
+): { price: number; block: number | undefined; time?: number; lif: number | null } | null {
   const seized = Math.abs(Number(ctx.assetsDelta));
   const repaid = Number(ctx.loanRepaid);
   if (read.status === "ok" && seized > 0 && repaid > 0) {
     const implied = (repaid * read.lif) / seized;
     const off = (p: number) => Math.abs(p / implied - 1);
     const best = [read.prev, read.at].filter((r) => r.price > 0).sort((a, b) => off(a.price) - off(b.price))[0];
-    if (best && off(best.price) < 0.002) return { price: best.price, block: best.block, lif: read.lif };
-    if (read.at.price > 0) return { price: read.at.price, block: read.at.block, lif: read.lif };
+    if (best && off(best.price) < 0.002)
+      return { price: best.price, block: best.block, time: best.timestamp, lif: read.lif };
+    if (read.at.price > 0)
+      return { price: read.at.price, block: read.at.block, time: read.at.timestamp, lif: read.lif };
   }
   const stored = ctx.oraclePriceAtBlock?.loanPerCollateral;
   if (read.status === "loading") return null;
-  return stored ? { price: stored, block: eventBlock, lif: read.status === "ok" ? read.lif : null } : null;
+  return stored
+    ? {
+        price: stored,
+        block: eventBlock,
+        time: read.status === "ok" && read.at.block === eventBlock ? read.at.timestamp : undefined,
+        lif: read.status === "ok" ? read.lif : null,
+      }
+    : null;
 }

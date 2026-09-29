@@ -19,6 +19,8 @@ import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { AmountText } from "@/components/shared/amount-text";
 import { parsePendlePt, pendlePtSentence } from "@/lib/morpho/pendle-pt";
 
+const MORPHO_LIQUIDATION_DOC = "https://docs.morpho.org/learn/concepts/liquidation/";
+
 export function MorphoPositionExplanation({
   chain,
   txCount,
@@ -122,7 +124,8 @@ export function MorphoPositionExplanation({
         ) : (
           <>was published </>
         )}
-        {age.published}, {age.age} before this read.
+        {age.published}, {age.age} before this page&rsquo;s chain read at block{" "}
+        {chain.blockNumber.toLocaleString("en-US")} ({age.readAt}).
       </span>,
     );
   }
@@ -152,19 +155,28 @@ export function MorphoPositionExplanation({
   if (hasDebt) {
     if (hf != null) {
       // One distance, three readings: the capacity bar's share of the line
-      // used is 1 ÷ HF, and the price fall to the line is 1 − 1 ÷ HF.
+      // used is LTV ÷ LLTV = 1 ÷ HF, and the price fall to the line is 1 − 1 ÷ HF.
       const usedPct = (100 / hf).toFixed(1);
+      const lltvPct = (chain.lltv * 100).toFixed(1);
       bullets.push(
         <span key="hf">
           Its health factor is {hf.toFixed(2)}: the collateral&rsquo;s value × the LLTV is {hf.toFixed(2)} times the
-          debt, and at 1 the position can be liquidated. The {usedPct}% of borrow capacity used
+          debt, and at 1 the position can be liquidated.
+          {chain.ltv != null && chain.ltv > 0 ? (
+            <>
+              {" "}
+              Its LTV (debt ÷ collateral value) is {(chain.ltv * 100).toFixed(1)}%, and {(chain.ltv * 100).toFixed(1)}%
+              ÷ {lltvPct}% is the {usedPct}% of borrow capacity used.
+            </>
+          ) : null}{" "}
+          That {usedPct}%
           {dropPct != null && dropPct > 0 ? (
             <>
               , the <H>{dropPct}%</H> fall in the {chain.collateralSymbol} price (in {chain.loanSymbol}) that would
               reach the line
             </>
           ) : null}{" "}
-          and the health factor are three views of that one distance.
+          and the health factor are three views of one distance.
         </span>,
       );
     }
@@ -172,8 +184,9 @@ export function MorphoPositionExplanation({
       bullets.push(
         <span key="rate">
           The market&rsquo;s borrow rate is {(chain.borrowApr * 100).toFixed(2)}% APR, about{" "}
-          <AmountText value={chain.currentDebt * chain.borrowApr} /> {chain.loanSymbol} a year on this debt; the
-          market&rsquo;s rate model moves it with how much of the market is lent out.
+          <AmountText value={chain.currentDebt * chain.borrowApr} /> {chain.loanSymbol} a year on this debt at this
+          rate; the market&rsquo;s rate model moves it with utilization, the share of the market&rsquo;s supplied{" "}
+          {chain.loanSymbol} that is lent out.
         </span>,
       );
     }
@@ -187,8 +200,12 @@ export function MorphoPositionExplanation({
     }
     bullets.push(
       <span key="liq-model">
-        Past the line, a liquidator can repay debt and seize collateral worth {penaltyPct}% more than it repays. If the
-        collateral runs out, the shortfall is written off against this market&rsquo;s lenders as bad debt.
+        Past the line, a liquidator can repay debt and seize collateral worth {penaltyPct}% more than it repays: this
+        market&rsquo;s liquidation incentive, set by its LLTV as min(1.15, 1 ÷ (0.3 × LLTV + 0.7)) − 1 (
+        <a href={MORPHO_LIQUIDATION_DOC} target="_blank" rel="noopener noreferrer" className="link-external underline">
+          docs.morpho.org — Liquidation
+        </a>
+        ). If the collateral runs out, the shortfall is written off against this market&rsquo;s lenders as bad debt.
       </span>,
     );
   }

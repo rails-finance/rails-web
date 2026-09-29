@@ -99,7 +99,8 @@ export function MorphoOraclePrice({
           >
             {age.published}
           </Prov>{" "}
-          ({age.age} before this read)
+          ({age.age} before this page&rsquo;s chain read at block {chain.blockNumber.toLocaleString("en-US")},{" "}
+          {age.readAt})
         </>
       )}
     </>

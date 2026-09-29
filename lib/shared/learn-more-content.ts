@@ -2508,20 +2508,23 @@ export function morphoVaultExposureContent(): LearnMoreContent {
       },
     ],
     links: [
-      { label: "MetaMorpho vaults", url: MORPHO_DOC_URLS.VAULT },
-      { label: "Morpho markets", url: MORPHO_DOC_URLS.MARKET },
-      { label: "Morpho docs", url: MORPHO_DOC_URLS.OVERVIEW },
+      { label: "docs.morpho.org — Vaults", url: MORPHO_DOC_URLS.VAULT },
+      { label: "docs.morpho.org — Markets", url: MORPHO_DOC_URLS.MARKET },
+      { label: "docs.morpho.org — Overview", url: MORPHO_DOC_URLS.OVERVIEW },
     ],
   };
 }
 
+// Each link names where it goes: the docs site or the contract's repository.
+const MORPHO_DOCS_HOST = "docs.morpho.org";
+const MORPHO_CONTRACT_LABEL = "github.com/morpho-org — Morpho.sol";
 const MORPHO_LINKS = {
-  mechanics: { label: "Market mechanics", url: MORPHO_DOC_URLS.MECHANICS },
-  health: { label: "Collateral, LTV & Health", url: MORPHO_DOC_URLS.HEALTH },
-  liquidation: { label: "Liquidation on Morpho", url: MORPHO_DOC_URLS.LIQUIDATION },
-  irm: { label: "Interest rate model", url: MORPHO_DOC_URLS.IRM },
-  markets: { label: "Morpho markets", url: MORPHO_DOC_URLS.MARKET },
-  contract: { label: "Morpho Blue contract", url: MORPHO_DOC_URLS.CONTRACT },
+  mechanics: { label: `${MORPHO_DOCS_HOST} — Market mechanics`, url: MORPHO_DOC_URLS.MECHANICS },
+  health: { label: `${MORPHO_DOCS_HOST} — Collateral, LTV & Health`, url: MORPHO_DOC_URLS.HEALTH },
+  liquidation: { label: `${MORPHO_DOCS_HOST} — Liquidation`, url: MORPHO_DOC_URLS.LIQUIDATION },
+  irm: { label: `${MORPHO_DOCS_HOST} — Interest rate model`, url: MORPHO_DOC_URLS.IRM },
+  markets: { label: `${MORPHO_DOCS_HOST} — Markets`, url: MORPHO_DOC_URLS.MARKET },
+  contract: { label: MORPHO_CONTRACT_LABEL, url: MORPHO_DOC_URLS.CONTRACT },
 };
 
 /** A claim's source, linked: a docs page above, or a Morpho Blue contract
@@ -2538,8 +2541,8 @@ const morphoSources = (...labels: string[]): LearnMoreLink[] =>
     (l) =>
       MORPHO_SOURCE[l] ??
       (l.startsWith("Morpho Blue contract")
-        ? { label: l, url: MORPHO_DOC_URLS.CONTRACT }
-        : { label: l, url: MORPHO_DOC_URLS.OVERVIEW }),
+        ? { label: l.replace("Morpho Blue contract", MORPHO_CONTRACT_LABEL), url: MORPHO_DOC_URLS.CONTRACT }
+        : { label: `${MORPHO_DOCS_HOST} — ${l}`, url: MORPHO_DOC_URLS.OVERVIEW }),
   );
 
 /** One modal per Morpho event kind. Each claim names its source in brackets:
@@ -2638,7 +2641,7 @@ export function morphoMarketContent(
           },
           {
             bold: "The rate",
-            text: "the market's interest rate model sets the borrow rate and moves it to keep utilization near 90%, faster the further utilization is from that target.",
+            text: "the market's interest rate model sets the borrow rate from utilization, the share of the market's supplied loan asset that is lent out, and moves it to keep utilization near 90%, faster the further utilization is from that target.",
             sources: morphoSources("Interest rate model"),
           },
           {
@@ -2746,7 +2749,7 @@ export function morphoEventFallbackContent(): LearnMoreContent {
         text: "the contract has no admin upgrade path; governance only enables new LLTV values and rate models for market creators to pick from.",
       },
     ],
-    links: [{ label: "Morpho docs", url: MORPHO_DOC_URLS.OVERVIEW }],
+    links: [{ label: `${MORPHO_DOCS_HOST} — Overview`, url: MORPHO_DOC_URLS.OVERVIEW }],
   };
 }
 

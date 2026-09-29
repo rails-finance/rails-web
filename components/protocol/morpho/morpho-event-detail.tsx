@@ -51,6 +51,7 @@ import {
   fmtMorphoPart,
   fmtMorphoHf,
   fmtMorphoPrice,
+  atBlockText,
   subDecimal,
   type MorphoAtBlock,
   type MorphoHealthMove,
@@ -76,6 +77,13 @@ const fmt = (human: string): string => formatNumber(Number(human));
 /** A running balance the answer did not carry is stated, never filled in. */
 const fmtAfter = (human: string | undefined): string => (human == null ? "Not loaded" : fmt(human));
 
+/** "2839.378833" → "2,839.378833": the exact figure grouped as every other
+ *  exact figure on the card is, with no digit dropped. */
+function groupDecimal(s: string): string {
+  const m = /^(-?)(\d+)(\.\d+)?$/.exec(s.trim());
+  return m ? `${m[1]}${BigInt(m[2]).toLocaleString("en-US")}${m[3] ?? ""}` : s;
+}
+
 /** The transition at the row's precision: the before is the row's own exact
  *  figure (never the float after − change), and both figures are written as
  *  the timeline row writes amounts. */
@@ -89,7 +97,7 @@ function atPrecision(
   return {
     ...t,
     before: fmtMorphoAmount(before),
-    beforeExact: before,
+    beforeExact: groupDecimal(before),
     change: `${c >= 0 ? "+" : "−"}${fmtMorphoAmount(Math.abs(c))}`,
     shownAsIs: true,
   };
@@ -156,7 +164,7 @@ function buildMorphoLiqForensics(
           priceBlock != null
             ? liqPriceUsedProv(collSym, loanSym, coords, price, priceBlock)
             : atBlockOraclePriceProv(collSym, loanSym, coords, price),
-        note: priceBlock != null ? `market oracle at block ${priceBlock.toLocaleString("en-US")}` : "market oracle",
+        note: priceBlock != null ? `market oracle at ${atBlockText(priceBlock, used.time)}` : "market oracle",
       },
     ],
     // Everything on this card is loan-token denominated — Morpho's own unit.
@@ -236,8 +244,8 @@ function MorphoRiskCards({
     l == null ? "no debt" : l > 0 && l < 0.001 ? "<0.1%" : `${(l * 100).toFixed(1)}%`;
   const priceNote = (
     <>
-      at {collSym} {fmtMorphoPrice(move.price)} {loanSym}, the market oracle at block{" "}
-      {move.priceBlock.toLocaleString("en-US")}
+      at {collSym} {fmtMorphoPrice(move.price)} {loanSym}, the market oracle at{" "}
+      {atBlockText(move.priceBlock, move.priceBlockTime)}
     </>
   );
   const apr = read.at.borrowApr;
@@ -264,7 +272,8 @@ function MorphoRiskCards({
             <Prov info={morphoBorrowRateAtBlockProv(coords, read.at.block, apr)}>{(apr * 100).toFixed(2)}% APR</Prov>
           </span>
           <div className="mt-0.5 text-xs text-rb-500">
-            at the end of block {read.at.block.toLocaleString("en-US")}; it moves with the market&rsquo;s utilization
+            at the end of {atBlockText(read.at.block, read.at.timestamp)}; it moves with the market&rsquo;s utilization,
+            the share of its supplied {loanSym} that is lent out
           </div>
         </StatCard>
       )}
