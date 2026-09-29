@@ -44,7 +44,7 @@ import type {
   ServedFolderLeg,
   ServedTimelineRow,
 } from "@/lib/shared/timeline-folder";
-import { CHUNK_TARGET, chunkByTransaction } from "@/lib/shared/timeline-chunks";
+import { CHUNK_TARGET, chunkByTransaction, splitAtMonths } from "@/lib/shared/timeline-chunks";
 import type { OpeningBucket } from "@/lib/shared/timeline-opening-balance";
 
 /** The four coordinates the pass needs from a family's own row shape. */
@@ -464,22 +464,32 @@ function findShapeStretches<R>(
  * One forward pass over `rows` in ASCENDING chain order — the server's
  * `groupIntoRows`: a row joins the first spec that matches it, a matching row
  * opens or extends a stretch, a stretch shorter than the spec's `min` stays as
- * events, and a longer one is chunked by transaction into folders. Ordinals run
+ * events, and a longer one is cut at month boundaries, each piece of two or
+ * more chunked by transaction into folders. Ordinals run
  * contiguously from `ordinalBase`, the first row's place in the WHOLE history.
+ *
+ * `keep` narrows the answer to a span without narrowing the runs: every row
+ * takes part in finding and qualifying a run, and only the rows `keep` admits
+ * are served — a piece left with two or more of them is still a group. So a
+ * month read groups exactly as the whole history does.
  */
 export function groupIntoRows<R>(
   rows: R[],
   specs: readonly GroupingSpec<R>[],
   access: GroupingAccess<R>,
-  opts: { ordinalBase: number; chunkTarget?: number },
+  opts: { ordinalBase: number; chunkTarget?: number; keep?: (row: R) => boolean },
 ): GroupedRows<R> {
   const target = opts.chunkTarget ?? CHUNK_TARGET;
+  const keep = opts.keep ?? (() => true);
   const out: ServedTimelineRow<R>[] = [];
   const folders = new Map<string, ServedFolder>();
   const members = new Map<string, R[]>();
   const folderByEvent = new Map<string, string>();
   const served = new Set<string>();
-  for (const row of rows) served.add(access.eventKey(row));
+  for (const row of rows) if (keep(row)) served.add(access.eventKey(row));
+  const loose = (row: R) => {
+    if (keep(row)) out.push({ kind: "event", event: row });
+  };
 
   // Shape runs first, as barriers for the row specs (the server's order).
   const shapeAt = new Map<number, ShapeStretch>();
@@ -499,24 +509,34 @@ export function groupIntoRows<R>(
     }
   };
 
+  // A qualifying run is cut at each UTC month boundary (rails-ops decision
+  // 0021, amendment 2026-09-29): a piece of two or more stays a group, one
+  // left over sits loose, and a shape run counts its pieces in transactions.
+  const emitRun = (stretch: R[], at: number, spec: GroupingSpec<R>, minTail: number, shape?: string[]) => {
+    let offset = 0;
+    for (const piece of splitAtMonths(stretch, access.timestamp, access.txHash)) {
+      const first = piece.findIndex(keep);
+      const kept = piece.filter(keep);
+      const units = shape ? new Set(kept.map(access.txHash)).size : kept.length;
+      if (units >= 2) emit(chunkByTransaction(kept, access.txHash, target, minTail), at + offset + first, spec, shape);
+      else for (const row of kept) out.push({ kind: "event", event: row });
+      offset += piece.length;
+    }
+  };
+
   let i = 0;
   while (i < rows.length) {
     const shaped = shapeAt.get(i);
     if (shaped) {
       const spec = specs[shaped.spec];
       const minTail = spec.min * shaped.keys;
-      emit(
-        chunkByTransaction(rows.slice(shaped.start, shaped.end), access.txHash, target, minTail),
-        i,
-        spec,
-        shaped.kinds,
-      );
+      emitRun(rows.slice(shaped.start, shaped.end), i, spec, minTail, shaped.kinds);
       i = shaped.end;
       continue;
     }
     const si = specOf(rows[i]);
     if (si < 0) {
-      out.push({ kind: "event", event: rows[i] });
+      loose(rows[i]);
       i += 1;
       continue;
     }
@@ -531,9 +551,9 @@ export function groupIntoRows<R>(
       j++;
     const stretch = rows.slice(i, j);
     if (stretch.length < spec.min) {
-      for (const row of stretch) out.push({ kind: "event", event: row });
+      for (const row of stretch) loose(row);
     } else {
-      emit(chunkByTransaction(stretch, access.txHash, target, spec.min), i, spec);
+      emitRun(stretch, i, spec, spec.min);
     }
     i = j;
   }
