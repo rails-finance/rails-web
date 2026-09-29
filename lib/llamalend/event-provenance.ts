@@ -342,3 +342,72 @@ export const llamaLiqPremiumProv = (
     { label: "cleared", value: parts.cleared, kind: "chain", pclass: "emitted" },
   ],
 });
+
+// ── the at-block reads (before and after an event) ───────────────────────────
+//
+// What stood before an event, what the AMM had converted, and the health on
+// each side are state only: /api/chain/llamalend/event-state reads the
+// position at block − 1 and at the event's block.
+
+const EVENT_STATE_VIA = "GET /api/chain/llamalend/event-state";
+
+/** One figure of the position read at one block. */
+export const stateAtBlockProv = (
+  figure: string,
+  getter: string,
+  block: number,
+  coords: LlamalendCoords,
+  raw?: string | null,
+): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  verify: {
+    kind: "recompute",
+    text: `Re-run the ${getter} eth_call at block ${block} against an archive node; it reproduces this figure exactly.`,
+  },
+  summary: `${figure} at block ${block} — ${getter}, read at ${
+    coords.blockNumber != null && block < coords.blockNumber ? "the block before this event" : "this event's block"
+  }.`,
+  contract: controllerOf(coords),
+  via: `${EVENT_STATE_VIA} · ${getter} @ ${block}${raw != null ? ` · raw: ${raw}` : ""}`,
+  inputs: eventInputs(coords),
+});
+
+/** A figure's change across the event: after − before, both at-block reads. */
+export const stateChangeProv = (figure: string, coords: LlamalendCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `Change in ${figure} across this event — the read at this event's block less the read at the block before.`,
+  formula: "after − before",
+  contract: controllerOf(coords),
+  via: `${EVENT_STATE_VIA} · two reads (block − 1, block)`,
+  inputs: eventInputs(coords),
+});
+
+/** The already-converted borrowed token a hard liquidation took (the
+ *  Liquidate log's stablecoin_received), beside the collateral and the debt. */
+export const liquidationConvertedProv = (sym: string, coords: LlamalendCoords, raw?: string | null): Provenance => ({
+  kind: "chain",
+  pclass: "emitted",
+  verify: txVerify(coords),
+  summary: `${sym} the AMM had converted from this position's collateral, taken in the hard liquidation — the Liquidate log's stablecoin_received field${atBlock(coords)}. It went toward the debt; it is a separate figure from the debt cleared.`,
+  contract: controllerOf(coords),
+  via: `${LLAMALEND_VIA} · Liquidate log · ${fieldSeg("stablecoin_received", raw)}`,
+  inputs: eventInputs(coords),
+});
+
+/** Collateral lost to soft-liquidation over the position's life: deposited −
+ *  withdrawn − held now, with nothing converted at head and no liquidation. */
+export const llamalendLostProv = (sym: string, controller?: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `${sym} the AMM sold while the price sat in this position's bands and did not buy back: everything deposited, less everything withdrawn, less what the position holds now. Nothing is converted at head and nothing was liquidated, so no other way out remains.`,
+  formula: "deposited − withdrawn − held now",
+  contract: { name: "LlamaLend Controller", address: controller ?? "" },
+  via: `${LLAMALEND_VIA} · Σ emitted collateral amounts · user_state @ head`,
+  inputs: [
+    { label: "deposited", kind: "chain", pclass: "emitted", note: "Σ collateral added in the position's events" },
+    { label: "withdrawn", kind: "chain", pclass: "emitted", note: "Σ collateral removed in the position's events" },
+    { label: "held now", kind: "chain", pclass: "state", note: "user_state(user)[0] @ head" },
+  ],
+});

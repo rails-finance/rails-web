@@ -100,6 +100,17 @@ export interface LlamalendChainResponse {
   /** price_oracle ÷ pUp — 1.0 exactly at soft-liq onset; below 1 the band is
    *  being crossed. A ratio of two same-unit prices. */
   health: number | null;
+  /** Controller.health(user, true) as a fraction (0.1122 = 11.22%): the value
+   *  the bands would hold with the price through their bottom, less the
+   *  position's liquidation discount, over the debt, minus 1, plus the price
+   *  gap above the bands while the position is out of range. Below 0 anyone
+   *  may liquidate the position. Null when the read failed. */
+  healthFull: number | null;
+  healthFullRaw: string | null;
+  /** Controller.liquidation_discounts(user) as a fraction — the discount
+   *  stored on this position when its owner last acted, which the health
+   *  figure subtracts. */
+  liquidationDiscount: number | null;
 
   /** True when the chain read failed and this is an empty stub. */
   chainStale: boolean;

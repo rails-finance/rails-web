@@ -61,6 +61,7 @@ export function TimelineActivityHeader({
   closed,
   firstAt,
   tenurePending,
+  reopenedAt,
 }: {
   events: { timestamp: number }[];
   /** Each served folder's own first and last member, whole and unfiltered —
@@ -82,6 +83,11 @@ export function TimelineActivityHeader({
    *  freshness pill stays — the NEWEST event is always in the window (a served
    *  folder's `lastAt` included). */
   tenurePending?: boolean;
+  /** Where the position closed and opened again under the same key (a
+   *  LlamaLend borrower who repaid in full and borrowed later), when the open
+   *  loan began: the eyebrow then reads "Open again since {date} · {tenure} ·
+   *  first opened {date}". Unset changes nothing. */
+  reopenedAt?: number | null;
 }) {
   if (events.length === 0 && !folders?.length) return null;
   let first = events.length ? events[0].timestamp : folders![0].firstAt;
@@ -96,6 +102,21 @@ export function TimelineActivityHeader({
   }
   if (firstAt != null && firstAt > 0 && firstAt < first) first = firstAt;
   const now = Math.floor(Date.now() / 1000);
+  if (!tenurePending && !closed && reopenedAt != null && reopenedAt > first) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-foreground">Open again since {formatDate(reopenedAt)}</span>
+        <span className={PILL_META} data-prov-exempt="">
+          {formatDuration(reopenedAt, now)}
+        </span>
+        <span className="text-muted-foreground">first opened {formatDate(first)}</span>
+        <span className={PILL_META}>
+          <Clock size={12} />
+          {formatDuration(last, now)} ago
+        </span>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
       {tenurePending ? (

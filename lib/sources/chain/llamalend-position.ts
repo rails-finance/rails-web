@@ -9,6 +9,8 @@
 //   AMM.A()                            amplification (immutable)
 //   AMM.get_base_price()               band-grid anchor (drifts on TTL)
 //   AMM.price_oracle()                 collateral in the borrowed token
+//   Controller.health(user, true)      the protocol's health (below 0: liquidatable)
+//   Controller.liquidation_discounts(user)  the discount that health subtracts
 //
 // `user_state.stablecoin` is the figure no event carries: collateral the AMM
 // has ALREADY converted for this user — soft-liquidation observed live. It is
@@ -38,7 +40,11 @@ import type { LlamalendChainResponse } from "@/lib/api/fetch-llamalend-position"
 
 const ZERO = BigInt(0);
 
-const CONTROLLER_ABI = parseAbi(["function user_state(address) view returns (uint256[4])"]);
+const CONTROLLER_ABI = parseAbi([
+  "function user_state(address) view returns (uint256[4])",
+  "function health(address,bool) view returns (int256)",
+  "function liquidation_discounts(address) view returns (uint256)",
+]);
 const AMM_ABI = parseAbi([
   "function read_user_tick_numbers(address) view returns (int256[2])",
   "function get_sum_xy(address) view returns (uint256[2])",
@@ -93,6 +99,9 @@ function stub(controller: string, user: string): LlamalendChainResponse {
     priceOracle: null,
     priceOracleRaw: null,
     health: null,
+    healthFull: null,
+    healthFullRaw: null,
+    liquidationDiscount: null,
     chainStale: true,
   };
 }
@@ -124,6 +133,15 @@ export async function loadLlamalendPositionFromChain(
           { address: amm, abi: AMM_ABI, functionName: "A" },
           { address: amm, abi: AMM_ABI, functionName: "get_base_price" },
           { address: amm, abi: AMM_ABI, functionName: "price_oracle" },
+          // Same multicall, so no extra RPC request: health reverts for a
+          // user with no loan, which allowFailure turns into null.
+          { address: controller as `0x${string}`, abi: CONTROLLER_ABI, functionName: "health", args: [user, true] },
+          {
+            address: controller as `0x${string}`,
+            abi: CONTROLLER_ABI,
+            functionName: "liquidation_discounts",
+            args: [user],
+          },
         ] as const,
       }) as Promise<Res[]>,
     ]);
@@ -165,6 +183,14 @@ export async function loadLlamalendPositionFromChain(
     base.bands = Number(bandsRaw);
     base.inSoftLiq = convertedRaw > ZERO;
     base.fullyConverted = convertedRaw > ZERO && collateralRaw === ZERO;
+
+    const healthRaw = ok<bigint>(reads[6]);
+    if (healthRaw != null) {
+      base.healthFullRaw = healthRaw.toString();
+      base.healthFull = Number(healthRaw) / 1e18;
+    }
+    const discountRaw = ok<bigint>(reads[7]);
+    if (discountRaw != null) base.liquidationDiscount = scale1e18(discountRaw);
 
     // The cross-check: a second contract's statement of the converted amount.
     const sumXy = ok<readonly [bigint, bigint]>(reads[2]);

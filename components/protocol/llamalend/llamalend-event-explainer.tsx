@@ -7,8 +7,8 @@
 // (skipLead), so the first sentence is never duplicated. Every figure here is
 // the card's own face value, Prov-traced — an echo of the header delta or the
 // detail-grid after-image. Grounded in LLAMMA semantics: collateral as band
-// liquidity, two-stage liquidation (soft = a reversible state, hard = a one-shot
-// event), per-second debt accrual, and the seized already-converted crvUSD that
+// liquidity, two-stage liquidation (soft = a state whose swaps reverse and whose losses
+// stay, hard = a one-shot event), per-second debt accrual, and the seized already-converted crvUSD that
 // is NEVER the debt cleared.
 
 import type { LlamalendContext } from "@/lib/shared/types/event-shape";
@@ -22,6 +22,8 @@ import {
 } from "@/lib/shared/learn-more-content";
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { llamalendEventSlots } from "@/lib/llamalend/explainer-clauses";
+import { useLlamalendEventState } from "@/lib/llamalend/use-event-state";
+import { llamalendEventFigures } from "@/lib/llamalend/event-figures";
 
 export interface LlamalendEventExplainerProps {
   ctx: LlamalendContext;
@@ -52,7 +54,10 @@ export function llamalendLearnMoreContent(ctx: LlamalendContext): LearnMoreConte
 
 export function LlamalendEventExplainer({ ctx, txHash, blockNumber, wallet, skipLead }: LlamalendEventExplainerProps) {
   const coords: LlamalendCoords = { txHash, blockNumber, controller: ctx.controller, user: wallet };
-  const clauses = eventClauses(llamalendEventSlots(ctx, coords));
+  // The same before/after read the grid uses (one request, shared).
+  const state = useLlamalendEventState(ctx, blockNumber, wallet);
+  const f = state ? llamalendEventFigures(ctx, state) : null;
+  const clauses = eventClauses(llamalendEventSlots(ctx, coords, f));
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;

@@ -301,7 +301,10 @@ try {
   // frozen split: the stated total must match the backend, and the three parts
   // must sum to it. That survives a new market appearing — which is exactly what
   // broke the old frozen "48 V1 lend · 9 V1 mint · 2 V2".
-  const census = body.match(/(\d+) markets listed \((\d+) V1 lend · (\d+) V1 mint · (\d+) V2\)/);
+  // The vitals band: "Markets listed" then the count, the lineage split in
+  // its notes.
+  const vitals = await page.evaluate(() => document.body.innerText);
+  const census = vitals.match(/Markets listed\s*(\d+)[\s\S]*?\b(\d+) V1 lend · (\d+) V1 mint · (\d+) V2/i);
   const [total, lend, mint, v2n] = (census ?? []).slice(1).map(Number);
   checkVsWire(
     "markets: census total matches the wire and its parts sum to it",
@@ -450,7 +453,7 @@ try {
   // liquidation-family row so both the partial hard-liq and the self-liq
   // explainers are in the DOM.
   {
-    const liqHeaders = page.getByRole("button", { name: /^(Self-)?[Ll]iquidation/ });
+    const liqHeaders = page.getByRole("button", { name: /^(Self-)?[Ll]iquidat/ });
     const n = await liqHeaders.count();
     for (let i = 0; i < n; i++) {
       await liqHeaders
@@ -476,24 +479,31 @@ try {
     await page.waitForTimeout(400);
   }
   body = await page.textContent("body");
-  // Was: /unstated/ && /partial/. Neither word is the page's treatment of an
-  // unstated after-image — and the page's actual treatment is the CORRECT one:
-  // it OMITS the stat rather than printing a zero the chain never stated ("a dash
-  // is an omission"). So assert the real invariant, counted against the wire:
-  // exactly the rows the chain left silent are the rows with no Collateral stat.
-  // Verified on this fixture: 4 liquidations, 1 with a null after-image (the
-  // partial), 3 that genuinely zeroed the position and rightly render 0.
+  // A partial liquidation logs no after-state. The row states what the
+  // position held from the chain read at its block (event-state), so every
+  // liquidation row carries a Collateral stat, and none prints a zero the
+  // chain never stated: the partial rows' figures are the read's.
   {
+    // The read is two archive calls per row; give it time to land.
+    await page
+      .waitForFunction(
+        () =>
+          [...document.querySelectorAll("div.flex.w-full.items-start.relative.rounded-xl")]
+            .filter((c) => /iquidat/.test(c.innerText) && /Position state|Collateral/.test(c.innerText))
+            .every((c) => /Collateral/.test(c.innerText)),
+        null,
+        { timeout: 30000 },
+      )
+      .catch(() => {});
     const perRow = await page.evaluate(() =>
       [...document.querySelectorAll("div.flex.w-full.items-start.relative.rounded-xl")]
-        .filter((c) => /iquidation/.test(c.innerText))
+        .filter((c) => /iquidat/.test(c.innerText) && /Position state|Collateral/.test(c.innerText))
         .map((c) => /Collateral/.test(c.innerText)),
     );
-    const omitted = perRow.filter((hasStat) => !hasStat).length;
     check(
-      "liq detail: a chain-silent after-image is OMITTED, never rendered as zero",
-      perRow.length === WIRE.liqRows && omitted === WIRE.liqNoAfterImage,
-      `${perRow.length} rows (wire ${WIRE.liqRows}); ${omitted} omit the stat (wire says ${WIRE.liqNoAfterImage} chain-silent)`,
+      "liq detail: every opened liquidation row states its collateral after (log or chain read)",
+      perRow.length > 0 && perRow.every(Boolean),
+      `${perRow.length} opened rows (wire ${WIRE.liqRows}, ${WIRE.liqNoAfterImage} with no after-image)`,
     );
   }
   check("liq detail: converted-taken stated (both AMM legs seized)", /already converted/.test(body));
@@ -507,6 +517,91 @@ try {
   await page.waitForSelector("text=Add collateral", { timeout: 120000 });
   body = await page.textContent("body");
   check("add-collateral: 'Add collateral' label renders (never a zero Borrow)", /Add collateral/.test(body));
+
+  // ── 6. the newcomer-review fixture — reads at block − 1 and block ─────────
+  // A closed block's state never changes, so these raw figures are exact
+  // forever (rails-ops item 77, the LlamaLend loop; checked against the
+  // answer key's chain reads).
+  const NR = {
+    controller: "0xaade9230aa9161880e13a38c83400d3d1995267b",
+    user: "0x8f1e003313650b3629a0d73b26a227574bad6c2d",
+  };
+  const es = async (block) =>
+    (
+      await fetch(`${BASE}/api/chain/llamalend/event-state?controller=${NR.controller}&user=${NR.user}&block=${block}`)
+    ).json();
+  const addColl = await es(25305369);
+  check(
+    "event-state: add-collateral row reads 1.0472 → 2.0480 WETH",
+    addColl.before?.collateralRaw === "1047182052278762595" && addColl.after?.collateralRaw === "2048046494738597881",
+    `${addColl.before?.collateralRaw} → ${addColl.after?.collateralRaw}`,
+  );
+  check(
+    "event-state: bands 76…79 → 122…125, health 109.48% after",
+    addColl.before?.n1 === "76" && addColl.after?.n1 === "122" && addColl.after?.healthRaw === "1094808657500230440",
+    `${addColl.before?.n1} → ${addColl.after?.n1}, ${addColl.after?.healthRaw}`,
+  );
+  const repayIn = await es(25388879);
+  check(
+    "event-state: in-band repay holds 1,484.58 crvUSD converted, health 2.35% → 5.08%",
+    repayIn.before?.convertedRaw === "1484575794186193099399" &&
+      repayIn.before?.healthRaw === "23488142984460246" &&
+      repayIn.after?.healthRaw === "50844625291548962",
+  );
+  const live = await (
+    await fetch(`${BASE}/api/chain/llamalend/position?controller=${NR.controller}&user=${NR.user}`)
+  ).json();
+  check(
+    "position: health(user, true) and the stored discount ride the live read",
+    typeof live.healthFull === "number" && live.liquidationDiscount === 0.04,
+    `${live.healthFull} · ${live.liquidationDiscount}`,
+  );
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem(
+        "rails-open-cards-v1",
+        JSON.stringify({
+          "llamalend:borrow:413b4e3d3cc6a7c487b619e137e5e5f54d7727ca22e107544921a9defde26c3c:187:self": true,
+        }),
+      );
+    } catch {}
+  });
+  await page.goto(`${BASE}${EXPLORER}/${NR.controller}/${NR.user}`, { waitUntil: "networkidle", timeout: 180000 });
+  await page.waitForSelector("text=Lost to soft-liquidation", { timeout: 120000 });
+  await page.waitForSelector("text=fewer than after the 11 Jun event", { timeout: 120000 });
+  body = await page.textContent("body");
+  check("nr: card states health", /Health:\s*[\d.]+%/.test(body));
+  // Deposited 7.61413 WETH, held 7.42038 WETH while the collateral is unchanged.
+  check(
+    "nr: card states the collateral lost to soft-liquidation",
+    /Lost to soft-liquidation:\s*0\.19375 WETH/.test(body),
+  );
+  check(
+    "nr: the add-collateral row reads its before from the chain",
+    /1\.0472/.test(body) && /0\.0061 WETH fewer/.test(body),
+  );
+  check("nr: no 'reversibly' in the page copy", !/reversibl/i.test(body));
+
+  const SPOT = {
+    controller: "0xa920de414ea4ab66b97da1bfe9e6eca7d4219635",
+    user: "0x1d737e0122c270c5fa476dab9038d05363ad3a3c",
+  };
+  await page.goto(`${BASE}${EXPLORER}/${SPOT.controller}/${SPOT.user}`, { waitUntil: "networkidle", timeout: 180000 });
+  await page.waitForSelector("text=liquidated by", { timeout: 120000 });
+  body = await page.textContent("body");
+  check("spot: 4 transactions (two borrows, two liquidations)", /4 transactions/.test(body));
+  check(
+    "spot: liquidation row states the converted leg and the debt apart",
+    /converted/.test(body) && /debt/.test(body),
+  );
+
+  await page.goto(`${BASE}${EXPLORER}/markets`, { waitUntil: "networkidle", timeout: 180000 });
+  await page.waitForSelector("text=A =", { timeout: 120000 });
+  body = await page.textContent("body");
+  check(
+    "markets: near-zero-rate markets state their policy bounds",
+    /minimum and maximum at 3 wei a second/.test(body),
+  );
 
   // The screenshot is a debugging aid, not an assertion. It used to hard-code an
   // absolute path into one long-dead session's scratchpad directory, which throws

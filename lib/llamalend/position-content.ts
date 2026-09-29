@@ -11,17 +11,20 @@ const LINKS: LearnMoreContent["links"] = [{ label: "Curve lending docs", url: LL
 export function llamalendPositionContent(opts: {
   status: "open" | "closed" | "liquidated";
   inSoftLiq?: boolean;
+  /** The position's band count, where the live read states it. */
+  bands?: number | null;
+  liquidationCount?: number;
 }): LearnMoreContent {
   if (opts.status === "liquidated") {
     return {
       title: "About This Position",
       intro:
-        "This position was hard-liquidated once soft-liquidation losses pushed its health below zero. The panel above shows its final recorded state — LlamaLend's lane carries no lifetime peaks, only the last emitted figures.",
+        "This position was hard-liquidated after its health fell below 0. The panel above shows its collateral and debt after its last event.",
       detailsHeading: "Key concepts:",
       details: [
         {
           bold: "Soft, then hard",
-          text: "before any hard liquidation comes soft-liquidation: while the oracle price sits inside the position's band, the AMM converts collateral to the borrowed token continuously, reversibly, with no event. Hard liquidation is the one-shot terminal step.",
+          text: "while the oracle price sits inside the position's bands, the AMM converts collateral to the borrowed token, with no event. Health falls as the price moves down through the bands, as interest adds to the debt, and with each loss on the AMM's sales; below 0 anyone may liquidate the position, in full or in part.",
         },
         {
           bold: "Isolated markets",
@@ -55,7 +58,9 @@ export function llamalendPositionContent(opts: {
   const details: LearnMoreContent["details"] = [
     {
       bold: "Collateral lives in an AMM",
-      text: "the collateral is not parked in a vault — it is liquidity in the market's LLAMMA AMM, placed across N adjacent price bands. That placement is what makes soft-liquidation possible.",
+      text: `the collateral is not parked in a vault — it is liquidity in the market's LLAMMA AMM, placed across ${
+        opts.bands != null ? `${opts.bands} adjacent price bands` : "a set of adjacent price bands chosen at opening"
+      }. That placement is what makes soft-liquidation possible.`,
     },
     {
       bold: "The band is the risk line",
@@ -64,7 +69,7 @@ export function llamalendPositionContent(opts: {
     opts.inSoftLiq
       ? {
           bold: "Soft-liquidation is live",
-          text: "the oracle price sits inside this position's band right now — the AMM is continuously converting its collateral to the borrowed token, reversibly, with no event marking it.",
+          text: "the oracle price sits inside this position's bands right now: the AMM sells its collateral for the borrowed token as the price falls and buys it back as the price rises, with no event marking it. The swap reverses; the losses do not.",
         }
       : {
           bold: "Isolated markets",

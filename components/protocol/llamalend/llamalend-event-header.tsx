@@ -16,6 +16,7 @@ import {
   collateralDeltaProv,
   debtDeltaProv,
   liquidationProv,
+  liquidationConvertedProv,
   type LlamalendCoords,
 } from "@/lib/llamalend/event-provenance";
 
@@ -65,8 +66,23 @@ export function LlamalendEventHeader({
         : collateralDeltaProv(ctx.collateralSymbol, ctx.eventType, coords, ctx.raw?.collateralDelta),
     });
   }
+  // A hard liquidation takes both legs of the AMM holding: the borrower's row
+  // states the converted borrowed token beside the collateral, and tags the
+  // debt so the two borrowed-token figures read apart.
+  const convTaken = Number(ctx.convertedTaken ?? "0") || 0;
+  if (borrowerLoss && convTaken > 0) {
+    deltas.push({
+      value: -convTaken,
+      symbol: ctx.borrowedSymbol,
+      address: soleFlowAddress(flows, ctx.borrowedSymbol),
+      prov: liquidationConvertedProv(ctx.borrowedSymbol, coords, ctx.raw?.convertedTaken),
+      suffix: "converted",
+      noSpineCounterpart: true,
+    });
+  }
   if (debt !== 0) {
     deltas.push({
+      ...(borrowerLoss ? { suffix: "debt" } : {}),
       value: debt,
       symbol: ctx.borrowedSymbol,
       address: soleFlowAddress(flows, ctx.borrowedSymbol),

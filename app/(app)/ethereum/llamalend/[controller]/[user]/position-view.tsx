@@ -52,9 +52,16 @@ import {
 import { LlamalendPositionExplanation } from "@/components/protocol/llamalend/llamalend-position-explanation";
 import { LlamalendRiskSlot } from "@/components/protocol/llamalend/llamalend-risk-slot";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { computeLlamalendEconomics, llamalendLifetimeWithOpening } from "@/lib/llamalend/economics";
+import {
+  computeLlamalendEconomics,
+  llamalendLifetimeWithOpening,
+  llamalendLostToSoftLiq,
+  replayLlamalendLifetime,
+} from "@/lib/llamalend/economics";
 import { llamalendEconomicsExplanation, llamalendEconomicsContent } from "@/lib/llamalend/economics-explanation";
 import { normalizeAddressParam } from "@/lib/llamalend/asset-catalog";
+import { llamalendLoans, llamalendPreviousStatedMap } from "@/lib/llamalend/event-figures";
+import { LlamalendLoansLine } from "@/components/protocol/llamalend/llamalend-loans-line";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
@@ -80,6 +87,23 @@ interface LlamalendPositionViewProps {
   initialEvents: BaseActivityEvent[] | null;
   initialCutoffBlock: number | null;
   initialOpening: TimelineOpeningBalance | null;
+}
+
+/** The whole-history flows: merged with the opening balance on a windowed
+ *  page, replayed otherwise; undefined while the whole is not known. */
+function precomputedLifetimeFor(
+  view: LlamalendPositionView,
+  events: BaseActivityEvent[],
+  opening: TimelineOpeningBalance | null,
+  known: boolean,
+) {
+  if (!known) return undefined;
+  if (opening)
+    return llamalendLifetimeWithOpening(events, opening, {
+      collateral: view.collateralDecimals,
+      borrowed: view.borrowedDecimals,
+    });
+  return replayLlamalendLifetime(events);
 }
 
 export default function LlamalendPositionView({
@@ -216,6 +240,21 @@ export default function LlamalendPositionView({
   }, [view, chain]);
 
   const llamalendEvents = useMemo(() => events.filter(isLlamalendEvent), [events]);
+  // The card's transaction count, raised to the distinct transactions the
+  // whole history holds: the index counts the borrower's own, and a
+  // liquidation is someone else's.
+  const cardView = useMemo<LlamalendPositionView | null>(() => {
+    if (!liveView || cutoffBlock != null) return liveView;
+    const txs = new Set(llamalendEvents.map((e) => e.txHash).filter(Boolean)).size;
+    return txs > liveView.txCount ? { ...liveView, txCount: txs } : liveView;
+  }, [liveView, llamalendEvents, cutoffBlock]);
+  const previousStated = useMemo(() => llamalendPreviousStatedMap(llamalendEvents), [llamalendEvents]);
+  // The loans this page holds (a closed loan and a later one share the key);
+  // read only over the whole history.
+  const loans = useMemo(
+    () => (cutoffBlock == null ? llamalendLoans(llamalendEvents) : []),
+    [llamalendEvents, cutoffBlock],
+  );
 
   const tl = useTimelineEvents(llamalendEvents, {
     storageKey: `llamalend-${controller}-${user}`,
@@ -230,6 +269,11 @@ export default function LlamalendPositionView({
   // the whole, which is the only correct answer between the two requests.
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? llamalendEvents : undefined;
+  const lost = useMemo(() => {
+    if (!liveView) return null;
+    const lifetime = precomputedLifetimeFor(liveView, llamalendEvents, opening, lifetimeKnown);
+    return llamalendLostToSoftLiq(liveView, lifetime);
+  }, [liveView, llamalendEvents, opening, lifetimeKnown]);
   const precomputedLifetime = useMemo(
     () =>
       liveView
@@ -302,9 +346,10 @@ export default function LlamalendPositionView({
         <DetailBodySkeleton />
       ) : (
         <>
-          {liveView && (
+          {cardView && liveView && (
             <LlamalendPositionCard
-              v={liveView}
+              v={cardView}
+              bands={chain?.hasLoan ? chain.bands : null}
               receipts
               viewHref={tl.viewHref}
               // ⇒ THE DISTINCTIVE SURFACE rides the heading-button row, the
@@ -317,15 +362,24 @@ export default function LlamalendPositionView({
               // while the loan is live and the chain read landed. The
               // Explanation heading-button narrates the same figures.
               rowExtra={
-                chain && chain.hasLoan && liveView.status === "open" ? <LlamalendRiskSlot chain={chain} /> : undefined
+                chain && chain.hasLoan && liveView.status === "open" ? (
+                  <LlamalendRiskSlot chain={chain} lost={lost} />
+                ) : undefined
               }
               // Passed whatever the status and before the chain read lands:
               // the pane, and the copy-view link at its foot, mount with the
               // card. A closed account, a read still pending or a read with no
               // loan narrates nothing.
+              bodyExtra={loans.length > 1 ? <LlamalendLoansLine loans={loans} /> : undefined}
               explanation={
                 <LlamalendPositionExplanation
                   chain={liveView.status === "open" ? chain : null}
+                  closed={
+                    liveView.status !== "open" && historyWindow.state === "whole"
+                      ? { view: liveView, events: llamalendEvents }
+                      : null
+                  }
+                  lost={lost}
                   liquidationCount={liveView.liquidationCount}
                   eventCount={liveView.eventCount}
                 />
@@ -338,7 +392,16 @@ export default function LlamalendPositionView({
               return (
                 <ChainTruthTower
                   data={towerData}
-                  explanation={llamalendEconomicsExplanation(towerData)}
+                  explanation={llamalendEconomicsExplanation(
+                    towerData,
+                    liveView.borrowedIsCrvusd && liveView.priceOracle != null
+                      ? {
+                          price: liveView.priceOracle,
+                          collateralSymbol: liveView.collateralSymbol,
+                          borrowedSymbol: liveView.borrowedSymbol,
+                        }
+                      : null,
+                  )}
                   learnMore={llamalendEconomicsContent()}
                 />
               );
@@ -361,6 +424,11 @@ export default function LlamalendPositionView({
                   // does.
                   firstAt={opening?.firstTimestamp}
                   tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                  reopenedAt={
+                    loans.length > 1 && loans[loans.length - 1].closedAt == null
+                      ? loans[loans.length - 1].openedAt
+                      : null
+                  }
                 />
               ) : undefined
             }
@@ -371,6 +439,7 @@ export default function LlamalendPositionView({
                   eventNumber={meta.eventNumber}
                   isFirst={meta.isFirst}
                   isLast={meta.isLast}
+                  previousStated={previousStated.get(event.id) ?? null}
                 />
               ) : null
             }

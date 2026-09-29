@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { formatCompact } from "@/lib/utils/format";
+import { fmtColl } from "@/lib/llamalend/event-figures";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
 
 const LLAMALEND_DOC_URL = "https://docs.curve.finance/lending/overview/";
@@ -26,12 +27,21 @@ function fmt(n: number, valued: boolean, symbol: string | null): string {
   return valued ? formatCompactUsd(n) : symbol ? `${formatCompact(n)} ${symbol}` : formatCompact(n);
 }
 
-export function llamalendEconomicsExplanation(data: ChainTruthTowerData): ReactNode {
+export function llamalendEconomicsExplanation(
+  data: ChainTruthTowerData,
+  /** The collateral price the dollar figures use (today's oracle), with its
+   *  units, where the tower is valued. */
+  pricing?: { price: number; collateralSymbol: string; borrowedSymbol: string } | null,
+): ReactNode {
   const valued = data.valued;
   const bullets: string[] = [];
 
   const deposited = data.collateral.lifetimeInflow;
-  const withdrawn = sideTotal(data.collateral.exited, valued);
+  const lostLines = data.collateral.exited.filter((l) => l.key === "coll-lost");
+  const withdrawn = sideTotal(
+    data.collateral.exited.filter((l) => l.key !== "coll-lost"),
+    valued,
+  );
   if (deposited > 0 || withdrawn > 0) {
     const symbol = soleSymbol([...data.collateral.current, ...data.collateral.exited]);
     const parts: string[] = [];
@@ -50,6 +60,13 @@ export function llamalendEconomicsExplanation(data: ChainTruthTowerData): ReactN
     bullets.push(`It has also had ${parts.join(" and ")}.`);
   }
 
+  const lost = lostLines[0];
+  if (lost) {
+    bullets.push(
+      `${fmtColl(lost.amount)} ${lost.symbol}${valued && lost.usd != null ? ` (${formatCompactUsd(lost.usd)})` : ""} was lost to soft-liquidation: the AMM sold it while the price sat in the bands and did not buy it back.`,
+    );
+  }
+
   const liquidated = sideTotal(data.collateral.liquidated, valued) + sideTotal(data.debt.liquidated, valued);
   if (liquidated > 0) {
     bullets.push("Part of this position's collateral and debt was taken in a hard liquidation.");
@@ -59,7 +76,7 @@ export function llamalendEconomicsExplanation(data: ChainTruthTowerData): ReactN
   bullets.push(
     hasConverted
       ? "Part of this position's collateral currently sits converted to the borrowed token — the market's soft-liquidation band has been swapping between the two as the price moved through it."
-      : "As a loan's health worsens, LlamaLend's soft-liquidation band progressively converts collateral into the borrowed token rather than liquidating all at once; this position isn't in that band right now.",
+      : "When the price falls into a position's bands, the AMM converts its collateral into the borrowed token band by band; this position isn't in its bands right now.",
   );
 
   const currentColl = sideTotal(data.collateral.current, valued);
@@ -69,6 +86,12 @@ export function llamalendEconomicsExplanation(data: ChainTruthTowerData): ReactN
     if (currentColl > 0) pieces.push(`${fmt(currentColl, valued, soleSymbol(data.collateral.current))} of collateral`);
     if (currentDebt > 0) pieces.push(`${fmt(currentDebt, valued, soleSymbol(data.debt.current))} of debt`);
     bullets.push(`Right now it holds ${pieces.join(" against ")}.`);
+  }
+
+  if (valued && pricing) {
+    bullets.push(
+      `Collateral amounts are valued at today's ${pricing.collateralSymbol} price, ${Math.round(pricing.price).toLocaleString("en-US")} ${pricing.borrowedSymbol}; a liquidation card values what it took at the price in its block.`,
+    );
   }
 
   if (!valued) {
@@ -84,7 +107,7 @@ export function llamalendEconomicsExplanation(data: ChainTruthTowerData): ReactN
       <p className="leading-relaxed">
         These figures total this position&apos;s lifetime flows on LlamaLend across every event in its captured history.
       </p>
-      {bullets.slice(0, 6).map((bullet, i) => (
+      {bullets.slice(0, 8).map((bullet, i) => (
         <div key={i} className="flex items-start gap-2 leading-relaxed">
           <span className="select-none text-rb-500">•</span>
           <span>{bullet}</span>
@@ -108,7 +131,7 @@ export function llamalendEconomicsContent(): LearnMoreContent {
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "Soft liquidation band",
+        bold: "Soft-liquidation band",
         text: "as a loan's health worsens, the AMM progressively converts collateral into the borrowed token across a price band, instead of an all-or-nothing liquidation.",
       },
       {

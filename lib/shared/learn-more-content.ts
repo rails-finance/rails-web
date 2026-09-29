@@ -2012,9 +2012,9 @@ export function dolomiteEventFallbackContent(): LearnMoreContent {
 // Curve's LLAMMA lending: each Controller is an isolated market (one
 // collateral, one borrowed token), and the collateral sits in the market's
 // AMM across a BAND of prices. Liquidation is two-stage: SOFT — the AMM
-// converts collateral to the borrowed token continuously while the price is
-// inside the band (a state, reversible, no event) — then HARD — a one-shot
-// Liquidate once health goes negative.
+// converts collateral to the borrowed token while the price is inside the
+// bands (a state, no event; the swaps reverse and their losses stay) — then
+// HARD — a Liquidate, in full or in part, once health goes negative.
 
 const LLAMALEND_DOC_URL = "https://docs.curve.finance/lending/overview/";
 
@@ -2029,7 +2029,7 @@ export function llamalendBorrowContent(kind: "borrow" | "add_collateral"): Learn
     details: [
       {
         bold: "Collateral lives in an AMM",
-        text: "the collateral is not parked in a vault — it is liquidity in the market's LLAMMA AMM, placed across N adjacent price bands. That placement is what makes soft-liquidation possible.",
+        text: "the collateral is not parked in a vault — it is liquidity in the market's LLAMMA AMM, placed across a set of adjacent price bands whose number the borrower chose at opening. That placement is what makes soft-liquidation possible.",
       },
       {
         bold: "The band is the risk line",
@@ -2071,9 +2071,9 @@ export function llamalendLiquidationContent(self: boolean): LearnMoreContent {
     title: self ? "How Self-Liquidation Works" : "How Hard Liquidation Works",
     intro: self
       ? "A borrower whose position is partly converted can settle it themselves: self-liquidation repays the debt using the already-converted borrowed tokens plus a top-up, and withdraws whatever collateral remains — a normal close from soft-liquidation, not a loss to a third party."
-      : "Hard liquidation is the terminal stage: once soft-liquidation losses push a position's health below zero, anyone may liquidate it — repaying its debt (partly from the position's own already-converted tokens) and taking the remaining collateral at the market's liquidation discount.",
+      : "Hard liquidation needs health below 0. Health falls as the price moves down through the bands, as interest adds to the debt, and with each loss on the AMM's sales. Anyone may then liquidate the position, in full or in part: the liquidator repays the debt, partly from the position's already-converted tokens, and takes the collateral and converted tokens it held. The owner, or an address the owner approved, may liquidate at any health.",
     extraParagraphs: [
-      "Before any hard liquidation comes SOFT-liquidation: while the oracle price is inside the position's band, the AMM converts its collateral to the borrowed token continuously — in place, reversibly, with no event and no liquidator. Every hard liquidation therefore carries its soft-liquidation history in state: the converted amount is readable from user_state right up to the liquidating block.",
+      "Soft-liquidation comes first: while the oracle price is inside the position's bands, the AMM sells its collateral for the borrowed token as the price falls and buys it back as the price rises, with no event and no liquidator. The swap reverses; the losses do not. The converted amount is readable from user_state up to the liquidating block.",
       "The Controller emits a paired Repay alongside every Liquidate with identical amounts — the index de-duplicates that pair, so the timeline shows one liquidation event, counted once.",
     ],
     links: [{ label: "Curve lending docs", url: LLAMALEND_DOC_URL }],
@@ -2089,11 +2089,11 @@ export function llamalendEventFallbackContent(): LearnMoreContent {
     details: [
       {
         bold: "Soft-liquidation is a state",
-        text: "inside the band the AMM converts collateral to the borrowed token continuously (and back on recovery). The converted amount appears in no event — it is read live from user_state.",
+        text: "inside the bands the AMM converts collateral to the borrowed token, and back as the price recovers; each round trip loses a little collateral. The converted amount appears in no event — it is read live from user_state.",
       },
       {
         bold: "Hard liquidation is an event",
-        text: "once health goes negative, one Liquidate transaction settles the position — debt cleared, remaining balances taken.",
+        text: "once health goes negative, a Liquidate transaction clears the debt, in full or in part, and takes the balances it covers.",
       },
       {
         bold: "Most markets borrow crvUSD",

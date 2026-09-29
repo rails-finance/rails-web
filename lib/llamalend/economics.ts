@@ -24,14 +24,19 @@
 import type { LlamalendPositionView } from "@/components/protocol/llamalend/llamalend-position-card";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isLlamalendEvent } from "@/lib/shared/types/event-shape";
-import { positionStateProv, positionIndexProv, llamalendLifetimeFlowProv } from "@/lib/llamalend/event-provenance";
+import {
+  positionStateProv,
+  positionIndexProv,
+  llamalendLifetimeFlowProv,
+  llamalendLostProv,
+} from "@/lib/llamalend/event-provenance";
 import { llamalendConvertedProv } from "@/lib/llamalend/live-provenance";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 
 const DUST = 1e-12;
 
-interface LifetimeFlows {
+export interface LifetimeFlows {
   collateralAdded: number;
   collateralWithdrawn: number;
   borrowed: number;
@@ -44,7 +49,7 @@ interface LifetimeFlows {
   convertedTaken: number;
 }
 
-function replayLlamalendLifetime(events: BaseActivityEvent[]): LifetimeFlows {
+export function replayLlamalendLifetime(events: BaseActivityEvent[]): LifetimeFlows {
   const f: LifetimeFlows = {
     collateralAdded: 0,
     collateralWithdrawn: 0,
@@ -127,6 +132,23 @@ export function llamalendLifetimeWithOpening(
   return f;
 }
 
+/**
+ * Collateral the AMM sold and did not buy back over the position's life:
+ * deposited − withdrawn − held now. Stated only where every other way out is
+ * zero and the rest is known: an open position with the live read landed,
+ * nothing converted at head (a converted balance still holds part of it as
+ * the borrowed token), and no hard liquidation (which takes the converted
+ * leg with it). A gap within the AMM's rounding is none.
+ */
+export function llamalendLostToSoftLiq(view: LlamalendPositionView, lifetime: LifetimeFlows | null | undefined) {
+  if (!lifetime || view.status !== "open" || view.stateBasis !== "chain" || view.collateral == null) return null;
+  if (view.converted == null || view.converted > DUST) return null;
+  if (view.liquidationCount > 0 || lifetime.collateralTaken > DUST || lifetime.convertedTaken > DUST) return null;
+  const gap = lifetime.collateralAdded - lifetime.collateralWithdrawn - view.collateral;
+  if (gap <= Math.max(lifetime.collateralAdded * 1e-9, DUST)) return null;
+  return gap;
+}
+
 export function computeLlamalendEconomics(
   view: LlamalendPositionView,
   events?: BaseActivityEvent[],
@@ -202,14 +224,32 @@ export function computeLlamalendEconomics(
   ): TowerLine[] =>
     amount > DUST ? [{ key, symbol, amount, usd, prov: llamalendLifetimeFlowProv(flow, symbol, view.controller) }] : [];
 
+  const lost = llamalendLostToSoftLiq(view, lifetime);
   const collExited = lifetime
-    ? flowLine(
-        lifetime.collateralWithdrawn,
-        view.collateralSymbol,
-        collUsd(lifetime.collateralWithdrawn),
-        "collateral withdrawn",
-        "coll-withdrawn",
-      )
+    ? [
+        ...flowLine(
+          lifetime.collateralWithdrawn,
+          view.collateralSymbol,
+          collUsd(lifetime.collateralWithdrawn),
+          "collateral withdrawn",
+          "coll-withdrawn",
+        ),
+        // What the AMM sold and did not buy back, so deposited = held +
+        // withdrawn + lost.
+        ...(lost != null
+          ? [
+              {
+                key: "coll-lost",
+                symbol: view.collateralSymbol,
+                amount: lost,
+                usd: collUsd(lost),
+                prov: llamalendLostProv(view.collateralSymbol, view.controller),
+                flowLabel: "Lost to soft-liquidation",
+                flowKind: "external" as const,
+              },
+            ]
+          : []),
+      ]
     : [];
   const collLiquidated = lifetime
     ? [

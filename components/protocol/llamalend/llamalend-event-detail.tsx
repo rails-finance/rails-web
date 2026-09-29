@@ -20,7 +20,22 @@
 
 import { useEffect, useState } from "react";
 import type { LlamalendContext } from "@/lib/shared/types/event-shape";
-import { ChainTruthDetail, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import {
+  ChainTruthDetail,
+  type ChainTruthStat,
+  type ChainTruthTransition,
+} from "@/components/shared/chain-truth-event";
+import { Prov } from "@/components/shared/provenance";
+import { useLlamalendEventState } from "@/lib/llamalend/use-event-state";
+import {
+  fmtBandPrice,
+  fmtColl,
+  fmtHealth,
+  llamalendEventFigures,
+  soldSincePrevious,
+  type LlamalendPreviousStated,
+} from "@/lib/llamalend/event-figures";
+import { formatDayMonth } from "@/lib/date";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
 import {
   afterImageProv,
@@ -29,15 +44,20 @@ import {
   llamaLiqSeizedValueProv,
   llamaLiqClearedValueProv,
   llamaLiqPremiumProv,
+  stateAtBlockProv,
+  stateChangeProv,
   type LlamalendCoords,
 } from "@/lib/llamalend/event-provenance";
-import { formatNumber } from "@/lib/utils/format";
+import { formatNumber, formatUnitsExact } from "@/lib/utils/format";
 
 export interface LlamalendEventDetailProps {
   ctx: LlamalendContext;
   txHash?: string;
   blockNumber?: number;
   wallet?: string;
+  /** The last collateral balance an earlier row stated (see
+   *  lib/llamalend/event-figures.ts), for what the AMM sold since. */
+  previousStated?: LlamalendPreviousStated | null;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Math.abs(Number(human))));
@@ -143,39 +163,238 @@ function buildLlamalendLiqForensics(
   };
 }
 
-export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet }: LlamalendEventDetailProps) {
+export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previousStated }: LlamalendEventDetailProps) {
   const coords: LlamalendCoords = { txHash, blockNumber, controller: ctx.controller, user: wallet };
   const isLiq = ctx.eventType === "liquidation";
   // Fetch only when a collateral leg exists — a fully-converted seizure is
   // valued at face and needs no archive read.
   const needsPrice = isLiq && ctx.collateralDelta != null && Math.abs(Number(ctx.collateralDelta)) > 0;
   const atBlock = useLiqPriceAtBlock(needsPrice, ctx.controller, blockNumber);
+  // The position at block − 1 and at this block: what stood before, what the
+  // AMM had converted, and health on each side.
+  const state = useLlamalendEventState(ctx, blockNumber, wallet);
+  const f = state ? llamalendEventFigures(ctx, state) : null;
+  const block = blockNumber ?? 0;
+  const cSym = ctx.collateralSymbol;
+  const bSym = ctx.borrowedSymbol;
+
+  const moved = (a: number | null, b: number | null, scale: number) =>
+    a != null && b != null && Math.abs(a - b) > Math.max(Math.abs(b), Math.abs(a), 1) * 1e-12 * scale;
+
+  /** Before → after from the two reads, at the grid's precision. */
+  const transition = (
+    figure: string,
+    getter: string,
+    before: number | null,
+    after: number | null,
+    beforeRaw: string | null,
+    fmt: (n: number) => string,
+  ): ChainTruthTransition | undefined => {
+    if (before == null || after == null || !moved(after, before, 1)) return undefined;
+    const d = after - before;
+    const sign = d >= 0 ? "+" : "−";
+    return {
+      before: fmt(before),
+      beforeExact: String(before),
+      beforeProv: stateAtBlockProv(figure, getter, block - 1, coords, beforeRaw),
+      change: `${sign}${fmt(Math.abs(d))}`,
+      changeExact: `${sign}${Math.abs(d)}`,
+      changeProv: stateChangeProv(figure, coords),
+      shownAsIs: true,
+    };
+  };
 
   const stats: ChainTruthStat[] = [];
-  if (ctx.collateralAfter != null) {
+
+  // Collateral: the event's after-image, or the read at this block where the
+  // Controller logged its sentinel (a repay while converted).
+  const collAfterStr =
+    ctx.collateralAfter ??
+    (f && state ? formatUnitsExact(state.after.collateralRaw ?? "0", ctx.collateralDecimals) : null);
+  if (collAfterStr != null) {
+    const t = f
+      ? transition(
+          `${cSym} collateral`,
+          "Controller.user_state(user)[0]",
+          f.collBefore,
+          Number(collAfterStr),
+          state?.before.collateralRaw ?? null,
+          fmtColl,
+        )
+      : undefined;
+    const sold = f ? soldSincePrevious(previousStated, f) : null;
     stats.push({
       label: "Collateral",
-      value: fmt(ctx.collateralAfter),
-      symbol: ctx.collateralSymbol,
-      prov: afterImageProv(ctx.collateralSymbol, "collateral", coords, ctx.raw?.collateralAfter),
-      changed: Boolean(ctx.collateralDelta) && Number(ctx.collateralDelta) !== 0,
+      value: fmt(collAfterStr),
+      display: fmtColl(Number(collAfterStr)),
+      symbol: cSym,
+      prov:
+        ctx.collateralAfter != null
+          ? afterImageProv(cSym, "collateral", coords, ctx.raw?.collateralAfter)
+          : stateAtBlockProv(
+              `${cSym} collateral`,
+              "Controller.user_state(user)[0]",
+              block,
+              coords,
+              state?.after.collateralRaw,
+            ),
+      changed: t != null || (Boolean(ctx.collateralDelta) && Number(ctx.collateralDelta) !== 0),
+      transition: t,
+      sub:
+        sold != null && previousStated ? (
+          <>
+            {(f?.convBefore ?? 0) > 0
+              ? `${fmtColl(sold)} ${cSym} sold by the AMM since the ${formatDayMonth(previousStated.timestamp)} event.`
+              : `${fmtColl(sold)} ${cSym} fewer than after the ${formatDayMonth(previousStated.timestamp)} event: the AMM sold it while the price sat in the bands, and the buy-back did not restore it.`}
+          </>
+        ) : undefined,
     });
   }
-  if (ctx.debtAfter != null) {
+
+  // Converted: the borrowed token the AMM held from sold collateral, where
+  // there was any on either side of the event.
+  if (f && state && ((f.convBefore ?? 0) > 0 || (f.convAfter ?? 0) > 0)) {
+    const t = transition(
+      `${bSym} converted`,
+      "Controller.user_state(user)[1]",
+      f.convBefore,
+      f.convAfter,
+      state.before.convertedRaw,
+      formatNumber,
+    );
+    stats.push({
+      label: "Converted",
+      value: formatUnitsExact(state.after.convertedRaw ?? "0", ctx.borrowedDecimals),
+      display: formatNumber(f.convAfter ?? 0),
+      symbol: bSym,
+      prov: stateAtBlockProv(
+        `${bSym} converted`,
+        "Controller.user_state(user)[1]",
+        block,
+        coords,
+        state.after.convertedRaw,
+      ),
+      changed: t != null,
+      transition: t,
+      sub: f.hadLoan && (f.convBefore ?? 0) > 0 ? <>In soft-liquidation at this block.</> : undefined,
+    });
+  }
+
+  const debtAfterStr =
+    ctx.debtAfter ?? (f && state ? formatUnitsExact(state.after.debtRaw ?? "0", ctx.borrowedDecimals) : null);
+  if (debtAfterStr != null) {
+    const t = f
+      ? transition(
+          `${bSym} debt`,
+          "Controller.user_state(user)[2]",
+          f.debtBefore,
+          Number(debtAfterStr),
+          state?.before.debtRaw ?? null,
+          formatNumber,
+        )
+      : undefined;
     stats.push({
       label: "Debt",
-      value: fmt(ctx.debtAfter),
-      symbol: ctx.borrowedSymbol,
-      prov: afterImageProv(ctx.borrowedSymbol, "debt", coords, ctx.raw?.debtAfter),
-      changed: Boolean(ctx.debtDelta) && Number(ctx.debtDelta) !== 0,
+      value: fmt(debtAfterStr),
+      symbol: bSym,
+      prov:
+        ctx.debtAfter != null
+          ? afterImageProv(bSym, "debt", coords, ctx.raw?.debtAfter)
+          : stateAtBlockProv(`${bSym} debt`, "Controller.user_state(user)[2]", block, coords, state?.after.debtRaw),
+      changed: t != null || (Boolean(ctx.debtDelta) && Number(ctx.debtDelta) !== 0),
+      transition: t,
     });
   }
-  if (ctx.n1 != null && ctx.n2 != null) {
+
+  // Health on each side: Controller.health(user, true). Below 0 anyone may
+  // liquidate the position.
+  if (f && state && f.healthAfter == null && f.healthBefore != null) {
+    // The event closed the loan: health before it, and no loan after.
+    stats.push({
+      label: "Health",
+      value: `${f.healthBefore * 100}%`,
+      display: "no loan",
+      symbol: "",
+      prov: stateAtBlockProv("Health", "Controller.health(user, true)", block - 1, coords, state.before.healthRaw),
+      changed: true,
+      transition: {
+        before: fmtHealth(f.healthBefore),
+        beforeExact: `${f.healthBefore * 100}%`,
+        beforeProv: stateAtBlockProv(
+          "Health",
+          "Controller.health(user, true)",
+          block - 1,
+          coords,
+          state.before.healthRaw,
+        ),
+        change: "loan closed",
+        changeExact: "loan closed",
+        changeProv: stateChangeProv("health", coords),
+        shownAsIs: true,
+      },
+    });
+  } else if (f && state && f.healthAfter != null) {
+    const after = f.healthAfter;
+    const t =
+      after != null
+        ? transition("Health", "Controller.health(user, true)", f.healthBefore, after, state.before.healthRaw, (x) =>
+            fmtHealth(x).replace(/^−/, ""),
+          )
+        : undefined;
+    stats.push({
+      label: "Health",
+      value: after != null ? `${after * 100}%` : "0",
+      display: after != null ? fmtHealth(after) : "no loan",
+      symbol: "",
+      prov: stateAtBlockProv("Health", "Controller.health(user, true)", block, coords, state.after.healthRaw),
+      changed: t != null,
+      transition: t
+        ? {
+            ...t,
+            beforeExact: f.healthBefore != null ? `${f.healthBefore * 100}%` : t.beforeExact,
+            before: f.healthBefore != null ? fmtHealth(f.healthBefore) : t.before,
+            change: `${t.change.startsWith("−") ? "−" : "+"}${fmtHealthPts(Math.abs((after ?? 0) - (f.healthBefore ?? 0)))}`,
+          }
+        : undefined,
+    });
+  }
+
+  const n1 = ctx.n1 ?? (f?.n1After != null ? String(f.n1After) : null);
+  const n2 = ctx.n2 ?? (f?.n2After != null ? String(f.n2After) : null);
+  // A row that closed the loan leaves no bands (the stored ticks read 0 … 0).
+  const closedHere = ctx.debtAfter != null && Number(ctx.debtAfter) === 0;
+  if (n1 != null && n2 != null && !closedHere) {
+    const bandsMoved = f != null && f.n1Before != null && f.n1Before !== Number(n1);
     stats.push({
       label: "Band ticks",
-      value: `${ctx.n1} … ${ctx.n2}`,
+      value: `${n1} … ${n2}`,
       symbol: "",
-      prov: tickPairProv(coords, ctx.n1, ctx.n2),
+      prov: tickPairProv(coords, n1, n2),
+      changed: bandsMoved,
+      transition:
+        bandsMoved && f && state
+          ? {
+              before: `${f.n1Before} … ${f.n2Before}`,
+              beforeExact: `${f.n1Before} … ${f.n2Before}`,
+              beforeProv: stateAtBlockProv("Band ticks", "AMM.read_user_tick_numbers(user)", block - 1, coords),
+              change: `${Number(n1) - (f.n1Before ?? 0) > 0 ? "+" : "−"}${Math.abs(Number(n1) - (f.n1Before ?? 0))}`,
+              changeExact: String(Number(n1) - (f.n1Before ?? 0)),
+              changeProv: stateChangeProv("the band ticks", coords),
+              shownAsIs: true,
+            }
+          : undefined,
+      sub:
+        f && f.pUpAfter != null && f.pDownAfter != null ? (
+          <>
+            <Prov
+              info={stateAtBlockProv("Band prices", "Controller.user_prices(user)", block, coords)}
+              value={`${f.pUpAfter} → ${f.pDownAfter}`}
+            >
+              {fmtBandPrice(f.pUpAfter)} → {fmtBandPrice(f.pDownAfter)}
+            </Prov>{" "}
+            {bSym} per {cSym}
+          </>
+        ) : undefined,
     });
   }
 
@@ -188,4 +407,9 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet }: Llama
       {forensics && <LiquidationForensics {...forensics} />}
     </>
   );
+}
+
+/** A health change in percentage points ("2.73 pts"). */
+function fmtHealthPts(fraction: number): string {
+  return `${(fraction * 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} pts`;
 }
