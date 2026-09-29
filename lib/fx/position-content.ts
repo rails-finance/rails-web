@@ -11,6 +11,8 @@
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { FxPoolTerms } from "@/lib/sources/chain/fx-terms";
 import { formatNumber } from "@/lib/utils/format";
+import { fxScheduleWords } from "@/lib/fx/row-figures";
+import { FX_ADDRESSES } from "@/lib/fx/asset-catalog";
 
 const FX_DOC_URL = "https://fxprotocol.gitbook.io/fx-docs";
 
@@ -21,8 +23,8 @@ function mechanics(pool: string, t: FxPoolTerms | null): { bold: string; text: s
     {
       bold: "Debt ratio",
       text: t
-        ? `fxUSD debt divided by the collateral's value at the oracle's anchor price. Borrowing and withdrawing stop at ${pct(t.maxBorrowRatio)}; from ${pct(t.rebalanceRatio)} a keeper can rebalance the position's tick, and from ${pct(t.liquidateRatio)} liquidate it.`
-        : `fxUSD debt divided by the collateral's value at the oracle's anchor price. Past the ${pool} pool's rebalance line a keeper can rebalance the position's tick, and past its liquidation line liquidate it.`,
+        ? `fxUSD debt divided by the collateral's value at the oracle's anchor price. The pool judges its lines at the oracle's min price, which is at or below the anchor: borrowing and withdrawing stop at ${pct(t.maxBorrowRatio)}; from ${pct(t.rebalanceRatio)} a keeper can rebalance the position's tick, and from ${pct(t.liquidateRatio)} liquidate it. A rebalanced row can therefore show a ratio a little under ${pct(t.rebalanceRatio)}.`
+        : `fxUSD debt divided by the collateral's value at the oracle's anchor price. The pool judges its lines at the oracle's min price: past the ${pool} pool's rebalance line a keeper can rebalance the position's tick, and past its liquidation line liquidate it.`,
     },
     {
       bold: "Who acts",
@@ -47,15 +49,14 @@ function costs(t: FxPoolTerms | null, colls?: number | null, sym?: string): { bo
     colls != null && colls > 0 && sym
       ? ` About ${formatNumber(colls * t.fundingRatio)} ${sym} a year on this position's ${formatNumber(colls)} ${sym}, at today's rate.`
       : "";
-  const fees = [
-    t.fees.supply > 0 ? `${pct(t.fees.supply)} of each deposit` : null,
-    t.fees.withdraw > 0 ? `${pct(t.fees.withdraw)} of each withdrawal` : null,
-    t.fees.borrow > 0 ? `${pct(t.fees.borrow)} of each borrow` : null,
-    t.fees.repay > 0 ? `${pct(t.fees.repay)} of each repayment` : null,
-  ].filter(Boolean);
+  const r = t.routerFees;
+  const routerNote =
+    r && fxScheduleWords(r) !== fxScheduleWords(t.fees)
+      ? ` A calling contract can have a schedule of its own: the router ${FX_ADDRESSES.ROUTER.slice(0, 6)}…${FX_ADDRESSES.ROUTER.slice(-4)}, which most position transactions go through, is charged ${fxScheduleWords(r)}, which is why a deposit made through it pays a fee.`
+      : "";
   return {
     bold: "Cost",
-    text: `funding at ${pct(t.fundingRatio)} a year, taken from collateral with no event.${perYear} The pool's default fee schedule charges ${fees.length ? fees.join(" and ") : "nothing"}; a router can carry its own schedule, and each timeline row states what its transaction paid.`,
+    text: `funding at ${pct(t.fundingRatio)} a year, taken from collateral with no event.${perYear} The manager charges fees to the account that calls it; the pool's default schedule charges ${fxScheduleWords(t.fees)}.${routerNote} Each timeline row names the caller and the schedule it paid.`,
   };
 }
 

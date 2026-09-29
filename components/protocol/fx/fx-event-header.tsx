@@ -18,8 +18,10 @@ import {
   transferPartyProv,
   fxExternalActorProv,
   tickRebAmountProv,
+  rowChangeProv,
   type FxCoords,
 } from "@/lib/fx/event-provenance";
+import { fxBlockChange, useFxSocializedReads } from "@/lib/fx/socialized-reads";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
 
 export interface FxEventHeaderProps {
@@ -34,6 +36,9 @@ export interface FxEventHeaderProps {
   externalBy?: string;
   /** The event's flows, read for the contract behind each delta's symbol. */
   flows?: AssetFlow[];
+  /** The row's id: a socialized row states the position's change only when it
+   *  is its block's first row (lib/fx/socialized-reads.tsx). */
+  eventId?: string;
 }
 
 export function FxEventHeader({
@@ -45,7 +50,9 @@ export function FxEventHeader({
   eventNumber,
   externalBy,
   flows,
+  eventId,
 }: FxEventHeaderProps) {
+  const socialized = useFxSocializedReads();
   const meta = isFxPoolKey(ctx.pool) ? FX_POOLS[ctx.pool] : undefined;
   const tokenSym = meta?.tokenSymbol ?? ctx.poolSymbol;
   const tokenAddr = meta?.tokenAddress ?? soleFlowAddress(flows, tokenSym);
@@ -69,7 +76,35 @@ export function FxEventHeader({
   const isAdjust = ctx.eventType === "operate" && !isOpen && !ctx.emptiesPosition;
   const perAxis = isOpen || isAdjust;
 
-  if (ctx.eventType === "tickRebalance") {
+  const poolLiq = ctx.eventType === "liquidation" && ctx.poolWide === true;
+  if (ctx.eventType === "tickRebalance" || poolLiq) {
+    // This position's change first: getPosition at block − 1 and at the block,
+    // stated on the block's first row (the read covers every row in it).
+    const change =
+      blockNumber != null && eventId != null && socialized?.leads.has(eventId)
+        ? fxBlockChange(socialized.reads, blockNumber)
+        : null;
+    const normSym = meta?.normalizedSymbol ?? tokenSym;
+    if (change) {
+      if (Math.abs(change.coll) > 1e-12)
+        deltas.push({
+          value: change.coll,
+          symbol: normSym,
+          address: normSym === tokenSym ? tokenAddr : undefined,
+          prov: rowChangeProv("coll", normSym, coords),
+          noSpineCounterpart: true,
+        });
+      if (Math.abs(change.debt) > 1e-12)
+        deltas.push({
+          value: change.debt,
+          symbol: "fxUSD",
+          address: fxusdAddr,
+          prov: rowChangeProv("debt", normSym, coords),
+          noSpineCounterpart: true,
+        });
+    }
+  }
+  if (ctx.eventType === "tickRebalance" || poolLiq) {
     // TICK-level amounts (the whole tick's clear), NOT this position's slice —
     // the logs never state the slice (fx.ts tick-lineage header), and the
     // settled reconciliation on the card carries the exact per-position drift.
@@ -90,8 +125,8 @@ export function FxEventHeader({
         value: -colls,
         symbol: tokenSym,
         address: tokenAddr,
-        prov: tickRebAmountProv("colls", tokenSym, coords, undefined, ctx.poolWide),
-        label: `${scope} cleared`,
+        prov: tickRebAmountProv("colls", tokenSym, coords, undefined, ctx.poolWide, poolLiq),
+        label: poolLiq ? "Pool liquidated" : `${scope} cleared`,
         tone: "caution",
       });
     const debt = Number(ctx.tickRebFxusdDebts ?? "0") || 0;
@@ -100,7 +135,7 @@ export function FxEventHeader({
         value: -debt,
         symbol: "fxUSD",
         address: fxusdAddr,
-        prov: tickRebAmountProv("fxusd", "fxUSD", coords, undefined, ctx.poolWide),
+        prov: tickRebAmountProv("fxusd", "fxUSD", coords, undefined, ctx.poolWide, poolLiq),
         // The collateral delta already scopes the clause; a second scope word
         // would only repeat it.
         label: colls !== 0 ? "Repaid" : `${scope} repaid`,
@@ -161,7 +196,7 @@ export function FxEventHeader({
         // pill carries the action name on desktop, the label becomes a
         // mobile badge, and the tick-level amounts stay in the header (the
         // warning spine shows no flanking numbers).
-        labelOnSpine: ctx.eventType === "tickRebalance",
+        labelOnSpine: ctx.eventType === "tickRebalance" || poolLiq,
         deltas,
         party: transferTo
           ? {

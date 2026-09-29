@@ -45,13 +45,15 @@ export function fxLearnMoreContent(ctx: FxContext): LearnMoreContent {
       ? fxLiquidationContent()
       : ctx.eventType === "liquidation"
         ? fxLiquidationContent()
-        : isOpen
-          ? fxOperateContent("open")
-          : isClose
-            ? fxOperateContent("close")
-            : ctx.eventType === "operate"
-              ? fxOperateContent("adjust")
-              : fxEventFallbackContent();
+        : ctx.reopens
+          ? fxOperateContent("reopen")
+          : isOpen
+            ? fxOperateContent("open")
+            : isClose
+              ? fxOperateContent("close")
+              : ctx.eventType === "operate"
+                ? fxOperateContent("adjust")
+                : fxEventFallbackContent();
 }
 
 export function FxEventExplainer({ ctx, txHash, blockNumber, blockPeers, skipLead }: FxEventExplainerProps) {

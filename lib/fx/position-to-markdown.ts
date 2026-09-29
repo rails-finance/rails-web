@@ -365,7 +365,19 @@ function timelineTable(
     let impliedCell = d.impliedDebtAfter != null ? amt(Number(d.impliedDebtAfter)) : "—";
     switch (d.eventType) {
       case "liquidation": {
-        // Liquidation figures are NORMALIZED units (unlike an operate's).
+        if (d.poolWide) {
+          // A pool-wide Liquidate run: its amounts are the whole run's.
+          action = `Pool-wide liquidation (tick ${d.rebalancedTick}${d.emptiesPosition ? ", liquidated whole" : ""})`;
+          colD =
+            d.tickRebColls && Number(d.tickRebColls) > 0 ? `−${amt(Number(d.tickRebColls))} ${tokenSym} (pool)` : "—";
+          debtD =
+            d.tickRebFxusdDebts && Number(d.tickRebFxusdDebts) > 0
+              ? `−${amt(Number(d.tickRebFxusdDebts))} (pool)`
+              : "—";
+          impliedCell = "—";
+          break;
+        }
+        // The collateral the liquidator received, in the token as transferred.
         action = "Liquidated";
         colD = d.liqColls && Number(d.liqColls) > 0 ? `−${amt(Number(d.liqColls))} ${tokenSym} to the liquidator` : "—";
         break;

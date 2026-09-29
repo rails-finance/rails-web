@@ -273,13 +273,14 @@ export const tickRebAmountProv = (
   coords: FxCoords,
   raw?: string | null,
   poolWide = false,
+  liquidate = false,
 ): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `The ${unit} the whole ${poolWide ? "pool" : "tick"} gave up in this rebalance — the ${poolWide ? "Rebalance" : "RebalanceTick"} event's ${which === "colls" ? "collateral field, in the token as transferred to the keeper, net of the protocol's share of the bonus" : which === "fxusd" ? "fxUSD debt field" : "stable-side debt field"}${atBlock(coords)}. Shared across every position ${poolWide ? "the sweep touched" : "in the tick"}; this position's change is the getPosition read beside it.`,
+  summary: `The ${unit} the whole ${poolWide ? "pool" : "tick"} gave up in this ${liquidate ? "liquidation run" : "rebalance"} — the ${liquidate ? "Liquidate" : poolWide ? "Rebalance" : "RebalanceTick"} event's ${which === "colls" ? "collateral field, in the token as transferred to the keeper, net of the protocol's share of the bonus" : which === "fxusd" ? "fxUSD debt field" : "stable-side debt field"}${atBlock(coords)}. Shared across every position ${poolWide ? "the sweep touched" : "in the tick"}; this position's change is the getPosition read beside it.`,
   contract: poolContract(coords),
-  via: `captured ${poolWide ? "Rebalance" : "RebalanceTick"} log · ${fieldSeg(which === "colls" ? "colls" : which === "fxusd" ? "fxUSDDebts" : "stableDebts", raw)}`,
+  via: `captured ${liquidate ? "Liquidate" : poolWide ? "Rebalance" : "RebalanceTick"} log · ${fieldSeg(which === "colls" ? "colls" : which === "fxusd" ? "fxUSDDebts" : "stableDebts", raw)}`,
   inputs: eventInputs(coords),
 });
 

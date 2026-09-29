@@ -177,7 +177,10 @@ function PoolStateCard({ p }: { p: FxPoolSystem }) {
             {p.positionsMinted.toLocaleString("en-US")}
           </Prov>
         </Stat>
-        <Stat label="Tick-tree nodes allocated">
+        <Stat
+          label="Tick-tree nodes allocated"
+          note="a node holds the shares of one tick's positions; each move of a tick opens a new one"
+        >
           <Prov info={treeNodesProv(label, p.address)} value={formatExact(p.treeNodes)}>
             {p.treeNodes.toLocaleString("en-US")}
           </Prov>
@@ -239,12 +242,18 @@ function FundingCard({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
             {pctOf(p.maxRedeemPerTick, 0)}
           </Prov>
         </Stat>
-        <Stat label="Debt index (a share owes ×)">
+        <Stat
+          label="Debt index (a share owes ×)"
+          note={`each debt share owes ${((p.debtIndexMultiplier - 1) * 100).toFixed(2)}% more fxUSD than at the start: other positions' bad debt added so far`}
+        >
           <Prov info={indexProv("debt", label, p.address)} value={formatExact(p.debtIndexMultiplier)}>
             ×{p.debtIndexMultiplier.toFixed(6)}
           </Prov>
         </Stat>
-        <Stat label="Collateral index (a share holds ÷)">
+        <Stat
+          label="Collateral index (a share holds ÷)"
+          note={`each collateral share holds ${((1 - 1 / p.collIndexMultiplier) * 100).toFixed(1)}% less than at the start: the funding charged so far, with any collateral the manager removed pool-wide`}
+        >
           <Prov info={indexProv("coll", label, p.address)} value={formatExact(p.collIndexMultiplier)}>
             ÷{p.collIndexMultiplier.toFixed(6)}
           </Prov>
@@ -291,7 +300,7 @@ function OracleCard({ p }: { p: FxPoolSystem }) {
 
       <div className="mt-3 space-y-1.5 text-xs tabular-nums">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-rb-500">min — judges ticks (this page)</span>
+          <span className="text-rb-500">min — borrowing, rebalancing, liquidation</span>
           <Prov
             info={oracleLegProv("min", label, p.address, p.oracle, p.normalizedSymbol)}
             value={formatExact(p.priceMin)}
@@ -300,7 +309,7 @@ function OracleCard({ p }: { p: FxPoolSystem }) {
           </Prov>
         </div>
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-rb-500">anchor — judges positions</span>
+          <span className="text-rb-500">anchor — a position&rsquo;s stated debt ratio</span>
           <Prov
             info={oracleLegProv("anchor", label, p.address, p.oracle, p.normalizedSymbol)}
             value={formatExact(p.priceAnchor)}
@@ -320,10 +329,11 @@ function OracleCard({ p }: { p: FxPoolSystem }) {
       </div>
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-        USD per {p.normalizedSymbol} (the normalized unit). The protocol itself splits the jobs: a position&rsquo;s
-        stated debt ratio is judged at the anchor, the rebalance and liquidation sweeps judge a whole tick at the min,
-        and a redeemer&rsquo;s collateral is priced at the max. Every tick ratio below therefore uses the min leg — the
-        engines&rsquo; own axis.
+        USD per {p.normalizedSymbol} (the normalized unit), from one oracle: the anchor is its Chainlink reading, the
+        min and max the lowest and highest of that and on-chain spot prices (each falls back to the anchor when it
+        strays too far). A position&rsquo;s stated debt ratio is read at the anchor; the borrow ceiling and the
+        rebalance and liquidation sweeps judge at the min; a redeemer&rsquo;s collateral is priced at the max. Every
+        tick ratio below uses the min leg.
       </p>
     </div>
   );
@@ -450,7 +460,7 @@ function LadderStrip({ p }: { p: FxPoolSystem }) {
         <div
           className="absolute inset-y-0 w-px bg-foreground/40"
           style={{ left: `${x(p.maxBorrowRatio)}%` }}
-          title={`Borrow cap · ${pctOf(p.maxBorrowRatio, 2)} — positions can be opened or adjusted only at or under this ratio (anchor leg)`}
+          title={`Borrow cap · ${pctOf(p.maxBorrowRatio, 2)} — positions can be opened or adjusted only at or under this ratio (min leg)`}
         />
         <div
           className="absolute inset-y-0 w-px bg-foreground/40"
@@ -640,6 +650,9 @@ function PoolSection({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
         >
           AaveFundingPool
         </a>
+        <span className="text-[11px] text-rb-500">
+          · the pool contract, which is also the position NFT; its funding rate follows Aave&rsquo;s borrow rate
+        </span>
         <span className="text-[11px] text-rb-500">
           · collateral {p.tokenSymbol}, accounted in {p.normalizedSymbol} · debt fxUSD
         </span>

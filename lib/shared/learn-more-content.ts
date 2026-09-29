@@ -2133,16 +2133,28 @@ export function llamalendEventFallbackContent(): LearnMoreContent {
 // docs live on its GitBook now.
 const FX_DOC_URL = "https://fxprotocol.gitbook.io/fx-docs";
 
-export function fxOperateContent(kind: "open" | "adjust" | "close"): LearnMoreContent {
+export function fxOperateContent(kind: "open" | "reopen" | "adjust" | "close"): LearnMoreContent {
   const intro =
-    kind === "open"
+    kind === "open" || kind === "reopen"
       ? "Opening a position deposits collateral into one of f(x)'s pools (wstETH or WBTC) and mints fxUSD debt against it, creating a leveraged long held as an ERC-721 position NFT."
       : kind === "close"
         ? "Closing repays the position's remaining fxUSD debt and withdraws its collateral, emptying the position. The final repay amount settles whatever the debt really was at that block — including every socialized adjustment accrued since the last touch."
         : "Adjusting moves a position's collateral and/or fxUSD debt in one operation — deposits, withdrawals, borrows and repays are all the same Operate call with signed deltas.";
   return {
-    title: kind === "open" ? "How Opening Works" : kind === "close" ? "How Closing Works" : "How Adjusting Works",
+    title:
+      kind === "open" || kind === "reopen"
+        ? "How Opening Works"
+        : kind === "close"
+          ? "How Closing Works"
+          : "How Adjusting Works",
     intro,
+    ...(kind === "reopen"
+      ? {
+          extraParagraphs: [
+            "Closing or liquidating a position empties it but does not burn the NFT: the owner keeps it, and the pool's ownerOf still answers for it. A later deposit to the same id funds it again, as a new loan on the same NFT. The timeline numbers the loans, and this row starts the next one; nothing from the previous loan carries into it.",
+          ],
+        }
+      : {}),
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -2166,7 +2178,7 @@ export function fxLiquidationContent(): LearnMoreContent {
   return {
     title: "How Liquidations & Rebalances Work",
     intro:
-      "f(x) positions sit in ticks: buckets of positions with nearly the same debt ratio. When a tick's debt ratio reaches the pool's rebalance line, a keeper can rebalance it; when it reaches the higher liquidation line, a keeper can liquidate. Keepers are any address that calls the manager; they are paid by the bonus.",
+      "f(x) positions sit in ticks: buckets of positions with nearly the same debt ratio. When a tick's debt ratio reaches the pool's rebalance line, a keeper can rebalance it; when it reaches the higher liquidation line, a keeper can liquidate. The pool judges both at the oracle's min price, which is at or below the anchor price the rows' ratios are read at. Keepers are any address that calls the manager; they are paid by the bonus. Since March 2025 a liquidation runs from the pool's top tick down, and the manager logs one event for the whole run; a rebalance can target one tick or run the same way.",
     extraParagraphs: [
       "A rebalance repays part of the tick's fxUSD debt and takes collateral worth that debt plus the rebalance bonus, bringing the tick back to the rebalance line. Every position in the tick loses collateral and debt in proportion and stays open. The position has no event of its own for it; the timeline places the rebalance on its history and reads the position before and after.",
       "A liquidation repays the position's debt and takes collateral worth it plus the liquidation bonus. Collateral beyond that stays in the position for the owner. When the collateral cannot cover the debt and the bonus, the liquidator takes all of it, and the debt it did not cover is added to every other position in the pool through the pool's debt index.",
@@ -2180,7 +2192,7 @@ export function fxTransferContent(): LearnMoreContent {
   return {
     title: "How Position Ownership Works",
     intro:
-      "f(x) V2 positions are ERC-721 tokens minted by the pool contract itself — the pool is the NFT. Holding the token IS owning the position: the holder alone can adjust or close it, and can transfer it like any NFT.",
+      "f(x) V2 positions are ERC-721 tokens minted by the pool contract — the pool is the NFT. Holding the token is owning the position: only the account holding it when the manager is called can withdraw collateral or borrow against it (anyone may add collateral or repay), and it transfers like any NFT. A contract the holder approves, such as f(x)'s router or limit-order manager, can hold it for one transaction and hand it back.",
     extraParagraphs: [
       "A Transfer log moves only the holder record — the position's collateral, debt and tick are untouched. The explorer replays these logs into ownership eras, so each historic event is judged against the owner in force at its block, not the current holder.",
       "The mint (a Transfer from the zero address) is the position's birth record. A handful of positions were minted via a path that emits no Operate event — for those, the mint transfer is the only dated record of their creation, and their state lives entirely in the settled lane.",

@@ -244,6 +244,19 @@ export default function FxPositionView({
     };
   }, [fxEvents, socializedRows, socializedReadsMap]);
   const loans = useMemo(() => fxLoans(fxEvents), [fxEvents]);
+  // Pool-wide liquidations (mig 369) are not in the summary's counts, which
+  // come from the per-position LiquidatePosition lane: the card counts them
+  // from the rows.
+  const cardView = useMemo(() => {
+    const n = socializedRows.filter((e) => e.context.data.eventType === "liquidation").length;
+    if (!view || n === 0 || historyWindow.state !== "whole") return view;
+    return {
+      ...view,
+      everLiquidated: true,
+      liquidationCount: view.liquidationCount + n,
+      activity: { ...view.activity, eventCount: view.activity.eventCount + n },
+    };
+  }, [view, socializedRows, historyWindow.state]);
   const blockDates = useMemo(() => new Map(fxEvents.map((e) => [e.blockNumber, e.timestamp])), [fxEvents]);
 
   const tl = useTimelineEvents(fxEvents, { storageKey: `fx-${slug}`, protocolKey: "fx", window: historyWindow });
@@ -330,7 +343,7 @@ export default function FxPositionView({
             // figures, in two moods — the pool's own figures present, or still
             // pending (the card shows dashes and the pane says so plainly).
             <FxPositionCard
-              v={view}
+              v={cardView ?? view}
               receipts
               viewHref={tl.viewHref}
               drift={drift}
@@ -340,7 +353,7 @@ export default function FxPositionView({
               }
               explanation={
                 <FxPositionExplanation
-                  v={view}
+                  v={cardView ?? view}
                   externalActivity={externalActivity}
                   // The full record's row count: the loaded rows plus the
                   // MV-lane events the opening balance summarised (the raw

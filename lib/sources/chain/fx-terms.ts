@@ -41,8 +41,10 @@ export interface FxPoolTerms {
   expenseRatio: number;
   /** Annual funding charged on collateral. */
   fundingRatio: number;
-  /** The default schedule; a router can carry its own. */
+  /** The default schedule; a calling contract can carry its own. */
   fees: { supply: number; withdraw: number; borrow: number; repay: number };
+  /** The router's schedule (FX_ADDRESSES.ROUTER). */
+  routerFees: { supply: number; withdraw: number; borrow: number; repay: number } | null;
   redeemAllowed: boolean;
 }
 
@@ -68,13 +70,19 @@ async function read(pool: FxPoolKey): Promise<FxPoolTerms> {
       { address: getAddress(FX_ADDRESSES.POOL_MANAGER), abi: PM_ABI, functionName: "getLiquidationExpenseRatio" },
     ],
   });
-  const [funding, fees, redeemAllowed] = await client.multicall({
+  const [funding, fees, redeemAllowed, router] = await client.multicall({
     allowFailure: false,
     ...at,
     contracts: [
       { address: configuration, abi: CONFIG_ABI, functionName: "getLongPoolFundingRatio", args: [address] },
       { address: configuration, abi: CONFIG_ABI, functionName: "getPoolFeeRatio", args: [address, ZERO_ADDRESS] },
       { address: configuration, abi: CONFIG_ABI, functionName: "isRedeemAllowed" },
+      {
+        address: configuration,
+        abi: CONFIG_ABI,
+        functionName: "getPoolFeeRatio",
+        args: [address, getAddress(FX_ADDRESSES.ROUTER)],
+      },
     ],
   });
   return {
@@ -88,6 +96,7 @@ async function read(pool: FxPoolKey): Promise<FxPoolTerms> {
     expenseRatio: fee(expense),
     fundingRatio: wad(funding),
     fees: { supply: fee(fees[0]), withdraw: fee(fees[1]), borrow: fee(fees[2]), repay: fee(fees[3]) },
+    routerFees: { supply: fee(router[0]), withdraw: fee(router[1]), borrow: fee(router[2]), repay: fee(router[3]) },
     redeemAllowed,
   };
 }

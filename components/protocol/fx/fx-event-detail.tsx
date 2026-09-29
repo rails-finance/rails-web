@@ -202,11 +202,16 @@ function FxEventDetailBody({
     );
   }
 
-  if (ctx.eventType === "tickRebalance") {
+  const poolLiq = ctx.eventType === "liquidation" && ctx.poolWide === true;
+  if (ctx.eventType === "tickRebalance" || poolLiq) {
     const scope = ctx.poolWide ? "whole pool" : "whole tick";
     const tickStats: ChainTruthStat[] = [
       {
-        label: ctx.poolWide ? "Pool-wide rebalance · moved this position's tick" : "Rebalanced tick",
+        label: poolLiq
+          ? "Pool-wide liquidation · liquidated this position's tick"
+          : ctx.poolWide
+            ? "Pool-wide rebalance · moved this position's tick"
+            : "Rebalanced tick",
         // `#`-prefixed so the grid's numeric compaction leaves the tick id alone.
         value: `#${ctx.rebalancedTick ?? "—"}`,
         symbol: "",
@@ -216,13 +221,13 @@ function FxEventDetailBody({
         label: `Collateral to the keeper · ${scope}`,
         value: fmt(ctx.tickRebColls),
         symbol: tokenSym,
-        prov: tickRebAmountProv("colls", tokenSym, coords, undefined, ctx.poolWide),
+        prov: tickRebAmountProv("colls", tokenSym, coords, undefined, ctx.poolWide, poolLiq),
       },
       {
         label: `fxUSD repaid · ${scope}`,
         value: fmt(ctx.tickRebFxusdDebts),
         symbol: "fxUSD",
-        prov: tickRebAmountProv("fxusd", "fxUSD", coords, undefined, ctx.poolWide),
+        prov: tickRebAmountProv("fxusd", "fxUSD", coords, undefined, ctx.poolWide, poolLiq),
       },
     ];
     if (ctx.tickRebStableDebts != null && Number(ctx.tickRebStableDebts) !== 0) {
@@ -230,7 +235,7 @@ function FxEventDetailBody({
         label: `USDC repaid · ${scope}`,
         value: fmt(ctx.tickRebStableDebts),
         symbol: "USDC",
-        prov: tickRebAmountProv("stable", "stable-side debt", coords, undefined, ctx.poolWide),
+        prov: tickRebAmountProv("stable", "stable-side debt", coords, undefined, ctx.poolWide, poolLiq),
       });
     }
     const tag = blockPeers && blockPeers > 1 ? ` · this block (${blockPeers} rebalances)` : "";

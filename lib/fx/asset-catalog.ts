@@ -36,6 +36,9 @@ export const FX_ADDRESSES = {
   FXUSD: "0x085780639cc2cacd35e474e71f4d000e2405d8f6",
   WSTETH_POOL: "0x6ecfa38fee8a5277b91efda204c235814f0122e8",
   WBTC_POOL: "0xab709e26fa6b0a30c119d8c55b887ded24952473",
+  /** The router (a diamond) most position transactions go through; the pools'
+   *  PoolConfiguration gives it a fee schedule of its own (getPoolFeeRatio). */
+  ROUTER: "0x33636d49fbefbe798e15e7f356e8dbef543cc708",
 } as const;
 
 export const FXUSD_META = { symbol: "fxUSD", decimals: 18, address: FX_ADDRESSES.FXUSD } as const;

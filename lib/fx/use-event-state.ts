@@ -71,6 +71,8 @@ export function fxEventStateUrl(ctx: FxContext, blockNumber?: number, txHash?: s
   if (blockNumber == null || ctx.eventType === "transfer") return null;
   const q = new URLSearchParams({ pool: ctx.pool, id: ctx.positionId, blocks: String(blockNumber) });
   if (ctx.eventType === "operate" && txHash && /^0x[0-9a-fA-F]{64}$/.test(txHash)) q.set("tx", txHash.toLowerCase());
+  // Rebalance and liquidation rows state which price the pool judged them at.
+  if (ctx.eventType === "tickRebalance" || ctx.eventType === "liquidation") q.set("prices", "1");
   return `/api/chain/fx/event-state?${q.toString()}`;
 }
 

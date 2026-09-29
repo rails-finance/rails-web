@@ -166,6 +166,7 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
           eventNumber={eventNumber}
           externalBy={extBy ?? undefined}
           flows={event.flows}
+          eventId={event.id}
         />
       }
       detail={

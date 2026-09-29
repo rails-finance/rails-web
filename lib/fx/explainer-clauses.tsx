@@ -358,6 +358,73 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
     );
   };
 
+  // This position's change over the row's block (getPosition at block − 1 and
+  // at the block): a rebalance's or pool-wide liquidation's only per-position
+  // figure.
+  const peers = read.blockPeers && read.blockPeers > 1 ? read.blockPeers : 0;
+  const ownChange = (noun: string): ClauseInput =>
+    before?.debts != null && after?.debts != null && before.colls != null && after.colls != null
+      ? clause(
+          <>
+            {peers ? (
+              <>
+                Over this block, with its {peers} {noun}, this
+              </>
+            ) : (
+              <>This</>
+            )}{" "}
+            position&rsquo;s debt went from{" "}
+            <Fig info={rowStateProv("debt", "before", normSym, coords)} value={String(before.debts)}>
+              {formatNumber(before.debts)}
+            </Fig>{" "}
+            to{" "}
+            <Fig info={rowStateProv("debt", "after", normSym, coords)} value={String(after.debts)}>
+              {formatNumber(after.debts)} fxUSD
+            </Fig>{" "}
+            and its collateral from{" "}
+            <Fig info={rowStateProv("coll", "before", normSym, coords)} value={String(before.colls)}>
+              {formatNumber(before.colls)}
+            </Fig>{" "}
+            to{" "}
+            <Fig info={rowStateProv("coll", "after", normSym, coords)} value={String(after.colls)}>
+              {formatNumber(after.colls)} {normSym}
+            </Fig>
+            {before.ratio != null && after.ratio != null && after.colls > 0 ? (
+              pctOf(before.ratio) === pctOf(after.ratio) ? (
+                <>; its debt ratio stayed at {ratioFig(after, "after")}</>
+              ) : (
+                <>
+                  ; its debt ratio went from {ratioFig(before, "before")} to {ratioFig(after, "after")}
+                </>
+              )
+            ) : null}
+            .
+          </>,
+        )
+      : null;
+  // Which price the pool judged the row at: the oracle's min leg (BasePool
+  // rebalance / liquidate), where the row's ratios are read at the anchor.
+  const usd = (n: number) => `$${formatNumber(n)}`;
+  const judgedClause = (what: "rebalance" | "liquidate"): ClauseInput => {
+    const line = what === "rebalance" ? before?.rebalanceLine : before?.liquidateLine;
+    return clause(
+      <>
+        The pool judged the tick at the oracle&rsquo;s min price
+        {before?.minPrice != null ? <>, {usd(before.minPrice)} at the block before</> : null}
+        {line != null ? (
+          <>
+            : it {what === "rebalance" ? "rebalances" : "liquidates"} a tick whose debt ratio there is{" "}
+            {pctOf(line).replace(".0%", "%")} or more
+          </>
+        ) : null}
+        {what === "rebalance" ? <>, and a rebalance brings the tick back toward that line at that price</> : null}. The
+        debt ratios on this row are read at the anchor price
+        {before?.anchorPrice != null ? <> ({usd(before.anchorPrice)})</> : null}, at or above the min, so they can show
+        below the line.
+      </>,
+    );
+  };
+
   switch (ctx.eventType) {
     case "operate": {
       if (isOpen) {
@@ -484,6 +551,55 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
     }
 
     case "liquidation": {
+      if (ctx.poolWide === true) {
+        const tickFig = () => (
+          <Fig info={tickRebalanceHitProv(ctx.rebalancedTick, coords, true)} value={`#${ctx.rebalancedTick}`}>
+            #{ctx.rebalancedTick}
+          </Fig>
+        );
+        const runCollsFig = () => (
+          <Fig info={tickRebAmountProv("colls", sym, coords, undefined, true, true)} value={fmtVal(ctx.tickRebColls)}>
+            {fmtVal(ctx.tickRebColls)} {sym}
+          </Fig>
+        );
+        const runFxusdFig = () => (
+          <Fig
+            info={tickRebAmountProv("fxusd", "fxUSD", coords, undefined, true, true)}
+            value={fmtVal(ctx.tickRebFxusdDebts)}
+          >
+            {fmtVal(ctx.tickRebFxusdDebts)} fxUSD
+          </Fig>
+        );
+        const keeper = ctx.txFrom ? ` (${shortAddr(ctx.txFrom)})` : "";
+        return {
+          happened: [
+            clause(
+              <>
+                A keeper{keeper} ran a liquidation of the {sym} pool from its top tick down, including tick {tickFig()}{" "}
+                where this position&rsquo;s shares sat: across the pool it repaid {runFxusdFig()} of debt and took{" "}
+                {runCollsFig()} of collateral. The manager logs one event for the whole run and none for this position.
+              </>,
+            ),
+          ],
+          changed: [ownChange("liquidations")],
+          meansNow: [
+            clause(
+              empties ? (
+                <>
+                  The run liquidated the whole tick, so the position was emptied. The owner keeps the fxUSD they
+                  borrowed; the NFT stays with them and can be funded again.
+                </>
+              ) : (
+                <>
+                  The run liquidated part of the tick; the position stays open with what is left, and the owner keeps
+                  the fxUSD they borrowed.
+                </>
+              ),
+            ),
+            judgedClause("liquidate"),
+          ],
+        };
+      }
       const hasStable = ctx.liqStableDebts != null && Number(ctx.liqStableDebts) !== 0;
       const sent = Number(ctx.liqColls ?? "0") || 0;
       const liqCollsFig = () => (
@@ -632,41 +748,7 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
           {tickFxusdFig()} of the tick&rsquo;s debt and took {tickCollsFig()} of its collateral.
         </>
       );
-      const peers = read.blockPeers && read.blockPeers > 1 ? read.blockPeers : 0;
-      const own: ClauseInput =
-        before?.debts != null && after?.debts != null && before.colls != null && after.colls != null
-          ? clause(
-              <>
-                {peers ? <>Over this block, with its {peers} rebalances, this</> : <>This</>} position&rsquo;s debt went
-                from{" "}
-                <Fig info={rowStateProv("debt", "before", normSym, coords)} value={String(before.debts)}>
-                  {formatNumber(before.debts)}
-                </Fig>{" "}
-                to{" "}
-                <Fig info={rowStateProv("debt", "after", normSym, coords)} value={String(after.debts)}>
-                  {formatNumber(after.debts)} fxUSD
-                </Fig>{" "}
-                and its collateral from{" "}
-                <Fig info={rowStateProv("coll", "before", normSym, coords)} value={String(before.colls)}>
-                  {formatNumber(before.colls)}
-                </Fig>{" "}
-                to{" "}
-                <Fig info={rowStateProv("coll", "after", normSym, coords)} value={String(after.colls)}>
-                  {formatNumber(after.colls)} {normSym}
-                </Fig>
-                {before.ratio != null && after.ratio != null ? (
-                  pctOf(before.ratio) === pctOf(after.ratio) ? (
-                    <>; its debt ratio stayed at {ratioFig(after, "after")}</>
-                  ) : (
-                    <>
-                      ; its debt ratio went from {ratioFig(before, "before")} to {ratioFig(after, "after")}
-                    </>
-                  )
-                ) : null}
-                .
-              </>,
-            )
-          : null;
+      const own = ownChange("rebalances");
       return {
         happened: [clause(happened)],
         changed: own ? [own] : [],
@@ -680,6 +762,7 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
               . The position stays open.
             </>,
           ),
+          judgedClause("rebalance"),
         ],
       };
     }
