@@ -105,7 +105,9 @@ export function RevealTip({
     >
       {label ? (
         <>
-          <span aria-hidden="true">{children}</span>
+          <span aria-hidden="true" className="inline-flex items-center [gap:inherit]">
+            {children}
+          </span>
           {/* data-prov-hidden: the capture reads the visible figure only. */}
           <span className="sr-only" data-prov-hidden="">
             {label}

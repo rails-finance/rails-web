@@ -22,12 +22,9 @@ export interface PositionCardMetaProps {
   lastActivityAt?: number | null;
   /** Non-liquidation transaction/event count. Hidden when 0/absent. */
   eventCount?: number | null;
-  /** What the count IS, on hover, where the default sentence would be wrong.
-   *  The two defaults below name the exclusions a LENDING position's count
-   *  makes; a roster whose count is not that (a vault position counts the
-   *  share-token transfers naming the address, and has no liquidations to
-   *  exclude) states its own. Omitted, nothing changes for any caller. */
-  eventCountTitle?: string;
+  /** What the count counts, singular or plural, in the hover tip ("52 transactions").
+   *  Default "transaction"; a vault position counts "transfer". */
+  eventCountNoun?: string;
   /** Exact liquidation count, when known (Aave, Compound). */
   liquidationCount?: number | null;
   /** Boolean-only liquidation history, when no count exists (Morpho, MakerDAO). */
@@ -51,7 +48,7 @@ function utcStamp(sec: number): string {
 export function PositionCardMeta({
   lastActivityAt,
   eventCount,
-  eventCountTitle,
+  eventCountNoun = "transaction",
   liquidationCount,
   liquidated,
   redemptionCount,
@@ -83,14 +80,7 @@ export function PositionCardMeta({
       )}
       {showEvents &&
         (() => {
-          // A protocol that supplies redemptionCount (the Liquity family) also
-          // excludes redemptions from its transaction count — they are not the
-          // owner's transactions — so the title names both exclusions there.
-          const label =
-            eventCountTitle ??
-            (redemptionCount != null
-              ? `${eventCount} transaction${eventCount === 1 ? "" : "s"} on this position (excludes liquidations and redemptions)`
-              : `${eventCount} transaction${eventCount === 1 ? "" : "s"} on this position (excludes liquidations)`);
+          const label = `${eventCount} ${eventCountNoun}${eventCount === 1 ? "" : "s"}`;
           return (
             <RevealTip tip={label} label={label} focusable className="focus-ring rounded-sm">
               <Icon name="arrow-left-right" size={12} />

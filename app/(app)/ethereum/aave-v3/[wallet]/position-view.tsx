@@ -643,7 +643,6 @@ export default function AaveV3PositionDetail({
               <AaveV3PositionCard
                 v={liveView}
                 receipts
-                countNote={countNote}
                 viewHref={tl.viewHref}
                 captions={captions ?? undefined}
                 // The risk slot rides the card's heading-button row (the V2 trove
