@@ -121,7 +121,7 @@ export function MorphoPositionExplanation({
         ) : (
           <>was published </>
         )}
-        {age.published}.
+        {age.published}, {age.age} before this read.
       </span>,
     );
   }
