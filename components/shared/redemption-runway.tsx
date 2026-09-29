@@ -40,6 +40,7 @@ export function RedemptionRunway({
   queueDebtTotal,
   shareProv,
   markerTitle = "This position's place in the redemption queue — everything left of the marker is redeemed first",
+  shareLabel,
 }: {
   /** Debt redeemed before this position is touched — the same figure the
    *  protocol's full redemption card labels "Debt in front". */
@@ -52,6 +53,10 @@ export function RedemptionRunway({
   shareProv: Provenance;
   /** Hover caption on the pink position marker. */
   markerTitle?: string;
+  /** Words after the share figure. Opt-in per protocol; the default is the
+   *  family's "of queue in front". A caller's longer label may wrap, putting
+   *  the bar on the line below at narrow widths. */
+  shareLabel?: string;
 }) {
   if (!(queueDebtTotal > 0) || debtInFront < 0) return null;
   const share = Math.min(1, debtInFront / queueDebtTotal);
@@ -60,9 +65,9 @@ export function RedemptionRunway({
   const markerLeft = Math.min(98.5, Math.max(1.5, share * 100));
 
   return (
-    <div className="flex w-full items-center gap-2.5">
-      <span className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-rb-500">
-        <Prov info={shareProv}>{pct(share)}</Prov> of queue in front
+    <div className={`flex w-full items-center gap-2.5${shareLabel ? " flex-wrap gap-y-1" : ""}`}>
+      <span className={`text-[11px] tabular-nums text-rb-500 ${shareLabel ? "min-w-0" : "shrink-0 whitespace-nowrap"}`}>
+        <Prov info={shareProv}>{pct(share)}</Prov> {shareLabel ?? "of queue in front"}
       </span>
       <div className="relative min-w-24 flex-1" style={{ height: H_BAR_COMPACT }}>
         <div className={`absolute inset-0 rounded-full ${TRACK}`} />

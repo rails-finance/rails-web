@@ -63,12 +63,14 @@ const LABELS: Record<LiquityV1EventType, string> = {
   openTrove: "Open Trove",
   adjustTrove: "Adjust Trove",
   closeTrove: "Close Trove",
-  liquidation: "Liquidation",
+  liquidation: "Liquidated",
   redemption: "Redemption",
 };
 
 const ZERO = BigInt(0);
 const DECIMALS = 18;
+/** LUSD_GAS_COMPENSATION: 200 LUSD, in wei. */
+const RESERVE = BigInt("200000000000000000000");
 // Native ETH has no ERC20 address — the conventional sentinel used across the app.
 const ETH_SENTINEL = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
@@ -148,13 +150,21 @@ export function buildLiquityV1Timeline(rows: MvRow[], walletRaw: string): Liquit
         : {}),
     };
 
-    // Spine flows: ETH collateral + LUSD debt, signed by which way each moved.
-    // "out" = leaves the wallet toward the protocol (collateral deposit / debt repay);
-    // "in" = comes to the wallet (collateral withdraw / debt draw).
+    // The owner's wallet flows: "out" = leaves the wallet toward the protocol
+    // (collateral deposit / debt repay); "in" = comes to the wallet (collateral
+    // withdraw / debt draw). A liquidation or a redemption moves nothing in or
+    // out of the owner's wallet: its ETH goes to the Stability Pool, the
+    // liquidator or the redeemer, and the debt is cancelled with their LUSD.
+    // A close takes the debt less the 200 LUSD reserve from the wallet; the
+    // GasPool burns the reserve.
     const flows: AssetFlow[] = [];
-    if (collDelta !== ZERO) flows.push(flowFor(ETH_SENTINEL, "ETH", collDelta, collDelta > ZERO ? "out" : "in"));
-    if (debtDelta !== ZERO)
-      flows.push(flowFor(LIQUITY_V1_ADDRESSES.LUSD, "LUSD", debtDelta, debtDelta > ZERO ? "in" : "out"));
+    const ownerActs = kind !== "liquidation" && kind !== "redemption";
+    if (ownerActs && collDelta !== ZERO)
+      flows.push(flowFor(ETH_SENTINEL, "ETH", collDelta, collDelta > ZERO ? "out" : "in"));
+    if (ownerActs && debtDelta !== ZERO) {
+      const walletDebt = kind === "closeTrove" && -debtDelta > RESERVE ? debtDelta + RESERVE : debtDelta;
+      flows.push(flowFor(LIQUITY_V1_ADDRESSES.LUSD, "LUSD", walletDebt, walletDebt > ZERO ? "in" : "out"));
+    }
 
     return {
       id: `${tx}-${r.log_index}`,

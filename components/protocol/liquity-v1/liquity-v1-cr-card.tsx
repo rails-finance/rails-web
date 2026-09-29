@@ -47,20 +47,27 @@ export function LiquityV1CrCard({ chain }: { chain: LiquityV1PositionChainRespon
           <>
             {" · "}
             <span className="font-semibold text-caution-600 dark:text-caution-400">
-              recovery mode — at risk below{" "}
-              <Prov info={ratioConstantProv("Critical collateral ratio", "CCR")}>{pct(chain.ccr)}</Prov>
+              Recovery Mode: at risk below the system ratio
             </span>
           </>
         )}
       </RiskFigure>
       <RiskFigure>
+        can borrow{" "}
         <Prov info={borrowHeadroomProv(activeLabel)}>
           <AmountText value={headroomLusd} format="compact" /> {DEBT_SYMBOL}
         </Prov>{" "}
-        more to the {activeLabel} minimum
+        more before reaching {activeLabel}
       </RiskFigure>
       <RiskFigure>
         system ratio <Prov info={systemStateProv("Total collateral ratio", "getTCR(price)")}>{pct(chain.tcr)}</Prov>
+        {chain.recoveryMode ? null : (
+          <>
+            {" "}
+            · Recovery Mode below{" "}
+            <Prov info={ratioConstantProv("Critical collateral ratio", "CCR")}>{pct(chain.ccr)}</Prov>
+          </>
+        )}
       </RiskFigure>
     </>
   );

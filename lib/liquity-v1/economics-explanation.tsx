@@ -1,13 +1,22 @@
 // Liquity V1 economics Explanation — the plain-language narration under the
-// chain-truth tower, mirroring the V2 benchmark (trove-economics.tsx): a
-// status-lead sentence plus bullets built straight from the tower's own data
-// (computeLiquityV1Economics), never boilerplate.
+// chain-truth tower, mirroring the V2 benchmark (lib/liquity/economics-
+// explanation.tsx): a lead sentence naming the prices the figures use, bullets
+// built from the tower's data (computeLiquityV1Economics), and the redemption
+// net outcome at each redemption's price and at today's price.
+//
+// Pricing: the tower values ETH at the PriceFeed price NOW and LUSD at $1, so
+// a "Redeemed" ETH row and the "Redeemed" LUSD row differ by how far ETH has
+// moved since the redemptions. The outcome bullet and the strip on the tower's
+// heading row state both prices so the difference reads as what it is.
 
 import type { ReactNode } from "react";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { ChainTruthTowerData, TowerSideData } from "@/lib/shared/chain-truth-economics";
+import type { LiquityV1RedemptionTotals } from "@/lib/liquity-v1/economics";
 import { formatCompact } from "@/lib/utils/format";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { fmtEth, fmtLusd, fmtUsd, fmtUsdSigned } from "@/lib/liquity-v1/event-figures";
 
 const DUST = 1e-9;
 
@@ -15,110 +24,109 @@ const sideSymbol = (side: TowerSideData, fallback: string): string =>
   side.current[0]?.symbol ?? side.exited[0]?.symbol ?? side.liquidated[0]?.symbol ?? fallback;
 
 const fig = (amount: number, usd: number | null, valued: boolean, symbol: string): string =>
-  valued && usd != null ? formatCompactUsd(usd) : `${formatCompact(amount)} ${symbol}`;
+  valued && usd != null
+    ? `${formatCompact(amount)} ${symbol} (${formatCompactUsd(usd)})`
+    : `${formatCompact(amount)} ${symbol}`;
 
-const exitedTotal = (side: TowerSideData, valued: boolean): { amount: number; usd: number | null } => {
-  const amount = side.exited.reduce((sum, l) => sum + l.amount, 0);
-  const usd = valued ? side.exited.reduce((sum, l) => sum + (l.usd ?? 0), 0) : null;
-  return { amount, usd };
-};
+const strong = (s: string) => <span className="font-semibold text-foreground tabular-nums">{s}</span>;
 
-const redeemedLine = (side: TowerSideData) => side.liquidated.find((l) => l.flowKind === "redeemed");
-const liquidatedLine = (side: TowerSideData) => side.liquidated.find((l) => l.flowKind !== "redeemed");
+const byKey = (side: TowerSideData, key: string) =>
+  [...side.exited, ...side.liquidated].find((l) => l.key === key) ?? null;
 
-/** Explanation body for the Liquity V1 tower — a lead sentence plus bullets
- *  derived from `data`. Returns null when there's nothing to narrate (no
- *  current state and no lifetime flows). */
-export function liquityV1EconomicsExplanation(data: ChainTruthTowerData): ReactNode {
+/** Explanation body for the Liquity V1 tower. Returns null when there's
+ *  nothing to narrate (no current state and no lifetime flows). */
+export function liquityV1EconomicsExplanation(
+  data: ChainTruthTowerData,
+  opts: { priceNow?: number | null; redemptions?: LiquityV1RedemptionTotals | null } = {},
+): ReactNode {
   const { collateral, debt, valued } = data;
+  const { priceNow, redemptions } = opts;
   const collSym = sideSymbol(collateral, "ETH");
   const debtSym = sideSymbol(debt, "LUSD");
   const bullets: ReactNode[] = [];
 
-  if (collateral.lifetimeInflow > DUST || exitedTotal(collateral, valued).amount > DUST) {
-    const { amount: withdrawnAmt, usd: withdrawnUsd } = exitedTotal(collateral, valued);
-    bullets.push(
-      <span key="coll-flow">
-        {collateral.lifetimeInflow > DUST && (
-          <>{fig(collateral.lifetimeInflow, valued ? collateral.lifetimeInflow : null, valued, collSym)} deposited</>
-        )}
-        {withdrawnAmt > DUST && (
-          <>
-            {collateral.lifetimeInflow > DUST ? ", " : ""}
-            {fig(withdrawnAmt, withdrawnUsd, valued, collSym)} withdrawn
-          </>
-        )}
-        {" over the trove's life."}
-      </span>,
-    );
-  }
-
-  if (debt.lifetimeInflow > DUST || exitedTotal(debt, valued).amount > DUST) {
-    const { amount: repaidAmt, usd: repaidUsd } = exitedTotal(debt, valued);
-    bullets.push(
-      <span key="debt-flow">
-        {debt.lifetimeInflow > DUST && (
-          <>{fig(debt.lifetimeInflow, valued ? debt.lifetimeInflow : null, valued, debtSym)} borrowed</>
-        )}
-        {repaidAmt > DUST && (
-          <>
-            {debt.lifetimeInflow > DUST ? ", " : ""}
-            {fig(repaidAmt, repaidUsd, valued, debtSym)} repaid
-          </>
-        )}
-        {" over the trove's life."}
-      </span>,
-    );
-  }
-
-  const redeemedDebt = redeemedLine(debt);
-  const redeemedColl = redeemedLine(collateral);
-  if (redeemedDebt) {
-    bullets.push(
-      <span key="redeemed">
-        The trove has been redeemed against: {fig(redeemedDebt.amount, redeemedDebt.usd, valued, debtSym)} of debt was
-        cleared this way
-        {redeemedColl && <>, taking {fig(redeemedColl.amount, redeemedColl.usd, valued, collSym)} collateral</>}.
-      </span>,
-    );
-  }
-
-  const liquidatedDebt = liquidatedLine(debt);
-  const liquidatedColl = liquidatedLine(collateral);
-  if (liquidatedDebt) {
-    bullets.push(
-      <span key="liquidated">
-        {fig(liquidatedDebt.amount, liquidatedDebt.usd, valued, debtSym)} of debt was cleared in liquidation
-        {liquidatedColl && <>, seizing {fig(liquidatedColl.amount, liquidatedColl.usd, valued, collSym)} collateral</>}.
-      </span>,
-    );
-  }
-
+  const withdrawn = byKey(collateral, "coll-withdrawn");
+  const toSurplus = byKey(collateral, "coll-surplus");
+  const collRedeemed = byKey(collateral, "coll-redeemed");
+  const collLiq = byKey(collateral, "coll-liq");
+  const repaid = byKey(debt, "debt-repaid");
+  const debtRedeemed = byKey(debt, "debt-redeemed");
+  const debtLiq = byKey(debt, "debt-liq");
   const collNow = collateral.current[0];
   const debtNow = debt.current[0];
-  if (collNow || debtNow) {
+  const depositedAmt = valued && priceNow ? collateral.lifetimeInflow / priceNow : collateral.lifetimeInflow;
+
+  if (collateral.lifetimeInflow > DUST) {
+    const parts: string[] = [];
+    if (withdrawn) parts.push(`${fig(withdrawn.amount, withdrawn.usd, valued, collSym)} withdrawn by the owner`);
+    if (collRedeemed) parts.push(`${fig(collRedeemed.amount, collRedeemed.usd, valued, collSym)} taken by redemptions`);
+    if (toSurplus) parts.push(`${fig(toSurplus.amount, toSurplus.usd, valued, collSym)} moved to the surplus pool`);
+    if (collLiq) parts.push(`${fig(collLiq.amount, collLiq.usd, valued, collSym)} seized in liquidation`);
     bullets.push(
-      <span key="current">
-        The trove currently holds {collNow ? fig(collNow.amount, collNow.usd, valued, collSym) : `no ${collSym}`}{" "}
-        backing {debtNow ? fig(debtNow.amount, debtNow.usd, valued, debtSym) : "no debt"}.
+      <span key="coll-flow">
+        Collateral: {strong(fig(depositedAmt, valued ? collateral.lifetimeInflow : null, valued, collSym))} deposited
+        {parts.length > 0 && <>, then {parts.join(", ")}</>}
+        {collNow ? <>, leaving {strong(fig(collNow.amount, collNow.usd, valued, collSym))}.</> : <>, leaving none.</>}
       </span>,
     );
-  } else if (bullets.length > 0) {
-    bullets.push(<span key="closed">The trove is closed — no collateral or debt remain.</span>);
   }
 
-  bullets.push(
-    <span key="mechanic">
-      Liquity V1 charges no ongoing interest: the debt is the trove&apos;s exact obligation, and opening sets aside a
-      200 LUSD gas-compensation reserve, refunded in full when the trove closes normally.
-    </span>,
-  );
+  if (debt.lifetimeInflow > DUST) {
+    const parts: string[] = [];
+    if (repaid) parts.push(`${fig(repaid.amount, null, false, debtSym)} repaid by the owner`);
+    if (debtRedeemed) parts.push(`${fig(debtRedeemed.amount, null, false, debtSym)} cancelled by redemptions`);
+    if (debtLiq) parts.push(`${fig(debtLiq.amount, null, false, debtSym)} cancelled in liquidation`);
+    bullets.push(
+      <span key="debt-flow">
+        Debt: {strong(fig(debt.lifetimeInflow, null, false, debtSym))} taken on (the LUSD received, the borrowing fees
+        and the 200 LUSD reserve)
+        {parts.length > 0 && <>, then {parts.join(", ")}</>}
+        {debtNow ? <>, leaving {strong(fig(debtNow.amount, null, false, debtSym))}.</> : <>, leaving none.</>}
+      </span>,
+    );
+  }
+
+  if (redemptions) {
+    const atToday = priceNow != null && priceNow > 0 ? redemptions.ethTaken * priceNow : null;
+    const netThen = redemptions.lusdRedeemed - redemptions.ethValueAtRedemption;
+    bullets.push(
+      <span key="redemption-outcome">
+        Redemptions took {strong(`${fmtEth(redemptions.ethTaken)} ${collSym}`)} for{" "}
+        {strong(`${fmtLusd(redemptions.lusdRedeemed)} ${debtSym}`)} of debt, and that ETH was worth{" "}
+        {strong(fmtUsd(redemptions.ethValueAtRedemption))} at the PriceFeed price when each redemption happened: a net{" "}
+        {strong(fmtUsdSigned(Math.abs(netThen) < 0.005 ? 0 : netThen))} to the owner.
+        {atToday != null && (
+          <>
+            {" "}
+            At today&apos;s {fmtUsd(priceNow as number)} the same ETH is worth {strong(fmtUsd(atToday))}, which is why
+            the Redeemed ETH row reads more than the Redeemed LUSD row: a net{" "}
+            {strong(fmtUsdSigned(redemptions.lusdRedeemed - atToday))} at today&apos;s value.
+          </>
+        )}
+        {redemptions.reserveBurned > 0 && (
+          <>
+            {" "}
+            The Redeemed LUSD row also counts the {fmtLusd(redemptions.reserveBurned)} LUSD of liquidation reserve a
+            full redemption burned.
+          </>
+        )}
+      </span>,
+    );
+  }
+
+  if (collNow || debtNow || bullets.length > 0) {
+    bullets.push(
+      <span key="mechanic">
+        Liquity V1 charges no interest: the debt moves only when the owner borrows or repays, or a redemption or
+        liquidation reaches the Trove.
+      </span>,
+    );
+  }
 
   if (!valued) {
     bullets.push(
       <span key="unvalued">
-        Amounts are shown in token units — the trove&apos;s own ETH oracle price wasn&apos;t available on this load, so
-        no dollar total is shown.
+        Amounts are in tokens: the PriceFeed&apos;s ETH price did not load, so no dollar values are shown.
       </span>,
     );
   }
@@ -128,7 +136,13 @@ export function liquityV1EconomicsExplanation(data: ChainTruthTowerData): ReactN
   return (
     <div className="space-y-2 text-sm text-rb-500">
       <p className="leading-relaxed">
-        These figures total the trove&apos;s lifetime flows on Liquity V1 across every event in its captured history.
+        These figures add up the Trove&apos;s flows over its life.{" "}
+        {valued && priceNow ? (
+          <>
+            ETH amounts are valued at today&apos;s PriceFeed price, {fmtUsd(priceNow)}, and LUSD at $1, so a flow from
+            years ago is shown at what that ETH is worth now.
+          </>
+        ) : null}
       </p>
       {bullets.map((item, i) => (
         <div key={i} className="flex items-start gap-2 leading-relaxed">
@@ -140,39 +154,99 @@ export function liquityV1EconomicsExplanation(data: ChainTruthTowerData): ReactN
   );
 }
 
+/** The redemption net-outcome strip on the tower's heading row (the V2 tower's
+ *  rowExtra): the net at each redemption's price, and at today's price. */
+export function liquityV1RedemptionOutcome(t: LiquityV1RedemptionTotals | null, priceNow?: number | null): ReactNode {
+  if (!t) return undefined;
+  const netThen = t.lusdRedeemed - t.ethValueAtRedemption;
+  const thenProv: Provenance = {
+    kind: "derived",
+    summary:
+      "Redemption net outcome — the LUSD the redeemers paid in, counted at $1, less the ETH they took valued at the PriceFeed price at each redemption's block.",
+    formula: "LUSD redeemed − ETH taken × price at each redemption",
+    inputs: [
+      { label: "LUSD redeemed", value: fmtLusd(t.lusdRedeemed), kind: "chain-derived" },
+      {
+        label: "ETH taken, at redemption prices",
+        value: fmtUsd(t.ethValueAtRedemption),
+        kind: "chain-derived",
+        pclass: "oracle",
+      },
+    ],
+  };
+  const netNow = priceNow != null && priceNow > 0 ? t.lusdRedeemed - t.ethTaken * priceNow : null;
+  const nowProv: Provenance | null =
+    netNow != null
+      ? {
+          kind: "derived",
+          summary:
+            "Redemption net outcome at today's price — the LUSD the redeemers paid in, counted at $1, less the ETH they took valued at the PriceFeed price now.",
+          formula: "LUSD redeemed − ETH taken × price now",
+          inputs: [
+            { label: "LUSD redeemed", value: fmtLusd(t.lusdRedeemed), kind: "chain-derived" },
+            { label: "ETH taken", value: fmtEth(t.ethTaken), kind: "chain-derived" },
+            { label: "price now", value: fmtUsd(priceNow as number), kind: "chain", pclass: "oracle" },
+          ],
+        }
+      : null;
+  const tone = (n: number) => (n >= 0 ? "text-green-400" : "text-red-400");
+  const shownThen = Math.abs(netThen) < 0.005 ? 0 : netThen;
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-2 text-xs text-rb-500">
+      <span>Owner&apos;s net outcome from redemptions was</span>
+      <Prov info={thenProv}>
+        <span className={tone(shownThen)}>{fmtUsdSigned(shownThen)}</span>
+      </Prov>
+      <span>at the redemption prices</span>
+      {netNow != null && nowProv && (
+        <>
+          <span>or</span>
+          <Prov info={nowProv}>
+            <span className={tone(netNow)}>{fmtUsdSigned(netNow)}</span>
+          </Prov>
+          <span>at today&apos;s value</span>
+        </>
+      )}
+    </div>
+  );
+}
+
 const LIQUITY_V1_FAQ = {
   BORROWING: "https://docs.liquity.org/liquity-v1/faq/borrowing",
   REDEMPTIONS: "https://docs.liquity.org/liquity-v1/faq/lusd-redemptions",
   LIQUIDATIONS: "https://docs.liquity.org/liquity-v1/faq/stability-pool-and-liquidations",
 } as const;
 
-/** The tower's "?" FAQ for Liquity V1. */
+/** The tower's "?" for Liquity V1. */
 export function liquityV1EconomicsContent(): LearnMoreContent {
   return {
-    title: "About the Economics",
+    title: "About the Lifetime Flows",
     intro:
-      "This panel replays the trove's own TroveUpdated events into lifetime flows, and reads its current ETH and LUSD balances from the chain at the head block. Liquity V1 charges no ongoing interest, so the LUSD figure is the trove's exact obligation.",
-    stepsHeading: "How the tower is built:",
+      "This panel adds up everything that moved in and out of the Trove over its life, from each of its events, and shows what it holds today.",
+    stepsHeading: "How to read it:",
     steps: [
-      "Deposited, withdrawn, borrowed and repaid are summed from the trove's own signed balance deltas, event by event.",
-      "Redemptions and liquidations are kept apart from voluntary flows — each is its own bar.",
-      "USD values use the protocol's own pricing (the PriceFeed's ETH price and LUSD's $1 redemption face) and appear only once that on-chain price has loaded.",
+      "The left bar is collateral (ETH): deposited, then withdrawn by the owner, taken by redemptions, moved to the surplus pool or seized in liquidation, and what is left.",
+      "The right bar is debt (LUSD): taken on, then repaid by the owner, cancelled by redemptions or in liquidation, and what is owed.",
+      "Dollar values put ETH at today's price from Liquity's PriceFeed and LUSD at $1. A deposit made when ETH was cheaper shows at today's value.",
+      "Because of that, the Redeemed ETH row and the Redeemed LUSD row differ by how far ETH has moved since. At the price of each redemption they were equal; the net outcome beside the heading gives both.",
     ],
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "No ongoing interest",
-        text: "the debt never grows on its own — only draws, repayments, redemptions and liquidations change it.",
+        bold: "No interest",
+        text: "the debt moves only when the owner borrows or repays, or a redemption or liquidation reaches the Trove.",
+        sources: [{ label: "Borrowing FAQ", url: LIQUITY_V1_FAQ.BORROWING }],
       },
       {
-        bold: "Gas-compensation reserve",
-        text: "200 LUSD is set aside when the trove opens and refunded when it closes normally.",
+        bold: "Debt taken on",
+        text: "each draw adds the LUSD received plus a one-time fee; opening also adds the 200 LUSD liquidation reserve, which closing or a full redemption burns.",
+        sources: [{ label: "Borrowing FAQ", url: LIQUITY_V1_FAQ.BORROWING }],
       },
     ],
     links: [
       { label: "Borrowing FAQ", url: LIQUITY_V1_FAQ.BORROWING },
       { label: "Redemptions FAQ", url: LIQUITY_V1_FAQ.REDEMPTIONS },
-      { label: "Stability Pool & liquidations FAQ", url: LIQUITY_V1_FAQ.LIQUIDATIONS },
+      { label: "Stability Pool and liquidations FAQ", url: LIQUITY_V1_FAQ.LIQUIDATIONS },
     ],
   };
 }

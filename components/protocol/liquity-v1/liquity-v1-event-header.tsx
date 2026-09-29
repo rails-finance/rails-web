@@ -5,11 +5,17 @@
 // row can carry two signed deltas. Each delta is after − before over two emitted
 // absolutes (chain-derived); traced via <Prov>. No USD, no collateral ratio — layers.
 
-import type { AssetFlow, LiquityV1Context } from "@/lib/shared/types/event-shape";
-import { soleFlowAddress } from "@/lib/shared/format-event";
+import type { LiquityV1Context } from "@/lib/shared/types/event-shape";
 import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
-import { collDeltaProv, debtDeltaProv, type LiquityV1Coords } from "@/lib/liquity-v1/event-provenance";
-import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
+import {
+  collDeltaProv,
+  debtDeltaProv,
+  closeRepaidProv,
+  redemptionLegProv,
+  type LiquityV1Coords,
+} from "@/lib/liquity-v1/event-provenance";
+import { COLLATERAL_SYMBOL, DEBT_SYMBOL, LIQUITY_V1_ADDRESSES } from "@/lib/liquity-v1/asset-catalog";
+import { LIQUITY_V1_RESERVE, redemptionSplit } from "@/lib/liquity-v1/event-figures";
 import { COLL_VERB, DEBT_VERB } from "@/lib/shared/liquity-fork-ops";
 
 export interface LiquityV1EventHeaderProps {
@@ -19,13 +25,6 @@ export interface LiquityV1EventHeaderProps {
   txHash?: string;
   blockNumber?: number;
   eventNumber?: number;
-  /** The event's own movements, read for the LUSD contract behind the debt
-   *  delta. The COLLATERAL delta deliberately takes nothing from here: V1's
-   *  collateral is native ETH, which the timeline records as the 0xEeee…eeee
-   *  sentinel — an address-shaped value that is not a contract, and handing it
-   *  to the chip would send it to two CDNs that cannot answer for it. ETH
-   *  already draws the curated local mark from its symbol. */
-  flows?: AssetFlow[];
 }
 
 export function LiquityV1EventHeader({
@@ -35,7 +34,6 @@ export function LiquityV1EventHeader({
   txHash,
   blockNumber,
   eventNumber,
-  flows,
 }: LiquityV1EventHeaderProps) {
   const coords: LiquityV1Coords = { txHash, blockNumber };
   const deltas: ChainTruthDelta[] = [];
@@ -53,8 +51,29 @@ export function LiquityV1EventHeader({
   const isAdjust = ctx.eventType === "adjustTrove";
   const perAxis = isOpen || isAdjust;
 
+  // A liquidation names what happened to each side: the ETH was seized, the
+  // debt cancelled. A full redemption splits the collateral: the redeemer's
+  // ETH is "Cleared", the rest moved to the CollSurplusPool for the owner.
+  const isLiq = ctx.eventType === "liquidation";
+  const split = redemptionSplit(ctx);
   const coll = Number(ctx.collDelta) || 0;
-  if (coll !== 0)
+  if (coll !== 0 && split?.full) {
+    const legVals = { debt: String(split.lusdRedeemed), priceUsd: split.price, coll: ctx.collBefore };
+    deltas.push({
+      value: -split.ethToRedeemer,
+      symbol: COLLATERAL_SYMBOL,
+      prov: redemptionLegProv(coords, "redeemer", legVals),
+      label: "Cleared",
+      tone: "external",
+    });
+    if (split.ethSurplus > 0)
+      deltas.push({
+        value: split.ethSurplus,
+        symbol: COLLATERAL_SYMBOL,
+        prov: redemptionLegProv(coords, "surplus", legVals),
+        label: "Surplus",
+      });
+  } else if (coll !== 0)
     deltas.push({
       value: coll,
       symbol: COLLATERAL_SYMBOL,
@@ -66,26 +85,41 @@ export function LiquityV1EventHeader({
       }),
       ...(isRedemption
         ? { label: "Cleared", tone: "external" as const }
-        : perAxis
-          ? { label: coll > 0 ? COLL_VERB.add : COLL_VERB.withdraw, axisVerb: true }
-          : {}),
+        : isLiq
+          ? { label: "Seized", tone: "caution" as const }
+          : perAxis
+            ? { label: coll > 0 ? COLL_VERB.add : COLL_VERB.withdraw, axisVerb: true }
+            : {}),
     });
 
   const debt = Number(ctx.debtDelta) || 0;
-  if (debt !== 0)
+  // A close takes the debt less the 200 LUSD reserve from the owner's wallet;
+  // the GasPool burns the reserve.
+  const isClose = ctx.eventType === "closeTrove";
+  if (debt !== 0 && isClose) {
+    const repaid = Math.max(0, Math.abs(debt) - LIQUITY_V1_RESERVE);
+    deltas.push({
+      value: -repaid,
+      symbol: DEBT_SYMBOL,
+      address: LIQUITY_V1_ADDRESSES.LUSD,
+      prov: closeRepaidProv(coords, ctx.debtBefore),
+    });
+  } else if (debt !== 0)
     deltas.push({
       value: debt,
       symbol: DEBT_SYMBOL,
-      address: soleFlowAddress(flows, DEBT_SYMBOL),
+      address: LIQUITY_V1_ADDRESSES.LUSD,
       prov: debtDeltaProv(coords, {
         after: ctx.debtAfter,
         before: ctx.debtAfter != null ? Number(ctx.debtAfter) - debt : null,
       }),
       ...(isRedemption
         ? { label: "Reduced", tone: "external" as const }
-        : perAxis
-          ? { label: debt > 0 ? DEBT_VERB.borrow : DEBT_VERB.repay, axisVerb: true }
-          : {}),
+        : isLiq
+          ? { label: "Cancelled", tone: "caution" as const }
+          : perAxis
+            ? { label: debt > 0 ? DEBT_VERB.borrow : DEBT_VERB.repay, axisVerb: true }
+            : {}),
     });
 
   return (

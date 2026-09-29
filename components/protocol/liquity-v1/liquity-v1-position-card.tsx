@@ -30,6 +30,9 @@ import { liquityV1PositionContent } from "@/lib/liquity-v1/position-content";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
+import type { LiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
+import { surplusClaimableProv, surplusUsdProv } from "@/lib/liquity-v1/event-provenance";
+import { formatUsdValue } from "@/lib/utils/format";
 
 export interface LiquityV1PositionView {
   wallet: string;
@@ -59,6 +62,8 @@ export function LiquityV1PositionCard({
   explanation,
   live = false,
   viewHref,
+  surplus,
+  priceUsd,
 }: {
   v: LiquityV1PositionView;
   receipts?: boolean;
@@ -77,6 +82,12 @@ export function LiquityV1PositionCard({
   /** Copy-this-view control, forwarded straight through to `PositionCardShell` —
    *  the page's `useTimelineEvents().viewHref`. */
   viewHref?: () => string;
+  /** A closed life's ETH left in the CollSurplusPool (a full redemption, or a
+   *  capped Recovery Mode liquidation), read at the head. Unclaimed, it leads
+   *  the card, as on Liquity V2. */
+  surplus?: LiquityV1Surplus | null;
+  /** The PriceFeed price now, to value the claimable ETH. */
+  priceUsd?: number | null;
 }) {
   // The protocol name is redundant inside the Liquity V1 explorer, so the
   // wallet pill leads (facehash + copy + bookmark — buttons, not anchors, so
@@ -101,6 +112,8 @@ export function LiquityV1PositionCard({
   // closed-epoch narration); rowExtra deliberately does not — the compact live
   // strips describe the chain NOW and never ride a past life's card.
   if (v.status === "closed" || v.status === "liquidated") {
+    const claimable = surplus && surplus.claimable > 1e-9 ? surplus : null;
+    const claimableUsd = claimable && priceUsd != null && priceUsd > 0 ? claimable.claimable * priceUsd : null;
     return (
       <PositionCardShell
         receipts={receipts}
@@ -113,8 +126,26 @@ export function LiquityV1PositionCard({
           leadingIdentity={walletId}
           identity={meta}
           closedAt={v.lastActivityAt}
+          collateralLabel={claimable ? "Claimable collateral" : undefined}
+          collateralFootnote={
+            claimable && claimableUsd != null ? (
+              <div className="text-xs mt-0.5 min-h-[1rem]">
+                <span className="inline-flex items-center font-bold text-green-400 border-l-2 border-r-2 border-green-400 rounded-sm px-1 py-0">
+                  <Prov info={surplusUsdProv(claimable.claimable, priceUsd as number)}>
+                    {formatUsdValue(claimableUsd)}
+                  </Prov>
+                </span>
+              </div>
+            ) : undefined
+          }
           collateral={
-            v.peakCollateral > 0 ? (
+            claimable ? (
+              <StatValue>
+                <Prov info={surplusClaimableProv(claimable)}>
+                  <AssetAmount value={claimable.claimable} symbol={COLLATERAL_SYMBOL} />
+                </Prov>
+              </StatValue>
+            ) : v.peakCollateral > 0 ? (
               <StatValue>
                 <Prov info={peakCollateralProv()}>
                   <AssetAmount value={v.peakCollateral} symbol={COLLATERAL_SYMBOL} />
@@ -125,7 +156,7 @@ export function LiquityV1PositionCard({
             )
           }
           debt={
-            v.peakDebt > 0 ? (
+            claimable ? undefined : v.peakDebt > 0 ? (
               <StatValue>
                 <Prov info={peakDebtProv()}>
                   <AssetAmount value={v.peakDebt} symbol={DEBT_SYMBOL} />
