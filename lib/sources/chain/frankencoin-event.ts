@@ -37,6 +37,17 @@
 //     returned, the debt burned, a shortfall the reserve covered (Loss) or an
 //     excess paid to the owner, and the reserve share the burn released.
 //   • creation handover: whether the new owner is a contract.
+//   • forced sale (MintingHubV2.buyExpiredCollateral → PositionV2.forceSale):
+//     the buyer, the collateral sold and the price per unit (the ForcedSale
+//     log), the cost the hub charged (price × amount, as the hub computes it),
+//     and which of forceSale's branches ran, read from its ZCHF transfers —
+//     full repayment (the reserve sends the buyer the assigned reserve share,
+//     the debt is burned from the buyer, the rest goes to the owner), partial
+//     repayment (the proceeds go to the position and repay what they can), a
+//     shortfall (the reserve's coverLoss pays the rest, Loss), or no debt (the
+//     whole price goes to the owner). The terms that set the price — declared
+//     price, expiration, challenge period — and the debt and reserve
+//     percentage are read one block earlier, in one multicall.
 //
 // A mined receipt never changes, so the route caches the answer hard.
 //
@@ -61,6 +72,15 @@ const POSITION_READS = parseAbi([
   "function owner() view returns (address)",
   "function collateral() view returns (address)",
   "function challengeData() view returns (uint256 liqPrice, uint40 phase)",
+]);
+const POSITION_V2_TERMS = parseAbi([
+  "function price() view returns (uint256)",
+  "function expiration() view returns (uint40)",
+  "function challengePeriod() view returns (uint40)",
+  "function minted() view returns (uint256)",
+  "function reserveContribution() view returns (uint24)",
+  "function owner() view returns (address)",
+  "function collateral() view returns (address)",
 ]);
 const HUB_V2_READS = parseAbi([
   "function challenges(uint256) view returns (address challenger, uint40 start, address position, uint256 size)",
@@ -145,6 +165,49 @@ export interface FrankencoinSaleRead {
   phase: number | null;
 }
 
+/** An expired position's collateral bought through the V2 hub. */
+export interface FrankencoinForcedSaleRead {
+  kind: "forced";
+  /** Who bought: the recipient of the position's collateral, or (nothing
+   *  sold) the account the hub charged. */
+  buyer: string | null;
+  buyerIsContract: boolean | null;
+  /** The position's owner one block earlier. */
+  owner: string | null;
+  /** Collateral sold, raw units (the ForcedSale log's amount). */
+  soldRaw: string;
+  /** Price per unit, raw (1e(36 − collateral decimals)), from the ForcedSale log. */
+  priceRaw: string;
+  /** What the hub charged: price × amount ÷ 1e18, as MintingHubV2 computes it. */
+  cost: string;
+  /** Which branch of PositionV2.forceSale ran. */
+  branch: "full" | "partial" | "shortfall" | "noDebt";
+  /** Debt burned. */
+  debtCleared: string;
+  /** Full repayment: the assigned reserve share the reserve sent the buyer. */
+  reserveToBuyer: string;
+  /** ZCHF the buyer sent the owner. */
+  ownerReceived: string;
+  /** Partial repayment: ZCHF the buyer sent the position. */
+  toPosition: string;
+  /** Partial repayment (collateral left): the reserve share the reserve
+   *  released toward the repayment. */
+  reserveFreed: string;
+  /** Shortfall: the Loss the position reported, the ZCHF the reserve sent,
+   *  the ZCHF minted when the reserve ran short, and the reserve share the
+   *  burn released (Profit). */
+  loss: string;
+  lossFromReserve: string;
+  lossMinted: string;
+  reserveReleased: string | null;
+  /** Read one block earlier. */
+  liqPriceRaw: string | null;
+  expiration: number | null;
+  challengePeriod: number | null;
+  mintedBefore: string | null;
+  reservePPM: number | null;
+}
+
 export interface FrankencoinEventRead {
   txHash: string;
   blockNumber: number;
@@ -180,6 +243,7 @@ export interface FrankencoinEventRead {
    *  start the interest runs from. */
   rate: { annualInterestPPM: number; expiration: number; start: number } | null;
   challenge: FrankencoinAvertRead | FrankencoinSaleRead | null;
+  forced: FrankencoinForcedSaleRead | null;
   /** A creation handover: whether the new owner holds contract code now. */
   newOwnerIsContract: boolean | null;
 }
@@ -301,6 +365,9 @@ export async function readFrankencoinEvent(
     (eq(l.address, FRANKENCOIN_ADDRESSES.HUB_V2) || eq(l.address, FRANKENCOIN_ADDRESSES.HUB_V1)) &&
     HUB_CLOSING_TOPICS.has((l.topics[0] ?? "").toLowerCase());
   const isChallengeKind = kind === "challenge_averted" || kind === "challenge_succeeded";
+  const isForcedSale = kind === "forced_sale";
+  // A hub row's ZCHF is read by its own reader, not as a mint or a repayment.
+  const isHubKind = isChallengeKind || isForcedSale;
 
   // The other positions this transaction updated, and whether each ended empty.
   const others = new Map<string, boolean>();
@@ -313,7 +380,7 @@ export async function readFrankencoinEvent(
   // The window of logs that belong to this event.
   let windowLogs: Log[] = receipt.logs;
   if (own != null && Number.isFinite(own)) {
-    const closing = isChallengeKind ? isHubClosing : isMintingUpdate;
+    const closing = isHubKind ? isHubClosing : isMintingUpdate;
     const prev = receipt.logs.filter((l) => logIdx(l) < own && closing(l)).map(logIdx);
     const lo = prev.length > 0 ? Math.max(...prev) : -1;
     windowLogs = receipt.logs.filter((l) => logIdx(l) > lo && logIdx(l) <= own);
@@ -372,7 +439,7 @@ export async function readFrankencoinEvent(
     .catch(() => null);
 
   // A mint's terms at that block.
-  const minted = !blank && mintedOut > ZERO && !isChallengeKind;
+  const minted = !blank && mintedOut > ZERO && !isHubKind;
   const rateP = minted
     ? Promise.all([
         readAt<number>(position, POSITION_READS, "annualInterestPPM", block),
@@ -387,15 +454,17 @@ export async function readFrankencoinEvent(
 
   const challengeP =
     isChallengeKind && own != null ? readChallenge(receipt.logs, windowLogs, transfers, position, block, kind) : null;
+  const forcedP = isForcedSale && own != null ? readForcedSale(receipt.logs, position, block) : null;
 
   const ownerP = kind === "ownership_transferred" && opts.newOwner ? isContract(opts.newOwner) : Promise.resolve(null);
 
   const rollerP = others.size > 0 ? v2Roller() : Promise.resolve(null);
 
-  const [blockTimestamp, rate, challenge, newOwnerIsContract, roller] = await Promise.all([
+  const [blockTimestamp, rate, challenge, forced, newOwnerIsContract, roller] = await Promise.all([
     blockP,
     rateP,
     challengeP ?? Promise.resolve(null),
+    forcedP ?? Promise.resolve(null),
     ownerP,
     rollerP,
   ]);
@@ -408,23 +477,22 @@ export async function readFrankencoinEvent(
     shared,
     otherPositions: [...others].map(([p, emptied]) => ({ position: p, emptied })),
     viaRoller: roller != null && receipt.to != null && eq(receipt.to, roller),
-    mintedOut: fig(isChallengeKind ? ZERO : mintedOut),
-    mintedOutTo: blank || isChallengeKind ? null : mintedOutTo,
-    mintedToReserve: fig(isChallengeKind ? ZERO : sum((t) => t.from === ZERO_ADDR && t.to === reserve)),
+    mintedOut: fig(isHubKind ? ZERO : mintedOut),
+    mintedOutTo: blank || isHubKind ? null : mintedOutTo,
+    mintedToReserve: fig(isHubKind ? ZERO : sum((t) => t.from === ZERO_ADDR && t.to === reserve)),
     interest:
-      blank || isChallengeKind || profits.length === 0
+      blank || isHubKind || profits.length === 0
         ? null
         : units(profits.reduce((s, d) => s + (d.args.amount as bigint), ZERO)),
-    burnedFromPayer: fig(isChallengeKind ? ZERO : sumOf(burns)),
-    payer: blank || isChallengeKind ? null : payer,
+    burnedFromPayer: fig(isHubKind ? ZERO : sumOf(burns)),
+    payer: blank || isHubKind ? null : payer,
     reserveReturned: fig(
-      isChallengeKind
-        ? ZERO
-        : sum((t) => t.from === reserve && t.to !== ZERO_ADDR && (burner == null || t.to === burner)),
+      isHubKind ? ZERO : sum((t) => t.from === reserve && t.to !== ZERO_ADDR && (burner == null || t.to === burner)),
     ),
-    burnedFromReserve: fig(isChallengeKind ? ZERO : sum((t) => t.from === reserve && t.to === ZERO_ADDR)),
+    burnedFromReserve: fig(isHubKind ? ZERO : sum((t) => t.from === reserve && t.to === ZERO_ADDR)),
     rate,
     challenge,
+    forced,
     newOwnerIsContract,
   };
 
@@ -534,6 +602,111 @@ export async function readFrankencoinEvent(
       liqPriceRaw,
       challengeStart,
       phase,
+    };
+  }
+
+  // An expired position's collateral bought through the hub. The ForcedSale
+  // log closes the call; before it, PositionV2.forceSale sends the collateral,
+  // moves the ZCHF and emits the position's MintingUpdate.
+  async function readForcedSale(all: Log[], pos: string, blk: bigint): Promise<FrankencoinForcedSaleRead | null> {
+    const hubLog = all.find((l) => logIdx(l) === own);
+    if (!hubLog || !eq(hubLog.address, FRANKENCOIN_ADDRESSES.HUB_V2)) return null;
+    // ForcedSale(address pos, uint256 amount, uint256 priceE36MinusDecimals), none indexed.
+    const words = (hubLog.data.slice(2).match(/.{64}/g) ?? []).map((w) => BigInt(`0x${w}`));
+    if (words.length < 3) return null;
+    const amount = words[1];
+    const priceRaw = words[2];
+    const terms = await alchemyClient()
+      .multicall({
+        contracts: (
+          ["price", "expiration", "challengePeriod", "minted", "reserveContribution", "owner", "collateral"] as const
+        ).map((functionName) => ({ address: getAddress(pos), abi: POSITION_V2_TERMS, functionName })),
+        blockNumber: blk - BigInt(1),
+        allowFailure: true,
+      })
+      .catch(() => null);
+    const at = <T>(i: number): T | null => (terms && terms[i]?.status === "success" ? (terms[i].result as T) : null);
+    const liq = at<bigint>(0);
+    const expiration = at<number>(1);
+    const period = at<number>(2);
+    const mintedBefore = at<bigint>(3);
+    const ppm = at<number>(4);
+    const ownerAddr = at<string>(5)?.toLowerCase() ?? null;
+    const collToken = at<string>(6);
+
+    // The call's own logs: from the position's collateral transfer to the
+    // ForcedSale log; with nothing sold, the ZCHF and position logs that sit
+    // right before it.
+    const earlier = all.filter((l) => logIdx(l) < (own as number)).sort((a, b) => logIdx(a) - logIdx(b));
+    const collOut = collToken ? transfersOf(earlier, collToken).filter((t) => eq(t.from, pos)) : [];
+    let lo: number;
+    if (collOut.length > 0) lo = collOut[collOut.length - 1].logIndex - 1;
+    else {
+      let i = earlier.length - 1;
+      while (i >= 0 && (eq(earlier[i].address, FRANKENCOIN_ADDRESSES.ZCHF) || eq(earlier[i].address, pos))) i--;
+      lo = i >= 0 ? logIdx(earlier[i]) : -1;
+    }
+    const win = all.filter((l) => logIdx(l) > lo && logIdx(l) <= (own as number));
+    const coll = collToken ? transfersOf(win, collToken).filter((t) => eq(t.from, pos)) : [];
+    const zl = decodeZchf(win);
+    const moves = transfersOf(win, FRANKENCOIN_ADDRESSES.ZCHF);
+    const p = pos.toLowerCase();
+    let buyer = coll.length === 1 ? coll[0].to : null;
+    if (buyer == null) {
+      const paidOwner = ownerAddr ? moves.filter((t) => t.to === ownerAddr && t.from !== reserve) : [];
+      buyer = paidOwner.length === 1 ? paidOwner[0].from : receipt.from.toLowerCase();
+    }
+    const b = buyer;
+    const total = (pred: (t: Move) => boolean) => sumOf(moves.filter(pred));
+    const reserveToBuyer = total((t) => t.from === reserve && t.to === b);
+    const burnBuyer = total((t) => t.from === b && t.to === ZERO_ADDR);
+    const ownerReceived = ownerAddr ? total((t) => t.from === b && t.to === ownerAddr) : ZERO;
+    const toPosition = total((t) => t.from === b && t.to === p);
+    const reserveToPos = total((t) => t.from === reserve && t.to === p);
+    const mintToPos = total((t) => t.from === ZERO_ADDR && t.to === p);
+    const burnPos = total((t) => t.from === p && t.to === ZERO_ADDR);
+    const loss = zl
+      .filter((d) => d.name === "Loss" && eq(d.args.reportingMinter as string, p))
+      .reduce((s, d) => s + (d.args.amount as bigint), ZERO);
+    const lastBurn = moves.filter((t) => t.from === p && t.to === ZERO_ADDR).map((t) => t.logIndex);
+    const release =
+      lastBurn.length > 0
+        ? zl.find(
+            (d) => d.name === "Profit" && d.logIndex > Math.max(...lastBurn) && eq(d.args.reportingMinter as string, p),
+          )
+        : undefined;
+    const branch: FrankencoinForcedSaleRead["branch"] =
+      loss > ZERO
+        ? "shortfall"
+        : toPosition > ZERO || burnPos > ZERO
+          ? "partial"
+          : burnBuyer > ZERO
+            ? "full"
+            : "noDebt";
+    const buyerIsContract = await isContract(buyer);
+    return {
+      kind: "forced",
+      buyer,
+      buyerIsContract,
+      owner: ownerAddr,
+      soldRaw: amount.toString(),
+      priceRaw: priceRaw.toString(),
+      cost: units((priceRaw * amount) / BigInt("1000000000000000000")),
+      branch,
+      debtCleared: units(branch === "full" ? burnBuyer : burnPos),
+      reserveToBuyer: units(reserveToBuyer),
+      ownerReceived: units(ownerReceived),
+      toPosition: units(toPosition),
+      reserveFreed: units(branch === "partial" ? reserveToPos : ZERO),
+      loss: units(loss),
+      lossFromReserve: units(branch === "shortfall" ? reserveToPos : ZERO),
+      lossMinted: units(mintToPos),
+      reserveReleased: release ? units(release.args.amount as bigint) : null,
+      liqPriceRaw: liq != null ? liq.toString() : null,
+      expiration: expiration != null ? Number(expiration) : null,
+      challengePeriod: period != null ? Number(period) : null,
+      mintedBefore: mintedBefore != null ? units(mintedBefore) : null,
+      reservePPM: ppm != null ? Number(ppm) : null,
     };
   }
 }

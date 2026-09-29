@@ -35,7 +35,7 @@ import { formatUnitsExact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { latestAbsoluteProv, peakAbsoluteProv } from "@/lib/frankencoin/event-provenance";
+import { soldPeakProv, latestAbsoluteProv, peakAbsoluteProv } from "@/lib/frankencoin/event-provenance";
 import {
   liveMintedProv,
   liveCollateralProv,
@@ -85,6 +85,17 @@ export interface FrankencoinPositionView {
   basis: "chain" | "index";
   /** The position's fixed annual interest (ppm) — chain lane only. */
   annualInterestPPM: number | null;
+}
+
+/** How a terminal position ended, from its timeline: the forced sale that
+ *  sold its collateral and the denial, each with its time. */
+export interface FrankencoinEnding {
+  /** The forced sale that sold collateral (the last one that did). */
+  forcedAt: number | null;
+  /** The most collateral one transaction's sales sold (a forced sale or a
+   *  challenge's slices), whole units. */
+  soldMost: number | null;
+  deniedAt: number | null;
 }
 
 /** The card's lifecycle vocabulary: the API's three + the chain-only
@@ -221,7 +232,10 @@ export function FrankencoinPositionCard({
   viewHref,
   surface = "detail",
   cloneParent,
+  ending,
 }: {
+  /** How a terminal position ended, where the timeline says. */
+  ending?: FrankencoinEnding | null;
   v: FrankencoinPositionView;
   /** The position a clone was cloned from (PositionOpened's parent), where the
    *  timeline has it; `v.original` is the family's original. */
@@ -249,29 +263,70 @@ export function FrankencoinPositionCard({
   // its height — lifetime maxima where the index carries them, an explicit
   // dash otherwise (never a fabricated figure).
   if (v.status === "closed" || v.status === "denied" || v.status === "expired") {
+    const forcedAt = ending?.forcedAt ?? null;
+    const deniedAt = v.status === "denied" ? (ending?.deniedAt ?? null) : null;
+    // The outcome names how it ended: a denial on its date, a forced sale on
+    // the sale's date. A denied position later force-sold says so beside it.
+    const outcomeLabel = v.status === "closed" && forcedAt != null ? "Forced sale" : undefined;
+    const closedAt = deniedAt ?? (v.status === "closed" && forcedAt != null ? forcedAt : v.lastActivityAt);
+    const extra =
+      v.status === "denied" && forcedAt != null
+        ? {
+            label: "Then",
+            value: (
+              <>
+                <div className="text-lg font-bold mt-2 text-rb-500">Forced sale</div>
+                <div className="text-xs text-rb-500 mt-0.5">{formatDate(forcedAt)}</div>
+              </>
+            ),
+          }
+        : {
+            label: "Challenges",
+            value: (
+              <div className="text-lg font-bold mt-2 text-rb-500">
+                {v.challengeCount === 0 ? "Never challenged" : v.challengeCount}
+              </div>
+            ),
+          };
+    // Collateral the ledger never recorded (deposited without a MintingUpdate)
+    // still shows as the amount a sale sold.
+    const peakCollateral =
+      v.peakCollateral != null && v.peakCollateral > 0 ? v.peakCollateral : (ending?.soldMost ?? null);
+    const peakFromSale = !(v.peakCollateral != null && v.peakCollateral > 0) && peakCollateral != null;
     return (
       <PositionCardShell
         receipts={receipts}
         rowExtra={rowExtra}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={frankencoinPositionContent({ status: v.status })}
+        learnMore={frankencoinPositionContent({ status: v.status, forcedSale: forcedAt != null })}
       >
         <ClosedPositionStats
           outcome={v.status}
+          outcomeLabel={outcomeLabel}
+          extra={extra}
           leadingIdentity={<IdentityLead v={v} cloneParent={cloneParent} />}
           identity={<MetaCluster v={v} />}
-          closedAt={v.lastActivityAt ?? undefined}
+          closedAt={closedAt ?? undefined}
           collateral={
-            v.peakCollateral != null && v.peakCollateral > 0 ? (
+            peakCollateral != null && peakCollateral > 0 ? (
               <StatValue>
-                <Prov info={peakAbsoluteProv("collateral", v.collateralSymbol)}>
-                  <AssetAmount value={v.peakCollateral} symbol={v.collateralSymbol} />
+                <Prov
+                  info={
+                    peakFromSale ? soldPeakProv(v.collateralSymbol) : peakAbsoluteProv("collateral", v.collateralSymbol)
+                  }
+                >
+                  <AssetAmount value={peakCollateral} symbol={v.collateralSymbol} />
                 </Prov>
               </StatValue>
             ) : (
               <StatDash />
             )
+          }
+          collateralFootnote={
+            peakFromSale ? (
+              <StatFootnote>{forcedAt != null ? "sold in its forced sale" : "sold in a challenge"}</StatFootnote>
+            ) : undefined
           }
           debt={
             v.peakMinted != null && v.peakMinted > 0 ? (

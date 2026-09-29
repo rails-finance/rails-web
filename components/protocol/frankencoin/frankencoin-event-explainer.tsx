@@ -20,7 +20,9 @@ import {
   frankencoinOwnershipContent,
   frankencoinChallengeContent,
   frankencoinLifecycleContent,
+  frankencoinForcedSaleContent,
   frankencoinEventFallbackContent,
+  type FrankencoinModalForcedSale,
 } from "@/lib/shared/learn-more-content";
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { frankencoinEventSlots } from "@/lib/frankencoin/explainer-clauses";
@@ -46,7 +48,15 @@ export interface FrankencoinEventExplainerProps {
 export function frankencoinLearnMoreContent(
   ctx: FrankencoinContext,
   facts?: FrankencoinPageFacts | null,
+  txHash?: string,
+  forcedExample?: FrankencoinModalForcedSale | null,
 ): LearnMoreContent {
+  const forcedTx = txHash != null && (facts?.txKinds[txHash] ?? []).includes("forced_sale");
+  const forced = () =>
+    frankencoinForcedSaleContent({ phase: facts?.challengePeriod ?? null, example: forcedExample ?? null });
+  // A combined adjust that moves the declared price changes the position's
+  // terms: the price modal explains the raise and its minting pause.
+  const priceMoved = ctx.liqPrice != null && ctx.liqPriceBefore != null && ctx.liqPrice !== ctx.liqPriceBefore;
   switch (ctx.eventType) {
     case "open":
       return frankencoinCreationContent("open");
@@ -55,6 +65,7 @@ export function frankencoinLearnMoreContent(
     case "ownership_transferred":
       return ctx.initialization ? frankencoinCreationContent("handover") : frankencoinOwnershipContent();
     case "adjust":
+      return priceMoved ? frankencoinPriceContent() : frankencoinMintingContent();
     case "mint":
     case "repay":
     case "add_collateral":
@@ -66,13 +77,15 @@ export function frankencoinLearnMoreContent(
     case "challenge_averted":
     case "challenge_succeeded":
     case "auction_settlement":
+      if (ctx.eventType === "auction_settlement" && forcedTx) return forced();
       return frankencoinChallengeContent({
         phase: facts?.challengePeriod ?? null,
         example: facts?.saleExample ?? null,
       });
+    case "forced_sale":
+      return forced();
     case "denied":
     case "close":
-    case "forced_sale":
       return frankencoinLifecycleContent();
     default:
       return frankencoinEventFallbackContent();

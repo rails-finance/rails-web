@@ -30,10 +30,11 @@ const intro = (
       A position&apos;s own page opens on a card: what the position holds and owes now, its declared price, its interest
       rate and its expiry, with a plain-language explanation behind the info button. Lifetime flows add up the ZCHF it
       has minted and repaid and the collateral it has deposited and withdrawn. The timeline lists every event, newest
-      first; one transaction can record several. Open an event for its figures before and after, and for a mint or a
-      repayment the ZCHF the wallet received or paid. Its info button says what happened in words, and its ? explains
-      that kind of event, with the Frankencoin docs pages it rests on. The debt is always the gross amount minted: the
-      wallet receives less, because the reserve share and the interest for the remaining term are taken at minting.
+      first; one transaction can record several. Open an event for its figures before and after; for a mint or a
+      repayment, the ZCHF the wallet received or paid; for a challenge sale or a forced sale, the buyer, the price and
+      where the ZCHF went. Its info button says what happened in words, and its ? explains that kind of event, with the
+      Frankencoin docs pages it rests on. The debt is always the gross amount minted: the wallet receives less, because
+      the reserve share and the interest for the remaining term are taken at minting.
     </p>
   </>
 );

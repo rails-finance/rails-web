@@ -33,10 +33,19 @@ import {
   challengeReceiptProv,
   type FrankencoinCoords,
 } from "@/lib/frankencoin/event-provenance";
-import { formatExact, formatNumber } from "@/lib/utils/format";
+import { formatExact, formatNumber, formatUnitsExact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { hubAddress, shortAddress } from "@/lib/frankencoin/asset-catalog";
-import { fmtFcColl, fmtFcPct, fmtFcPrice, fmtZchf, termText } from "@/lib/frankencoin/figures";
+import {
+  fmtFcColl,
+  fmtFcPct,
+  fmtFcPrice,
+  fmtMultiple,
+  fmtZchf,
+  forcedCurvePoint,
+  groupExact,
+  termText,
+} from "@/lib/frankencoin/figures";
 import { frankencoinZchfSplit, useFrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
 import { dateTimeText, phaseText, spanText, useFrankencoinPageFacts } from "@/lib/frankencoin/page-facts";
 import { formatDate } from "@/lib/date";
@@ -290,14 +299,103 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber, eventId, time
       break;
     }
     case "forced_sale": {
+      const f = read?.forced ?? null;
+      const sold = num(ctx.forcedSaleAmount);
       if (ctx.forcedSaleAmount != null)
         stats.push({
           label: "Collateral sold",
-          value: fmtFcColl(num(ctx.forcedSaleAmount)),
-          display: fmtFcColl(num(ctx.forcedSaleAmount)),
+          value: fmtFcColl(sold),
+          display: fmtFcColl(sold),
           symbol: sym,
           prov: forcedSaleProv(sym, coords, ctx.raw?.size),
+          sub: f?.buyer ? (
+            <Prov info={challengeReceiptProv("forcedBuyer", sym, coords, f.buyer)} value={f.buyer}>
+              <span>
+                {sold > 0 ? "to" : "called by"} {shortAddress(f.buyer)} ·{" "}
+                {partyKind(f.buyer, f.owner, f.buyerIsContract, null)}
+              </span>
+            </Prov>
+          ) : undefined,
         });
+      if (f && sold > 0) {
+        const unit = scaled(f.priceRaw, 36 - dec);
+        const liq = f.liqPriceRaw != null ? scaled(f.liqPriceRaw, 36 - dec) : null;
+        const curve =
+          f.expiration != null && f.challengePeriod != null && timestamp != null
+            ? forcedCurvePoint(timestamp, f.expiration, f.challengePeriod, unit, liq)
+            : null;
+        stats.push({
+          label: `Price · ZCHF per ${sym}`,
+          value: groupExact(formatUnitsExact(f.priceRaw, 36 - dec)),
+          display: fmtFcPrice(unit),
+          symbol: "",
+          prov: challengeReceiptProv("forcedPrice", sym, coords, f.priceRaw),
+          sub: curve ? (
+            <>
+              {curve.multiple != null && liq != null && unit > 0 ? (
+                <>
+                  {fmtMultiple(curve.multiple)} the declared {fmtFcPrice(liq)} ·{" "}
+                </>
+              ) : null}
+              {spanText(curve.since)} after expiry
+            </>
+          ) : undefined,
+        });
+        const cost = Number(f.cost);
+        stats.push({
+          label: "Buyer paid",
+          value: groupExact(f.cost),
+          display: fmtZchf(cost),
+          symbol: "ZCHF",
+          prov: challengeReceiptProv("forcedCost", sym, coords, f.cost),
+        });
+        const debt = Number(f.debtCleared);
+        if (debt > 0 || (f.mintedBefore != null && Number(f.mintedBefore) > 0))
+          stats.push({
+            label: "Debt cleared",
+            value: groupExact(f.debtCleared),
+            display: fmtZchf(debt),
+            symbol: "ZCHF",
+            prov: challengeReceiptProv("forcedDebt", sym, coords, f.debtCleared),
+            sub:
+              Number(f.reserveToBuyer) > 0 ? (
+                <Prov
+                  info={challengeReceiptProv("forcedReserveToBuyer", sym, coords, f.reserveToBuyer)}
+                  value={fmtZchf(Number(f.reserveToBuyer))}
+                >
+                  <span className="tabular-nums">
+                    reserve share {fmtZchf(Number(f.reserveToBuyer))} released to the buyer
+                  </span>
+                </Prov>
+              ) : undefined,
+          });
+        const loss = Number(f.loss);
+        if (loss > 0)
+          stats.push({
+            label: "Shortfall",
+            value: fmtZchf(loss),
+            display: fmtZchf(loss),
+            symbol: "ZCHF",
+            prov: challengeReceiptProv("forcedShortfall", sym, coords, f.loss),
+            sub:
+              f.reserveReleased != null && Number(f.reserveReleased) > 0 ? (
+                <>
+                  from the reserve, against this position&rsquo;s {fmtZchf(Number(f.reserveReleased))} ZCHF reserve
+                  share
+                </>
+              ) : (
+                <>from the reserve</>
+              ),
+          });
+        stats.push({
+          label: "Owner received",
+          value: groupExact(f.ownerReceived),
+          display: fmtZchf(Number(f.ownerReceived)),
+          symbol: "ZCHF",
+          prov: challengeReceiptProv("forcedOwner", sym, coords, f.ownerReceived),
+          changed: Number(f.ownerReceived) > 0,
+        });
+      } else if (!f && pending) stats.push(readingStat(coords, sym));
       break;
     }
     case "ownership_transferred": {

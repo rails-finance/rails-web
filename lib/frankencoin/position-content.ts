@@ -17,10 +17,19 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 
 const FRANKENCOIN_DOC_URL = "https://docs.frankencoin.com";
 
+/** The forced sale that ended a position, in the card's modal. */
+const FORCED_SALE_DETAIL = {
+  bold: "Expiry and the forced sale",
+  text: "once a Minting Hub V2 position passes its expiration, anyone can buy its collateral through the hub at a price that starts at 10× the declared price and falls to zero over two challenge periods. The payment repays the debt, the reserve share goes to the buyer toward it, and the rest goes to the owner; a shortfall comes out of the reserve. This position's Forced Sale rows show its sale.",
+  sources: [{ label: "expiry and the forced sale", url: `${FRANKENCOIN_DOC_URL}/risks` }],
+};
+
 export function frankencoinPositionContent(opts: {
   status: "open" | "closed" | "denied" | "expired";
+  /** It ended by a forced sale after expiry. */
+  forcedSale?: boolean;
 }): LearnMoreContent {
-  const { status } = opts;
+  const { status, forcedSale = false } = opts;
 
   if (status === "denied") {
     return {
@@ -39,6 +48,7 @@ export function frankencoinPositionContent(opts: {
           text: "only original positions carry a veto window. A clone uses an accepted original's terms and limit, and can mint at once.",
           sources: [{ label: "cloning a position", url: `${FRANKENCOIN_DOC_URL}/positions/clone` }],
         },
+        ...(forcedSale ? [FORCED_SALE_DETAIL] : []),
       ],
       links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],
     };
@@ -67,8 +77,9 @@ export function frankencoinPositionContent(opts: {
   if (status === "closed") {
     return {
       title: "About This Position",
-      intro:
-        "This position is closed: it holds no collateral and owes no ZCHF. The panel above shows its lifetime peaks — the most collateral and minted ZCHF it ever held.",
+      intro: forcedSale
+        ? "This position is closed: a forced sale after its expiration sold its collateral and cleared its debt. The panel above shows its lifetime peaks — the most collateral and minted ZCHF it ever held."
+        : "This position is closed: it holds no collateral and owes no ZCHF. The panel above shows its lifetime peaks — the most collateral and minted ZCHF it ever held.",
       detailsHeading: "Key concepts:",
       details: [
         {
@@ -80,6 +91,7 @@ export function frankencoinPositionContent(opts: {
           text: "a fixed share of every mint was held in the system reserve and released as the position repaid: in full while the reserve covered every position's share, in proportion when losses had drawn it down. A challenge sale that fell short of the debt was paid out of this share first.",
           sources: [{ label: "the reserve", url: `${FRANKENCOIN_DOC_URL}/reserve` }],
         },
+        ...(forcedSale ? [FORCED_SALE_DETAIL] : []),
       ],
       links: [{ label: "Frankencoin docs", url: FRANKENCOIN_DOC_URL }],
     };

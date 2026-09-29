@@ -3728,6 +3728,87 @@ export function frankencoinChallengeContent(
   };
 }
 
+/** A forced sale on the position the modal is opened from, for a worked
+ *  example: the receipt's figures and the terms read one block earlier. */
+export interface FrankencoinModalForcedSale {
+  symbol: string;
+  /** Unix seconds. */
+  expiration: number;
+  /** One challenge period, seconds. */
+  period: number;
+  soldAt: number;
+  /** Price per unit and the declared price, ZCHF. */
+  unit: number;
+  declared: number | null;
+  sold: number;
+  cost: number;
+  /** The buyer, shortened. */
+  buyer: string | null;
+  branch: "full" | "partial" | "shortfall" | "noDebt";
+  debt: number;
+  reserveBack: number;
+  owner: number;
+  loss: number;
+}
+
+const fcDateTime = (unix: number): string => {
+  const d = new Date(unix * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCDate()} ${d.toLocaleString("en-GB", { month: "short", timeZone: "UTC" })} ${d.getUTCFullYear()}, ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
+};
+
+/** An expired position's collateral bought through the V2 hub. */
+export function frankencoinForcedSaleContent(
+  opts: { phase?: number | null; example?: FrankencoinModalForcedSale | null } = {},
+): LearnMoreContent {
+  const phase = opts.phase ?? null;
+  const len = phase != null && phase > 0 ? ` (${fcDays(phase)} on this position)` : "";
+  const ex = opts.example ?? null;
+  const example: string[] = [];
+  if (ex) {
+    const since = ex.soldAt - ex.expiration;
+    const stage = since <= ex.period ? "first" : since < 2 * ex.period ? "second" : "zero";
+    const days = Math.floor(since / 86400);
+    const when = since < 86400 * 2 ? fcMinutes(since) : `${days} days`;
+    const priceText =
+      stage === "zero" || ex.unit === 0
+        ? `${when} later, past both periods, the price was zero`
+        : `${when} later, in the ${stage} period, the price stood at ${fcNum(ex.unit)} ZCHF per ${ex.symbol}${
+            ex.declared ? ` (${fcNum(ex.unit / ex.declared)}× the declared ${fcNum(ex.declared)})` : ""
+          }`;
+    const money =
+      ex.branch === "full"
+        ? `${ex.reserveBack > 0 ? `The reserve sent the buyer the position's ${fcNum(ex.reserveBack, 2, 2)} ZCHF reserve share, the ` : "The "}${fcNum(ex.debt, 2, 2)} ZCHF debt was burned from the buyer, and the owner received the other ${fcNum(ex.owner, 2, 2)} ZCHF.`
+        : ex.branch === "shortfall"
+          ? `The payment fell short of the ${fcNum(ex.debt, 2, 2)} ZCHF debt, so the reserve paid ${fcNum(ex.loss, 2, 2)} ZCHF and the owner received nothing.`
+          : ex.branch === "partial"
+            ? `The payment repaid ${fcNum(ex.debt, 2, 2)} ZCHF of the debt and the owner received nothing.`
+            : ex.cost > 0
+              ? `The position had no debt, so the owner received all ${fcNum(ex.owner, 2, 2)} ZCHF.`
+              : "The position had no debt, so no ZCHF moved.";
+    example.push(
+      `On this position: it expired on ${fcDateTime(ex.expiration)}. ${priceText}, and ${ex.buyer ?? "a buyer"} bought ${fcNum(ex.sold, 8)} ${ex.symbol} for ${ex.cost > 0 ? `${fcNum(ex.cost, 2, 2)} ZCHF` : "nothing"}. ${money}`,
+    );
+  }
+  return {
+    title: "How a Forced Sale Works",
+    intro:
+      "Once a Minting Hub V2 position passes its expiration, anyone can buy its collateral through the hub at a price set by the time since expiry. The owner does not need to act, and no challenge is involved.",
+    stepsHeading: "The price and the money:",
+    steps: [
+      `First challenge period after expiry${len}: the price starts at 10× the declared liquidation price and falls in a straight line to 1× the declared price.`,
+      `Second challenge period${len}: the price falls from the declared price to zero. After that the collateral goes for nothing.`,
+      "Who may buy: anyone, the owner included, any amount up to all the collateral, at that moment's price. No forced sale can run while a challenge on the position is open.",
+      "Where the money goes: the payment repays the debt first. When the payment and the position's reserve share together cover the debt, the reserve sends that share to the buyer, the whole debt is burned from the buyer, and the rest of the price goes to the owner. When they fall short and the last collateral is sold, the reserve pays the difference (out of the position's reserve share first, then equity) and the owner receives nothing; while collateral remains, the payment repays what it can. A position with no debt pays the whole price to the owner.",
+    ],
+    extraParagraphs: example,
+    links: [
+      { label: "Expiry and the forced sale (Frankencoin docs)", url: FC_PAGE.risks },
+      { label: "How the reserve covers losses (Frankencoin docs)", url: FC_PAGE.reserve },
+    ],
+  };
+}
+
 export function frankencoinLifecycleContent(): LearnMoreContent {
   return {
     title: "A Frankencoin Position's Lifecycle",

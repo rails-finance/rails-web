@@ -24,7 +24,10 @@ import { FrankencoinEventDetail } from "./frankencoin-event-detail";
 import { FrankencoinEventExplainer, frankencoinLearnMoreContent } from "./frankencoin-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { useFrankencoinPageFacts } from "@/lib/frankencoin/page-facts";
-import { useFrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
+import { useFrankencoinEventRead, type FrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
+import type { FrankencoinForcedSaleFact } from "@/lib/frankencoin/page-facts";
+import type { FrankencoinModalForcedSale } from "@/lib/shared/learn-more-content";
+import { shortAddress } from "@/lib/frankencoin/asset-catalog";
 
 export interface FrankencoinEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "frankencoin"; data: FrankencoinContext } };
@@ -44,6 +47,18 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
   // The receipt read the teaser's lead can use (a new owner's kind); the same
   // request serves the grid and the explanation.
   const { read } = useFrankencoinEventRead(ctx, event.txHash, event.id);
+
+  // A settlement row in a forced sale's transaction belongs to that sale: it
+  // says so in its title and badge and opens the forced-sale modal, whose
+  // worked example is the position's own sale (the one that sold something).
+  const forcedTx = (facts?.txKinds[event.txHash] ?? []).includes("forced_sale");
+  const exampleSale = facts ? [...facts.forcedSales].reverse().find((f) => f.amount > 0) : undefined;
+  const { read: exampleRead } = useFrankencoinEventRead(
+    exampleSale?.ctx ?? ctx,
+    exampleSale?.txHash ?? event.txHash,
+    exampleSale?.eventId ?? event.id,
+  );
+  const forcedExample = exampleSale ? forcedModalExample(exampleSale, exampleRead) : null;
 
   const critical = ctx.eventType === "challenge_succeeded" || ctx.eventType === "denied";
   const caution =
@@ -148,7 +163,7 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
               ? "Collateral sold"
               : ctx.eventType === "denied"
                 ? "Denied"
-                : ctx.eventType === "auction_settlement"
+                : ctx.eventType === "auction_settlement" && !forcedTx
                   ? "Auction"
                   : "Forced sale"
         }
@@ -173,7 +188,9 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
       iconColumn={iconSlot}
       header={
         <FrankencoinEventHeader
-          actionLabel={event.actionLabel}
+          actionLabel={
+            ctx.eventType === "auction_settlement" && forcedTx ? "Forced Sale Settlement" : event.actionLabel
+          }
           ctx={ctx}
           timestamp={event.timestamp}
           txHash={event.txHash}
@@ -205,8 +222,35 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
       explainerLabel="Plain English"
       explainerTeaser={frankencoinExplainerTeaser(ctx, coords, event.timestamp, facts, event.txHash, read)}
       txHash={event.txHash}
-      learnMore={<LearnMore inline content={frankencoinLearnMoreContent(ctx, facts)} />}
+      learnMore={<LearnMore inline content={frankencoinLearnMoreContent(ctx, facts, event.txHash, forcedExample)} />}
       persistKey={`frankencoin:${event.id}`}
     />
   );
+}
+
+/** The forced-sale modal's worked example, from the sale's receipt read. */
+function forcedModalExample(
+  sale: FrankencoinForcedSaleFact,
+  read: FrankencoinEventRead | null,
+): FrankencoinModalForcedSale | null {
+  const f = read?.forced;
+  if (!f || f.expiration == null || f.challengePeriod == null) return null;
+  const dec = sale.ctx.collateralDecimals;
+  const scale = (raw: string, d: number) => Number(raw) / 10 ** d;
+  return {
+    symbol: sale.ctx.collateralSymbol,
+    expiration: f.expiration,
+    period: f.challengePeriod,
+    soldAt: sale.timestamp,
+    unit: scale(f.priceRaw, 36 - dec),
+    declared: f.liqPriceRaw != null ? scale(f.liqPriceRaw, 36 - dec) : null,
+    sold: scale(f.soldRaw, dec),
+    cost: Number(f.cost),
+    buyer: f.buyer ? shortAddress(f.buyer) : null,
+    branch: f.branch,
+    debt: Number(f.debtCleared),
+    reserveBack: Number(f.reserveToBuyer),
+    owner: Number(f.ownerReceived),
+    loss: Number(f.loss),
+  };
 }

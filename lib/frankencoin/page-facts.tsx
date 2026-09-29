@@ -4,10 +4,10 @@
 // when each challenge started and who started it (the averted and succeeded
 // rows name neither), the position's phase length (one challenge period), what
 // else each transaction recorded (a settlement row belongs to a challenge sale
-// or to a forced sale), and one sale from this position's own history to work
-// through in the challenge modal. Built from the timeline and the chain read;
-// a card rendered without the provider (the per-event share route) falls back
-// to the general wording.
+// or to a forced sale), the forced sales in order, and one sale from this
+// position's own history to work through in the challenge modal. Built from
+// the timeline and the chain read; a card rendered without the provider (the
+// per-event share route) falls back to the general wording.
 
 import { createContext, useContext } from "react";
 
@@ -33,6 +33,20 @@ export interface FrankencoinSaleExample {
   sold: number;
 }
 
+/** One forced sale on this position, oldest first. */
+export interface FrankencoinForcedSaleFact {
+  txHash: string;
+  timestamp: number;
+  blockNumber: number;
+  /** Collateral sold, whole units. */
+  amount: number;
+  /** The transaction's sender. */
+  caller: string | null;
+  /** The row itself, for its receipt read. */
+  eventId: string;
+  ctx: FrankencoinContext;
+}
+
 export interface FrankencoinPageFacts {
   challengePeriod: number | null;
   /** The family's original (the chain's original()), for a clone's lineage. */
@@ -42,6 +56,10 @@ export interface FrankencoinPageFacts {
   /** The kinds each transaction recorded, keyed by tx hash. */
   txKinds: Record<string, string[]>;
   saleExample: FrankencoinSaleExample | null;
+  forcedSales: FrankencoinForcedSaleFact[];
+  /** Collateral each transaction's sales sold (forced sale amounts and
+   *  challenge slices), whole units, keyed by tx hash. */
+  txSold: Record<string, number>;
 }
 
 const FactsContext = createContext<FrankencoinPageFacts | null>(null);
@@ -62,9 +80,28 @@ export function frankencoinPageFacts(
 ): FrankencoinPageFacts {
   const challenges: Record<string, FrankencoinChallengeFacts> = {};
   const txKinds: Record<string, string[]> = {};
+  const forcedSales: FrankencoinForcedSaleFact[] = [];
+  const txSold: Record<string, number> = {};
   for (const e of events) {
     const ctx = e.context.data;
     (txKinds[e.txHash] ??= []).push(ctx.eventType);
+    const sold =
+      ctx.eventType === "forced_sale"
+        ? Number(ctx.forcedSaleAmount ?? 0)
+        : ctx.eventType === "challenge_succeeded"
+          ? Number(ctx.acquiredCollateral ?? 0)
+          : 0;
+    if (sold > 0) txSold[e.txHash] = (txSold[e.txHash] ?? 0) + sold;
+    if (ctx.eventType === "forced_sale")
+      forcedSales.push({
+        txHash: e.txHash,
+        timestamp: e.timestamp,
+        blockNumber: e.blockNumber,
+        amount: Number(ctx.forcedSaleAmount ?? 0),
+        caller: ctx.txFrom ?? null,
+        eventId: e.id,
+        ctx,
+      });
     if (ctx.eventType === "challenge_started" && ctx.challengeNumber != null)
       challenges[challengeKey(ctx)] = { start: e.timestamp, challenger: ctx.challenger ?? null };
   }
@@ -94,5 +131,6 @@ export function frankencoinPageFacts(
       };
     }
   }
-  return { challengePeriod, familyOriginal, challenges, txKinds, saleExample };
+  forcedSales.sort((a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp);
+  return { challengePeriod, familyOriginal, challenges, txKinds, saleExample, forcedSales, txSold };
 }

@@ -19,10 +19,15 @@ import { ppmToPct, shortAddress } from "@/lib/frankencoin/asset-catalog";
 import { frankencoinZchfSplit, useFrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
 import { termText } from "@/lib/frankencoin/figures";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
+import { dateTimeText, spanText } from "@/lib/frankencoin/figures";
+import type { FrankencoinEnding } from "./frankencoin-position-card";
 import { formatDate } from "@/lib/date";
 import { AmountText } from "@/components/shared/amount-text";
 
 const dateOf = (unix: number): string => formatDate(unix);
+/** "23 h 39 min", "152 days". */
+const spanOf = (seconds: number): string =>
+  seconds >= 2 * 86400 ? `${Math.floor(seconds / 86400)} days` : spanText(seconds);
 
 /** How the timeline's events divide over the transactions: the total, and
  *  the transaction that recorded the most, described by what it recorded. */
@@ -43,8 +48,14 @@ export function FrankencoinPositionExplanation({
   eventTally,
   cloneParent,
   lastMint,
+  ending,
+  closedAt,
 }: {
   chain: FrankencoinChainResponse;
+  /** How a terminal position ended (the forced sale, the denial). */
+  ending?: FrankencoinEnding | null;
+  /** The position's last activity: when a closed position closed. */
+  closedAt?: number | null;
   /** The position a clone was cloned from (the timeline's PositionOpened
    *  parent); `chain.original` is the family's original. */
   cloneParent?: string | null;
@@ -207,11 +218,14 @@ export function FrankencoinPositionExplanation({
     );
   }
 
+  const forcedAt = ending?.forcedAt ?? null;
   if (denied) {
     bullets.push(
       <span key="denied">
-        The position was <H>denied</H> during its veto window: a holder of more than 1% of the governance votes vetoed
-        it. Minting is closed to it permanently; the collateral stays withdrawable by the owner.
+        The position was <H>denied</H> during its veto window
+        {ending?.deniedAt != null ? <>, on {dateOf(ending.deniedAt)}</> : null}: a holder of more than 1% of the
+        governance votes vetoed it. Minting is closed to it permanently.
+        {forcedAt == null && !chain.isClosed ? <> The collateral stays withdrawable by the owner.</> : null}
       </span>,
     );
   } else if (chain.mintingDisabledForGood && !chain.isClosed) {
@@ -226,10 +240,20 @@ export function FrankencoinPositionExplanation({
     const days = Math.round((chain.expiration - now) / 86400);
     bullets.push(
       <span key="expiry">
-        {chain.isClosed ? (
+        {chain.isClosed && forcedAt != null && forcedAt > chain.expiration ? (
+          <>
+            It expired on {dateTimeText(chain.expiration)}. From then anyone could buy its collateral through the hub,
+            and a <H>forced sale</H> did, {spanOf(forcedAt - chain.expiration)} later, closing it.
+          </>
+        ) : chain.isClosed && closedAt != null && closedAt > chain.expiration ? (
+          <>
+            Its terms ran to {dateOf(chain.expiration)}; it closed on {dateOf(closedAt)}, after that date.
+          </>
+        ) : chain.isClosed ? (
           <>
             Its terms ran to {dateOf(chain.expiration)}
-            {chain.expiration < now ? <>, a date now past</> : null}; it closed before then.
+            {chain.expiration < now ? <>, a date now past</> : null}
+            {closedAt != null ? <>; it closed before then, on {dateOf(closedAt)}</> : null}.
           </>
         ) : chain.expired ? (
           <>
@@ -301,10 +325,18 @@ export function FrankencoinPositionExplanation({
     );
   }
 
-  if (challengeCount === 0 && !chain.isClosed && !denied) {
+  if (challengeCount === 0 && !denied) {
     bullets.push(
       <span key="never-challenged">
-        It has <H>never been challenged</H>.
+        {chain.isClosed ? (
+          <>
+            It was <H>never challenged</H>.
+          </>
+        ) : (
+          <>
+            It has <H>never been challenged</H>.
+          </>
+        )}
       </span>,
     );
   }

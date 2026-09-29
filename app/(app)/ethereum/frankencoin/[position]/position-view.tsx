@@ -49,6 +49,7 @@ import {
   mergeChainAndSummary,
   viewFromSummary,
   type FrankencoinPositionView,
+  type FrankencoinEnding,
 } from "@/components/protocol/frankencoin/frankencoin-position-card";
 import {
   FrankencoinPositionExplanation,
@@ -245,6 +246,21 @@ export default function FrankencoinPositionView({
     return null;
   }, [frankEvents]);
 
+  // How a terminal position ended: the forced sale that sold its collateral
+  // and the denial, from the timeline.
+  const ending = useMemo<FrankencoinEnding | null>(() => {
+    const sold = pageFacts.forcedSales.filter((f) => f.amount > 0);
+    const last = sold[sold.length - 1];
+    const denied = frankEvents.find((e) => e.context.data.eventType === "denied");
+    const saleAmounts = Object.values(pageFacts.txSold);
+    if (!last && !denied && saleAmounts.length === 0) return null;
+    return {
+      forcedAt: last?.timestamp ?? null,
+      soldMost: saleAmounts.length > 0 ? Math.max(...saleAmounts) : null,
+      deniedAt: denied?.timestamp ?? null,
+    };
+  }, [pageFacts, frankEvents]);
+
   // How the timeline's events divide over the transactions, for the card's
   // counter sentence. Whole history only: a window's rows are not the count.
   const eventTally = useMemo<FrankencoinEventTally | null>(() => {
@@ -382,6 +398,7 @@ export default function FrankencoinPositionView({
             <FrankencoinPositionCard
               v={view}
               cloneParent={cloneParent}
+              ending={ending}
               receipts
               viewHref={tl.viewHref}
               // The context strip riding the heading-button row: the live
@@ -429,6 +446,8 @@ export default function FrankencoinPositionView({
                     eventTally={eventTally}
                     cloneParent={cloneParent}
                     lastMint={lastMint}
+                    ending={ending}
+                    closedAt={summary?.lastActivityAt ?? null}
                   />
                 ) : undefined
               }
@@ -439,7 +458,7 @@ export default function FrankencoinPositionView({
               return (
                 <ChainTruthTower
                   data={towerData}
-                  explanation={frankencoinEconomicsExplanation(towerData)}
+                  explanation={frankencoinEconomicsExplanation(towerData, view.hub)}
                   learnMore={frankencoinEconomicsContent()}
                 />
               );

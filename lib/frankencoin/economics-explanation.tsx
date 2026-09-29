@@ -26,7 +26,7 @@ const sideTotal = (lines: TowerSideData["exited"]): number => lines.reduce((sum,
 /** Explanation body for the Frankencoin tower — a lead sentence plus bullets
  *  derived from `data`. The mechanic behind the figures (gross debt, interest
  *  up front) is said here once; the panel above carries no second copy. */
-export function frankencoinEconomicsExplanation(data: ChainTruthTowerData): ReactNode {
+export function frankencoinEconomicsExplanation(data: ChainTruthTowerData, hub?: "v1" | "v2"): ReactNode {
   const { collateral, debt } = data;
   const collSym = sideSymbol(collateral, "collateral");
   const bullets: ReactNode[] = [];
@@ -86,8 +86,12 @@ export function frankencoinEconomicsExplanation(data: ChainTruthTowerData): Reac
         {collAuctioned && <>{fig(collAuctioned.amount, collSym)} of collateral</>}
         {collAuctioned && debtAuctioned && " and cleared "}
         {!collAuctioned && debtAuctioned && "cleared "}
-        {debtAuctioned && <>{fig(debtAuctioned.amount, "ZCHF")} of debt</>}. The opened sale events show who bought and
-        where the ZCHF went.
+        {debtAuctioned && <>{fig(debtAuctioned.amount, "ZCHF")} of debt</>}.
+        {who === "A forced sale after expiry" ? (
+          <> The opened Forced Sale row names the buyer, the price and where the ZCHF went.</>
+        ) : who === "A challenge sale" && hub === "v2" ? (
+          <> The opened Challenge Succeeded row names the bidder and where the ZCHF went.</>
+        ) : null}
       </span>,
     );
   }

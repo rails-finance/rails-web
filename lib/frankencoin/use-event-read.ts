@@ -3,11 +3,12 @@
 // Client read for one Frankencoin event's receipt figures
 // (/api/chain/frankencoin/event): what a mint paid out, sent to the reserve and
 // charged as interest at which rate, what a repayment burned and got back from
-// the reserve, who bought or bid in a challenge and where its ZCHF went, and a
-// new owner's kind. A mined transaction never changes, so each answer is kept
-// per page load and shared by the card's grid, its explanation and the
-// challenge panel. The page starts the reads as soon as the timeline lands, so
-// an opened card rarely waits; while one is in flight the card says so.
+// the reserve, who bought or bid in a challenge and where its ZCHF went, who
+// bought a forced sale and where its ZCHF went, and a new owner's kind. A
+// mined transaction never changes, so each answer is kept per page load and
+// shared by the card's grid, its explanation and the challenge panel. The
+// page starts the reads as soon as the timeline lands, so an opened card
+// rarely waits; while one is in flight the card says so.
 
 import { useEffect, useState } from "react";
 import type { FrankencoinEventRead } from "@/lib/sources/chain/frankencoin-event";
@@ -72,7 +73,10 @@ const logIndexOf = (eventId?: string): string | null => {
 export function frankencoinEventReadUrl(ctx: FrankencoinContext, txHash?: string, eventId?: string): string | null {
   if (!txHash) return null;
   const challenge =
-    ctx.hub === "v2" && (ctx.eventType === "challenge_averted" || ctx.eventType === "challenge_succeeded");
+    ctx.hub === "v2" &&
+    (ctx.eventType === "challenge_averted" ||
+      ctx.eventType === "challenge_succeeded" ||
+      ctx.eventType === "forced_sale");
   const ownership = ctx.eventType === "ownership_transferred" && ctx.newOwner != null;
   if (!frankencoinEventMovesZchf(ctx) && !challenge && !ownership) return null;
   const q = new URLSearchParams({ tx: txHash, position: ctx.position.toLowerCase(), kind: ctx.eventType });

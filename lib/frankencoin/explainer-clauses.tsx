@@ -70,7 +70,7 @@ import {
   spanText,
   type FrankencoinPageFacts,
 } from "@/lib/frankencoin/page-facts";
-import { termText } from "@/lib/frankencoin/figures";
+import { fmtMultiple, forcedCurvePoint, gapText, periodAfterExpiry, termText } from "@/lib/frankencoin/figures";
 import { formatDate } from "@/lib/date";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
@@ -592,6 +592,7 @@ export function frankencoinEventSlots(
         : siblings.includes("forced_sale")
           ? "forced"
           : null;
+      const soldHere = extras.txHash ? (facts?.txSold[extras.txHash] ?? 0) : 0;
       const saleName =
         bySale === "challenge" ? "The challenge sale" : bySale === "forced" ? "The forced sale" : "The sale";
       const tail: ReactNode =
@@ -605,6 +606,14 @@ export function frankencoinEventSlots(
           <> took {collDeltaFig(dColl as number, true)} of collateral.</>
         ) : clearedDebt ? (
           <> cleared {mintDeltaFig(dMint as number, true)} of debt.</>
+        ) : bySale != null && rs.closed && soldHere > FC_EPS ? (
+          <>
+            {" "}
+            sold {fmtFcColl(soldHere)} {sym} that the position&rsquo;s recorded collateral never showed, so this
+            row&rsquo;s figures stay at zero.
+          </>
+        ) : bySale === "forced" && rs.closed ? (
+          <> found nothing to sell: the position&rsquo;s collateral and debt were already zero.</>
         ) : (
           <> left the position&rsquo;s collateral and debt unchanged.</>
         );
@@ -632,7 +641,7 @@ export function frankencoinEventSlots(
             ) : bySale === "forced" ? (
               <>
                 This row records the sale&rsquo;s effect on the position. The Forced Sale row that follows it in the
-                same transaction records the amount sold.
+                same transaction names the buyer, the price and where the ZCHF went.
               </>
             ) : (
               <>This row records a sale&rsquo;s effect on the position, written by the hub in the same transaction.</>
@@ -704,7 +713,12 @@ export function frankencoinEventSlots(
             </>,
           ),
           clause(
-            phase != null && ts != null ? (
+            phase === 0 ? (
+              <>
+                This position&rsquo;s challenge period is 0 seconds, so both phases ended the moment the challenge
+                started and the position&rsquo;s collateral could be bid for at once.
+              </>
+            ) : phase != null && ts != null ? (
               <>
                 Phase 1 runs {phaseText(phase)}, to {dateTimeText(ts + phase)}: anyone, the owner included, can buy that
                 collateral at the declared price. If nobody does, phase 2 runs {phaseText(phase)} more and sells the
@@ -860,6 +874,10 @@ export function frankencoinEventSlots(
               </>,
             )
           : null;
+      const zeroPeriod: ClauseInput =
+        phase === 0 && bid === 0
+          ? clause(<>The bid was zero: with a 0-second challenge period the falling price had already reached zero.</>)
+          : null;
       if (!c)
         return {
           happened: [
@@ -869,7 +887,7 @@ export function frankencoinEventSlots(
               </>,
             ),
           ],
-          changed: [cleared],
+          changed: [cleared, zeroPeriod],
           meansNow: [
             clause(
               <>
@@ -1005,7 +1023,48 @@ export function frankencoinEventSlots(
 
     case "forced_sale": {
       const amt = num(ctx.forcedSaleAmount);
-      if (amt <= FC_EPS)
+      const f = read?.forced ?? null;
+      const mechanic = clause(
+        <>
+          The position&rsquo;s expiration had passed, so anyone could buy its collateral through the hub; the owner did
+          not need to act.
+        </>,
+      );
+      if (amt <= FC_EPS) {
+        // A call that found the collateral gone: name the caller and the sale
+        // that took it.
+        const block = coords.blockNumber;
+        const prev =
+          facts && block != null
+            ? [...facts.forcedSales].reverse().find((s) => s.blockNumber < block && s.amount > FC_EPS)
+            : undefined;
+        const caller = f?.buyer ?? ctx.txFrom ?? null;
+        if (prev && ts != null && caller) {
+          const blocks = block != null ? block - prev.blockNumber : null;
+          const same = prev.caller != null && prev.caller === caller;
+          return {
+            happened: [
+              clause(
+                <>
+                  This forced sale sold nothing: <Addr address={caller} /> called it {gapText(ts - prev.timestamp)}
+                  {blocks != null ? <> ({blocks === 1 ? "one block" : `${blocks} blocks`})</> : null} after{" "}
+                  {same ? (
+                    "its own"
+                  ) : prev.caller ? (
+                    <>
+                      <Addr address={prev.caller} />
+                      &rsquo;s
+                    </>
+                  ) : (
+                    "an earlier"
+                  )}{" "}
+                  sale had bought all {fmtFcColl(prev.amount)} {sym} of the collateral.
+                </>,
+              ),
+            ],
+            meansNow: [clause(<>The position held nothing by then, so the call moved no collateral and no ZCHF.</>)],
+          };
+        }
         return {
           happened: [clause(<>This forced sale sold no collateral: the position held none by then.</>)],
           meansNow: [
@@ -1017,25 +1076,222 @@ export function frankencoinEventSlots(
             ),
           ],
         };
+      }
+      const amtFig = (
+        <Fig info={forcedSaleProv(sym, coords, ctx.raw?.size)} value={chainTruthDeltaValue(amt, true)} symbol={sym}>
+          {fmtFcColl(amt)} {sym}
+        </Fig>
+      );
+      if (!f)
+        return {
+          happened: [clause(<>{amtFig} of the position&rsquo;s collateral was sold in a forced sale.</>)],
+          meansNow: [
+            clause(
+              <>
+                The position&rsquo;s expiration had passed, so anyone could buy its collateral through the hub at a
+                price that falls with time; the payment repays the debt first.
+              </>,
+            ),
+            mechanic,
+          ],
+        };
+      const cost = Number(f.cost);
+      const unit = scaled(f.priceRaw, 36 - dec);
+      const liq = f.liqPriceRaw != null ? scaled(f.liqPriceRaw, 36 - dec) : null;
+      const debt = Number(f.debtCleared);
+      const owed = f.mintedBefore != null ? Number(f.mintedBefore) : null;
+      const toOwner = Number(f.ownerReceived);
+      const reserveBack = Number(f.reserveToBuyer);
+      const loss = Number(f.loss);
+      const released = f.reserveReleased != null ? Number(f.reserveReleased) : null;
+      const zchf = (leg: FrankencoinChallengeLeg, value: string, n: number) =>
+        chFig(leg, value, <>{fmtZchf(n)} ZCHF</>, "ZCHF");
+      const buyerIsOwner = f.buyer != null && f.owner != null && f.buyer === f.owner;
       const happened = (
         <>
-          <Fig info={forcedSaleProv(sym, coords, ctx.raw?.size)} value={chainTruthDeltaValue(amt, true)} symbol={sym}>
-            {fmtFcColl(amt)} {sym}
-          </Fig>{" "}
-          of the position&rsquo;s collateral was sold in a forced sale.
+          {f.buyer ? <Addr address={f.buyer} /> : "A buyer"}
+          {buyerIsOwner
+            ? ", the owner,"
+            : f.buyerIsContract === true
+              ? ", a contract and not the owner,"
+              : f.buyerIsContract === false
+                ? ", a wallet and not the owner,"
+                : ""}{" "}
+          bought {amtFig} of the position&rsquo;s collateral in a forced sale
+          {cost > 0 ? <> for {zchf("forcedCost", f.cost, cost)}</> : <> and paid nothing</>}.
         </>
       );
+      const curve =
+        f.expiration != null && f.challengePeriod != null && ts != null
+          ? forcedCurvePoint(ts, f.expiration, f.challengePeriod, unit, liq)
+          : null;
+      const priceLine: ClauseInput =
+        curve == null
+          ? null
+          : curve.stage === "zero" || unit === 0
+            ? clause(
+                <>
+                  The price was zero: the sale came {spanText(curve.since)} after the position expired on{" "}
+                  {dateTimeText(f.expiration as number)}, past the two challenge periods ({phaseText(curve.period)}{" "}
+                  each) over which the price falls to nothing.
+                </>,
+              )
+            : clause(
+                <>
+                  That is{" "}
+                  {chFig(
+                    "forcedPrice",
+                    f.priceRaw,
+                    <>
+                      {fmtFcPrice(unit)} ZCHF per {sym}
+                    </>,
+                  )}
+                  {curve.multiple != null && liq != null ? (
+                    <>
+                      , {fmtMultiple(curve.multiple)} the declared {fmtFcPrice(liq)}
+                    </>
+                  ) : null}
+                  : the sale came {spanText(curve.since)} after the position expired on{" "}
+                  {dateTimeText(f.expiration as number)},{" "}
+                  {curve.stage === "first" ? (
+                    <>
+                      in the {periodAfterExpiry("first", curve.period)} after expiry, when the price falls from 10× the
+                      declared price to 1×
+                    </>
+                  ) : (
+                    <>
+                      in the {periodAfterExpiry("second", curve.period)} after expiry, when the price falls from the
+                      declared price to zero
+                    </>
+                  )}
+                  .
+                </>,
+              );
+      const sender: ClauseInput =
+        read && f.buyer && read.sender !== f.buyer
+          ? clause(
+              <>
+                The transaction was sent by <Addr address={read.sender} />.
+              </>,
+            )
+          : null;
+      const ownerAddr = f.owner ? (
+        <>
+          {" "}
+          <Addr address={f.owner} />
+        </>
+      ) : null;
+      let money: ClauseInput = null;
+      let ends: ReactNode = null;
+      const has = (
+        <>
+          the buyer has the {fmtFcColl(amt)} {sym}
+          {cost > 0 ? <> for {fmtZchf(cost)} ZCHF</> : <> for nothing</>}
+        </>
+      );
+      if (f.branch === "full") {
+        money = clause(
+          <>
+            The hub burned {zchf("forcedDebt", f.debtCleared, debt)} from the buyer, clearing the debt in full.
+            {reserveBack > 0 ? (
+              <>
+                {" "}
+                The reserve sent the buyer this position&rsquo;s{" "}
+                {zchf("forcedReserveToBuyer", f.reserveToBuyer, reserveBack)} reserve share toward it, so{" "}
+                {fmtZchf(debt - reserveBack)} ZCHF of the debt came from the buyer&rsquo;s own ZCHF, and the remaining{" "}
+                {zchf("forcedOwner", f.ownerReceived, toOwner)} of the price went to the owner{ownerAddr}.
+              </>
+            ) : (
+              <>
+                {" "}
+                The remaining {zchf("forcedOwner", f.ownerReceived, toOwner)} of the price went to the owner
+                {ownerAddr}.
+              </>
+            )}
+          </>,
+        );
+        ends = (
+          <>
+            {has}; the owner received {fmtZchf(toOwner)} ZCHF here, keeps the ZCHF minted earlier and no longer owes the{" "}
+            {fmtZchf(debt)} ZCHF
+            {reserveBack > 0 ? (
+              <>
+                ; the reserve paid out the {fmtZchf(reserveBack)} ZCHF it held for this position, which the cleared debt
+                no longer needs
+              </>
+            ) : null}
+            .
+          </>
+        );
+      } else if (f.branch === "shortfall") {
+        money = clause(
+          <>
+            The price did not cover the {owed != null ? <>{fmtZchf(owed)} ZCHF </> : null}debt: the buyer&rsquo;s{" "}
+            {fmtZchf(Number(f.toPosition))} ZCHF went against it and the reserve paid the other{" "}
+            {zchf("forcedShortfall", f.loss, loss)}
+            {Number(f.lossMinted) > 0 ? <> ({fmtZchf(Number(f.lossMinted))} ZCHF of it newly minted)</> : null}, and the
+            hub burned {zchf("forcedDebt", f.debtCleared, debt)}, clearing the debt in full
+            {released != null && released > 0 ? (
+              <>
+                . That also released this position&rsquo;s {fmtZchf(released)} ZCHF reserve share, so the shortfall came
+                out of that share
+                {released > loss ? (
+                  <> and the other {fmtZchf(released - loss)} ZCHF stayed with the reserve</>
+                ) : released < loss ? (
+                  <> and the other {fmtZchf(loss - released)} ZCHF out of equity</>
+                ) : null}
+              </>
+            ) : null}
+            . The owner received nothing.
+          </>,
+        );
+        ends = (
+          <>
+            {has}; the owner received nothing, keeps the ZCHF minted earlier and no longer owes the {fmtZchf(debt)}{" "}
+            ZCHF; the reserve paid {fmtZchf(loss)} ZCHF
+            {released != null && released > 0 ? (
+              <> against the {fmtZchf(released)} ZCHF it held for this position</>
+            ) : null}
+            .
+          </>
+        );
+      } else if (f.branch === "partial") {
+        const freed = Number(f.reserveFreed);
+        money = clause(
+          <>
+            The price did not cover the {owed != null ? <>{fmtZchf(owed)} ZCHF </> : null}debt and collateral remains,
+            so the buyer&rsquo;s {fmtZchf(Number(f.toPosition))} ZCHF went to the position
+            {freed > 0 ? <> and, with {fmtZchf(freed)} ZCHF of its reserve share,</> : null} cleared{" "}
+            {zchf("forcedDebt", f.debtCleared, debt)} of debt. The owner received nothing.
+          </>,
+        );
+        ends = (
+          <>
+            {has}; the owner received nothing
+            {owed != null ? <> and still owes {fmtZchf(Math.max(0, owed - debt))} ZCHF</> : null}.
+          </>
+        );
+      } else {
+        money = clause(
+          cost > 0 ? (
+            <>
+              The position had no debt, so the whole price, {zchf("forcedOwner", f.ownerReceived, toOwner)}, went to the
+              owner{ownerAddr}.
+            </>
+          ) : (
+            <>The position had no debt and the price had reached zero, so no ZCHF moved.</>
+          ),
+        );
+        ends = (
+          <>
+            {has}; the owner received {toOwner > 0 ? <>{fmtZchf(toOwner)} ZCHF</> : "nothing"}.
+          </>
+        );
+      }
       return {
         happened: [clause(happened)],
-        meansNow: [
-          clause(
-            <>
-              The position&rsquo;s expiration had passed, so anyone could clear it through the hub at a declining price;
-              the proceeds repay the debt.
-            </>,
-          ),
-          clause(<>Anyone can make this sale once a position has expired; the owner does not need to act.</>),
-        ],
+        changed: [priceLine, sender],
+        meansNow: [money, clause(<>Who ends up with what: {ends}</>), mechanic],
       };
     }
 

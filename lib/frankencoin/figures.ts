@@ -46,6 +46,54 @@ export function phaseText(seconds: number): string {
   return spanText(seconds);
 }
 
+/** "12 s", else spanText: a gap between two blocks can be seconds. */
+export const gapText = (seconds: number): string =>
+  seconds < 60 ? `${Math.max(0, Math.round(seconds))} s` : spanText(seconds);
+
+/** Where a forced sale's price stood on MintingHubV2.expiredPurchasePrice's
+ *  curve: 10× the declared price at expiry, 1× one challenge period later,
+ *  zero after a second. */
+export interface ForcedCurvePoint {
+  /** Seconds from expiry to the sale. */
+  since: number;
+  period: number;
+  stage: "first" | "second" | "zero";
+  /** The price paid over the declared price (null when none was declared). */
+  multiple: number | null;
+}
+
+export function forcedCurvePoint(
+  at: number,
+  expiration: number,
+  period: number,
+  unit: number,
+  declared: number | null,
+): ForcedCurvePoint {
+  const since = at - expiration;
+  const stage = since <= period ? "first" : since < 2 * period ? "second" : "zero";
+  return { since, period, stage, multiple: declared != null && declared > 0 ? unit / declared : null };
+}
+
+/** "first day", "second 2-day period": a challenge period named by its place
+ *  after expiry. */
+export const periodAfterExpiry = (which: "first" | "second", period: number): string =>
+  period === 86400
+    ? `${which} day`
+    : period % 86400 === 0
+      ? `${which} ${period / 86400}-day period`
+      : `${which} period of ${phaseText(period)}`;
+
+/** An exact decimal string with its whole part grouped: "2,322.994071369077767177". */
+export const groupExact = (s: string): string => {
+  const [whole, frac] = s.split(".");
+  const g = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return frac ? `${g}.${frac}` : g;
+};
+
+/** "1.13×". */
+export const fmtMultiple = (m: number): string =>
+  `${m.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}×`;
+
 /** "18 Nov 2025, 09:05 UTC". */
 export function dateTimeText(unix: number): string {
   const d = new Date(unix * 1000);

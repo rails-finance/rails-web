@@ -320,7 +320,15 @@ export type FrankencoinChallengeLeg =
   | "ownerReceived"
   | "clearedPrice"
   | "rate"
-  | "ownerKind";
+  | "ownerKind"
+  | "forcedBuyer"
+  | "forcedPrice"
+  | "forcedCost"
+  | "forcedDebt"
+  | "forcedReserveToBuyer"
+  | "forcedOwner"
+  | "forcedShortfall"
+  | "forcedTerms";
 
 const CHALLENGE_LEG: Record<
   FrankencoinChallengeLeg,
@@ -410,6 +418,55 @@ const CHALLENGE_LEG: Record<
     via: "Position.annualInterestPPM() · expiration() · start() at the event block",
     token: "position",
   },
+  forcedBuyer: {
+    summary: () =>
+      "Who bought the expired position's collateral — the recipient of the position's collateral Transfer in this transaction (with nothing sold, the account the hub charged); whether it holds contract code is read from the chain now.",
+    via: "Transfer(position → buyer) · eth_getCode(buyer)",
+    token: "collateral",
+  },
+  forcedPrice: {
+    summary: (sym) =>
+      `The forced-sale price per ${sym} — the V2 hub's ForcedSale log's own price field. MintingHubV2.expiredPurchasePrice sets it from the time since expiry: 10× the declared price at expiry, falling to 1× over one challenge period, then to zero over a second. The declared price, expiration and challenge period are read from the position one block earlier.`,
+    via: "ForcedSale.priceE36MinusDecimals ÷ 1e(36 − decimals) · Position.price() · expiration() · challengePeriod() one block earlier",
+    token: "hub",
+  },
+  forcedCost: {
+    summary: () =>
+      "What the buyer paid — the ForcedSale log's price times its amount ÷ 10^18, the cost MintingHubV2.buyExpiredCollateral charges. The ZCHF Transfers in the transaction show where it went.",
+    via: "price × amount ÷ 10^18 (ForcedSale)",
+    derived: true,
+    token: "hub",
+  },
+  forcedDebt: {
+    summary: () =>
+      "Debt the forced sale cleared — the ZCHF burned in this transaction, from the buyer on a full repayment (Frankencoin.burnFromWithReserve) or from the position on a partial one.",
+    via: "Transfer(buyer or position → 0x0) · ÷10^18",
+    token: "zchf",
+  },
+  forcedReserveToBuyer: {
+    summary: () =>
+      "The position's reserve share, sent to the buyer — the ZCHF Transfer from the reserve (the Equity contract) to the buyer. On a full repayment burnFromWithReserve returns the share held against the debt to whoever repays it, so it counts toward the price.",
+    via: "Transfer(Equity → buyer) · ÷10^18",
+    token: "zchf",
+  },
+  forcedOwner: {
+    summary: () =>
+      "ZCHF paid to the owner — the ZCHF Transfer from the buyer to the owner in this transaction: the price plus the returned reserve share, less the debt (all of the price when the position had no debt).",
+    via: "Transfer(buyer → owner) · ÷10^18",
+    token: "zchf",
+  },
+  forcedShortfall: {
+    summary: () =>
+      "The shortfall the reserve covered — the ZCHF contract's Loss log for the position: the debt the price did not cover once the last collateral was sold. The reserve sent that much to the position (new ZCHF is minted for any part it lacks) and the debt was burned.",
+    via: "Loss(reportingMinter = position, amount) · Transfer(Equity → position) · ÷10^18",
+    token: "zchf",
+  },
+  forcedTerms: {
+    summary: () =>
+      "The position's terms before the sale — its minted(), price(), expiration(), challengePeriod() and reserveContribution() read one block earlier in one multicall.",
+    via: "Position.minted() · price() · expiration() · challengePeriod() · reserveContribution() one block earlier",
+    token: "position",
+  },
   ownerKind: {
     summary: () =>
       "Whether the new owner is a wallet or a contract — eth_getCode on the address now: no code is a wallet (an externally owned account), code is a contract.",
@@ -490,6 +547,16 @@ export const peakAbsoluteProv = (what: "minted" | "collateral", sym: string): Pr
       : `The most ${sym} this position ever held — the maximum over its own MintingUpdate \`collateral\` absolutes (each equal to the collateral token's balanceOf(position) at its block), replayed over the position's whole life. A closed position's latest absolutes are back at zero, so its headline states the ledger's height instead.`,
   contract: { name: "Frankencoin Position" },
   via: `${FRANKENCOIN_VIA} · max(${what}) over all MintingUpdates`,
+});
+
+/** A closed card's collateral headline when the position's MintingUpdates
+ *  never recorded any: the most a sale sold. */
+export const soldPeakProv = (sym: string): Provenance => ({
+  kind: "chain",
+  pclass: "emitted",
+  summary: `The ${sym} this position's sale sold — the hub's ForcedSale amount or ChallengeSucceeded acquiredCollateral. The position's own MintingUpdates never recorded this collateral (it arrived without one), so the ledger has no peak to show; the sale's amount is the most it is known to have held.`,
+  contract: { name: "Frankencoin MintingHub" },
+  via: `${FRANKENCOIN_VIA} · ForcedSale amount · ChallengeSucceeded acquiredCollateral`,
 });
 
 /** A lifetime gross flow — Σ of per-event changes on one axis. */
