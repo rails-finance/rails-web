@@ -48,7 +48,7 @@ function balanceColumn(p: SkyPosition, block: number, withWorth: boolean): OpenP
       ),
     footnote: !withWorth ? undefined : p.value && shares > 0 ? (
       <StatFootnote>
-        <Prov info={valueProv(block, p.value.raw, null)} value={exact(p.value.raw)} symbol={USDS.symbol}>
+        <Prov info={valueProv(block, p.value.raw, p.shares.raw, null)} value={exact(p.value.raw)} symbol={USDS.symbol}>
           <span className="tabular-nums">
             worth <AmountText value={units(p.value.raw)} exact={exact(p.value.raw)} symbol={USDS.symbol} />{" "}
             {USDS.symbol}
@@ -68,7 +68,7 @@ function worthColumn(p: SkyPosition, asOf: SkyAsOf): OpenPositionStatsColumn {
     value:
       p.value && v > 0 ? (
         <StatValue>
-          <Prov info={valueProv(asOf.block, p.value.raw, asOf.chi)}>
+          <Prov info={valueProv(asOf.block, p.value.raw, p.shares.raw, asOf.chi)}>
             <AssetAmount value={v} symbol={USDS.symbol} address={USDS.address} exact={exact(p.value.raw)} />
           </Prov>
         </StatValue>
@@ -87,7 +87,7 @@ function earnedColumn(p: SkyPosition, block: number, asOf?: SkyAsOf): OpenPositi
     label: "Interest earned",
     value: (
       <StatValue title={`${full} ${USDS.symbol}`}>
-        <Prov info={earnedProv(block, p.earned.raw, p.usdsIn.raw, p.usdsOut.raw)}>
+        <Prov info={earnedProv(block, p.earned.raw, p.value?.raw ?? "0", p.usdsIn.raw, p.usdsOut.raw)}>
           <AssetAmount
             value={e}
             symbol={USDS.symbol}
@@ -102,7 +102,7 @@ function earnedColumn(p: SkyPosition, block: number, asOf?: SkyAsOf): OpenPositi
       yearly != null && asOf ? (
         <StatFootnote>
           <Prov
-            info={yearlyProv(asOf.block, p.value!.raw, pctString(asOf.ssrAnnual))}
+            info={yearlyProv(asOf.block, p.value!.raw, asOf.ssr, pctString(asOf.ssrAnnual))}
             value={yearly.toFixed(2)}
             symbol={USDS.symbol}
           >
@@ -127,7 +127,7 @@ function rateColumn(asOf: SkyAsOf): OpenPositionStatsColumn {
     ),
     footnote: asOf.chi ? (
       <StatFootnote>
-        <Prov info={chiProv(asOf.block, asOf.chi)} value={rayExact(asOf.chi)} symbol={USDS.symbol}>
+        <Prov info={chiProv(asOf)} value={rayExact(asOf.chi)} symbol={USDS.symbol}>
           <span className="tabular-nums">
             1 {SUSDS.symbol} = {rayNumber(asOf.chi).toFixed(6)} {USDS.symbol}
           </span>

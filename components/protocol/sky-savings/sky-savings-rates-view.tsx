@@ -9,7 +9,7 @@ import { BlockRef } from "@/components/shared/block-ref";
 import { formatDate } from "@/lib/date";
 import { explorerUrl } from "@/lib/shared/chains";
 import { SKY_CHAIN_ID, SUSDS, USDS } from "@/lib/sky-savings/constants";
-import { pctString, rayExact, rayNumber, usdcPerUsdsAt } from "@/lib/sky-savings/math";
+import { pctString, rayExact, rayNumber, toutAt, usdcPerUsdsAt } from "@/lib/sky-savings/math";
 import { chiProv, psmPriceProv, rateChangeProv, rateProv } from "@/lib/sky-savings/provenance";
 import type { SkyRates } from "@/lib/sky-savings/types";
 
@@ -30,7 +30,7 @@ export function SkySavingsRatesView({ rates }: { rates: SkyRates }) {
           </Figure>
           {asOf.chi && (
             <Figure label={`One ${SUSDS.symbol} worth`}>
-              <Prov info={chiProv(asOf.block, asOf.chi)} value={rayExact(asOf.chi)} symbol={USDS.symbol}>
+              <Prov info={chiProv(asOf)} value={rayExact(asOf.chi)} symbol={USDS.symbol}>
                 <span>{rayNumber(asOf.chi).toFixed(6)}</span>
               </Prov>
               <span className="text-sm font-normal text-rb-500"> {USDS.symbol}</span>
@@ -38,7 +38,10 @@ export function SkySavingsRatesView({ rates }: { rates: SkyRates }) {
           )}
           {usdc != null && (
             <Figure label="One USDS worth">
-              <Prov info={psmPriceProv(asOf.block, usdc.toFixed(6))} value={usdc.toFixed(6)}>
+              <Prov
+                info={psmPriceProv(asOf.block, usdc.toFixed(6), toutAt(rates.psm.series, asOf.block))}
+                value={usdc.toFixed(6)}
+              >
                 <span>{usdc.toFixed(6)}</span>
               </Prov>
               <span className="text-sm font-normal text-rb-500"> USDC at the PSM</span>

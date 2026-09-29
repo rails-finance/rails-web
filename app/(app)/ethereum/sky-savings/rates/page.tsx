@@ -6,6 +6,7 @@ import { protocolForHref } from "@/lib/shared/protocols";
 import { unlaunchedRobotsForPath } from "@/lib/shared/page-metadata";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { readSkyRates } from "@/lib/sources/api/sky-savings";
+import { withSkyDrip } from "@/lib/sources/chain/sky-savings-drip";
 import { skyRateContent } from "@/lib/sky-savings/learn-more";
 import { SKY_BASE_PATH, SKY_RATES_PATH } from "@/lib/sky-savings/constants";
 import { gateRefusal } from "@/lib/sky-savings/types";
@@ -23,7 +24,8 @@ export const metadata = {
 const PROTOCOL = protocolForHref(SKY_BASE_PATH)!;
 
 export default async function SkySavingsRatesPage() {
-  const rates = await readSkyRates(await readerIpFromHeaders()).catch(() => null);
+  const read = await readSkyRates(await readerIpFromHeaders()).catch(() => null);
+  const rates = read ? { ...read, asOf: await withSkyDrip(read.asOf) } : null;
   const refusal = rates ? gateRefusal(rates) : "missing";
   return (
     <div className="min-h-screen">

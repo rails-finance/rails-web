@@ -58,6 +58,34 @@ export function skyPositionContent(): LearnMoreContent {
         text: "Sky runs no USDS price feed. The PSM (peg stability module) is Sky's contract that swaps USDS and USDC one for one, less a fee; one USDS is worth 1 ÷ (1 + exit fee) USDC. That fee has been zero for the whole life of sUSDS.",
         sources: [link(SKY_DOCS.wrapper), link(SKY_DOCS.psm)],
       },
+      {
+        bold: "Term: chi",
+        text: "The share price: the USDS one sUSDS redeems for, held as a number with 27 decimals. It starts at 1.",
+      },
+      {
+        bold: "Term: rho",
+        text: "The time of the last drip, as a Unix timestamp.",
+      },
+      {
+        bold: "Term: ssr",
+        text: "The Savings Rate as a per-second growth factor, with 27 decimals.",
+      },
+      {
+        bold: "Term: drip",
+        text: "The contract function that brings chi up to date and mints the interest as USDS.",
+      },
+      {
+        bold: "Term: Vow",
+        text: "Sky's surplus buffer, which the minted interest is booked against as debt.",
+      },
+      {
+        bold: "Term: suck",
+        text: "The Vat function drip calls to create the USDS against debt booked to the Vow.",
+      },
+      {
+        bold: "Term: wei",
+        text: "The smallest unit of a token: one 10⁻¹⁸ of it.",
+      },
     ],
     links: LINKS,
   };

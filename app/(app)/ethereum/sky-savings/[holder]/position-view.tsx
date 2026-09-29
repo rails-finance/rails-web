@@ -12,8 +12,7 @@ import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubb
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { Prov } from "@/components/shared/provenance";
-import { RiskFigure, RiskFooterStrip, RiskStrong } from "@/components/shared/risk-footer-strip";
+import { RiskFigure, RiskFooterStrip } from "@/components/shared/risk-footer-strip";
 import { BlockRef } from "@/components/shared/block-ref";
 import { CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { SkySavingsActivityHeader } from "@/components/protocol/sky-savings/sky-savings-activity-header";
@@ -26,11 +25,11 @@ import { isSkySavingsEvent, type BaseActivityEvent } from "@/lib/shared/types/ev
 import { vaultTermsNotes, type MarketNote } from "@/lib/shared/market-note";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { SKY_CHAIN_ID, SUSDS, USDS } from "@/lib/sky-savings/constants";
-import { pctString, rayNumber, usdcPerUsdsAt } from "@/lib/sky-savings/math";
+import { pctString, rayNumber, toutAt, usdcPerUsdsAt } from "@/lib/sky-savings/math";
 import { skyFlowTimeline, skyLifetimeTotals, skyTowerData } from "@/lib/sky-savings/flows";
 import { skyFlowsExplanation } from "@/lib/sky-savings/flows-explanation";
 import { skyFlowsContent } from "@/lib/sky-savings/learn-more";
-import { chiProv, gateProv, psmPriceProv, rateChangeProv } from "@/lib/sky-savings/provenance";
+import { chiProv, psmPriceProv, rateChangeProv } from "@/lib/sky-savings/provenance";
 import type { SkyAsOf, SkyFlowDay, SkyGate, SkyPosition, SkyRateChange, SkyRates } from "@/lib/sky-savings/types";
 
 /** On a phone, consecutive Savings Rate changes draw as one row that opens. */
@@ -154,7 +153,7 @@ export default function SkySavingsPositionView({
       unit: USDS.symbol,
       label: "One sUSDS in USDS, the share price at the page's block",
       tip: `The sUSDS share price: what one sUSDS redeems for in USDS at block ${asOf.block.toLocaleString("en-US")}.`,
-      info: asOf.chi ? chiProv(asOf.block, asOf.chi) : undefined,
+      info: asOf.chi ? chiProv(asOf) : undefined,
     },
     ...(usdc != null
       ? [
@@ -164,7 +163,7 @@ export default function SkySavingsPositionView({
             price: usdc,
             unit: "USDC",
             label: "One USDS in USDC, the PSM exit rate",
-            info: psmPriceProv(asOf.block, usdc.toFixed(6)),
+            info: psmPriceProv(asOf.block, usdc.toFixed(6), toutAt(rates?.psm.series, asOf.block)),
           },
         ]
       : []),
@@ -172,16 +171,7 @@ export default function SkySavingsPositionView({
 
   const checked = (
     <RiskFooterStrip>
-      <RiskFigure>
-        Checked against the contract at block {gate.block.toLocaleString("en-US")}: all{" "}
-        <Prov info={gateProv(gate.block, gate.holdersChecked, gate.totalSupply)} value={String(gate.holdersChecked)}>
-          <RiskStrong>{gate.holdersChecked.toLocaleString("en-US")}</RiskStrong>
-        </Prov>{" "}
-        addresses that ever held sUSDS
-        {gate.openHoldersChecked != null
-          ? `, ${gate.openHoldersChecked.toLocaleString("en-US")} of them holding sUSDS`
-          : ""}
-      </RiskFigure>
+      <RiskFigure>Checked against the contract at block {gate.block.toLocaleString("en-US")}</RiskFigure>
     </RiskFooterStrip>
   );
 
@@ -195,7 +185,8 @@ export default function SkySavingsPositionView({
       />
 
       <p className="text-xs text-rb-500" data-sky-asof={asOf.block}>
-        Sky Savings · sUSDS on Ethereum · every figure at <BlockRef block={asOf.block} chainId={SKY_CHAIN_ID} />
+        Sky Savings · sUSDS on Ethereum · every figure at <BlockRef block={asOf.block} chainId={SKY_CHAIN_ID} />, the
+        newest block when the page loaded
       </p>
 
       <SkySavingsPositionCard
@@ -238,6 +229,7 @@ export default function SkySavingsPositionView({
             first={position.activity.firstTimestamp ?? firstAt}
             last={position.activity.lastTimestamp ?? null}
             events={skyEvents}
+            complete={totalEvents <= skyEvents.length}
             closed={!open}
           />
         }
