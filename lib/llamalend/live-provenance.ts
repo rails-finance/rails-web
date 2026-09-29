@@ -82,7 +82,7 @@ export function llamalendBandEdgeProv(
     summary:
       edge === "pUp"
         ? `The price where SOFT-liquidation begins for this position — base_price · ((A−1)/A)^n1, the top of its band, in ${unit} per collateral token. At this price health reads exactly 1.0; below it the AMM starts converting collateral. Derived from three same-block state reads (A, get_base_price, n1) by the deployed integer formula — chain-derived over state, not an oracle figure.`
-        : `The price where this position is FULLY converted — base_price · ((A−1)/A)^(n2+1), the bottom of its band, in ${unit} per collateral token. Below it nothing remains as collateral (everything is the borrowed token) and hard liquidation arms. A second risk coordinate no other protocol on this roster has. Derived from three same-block state reads by the deployed integer formula.`,
+        : `The price where this position is FULLY converted — base_price · ((A−1)/A)^(n2+1), the bottom of its band, in ${unit} per collateral token. Below it nothing remains as collateral (everything is the borrowed token). Hard liquidation depends on health, not on this price. Derived from three same-block state reads by the deployed integer formula.`,
     contract: ammOf(amm),
     via: `${LANE_VIA} · exact ln_int/expWad port over A + get_base_price + ticks (≡ ${
       edge === "pUp" ? "p_oracle_up(n1)" : "p_oracle_down(n2)"
@@ -134,6 +134,19 @@ export function llamalendHealthProv(amm?: string): Provenance {
       { label: "price_oracle", kind: "chain", pclass: "oracle", note: "the AMM's own price @ head" },
       { label: "pUp", kind: "chain-derived", pclass: "state", note: "exact band math over A, base_price, n1" },
     ],
+  };
+}
+
+/** The Controller's own health(user, true) at head. */
+export function llamalendHealthFullProv(controller?: string, raw?: string | null): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    verify: recompute("Re-run the Controller's health(user, true) eth_call; it returns this figure scaled by 1e18."),
+    summary:
+      "The position's health, from the Controller — what its bands would hold with the price through their bottom, less the liquidation discount stored on the position, over the debt, minus 1; while the price is above the bands, the price gap adds to it. Below 0, anyone may liquidate the position.",
+    contract: controllerOf(controller),
+    via: `${LANE_VIA} · health(user, true) @ head${raw != null ? ` · raw: ${raw}` : ""}`,
   };
 }
 

@@ -63,6 +63,11 @@ const tokenAmount = (v: number, symbol: string): string => {
   return `${n} ${symbol}`;
 };
 
+/** A lend market whose policy bounds hold the rate near zero: a maximum under
+ *  a million wei a second (1e-12 at 1e18 scale), about 0.003% a year. */
+const nearZeroRate = (m: LlamalendMarketRow): boolean =>
+  m.minRateRaw != null && m.maxRateRaw != null && BigInt(m.maxRateRaw) < BigInt(1_000_000);
+
 function MarketCard({ m, block }: { m: LlamalendMarketRow; block: number }) {
   // Every per-market figure traces to the same coordinates: the head block, the
   // three contracts this market's reads came from, and the two flags that decide
@@ -96,7 +101,8 @@ function MarketCard({ m, block }: { m: LlamalendMarketRow; block: number }) {
         <span className="shrink-0 text-[13px] tabular-nums text-foreground">
           <Prov info={llamaDebtProv(coords)}>
             {m.borrowedIsCrvusd ? usd(m.totalDebtUsd) : tokenAmount(m.totalDebt, m.borrowedSymbol)}
-          </Prov>
+          </Prov>{" "}
+          <span className="text-[11px] text-rb-500">debt</span>
         </span>
       </div>
 
@@ -137,6 +143,14 @@ function MarketCard({ m, block }: { m: LlamalendMarketRow; block: number }) {
           )}
         </span>
       </div>
+
+      {nearZeroRate(m) && (
+        <p className="mt-1 text-[11px] text-rb-500">
+          The market&rsquo;s rate policy sets its minimum and maximum at{" "}
+          {m.minRateRaw === m.maxRateRaw ? `${m.minRateRaw} wei` : `${m.minRateRaw} and ${m.maxRateRaw} wei`} a second,
+          about 0% a year at any utilisation.
+        </p>
+      )}
 
       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] tabular-nums text-rb-500">
         <span>

@@ -16,11 +16,17 @@ import type { LlamalendChainResponse } from "@/lib/api/fetch-llamalend-position"
 import { formatNumber } from "@/lib/utils/format";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { AmountText } from "@/components/shared/amount-text";
+import { fmtColl, fmtHealth } from "@/lib/llamalend/event-figures";
+import { formatDate } from "@/lib/date";
+import { isLlamalendEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import type { LlamalendPositionView } from "./llamalend-position-card";
 
 export function LlamalendPositionExplanation({
   chain,
   liquidationCount,
   eventCount,
+  lost,
+  closed,
 }: {
   /** The live chain read. Null until it lands (or for a closed account):
    *  nothing is narrated, and the pane still mounts so its foot controls draw. */
@@ -30,7 +36,13 @@ export function LlamalendPositionExplanation({
   liquidationCount?: number;
   /** The card's event count (the count badge). Omit to skip. */
   eventCount?: number;
+  /** Collateral lost to soft-liquidation over the position's life
+   *  (llamalendLostToSoftLiq), where it can be stated. */
+  lost?: number | null;
+  /** A closed position's story, from its events. */
+  closed?: { view: LlamalendPositionView; events: BaseActivityEvent[] } | null;
 }) {
+  if (closed) return <ClosedExplanation view={closed.view} events={closed.events} />;
   if (!chain || chain.chainStale || !chain.hasLoan) return null;
 
   const unit = chain.borrowedIsCrvusd ? `${chain.borrowedSymbol} (~$1)` : chain.borrowedSymbol;
@@ -38,6 +50,19 @@ export function LlamalendPositionExplanation({
   // its state tail, so the two never disagree at the edge.
   const aboveBand = chain.priceOracle != null && chain.pUp != null && chain.priceOracle > chain.pUp;
   const bullets: React.ReactNode[] = [];
+
+  if (chain.healthFull != null) {
+    bullets.push(
+      <span key="health-full">
+        Health is <H>{fmtHealth(chain.healthFull)}</H>. It compares what the collateral would be worth with the price
+        through the bottom band, less the{" "}
+        {chain.liquidationDiscount != null ? <>{pct(chain.liquidationDiscount)} </> : null}liquidation discount, with
+        the debt{aboveBand ? "; while the price is above the bands, the distance adds to it" : ""}. Below 0 anyone may
+        liquidate the position. It falls as the price moves down through the bands, as interest adds to the debt, and
+        with each loss on the AMM&rsquo;s sales.
+      </span>,
+    );
+  }
 
   bullets.push(
     <span key="isolated">
@@ -57,7 +82,13 @@ export function LlamalendPositionExplanation({
         <H>
           <AmountText value={chain.pDown} />
         </H>{" "}
-        {unit}. Soft-liquidation begins at the top of that range and completes at its bottom.
+        {unit}
+        {chain.n1 != null && chain.n2 != null ? (
+          <>
+            , bands {chain.n1}…{chain.n2} (a higher band number is a lower price)
+          </>
+        ) : null}
+        . Soft-liquidation begins at the top of that range and completes at its bottom.
       </span>,
     );
   }
@@ -82,17 +113,17 @@ export function LlamalendPositionExplanation({
   if (chain.inSoftLiq && chain.converted != null) {
     bullets.push(
       <span key="softliq">
-        The AMM has already converted{" "}
+        The AMM has converted{" "}
         <H>
           <AmountText value={chain.converted} /> {chain.borrowedSymbol}
         </H>{" "}
         of this position&rsquo;s collateral.{" "}
         {chain.fullyConverted ? (
-          <>Nothing remains as {chain.collateralSymbol}, and a hard liquidation can now be triggered.</>
+          <>Nothing remains as {chain.collateralSymbol}.</>
         ) : (
           <>
-            Soft-liquidation is in progress: if the price recovers, the AMM converts it back into{" "}
-            {chain.collateralSymbol}, and each pass through the band costs a little to fees and arbitrage.
+            If the price rises, the AMM buys {chain.collateralSymbol} back with it. The swap reverses; the losses do
+            not: each sale is below the oracle price and each buy-back above it.
           </>
         )}
       </span>,
@@ -110,18 +141,31 @@ export function LlamalendPositionExplanation({
         <H>
           <AmountText value={chain.converted ?? 0} /> {chain.borrowedSymbol}
         </H>{" "}
-        of this position&rsquo;s collateral{aboveBand ? ", because the price sits above the band" : ""}. The collateral
-        is intact, and only interest accrues, second by second.
+        of this position&rsquo;s collateral{aboveBand ? ", because the price sits above the band" : ""}, and only
+        interest accrues, second by second.
+      </span>,
+    );
+  }
+
+  if (lost != null && lost > 0) {
+    bullets.push(
+      <span key="lost">
+        Lost to soft-liquidation over its life:{" "}
+        <H>
+          {fmtColl(lost)} {chain.collateralSymbol}
+        </H>
+        , sold by the AMM while the price sat in the bands and not bought back. It is what was deposited, less what was
+        withdrawn and what is held now.
       </span>,
     );
   }
 
   bullets.push(
     <span key="mechanics">
-      Liquidation here happens in two stages. <H>Soft</H>-liquidation converts collateral continuously while the price
-      is inside the band, reversibly and with no event and no liquidator. <H>Hard</H> liquidation arms once losses push
-      the position&rsquo;s health below zero: anyone may then clear it in one transaction, taking whatever mix of{" "}
-      {chain.collateralSymbol} and {chain.borrowedSymbol} remains.
+      Liquidation here happens in two stages. <H>Soft</H> liquidation converts collateral while the price is inside the
+      bands, with no event and no liquidator; when the price rises the AMM buys the collateral back, and the losses on
+      each round trip stay. <H>Hard</H> liquidation needs health below 0: anyone may then repay the debt, in full or in
+      part, and take the {chain.collateralSymbol} and {chain.borrowedSymbol} the position holds.
     </span>,
   );
 
@@ -159,5 +203,76 @@ export function LlamalendPositionExplanation({
     </>
   );
 
+  return <ProseExplainer paragraph={lead} items={bullets} />;
+}
+
+const pct = (fraction: number): string => `${(fraction * 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
+
+/** A closed position: when it opened and closed, and each hard liquidation's
+ *  figures, from its events. */
+function ClosedExplanation({ view, events }: { view: LlamalendPositionView; events: BaseActivityEvent[] }) {
+  const rows = events
+    .filter(isLlamalendEvent)
+    .filter((e) => e.context.data.role !== "liquidator")
+    .sort((a, b) => a.blockNumber - b.blockNumber);
+  if (rows.length === 0) return null;
+  const liqs = rows.filter(
+    (e) =>
+      e.context.data.eventType === "liquidation" && !e.context.data.selfLiquidation && e.context.data.role !== "self",
+  );
+  const cSym = view.collateralSymbol;
+  const bSym = view.borrowedSymbol;
+  const bullets: React.ReactNode[] = [
+    <span key="span">
+      It opened on {formatDate(rows[0].timestamp)} and closed on {formatDate(rows[rows.length - 1].timestamp)}.
+    </span>,
+  ];
+  const abs = (h?: string) => Math.abs(Number(h ?? 0));
+  liqs.forEach((e, i) => {
+    const c = e.context.data;
+    const conv = abs(c.convertedTaken);
+    const nth =
+      liqs.length === 1
+        ? "The liquidation"
+        : i === 0
+          ? "The first"
+          : i === liqs.length - 1
+            ? "The last"
+            : `Liquidation ${i + 1}`;
+    const rest = i > 0 && liqs.length > 1 && i === liqs.length - 1;
+    bullets.push(
+      <span key={e.id}>
+        {nth}, on {formatDate(e.timestamp)}, cleared {rest ? "the rest of the debt, " : ""}
+        <H>
+          {formatNumber(abs(c.debtDelta))} {bSym}
+        </H>
+        {rest ? "," : " of debt"} and took{" "}
+        <H>
+          {fmtColl(abs(c.collateralDelta))} {cSym}
+        </H>
+        {conv > 0 ? (
+          <>
+            {" "}
+            and{" "}
+            <H>
+              {formatNumber(conv)} {bSym}
+            </H>{" "}
+            the AMM had converted
+          </>
+        ) : null}
+        .
+      </span>,
+    );
+  });
+  const firstPartial = liqs.length > 1 && liqs[0].context.data.collateralAfter == null;
+  const lead =
+    view.status === "liquidated" && liqs.length > 0 ? (
+      <>
+        This position was liquidated {liqs.length === 1 ? "once" : liqs.length === 2 ? "twice" : `${liqs.length} times`}
+        {firstPartial ? "; the first took part of the loan, and the last cleared what was left" : ""}:
+      </>
+    ) : (
+      <>This position is closed: its debt is 0 and it holds no collateral:</>
+    );
   return <ProseExplainer paragraph={lead} items={bullets} />;
 }

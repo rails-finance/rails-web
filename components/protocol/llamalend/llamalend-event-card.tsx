@@ -25,15 +25,19 @@ import { LlamalendEventHeader } from "./llamalend-event-header";
 import { LlamalendEventDetail } from "./llamalend-event-detail";
 import { LlamalendEventExplainer, llamalendLearnMoreContent } from "./llamalend-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import type { LlamalendPreviousStated } from "@/lib/llamalend/event-figures";
 
 export interface LlamalendEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "llamalend"; data: LlamalendContext } };
   isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
+  /** The last collateral balance an earlier row stated, for what the AMM
+   *  sold since (lib/llamalend/event-figures.ts). */
+  previousStated?: LlamalendPreviousStated | null;
 }
 
-export function LlamalendEventCard({ event, isFirst, isLast, eventNumber }: LlamalendEventCardProps) {
+export function LlamalendEventCard({ event, isFirst, isLast, eventNumber, previousStated }: LlamalendEventCardProps) {
   const ctx = event.context.data;
   // Only the BORROWER's leg of a third-party liquidation is a passive loss;
   // the liquidator's leg and a self-liquidation are the subject's own acts.
@@ -132,7 +136,13 @@ export function LlamalendEventCard({ event, isFirst, isLast, eventNumber }: Llam
         />
       }
       detail={
-        <LlamalendEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} wallet={event.wallet} />
+        <LlamalendEventDetail
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          wallet={event.wallet}
+          previousStated={previousStated}
+        />
       }
       detailLabel="Position state"
       explainer={

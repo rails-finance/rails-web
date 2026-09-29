@@ -1,0 +1,31 @@
+"use client";
+
+// The card's line naming the earlier loans on this page. The Controller keys a
+// position by (market, borrower), so a borrower who repaid in full and later
+// borrowed again writes both loans here: "Loan 2 of 2 · earlier loan 25 Apr –
+// 12 Jul 2025, repaid". The Liquity V1 lives line is the model.
+
+import { formatDate, formatDayMonth } from "@/lib/date";
+import type { LlamalendLoan } from "@/lib/llamalend/event-figures";
+
+function span(l: LlamalendLoan): string {
+  if (l.closedAt == null) return `from ${formatDate(l.openedAt)}`;
+  const sameYear = new Date(l.openedAt * 1000).getUTCFullYear() === new Date(l.closedAt * 1000).getUTCFullYear();
+  return `${sameYear ? formatDayMonth(l.openedAt) : formatDate(l.openedAt)} – ${formatDate(l.closedAt)}`;
+}
+
+export function LlamalendLoansLine({ loans }: { loans: LlamalendLoan[] }) {
+  const at = loans.length - 1;
+  if (loans.length < 2 || loans[at].closedAt != null) return null;
+  return (
+    <p className="text-xs text-rb-500" data-llamalend-loans="">
+      Loan {at + 1} of {loans.length}, open since {formatDate(loans[at].openedAt)}
+      {loans.slice(0, at).map((l, i) => (
+        <span key={l.openedAt}>
+          {" · "}
+          {loans.length > 2 ? `loan ${i + 1}` : "earlier loan"} {span(l)}, {l.ending}
+        </span>
+      ))}
+    </p>
+  );
+}

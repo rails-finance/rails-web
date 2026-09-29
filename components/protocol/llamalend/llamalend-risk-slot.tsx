@@ -34,12 +34,22 @@
 
 import { Prov } from "@/components/shared/provenance";
 import { RiskFigure, RiskFooterStrip, RiskMeter, RiskStrong } from "@/components/shared/risk-footer-strip";
-import { llamalendConvertedProv, llamalendHealthProv } from "@/lib/llamalend/live-provenance";
+import { llamalendConvertedProv, llamalendHealthFullProv, llamalendHealthProv } from "@/lib/llamalend/live-provenance";
+import { llamalendLostProv } from "@/lib/llamalend/event-provenance";
+import { fmtColl, fmtHealth } from "@/lib/llamalend/event-figures";
 import { formatNumber, formatUnitsExact } from "@/lib/utils/format";
 import { LlamalendBandsAxis } from "./llamalend-bands-axis";
 import type { LlamalendChainResponse } from "@/lib/api/fetch-llamalend-position";
 
-export function LlamalendRiskSlot({ chain }: { chain: LlamalendChainResponse }) {
+export function LlamalendRiskSlot({
+  chain,
+  lost,
+}: {
+  chain: LlamalendChainResponse;
+  /** Collateral lost to soft-liquidation over the position's life, where it
+   *  can be stated (llamalendLostToSoftLiq). */
+  lost?: number | null;
+}) {
   if (chain.chainStale || !chain.hasLoan) return null;
 
   return (
@@ -54,6 +64,17 @@ export function LlamalendRiskSlot({ chain }: { chain: LlamalendChainResponse }) 
         <RiskFigure caution>
           ⚠️ Converted figure unconfirmed — the market gave two different answers, most likely a trade mid-check.
           Reloading checks it again.
+        </RiskFigure>
+      )}
+
+      {/* The protocol's own health: below 0 anyone may liquidate. */}
+      {chain.healthFull != null && (
+        <RiskFigure label="Health">
+          <RiskStrong>
+            <Prov info={llamalendHealthFullProv(chain.controller, chain.healthFullRaw)}>
+              {fmtHealth(chain.healthFull)}
+            </Prov>
+          </RiskStrong>
         </RiskFigure>
       )}
 
@@ -86,6 +107,16 @@ export function LlamalendRiskSlot({ chain }: { chain: LlamalendChainResponse }) 
               >
                 {chain.converted != null ? formatNumber(chain.converted) : "—"} {chain.borrowedSymbol}
               </span>
+            </Prov>
+          </RiskStrong>
+        </RiskFigure>
+      )}
+
+      {lost != null && lost > 0 && (
+        <RiskFigure label="Lost to soft-liquidation">
+          <RiskStrong>
+            <Prov info={llamalendLostProv(chain.collateralSymbol, chain.controller)}>
+              {fmtColl(lost)} {chain.collateralSymbol}
             </Prov>
           </RiskStrong>
         </RiskFigure>

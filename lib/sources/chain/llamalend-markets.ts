@@ -93,6 +93,8 @@ const AMM_ABI = parseAbi([
 const POLICY_ABI = parseAbi([
   "function rate(address) view returns (uint256)",
   "function rate() view returns (uint256)",
+  "function min_rate() view returns (uint256)",
+  "function max_rate() view returns (uint256)",
 ]);
 
 const ERC20_BAL_ABI = parseAbi(["function balanceOf(address) view returns (uint256)"]);
@@ -377,6 +379,10 @@ export interface LlamalendMarketRow extends LlamalendMarketIdentity {
   /** Borrow APR (%) — monetary_policy.rate(controller), per-second 1e18,
    *  annualized by simple multiplication. Null when the read failed. */
   borrowAprPct: number | null;
+  /** The SemiLog policy's min_rate / max_rate, per second at 1e18 (lend
+   *  markets); null where the policy has no such bounds. */
+  minRateRaw: string | null;
+  maxRateRaw: string | null;
   /** AMM.price_oracle() — collateral priced in the BORROWED token (1e18). */
   priceOracle: number;
   priceOracleRaw: string;
@@ -467,7 +473,7 @@ export async function loadLlamalendMarkets(): Promise<LlamalendMarketsResponse> 
     // Second pass: each market's own monetary-policy rate + the mint markets'
     // debt ceilings (both need the first pass's answers).
     const policyOf = markets.map((_, i) => ok<string>(state[i * PER + 4]));
-    const PER2 = 3;
+    const PER2 = 5;
     const second = (await client.multicall({
       allowFailure: true,
       contracts: markets.flatMap((m, i) => {
@@ -483,6 +489,10 @@ export async function loadLlamalendMarkets(): Promise<LlamalendMarketsResponse> 
             functionName: "debt_ceiling",
             args: [m.controller as `0x${string}`],
           },
+          // The SemiLog policy's bounds (lend markets); the mint markets'
+          // policy has none, and allowFailure leaves them null.
+          { address: policy, abi: POLICY_ABI, functionName: "min_rate" },
+          { address: policy, abi: POLICY_ABI, functionName: "max_rate" },
         ] as const;
       }),
     })) as Res[];
@@ -502,6 +512,8 @@ export async function loadLlamalendMarkets(): Promise<LlamalendMarketsResponse> 
       const rateNoArg = ok<bigint>(second[i * PER2 + 1]);
       const rateRaw = rateWithArg ?? rateNoArg;
       const borrowAprPct = rateRaw != null ? scale1e18(rateRaw) * SECONDS_PER_YEAR * 100 : null;
+      const minRate = ok<bigint>(second[i * PER2 + 3]);
+      const maxRate = ok<bigint>(second[i * PER2 + 4]);
 
       const totalDebt = scaleRaw(totalDebtRaw, m.borrowedDecimals);
 
@@ -531,6 +543,8 @@ export async function loadLlamalendMarkets(): Promise<LlamalendMarketsResponse> 
         liquidationDiscount,
         monetaryPolicy,
         borrowAprPct,
+        minRateRaw: minRate != null ? minRate.toString() : null,
+        maxRateRaw: maxRate != null ? maxRate.toString() : null,
         priceOracle: scale1e18(priceOracleRaw),
         priceOracleRaw: priceOracleRaw.toString(),
         basePriceRaw: basePriceRaw.toString(),

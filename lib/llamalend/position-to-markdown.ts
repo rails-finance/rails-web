@@ -51,8 +51,8 @@ export function llamalendPositionToMarkdown(args: LlamalendPositionMarkdownArgs)
       `The position is ONE (market, user) pair — each LlamaLend Controller is an isolated market ` +
       `(one collateral, one borrowed token) margined and liquidated independently of the user's other markets. ` +
       `Liquidation is two-stage: SOFT (the AMM converts collateral to the borrowed token continuously while the ` +
-      `price is inside the position's band — reversible, no event) then HARD (a one-shot Liquidate once health ` +
-      `goes negative). Debt accrues per second. ` +
+      `price is inside the position's band and back as it rises, with no event; the swaps reverse and their losses ` +
+      `stay) then HARD (a Liquidate, in full or in part, once health goes negative). Debt accrues per second. ` +
       (view.borrowedIsCrvusd
         ? `Prices and debt are in crvUSD, a $-pegged stable — figures read as dollars (unit: crvUSD ~$1). `
         : `⚠️ This market borrows ${view.borrowedSymbol}, NOT crvUSD — figures are in ${view.borrowedSymbol}, and no USD is asserted. `) +

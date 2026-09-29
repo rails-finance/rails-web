@@ -60,6 +60,7 @@ import {
   type LlamalendCoords,
 } from "@/lib/llamalend/event-provenance";
 import { formatNumber } from "@/lib/utils/format";
+import { fmtColl, fmtHealth, type LlamalendEventFigures } from "@/lib/llamalend/event-figures";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 /** A balance below this is arithmetic dust, not a real leg. Mirrors economics.ts. */
@@ -143,10 +144,17 @@ const present = (h?: string | null): boolean => h != null && h !== "" && Number(
 
 // ── the variant table ────────────────────────────────────────────────────────
 
-export function llamalendEventSlots(ctx: LlamalendContext, coords: LlamalendCoords): EventProseSlots {
+export function llamalendEventSlots(
+  ctx: LlamalendContext,
+  coords: LlamalendCoords,
+  /** The position read at block − 1 and at this block, once it landed. */
+  f?: LlamalendEventFigures | null,
+): EventProseSlots {
   const collSym = ctx.collateralSymbol;
   const debtSym = ctx.borrowedSymbol;
   const rs = resultingState(ctx);
+  const bands = bandMoveClause(ctx, f);
+  const inBand = inBandRepayClause(ctx, f);
 
   // Emitted-delta figures echo the header row (signed exact value, same prov
   // vocabulary + coords → same entry key).
@@ -227,7 +235,7 @@ export function llamalendEventSlots(ctx: LlamalendContext, coords: LlamalendCoor
           : null;
       return {
         happened: [clause(happened)],
-        changed: [changed],
+        changed: [changed, bands],
         meansNow: [],
       };
     }
@@ -243,7 +251,7 @@ export function llamalendEventSlots(ctx: LlamalendContext, coords: LlamalendCoor
           : null;
       return {
         happened: [clause(<>Added {collDeltaFig()} of collateral without changing the debt.</>)],
-        changed: [changed],
+        changed: [changed, bands],
         meansNow: [],
       };
     }
@@ -261,6 +269,7 @@ export function llamalendEventSlots(ctx: LlamalendContext, coords: LlamalendCoor
           : cont(<>.</>);
       return {
         happened: [clause(<>Repaid {debtDeltaFig()} of the position&rsquo;s debt</>), ending],
+        changed: [inBand, bands],
         meansNow: [],
       };
     }
@@ -276,13 +285,13 @@ export function llamalendEventSlots(ctx: LlamalendContext, coords: LlamalendCoor
           : null;
       return {
         happened: [clause(<>Withdrew {collDeltaFig()} of collateral from the position&rsquo;s bands.</>)],
-        changed: [changed],
+        changed: [changed, bands],
         meansNow: [],
       };
     }
 
     case "liquidation":
-      return liquidationSlots(ctx, coords, collSym, debtSym, rs);
+      return liquidationSlots(ctx, coords, collSym, debtSym, rs, f);
 
     default:
       return { happened: [] };
@@ -295,6 +304,7 @@ function liquidationSlots(
   collSym: string,
   debtSym: string,
   rs: LlamalendResultingState,
+  f?: LlamalendEventFigures | null,
 ): EventProseSlots {
   // Match the header's echo role exactly (`ctx.role ?? "borrower"`), so the
   // liquidation figures twin the header's liquidationProv primary.
@@ -337,7 +347,7 @@ function liquidationSlots(
             (borrower <Addr address={ctx.positionUser} />)
           </>
         ) : null}
-        : put {liqDebtFig()} toward its debt and received {liqCollFig()} at the market&rsquo;s liquidation discount.
+        : put {liqDebtFig()} toward its debt and received {liqCollFig()}.
       </>
     );
     return {
@@ -387,11 +397,11 @@ function liquidationSlots(
       ? cont(
           <>
             {" "}
-            and {liqCollFig()} taken at the market&rsquo;s liquidation discount, along with {conv} {debtSym} the AMM had
-            already converted — a hard liquidation seizes both legs of the position&rsquo;s holding.
+            and {liqCollFig()} taken, along with {conv} {debtSym} the AMM had already converted — a hard liquidation
+            seizes both legs of the position&rsquo;s holding.
           </>,
         )
-      : cont(<> and {liqCollFig()} taken at the market&rsquo;s liquidation discount.</>)
+      : cont(<> and {liqCollFig()} taken.</>)
     : conv
       ? cont(
           <>
@@ -401,29 +411,115 @@ function liquidationSlots(
         )
       : cont(<>.</>);
 
-  const softLiqHistory = clause(
-    <>
-      A hard liquidation only arms after soft-liquidation. While the price sat inside the band, the AMM had already been
-      converting the collateral gradually, and the position&rsquo;s health eroded to zero.
-    </>,
-  );
+  // Why others could liquidate it, from the read at block − 1, and how the
+  // discount and the premium differ.
+  const healthBefore: ClauseInput =
+    f?.healthBefore != null
+      ? clause(
+          <>
+            Health was {fmtHealth(f.healthBefore)} in the block before. Once health is below 0 anyone may liquidate a
+            position; its owner, or an address the owner approved, may do so at any health.
+          </>,
+        )
+      : clause(
+          <>
+            Once health is below 0 anyone may liquidate a position; its owner, or an address the owner approved, may do
+            so at any health.
+          </>,
+        );
+  const discountVsPremium: ClauseInput =
+    f?.discountBefore != null
+      ? clause(
+          <>
+            The liquidation discount ({pct(f.discountBefore)} on this position) is taken off the collateral&rsquo;s
+            value inside health, so it sets how early health reaches 0. The realized premium is what this liquidator
+            received above the debt it cleared.
+          </>,
+        )
+      : null;
   const takingFraming = clause(
     <>The balances were taken under the protocol&rsquo;s rules, not moved by the borrower.</>,
   );
-  const partialPath: ClauseInput = rs.unstated
-    ? clause(
-        <>
-          A partial liquidation doesn&rsquo;t record the position&rsquo;s end balances, so its remaining collateral and
-          debt aren&rsquo;t shown here; they settle on its next event, and the loan may still be open.
-        </>,
-      )
-    : null;
+  // A liquidation can take a fraction of the loan (liquidate_extended); the
+  // Controller then logs no after-state, and the read at this block states it.
+  const partialPath: ClauseInput =
+    f && f.hasLoan && f.debtAfter != null
+      ? clause(
+          <>
+            It took part of the loan: {formatNumber(f.debtAfter)} {debtSym} of debt stayed, against{" "}
+            {fmtColl(f.collAfter ?? 0)} {collSym}
+            {(f.convAfter ?? 0) > 0 ? (
+              <>
+                {" "}
+                and {formatNumber(f.convAfter ?? 0)} {debtSym} converted
+              </>
+            ) : null}
+            , for a later liquidation or repay to clear.
+          </>,
+        )
+      : rs.unstated
+        ? clause(
+            <>
+              A partial liquidation doesn&rsquo;t record the position&rsquo;s end balances, so its remaining collateral
+              and debt aren&rsquo;t shown here; they settle on its next event, and the loan may still be open.
+            </>,
+          )
+        : null;
 
   return {
     happened: [clause(opener), seizeTail],
-    changed: [softLiqHistory],
+    changed: [healthBefore, discountVsPremium],
     meansNow: [takingFraming, partialPath],
   };
+}
+
+const pct = (fraction: number): string => `${(fraction * 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
+
+/** Where the event placed the bands, from the ticks at block − 1 and after:
+ *  how many bands, and which way (a higher band number is a lower price). */
+function bandMoveClause(ctx: LlamalendContext, f?: LlamalendEventFigures | null): ClauseInput {
+  if (!f || !f.hasLoan || f.n1After == null) return null;
+  if (!f.hadLoan) {
+    return clause(
+      <>
+        The loan opened in bands {f.n1After}…{f.n2After}; a higher band number is a lower price.
+      </>,
+    );
+  }
+  if (f.n1Before == null || f.n1Before === f.n1After) return null;
+  const k = f.n1After - f.n1Before;
+  const n = Math.abs(k);
+  const coll = Number(ctx.collateralDelta ?? 0);
+  const who =
+    ctx.eventType === "add_collateral"
+      ? "Adding collateral with the same debt"
+      : ctx.eventType === "borrow"
+        ? coll > 0
+          ? "Borrowing with the added collateral"
+          : "Borrowing more"
+        : ctx.eventType === "repay"
+          ? "Repaying"
+          : ctx.eventType === "remove_collateral"
+            ? "Removing collateral"
+            : null;
+  if (!who) return null;
+  return clause(
+    <>
+      {who} placed the bands {n} {k > 0 ? "lower" : "higher"}, at {f.n1After}…{f.n2After}; a higher band number is a
+      lower price.
+    </>,
+  );
+}
+
+/** A repay while the AMM held converted collateral. */
+function inBandRepayClause(ctx: LlamalendContext, f?: LlamalendEventFigures | null): ClauseInput {
+  if (!f || ctx.eventType !== "repay" || !f.hadLoan || (f.convBefore ?? 0) <= 0 || !f.hasLoan) return null;
+  return clause(
+    <>
+      The position was in soft-liquidation: the AMM held {formatNumber(f.convBefore ?? 0)} {ctx.borrowedSymbol} from
+      sold collateral. A repay then lowers the debt and raises health; the bands stay where they are.
+    </>,
+  );
 }
 
 /** The teaser = the lead of the composed arc (the first sentence plus its

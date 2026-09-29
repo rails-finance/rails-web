@@ -114,6 +114,7 @@ export function LlamalendPositionCard({
   explanation,
   bodyExtra,
   viewHref,
+  bands,
 }: {
   v: LlamalendPositionView;
   receipts?: boolean;
@@ -131,6 +132,8 @@ export function LlamalendPositionCard({
   /** Copy-this-view control, forwarded straight through to `PositionCardShell` —
    *  the page's `useTimelineEvents().viewHref`. */
   viewHref?: () => string;
+  /** The position's band count, from the live read, for the "?" modal. */
+  bands?: number | null;
 }) {
   // Closed / liquidated: the last emitted absolutes are back at zero, so the
   // card states the outcome and its metadata (no USD: the oracle prices the
@@ -142,7 +145,7 @@ export function LlamalendPositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={llamalendPositionContent({ status: v.status })}
+        learnMore={llamalendPositionContent({ status: v.status, liquidationCount: v.liquidationCount })}
       >
         <ClosedPositionStats
           outcome={v.status}
@@ -160,23 +163,26 @@ export function LlamalendPositionCard({
           // recorded": the API carries no peak figures.
           collateralLabel={CARD_VOCAB.finalCollateral}
           debtLabel={CARD_VOCAB.finalDebt}
+          // The figures after the last event. A closed loan holds nothing: the
+          // Controller withdraws the collateral when the debt reaches 0, so an
+          // unstated collateral here is 0.
           collateral={
-            v.collateral != null && v.collateral > 0 ? (
-              <StatValue>
-                <AssetAmount value={v.collateral} symbol={v.collateralSymbol} exact="last emitted absolute" />
-              </StatValue>
-            ) : (
-              <StatDash />
-            )
+            <StatValue>
+              <AssetAmount
+                value={v.collateral ?? 0}
+                symbol={v.collateralSymbol}
+                exact={v.collateralRaw != null ? formatUnitsExact(v.collateralRaw, v.collateralDecimals) : "0"}
+              />
+            </StatValue>
           }
           debt={
-            v.debt > 0 ? (
-              <StatValue>
-                <AssetAmount value={v.debt} symbol={v.borrowedSymbol} exact="last emitted absolute" />
-              </StatValue>
-            ) : (
-              <StatDash />
-            )
+            <StatValue>
+              <AssetAmount
+                value={v.debt}
+                symbol={v.borrowedSymbol}
+                exact={formatUnitsExact(v.debtRaw, v.borrowedDecimals)}
+              />
+            </StatValue>
           }
         />
       </PositionCardShell>
@@ -319,7 +325,7 @@ export function LlamalendPositionCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={llamalendPositionContent({ status: v.status, inSoftLiq: v.inSoftLiq ?? undefined })}
+      learnMore={llamalendPositionContent({ status: v.status, inSoftLiq: v.inSoftLiq ?? undefined, bands })}
     >
       <OpenPositionStats
         statusPill={

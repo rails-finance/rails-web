@@ -14,7 +14,10 @@ const intro = (
       LlamaLend is Curve&apos;s lending protocol, and its liquidation is a band rather than a line. Each market is
       isolated — one collateral token, one borrowed token — and holds its collateral in an AMM across a range of prices.
       When the price falls into a position&apos;s band, the AMM converts its collateral to the borrowed token
-      continuously: soft-liquidation, a state a position lives in rather than an event that ends it.
+      continuously: soft-liquidation, a state a position lives in rather than an event that ends it. When the price
+      rises back, the AMM buys the collateral back. The swap reverses; the losses do not: each sale is below the oracle
+      price and each buy-back above it. Hard liquidation needs the position&apos;s health below 0, and then anyone may
+      repay its debt, in full or in part, and take what it holds.
     </p>
     <p>
       Each row of the listing is one position — a market and a borrower — showing its collateral, its debt, and how much
