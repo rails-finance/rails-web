@@ -26,7 +26,7 @@ const INFO_LINK = { label: "About Liquity V1: terms and sources", url: "/ethereu
 
 const RESERVE_DETAIL = {
   bold: "Liquidation reserve",
-  text: "200 LUSD of the debt is minted to a gas pool when the Trove opens. Closing repays the debt less 200 LUSD and the reserve is burned; a full redemption burns it too; a liquidation pays it to the liquidator.",
+  text: "200 LUSD of the debt is minted to the reserve pool (Liquity's gas pool) when the Trove opens. Closing repays the debt less 200 LUSD and the reserve is burned; a full redemption burns it too; a liquidation pays it to the liquidator.",
   sources: [{ label: "Borrowing FAQ", url: LIQUITY_V1_FAQ.BORROWING }],
 };
 

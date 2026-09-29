@@ -9,13 +9,15 @@
 // driver owns the toolbar, pagination, debounced search and the fetch lifecycle.
 
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
+import { useUrlSearchParams } from "@/lib/shared/use-url-search-params";
+import { readListQuery } from "@/lib/shared/list-filter";
 import { fetchLiquityV1Positions } from "@/lib/api/fetch-liquity-v1-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import { LiquityV1PositionCard, viewFromSummary } from "@/components/protocol/liquity-v1/liquity-v1-position-card";
 import {
   liquityV1ListDimensions,
   liquityV1FiltersToFetchParams,
-  LIQUITY_V1_LIST_DEFAULTS,
+  liquityV1ListDefaults,
   LIQUITY_V1_SORT_OPTIONS,
   LIQUITY_V1_ITEMS_PER_PAGE,
   type LiquityV1ListFilters,
@@ -29,13 +31,15 @@ export interface LiquityV1ListingProps {
 }
 
 export function LiquityV1Listing({ initialItems, initialTotal, initialKey, initialSearch }: LiquityV1ListingProps) {
+  // A wallet search rests on every status (liquityV1ListDefaults).
+  const defaults = liquityV1ListDefaults(readListQuery(useUrlSearchParams(initialSearch ?? "")));
   return (
     <ChainTruthListingPage<LiquityV1PositionSummary, LiquityV1ListFilters>
       title="Liquity V1 Troves"
       noun="Troves"
       basePath="/ethereum/liquity-v1"
       bookmarksProtocol="liquity-v1"
-      defaults={LIQUITY_V1_LIST_DEFAULTS}
+      defaults={defaults}
       sortOptions={LIQUITY_V1_SORT_OPTIONS}
       searchPlaceholder="Search wallet address"
       renderCard={(p) => <LiquityV1PositionCard v={viewFromSummary(p)} />}

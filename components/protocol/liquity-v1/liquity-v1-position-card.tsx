@@ -34,6 +34,7 @@ import type { LiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
 import { CLAIMABLE_WHERE } from "@/lib/shared/liquity-coll-surplus-provenance";
 import { surplusClaimableProv, surplusUsdProv } from "@/lib/liquity-v1/event-provenance";
 import { formatUsdValue } from "@/lib/utils/format";
+import { fmtEth, fmtLusd } from "@/lib/liquity-v1/event-figures";
 
 export interface LiquityV1PositionView {
   wallet: string;
@@ -66,8 +67,11 @@ export function LiquityV1PositionCard({
   surplus,
   priceUsd,
   endedBy,
+  lives,
 }: {
   v: LiquityV1PositionView;
+  /** The line naming the wallet's other Trove lives, under the stats. */
+  lives?: React.ReactNode;
   receipts?: boolean;
   /** Context content riding the shell's heading-button row (the detail page
    *  passes the compact liquidation runway). */
@@ -154,13 +158,17 @@ export function LiquityV1PositionCard({
             claimable ? (
               <StatValue>
                 <Prov info={surplusClaimableProv(claimable)}>
-                  <AssetAmount value={claimable.claimable} symbol={COLLATERAL_SYMBOL} />
+                  <AssetAmount
+                    value={claimable.claimable}
+                    symbol={COLLATERAL_SYMBOL}
+                    exact={fmtEth(claimable.claimable)}
+                  />
                 </Prov>
               </StatValue>
             ) : v.peakCollateral > 0 ? (
               <StatValue>
                 <Prov info={peakCollateralProv()}>
-                  <AssetAmount value={v.peakCollateral} symbol={COLLATERAL_SYMBOL} />
+                  <AssetAmount value={v.peakCollateral} symbol={COLLATERAL_SYMBOL} exact={fmtEth(v.peakCollateral)} />
                 </Prov>
               </StatValue>
             ) : (
@@ -171,7 +179,7 @@ export function LiquityV1PositionCard({
             claimable ? undefined : v.peakDebt > 0 ? (
               <StatValue>
                 <Prov info={peakDebtProv()}>
-                  <AssetAmount value={v.peakDebt} symbol={DEBT_SYMBOL} />
+                  <AssetAmount value={v.peakDebt} symbol={DEBT_SYMBOL} exact={fmtLusd(v.peakDebt)} />
                 </Prov>
               </StatValue>
             ) : (
@@ -179,6 +187,7 @@ export function LiquityV1PositionCard({
             )
           }
         />
+        {lives}
       </PositionCardShell>
     );
   }
@@ -214,7 +223,7 @@ export function LiquityV1PositionCard({
               v.collateral > 0 ? (
                 <StatValue>
                   <Prov info={live ? entireCollateralProv(v.atBlock) : positionCollateralProv(v.atBlock)}>
-                    <AssetAmount value={v.collateral} symbol={COLLATERAL_SYMBOL} />
+                    <AssetAmount value={v.collateral} symbol={COLLATERAL_SYMBOL} exact={fmtEth(v.collateral)} />
                   </Prov>
                 </StatValue>
               ) : (
@@ -227,7 +236,7 @@ export function LiquityV1PositionCard({
               v.debt > 0 ? (
                 <StatValue>
                   <Prov info={live ? entireDebtProv(v.atBlock) : positionDebtProv(v.atBlock)}>
-                    <AssetAmount value={v.debt} symbol={DEBT_SYMBOL} />
+                    <AssetAmount value={v.debt} symbol={DEBT_SYMBOL} exact={fmtLusd(v.debt)} />
                   </Prov>
                 </StatValue>
               ) : (
@@ -237,6 +246,7 @@ export function LiquityV1PositionCard({
           },
         ]}
       />
+      {lives}
     </PositionCardShell>
   );
 }

@@ -62,7 +62,12 @@ import {
   liquityV1RedemptionOutcome,
 } from "@/lib/liquity-v1/economics-explanation";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
-import { useLiquityV1EventReads, useLiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
+import {
+  useLiquityV1EventReads,
+  useLiquityV1EventReadState,
+  useLiquityV1Surplus,
+} from "@/lib/liquity-v1/use-event-read";
+import { LiquityV1LivesLine, liquityV1Lives } from "@/components/protocol/liquity-v1/liquity-v1-lives-line";
 import { liquityV1OutcomeTxs, liquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
 import { protocolPriceProv } from "@/lib/liquity-v1/position-provenance";
 import { eventPriceProv } from "@/lib/liquity-v1/event-provenance";
@@ -356,6 +361,30 @@ export default function LiquityV1TroveView({
           ? (surplus?.surplus ?? redemptionSplit(lastRow.context.data)?.ethSurplus ?? null)
           : null;
 
+  // The wallet's other Trove lives, for the card's line linking them.
+  const lives = useMemo(() => (summaries.length > 1 ? liquityV1Lives(summaries, events) : []), [summaries, events]);
+  // How the timeline's events divide: the owner's own rows, the redemptions,
+  // the liquidation and the surplus claim. Only a page holding the whole
+  // history can count them.
+  const eventTally =
+    historyWindow.state === "whole"
+      ? {
+          total: v1Events.length + (claimRow ? 1 : 0),
+          owner: v1Events.filter(
+            (e) => e.context.data.eventType !== "redemption" && e.context.data.eventType !== "liquidation",
+          ).length,
+          claim: claimRow != null,
+        }
+      : null;
+  // An owner's close carries no captured price, so the closing price comes
+  // from the close's receipt read (PriceFeed.lastGoodPrice at its block), the
+  // price its opened card shows.
+  const closeTx =
+    view && view.status !== "open" && lastRow && !(lastRow.context.data.priceAtBlock?.usd ?? 0)
+      ? lastRow.txHash
+      : undefined;
+  const { read: closeRead } = useLiquityV1EventReadState(closeTx, closeTx ? wallet : undefined);
+
   const chainLive = view?.status === "open" && chain != null && chain.troveStatus === "active" ? chain : null;
   const faceView =
     view && chainLive
@@ -378,7 +407,9 @@ export default function LiquityV1TroveView({
           // liquidation and redemption rows only.
           view && view.status !== "open"
             ? closingPricesAt(v1Events, (row) => {
-                const usd = row.context.data.priceAtBlock?.usd;
+                const usd =
+                  row.context.data.priceAtBlock?.usd ??
+                  (closeRead && closeRead.txHash === row.txHash.toLowerCase() ? closeRead.priceUsd : null);
                 return usd != null && usd > 0
                   ? [
                       {
@@ -422,6 +453,11 @@ export default function LiquityV1TroveView({
               surplus={surplus}
               priceUsd={priceNow}
               endedBy={lastRow ? endedBy : null}
+              lives={
+                selectedEpoch != null ? (
+                  <LiquityV1LivesLine wallet={wallet} lives={lives} epoch={selectedEpoch} />
+                ) : undefined
+              }
               // The risk slot rides the card's heading-button row (the Aave V3
               // treatment): the Display menu plus the chosen risk picture —
               // liquidation runway (default) or the collateral-ratio card —
@@ -460,6 +496,7 @@ export default function LiquityV1TroveView({
                     redemptions={redemptions}
                     priceNow={priceNow}
                     ethBack={ethBack}
+                    eventTally={eventTally}
                   />
                 ) : chain && chain.troveStatus !== "active" ? (
                   // Index says open, the chain says the Trove has since closed

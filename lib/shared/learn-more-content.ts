@@ -2225,7 +2225,7 @@ const V1_SRC = {
 /** The 200 LUSD liquidation reserve, stated the same way on every modal. */
 const V1_RESERVE_DETAIL = {
   bold: "Liquidation reserve",
-  text: "200 LUSD of every Trove's debt is minted to a gas pool when it opens. It stays part of the debt: closing repays the debt less 200 LUSD and the reserve is burned; a full redemption burns it too; a liquidation pays it to the liquidator.",
+  text: "200 LUSD of every Trove's debt is minted to the reserve pool (Liquity's gas pool) when it opens. It stays part of the debt: closing repays the debt less 200 LUSD and the reserve is burned; a full redemption burns it too; a liquidation pays it to the liquidator.",
   sources: [V1_SRC.borrowing, V1_SRC.bo],
 };
 
@@ -2334,7 +2334,7 @@ export function liquityV1CloseContent(): LearnMoreContent {
   return {
     title: "How Closing a Trove Works",
     intro:
-      "Closing repays the Trove's debt and returns all of its ETH to the owner in one transaction. The owner pays the debt less the 200 LUSD liquidation reserve; the gas pool burns the reserve, which cancels the rest.",
+      "Closing repays the Trove's debt and returns all of its ETH to the owner in one transaction. The owner pays the debt less the 200 LUSD liquidation reserve; the reserve pool burns those 200 LUSD, which cancels the rest.",
     stepsHeading: "Limits:",
     steps: [
       "The owner needs the debt less 200 LUSD in their wallet. A 2,000 LUSD debt takes 1,800 LUSD to close.",
@@ -2351,12 +2351,12 @@ export function liquityV1RedemptionContent(): LearnMoreContent {
   return {
     title: "How Redemptions Work",
     intro:
-      "Anyone holding LUSD can swap it for ETH at $1 per LUSD, at the protocol's ETH price. The LUSD cancels debt in the Troves with the lowest collateral ratio first. This is what holds LUSD at a dollar when it trades below.",
+      "Anyone holding LUSD can swap it for ETH at $1 per LUSD, at the protocol's ETH price. The LUSD cancels debt in the Troves with the lowest collateral ratios at the time, ranked across all open Troves, whatever their level. This is what holds LUSD at a dollar when it trades below.",
     stepsHeading: "What happens to a redeemed Trove:",
     steps: [
       "The redeemer's LUSD cancels part of the Trove's debt, and ETH worth the same number of dollars leaves the Trove to the redeemer.",
       "Because debt and collateral fall by the same dollar amount, the Trove's collateral ratio goes up.",
-      "If the redemption cancels the whole debt, the redeemer pays for all of it except the 200 LUSD reserve, which the gas pool burns. The Trove closes, and its remaining ETH moves to a surplus pool, where the owner claims it.",
+      "If the redemption cancels the whole debt, the redeemer pays for all of it except the 200 LUSD reserve, which the reserve pool burns. The Trove closes, and its remaining ETH moves to a surplus pool, where the owner claims it.",
       "Troves below 110% are skipped; liquidation deals with those.",
     ],
     extraParagraphs: [

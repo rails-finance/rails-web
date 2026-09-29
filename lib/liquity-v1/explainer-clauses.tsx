@@ -466,11 +466,14 @@ export function liquityV1EventSlots(
           ),
         ],
         changed: [liquidationWhyClause(ctx), ...route],
+        // This event's figures only: what the owner kept and lost over the
+        // whole life is the position card's.
         meansNow: [
           valuedLiquidationSentence(ctx, coords),
+          clause(<>The owner keeps the LUSD they borrowed and gets none of the seized ETH back.</>),
           ...(ownerOutcome
-            ? liquityV1OutcomeSentences(ownerOutcome, muted, true).map((sentence) => clause(sentence))
-            : [clause(<>The owner keeps the LUSD they borrowed and gets none of the seized ETH back.</>)]),
+            ? [liquityV1NearLineSentence(ownerOutcome, muted)].filter((x) => x != null).map((x) => clause(x))
+            : []),
         ],
       };
     }
@@ -490,19 +493,29 @@ export function liquityV1EventSlots(
           </Fig>
         ) : null;
 
+      // The queue is ordered across all open Troves, so a Trove well above
+      // 110% is redeemed when it is among the lowest at the time.
+      const ratioThen = ratioOf(s.collBefore, s.debtBefore, price);
       const happened = [
         clause(
           split?.full && redeemerFig ? (
             <>
-              An LUSD holder redeemed against this Trove, one of the lowest collateral ratios in the queue at the time:{" "}
-              {debtDeltaFig()} of debt was cancelled and {redeemerFig} went to the redeemer.
+              An LUSD holder redeemed against this Trove: {debtDeltaFig()} of debt was cancelled and {redeemerFig} went
+              to the redeemer.
             </>
           ) : (
             <>
-              An LUSD holder redeemed against this Trove, one of the lowest collateral ratios in the queue at the time:{" "}
-              {collDeltaFig()} went to the redeemer and {debtDeltaFig()} of its debt was cancelled at $1 per LUSD.
+              An LUSD holder redeemed against this Trove: {collDeltaFig()} went to the redeemer and {debtDeltaFig()} of
+              its debt was cancelled at $1 per LUSD.
             </>
           ),
+        ),
+        clause(
+          <>
+            Redemptions work up from the lowest collateral ratio across all open Troves, so a Trove is redeemed when it
+            is among the lowest at the time, whatever its level
+            {ratioThen != null && <>; this one stood at {fmtPct(ratioThen)}</>}.
+          </>,
         ),
       ];
 
@@ -705,8 +718,8 @@ export function liquityV1ExplainerTeaser(ctx: LiquityV1Context, coords: LiquityV
 
 // ── a liquidated life's outcome for its owner ────────────────────────────────
 //
-// Shared by the liquidation's opened card and the closed Trove's card, each
-// passing its own highlight. Figures only: what the owner kept, withdrew and
+// The closed Trove's card states the whole outcome; the liquidation's opened
+// card keeps only the near-line pair. Figures only: what the owner kept, withdrew and
 // lost, where the debt and ETH went, and, where the owner's last act took the
 // ratio to the line, the two ratios side by side.
 
@@ -729,12 +742,7 @@ const actNoun = (kinds: LiquityV1NearLine["kinds"]): string =>
 
 /** What the owner kept, withdrew and lost, and the near-line pair when there
  *  is one: one sentence each. */
-export function liquityV1OutcomeSentences(
-  o: LiquityV1OwnerOutcome,
-  hl: Hl,
-  /** The surface already values the seized ETH (the liquidation's own card). */
-  valued = false,
-): ReactNode[] {
+export function liquityV1OutcomeSentences(o: LiquityV1OwnerOutcome, hl: Hl): ReactNode[] {
   const out: ReactNode[] = [];
   const kept = o.lusdReceived - o.lusdRepaid;
   const lusd = (n: number) => hl(`${fmtLusd(n)} ${DEBT_SYMBOL}`);
@@ -753,9 +761,7 @@ export function liquityV1OutcomeSentences(
       </>
     ),
   );
-  const lost = valued ? (
-    eth(o.ethLost)
-  ) : (
+  const lost = (
     <>
       {eth(o.ethLost)}, worth {hl(fmtUsd(o.ethLost * o.liquidationPrice))} at the liquidation price of{" "}
       {fmtUsd(o.liquidationPrice)}
@@ -772,18 +778,24 @@ export function liquityV1OutcomeSentences(
       <>The owner withdrew no ETH over the Trove&rsquo;s life, and the liquidation took {lost}.</>
     ),
   );
-  const n = o.nearLine;
-  if (n) {
-    const act = formatDate(n.timestamp);
-    const at = formatDate(n.liquidationTimestamp);
-    out.push(
-      <>
-        The {actNoun(n.kinds)} on {act} left the ratio at {hl(fmtPct(n.ratioAfter))}; the Trove was liquidated at{" "}
-        {hl(fmtPct(n.liquidationRatio))} {act === at ? "the same day" : <>on {at}</>}.
-      </>,
-    );
-  }
+  const near = liquityV1NearLineSentence(o, hl);
+  if (near) out.push(near);
   return out;
+}
+
+/** Where the owner's last act took the ratio to the line: the ratio it left
+ *  and the ratio at liquidation, side by side. Null when no act did. */
+export function liquityV1NearLineSentence(o: LiquityV1OwnerOutcome, hl: Hl): ReactNode | null {
+  const n = o.nearLine;
+  if (!n) return null;
+  const act = formatDate(n.timestamp);
+  const at = formatDate(n.liquidationTimestamp);
+  return (
+    <>
+      The {actNoun(n.kinds)} on {act} left the ratio at {hl(fmtPct(n.ratioAfter))}; the Trove was liquidated at{" "}
+      {hl(fmtPct(n.liquidationRatio))} {act === at ? "the same day" : <>on {at}</>}.
+    </>
+  );
 }
 
 /** Where a liquidation's debt and ETH went, and whether the system was in
