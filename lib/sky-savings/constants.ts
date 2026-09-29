@@ -48,6 +48,18 @@ export const SKY_DOCS = {
     label: "DssLitePsm.sol, the PSM contract source",
     href: "https://github.com/sky-ecosystem/dss-lite-psm/blob/main/src/DssLitePsm.sol",
   },
+  vat: {
+    label: "vat.sol: suck, the debt booked for new USDS",
+    href: "https://github.com/sky-ecosystem/dss/blob/master/src/vat.sol",
+  },
+  jug: {
+    label: "jug.sol: stability fees paid to the Vow",
+    href: "https://github.com/sky-ecosystem/dss/blob/master/src/jug.sol",
+  },
+  vow: {
+    label: "vow.sol: the surplus buffer, where debt and surplus settle",
+    href: "https://github.com/sky-ecosystem/dss/blob/master/src/vow.sol",
+  },
   wrapper: {
     label: "UsdsPsmWrapper.sol, the USDS side of the PSM",
     href: "https://github.com/sky-ecosystem/usds-wrappers/blob/dev/src/UsdsPsmWrapper.sol",

@@ -135,6 +135,23 @@ export interface FlowTimeline {
   totalTxs?: number;
   /** The headline words, the position card's: "Collateral" and "Debt" by default. */
   labels?: { collateral: string; debt: string };
+  /** A family's own words for the one-sided bar; each unset one keeps the default. */
+  words?: FlowWords;
+}
+
+/** Per-timeline words for the scrubber. Every field is optional and defaults
+ *  to the words every lending family reads. */
+export interface FlowWords {
+  /** The solid segment of the supplied side ("Still supplied"). */
+  held?: string;
+  /** The date label at the last stop ("Today, live prices"). */
+  live?: string;
+  /** The footnote's sentence on how flows and holdings are valued. */
+  priceNote?: string;
+  /** The zoom's total line after the in-figure (" in, "). */
+  totalIn?: string;
+  /** The smallest interest, in USD, that gets its own source row (0.5). */
+  interestMin?: number;
 }
 
 /** A held asset whose price, at some date, is older than the gap allowed. */
@@ -193,6 +210,7 @@ export interface FlowModel {
   totalTxs: number | null;
   /** The headline words. */
   labels: { collateral: string; debt: string };
+  words: FlowWords;
   /** Each asset held and owed at the end of each stop before the live one,
    *  and at the live stop. */
   heldAt: FlowAssetHeld[][];
@@ -516,6 +534,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     totalEvents: t.totalEvents ?? last.events,
     totalTxs: t.totalTxs ?? last.txs ?? null,
     labels: t.labels ?? { collateral: "Collateral", debt: "Debt" },
+    words: t.words ?? {},
     heldAt,
     liveHeld: t.live.assets ?? liveHeldFromBalances(held, t.todayPrices, heldAt[heldAt.length - 1] ?? []),
     axis: axisFor(peak),
@@ -620,7 +639,7 @@ function sideState(
   const bar: FlowSegment[] = [
     {
       key: `${side}-held`,
-      label: side === "collateral" ? "Still supplied" : "Still owed",
+      label: side === "collateral" ? (m.words.held ?? "Still supplied") : "Still owed",
       fill: "held",
       width: heldNow,
       value: heldNow,
@@ -648,7 +667,7 @@ function sideState(
   const balancing =
     interest != null
       ? [
-          ...(Math.abs(interest) >= 0.5
+          ...(Math.abs(interest) >= (m.words.interestMin ?? 0.5)
             ? [
                 {
                   key: `${side}-interest`,

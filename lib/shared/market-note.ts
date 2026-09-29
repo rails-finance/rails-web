@@ -303,6 +303,11 @@ export interface VaultTermsNote extends MarketNoteBase {
   /** The quiet word after it naming what that figure counts ("target rate",
    *  "performance fee"). */
   quantity: string;
+  /** The marker's name where the family has one ("Savings Rate change");
+   *  unset, the marker reads "Market note". */
+  title?: string;
+  /** The marker's tooltip where the family words it; unset, "<share> terms". */
+  tip?: string;
   /** The whole sentence, as the family states it: what the event says, in the
    *  contract's own units. */
   statement: string;
@@ -327,7 +332,14 @@ export type MarketNote = ShareRateStepNote | PriceGapNote | RateStepNote | Vault
 export function vaultTermsNotes<N extends VaultTermsSource>(
   notes: readonly N[],
   vault: { address: string; shareSymbol: string; protocolId: string },
-  say: (note: N) => { headline: string; quantity: string; statement: string; prov: Provenance },
+  say: (note: N) => {
+    headline: string;
+    quantity: string;
+    statement: string;
+    prov: Provenance;
+    title?: string;
+    tip?: string;
+  },
 ): VaultTermsNote[] {
   return notes.map((note) => {
     const words = say(note);
@@ -355,6 +367,8 @@ export function vaultTermsNotes<N extends VaultTermsSource>(
       termsKind: note.kind,
       headline: words.headline,
       quantity: words.quantity,
+      ...(words.title ? { title: words.title } : {}),
+      ...(words.tip ? { tip: words.tip } : {}),
       statement: words.statement,
       prov: words.prov,
       measureProtocolId: vault.protocolId,

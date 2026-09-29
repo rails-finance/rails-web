@@ -59,7 +59,8 @@ export const noteOpenId = (note: MarketNote) => `note:${note.id}`;
 
 function markerLabel(note: MarketNote): string {
   const when = note.live ? "now" : note.to.timestamp > 0 ? formatDate(note.to.timestamp) : null;
-  return `Market note${when ? `, ${when}` : ""}: ${noteMarkerText(note).spoken}`;
+  const title = (note.kind === "vault-terms" && note.title) || "Market note";
+  return `${title}${when ? `, ${when}` : ""}: ${noteMarkerText(note).spoken}`;
 }
 
 function Diamond({ filled }: { filled: boolean }) {

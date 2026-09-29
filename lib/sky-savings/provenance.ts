@@ -288,3 +288,33 @@ export const ledgerLineProv = (
   via: LEDGER,
   source: { block },
 });
+
+export const eventInterestSinceProv = (
+  c: SkyEventCoords,
+  raw: string,
+  prevBlock: number,
+  prevValueAfter: string,
+  valueBefore: string,
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `Interest since the previous event — the sUSDS held since block ${n(prevBlock)} at this block's share price, less their worth just after that event. No log moved it: it is the share price's growth on a balance that stood still.`,
+  contract: SUSDS_CONTRACT,
+  formula: "worth just before this event − worth just after the previous one",
+  inputs: [
+    { label: "Worth after the previous event (raw)", value: prevValueAfter, kind: "chain-derived" },
+    { label: "Worth just before this event (raw)", value: valueBefore, kind: "chain-derived" },
+  ],
+  source: src(c),
+  scaling: scaling18(raw),
+});
+
+export const yearlyProv = (block: number, valueRaw: string, annual: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `A year's interest at today's rate — the worth at block ${n(block)} times the Savings Rate in force there (${annual} a year, already compounded). Governance can change the rate at any block.`,
+  contract: SUSDS_CONTRACT,
+  formula: "worth × (ssr ^ 31,536,000 − 1)",
+  inputs: [{ label: "Worth in USDS (raw)", value: valueRaw, kind: "chain-derived" }],
+  source: { block },
+});

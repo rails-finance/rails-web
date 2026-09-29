@@ -3,11 +3,12 @@
 // One Sky Savings event on the timeline: a Deposit, Withdrawal, Received, Sent
 // or Transfer to self, from the sealed sUSDS ledger. The disclosure ladder
 // (rails-ops standards/detail-page-anatomy.md):
-//   T1 — the header: the verb and the amounts (USDS and sUSDS on a deposit or
-//        withdrawal, sUSDS on a transfer, with the other address), and the
-//        referral code a deposit carried.
+//   T1 — the header: the verb and the amounts, each unit named in words (USDS
+//        and sUSDS on a deposit or withdrawal; sUSDS and its USDS worth on a
+//        transfer, with the other address), who deposited when it was another
+//        address, and the referral code a deposit carried.
 //   T2 — the opened card: sUSDS held and its worth before → after, the
-//        interest earned to date, the share price and the Savings Rate at
+//        interest earned to date and since the previous event, the share price and the Savings Rate at
 //        the event's block, the referral code.
 //   T3 — the explanation of this event's figures (sky-savings-event-explainer).
 //   T4 — the lesson for the kind (lib/sky-savings/learn-more.ts).
@@ -33,11 +34,12 @@ import { LearnMore } from "@/components/shared/learn-more-modal";
 import { formatCompact, withRealMinus } from "@/lib/utils/format";
 import type { BaseActivityEvent, SkySavingsContext } from "@/lib/shared/types/event-shape";
 import { SUSDS, USDS } from "@/lib/sky-savings/constants";
-import { annualRate, exact, pct, rayExact, rayNumber, skyTransition, units } from "@/lib/sky-savings/math";
+import { annualRate, exact, fixed6, pct, rayExact, rayNumber, skyTransition, units } from "@/lib/sky-savings/math";
 import {
   eventChiProv,
   eventCounterpartyProv,
   eventEarnedProv,
+  eventInterestSinceProv,
   eventRateProv,
   eventReferralProv,
   eventSharesAfterProv,
@@ -48,6 +50,7 @@ import {
   type SkyEventCoords,
 } from "@/lib/sky-savings/provenance";
 import { skyEventContent } from "@/lib/sky-savings/learn-more";
+import { skyInterestSince, type SkyPreviousEvent } from "@/lib/sky-savings/explainer-clauses";
 import { SkySavingsEventExplainer } from "./sky-savings-event-explainer";
 
 export type SkySavingsEvent = BaseActivityEvent & { context: { protocol: "sky-savings"; data: SkySavingsContext } };
@@ -72,11 +75,15 @@ export function SkySavingsEventCard({
   isFirst,
   isLast,
   eventNumber,
+  previous,
 }: {
   event: SkySavingsEvent;
   isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
+  /** The holder's event before this one: null for the first, undefined when
+   *  it is older than the rows the page holds. */
+  previous?: SkyPreviousEvent | null;
 }) {
   const c = event.context.data;
   const coords: SkyEventCoords = { block: event.blockNumber, txHash: event.txHash, holder: c.holder };
@@ -98,7 +105,16 @@ export function SkySavingsEventCard({
   const tokens: SpineTokenRow[] = [];
   if (kind === "deposit" || kind === "withdrawal") {
     const usdsSigned = kind === "deposit" ? usdsMoved : -usdsMoved;
-    deltas.push({ value: usdsSigned, symbol: USDS.symbol, address: USDS.address, prov: usdsProv });
+    // Each amount names its unit in words beside its mark: at ≥sm the figure
+    // rides the spine and the words stay in the header.
+    deltas.push({
+      value: usdsSigned,
+      symbol: USDS.symbol,
+      address: USDS.address,
+      prov: usdsProv,
+      label: kind === "deposit" ? "USDS in" : "USDS out",
+      axisVerb: true,
+    });
     tokens.push({
       symbol: USDS.symbol,
       address: USDS.address,
@@ -106,7 +122,14 @@ export function SkySavingsEventCard({
       value: usdsMoved,
       prov: { info: usdsProv, value: chainTruthDeltaValue(usdsSigned, false), symbol: USDS.symbol },
     });
-    deltas.push({ value: sharesMoved, symbol: SUSDS.symbol, address: SUSDS.address, prov: sharesProv });
+    deltas.push({
+      value: sharesMoved,
+      symbol: SUSDS.symbol,
+      address: SUSDS.address,
+      prov: sharesProv,
+      label: kind === "deposit" ? "sUSDS minted" : "sUSDS burned",
+      axisVerb: true,
+    });
     tokens.push({
       symbol: SUSDS.symbol,
       address: SUSDS.address,
@@ -115,7 +138,23 @@ export function SkySavingsEventCard({
       prov: { info: sharesProv, value: chainTruthDeltaValue(sharesMoved, false), symbol: SUSDS.symbol },
     });
   } else if (isTransfer) {
-    deltas.push({ value: sharesMoved, symbol: SUSDS.symbol, address: SUSDS.address, prov: sharesProv });
+    // A transfer moves sUSDS only; its worth in USDS rides beside it.
+    deltas.push({
+      value: sharesMoved,
+      symbol: SUSDS.symbol,
+      address: SUSDS.address,
+      prov: sharesProv,
+      suffix: SUSDS.symbol,
+    });
+    deltas.push({
+      value: usdsMoved,
+      symbol: USDS.symbol,
+      address: USDS.address,
+      prov: usdsProv,
+      label: "worth",
+      suffix: USDS.symbol,
+      noSpineCounterpart: true,
+    });
     tokens.push({ symbol: SUSDS.symbol, address: SUSDS.address, badge: "send" });
   }
 
@@ -125,7 +164,7 @@ export function SkySavingsEventCard({
     isTransfer && other
       ? { prefix: kind === "sent" ? "to" : "from", address: other, prov: eventCounterpartyProv(coords, kind) }
       : kind === "deposit" && other && other !== holder
-        ? { prefix: "from", address: other, prov: eventCounterpartyProv(coords, kind) }
+        ? { prefix: "for this address by", address: other, prov: eventCounterpartyProv(coords, kind) }
         : kind === "withdrawal" && other && other !== holder
           ? { prefix: "to", address: other, prov: eventCounterpartyProv(coords, kind) }
           : undefined;
@@ -146,6 +185,9 @@ export function SkySavingsEventCard({
 
   // ── T2 ────────────────────────────────────────────────────────────────────
   const sharesChanged = t.sharesDelta !== BigInt(0);
+  const since = skyInterestSince(c, previous);
+  // Omitted where the balance was empty in between (nothing to earn).
+  const sinceRaw = since != null && previous && since !== BigInt(0) ? since : null;
   const stats: ChainTruthStat[] = [
     {
       label: "sUSDS held",
@@ -190,8 +232,23 @@ export function SkySavingsEventCard({
       address: USDS.address,
       prov: eventEarnedProv(coords, "after", c.earnedAfter),
       // A deposit, withdrawal or transfer moves USDS in or out at the share
-      // price of its block, so interest earned stands still across it.
+      // price of its block, so interest earned stands still across it; what
+      // moved it is the time since the previous event.
       changed: false,
+      interestSincePrevious:
+        sinceRaw != null && previous
+          ? {
+              value: exact(sinceRaw),
+              display: fixed6(sinceRaw),
+              prov: eventInterestSinceProv(
+                coords,
+                sinceRaw.toString(),
+                previous.blockNumber,
+                previous.ctx.valueAfter,
+                t.valueBefore.toString(),
+              ),
+            }
+          : undefined,
     },
     {
       label: "One sUSDS worth",
@@ -244,7 +301,7 @@ export function SkySavingsEventCard({
       header={<ChainTruthRow spec={spec} timestamp={event.timestamp} eventNumber={eventNumber} />}
       detail={detail}
       detailLabel="Position after this event"
-      explainer={<SkySavingsEventExplainer ctx={c} />}
+      explainer={<SkySavingsEventExplainer ctx={c} previous={previous} />}
       explainerLabel="Plain English"
       txHash={event.txHash}
       learnMore={<LearnMore inline content={skyEventContent(kind)} />}

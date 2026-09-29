@@ -4,7 +4,7 @@
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { formatDate } from "@/lib/date";
 import { formatCompact, formatNumber } from "@/lib/utils/format";
-import { pctString, rayNumber, units } from "@/lib/sky-savings/math";
+import { pctString, rayNumber, skyYearlyEarnings, units, yearlyText } from "@/lib/sky-savings/math";
 import type { SkyLifetimeTotals } from "@/lib/sky-savings/flows";
 import type { SkyAsOf, SkyPosition } from "@/lib/sky-savings/types";
 
@@ -61,10 +61,24 @@ export function SkySavingsPositionExplanation({
       </>,
     );
 
+  const yearly = skyYearlyEarnings(p, asOf);
+  items.push(
+    yearly != null ? (
+      <>
+        At <H>{pctString(asOf.ssrAnnual)}</H> a year this balance earns about <H>{yearlyText(yearly)} USDS</H> a year.
+        Sky governance sets the rate and can change it at any block; a change applies to every holder from that block.
+      </>
+    ) : (
+      <>
+        The Savings Rate is <H>{pctString(asOf.ssrAnnual)}</H> a year. Sky governance sets it and can change it at any
+        block; a change applies to every holder from that block.
+      </>
+    ),
+  );
   items.push(
     <>
-      The Savings Rate is <H>{pctString(asOf.ssrAnnual)}</H> a year. Sky governance sets it, and it applies to every
-      holder at once.
+      Sky mints the interest as new USDS when the share price is brought up to date, and books the same amount as debt
+      at its surplus buffer, where borrowers&rsquo; stability fees on Sky vaults are paid in.
     </>,
   );
 

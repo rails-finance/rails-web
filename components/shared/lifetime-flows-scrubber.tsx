@@ -395,7 +395,7 @@ function SideBlock({
   const repaid = st.out - liquidated;
   const held = st.bar[0];
   const spoken = coll
-    ? `${word}: ${spokenUsd(st.now)} still supplied, of ${spokenUsd(st.total)} that came in; ${spokenUsd(st.out)} has left.`
+    ? `${word}: ${spokenUsd(st.now)} ${(model.words.held ?? "Still supplied").toLowerCase()}, of ${spokenUsd(st.total)} that came in; ${spokenUsd(st.out)} has left.`
     : `${word}: ${spokenUsd(st.now)} owed, of ${spokenUsd(st.total)} owed in all; ${spokenUsd(repaid)} repaid` +
       (liquidated > 0 ? `, ${spokenUsd(liquidated)} liquidated.` : ".");
   const srcSpoken = `${coll ? "Everything that came in" : "Everything that was owed"}, by source: ${st.sources
@@ -476,7 +476,7 @@ function SideBlock({
               <Prov info={flowTotalProv(side, "in", when)}>
                 <span className="text-foreground">{formatFlowUsd(st.total)}</span>
               </Prov>
-              {coll ? " in, " : " owed in all, "}
+              {coll ? (model.words.totalIn ?? " in, ") : " owed in all, "}
               <Prov info={flowTotalProv(side, "out", when)}>
                 <span className="text-foreground">{formatFlowUsd(coll ? st.out : repaid)}</span>
               </Prov>
@@ -610,7 +610,7 @@ function ScrubberBody({ model }: { model: FlowModel }) {
   );
   const active = pinned ?? hover;
   const pin = (k: string) => setPinned((p) => (p === k ? null : k));
-  const dateText = s.isLive ? "Today, live prices" : formatDate(dayStart(model, stop));
+  const dateText = s.isLive ? (model.words.live ?? "Today, live prices") : formatDate(dayStart(model, stop));
   const when = s.isLive ? "now" : `the end of ${dateText}`;
   const counter =
     model.totalTxs != null && s.txs != null
@@ -619,10 +619,12 @@ function ScrubberBody({ model }: { model: FlowModel }) {
   const repricedHere = s.isLive ? [] : model.repricings.filter((r) => r.day === stop);
   const btn = `${CTRL_GHOST} ${CTRL_OFF} size-11 shrink-0 rounded-md sm:size-9`;
   const hint =
-    "Solid is still there; each hatch is one way value left, and a dashed fill moved no funds. The dashed outline marks where each bar ends today. Flows are valued at the oracle price at their block; " +
-    (model.daily
-      ? "what is held on a day is valued at the last oracle price recorded by that day's end."
-      : "between events an asset keeps the price of its last event.");
+    "Solid is still there; each hatch is one way value left, and a dashed fill moved no funds. The dashed outline marks where each bar ends today. " +
+    (model.words.priceNote ??
+      "Flows are valued at the oracle price at their block; " +
+        (model.daily
+          ? "what is held on a day is valued at the last oracle price recorded by that day's end."
+          : "between events an asset keeps the price of its last event."));
 
   return (
     <div className="text-sm">

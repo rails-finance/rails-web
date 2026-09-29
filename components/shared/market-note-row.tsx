@@ -458,7 +458,10 @@ export function noteMarkerText(note: MarketNote): { tip: string; spoken: string 
   // The other kinds carry no one signed move on the price-gap's grain: the
   // marker names the quantity and its direction, and the open row the figures.
   const noun = note.kind === "rate-step" ? "rate" : note.kind === "share-rate-step" ? "share rate" : "terms";
-  if (note.kind === "vault-terms") return { tip: `${sym} ${noun}`, spoken: `${sym} ${noun}` };
+  if (note.kind === "vault-terms") {
+    const text = note.tip ?? `${sym} ${noun}`;
+    return { tip: text, spoken: text };
+  }
   const text = `${sym} ${noun} ${note.to.value >= note.from.value ? "up" : "down"}`;
   return { tip: text, spoken: text };
 }
