@@ -22,7 +22,14 @@
 import { formatDate } from "@/lib/date";
 import { formatNumber } from "@/lib/utils/format";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
-import { driftIntervalProv, driftValueProv } from "@/lib/fx/event-provenance";
+import {
+  driftIntervalProv,
+  driftValueProv,
+  lifetimeInTxFundingProv,
+  lifetimeCollateralMovedProv,
+  driftTotalProv,
+} from "@/lib/fx/event-provenance";
+import { fxFundingText, type FxInTxFunding } from "@/lib/fx/in-tx-funding";
 import type { FxDriftInterval, FxDriftResult } from "@/lib/sources/api/fx-drift";
 import { AmountText } from "@/components/shared/amount-text";
 
@@ -34,7 +41,7 @@ function DriftCell({ value, symbol, prov }: { value: number; symbol: string; pro
     <Prov info={prov} value={`${value > 0 ? "+" : "−"}${formatNumber(Math.abs(value))} ${symbol}`}>
       <span className="tabular-nums text-foreground/80">
         {value > 0 ? "+" : "−"}
-        <AmountText value={Math.abs(value)} /> {symbol}
+        {symbol === "fxUSD" ? <AmountText value={Math.abs(value)} /> : fxFundingText(value)} {symbol}
       </span>
     </Prov>
   );
@@ -47,6 +54,7 @@ export function FxDriftPanel({
   onLoad,
   normalizedSymbol,
   blockDates,
+  inTx,
 }: {
   /** The intervals in hand (the newest suffix), or null before the first
    *  answer. */
@@ -62,6 +70,8 @@ export function FxDriftPanel({
   /** Block → unix time for the position's event blocks (the stretches'
    *  bounds), so each row carries its dates. */
   blockDates?: Map<number, number>;
+  /** Funding the pool booked inside the position's own transactions. */
+  inTx?: FxInTxFunding | null;
 }) {
   const dateOf = (b: number): string | null => {
     const t = blockDates?.get(b);
@@ -69,6 +79,15 @@ export function FxDriftPanel({
   };
   const registry = useReceiptRegistry();
   const loading = state === "loading";
+  // Stretches with no change are one line under the table.
+  const moved = drift
+    ? drift.intervals.filter((iv) => Math.abs(iv.collsDrift) > DUST || Math.abs(iv.debtsDrift) > DUST)
+    : [];
+  const quiet = drift ? drift.intervals.length - moved.length : 0;
+  const complete = drift != null && drift.unread === 0 && !drift.headPending && drift.headBlock != null;
+  const inside = complete && inTx && inTx.total > DUST ? inTx : null;
+  const sumColls = drift ? drift.intervals.reduce((t, iv) => t + iv.collsDrift, 0) : 0;
+  const sumDebts = drift ? drift.intervals.reduce((t, iv) => t + iv.debtsDrift, 0) : 0;
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -78,10 +97,10 @@ export function FxDriftPanel({
           {!drift && loading && <span className="text-xs text-rb-500">Reading boundary states…</span>}
         </div>
         <p className="mt-1 text-xs text-rb-500">
-          Between the owner&rsquo;s transactions, funding takes collateral, rebalances and redemptions take collateral
-          and debt, a pool-wide liquidation can write debt off, and other positions&rsquo; bad debt adds debt. Each row
-          is one stretch between two transactions: the pool&rsquo;s reading of the position at its start and end, and
-          the difference.
+          Between this position&rsquo;s transactions, funding takes collateral, rebalances and redemptions take
+          collateral and debt, a pool-wide liquidation can write debt off, and other positions&rsquo; bad debt adds
+          debt. Each row is one stretch between two transactions: the pool&rsquo;s reading of the position at its start
+          and end, and the difference.
         </p>
         {state === "error" && (
           <p className="mt-2 text-xs text-rb-500">
@@ -101,7 +120,7 @@ export function FxDriftPanel({
                     ? "No settled sweep for this position yet — the stretches are stated once it lands."
                     : "No quiet stretches — every block gap between events is empty."}
               </p>
-            ) : (
+            ) : moved.length === 0 ? null : (
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-rb-500">
@@ -111,7 +130,7 @@ export function FxDriftPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {drift.intervals.map((iv: FxDriftInterval) => (
+                  {moved.map((iv: FxDriftInterval) => (
                     <tr
                       key={`${iv.fromBlock}-${iv.toBlock}`}
                       className="border-t border-rb-300/40 dark:border-rb-700/40"
@@ -146,9 +165,53 @@ export function FxDriftPanel({
                       </td>
                     </tr>
                   ))}
+                  {moved.length > 1 && complete ? (
+                    <tr className="border-t border-rb-300/40 dark:border-rb-700/40">
+                      <td className="py-1.5 pr-4 text-rb-500">Total between the transactions</td>
+                      <td className="py-1.5 pr-4">
+                        <DriftCell
+                          value={sumColls}
+                          symbol={normalizedSymbol}
+                          prov={driftTotalProv("colls", normalizedSymbol, drift.intervals.length)}
+                        />
+                      </td>
+                      <td className="py-1.5 pr-4">
+                        <DriftCell
+                          value={sumDebts}
+                          symbol="fxUSD"
+                          prov={driftTotalProv("debts", "fxUSD", drift.intervals.length)}
+                        />
+                      </td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             )}
+            {quiet > 0 ? (
+              <p className="mt-2 text-xs text-rb-500">
+                {quiet} stretch{quiet === 1 ? "" : "es"} with no change.
+              </p>
+            ) : null}
+            {inside ? (
+              <p className="mt-2 text-xs text-rb-500">
+                The pool also books funding at the start of each transaction that reaches it, and that lands in the
+                transaction&rsquo;s own row:{" "}
+                {inside.rows.map((r, i) => (
+                  <span key={r.block}>
+                    {i > 0 ? (i === inside.rows.length - 1 ? " and " : ", ") : ""}
+                    <Prov info={lifetimeInTxFundingProv(normalizedSymbol, inside.reads)} value={String(r.taken)}>
+                      {fxFundingText(r.taken)} {normalizedSymbol}
+                    </Prov>{" "}
+                    on {formatDate(r.ts)}
+                  </span>
+                ))}
+                . With the table, funding and rebalances took{" "}
+                <Prov info={lifetimeCollateralMovedProv(normalizedSymbol, drift.headBlock)}>
+                  {fxFundingText(-sumColls + inside.total)} {normalizedSymbol}
+                </Prov>{" "}
+                in all.
+              </p>
+            ) : null}
             {drift.intervals.length > 0 && drift.headPending && (
               <p className="mt-2 text-xs text-rb-500">
                 The latest stretch is not shown yet: the position was touched after the last settled sweep, and it is

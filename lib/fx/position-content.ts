@@ -11,8 +11,7 @@
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { FxPoolTerms } from "@/lib/sources/chain/fx-terms";
 import { formatNumber } from "@/lib/utils/format";
-import { fxScheduleWords } from "@/lib/fx/row-figures";
-import { FX_ADDRESSES } from "@/lib/fx/asset-catalog";
+import { fxScheduleFull } from "@/lib/fx/row-figures";
 
 const FX_DOC_URL = "https://fxprotocol.gitbook.io/fx-docs";
 
@@ -49,14 +48,16 @@ function costs(t: FxPoolTerms | null, colls?: number | null, sym?: string): { bo
     colls != null && colls > 0 && sym
       ? ` About ${formatNumber(colls * t.fundingRatio)} ${sym} a year on this position's ${formatNumber(colls)} ${sym}, at today's rate.`
       : "";
-  const r = t.routerFees;
+  const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
   const routerNote =
-    r && fxScheduleWords(r) !== fxScheduleWords(t.fees)
-      ? ` A calling contract can have a schedule of its own: the router ${FX_ADDRESSES.ROUTER.slice(0, 6)}…${FX_ADDRESSES.ROUTER.slice(-4)}, which most position transactions go through, is charged ${fxScheduleWords(r)}, which is why a deposit made through it pays a fee.`
+    t.routers.length > 0
+      ? ` The two f(x) routers are charged ${t.routers
+          .map((r) => `${fxScheduleFull(r.fees)} (${short(r.address)})`)
+          .join(" and ")}.`
       : "";
   return {
     bold: "Cost",
-    text: `funding at ${pct(t.fundingRatio)} a year, taken from collateral with no event.${perYear} The manager charges fees to the account that calls it; the pool's default schedule charges ${fxScheduleWords(t.fees)}.${routerNote} Each timeline row names the caller and the schedule it paid.`,
+    text: `funding at ${pct(t.fundingRatio)} a year, taken from collateral with no event.${perYear} The manager charges fees to the account that calls it; the pool's default schedule charges ${fxScheduleFull(t.fees)}.${routerNote} Each timeline row names the caller and the schedule it paid.`,
   };
 }
 

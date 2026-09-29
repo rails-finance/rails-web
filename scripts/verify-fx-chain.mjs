@@ -768,5 +768,105 @@ if (priceLegChecked > 0) {
   );
 }
 
+// ── round 4: wsteth-1801 and wsteth-1 ───────────────────────────────────────
+{
+  const near = (a, b, tol) => Math.abs(a - b) <= tol;
+  const R4_POOL = POOLS.wsteth.address;
+  const R4_ABI = parseAbi([
+    "function getPosition(uint256) view returns (uint256,uint256)",
+    "function getTopTick() view returns (int16)",
+    "function tickBitmap(int8) view returns (uint256)",
+    "function positionData(uint256) view returns (int16 tick, uint48 nodeId, uint96 colls, uint96 debts)",
+    "function tickTreeData(uint256) view returns (bytes32,bytes32)",
+  ]);
+  const CFG_ABI = parseAbi([
+    "function getPoolFeeRatio(address,address) view returns (uint256,uint256,uint256,uint256)",
+    "function getLongPoolFundingRatio(address) view returns (uint256)",
+  ]);
+  const ROUTER_1 = "0x33636D49FbefBE798e15e7F356E8DBef543CC708";
+  const ROUTER_2 = "0xB753366082466c4B5984312f0c4Bb97554be067E";
+  const OWN_ABI = parseAbi([
+    "function owner() view returns (address)",
+    "function facetAddresses() view returns (address[])",
+  ]);
+
+  // P3: what 0xb753…067e is and what it is charged.
+  const [o1, o2, f1, f2] = await Promise.all([
+    client.readContract({ address: ROUTER_1, abi: OWN_ABI, functionName: "owner" }),
+    client.readContract({ address: ROUTER_2, abi: OWN_ABI, functionName: "owner" }),
+    client.readContract({ address: ROUTER_1, abi: OWN_ABI, functionName: "facetAddresses" }),
+    client.readContract({ address: ROUTER_2, abi: OWN_ABI, functionName: "facetAddresses" }),
+  ]);
+  check(
+    "r4 P3: 0xb753…067e is a diamond router (facets), owned by the address that owns 0x3363…c708",
+    same(o1, o2) && f2.length > 0 && f1.length > 0,
+    `owner ${o1}, ${f2.length} facets (0x3363 has ${f1.length})`,
+  );
+  const cfg = await client.readContract({
+    address: POOL_MANAGER,
+    abi: parseAbi(["function configuration() view returns (address)"]),
+    functionName: "configuration",
+  });
+  const fee = (who, block) =>
+    client.readContract({
+      address: cfg,
+      abi: CFG_ABI,
+      functionName: "getPoolFeeRatio",
+      args: [R4_POOL, who],
+      blockNumber: block,
+    });
+  const ZERO_A = "0x0000000000000000000000000000000000000000";
+  const at1801 = [24490945n, 24540534n, 25791803n, 26025273n];
+  let same2 = true;
+  let r1 = null;
+  for (const b of at1801) {
+    const [a, d, r] = await Promise.all([fee(ROUTER_2, b), fee(ZERO_A, b), fee(ROUTER_1, b)]);
+    same2 = same2 && a.every((x, i) => x === d[i]) && a[0] === 0n && a[2] === 5000000n;
+    r1 = r;
+  }
+  check(
+    "r4 P3: at the four deposit/borrow blocks 0xb753…067e pays the default (0 deposit, 0.5% borrow) and 0x3363…c708 pays 0.3% of a deposit",
+    same2 && r1[0] === 3000000n && r1[1] === 1000000n,
+    `router 2 = default ${same2}; router 1 ${r1.map((x) => Number(x) / 1e9).join(",")}`,
+  );
+
+  // P1: funding is booked inside a transaction. getPosition at block − 1 holds the old index.
+  const P1801 = 1801n;
+  const pp = (b) =>
+    client.readContract({ address: R4_POOL, abi: R4_ABI, functionName: "getPosition", args: [P1801], blockNumber: b });
+  const [b0, b1] = await Promise.all([pp(26025273n), pp(26025274n)]);
+  const drop = Number(b0[0] - b1[0]) / 1e18;
+  check(
+    "r4 P1: the 21 Sep borrow (block 26,025,274, no collateral moved) takes 0.0072 stETH of funding inside the transaction",
+    near(drop, 0.0072, 0.0002) && near(Number(b1[1] - b0[1]) / 1e18, 40000, 0.001),
+    `collateral ${fmt(b0[0])} → ${fmt(b1[0])}, debt rose ${fmt(b1[1] - b0[1], 18, 3)}`,
+  );
+
+  // P7: ticks above 4920 with debt (bitmap words 19..top word).
+  const head1 = await client.getBlockNumber();
+  const top = Number(
+    await client.readContract({ address: R4_POOL, abi: R4_ABI, functionName: "getTopTick", blockNumber: head1 }),
+  );
+  let above = 0;
+  for (let w = Math.floor(4921 / 256); w <= Math.floor(top / 256); w++) {
+    const word = await client.readContract({
+      address: R4_POOL,
+      abi: R4_ABI,
+      functionName: "tickBitmap",
+      args: [w],
+      blockNumber: head1,
+    });
+    for (let bit = 0; bit < 256; bit++) {
+      const t = w * 256 + bit;
+      if (t > 4920 && t <= top && (word >> BigInt(bit)) & 1n) above++;
+    }
+  }
+  check(
+    "r4 P7: debt ticks above tick 4920 are counted from the bitmap (top tick above it)",
+    top > 4920 && above > 0,
+    `top ${top}, ${above} above`,
+  );
+}
+
 console.log(`\n${pass}/${pass + fail} checks passed${fail ? ` — ${fail} FAILED` : ""}`);
 process.exit(fail ? 1 : 0);

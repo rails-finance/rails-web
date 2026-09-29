@@ -43,8 +43,8 @@ export interface FxPoolTerms {
   fundingRatio: number;
   /** The default schedule; a calling contract can carry its own. */
   fees: { supply: number; withdraw: number; borrow: number; repay: number };
-  /** The router's schedule (FX_ADDRESSES.ROUTER). */
-  routerFees: { supply: number; withdraw: number; borrow: number; repay: number } | null;
+  /** The two f(x) routers' schedules (FX_ADDRESSES.ROUTER, ROUTER_2). */
+  routers: { address: string; fees: { supply: number; withdraw: number; borrow: number; repay: number } }[];
   redeemAllowed: boolean;
 }
 
@@ -53,6 +53,12 @@ const cache = new Map<FxPoolKey, { at: number; p: Promise<FxPoolTerms> }>();
 
 const wad = (v: bigint): number => Number(v) / 1e18;
 const fee = (v: bigint): number => Number(v) / 1e9;
+const feeSchedule = (r: readonly [bigint, bigint, bigint, bigint]) => ({
+  supply: fee(r[0]),
+  withdraw: fee(r[1]),
+  borrow: fee(r[2]),
+  repay: fee(r[3]),
+});
 
 async function read(pool: FxPoolKey): Promise<FxPoolTerms> {
   const client = alchemyClient();
@@ -70,7 +76,7 @@ async function read(pool: FxPoolKey): Promise<FxPoolTerms> {
       { address: getAddress(FX_ADDRESSES.POOL_MANAGER), abi: PM_ABI, functionName: "getLiquidationExpenseRatio" },
     ],
   });
-  const [funding, fees, redeemAllowed, router] = await client.multicall({
+  const [funding, fees, redeemAllowed, router, router2] = await client.multicall({
     allowFailure: false,
     ...at,
     contracts: [
@@ -82,6 +88,12 @@ async function read(pool: FxPoolKey): Promise<FxPoolTerms> {
         abi: CONFIG_ABI,
         functionName: "getPoolFeeRatio",
         args: [address, getAddress(FX_ADDRESSES.ROUTER)],
+      },
+      {
+        address: configuration,
+        abi: CONFIG_ABI,
+        functionName: "getPoolFeeRatio",
+        args: [address, getAddress(FX_ADDRESSES.ROUTER_2)],
       },
     ],
   });
@@ -95,8 +107,11 @@ async function read(pool: FxPoolKey): Promise<FxPoolTerms> {
     liquidateBonus: fee(liq[1]),
     expenseRatio: fee(expense),
     fundingRatio: wad(funding),
-    fees: { supply: fee(fees[0]), withdraw: fee(fees[1]), borrow: fee(fees[2]), repay: fee(fees[3]) },
-    routerFees: { supply: fee(router[0]), withdraw: fee(router[1]), borrow: fee(router[2]), repay: fee(router[3]) },
+    fees: feeSchedule(fees),
+    routers: [
+      { address: FX_ADDRESSES.ROUTER, fees: feeSchedule(router) },
+      { address: FX_ADDRESSES.ROUTER_2, fees: feeSchedule(router2) },
+    ],
     redeemAllowed,
   };
 }

@@ -63,12 +63,15 @@ import {
   protocolShareProv,
   unpaidDebtProv,
   feeScheduleProv,
+  debtEquationProv,
+  inTxFundingProv,
   type FxCoords,
 } from "@/lib/fx/event-provenance";
 import type { FxSide } from "@/lib/fx/use-event-state";
 import type { FxFeeSchedule } from "@/lib/sources/chain/fx-event-state";
-import { fxRowFees, fxFeePct, fxScheduleWords, fxLiquidationMoved } from "@/lib/fx/row-figures";
-import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
+import { fxRowFees, fxFeePct, fxScheduleFull, fxLiquidationMoved } from "@/lib/fx/row-figures";
+import { fxCollMoved, fxFundingText, fxRowFunding } from "@/lib/fx/in-tx-funding";
+import { FX_ADDRESSES, FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
 import { fxExternalActor } from "@/lib/fx/external-actor";
 import { formatExact, formatNumber, formatTinyNonZero } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
@@ -146,12 +149,12 @@ function permissionlessActorMechanic(ctx: FxContext, read?: FxRowRead): ClauseIn
   if (fees?.limitOrder && fees.limitOrder.maker === ctx.ownerAt) {
     return clause(
       <>
-        {shortAddr(signer)} sent this transaction to fill a limit order the holder ({shortAddr(fees.limitOrder.maker)})
-        had signed. The f(x) Limit Order Manager, which the holder had approved to move its position NFTs, took this NFT
-        for the transaction, called the manager as its holder, and returned it; the filler (
-        {shortAddr(fees.limitOrder.taker)}) supplied the {ctx.poolSymbol} and took the fxUSD the order named. The pool
-        lets only the NFT&rsquo;s holder at the moment of the call withdraw or borrow, and here that was the Limit Order
-        Manager.
+        {shortAddr(signer)} sent this transaction to fill a limit order the holder at the time (
+        {shortAddr(fees.limitOrder.maker)}) had signed. The f(x) Limit Order Manager, which the holder had approved to
+        move its position NFTs, took this NFT for the transaction, called the manager as its holder, and returned it;
+        the filler ({shortAddr(fees.limitOrder.taker)}) supplied the {ctx.poolSymbol} and took the fxUSD the order
+        named. The pool lets only the NFT&rsquo;s holder at the moment of the call withdraw or borrow, and here that was
+        the Limit Order Manager.
       </>,
     );
   }
@@ -326,13 +329,25 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
     const f = read.fees;
     const legs = fxRowFees(ctx, f);
     const charged = legs.filter((l) => l.amount > 0);
+    const holder = ctx.ownerAt ? shortAddr(ctx.ownerAt) : null;
+    // Who called the manager: the holder at the time, an f(x) router, the
+    // Limit Order Manager, or another contract; and who called it in turn.
+    const calledBy =
+      f.signer && f.signer === ctx.ownerAt
+        ? `, which the holder at the time (${holder}) called`
+        : f.signer && f.signer !== f.caller
+          ? `, which ${shortAddr(f.signer)} called`
+          : "";
+    const isRouter = f.caller === FX_ADDRESSES.ROUTER || f.caller === FX_ADDRESSES.ROUTER_2;
     const who =
       f.caller === ctx.ownerAt
-        ? `the owner's address (${shortAddr(f.caller)})${f.signer === f.caller ? ", which sent the transaction" : ""}`
+        ? `the holder at the time (${shortAddr(f.caller)})${f.signer === f.caller ? ", who sent the transaction" : ""}`
         : f.limitOrder && f.caller === f.limitOrder.manager
           ? "the f(x) Limit Order Manager"
-          : `the contract that called the manager (${shortAddr(f.caller)})`;
-    const schedule = f.custom ? "the schedule the pool sets for that caller" : "the pool's default schedule";
+          : isRouter
+            ? `the f(x) router (${shortAddr(f.caller)})${calledBy}`
+            : `the contract that called the manager (${shortAddr(f.caller)})${calledBy}`;
+    const schedule = `${f.custom ? "the schedule the pool sets for that caller" : "the pool's default schedule"} (${fxScheduleFull(f)})`;
     const legList = (
       <>
         {charged.map((l, i) => (
@@ -349,12 +364,59 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
     );
     const d = f.defaults;
     const defaultNote =
-      f.custom && d ? <> The pool&rsquo;s default at this block charges {fxScheduleWords(d)}.</> : null;
+      f.custom && d ? <> The pool&rsquo;s default at this block charges {fxScheduleFull(d)}.</> : null;
     return clause(
       <>
         The manager charges the account that calls it; here that was {who}, on {schedule}
         {charged.length === 0 ? <>, which charged nothing on this row.</> : <>: {legList}.</>}
         {defaultNote}
+      </>,
+    );
+  };
+
+  // How the fee sits in the debt (PoolManager _handleBorrow / _handleRepay): a
+  // borrow adds the whole amount to the debt and the fee comes out of the fxUSD
+  // minted; a repayment removes the amount and the fee is burned on top.
+  const debtEquation = (): ClauseInput => {
+    if (debt === 0 || !read.fees || (ctx.protocolFees != null && Number(ctx.protocolFees) !== 0)) return null;
+    const leg = fxRowFees(ctx, read.fees).find((l) => l.symbol === "fxUSD");
+    if (!leg) return null;
+    const amt = Math.abs(debt);
+    return debt > 0
+      ? clause(
+          <>
+            <Prov echo info={debtEquationProv("borrow", coords)} value={String(amt)}>
+              The debt rose by {formatNumber(amt)} fxUSD
+            </Prov>
+            , the whole amount borrowed; the {formatNumber(leg.amount)} fxUSD fee came out of the fxUSD minted, so the
+            caller received {formatNumber(amt - leg.amount)}.
+          </>,
+        )
+      : clause(
+          <>
+            <Prov echo info={debtEquationProv("repay", coords)} value={String(amt)}>
+              The debt fell by {formatNumber(amt)} fxUSD
+            </Prov>
+            , the amount repaid; the {formatNumber(leg.amount)} fxUSD fee was paid on top, so the caller paid{" "}
+            {formatNumber(amt + leg.amount)}.
+          </>,
+        );
+  };
+  // Funding the pool booked into its collateral index at the start of this
+  // transaction, which lands in the row's before → after (lib/fx/in-tx-funding.ts).
+  const fundingClause = (): ClauseInput => {
+    if (ctx.eventType !== "operate" || isOpen || (read.blockPeers ?? 1) > 1) return null;
+    const converts = sym !== normSym;
+    const taken = fxRowFunding(fxCollMoved(ctx), converts ? rate : null, before?.colls ?? null, after?.colls ?? null);
+    if (taken == null || taken <= 0 || (converts && rate == null)) return null;
+    return clause(
+      <>
+        Funding of{" "}
+        <Prov echo info={inTxFundingProv(normSym, coords)} value={String(taken)}>
+          {fxFundingText(taken)} {normSym}
+        </Prov>
+        , accrued since the pool was last called, came off the position at the start of this transaction, so the
+        collateral change above includes it.
       </>,
     );
   };
@@ -451,7 +513,14 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
           // The general form of the position (a leveraged holding kept as an
           // ERC-721) is Layer-2 material — the "?" modal
           // (fxOperateContent("open")) carries it.
-          meansNow: [unitClause(coll, "deposited"), feeClause(), oracleClause(), ratioMove(), ...impliedClauses()],
+          meansNow: [
+            unitClause(coll, "deposited"),
+            feeClause(),
+            debtEquation(),
+            oracleClause(),
+            ratioMove(),
+            ...impliedClauses(),
+          ],
         };
       }
 
@@ -480,6 +549,8 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
             clause(<>Closing or liquidating a position leaves its NFT with the owner, who can use it again.</>),
             unitClause(coll, "deposited"),
             feeClause(),
+            debtEquation(),
+            fundingClause(),
             oracleClause(),
             ratioMove(),
             ...impliedClauses(),
@@ -508,6 +579,8 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
               </>,
             ),
             feeClause(),
+            debtEquation(),
+            fundingClause(),
             oracleClause(),
           ],
         };
@@ -544,6 +617,8 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
         meansNow: [
           unitClause(coll, coll > 0 ? "deposited" : "withdrawn"),
           feeClause(),
+          debtEquation(),
+          fundingClause(),
           oracleClause(),
           ratioMove(),
           ...impliedClauses(),

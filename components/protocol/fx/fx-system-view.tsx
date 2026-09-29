@@ -178,8 +178,8 @@ function PoolStateCard({ p }: { p: FxPoolSystem }) {
           </Prov>
         </Stat>
         <Stat
-          label="Tick-tree nodes allocated"
-          note="a node holds the shares of one tick's positions; each move of a tick opens a new one"
+          label="Tick nodes allocated"
+          note="a node records the debt and collateral of one tick's positions; each move of a tick opens a new one"
         >
           <Prov info={treeNodesProv(label, p.address)} value={formatExact(p.treeNodes)}>
             {p.treeNodes.toLocaleString("en-US")}
@@ -188,13 +188,14 @@ function PoolStateCard({ p }: { p: FxPoolSystem }) {
       </div>
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-        Collateral is the pool&rsquo;s rate-normalized accounting unit, not the token as deposited — the manager&rsquo;s
-        token-unit line above is the other system, named. The node count against{" "}
+        Collateral here is counted in the pool&rsquo;s own unit: the deposited token multiplied by its rate to the
+        underlying (stETH per wstETH for the wstETH pool). The manager&rsquo;s token-unit line above counts the token as
+        deposited. The node count against{" "}
         <Prov info={occupiedTicksProv(poolLabel(p), p.address)} value={formatExact(p.occupiedTicks)} echo>
           <span className="tabular-nums text-foreground">{p.occupiedTicks}</span>
         </Prov>{" "}
-        live ticks is the fossil record of the ladder being rearranged: every rebalance, tick liquidation and redemption
-        retires a node.
+        live ticks shows how often ticks have been rearranged: every rebalance, tick liquidation and redemption retires
+        a node.
       </p>
     </div>
   );
@@ -364,7 +365,10 @@ function ReconcileCard({ p }: { p: FxPoolSystem }) {
 
       <div className="mt-3 space-y-1.5 text-xs tabular-nums">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="shrink-0 text-rb-500">every tick&apos;s debt shares, added up</span>
+          <span className="shrink-0 text-rb-500">
+            every tick&apos;s debt shares (units of the debt the pool tracks, each worth more as the debt index rises),
+            added up
+          </span>
           <Prov
             info={ladderReconcileProv(label, p.address, p.debtSharesReconcile, p.occupiedTicks)}
             value={p.tickDebtSharesSumRaw}
@@ -411,7 +415,7 @@ function ReconcileCard({ p }: { p: FxPoolSystem }) {
             {amt(p.collOutsideLadder)} {p.normalizedSymbol}
           </span>
         </Prov>{" "}
-        sits outside the ladder entirely, held by positions with no debt — no debt, no tick, no rung.
+        sits outside the ladder entirely, held by positions with no debt — a position with no debt has no tick.
         {p.dustTicks > 0 && (
           <>
             {" "}

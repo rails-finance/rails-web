@@ -459,8 +459,8 @@ const FX_OP_LABELS: Record<string, string> = {
   liquidatePosition: "Liquidated",
   // The ownership lane (pool ERC721 Transfer logs): standalone mints anchor
   // the eventless positions; transfers re-home a position mid-life.
-  mintPosition: "Minted",
-  transferOwnership: "Transferred",
+  mintPosition: "Position Minted",
+  transferOwnership: "Ownership Transfer",
   // The socialized lane (derived): a tick-level rebalance the lineage replay
   // attributed to this position.
   tickRebalance: "Rebalanced",

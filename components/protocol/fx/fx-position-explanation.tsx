@@ -55,12 +55,39 @@ const joinParts = (items: React.ReactNode[]) =>
     </span>
   ));
 
+export interface FxRowKinds {
+  rebalances: number;
+  redemptions: number;
+  poolLiquidations: number;
+  transfers: number;
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** "17 transactions, 1 ownership transfer and 2 rebalances": the rows by kind. */
+function timelineKinds(rows: number, k: FxRowKinds | undefined, emptyLiquidations: number): string {
+  const kinds = [
+    k?.transfers ? plural(k.transfers, "ownership transfer") : null,
+    k?.rebalances ? plural(k.rebalances, "rebalance") : null,
+    k?.redemptions ? plural(k.redemptions, "redemption") : null,
+    k?.poolLiquidations ? plural(k.poolLiquidations, "pool-wide liquidation") : null,
+    emptyLiquidations > 0 ? plural(emptyLiquidations, "liquidation call") + " that found nothing left to take" : null,
+  ].filter((x): x is string => x != null);
+  const base =
+    rows -
+    (k ? k.transfers + k.rebalances + k.redemptions + k.poolLiquidations : 0) -
+    (emptyLiquidations > 0 ? emptyLiquidations : 0);
+  const all = [plural(base, "transaction"), ...kinds];
+  return all.length === 1 ? all[0] : `${all.slice(0, -1).join(", ")} and ${all[all.length - 1]}`;
+}
+
 export function FxPositionExplanation({
   v,
   parts,
   emptyLiquidations = 0,
   externalActivity,
   timelineRows,
+  rowKinds,
 }: {
   v: FxPositionView;
   /** What moved the debt without a transaction, part by part. */
@@ -75,6 +102,8 @@ export function FxPositionExplanation({
    *  emitted events (derived tick rebalances, ownership handovers), so the
    *  events bullet names both counts instead of letting them contradict. */
   timelineRows?: number;
+  /** The timeline's rows that are not the position's own transactions, by kind. */
+  rowKinds?: FxRowKinds;
 }) {
   // Hooks first — the pane has several early returns below.
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
@@ -422,18 +451,10 @@ export function FxPositionExplanation({
           ? `, alongside the ${v.liquidationCount} liquidation${v.liquidationCount === 1 ? "" : "s"}`
           : ""}
         .
-        {extras > 0 ? (
+        {extras > 0 && timelineRows != null ? (
           <>
             {" "}
-            The timeline below carries {timelineRows} rows; the other {extras} are rebalances run by keepers and
-            ownership handovers, placed on its history
-            {emptyLiquidations > 0 ? (
-              <>
-                , and {emptyLiquidations} liquidation call{emptyLiquidations === 1 ? "" : "s"} that found nothing left
-                to take
-              </>
-            ) : null}
-            .
+            The timeline below carries {timelineRows} rows: {timelineKinds(timelineRows, rowKinds, emptyLiquidations)}.
           </>
         ) : null}
       </span>,

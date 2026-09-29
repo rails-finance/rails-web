@@ -67,6 +67,15 @@ export function fxEconomicsExplanation(data: ChainTruthTowerData): ReactNode {
     );
   }
 
+  if (!socialized && !socializedAccrual && debt.lifetimeInflow > DUST && debt.current[0]) {
+    bullets.push(
+      <span key="socialized-none">
+        Moved by the pool: none. This position&apos;s transactions add up to the pool&apos;s debt figure, so no hatched
+        segment is drawn.
+      </span>,
+    );
+  }
+
   const liquidated = debt.liquidated.find((l) => l.key === "debt-liquidated");
   if (liquidated) {
     bullets.push(
@@ -123,7 +132,7 @@ export function fxEconomicsContent(): LearnMoreContent {
     steps: [
       "Current collateral and debt are the pool's own settled reading at a named block — funding and rebalances already applied.",
       "Borrowed and repaid fxUSD are summed from the position's transactions.",
-      "The gap between what the transactions add up to and the pool's reading is drawn as one segment, moved by the pool: debt cleared by rebalances and redemptions, debt written off at liquidations, and other positions' bad debt added through the pool's debt index. None logs an event for the position.",
+      "The gap between what the transactions add up to and the pool's reading is drawn as one segment, moved by the pool: debt cleared by rebalances and redemptions, debt written off at liquidations, and other positions' bad debt added through the pool's debt index. None logs an event for the position. When the gap is zero, no segment is drawn.",
     ],
     detailsHeading: "Key concepts:",
     details: [

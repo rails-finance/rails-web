@@ -552,7 +552,7 @@ export function ChainTruthRow({
         // still owns the whole Prov, so the lozenge never paints empty.
         if (d.axisVerb) {
           return (
-            <span key={i} className="inline-flex items-center gap-1.5 text-sm">
+            <span key={i} className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
               {d.label && <span className={toneClass}>{d.label}</span>}
               <Prov info={d.prov} value={exact} symbol={d.symbol} className={deltaHide || undefined}>
                 <span className="font-semibold tabular-nums text-foreground">

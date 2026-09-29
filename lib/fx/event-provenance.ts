@@ -651,6 +651,49 @@ export const feeScheduleProv = (caller: string, coords: FxCoords): Provenance =>
   inputs: eventInputs(coords),
 });
 
+/** How the fee sits in the debt: a borrow's fee is taken from the fxUSD minted,
+ *  a repayment's is burned on top. */
+export const debtEquationProv = (leg: "borrow" | "repay", coords: FxCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: {
+    kind: "recompute",
+    text: `Read PoolManager ${leg === "borrow" ? "_handleBorrow" : "_handleRepay"} in f(x)'s contracts, and re-run the caller's getPoolFeeRatio${coords.blockNumber != null ? ` at block ${coords.blockNumber - 1}` : ""}`,
+  },
+  summary:
+    leg === "borrow"
+      ? "The debt rises by the whole amount borrowed (BasePool.operate); PoolManager._handleBorrow mints that amount and sends the fee, the borrow ratio times the amount, to the open revenue pool, and the rest to the caller."
+      : "The debt falls by the amount repaid (BasePool.operate); PoolManager._handleRepay burns the amount plus the fee, the repay ratio times the amount, from the caller and mints the fee to the close revenue pool.",
+  contract: poolContract(coords),
+  via: leg === "borrow" ? "borrow − fee = fxUSD minted to the caller" : "repaid + fee = fxUSD burned from the caller",
+  formula: leg === "borrow" ? "amount × (1 − borrow ratio)" : "amount × (1 + repay ratio)",
+  inputs: eventInputs(coords),
+});
+
+/** Funding the pool booked into the collateral index at the start of a
+ *  transaction: the row's collateral change less what the transaction moved. */
+export const inTxFundingProv = (sym: string, coords: FxCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: rowReadVerify(coords.blockNumber),
+  summary: `Collateral (${sym}) the pool took as funding at the start of this transaction — getPosition at the block less the same read at the block before, less what the transaction deposited or withdrew (converted to ${sym} at the block's rate). getPosition at the block before uses the collateral index as it was last written; the first call into the pool in a later block (AaveFundingPool._updateCollAndDebtIndex) writes the funding accrued since, and it lands in this row.`,
+  contract: poolContract(coords),
+  via: "(read at block − read at block − 1) − the row's collateral moved",
+  formula: "after − before − moved",
+  inputs: eventInputs(coords),
+});
+
+/** The card's funding booked inside the position's own transactions. */
+export const lifetimeInTxFundingProv = (unit: string, rows: number): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: { kind: "recompute", text: "Re-run getPosition at each operate row's block and the block before" },
+  summary: `Collateral (${unit}, rate-normalized) the pool took as funding inside the position's own transactions — over each of its ${rows} operate row${rows === 1 ? "" : "s"}, the change in getPosition collateral across the block less what the row deposited or withdrew, summed over the rows where it is not zero. Adding it to the funding between transactions gives the position's whole funding bill.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "Σ over operate rows ((read at block − read at block − 1) − collateral moved)",
+  formula: "Σ (after − before − moved)",
+});
+
 // ── the card's thresholds, trigger price and rebalance split ─────────────────
 
 /** The anchor oracle price the debt ratio was judged at, recovered from the
@@ -810,6 +853,45 @@ export const positionTickProv = (sym: string, block: number): Provenance => ({
   contract: { name: "AaveFundingPool", address: "" },
   via: "positionData(id).nodeId → tickTreeData(node).metadata parent links → root's tick",
   formula: "root(node).tick",
+});
+
+/** The table's total: the drift of every stretch, added. */
+export const driftTotalProv = (leg: "colls" | "debts", unit: string, count: number): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: { kind: "recompute", text: "Add the drift column of the stretches above" },
+  summary: `The table's total ${leg === "colls" ? "collateral" : "debt"} drift (${unit}) — every one of the ${count} stretch${count === 1 ? "" : "es"} added, each being its getPosition read at the end less the read at the start.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "Σ stretch drift",
+  formula: "Σ (end read − start read)",
+});
+
+/** The position's whole collateral gap: between its transactions plus inside them. */
+export const lifetimeCollateralMovedProv = (unit: string, block: number | null): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: {
+    kind: "recompute",
+    text: "Add the collateral drift over the quiet stretches to the funding booked inside the operate rows",
+  },
+  summary: `Collateral (${unit}, rate-normalized) the pool moved away from the position with no transaction of its own asking for it — the drift over every quiet stretch between its transactions plus the funding booked inside them. With the collateral its transactions deposited less what they withdrew, it gives the settled collateral${block != null ? ` at block ${block}` : ""}.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "Σ stretch drift + Σ funding inside operate rows",
+  formula: "between + inside",
+});
+
+/** How many ticks holding debt sit above the position's tick. */
+export const ticksAboveProv = (block: number): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: {
+    kind: "recompute",
+    text: `Count the set bits of the pool's tickBitmap above the position's tick, up to getTopTick, at block ${block}`,
+  },
+  summary: `The number of ticks that hold debt above this position's tick at block ${block} — the set bits of the pool's tickBitmap words between the tick and getTopTick. A redemption (BasePool._redeem) starts at the top tick and walks down the bitmap, so this is how many debt ticks it passes before this one, before any tick it skips as dust or bad debt.`,
+  contract: { name: "AaveFundingPool", address: "" },
+  via: "popcount(tickBitmap words, tick + 1 … getTopTick)",
+  formula: "Σ set bits above the tick",
 });
 
 export const otherDebtMovesProv = (): Provenance => ({

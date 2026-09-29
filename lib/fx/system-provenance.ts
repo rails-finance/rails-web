@@ -89,7 +89,7 @@ export const positionsMintedProv = (label: string, address: string): Provenance 
 export const treeNodesProv = (label: string, address: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `Tick-tree nodes ever allocated in the ${label} — getNextTreeNodeId minus one. Every rebalance, tick liquidation and redemption retires a tick's node and re-homes the survivors under a fresh one (the TickMovement mechanics), so the gap between this and the tick count is a fossil record of how often the ladder has been rearranged without any position signing anything.`,
+  summary: `Tick-tree nodes ever allocated in the ${label} — getNextTreeNodeId minus one. Every rebalance, tick liquidation and redemption retires a tick's node and re-homes the survivors under a fresh one (the TickMovement mechanics), so the gap between this and the tick count shows how often the ticks have been rearranged without any position signing anything.`,
   contract: pool(label, address),
   via: `${SYSTEM_VIA} · pool.getNextTreeNodeId() − 1`,
   formula: "getNextTreeNodeId − 1",

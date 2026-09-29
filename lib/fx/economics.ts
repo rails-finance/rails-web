@@ -302,6 +302,9 @@ export function computeFxEconomics(
         ? undefined
         : preSweep
           ? "This position's current collateral and debt aren't in yet — f(x) reads them straight from the pool. Its own events can't stand in for them: funding on collateral, and rebalances and write-offs on debt, all change the real amounts with no per-position record, so the event-implied running debt is history, never the live figure."
-          : "The current lines are the pool's reading, funding and rebalances applied. The hatched segment, moved by the pool, is the gap between what this position's transactions add up to and that reading: debt cleared by rebalances and redemptions, written off at liquidations, less other positions' bad debt that the pool adds to every position. Its tip names each part. Debt is shown in fxUSD; fxUSD is not pinned to a dollar, so it is never restated as USD.",
+          : (socialized != null && Math.abs(socialized) <= DUST
+              ? "Moved by the pool: none, so no hatched segment is drawn; this position's transactions add up to the pool's debt figure. "
+              : "") +
+            "The current lines are the pool's reading, funding and rebalances applied. The hatched segment, moved by the pool, is the gap between what this position's transactions add up to and that reading: debt cleared by rebalances and redemptions, written off at liquidations, less other positions' bad debt that the pool adds to every position. Its tip names each part. Debt is shown in fxUSD; fxUSD is not pinned to a dollar, so it is never restated as USD.",
   };
 }

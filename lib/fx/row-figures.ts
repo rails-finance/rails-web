@@ -40,17 +40,21 @@ export function fxRowFees(ctx: FxContext, fees: FxFeeSchedule): FxRowFee[] {
 /** "0.3%" from 0.003. */
 export const fxFeePct = (r: number): string => `${(r * 100).toFixed(2).replace(/\.?0+$/, "")}%`;
 
-/** A schedule in words: "0.8% of a borrow and 0.2% of a repayment", or
- *  "nothing". */
-export function fxScheduleWords(s: { supply: number; withdraw: number; borrow: number; repay: number }): string {
-  const parts = [
-    s.supply > 0 ? `${fxFeePct(s.supply)} of a deposit` : null,
-    s.withdraw > 0 ? `${fxFeePct(s.withdraw)} of a withdrawal` : null,
-    s.borrow > 0 ? `${fxFeePct(s.borrow)} of a borrow` : null,
-    s.repay > 0 ? `${fxFeePct(s.repay)} of a repayment` : null,
-  ].filter((p): p is string => p != null);
-  if (parts.length === 0) return "nothing";
-  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+/** A schedule with its zero legs named: "0.5% of a borrow, 0.2% of a
+ *  repayment and nothing on a deposit or a withdrawal". */
+export function fxScheduleFull(s: { supply: number; withdraw: number; borrow: number; repay: number }): string {
+  const legs: [number, string, string][] = [
+    [s.supply, "a deposit", "of a deposit"],
+    [s.withdraw, "a withdrawal", "of a withdrawal"],
+    [s.borrow, "a borrow", "of a borrow"],
+    [s.repay, "a repayment", "of a repayment"],
+  ];
+  const paid = legs.filter((l) => l[0] > 0).map((l) => `${fxFeePct(l[0])} ${l[2]}`);
+  const free = legs.filter((l) => l[0] <= 0).map((l) => l[1]);
+  if (paid.length === 0) return "nothing";
+  if (free.length === 0)
+    return paid.length === 1 ? paid[0] : `${paid.slice(0, -1).join(", ")} and ${paid[paid.length - 1]}`;
+  return `${paid.join(", ")} and nothing on ${free.join(" or ")}`;
 }
 
 /** The amount below which a liquidation moved nothing: the site's display
