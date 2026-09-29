@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["scripts/**/*.mjs", "scripts/verify/**/*.mjs"],
+  "entry": ["scripts/**/*.mjs", "scripts/verify/**/*.mjs", "scripts/verify/**/*.ts"],
   "project": [
     "app/**/*.{ts,tsx}",
     "components/**/*.{ts,tsx}",

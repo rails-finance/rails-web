@@ -1,19 +1,24 @@
 // Lifetime flows over time — the protocol-neutral contract behind the date
 // scrubber (components/shared/lifetime-flows-scrubber.tsx, rails-ops
-// TO-DO-ui-jobs §141).
+// reference/lifetime-flows-scrubber.md).
 // ----------------------------------------------------------------------------
-// A protocol adapter hands in its events in order, each with the USD legs it
-// adds to the lifetime buckets (valued at the oracle price at the event's
-// block, the tower's rule) and the token balances it leaves. Everything the
-// view draws at a date is `stateAt(model, stop)`: a pure function of that list
-// and the live totals, with no DOM and no fetch, so it is tested offline
-// (scripts/verify/verify-lifetime-flows-state.ts).
+// An adapter hands in one row per active UTC day: the running USD per lifetime
+// bucket after the day's last event (each flow valued at the oracle price at
+// its block, the tower's rule), the token balances the day's events left, and
+// the prices they carried. The scrubber steps by day and a day's state is its
+// last event's, so day rows are exact. `daysFromEvents` builds them from a
+// page's events; the Aave V3 route (/api/aave-v3/flows/daily) serves them.
 //
-// Between two events an asset is valued at the price its last event carried.
-// No daily price series is read yet, so a quiet asset's value steps when an
-// event finally reprices it; the model records each such step (`repriced`)
-// and each stale price at a date (`stale`) so the view can say so. Nothing is
-// interpolated.
+// Everything the view draws at a date is `stateAt(model, stop)`: a pure
+// function of the rows, the prices and the live totals, with no DOM and no
+// fetch, so it is tested offline (scripts/verify/verify-lifetime-flows-state.ts).
+//
+// Prices between events. With a daily series (`dailyPrices`: the last oracle
+// price recorded on or before each day's end), a held asset is valued at its
+// day's price; a stretch where the series records nothing for more than
+// `SERIES_GAP_DAYS` keeps its older price and is marked. Without one, an asset
+// keeps the price its last event carried and a price older than `STALE_DAYS`
+// is marked. Nothing is interpolated.
 
 export type FlowSide = "collateral" | "debt";
 
@@ -66,25 +71,49 @@ export interface FlowLive {
   debtInterestUsd: number | null;
 }
 
+/** One active UTC day: the position after the day's last event. */
+export interface FlowDayRow {
+  /** UTC day number (unix seconds / 86400). */
+  day: number;
+  /** Events on or before this day. */
+  events: number;
+  /** Which sides the day's events moved, or a liquidation: the tick strip. */
+  tick: FlowEvent["tick"];
+  /** Running USD per bucket after the day. */
+  cum: Record<string, number>;
+  /** Balances the day's events stated, after its last event. */
+  balances: FlowEvent["balances"];
+  /** Each asset's last at-block price that day, with its block time. */
+  prices: { asset: string; usd: number; ts: number }[];
+}
+
 export interface FlowTimeline {
   buckets: FlowBucket[];
-  /** Ascending by time. */
-  events: FlowEvent[];
+  /** Ascending by day. */
+  days: FlowDayRow[];
   live: FlowLive;
   /** Today's price per asset, for an asset held while no event has priced it. */
   todayPrices?: Record<string, number>;
+  /** Per asset, the days a new daily price was recorded: [day, usd]. The last
+   *  oracle price recorded on or before each day's end, across every wallet. */
+  dailyPrices?: Record<string, [number, number][]>;
+  /** Today's UTC day number. With it the slider runs to today while anything
+   *  is still held after the last event; without it, one stop past that event. */
+  today?: number;
+  /** Events in the history (the last day row's count when absent). */
+  totalEvents?: number;
 }
 
-/** A held asset whose price, at some date, is older than `STALE_DAYS`. */
+/** A held asset whose price, at some date, is older than the gap allowed. */
 export interface StalePrice {
   symbol: string;
   side: FlowSide;
-  /** Unix seconds of the event that last priced it. */
+  /** Unix seconds of the price used. */
   pricedAt: number;
   usd: number;
 }
 
-/** An event that repriced a held asset after a gap longer than `STALE_DAYS`. */
+/** A day that repriced a held asset after a stale stretch. */
 export interface Repricing {
   /** Slider stop (day index). */
   day: number;
@@ -94,29 +123,35 @@ export interface Repricing {
 }
 
 interface FlowRow {
-  ts: number;
+  /** Slider stop of the active day. */
   day: number;
+  events: number;
   cum: Record<string, number>;
-  collateralUsd: number;
-  debtUsd: number;
-  stale: StalePrice[];
 }
 
 export interface FlowModel {
   buckets: FlowBucket[];
+  /** One per active day, ascending. */
   rows: FlowRow[];
   /** UTC midnight of the first event's day, ms. */
   start: number;
   /** Day index of the last event's day. */
   lastDay: number;
-  /** The final stop, one past `lastDay`: today, at live prices. */
+  /** The final stop: today, at live prices. */
   liveStop: number;
   /** Day indexes that carry at least one event, ascending, unique. */
   eventDays: number[];
-  /** The tick strip: one entry per event. */
+  /** The tick strip: one entry per active day. */
   ticks: { day: number; tick: FlowEvent["tick"] }[];
   repricings: Repricing[];
   live: FlowLive;
+  /** Held and owed, valued, at the end of each stop before the live one. */
+  valued: { collateral: number; debt: number }[];
+  /** Held assets on an old price, per stop (only stops that have any). */
+  stale: Map<number, StalePrice[]>;
+  /** Whether held assets are valued at a daily price series. */
+  daily: boolean;
+  totalEvents: number;
   /** The shared x-axis, fixed for the position so bars never rescale. */
   axis: { max: number; ticks: number[] };
   /** Each bar's length at the live stop, for the "today" outline. */
@@ -159,19 +194,23 @@ export interface FlowState {
   count: number;
   collateral: FlowSideState;
   debt: FlowSideState;
-  /** Held assets valued at a price older than `STALE_DAYS` at this stop. */
+  /** Held assets valued at an old price at this stop. */
   stale: StalePrice[];
 }
 
 export const DAY_MS = 86_400_000;
-/** A price older than this at a date is stated as such. */
+const DAY_S = 86_400;
+/** Event prices only: a price older than this at a date is stated as such. */
 export const STALE_DAYS = 30;
+/** Daily series: a stretch longer than this with no recorded price keeps the
+ *  older price, stated as such. */
+export const SERIES_GAP_DAYS = 7;
 /** A held position below this many dollars is not named as stale. */
 const STALE_FLOOR_USD = 1;
 /** A repricing is marked when it moves its side's value by this share. */
 const REPRICE_SHARE = 0.01;
 
-const dayOf = (tsSec: number, start: number): number => Math.floor((tsSec * 1000 - start) / DAY_MS);
+const utcDay = (tsSec: number): number => Math.floor(tsSec / DAY_S);
 
 /** The largest of 1, 2, 2.5 or 5 × 10^k not above `x`. */
 function niceStepBelow(x: number): number {
@@ -195,66 +234,188 @@ export function axisFor(peak: number): { max: number; ticks: number[] } {
   return { max, ticks };
 }
 
-/** Replay the events into one cumulative row per event. */
-export function buildFlowModel(t: FlowTimeline): FlowModel | null {
-  const events = [...t.events].sort((a, b) => a.ts - b.ts || a.block - b.block);
-  if (events.length === 0) return null;
-  const start = Math.floor((events[0].ts * 1000) / DAY_MS) * DAY_MS;
-  const cum: Record<string, number> = Object.fromEntries(t.buckets.map((b) => [b.key, 0]));
-  const held = new Map<string, { symbol: string; side: FlowSide; amount: number }>();
-  const price = new Map<string, { usd: number; ts: number }>();
-  const rows: FlowRow[] = [];
-  const repricings: Repricing[] = [];
-
-  for (const ev of events) {
-    const day = dayOf(ev.ts, start);
-    const before = rows[rows.length - 1];
-    for (const p of ev.prices) {
-      if (!(p.usd > 0)) continue;
-      const prev = price.get(p.asset);
-      const h = [...held.entries()].find(([k]) => k.endsWith(`:${p.asset}`))?.[1];
-      // A step worth marking: a price older than STALE_DAYS that moves the
-      // side's value by at least REPRICE_SHARE of it.
-      if (prev && h && before && ev.ts - prev.ts > STALE_DAYS * 86_400) {
-        const step = Math.abs(h.amount * (p.usd - prev.usd));
-        const sideUsd = h.side === "collateral" ? before.collateralUsd : before.debtUsd;
-        if (step >= STALE_FLOOR_USD && step >= sideUsd * REPRICE_SHARE)
-          repricings.push({ day, symbol: h.symbol, from: prev.ts });
-      }
-      price.set(p.asset, { usd: p.usd, ts: ev.ts });
-    }
+/** A page's events as day rows: each day's running totals, the balances its
+ *  events stated, and the prices they carried, as the day's last event left
+ *  them. */
+export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowDayRow[] {
+  const ordered = [...events].sort((a, b) => a.ts - b.ts || a.block - b.block);
+  const cum: Record<string, number> = Object.fromEntries(bucketKeys.map((k) => [k, 0]));
+  const days: FlowDayRow[] = [];
+  let cur: {
+    day: number;
+    sides: Set<"collateral" | "debt">;
+    liq: boolean;
+    balances: Map<string, FlowEvent["balances"][number]>;
+    prices: Map<string, { usd: number; ts: number }>;
+  } | null = null;
+  let n = 0;
+  const close = () => {
+    if (!cur) return;
+    days.push({
+      day: cur.day,
+      events: n,
+      tick: cur.liq ? "liquidation" : cur.sides.size === 2 ? "both" : cur.sides.has("debt") ? "debt" : "collateral",
+      cum: { ...cum },
+      balances: [...cur.balances.values()],
+      prices: [...cur.prices].map(([asset, p]) => ({ asset, usd: p.usd, ts: p.ts })),
+    });
+    cur = null;
+  };
+  for (const ev of ordered) {
+    const day = utcDay(ev.ts);
+    if (cur && cur.day !== day) close();
+    cur ??= { day, sides: new Set(), liq: false, balances: new Map(), prices: new Map() };
+    n += 1;
+    for (const p of ev.prices) if (p.usd > 0) cur.prices.set(p.asset, { usd: p.usd, ts: ev.ts });
     for (const leg of ev.legs) if (leg.bucket in cum && Number.isFinite(leg.usd)) cum[leg.bucket] += leg.usd;
-    for (const b of ev.balances) held.set(`${b.side}:${b.asset}`, { symbol: b.symbol, side: b.side, amount: b.amount });
+    for (const b of ev.balances) cur.balances.set(`${b.side}:${b.asset}`, b);
+    if (ev.tick === "liquidation") cur.liq = true;
+    else if (ev.tick === "both") {
+      cur.sides.add("collateral");
+      cur.sides.add("debt");
+    } else cur.sides.add(ev.tick);
+  }
+  close();
+  return days;
+}
 
-    let collateralUsd = 0;
-    let debtUsd = 0;
-    const stale: StalePrice[] = [];
+/** One asset's price at a stop: the newer of its daily series and its events'. */
+interface PriceAt {
+  usd: number;
+  /** Unix seconds the price was recorded (a series price: its day's start). */
+  ts: number;
+  /** Stop of the day it was recorded. */
+  day: number;
+  series: boolean;
+}
+
+/** Replay the day rows into the model the scrubber reads. */
+export function buildFlowModel(t: FlowTimeline): FlowModel | null {
+  const days = [...t.days].sort((a, b) => a.day - b.day);
+  if (days.length === 0) return null;
+  const startDay = days[0].day;
+  const start = startDay * DAY_MS;
+  const daily = !!t.dailyPrices && Object.keys(t.dailyPrices).length > 0;
+  const gapDays = daily ? SERIES_GAP_DAYS : STALE_DAYS;
+  const outOf = (side: FlowSide, c: Record<string, number>) =>
+    t.buckets.filter((b) => b.side === side && b.dir === "out").reduce((s, b) => s + (c[b.key] ?? 0), 0);
+
+  const rows: FlowRow[] = days.map((d) => ({ day: d.day - startDay, events: d.events, cum: { ...d.cum } }));
+  const lastDay = rows[rows.length - 1].day;
+  const eventDays = rows.map((r) => r.day);
+
+  // Held balances after the last active day, to see whether the slider runs on.
+  const heldEnd = new Map<string, number>();
+  for (const d of days) for (const b of d.balances) heldEnd.set(`${b.side}:${b.asset}`, b.amount);
+  const stillHeld = [...heldEnd.values()].some((v) => v > 0);
+  const liveStop = t.today != null && stillHeld ? Math.max(lastDay + 1, t.today - startDay) : lastDay + 1;
+
+  // Each asset's daily observations as stops, ascending.
+  const series = new Map<string, { day: number; usd: number }[]>();
+  for (const [asset, obs] of Object.entries(t.dailyPrices ?? {}))
+    series.set(
+      asset,
+      obs
+        .map(([d, usd]) => ({ day: d - startDay, usd }))
+        .filter((o) => o.usd > 0)
+        .sort((a, b) => a.day - b.day),
+    );
+  const seriesAt = (asset: string, stop: number, from: { i: number }): PriceAt | null => {
+    const obs = series.get(asset);
+    if (!obs) return null;
+    while (from.i + 1 < obs.length && obs[from.i + 1].day <= stop) from.i++;
+    const o = obs[from.i];
+    return o && o.day <= stop ? { usd: o.usd, ts: (startDay + o.day) * DAY_S, day: o.day, series: true } : null;
+  };
+
+  const held = new Map<string, { symbol: string; side: FlowSide; amount: number }>();
+  const eventPrice = new Map<string, PriceAt>();
+  const seriesCursor = new Map<string, { i: number }>();
+  const valued: FlowModel["valued"] = [];
+  const stale = new Map<number, StalePrice[]>();
+  const repricings: Repricing[] = [];
+  let prevPrice = new Map<string, PriceAt>();
+  let di = 0;
+
+  for (let stop = 0; stop < liveStop; stop++) {
+    if (di < days.length && days[di].day - startDay === stop) {
+      const d = days[di++];
+      for (const p of d.prices)
+        if (p.usd > 0) eventPrice.set(p.asset, { usd: p.usd, ts: p.ts, day: utcDay(p.ts) - startDay, series: false });
+      for (const b of d.balances)
+        held.set(`${b.side}:${b.asset}`, { symbol: b.symbol, side: b.side, amount: b.amount });
+    }
+    const priceNow = new Map<string, PriceAt>();
+    let coll = 0;
+    let debt = 0;
+    const staleHere: StalePrice[] = [];
+    const lines: { asset: string; h: { symbol: string; side: FlowSide; amount: number }; usd: number }[] = [];
     for (const [key, h] of held) {
       if (!(h.amount > 0)) continue;
       const asset = key.slice(key.indexOf(":") + 1);
-      const p = price.get(asset);
+      let p = priceNow.get(asset);
+      if (!p) {
+        const cursor = seriesCursor.get(asset) ?? { i: 0 };
+        seriesCursor.set(asset, cursor);
+        const s = seriesAt(asset, stop, cursor);
+        const e = eventPrice.get(asset);
+        // The newer of the two; on one day the series (the day's end) wins.
+        const best = s && e ? (e.day > s.day ? e : s) : (s ?? e ?? null);
+        if (best) {
+          p = best;
+          priceNow.set(asset, best);
+        }
+      }
       const usdPer = p?.usd ?? t.todayPrices?.[asset] ?? 0;
       const usd = h.amount * usdPer;
-      if (h.side === "collateral") collateralUsd += usd;
-      else debtUsd += usd;
-      if (p && usd >= STALE_FLOOR_USD) stale.push({ symbol: h.symbol, side: h.side, pricedAt: p.ts, usd });
+      if (h.side === "collateral") coll += usd;
+      else debt += usd;
+      lines.push({ asset, h, usd });
+      if (p && usd >= STALE_FLOOR_USD) {
+        const old = daily ? stop - p.day > gapDays : (startDay + stop + 1) * DAY_S - p.ts > gapDays * DAY_S;
+        if (old) staleHere.push({ symbol: h.symbol, side: h.side, pricedAt: p.ts, usd });
+      }
     }
-    rows.push({ ts: ev.ts, day, cum: { ...cum }, collateralUsd, debtUsd, stale });
+    // A repricing: a held asset whose price was stale at the previous stop
+    // gets a newer one, and the step moves its side by REPRICE_SHARE or more.
+    if (stop > 0) {
+      const before = valued[stop - 1];
+      for (const { asset, h } of lines) {
+        const was = prevPrice.get(asset);
+        const now = priceNow.get(asset);
+        if (!was || !now || now.ts <= was.ts) continue;
+        const staleBefore = daily
+          ? stop - 1 - was.day > gapDays
+          : (startDay + stop) * DAY_S - was.ts > gapDays * DAY_S || now.ts - was.ts > gapDays * DAY_S;
+        if (!staleBefore) continue;
+        const step = Math.abs(h.amount * (now.usd - was.usd));
+        const sideUsd = h.side === "collateral" ? before.collateral : before.debt;
+        if (
+          step >= STALE_FLOOR_USD &&
+          step >= sideUsd * REPRICE_SHARE &&
+          !repricings.some((r) => r.day === stop && r.symbol === h.symbol)
+        )
+          repricings.push({ day: stop, symbol: h.symbol, from: was.ts });
+      }
+    }
+    // Only what was held at this stop can be repriced at the next.
+    prevPrice = priceNow;
+    valued.push({ collateral: coll, debt });
+    if (staleHere.length) stale.set(stop, staleHere);
   }
 
-  const lastDay = rows[rows.length - 1].day;
-  const liveStop = lastDay + 1;
-  const eventDays = [...new Set(rows.map((r) => r.day))];
-  const outOf = (side: FlowSide, c: Record<string, number>) =>
-    t.buckets.filter((b) => b.side === side && b.dir === "out").reduce((s, b) => s + (c[b.key] ?? 0), 0);
   const last = rows[rows.length - 1];
   const today = {
     collateral: t.live.collateralUsd + outOf("collateral", last.cum),
     debt: t.live.debtUsd + outOf("debt", last.cum),
   };
   let peak = Math.max(today.collateral, today.debt);
-  for (const r of rows)
-    peak = Math.max(peak, r.collateralUsd + outOf("collateral", r.cum), r.debtUsd + outOf("debt", r.cum));
+  let ri = 0;
+  for (let stop = 0; stop < liveStop; stop++) {
+    while (ri + 1 < rows.length && rows[ri + 1].day <= stop) ri++;
+    const c = rows[ri].cum;
+    peak = Math.max(peak, valued[stop].collateral + outOf("collateral", c), valued[stop].debt + outOf("debt", c));
+  }
   // An exact inflow can exceed its bar where a price fell; the drill-down
   // strip clamps to the bar, so the axis follows the bars alone.
   return {
@@ -264,9 +425,13 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     lastDay,
     liveStop,
     eventDays,
-    ticks: events.map((e) => ({ day: dayOf(e.ts, start), tick: e.tick })),
+    ticks: days.map((d) => ({ day: d.day - startDay, tick: d.tick })),
     repricings,
     live: t.live,
+    valued,
+    stale,
+    daily,
+    totalEvents: t.totalEvents ?? last.events,
     axis: axisFor(peak),
     today,
   };
@@ -381,17 +546,16 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
   const i = isLive ? m.rows.length - 1 : rowAt(m, stop);
   const row = i >= 0 ? m.rows[i] : null;
   const cum = row?.cum ?? Object.fromEntries(m.buckets.map((b) => [b.key, 0]));
-  const collNow = isLive ? m.live.collateralUsd : (row?.collateralUsd ?? 0);
-  const debtNow = isLive ? m.live.debtUsd : (row?.debtUsd ?? 0);
-  const cutoff = (m.start + (Math.min(stop, m.lastDay) + 1) * DAY_MS) / 1000;
-  const stale = isLive || !row ? [] : row.stale.filter((s) => cutoff - s.pricedAt > STALE_DAYS * 86_400);
+  const v = !isLive && stop >= 0 ? m.valued[Math.min(stop, m.valued.length - 1)] : undefined;
+  const collNow = isLive ? m.live.collateralUsd : (v?.collateral ?? 0);
+  const debtNow = isLive ? m.live.debtUsd : (v?.debt ?? 0);
   return {
     stop: Math.min(stop, m.liveStop),
     isLive,
-    count: i + 1,
+    count: row?.events ?? 0,
     collateral: sideState(m, "collateral", cum, collNow, isLive ? m.live.collateralInterestUsd : null),
     debt: sideState(m, "debt", cum, debtNow, isLive ? m.live.debtInterestUsd : null),
-    stale,
+    stale: isLive ? [] : (m.stale.get(stop) ?? []),
   };
 }
 

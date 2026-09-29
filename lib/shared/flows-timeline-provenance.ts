@@ -5,8 +5,15 @@
 import type { Provenance } from "@/components/shared/provenance";
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
 
-/** `when` is "now" at the live stop, else "the end of 9 Nov 2025". */
-export function flowSegmentProv(s: FlowSegment, side: FlowSide, when: string, isLive: boolean): Provenance {
+/** `when` is "now" at the live stop, else "the end of 9 Nov 2025". `daily`:
+ *  held assets are valued at a daily price series. */
+export function flowSegmentProv(
+  s: FlowSegment,
+  side: FlowSide,
+  when: string,
+  isLive: boolean,
+  daily = false,
+): Provenance {
   const held = side === "collateral" ? "held" : "owed";
   if (s.fill === "held")
     return isLive
@@ -15,11 +22,17 @@ export function flowSegmentProv(s: FlowSegment, side: FlowSide, when: string, is
           summary: `${s.label} — each asset the position has ${held} now, at the oracle price now, added up. The Full breakdown lists them.`,
           formula: "Σ balance × price",
         }
-      : {
-          kind: "chain-derived",
-          summary: `${s.label} at ${when} — each asset's balance after its last event by then, at the oracle price that event carried, added up.`,
-          formula: "Σ balance × price at its last event",
-        };
+      : daily
+        ? {
+            kind: "chain-derived",
+            summary: `${s.label} at ${when} — each asset's balance after its last event by then, at the last oracle price recorded by the end of that day, added up.`,
+            formula: "Σ balance × price at the day's end",
+          }
+        : {
+            kind: "chain-derived",
+            summary: `${s.label} at ${when} — each asset's balance after its last event by then, at the oracle price that event carried, added up.`,
+            formula: "Σ balance × price at its last event",
+          };
   if (s.fill === "estimate")
     return {
       kind: "chain-derived",
