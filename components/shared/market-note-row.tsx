@@ -55,6 +55,7 @@
 
 import { type ReactNode } from "react";
 import { formatTinyNonZero } from "@/lib/utils/format";
+import { formatDate } from "@/lib/date";
 import { usePathname } from "next/navigation";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 
@@ -1762,47 +1763,6 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
   const ilk = note.marketName ?? note.marketSymbol;
   const debtSymbol = note.interest?.symbol ?? note.marketSymbol;
 
-  /** One end of the step: the vault's own touch, and the drip the fee in force
-   *  at it was first evidenced by. Nobody "fired" that drip in a sense that
-   *  touches this vault — a drip is a keeper call anyone may make, and the duty
-   *  it compounds at is governance's — so the row offers only the explorer link
-   *  for it and never implies a party. */
-  const observation = (which: "from" | "to") => {
-    const p = which === "from" ? note.from : note.to;
-    if (which === "to" && note.live) {
-      return (
-        <>
-          now: the Jug&rsquo;s own base + duty for this ilk, compounded over a year and read live at block{" "}
-          {p.block.toLocaleString("en-US")}
-        </>
-      );
-    }
-    const o = which === "from" ? note.observed.from : note.observed.to;
-    if (!o) {
-      return (
-        <>
-          {makerRateEndLabel(p)}: this vault&rsquo;s own touch at block {p.block.toLocaleString("en-US")}
-          {observationLinks(p, links)}
-        </>
-      );
-    }
-    const dripPoint: MarketNotePoint = {
-      block: o.block,
-      timestamp: o.timestamp,
-      value: p.value,
-      txHash: o.txHash,
-      logIndex: o.logIndex,
-      wallet: o.txFrom,
-      kind: "drip",
-    };
-    return (
-      <>
-        {makerRateEndLabel(p)}: the first Jug.drip at that fee, block {o.block.toLocaleString("en-US")}
-        {observationLinks(dripPoint, links)}
-      </>
-    );
-  };
-
   const stats: NoteStat[] = [
     {
       label: "Stability fee (% per year)",
@@ -1843,7 +1803,10 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
   if (note.interest && f.debt && f.before && f.after) {
     const interest = note.interest;
     stats.push({
-      label: `Yearly interest on the debt recorded at block ${f.fromBlock}`,
+      label:
+        note.live && interest.atBlock === note.to.block
+          ? "Yearly interest on today's debt"
+          : `Yearly interest on the debt recorded at block ${f.fromBlock}`,
       transition: {
         before: {
           text: f.before,
@@ -1880,54 +1843,41 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     quantity: "stability fee",
     ...liftTimeCells(stats),
     learnMore: marketNoteRateStepContent("makerdao"),
-    derivation: note.live ? (
+    // T3 in plain words. How the fee at each touch is found (the Jug.drip
+    // derivation) is the receipts' job: makerRateStepProv.
+    derivation: (
       <>
-        This is a LIVE note: the {ilk} stability fee is governance&rsquo;s own duty on the Jug — nobody borrowing in
-        this ilk chooses it. The earlier value is the fee in force at this vault&rsquo;s own last touch, the later one
-        the Jug&rsquo;s base + duty read now and compounded over a year — {observation("from")}, {observation("to")}.
-        Both ends are the same quantity, reached two ways. Shown whenever this vault is open, whatever the move —
-        nothing having moved is itself the fact this note states.
-        {note.interest && (
+        {ilk}&rsquo;s stability fee {note.deltaPp >= 0 ? "rose" : "fell"} from <H>{f.fromRate}</H> at this vault&rsquo;s{" "}
+        {makerRateEndLabel(note.from).toLowerCase()} on {formatDate(note.from.timestamp)} to <H>{f.toRate}</H>{" "}
+        {note.live ? (
+          "today"
+        ) : (
           <>
-            {" "}
-            The interest figures hold this vault&rsquo;s own {debtSymbol} debt at that touch fixed and move only the
-            fee; interest actually charged compounds continuously into the ilk&rsquo;s rate accumulator and settles on
-            the vault&rsquo;s own next touch.
+            by its {makerRateEndLabel(note.to).toLowerCase()} on {formatDate(note.to.timestamp)}
           </>
         )}
-      </>
-    ) : (
-      <>
-        MakerDAO states no stability fee anywhere a row can carry it: governance files a duty on the Jug, and the
-        spell&rsquo;s own block is not indexed. What the index holds is the Vat&rsquo;s rate accumulator moving — every
-        Jug.drip applies <span className="whitespace-nowrap">rate_delta = rate_before × (duty^Δt − 1)</span>, so the fee
-        a drip compounded at falls out of its own delta and the seconds since the ilk&rsquo;s previous drip. The fee in
-        force at a touch is therefore the ilk&rsquo;s last rate SET at or before it — the first drip at a new fee, which
-        is the earliest observable moment of a governance change — and every set is CONFIRMED by reading the Jug&rsquo;s
-        duty at that drip&rsquo;s own block before it is stated. The two values here are the fees in force at this
-        vault&rsquo;s own two touches — {observation("from")}, {observation("to")}.{" "}
+        {note.setsBetween != null && note.setsBetween > 0 ? (
+          <>; governance changed it {note.setsBetween === 1 ? "once" : `${f.sets} times`} in between</>
+        ) : null}
+        .{" "}
+        {note.interest && f.before && f.after && f.debt ? (
+          <>
+            On the <H>{f.debt}</H> this vault{" "}
+            {note.live && note.interest.atBlock === note.to.block ? (
+              <>owes now</>
+            ) : (
+              <>owed on {formatDate(note.from.timestamp)}</>
+            )}
+            , that is about <H>{f.after}</H> a year, against <H>{f.before}</H> at the earlier fee. The fee is added to
+            the debt continuously; nothing is billed.{" "}
+          </>
+        ) : null}
         {note.steps != null && (
-          <>
-            Those two ends are {f.steps} of this vault&rsquo;s touches apart: the fee moved the same way at every step
-            in between, and a run of steps one after another in one direction is one thing happening to this vault — so
-            it is stated as one stretch, and the receipt lists each step it took in. A step the other way ends the run
-            and begins the next note.{" "}
-          </>
+          <>The fee moved the same way across {f.steps} of the vault&rsquo;s touches, so they make one note. </>
         )}
-        {note.setsBetween != null && note.setsBetween > 0 && (
-          <>
-            Governance reset the fee {f.sets} {note.setsBetween === 1 ? "time" : "times"} in between; nothing between
-            the two touches is drawn, because nothing between them was observed on this vault.{" "}
-          </>
-        )}
-        A stretch is stated only where the fee moved at least one percentage point.
-        {note.interest && (
-          <>
-            {" "}
-            The interest figures hold this vault&rsquo;s own {debtSymbol} debt at the earlier touch fixed — its
-            normalized art valued at the rate accumulator in force at that block — and move only the fee.
-          </>
-        )}
+        {note.live
+          ? "Governance sets this fee for every vault of the type; the vault's owner did nothing to change it."
+          : "A note appears where the fee moved at least one percentage point between two of the vault's touches."}
       </>
     ),
   };

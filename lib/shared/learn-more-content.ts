@@ -2972,27 +2972,123 @@ const MAKER_DOCS = {
   OVERVIEW: "https://docs.makerdao.com/",
 } as const;
 
-export function makerdaoVaultContent(kind: "open" | "adjust" = "adjust"): LearnMoreContent {
-  return {
-    title: kind === "open" ? "How Opening a Maker Vault Works" : "How Maker Vault Adjustments Work",
-    intro:
-      "A Maker vault holds one collateral type (its ilk — ETH-A, ETH-C, WSTETH-B, …) and mints DAI debt against it. Every change goes through one Vat operation, frob: a signed collateral delta (dink) and a signed debt delta (dart) in a single call.",
-    stepsHeading: "The mechanics:",
-    steps: [
-      "Depositing collateral or repaying DAI raises the vault's collateral ratio; withdrawing collateral or drawing DAI lowers it.",
-      "The Vat only allows a frob that leaves the vault safe: collateral value (at the ilk's liquidation-adjusted price) must cover the debt.",
-      "Debt is stored normalized (art); the DAI figure is art × the ilk's rate accumulator, which grows at the stability fee.",
-      "Each ilk enforces a minimum debt (dust) — a repayment may not leave a smaller remainder (only exactly zero) — and a per-ilk ceiling (line).",
-    ],
-    extraParagraphs: [
-      "The vault's ilk decides its terms: the liquidation ratio (mat), the stability fee (duty) and the dust floor are all per-ilk governance parameters, read live from the chain on this page.",
-    ],
-    links: [
-      { label: "Vat — the core accounting", url: MAKER_DOCS.VAT },
-      { label: "Rates module (stability fees)", url: MAKER_DOCS.RATES },
-      { label: "Maker protocol docs", url: MAKER_DOCS.OVERVIEW },
-    ],
-  };
+/** The act a Maker vault row performs, for its "?" modal. */
+export type MakerVaultAct = "open" | "deposit" | "withdraw" | "generate" | "repay" | "adjust" | "returned";
+
+/** Where the on-chain names go: one closing paragraph, so the modal's body
+ *  stays in plain terms. */
+const MAKER_FROB_SOURCE =
+  "On chain every one of these acts is one call to the Vat, frob, which carries a change to the collateral (dink) and a change to the debt (dart); the debt is stored divided by the rate accumulator (art).";
+
+export function makerdaoVaultContent(kind: MakerVaultAct = "adjust"): LearnMoreContent {
+  const links = [
+    { label: "Vat — the core accounting", url: MAKER_DOCS.VAT },
+    { label: "Rates module (stability fees)", url: MAKER_DOCS.RATES },
+    { label: "Maker protocol docs", url: MAKER_DOCS.OVERVIEW },
+  ];
+  switch (kind) {
+    case "open":
+      return {
+        title: "How Opening a Maker Vault Works",
+        intro:
+          "A vault holds one type of collateral (ETH-A, ETH-C and WSTETH-B are types, each with its own terms) and lets its owner draw DAI against it. Opening one is usually a deposit and a first draw in the same transaction.",
+        stepsHeading: "What to watch from the start:",
+        steps: [
+          "The collateral ratio: the collateral's value divided by the debt. It must stay above the type's minimum; below it the vault can be liquidated.",
+          "The price it is judged at: Maker's oracle price, which lags the market by an hour, so a sharp fall reaches the vault an hour later.",
+          "The stability fee: a yearly rate that governance sets for the type and can change at any time. It is added to the debt continuously; nothing is billed.",
+          "The minimum debt: a vault that owes anything must owe at least the type's floor.",
+        ],
+        extraParagraphs: [MAKER_FROB_SOURCE],
+        links,
+      };
+    case "deposit":
+      return {
+        title: "How Depositing Collateral Works",
+        intro:
+          "A deposit locks more collateral in the vault. It raises the collateral ratio, which lowers the price at which the vault could be liquidated and leaves room to draw more DAI.",
+        stepsHeading: "What it changes:",
+        steps: [
+          "Nothing is charged for a deposit, and the debt does not change.",
+          "The added value counts at Maker's oracle price at the time, so the same deposit buys more room when the price is high.",
+          "Anyone can add collateral to a vault directly at the Vat; through the CDP manager the owner has to have authorised them first.",
+        ],
+        extraParagraphs: [MAKER_FROB_SOURCE],
+        links,
+      };
+    case "withdraw":
+      return {
+        title: "How Withdrawing Collateral Works",
+        intro:
+          "A withdrawal takes collateral out of the vault. It lowers the collateral ratio, so Maker only allows it while the vault stays above its type's minimum at the oracle price.",
+        stepsHeading: "What it changes:",
+        steps: [
+          "A vault with debt can release only the collateral above what the minimum ratio needs; the rest stays locked until the debt is repaid.",
+          "A vault with no debt can withdraw everything, which leaves it empty. The vault number stays with its owner and can take a new deposit later.",
+          "Only the owner, or an address the owner authorised, can take collateral out.",
+        ],
+        extraParagraphs: [MAKER_FROB_SOURCE],
+        links,
+      };
+    case "generate":
+      return {
+        title: "How Drawing DAI Works",
+        intro:
+          "Drawing (generating) DAI mints new DAI to the owner and adds it to the vault's debt. It lowers the collateral ratio, and Maker refuses a draw that would take the vault under its type's minimum.",
+        stepsHeading: "What it changes:",
+        steps: [
+          "The debt grows by the amount drawn, and from then on by the stability fee on it, until it is repaid.",
+          "The fee is not a separate bill: it is added to the debt continuously, so repaying costs more than was drawn.",
+          "After a draw the debt must be at least the type's minimum debt.",
+        ],
+        extraParagraphs: [MAKER_FROB_SOURCE],
+        links,
+      };
+    case "repay":
+      return {
+        title: "How Repaying DAI Works",
+        intro:
+          "Repaying returns DAI to the vault, which burns it and reduces the debt. It raises the collateral ratio and frees collateral to withdraw.",
+        stepsHeading: "What it changes:",
+        steps: [
+          "The DAI owed includes the stability fee added since the draws, so clearing a debt takes more DAI than was drawn.",
+          "A repayment must leave either no debt or at least the type's minimum debt; a smaller remainder is refused.",
+          "Anyone can repay a vault's debt directly at the Vat; the collateral stays the owner's.",
+        ],
+        extraParagraphs: [MAKER_FROB_SOURCE],
+        links,
+      };
+    case "returned":
+      return {
+        title: "How Auction Leftovers Come Back",
+        intro:
+          "When a liquidation auction has raised the debt and the penalty, it stops selling and sends the collateral left over back to the vault's address. It arrives as free collateral, outside the vault's balance.",
+        stepsHeading: "How the owner takes it:",
+        steps: [
+          "The owner moves the returned collateral into the vault and then out again to their own address; the two steps show as a deposit and a withdrawal.",
+          "It is the owner's own collateral coming back, so it adds nothing to what they put in.",
+        ],
+        extraParagraphs: [MAKER_FROB_SOURCE],
+        links: [
+          { label: "Liquidations 2.0 (Dog & Clipper)", url: MAKER_DOCS.LIQUIDATIONS },
+          { label: "Vat — the core accounting", url: MAKER_DOCS.VAT },
+        ],
+      };
+    default:
+      return {
+        title: "How Maker Vault Adjustments Work",
+        intro:
+          "A vault can take collateral in or out and draw or repay DAI, one or several of these at once. Adding collateral or repaying raises the collateral ratio; withdrawing or drawing lowers it.",
+        stepsHeading: "The rules every change meets:",
+        steps: [
+          "The vault must stay above its type's minimum collateral ratio at Maker's oracle price, unless the change only adds collateral or repays.",
+          "The debt includes the stability fee added since the draws.",
+          "A vault's debt is either zero or at least the type's minimum debt.",
+        ],
+        extraParagraphs: [MAKER_FROB_SOURCE],
+        links,
+      };
+  }
 }
 
 export function makerdaoLiquidationContent(): LearnMoreContent {
@@ -3004,7 +3100,7 @@ export function makerdaoLiquidationContent(): LearnMoreContent {
     steps: [
       "The grab removes the seized collateral (dink < 0) and the seized normalized debt (dart < 0) from the urn in one step.",
       "The seized collateral goes to a Dutch auction (Clipper); proceeds cover the debt plus a liquidation penalty.",
-      "Any auction surplus is returned to the vault owner; a shortfall becomes system bad debt handled by the protocol's buffer.",
+      "Once the auction has raised the debt plus the penalty it stops, and the collateral left over goes back to the vault's address, where the owner can take it; a shortfall becomes system bad debt handled by the protocol's buffer.",
       "The vault itself survives — a partially liquidated vault can be topped up and used again.",
     ],
     extraParagraphs: [

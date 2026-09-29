@@ -8,6 +8,7 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { TowerSideData } from "@/lib/shared/chain-truth-economics";
 import type { MakerTowerData } from "@/lib/makerdao/economics";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
+import { formatNumber, formatPrice } from "@/lib/utils/format";
 
 const DUST = 1e-9;
 
@@ -20,14 +21,19 @@ const fig = (usd: number): string => formatCompactUsd(usd);
 const exitedTotal = (side: TowerSideData): number => side.exited.reduce((sum, l) => sum + (l.usd ?? 0), 0);
 
 /** Explanation body for the MakerDAO tower — a lead sentence plus bullets
- *  derived from `data`. Returns null when there's nothing to narrate. */
+ *  derived from `data`. Every USD figure names the price it is valued at.
+ *  Returns null when there's nothing to narrate. */
 export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
   const { collateral, debt } = data;
-  const collSym = sideSymbol(collateral, "collateral");
+  const collSym = data.collateralSymbol ?? sideSymbol(collateral, "collateral");
   const debtSym = sideSymbol(debt, "DAI");
+  const atEvents = data.flowsPricedAtEvents === true;
+  const now = data.priceNow;
+  const nowText = now != null ? `today's OSM price of $${formatPrice(now)}` : "today's OSM price";
   const bullets: ReactNode[] = [];
 
   const collWithdrawn = exitedTotal(collateral);
+  const returned = (collateral.received ?? []).reduce((t, l) => t + (l.usd ?? 0), 0);
   if (collateral.lifetimeInflow > DUST || collWithdrawn > DUST) {
     bullets.push(
       <span key="coll-flow">
@@ -36,13 +42,14 @@ export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
             {fig(collateral.lifetimeInflow)} of {collSym} deposited
           </>
         )}
+        {returned > DUST && <>, {fig(returned)} returned by a liquidation auction</>}
         {collWithdrawn > DUST && (
           <>
             {collateral.lifetimeInflow > DUST ? ", " : ""}
-            {fig(collWithdrawn)} withdrawn or moved to another vault
+            {fig(collWithdrawn)} withdrawn
           </>
         )}
-        {" over the vault's life."}
+        {atEvents ? ", each valued at the OSM price at its own block." : `, valued at ${nowText}.`}
       </span>,
     );
   }
@@ -53,16 +60,16 @@ export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
       <span key="debt-flow">
         {debt.lifetimeInflow > DUST && (
           <>
-            {fig(debt.lifetimeInflow)} of {debtSym} generated
+            {fig(debt.lifetimeInflow)} of {debtSym} drawn
           </>
         )}
         {debtRepaid > DUST && (
           <>
             {debt.lifetimeInflow > DUST ? ", " : ""}
-            {fig(debtRepaid)} repaid or moved out
+            {fig(debtRepaid)} repaid
           </>
-        )}
-        {" over the vault's life."}
+        )}{" "}
+        over the vault&apos;s life, at $1 a {debtSym}.
       </span>,
     );
   }
@@ -72,11 +79,18 @@ export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
   if (debtLiq || collLiq) {
     bullets.push(
       <span key="liquidated">
-        {debtLiq && <>{fig(debtLiq.usd ?? 0)} of debt was cleared in liquidation</>}
+        Liquidation cleared {debtLiq ? fig(debtLiq.usd ?? 0) : "the"} of debt
         {collLiq && (
           <>
-            {debtLiq ? ", seizing " : "Liquidation seized "}
-            {fig(collLiq.usd ?? 0)} of {collSym} collateral
+            {" "}
+            and seized {formatNumber(collLiq.amount)} {collSym}, worth {fig(collLiq.usd ?? 0)}
+            {atEvents ? " at the OSM price then" : ` at ${nowText}`}
+            {atEvents && data.liquidatedNowUsd != null ? (
+              <>
+                {" "}
+                and {fig(data.liquidatedNowUsd)} at {nowText}
+              </>
+            ) : null}
           </>
         )}
         .
@@ -84,30 +98,41 @@ export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
     );
   }
 
-  if (data.lifetimeInterest != null && data.lifetimeInterest > DUST) {
+  if (collateral.priceChange && collateral.priceChange.usd != null) {
+    const c = collateral.priceChange.usd;
     bullets.push(
-      <span key="interest-accrued">
-        {fig(data.lifetimeInterest)} of stability fee accrued over the vault&apos;s life: the {debtSym} owed now less
-        the net {debtSym} drawn, each draw and repayment valued at its block&apos;s rate.
+      <span key="price-change">
+        Price change {c < 0 ? "−" : "+"}
+        {fig(Math.abs(c))}: {collSym}&apos;s price {c < 0 ? "fell" : "rose"} between the events and today, so the
+        collateral held is worth {c < 0 ? "less" : "more"} than the flows above add up to.
       </span>,
     );
   }
 
-  const fee = debt.interest;
   if (data.lifetimeInterest != null && data.lifetimeInterest > DUST) {
-    // The vault's own accrual is stated above.
-  } else if (fee && fee.amount > DUST) {
+    const owed = data.feeOwed ?? 0;
+    const liq = data.feeLiquidated ?? 0;
+    const repaid = Math.max(0, data.lifetimeInterest - owed - liq);
+    const parts: ReactNode[] = [];
+    if (owed > DUST) parts.push(<>{fig(owed)} is in today&apos;s debt</>);
+    if (repaid > DUST) parts.push(<>{fig(repaid)} was paid inside repayments</>);
+    if (liq > DUST) parts.push(<>{fig(liq)} was part of the debt the liquidation cleared</>);
     bullets.push(
-      <span key="fee">
-        An accrued stability fee of {fig(fee.usd ?? 0)} sits on top of the {fig(debt.current[0]?.usd ?? 0)} DAI
-        principal — Maker's stability fee compounds into the debt via the ilk's own rate accumulator.
-      </span>,
-    );
-  } else {
-    bullets.push(
-      <span key="fee-mechanic">
-        Maker's stability fee compounds into the debt via the ilk's own rate accumulator — each vault belongs to one
-        ilk, with its own liquidation ratio and fee rate.
+      <span key="interest-accrued">
+        {fig(data.lifetimeInterest)} of stability fee over the vault&apos;s life: the {debtSym} owed now less every{" "}
+        {debtSym} drawn net of repayments and liquidations
+        {parts.length > 0 ? (
+          <>
+            {"; "}
+            {parts.map((p, i) => (
+              <span key={i}>
+                {i > 0 ? (i === parts.length - 1 ? " and " : ", ") : null}
+                {p}
+              </span>
+            ))}
+          </>
+        ) : null}
+        .
       </span>,
     );
   }
@@ -117,8 +142,15 @@ export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
   if (collNow || debtNow) {
     bullets.push(
       <span key="current">
-        The vault currently holds {collNow ? fig(collNow.usd ?? 0) : `no ${collSym}`} backing{" "}
-        {debtNow ? fig(debtNow.usd ?? 0) : "no debt"}.
+        The vault holds{" "}
+        {collNow ? (
+          <>
+            {fig(collNow.usd ?? 0)} of {collSym} at {nowText}
+          </>
+        ) : (
+          `no ${collSym}`
+        )}{" "}
+        against {debtNow ? <>{fig((debtNow.usd ?? 0) + (debt.interest?.usd ?? 0))} of debt</> : "no debt"}.
       </span>,
     );
   } else if (bullets.length > 0) {
@@ -129,9 +161,7 @@ export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
 
   return (
     <div className="space-y-2 text-sm text-rb-500">
-      <p className="leading-relaxed">
-        These figures total this vault&apos;s lifetime flows on MakerDAO across every event in its captured history.
-      </p>
+      <p className="leading-relaxed">These figures total every event of this vault on MakerDAO.</p>
       {bullets.map((item, i) => (
         <div key={i} className="flex items-start gap-2 leading-relaxed">
           <span className="select-none text-rb-500">•</span>
@@ -153,23 +183,23 @@ export function makerdaoEconomicsContent(): LearnMoreContent {
   return {
     title: "About the Economics",
     intro:
-      "This panel replays the vault's own Vat events (frob, grab, fork) into lifetime flows, and reads its current ink (collateral) and art (normalized debt) live from the chain at the head block.",
-    stepsHeading: "How the tower is built:",
+      "This panel adds up everything the vault's events moved: collateral in and out on the left, DAI drawn and repaid on the right, with what the vault holds and owes today at the bottom of each side.",
+    stepsHeading: "How the figures are valued:",
     steps: [
-      "Collateral deposited, withdrawn, generated and repaid debt are summed from the vault's own signed dink/dart deltas, event by event.",
-      "Each historic debt delta is valued in DAI at the ilk's rate accumulator AS OF its own block, so the sum reflects what was actually owed at the time.",
-      "The accrued stability fee is the gap between the current DAI debt (art × rate) and the normalized principal (art) — both read live off the Vat.",
-      "USD values use Maker's own OSM price (the same price its liquidations act on).",
+      "Collateral flows are valued at Maker's oracle (OSM) price at each event's block when the page has read every one of them; otherwise at today's OSM price, and the explanation says which.",
+      "What the vault holds is valued at today's OSM price. The difference between the two is the Price change row.",
+      "DAI is counted at $1. Each draw and repayment is the DAI minted or burned at the time.",
+      "The stability fee owed is the debt less the DAI drawn since the vault last owed nothing; the all-time fee row adds the fee already paid inside repayments or cleared by a liquidation.",
     ],
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "The ilk",
-        text: "each vault belongs to one collateral type (its ilk), which sets its own liquidation ratio and stability fee.",
+        bold: "The collateral type",
+        text: "each vault belongs to one collateral type (ETH-A, ETH-C, …), which sets its own minimum ratio and stability fee.",
       },
       {
         bold: "Stability fee",
-        text: "interest accrues into the debt via the ilk's rate accumulator — principal (art) times rate gives the current DAI owed.",
+        text: "a yearly rate governance sets per collateral type, added to the debt continuously rather than billed.",
       },
     ],
     links: [

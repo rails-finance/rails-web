@@ -202,23 +202,6 @@ export const daiDebtProv = (artHuman: string, rateRay: string, symbol: string = 
   ],
 });
 
-/** Accrued stability fee = art × rate − art (the DAI the rate accumulator has
- *  charged on the currently-outstanding normalized debt). Both operands are Vat
- *  reads, so the fee carry is chain-direct, not a projection. */
-export const stabilityFeeProv = (artHuman: string, rateRay: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary:
-    "Accrued stability fee on this vault — the difference between the current DAI debt (art × rate) and the normalized art, i.e. the DAI the ilk's rate accumulator has charged since each draw. Both operands are Vat reads, so this carry is read from the chain.",
-  contract: VAT,
-  via: "urn.art (Σ dart replay) × (Vat.ilks(ilk).rate − 1)",
-  formula: "art × rate ÷ 10^27 − art",
-  inputs: [
-    { label: "art", value: artHuman, kind: "chain", pclass: "indexed", note: "Σ dart (replay of the urn.art slot)" },
-    { label: "rate", value: rateRay, kind: "chain", pclass: "state", note: "Vat.ilks(ilk).rate, ray — live read" },
-  ],
-});
-
 /** Lifetime gross collateral flow (deposited / withdrawn / liquidated / moved
  *  out) — the sum of the signed dink deltas of that kind over the vault's life.
  *  Chain-state amounts (frob/grab/fork dink); the tower values them at the
@@ -314,38 +297,6 @@ export const grabSeizedUsdProv = (
   inputs: [
     { label: "seized", value: `${vals.amount} ${collSym}`, kind: "chain", note: "grab LogNote · dink" },
     { label: "price at block", value: String(vals.priceUsd), kind: "chain", note: "Vat spot × Spotter mat" },
-    ...eventInputs(coords),
-  ],
-});
-
-/** The cleared-debt leg — |dart| × rate@block: DAI, the Vat's own unit. */
-export const grabClearedDaiProv = (coords: MakerCoords, vals: { amount: string; dai: string }): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  formula: "dart × rate@block ÷ 10^45",
-  verify: txVerify(coords),
-  summary: `The debt this grab cleared from the vault, in DAI — the grab LogNote's dart valued at the ilk's rate accumulator as of this block (replayed from the Vat's own fold deltas). DAI is the Vat's own unit of account, so no price is applied: this is the protocol's exact reckoning of the debt seized into the liquidation system. The liquidation penalty (chop) is added on top at auction.`,
-  contract: VAT,
-  via: `${MAKER_VIA} · |dart| × rate@block ÷ 10^45`,
-  inputs: [
-    { label: "debt cleared", value: `${vals.amount} (normalized art)`, kind: "chain", note: "grab LogNote · dart" },
-    { label: "in DAI", value: vals.dai, kind: "chain", note: "× rate@block" },
-    ...eventInputs(coords),
-  ],
-});
-
-/** The cushion the seizure carried into the auction — seized ÷ cleared − 1. */
-export const grabCushionProv = (coords: MakerCoords, vals: { seizedUsd: string; clearedDai: string }): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  formula: "seized ÷ cleared − 1",
-  verify: txVerify(coords),
-  summary: `The vault's cushion at seizure — seized collateral value over cleared DAI debt, minus one, both at the block's own figures. Unlike Aave-model liquidations this is NOT a liquidator's realized bonus: the collateral went to a Dutch auction, where the liquidation penalty (chop) is charged on top of the debt and any remainder above debt + penalty returns to the vault owner as surplus. The cushion is what there was to auction over.`,
-  contract: VAT,
-  via: "seized ÷ cleared − 1 · both legs at the block's own figures",
-  inputs: [
-    { label: "seized", value: vals.seizedUsd, kind: "chain", note: "|dink| × price at block" },
-    { label: "cleared", value: vals.clearedDai, kind: "chain", note: "|dart| × rate@block" },
     ...eventInputs(coords),
   ],
 });
@@ -626,3 +577,219 @@ export const peakDebtProv = (symbol: string, coords?: MakerCoords): Provenance =
   contract: VAT,
   via: `${MAKER_VIA} · max(art × rate-at-block) · open → close${coords?.ilk ? ` · ${coords.ilk}` : ""}`,
 });
+
+// ── The debt split: DAI drawn and the stability fee on it ────────────────────
+// One definition for the card, the flows panel and every row
+// (lib/makerdao/vault-history.tsx): the fee is the debt less the DAI drawn net
+// of repayments since the vault last owed nothing.
+
+/** The stability fee inside the vault's debt now. */
+export const feeInDebtProv = (vals: { debt: string; drawn: string; since?: string }): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `Stability fee in the debt — the debt owed now less the DAI drawn, net of repayments, since the vault last owed nothing${vals.since ? ` (${vals.since})` : ""}. A repayment is counted against the drawn DAI first.`,
+  contract: VAT,
+  via: "art × rate (live) − Σ (dart × rate@block) since the debt was last zero",
+  formula: "debt now − DAI drawn since zero debt",
+  inputs: [
+    { label: "debt now", value: vals.debt, kind: "chain-derived", pclass: "state", note: "art × rate (Vat)" },
+    {
+      label: "DAI drawn",
+      value: vals.drawn,
+      kind: "chain-derived",
+      pclass: "indexed",
+      note: "each draw and repayment at its block's rate",
+    },
+  ],
+});
+
+/** The DAI drawn and still owed (the debt less its fee). */
+export const drawnDaiProv = (vals: { drawn: string; since?: string }): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary: `DAI drawn and still owed — every draw less every repayment since the vault last owed nothing${vals.since ? ` (${vals.since})` : ""}, each valued at the rate accumulator at its block, which is the DAI minted or burned then.`,
+  contract: VAT,
+  via: `${MAKER_VIA} · Σ (dart × rate@block ÷ 10^45) since the debt was last zero`,
+  formula: "Σ draws − Σ repayments since zero debt",
+  inputs: [{ label: "DAI drawn", value: vals.drawn, kind: "chain-derived", pclass: "indexed" }],
+});
+
+/** The stability fee accrued over the vault's whole life. */
+export const lifetimeFeeProv = (vals: { debt: string; net: string }): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary:
+    "Stability fee over the vault's life — the debt owed now less every DAI drawn net of every repayment and liquidation, each at its block's rate. It is the fee in the debt today plus the fee paid inside repayments and cleared by liquidations.",
+  contract: VAT,
+  via: "art × rate (live) − Σ (dart × rate@block) over every event",
+  formula: "debt now − (drawn − repaid − liquidated)",
+  inputs: [
+    { label: "debt now", value: vals.debt, kind: "chain-derived", pclass: "state", note: "art × rate (Vat)" },
+    { label: "net drawn", value: vals.net, kind: "chain-derived", pclass: "indexed", note: "each at its block's rate" },
+  ],
+});
+
+/** A lifetime collateral flow valued at the OSM price at each event's block. */
+export const collateralFlowAtEventsProv = (
+  flow: "deposited" | "withdrawn" | "liquidated" | "returned",
+  collSym: string,
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  summary: `${collSym} ${flow} over the vault's life, at the price of each event — each ${
+    flow === "liquidated"
+      ? "seizure"
+      : flow === "returned"
+        ? "move of auction leftovers back into the vault"
+        : flow === "deposited"
+          ? "deposit"
+          : "withdrawal"
+  } valued at the ${collSym} OSM price at its own block (Vat spot × Spotter mat, read at that block), then added up.`,
+  contract: { name: "Spotter", address: MAKER_ADDRESSES.SPOTTER },
+  via: `${MAKER_VIA} · Σ |dink| × (spot × mat at the event's block)`,
+  formula: "Σ amount × price at block",
+});
+
+/** Collateral an auction handed back, moved into the vault by its owner. */
+export const returnedCollateralProv = (collSym: string): Provenance => ({
+  kind: "chain",
+  pclass: "indexed",
+  summary: `${collSym} returned by a liquidation auction — what was left of the seized collateral once the debt and penalty were covered. The Clipper sends it to the vault's address as free collateral, and the owner's frob moved it into the vault.`,
+  contract: VAT,
+  via: `${MAKER_VIA} · frob dink equal to the auction's remaining lot`,
+});
+
+/** The price-change row on the collateral side. */
+export const collateralPriceChangeProv = (collSym: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  summary: `Price change — the difference between valuing each ${collSym} deposit, withdrawal and liquidation at the OSM price at its block and valuing what the vault holds at today's OSM price. In ${collSym} the column adds up without it.`,
+  formula: "held now − (in − out)",
+  inputs: [
+    { label: "flows", kind: "chain-derived", pclass: "oracle", note: "each at its event's OSM price" },
+    { label: "held now", kind: "chain-derived", pclass: "oracle", note: "at today's OSM price" },
+  ],
+});
+
+// ── The ilk at an event's block (T2 of a row) ────────────────────────────────
+
+/** The OSM price at a row's block. */
+export const eventPriceProv = (collSym: string, coords: MakerCoords, priceUsd: number): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  formula: "Vat.ilks(ilk).spot × Spotter.par × Spotter.ilks(ilk).mat ÷ RAY²",
+  verify: {
+    kind: "recompute",
+    text:
+      coords.blockNumber != null
+        ? `Re-run the Vat.ilks and Spotter.ilks eth_calls at block ${coords.blockNumber} (archive node) and multiply spot × mat`
+        : "Re-run the Vat.ilks and Spotter.ilks eth_calls (archive node) and multiply spot × mat",
+  },
+  summary: `${collSym} OSM price at this event — the price the Vat checked this change against${atBlock(coords)}: the Spotter stores spot = price ÷ par ÷ mat, so spot × par × mat gives the price back. Read by eth_call at the block.`,
+  contract: SPOTTER,
+  via: "Vat.ilks · spot × Spotter.par × Spotter.ilks · mat, eth_call at the event's block",
+  inputs: [
+    { label: `${collSym} price`, value: String(priceUsd), kind: "chain", note: "spot × par × mat" },
+    ...eventInputs(coords),
+  ],
+});
+
+/** The collateral ratio before or after a row, at the row's price. */
+export const eventRatioProv = (
+  side: "before" | "after",
+  coords: MakerCoords,
+  vals: { collateralUsd: string; debt: string },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  summary: `Collateral ratio ${side} this event — the collateral ${side} it times the OSM price at the block, divided by the debt ${side} it.`,
+  contract: VAT,
+  via: `ink ${side} × price at block ÷ debt ${side}`,
+  formula: "collateral × price ÷ debt × 100",
+  inputs: [
+    { label: "collateral value", value: vals.collateralUsd, kind: "chain-derived", pclass: "oracle" },
+    { label: "debt", value: vals.debt, kind: "chain-derived", pclass: "indexed", note: "art × rate@block" },
+    ...eventInputs(coords),
+  ],
+});
+
+/** The ilk's minimum ratio at a row's block. */
+export const matAtBlockProv = (ilk: string, coords: MakerCoords): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  summary: `${ilk}'s minimum collateral ratio at this event — the Spotter's mat for the ilk, read by eth_call${atBlock(coords)}.`,
+  contract: SPOTTER,
+  via: "Spotter.ilks(ilk).mat at the event's block",
+  inputs: eventInputs(coords),
+});
+
+/** How much more DAI the vault could have drawn after a row. */
+export const roomAtBlockProv = (coords: MakerCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  summary: `DAI the vault could still draw after this event — its collateral value at the block's OSM price divided by the minimum ratio, less the debt after the event.`,
+  contract: VAT,
+  via: "ink after × price at block ÷ mat − debt after",
+  formula: "ink × price ÷ mat − debt",
+  inputs: eventInputs(coords),
+});
+
+// ── The auction behind a liquidation (Dog.Bark, Clipper.Kick / Take) ────────
+
+const DOG = { name: "Dog", address: MAKER_ADDRESSES.DOG };
+
+export type MakerAuctionFigure = "ratio" | "tab" | "penalty" | "sold" | "raised" | "leftover" | "shortfall";
+
+export const auctionProv = (
+  figure: MakerAuctionFigure,
+  coords: MakerCoords,
+  vals: { clip?: string; auctionId?: string; value?: string } = {},
+): Provenance => {
+  const where = vals.auctionId ? ` (auction ${vals.auctionId}${vals.clip ? ` on Clipper ${vals.clip}` : ""})` : "";
+  const texts: Record<MakerAuctionFigure, { summary: string; via: string; formula?: string }> = {
+    ratio: {
+      summary: `Collateral ratio at seizure — the seized collateral at the OSM price of the block divided by the debt the liquidation cleared. The Dog could bark only because it was under the minimum.`,
+      via: "Bark.ink × price at block ÷ Bark.due",
+      formula: "ink × price ÷ debt × 100",
+    },
+    tab: {
+      summary: `What the auction had to raise — the Clipper's Kick tab${where}: the debt cleared times the ilk's penalty factor.`,
+      via: "Clipper Kick · tab ÷ 10^45",
+      formula: "due × chop",
+    },
+    penalty: {
+      summary: `Liquidation penalty — the auction's tab less the debt cleared (Dog Bark · due)${where}. It went to the protocol's surplus.`,
+      via: "Kick.tab − Bark.due",
+      formula: "tab − due",
+    },
+    sold: {
+      summary: `Collateral the auction sold — the lot at the Kick less what remained after the closing Take${where}.`,
+      via: "Kick.lot − last Take.lot",
+      formula: "lot − lot left",
+    },
+    raised: {
+      summary: `DAI the buyers paid — the sum of every Take's owe${where}.`,
+      via: "Σ Take.owe ÷ 10^45",
+      formula: "Σ owe",
+    },
+    leftover: {
+      summary: `Collateral handed back to the vault — the lot left when a Take covered the whole tab${where}; the Clipper sends it to the vault's address (vat.flux).`,
+      via: "last Take.lot where Take.tab = 0",
+    },
+    shortfall: {
+      summary: `Debt the auction did not cover — the tab left when the lot ran out${where}; the protocol absorbs it.`,
+      via: "last Take.tab where Take.lot = 0",
+    },
+  };
+  const t = texts[figure];
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary: t.summary,
+    contract: figure === "ratio" || figure === "penalty" || !vals.clip ? DOG : { name: "Clipper", address: vals.clip },
+    via: t.via,
+    ...(t.formula ? { formula: t.formula } : {}),
+    inputs: eventInputs(coords, vals.value ? [{ label: figure, value: vals.value, kind: "chain" }] : []),
+  };
+};

@@ -55,6 +55,9 @@ export interface MakerLiveRate {
   aprPct: number;
   block: number;
   timestamp: number;
+  /** The vault's debt at that block (the overlay's art × rate). The live
+   *  note's yearly interest is stated on it: today's debt. */
+  debtNow?: number | null;
 }
 
 /** MakerDAO's context on an event, or null — the same spelled-out narrowing
@@ -330,14 +333,17 @@ export function liveMakerRateStepNote(
 
   const a = rated[rated.length - 1];
   const rateA = asFraction(a.set.aprPct);
-  const debt = debtAt(a.d);
+  // Today's debt when the overlay has it: the fee is read now, so the yearly
+  // figure is what it costs on what the vault owes now.
+  const today = live.debtNow != null && live.debtNow > 0 ? live.debtNow : null;
+  const debt = today ?? debtAt(a.d);
   const interest =
     debt != null
       ? {
           debt,
           before: debt * rateA,
           after: debt * live.aprPct,
-          atBlock: a.e.blockNumber,
+          atBlock: today != null ? live.block : a.e.blockNumber,
           symbol: ilkDebtSymbol(market.ilk),
         }
       : undefined;

@@ -18,10 +18,14 @@ import type { MakerCoords } from "@/lib/makerdao/event-provenance";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { makerdaoVaultContent, makerdaoLiquidationContent } from "@/lib/shared/learn-more-content";
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { makerdaoEventSlots } from "@/lib/makerdao/explainer-clauses";
+import { makerdaoEventSlots, type MakerRowExtras } from "@/lib/makerdao/explainer-clauses";
+import { useMakerVaultHistory } from "@/lib/makerdao/vault-history";
+import { useIlkAtRow } from "./makerdao-event-detail";
 
 export interface MakerDAOEventExplainerProps {
   ctx: MakerDAOContext;
+  /** The row's id, which the page's history is keyed by. */
+  eventId?: string;
   txHash?: string;
   blockNumber?: number;
   /** The card shows the lead sentence as the teaser; render only the rest here. */
@@ -33,15 +37,55 @@ export interface MakerDAOEventExplainerProps {
  *  and LockStake auction rows ride the liquidation content). Used by the card
  *  composer, which renders the "?" trigger on the footer row (this pane
  *  renders prose only). */
-export function makerdaoLearnMoreContent(ctx: MakerDAOContext): LearnMoreContent {
-  return ctx.eventType === "grab" || ctx.eventType.startsWith("lse-")
-    ? makerdaoLiquidationContent()
-    : makerdaoVaultContent(ctx.isOpen ? "open" : "adjust");
+export function makerdaoLearnMoreContent(ctx: MakerDAOContext, returned = false): LearnMoreContent {
+  if (ctx.eventType === "grab" || ctx.eventType.startsWith("lse-")) return makerdaoLiquidationContent();
+  if (ctx.eventType !== "frob") return makerdaoVaultContent("adjust");
+  if (ctx.isOpen) return makerdaoVaultContent("open");
+  if (returned) return makerdaoVaultContent("returned");
+  const dink = Number(ctx.dink) || 0;
+  const dart = Number(ctx.dart) || 0;
+  if (dink !== 0 && dart !== 0) return makerdaoVaultContent("adjust");
+  if (dink > 0) return makerdaoVaultContent("deposit");
+  if (dink < 0) return makerdaoVaultContent("withdraw");
+  if (dart > 0) return makerdaoVaultContent("generate");
+  if (dart < 0) return makerdaoVaultContent("repay");
+  return makerdaoVaultContent("adjust");
 }
 
-export function MakerDAOEventExplainer({ ctx, txHash, blockNumber, skipLead }: MakerDAOEventExplainerProps) {
+/** What the page holds about one row (lib/makerdao/vault-history.tsx), as the
+ *  explainer's extras. */
+export function useMakerRowExtras(
+  ctx: MakerDAOContext,
+  eventId: string | undefined,
+  txHash: string | undefined,
+  blockNumber: number | undefined,
+  /** Read the row's block when the page does not hold it (the opened card). */
+  readOwn = true,
+): MakerRowExtras {
+  const history = useMakerVaultHistory();
+  const ilkAt = useIlkAtRow(ctx, blockNumber, readOwn);
+  const tx = txHash?.toLowerCase();
+  const auction = ctx.eventType === "grab" && tx ? history.auctions.get(tx) : undefined;
+  let leftoverTakenAt: number | undefined;
+  if (auction?.kind === "clipper") {
+    for (const link of history.leftover.values()) {
+      if (link.role === "out" && link.auction.txHash.toLowerCase() === tx) leftoverTakenAt = link.at;
+    }
+  }
+  return {
+    ilkAt,
+    split: eventId ? history.debtSplit.get(eventId) : undefined,
+    previousAt: eventId ? history.previousAt.get(eventId) : undefined,
+    leftover: eventId ? history.leftover.get(eventId) : undefined,
+    auction,
+    leftoverTakenAt,
+  };
+}
+
+export function MakerDAOEventExplainer({ ctx, eventId, txHash, blockNumber, skipLead }: MakerDAOEventExplainerProps) {
   const coords: MakerCoords = { txHash, blockNumber, urn: ctx.urn, ilk: ctx.ilk };
-  const clauses = eventClauses(makerdaoEventSlots(ctx, coords));
+  const extras = useMakerRowExtras(ctx, eventId, txHash, blockNumber);
+  const clauses = eventClauses(makerdaoEventSlots(ctx, coords, extras));
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;

@@ -361,6 +361,35 @@ export const makerRateStepInterestProv = (note: RateStepNote, part: "debt" | "be
   const sym = interest?.symbol ?? note.marketSymbol;
   const rate = part === "after" ? note.to.value : note.from.value;
   const derived = part !== "debt";
+  const onToday = note.live === true && interest != null && interest.atBlock === note.to.block;
+  if (onToday) {
+    const summary =
+      part === "debt"
+        ? `The ${sym} debt this vault owes now — its normalized art times the Vat rate accumulator, both read at block ${note.to.block}. The interest figures beside it move only the fee.`
+        : `The yearly interest this vault's debt now would cost at the ${part === "before" ? "earlier" : "current"} fee (${pct(rate)} per year) — debt × fee, holding today's debt fixed.`;
+    return {
+      kind: "chain-derived",
+      pclass: derived ? "indexed" : "state",
+      summary,
+      ...jugContract(note),
+      via: derived ? "the vault's debt now × the fee at this end" : "Vat.urns art × Vat.ilks rate at the head block",
+      formula: derived ? "debt now × fee" : "art × rate ÷ 1e27",
+      inputs: [
+        { label: "debt now", value: String(interest!.debt), kind: "chain-derived", pclass: "state" },
+        ...(part === "debt"
+          ? []
+          : [
+              {
+                label: `rate ${part}`,
+                value: pct(rate),
+                kind: "chain" as const,
+                pclass: "state" as const,
+                note: rateLeafNote(note, part === "before" ? "earlier" : "later"),
+              },
+            ]),
+      ],
+    };
+  }
   const summary =
     part === "debt"
       ? `The ${sym} debt this vault recorded at the earlier touch (block ${note.from.block}) — its own normalized ` +

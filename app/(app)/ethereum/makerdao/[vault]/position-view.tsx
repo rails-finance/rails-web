@@ -61,6 +61,21 @@ import { summariseExternalActors, withOpeningActors } from "@/lib/shared/externa
 import { fetchMakerRateLog, type MakerRateLogResponse } from "@/lib/api/fetch-makerdao-rate-log";
 import { liveMakerRateStepNote, makerRateStepNotesFor } from "@/lib/makerdao/market-notes";
 import type { MarketNote } from "@/lib/shared/market-note";
+import { makerTxHashOf } from "@/lib/makerdao/market-notes";
+import { useMakerAuctions, useMakerIlkAt } from "@/lib/makerdao/use-chain-history";
+import {
+  MakerVaultHistoryProvider,
+  makerDebtSplits,
+  makerLeftoverLinks,
+  makerPreviousAt,
+  sortedMakerEvents,
+  type MakerVaultHistory,
+} from "@/lib/makerdao/vault-history";
+
+/** How many of a vault's blocks the page reads the ilk at: the rows' price,
+ *  minimum ratio and minimum debt. Past it the flows stay at today's price and
+ *  a row reads its own block when opened. */
+const ILK_AT_PAGE_LIMIT = 60;
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle, mirroring the V4 spoke page.
@@ -258,6 +273,8 @@ export default function MakerVaultDetailView({
   // array's identity, so re-filtering on every render would recompute both.
   const makerEvents = useMemo(() => events.filter(isMakerDAOEvent), [events]);
 
+  // ── What the page knows beyond the rows (lib/makerdao/vault-history.tsx) ──
+  const sortedMaker = useMemo(() => sortedMakerEvents(makerEvents), [makerEvents]);
   // The ilk names itself on the vault's own rows, so the rate log can only be
   // asked for once the timeline has landed — and it is reset on a vault change
   // so a second vault of a DIFFERENT ilk can never render notes off the first
@@ -299,6 +316,61 @@ export default function MakerVaultDetailView({
       ),
     [servedFolders],
   );
+
+  // The rows hold the vault's whole history from its first event: no window
+  // cut and no folder standing for members the page does not hold.
+  const wholeRows = historyWindow.state === "whole" && !(servedFolders?.length ?? 0);
+  const debtSplit = useMemo(() => makerDebtSplits(sortedMaker, wholeRows), [sortedMaker, wholeRows]);
+  const rowBlocks = useMemo(() => sortedMaker.map((e) => e.blockNumber), [sortedMaker]);
+  const ilkAtRead = useMakerIlkAt(ilk, rowBlocks, ILK_AT_PAGE_LIMIT);
+  const grabRows = useMemo(
+    () =>
+      sortedMaker
+        .filter((e) => e.context.data.eventType === "grab")
+        .map((e) => ({ txHash: makerTxHashOf(e), urn: e.context.data.urn })),
+    [sortedMaker],
+  );
+  const auctions = useMakerAuctions(grabRows);
+  const vaultHistory = useMemo<MakerVaultHistory>(
+    () => ({
+      ilkAt: ilkAtRead?.reads ?? new Map(),
+      auctions,
+      leftover: makerLeftoverLinks(sortedMaker, auctions),
+      debtSplit,
+      previousAt: makerPreviousAt(sortedMaker),
+    }),
+    [ilkAtRead, auctions, sortedMaker, debtSplit],
+  );
+  // The card's debt split, from the newest row's.
+  const lastSplit = sortedMaker.length ? debtSplit.get(sortedMaker[sortedMaker.length - 1].id) : undefined;
+  const cardView = useMemo<MakerVaultView | null>(
+    () =>
+      view && !(servedFolders?.length ?? 0)
+        ? { ...view, drawnDai: lastSplit?.drawnAfter ?? null, drawnSince: lastSplit?.stretchStartAt ?? null }
+        : view,
+    [view, lastSplit, servedFolders],
+  );
+  const feeLiquidated = useMemo(() => {
+    let sum = 0;
+    for (const e of sortedMaker) {
+      if (e.context.data.eventType !== "grab") continue;
+      const sp = debtSplit.get(e.id);
+      if (sp?.feeBefore == null || sp.feeAfter == null) return undefined;
+      sum += sp.feeBefore - sp.feeAfter;
+    }
+    return sum;
+  }, [sortedMaker, debtSplit]);
+  // "12 events in 11 transactions": the count line and the card's counter
+  // state one pair. A liquidation is the keeper's transaction, so it is named
+  // beside the owner's own.
+  const countDetail = useMemo(() => {
+    if (!view || !wholeRows) return undefined;
+    const grabs = sortedMaker.filter((e) => e.context.data.eventType === "grab").length;
+    const tx = view.txCount;
+    if (tx + grabs === sortedMaker.length && grabs === 0) return undefined;
+    const txWord = `${tx.toLocaleString("en-US")} transaction${tx === 1 ? "" : "s"}`;
+    return grabs > 0 ? `: ${txWord} and ${grabs} liquidation${grabs === 1 ? "" : "s"}` : ` in ${txWord}`;
+  }, [view, wholeRows, sortedMaker]);
 
   // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
   // Decision 0019, amendments 2026-09-24 and 2026-09-25: a month the loaded
@@ -399,6 +471,7 @@ export default function MakerVaultDetailView({
       aprPct: chainState.stabilityFeeApr,
       block: chainState.atBlock,
       timestamp: chainState.blockTimestamp,
+      debtNow: chainState.debtDai,
     });
     return note ? [note] : [];
   }, [market, vaultOpen, chainState, tl.sortedEvents, rateLog]);
@@ -451,10 +524,10 @@ export default function MakerVaultDetailView({
       {loading ? (
         <DetailBodySkeleton />
       ) : (
-        <>
-          {view && (
+        <MakerVaultHistoryProvider value={vaultHistory}>
+          {cardView && (
             <MakerVaultCard
-              v={view}
+              v={cardView}
               receipts
               viewHref={tl.viewHref}
               // The risk slot rides the card's heading-button row (the Aave V3
@@ -463,7 +536,11 @@ export default function MakerVaultDetailView({
               // Whatever it draws is on the card face and in the card's receipts
               // scope, so the Provenance list stays 1:1 with the face figures.
               // Mounts only when the live overlay landed and the vault is open.
-              rowExtra={view.source === "chain" && view.status === "open" ? <MakerdaoRiskSlot v={view} /> : undefined}
+              rowExtra={
+                cardView.source === "chain" && cardView.status === "open" ? (
+                  <MakerdaoRiskSlot v={cardView} />
+                ) : undefined
+              }
               // The Explanation is now pure prose about those same face figures
               // (the 3-section page anatomy: card → economics → timeline). The
               // CR strip is absorbed into the risk slot above.
@@ -472,17 +549,21 @@ export default function MakerVaultDetailView({
               // still needs the live overlay for the ilk parameters and
               // declines without it.
               explanation={
-                view.status !== "open" ? (
-                  <MakerdaoClosedPositionExplanation v={view} events={makerEvents} folders={servedFolders} />
-                ) : view.source === "chain" ? (
-                  <MakerdaoPositionExplanation v={view} externalActivity={externalActivityWithOpening} />
+                cardView.status !== "open" ? (
+                  <MakerdaoClosedPositionExplanation v={cardView} events={makerEvents} folders={servedFolders} />
+                ) : cardView.source === "chain" ? (
+                  <MakerdaoPositionExplanation v={cardView} externalActivity={externalActivityWithOpening} />
                 ) : undefined
               }
             />
           )}
           {view &&
             (() => {
-              const towerData = computeMakerEconomics(view, lifetimeEvents ?? [], precomputedLifetime);
+              const towerData = computeMakerEconomics(cardView ?? view, lifetimeEvents ?? [], precomputedLifetime, {
+                priceAt: ilkAtRead?.complete ? (b) => ilkAtRead.reads.get(b)?.priceUsd ?? null : undefined,
+                leftover: vaultHistory.leftover,
+                feeLiquidated,
+              });
               return (
                 <ChainTruthTower
                   data={towerData}
@@ -498,6 +579,7 @@ export default function MakerVaultDetailView({
             // card's detail panel open on its first mount.
             persistKeyPrefix="makerdao"
             closed={view?.status !== "open"}
+            countDetail={countDetail}
             tl={tl}
             notes={notes}
             liveNotes={liveNotes}
@@ -528,7 +610,7 @@ export default function MakerVaultDetailView({
             }
           />
           <ProvInspectorLayer />
-        </>
+        </MakerVaultHistoryProvider>
       )}
     </div>
   );

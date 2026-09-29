@@ -306,6 +306,11 @@ export interface ChainTruthTimelineProps {
    *  combines two of the position's own logs into one card, so the count runs
    *  ahead of the cards on screen. Unset renders identically to today. */
   countTooltip?: string;
+  /** Words after the count on an unfiltered whole-history line ("in 11
+   *  transactions"), where a family's counter elsewhere on the page counts
+   *  something else (MakerDAO: the card counts the owner's transactions).
+   *  Unset renders identically to today. */
+  countDetail?: string;
   /** Display-menu items (default CHAIN_TRUTH_DISPLAY_ITEMS). */
   displayItems?: TimelineDisplayItem[];
   /** Message when the wallet has no events at all (vs filtered out). */
@@ -626,6 +631,7 @@ function ChainTruthTimelineBody({
   renderCard,
   toolbarLeading = "replayed from chain",
   countTooltip,
+  countDetail,
   displayItems = CHAIN_TRUTH_DISPLAY_ITEMS,
   emptyLabel = "No transaction history available.",
   runs,
@@ -1450,6 +1456,7 @@ function ChainTruthTimelineBody({
             displayItems={items}
             leading={toolbarLeading}
             countTooltip={countTooltip}
+            countDetail={countDetail}
             viewSwitch={spineOptIn}
             // The Date button's panel hangs from the toolbar; the second path a
             // month click can take travels to it here.

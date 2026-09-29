@@ -42,7 +42,12 @@ export function MakerdaoPositionExplanation({
   const hasDebt = v.debtDai != null && v.debtDai > 0;
   // DAI on CdpManager vaults, USDS on LockStake urns (asset-catalog).
   const dsym = ilkDebtSymbol(v.ilk);
-  const accruedFee = hasDebt ? Math.max(0, (v.debtDai as number) - v.art) : 0;
+  // The fee in the debt: the debt less the DAI drawn since the vault last owed
+  // nothing (lib/makerdao/vault-history.tsx), the figure the card states.
+  const feeInDebt =
+    hasDebt && v.drawnDai != null && (v.debtDai as number) - v.drawnDai > 0.005
+      ? (v.debtDai as number) - v.drawnDai
+      : null;
   const ratio = hasDebt && v.collateralUsd != null ? v.collateralUsd / (v.debtDai as number) : null;
   const dropPct =
     v.liquidationPriceUsd != null && v.priceUsd != null && v.priceUsd > 0
@@ -93,17 +98,19 @@ export function MakerdaoPositionExplanation({
     );
   } else {
     if (v.stabilityFeeApr != null) {
+      const yearly = (v.debtDai as number) * v.stabilityFeeApr;
       bullets.push(
         <span key="fee">
-          The debt grows at the {v.ilk} stability fee, currently <H>{(v.stabilityFeeApr * 100).toFixed(2)}%</H> a year
-          {accruedFee > 0.005 ? (
+          The debt grows at {v.ilk}&rsquo;s stability fee, <H>{(v.stabilityFeeApr * 100).toFixed(2)}%</H> a year, about{" "}
+          <AmountText value={yearly} format="compact" /> {dsym} a year on today&rsquo;s debt
+          {feeInDebt != null && v.drawnDai != null ? (
             <>
-              {" "}
-              —{" "}
+              {": "}
               <H>
-                <AmountText value={accruedFee} /> {dsym}
+                {dai2(feeInDebt)} {dsym}
               </H>{" "}
-              of fee has built up on the outstanding draw so far
+              of what it owes is fee on the {dai2(v.drawnDai)} {dsym} drawn
+              {v.drawnSince != null ? <> since {formatDate(v.drawnSince)}</> : null}
             </>
           ) : null}
           .
@@ -142,15 +149,6 @@ export function MakerdaoPositionExplanation({
       that delayed price, and that is the price shown here.
     </span>,
   );
-
-  if (v.txCount > 0) {
-    bullets.push(
-      <span key="event-count">
-        The vault has recorded <H>{v.txCount}</H> transaction{v.txCount === 1 ? "" : "s"} of its own to date
-        {v.everLiquidated ? <>, and its record also carries liquidation seizures</> : null}.
-      </span>,
-    );
-  }
 
   // Who has been operating the vault, across its whole history — the same
   // verdict each event card renders on its spine, reduced once so the pane can
@@ -206,6 +204,11 @@ import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
 import { formatDate } from "@/lib/date";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
+import { useMakerVaultHistory } from "@/lib/makerdao/vault-history";
+import { makerTxHashOf } from "@/lib/makerdao/market-notes";
+import type { MakerAuctionOutcome } from "@/lib/makerdao/chain-history-types";
+
+const dai2 = (n: number): string => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function closureDate(unix: number): string {
   return formatDate(unix);
@@ -225,11 +228,15 @@ export function MakerdaoClosedPositionExplanation({
    *  before falling back to the last loaded row. */
   folders?: readonly ServedFolder[] | null;
 }) {
+  // The auctions and their leftovers, read by the page (vault-history.tsx).
+  const history = useMakerVaultHistory();
   if (v.status === "open") return null;
 
   const dsym = ilkDebtSymbol(v.ilk);
+  const sym = v.collateralSymbol;
   const maker = events.filter(isMakerDAOEvent);
-  const grabCount = maker.filter((e) => e.context.data.eventType === "grab").length;
+  const grabs = maker.filter((e) => e.context.data.eventType === "grab");
+  const grabCount = grabs.length;
   // The newest activity overall — a served folder's last member when it is
   // newer than every loaded row, the loaded row otherwise. MakerDAO's two
   // folder kinds are `liquidation` (pure grabs) and `owner_run` (frob shapes
@@ -242,27 +249,112 @@ export function MakerdaoClosedPositionExplanation({
   // with the seizure; the rest closed by their own hand afterwards).
   const endedBySeizure = newestFolder ? newestFolder.kind === "liquidation" : lastType === "grab";
   const endedByMove = !newestFolder && lastType === "fork-out";
+  // After the last liquidation, did the owner do anything beyond taking back
+  // what the auction returned?
+  const lastGrabIdx = maker.map((e) => e.context.data.eventType).lastIndexOf("grab");
+  const ownerActedAfter =
+    !newestFolder &&
+    lastGrabIdx >= 0 &&
+    maker.slice(lastGrabIdx + 1).some((e) => !history.leftover.has(e.id) && e.context.data.eventType !== "grab");
+
+  // Every auction the page read for this vault's liquidations.
+  const outcomes = grabs
+    .map((g) => history.auctions.get(makerTxHashOf(g)))
+    .filter((a): a is MakerAuctionOutcome => a?.kind === "clipper" && a.settled);
+  const allRead = grabCount > 0 && outcomes.length === grabCount;
+  const sum = (f: (a: MakerAuctionOutcome) => string) => outcomes.reduce((t, a) => t + Number(f(a)), 0);
+  const sold = sum((a) => a.soldInk);
+  const raised = sum((a) => a.raisedDai);
+  const due = sum((a) => a.dueDai);
+  const penalty = sum((a) => a.penaltyDai);
+  const returned = sum((a) => a.leftoverInk);
+  const shortfall = sum((a) => a.shortfallDai);
+  const firstGrab = grabs[0];
+  const minimum = outcomes[0]?.mat ?? null;
+  const takenOut = [...history.leftover.values()].filter((l) => l.role === "out").map((l) => l.at);
 
   const hasPeakInk = v.peakInk > 0;
   const hasPeakDebt = v.peakDebtDai != null && v.peakDebtDai > 0;
 
-  const lead = endedBySeizure ? (
-    <>This vault was emptied by liquidation — the final seizure took the last of its collateral to cover its debt:</>
+  const lead = v.everLiquidated ? (
+    <>
+      This vault was liquidated
+      {firstGrab ? <> on {formatDate(firstGrab.timestamp)}</> : null}
+      {minimum != null ? (
+        <>
+          , when its collateral ratio fell under {v.ilk}&rsquo;s {Number((minimum * 100).toFixed(2))}% minimum
+        </>
+      ) : null}
+      {grabCount > 1 ? (
+        <>
+          {" "}
+          (and {grabCount - 1} more time{grabCount === 2 ? "" : "s"} after)
+        </>
+      ) : null}
+      {endedByMove
+        ? ", and later moved its remaining collateral and debt to another vault"
+        : ownerActedAfter
+          ? ", and its owner emptied it afterwards"
+          : ""}
+      :
+    </>
   ) : endedByMove ? (
-    <>
-      This vault closed by moving — its remaining collateral and debt transferred to another vault
-      {v.everLiquidated ? <>, with liquidation seizures earlier in its record</> : null}:
-    </>
-  ) : v.everLiquidated ? (
-    <>
-      This vault ran its course and closed — the remaining collateral withdrawn and the debt repaid — with liquidation
-      seizures in its record:
-    </>
+    <>This vault closed by moving — its remaining collateral and debt transferred to another vault:</>
   ) : (
     <>This vault ran its course and closed — the collateral withdrawn and the debt repaid:</>
   );
 
   const bullets: React.ReactNode[] = [];
+
+  if (v.everLiquidated && allRead) {
+    bullets.push(
+      <span key="lost">
+        Lost:{" "}
+        <H>
+          <AmountText value={sold} /> {sym}
+        </H>
+        , sold by the auction for {dai2(raised)} {dsym} to cover the {dai2(due)} {dsym} debt and a {dai2(penalty)}{" "}
+        {dsym} liquidation penalty
+        {shortfall > 0 ? (
+          <>
+            ; it fell {dai2(shortfall)} {dsym} short, which the protocol absorbed
+          </>
+        ) : null}
+        .
+      </span>,
+    );
+    bullets.push(
+      <span key="kept">
+        Kept: the {dsym} the vault had drawn, since the liquidation cleared the debt
+        {returned > 0 ? (
+          <>
+            , and{" "}
+            <H>
+              <AmountText value={returned} /> {sym}
+            </H>{" "}
+            the auction handed back
+            {takenOut.length > 0 ? <>, which the owner took out on {formatDate(Math.max(...takenOut))}</> : null}
+          </>
+        ) : null}
+        .
+      </span>,
+    );
+  } else if (v.everLiquidated) {
+    bullets.push(
+      <span key="seizures">
+        {grabCount > 0 ? (
+          <>
+            Liquidation seized it {grabCount} time{grabCount === 1 ? "" : "s"}.{" "}
+          </>
+        ) : (
+          <>Liquidation seized it. </>
+        )}
+        Each seizure sent collateral to an auction that raised the debt plus a penalty and handed any collateral left
+        back to the vault.
+        {endedBySeizure ? " The final seizure emptied it." : null}
+      </span>,
+    );
+  }
 
   if (hasPeakInk || hasPeakDebt) {
     bullets.push(
@@ -270,7 +362,7 @@ export function MakerdaoClosedPositionExplanation({
         At its height it held as much as{" "}
         {hasPeakInk ? (
           <H>
-            <AmountText value={v.peakInk} /> {v.collateralSymbol}
+            <AmountText value={v.peakInk} /> {sym}
           </H>
         ) : null}
         {hasPeakInk && hasPeakDebt ? <> of collateral and owed as much as </> : null}
@@ -290,26 +382,6 @@ export function MakerdaoClosedPositionExplanation({
         ) : (
           <> — its highest recorded debt over the vault&rsquo;s life.</>
         )}
-      </span>,
-    );
-  }
-
-  if (v.everLiquidated) {
-    bullets.push(
-      <span key="seizures">
-        {grabCount > 0 ? (
-          <>
-            Liquidation seized it {grabCount} time{grabCount === 1 ? "" : "s"} —{" "}
-          </>
-        ) : (
-          <>Liquidation seized it — </>
-        )}
-        a Maker liquidation is partial by design (each ilk caps how much can be auctioned at once), so a single seizure
-        need not empty a vault.{" "}
-        {endedBySeizure
-          ? "Here the final seizure emptied it entirely."
-          : "What remained after the seizures left by the vault's own transactions."}{" "}
-        Seizures in the record are what mark the outcome Liquidated.
       </span>,
     );
   }
@@ -335,7 +407,7 @@ export function MakerdaoClosedPositionExplanation({
         The Vat still records a trace on this urn —{" "}
         {inkResidue ? (
           <H>
-            <AmountText value={v.ink} /> {v.collateralSymbol}
+            <AmountText value={v.ink} /> {sym}
           </H>
         ) : null}
         {inkResidue && artResidue ? <> of collateral and </> : null}
@@ -352,31 +424,20 @@ export function MakerdaoClosedPositionExplanation({
     );
   }
 
-  bullets.push(
-    <span key="closure">
-      Its record closed
-      {v.lastActivityAt != null ? (
-        <>
-          {" "}
-          on <H>{closureDate(v.lastActivityAt)}</H>
-        </>
-      ) : null}
-      , after <H>{v.txCount}</H> transaction{v.txCount === 1 ? "" : "s"} of its own.
-    </span>,
-  );
+  if (v.lastActivityAt != null) {
+    bullets.push(
+      <span key="closure">
+        Its last event was on <H>{closureDate(v.lastActivityAt)}</H>.
+      </span>,
+    );
+  }
 
   bullets.push(
     <span key="door">
       {v.cdpId != null ? (
-        <>
-          Vault #{v.cdpId} survives its closing — it stays with its owner, and a new deposit or draw under the same
-          vault reopens this very timeline.
-        </>
+        <>Vault #{v.cdpId} still belongs to its owner and could take a new deposit; it has had none since.</>
       ) : (
-        <>
-          The engine urn survives its closing — it stays with its staker, and a new stake or draw under it reopens this
-          very timeline.
-        </>
+        <>The engine urn still belongs to its staker and could take a new stake; it has had none since.</>
       )}
     </span>,
   );

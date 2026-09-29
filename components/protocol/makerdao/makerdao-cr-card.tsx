@@ -62,10 +62,11 @@ export function MakerdaoCrCard({ v }: { v: MakerVaultView }) {
         · minimum <Prov info={matProv(v.ilk)}>{pct(v.matRatio)}</Prov>
       </RiskFigure>
       <RiskFigure>
+        can borrow{" "}
         <Prov info={borrowHeadroomProv(pct(v.matRatio))}>
           <AmountText value={headroomDai} format="compact" /> {dsym}
         </Prov>{" "}
-        more to the {pct(v.matRatio)} minimum
+        more before reaching the {pct(v.matRatio)} minimum
         {v.dustDai != null && v.dustDai > 0 ? (
           <>
             {" "}

@@ -832,10 +832,12 @@ check(
     ? `debt ${pinned.interest.debt.toFixed(0)} before ${pinned.interest.before.toFixed(0)} after ${pinned.interest.after.toFixed(0)}`
     : "note not found once opened",
 );
+// The drip each fee was evidenced by is the receipts' job since the MakerDAO
+// newcomer round 1 (T3 in plain words); §7b asserts the receipts' step lists.
 check(
-  "3g. its derivation names the drip the later fee was evidenced by — block 25,630,785, the set in force at the run's LAST member's later touch",
-  pinnedText != null && pinnedText.includes(blk(25630785)),
-  pinnedText ? `wanted "${blk(25630785)}"` : "",
+  "3g. its explanation states the move in plain words — the two fees, no Jug.drip derivation",
+  pinnedText != null && /stability fee (rose|fell) from/.test(pinnedText) && !/Jug\.drip|rate_delta/.test(pinnedText),
+  pinnedText ? (pinnedText.match(/stability fee (rose|fell) from.{0,60}/)?.[0] ?? "no plain sentence") : "",
 );
 
 // ── 3i–3k. the three surfaces a merged row owes its members ────────────────
@@ -859,12 +861,10 @@ check(
   pinnedText ? (pinnedText.match(/Fee resets in between.{0,20}/)?.[0] ?? "no resets stat") : "note not found",
 );
 check(
-  "3j. the derivation prose says how far apart the two ends are in this vault's own touches, and that a step the other way ends the run",
-  pinnedText != null &&
-    new RegExp(`${pinned.steps} of this vault.s touches apart`).test(pinnedText) &&
-    /step the other way ends the run/i.test(pinnedText),
+  "3j. the explanation says how many of this vault's touches the merged run spans",
+  pinnedText != null && new RegExp(`across ${pinned.steps} of the vault.s touches`).test(pinnedText),
   pinnedText
-    ? (pinnedText.match(/.{0,30}of this vault.s touches apart.{0,60}/)?.[0] ?? "no merged prose")
+    ? (pinnedText.match(/across \d+ of the vault.s touches.{0,30}/)?.[0] ?? "no merged prose")
     : "note not found",
 );
 // The silence on a row that merged nothing — the same surfaces must not claim
