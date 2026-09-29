@@ -43,6 +43,9 @@ import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { FxDriftPanel } from "@/components/protocol/fx/fx-drift-panel";
 import { FxSocializedReadsContext } from "@/lib/fx/socialized-reads";
 import { useFxPositionReads, useFxPricesAt } from "@/lib/fx/use-event-state";
+import { fxInTxFunding, fxOperateBlocks } from "@/lib/fx/in-tx-funding";
+import { currentHolder, withHolderSpans } from "@/lib/fx/holders";
+import { FxHolderLine } from "@/components/protocol/fx/fx-holder-line";
 import { fetchFxDrift, FxDriftError, type FxDriftResult } from "@/lib/sources/api/fx-drift";
 import { computeFxEconomics, fxDebtFlowsWithOpening } from "@/lib/fx/economics";
 import { fxNoTxParts } from "@/lib/fx/no-tx-parts";
@@ -150,7 +153,11 @@ export default function FxPositionView({
     return { state: openingFailed ? "failed" : "pending", cutoffBlock, opening: null };
   }, [cutoffBlock, opening, openingFailed]);
 
-  const fxEvents = useMemo(() => events.filter(isFxEvent), [events]);
+  // The ownership rows carry when each sending holder took the position.
+  const fxEvents = useMemo(
+    () => withHolderSpans(events.filter(isFxEvent), view?.openedBy).filter(isFxEvent),
+    [events, view?.openedBy],
+  );
 
   // The socialized lane by interval — rails-server's per-position boundary
   // reads (archive getPosition at the position's own event boundaries, cached
@@ -235,6 +242,39 @@ export default function FxPositionView({
     for (const id of lastOf.values()) leads.add(id);
     return { reads: socializedReadsMap, leads, peers };
   }, [socializedRows, socializedReadsMap]);
+
+  // Funding the pool books inside the position's own transactions: the position
+  // read at each operate row's block, once, for the card, the stretch table and
+  // each row's collateral tile (lib/fx/in-tx-funding.ts).
+  const operateBlocks = useMemo(() => fxOperateBlocks(fxEvents), [fxEvents]);
+  const operateReads = useFxPositionReads(parsed?.pool ?? "", parsed?.positionId ?? "", operateBlocks, 120);
+  const inTxFunding = useMemo(
+    () => (historyWindow.state === "whole" ? fxInTxFunding(fxEvents, operateReads) : null),
+    [fxEvents, operateReads, historyWindow.state],
+  );
+  const ownPeers = useMemo(() => {
+    const perBlock = new Map<number, number>();
+    for (const e of fxEvents)
+      if (e.context.data.eventType === "operate") perBlock.set(e.blockNumber, (perBlock.get(e.blockNumber) ?? 0) + 1);
+    return perBlock;
+  }, [fxEvents]);
+  const holder = useMemo(
+    () => currentHolder(fxEvents, view?.owner, view?.openedBy),
+    [fxEvents, view?.owner, view?.openedBy],
+  );
+  const rowKinds = useMemo(() => {
+    let rebalances = 0;
+    let redemptions = 0;
+    let poolLiquidations = 0;
+    let transfers = 0;
+    for (const e of fxEvents) {
+      const d = e.context.data;
+      if (d.eventType === "transfer") transfers += 1;
+      else if (d.eventType === "tickRebalance") d.redemption ? (redemptions += 1) : (rebalances += 1);
+      else if (d.eventType === "liquidation" && d.poolWide) poolLiquidations += 1;
+    }
+    return { rebalances, redemptions, poolLiquidations, transfers };
+  }, [fxEvents]);
 
   // The socialized rows, for the card's lines (what they took, read per
   // block), and the loans this NFT has carried.
@@ -403,8 +443,14 @@ export default function FxPositionView({
               viewHref={tl.viewHref}
               drift={drift}
               rebalanceRows={historyWindow.state === "whole" ? rebalanceRows : undefined}
+              inTxFunding={inTxFunding}
               bodyExtra={
-                loans.length > 1 || loans.at(-1)?.ending === "liquidated" ? <FxLoansLine loans={loans} /> : undefined
+                holder || loans.length > 1 || loans.at(-1)?.ending === "liquidated" ? (
+                  <>
+                    {holder ? <FxHolderLine holder={holder} /> : null}
+                    {loans.length > 1 || loans.at(-1)?.ending === "liquidated" ? <FxLoansLine loans={loans} /> : null}
+                  </>
+                ) : undefined
               }
               explanation={
                 <FxPositionExplanation
@@ -417,6 +463,7 @@ export default function FxPositionView({
                   // lanes always load whole, so they are already counted).
                   // Unknown while the opening balance is in flight.
                   timelineRows={lifetimeKnown ? fxEvents.length + (opening?.totalEvents ?? 0) : undefined}
+                  rowKinds={rowKinds}
                 />
               }
             />
@@ -444,6 +491,7 @@ export default function FxPositionView({
               onLoad={() => void loadDrift()}
               normalizedSymbol={view.normalizedSymbol}
               blockDates={blockDates}
+              inTx={inTxFunding}
             />
           )}
           {/* Chain-only positions: the contract minted them via a path that
@@ -492,7 +540,11 @@ export default function FxPositionView({
                     isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     blockPeers={
-                      event.context.data.eventType === "tickRebalance" ? blockPeers.get(event.blockNumber) : undefined
+                      event.context.data.eventType === "tickRebalance"
+                        ? blockPeers.get(event.blockNumber)
+                        : event.context.data.eventType === "operate"
+                          ? ownPeers.get(event.blockNumber)
+                          : undefined
                     }
                   />
                 ) : null

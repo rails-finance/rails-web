@@ -2508,6 +2508,13 @@ export interface FxContext {
   transferFrom?: string;
   /** transfer only — the receiving holder, lowercased. */
   transferTo?: string;
+  /** transfer only, derived on the position page — when the sending holder
+   *  took the position (unix seconds): the previous transfer to it, else the
+   *  position's first row where it is the opener. */
+  transferFromSince?: number;
+  /** transfer only, derived with `transferFromSince` — the transfer's own time
+   *  (unix seconds). */
+  transferAt?: number;
   /** The owner IN FORCE at this event's block (era-aware, walked from the
    *  transfer lane — a later transfer may have re-homed the position, so a
    *  historic event's owner can differ from the current one). Receipts judge

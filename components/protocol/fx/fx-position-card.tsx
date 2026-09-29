@@ -48,12 +48,16 @@ import {
   socializedCollTakenProv,
   fundingTakenProv,
   positionTickProv,
+  ticksAboveProv,
+  lifetimeInTxFundingProv,
+  lifetimeCollateralMovedProv,
   leftUnpaidProv,
   badDebtAddedProv,
 } from "@/lib/fx/event-provenance";
 import { useFxPoolTerms, useFxPricesAt, type FxPoolTerms } from "@/lib/fx/use-event-state";
 import { fxBlocksChange } from "@/lib/fx/socialized-reads";
 import type { FxNoTxParts } from "@/lib/fx/no-tx-parts";
+import { fxFundingText, type FxInTxFunding } from "@/lib/fx/in-tx-funding";
 import { FX_LIQUIDATION_RULE } from "@/lib/fx/row-figures";
 import Link from "next/link";
 import type { FxStateAt } from "@/lib/sources/chain/fx-event-state";
@@ -280,7 +284,7 @@ function RatioFootnote({
 }: {
   v: FxPositionView;
   terms: FxPoolTerms | null;
-  px: { anchor: number; min: number; block: number; tick?: number | null } | null;
+  px: { anchor: number; min: number; block: number; tick?: number | null; ticksAbove?: number | null } | null;
 }) {
   const { colls, debts, debtRatio } = v.settled;
   if (colls == null || debts == null || debtRatio == null || colls <= 0 || debtRatio <= 0) return null;
@@ -300,7 +304,10 @@ function RatioFootnote({
         {v.settled.block != null ? (
           <>
             {" "}
-            · settled @ <BlockRef block={v.settled.block} />
+            ·{" "}
+            <span className="whitespace-nowrap">
+              settled @ <BlockRef block={v.settled.block} />
+            </span>
           </>
         ) : null}
       </StatFootnote>
@@ -317,6 +324,25 @@ function RatioFootnote({
           >
             find it on the pools page
           </Link>
+        </div>
+      ) : null}
+      {px?.tick != null && terms ? (
+        <div className="text-xs mt-0.5 text-rb-500">
+          redemption is {terms.redeemAllowed ? "open" : "closed"} now
+          {terms.redeemAllowed ? "" : " (it opens only while fxUSD trades below its peg)"}; it takes from the
+          highest-ratio ticks first
+          {px.ticksAbove == null ? null : px.ticksAbove === 0 ? (
+            <>, and this position&apos;s tick is the top one</>
+          ) : (
+            <>
+              , and{" "}
+              <Prov info={ticksAboveProv(px.block)} value={String(px.ticksAbove)}>
+                {px.ticksAbove}
+              </Prov>{" "}
+              debt tick{px.ticksAbove === 1 ? "" : "s"} sit{px.ticksAbove === 1 ? "s" : ""} above the position&apos;s
+              tick
+            </>
+          )}
         </div>
       ) : null}
       {px && minRatio != null ? (
@@ -377,11 +403,36 @@ function RatioFootnote({
  *  ends at the same settled sweep the collateral figure comes from). Rendered
  *  once the intervals have arrived; while a long history is still being read,
  *  the line says how much of the life it covers. */
-function CollateralDriftLine({ v, drift, rows }: { v: FxPositionView; drift: FxDriftResult; rows?: FxRebalanceRows }) {
+function CollateralDriftLine({
+  v,
+  drift,
+  rows,
+  inTx,
+}: {
+  v: FxPositionView;
+  drift: FxDriftResult;
+  rows?: FxRebalanceRows;
+  /** Funding the pool booked inside the position's own transactions
+   *  (lib/fx/in-tx-funding.ts): with the drift between them it is the whole
+   *  collateral gap. */
+  inTx?: FxInTxFunding | null;
+}) {
   if (drift.intervals.length === 0) return null;
   const s = summariseFxDrift(drift);
   const taken = s.complete ? socializedTaken(rows) : null;
-  const funding = taken ? -s.collsDrift - taken.coll : null;
+  const inside = s.complete && inTx && inTx.total > DUST ? inTx : null;
+  const between = -s.collsDrift;
+  const insideNote = inside ? (
+    <>
+      {" "}
+      ({fxFundingText(between)} between the transactions and{" "}
+      <Prov info={lifetimeInTxFundingProv(v.normalizedSymbol, inTx?.reads ?? 0)}>
+        {fxFundingText(inside.total)} {v.normalizedSymbol}
+      </Prov>{" "}
+      inside {inside.rows.length === 1 ? "one of them" : `${inside.rows.length} of them`})
+    </>
+  ) : null;
+  const funding = taken ? between - taken.coll + (inside?.total ?? 0) : null;
   // Funding and the rows apart: the rows' blocks read one by one, funding the
   // remainder of the drift (never below zero; if it is, the line keeps the
   // two together).
@@ -395,8 +446,9 @@ function CollateralDriftLine({ v, drift, rows }: { v: FxPositionView; drift: FxD
         </Prov>{" "}
         and funding took{" "}
         <Prov info={fundingTakenProv(v.normalizedSymbol)}>
-          <AmountText value={Math.abs(funding)} /> {v.normalizedSymbol}
+          {fxFundingText(funding)} {v.normalizedSymbol}
         </Prov>
+        {insideNote}
       </div>
     );
   }
@@ -404,10 +456,21 @@ function CollateralDriftLine({ v, drift, rows }: { v: FxPositionView; drift: FxD
     ? "without a transaction"
     : `over the latest ${s.intervals} stretch${s.intervals === 1 ? "" : "es"} read so far`;
   const prov = lifetimeCollateralDriftProv(v.normalizedSymbol, s.intervals, s.complete, drift.headBlock);
-  if (Math.abs(s.collsDrift) <= DUST) {
+  if (Math.abs(s.collsDrift) <= DUST && !inside) {
     return (
       <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
         <Prov info={prov}>0 {v.normalizedSymbol}</Prov> of funding or rebalance movement {scope}
+      </div>
+    );
+  }
+  if (inside) {
+    return (
+      <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+        funding &amp; rebalances took{" "}
+        <Prov info={lifetimeCollateralMovedProv(v.normalizedSymbol, drift.headBlock)}>
+          {fxFundingText(between + inside.total)} {v.normalizedSymbol}
+        </Prov>
+        {insideNote}
       </div>
     );
   }
@@ -457,8 +520,10 @@ function CollateralUsdFootnote({
           {formatUsd(v.settled.colls * listing.anchor)}
         </Prov>{" "}
         at the anchor price{" "}
-        <Prov info={oracleLegAtProv("anchor", v.normalizedSymbol, listing.block)}>{formatUsd(listing.anchor)}</Prov> ·
-        oracle @ <BlockRef block={listing.block} />
+        <Prov info={oracleLegAtProv("anchor", v.normalizedSymbol, listing.block)}>{formatUsd(listing.anchor)}</Prov> ·{" "}
+        <span className="whitespace-nowrap">
+          oracle @ <BlockRef block={listing.block} />
+        </span>
       </StatFootnote>
     );
   }
@@ -471,7 +536,10 @@ function CollateralUsdFootnote({
       {v.oracle.priceBlock != null ? (
         <>
           {" "}
-          · oracle @ <BlockRef block={v.oracle.priceBlock} />
+          ·{" "}
+          <span className="whitespace-nowrap">
+            oracle @ <BlockRef block={v.oracle.priceBlock} />
+          </span>
         </>
       ) : null}
     </StatFootnote>
@@ -486,6 +554,7 @@ export function FxPositionCard({
   viewHref,
   drift,
   rebalanceRows,
+  inTxFunding,
   bodyExtra,
   listingPx,
 }: {
@@ -505,6 +574,8 @@ export function FxPositionCard({
   /** The detail page's rebalance rows — the debt line splits what they
    *  cleared from the rest. */
   rebalanceRows?: FxRebalanceRows;
+  /** Funding booked inside the position's own transactions. */
+  inTxFunding?: FxInTxFunding | null;
   /** Lines under the card's figures (the loans this NFT has carried). */
   bodyExtra?: React.ReactNode;
   /** The listing's price for this pool (FxListing). */
@@ -522,6 +593,7 @@ export function FxPositionCard({
           min: Number(pxRead.minPrice) / 1e18,
           block: v.settled.block,
           tick: pxRead.tick ?? null,
+          ticksAbove: pxRead.ticksAbove ?? null,
         }
       : null;
 
@@ -608,7 +680,9 @@ export function FxPositionCard({
               <StatDash />
             )
           }
-          collateralFootnote={drift ? <CollateralDriftLine v={v} drift={drift} rows={rebalanceRows} /> : undefined}
+          collateralFootnote={
+            drift ? <CollateralDriftLine v={v} drift={drift} rows={rebalanceRows} inTx={inTxFunding} /> : undefined
+          }
           debtFootnote={<SocializedLine v={v} rows={rebalanceRows} />}
         />
         {bodyExtra && <div className="mt-3 border-t border-rb-300/40 pt-3 dark:border-rb-700/40">{bodyExtra}</div>}
@@ -672,7 +746,7 @@ export function FxPositionCard({
             footnote: (
               <>
                 <CollateralUsdFootnote v={v} px={px} listing={listingPx} />
-                {drift ? <CollateralDriftLine v={v} drift={drift} rows={rebalanceRows} /> : null}
+                {drift ? <CollateralDriftLine v={v} drift={drift} rows={rebalanceRows} inTx={inTxFunding} /> : null}
               </>
             ),
           },

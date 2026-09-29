@@ -36,9 +36,15 @@ export const FX_ADDRESSES = {
   FXUSD: "0x085780639cc2cacd35e474e71f4d000e2405d8f6",
   WSTETH_POOL: "0x6ecfa38fee8a5277b91efda204c235814f0122e8",
   WBTC_POOL: "0xab709e26fa6b0a30c119d8c55b887ded24952473",
-  /** The router (a diamond) most position transactions go through; the pools'
-   *  PoolConfiguration gives it a fee schedule of its own (getPoolFeeRatio). */
+  /** The first f(x) router (a diamond, owner 0x26b2…7bbf). The pools'
+   *  PoolConfiguration gives it a fee schedule of its own (getPoolFeeRatio):
+   *  a deposit and a withdrawal pay, a borrow and a repayment do not. */
   ROUTER: "0x33636d49fbefbe798e15e7f356e8dbef543cc708",
+  /** The second f(x) router: a diamond deployed as `FxMintRouter` by the
+   *  Upgrade20251030 module of f(x)'s contracts repo (ignition/deployments),
+   *  with the same owner as ROUTER and the PositionOperateFacet added there.
+   *  It has no schedule of its own, so the pool's default applies. */
+  ROUTER_2: "0xb753366082466c4b5984312f0c4bb97554be067e",
 } as const;
 
 export const FXUSD_META = { symbol: "fxUSD", decimals: 18, address: FX_ADDRESSES.FXUSD } as const;

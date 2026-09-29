@@ -232,16 +232,22 @@ check(
 );
 check(
   "484: the 6 Feb borrow names the limit order and who held the NFT",
-  /0xaf13…dc06 sent this transaction to fill a limit order the holder \(0x860e…e5c5\) had signed/.test(p484.text),
+  /0xaf13…dc06 sent this transaction to fill a limit order the holder at the time \(0x860e…e5c5\) had signed/.test(
+    p484.text,
+  ),
 );
 check(
   "484: a router row names its schedule and the default",
-  /0x3363…c708\), on the schedule the pool sets for that caller: 0\.3% of the deposit/.test(p484.text) &&
-    /The pool’s default at this block charges 0\.8% of a borrow and 0\.2% of a repayment/.test(p484.text),
+  /the f\(x\) router \(0x3363…c708\)[^.]*, on the schedule the pool sets for that caller \(0\.3% of a deposit[^)]*\): 0\.3% of the deposit/.test(
+    p484.text,
+  ) &&
+    /The pool’s default at this block charges 0\.\d% of a borrow, 0\.2% of a repayment and nothing on a deposit or a withdrawal/.test(
+      p484.text,
+    ),
 );
 check(
   "484: the owner's own repay is on the default schedule",
-  /the owner's address \(0x860e…e5c5\), which sent the transaction, on the pool's default schedule: 0\.2% of the repayment/.test(
+  /the holder at the time \(0x860e…e5c5\), who sent the transaction, on the pool's default schedule \([^)]*\): 0\.2% of the repayment/.test(
     p484.text,
   ),
 );
@@ -377,6 +383,129 @@ check(
     `borrow ${(terms.fees.borrow * 100).toFixed(1)}% · repay ${(terms.fees.repay * 100).toFixed(1)}%`,
   ),
 );
+
+// ── round 4: wsteth-1801 (ownership transfer) and wsteth-1 (closed twice) ───
+{
+  const tl = await json("/api/fx/position/wsteth/1801/timeline");
+  const ops = tl.events.filter((e) => e.context.data.eventType === "operate");
+  const opBlocks = ops.map((e) => e.blockNumber);
+  const st = await json(`/api/chain/fx/event-state?pool=wsteth&id=1801&blocks=${opBlocks.join(",")}`);
+  let inTx = 0;
+  let deposited = 0;
+  for (const e of ops) {
+    const b = st.reads[String(e.blockNumber - 1)];
+    const a = st.reads[String(e.blockNumber)];
+    const rate = W(a.rate);
+    const moved = Number(e.context.data.collDelta) * rate;
+    deposited += moved;
+    inTx += W(b.colls) - W(a.colls) + moved;
+  }
+  const drift = await json("/api/fx/position/wsteth/1801/drift");
+  const between = -drift.intervals.reduce((t, iv) => t + iv.collsDrift, 0);
+  const settled = tl.position.settled.colls;
+  check(
+    "1801 r4 P1: funding inside the transactions plus the stretches is the whole collateral gap (chain, block − 1 reads)",
+    near(deposited - settled, between + inTx, 1e-6) && near(inTx, 0.0097, 0.0002),
+    `deposited-net ${deposited.toFixed(6)} − settled ${settled.toFixed(6)} = ${(deposited - settled).toFixed(6)}; between ${between.toFixed(6)} + inside ${inTx.toFixed(6)}`,
+  );
+  const last = ops.at(-1);
+  const sb = st.reads[String(last.blockNumber - 1)];
+  const sa = st.reads[String(last.blockNumber)];
+  check(
+    "1801 r4 P1: the 21 Sep borrow moves collateral 99.815 → 99.808 (funding booked in the transaction)",
+    near(W(sb.colls), 99.8148, 0.0002) && near(W(sa.colls), 99.8075, 0.0002),
+    `${W(sb.colls).toFixed(4)} → ${W(sa.colls).toFixed(4)}`,
+  );
+  const fee = await json(
+    `/api/chain/fx/event-state?pool=wsteth&id=1801&blocks=${last.blockNumber}&tx=${last.id.split(":")[0]}`,
+  );
+  check(
+    "1801 r4 P3: the caller is 0xb753…067e on the pool's default schedule (0 on a deposit)",
+    fee.fees?.caller === "0xb753366082466c4b5984312f0c4bb97554be067e" &&
+      fee.fees.custom === false &&
+      fee.fees.supply === 0 &&
+      near(fee.fees.borrow, 0.005, 1e-9),
+    JSON.stringify(fee.fees),
+  );
+  const tk = await json(
+    `/api/chain/fx/event-state?pool=wsteth&id=1801&blocks=${tl.position.settled.block}&prices=1&tick=1`,
+  );
+  const rd = tk.reads[String(tl.position.settled.block)];
+  check(
+    "1801 r4 P7: tick 4920 with debt ticks above it",
+    rd.tick === 4920 && rd.ticksAbove > 0,
+    `${rd.tick}, ${rd.ticksAbove} above`,
+  );
+
+  const p = await openAndRead("/ethereum/fx/wsteth-1801");
+  check("1801 r4: no page errors", p.errors.length === 0, p.errors.slice(0, 2).join(" | "));
+  check(
+    "1801 r4 P1: the card states the whole gap, 1.341, as 1.332 between and 0.00971 inside 3 transactions",
+    /funding & rebalances took 1\.341 stETH \(1\.332 between the transactions and 0\.00971 stETH inside 3 of them\)/.test(
+      p.text,
+    ),
+  );
+  check(
+    "1801 r4 P1: the stretch table hides the empty stretches and totals the rest",
+    /11 stretches with no change\./.test(p.text) && /Total between the transactions\t−1\.332 stETH/.test(p.text),
+  );
+  check("1801 r4 P6: the table header no longer says the owner's", !/Between the owner’s transactions/.test(p.text));
+  check(
+    "1801 r4 P2: the card names the holder once",
+    /Held by 0xc32b…5fa3 since 4 Aug 2026; opened by 0xc563…b9cd\./.test(p.text),
+  );
+  check(
+    "1801 r4 P2: the ownership row names the previous holder's span",
+    /held it from 19 Feb 2026 to 4 Aug 2026/.test(p.text),
+  );
+  check(
+    "1801 r4 P3: rows name the caller as the f(x) router and the holder who called it",
+    /the f\(x\) router \(0xb753…067e\), which the holder at the time \(0xc563…b9cd\) called, on the pool's default schedule \(0\.5% of a borrow, 0\.2% of a repayment and nothing on a deposit or a withdrawal\)/.test(
+      p.text,
+    ),
+  );
+  check(
+    "1801 r4 P4: the borrow and repay equations",
+    /The debt rose by 40,000 fxUSD, the whole amount borrowed; the 200 fxUSD fee came out of the fxUSD minted, so the caller received 39,800\./.test(
+      p.text,
+    ) &&
+      /The debt fell by 60,882\.095 fxUSD, the amount repaid; the 121\.764 fxUSD fee was paid on top, so the caller paid 61,003\.859\./.test(
+        p.text,
+      ),
+  );
+  check("1801 r4 P5: row counts by kind", /carries 18 rows: 17 transactions and 1 ownership transfer\./.test(p.text));
+  check(
+    "1801 r4 P7: redemption line",
+    /redemption is (closed|open) now[^\n]*highest-ratio ticks first, and \d+ debt ticks? sits? above the position's tick/.test(
+      p.text,
+    ),
+  );
+  check("1801 r4 P9: one name for the transfer", /Ownership Transfer/.test(p.text) && !/\nTransferred\n/.test(p.text));
+  check("1801 r4 P9: the flows note says none moved by the pool", /Moved by the pool: none/.test(p.text));
+
+  const t1 = await json("/api/fx/position/wsteth/1/timeline");
+  const ops1 = t1.events.filter((e) => e.context.data.eventType === "operate");
+  const st1 = await json(
+    `/api/chain/fx/event-state?pool=wsteth&id=1&blocks=${ops1.map((e) => e.blockNumber).join(",")}`,
+  );
+  let in1 = 0;
+  for (const e of ops1) {
+    const b = st1.reads[String(e.blockNumber - 1)];
+    const a = st1.reads[String(e.blockNumber)];
+    if (!b?.colls || !a?.colls || Number(b.colls) === 0) continue;
+    const d = e.context.data;
+    // The old manager emitted a withdrawal net of the fee it kept (protocolFees, wstETH).
+    const cd = Number(d.collDelta) - (Number(d.collDelta) < 0 ? Number(d.protocolFees ?? 0) : 0);
+    in1 += W(b.colls) - W(a.colls) + cd * W(a.rate);
+  }
+  const d1 = await json("/api/fx/position/wsteth/1/drift");
+  const between1 = -d1.intervals.reduce((t, iv) => t + iv.collsDrift, 0);
+  check(
+    "wsteth-1 r4 P1: funding between and inside the transactions is 0.0077 stETH (the reader's 0.0071 summed rounded cells)",
+    near(between1 + in1, 0.0077, 0.0002),
+    `between ${between1.toFixed(6)} + inside ${in1.toFixed(6)} = ${(between1 + in1).toFixed(6)}`,
+  );
+}
 
 await browser.close();
 console.log(`\n${pass} passed, ${fail} failed`);

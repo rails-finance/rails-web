@@ -48,12 +48,15 @@ import {
   protocolShareProv,
   unpaidDebtProv,
   feeScheduleProv,
+  inTxFundingProv,
   type FxCoords,
 } from "@/lib/fx/event-provenance";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
 import { formatExact, formatNumber, formatTinyNonZero } from "@/lib/utils/format";
 import { fxBeforeAfter, useFxEventState, type FxEventState, type FxSide } from "@/lib/fx/use-event-state";
 import { fxRowFees, fxFeePct } from "@/lib/fx/row-figures";
+import { fxCollMoved, fxFundingText, fxRowFunding } from "@/lib/fx/in-tx-funding";
+import { formatDate } from "@/lib/date";
 
 export interface FxEventDetailProps {
   ctx: FxContext;
@@ -187,6 +190,7 @@ function FxEventDetailBody({
   const { before, after } = fxBeforeAfter(state, blockNumber);
   const rate = after?.rate ?? before?.rate ?? null;
   const stats: ChainTruthStat[] = [];
+  const feeStats: ChainTruthStat[] = [];
 
   // "= 1.748 stETH at 1.192 stETH per wstETH" under a wstETH amount.
   const stethSub = (tokenAmount: number, what: string) =>
@@ -216,6 +220,12 @@ function FxEventDetailBody({
             value: isMint ? "0x0" : short(ctx.transferFrom),
             symbol: "",
             prov: transferPartyProv("from", coords),
+            sub:
+              !isMint && ctx.transferFromSince != null && ctx.transferAt != null ? (
+                <>
+                  held it from {formatDate(ctx.transferFromSince)} to {formatDate(ctx.transferAt)}
+                </>
+              ) : undefined,
           },
           {
             label: "To · new holder",
@@ -328,10 +338,11 @@ function FxEventDetailBody({
       });
     }
   } else {
-    // Operate: the fee first — the event's field where the old manager emitted
-    // one, else the caller's schedule at the block.
+    // Operate: the fee is drawn last, after the position's figures and the
+    // price — the event's field where the old manager emitted one, else the
+    // caller's schedule at the block.
     if (ctx.protocolFees != null && Number(ctx.protocolFees) !== 0) {
-      stats.push({
+      feeStats.push({
         label: "Protocol fee",
         value: fmt(ctx.protocolFees),
         symbol: tokenSym,
@@ -340,7 +351,7 @@ function FxEventDetailBody({
     } else if (state?.fees) {
       for (const f of fxRowFees(ctx, state.fees)) {
         if (f.amount <= 0) continue;
-        stats.push({
+        feeStats.push({
           label: `Fee · ${fxFeePct(f.ratio)} ${f.leg}`,
           value: String(f.amount),
           symbol: f.symbol === "token" ? tokenSym : "fxUSD",
@@ -359,6 +370,32 @@ function FxEventDetailBody({
   if (collAfter != null && debtAfter != null) {
     const collBefore = before?.colls ?? (ctx.collBefore != null ? Number(ctx.collBefore) : null);
     const coll = Number(ctx.collDelta ?? "0") || 0;
+    // Funding the pool booked at the start of this transaction lands in the
+    // row's before → after (lib/fx/in-tx-funding.ts).
+    const funding =
+      ctx.eventType === "operate" && !ctx.isOpen && (blockPeers ?? 1) <= 1
+        ? fxRowFunding(
+            fxCollMoved(ctx),
+            tokenSym !== normalizedSymbol ? rate : null,
+            before?.colls ?? null,
+            after?.colls ?? null,
+          )
+        : null;
+    const moved =
+      ctx.eventType === "operate" && coll !== 0 ? stethSub(Math.abs(coll), `The ${tokenSym} moved`) : undefined;
+    const collSub =
+      funding != null && funding > 0 && (tokenSym === normalizedSymbol || rate != null) ? (
+        <>
+          {moved ? <>{moved}; </> : null}
+          includes{" "}
+          <Prov info={inTxFundingProv(normalizedSymbol, coords)} value={formatExact(funding)}>
+            {fxFundingText(funding)}
+          </Prov>{" "}
+          {normalizedSymbol} of funding booked at the start of this transaction
+        </>
+      ) : (
+        moved
+      );
     stats.push({
       label: "Collateral",
       value: String(collAfter),
@@ -379,7 +416,7 @@ function FxEventDetailBody({
                 : chainBeforeProv("coll", normalizedSymbol, coords, true),
             })
           : undefined,
-      sub: ctx.eventType === "operate" && coll !== 0 ? stethSub(Math.abs(coll), `The ${tokenSym} moved`) : undefined,
+      sub: collSub,
     });
     const debtBefore = before?.debts ?? (ctx.debtBefore != null ? Number(ctx.debtBefore) : null);
     stats.push({
@@ -425,7 +462,11 @@ function FxEventDetailBody({
       ctx.eventType === "liquidation" && ctx.oraclePrice != null ? Number(ctx.oraclePrice) : null,
     );
     if (ratio) stats.push(ratio);
-    return <ChainTruthDetail stats={withPrice(ctx.eventType === "liquidation" ? stats.map(readable) : stats)} />;
+    return (
+      <ChainTruthDetail
+        stats={[...withPrice(ctx.eventType === "liquidation" ? stats.map(readable) : stats), ...feeStats]}
+      />
+    );
   }
 
   // The replay lane — labeled event-implied so it is never read as the
@@ -443,7 +484,7 @@ function FxEventDetailBody({
     }),
   });
 
-  return <ChainTruthDetail stats={withPrice(stats)} />;
+  return <ChainTruthDetail stats={[...withPrice(stats), ...feeStats]} />;
 
   // The same-tx PositionSnapshot's oracle price — USD per NORMALIZED unit at
   // this event's block.

@@ -17,7 +17,10 @@
 // gives the node a parent in the tick the shares went to, so the walk up the
 // parents (tickTreeData(node).metadata: parent in bits 0–47, tick in 48–63)
 // ends at the node that holds them now, and its tick is the position's tick
-// (TickLogic.sol, _getRootNode). One eth_call per node on the path.
+// (TickLogic.sol, _getRootNode). One eth_call per node on the path. The read
+// also counts the ticks holding debt above it (the pool's tickBitmap between
+// this tick and getTopTick), which is where a redemption stands: BasePool._redeem
+// walks down from the top tick.
 //
 // A single-row read may also ask for what the transaction was charged
 // (`tx`): the pool's fee schedule for the manager's caller at block − 1
@@ -50,6 +53,8 @@ const POOL_ABI = parseAbi([
   "function priceOracle() view returns (address)",
   "function positionData(uint256) view returns (int16 tick, uint48 nodeId, uint96 colls, uint96 debts)",
   "function tickTreeData(uint256) view returns (bytes32 metadata, bytes32 value)",
+  "function getTopTick() view returns (int16)",
+  "function tickBitmap(int8) view returns (uint256)",
 ]);
 const ORACLE_ABI = parseAbi(["function getPrice() view returns (uint256 anchor, uint256 min, uint256 max)"]);
 const WSTETH_ABI = parseAbi(["function stEthPerToken() view returns (uint256)"]);
@@ -82,6 +87,9 @@ export interface FxStateAt {
   minPrice?: string | null;
   /** With `tick`: the tick the position's shares sit in at this block. */
   tick?: number | null;
+  /** With `tick`: how many ticks holding debt sit above that tick (0 = it is
+   *  the top tick, where a redemption starts). */
+  ticksAbove?: number | null;
 }
 
 /** Fee ratios (fractions, 1e9 on chain) the pool applied to the caller. */
@@ -202,6 +210,41 @@ function readTick(pool: FxPoolKey, id: bigint, block: number): Promise<number | 
       node = parent;
     }
     return null;
+  }) as Promise<number | null>;
+}
+
+/** The ticks holding debt above `tick` at `block`: the set bits of the pool's
+ *  tickBitmap from tick + 1 up to getTopTick. */
+function readTicksAbove(pool: FxPoolKey, tick: number, block: number): Promise<number | null> {
+  return remember(extraCache, `above:${pool}:${tick}:${block}`, async () => {
+    const client = alchemyClient();
+    const address = getAddress(FX_POOLS[pool].address);
+    const at = BigInt(block);
+    const top = Number(
+      await client.readContract({ address, abi: POOL_ABI, functionName: "getTopTick", blockNumber: at }),
+    );
+    if (top <= tick) return 0;
+    const first = Math.floor((tick + 1) / 256);
+    const last = Math.floor(top / 256);
+    const words = (await client.multicall({
+      allowFailure: false,
+      blockNumber: at,
+      contracts: Array.from({ length: last - first + 1 }, (_, i) => ({
+        address,
+        abi: POOL_ABI,
+        functionName: "tickBitmap",
+        args: [first + i],
+      })),
+    } as never)) as unknown as bigint[];
+    let n = 0;
+    words.forEach((w, i) => {
+      const base = (first + i) * 256;
+      for (let b = 0; b < 256; b++) {
+        const t = base + b;
+        if (t > tick && t <= top && (w >> BigInt(b)) & BigInt(1)) n += 1;
+      }
+    });
+    return n;
   }) as Promise<number | null>;
 }
 
@@ -356,7 +399,10 @@ export async function readFxEventState(
   }
   if (tick && blocks.length === 1) {
     const at = reads[String(blocks[0])];
-    if (at) at.tick = await readTick(pool, pid, blocks[0]).catch(() => null);
+    if (at) {
+      at.tick = await readTick(pool, pid, blocks[0]).catch(() => null);
+      at.ticksAbove = at.tick != null ? await readTicksAbove(pool, at.tick, blocks[0]).catch(() => null) : null;
+    }
   }
   const out: FxEventState = { pool, id, reads };
   if (blocks.length === 1) {
