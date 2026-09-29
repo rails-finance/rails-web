@@ -1067,6 +1067,11 @@ export interface ChainTruthTowerProps {
    *  example frame does. Its route resolves to no explorer anyway, and saying
    *  so keeps the frame from picking a key up if it ever moves. */
   collapseKey?: string | null;
+  /** The date-scrubber view drawn in place of the towers
+   *  (`<LifetimeFlowsScrubber>`, rails-ops TO-DO-ui-jobs §141). When set, the
+   *  towers and their tables move behind a "Full breakdown" disclosure under
+   *  it; the Explanation and "?" stay at the foot. */
+  timeline?: ReactNode;
 }
 
 export function ChainTruthTower({
@@ -1076,6 +1081,7 @@ export function ChainTruthTower({
   learnMore,
   rowExtra,
   collapseKey: collapseKeyProp,
+  timeline,
 }: ChainTruthTowerProps) {
   // The route's key unless the caller states one (including a stated null).
   const pathname = usePathname();
@@ -1087,6 +1093,9 @@ export function ChainTruthTower({
   // null = follow the auto-default (group whenever anything can merge); a
   // "Group assets" toggle pins the reader's choice (the Aave V4 default).
   const [groupOverride, setGroupOverride] = useState<boolean | null>(null);
+  // The ledger behind the scrubber, when one is drawn: closed by default.
+  const [ledgerOpen, setLedgerOpen] = useState(false);
+  const ledgerShown = timeline == null || ledgerOpen;
   // Collapsed, per protocol (ui-jobs 61). `settled` is false until the effect
   // below has read the store, and while it is false React writes NO collapsed
   // attribute: the server cannot know the answer, so the pre-paint script owns
@@ -1201,55 +1210,74 @@ export function ChainTruthTower({
               <span className={`${OVERLAY_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
               {/* No corner color key — the flank-table swatches are the one legend
                   (design-grammar rule; neither reference tower carries one). */}
-              <div className="pointer-events-auto flex items-center gap-3">
-                <TowerDisplayControls
-                  lifetimeAvailable={lifetimeAvailable}
-                  canGroup={canGroup}
-                  grouped={grouped}
-                  hideHistorical={hideHistorical}
-                  showBars={showBars}
-                  flowsNote={data.flowsNote}
-                  onGroup={() => setGroupOverride((v) => !(v ?? true))}
-                  onHideHistorical={() => setHideHistorical((v) => !v)}
-                />
-              </div>
+              {timeline == null && (
+                <div className="pointer-events-auto flex items-center gap-3">
+                  <TowerDisplayControls
+                    lifetimeAvailable={lifetimeAvailable}
+                    canGroup={canGroup}
+                    grouped={grouped}
+                    hideHistorical={hideHistorical}
+                    showBars={showBars}
+                    flowsNote={data.flowsNote}
+                    onGroup={() => setGroupOverride((v) => !(v ?? true))}
+                    onHideHistorical={() => setHideHistorical((v) => !v)}
+                  />
+                </div>
+              )}
             </>
           )}
         </div>
         <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
-          {collapseKey && (
-            <div className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-end gap-3">
-              <div className="pointer-events-auto flex items-center gap-3">
-                <TowerDisplayControls
-                  lifetimeAvailable={lifetimeAvailable}
-                  canGroup={canGroup}
-                  grouped={grouped}
-                  hideHistorical={hideHistorical}
-                  showBars={showBars}
-                  flowsNote={data.flowsNote}
-                  onGroup={() => setGroupOverride((v) => !(v ?? true))}
-                  onHideHistorical={() => setHideHistorical((v) => !v)}
-                />
+          {timeline != null && (
+            <>
+              <div className="mt-2">{timeline}</div>
+              <button
+                type="button"
+                onClick={() => setLedgerOpen((v) => !v)}
+                aria-expanded={ledgerOpen}
+                aria-controls={`${bodyId}-ledger`}
+                className={`${CTRL_GHOST} mt-3 -mx-1 gap-1 rounded-md px-1 text-xs font-semibold text-foreground`}
+              >
+                Full breakdown
+                <ChevronDown size={14} aria-hidden className={ledgerOpen ? "rotate-180" : ""} />
+              </button>
+            </>
+          )}
+          <div id={`${bodyId}-ledger`} hidden={!ledgerShown} className={timeline != null ? "mt-2" : undefined}>
+            {(collapseKey || timeline != null) && (
+              <div className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-end gap-3">
+                <div className="pointer-events-auto flex items-center gap-3">
+                  <TowerDisplayControls
+                    lifetimeAvailable={lifetimeAvailable}
+                    canGroup={canGroup}
+                    grouped={grouped}
+                    hideHistorical={hideHistorical}
+                    showBars={showBars}
+                    flowsNote={data.flowsNote}
+                    onGroup={() => setGroupOverride((v) => !(v ?? true))}
+                    onHideHistorical={() => setHideHistorical((v) => !v)}
+                  />
+                </div>
               </div>
-            </div>
-          )}
-          {/* Bars pull up under the toolbar row; the gated reserve LIST keeps its
+            )}
+            {/* Bars pull up under the toolbar row; the gated reserve LIST keeps its
             own row (text would collide with the title). */}
-          {drawable && (
-            <div className={showBars ? "-mt-7" : "mt-3"}>
-              {showBars ? (
-                <ChainTruthTowerChart data={chartData} hideHistorical={hideHistorical} />
-              ) : (
-                <GatedEconomics data={data} />
-              )}
-            </div>
-          )}
-          {leftOut.length > 0 && (
-            <p className="mt-3 text-[11px] leading-snug text-rb-400" data-not-loaded="">
-              Leaves out {leftOut.map((t) => t.label).join(", ")}:{" "}
-              <NotLoaded inline className="text-rb-500" title={leftOutTitle(leftOut)} />
-            </p>
-          )}
+            {drawable && (
+              <div className={showBars ? "-mt-7" : "mt-3"}>
+                {showBars ? (
+                  <ChainTruthTowerChart data={chartData} hideHistorical={hideHistorical} />
+                ) : (
+                  <GatedEconomics data={data} />
+                )}
+              </div>
+            )}
+            {leftOut.length > 0 && (
+              <p className="mt-3 text-[11px] leading-snug text-rb-400" data-not-loaded="">
+                Leaves out {leftOut.map((t) => t.label).join(", ")}:{" "}
+                <NotLoaded inline className="text-rb-500" title={leftOutTitle(leftOut)} />
+              </p>
+            )}
+          </div>
           <ProvenanceInfoTabs className="mt-3" explanation={explanation} learnMore={learnMore} rowExtra={rowExtra} />
         </div>
       </section>

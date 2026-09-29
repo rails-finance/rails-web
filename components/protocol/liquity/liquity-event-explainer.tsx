@@ -10,6 +10,7 @@
 // header/detail receipt where an exported builder gives it one, plain bold
 // otherwise (the highlight rule without invented provenance).
 
+import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
 import type { ReactNode } from "react";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { BaseActivityEvent, GasCost } from "@/lib/shared/types/activity";
@@ -127,8 +128,17 @@ export function LiquityEventExplainer({
 }: LiquityEventExplainerProps) {
   const { prefs } = usePreferences();
   const coords = { txHash, blockNumber };
+  const claim = useSurplusClaimFor(ctx.operation === "liquidate" ? txHash : undefined);
   const clauses = eventClauses(
-    liquityEventSlots(ctx, coords, prefs.ratioMode, previousEvent, currentEvent, currentPrice),
+    liquityEventSlots(
+      ctx,
+      coords,
+      prefs.ratioMode,
+      previousEvent,
+      currentEvent,
+      currentPrice,
+      claim ? claim.timestamp : undefined,
+    ),
   );
   // Gas rides last, after the arc — never the lead, so skipLead removes exactly
   // the teaser sentence and the gas clause always survives into the pane.

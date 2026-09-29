@@ -31,6 +31,7 @@ import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
 import type { LiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
+import { CLAIMABLE_WHERE } from "@/lib/shared/liquity-coll-surplus-provenance";
 import { surplusClaimableProv, surplusUsdProv } from "@/lib/liquity-v1/event-provenance";
 import { formatUsdValue } from "@/lib/utils/format";
 
@@ -127,15 +128,21 @@ export function LiquityV1PositionCard({
           identity={meta}
           closedAt={v.lastActivityAt}
           collateralLabel={claimable ? "Claimable collateral" : undefined}
+          outcomeFollows={!!claimable}
           collateralFootnote={
-            claimable && claimableUsd != null ? (
-              <div className="text-xs mt-0.5 min-h-[1rem]">
-                <span className="inline-flex items-center font-bold text-green-400 border-l-2 border-r-2 border-green-400 rounded-sm px-1 py-0">
-                  <Prov info={surplusUsdProv(claimable.claimable, priceUsd as number)}>
-                    {formatUsdValue(claimableUsd)}
-                  </Prov>
-                </span>
-              </div>
+            claimable ? (
+              <>
+                {claimableUsd != null && (
+                  <div className="text-xs mt-0.5 min-h-[1rem]">
+                    <span className="inline-flex items-center font-bold text-green-400 border-l-2 border-r-2 border-green-400 rounded-sm px-1 py-0">
+                      <Prov info={surplusUsdProv(claimable.claimable, priceUsd as number)}>
+                        {formatUsdValue(claimableUsd)}
+                      </Prov>
+                    </span>
+                  </div>
+                )}
+                <div className="text-xs text-rb-500 mt-0.5">{CLAIMABLE_WHERE}</div>
+              </>
             ) : undefined
           }
           collateral={

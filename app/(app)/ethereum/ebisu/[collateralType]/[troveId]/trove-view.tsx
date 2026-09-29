@@ -31,7 +31,11 @@ import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { isEbisuEvent } from "@/lib/shared/types/event-shape";
+import { isCollSurplusClaimEvent, isEbisuEvent } from "@/lib/shared/types/event-shape";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { collSurplusClaimEvent } from "@/lib/shared/liquity-coll-surplus-claim";
+import { CollSurplusClaimCard } from "@/components/protocol/liquity-family/coll-surplus-claim-card";
+import { EBISU_FORK } from "@/components/protocol/ebisu/ebisu-event-card";
 import type { EbisuTroveSummary } from "@/lib/sources/api/ebisu-troves";
 import { fetchEbisuTroves } from "@/lib/api/fetch-ebisu-troves";
 import {
@@ -255,15 +259,52 @@ export default function EbisuTroveDetail({
     [ebisuEvents, servedFolders],
   );
 
+  const lastLiq = ebisuEvents.find((e) => e.context.data.eventType === "liquidate");
+  // The liquidation's surplus at the head: claimable or claimed (the index
+  // records the credit, never the claim).
+  const surplus = useLiquityCollSurplus({
+    protocol: "ebisu",
+    branch: collateralType,
+    owner: view?.status === "liquidated" ? (view.lastOwner ?? view.owner) : null,
+    liquidationTx: lastLiq?.txHash,
+  });
+
+  // The claim that paid the surplus out, as its own row (the index has none):
+  // added to the served rows, so it is numbered, filtered and exported.
+  const claimRow = useMemo(
+    () =>
+      collSurplusClaimEvent({
+        source: surplus,
+        family: "ebisu",
+        protocolName: "Ebisu",
+        chainId: MAINNET_CHAIN_ID,
+        symbol: view?.collateralType ?? collateralType,
+        owner: view?.lastOwner ?? view?.owner,
+        creditTx: lastLiq?.txHash,
+        creditKind: "liquidation",
+        creditAt: lastLiq?.timestamp ?? null,
+      }),
+    [surplus, view?.collateralType, collateralType, view?.lastOwner, view?.owner, lastLiq],
+  );
+  const timelineEvents = useMemo(() => (claimRow ? [...ebisuEvents, claimRow] : ebisuEvents), [ebisuEvents, claimRow]);
+  const timelineRows = useMemo(
+    () => (servedRows && claimRow ? [...servedRows, { kind: "event" as const, event: claimRow }] : servedRows),
+    [servedRows, claimRow],
+  );
+  const timelineTail = useMemo(
+    () => (groupedTail && claimRow ? { ...groupedTail, eventsServed: groupedTail.eventsServed + 1 } : groupedTail),
+    [groupedTail, claimRow],
+  );
+
   // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
   // Decision 0019, amendments 2026-09-24 and 2026-09-25: a month the loaded
   // rows do not hold is read from the index as its segment
   // (hooks/useTimelineSegment.ts). The preload stays the page's whole-history
   // record; the timeline alone swaps.
   const { tl, segments, readFolderMembers } = useTimelineSegment({
-    events: ebisuEvents,
-    groupedTail,
-    servedRows,
+    events: timelineEvents,
+    groupedTail: timelineTail,
+    servedRows: timelineRows,
     servedFolders,
     opening,
     historyWindow,
@@ -373,15 +414,6 @@ export default function EbisuTroveDetail({
   // Terminal narration: the ending mechanism is exact on this fork (closed =
   // the owner's closeTrove; liquidated = the liquidation), and the seizure legs
   // come from the life's own liquidate event once the timeline lands.
-  const lastLiq = ebisuEvents.find((e) => e.context.data.eventType === "liquidate");
-  // The liquidation's surplus at the head: claimable or claimed (the index
-  // records the credit, never the claim).
-  const surplus = useLiquityCollSurplus({
-    protocol: "ebisu",
-    branch: collateralType,
-    owner: view?.status === "liquidated" ? (view.lastOwner ?? view.owner) : null,
-    liquidationTx: lastLiq?.txHash,
-  });
   const terminalPane =
     view && view.status !== "open" ? (
       <LiquityForkClosedExplanation
@@ -423,6 +455,7 @@ export default function EbisuTroveDetail({
             // A grouped page's `events` hold only the ungrouped rows, so its
             // CSV reads the whole history too.
             fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
+            claimRow={claimRow}
             history={markdownHistoryScope(historyWindow, ebisuEvents, servedFolders)}
             scopeNote={exportScopeNote(historyWindow, ebisuEvents, "this Trove's whole history", servedFolders)}
           />
@@ -510,7 +543,16 @@ export default function EbisuTroveDetail({
               ) : undefined
             }
             renderCard={(event, meta) =>
-              isEbisuEvent(event) ? (
+              isCollSurplusClaimEvent(event) ? (
+                <CollSurplusClaimCard
+                  event={event}
+                  isFirst={meta.isFirst}
+                  isLast={meta.isLast}
+                  eventNumber={meta.eventNumber}
+                  persistPrefix="ebisu"
+                  fork={EBISU_FORK}
+                />
+              ) : isEbisuEvent(event) ? (
                 <EbisuEventCard
                   event={event}
                   eventNumber={meta.eventNumber}

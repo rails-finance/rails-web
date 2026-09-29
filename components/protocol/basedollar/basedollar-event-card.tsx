@@ -46,7 +46,7 @@ import {
 import { DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
 
 // The one live-verified Basedollar link (docs.basedollar.money doesn't answer).
-const BASEDOLLAR_FORK = {
+export const BASEDOLLAR_FORK = {
   protocolName: "Basedollar",
   stablecoin: DEBT_SYMBOL,
   docsLink: { label: "Basedollar", url: "https://basedollar.money" },

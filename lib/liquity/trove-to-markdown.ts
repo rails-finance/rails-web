@@ -18,7 +18,8 @@ import type { TroveStateData } from "@/types/api/troveState";
 import type { OraclePricesData } from "@/types/api/oracle";
 import { formatExact } from "@/lib/utils/format";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { isLiquityEvent } from "@/lib/shared/types/event-shape";
+import { isCollSurplusClaimEvent, isLiquityEvent } from "@/lib/shared/types/event-shape";
+import { claimMarkdownLabel } from "@/lib/shared/liquity-coll-surplus-claim";
 import { getLiquidationThreshold } from "@/lib/utils/liquidation-utils";
 import {
   anchorMarketNotes,
@@ -320,6 +321,11 @@ function timelineTable(
   out.push(`| # | Date | Action | Debt after (BOLD) | Collateral after (${collateralType}) | Transaction |`);
   out.push("|---|------|--------|-------------------|------------------------|-------------|");
   events.forEach((e, i) => {
+    if (isCollSurplusClaimEvent(e)) {
+      const tx = e.etherscanUrl ? `[${e.txHash.slice(0, 10)}…](${e.etherscanUrl})` : e.txHash.slice(0, 10) + "…";
+      out.push(`| ${i + 1} | ${fmtUtc(e.timestamp)} | ${claimMarkdownLabel(e.context.data)} | — | — | ${tx} |`);
+      return;
+    }
     if (!isLiquityEvent(e)) return;
     const d = e.context.data;
     const debtAfter = d.stateAfter ? num(d.stateAfter.debt, 2) : "—";

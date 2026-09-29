@@ -372,7 +372,8 @@ export function LiquityV1ClosedEpochExplanation({
                 <AmountText value={surplus.claimable} /> ETH
               </H>
             </Prov>{" "}
-            is still in the CollSurplusPool, waiting for the owner to claim it.
+            is still in the CollSurplusPool, waiting for the owner to claim it: the owner&apos;s wallet calls
+            claimCollateral() on BorrowerOperations, which pays out the whole balance.
           </>
         )}
       </span>,

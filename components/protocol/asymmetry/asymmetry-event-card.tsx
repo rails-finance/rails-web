@@ -48,7 +48,7 @@ import { DEBT_SYMBOL, ASYMMETRY_DOCS } from "@/lib/asymmetry/asset-catalog";
 // The general Asymmetry docs link plus the question-level docs links per card
 // topic (ASYMMETRY_DOCS — read and verified against docs.asymmetry.finance,
 // 2026-09-28, Miles's OK).
-const ASYMMETRY_FORK = {
+export const ASYMMETRY_FORK = {
   protocolName: "Asymmetry",
   stablecoin: DEBT_SYMBOL,
   docsLink: { label: "Asymmetry docs", url: "https://docs.asymmetry.finance" },

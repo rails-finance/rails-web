@@ -4225,3 +4225,44 @@ export function aaveVaultFlowsContent(assetSymbol: string, shareSymbol: string):
     ],
   };
 }
+
+// ── Liquity family — claiming a collateral surplus ───────────────────────────
+
+/** The "?" on a Trove's "Claim collateral" row: what the CollSurplusPool holds
+ *  and what claimCollateral() pays. Shared by Liquity V2, its forks and
+ *  Liquity V1; each passes its own name and links. */
+export function liquityCollSurplusClaimContent(
+  p:
+    | { family: "liquity-v2"; protocolName: string }
+    | { family: "liquity-v1"; protocolName: string }
+    | { family: "fork"; fork: LiquityForkLearnMoreParams },
+): LearnMoreContent {
+  const v1 = p.family === "liquity-v1";
+  const name = p.family === "fork" ? p.fork.protocolName : p.protocolName;
+  const links =
+    p.family === "liquity-v1"
+      ? [V1_SRC.liquidations, V1_SRC.redemptions, V1_SRC.bo]
+      : p.family === "fork"
+        ? forkLinks(p.fork, "liquidation")
+        : [
+            {
+              label: "How do liquidations work?",
+              url: "https://docs.liquity.org/v2-faq/borrowing-and-liquidations#how-do-liquidations-work-in-liquity-v2",
+            },
+          ];
+  return {
+    title: "How Claiming Collateral Works",
+    intro: v1
+      ? `When a liquidation in Recovery Mode takes less than all of a Trove's ETH, or redemptions cancel its whole debt, the ETH left over does not go back to the owner's wallet. ${name} credits it to the owner in the CollSurplusPool, which holds it until the owner calls claimCollateral() on BorrowerOperations.`
+      : `When a liquidation takes less collateral than the Trove holds, the rest does not go back to the owner's wallet. ${name} credits it to the owner in the collateral branch's CollSurplusPool, which holds it until the owner calls claimCollateral() on BorrowerOperations.`,
+    stepsHeading: "How the pool pays out:",
+    steps: [
+      v1
+        ? "The pool keeps one balance per owner. Each Trove that closes this way adds its leftover ETH to it."
+        : "The pool keeps one balance per owner on each branch. Each Trove liquidated with collateral to spare adds its leftover to it.",
+      "claimCollateral() pays the whole balance to the owner in one transaction, so one claim can cover several Troves.",
+      "The balance does not change while it waits: it earns nothing and nobody else can take it.",
+    ],
+    links,
+  };
+}

@@ -31,8 +31,8 @@ export function SurplusBullet({ surplus, symbol }: { surplus: LiquityTroveSurplu
           {formatNum(surplus.claimable, 4)} {symbol}
         </span>
       </Prov>{" "}
-      of surplus collateral in the branch&apos;s CollSurplusPool. The owner can claim it with claimCollateral() on
-      BorrowerOperations
+      of surplus collateral in the branch&apos;s CollSurplusPool. The owner&apos;s wallet claims it by calling
+      claimCollateral() on BorrowerOperations, which pays out the whole balance
     </span>
   );
 }

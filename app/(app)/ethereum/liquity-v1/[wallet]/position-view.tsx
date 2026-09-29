@@ -19,7 +19,10 @@ import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { isLiquityV1Event } from "@/lib/shared/types/event-shape";
+import { isCollSurplusClaimEvent, isLiquityV1Event } from "@/lib/shared/types/event-shape";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { collSurplusClaimEvent } from "@/lib/shared/liquity-coll-surplus-claim";
+import { CollSurplusClaimCard } from "@/components/protocol/liquity-family/coll-surplus-claim-card";
 import { fetchLiquityV1Positions } from "@/lib/api/fetch-liquity-v1-positions";
 import { fetchLiquityV1Timeline } from "@/lib/api/fetch-liquity-v1-timeline";
 import { fetchLiquityV1Position, type LiquityV1PositionChainResponse } from "@/lib/api/fetch-liquity-v1-position";
@@ -248,7 +251,38 @@ export default function LiquityV1TroveView({
       })(),
     [wallet, selectedEpoch],
   );
-  const tl = useTimelineEvents(v1Events, {
+  // A closed life that ended in a full redemption or a liquidation may have left
+  // ETH in the CollSurplusPool: read it (claimable, or claimed) for the card.
+  const lastRow = v1Events.length > 0 ? v1Events[v1Events.length - 1] : null;
+  const closingTx =
+    view && view.status !== "open" && lastRow
+      ? lastRow.context.data.eventType === "liquidation" ||
+        (lastRow.context.data.eventType === "redemption" && Number(lastRow.context.data.debtAfter) <= 1e-9)
+        ? lastRow.txHash
+        : null
+      : null;
+  const surplus = useLiquityV1Surplus(closingTx, wallet);
+  // The claim that paid that ETH out, as its own row (the index has none).
+  // The read builds a fresh object each render, so the row is keyed on the
+  // claim itself.
+  const claimNow = collSurplusClaimEvent({
+    source: surplus,
+    family: "liquity-v1",
+    protocolName: "Liquity V1",
+    chainId: MAINNET_CHAIN_ID,
+    symbol: "ETH",
+    owner: wallet,
+    creditTx: closingTx,
+    creditKind: lastRow?.context.data.eventType === "liquidation" ? "liquidation" : "redemption",
+    creditAt: lastRow?.timestamp ?? null,
+  });
+  const claimKey = claimNow
+    ? `${claimNow.id}:${claimNow.context?.protocol === "liquity-coll-surplus-claim" ? claimNow.context.data.paidRaw : ""}`
+    : null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const claimRow = useMemo(() => claimNow, [claimKey]);
+  const timelineEvents = useMemo(() => (claimRow ? [...v1Events, claimRow] : v1Events), [v1Events, claimRow]);
+  const tl = useTimelineEvents(timelineEvents, {
     storageKey: `liquity-v1-${wallet}-${selectedEpoch ?? "all"}`,
     protocolKey: "liquity-v1",
     window: historyWindow,
@@ -290,17 +324,6 @@ export default function LiquityV1TroveView({
   // is primary truth on the detail page. The tower keeps the replayed view —
   // its lifetime flows reconcile against the recorded absolutes and its
   // receipts declare that basis.
-  // A closed life that ended in a full redemption or a liquidation may have left
-  // ETH in the CollSurplusPool: read it (claimable, or claimed) for the card.
-  const lastRow = v1Events.length > 0 ? v1Events[v1Events.length - 1] : null;
-  const closingTx =
-    view && view.status !== "open" && lastRow
-      ? lastRow.context.data.eventType === "liquidation" ||
-        (lastRow.context.data.eventType === "redemption" && Number(lastRow.context.data.debtAfter) <= 1e-9)
-        ? lastRow.txHash
-        : null
-      : null;
-  const surplus = useLiquityV1Surplus(closingTx, wallet);
   // A liquidated life's outcome for its owner needs every draw of the life, so
   // it is read only on a page holding the whole history.
   const liquidatedWhole = view?.status === "liquidated" && historyWindow.state === "whole";
@@ -363,6 +386,7 @@ export default function LiquityV1TroveView({
             events={v1Events}
             csvFilename={`liquity-v1-${wallet.slice(0, 10)}-activity.csv`}
             fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
+            claimRow={claimRow}
             history={markdownHistoryScope(historyWindow, v1Events)}
             scopeNote={exportScopeNote(historyWindow, v1Events, "this wallet's whole history")}
           />
@@ -476,7 +500,15 @@ export default function LiquityV1TroveView({
               ) : undefined
             }
             renderCard={(event, meta) =>
-              isLiquityV1Event(event) ? (
+              isCollSurplusClaimEvent(event) ? (
+                <CollSurplusClaimCard
+                  event={event}
+                  isFirst={meta.isFirst}
+                  isLast={meta.isLast}
+                  eventNumber={meta.eventNumber}
+                  persistPrefix="liquity-v1"
+                />
+              ) : isLiquityV1Event(event) ? (
                 <LiquityV1EventCard
                   event={event}
                   eventNumber={meta.eventNumber}
