@@ -63,10 +63,14 @@ import {
   sidesOf,
 } from "@/lib/liquity-v1/event-figures";
 import type { LiquityV1EventRead, LiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
+import type { LiquityV1LiquidationRead } from "@/lib/sources/chain/liquity-v1-event";
+import type { LiquityV1NearLine, LiquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
 
 /** A leg below this magnitude reads as empty — a full repay or a full sweep
  *  leaves the emitted absolute at (or a hair above) zero. */
 export const LIQUITY_V1_EPS = 1e-9;
+/** An ETH figure below this rounds to nothing at four places. */
+const EPS_ETH = 5e-5;
 
 // ── resulting state ──────────────────────────────────────────────────────────
 
@@ -127,6 +131,11 @@ export interface LiquityV1ClauseReads {
   price?: number | null;
   /** The PriceFeed price now. */
   currentPrice?: number | null;
+  /** The receipt read is still on its way: the liquidation's route waits for
+   *  it rather than falling back to the general description. */
+  readPending?: boolean;
+  /** On a liquidation, what the Trove's life left its owner. */
+  ownerOutcome?: LiquityV1OwnerOutcome | null;
 }
 
 const muted = (children: ReactNode) => <strong className="font-semibold text-foreground">{children}</strong>;
@@ -136,7 +145,7 @@ export function liquityV1EventSlots(
   coords: LiquityV1Coords,
   reads: LiquityV1ClauseReads = {},
 ): EventProseSlots {
-  const { read, surplus, price, currentPrice } = reads;
+  const { read, surplus, price, currentPrice, readPending, ownerOutcome } = reads;
   const rs = resultingState(ctx);
   const s = sidesOf(ctx);
   const coll = s.collDelta;
@@ -398,7 +407,7 @@ export function liquityV1EventSlots(
                     <Fig info={liqRouteProv(coords, "stability pool debt")} symbol={DEBT_SYMBOL}>
                       {fmtLusd(n(l.stabilityPoolDebt))} {DEBT_SYMBOL}
                     </Fig>{" "}
-                    of its deposits to cancel the debt and received{" "}
+                    of its deposits to clear the debt and received{" "}
                     <Fig info={liqRouteProv(coords, "stability pool eth")} symbol={COLLATERAL_SYMBOL}>
                       {fmtEth(n(l.stabilityPoolEth))} {COLLATERAL_SYMBOL}
                     </Fig>
@@ -435,28 +444,33 @@ export function liquityV1EventSlots(
                   </>,
                 )
               : null,
+            l.recoveryMode ? null : clause(<>The system was not in Recovery Mode.</>),
           ]
-        : [
-            clause(
-              <>
-                The Stability Pool cancels the debt with its LUSD deposits and receives the ETH; debt it cannot cover is
-                shared out to the other open Troves. The liquidator is paid the 200 LUSD reserve and 0.5% of the ETH.
-              </>,
-            ),
-          ];
+        : readPending
+          ? []
+          : [
+              clause(
+                <>
+                  The Stability Pool clears the debt with its LUSD deposits and receives the ETH; debt it cannot cover
+                  is shared out to the other open Troves. The liquidator is paid the 200 LUSD reserve and 0.5% of the
+                  ETH.
+                </>,
+              ),
+            ];
       return {
         happened: [
           clause(
             <>
-              The Trove was liquidated: {collDeltaFig()} of collateral was seized and {debtDeltaFig()} of debt
-              cancelled.
+              The Trove was liquidated: {collDeltaFig()} of collateral was seized and {debtDeltaFig()} of debt cleared.
             </>,
           ),
         ],
         changed: [liquidationWhyClause(ctx), ...route],
         meansNow: [
           valuedLiquidationSentence(ctx, coords),
-          clause(<>The owner keeps the LUSD they borrowed and gets none of the seized ETH back.</>),
+          ...(ownerOutcome
+            ? liquityV1OutcomeSentences(ownerOutcome, muted, true).map((sentence) => clause(sentence))
+            : [clause(<>The owner keeps the LUSD they borrowed and gets none of the seized ETH back.</>)]),
         ],
       };
     }
@@ -503,15 +517,16 @@ export function liquityV1EventSlots(
               const netVals = { debt: String(split.lusdRedeemed), eth: String(split.ethToRedeemer) };
               return clause(
                 <>
-                  The owner&rsquo;s net outcome is{" "}
+                  The owner&rsquo;s net outcome is the debt cancelled minus the value of the ETH given up:{" "}
+                  {fmtUsd(split.lusdRedeemed)} &minus; {fmtEth(split.ethToRedeemer)} {COLLATERAL_SYMBOL} &times;{" "}
+                  {fmtUsd(split.price)} ={" "}
                   <Fig info={redemptionNetProv(coords, { ...netVals, priceUsd: split.price, when: "redemption" })}>
                     {fmtUsdSigned(Math.abs(atRedemption) < 0.005 ? 0 : atRedemption)}
                   </Fig>{" "}
                   at the redemption price
                   {today != null && (
                     <>
-                      {" "}
-                      and{" "}
+                      , or{" "}
                       <Fig
                         info={redemptionNetProv(coords, {
                           ...netVals,
@@ -521,10 +536,8 @@ export function liquityV1EventSlots(
                       >
                         {fmtUsdSigned(today)}
                       </Fig>{" "}
-                      at today&rsquo;s {fmtUsd(currentPrice as number)}:{" "}
-                      {today < 0
-                        ? "the ETH taken is worth more now than the debt it cancelled"
-                        : "the ETH taken is worth less now than the debt it cancelled"}
+                      at today&rsquo;s ETH price of {fmtUsd(currentPrice as number)}, the difference from having held
+                      that ETH
                     </>
                   )}
                   .
@@ -687,4 +700,132 @@ function valuedLiquidationSentence(ctx: LiquityV1Context, coords: LiquityV1Coord
  *  trailing continuations). */
 export function liquityV1ExplainerTeaser(ctx: LiquityV1Context, coords: LiquityV1Coords): ReactNode | null {
   return splitLead(eventClauses(liquityV1EventSlots(ctx, coords))).lead;
+}
+
+// ── a liquidated life's outcome for its owner ────────────────────────────────
+//
+// Shared by the liquidation's opened card and the closed Trove's card, each
+// passing its own highlight. Figures only: what the owner kept, withdrew and
+// lost, where the debt and ETH went, and, where the owner's last act took the
+// ratio to the line, the two ratios side by side.
+
+type Hl = (children: ReactNode) => ReactNode;
+
+const andJoin = (parts: ReactNode[]): ReactNode =>
+  parts.map((p, i) => (
+    <span key={i}>
+      {i > 0 && (i === parts.length - 1 ? (parts.length > 2 ? ", and " : " and ") : ", ")}
+      {p}
+    </span>
+  ));
+
+const actNoun = (kinds: LiquityV1NearLine["kinds"]): string =>
+  kinds.includes("withdraw") && kinds.includes("borrow")
+    ? "withdrawal and borrow"
+    : kinds.includes("withdraw")
+      ? "withdrawal"
+      : "borrow";
+
+/** What the owner kept, withdrew and lost, and the near-line pair when there
+ *  is one: one sentence each. */
+export function liquityV1OutcomeSentences(
+  o: LiquityV1OwnerOutcome,
+  hl: Hl,
+  /** The surface already values the seized ETH (the liquidation's own card). */
+  valued = false,
+): ReactNode[] {
+  const out: ReactNode[] = [];
+  const kept = o.lusdReceived - o.lusdRepaid;
+  const lusd = (n: number) => hl(`${fmtLusd(n)} ${DEBT_SYMBOL}`);
+  const eth = (n: number) => hl(`${fmtEth(n)} ${COLLATERAL_SYMBOL}`);
+  out.push(
+    kept > 0.005 && o.lusdRepaid > 0.005 ? (
+      <>
+        The owner kept {lusd(kept)}: {fmtLusd(o.lusdReceived)} received over the Trove&rsquo;s life less{" "}
+        {fmtLusd(o.lusdRepaid)} repaid.
+      </>
+    ) : kept > 0.005 ? (
+      <>The owner kept the {lusd(o.lusdReceived)} received over the Trove&rsquo;s life.</>
+    ) : (
+      <>
+        The owner received {lusd(o.lusdReceived)} over the Trove&rsquo;s life and repaid {lusd(o.lusdRepaid)}.
+      </>
+    ),
+  );
+  const lost = valued ? (
+    eth(o.ethLost)
+  ) : (
+    <>
+      {eth(o.ethLost)}, worth {hl(fmtUsd(o.ethLost * o.liquidationPrice))} at the liquidation price of{" "}
+      {fmtUsd(o.liquidationPrice)}
+    </>
+  );
+  const parts: ReactNode[] = [];
+  if (o.ethWithdrawn > EPS_ETH) parts.push(<>the owner withdrew {eth(o.ethWithdrawn)}</>);
+  if (o.ethRedeemed > EPS_ETH) parts.push(<>redemptions took {eth(o.ethRedeemed)}</>);
+  parts.push(<>the liquidation took {lost}</>);
+  out.push(
+    parts.length > 1 ? (
+      <>Over its life {andJoin(parts)}.</>
+    ) : (
+      <>The owner withdrew no ETH over the Trove&rsquo;s life, and the liquidation took {lost}.</>
+    ),
+  );
+  const n = o.nearLine;
+  if (n) {
+    const act = formatDate(n.timestamp);
+    const at = formatDate(n.liquidationTimestamp);
+    out.push(
+      <>
+        The {actNoun(n.kinds)} on {act} left the ratio at {hl(fmtPct(n.ratioAfter))}; the Trove was liquidated at{" "}
+        {hl(fmtPct(n.liquidationRatio))} {act === at ? "the same day" : <>on {at}</>}.
+      </>,
+    );
+  }
+  return out;
+}
+
+/** Where a liquidation's debt and ETH went, and whether the system was in
+ *  Recovery Mode: one sentence each. */
+export function liquityV1RouteSentences(l: LiquityV1LiquidationRead, hl: Hl): ReactNode[] {
+  const n = (v: string) => Number(v);
+  const out: ReactNode[] = [];
+  const spDebt = n(l.stabilityPoolDebt);
+  const rdDebt = n(l.redistributedDebt);
+  const rdEth = n(l.redistributedEth);
+  if (spDebt > 0)
+    out.push(
+      <>
+        The Stability Pool burned {hl(`${fmtLusd(spDebt)} ${DEBT_SYMBOL}`)} to clear the debt and received{" "}
+        {hl(`${fmtEth(n(l.stabilityPoolEth))} ${COLLATERAL_SYMBOL}`)}.
+      </>,
+    );
+  if (rdDebt > 0 || rdEth > 0)
+    out.push(
+      <>
+        {spDebt > 0 ? "What the Stability Pool could not cover" : "The Stability Pool covered none of it"},{" "}
+        {hl(`${fmtLusd(rdDebt)} ${DEBT_SYMBOL}`)} of debt and {hl(`${fmtEth(rdEth)} ${COLLATERAL_SYMBOL}`)}, was shared
+        out to the other open Troves.
+      </>,
+    );
+  out.push(
+    <>
+      The liquidator was paid {fmtLusd(n(l.liquidatorLusd))} {DEBT_SYMBOL} and {fmtEth(n(l.liquidatorEth))}{" "}
+      {COLLATERAL_SYMBOL}.
+    </>,
+  );
+  if (l.trovesInTx > 1)
+    out.push(
+      <>
+        The transaction liquidated {l.trovesInTx} Troves at once, so these amounts are its totals across all of them.
+      </>,
+    );
+  out.push(
+    l.recoveryMode ? (
+      <>The system was in Recovery Mode: its total collateral ratio was below 150%.</>
+    ) : (
+      <>The system was not in Recovery Mode.</>
+    ),
+  );
+  return out;
 }

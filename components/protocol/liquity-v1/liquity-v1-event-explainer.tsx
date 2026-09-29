@@ -21,7 +21,8 @@ import {
 } from "@/lib/shared/learn-more-content";
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { liquityV1EventSlots } from "@/lib/liquity-v1/explainer-clauses";
-import { useLiquityV1EventRead, useLiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
+import { useLiquityV1EventReadState, useLiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
+import type { LiquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
 import { adjustKinds, redemptionSplit } from "@/lib/liquity-v1/event-figures";
 import { liquityV1EventPrice } from "./liquity-v1-event-detail";
 
@@ -35,6 +36,8 @@ export interface LiquityV1EventExplainerProps {
   currentPrice?: number | null;
   /** The card shows the lead sentence as the teaser; render only the rest here. */
   skipLead?: boolean;
+  /** On a liquidation, what the Trove's life left its owner. */
+  ownerOutcome?: LiquityV1OwnerOutcome | null;
 }
 
 /** Mechanic modal content for this event — never-empty floor: every event type
@@ -69,14 +72,17 @@ export function LiquityV1EventExplainer({
   wallet,
   currentPrice,
   skipLead,
+  ownerOutcome,
 }: LiquityV1EventExplainerProps) {
   const coords: LiquityV1Coords = { txHash, blockNumber };
   // The same reads the opened grid makes; the hooks share one request each.
-  const read = useLiquityV1EventRead(txHash, wallet);
+  const { read, pending: readPending } = useLiquityV1EventReadState(txHash, wallet);
   const wantsSurplus = ctx.eventType === "liquidation" || redemptionSplit(ctx)?.full === true;
   const surplus = useLiquityV1Surplus(wantsSurplus ? txHash : null, wantsSurplus ? wallet : null);
   const price = liquityV1EventPrice(ctx, read);
-  const clauses = eventClauses(liquityV1EventSlots(ctx, coords, { read, surplus, price, currentPrice }));
+  const clauses = eventClauses(
+    liquityV1EventSlots(ctx, coords, { read, surplus, price, currentPrice, readPending, ownerOutcome }),
+  );
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;

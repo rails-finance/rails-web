@@ -24,6 +24,9 @@ import { LearnMore } from "@/components/shared/learn-more-modal";
 import { liquityV1LiquidationContent } from "@/lib/shared/learn-more-content";
 import { surplusClaimableProv } from "@/lib/liquity-v1/event-provenance";
 import type { LiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
+import type { LiquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
+import { liquityV1OutcomeSentences, liquityV1RouteSentences } from "@/lib/liquity-v1/explainer-clauses";
+import { fmtPct } from "@/lib/liquity-v1/event-figures";
 
 const DUST = 1e-9;
 
@@ -210,7 +213,7 @@ export function LiquityV1SupersededExplanation({ chain }: { chain: LiquityV1Posi
     ) : chain.troveStatus === "closedByLiquidation" ? (
       <>
         was <H>liquidated</H> — its collateral ratio fell below the protocol&rsquo;s liquidation threshold, the ETH
-        collateral seized and the LUSD debt cancelled
+        collateral seized and the LUSD debt cleared
       </>
     ) : (
       <>
@@ -256,6 +259,8 @@ export function LiquityV1ClosedEpochExplanation({
   openedAt,
   lastAction,
   surplus,
+  ownerOutcome,
+  outcomePending,
 }: {
   v: LiquityV1PositionView;
   /** Unix seconds of the life's first captured event — the "active from"
@@ -267,6 +272,11 @@ export function LiquityV1ClosedEpochExplanation({
   lastAction?: string | null;
   /** ETH the closing left in the CollSurplusPool, with its claim status. */
   surplus?: LiquityV1Surplus | null;
+  /** A liquidated life: what it left its owner and where the liquidation's
+   *  debt and ETH went. */
+  ownerOutcome?: LiquityV1OwnerOutcome | null;
+  /** The outcome's reads are still on their way. */
+  outcomePending?: boolean;
 }) {
   if (v.status !== "closed" && v.status !== "liquidated") return null;
   const liquidated = v.status === "liquidated";
@@ -295,11 +305,33 @@ export function LiquityV1ClosedEpochExplanation({
 
   const bullets: React.ReactNode[] = [];
 
+  const hl = (children: React.ReactNode) => <H>{children}</H>;
+  const route = ownerOutcome?.route ?? null;
   bullets.push(
-    liquidated ? (
+    liquidated && ownerOutcome && route ? (
+      <span key="outcome">
+        {ownerOutcome.liquidationRatio != null && (
+          <>
+            Its collateral ratio was {hl(fmtPct(ownerOutcome.liquidationRatio))} at liquidation
+            {ownerOutcome.liquidationRatio < 1.1 ? ", below the 110% minimum" : ""}.{" "}
+          </>
+        )}
+        {liquityV1RouteSentences(route, hl).map((sentence, i) => (
+          <span key={i}>
+            {i > 0 && " "}
+            {sentence}
+          </span>
+        ))}
+      </span>
+    ) : liquidated && outcomePending ? (
       <span key="outcome">
         Its collateral ratio fell below the level at which it could be liquidated: the ETH collateral was seized and the
-        LUSD debt cancelled, by the Stability Pool or shared out to other Troves. The owner kept the LUSD borrowed.
+        LUSD debt cleared.
+      </span>
+    ) : liquidated ? (
+      <span key="outcome">
+        Its collateral ratio fell below the level at which it could be liquidated: the ETH collateral was seized and the
+        LUSD debt cleared, by the Stability Pool or shared out to other Troves. The owner kept the LUSD borrowed.
       </span>
     ) : redeemed ? (
       <span key="outcome">
@@ -313,6 +345,11 @@ export function LiquityV1ClosedEpochExplanation({
       </span>
     ),
   );
+
+  if (liquidated && ownerOutcome)
+    liquityV1OutcomeSentences(ownerOutcome, hl).forEach((sentence, i) =>
+      bullets.push(<span key={`owner-${i}`}>{sentence}</span>),
+    );
 
   if (surplus) {
     bullets.push(

@@ -246,7 +246,7 @@ export const liqPremiumProv = (
   pclass: "oracle",
   formula: "seized ÷ cleared − 1",
   verify: txVerify(coords),
-  summary: `The premium realized on this liquidation — seized collateral value over cleared debt, minus one. Because V1 wipes the whole trove, this is exactly the trove's collateral ratio at fire minus 100%: what the Stability Pool depositors (or, in a redistribution, the surviving troves) gained for absorbing the debt. A trove liquidates below the 110% minimum, so the premium tops out near +10%.`,
+  summary: `The premium realized on this liquidation — seized collateral value over cleared debt, minus one. Because V1 wipes the whole trove, this is exactly the trove's collateral ratio at liquidation minus 100%: what the Stability Pool depositors (or, in a redistribution, the surviving troves) gained for absorbing the debt. A trove liquidates below the 110% minimum, so the premium tops out near +10%.`,
   contract: TROVE_MANAGER,
   via: "seized ÷ cleared − 1 · both legs at the block's own figures",
   inputs: [
@@ -461,7 +461,7 @@ export const liqRouteProv = (
   verify: txVerify(coords),
   summary: {
     "stability pool debt":
-      "Debt the Stability Pool cancelled — the LUSD burned out of the Stability Pool in this liquidation, from the LUSD token's Transfer log into the zero address.",
+      "Debt the Stability Pool cleared — the LUSD burned out of the Stability Pool in this liquidation, from the LUSD token's Transfer log into the zero address.",
     "stability pool eth":
       "ETH the Stability Pool received — the ActivePool's EtherSent log to the Stability Pool in this liquidation. Its depositors share it in proportion to their deposits.",
     liquidator:

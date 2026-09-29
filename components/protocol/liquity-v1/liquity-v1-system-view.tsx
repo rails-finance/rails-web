@@ -223,7 +223,7 @@ function StabilityPoolCard({ data }: { data: LiquityV1SystemChainResponse }) {
       )}
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-        A liquidated Trove&rsquo;s debt is cancelled against these deposits and its ETH handed to the depositors, at a
+        A liquidated Trove&rsquo;s debt is cleared against these deposits and its ETH handed to the depositors, at a
         discount. What the pool can&rsquo;t absorb is redistributed to the remaining Troves instead — collateral and
         debt both — so the pool&rsquo;s depth is what stands between a liquidation and everyone else&rsquo;s balance
         sheet. The bar is the whole book against the pool, not a forecast: liquidations arrive one Trove at a time, and

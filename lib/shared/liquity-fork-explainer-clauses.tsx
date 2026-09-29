@@ -956,7 +956,7 @@ function liquidationValued(
     <>
       At the branch&rsquo;s own price at the time ({priceFig} per {coll}) the seized collateral was worth {seizedFig}{" "}
       against {clearedFig} of debt counted at $1 face — a {premiumFig} premium, the Trove&rsquo;s collateral ratio at
-      fire minus 100%
+      liquidation minus 100%
       {ctx.liquidation
         ? null
         : ". It is the most the Stability Pool’s depositors (or the surviving Troves) could realize for absorbing the debt"}

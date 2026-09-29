@@ -75,7 +75,7 @@ export function liquityV1EconomicsExplanation(
     const parts: string[] = [];
     if (repaid) parts.push(`${fig(repaid.amount, null, false, debtSym)} repaid by the owner`);
     if (debtRedeemed) parts.push(`${fig(debtRedeemed.amount, null, false, debtSym)} cancelled by redemptions`);
-    if (debtLiq) parts.push(`${fig(debtLiq.amount, null, false, debtSym)} cancelled in liquidation`);
+    if (debtLiq) parts.push(`${fig(debtLiq.amount, null, false, debtSym)} cleared in liquidation`);
     bullets.push(
       <span key="debt-flow">
         Debt: {strong(fig(debt.lifetimeInflow, null, false, debtSym))} taken on (the LUSD received, the borrowing fees
@@ -99,8 +99,8 @@ export function liquityV1EconomicsExplanation(
           <>
             {" "}
             At today&apos;s {fmtUsd(priceNow as number)} the same ETH is worth {strong(fmtUsd(atToday))}, which is why
-            the Redeemed ETH row reads more than the Redeemed LUSD row: a net{" "}
-            {strong(fmtUsdSigned(redemptions.lusdRedeemed - atToday))} at today&apos;s value.
+            the Redeemed ETH and Redeemed LUSD rows differ: {strong(fmtUsdSigned(redemptions.lusdRedeemed - atToday))}{" "}
+            against having held that ETH.
           </>
         )}
         {redemptions.reserveBurned > 0 && (
@@ -200,11 +200,11 @@ export function liquityV1RedemptionOutcome(t: LiquityV1RedemptionTotals | null, 
       <span>at the redemption prices</span>
       {netNow != null && nowProv && (
         <>
-          <span>or</span>
+          <span>and</span>
           <Prov info={nowProv}>
             <span className={tone(netNow)}>{fmtUsdSigned(netNow)}</span>
           </Prov>
-          <span>at today&apos;s value</span>
+          <span>against having held the ETH</span>
         </>
       )}
     </div>
@@ -217,8 +217,9 @@ const LIQUITY_V1_FAQ = {
   LIQUIDATIONS: "https://docs.liquity.org/liquity-v1/faq/stability-pool-and-liquidations",
 } as const;
 
-/** The tower's "?" for Liquity V1. */
-export function liquityV1EconomicsContent(): LearnMoreContent {
+/** The tower's "?" for Liquity V1. The note on the Redeemed rows shows only
+ *  on a Trove that has them. */
+export function liquityV1EconomicsContent({ redeemed }: { redeemed: boolean }): LearnMoreContent {
   return {
     title: "About the Lifetime Flows",
     intro:
@@ -226,9 +227,13 @@ export function liquityV1EconomicsContent(): LearnMoreContent {
     stepsHeading: "How to read it:",
     steps: [
       "The left bar is collateral (ETH): deposited, then withdrawn by the owner, taken by redemptions, moved to the surplus pool or seized in liquidation, and what is left.",
-      "The right bar is debt (LUSD): taken on, then repaid by the owner, cancelled by redemptions or in liquidation, and what is owed.",
+      "The right bar is debt (LUSD): taken on, then repaid by the owner, cancelled by redemptions or cleared in liquidation, and what is owed.",
       "Dollar values put ETH at today's price from Liquity's PriceFeed and LUSD at $1. A deposit made when ETH was cheaper shows at today's value.",
-      "Because of that, the Redeemed ETH row and the Redeemed LUSD row differ by how far ETH has moved since. At the price of each redemption they were equal; the net outcome beside the heading gives both.",
+      ...(redeemed
+        ? [
+            "Because of that, the Redeemed ETH row and the Redeemed LUSD row differ by how far ETH has moved since. At the price of each redemption they were equal; the net outcome beside the heading gives both.",
+          ]
+        : []),
     ],
     detailsHeading: "Key concepts:",
     details: [

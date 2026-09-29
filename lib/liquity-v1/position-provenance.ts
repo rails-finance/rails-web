@@ -303,7 +303,7 @@ export function stabilityPoolProv(): Provenance {
     pclass: "state",
     verify: STATE_VERIFY,
     summary:
-      "LUSD in the Stability Pool — StabilityPool.getTotalLUSDDeposits at the latest block. This is the protocol's first line against liquidations: a liquidated Trove's debt is cancelled against these deposits and its ETH handed to the depositors. What the pool can't absorb is redistributed to the remaining Troves instead, which is why its depth is a system fact and not a depositor's private one.",
+      "LUSD in the Stability Pool — StabilityPool.getTotalLUSDDeposits at the latest block. This is the protocol's first line against liquidations: a liquidated Trove's debt is cleared against these deposits and its ETH handed to the depositors. What the pool can't absorb is redistributed to the remaining Troves instead, which is why its depth is a system fact and not a depositor's private one.",
     contract: STABILITY_POOL,
     via: `${SYSTEM_VIA} · StabilityPool.getTotalLUSDDeposits @ head · ÷10^18`,
   };

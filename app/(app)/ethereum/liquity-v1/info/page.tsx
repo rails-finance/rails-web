@@ -15,15 +15,12 @@ const intro = (
     <p>
       Liquity V1 is the original interest-free borrowing protocol. A borrower locks ETH in a Trove (a collateralised
       loan) and mints LUSD, a dollar stablecoin, against it, paying a one-time fee instead of interest. A Trove below a
-      110% collateral ratio can be liquidated: the Stability Pool&apos;s LUSD cancels its debt and takes its ETH.
+      110% collateral ratio can be liquidated: the Stability Pool&apos;s LUSD clears its debt and takes its ETH.
       Redemptions, which let anyone swap LUSD for $1 of ETH, reach the Troves with the lowest collateral ratio first. If
       all Troves together fall below 150%, the system enters Recovery Mode, where more Troves can be liquidated and
       borrowing is restricted.
     </p>
-    <div className="flex items-center gap-2">
-      <span className="font-medium text-foreground">About Liquity V1: terms and sources</span>
-      <LearnMore inline content={liquityV1AboutContent()} />
-    </div>
+    <LearnMore inline label="About Liquity V1: terms and sources" content={liquityV1AboutContent()} />
     <p>
       Each row of the listing is one Trove (a collateralised loan): its ETH collateral, its exact LUSD debt, and its
       status. Open Troves show by default — clearing the Status filter brings back six years of closed and liquidated

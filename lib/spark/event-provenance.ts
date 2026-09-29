@@ -439,7 +439,7 @@ export const sparkDebtInterestProv = (sym: string): Provenance => ({
 export const atBlockPriceProv = (sym: string, coords: SparkCoords, priceUsd: number): Provenance => ({
   kind: "chain",
   pclass: "oracle",
-  summary: `${sym} priced in USD by SparkLend's own oracle at this event's block${atBlock(coords)} — the same IAaveOracle the Pool reads to validate liquidations (getAssetPrice, 8-dec USD), called at the block and captured into the index. The price the protocol was using at fire time, not today's price.`,
+  summary: `${sym} priced in USD by SparkLend's own oracle at this event's block${atBlock(coords)} — the same IAaveOracle the Pool reads to validate liquidations (getAssetPrice, 8-dec USD), called at the block and captured into the index. The price the protocol was using at the liquidation, not today's price.`,
   contract: SPARK_ORACLE,
   via: `${SPARK_VIA} · IAaveOracle getAssetPrice at the event's block = $${priceUsd}`,
   inputs: eventInputs(coords),
@@ -493,7 +493,7 @@ export const liqLegUsdProv = (
   kind: "chain-derived",
   pclass: "oracle",
   verify: txVerify(coords),
-  summary: `The ${leg} (${sym}) valued at the block's own oracle price — the LiquidationCall's emitted ${leg === "seized collateral" ? "liquidatedCollateralAmount" : "debtToCover"} × SparkLend's IAaveOracle price captured at this event's block${atBlock(coords)}. What this leg was worth at fire time, at the prices the Pool itself was reading — not at today's prices.`,
+  summary: `The ${leg} (${sym}) valued at the block's own oracle price — the LiquidationCall's emitted ${leg === "seized collateral" ? "liquidatedCollateralAmount" : "debtToCover"} × SparkLend's IAaveOracle price captured at this event's block${atBlock(coords)}. What this leg was worth at the liquidation, at the prices the Pool itself was reading — not at today's prices.`,
   contract: SPARK,
   via: "emitted amount × oracle price at the event's block",
   formula: "amount × price at block",

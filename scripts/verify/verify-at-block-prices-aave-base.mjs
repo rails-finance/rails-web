@@ -146,8 +146,8 @@ async function expandCard(page, n) {
   await page.waitForTimeout(250);
 }
 
-/** The forensics grid's own StatCard for one leg ("Seized, at fire" /
- *  "Cleared, at fire") — scopes a "$" search to that leg alone. Needed
+/** The forensics grid's own StatCard for one leg ("Seized, at liquidation" /
+ *  "Cleared, at liquidation") — scopes a "$" search to that leg alone. Needed
  *  because the snapshot grid above the forensics grid carries its own
  *  after-balance USD chip (lib/aave-v3/event-provenance.ts's
  *  snapshotUsdProv), so an unscoped "$" search on the whole card finds that
@@ -407,7 +407,7 @@ async function runExplorer(x) {
     }
     check(
       `${x.key} ordinary #${n}: no forensics grid on an ordinary row`,
-      (await card.getByText("Seized, at fire").count()) === 0,
+      (await card.getByText("Seized, at liquidation").count()) === 0,
     );
     if (own.page !== page) await own.page.close();
   }
@@ -421,8 +421,8 @@ async function runExplorer(x) {
     const premium = seized / cleared - 1;
     check(
       `${x.key} liquidation #${n}: forensics grid renders (Seized / Cleared / Realized premium)`,
-      (await card.getByText("Seized, at fire").count()) > 0 &&
-        (await card.getByText("Cleared, at fire").count()) > 0 &&
+      (await card.getByText("Seized, at liquidation").count()) > 0 &&
+        (await card.getByText("Cleared, at liquidation").count()) > 0 &&
         (await card.getByText("Realized premium").count()) > 0,
     );
     const premiumEl = card.getByText(/^[+−]\d+\.\d\d%$/).first();
@@ -453,7 +453,7 @@ async function runExplorer(x) {
       (await pills.count()) === 2,
       `${await pills.count()} pill(s)`,
     );
-    const receipt = await openReceiptFor(page, legStatFor(card, "Seized, at fire"), "$");
+    const receipt = await openReceiptFor(page, legStatFor(card, "Seized, at liquidation"), "$");
     check(
       `${x.key} liquidation #${n}: the seized leg's receipt is amount × price at block, no untraced input`,
       !!receipt && /amount × price at block/.test(receipt) && !/Untraced input/.test(receipt),

@@ -2229,11 +2229,20 @@ const V1_RESERVE_DETAIL = {
   sources: [V1_SRC.borrowing, V1_SRC.bo],
 };
 
-/** Recovery Mode, the system state every adjustment modal names. */
+/** Recovery Mode in full: the info modal. The liquidation modal gives it its
+ *  own section. */
 const V1_RECOVERY_DETAIL = {
   bold: "Recovery Mode",
   text: "when the total collateral ratio of all Troves falls below 150%, the system enters Recovery Mode. While it lasts, no collateral can be withdrawn, new debt needs the Trove to end at 150% or more and at a higher ratio than before, closing a Trove is blocked, the borrowing fee is zero, and any Trove below the system's total ratio can be liquidated.",
   sources: [V1_SRC.recovery, V1_SRC.bo],
+};
+
+/** Recovery Mode on an owner's act: what it is, and where its full rules
+ *  are. The act's own rule under Recovery Mode is in the modal's steps. */
+const V1_RECOVERY_SHORT = {
+  bold: "Recovery Mode",
+  text: "the state the system enters when the total collateral ratio of all Troves falls below 150%. Its full rules are under How Liquidation Works.",
+  sources: [V1_SRC.recovery],
 };
 
 export function liquityV1OpenContent(): LearnMoreContent {
@@ -2249,7 +2258,7 @@ export function liquityV1OpenContent(): LearnMoreContent {
       "One address holds one Trove. After it closes, the same address can open another.",
     ],
     detailsHeading: "Key concepts:",
-    details: [V1_RESERVE_DETAIL, V1_RECOVERY_DETAIL],
+    details: [V1_RESERVE_DETAIL, V1_RECOVERY_SHORT],
     links: [V1_SRC.borrowing, V1_SRC.general],
   };
 }
@@ -2269,7 +2278,7 @@ export function liquityV1AdjustContent(kind: LiquityV1AdjustModalKind): LearnMor
           "The same transaction can also borrow or repay LUSD; each part follows its own rules.",
         ],
         detailsHeading: "Key concepts:",
-        details: [V1_RECOVERY_DETAIL],
+        details: [V1_RECOVERY_SHORT],
         links: [V1_SRC.borrowing, V1_SRC.redemptions],
       };
     case "withdraw":
@@ -2285,7 +2294,7 @@ export function liquityV1AdjustContent(kind: LiquityV1AdjustModalKind): LearnMor
           "Repaying LUSD in the same transaction counts toward the ratio, so a withdrawal and a repayment can go together.",
         ],
         detailsHeading: "Key concepts:",
-        details: [V1_RECOVERY_DETAIL],
+        details: [V1_RECOVERY_SHORT],
         links: [V1_SRC.borrowing, V1_SRC.recovery, V1_SRC.bo],
       };
     case "borrow":
@@ -2301,7 +2310,7 @@ export function liquityV1AdjustContent(kind: LiquityV1AdjustModalKind): LearnMor
           "Adding ETH in the same transaction counts toward the ratio.",
         ],
         detailsHeading: "Key concepts:",
-        details: [V1_RECOVERY_DETAIL],
+        details: [V1_RECOVERY_SHORT],
         links: [V1_SRC.borrowing, V1_SRC.recovery, V1_SRC.bo],
       };
     case "repay":
@@ -2362,7 +2371,7 @@ export function liquityV1LiquidationContent(): LearnMoreContent {
   return {
     title: "How Liquidation Works",
     intro:
-      "Anyone can liquidate a Trove whose collateral ratio is below 110%. The whole Trove closes: its debt is cancelled and its ETH is taken, and the owner keeps the LUSD they borrowed but gets no ETH back.",
+      "Anyone can liquidate a Trove whose collateral ratio is below 110%. The whole Trove closes: its debt is cleared and its ETH is taken, and the owner keeps the LUSD they borrowed but gets no ETH back.",
     stepsHeading: "Where the debt and the ETH go:",
     steps: [
       "The Stability Pool pays first. It holds LUSD deposited by anyone; the liquidation burns the Trove's debt out of those deposits and hands the Trove's ETH to the depositors. Since the Trove was worth up to 110% of its debt, depositors gain up to about 10%.",
@@ -2450,7 +2459,7 @@ export function liquityV1AboutContent(): LearnMoreContent {
       },
       {
         bold: "Stability Pool",
-        text: "a pool of LUSD deposited by anyone. When a Trove is liquidated, the pool's LUSD cancels its debt and the depositors receive its ETH, worth up to 10% more than the LUSD they gave up.",
+        text: "a pool of LUSD deposited by anyone. When a Trove is liquidated, the pool's LUSD clears its debt and the depositors receive its ETH, worth up to 10% more than the LUSD they gave up.",
         sources: [V1_SRC.liquidations],
       },
       {

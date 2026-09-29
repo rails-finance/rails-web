@@ -15,7 +15,12 @@ import {
   type LiquityV1Coords,
 } from "@/lib/liquity-v1/event-provenance";
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL, LIQUITY_V1_ADDRESSES } from "@/lib/liquity-v1/asset-catalog";
-import { LIQUITY_V1_RESERVE, redemptionSplit } from "@/lib/liquity-v1/event-figures";
+import {
+  LIQUIDATION_COLL_VERB,
+  LIQUIDATION_DEBT_VERB,
+  LIQUITY_V1_RESERVE,
+  redemptionSplit,
+} from "@/lib/liquity-v1/event-figures";
 import { COLL_VERB, DEBT_VERB } from "@/lib/shared/liquity-fork-ops";
 
 export interface LiquityV1EventHeaderProps {
@@ -52,7 +57,7 @@ export function LiquityV1EventHeader({
   const perAxis = isOpen || isAdjust;
 
   // A liquidation names what happened to each side: the ETH was seized, the
-  // debt cancelled. A full redemption splits the collateral: the redeemer's
+  // debt cleared. A full redemption splits the collateral: the redeemer's
   // ETH is "Cleared", the rest moved to the CollSurplusPool for the owner.
   const isLiq = ctx.eventType === "liquidation";
   const split = redemptionSplit(ctx);
@@ -86,7 +91,7 @@ export function LiquityV1EventHeader({
       ...(isRedemption
         ? { label: "Cleared", tone: "external" as const }
         : isLiq
-          ? { label: "Seized", tone: "caution" as const }
+          ? { label: LIQUIDATION_COLL_VERB, tone: "caution" as const }
           : perAxis
             ? { label: coll > 0 ? COLL_VERB.add : COLL_VERB.withdraw, axisVerb: true }
             : {}),
@@ -116,7 +121,7 @@ export function LiquityV1EventHeader({
       ...(isRedemption
         ? { label: "Reduced", tone: "external" as const }
         : isLiq
-          ? { label: "Cancelled", tone: "caution" as const }
+          ? { label: LIQUIDATION_DEBT_VERB, tone: "caution" as const }
           : perAxis
             ? { label: debt > 0 ? DEBT_VERB.borrow : DEBT_VERB.repay, axisVerb: true }
             : {}),

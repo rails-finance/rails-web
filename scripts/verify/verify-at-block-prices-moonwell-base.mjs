@@ -356,7 +356,7 @@ if (pricedOrdinary) {
   }
   check(
     `ordinary #${n}: no forensics grid on an ordinary row`,
-    (await card.getByText("Seized, at fire").count()) === 0,
+    (await card.getByText("Seized, at liquidation").count()) === 0,
   );
 }
 
@@ -369,8 +369,8 @@ if (pricedLiq) {
   const premium = seized / cleared - 1;
   check(
     `liquidation #${n}: forensics grid renders (Seized / Cleared / Realized premium)`,
-    (await card.getByText("Seized, at fire").count()) > 0 &&
-      (await card.getByText("Cleared, at fire").count()) > 0 &&
+    (await card.getByText("Seized, at liquidation").count()) > 0 &&
+      (await card.getByText("Cleared, at liquidation").count()) > 0 &&
       (await card.getByText("Realized premium").count()) > 0,
   );
   const premiumEl = card.getByText(/^[+−]\d+\.\d\d%$/).first();

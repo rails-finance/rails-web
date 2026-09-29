@@ -19,6 +19,7 @@ import { liquityV1ExplainerTeaser } from "@/lib/liquity-v1/explainer-clauses";
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL, LIQUITY_V1_ADDRESSES } from "@/lib/liquity-v1/asset-catalog";
 import { LIQUITY_V1_RESERVE } from "@/lib/liquity-v1/event-figures";
 import { collDeltaProv, debtDeltaProv, closeRepaidProv } from "@/lib/liquity-v1/event-provenance";
+import type { LiquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
 
 export interface LiquityV1EventCardProps {
   event: BaseActivityEvent & { context: { protocol: "liquity-v1"; data: LiquityV1Context } };
@@ -27,9 +28,18 @@ export interface LiquityV1EventCardProps {
   eventNumber?: number;
   /** The PriceFeed price now — a redemption's net outcome at today's price. */
   currentPrice?: number | null;
+  /** On a liquidation, what the Trove's life left its owner. */
+  ownerOutcome?: LiquityV1OwnerOutcome | null;
 }
 
-export function LiquityV1EventCard({ event, isFirst, isLast, eventNumber, currentPrice }: LiquityV1EventCardProps) {
+export function LiquityV1EventCard({
+  event,
+  isFirst,
+  isLast,
+  eventNumber,
+  currentPrice,
+  ownerOutcome,
+}: LiquityV1EventCardProps) {
   const ctx = event.context.data;
   const isLiq = ctx.eventType === "liquidation";
   const isRedemption = ctx.eventType === "redemption";
@@ -159,6 +169,7 @@ export function LiquityV1EventCard({ event, isFirst, isLast, eventNumber, curren
           blockNumber={event.blockNumber}
           wallet={event.wallet}
           currentPrice={currentPrice}
+          ownerOutcome={isLiq ? ownerOutcome : null}
           skipLead
         />
       }

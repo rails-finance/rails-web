@@ -29,7 +29,7 @@ import { positionCollateralProv, positionDebtProv, lifetimeFlowProv } from "@/li
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
 import { flowsReconcile, type ChainTruthTowerData, type TowerLine } from "@/lib/shared/chain-truth-economics";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
-import { redemptionSplit } from "@/lib/liquity-v1/event-figures";
+import { LIQUIDATION_COLL_VERB, LIQUIDATION_DEBT_VERB, redemptionSplit } from "@/lib/liquity-v1/event-figures";
 
 const DUST = 1e-9;
 
@@ -228,7 +228,7 @@ export function computeLiquityV1Economics(
     ...flowLine(f?.collSurplus ?? 0, COLLATERAL_SYMBOL, "coll-surplus", "surplus collateral", "To surplus pool"),
   ];
   const collLiquidated = [
-    ...flowLine(f?.collLiquidated ?? 0, COLLATERAL_SYMBOL, "coll-liq", "liquidated collateral"),
+    ...flowLine(f?.collLiquidated ?? 0, COLLATERAL_SYMBOL, "coll-liq", "liquidated collateral", LIQUIDATION_COLL_VERB),
     ...flowLine(
       f?.collRedeemed ?? 0,
       COLLATERAL_SYMBOL,
@@ -240,7 +240,7 @@ export function computeLiquityV1Economics(
   ];
   const debtExited = flowLine(f?.repaid ?? 0, DEBT_SYMBOL, "debt-repaid", "repaid");
   const debtLiquidated = [
-    ...flowLine(f?.debtLiquidated ?? 0, DEBT_SYMBOL, "debt-liq", "liquidated debt"),
+    ...flowLine(f?.debtLiquidated ?? 0, DEBT_SYMBOL, "debt-liq", "liquidated debt", LIQUIDATION_DEBT_VERB),
     ...flowLine(f?.debtRedeemed ?? 0, DEBT_SYMBOL, "debt-redeemed", "redeemed debt", "Redeemed", "redeemed"),
   ];
 

@@ -65,7 +65,11 @@ import {
   redemptionSplit,
   sidesOf,
 } from "@/lib/liquity-v1/event-figures";
-import { useLiquityV1EventRead, useLiquityV1Surplus, type LiquityV1EventRead } from "@/lib/liquity-v1/use-event-read";
+import {
+  useLiquityV1EventReadState,
+  useLiquityV1Surplus,
+  type LiquityV1EventRead,
+} from "@/lib/liquity-v1/use-event-read";
 import { formatUsdValue } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 
@@ -183,7 +187,7 @@ function Transition({
 
 export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, currentPrice }: LiquityV1EventDetailProps) {
   const coords: LiquityV1Coords = { txHash, blockNumber, wallet };
-  const read = useLiquityV1EventRead(txHash, wallet);
+  const { read, pending: readPending } = useLiquityV1EventReadState(txHash, wallet);
   const s = sidesOf(ctx);
   const split = redemptionSplit(ctx);
   const surplus = useLiquityV1Surplus(
@@ -410,9 +414,11 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
       )}
 
       {forensics && <LiquidationForensics {...forensics} />}
-      {isLiq && read?.liquidation && (
+      {isLiq && read?.liquidation ? (
         <LiquidationRoute read={read} coords={coords} surplusClaimed={surplus?.claimed ?? null} />
-      )}
+      ) : isLiq && readPending ? (
+        <LiquidationRoutePending />
+      ) : null}
     </>
   );
 }
@@ -504,6 +510,21 @@ function RedemptionOutcome({
           </>
         )}
       </Row>
+    </div>
+  );
+}
+
+/** The "Where it went" block while the liquidation's receipt read is on its
+ *  way: the heading and a placeholder for each row it will carry. */
+function LiquidationRoutePending() {
+  return (
+    <div className="mx-5 my-2 space-y-1 rounded-xl bg-background px-4 py-3" aria-busy="true">
+      <div className="mb-1 text-xs font-semibold text-rb-500">Where it went</div>
+      {["Stability Pool", "Liquidator", "Owner"].map((label) => (
+        <Row key={label} label={label}>
+          <span className="inline-block h-3 w-28 animate-pulse rounded bg-rb-500/20 align-middle" />
+        </Row>
+      ))}
     </div>
   );
 }

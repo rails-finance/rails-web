@@ -58,7 +58,8 @@ import {
   liquityV1RedemptionOutcome,
 } from "@/lib/liquity-v1/economics-explanation";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
-import { useLiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
+import { useLiquityV1EventReads, useLiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
+import { liquityV1OutcomeTxs, liquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
 import { protocolPriceProv } from "@/lib/liquity-v1/position-provenance";
 import { eventPriceProv } from "@/lib/liquity-v1/event-provenance";
 
@@ -300,6 +301,20 @@ export default function LiquityV1TroveView({
         : null
       : null;
   const surplus = useLiquityV1Surplus(closingTx, wallet);
+  // A liquidated life's outcome for its owner needs every draw of the life, so
+  // it is read only on a page holding the whole history.
+  const liquidatedWhole = view?.status === "liquidated" && historyWindow.state === "whole";
+  const outcomeTxs = useMemo(
+    () => (liquidatedWhole ? liquityV1OutcomeTxs(v1Events) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [liquidatedWhole, events, selectedEpoch],
+  );
+  const outcomeReads = useLiquityV1EventReads(outcomeTxs, liquidatedWhole ? wallet : null);
+  const ownerOutcome = useMemo(
+    () => (liquidatedWhole ? liquityV1OwnerOutcome(v1Events, outcomeReads) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [liquidatedWhole, outcomeReads, events, selectedEpoch],
+  );
   const priceNow = chain && !chain.chainStale && chain.price > 0 ? chain.price : null;
 
   const chainLive = view?.status === "open" && chain != null && chain.troveStatus === "active" ? chain : null;
@@ -399,6 +414,8 @@ export default function LiquityV1TroveView({
                     openedAt={epochOpenedAt}
                     lastAction={v1Events.length > 0 ? v1Events[v1Events.length - 1].context.data.eventType : null}
                     surplus={surplus}
+                    ownerOutcome={ownerOutcome}
+                    outcomePending={liquidatedWhole && outcomeReads == null}
                   />
                 ) : chain && chain.troveStatus !== "active" ? (
                   // Index says open, the chain says the Trove has since closed
@@ -429,7 +446,9 @@ export default function LiquityV1TroveView({
                 <ChainTruthTower
                   data={towerData}
                   explanation={liquityV1EconomicsExplanation(towerData, { priceNow, redemptions })}
-                  learnMore={liquityV1EconomicsContent()}
+                  learnMore={liquityV1EconomicsContent({
+                    redeemed: towerData.collateral.liquidated.some((l) => l.key === "coll-redeemed"),
+                  })}
                   rowExtra={liquityV1RedemptionOutcome(redemptions, priceNow)}
                 />
               );
@@ -466,6 +485,7 @@ export default function LiquityV1TroveView({
                   // Today's PriceFeed price — a redemption's net outcome at
                   // today's value. Read on any life: it prices the ETH now.
                   currentPrice={priceNow}
+                  ownerOutcome={ownerOutcome}
                 />
               ) : null
             }

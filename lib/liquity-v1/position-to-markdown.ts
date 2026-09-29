@@ -92,7 +92,7 @@ export function liquityV1PositionToMarkdown(args: LiquityV1PositionMarkdownArgs)
     if (view.status === "liquidated") {
       lines.push(
         `- **Liquidated** — the collateral ratio fell below the protocol's liquidation threshold; the ETH ` +
-          `collateral was seized and the LUSD debt cancelled, absorbed by the Stability Pool or redistributed ` +
+          `collateral was seized and the LUSD debt cleared, absorbed by the Stability Pool or redistributed ` +
           `to other Troves.`,
       );
     } else if (lastType === "redemption") {

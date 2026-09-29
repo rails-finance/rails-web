@@ -28,7 +28,7 @@ const RESERVE_DETAIL = {
 
 const LIQUIDATION_DETAIL = {
   bold: "Liquidation and Recovery Mode",
-  text: "below 110% anyone can liquidate the whole Trove: the Stability Pool's LUSD cancels the debt and its depositors receive the ETH; debt the pool cannot cover is shared out to the other Troves. When the total ratio of all Troves falls below 150%, the system enters Recovery Mode, where a Trove below that total ratio can be liquidated even above 110%. The Explanation's “?” beside the system ratio opens the full account.",
+  text: "below 110% anyone can liquidate the whole Trove: the Stability Pool's LUSD clears the debt and its depositors receive the ETH; debt the pool cannot cover is shared out to the other Troves. When the total ratio of all Troves falls below 150%, the system enters Recovery Mode, where a Trove below that total ratio can be liquidated even above 110%. The Explanation's “?” beside the system ratio opens the full account.",
   sources: [
     { label: "Stability Pool and liquidations FAQ", url: LIQUITY_V1_FAQ.LIQUIDATIONS },
     { label: "Recovery Mode FAQ", url: LIQUITY_V1_FAQ.RECOVERY_MODE },
@@ -51,7 +51,7 @@ export function liquityV1PositionContent(opts: { status: "open" | "closed" | "li
         },
         {
           bold: "Stability Pool first",
-          text: "LUSD deposited in the Stability Pool cancels the debt, and its depositors receive the ETH; any shortfall is shared out to the other open Troves.",
+          text: "LUSD deposited in the Stability Pool clears the debt, and its depositors receive the ETH; any shortfall is shared out to the other open Troves.",
           sources: [{ label: "Stability Pool and liquidations FAQ", url: LIQUITY_V1_FAQ.LIQUIDATIONS }],
         },
         {

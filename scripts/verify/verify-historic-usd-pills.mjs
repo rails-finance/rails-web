@@ -362,12 +362,12 @@ async function runProtocol(proto, wallet, cases) {
     );
 
     check(
-      `${proto}: LiquidationForensics "Seized, at fire" renders`,
-      (await card.getByText("Seized, at fire").count()) > 0,
+      `${proto}: LiquidationForensics "Seized, at liquidation" renders`,
+      (await card.getByText("Seized, at liquidation").count()) > 0,
     );
     check(
-      `${proto}: LiquidationForensics "Cleared, at fire" renders`,
-      (await card.getByText("Cleared, at fire").count()) > 0,
+      `${proto}: LiquidationForensics "Cleared, at liquidation" renders`,
+      (await card.getByText("Cleared, at liquidation").count()) > 0,
     );
     check(
       `${proto}: LiquidationForensics "Realized premium" renders`,

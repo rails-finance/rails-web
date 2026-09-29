@@ -173,5 +173,5 @@ export function StateTransition({ children }: { children: ReactNode }) {
   // gap, not space-x: space-x stamps margins onto the children, which would
   // fight the locator pill's negative-margin box (.prov-locate-box) on any
   // <Prov>-wrapped value sitting directly in this row.
-  return <div className="flex items-center gap-1">{children}</div>;
+  return <div className="flex flex-wrap items-center gap-1">{children}</div>;
 }

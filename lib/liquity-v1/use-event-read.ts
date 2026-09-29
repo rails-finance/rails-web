@@ -31,14 +31,15 @@ function load<T>(url: string, ok: (d: unknown) => d is T): Promise<T | null> {
   return p;
 }
 
-function useLoad<T>(url: string | null, ok: (d: unknown) => d is T): T | null {
-  const [v, setV] = useState<T | null>(null);
+/** The answer for `url` and whether it is still on its way; a failed read
+ *  settles as null. */
+function useLoadState<T>(url: string | null, ok: (d: unknown) => d is T): { value: T | null; pending: boolean } {
+  const [state, setState] = useState<{ url: string | null; value: T | null }>({ url: null, value: null });
   useEffect(() => {
-    setV(null);
     if (!url) return;
     let live = true;
     load(url, ok).then((d) => {
-      if (live) setV(d);
+      if (live) setState({ url, value: d });
     });
     return () => {
       live = false;
@@ -46,16 +47,56 @@ function useLoad<T>(url: string | null, ok: (d: unknown) => d is T): T | null {
     // `ok` is a module-level guard.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
-  return v;
+  const settled = url != null && state.url === url;
+  return { value: settled ? state.value : null, pending: url != null && !settled };
+}
+
+function useLoad<T>(url: string | null, ok: (d: unknown) => d is T): T | null {
+  return useLoadState(url, ok).value;
 }
 
 const isEventRead = (d: unknown): d is LiquityV1EventRead =>
   d != null && typeof d === "object" && "blockNumber" in d && "lusdMintedToOwner" in d;
 
-/** The receipt read for one event; null while loading or when it failed. */
-export function useLiquityV1EventRead(txHash?: string, wallet?: string): LiquityV1EventRead | null {
-  const url = txHash && wallet ? `/api/chain/liquity-v1/event?tx=${txHash}&wallet=${wallet.toLowerCase()}` : null;
-  return useLoad(url, isEventRead);
+const eventReadUrl = (txHash?: string | null, wallet?: string | null): string | null =>
+  txHash && wallet ? `/api/chain/liquity-v1/event?tx=${txHash}&wallet=${wallet.toLowerCase()}` : null;
+
+/** The receipt read for one event with its loading state: null while loading
+ *  or when it failed, and `pending` tells the two apart. */
+export function useLiquityV1EventReadState(
+  txHash?: string,
+  wallet?: string,
+): { read: LiquityV1EventRead | null; pending: boolean } {
+  const { value, pending } = useLoadState(eventReadUrl(txHash, wallet), isEventRead);
+  return { read: value, pending };
+}
+
+/** The receipt reads for several events of one Trove, keyed by transaction;
+ *  null until every one has settled. A failed read is absent from the map. */
+export function useLiquityV1EventReads(
+  txHashes: readonly string[],
+  wallet?: string | null,
+): Map<string, LiquityV1EventRead> | null {
+  const key = wallet ? txHashes.join(",") : "";
+  const [state, setState] = useState<{ key: string; reads: Map<string, LiquityV1EventRead> } | null>(null);
+  useEffect(() => {
+    if (!key || !wallet) return;
+    let live = true;
+    const txs = key.split(",");
+    Promise.all(txs.map((tx) => load(eventReadUrl(tx, wallet) as string, isEventRead))).then((reads) => {
+      if (!live) return;
+      const m = new Map<string, LiquityV1EventRead>();
+      reads.forEach((r, i) => {
+        if (r) m.set(txs[i], r);
+      });
+      setState({ key, reads: m });
+    });
+    return () => {
+      live = false;
+    };
+  }, [key, wallet]);
+  if (!key) return null;
+  return state?.key === key ? state.reads : null;
 }
 
 export interface LiquityV1Surplus {

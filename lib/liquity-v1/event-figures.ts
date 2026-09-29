@@ -17,6 +17,10 @@ import type { LiquityV1Context } from "@/lib/shared/types/event-shape";
 
 /** LUSD_GAS_COMPENSATION: the reserve every Trove's debt carries. */
 export const LIQUITY_V1_RESERVE = 200;
+/** What a liquidation does to each side, as the timeline row and the lifetime
+ *  flows both name it. One place, so the two change together. */
+export const LIQUIDATION_COLL_VERB = "Seized";
+export const LIQUIDATION_DEBT_VERB = "Cleared";
 /** A figure below this reads as zero. */
 const EPS = 1e-9;
 
