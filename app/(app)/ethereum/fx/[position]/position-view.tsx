@@ -42,7 +42,7 @@ import { summariseFxExternalActors } from "@/lib/fx/external-actor";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { FxDriftPanel } from "@/components/protocol/fx/fx-drift-panel";
 import { FxSocializedReadsContext } from "@/lib/fx/socialized-reads";
-import { useFxPositionReads } from "@/lib/fx/use-event-state";
+import { useFxPositionReads, useFxPricesAt } from "@/lib/fx/use-event-state";
 import { fetchFxDrift, FxDriftError, type FxDriftResult } from "@/lib/sources/api/fx-drift";
 import { computeFxEconomics, fxDebtFlowsWithOpening } from "@/lib/fx/economics";
 import { fxEconomicsExplanation, fxEconomicsContent } from "@/lib/fx/economics-explanation";
@@ -301,11 +301,27 @@ export default function FxPositionView({
 
   // The top row's price dropdown: the pool's own oracle price per
   // NORMALIZED unit (the settled amounts' basis), while the position is open.
+  // The anchor price read at the settled block, the price the card's USD
+  // figure and debt ratio use; the sweep's stored min-leg reading until it
+  // lands.
+  const settledPx = useFxPricesAt(
+    parsed?.pool ?? "",
+    parsed?.positionId ?? "",
+    view?.status === "open" ? view.settled.block : null,
+  );
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
     if (!view || view.status !== "open") return [];
+    if (settledPx?.anchorPrice != null)
+      return [
+        {
+          symbol: view.normalizedSymbol,
+          price: Number(settledPx.anchorPrice) / 1e18,
+          label: `${view.normalizedSymbol} · anchor price`,
+        },
+      ];
     if (view.oracle.priceUsd == null || view.oracle.priceUsd <= 0) return [];
     return [{ symbol: view.normalizedSymbol, price: view.oracle.priceUsd }];
-  }, [view]);
+  }, [view, settledPx]);
 
   // A closed position's price: the oracle read its closing row's snapshot
   // carries.
