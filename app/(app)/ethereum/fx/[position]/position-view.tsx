@@ -233,6 +233,7 @@ export default function FxPositionView({
       firstTs: reb[0].timestamp,
       lastTs: reb[reb.length - 1].timestamp,
       liquidations: reb.filter((e) => e.context.data.eventType === "liquidation").length,
+      redemptions: reb.filter((e) => e.context.data.redemption === true).length,
       ownEventBlocks: fxEvents
         .filter(
           (e) =>

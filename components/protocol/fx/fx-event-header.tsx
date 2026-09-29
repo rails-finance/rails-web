@@ -125,8 +125,8 @@ export function FxEventHeader({
         value: -colls,
         symbol: tokenSym,
         address: tokenAddr,
-        prov: tickRebAmountProv("colls", tokenSym, coords, undefined, ctx.poolWide, poolLiq),
-        label: poolLiq ? "Pool liquidated" : `${scope} cleared`,
+        prov: tickRebAmountProv("colls", tokenSym, coords, undefined, ctx.poolWide, poolLiq, ctx.redemption),
+        label: poolLiq ? "Pool liquidated" : ctx.redemption ? "Pool redeemed" : `${scope} cleared`,
         tone: "caution",
       });
     const debt = Number(ctx.tickRebFxusdDebts ?? "0") || 0;
@@ -135,7 +135,7 @@ export function FxEventHeader({
         value: -debt,
         symbol: "fxUSD",
         address: fxusdAddr,
-        prov: tickRebAmountProv("fxusd", "fxUSD", coords, undefined, ctx.poolWide, poolLiq),
+        prov: tickRebAmountProv("fxusd", "fxUSD", coords, undefined, ctx.poolWide, poolLiq, ctx.redemption),
         // The collateral delta already scopes the clause; a second scope word
         // would only repeat it.
         label: colls !== 0 ? "Repaid" : `${scope} repaid`,

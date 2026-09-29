@@ -132,7 +132,7 @@ export interface RawFxSocializedRow {
   fx_usd_debts: string;
   stable_debts: string;
   /** Absent on a payload from before the route sent it: a one-tick row. */
-  kind?: "tick" | "pool" | "liquidate";
+  kind?: "tick" | "pool" | "liquidate" | "redeem";
   /** Pool-wide rows: the tick the position's shares moved to (-32768 = the
    *  tick was liquidated whole). */
   moved_to_tick?: string;
@@ -437,7 +437,8 @@ export function buildFxTimeline(resp: RawFxTimelineResponse): FxTimelineResult {
       });
       continue;
     }
-    const poolWide = s.kind === "pool";
+    const redemption = s.kind === "redeem";
+    const poolWide = s.kind === "pool" || redemption;
     const context: FxContext = {
       eventType: "tickRebalance",
       pool: position.pool,
@@ -447,6 +448,7 @@ export function buildFxTimeline(resp: RawFxTimelineResponse): FxTimelineResult {
       impliedDebtAfter: "0",
       rebalancedTick: Number(s.position_tick),
       ...(poolWide ? { poolWide: true } : {}),
+      ...(redemption ? { redemption: true } : {}),
       tickRebColls: fmtUnits(s.colls, meta.tokenDecimals),
       tickRebFxusdDebts: fmtUnits(s.fx_usd_debts, 18),
       tickRebStableDebts: fmtUnits(s.stable_debts, 18),
@@ -460,7 +462,7 @@ export function buildFxTimeline(resp: RawFxTimelineResponse): FxTimelineResult {
       timestamp: s.block_timestamp != null ? Number(s.block_timestamp) : 0,
       wallet,
       actionType: "tickRebalance",
-      actionLabel: poolWide ? "Pool Rebalance" : "Tick Rebalance",
+      actionLabel: redemption ? "Redemption" : poolWide ? "Pool Rebalance" : "Tick Rebalance",
       flows: [],
       etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", s.tx_hash),
       context: { protocol: "fx" as const, data: context },

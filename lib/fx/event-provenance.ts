@@ -274,13 +274,16 @@ export const tickRebAmountProv = (
   raw?: string | null,
   poolWide = false,
   liquidate = false,
+  redeem = false,
 ): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `The ${unit} the whole ${poolWide ? "pool" : "tick"} gave up in this ${liquidate ? "liquidation run" : "rebalance"} — the ${liquidate ? "Liquidate" : poolWide ? "Rebalance" : "RebalanceTick"} event's ${which === "colls" ? "collateral field, in the token as transferred to the keeper, net of the protocol's share of the bonus" : which === "fxusd" ? "fxUSD debt field" : "stable-side debt field"}${atBlock(coords)}. Shared across every position ${poolWide ? "the sweep touched" : "in the tick"}; this position's change is the getPosition read beside it.`,
+  summary: redeem
+    ? `The ${unit} of this redemption across the pool — the Redeem event's ${which === "colls" ? "collateral field: the token paid to the redeemer, after the protocol's redeem fee" : "debts field: the fxUSD the redeemer paid in and the manager burned"}${atBlock(coords)}. Shared across every tick it took from; this position's change is the getPosition read beside it.`
+    : `The ${unit} the whole ${poolWide ? "pool" : "tick"} gave up in this ${liquidate ? "liquidation run" : "rebalance"} — the ${liquidate ? "Liquidate" : poolWide ? "Rebalance" : "RebalanceTick"} event's ${which === "colls" ? "collateral field, in the token as transferred to the keeper, net of the protocol's share of the bonus" : which === "fxusd" ? "fxUSD debt field" : "stable-side debt field"}${atBlock(coords)}. Shared across every position ${poolWide ? "the sweep touched" : "in the tick"}; this position's change is the getPosition read beside it.`,
   contract: poolContract(coords),
-  via: `captured ${liquidate ? "Liquidate" : poolWide ? "Rebalance" : "RebalanceTick"} log · ${fieldSeg(which === "colls" ? "colls" : which === "fxusd" ? "fxUSDDebts" : "stableDebts", raw)}`,
+  via: `captured ${redeem ? "Redeem" : liquidate ? "Liquidate" : poolWide ? "Rebalance" : "RebalanceTick"} log · ${fieldSeg(which === "colls" ? "colls" : which === "fxusd" ? "fxUSDDebts" : "stableDebts", raw)}`,
   inputs: eventInputs(coords),
 });
 

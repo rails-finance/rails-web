@@ -125,6 +125,16 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
       isFirst={isFirst}
       isLast={!!isLast}
     />
+  ) : ctx.eventType === "tickRebalance" && ctx.redemption ? (
+    <SpineColumn
+      icon="warning"
+      warningTone="caution"
+      warningLabel="Redemption"
+      warningTip="Someone redeemed fxUSD for collateral from the pool's highest-ratio ticks, including this position's. The position gave up collateral and debt of equal value and stays open; the owner did not act."
+      spine="dotted"
+      isFirst={isFirst}
+      isLast={!!isLast}
+    />
   ) : ctx.eventType === "tickRebalance" ? (
     // Derived socialized row — routine adverse (caution, not critical): the
     // pool trimmed the position's whole tick; no action by the owner.

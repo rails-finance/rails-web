@@ -85,8 +85,9 @@ export interface FxRebalanceRows {
   blocks: number[];
   firstTs: number;
   lastTs: number;
-  /** How many of the rows are pool-wide liquidations. */
+  /** How many of the rows are pool-wide liquidations, and redemptions. */
   liquidations?: number;
+  redemptions?: number;
   /** Blocks that also carry one of the position's own events: a block read
    *  there mixes the two, so the split is not stated. */
   ownEventBlocks: number[];
@@ -106,8 +107,12 @@ function socializedTaken(rows?: FxRebalanceRows): { coll: number; debt: number }
 /** "rebalances", "liquidations" or "rebalances and liquidations". */
 function rowsNoun(rows: FxRebalanceRows): string {
   const liq = rows.liquidations ?? 0;
-  const reb = rows.blocks.length - liq;
-  return liq === 0 ? "rebalances" : reb === 0 ? "liquidations" : "rebalances and liquidations";
+  const red = rows.redemptions ?? 0;
+  const reb = rows.blocks.length - liq - red;
+  const parts = [reb > 0 ? "rebalances" : null, liq > 0 ? "liquidations" : null, red > 0 ? "redemptions" : null].filter(
+    (p): p is string => p != null,
+  );
+  return parts.length <= 1 ? (parts[0] ?? "rebalances") : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
 
 const dateSpan = (a: number, b: number): string =>

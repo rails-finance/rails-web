@@ -389,9 +389,11 @@ function timelineTable(
         // position's OWN drift over that stretch follows in the same cell,
         // labeled as such (one rebalance in the stretch = its exact slice).
         const scope = d.poolWide ? "pool" : "tick";
-        action = d.poolWide
-          ? `Pool-wide rebalance (moved tick ${d.rebalancedTick})`
-          : `Tick ${d.rebalancedTick} rebalanced (whole tick)`;
+        action = d.redemption
+          ? `Redemption (took from tick ${d.rebalancedTick})`
+          : d.poolWide
+            ? `Pool-wide rebalance (moved tick ${d.rebalancedTick})`
+            : `Tick ${d.rebalancedTick} rebalanced (whole tick)`;
         colD =
           d.tickRebColls && Number(d.tickRebColls) > 0 ? `−${amt(Number(d.tickRebColls))} ${tokenSym} (${scope})` : "—";
         debtD =

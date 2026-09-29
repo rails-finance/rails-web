@@ -2183,6 +2183,7 @@ export function fxLiquidationContent(): LearnMoreContent {
       "A rebalance repays part of the tick's fxUSD debt and takes collateral worth that debt plus the rebalance bonus, bringing the tick back to the rebalance line. Every position in the tick loses collateral and debt in proportion and stays open. The position has no event of its own for it; the timeline places the rebalance on its history and reads the position before and after.",
       "A liquidation repays the position's debt and takes collateral worth it plus the liquidation bonus. Collateral beyond that stays in the position for the owner. When the collateral cannot cover the debt and the bonus, the liquidator takes all of it, and the debt it did not cover is added to every other position in the pool through the pool's debt index.",
       "Of each bonus the protocol keeps a share (getLiquidationExpenseRatio: 10% on both pools in September 2026), so the collateral the keeper receives is less than what the position lost. The owner keeps the fxUSD they borrowed.",
+      "A redemption is the third way a position changes without its owner: anyone may pay fxUSD into the manager for collateral at the oracle's max price, taken from the highest-ratio ticks first, at most 20% of a tick per pass. Today the manager opens it only while fxUSD trades below its peg; six redemptions have run, all on the wstETH pool in March 2025.",
     ],
     links: [{ label: "f(x) docs", url: FX_DOC_URL }],
   };

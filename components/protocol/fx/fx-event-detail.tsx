@@ -88,8 +88,18 @@ function readStat(
   after: FxSide | null,
   coords: FxCoords,
 ): ChainTruthStat | null {
+  // A ratio over dust collateral (a wei left after a liquidation) is no
+  // figure to show.
   const pick = (s: FxSide | null) =>
-    s == null ? null : side === "coll" ? s.colls : side === "debt" ? s.debts : s.ratio;
+    s == null
+      ? null
+      : side === "coll"
+        ? s.colls
+        : side === "debt"
+          ? s.debts
+          : s.colls != null && s.colls > 0 && s.colls < 1e-9
+            ? null
+            : s.ratio;
   const a = pick(after);
   const b = pick(before);
   if (a == null) return null;
@@ -209,25 +219,27 @@ function FxEventDetailBody({
       {
         label: poolLiq
           ? "Pool-wide liquidation · liquidated this position's tick"
-          : ctx.poolWide
-            ? "Pool-wide rebalance · moved this position's tick"
-            : "Rebalanced tick",
+          : ctx.redemption
+            ? "Redemption · took from this position's tick"
+            : ctx.poolWide
+              ? "Pool-wide rebalance · moved this position's tick"
+              : "Rebalanced tick",
         // `#`-prefixed so the grid's numeric compaction leaves the tick id alone.
         value: `#${ctx.rebalancedTick ?? "—"}`,
         symbol: "",
         prov: tickRebalanceHitProv(ctx.rebalancedTick, coords, ctx.poolWide),
       },
       {
-        label: `Collateral to the keeper · ${scope}`,
+        label: `${ctx.redemption ? "Collateral to the redeemer" : "Collateral to the keeper"} · ${scope}`,
         value: fmt(ctx.tickRebColls),
         symbol: tokenSym,
-        prov: tickRebAmountProv("colls", tokenSym, coords, undefined, ctx.poolWide, poolLiq),
+        prov: tickRebAmountProv("colls", tokenSym, coords, undefined, ctx.poolWide, poolLiq, ctx.redemption),
       },
       {
-        label: `fxUSD repaid · ${scope}`,
+        label: `${ctx.redemption ? "fxUSD redeemed" : "fxUSD repaid"} · ${scope}`,
         value: fmt(ctx.tickRebFxusdDebts),
         symbol: "fxUSD",
-        prov: tickRebAmountProv("fxusd", "fxUSD", coords, undefined, ctx.poolWide, poolLiq),
+        prov: tickRebAmountProv("fxusd", "fxUSD", coords, undefined, ctx.poolWide, poolLiq, ctx.redemption),
       },
     ];
     if (ctx.tickRebStableDebts != null && Number(ctx.tickRebStableDebts) !== 0) {
@@ -235,7 +247,7 @@ function FxEventDetailBody({
         label: `USDC repaid · ${scope}`,
         value: fmt(ctx.tickRebStableDebts),
         symbol: "USDC",
-        prov: tickRebAmountProv("stable", "stable-side debt", coords, undefined, ctx.poolWide, poolLiq),
+        prov: tickRebAmountProv("stable", "stable-side debt", coords, undefined, ctx.poolWide, poolLiq, ctx.redemption),
       });
     }
     const tag = blockPeers && blockPeers > 1 ? ` · this block (${blockPeers} rebalances)` : "";

@@ -2528,8 +2528,14 @@ export interface FxContext {
 
   /** tickRebalance only — the pool-wide `Rebalance` (every tick above the
    *  line, top down), not a one-tick `RebalanceTick`. The amounts are then the
-   *  whole pool's. */
+   *  whole pool's. Also set on a pool-wide `Liquidate` row (eventType
+   *  liquidation) and a `Redeem` row. */
   poolWide?: boolean;
+
+  /** tickRebalance only — the row is a `Redeem` that took from this
+   *  position's tick (fxUSD paid in for collateral, top tick down). The tick
+   *  fields carry the redemption's collateral paid out and fxUSD redeemed. */
+  redemption?: boolean;
 
   /** tickRebalance only — the tick that was rebalanced while this position's
    *  shares sat in it (walked via PositionSnapshot anchors + TickMovement). */

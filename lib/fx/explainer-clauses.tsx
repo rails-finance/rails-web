@@ -71,6 +71,7 @@ import { fxRowFees, fxFeePct, fxScheduleWords } from "@/lib/fx/row-figures";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
 import { fxExternalActor } from "@/lib/fx/external-actor";
 import { formatExact, formatNumber, formatTinyNonZero } from "@/lib/utils/format";
+import { formatUsd } from "@/lib/shared/format-event";
 
 /** What the row's read (getPosition at block − 1 and at the block) adds to the
  *  prose, once it has landed. */
@@ -404,7 +405,7 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
       : null;
   // Which price the pool judged the row at: the oracle's min leg (BasePool
   // rebalance / liquidate), where the row's ratios are read at the anchor.
-  const usd = (n: number) => `$${formatNumber(n)}`;
+  const usd = (n: number) => formatUsd(n);
   const judgedClause = (what: "rebalance" | "liquidate"): ClauseInput => {
     const line = what === "rebalance" ? before?.rebalanceLine : before?.liquidateLine;
     return clause(
@@ -725,17 +726,47 @@ function fxEventSlotsBase(ctx: FxContext, coords: FxCoords, read: FxRowRead): Ev
           #{ctx.rebalancedTick}
         </Fig>
       );
+      const redeem = ctx.redemption === true;
       const tickCollsFig = () => (
-        <Fig info={tickRebAmountProv("colls", sym, coords, undefined, pool)} value={fmtVal(ctx.tickRebColls)}>
+        <Fig
+          info={tickRebAmountProv("colls", sym, coords, undefined, pool, false, redeem)}
+          value={fmtVal(ctx.tickRebColls)}
+        >
           {fmtVal(ctx.tickRebColls)} {sym}
         </Fig>
       );
       const tickFxusdFig = () => (
-        <Fig info={tickRebAmountProv("fxusd", "fxUSD", coords, undefined, pool)} value={fmtVal(ctx.tickRebFxusdDebts)}>
+        <Fig
+          info={tickRebAmountProv("fxusd", "fxUSD", coords, undefined, pool, false, redeem)}
+          value={fmtVal(ctx.tickRebFxusdDebts)}
+        >
           {fmtVal(ctx.tickRebFxusdDebts)} fxUSD
         </Fig>
       );
       const keeper = ctx.txFrom ? ` (${shortAddr(ctx.txFrom)})` : "";
+      if (redeem) {
+        return {
+          happened: [
+            clause(
+              <>
+                {ctx.txFrom ? shortAddr(ctx.txFrom) : "Someone"} redeemed {tickFxusdFig()} for {tickCollsFig()} from the{" "}
+                {sym} pool, taking from its highest-ratio ticks first, including tick {tickFig()} where this
+                position&rsquo;s shares sat.
+              </>,
+            ),
+          ],
+          changed: [ownChange("redemptions")],
+          meansNow: [
+            clause(
+              <>
+                A redemption swaps fxUSD for collateral at the oracle&rsquo;s max price, at most 20% of a tick per pass;
+                today the manager opens it only while fxUSD trades below its peg. The position gave up debt and
+                collateral worth the same at that price, and stays open; the owner did not act.
+              </>,
+            ),
+          ],
+        };
+      }
       const happened = pool ? (
         <>
           A keeper{keeper} rebalanced the {sym} pool from its top tick down, including tick {tickFig()} where this

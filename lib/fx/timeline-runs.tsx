@@ -106,7 +106,7 @@ const MIN_TICK_REBALANCE_RUN = 3;
 // Module-scope so the timeline's row memo keeps a stable identity.
 export const FX_TICK_REBALANCE_RUNS: TimelineRunSpec[] = [
   {
-    match: (e) => isFxEvent(e) && e.context.data.eventType === "tickRebalance",
+    match: (e) => isFxEvent(e) && e.context.data.eventType === "tickRebalance" && !e.context.data.redemption,
     min: MIN_TICK_REBALANCE_RUN,
     render: (run, meta) =>
       renderRunFolders(run, meta, MIN_TICK_REBALANCE_RUN, (events, folder) => (
