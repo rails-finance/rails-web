@@ -384,6 +384,7 @@ function SideBlock({
   when,
   assets,
   first,
+  atLive,
 }: {
   side: FlowSide;
   st: FlowSideState;
@@ -400,6 +401,9 @@ function SideBlock({
   assets: ReturnType<typeof assetsAt>;
   /** The first bar drawn: the axis labels sit over it. */
   first: boolean;
+  /** The last stop, where no "today" outline is drawn (`isLive` there is
+   *  false on a closed position: its receipts read as the close's). */
+  atLive: boolean;
 }) {
   const id = `flows-${side}`;
   const coll = side === "collateral";
@@ -449,7 +453,7 @@ function SideBlock({
         max={model.axis.max}
         ticks={model.axis.ticks}
         height="h-10 sm:h-11"
-        today={isLive ? null : coll ? model.today.collateral : model.today.debt}
+        today={atLive ? null : coll ? model.today.collateral : model.today.debt}
         active={active}
         onHover={onHover}
         onPin={onPin}
@@ -630,18 +634,29 @@ function ScrubberBody({ model }: { model: FlowModel }) {
   const assets = useMemo(() => assetsAt(model, stop), [model, stop]);
   const active = pinned ?? hover;
   const pin = (k: string) => setPinned((p) => (p === k ? null : k));
-  const dateText = s.isLive ? "Today, live prices" : dayStamp(dayStart(model, stop));
-  const when = s.isLive ? "now" : `the end of ${dateText}`;
-  const dateLine = s.isLive
-    ? `Position ${dateText.charAt(0).toLowerCase()}${dateText.slice(1)}`
-    : `Position on ${dateText}`;
+  // Closed: nothing held after the last event, so the last stop is its close.
+  const closed = !(model.heldAt[model.heldAt.length - 1] ?? []).some((h) => (h.amount ?? 0) > 0);
+  // A closed position's last stop is stated as the close: its day, its prices.
+  const atClose = s.isLive && closed;
+  const closeDay = dayStamp(dayStart(model, model.lastDay));
+  const dateText = atClose
+    ? `At close, ${closeDay}`
+    : s.isLive
+      ? "Today, live prices"
+      : dayStamp(dayStart(model, stop));
+  const when = atClose ? `the close on ${closeDay}` : s.isLive ? "now" : `the end of ${dateText}`;
+  const dateLine = atClose
+    ? `Position at close, ${closeDay}`
+    : s.isLive
+      ? `Position ${dateText.charAt(0).toLowerCase()}${dateText.slice(1)}`
+      : `Position on ${dateText}`;
+  // Receipts read the live stop as the close's where the position closed.
+  const liveReceipts = s.isLive && !closed;
   const counter =
     model.totalTxs != null && s.txs != null
       ? `${s.txs.toLocaleString("en-US")} of ${model.totalTxs.toLocaleString("en-US")} transaction${model.totalTxs === 1 ? "" : "s"}`
       : `${s.count.toLocaleString("en-US")} of ${model.totalEvents.toLocaleString("en-US")} event${model.totalEvents === 1 ? "" : "s"}`;
   const repricedHere = s.isLive ? [] : model.repricings.filter((r) => r.day === stop);
-  // Closed: nothing held after the last event, so the last stop is its close.
-  const closed = !(model.heldAt[model.heldAt.length - 1] ?? []).some((h) => (h.amount ?? 0) > 0);
   const btn = `${CTRL_GHOST} ${CTRL_OFF} size-11 shrink-0 rounded-md sm:size-9`;
   const go = (to: number) => {
     halt();
@@ -662,7 +677,8 @@ function ScrubberBody({ model }: { model: FlowModel }) {
         side="collateral"
         st={s.collateral}
         model={model}
-        isLive={s.isLive}
+        isLive={liveReceipts}
+        atLive={s.isLive}
         open={open.collateral}
         onToggle={() => setOpen((o) => ({ ...o, collateral: !o.collateral }))}
         active={active}
@@ -681,7 +697,8 @@ function ScrubberBody({ model }: { model: FlowModel }) {
           side="debt"
           st={s.debt}
           model={model}
-          isLive={s.isLive}
+          isLive={liveReceipts}
+          atLive={s.isLive}
           open={open.debt}
           onToggle={() => setOpen((o) => ({ ...o, debt: !o.debt }))}
           active={active}
@@ -733,7 +750,7 @@ function ScrubberBody({ model }: { model: FlowModel }) {
                 borderColor: "var(--rb-tooltip-border)",
               }}
             >
-              {s.isLive ? "Today" : dateText}
+              {atClose ? "Close" : s.isLive ? "Today" : dateText}
             </span>
           )}
         </div>
