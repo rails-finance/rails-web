@@ -54,7 +54,7 @@ export function flowRemainderProv(label: string, side: FlowSide, when: string): 
   const held = side === "collateral" ? "held" : "owed";
   return {
     kind: "chain-derived",
-    summary: `${label} at ${when} — the remainder: what the position has ${held} at that date less every flow above it, each flow valued at the oracle price at its block. It holds price changes and interest together; no funds moved.`,
+    summary: `${label} ${when === "now" ? "now" : `at ${when}`} — the remainder: what the position has ${held} ${when === "now" ? "now" : "at that date"} less every flow above it, each flow valued at the oracle price at its block. It holds price changes and interest together; no funds moved.`,
     formula: `${held} − Σ flows`,
   };
 }

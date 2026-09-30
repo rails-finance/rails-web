@@ -217,11 +217,13 @@ export function FlowPanelShell({
     return () => window.removeEventListener("keydown", onKey, true);
   }, [phone]);
 
+  // Once, as it opens, after it is placed (a hidden panel takes no focus).
+  const focused = useRef(false);
   useEffect(() => {
-    if (focusOnOpen && !phone) ref.current?.focus();
-    // Once, as it opens.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!focusOnOpen || phone || !pos || focused.current) return;
+    focused.current = true;
+    ref.current?.focus();
+  }, [focusOnOpen, phone, pos]);
 
   if (typeof document === "undefined") return null;
   if (phone)
