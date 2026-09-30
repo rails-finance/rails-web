@@ -25,19 +25,24 @@ function inflowAt(m: FlowModel, side: "collateral" | "debt", row = m.rows[m.rows
 /** Events and transactions before the model's first stop (a window's opening). */
 const baseCounts = (m: FlowModel) => ({ events: m.opening?.events ?? 0, txs: m.opening?.txs ?? 0 });
 
+/** The most the collateral has been in the model's stops, today included. */
+const collateralPeak = (m: FlowModel) => Math.max(m.live.collateralUsd, ...m.valued.map((v) => v.collateral));
+
 /** Busy: more than BUSY_EVENTS events in the model's stops, or deposits over
  *  BUSY_TURNOVER times the most the collateral has been in them. Measured
  *  against that peak, a position that deposited once and withdrew most of it
  *  is not busy; one that cycles the same funds in and out is. */
 export function isBusy(m: FlowModel): boolean {
   if (m.totalEvents - baseCounts(m).events > BUSY_EVENTS) return true;
-  const peak = Math.max(m.live.collateralUsd, ...m.valued.map((v) => v.collateral));
+  const peak = collateralPeak(m);
   return peak > 0 && inflowAt(m, "collateral") > BUSY_TURNOVER * peak;
 }
 
 /** The throughput over the model's stops (the window's, where it is cut to one):
- *  what came in on each side, the transactions,
- *  and how many times over the deposits have replaced the collateral held now. */
+ *  what came in on each side, the transactions, and the turnover: the deposits
+ *  over the most the collateral has been in the stops, the base `isBusy` uses.
+ *  Against the collateral held now, a position emptied to $15.70 read as
+ *  "turned over about 230,000,000 times". */
 export function throughput(m: FlowModel): {
   deposited: number;
   borrowed: number;
@@ -47,8 +52,8 @@ export function throughput(m: FlowModel): {
 } {
   const deposited = inflowAt(m, "collateral");
   const borrowed = inflowAt(m, "debt");
-  const held = m.live.collateralUsd;
-  const ratio = held > 0 ? deposited / held : 0;
+  const peak = collateralPeak(m);
+  const ratio = peak > 0 ? deposited / peak : 0;
   return {
     deposited,
     borrowed,
