@@ -218,8 +218,8 @@ export function AaveV3PositionExplanation({
               {sinceWords(captions?.debtInterestSince)}
             </>
           )}
-          , counted from when each balance last started from zero; the Lifetime flows panel counts the interest of
-          the whole life.
+          , counted from when each balance last started from zero; the Lifetime flows panel counts the interest of the
+          whole life.
         </span>,
       );
     }
@@ -322,6 +322,9 @@ import { MARKET_NAME } from "@/lib/aave-v3/asset-catalog";
 import { formatDate } from "@/lib/date";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
+import { isWethGateway } from "@/lib/aave-v3/chain-truth-tower";
+import { useV3Pool } from "@/lib/aave-v3/pool-context";
+import { v3Protocol } from "@/lib/aave-v3/protocol-name";
 
 function closureDate(unix: number): string {
   return formatDate(unix);
@@ -375,6 +378,7 @@ export function AaveV3ClosedPositionExplanation({
    *  market", "Seamless market") so the pane never calls a Base Pool "Core". */
   marketPhrase?: string;
 }) {
+  const protocol = v3Protocol(useV3Pool());
   if (v.status === "open") return null;
 
   const aave = events.filter(isAaveV3Event);
@@ -386,7 +390,13 @@ export function AaveV3ClosedPositionExplanation({
   // The newest activity overall — a served folder's last member when it is
   // newer than every loaded row, the loaded row otherwise.
   const newestFolder = newestActivityFolder(aave, folders);
-  const lastType = newestFolder ? null : aave.length > 0 ? aave[aave.length - 1].context.data.eventType : null;
+  const lastRow = newestFolder ? null : aave.length > 0 ? aave[aave.length - 1].context.data : null;
+  // A transfer to a WETH gateway is a withdrawal as ETH (the gateway withdraws
+  // it in the same transaction), and ends the record as a withdrawal does.
+  const lastType =
+    lastRow?.eventType === "transfer_out" && isWethGateway(lastRow.counterparty)
+      ? "withdraw"
+      : (lastRow?.eventType ?? null);
   // How the record actually ended — the truthful closure attribution. The
   // liquidated STATUS only says seizures exist somewhere in the record; the
   // ending is a separate fact (1,438 of 4,369 liquidated-status accounts ended
@@ -472,12 +482,13 @@ export function AaveV3ClosedPositionExplanation({
   if (everLiquidated) {
     bullets.push(
       <span key="seizures">
-        Liquidation seized it <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} — an Aave V3
-        liquidation is by parts: a liquidator repays a slice of one borrowed reserve and takes collateral from one
-        supplied reserve at that pair&rsquo;s liquidation bonus, so a single call need not empty the account.{" "}
+        Liquidation seized it <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} —{" "}
+        {protocol === "Aave V3" ? "an" : "a"} {protocol} liquidation is by parts: a liquidator repays a slice of one
+        borrowed reserve and takes collateral from one supplied reserve at that pair&rsquo;s liquidation bonus, so a
+        single call need not empty the account.{" "}
         {endedBySeizure
           ? "Here the final seizure emptied it entirely."
-          : "What remained after the seizures left by the account's own transactions."}{" "}
+          : "The account's own transactions then took out what the seizures left."}{" "}
         Seizures in the record are what mark the outcome Liquidated.
       </span>,
     );

@@ -349,7 +349,7 @@ export function AaveV3CtEventDetail({
     // Seized collateral reduces the supply balance (change negative).
     push(
       statFor({
-        label: "Collateral",
+        label: "Supplied",
         symbol: collSym,
         reserve: ctx.collateralAsset,
         side: "supply",
@@ -652,7 +652,14 @@ export function AaveV3CtEventDetail({
           Position state isn&rsquo;t available for this event.
         </div>
       )}
-      {ready && <AaveV3PositionStateBlock state={ready} coords={stateCoords} touched={touched} />}
+      {ready && (
+        <AaveV3PositionStateBlock
+          state={ready}
+          coords={stateCoords}
+          touched={touched}
+          liquidation={ctx.eventType === "liquidation"}
+        />
+      )}
       {forensics && <LiquidationForensics {...forensics} />}
       {fee && ctx.collateralSymbol && (
         <div className="px-5 pb-2 text-xs text-rb-500">

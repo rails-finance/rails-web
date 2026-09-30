@@ -207,3 +207,29 @@ export function emodeName(state: AaveV3PositionState, id: number): string {
   const label = state.emode?.categories[String(id)]?.label;
   return label ? label : `Category ${id}`;
 }
+
+/** The balances before the transaction valued at block N's oracle prices — the
+ *  prices a liquidation in block N ran at — on one basis: the health factor
+ *  (Σ collateral × price × threshold ÷ Σ debt × price) and the loan-to-value
+ *  (Σ debt ÷ Σ collateral the Pool counts: switched on, threshold above 0).
+ *  The account's own before figures are the end of block N−1, at N−1's prices.
+ *  Null where a reserve is unpriced or unnamed. */
+export function beforeAtBlockPrices(state: AaveV3PositionState): { hf: number | null; ltv: number | null } | null {
+  const cat = state.emode && state.emode.before > 0 ? state.emode.categories[String(state.emode.before)] : undefined;
+  let weighted = 0;
+  let coll = 0;
+  let debt = 0;
+  for (const r of state.reserves) {
+    if (r.priceBase == null || r.decimals == null) return null;
+    const p = Number(r.priceBase) / 1e8;
+    const supply = Number(humanOf(r.supply.before, r.decimals));
+    const owed = Number(humanOf(r.debt.before, r.decimals));
+    const lt = r.inEmode && cat ? cat.liquidationThresholdBps : (r.liquidationThresholdBps ?? 0);
+    if (r.collateral?.before && supply > 0 && lt > 0) {
+      weighted += supply * p * (lt / 1e4);
+      coll += supply * p;
+    }
+    debt += owed * p;
+  }
+  return { hf: debt > 0 ? weighted / debt : null, ltv: coll > 0 ? debt / coll : null };
+}

@@ -29,15 +29,17 @@ const inFlight = new Map<string, Promise<Settled>>();
 const LASTING_REFUSALS = new Set([400, 404]);
 const LOADING: AaveV3PositionStateResult = { status: "loading" };
 
-/** The Ethereum markets read the index's answer; Base and SparkLend read the
- *  chain at the block (app/api/chain/{aave-v3-base,spark}/position-state), same
- *  wire shape. */
+/** The Ethereum markets read the index's answer; Base, Seamless and SparkLend
+ *  read the chain at the block (app/api/chain/{aave-v3-base,seamless,spark}/
+ *  position-state), same wire shape. */
 const routeFor = (market: string): string =>
   market === "base"
     ? "/api/chain/aave-v3-base/position-state"
-    : market === "spark"
-      ? "/api/chain/spark/position-state"
-      : "/api/aave-v3/timeline/position-state";
+    : market === "seamless"
+      ? "/api/chain/seamless/position-state"
+      : market === "spark"
+        ? "/api/chain/spark/position-state"
+        : "/api/aave-v3/timeline/position-state";
 
 async function read(key: string, qs: string, market: string): Promise<Settled> {
   try {
@@ -75,9 +77,9 @@ export function prefetchAaveV3PositionState(args: {
   inFlight.set(key, read(key, qs, market));
 }
 
-/** Null when the card carries no market (Seamless, and a Base event sharing
- *  its block with another of the owner's transactions): those keep the
- *  replayed principal line and never ask. */
+/** Null when the card carries no market (a Base or Seamless event sharing its
+ *  block with another of the owner's transactions): those keep the replayed
+ *  principal line and never ask. */
 export function useAaveV3PositionState(args: {
   wallet?: string;
   market?: string;

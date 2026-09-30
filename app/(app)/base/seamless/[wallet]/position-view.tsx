@@ -41,6 +41,7 @@ import {
 import { AaveV3PoolNotes, type AaveV3FrozenMarket } from "@/components/protocol/aave-v3/aave-v3-pool-notes";
 import { AaveV3RiskSlot } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
+import { aaveV3Neighbours, type AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -230,6 +231,21 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
 
   const events = useMemo<BaseActivityEvent[]>(() => timeline?.events ?? [], [timeline]);
   const aaveEvents = useMemo(() => events.filter(isAaveV3Event), [events]);
+  // Each card's same-transaction rows and the transaction before it: the open
+  // card reads the account at blocks N−1 and N (/api/chain/seamless/
+  // position-state), as on Aave V3 Base.
+  const neighbours = useMemo(() => aaveV3Neighbours(aaveEvents as AaveV3TimelineEvent[]), [aaveEvents]);
+  // A block holding two of the owner's transactions has no N−1 read that is
+  // "immediately before" the second: those cards keep the row's own figures.
+  const sharedBlocks = useMemo(() => {
+    const txs = new Map<number, Set<string>>();
+    for (const e of aaveEvents) {
+      const set = txs.get(e.blockNumber) ?? new Set<string>();
+      set.add((e.txHash ?? e.id).toLowerCase());
+      txs.set(e.blockNumber, set);
+    }
+    return new Set([...txs].filter(([, s]) => s.size > 1).map(([b]) => b));
+  }, [aaveEvents]);
 
   // The served list as ROWS, when the route grouped it; the plan and the
   // events it interleaves come from one answer.
@@ -320,10 +336,29 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     };
   }, [data, events, timeline, wallet]);
 
-  const view = useMemo(
-    () => (data && !data.chainStale ? v3ViewFromChain(data, "seamless", prices, events, history) : null),
-    [data, prices, events, history],
-  );
+  // Every row in hand (no folder, nothing trimmed): the flows read the rows,
+  // as on Aave V3 Base.
+  const wholeRows = sweptClean && (servedFolders?.length ?? 0) === 0 && (timeline?.coverage.omitted?.count ?? 0) === 0;
+
+  const view = useMemo(() => {
+    if (!data || data.chainStale) return null;
+    const base = v3ViewFromChain(data, "seamless", prices, events, history);
+    const liqs = base.liquidationCount;
+    const v: typeof base = {
+      ...base,
+      eventTotal: timeline?.totalEvents ?? null,
+      countRule: "Withdrawals as ETH through the WETH gateway and other aToken transfers count",
+      ...(liqs > 0
+        ? {
+            countNote:
+              liqs === 1
+                ? "the liquidation is a row of its own, sent by the liquidator"
+                : "each liquidation is a row of its own, sent by the liquidator",
+          }
+        : {}),
+    };
+    return v;
+  }, [data, prices, events, history, timeline]);
 
   // The month read (hooks/useTimelineSegment.ts): a month the preload does
   // not hold is sliced from the route's replay (`&from=&to=`), whose running
@@ -396,7 +431,10 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   // and only when the sweep read every block, because an attribution against
   // a partial history would call missed principal "interest".
   const captions = useMemo(
-    () => (view && data ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents) : null),
+    () =>
+      view && data
+        ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents)
+        : null,
     [view, data, sweptClean, lifetime, aaveEvents],
   );
 
@@ -447,11 +485,15 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   // current state comes from the Pool, not the logs) and drops the flows.
   const towerData = useMemo(() => {
     if (!view) return null;
+    // Every row in hand: the flows reduce from the rows, so a withdrawal
+    // through the WETH gateway counts as withdrawn and each flow is valued at
+    // its event's oracle price. The route's lifetime sums stand in only where
+    // rows are missing.
     const built = computeAaveV3Economics(
       view,
-      undefined,
+      wholeRows ? aaveEvents : undefined,
       SEAMLESS_TOWER_VOCABULARY,
-      sweptClean ? lifetime : undefined,
+      sweptClean && !wholeRows ? lifetime : undefined,
       // Each lane's net moved beside its chain balance (decision 0033): a side
       // holding one reserve splits into that net and the interest on top.
       sweptClean ? laneInterest : undefined,
@@ -463,7 +505,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
           flowsNote:
             "Lifetime flows are hidden because the history sweep did not read every block of this position's life — see the note under the timeline for where it stopped or what it missed. Summing what did arrive would label a partial history “all time”. The current balances above are unaffected: they are read from the Pool, not replayed from the events.",
         };
-  }, [view, lifetime, sweptClean, laneInterest]);
+  }, [view, lifetime, sweptClean, laneInterest, wholeRows, aaveEvents]);
 
   return (
     <CaptureSourceProvider value={captureSource}>
@@ -622,6 +664,9 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                           eventNumber={meta.eventNumber}
                           isFirst={meta.isFirst}
                           isLast={meta.isLast}
+                          market={sharedBlocks.has(event.blockNumber) ? undefined : "seamless"}
+                          siblings={neighbours.get(event.id)?.siblings}
+                          previous={neighbours.get(event.id)?.previous}
                         />
                       ) : null
                     }

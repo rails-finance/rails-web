@@ -36,6 +36,7 @@ import { StatCard, StateTransition, TransitionArrow } from "@/components/shared/
 import { PositionRow, fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
 import { hfLabelV4 } from "@/lib/aave-v4/format";
 import { formatUsdValue } from "@/lib/utils/format";
+import { v3Brand, v3Protocol } from "@/lib/aave-v3/protocol-name";
 import {
   accountRatioProv,
   accountTotalProv,
@@ -51,6 +52,7 @@ import {
 } from "@/lib/aave-v3/event-provenance";
 import {
   baseToUsd,
+  beforeAtBlockPrices,
   big,
   bpsPct,
   emodeName,
@@ -361,15 +363,20 @@ export function AaveV3PositionStateBlock({
   state,
   coords,
   touched = [],
+  liquidation = false,
 }: {
   state: AaveV3PositionState;
   coords: V3Coords;
   /** Reserves the event touched: the grid above gives way to their row for
    *  the same balance (§47), so the dust rule here never hides it (§52). */
   touched?: TouchedLeg[];
+  /** The event is a liquidation: a line under the grid states the before
+   *  figures at the prices the call ran at (block N), beside the end of N−1. */
+  liquidation?: boolean;
 }) {
   const { account, emode, sources } = state;
   const touchedOn = (side: Side): Set<string> => new Set(touched.filter((t) => t.side === side).map((t) => t.reserve));
+  const atCall = liquidation ? beforeAtBlockPrices(state) : null;
 
   const accountCard = (figure: (side: AaveV3AccountSide, when: When) => Figure, always = false) =>
     account ? (
@@ -494,8 +501,21 @@ export function AaveV3PositionStateBlock({
         {account && (
           <p>
             Current LTV is the debt divided by the collateral. Max LTV and the liquidation threshold are each collateral
-            asset&rsquo;s setting at this block averaged by its value, so they move when the mix of collateral changes;
-            Aave governance changes the settings over time.
+            asset&rsquo;s setting at this block averaged by its value, so they move when the mix of collateral changes;{" "}
+            {v3Brand(v3Protocol(coords.pool))} governance changes the settings over time.
+          </p>
+        )}
+        {account && liquidation && atCall?.hf != null && (
+          <p data-liq-basis>
+            Before is the account at the end of block {(state.block - 1).toLocaleString("en-US")}. At the oracle prices
+            the liquidation ran at (block {state.block.toLocaleString("en-US")}) the health factor before it was{" "}
+            {atCall.hf.toFixed(4)}
+            {atCall.ltv != null ? <> and the loan-to-value {(atCall.ltv * 100).toFixed(2)}%</> : null}
+            {account.before.healthFactor != null &&
+            Math.abs(wadToNumber(account.before.healthFactor) - atCall.hf) < 0.0005
+              ? "; the prices did not move between the two blocks"
+              : ""}
+            .
           </p>
         )}
         {missing && <p>{missing}</p>}

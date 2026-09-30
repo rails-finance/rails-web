@@ -41,6 +41,13 @@ export default function SeamlessMarketPage() {
               enforced, and none of it is an invitation.
             </span>
           </p>
+          <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
+            SEAM, DEGEN and BRETT have no market price here: the Pool&rsquo;s oracle returns a fixed $1.00 for each, so
+            the page shows their size in tokens and leaves them out of the dollar totals. None of the three is
+            collateral. The reserves whose names start with r (rWETH, rwstETH, rweETH, rUSDC, rcbBTC) are what their
+            contracts call Seamless ILM Reserved tokens, one each for WETH, wstETH, weETH, USDC and cbBTC; ILM is
+            Seamless&rsquo;s name for its leverage strategies. The oracle prices each at its underlying asset.
+          </p>
         </div>
       </div>
 
