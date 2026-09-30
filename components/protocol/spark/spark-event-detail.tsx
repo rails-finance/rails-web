@@ -297,6 +297,10 @@ export function SparkEventDetail({
         <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="loading">
           Reading the account before and after this transaction…
         </div>
+      ) : read.status === "unavailable" && !read.lasting ? (
+        <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="unread">
+          The account before and after this transaction was not read. Reload to try again.
+        </div>
       ) : null}
       {forensics && (
         <LiquidationForensics

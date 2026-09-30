@@ -132,6 +132,9 @@ interface SparkPositionDetailProps {
   initialLaneInterest?: AaveLaneInterest[] | null;
 }
 
+
+/** How long the card waits on the live Pool read before saying it was not read. */
+const HF_READ_WAIT_MS = 30_000;
 export default function SparkPositionDetail({
   wallet,
   initialPosition,
@@ -432,22 +435,31 @@ export default function SparkPositionDetail({
   );
 
   const pricedFlowsRef = useRef<string | null>(null);
+  // Seeded from the merged lifetime, so a reserve the position only ever
+  // touched below the cut still gets its oracle price — otherwise the tower's
+  // strict per-total guard would gate the whole ECONOMICS panel on a wallet
+  // whose oldest reserves are all in the opening balance.
+  const missingPrices = useMemo(
+    () =>
+      !view || view.status !== "open" || sparkEvents.length === 0
+        ? []
+        : unpricedSparkFlowAddresses(view, sparkEvents, precomputedLifetime),
+    [view, sparkEvents, precomputedLifetime],
+  );
+  // One read per set of reserves: the route's lifetime can name reserves the
+  // page's rows did not.
+  const missingKey = missingPrices.length > 0 ? `${wallet}:${missingPrices.join(",")}` : null;
+  // Until the read for this set has answered, the flows prose says it is
+  // reading rather than that no price was captured.
+  const [answeredPriceKey, setAnsweredPriceKey] = useState<string | null>(null);
+  const pricesReading = missingKey != null && answeredPriceKey !== missingKey;
   useEffect(() => {
-    if (!view || view.status !== "open" || sparkEvents.length === 0) return;
-    // Seeded from the merged lifetime, so a reserve the position only ever
-    // touched below the cut still gets its oracle price — otherwise the tower's
-    // strict per-total guard would gate the whole ECONOMICS panel on a wallet
-    // whose oldest reserves are all in the opening balance.
-    const missing = unpricedSparkFlowAddresses(view, sparkEvents, precomputedLifetime);
-    if (missing.length === 0) return;
-    // One read per set of reserves: the route's lifetime can name reserves the
-    // page's rows did not.
-    const key = `${wallet}:${missing.join(",")}`;
-    if (pricedFlowsRef.current === key) return;
+    if (missingKey == null || pricedFlowsRef.current === missingKey) return;
+    const key = missingKey;
     pricedFlowsRef.current = key;
     // Not cancelled when the lifetime changes under it (the route's answer
     // landing): the prices still belong to this wallet's view.
-    fetchSparkOraclePrices(missing)
+    fetchSparkOraclePrices(missingPrices)
       .then((prices) => {
         if (Object.keys(prices).length === 0) return;
         setView((v) =>
@@ -458,8 +470,10 @@ export default function SparkPositionDetail({
       })
       .catch(() => {
         // The tower simply stays on the gated token list.
-      });
-  }, [view, sparkEvents, wallet, precomputedLifetime]);
+      })
+      .finally(() => setAnsweredPriceKey(key));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missingKey, wallet]);
 
   // ── ONE SEGMENT OF TIME, navigated by month ─────────────────────────────
   //
@@ -648,9 +662,22 @@ export default function SparkPositionDetail({
   // risk slot's live one — two "drop to liquidation" percentages from two
   // blocks on one card. The listing keeps the snapshot; this page re-reads
   // live (which the snapshot receipt itself states).
+  // Until the read lands the card says the health factor is reading; a read
+  // that failed, or has not answered in HF_READ_WAIT_MS, says it was not read.
+  const [chainSlow, setChainSlow] = useState(false);
+  useEffect(() => {
+    setChainSlow(false);
+    const t = setTimeout(() => setChainSlow(true), HF_READ_WAIT_MS);
+    return () => clearTimeout(t);
+  }, [wallet]);
   const liveView = useMemo<SparkPositionView | null>(
-    () => (view && chain ? { ...view, healthFactor: chain.healthFactor, chainHfStale: false } : view),
-    [view, chain],
+    () =>
+      view && chain
+        ? { ...view, healthFactor: chain.healthFactor, chainHfStale: false }
+        : view && view.status === "open"
+          ? { ...view, hfRead: chainSettled || chainSlow ? "unread" : "reading" }
+          : view,
+    [view, chain, chainSettled, chainSlow],
   );
 
   // Stat captions (accrued interest, borrow rate) — the event stream feeds the
@@ -801,6 +828,7 @@ export default function SparkPositionDetail({
                 sparkEvents.some((e) => isGatewayWithdrawal(e.context.data)),
                 activity ? sparkEvents : null,
                 (view?.borrows ?? []).filter((r) => r.amount > 0).map((r) => r.symbol),
+                pricesReading,
               )}
               learnMore={sparkEconomicsContent(towerData)}
               timeline={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : undefined}

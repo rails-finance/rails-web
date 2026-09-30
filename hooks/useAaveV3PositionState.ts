@@ -13,6 +13,15 @@
 //
 // Lazy-fetch idiom after the Dolomite and LlamaLend details: fetch in an effect,
 // drop a late answer after unmount.
+//
+// A read that never lands must not leave a row "reading" forever (SparkLend
+// newcomer round 4: 10 of 31 rows opened in a row stayed on the reading line).
+// Each attempt gives up after READ_TIMEOUT_MS; a refusal that can change is
+// asked once more after a pause; then the result is "unavailable" with
+// `lasting: false`, which the cards state as "not read, reload to try again".
+// Opening every row of a 31-row page asks 31 reads, so at most MAX_IN_FLIGHT
+// run at once and the rest queue, which keeps the chain reads under the RPC's
+// rate limit.
 
 import { useEffect, useState } from "react";
 import type { AaveV3PositionState } from "@/lib/aave-v3/position-state";
@@ -20,7 +29,7 @@ import type { AaveV3PositionState } from "@/lib/aave-v3/position-state";
 export type AaveV3PositionStateResult =
   | { status: "loading" }
   | { status: "ready"; data: AaveV3PositionState }
-  | { status: "unavailable"; code: string };
+  | { status: "unavailable"; code: string; /** A refusal a reload cannot change (400, 404). */ lasting: boolean };
 
 type Settled = Exclude<AaveV3PositionStateResult, { status: "loading" }>;
 
@@ -41,20 +50,53 @@ const routeFor = (market: string): string =>
         ? "/api/chain/spark/position-state"
         : "/api/aave-v3/timeline/position-state";
 
+const READ_TIMEOUT_MS = 25_000;
+const RETRY_AFTER_MS = 2_000;
+const MAX_IN_FLIGHT = 3;
+
+let running = 0;
+const waiting: (() => void)[] = [];
+
+/** Run `job` when fewer than MAX_IN_FLIGHT reads are out. */
+async function limited<T>(job: () => Promise<T>): Promise<T> {
+  if (running >= MAX_IN_FLIGHT) await new Promise<void>((go) => waiting.push(go));
+  running++;
+  try {
+    return await job();
+  } finally {
+    running--;
+    waiting.shift()?.();
+  }
+}
+
+async function attempt(qs: string, market: string): Promise<Settled> {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), READ_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${routeFor(market)}?${qs}`, { signal: ac.signal });
+    const body = (await res.json().catch(() => null)) as (AaveV3PositionState & { code?: string }) | null;
+    if (res.ok && body && Array.isArray(body.reserves)) return { status: "ready", data: body };
+    return {
+      status: "unavailable",
+      code: body?.code ?? String(res.status),
+      lasting: LASTING_REFUSALS.has(res.status),
+    };
+  } catch {
+    return { status: "unavailable", code: ac.signal.aborted ? "timeout" : "network", lasting: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function read(key: string, qs: string, market: string): Promise<Settled> {
   try {
-    const res = await fetch(`${routeFor(market)}?${qs}`);
-    const body = (await res.json().catch(() => null)) as (AaveV3PositionState & { code?: string }) | null;
-    if (res.ok && body && Array.isArray(body.reserves)) {
-      const ready: Settled = { status: "ready", data: body };
-      settled.set(key, ready);
-      return ready;
+    let r = await limited(() => attempt(qs, market));
+    if (r.status === "unavailable" && !r.lasting) {
+      await new Promise((go) => setTimeout(go, RETRY_AFTER_MS));
+      r = await limited(() => attempt(qs, market));
     }
-    const refused: Settled = { status: "unavailable", code: body?.code ?? String(res.status) };
-    if (LASTING_REFUSALS.has(res.status)) settled.set(key, refused);
-    return refused;
-  } catch {
-    return { status: "unavailable", code: "network" };
+    if (r.status === "ready" || r.lasting) settled.set(key, r);
+    return r;
   } finally {
     inFlight.delete(key);
   }

@@ -39,24 +39,19 @@ export function fmtTokenAmount(n: number): string {
   return n.toLocaleString("en-US", { maximumFractionDigits: decimals });
 }
 
-export function hfLabel(hf: number | null): string {
-  if (hf == null || hf >= 100) return "∞";
-  return hf.toFixed(2);
-}
-
 /** A health factor at or above this reads as a capped figure (">100"). */
 export const HF_CAP = 100;
 
-/** The Aave V4 health-factor label: a third decimal below 1.1, so a position
- *  at 1.004 does not read as 1.00, the liquidation line. `hfLabel` stays two
- *  decimals for the other explorers that import it. RULE: "∞" only where no
+/** The Aave V4 and SparkLend health-factor label, the Aave V3 family's format
+ *  (`hfLabelV3`): four decimals below 1.1, so a position at 1.0004 does not
+ *  read as 1.000, the liquidation line; two above. RULE: "∞" only where no
  *  debt remains (null); a finite factor however large is capped at ">100". */
 export function hfLabelV4(hf: number | null): string {
   if (hf == null) return "∞";
   if (hf >= HF_CAP) return `>${HF_CAP}`;
-  // Below 1 round down, so a liquidatable 0.9997 never reads 1.000.
-  if (hf < 1) return (Math.floor(hf * 1000) / 1000).toFixed(3);
-  return hf < 1.1 ? hf.toFixed(3) : hf.toFixed(2);
+  // Below 1 round down, so a liquidatable 0.99997 never reads 1.0000.
+  if (hf < 1) return (Math.floor(hf * 1e4 + 1e-9) / 1e4).toFixed(4);
+  return hf < 1.1 ? hf.toFixed(4) : hf.toFixed(2);
 }
 
 /** The health factor in a sentence: "over 100" where the label reads ">100". */

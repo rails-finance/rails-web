@@ -42,7 +42,7 @@ import { accountDataProv, reserveDataProv, avgBorrowRateProv } from "@/lib/spark
 import { sparkLiquidationRead, type SparkCardCaptions } from "@/lib/spark/economics";
 import { sparkPositionContent } from "@/lib/spark/position-content";
 import { formatUsd } from "@/lib/shared/format-event";
-import { fmtLiqPrice } from "@/lib/aave-v4/format";
+import { fmtLiqPrice, hfLabelV4 } from "@/lib/aave-v4/format";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
 import {
@@ -82,6 +82,10 @@ export interface SparkPositionView {
    *  view, and the position page until its chain read lands — so the HF
    *  column is omitted rather than asserted. */
   chainHfStale?: boolean;
+  /** The position page only, while `chainHfStale`: the live read is out
+   *  ("reading") or failed ("unread"); the card says so in the health
+   *  factor's place. */
+  hfRead?: "reading" | "unread";
 }
 
 /** The count tip's reason for events outnumbering transactions. */
@@ -300,9 +304,10 @@ function LiquidationFootnote({ v }: { v: SparkPositionView }) {
 }
 
 /** Neutral HF headline (Rails doesn't color-code risk): "∞" above 100 — the
- *  figure stops meaning anything as a ratio there — else two decimals. */
+ *  figure stops meaning anything as a ratio there — else the family's format
+ *  (four decimals below 1.1, as the event tiles and the prose). */
 function hfLabel(hf: number): string {
-  return hf >= 100 ? "∞" : hf.toFixed(2);
+  return hf >= 100 ? "∞" : hfLabelV4(hf);
 }
 
 /** A vertical stack of the wallet's reserves on one side, each traced. */
@@ -628,7 +633,19 @@ export function SparkPositionCard({
           // charter. A read wallet with no debt reads "No debt" (HF is
           // undefined, ∞ in protocol terms).
           v.chainHfStale
-            ? null
+            ? v.hfRead
+              ? {
+                  label: ratioLabel("pooled"),
+                  labelTip: HF_TIP,
+                  value: (
+                    <StatValue color="text-rb-400">
+                      <span className="text-sm font-normal" data-spark-hf={v.hfRead}>
+                        {v.hfRead === "reading" ? "reading…" : "not read, reload to try again"}
+                      </span>
+                    </StatValue>
+                  ),
+                }
+              : null
             : {
                 label: ratioLabel("pooled"),
                 labelTip: HF_TIP,
