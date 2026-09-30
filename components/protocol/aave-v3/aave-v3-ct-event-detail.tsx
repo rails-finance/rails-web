@@ -667,7 +667,9 @@ export function AaveV3CtEventDetail({
           data-position-state="unavailable"
           data-position-code={state.code}
         >
-          Position state isn&rsquo;t available for this event.
+          {state.lasting
+            ? "Position state isn’t available for this event."
+            : "The position at this block was not read. Reload to try again."}
         </div>
       )}
       {ready && (

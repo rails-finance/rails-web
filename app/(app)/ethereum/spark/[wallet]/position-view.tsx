@@ -132,6 +132,9 @@ interface SparkPositionDetailProps {
   initialLaneInterest?: AaveLaneInterest[] | null;
 }
 
+/** How long the card waits on the live Pool read before saying it was not read. */
+const HF_READ_WAIT_MS = 30_000;
+
 export default function SparkPositionDetail({
   wallet,
   initialPosition,
@@ -648,9 +651,22 @@ export default function SparkPositionDetail({
   // risk slot's live one — two "drop to liquidation" percentages from two
   // blocks on one card. The listing keeps the snapshot; this page re-reads
   // live (which the snapshot receipt itself states).
+  // Until the read lands the card says the health factor is reading; a read
+  // that failed, or has not answered in HF_READ_WAIT_MS, says it was not read.
+  const [chainSlow, setChainSlow] = useState(false);
+  useEffect(() => {
+    setChainSlow(false);
+    const t = setTimeout(() => setChainSlow(true), HF_READ_WAIT_MS);
+    return () => clearTimeout(t);
+  }, [wallet]);
   const liveView = useMemo<SparkPositionView | null>(
-    () => (view && chain ? { ...view, healthFactor: chain.healthFactor, chainHfStale: false } : view),
-    [view, chain],
+    () =>
+      view && chain
+        ? { ...view, healthFactor: chain.healthFactor, chainHfStale: false }
+        : view && view.status === "open"
+          ? { ...view, hfRead: chainSettled || chainSlow ? "unread" : "reading" }
+          : view,
+    [view, chain, chainSettled, chainSlow],
   );
 
   // Stat captions (accrued interest, borrow rate) — the event stream feeds the

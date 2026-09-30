@@ -85,7 +85,12 @@ export function AaveFamilyEmodeSwitchCard({
           raw: here.data,
           state: sparkEventState(NO_RESERVE, undefined, here.data, undefined),
         }
-      : { status: here?.status ?? ("off" as const), raw: undefined, state: undefined };
+      : {
+          status: here?.status ?? ("off" as const),
+          lasting: here?.status === "unavailable" ? here.lasting : undefined,
+          raw: undefined,
+          state: undefined,
+        };
   const coords = { txHash: event.txHash, blockNumber: event.blockNumber };
   const v3Coords: V3Coords = {
     txHash: event.txHash,
@@ -131,6 +136,10 @@ export function AaveFamilyEmodeSwitchCard({
         ) : read.status === "loading" ? (
           <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="loading">
             Reading the account before and after this transaction…
+          </div>
+        ) : read.status === "unavailable" && !read.lasting ? (
+          <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="unread">
+            The account before and after this transaction was not read. Reload to try again.
           </div>
         ) : null
       }

@@ -15,7 +15,7 @@
 import type { SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
 import type { SparkPositionView } from "@/components/protocol/spark/spark-position-card";
 import { sparkLiquidationRead, type SparkCardCaptions } from "@/lib/spark/economics";
-import { fmtUsd, hfLabel, fmtLiqPrice } from "@/lib/aave-v4/format";
+import { fmtUsd, hfLabelV4, fmtLiqPrice } from "@/lib/aave-v4/format";
 import { formatUsd } from "@/lib/shared/format-event";
 import { pct } from "@/components/shared/ratio-bar";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -90,7 +90,14 @@ export function SparkPositionExplanation({
   // list (see the operator bullet below).
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
-  if (!chain) return null;
+  if (!chain) {
+    // The pane says what state the read is in, so it never opens empty.
+    if (view?.hfRead === "reading")
+      return <p className="text-sm text-rb-500">Reading the account from the Pool…</p>;
+    if (view?.hfRead === "unread")
+      return <p className="text-sm text-rb-500">The account was not read from the Pool. Reload to try again.</p>;
+    return null;
+  }
   const hasDebt = chain.totalDebtUsd > 0;
   const supplySyms = chain.reserves.filter((r) => r.supplyBalanceRaw !== "0").map((r) => r.symbol);
   const collateralSyms = chain.reserves
@@ -118,7 +125,7 @@ export function SparkPositionExplanation({
     <>This position supplies collateral only and carries no debt, so none of it can be liquidated:</>
   ) : hf != null ? (
     <>
-      This position borrows against its supplied collateral, held at a <H>{hfLabel(hf)}</H> health factor:
+      This position borrows against its supplied collateral, held at a <H>{hf == null || hf >= 100 ? "∞" : hfLabelV4(hf)}</H> health factor:
     </>
   ) : (
     <>This position borrows against its supplied collateral:</>

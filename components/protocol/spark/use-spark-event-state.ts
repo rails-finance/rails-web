@@ -22,6 +22,8 @@ export interface SparkStateArgs {
 
 export function useSparkEventState(a: SparkStateArgs): {
   status: "off" | "loading" | "ready" | "unavailable";
+  /** Unavailable only: true where a reload cannot change it (400, 404). */
+  lasting?: boolean;
   raw?: AaveV3PositionState;
   state?: SparkEventState;
 } {
@@ -33,6 +35,7 @@ export function useSparkEventState(a: SparkStateArgs): {
     txHash: a.previous?.txHash,
   });
   if (!here) return { status: "off" };
+  if (here.status === "unavailable") return { status: "unavailable", lasting: here.lasting };
   if (here.status !== "ready") return { status: here.status };
   const state = sparkEventState(a.ctx, a.reserveAddress, here.data, prev?.status === "ready" ? prev.data : undefined);
   return { status: state ? "ready" : "unavailable", raw: here.data, state };
