@@ -1,8 +1,10 @@
 "use client";
 
 // The SparkLend event card's account block (T2): the whole account before and
-// after the event's transaction — health factor, loan-to-value against its
-// limits, and the e-mode category — read from the chain at blocks N−1 and N
+// after the event's transaction — Collateral and Debt (the totals with each
+// reserve beneath, the Aave V3 family's cells), health factor, LTV against its
+// limits with what could still be borrowed, and the e-mode category (rails-ops
+// TO-DO-ui-jobs §213) — read from the chain at blocks N−1 and N
 // through the Aave V3 Base lane's loader (/api/chain/spark/position-state).
 // The receipts are the Aave V3 family's at-block receipts (SparkLend runs Aave
 // V3's account arithmetic), naming the SparkLend Pool.
@@ -14,22 +16,22 @@
 // line under the grid names the basis and gives the end-of-N−1 figures.
 //
 // E-mode always draws, "None" included, so a reader can tell the account's
-// limits are each asset's own figures; an account with no debt says it has no
-// health factor rather than leaving the grid empty.
+// limits are each asset's figures; an account with no debt says it has no
+// health factor.
 
 import type { ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { StatCard, StatSubline, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
 import { hfLabelV4 } from "@/lib/aave-v4/format";
-import {
-  accountRatioProv,
-  currentLtvProv,
-  emodeCategoryProv,
-  healthFactorProv,
-  type V3Coords,
-} from "@/lib/aave-v3/event-provenance";
+import { emodeCategoryProv, healthFactorProv, type V3Coords } from "@/lib/aave-v3/event-provenance";
 import { bpsPct, type AaveV3PositionState } from "@/lib/aave-v3/position-state";
 import { emodeLabel, type SparkEventState } from "@/lib/spark/event-state";
+import {
+  CollateralCellBody,
+  DebtCellBody,
+  LtvCellBody,
+  type TouchedLeg,
+} from "@/components/protocol/aave-v3/aave-v3-position-state";
 
 interface Fig {
   text: string;
@@ -90,18 +92,23 @@ export function SparkAccountState({
   raw,
   coords,
   isLiquidation,
+  touched = [],
   hfFormat = hfLabelV4,
 }: {
   state: SparkEventState;
   raw: AaveV3PositionState;
   coords: V3Coords;
   isLiquidation: boolean;
+  /** The reserves the event touched: their rows always draw (§47, §52). */
+  touched?: TouchedLeg[];
   /** The explorer's health-factor format; SparkLend's by default. */
   hfFormat?: (hf: number | null) => string;
 }) {
   const acc = raw.account;
   if (!acc) return null;
   const { before, after } = state;
+  const touchedOn = (side: "supply" | "debt"): Set<string> =>
+    new Set(touched.filter((t) => t.side === side).map((t) => t.reserve));
 
   const hfBeforeValue = isLiquidation && state.liqHfAtCall != null ? state.liqHfAtCall : before.hf;
   const hfFig = (hf: number | null, when: "before" | "after"): Fig => {
@@ -120,29 +127,16 @@ export function SparkAccountState({
           }),
     };
   };
+  // A liquidation's before LTV is at the prices the call ran at.
   const ltvAtCall = isLiquidation && state.liqLtvAtCall != null ? state.liqLtvAtCall : null;
-  const ltvFig = (when: "before" | "after"): Fig => {
-    const a = when === "before" ? before : after;
-    const v = when === "before" && ltvAtCall != null ? ltvAtCall : a.ltv;
-    const text = v == null ? "—" : `${(v * 100).toFixed(2)}%`;
-    return {
-      text,
-      value: text,
-      prov:
-        when === "before" && ltvAtCall != null
-          ? ltvAtCallProv(coords, ltvAtCall, before.ltv)
-          : currentLtvProv(when, coords, { debtUsd: a.debtUsd, collateralUsd: a.collateralUsd }),
-    };
-  };
-  const inEmode = state.emodeBefore.id !== 0 || state.emodeAfter.id !== 0;
-  const limitFig = (which: "ltv" | "lt"): Fig => {
-    const bps = which === "ltv" ? after.maxLtvBps : after.liquidationThresholdBps;
-    return {
-      text: bpsPct(bps),
-      value: bpsPct(bps),
-      prov: accountRatioProv(which, "after", coords, { bps, emode: inEmode }),
-    };
-  };
+  const ltvBefore: Fig | undefined =
+    ltvAtCall != null
+      ? {
+          text: `${(ltvAtCall * 100).toFixed(2)}%`,
+          value: `${(ltvAtCall * 100).toFixed(2)}%`,
+          prov: ltvAtCallProv(coords, ltvAtCall, before.ltv),
+        }
+      : undefined;
   const emodeFig = (when: "before" | "after"): Fig => {
     const e = when === "before" ? state.emodeBefore : state.emodeAfter;
     const name = emodeLabel(e);
@@ -158,11 +152,19 @@ export function SparkAccountState({
   };
 
   const hfChanged = hfBeforeValue !== after.hf;
-  const ltvBeforeValue = ltvAtCall ?? before.ltv;
-  const ltvChanged = (ltvBeforeValue ?? -1).toFixed(4) !== (after.ltv ?? -1).toFixed(4);
   const emodeChanged = state.emodeBefore.id !== state.emodeAfter.id;
 
-  const cards: { key: string; label: string; body: ReactNode }[] = [];
+  // Collateral and Debt: the totals with each reserve beneath (rails-ops
+  // TO-DO-ui-jobs §213); the event's own reserve is stated there once, the
+  // grid above giving way to it (§47).
+  const cards: { key: string; label: string; body: ReactNode }[] = [
+    {
+      key: "collateral",
+      label: "Collateral",
+      body: <CollateralCellBody state={raw} coords={coords} touched={touchedOn("supply")} />,
+    },
+    { key: "debt", label: "Debt", body: <DebtCellBody state={raw} coords={coords} touched={touchedOn("debt")} /> },
+  ];
   if (before.hf != null || after.hf != null)
     cards.push({
       key: "health-factor",
@@ -190,28 +192,7 @@ export function SparkAccountState({
       r.liquidationThresholdBps != null &&
       r.symbol != null,
   );
-  if (before.debtUsd > 0 || after.debtUsd > 0)
-    cards.push({
-      key: "ltv",
-      label: "Loan-to-value",
-      body: (
-        <>
-          <Pair before={ltvFig("before")} after={ltvFig("after")} changed={ltvChanged} />
-          {after.debtUsd > 0 && (
-            <StatSubline>
-              max{" "}
-              <Prov info={limitFig("ltv").prov} value={limitFig("ltv").value}>
-                {limitFig("ltv").text}
-              </Prov>{" "}
-              · liquidation at{" "}
-              <Prov info={limitFig("lt").prov} value={limitFig("lt").value}>
-                {limitFig("lt").text}
-              </Prov>
-            </StatSubline>
-          )}
-        </>
-      ),
-    });
+  cards.push({ key: "ltv", label: "LTV", body: <LtvCellBody state={raw} coords={coords} before={ltvBefore} /> });
   // E-mode always draws: "None" says the limits above are each asset's own.
   {
     cards.push({
@@ -258,9 +239,9 @@ export function SparkAccountState({
 
   return (
     <div className="px-5 pb-2" data-spark-account-state="ready">
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         {cards.map((c) => (
-          <div key={c.key} className="h-full" data-position-card={c.key}>
+          <div key={c.key} className="h-full min-w-0" data-position-card={c.key}>
             <StatCard label={c.label}>{c.body}</StatCard>
           </div>
         ))}

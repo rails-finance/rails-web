@@ -57,6 +57,10 @@ export interface AtBlockPricePill {
    *  letter instead of a mark. */
   address?: string;
   priceUsd: number;
+  /** The price as printed, where the adapter sets its precision (the Aave
+   *  V3 family prints the decimals that reproduce its USD figures); the
+   *  footnote's `format` otherwise. */
+  display?: string;
   priceProv: Provenance;
   /** Source note after the price (default "oracle at block"). */
   note?: string;
@@ -269,10 +273,10 @@ export function AtBlockPriceFootnote({
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-rb-500">
       {pills.map((pill, i) => (
-        <Prov key={i} info={pill.priceProv} value={format(pill.priceUsd)} symbol={pill.symbol}>
+        <Prov key={i} info={pill.priceProv} value={pill.display ?? format(pill.priceUsd)} symbol={pill.symbol}>
           <span className="inline-flex items-center gap-1 tabular-nums">
             <TokenChipIcon symbol={pill.symbol} address={pill.address} size={14} />
-            {pill.symbol} {format(pill.priceUsd)}
+            {pill.symbol} {pill.display ?? format(pill.priceUsd)}
             <span className="text-rb-400">· {pill.note ?? "oracle at block"}</span>
           </span>
         </Prov>

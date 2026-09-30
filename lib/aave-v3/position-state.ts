@@ -409,3 +409,75 @@ export function beforeAtBlockPrices(state: AaveV3PositionState): { hf: number | 
   }
   return { hf: debt > 0 ? weighted / debt : null, ltv: coll > 0 ? debt / coll : null };
 }
+
+/** What the account could still borrow at one end of the transaction, in
+ *  base units: max LTV × total collateral − total debt, floored at zero —
+ *  the Pool's availableBorrowsBase arithmetic (percentMul, half up). */
+export function borrowableBase(side: AaveV3AccountSide): bigint {
+  const room = (big(side.totalCollateralBase) * BigInt(side.ltvBps) + BigInt(5000)) / BigInt(10000);
+  const debt = big(side.totalDebtBase);
+  return room > debt ? room - debt : ZERO;
+}
+
+/** A USD figure as the position rows print it: whole dollars from $1 up, cents
+ *  under, "< $0.01" below a cent (components/shared/position-row fmtPositionUsd). */
+const shownUsd = (v: number): string => (v < 0.01 ? "<0.01" : v < 1 ? v.toFixed(2) : String(Math.round(v)));
+
+/** An 8-decimal oracle price printed to the fewest decimals (two at least)
+ *  whose product with every amount it prices rounds to the USD figure the card
+ *  prints: 0.9996 USDT reads "0.9996", since "1.00" would turn 7,912 USDT into
+ *  $7,912 where the card says $7,909. */
+export function priceText(priceBase: string, amounts: { raw: string; decimals: number }[]): string {
+  const p = big(priceBase);
+  const held = amounts.filter((a) => big(a.raw) > ZERO);
+  for (let d = 2; d <= 8; d++) {
+    const unit = pow10(8 - d);
+    const rounded = ((p + unit / BigInt(2)) / unit) * unit;
+    const fits = held.every(
+      (a) =>
+        shownUsd(rawToUsd(a.raw, rounded.toString(), a.decimals)) === shownUsd(rawToUsd(a.raw, priceBase, a.decimals)),
+    );
+    if (fits || d === 8) {
+      const [int, frac = ""] = humanOf(rounded.toString(), 8).split(".");
+      return `${big(int).toLocaleString("en-US")}.${frac.padEnd(d, "0").slice(0, d)}`;
+    }
+  }
+  return humanOf(priceBase, 8);
+}
+
+/** One reserve's interest between the previous event and this one. */
+export interface InterestPart {
+  reserve: string;
+  symbol: string;
+  /** Exact, in the reserve's units. */
+  interest: string;
+}
+
+/** Interest every held reserve accrued from the previous event's after-state
+ *  to immediately before this transaction, per side: the debt on each borrowed
+ *  reserve, and the supply interest on each reserve that counted as collateral
+ *  over the stretch (its switch on going into this transaction; every supplied
+ *  reserve where the switches are unread). Under a millionth of a token is
+ *  left out. Null where there is no previous read to measure from. */
+export function interestSincePrevious(
+  here: AaveV3PositionState,
+  prev: AaveV3PositionState | undefined,
+): { debt: InterestPart[]; collateral: InterestPart[] } | null {
+  if (!prev || prev.txHash.toLowerCase() === here.txHash.toLowerCase()) return null;
+  const parts = (side: "supply" | "debt"): InterestPart[] =>
+    here.reserves.flatMap((r) => {
+      const leg = side === "supply" ? r.supply : r.debt;
+      if (big(leg.before) <= ZERO) return [];
+      if (side === "supply" && r.collateral && !r.collateral.before) return [];
+      const since = sincePrevious(here, prev, r.reserve, side);
+      if (!since || Number(since.interest) < 1e-6) return [];
+      return [
+        {
+          reserve: r.reserve,
+          symbol: r.symbol ?? `${r.reserve.slice(0, 6)}…${r.reserve.slice(-4)}`,
+          interest: since.interest,
+        },
+      ];
+    });
+  return { debt: parts("debt"), collateral: parts("supply") };
+}

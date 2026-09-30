@@ -72,7 +72,15 @@ import {
   type AtBlockPricePill,
 } from "@/components/shared/liquidation-forensics";
 import { signedAmount } from "./aave-v3-ct-event-header";
-import { AaveV3PositionStateBlock, exactLeg, exactUsd, reserveSymbol, type TouchedLeg } from "./aave-v3-position-state";
+import {
+  AaveV3PositionStateBlock,
+  StateInterestLine,
+  exactLeg,
+  exactUsd,
+  reserveSymbol,
+  statePricePills,
+  type TouchedLeg,
+} from "./aave-v3-position-state";
 import { formatCompact, formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
@@ -220,13 +228,18 @@ export function AaveV3CtEventDetail({
     if (since && Number(since.interest) < 1e-6) return undefined;
     if (since && reserve && !rated.some((x) => x.reserve === reserve && x.side === a.side))
       rated.push({ reserve, symbol: a.symbol, side: a.side });
-    if (since) return { value: since.interest, prov: prevEventInterestProv(a.symbol, a.side, stateCoords) };
+    if (since)
+      return {
+        value: since.interest,
+        prov: prevEventInterestProv(a.symbol, a.side, stateCoords),
+        label: `${a.side === "debt" ? "Interest on the debt" : "Supply interest"} since the previous event`,
+      };
     if (since || (ready && previous && prevState?.status === "loading")) return undefined;
     return a.chain?.interest
       ? {
           value: a.chain.interest,
           prov: rowInterestProv(a.symbol, a.side, coords),
-          label: "Interest since this balance last moved",
+          label: `${a.side === "debt" ? "Interest on the debt" : "Supply interest"} since this balance last moved`,
         }
       : undefined;
   };
@@ -615,7 +628,7 @@ export function AaveV3CtEventDetail({
   // Ordinary events gain the at-block price footnote pill for the touched
   // reserve — the read the USD chip above derives from. Liquidations carry
   // their two pills inside the forensics block instead.
-  const pricePills: AtBlockPricePill[] = [
+  const ctxPills: AtBlockPricePill[] = [
     ...(ctx.eventType !== "liquidation" && ctx.price && ctx.reserveSymbol
       ? [
           {
@@ -636,26 +649,22 @@ export function AaveV3CtEventDetail({
         ]
       : []),
   ];
+  // Once the position read has priced the account, the chip lists every price
+  // the card's USD figures use, the event's own asset among them; an asset the
+  // read does not hold (a swap's bought token that left the position) keeps
+  // its captured price.
+  const readPills = ready?.sources.market ? statePricePills(ready, stateCoords, touched) : [];
+  const pricePills: AtBlockPricePill[] =
+    readPills.length > 0
+      ? [...readPills, ...ctxPills.filter((p) => !readPills.some((q) => q.symbol === p.symbol))]
+      : ctxPills;
+  // The interest line runs from the two position reads where both landed; a
+  // previous read that failed leaves the supply interest on the collateral out.
+  const prevUnread = !!ready && !!previous && prevState?.status === "unavailable";
 
   return (
     <>
       {stats.length > 0 && <ChainTruthDetail stats={stats} />}
-      {interestLines.map((l) => (
-        <div key={`${l.label ?? ""}:${l.symbol}`} className="px-5 pb-1">
-          <StatSubline>
-            {l.label ?? "Interest since previous event"}:{" "}
-            <Prov info={l.prov} value={l.value} symbol={l.symbol}>
-              <span title={l.value}>
-                <AmountText value={Number(l.value)} />
-              </span>
-            </Prov>{" "}
-            {l.symbol}
-          </StatSubline>
-        </div>
-      ))}
-      {ready && prevReady && rated.length > 0 && (
-        <RateNote here={ready} prev={prevReady} rated={rated} seamless={v3Protocol(coords.pool) === "Seamless"} />
-      )}
       {state?.status === "loading" && (
         <div className="px-5 pb-2 text-xs text-rb-500" data-position-state="loading">
           Reading the position at this block…
@@ -679,6 +688,37 @@ export function AaveV3CtEventDetail({
           touched={touched}
           liquidation={ctx.eventType === "liquidation"}
         />
+      )}
+      {/* The interest line sits under the grid: from the two position reads
+          where both landed, else the given-way balance's since its last move. */}
+      {ready && prevReady ? (
+        <div className="px-5 pb-1">
+          <StateInterestLine here={ready} prev={prevReady} coords={stateCoords} />
+        </div>
+      ) : (
+        interestLines.map((l) => (
+          <div key={`${l.label ?? ""}:${l.symbol}`} className="px-5 pb-1">
+            <StatSubline>
+              {l.label ?? "Interest since previous event"}:{" "}
+              <Prov info={l.prov} value={l.value} symbol={l.symbol}>
+                <span title={l.value}>
+                  <AmountText value={Number(l.value)} />
+                </span>
+              </Prov>{" "}
+              {l.symbol}
+            </StatSubline>
+          </div>
+        ))
+      )}
+      {prevUnread && (
+        <div className="px-5 pb-1">
+          <StatSubline>
+            Supply interest on the collateral is left out: the position after the previous event was not read.
+          </StatSubline>
+        </div>
+      )}
+      {ready && prevReady && rated.length > 0 && (
+        <RateNote here={ready} prev={prevReady} rated={rated} seamless={v3Protocol(coords.pool) === "Seamless"} />
       )}
       {forensics && <LiquidationForensics {...forensics} />}
       {fee && ctx.collateralSymbol && (
