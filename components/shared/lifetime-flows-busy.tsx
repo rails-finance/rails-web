@@ -17,7 +17,6 @@ import {
   FlowCursorContext,
   FlowPanelShell,
   KEEP_PANEL,
-  panelSplit,
   SegmentPanelBody,
   sumSwatch,
 } from "@/components/shared/lifetime-flows-tip";
@@ -398,7 +397,8 @@ export function Rescaled({
                   <SegmentPanelBody
                     side={side}
                     seg={st.bar[0]}
-                    split={panelSplit(model, side, assets.flows)}
+                    title={word}
+                    parts={[]}
                     st={st}
                     held={assets.held.filter((h) => h.side === side)}
                     when={when}

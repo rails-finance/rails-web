@@ -17,25 +17,24 @@ export interface UnknownTokenSvgProps {
     title?: string;
   };
   clickClass?: string;
-  /** The symbol is printed beside it: hidden from assistive tech, and the
-   *  letter does not copy. */
-  decorative?: boolean;
 }
 
-export function UnknownTokenSvg({ size = 16, symbol, clickProps, clickClass, decorative }: UnknownTokenSvgProps) {
+export function UnknownTokenSvg({ size = 16, symbol, clickProps, clickClass }: UnknownTokenSvgProps) {
   // A principal token's symbol always begins "PT-", so its first letter says
   // nothing; it draws "PT". Everything else draws its first character.
   const initial = /^PT-/i.test(symbol ?? "") ? "PT" : (symbol ?? "?").slice(0, 1).toUpperCase();
   const label = symbol ?? "Unknown token";
   return (
     <span
-      className={`inline-flex items-center justify-center shrink-0 rounded-full bg-marker text-rb-500 font-semibold leading-none ${decorative ? "select-none" : ""} ${clickClass ?? ""}`}
+      className={`inline-flex items-center justify-center shrink-0 rounded-full bg-marker text-rb-500 font-semibold leading-none ${clickClass ?? ""}`}
       style={{
         width: size,
         height: size,
         fontSize: Math.max(initial.length > 1 ? 7 : 8, size * (initial.length > 1 ? 0.42 : 0.55)),
       }}
-      {...(decorative ? { "aria-hidden": true } : { role: "img", "aria-label": label, title: label })}
+      role="img"
+      aria-label={label}
+      title={label}
       {...(clickProps ?? {})}
     >
       {initial}

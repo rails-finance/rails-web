@@ -99,9 +99,6 @@ export interface TokenChipIconProps {
   size?: number;
   onClick?: () => void;
   filterable?: boolean;
-  /** The symbol is printed beside the chip: the chip is hidden from assistive
-   *  tech and copies as nothing, so a copied row reads "WBTC", not "WBTC WBTC". */
-  decorative?: boolean;
 }
 
 export function TokenChipIcon({
@@ -111,7 +108,6 @@ export function TokenChipIcon({
   size = 16,
   onClick,
   filterable = true,
-  decorative = false,
 }: TokenChipIconProps) {
   const ctxFilter = useTokenFilterCtx();
   const chainId = useChainId();
@@ -123,7 +119,7 @@ export function TokenChipIcon({
           e.stopPropagation();
           handler!();
         },
-        ...(decorative ? {} : { role: "button" as const }),
+        role: "button" as const,
         title: `Filter by ${symbol}`,
       }
     : {};
@@ -200,22 +196,9 @@ export function TokenChipIcon({
 
   const chip =
     srcs.length === 0 ? (
-      <UnknownTokenSvg
-        size={size}
-        symbol={symbol}
-        clickProps={clickProps}
-        clickClass={clickClass}
-        decorative={decorative}
-      />
+      <UnknownTokenSvg size={size} symbol={symbol} clickProps={clickProps} clickClass={clickClass} />
     ) : (
-      <FallbackTokenIcon
-        symbol={symbol}
-        srcs={srcs}
-        size={size}
-        clickClass={clickClass}
-        clickProps={clickProps}
-        decorative={decorative}
-      />
+      <FallbackTokenIcon symbol={symbol} srcs={srcs} size={size} clickClass={clickClass} clickProps={clickProps} />
     );
   if (!isPt) return chip;
   return (
@@ -275,27 +258,17 @@ function FallbackTokenIcon({
   size,
   clickClass,
   clickProps,
-  decorative,
 }: {
   symbol: string;
   srcs: string[];
   size: number;
   clickClass: string;
   clickProps: Record<string, unknown>;
-  decorative: boolean;
 }) {
   const [idx, setIdx] = useState(0);
   const advance = () => setIdx((i) => i + 1);
   if (idx >= srcs.length) {
-    return (
-      <UnknownTokenSvg
-        size={size}
-        symbol={symbol}
-        clickProps={clickProps}
-        clickClass={clickClass}
-        decorative={decorative}
-      />
-    );
+    return <UnknownTokenSvg size={size} symbol={symbol} clickProps={clickProps} clickClass={clickClass} />;
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -314,8 +287,7 @@ function FallbackTokenIcon({
         if (el && el.complete && el.naturalWidth === 0) advance();
       }}
       src={srcs[idx]}
-      alt={decorative ? "" : symbol}
-      {...(decorative ? { "aria-hidden": true } : {})}
+      alt={symbol}
       width={size}
       height={size}
       // shrink-0 from sm up only: a headline figure's flex row (number + this
