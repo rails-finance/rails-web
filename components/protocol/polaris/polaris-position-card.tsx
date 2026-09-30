@@ -401,10 +401,10 @@ export function PolarisPositionCard({
           labelTips={{
             collateral: v.peaksCountLiquidation
               ? "The most pETH the CDP held at any touch (a touch is any transaction on it), its liquidation included, once the pending legs — interest, stability gains, reward pETH and the PSM's share, which build up between touches — were written in."
-              : "The most pETH the CDP held after any of its own touches (a touch is any transaction on it).",
+              : "The most pETH the CDP held after any of its touches (a touch is any transaction on it).",
             debt: v.peaksCountLiquidation
               ? `The most ${stable} the CDP owed at any touch (a touch is any transaction on it), its liquidation included, once the pending legs — interest, stability gains, reward pETH and the PSM's share, which build up between touches — were written in.`
-              : `The most ${stable} the CDP owed after any of its own touches (a touch is any transaction on it).`,
+              : `The most ${stable} the CDP owed after any of its touches (a touch is any transaction on it).`,
           }}
         />
       </PositionCardShell>

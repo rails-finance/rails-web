@@ -461,7 +461,8 @@ try {
     chipOpen175 != null && chipOpen175.text === chipText(crOpen175) && !chipOpen175.red,
     JSON.stringify(chipOpen175),
   );
-  // The forensics explainer states the same at-fire figure to 2 dp.
+  // The forensics explainer states the same at-fire figure at the metric's
+  // grain (one decimal, two where one would read as the minimum).
   await expandRow(page175, liq175.id);
   const liqRow = rowOf(page175, liq175.id);
   const explBtn = liqRow.getByRole("button", { name: /explanation/i }).first();
@@ -470,9 +471,12 @@ try {
   const liqText = (await liqRow.innerText()).replace(/\s+/g, " ");
   const liqStat = await readRatioStat(page175, liq175.id);
   check(
-    `c5. the liquidation row's metric (${pct1(fire)}) and the forensics clause (${pct2(fire)}) state the same ratio at fire`,
-    liqStat != null && liqStat.text.includes(pct1(fire)) && liqText.includes(pct2(fire)) && liqStat.change == null,
-    JSON.stringify({ liqStat, has2dp: liqText.includes(pct2(fire)) }),
+    `c5. the liquidation row's metric and the forensics clause both state ${pct1(fire)} at fire`,
+    liqStat != null &&
+      liqStat.text.includes(pct1(fire)) &&
+      liqText.includes(`ratio at liquidation at ${pct1(fire)}`) &&
+      liqStat.change == null,
+    JSON.stringify({ liqStat, inClause: liqText.includes(`ratio at liquidation at ${pct1(fire)}`) }),
   );
   await page175.close();
 

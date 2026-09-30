@@ -233,13 +233,18 @@ check(
   "1f. no listing card states a liquidation price in dollars",
   !cards.some((c) => /Liquidates if[^·]*\$/.test(c.footnote)),
 );
+// A card with debt states the board's rate; a collateral-only card states
+// none (nothing accrues on a debt of "none").
 check(
-  "1g. the rate line renders on the debt column from the board's own rate",
+  "1g. the rate line renders on a card with debt from the board's own rate, and not on a debt-free card",
   cards
     .filter((c) => c.market)
     .every((c) => {
       const m = byMarket[c.market];
-      return !m || c.cardText.includes(`${(m.interestRate * 100).toFixed(2)}% per year, set by the market`);
+      const row = c.cdpId ? rows[`${c.market}:${c.cdpId}`] : null;
+      if (!m || !row) return true;
+      const has = c.cardText.includes(`${(m.interestRate * 100).toFixed(2)}% per year, set by the market`);
+      return row.debt > 0 ? has : !/per year, set by the market/.test(c.cardText);
     }),
   `usdp ${(byMarket.usdp.interestRate * 100).toFixed(2)}% / goldp ${(byMarket.goldp.interestRate * 100).toFixed(2)}%`,
 );

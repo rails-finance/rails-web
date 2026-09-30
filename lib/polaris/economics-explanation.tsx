@@ -134,7 +134,7 @@ export function polarisEconomicsExplanation(
   if (psmCollIn + psmCollOut + psmDebtIn + psmDebtOut > DUST) {
     bullets.push(
       <span key="psm">
-        Its net PSM shares, touch by touch, each side summed by its own sign:{" "}
+        Its net PSM shares, touch by touch, each side summed by its sign:{" "}
         {psmCollIn > DUST && <>{fig(psmCollIn, collSym)} in</>}
         {psmCollOut > DUST && (
           <>
@@ -234,7 +234,7 @@ export function polarisEconomicsContent(): LearnMoreContent {
       },
       {
         bold: "Settled to zero",
-        text: "when a net PSM share clears more debt than the CDP owes, the protocol adds the difference back to the debt so it lands on zero. It is its own line, apart from what the holder borrowed.",
+        text: "when a net PSM share clears more debt than the CDP owes, the protocol adds the difference back to the debt so it lands on zero. It stands on a line apart from what the holder borrowed.",
       },
       {
         bold: "Native units",

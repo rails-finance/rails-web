@@ -978,7 +978,7 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
       const liqProv = (what: string, field: string): Provenance => ({
         kind: "chain",
         pclass: "emitted",
-        summary: `The ${what} at the liquidation that ends the stretch — the Liquidation log's own \`${field}\` at block ${note.to.block}, after the interest, stability gain and PSM share pending since the earlier touch were written in.`,
+        summary: `The ${what} at the liquidation that ends the stretch — the Liquidation log's \`${field}\` at block ${note.to.block}, after the interest, stability gain and PSM share pending since the earlier touch were written in.`,
         via: `Liquidation.${field}`,
       });
       const seizedValue = fire.coll * note.to.value;
@@ -1006,7 +1006,7 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
           prov: {
             kind: "chain-derived",
             pclass: "oracle",
-            summary: `The collateral seized at the liquidation, valued at the pETH price at that block.`,
+            summary: `The collateral seized at the liquidation, valued — at that block's pETH price, the figure the ratio at the liquidation divides by the debt cleared.`,
             formula: "collateral seized × price",
             inputs: [
               {
@@ -1137,8 +1137,8 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
     atBlock &&
       (fireFigs ? (
         <>
-          The earlier ratio uses the debt and collateral recorded at block {atBlock}; the later one is the
-          liquidation&rsquo;s own, the figure its row states.
+          The earlier ratio uses the debt and collateral recorded at block {atBlock}; the later one uses the
+          liquidation&rsquo;s seized collateral and cleared debt, as its row does.
         </>
       ) : (
         <>Both ratios use the debt and collateral recorded at block {atBlock}; only the price moves.</>

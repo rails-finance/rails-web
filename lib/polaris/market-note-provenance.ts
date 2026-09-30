@@ -542,7 +542,7 @@ export const polarisPriceGapPositionProv = (
     return {
       kind: "chain-derived",
       pclass: "oracle",
-      summary: `This CDP's collateral ratio at the liquidation that ends the stretch — the whole collateral seized over the debt cleared (the Liquidation log's own \`_collLiquidated\` and \`_debtLiquidated\`, after the interest, stability gain and PSM share pending since block ${p.atBlock} were written in), at the pETH price of ${formatPrice(note.to.value, priceDecimals(note))} at that block. The liquidation row states the same figure.`,
+      summary: `This CDP's collateral ratio at the liquidation that ends the stretch — the whole collateral seized over the debt cleared (the Liquidation log's \`_collLiquidated\` and \`_debtLiquidated\`, after the interest, stability gain and PSM share pending since block ${p.atBlock} were written in), at the pETH price of ${formatPrice(note.to.value, priceDecimals(note))} at that block. The liquidation row states the same figure.`,
       contract: managerContract(market),
       via: "Liquidation._collLiquidated × price at the liquidation's block ÷ Liquidation._debtLiquidated",
       formula: "(collateral seized × price) ÷ debt cleared × 100",

@@ -157,11 +157,11 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
               label="Stability pool"
               note={
                 <>
-                  a {stable} deposit made when the pool opened is now worth{" "}
+                  each {stable} deposited when the pool opened is now worth{" "}
                   <Prov info={liveSpPProv(market)} value={chain.spP}>
                     {formatSpP(chain.spP)}
                   </Prov>{" "}
-                  of itself in {stable}; the rest paid off liquidated debt and came back to the depositor as pETH
+                  {stable}; the rest paid off liquidated debt and came back to the depositor as pETH
                 </>
               }
             >
