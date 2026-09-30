@@ -43,6 +43,8 @@ function yieldWindow(h: MaplePoolHolding | undefined, st: MaplePoolState) {
   const now = Date.now() / 1000;
   const legs: { from: number; to: number; today: boolean }[] = [];
   let heldSec = 0;
+  // Whole days per stretch, as the header counts each stretch.
+  let heldWhole = 0;
   let growth = 1;
   for (const s of h.stretches) {
     const today = s.toAt == null;
@@ -50,6 +52,7 @@ function yieldWindow(h: MaplePoolHolding | undefined, st: MaplePoolState) {
     if (to == null || !(s.fromRate > 0)) return null;
     legs.push({ from: s.fromRate, to, today });
     heldSec += (s.toAt ?? now) - s.fromAt;
+    heldWhole += Math.floor(((s.toAt ?? now) - s.fromAt) / 86400);
     growth *= to / s.fromRate;
   }
   // A pool the wallet holds now ends in an open stretch.
@@ -59,8 +62,8 @@ function yieldWindow(h: MaplePoolHolding | undefined, st: MaplePoolState) {
   const gaps = h.stretches.slice(1).map((s, i) => ({ from: h.stretches[i].toAt!, to: s.fromAt }));
   return {
     firstAt: h.stretches[0].fromAt,
-    heldDays: Math.round(days),
-    totalDays: Math.round((now - h.stretches[0].fromAt) / 86400),
+    heldDays: heldWhole,
+    totalDays: Math.floor((now - h.stretches[0].fromAt) / 86400),
     gaps,
     legs,
     rise: growth - 1,
@@ -283,15 +286,15 @@ export function MaplePositionExplanation({
           {y.gaps.length === 0 ? (
             <>
               The wallet has held shares in {multi ? `the ${p.assetSymbol} pool` : "the pool"} since{" "}
-              {formatDate(y.firstAt)} ({y.heldDays} days), and over that time the pool&rsquo;s rate rose from {pairs[0]}{" "}
-              {p.assetSymbol} per share
+              {formatDate(y.firstAt)} ({y.heldDays} days), and over that time the pool&rsquo;s rate, in {p.assetSymbol}{" "}
+              per share, rose from {pairs[0]}
             </>
           ) : (
             <>
               The wallet held shares in {multi ? `the ${p.assetSymbol} pool` : "the pool"} for {y.heldDays} of the{" "}
               {y.totalDays} days since {formatDate(y.firstAt)}; it was out of the pool{" "}
-              {y.gaps.map((g) => formatDateRange(g.from, g.to)).join(" and ")}. While it held them the pool&rsquo;s rate
-              rose from {pairs.join(", then from ")} {p.assetSymbol} per share
+              {y.gaps.map((g) => formatDateRange(g.from, g.to)).join(" and ")}. While it held them the pool&rsquo;s
+              rate, in {p.assetSymbol} per share, rose from {pairs.join(", then from ")}
             </>
           )}
           : {(y.rise * 100).toFixed(2)}%, or about {(y.yearly * 100).toFixed(1)}% a year if that pace compounded for a

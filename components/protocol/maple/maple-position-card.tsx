@@ -17,10 +17,10 @@ import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
-import { AssetAmount } from "@/components/shared/asset-amount";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { formatUnitsExact, formatNumber } from "@/lib/utils/format";
+import { formatExact, formatUnitsExact, formatNumber } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import {
@@ -76,6 +76,28 @@ const claimAmount = (p: MaplePoolAmount): number => p.currentValue ?? p.deposite
 const claimProv = (p: MaplePoolAmount) =>
   p.currentValue != null ? positionCurrentValueProv(p.assetSymbol, p.symbol) : positionPrincipalProv(p.assetSymbol);
 
+/** A card figure in full to three decimals with its token named, the rows'
+ *  rule (Polaris's CardAmount). The unit and glyph wrap as one piece, so a
+ *  nine-figure claim does not push the card past a phone's width. */
+function CardAmount({ value, symbol, exact }: { value: number; symbol: string; exact?: string }) {
+  const full = exact ?? formatExact(value);
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2">
+      <RevealTip tip={`${full} ${symbol}`} label={`${full} ${symbol}`}>
+        <span data-prov-exact={full} data-prov-symbol={symbol}>
+          {formatNumber(value)}
+        </span>
+      </RevealTip>
+      <span data-prov-hidden="" className="inline-flex items-center gap-2">
+        <span className="text-[0.55em] font-medium text-rb-500">{symbol}</span>
+        <span className="inline-flex items-center justify-center rounded-full bg-raised p-0.5">
+          <TokenChipIcon symbol={symbol} size={28} filterable={false} />
+        </span>
+      </span>
+    </span>
+  );
+}
+
 /** A vertical stack of the wallet's pool claims, each traced. */
 function ClaimStack({ v }: { v: MaplePositionView }) {
   const live = v.pools.filter((p) => p.shares + p.escrowedShares > 0);
@@ -87,12 +109,10 @@ function ClaimStack({ v }: { v: MaplePositionView }) {
           <Prov info={claimProv(p)}>
             {/* The tip states the claim in its own token; the shares behind
                 it are the line beneath. */}
-            <AssetAmount
+            <CardAmount
               value={claimAmount(p)}
               symbol={p.assetSymbol}
               exact={p.currentValue != null ? undefined : String(p.depositedPrincipal)}
-              display={formatNumber(claimAmount(p))}
-              unit
             />
           </Prov>
         </StatValue>
@@ -190,12 +210,10 @@ function QueueStack({ v }: { v: MaplePositionView }) {
         return (
           <StatValue key={p.pool}>
             <Prov info={positionEscrowProv(p.symbol)}>
-              <AssetAmount
+              <CardAmount
                 value={value ?? p.escrowedShares}
                 symbol={value != null ? p.assetSymbol : p.symbol}
                 exact={value != null ? undefined : formatUnitsExact(p.escrowedSharesRaw, 6)}
-                display={formatNumber(value ?? p.escrowedShares)}
-                unit
               />
             </Prov>
           </StatValue>
@@ -221,13 +239,7 @@ function PeakStack({ lines }: { lines: MaplePeakAmount[] }) {
         <div key={p.pool}>
           <StatValue>
             <Prov info={peakSharesProv(p.symbol)}>
-              <AssetAmount
-                value={p.peakShares}
-                symbol={p.symbol}
-                exact={String(p.peakShares)}
-                display={formatNumber(p.peakShares)}
-                unit
-              />
+              <CardAmount value={p.peakShares} symbol={p.symbol} exact={String(p.peakShares)} />
             </Prov>
           </StatValue>
           {p.peakDeposited > 0 && (
