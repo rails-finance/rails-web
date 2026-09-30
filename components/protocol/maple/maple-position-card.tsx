@@ -20,7 +20,7 @@ import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
+import { formatUnitsExact, formatNumber } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import {
@@ -91,6 +91,8 @@ function ClaimStack({ v }: { v: MaplePositionView }) {
               value={claimAmount(p)}
               symbol={p.assetSymbol}
               exact={p.currentValue != null ? undefined : String(p.depositedPrincipal)}
+              display={formatNumber(claimAmount(p))}
+              unit
             />
           </Prov>
         </StatValue>
@@ -111,7 +113,7 @@ function ClaimFootnoteLines({ v, asOf = false }: { v: MaplePositionView; asOf?: 
           <div key={p.pool}>
             <Prov info={positionSharesProv(p.symbol)}>
               <ExactSpan exact={exact} symbol={p.symbol}>
-                {formatCompact(p.shares)} {p.symbol}
+                {formatNumber(p.shares)} {p.symbol}
               </ExactSpan>
             </Prov>
             {p.currentValue != null && v.poolState?.[p.pool] != null && (
@@ -151,7 +153,7 @@ function InterestCaption({ captions }: { captions?: MapleCardCaptions }) {
         incl.{" "}
         <Prov info={interestEarnedProv(it.symbol)}>
           <span>
-            <AmountText value={it.amount} format="compact" /> {it.symbol}
+            <AmountText value={it.amount} format="number" /> {it.symbol}
           </span>
         </Prov>{" "}
         interest earned
@@ -161,7 +163,7 @@ function InterestCaption({ captions }: { captions?: MapleCardCaptions }) {
         <div key={e.symbol} className="text-xs mt-0.5 text-rb-500">
           <Prov info={interestEarnedLifetimeProv(e.symbol)}>
             <span>
-              <AmountText value={e.amount} format="compact" /> {e.symbol}
+              <AmountText value={e.amount} format="number" /> {e.symbol}
             </span>
           </Prov>{" "}
           earned in the {e.symbol} pool, all withdrawn
@@ -192,6 +194,8 @@ function QueueStack({ v }: { v: MaplePositionView }) {
                 value={value ?? p.escrowedShares}
                 symbol={value != null ? p.assetSymbol : p.symbol}
                 exact={value != null ? undefined : formatUnitsExact(p.escrowedSharesRaw, 6)}
+                display={formatNumber(value ?? p.escrowedShares)}
+                unit
               />
             </Prov>
           </StatValue>
@@ -217,14 +221,20 @@ function PeakStack({ lines }: { lines: MaplePeakAmount[] }) {
         <div key={p.pool}>
           <StatValue>
             <Prov info={peakSharesProv(p.symbol)}>
-              <AssetAmount value={p.peakShares} symbol={p.symbol} exact={`${p.peakShares} ${p.symbol}`} />
+              <AssetAmount
+                value={p.peakShares}
+                symbol={p.symbol}
+                exact={String(p.peakShares)}
+                display={formatNumber(p.peakShares)}
+                unit
+              />
             </Prov>
           </StatValue>
           {p.peakDeposited > 0 && (
             <div className="text-xs mt-0.5 text-rb-500">
               <Prov info={peakDepositedProv(p.assetSymbol)}>
                 <span>
-                  peak deposited <AmountText value={p.peakDeposited} format="compact" /> {p.assetSymbol}
+                  peak deposited <AmountText value={p.peakDeposited} format="number" /> {p.assetSymbol}
                 </span>
               </Prov>
             </div>
@@ -357,11 +367,11 @@ export function MaplePositionCard({
                   disclosure={claimDisclosure}
                   count={liveCount}
                   // Each pool's claim in its own token, so a closed list still
-                  // reads: "5K USDC · 5K USDT".
+                  // reads: "5,000.409 USDC · 5,000.459 USDT".
                   closedLabel={live.map((p, i) => (
                     <span key={p.pool}>
                       {i > 0 ? " · " : ""}
-                      <AmountText value={claimAmount(p)} format="compact" /> {p.assetSymbol}
+                      <AmountText value={claimAmount(p)} format="number" /> {p.assetSymbol}
                     </span>
                   ))}
                 />

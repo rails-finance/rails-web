@@ -50,6 +50,9 @@ export type LatestPriceAsset = Omit<PriceStripAsset, "price"> & {
    *  as something else (Polaris: "2.84 ETH" read as a gas price). Unset, the
    *  token glyph alone names it. */
   triggerLabel?: string;
+  /** Where this asset leads the trigger, the count says what it counts
+   *  ("+1 more price"). Unset, it reads "+1". */
+  moreInWords?: boolean;
 };
 
 /** The block a closed position's prices were read at: its closing row. */
@@ -183,6 +186,7 @@ export function LatestPrices({
             {more > 0 && (
               <span className="tabular-nums text-rb-500" data-prov-exempt>
                 +{more}
+                {first.moreInWords ? ` more ${anyPriced ? "price" : "asset"}${more === 1 ? "" : "s"}` : ""}
               </span>
             )}
           </>

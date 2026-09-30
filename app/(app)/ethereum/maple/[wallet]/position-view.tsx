@@ -49,7 +49,14 @@ import {
   mapleFlowSummaries,
   mapleLifetimeWithOpening,
 } from "@/lib/maple/economics";
-import { mapleBoundaryFolders, mapleRateWindows, mapleRowTimes, mapleSinceLastEvent } from "@/lib/maple/row-times";
+import {
+  mapleBoundaryFolders,
+  mapleHoldings,
+  mapleLives,
+  mapleRowTimes,
+  mapleSinceLastEvent,
+  mapleStretchFolders,
+} from "@/lib/maple/row-times";
 import { MapleSinceLastEventRow } from "@/components/protocol/maple/maple-since-last-event";
 import type { FolderMembersReader } from "@/lib/shared/folder-members";
 import { mapleEconomicsExplanation, mapleEconomicsContent } from "@/lib/maple/economics-explanation";
@@ -338,10 +345,15 @@ export default function MaplePositionView({
       .filter((e) => isMapleEvent(e) && !seen.has(e.id) && (seen.add(e.id), true));
     return extra.length > 0 ? [...mapleEvents, ...extra] : mapleEvents;
   }, [mapleEvents, memberEvents]);
-  const boundaryFolders = useMemo(
-    () => mapleBoundaryFolders(rowEvents, servedFolders, readFolders),
-    [rowEvents, servedFolders, readFolders],
-  );
+  // The folders the yield window, the held stretches and the since-last-event
+  // line need read: a pool's first or last row, and any row that could have
+  // emptied a holding.
+  const boundaryFolders = useMemo(() => {
+    const need = mapleBoundaryFolders(rowEvents, servedFolders, readFolders);
+    const ids = new Set(need.map((f) => f.responseId));
+    for (const f of mapleStretchFolders(servedFolders, readFolders)) if (!ids.has(f.responseId)) need.push(f);
+    return need;
+  }, [rowEvents, servedFolders, readFolders]);
   useEffect(() => {
     for (const f of boundaryFolders) void readMembers({ folder: f.responseId }).catch(() => {});
     // One read per folder: a failed one is not retried, and its figures stay unstated.
@@ -354,12 +366,14 @@ export default function MaplePositionView({
     () => mapleRowTimes(rowEvents, servedFolders, readFolders),
     [rowEvents, servedFolders, readFolders],
   );
-  // The yield window runs from the wallet's first row in a pool to its last,
-  // so it is stated only on a page that holds the whole history.
-  const rateWindows = useMemo(
-    () => (cutoffBlock == null ? mapleRateWindows(rowEvents, servedFolders, readFolders) : undefined),
+  // The stretches the wallet held shares in each pool, for the yield window
+  // and the header's time in the pool: stated only on a page that holds the
+  // whole history.
+  const holdings = useMemo(
+    () => (cutoffBlock == null ? mapleHoldings(rowEvents, servedFolders, readFolders) : undefined),
     [rowEvents, servedFolders, readFolders, cutoffBlock],
   );
+  const lives = useMemo(() => (holdings ? mapleLives(holdings) : null), [holdings]);
   // The stretch from the newest row to now, per live pool: the interest no row
   // states, drawn at the head of the timeline.
   const sinceLast = useMemo(
@@ -415,6 +429,7 @@ export default function MaplePositionView({
         label: `Exit rate: what one ${p.symbol} pays out on withdrawal, in ${p.assetSymbol}`,
         tip: `Exit rate: what one ${p.symbol} pays out on withdrawal now, in ${p.assetSymbol}.`,
         info: rate && state ? poolExitRateProv(p.assetSymbol, p.symbol, state.blockNumber) : undefined,
+        moreInWords: true,
       });
     }
     return out;
@@ -514,7 +529,7 @@ export default function MaplePositionView({
                   v={view}
                   captions={captions}
                   externalActivity={externalActivity}
-                  rateWindows={rateWindows}
+                  holdings={holdings}
                   cancelledRequests={cancelledRequests}
                   receivedPools={receivedPools}
                 />
@@ -559,9 +574,10 @@ export default function MaplePositionView({
                   // old because its oldest loaded card is.
                   firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                   tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                  // "in the pool 315 days" runs to today; the Explanation's
-                  // yield window runs first event to last, and says so.
+                  // "in the pool 315 days" runs to today. A wallet that left
+                  // and came back names each stretch it held shares.
                   labelTenure={view.status === "open" ? "in the pool" : true}
+                  lives={lives}
                   labelLastActivity
                 />
               ) : undefined
