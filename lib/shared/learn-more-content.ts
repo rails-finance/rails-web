@@ -3375,11 +3375,11 @@ export function mapleDepositWithdrawContent(eventType: "deposit" | "withdraw"): 
     details: [
       {
         bold: "Shares & the exit rate",
-        text: "the share is a claim on the pool: shares × convertToExitAssets = what a withdrawal pays. The rate rises as loans accrue interest at their posted rates, and falls only when the pool delegate marks an impairment (unrealizedLosses) — which exiting lenders realize first.",
+        text: "the share is a claim on the pool. The exit rate is what one share pays out on withdrawal, so shares × the exit rate = what a withdrawal pays. It rises as borrowers pay interest, and falls only when the pool delegate, the manager that runs the pool's lending, marks a loan as impaired; a lender who exits while that mark stands takes the loss for good.",
       },
       {
         bold: "Where the money actually is",
-        text: "only a small liquid buffer sits in the pool contract itself (about 1% in mid-2026). The rest is deployed to loans whose collateral — BTC, ETH, stables — is held by custodians (BitGo, Copper, Anchorage, Hex Trust) under off-chain tri-party agreements. The chain records the bookkeeping; the collateral itself is not on-chain.",
+        text: "only a small liquid buffer sits in the pool contract (a few percent of the pool; the pool band shows it live). The rest is deployed to loans whose collateral — BTC, ETH, stables — is held by custodians (BitGo, Copper, Anchorage, Hex Trust) under off-chain tri-party agreements. The chain records the bookkeeping; the collateral itself is not on-chain.",
       },
       {
         bold: "What the chain proves",
@@ -3396,7 +3396,7 @@ export function mapleQueueContent(
   return {
     title: "How the Withdrawal Queue Works",
     intro:
-      "Syrup-pool withdrawals are queued: requesting a withdrawal escrows the shares with the WithdrawalManager and takes a place in a first-in-first-out line. Requests fill as pool liquidity allows — typically within minutes when the liquid buffer covers them; the contract permits up to 30 days.",
+      "Syrup-pool withdrawals are queued: a request moves the shares into the queue's escrow and takes a place in a first-in, first-out (FIFO) line, paid from the pool's liquid cash. Maple's docs say most withdrawals are processed in under 24 hours and some can take up to 30 days. The page has no record of the pool's cash at past requests, so it cannot say why a given fill waited.",
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -3411,10 +3411,16 @@ export function mapleQueueContent(
       },
       {
         bold: "Who processes",
-        text: "the pool delegate's operational machinery calls processRedemptions as cash allows; it can also cancel requests (Maple documents this for abuse and congestion cases). The queue's depth against the pool's liquid cash — shown on the pool band — is the live health of this pipeline.",
+        text: "the pool delegate or Maple's admins process requests as cash allows, earliest first; if the cash does not cover every request, only the earliest are paid and the rest wait. The pool band shows the queue against the pool's liquid cash.",
       },
     ],
-    links: [{ label: "Maple docs — withdrawals", url: MAPLE_DOC_URL }],
+    links: [
+      { label: "Maple docs: withdrawals", url: `${MAPLE_DOC_URL}/syrupusdc-usdt-usdg-for-lenders/risk` },
+      {
+        label: "Maple docs: the queue",
+        url: `${MAPLE_DOC_URL}/technical-resources/withdrawal-managers/withdrawal-manager-queue`,
+      },
+    ],
   };
 }
 

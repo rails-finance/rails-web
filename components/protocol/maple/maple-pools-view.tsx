@@ -49,7 +49,7 @@ import {
   poolUnrealizedLossesProv,
 } from "@/lib/maple/event-provenance";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
-import { MapleResidualNote } from "./maple-pools-copy";
+import { MapleResidualNote, mapleNavTip, mapleExitTip, MAPLE_NO_IMPAIRMENT_TIP } from "./maple-pools-copy";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 const amount = (v: number, symbol: string): React.ReactNode => {
@@ -132,12 +132,12 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
           </span>
         </Prov>
         <Prov info={poolNavRateProv(cat.assetSymbol, cat.symbol, s.blockNumber)}>
-          <span title={`convertToAssets on one share, read at block ${s.blockNumber} — shown as read`}>
+          <span title={mapleNavTip(s.blockNumber)}>
             NAV {s.navRate.toFixed(4)} {cat.assetSymbol}
           </span>
         </Prov>
         <Prov info={poolExitRateProv(cat.assetSymbol, cat.symbol, s.blockNumber)}>
-          <span title={`convertToExitAssets on one share, read at block ${s.blockNumber} — shown as read`}>
+          <span title={mapleExitTip(s.blockNumber)}>
             exit {s.exitRate.toFixed(4)} {cat.assetSymbol}
           </span>
         </Prov>
@@ -214,9 +214,7 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
             </span>
           </Prov>
         ) : (
-          <span title="unrealizedLosses is zero, so convertToAssets and convertToExitAssets return the same figure">
-            no impairment marked — NAV and exit rates are equal
-          </span>
+          <span title={MAPLE_NO_IMPAIRMENT_TIP}>no impairment marked — NAV and exit rates are equal</span>
         )}
       </div>
     </div>

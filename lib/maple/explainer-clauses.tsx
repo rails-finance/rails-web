@@ -50,6 +50,7 @@ import {
   type MapleCoords,
 } from "@/lib/maple/event-provenance";
 import { getCcipEscrow } from "@/lib/shared/known-infrastructure";
+import { shortAddress } from "@/lib/maple/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 
 /** Dust epsilon — a balance below this reads as zero (a fully-exited leg). */
@@ -137,10 +138,10 @@ function permissionedActorMechanic(ctx: MapleContext, coords: MapleCoords): Clau
   if (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out")
     return clause(
       <>
-        {opened}
-        nor was it the wallet on the other side of the transfer. Pool shares move wallet-to-wallet as freely as any
-        token: arriving shares ask nothing of the receiver, and shares leaving this way ride an ordinary ERC-20
-        allowance the holder granted beforehand — revocable the same way.
+        The &ldquo;by&rdquo; address sent the transaction; the &ldquo;{ctx.eventType === "transfer_in" ? "from" : "to"}
+        &rdquo; address is the wallet on the other side of the transfer. Pool shares move wallet-to-wallet like any
+        token: arriving shares ask nothing of the receiver, and shares leaving this way need an allowance the holder
+        granted beforehand.
       </>,
     );
   return clause(
@@ -332,7 +333,13 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
         changed: [changed],
         meansNow: [
           rate ? clause(<>The pool paid out at its exit rate of {rate}.</>) : null,
-          clause(<>When the pool marks an impairment, the lenders exiting first take it.</>),
+          clause(
+            <>
+              If the pool delegate, the manager that runs the pool&rsquo;s lending, marks a loan as impaired (likely to
+              lose money), the exit rate drops by the marked amount, and a lender who exits while the mark stands takes
+              that loss for good.
+            </>,
+          ),
         ],
       };
     }
@@ -348,8 +355,8 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
         meansNow: [
           clause(
             <>
-              The request takes its place in line and fills first-in, first-out as the pool has cash — typically within
-              minutes, though the queue allows up to 30 days.
+              The request takes its place in line and fills first in, first out, from the pool&rsquo;s liquid cash.
+              Maple&rsquo;s docs say most withdrawals are processed in under 24 hours and some can take up to 30 days.
             </>,
           ),
           clause(
@@ -418,7 +425,15 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
               ? clause(<>That cleared the request from the queue.</>)
               : null,
         ],
-        meansNow: [rate ? clause(<>It redeemed at the exit rate the moment it filled, {rate}.</>) : null],
+        meansNow: [
+          rate ? clause(<>It redeemed at the exit rate the moment it filled, {rate}.</>) : null,
+          clause(
+            <>
+              How long a request waits depends on the pool&rsquo;s liquid cash when its turn comes. The page has no
+              record of the pool&rsquo;s cash at past requests, so it cannot say why one fill took longer than another.
+            </>,
+          ),
+        ],
       };
     }
 
@@ -445,7 +460,21 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
             ],
           }
         : {
-            happened: [clause(<>Received {transferShareFig("in")} from another wallet.</>)],
+            happened: [
+              clause(
+                <>
+                  Received {transferShareFig("in")} from{" "}
+                  {ctx.counterparty ? (
+                    <>
+                      <span className="font-mono">{shortAddress(ctx.counterparty)}</span>, an address with no label here
+                    </>
+                  ) : (
+                    <>another wallet</>
+                  )}
+                  . The wallet paid nothing into the pool for them.
+                </>,
+              ),
+            ],
             changed: [transferValueClause()],
             meansNow: [
               clause(

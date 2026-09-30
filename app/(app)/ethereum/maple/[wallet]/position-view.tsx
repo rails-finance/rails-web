@@ -43,12 +43,19 @@ import {
 } from "@/components/protocol/maple/maple-position-card";
 import { MaplePositionExplanation } from "@/components/protocol/maple/maple-position-explanation";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { computeMapleEconomics, computeMapleCardCaptions, mapleLifetimeWithOpening } from "@/lib/maple/economics";
+import {
+  computeMapleEconomics,
+  computeMapleCardCaptions,
+  mapleFlowSummaries,
+  mapleLifetimeWithOpening,
+} from "@/lib/maple/economics";
+import { mapleRateWindows, mapleRowTimes } from "@/lib/maple/row-times";
 import { mapleEconomicsExplanation, mapleEconomicsContent } from "@/lib/maple/economics-explanation";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { maplePoolOf } from "@/lib/maple/asset-catalog";
+import { poolExitRateProv } from "@/lib/maple/event-provenance";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
@@ -309,6 +316,11 @@ export default function MaplePositionView({
     return servedFolders && servedFolders.length > 0 ? withFolderActors(withOpening, servedFolders) : withOpening;
   }, [mapleEvents, opening, servedFolders]);
 
+  // Each row's previous row in its pool and, for a queue fill, its request:
+  // the period a row's interest covers and how long a fill waited.
+  const rowTimes = useMemo(() => mapleRowTimes(mapleEvents), [mapleEvents]);
+  const rateWindows = useMemo(() => mapleRateWindows(mapleEvents), [mapleEvents]);
+
   // Stat captions (earned interest) — the event stream feeds the split; the
   // rate rides the listing row's per-pool chain read.
   const captions = view ? computeMapleCardCaptions(view, lifetimeEvents, precomputedLifetime) : null;
@@ -321,16 +333,13 @@ export default function MaplePositionView({
     return Object.fromEntries(Object.entries(poolState).filter(([k]) => touched.size === 0 || touched.has(k)));
   }, [view, poolState]);
 
-  // The top row's price dropdown. A Maple lender holds POOL SHARES, and the
-  // one price the protocol states about a share is the pool's own exit rate:
-  // what one share converts to in the pool's funds asset, quantized by the pool
-  // rather than re-multiplied here. The funds asset is that unit — and it is
-  // where the USD stops, since Maple's oracle answers a governance-set $1 pin
-  // for USDC and reverts for USDT, so its row names the asset and no figure.
+  // The top row's price dropdown: one row per pool, its exit rate, the amount
+  // one share pays out on withdrawal, in the pool's token. USDC and USDT get
+  // no row of their own: amounts stay in the token, and the reason under the
+  // list says so once.
   const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view) return [];
     const out: LatestPriceAsset[] = [];
-    const assets = new Map<string, string>();
     for (const p of view.pools) {
       const state = walletPoolState[p.pool];
       const rate = state && !Number.isNaN(state.exitRate) && state.exitRate > 0 ? state.exitRate : undefined;
@@ -339,12 +348,10 @@ export default function MaplePositionView({
         address: maplePoolOf(p.pool).pool,
         price: rate,
         unit: rate ? p.assetSymbol : undefined,
-        label: `One ${p.symbol} at the pool's exit rate, in ${p.assetSymbol}`,
+        label: `Exit rate: what one ${p.symbol} pays out on withdrawal, in ${p.assetSymbol}`,
+        tip: `Exit rate: what one ${p.symbol} pays out on withdrawal now, in ${p.assetSymbol}.`,
+        info: rate && state ? poolExitRateProv(p.assetSymbol, p.symbol, state.blockNumber) : undefined,
       });
-      assets.set(p.assetAddress, p.assetSymbol);
-    }
-    for (const [address, symbol] of assets) {
-      out.push({ symbol, address, label: `${symbol}, the pool's funds asset` });
     }
     return out;
   }, [view, walletPoolState]);
@@ -438,7 +445,12 @@ export default function MaplePositionView({
               // The Explanation pane: layman narration of the card's own face
               // figures (claim, exit rate, escrow, the pool's queue and split).
               explanation={
-                <MaplePositionExplanation v={view} captions={captions} externalActivity={externalActivity} />
+                <MaplePositionExplanation
+                  v={view}
+                  captions={captions}
+                  externalActivity={externalActivity}
+                  rateWindows={rateWindows}
+                />
               }
             />
           )}
@@ -449,7 +461,10 @@ export default function MaplePositionView({
               return (
                 <ChainTruthTower
                   data={towerData}
-                  explanation={mapleEconomicsExplanation(towerData)}
+                  explanation={mapleEconomicsExplanation(
+                    towerData,
+                    mapleFlowSummaries(view, lifetimeEvents, precomputedLifetime),
+                  )}
                   learnMore={mapleEconomicsContent()}
                 />
               );
@@ -491,6 +506,7 @@ export default function MaplePositionView({
                   eventNumber={meta.eventNumber}
                   isFirst={meta.isFirst}
                   isLast={meta.isLast}
+                  times={rowTimes.get(event.id)}
                 />
               ) : null
             }
