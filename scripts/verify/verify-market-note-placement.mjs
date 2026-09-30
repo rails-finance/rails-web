@@ -734,6 +734,39 @@ check(
   `${mixedAnchors.size} anchor(s)`,
 );
 
+// ── 9. The live notes as one card — which notes join, and in what order ─────
+// Synthetic notes: only `kind`, `live`, `id` and the move each kind states
+// (`deltaPp`, `changePct`, `ratio`) reach the rule. The shapes are the example
+// wallet's (Aave V3 Core 0x0af1…6a6a, 2026-09-30): five borrow-rate notes at
+// the head, plus a Polaris CDP's price gap and rate step.
+
+{
+  const { liveNoteGroup, orderLiveNotes, LIVE_NOTE_GROUP_ID } = mod;
+  const rate = (id, deltaPp, live = true) => ({ id, kind: "rate-step", deltaPp, ...(live ? { live: true } : {}) });
+  const gap = (id, changePct) => ({ id, kind: "price-gap", changePct, live: true });
+  check(
+    "9. the group rule is exported from the module the page imports",
+    typeof liveNoteGroup === "function" && typeof orderLiveNotes === "function",
+  );
+
+  const five = [rate("a", 0.4), rate("b", -2.1), rate("c", 1.7), rate("d", 0.4), rate("e", -0.02)];
+  const g = liveNoteGroup(five);
+  check(
+    "9a. five live notes make one group, largest move first, ties in the builder's order",
+    g?.id === LIVE_NOTE_GROUP_ID && g.notes.map((n) => n.id).join("") === "bcade",
+    g?.notes.map((n) => n.id).join("") ?? "no group",
+  );
+  check("9b. one live note makes no group (it keeps its own row)", liveNoteGroup([rate("a", 1)]) === null);
+  const mixedLive = liveNoteGroup([rate("h", 3, false), rate("a", 1), rate("t", 9, false)]);
+  check("9c. a historical note never joins a group", mixedLive === null);
+  const polaris = orderLiveNotes([gap("p", -0.5), rate("r", 4), gap("q", 2)]);
+  check(
+    "9d. kinds keep the builder's order (a Polaris price gap before its rate); each kind is ordered by its own move",
+    polaris.map((n) => n.id).join("") === "qpr",
+    polaris.map((n) => n.id).join(""),
+  );
+}
+
 // ── summary ────────────────────────────────────────────────────────────────
 
 console.log(
