@@ -48,6 +48,9 @@ export interface CompoundCoords {
   asset?: string;
   /** Position owner. */
   account?: string;
+  /** An ETH-quoted market's absorb only: Comet's WETH/USD at the absorb block,
+   *  which turned the emitted WETH figure into dollars. */
+  quoteUsd?: string;
 }
 
 export const cometContract = (coords?: CompoundCoords) => ({
@@ -57,6 +60,13 @@ export const cometContract = (coords?: CompoundCoords) => ({
 
 const atBlock = (coords?: CompoundCoords): string =>
   coords?.blockNumber != null ? ` at block ${coords.blockNumber}` : "";
+
+/** The sentence an ETH-quoted market's dollar figure adds: the log's value is
+ *  in WETH, converted at Comet's WETH/USD at the absorb block. */
+const quoteNote = (coords?: CompoundCoords): string =>
+  coords?.quoteUsd != null
+    ? ` This market prices everything in WETH (its base feed is a constant 1), so the log's usdValue is in WETH; the dollar figure multiplies it by Comet's WETH/USD at the same block, $${coords.quoteUsd}, read from a USD market's WETH feed (getAssetInfoByAddress(WETH).priceFeed → getPrice).`
+    : "";
 
 /** Block-explorer tx-logs link for an emitted event field — zero-RPC, link
  *  only. Etherscan on Ethereum, Basescan on Base: a link a reader can follow
@@ -283,8 +293,8 @@ export const absorbSeizedUsdProv = (
   verify: txVerify(coords),
   summary:
     legs.length > 1
-      ? `What the seized collateral was worth at absorption — the sum of each AbsorbCollateral event's own usdValue in this transaction (Comet absorbs the whole account: every collateral asset is seized in one call). Each addend is the Comet's oracle reckoning emitted in the log itself${atBlock(coords)}.`
-      : `What the seized collateral was worth at the moment the protocol absorbed it — the AbsorbCollateral event's own usdValue param, the Comet's oracle reckoning emitted in the log itself${atBlock(coords)}.`,
+      ? `What the seized collateral was worth at absorption — the sum of each AbsorbCollateral event's own usdValue in this transaction (Comet absorbs the whole account: every collateral asset is seized in one call). Each addend is the Comet's oracle reckoning emitted in the log itself${atBlock(coords)}.${quoteNote(coords)}`
+      : `What the seized collateral was worth at the moment the protocol absorbed it — the AbsorbCollateral event's own usdValue param, the Comet's oracle reckoning emitted in the log itself${atBlock(coords)}.${quoteNote(coords)}`,
   contract: cometContract(coords),
   via: `${captureVia(coords)} · AbsorbCollateral log${legs.length > 1 ? "s" : ""} · usdValue`,
   inputs: eventInputs(
@@ -308,7 +318,7 @@ export const absorbPriceProv = (
   pclass: "emitted",
   formula: "usdValue ÷ amount",
   verify: txVerify(coords),
-  summary: `The price the protocol carried ${sym} at when it absorbed this account — the absorb event's own usdValue divided by the amount it moved, both emitted in the same log${atBlock(coords)}. This is the Comet's oracle at absorption time, recovered from the event's own two params.`,
+  summary: `The price the protocol carried ${sym} at when it absorbed this account — the absorb event's own usdValue divided by the amount it moved, both emitted in the same log${atBlock(coords)}. This is the Comet's oracle at absorption time, recovered from the event's own two params.${quoteNote(coords)}`,
   contract: cometContract(coords),
   via: `${captureVia(coords)} · absorb log · usdValue ÷ amount`,
   inputs: eventInputs(coords, [
@@ -635,7 +645,7 @@ export const absorbCreditedUsdProv = (sym: string, coords: CompoundCoords, vals:
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `What the account was credited for its seized collateral, in dollars: the AbsorbDebt event's usdValue${atBlock(coords)}, which is basePaidOut valued at the ${sym} oracle price. Comet computes it as each seized asset's value times that asset's liquidation factor, added up.`,
+  summary: `What the account was credited for its seized collateral, in dollars: the AbsorbDebt event's usdValue${atBlock(coords)}, which is basePaidOut valued at the ${sym} oracle price. Comet computes it as each seized asset's value times that asset's liquidation factor, added up.${quoteNote(coords)}`,
   contract: cometContract(coords),
   via: `${captureVia(coords)} · AbsorbDebt log · usdValue`,
   inputs: eventInputs(coords, [{ label: "basePaidOut", value: vals.paidOut, kind: "chain", note: "AbsorbDebt" }]),
@@ -693,7 +703,7 @@ export const absorbDebtUsdAtLineProv = (sym: string, coords: CompoundCoords, val
   pclass: "emitted",
   formula: "debt × base price",
   verify: txVerify(coords),
-  summary: `Debt at the absorb, in dollars (${sym}) — the debt the absorb cleared times the ${sym} price the AbsorbDebt event carries (its usdValue over basePaidOut)${atBlock(coords)}, as Comet compares it with the liquidation line.`,
+  summary: `Debt at the absorb, in dollars (${sym}) — the debt the absorb cleared times the ${sym} price the AbsorbDebt event carries (its usdValue over basePaidOut)${atBlock(coords)}, as Comet compares it with the liquidation line.${quoteNote(coords)}`,
   contract: cometContract(coords),
   via: `debt ${vals.debt} ${sym} × AbsorbDebt usdValue ÷ basePaidOut`,
   inputs: eventInputs(coords),

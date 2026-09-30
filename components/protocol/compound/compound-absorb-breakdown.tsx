@@ -165,6 +165,7 @@ export function CompoundAbsorbBreakdown({
   const joinTerms = (which: "liquidate" | "liquidation") =>
     priced.flatMap((l, i) => [...(i > 0 ? [<span key={`plus-${i}-${which}`}> + </span>] : []), term(l, which)]);
 
+  const ethQuoted = ctx.quoteValue != null;
   const pills: AtBlockPricePill[] = [];
   for (const l of legs) {
     const amt = Number(l.amount);
@@ -182,7 +183,7 @@ export function CompoundAbsorbBreakdown({
       symbol: sym,
       priceUsd: basePrice,
       priceProv: absorbPriceProv(sym, coords, { amount: split.paidOut, usdValue: ctx.usdValue as string }),
-      note: "price at the absorb",
+      note: ethQuoted ? "Comet's WETH/USD at the absorb" : "price at the absorb",
     });
 
   // One liquidation factor for every seized asset (the usual case): the credit
@@ -196,16 +197,25 @@ export function CompoundAbsorbBreakdown({
 
   // What moved between the previous event and the absorb: each seized asset's
   // price, the base's where it is not a dollar token, and the debt's interest.
+  // An ETH-quoted market (cWETHv3) prices collateral in WETH, and the prices
+  // read at the previous event are in WETH too: the move is stated in WETH,
+  // the unit its liquidation line is drawn in.
+  const wethPrice = (n: number) => `${n.toFixed(5)} ${sym}`;
   const prevPrices = factors?.prevPrices;
   const moves: string[] = [];
   if (prevPrices && previous) {
     for (const l of priced) {
       const then = l.address ? prevPrices[l.address.toLowerCase()] : undefined;
-      const now = Number(l.usdValue) / Number(l.amount);
-      if (then != null && Number.isFinite(now)) moves.push(`${l.symbol} ${absorbPrice(then)} → ${absorbPrice(now)}`);
+      const now = Number(ethQuoted ? l.quoteValue : l.usdValue) / Number(l.amount);
+      if (then != null && Number.isFinite(now))
+        moves.push(
+          ethQuoted
+            ? `${l.symbol} ${wethPrice(then)} → ${wethPrice(now)}`
+            : `${l.symbol} ${absorbPrice(then)} → ${absorbPrice(now)}`,
+        );
     }
     const baseThen = prevPrices.base;
-    if (baseThen != null && basePrice > 0 && Math.abs(basePrice / baseThen - 1) > 0.01)
+    if (!ethQuoted && baseThen != null && basePrice > 0 && Math.abs(basePrice / baseThen - 1) > 0.01)
       moves.push(`${sym}, the debt's asset, ${absorbPrice(baseThen)} → ${absorbPrice(basePrice)}`);
   }
   const prevAfter = previous?.baseAfter != null ? Number(previous.baseAfter) : null;
@@ -347,6 +357,7 @@ export function CompoundAbsorbBreakdown({
       {moves.length > 0 && previous && (
         <p className="text-xs leading-relaxed text-rb-500" data-absorb-why="">
           What moved it over: from the previous event ({formatDate(previous.timestamp)}) to the absorb,{" "}
+          {ethQuoted ? `in ${sym}, the unit this market prices collateral in, ` : ""}
           {moves.join("; ")}
           {interestSince != null && interestSince > 0 ? (
             <>

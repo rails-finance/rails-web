@@ -7,6 +7,7 @@
 // Base events show the SIGNED base (lent / borrowed); collateral events show that
 // asset's collateral balance. Current value WITH interest is a layer, absent.
 
+import { unreadBalanceText, useCompoundBalanceRead } from "./balance-read";
 import type { CompoundContext } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
 import {
@@ -92,7 +93,9 @@ export function CompoundEventDetail({
     blockNumber,
     chainId: useChainId(),
     source: useCaptureSource(),
+    ...(ctx.quoteUsd != null ? { quoteUsd: ctx.quoteUsd } : {}),
   };
+  const balanceRead = useCompoundBalanceRead();
   const stats: ChainTruthStat[] = [];
   // Interest since the account's previous row (Ethereum rows carry it; the
   // Base sweep's do not), stated under the base balance as a magnitude.
@@ -132,24 +135,34 @@ export function CompoundEventDetail({
           ? transferBaseProv(ctx.assetSymbol, ctx.eventType === "transfer_in" ? "in" : "out", coords)
           : baseDeltaProv(ctx.assetSymbol, ctx.eventType === "supply" ? "supply" : "withdraw", coords);
     const before = compoundBaseBefore(ctx, m.baseDecimals);
-    stats.push({
-      label: ctx.baseAfter != null ? compoundBaseCaption(before, ctx.baseAfter) : "Base balance",
-      value: fmt(ctx.baseAfter),
-      symbol: ctx.assetSymbol,
-      prov: baseAfterProv(ctx.assetSymbol, coords),
-      interestSincePrevious: interestSincePrevious(ctx.assetSymbol),
-      transition: dustBefore(
-        reconstructTransition({
-          after: ctx.baseAfter,
-          change: ctx.assetsDelta,
-          changeProv,
-          beforeProv: baseBeforeProv(ctx.assetSymbol, coords),
-        }),
-        before === "0" && decimalSub(ctx.baseAfter ?? "0", ctx.assetsDelta) !== "0",
-        ctx.assetSymbol,
-        m.baseDecimals,
-      ),
-    });
+    if (ctx.baseUnsettled)
+      stats.push({
+        label: "Base balance",
+        value: "",
+        display: unreadBalanceText(balanceRead),
+        symbol: "",
+        prov: baseAfterProv(ctx.assetSymbol, coords),
+        changed: false,
+      });
+    else
+      stats.push({
+        label: ctx.baseAfter != null ? compoundBaseCaption(before, ctx.baseAfter) : "Base balance",
+        value: fmt(ctx.baseAfter),
+        symbol: ctx.assetSymbol,
+        prov: baseAfterProv(ctx.assetSymbol, coords),
+        interestSincePrevious: interestSincePrevious(ctx.assetSymbol),
+        transition: dustBefore(
+          reconstructTransition({
+            after: ctx.baseAfter,
+            change: ctx.assetsDelta,
+            changeProv,
+            beforeProv: baseBeforeProv(ctx.assetSymbol, coords),
+          }),
+          before === "0" && decimalSub(ctx.baseAfter ?? "0", ctx.assetsDelta) !== "0",
+          ctx.assetSymbol,
+          m.baseDecimals,
+        ),
+      });
   } else {
     const collCoords: CompoundCoords = { ...coords, asset: undefined };
     const changeProv =

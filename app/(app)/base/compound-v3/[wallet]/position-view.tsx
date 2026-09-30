@@ -56,6 +56,7 @@ import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-fo
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { CaptureSourceProvider, type CaptureSource } from "@/lib/shared/capture-source";
+import { CompoundBalanceReadProvider, type CompoundBalanceRead } from "@/components/protocol/compound/balance-read";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { eventsBelowLife, replaySegmentReads } from "@/lib/api/fetch-replay-segment";
 import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
@@ -484,6 +485,42 @@ export default function CompoundBaseWalletView({
     };
   }, [wallet, timelineSeeded, pinnedRoute]);
 
+  // A swept answer carries the amounts moved but no balance with interest, so
+  // its rows say "reading…" while the page asks the index again, a few times.
+  const [balanceRead, setBalanceRead] = useState<CompoundBalanceRead>("reading");
+  const swept = timeline != null && timeline.coverage.source !== "index";
+  useEffect(() => {
+    if (!swept || !wallet) return;
+    let cancelled = false;
+    let tries = 0;
+    const retry = () => {
+      if (cancelled) return;
+      if (tries++ >= 4) {
+        setBalanceRead("unread");
+        return;
+      }
+      fetchChainTimeline<CompoundBaseTimeline>({
+        wallet,
+        route: TIMELINE_ROUTE,
+        mark: "compound-base-timeline",
+        params: servedFoldersEnabled() && !pinnedRoute ? { group: "1" } : undefined,
+      })
+        .then((d) => {
+          if (cancelled) return;
+          if (d.coverage.source === "index") setTimeline(d);
+          else timer = setTimeout(retry, 8000);
+        })
+        .catch(() => {
+          if (!cancelled) timer = setTimeout(retry, 8000);
+        });
+    };
+    let timer = setTimeout(retry, 5000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [swept, wallet, pinnedRoute]);
+
   const events = useMemo<BaseActivityEvent[]>(() => timeline?.events ?? [], [timeline]);
   const compoundEvents = useMemo(() => events.filter(isCompoundEvent), [events]);
 
@@ -535,18 +572,22 @@ export default function CompoundBaseWalletView({
       for (const a of Object.keys(s.replay?.lifetime.collateral ?? {})) pairs.add(`${key}:${a}`);
       for (const c of s.replay?.peak.collateral ?? []) pairs.add(`${key}:${c.address}`);
     }
+    // The answer is kept however the sections change while it is in flight:
+    // the prices are this wallet's either way, and dropping them left the
+    // one-shot guard set with nothing priced (the card's dollar totals and
+    // the flows panel stayed token-only).
     pricedRef.current = wallet;
-    let cancelled = false;
+    const forWallet = wallet;
     fetchCometPrices([...pairs])
       .then((p) => {
-        if (!cancelled && Object.keys(p).length > 0) setPrices(p);
+        if (pricedRef.current !== forWallet) return;
+        if (Object.keys(p).length > 0) setPrices(p);
+        else pricedRef.current = null;
       })
       .catch(() => {
-        // The tower stays on the token-only list, which is what no price means.
+        // Nothing priced: the next change may ask again.
+        if (pricedRef.current === forWallet) pricedRef.current = null;
       });
-    return () => {
-      cancelled = true;
-    };
   }, [sections, timelineState, wallet]);
 
   const views = useMemo(
@@ -668,89 +709,91 @@ export default function CompoundBaseWalletView({
 
   return (
     <CaptureSourceProvider value={captureSource}>
-      <CometDeploymentProvider deployment={COMPOUND_BASE_DEPLOYMENT}>
-        <div className="py-8 space-y-6">
-          <DetailTopRow
-            session="compound-base"
-            wallet={wallet}
-            assets={stripAssets}
-            closed={views.length > 0 && views.every((v) => v.status !== "open")}
-          >
-            {views.length > 0 && (
-              <CompoundExportMenu
-                wallet={wallet}
-                views={views}
-                chainByMarket={chainByMarket}
-                events={compoundEvents}
-                history={markdownHistoryScope(undefined, compoundEvents, allFolders)}
-                scopeNote={exportScopeNote(undefined, compoundEvents, "this wallet's whole history", allFolders)}
-                fetchAllEvents={allFolders && allFolders.length > 0 ? fetchAllHistory : undefined}
-                csvFilename={`compound-base-${wallet.slice(0, 10)}-activity.csv`}
-              />
-            )}
-          </DetailTopRow>
-
-          {loading ? (
-            <DetailBodySkeleton />
-          ) : error ? (
-            <div className="py-12 text-center text-rb-500">
-              <p className="mb-1">Couldn&apos;t read this wallet&apos;s positions.</p>
-              <p className="text-sm">{error}</p>
-            </div>
-          ) : untouched ? (
-            <div className="py-12 text-center text-rb-500">
-              <p className="mb-1">This wallet has never touched Compound V3 on Base.</p>
-              <p className="text-sm">
-                All {data?.marketsScanned} markets were asked and none holds a balance, a debt or collateral for this
-                address — and no Comet has emitted an event naming it between the earliest market&rsquo;s first block
-                and now.
-              </p>
-            </div>
-          ) : sections.length === 0 ? (
-            // The Comets hold nothing for this wallet and the sweep could not
-            // say whether it ever did: the two facts are stated apart.
-            <div className="py-12 text-center text-rb-500">
-              <p className="mb-1">This wallet holds nothing on Compound V3 Base right now.</p>
-              <p className="text-sm">
-                All {data?.marketsScanned} markets were asked, and none holds a balance, a debt or collateral for this
-                address.{" "}
-                {timelineState === "loading"
-                  ? "Whether it ever did is still being read from the Comets' logs."
-                  : timelineState === "ready"
-                    ? "Whether it ever did could not be settled: the history sweep did not read every block. Reload to sweep again."
-                    : "Whether it ever did is unknown: the history sweep could not run."}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-10">
-              <p className="text-[11px] text-rb-500">
-                This wallet has a position in{" "}
-                <span className="text-foreground">
-                  {sections.length} of Base&rsquo;s {data?.marketsScanned ?? COMPOUND_BASE_DEPLOYMENT.markets.length}
-                </span>{" "}
-                Compound markets; the others hold nothing for it. Each market is separate: nothing is
-                cross-collateralised between them, so there is no combined health factor here and no total — the markets
-                do not all price in the same unit.
-              </p>
-              {renderedSectionsWithViews.map(({ s, view }) => (
-                <MarketSection
-                  key={s.market.key}
-                  section={s}
+      <CompoundBalanceReadProvider value={balanceRead}>
+        <CometDeploymentProvider deployment={COMPOUND_BASE_DEPLOYMENT}>
+          <div className="py-8 space-y-6">
+            <DetailTopRow
+              session="compound-base"
+              wallet={wallet}
+              assets={stripAssets}
+              closed={views.length > 0 && views.every((v) => v.status !== "open")}
+            >
+              {views.length > 0 && (
+                <CompoundExportMenu
                   wallet={wallet}
-                  view={view}
-                  events={compoundEvents.filter((e) => e.context.data.market === s.market.key)}
-                  timeline={timeline}
-                  timelineState={timelineState}
-                  sweptClean={sweptClean}
-                  captureSource={captureSource}
+                  views={views}
+                  chainByMarket={chainByMarket}
+                  events={compoundEvents}
+                  history={markdownHistoryScope(undefined, compoundEvents, allFolders)}
+                  scopeNote={exportScopeNote(undefined, compoundEvents, "this wallet's whole history", allFolders)}
+                  fetchAllEvents={allFolders && allFolders.length > 0 ? fetchAllHistory : undefined}
+                  csvFilename={`compound-base-${wallet.slice(0, 10)}-activity.csv`}
                 />
-              ))}
-            </div>
-          )}
+              )}
+            </DetailTopRow>
 
-          <ProvInspectorLayer />
-        </div>
-      </CometDeploymentProvider>
+            {loading ? (
+              <DetailBodySkeleton />
+            ) : error ? (
+              <div className="py-12 text-center text-rb-500">
+                <p className="mb-1">Couldn&apos;t read this wallet&apos;s positions.</p>
+                <p className="text-sm">{error}</p>
+              </div>
+            ) : untouched ? (
+              <div className="py-12 text-center text-rb-500">
+                <p className="mb-1">This wallet has never touched Compound V3 on Base.</p>
+                <p className="text-sm">
+                  All {data?.marketsScanned} markets were asked and none holds a balance, a debt or collateral for this
+                  address — and no Comet has emitted an event naming it between the earliest market&rsquo;s first block
+                  and now.
+                </p>
+              </div>
+            ) : sections.length === 0 ? (
+              // The Comets hold nothing for this wallet and the sweep could not
+              // say whether it ever did: the two facts are stated apart.
+              <div className="py-12 text-center text-rb-500">
+                <p className="mb-1">This wallet holds nothing on Compound V3 Base right now.</p>
+                <p className="text-sm">
+                  All {data?.marketsScanned} markets were asked, and none holds a balance, a debt or collateral for this
+                  address.{" "}
+                  {timelineState === "loading"
+                    ? "Whether it ever did is still being read from the Comets' logs."
+                    : timelineState === "ready"
+                      ? "Whether it ever did could not be settled: the history sweep did not read every block. Reload to sweep again."
+                      : "Whether it ever did is unknown: the history sweep could not run."}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-10">
+                <p className="text-[11px] text-rb-500">
+                  This wallet has a position in{" "}
+                  <span className="text-foreground">
+                    {sections.length} of Base&rsquo;s {data?.marketsScanned ?? COMPOUND_BASE_DEPLOYMENT.markets.length}
+                  </span>{" "}
+                  Compound markets; the others hold nothing for it. Each market is separate: nothing is
+                  cross-collateralised between them, so there is no combined health factor here and no total — the
+                  markets do not all price in the same unit.
+                </p>
+                {renderedSectionsWithViews.map(({ s, view }) => (
+                  <MarketSection
+                    key={s.market.key}
+                    section={s}
+                    wallet={wallet}
+                    view={view}
+                    events={compoundEvents.filter((e) => e.context.data.market === s.market.key)}
+                    timeline={timeline}
+                    timelineState={timelineState}
+                    sweptClean={sweptClean}
+                    captureSource={captureSource}
+                  />
+                ))}
+              </div>
+            )}
+
+            <ProvInspectorLayer />
+          </div>
+        </CometDeploymentProvider>
+      </CompoundBalanceReadProvider>
     </CaptureSourceProvider>
   );
 }

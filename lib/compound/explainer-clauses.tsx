@@ -206,6 +206,7 @@ function compoundEventSlotsBase(
   // The resulting base state, stated plainly (the never-empty floor drops it
   // when the after-balance is absent).
   const baseAfterClause = (): ClauseInput => {
+    if (ctx.baseUnsettled) return clause(<>The balance after it, with interest, is still being read.</>);
     if (ctx.baseAfter == null) return null;
     const a = Number(ctx.baseAfter);
     if (a > COMPOUND_EPS) return clause(<>The account now lends {baseAfterFig()}.</>);
@@ -358,6 +359,27 @@ function compoundEventSlotsBase(
       changed: [],
     };
   }
+
+  // A swept row has no balance before it, so whether a supply repaid or lent,
+  // or a withdrawal drew savings or borrowed, is not known yet.
+  if (ctx.baseUnsettled && (ctx.eventType === "supply" || ctx.eventType === "withdraw"))
+    return {
+      happened: [
+        clause(
+          ctx.eventType === "supply" ? (
+            <>
+              Supplied {deltaFig} to the {market} market.
+            </>
+          ) : (
+            <>
+              Withdrew {deltaFig} from the {market} market.
+            </>
+          ),
+        ),
+      ],
+      changed: [],
+      meansNow: [baseAfterClause()],
+    };
 
   switch (ctx.eventType) {
     case "supply": {

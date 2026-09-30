@@ -1,6 +1,6 @@
 "use client";
 
-// Stated borrow-capacity readout for the Compound V3 position detail — the
+// Stated borrowing-limit readout for the Compound V3 position detail — the
 // text companion to the always-on liquidation runway in the card's risk slot,
 // the Comet analog of the Aave-family LTV lines. Where the runway answers "how
 // far can collateral fall before liquidation?", these lines state where
@@ -44,13 +44,14 @@ export function CompoundBorrowCapacityView({ chain }: { chain: CompoundMarketCha
   // builder, same format call, same value text.
   return (
     <>
-      <RiskFigure label="Borrow capacity">
-        <Prov info={capacityProv("Debt share of the liquidation line", "debt value ÷ liquidation capacity", coords)}>
-          <RiskStrong>{share.text}</RiskStrong>
-        </Prov>{" "}
-        {share.ofThe}{" "}
-        <Prov info={contractVerdictProv("Liquidation line", "isLiquidatable", coords)}>liquidation line</Prov>
-      </RiskFigure>
+      {chain.borrowCapacity > 0 && (
+        <RiskFigure label="Borrowing limit">
+          <Prov info={capacityProv("Share of the borrowing limit used", "debt value ÷ borrow capacity", coords)}>
+            <RiskStrong>{capacityShare(chain.debtValue, chain.borrowCapacity).text}</RiskStrong>
+          </Prov>{" "}
+          used
+        </RiskFigure>
+      )}
       <RiskFigure label="Can borrow">
         <Prov
           info={capacityProv(
@@ -67,7 +68,13 @@ export function CompoundBorrowCapacityView({ chain }: { chain: CompoundMarketCha
         <Prov info={capacityProv("Liquidation line", "Σ collateral × price × liquidate factor ÷ base price", coords)}>
           <AmountText value={liqAtBase} /> {chain.baseSymbol}
         </Prov>{" "}
-        of debt
+        of debt, {share.beyond ? "debt " : ""}
+        <Prov info={capacityProv("Debt share of the liquidation line", "debt value ÷ liquidation capacity", coords)}>
+          <RiskStrong>{share.text}</RiskStrong>
+        </Prov>{" "}
+        <Prov info={contractVerdictProv("Liquidation line", "isLiquidatable", coords)}>
+          {share.beyond ? "it" : "reached"}
+        </Prov>
       </RiskFigure>
     </>
   );

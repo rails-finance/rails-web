@@ -259,3 +259,61 @@ export async function resolveCometPrices(
 
   return out;
 }
+
+// ── ETH/USD at a past block, for an ETH-quoted market's absorb ────────────────
+// An absorb emits `usdValue` in its market's quote unit: in cWETHv3 (Ethereum
+// and Base) the base feed is a constant 1e8, so that figure is WETH. To state it
+// in dollars the page multiplies by Comet's own WETH/USD price AT THE ABSORB
+// BLOCK: getPrice on the WETH feed a USD-quoted Comet of the same deployment
+// lists (cUSDCv3 first; on Base, cUSDbCv3 answers for blocks before cUSDCv3
+// existed). A past block's price never changes, so each answer is cached.
+
+const ethUsdAtBlockCache = new Map<string, bigint>();
+
+/** Comet's WETH/USD price (8 decimals) at each block, from the deployment's
+ *  USD-quoted Comets. A block no USD Comet can price is absent from the map. */
+export async function cometEthUsdAtBlocks(deployment: CometDeployment, blocks: number[]): Promise<Map<number, bigint>> {
+  const out = new Map<number, bigint>();
+  const eth = deployment.markets.find((m) => m.quoteUnit === "ETH");
+  const usdMarkets = deployment.markets.filter((m) => m.quoteUnit === "USD");
+  if (!eth || usdMarkets.length === 0) return out;
+  const weth = eth.baseToken as `0x${string}`;
+  const client = chainClient(deployment.chainId);
+  await Promise.all(
+    [...new Set(blocks)].map(async (block) => {
+      const key = `${deployment.chainId}:${block}`;
+      const hit = ethUsdAtBlockCache.get(key);
+      if (hit != null) {
+        out.set(block, hit);
+        return;
+      }
+      for (const m of usdMarkets) {
+        try {
+          const comet = m.comet as `0x${string}`;
+          const info = await client.readContract({
+            address: comet,
+            abi: COMET_ABI,
+            functionName: "getAssetInfoByAddress",
+            args: [weth],
+            blockNumber: BigInt(block),
+          });
+          const price = await client.readContract({
+            address: comet,
+            abi: COMET_ABI,
+            functionName: "getPrice",
+            args: [info.priceFeed],
+            blockNumber: BigInt(block),
+          });
+          if (price > BigInt(0)) {
+            ethUsdAtBlockCache.set(key, price);
+            out.set(block, price);
+            return;
+          }
+        } catch {
+          // This Comet did not exist or did not list WETH at that block: try the next.
+        }
+      }
+    }),
+  );
+  return out;
+}

@@ -61,6 +61,7 @@ export function CompoundEventHeader({
     blockNumber,
     chainId: useChainId(),
     source: useCaptureSource(),
+    ...(ctx.quoteUsd != null ? { quoteUsd: ctx.quoteUsd } : {}),
   };
   const critical = ctx.eventType === "absorb_debt" || ctx.eventType === "absorb_collateral";
   const deltas: ChainTruthDelta[] = [];

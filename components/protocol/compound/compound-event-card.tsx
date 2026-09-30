@@ -95,6 +95,7 @@ export function CompoundEventCard({
     blockNumber: event.blockNumber,
     chainId: useChainId(),
     source: useCaptureSource(),
+    ...(ctx.quoteUsd != null ? { quoteUsd: ctx.quoteUsd } : {}),
   };
   // A transfer draws no flank (see `tokens` below), so it echoes nothing.
   const kind = ctx.eventType;

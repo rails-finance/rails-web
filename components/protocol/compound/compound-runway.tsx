@@ -26,9 +26,14 @@ import { PriceRunway } from "@/components/shared/price-runway";
 export function CompoundRunway({ healthFactor, compact }: { healthFactor: number | null; compact?: boolean }) {
   if (healthFactor == null || healthFactor <= 0) return null;
 
+  // A basket has no one price, so the figure names the collateral's value.
+  const m = ((healthFactor - 1) / healthFactor) * 100;
+  const fall = Math.round(m) >= 100 && m < 100 ? "over 99" : String(Math.round(m));
   const bar = (
     <PriceRunway
       compact={compact}
+      label={`collateral value can fall ${fall}% before absorb`}
+      wrapLabel
       currentPrice={healthFactor}
       liqPrice={1}
       liqCaption="liquidation · HF 1.0"

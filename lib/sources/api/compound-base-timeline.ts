@@ -70,6 +70,7 @@ import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
 import type { BaseLendingCoverage } from "@/lib/api/fetch-aave-v3-positions";
 import type { CometDeployment } from "@/lib/compound/asset-catalog";
 import {
+  attachCometEthUsd,
   replayCometRows,
   type CometChainTimelineResult,
   type CometDecodedRow,
@@ -343,6 +344,8 @@ export async function readCometIndex(p: LoadCometIndexParams, readerIp?: string)
   // The API orders by (block, tx, log) and the key is unique, but the replay's
   // contract is stated here rather than assumed of the wire.
   rows.sort((a, b) => a.blockNumber - b.blockNumber || a.txIndex - b.txIndex || a.logIndex - b.logIndex);
+  // An ETH-quoted market's absorb values are in WETH: read WETH/USD at their blocks.
+  await attachCometEthUsd(rows, p.deployment);
 
   // A heavy wallet's elided rows, as the state they left behind. Without
   // `heavy.seeds` this is undefined and the replay runs exactly as it always

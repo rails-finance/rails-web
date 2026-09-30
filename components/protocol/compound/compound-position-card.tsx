@@ -613,7 +613,11 @@ export function CompoundPositionCard({
             // Supply side: "Lent" when the base sits here (net lender), else the
             // borrower's posted "Collateral".
             label: eff.side === "lend" ? "Lent" : "Collateral",
-            assetIcons: supplySymbols.length > 0 ? <InlineAssetCluster symbols={supplySymbols} /> : undefined,
+            // The token stack below draws its own icons: the cluster only rides a dollar headline.
+            assetIcons:
+              supplyUsd != null && supplySymbols.length > 0 ? (
+                <InlineAssetCluster symbols={supplySymbols} />
+              ) : undefined,
             value:
               supplyUsd != null ? (
                 <UsdHeadline
@@ -641,7 +645,8 @@ export function CompoundPositionCard({
           },
           {
             label: CARD_VOCAB.debt,
-            assetIcons: eff.side === "borrow" ? <InlineAssetCluster symbols={[v.base.symbol]} /> : undefined,
+            assetIcons:
+              borrowUsd != null && eff.side === "borrow" ? <InlineAssetCluster symbols={[v.base.symbol]} /> : undefined,
             value:
               borrowUsd != null ? (
                 <UsdHeadline usd={borrowUsd} info={compoundUsdProvOnchain("Borrowed base", coords)} />
