@@ -226,9 +226,6 @@ export interface ChainTruthTowerData {
    *  ("$6.4M"), so each column adds up on its face to the dollar. Unset:
    *  compact, as every other feeder renders. */
   fullUsdAmounts?: boolean;
-  /** Valued rows print dollars and cents ("$30.37"): a small account whose
-   *  whole-dollar rows would not add up on their face. */
-  centsUsdAmounts?: boolean;
 }
 
 /** The scalar a tower stacks by: USD when valued, else the token amount. */

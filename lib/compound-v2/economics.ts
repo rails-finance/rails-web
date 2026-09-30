@@ -393,10 +393,6 @@ export function computeCompoundV2Economics(
     },
     flowsPricedAtEvents: flows.flowsPricedAtEvents,
     wrapFlowLabels: true,
-    // Whole dollars (cents on a small account), so each column adds up on
-    // its face.
-    fullUsdAmounts: true,
-    centsUsdAmounts: flows.cents,
     interestNote: base.interestNote?.startsWith(FIXED_NOTE) ? FIXED_NOTE : undefined,
   };
 }

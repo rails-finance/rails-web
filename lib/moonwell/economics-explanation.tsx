@@ -186,7 +186,7 @@ export function moonwellEconomicsContent(opts: MoonwellEconomicsOpts = {}): Lear
     stepsHeading: "How it's built:",
     steps: [
       "Every flow is replayed from the position's own Mint, Redeem, Borrow and RepayBorrow events on the market's mToken contracts.",
-      "Current collateral is the mToken balance times the market's exchange rate; current debt is the market's figure for the account's debt. Both include interest.",
+      "Current collateral is the mToken balance times the market's exchange rate; current debt is the Comptroller's own accountBorrows or borrowBalanceStored figure — both interest included.",
       `USD values use ${name}'s own oracle price for each market; when a contributing market has no on-chain price, the figures are shown in token units instead.`,
     ],
     detailsHeading: "Key concepts:",

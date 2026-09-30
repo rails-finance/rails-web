@@ -65,8 +65,8 @@ export interface MoonwellEventDetailProps {
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
 
-/** A price under $10 keeps four decimals: a stablecoin read at 0.9996 is the
- *  figure the flows panel's price change turns on. */
+/** A price under $10 keeps four decimals: a stablecoin read at 0.9996 shows
+ *  as 0.9996. */
 const pillPrice = (n: number) =>
   n < 10
     ? n.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })

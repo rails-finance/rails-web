@@ -66,7 +66,7 @@ import {
 } from "@/lib/compound-v2/economics";
 import { compoundV2EconomicsExplanation, compoundV2EconomicsContent } from "@/lib/compound-v2/economics-explanation";
 import { compoundV2Ledger, compoundV2PricePairs } from "@/lib/compound-v2/ledger";
-import { fetchCompoundV2PricesAt, PRICE_PAIR_LIMIT } from "@/lib/api/fetch-compound-v2-prices-at";
+import { fetchCompoundV2PricesAt } from "@/lib/api/fetch-compound-v2-prices-at";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -369,50 +369,22 @@ export default function CompoundV2PositionView({
   // and interest on both sides) needs every row on the page: a windowed or
   // grouped history keeps the lifetime layer above.
   const wholeRows = historyWindow.state === "whole" && (servedFolders?.length ?? 0) === 0 && v2Events.length > 0;
-  // A page served in folders or a window holds only some rows: the ledger
-  // reads the whole ungrouped history once (the CSV's read), up to the
-  // at-block price read's 400-pair limit.
-  const [allRows, setAllRows] = useState<BaseActivityEvent[] | null>(null);
-  const [allRowsState, setAllRowsState] = useState<"idle" | "pending" | "done" | "over" | "failed">("idle");
-  useEffect(() => {
-    if (wholeRows || loading || allRowsState !== "idle" || v2Events.length === 0) return;
-    setAllRowsState("pending");
-    fetchAllHistory()
-      .then(({ events: rows, missing }) => {
-        if (missing > 0) return setAllRowsState("failed");
-        setAllRows(rows);
-        setAllRowsState(compoundV2PricePairs(rows).length > PRICE_PAIR_LIMIT ? "over" : "done");
-      })
-      .catch(() => setAllRowsState("failed"));
-  }, [wholeRows, loading, allRowsState, v2Events.length, fetchAllHistory]);
-  const ledgerRows = wholeRows ? v2Events : allRowsState === "done" ? allRows : null;
-
   const [eventPrices, setEventPrices] = useState<Map<string, number> | null>(null);
-  const [pricesState, setPricesState] = useState<"pending" | "done" | "failed">("pending");
-  const pricePairs = useMemo(() => (ledgerRows ? compoundV2PricePairs(ledgerRows) : []), [ledgerRows]);
+  const pricePairs = useMemo(() => (wholeRows ? compoundV2PricePairs(v2Events) : []), [wholeRows, v2Events]);
   useEffect(() => {
     if (pricePairs.length === 0) return;
     const ac = new AbortController();
-    setPricesState("pending");
     fetchCompoundV2PricesAt(pricePairs, ac.signal)
-      .then((m) => {
-        setEventPrices(m);
-        setPricesState(m ? "done" : "failed");
-      })
-      .catch((err) => {
+      .then((m) => setEventPrices(m))
+      .catch(() => {
         // Today's prices stand in; the receipts say which.
-        if ((err as { name?: string })?.name !== "AbortError") setPricesState("failed");
       });
     return () => ac.abort();
   }, [pricePairs]);
   const ledger = useMemo(
-    () => (ledgerRows && eventPrices ? compoundV2Ledger(ledgerRows, eventPrices) : null),
-    [ledgerRows, eventPrices],
+    () => (wholeRows && eventPrices ? compoundV2Ledger(v2Events, eventPrices) : null),
+    [wholeRows, eventPrices, v2Events],
   );
-  // Until the rows' own prices land, the panel states no dollar totals: the
-  // stand-in at today's prices would read as the answer.
-  const flowsPricing =
-    (ledgerRows != null && pricePairs.length > 0 && pricesState === "pending") || allRowsState === "pending";
 
   // What each liquidation did, and a closed card's peaks as each row's balance
   // before and after it (interest included), where the page holds every row.
@@ -556,20 +528,10 @@ export default function CompoundV2PositionView({
               }
             />
           )}
-          {towerData && flowsPricing && (
-            <div
-              className="rounded-lg border border-rb-200 dark:border-rb-800 px-5 py-4 text-sm text-rb-500"
-              data-flows-pricing=""
-            >
-              Lifetime flows: pricing each row at its block&hellip;
-            </div>
-          )}
-          {towerData && !flowsPricing && (
+          {towerData && (
             <ChainTruthTower
               data={towerData}
-              explanation={compoundV2EconomicsExplanation(towerData, {
-                overLimit: allRowsState === "over" ? PRICE_PAIR_LIMIT : undefined,
-              })}
+              explanation={compoundV2EconomicsExplanation(towerData)}
               learnMore={compoundV2EconomicsContent()}
             />
           )}

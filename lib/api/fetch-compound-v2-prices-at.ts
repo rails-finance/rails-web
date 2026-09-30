@@ -4,9 +4,7 @@
 // and says so.
 
 const ROUTE = "/api/chain/compound-v2/prices-at";
-/** The most (block, market) pairs one read prices; the route refuses more. */
-export const PRICE_PAIR_LIMIT = 400;
-const MAX_PAIRS = PRICE_PAIR_LIMIT;
+const MAX_PAIRS = 400;
 
 export async function fetchCompoundV2PricesAt(
   pairs: string[],

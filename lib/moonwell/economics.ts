@@ -454,10 +454,6 @@ export function computeMoonwellEconomics(
     debt: { ...flows.debt, current: current(base.debt.current, debtBy), interest: null },
     flowsPricedAtEvents: flows.flowsPricedAtEvents,
     wrapFlowLabels: true,
-    // Whole dollars (cents on a small account), so each column adds up on
-    // its face.
-    fullUsdAmounts: true,
-    centsUsdAmounts: flows.cents,
     interestNote: undefined,
   };
 }

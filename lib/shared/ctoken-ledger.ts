@@ -275,9 +275,6 @@ export function ctokenLedgerTower(
   debt: Omit<TowerSideData, "current" | "interest">;
   flowsPricedAtEvents: boolean;
   valued: boolean;
-  /** Every column under $1,000: the rows print cents, and none is dropped as
-   *  too small to show. */
-  cents: boolean;
 } {
   let atEvents = true;
   // A market whose rows came without their balances cannot close: the
@@ -417,7 +414,7 @@ export function ctokenLedgerTower(
   const priceChange = (side: "supply" | "debt", inUsd: number, outUsd: number): TowerLine | null => {
     if (!valued || !closes(side)) return null;
     const change = heldUsd(side === "supply" ? held.supply : held.debt) - (inUsd - outUsd);
-    if (Math.abs(change) < minRow) return null;
+    if (Math.abs(change) < 0.5) return null;
     return {
       key: `${side}-price-change`,
       symbol: "",
@@ -434,16 +431,6 @@ export function ctokenLedgerTower(
 
   const collIn = usdSum(supplied);
   const debtIn = usdSum(borrowed);
-  // A column under $1,000 prints cents, so rows under half a dollar stay in
-  // it; above that they round to "$0" and are left out.
-  const cents =
-    Math.max(
-      collIn + usdSum(received) + usdSum(earned),
-      debtIn + usdSum(charged),
-      heldUsd(held.supply),
-      heldUsd(held.debt),
-    ) < 1_000;
-  const minRow = cents ? 0.005 : 0.5;
   const collChange = priceChange(
     "supply",
     collIn + usdSum(received) + usdSum(earned),
@@ -452,7 +439,7 @@ export function ctokenLedgerTower(
   const debtChange = priceChange("debt", debtIn + usdSum(charged), usdSum(repaid) + usdSum(liquidated));
   // Interest or a transfer under half a dollar is a row of "$0": left out
   // once the price change above has counted it.
-  const visible = (ls: TowerLine[]) => (valued ? ls.filter((l) => l.usd == null || Math.abs(l.usd) >= minRow) : ls);
+  const visible = (ls: TowerLine[]) => (valued ? ls.filter((l) => l.usd == null || Math.abs(l.usd) >= 0.5) : ls);
   return {
     collateral: {
       earned: visible(earned),
@@ -471,6 +458,5 @@ export function ctokenLedgerTower(
     },
     flowsPricedAtEvents: atEvents,
     valued,
-    cents,
   };
 }
