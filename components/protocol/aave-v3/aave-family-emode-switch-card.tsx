@@ -59,6 +59,7 @@ export function AaveFamilyEmodeSwitchCard({
   isLast,
   eventNumber,
   market,
+  hfFormat = hfLabelV4,
 }: {
   event: BaseActivityEvent;
   sw: EmodeSwitchFields;
@@ -72,6 +73,9 @@ export function AaveFamilyEmodeSwitchCard({
   /** Where the account around this transaction can be read at N−1 and N;
    *  unset where another of the owner's transactions shares the block. */
   market?: "spark" | "seamless";
+  /** The explorer's health-factor format (Seamless: the Aave V3 family's
+   *  four decimals below 1.1); SparkLend's by default. */
+  hfFormat?: (hf: number | null) => string;
 }) {
   const here = useAaveV3PositionState({ wallet: event.wallet, market, block: event.blockNumber, txHash: event.txHash });
   const read =
@@ -117,7 +121,13 @@ export function AaveFamilyEmodeSwitchCard({
       }
       detail={
         read.status === "ready" && read.state && read.raw ? (
-          <SparkAccountState state={read.state} raw={read.raw} coords={v3Coords} isLiquidation={false} />
+          <SparkAccountState
+            state={read.state}
+            raw={read.raw}
+            coords={v3Coords}
+            isLiquidation={false}
+            hfFormat={hfFormat}
+          />
         ) : read.status === "loading" ? (
           <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="loading">
             Reading the account before and after this transaction…
@@ -145,8 +155,8 @@ export function AaveFamilyEmodeSwitchCard({
           {hfMoved ? (
             <>
               {" "}
-              Nothing was supplied or borrowed; the health factor went from {hfLabelV4(hfMoved.before.hf)} to{" "}
-              {hfLabelV4(hfMoved.after.hf)}.
+              Nothing was supplied or borrowed; the health factor went from {hfFormat(hfMoved.before.hf)} to{" "}
+              {hfFormat(hfMoved.after.hf)}.
             </>
           ) : null}
         </p>

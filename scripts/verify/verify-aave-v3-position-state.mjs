@@ -201,14 +201,14 @@ const fmtUsd = (v) =>
   v < 0.01 ? "< $0.01" : v < 1 ? `$${v.toFixed(2)}` : "$" + v.toLocaleString("en-US", { maximumFractionDigits: 0 });
 const rawToUsd = (raw, priceBase, decimals) => Number((big(raw) * big(priceBase)) / pow10(decimals + 4)) / 1e4;
 const baseToUsd = (base) => Number(big(base) / pow10(4)) / 1e4;
-// hfLabelV4 (lib/aave-v4/format.ts): a third decimal below 1.1, rounded down
-// under 1, ">100" from 100.
+// hfLabelV3 (lib/aave-v3/position-state.ts): four decimals below 1.1, rounded
+// down under 1, ">100" from 100.
 const hfLabel = (wad) => {
   if (wad == null) return "∞";
   const n = Number(big(wad) / pow10(14)) / 1e4;
   if (n >= 100) return ">100";
-  if (n < 1) return (Math.floor(n * 1000) / 1000).toFixed(3);
-  return n < 1.1 ? n.toFixed(3) : n.toFixed(2);
+  if (n < 1) return (Math.floor(n * 1e4 + 1e-9) / 1e4).toFixed(4);
+  return n < 1.1 ? n.toFixed(4) : n.toFixed(2);
 };
 const bpsPct = (bps) => `${(bps / 100).toFixed(2)}%`;
 const emodeName = (state, id) => (id === 0 ? "None" : state.emode?.categories?.[String(id)]?.label || `Category ${id}`);

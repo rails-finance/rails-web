@@ -90,11 +90,14 @@ export function SparkAccountState({
   raw,
   coords,
   isLiquidation,
+  hfFormat = hfLabelV4,
 }: {
   state: SparkEventState;
   raw: AaveV3PositionState;
   coords: V3Coords;
   isLiquidation: boolean;
+  /** The explorer's health-factor format; SparkLend's by default. */
+  hfFormat?: (hf: number | null) => string;
 }) {
   const acc = raw.account;
   if (!acc) return null;
@@ -105,8 +108,8 @@ export function SparkAccountState({
     const side = when === "before" ? acc.before : acc.after;
     const atCall = when === "before" && isLiquidation && state.liqHfAtCall != null;
     return {
-      text: hfLabelV4(hf),
-      value: hf == null ? "∞" : hfLabelV4(hf),
+      text: hfFormat(hf),
+      value: hf == null ? "∞" : hfFormat(hf),
       prov: atCall
         ? hfAtCallProv(coords, state.liqHfAtCall as number, before.hf)
         : healthFactorProv(when, coords, {
@@ -248,7 +251,7 @@ export function SparkAccountState({
         Before: the balances before this transaction at the oracle prices the liquidation ran at
         {priceMove ? ` (${priceMove.symbol} ${usd2(priceMove.to)})` : ""}. At the end of the block before
         {priceMove ? `, with ${priceMove.symbol} at ${usd2(priceMove.from)},` : ""} the health factor was{" "}
-        {hfLabelV4(before.hf)}
+        {hfFormat(before.hf)}
         {before.ltv != null ? ` and the loan-to-value ${(before.ltv * 100).toFixed(2)}%` : ""}.
       </p>
     ) : null;

@@ -30,6 +30,7 @@ import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { reserveDataProv, avgBorrowRateProv, type V3PoolLane } from "@/lib/aave-v3/position-provenance";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
+import { hfLabelV3 } from "@/lib/aave-v3/position-state";
 import { aaveV3LiquidationRead, type AaveV3CardCaptions } from "@/lib/aave-v3/chain-truth-tower";
 import {
   AaveV3CardDeploymentProvider,
@@ -263,9 +264,10 @@ function LiquidationFootnote({ v }: { v: AaveV3PositionView }) {
 }
 
 /** Neutral HF headline (Rails doesn't color-code risk): "∞" above 100 — the
- *  figure stops meaning anything as a ratio there — else two decimals. */
+ *  figure stops meaning anything as a ratio there — else the family's format
+ *  (four decimals below 1.1, as the event tiles and the prose). */
 function hfLabel(hf: number): string {
-  return hf >= 100 ? "∞" : hf.toFixed(2);
+  return hf >= 100 ? "∞" : hfLabelV3(hf);
 }
 
 function rawBigInt(raw: string | null | undefined): bigint {

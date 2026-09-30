@@ -60,12 +60,15 @@ import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { v3Brand, v3Possessive, v3Protocol, type V3Protocol } from "./protocol-name";
 import { AAVE_V3_SWAP_LABELS } from "./swap-kinds";
 import { externalActor } from "@/lib/shared/external-actor";
-import { hfLabelV4, fmtUnitPrice } from "@/lib/aave-v4/format";
+import { fmtUnitPrice } from "@/lib/aave-v4/format";
 import { fmtPositionAmount } from "@/components/shared/position-row";
 import {
   baseToUsd,
   beforeAtBlockPrices,
   findReserve,
+  hf4,
+  hfLabelV3,
+  hfMoveParts,
   humanOf,
   sincePrevious,
   stateEmptyAfter,
@@ -166,6 +169,10 @@ export interface V3StateRead {
   prevHf?: number | null;
   priceMove?: { symbol: string; from: number; to: number };
   ltMove?: { from: number; to: number };
+  /** That move split into its causes, each with its signed share. */
+  moveParts?: NonNullable<ReturnType<typeof hfMoveParts>>;
+  /** The brand whose governance sets the thresholds ("Aave", "Seamless"). */
+  brand?: string;
   /** Account totals before the transaction, in USD. */
   debtUsdBefore?: number;
   /** Balances after the transaction, per reserve and side. */
@@ -250,13 +257,14 @@ export function v3StateRead(
     const ltFrom = prev.account.after.liquidationThresholdBps;
     const ltTo = here.account.before.liquidationThresholdBps;
     if (ltFrom > 0 && ltTo > 0 && ltFrom !== ltTo) out.ltMove = { from: ltFrom / 100, to: ltTo / 100 };
+    out.moveParts = hfMoveParts(prev, here) ?? undefined;
   }
   return out;
 }
 
-/** The health factor as the open card shows it: a third decimal below 1.1,
- *  rounded down under 1 so a liquidatable account never reads 1.000. */
-const hfText = (hf: number): string => hfLabelV4(hf);
+/** The health factor as the tiles and the card show it: four decimals below
+ *  1.1, rounded down under 1 so a liquidatable account never reads 1.0000. */
+const hfText = (hf: number): string => hfLabelV3(hf);
 
 /** One sentence on how the health factor moved in this transaction. */
 function healthFactorLine(state: V3StateRead | undefined, withdraw = false): ClauseInput {
@@ -316,9 +324,83 @@ function healthFactorLine(state: V3StateRead | undefined, withdraw = false): Cla
 }
 
 /** How the health factor moved between the previous event and this one, with
- *  no event: a price, a governance change to the threshold, or interest. */
+ *  no event: prices, interest, a threshold change. Where both reads are in
+ *  hand each cause carries its signed share (hfMoveParts), rounded so the
+ *  shares add up to the move at the digits shown. */
 function priorMoveLine(state: V3StateRead | undefined): ClauseInput {
   if (!state || state.prevHf == null || state.hfBefore == null) return null;
+  const brand = state.brand ?? "Aave";
+  const mp = state.moveParts;
+  if (mp && mp.parts.length > 0) {
+    // Far from the line (both ends past the card's cap) the move says nothing.
+    if (Math.abs(mp.to - mp.from) < 0.01 || Math.min(mp.from, mp.to) >= 100) return null;
+    const fine = mp.from < 1.1 || mp.to < 1.1;
+    const dp = fine ? 4 : 2;
+    const u = 10 ** dp;
+    const end = (hf: number): string => (fine ? hf4(hf) : hf.toFixed(2));
+    const fromT = end(mp.from);
+    const toT = end(mp.to);
+    const target = Math.round((Number(toT) - Number(fromT)) * u);
+    // Largest remainder: each share rounded, the rounding spread so they sum to the move shown.
+    const raw = mp.parts.map((p) => p.delta * u);
+    const units = raw.map(Math.floor);
+    let rest = target - units.reduce((a, b) => a + b, 0);
+    const order = raw.map((r, i) => i).sort((a, b) => raw[b] - units[b] - (raw[a] - units[a]));
+    for (let k = 0; rest > 0 && order.length > 0; k = (k + 1) % order.length, rest--) units[order[k]]++;
+    for (let k = order.length - 1; rest < 0 && order.length > 0; k = (k - 1 + order.length) % order.length, rest++)
+      units[order[k]]--;
+    const signed = (v: number): string => `${v > 0 ? "+" : "−"}${(Math.abs(v) / u).toFixed(dp)}`;
+    const amounts = (list: { symbol: string; amount: number }[] | undefined): ReactNode =>
+      (list ?? []).map((a, i) => (
+        <span key={a.symbol}>
+          {i > 0 ? " and " : null}
+          {fmtPositionAmount(a.amount)} {a.symbol}
+        </span>
+      ));
+    const what = (p: (typeof mp.parts)[number]): ReactNode => {
+      switch (p.kind) {
+        case "price":
+          return (
+            <>
+              {p.symbol}&rsquo;s price {(p.to ?? 0) > (p.from ?? 0) ? "rose" : "fell"} from {fmtUnitPrice(p.from ?? 0)}{" "}
+              to {fmtUnitPrice(p.to ?? 0)}
+            </>
+          );
+        case "prices":
+          return <>the oracle prices moved</>;
+        case "debt-interest":
+          return <>interest added {amounts(p.amounts)} to the debt</>;
+        case "supply-interest":
+          return <>interest added {amounts(p.amounts)} to the collateral</>;
+        case "threshold": {
+          const t = p.thresholds ?? [];
+          if (p.emodeSwitch) return <>the e-mode switch changed the liquidation threshold</>;
+          return t.length === 1 ? (
+            <>
+              {brand} governance {t[0].to > t[0].from ? "raised" : "lowered"} {t[0].symbol}&rsquo;s liquidation
+              threshold from {t[0].from}% to {t[0].to}%
+            </>
+          ) : (
+            <>{brand} governance changed the liquidation thresholds</>
+          );
+        }
+      }
+    };
+    const shown = mp.parts.map((p, i) => ({ p, v: units[i] })).filter((x) => x.v !== 0);
+    return clause(
+      <>
+        Between the previous event and this one the health factor moved from {fromT} to {toT} with no transaction by the
+        account. What moved it, with each change&rsquo;s effect on the health factor:{" "}
+        {shown.map((x, i) => (
+          <span key={i}>
+            {i > 0 ? "; " : null}
+            {what(x.p)} ({signed(x.v)})
+          </span>
+        ))}
+        . In all {signed(target)}.
+      </>,
+    );
+  }
   const from = state.prevHf;
   const to = state.hfBefore;
   if (Math.abs(to - from) < 0.01) return null;
@@ -334,7 +416,7 @@ function priorMoveLine(state: V3StateRead | undefined): ClauseInput {
   if (state.ltMove)
     causes.push(
       <>
-        Aave governance {state.ltMove.to > state.ltMove.from ? "raised" : "lowered"} the liquidation threshold from{" "}
+        {brand} governance {state.ltMove.to > state.ltMove.from ? "raised" : "lowered"} the liquidation threshold from{" "}
         {state.ltMove.from}% to {state.ltMove.to}%
       </>,
     );
@@ -424,10 +506,19 @@ function reconcileLine(
   label: string,
   sym: string,
   terms: { after: number; interest?: number; moves: { amount: number; sign: 1 | -1; what: string }[]; start?: string },
-  d = 3,
+  minDecimals = 3,
 ): ClauseInput {
   const { after, moves } = terms;
   const interest = terms.interest ?? 0;
+  // Small amounts to four significant figures: the smallest term that matters
+  // (a ten-thousandth of the largest or more) sets the decimals for the sum,
+  // so the balance the sum derives rounds to the figure the rows show.
+  const mags = [after, interest, ...moves.map((m) => m.amount)].map(Math.abs).filter((x) => x > 0);
+  const largest = Math.max(0, ...mags);
+  const smallest = Math.min(...mags.filter((x) => x >= largest * 1e-4));
+  const d = Number.isFinite(smallest)
+    ? Math.min(8, Math.max(minDecimals, Math.ceil(-Math.log10(smallest)) + 3))
+    : minDecimals;
   const r = (n: number) => Number(n.toFixed(d));
   const prev = r(r(after) - r(interest) - moves.reduce((s, m) => s + m.sign * r(m.amount), 0));
   if (prev < -1e-9) return null;
@@ -482,11 +573,11 @@ function eventReconcile(ctx: AaveV3Context, sym: string, state?: V3StateRead): C
     return clause(
       supplySide ? (
         <>
-          {sym} supplied is now {recFmt(after, 3)} {sym}.
+          {sym} supplied is now {fmtPositionAmount(after)} {sym}.
         </>
       ) : (
         <>
-          {sym} debt is now {recFmt(after, 3)} {sym}.
+          {sym} debt is now {fmtPositionAmount(after)} {sym}.
         </>
       ),
     );
@@ -515,6 +606,7 @@ export interface V3SlotOpts {
 
 export function aaveV3EventSlots(ctx: AaveV3Context, coords: V3Coords, opts: V3SlotOpts = {}): EventProseSlots {
   const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
+  if (opts.state) opts = { ...opts, state: { ...opts.state, brand: v3Brand(v3Protocol(coords.pool)) } };
   let slots = aaveV3EventSlotsBase(ctx, coords, opts);
   // A swap that moved the account's own balances moves its health factor
   // like any supply, withdraw or repay; the account block states it too.
@@ -1170,7 +1262,7 @@ function liquidationSlots(ctx: AaveV3Context, coords: V3Coords, debtSym: string,
   const fell =
     hfBeforeCall != null ? (
       <>
-        The account&rsquo;s health factor had fallen to {hfBeforeCall.toFixed(4)} at the prices the liquidation ran at,
+        The account&rsquo;s health factor had fallen to {hfText(hfBeforeCall)} at the prices the liquidation ran at,
         below 1.0
       </>
     ) : (
@@ -1247,6 +1339,12 @@ function liquidationSlots(ctx: AaveV3Context, coords: V3Coords, debtSym: string,
               <>
                 : the {fmt2(ctx.debtToCover)} {debtSym} repaid here is half of the {fmt2(String(debtBeforeAmt))}{" "}
                 {debtSym} owed
+              </>
+            ) : debtBeforeAmt != null && debtBeforeAmt > 0 ? (
+              <>
+                : the {fmt2(ctx.debtToCover)} {debtSym} repaid here is{" "}
+                {((Number(ctx.debtToCover) / debtBeforeAmt) * 100).toFixed(1)}% of the {fmt2(String(debtBeforeAmt))}{" "}
+                {debtSym} owed, the amount the liquidator asked to repay
               </>
             ) : null}
             .
