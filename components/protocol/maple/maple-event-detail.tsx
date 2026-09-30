@@ -14,7 +14,12 @@
 //   transfers — the share lane (a position can arrive or leave by transfer).
 
 import type { MapleContext } from "@/lib/shared/types/event-shape";
-import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import {
+  ChainTruthDetail,
+  reconstructTransition,
+  type ChainTruthStat,
+  type ChainTruthTransition,
+} from "@/components/shared/chain-truth-event";
 import {
   sharesDeltaProv,
   requestSharesProv,
@@ -28,6 +33,7 @@ import {
   claimAfterProv,
   claimBeforeProv,
   interestSincePrevProv,
+  flankedLegProv,
   type MapleCoords,
 } from "@/lib/maple/event-provenance";
 import { formatNumber } from "@/lib/utils/format";
@@ -45,6 +51,26 @@ export interface MapleEventDetailProps {
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
 
+/** One rounding rule, Polaris's: the opened grid states the before and the
+ *  change in full to three decimals, as the row and the card do. */
+const num = (s: string): number => Number(s.replace(/,/g, ""));
+const full = (t: ChainTruthTransition | undefined): ChainTruthTransition | undefined =>
+  t && {
+    ...t,
+    before: formatNumber(num(t.beforeExact)),
+    change: `${t.change.charAt(0)}${formatNumber(Math.abs(num(t.changeExact.slice(1))))}`,
+  };
+
+/** What the row did, for the claim's "before → after this …" label. */
+const ACT: Partial<Record<MapleContext["eventType"], string>> = {
+  deposit: "deposit",
+  withdraw: "withdrawal",
+  request: "request",
+  request_decrease: "request change",
+  request_cancel: "cancellation",
+  request_fill: "fill",
+};
+
 export function MapleEventDetail({ ctx, txHash, blockNumber, wallet, timestamp, prevAt }: MapleEventDetailProps) {
   const coords: MapleCoords = { txHash, blockNumber, pool: ctx.pool, account: wallet };
   const stats: ChainTruthStat[] = [];
@@ -59,10 +85,13 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet, timestamp, 
       beforeProv: claimBeforeProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords),
     });
     const interest = Number(ctx.interestSincePrev ?? "0");
+    // A wallet's two pools interleave, so the period runs from the previous
+    // row in this pool, which need not be the row below.
     const since =
       prevAt != null && timestamp != null && timestamp >= prevAt
-        ? `Interest since ${formatDayMonth(prevAt)}, ${formatDuration(prevAt, timestamp)}`
-        : "Interest since previous event";
+        ? `Interest since the pool's previous row (${formatDayMonth(prevAt)}, ${formatDuration(prevAt, timestamp)})`
+        : "Interest since the pool's previous row";
+    const act = ACT[ctx.eventType];
     stats.push({
       // The wallet's own claim: a − on a fill is the claim shrinking as the
       // assets leave for the wallet.
@@ -72,7 +101,9 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet, timestamp, 
       label:
         ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out"
           ? "Wallet's pool claim, just before and after this transfer"
-          : "Wallet's pool claim",
+          : transition != null && act
+            ? `Wallet's pool claim, before → after this ${act}`
+            : "Wallet's pool claim",
       value: fmt(ctx.valueAfter),
       symbol: ctx.assetSymbol,
       prov: claimAfterProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords, ctx.raw?.valueAfter),
@@ -89,6 +120,18 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet, timestamp, 
             }
           : undefined,
     });
+  }
+
+  // What left for the wallet, on the card that shows the claim fall by it.
+  if (ctx.eventType === "withdraw" || ctx.eventType === "request_fill") {
+    const paid = flankedLegProv(ctx, coords);
+    if (paid)
+      stats.push({
+        label: "Paid to the wallet",
+        value: formatNumber(Math.abs(paid.value)),
+        symbol: ctx.assetSymbol,
+        prov: paid.prov,
+      });
   }
 
   if (ctx.eventType === "deposit" || ctx.eventType === "withdraw" || ctx.eventType === "request_fill") {
@@ -206,5 +249,9 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet, timestamp, 
     });
   }
 
-  return <ChainTruthDetail stats={stats} />;
+  return (
+    <ChainTruthDetail
+      stats={stats.map((st) => ({ ...st, display: st.display ?? st.value, transition: full(st.transition) }))}
+    />
+  );
 }
