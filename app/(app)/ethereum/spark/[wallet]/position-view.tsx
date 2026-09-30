@@ -59,6 +59,7 @@ import {
 import {
   SparkPositionExplanation,
   SparkClosedPositionExplanation,
+  type SparkActivityCounts,
 } from "@/components/protocol/spark/spark-position-explanation";
 import { SparkRiskSlot } from "@/components/protocol/spark/spark-risk-slot";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
@@ -519,6 +520,8 @@ export default function SparkPositionDetail({
     [sparkEvents, reserveRates, noteOptions, servedFolders],
   );
 
+  // A live note whose move rounds to 0.00 points says nothing; SparkLend
+  // leaves it out (the note modal says so).
   const liveNotes = useMemo<MarketNote[]>(
     () =>
       reserveRates && chain && !chain.chainStale
@@ -527,7 +530,7 @@ export default function SparkPositionDetail({
             reserveRates,
             { blockNumber: chain.blockNumber, timestamp: head?.blockTimestamp, reserves: chain.reserves },
             noteOptions,
-          )
+          ).filter((n) => n.kind !== "rate-step" || Math.abs(n.deltaPp) >= 0.005)
         : [],
     [sparkEvents, reserveRates, chain, head, noteOptions],
   );
@@ -572,6 +575,21 @@ export default function SparkPositionDetail({
     [sparkEvents, opening, servedFolders],
   );
 
+  // What the wallet did, by act, where the page holds the whole history: the
+  // card's explanation says it in one line on a long record.
+  const activity = useMemo<SparkActivityCounts | null>(() => {
+    if (historyWindow.state !== "whole" || (servedFolders?.length ?? 0) > 0) return null;
+    const c: SparkActivityCounts = { supply: 0, withdraw: 0, borrow: 0, repay: 0 };
+    for (const e of sparkEvents) {
+      const d = e.context.data;
+      if (d.eventType === "supply") c.supply += 1;
+      else if (d.eventType === "withdraw" || isGatewayWithdrawal(d)) c.withdraw += 1;
+      else if (d.eventType === "borrow") c.borrow += 1;
+      else if (d.eventType === "repay") c.repay += 1;
+    }
+    return c;
+  }, [historyWindow.state, servedFolders, sparkEvents]);
+
   // Once the live Pool read lands, the card renders ITS health factor — the
   // HF headline, the liquidation footnote (both pure functions of HF), the
   // risk slot, and the explanation then all read the same figure. Without
@@ -588,7 +606,7 @@ export default function SparkPositionDetail({
   // interest split; the live Pool read feeds the rate and streams in when it
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
-  const captions = view ? computeSparkCardCaptions(view, lifetimeEvents, chain, precomputedLifetime) : null;
+  const captions = view ? computeSparkCardCaptions(view, lifetimeEvents, chain, precomputedLifetime, sparkEvents) : null;
 
   // The tower's data feeds both the bars and their Explanation prose, so it's
   // computed once and shared rather than re-derived for each.
@@ -693,6 +711,7 @@ export default function SparkPositionDetail({
                     captions={captions}
                     view={liveView}
                     externalActivity={externalActivity}
+                    activity={activity}
                   />
                 )
               }
@@ -704,6 +723,8 @@ export default function SparkPositionDetail({
               explanation={sparkEconomicsExplanation(
                 towerData,
                 sparkEvents.some((e) => isGatewayWithdrawal(e.context.data)),
+                activity ? sparkEvents : null,
+                (view?.borrows ?? []).filter((r) => r.amount > 0).map((r) => r.symbol),
               )}
               learnMore={sparkEconomicsContent(towerData)}
               timeline={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : undefined}

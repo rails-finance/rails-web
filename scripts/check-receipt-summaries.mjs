@@ -92,16 +92,6 @@ const C_KEEP = [
     why: "Distinguishes the TroveManager's own emitted absolute from a client-side replay; a reader who assumed the latter could doubt a figure that is in fact exact.",
   },
   {
-    file: "lib/spark/event-provenance.ts",
-    phrase: "Interest grew the collateral, so it is part of the headline figure, not a separate holding.",
-    why: "Without this, a reader could double-count accrued interest as an amount on top of the balance shown.",
-  },
-  {
-    file: "lib/spark/event-provenance.ts",
-    phrase: "Interest grew the debt, so it is part of the headline figure, not an amount repaid.",
-    why: "Same double-counting risk on the debt side: the interest is already in the figure, not something separately paid down.",
-  },
-  {
     file: "lib/spark/position-provenance.ts",
     phrase: "The protocol's own oracle-priced account state, not an event-replay approximation.",
     why: "Health-factor-adjacent account state; a reader who thought this was a replayed approximation could distrust an exact, protocol-computed figure near the liquidation line.",

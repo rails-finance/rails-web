@@ -1988,7 +1988,7 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
   if (note.interest && f.debt && f.before && f.after) {
     const interest = note.interest;
     stats.push({
-      label: `Yearly interest on the ${isSupply ? "supply" : "debt"} recorded at block ${f.fromBlock}`,
+      label: `Yearly interest on the ${isSupply ? "supply" : "debt"} held on ${formatDate(note.from.timestamp)}`,
       transition: {
         before: {
           text: f.before,

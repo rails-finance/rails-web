@@ -597,7 +597,7 @@ export default function AaveV3PositionDetail({
   // interest split; the live Pool read feeds the rate and streams in when it
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
-  const captions = view ? computeAaveV3CardCaptions(view, lifetimeEvents, chain, precomputedLifetime) : null;
+  const captions = view ? computeAaveV3CardCaptions(view, lifetimeEvents, chain, precomputedLifetime, aaveEvents) : null;
 
   // The tower's data feeds both the bars and their Explanation prose, so it's
   // computed once and shared rather than re-derived for each.

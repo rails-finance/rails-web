@@ -21,9 +21,14 @@ export function SparkRiskSlot({ chain }: { chain: SparkPositionChainResponse }) 
   return (
     <RiskFooterStrip>
       <SparkLtvView chain={chain} />
-      <RiskMeter>
-        <SparkRunway compact healthFactor={chain.healthFactor} />
-      </RiskMeter>
+      {/* On a phone the strip stacks its figures right-aligned above the card's
+          (i) button; the meter keeps a line of its own there rather than
+          sharing the button's. */}
+      <div className="mb-11 @min-[560px]:mb-0">
+        <RiskMeter>
+          <SparkRunway compact healthFactor={chain.healthFactor} />
+        </RiskMeter>
+      </div>
     </RiskFooterStrip>
   );
 }

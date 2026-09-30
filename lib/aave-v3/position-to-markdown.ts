@@ -12,6 +12,7 @@
 // precision (no compact "60K" notation) because an LLM reasons better over
 // exact values than over rounded display strings.
 
+import { formatDate } from "@/lib/date";
 import { NOT_LOADED_CELL, unreadToken } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
@@ -220,11 +221,15 @@ export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): stri
   }
   lines.push(...sideLines(view, view.supplies, "Collateral"));
   if (captions?.supplyInterestUsd != null && captions.supplyInterestUsd >= 0.01) {
-    lines.push(`  - incl. ${usd(captions.supplyInterestUsd)} accrued supply interest`);
+    lines.push(
+      `  - incl. ${usd(captions.supplyInterestUsd)} supply interest${captions.supplyInterestSince != null ? ` since ${formatDate(captions.supplyInterestSince)}` : ""}, counted from when the balance last started from zero`,
+    );
   }
   lines.push(...sideLines(view, view.borrows, "Debt"));
   if (captions?.debtInterestUsd != null && captions.debtInterestUsd >= 0.01) {
-    lines.push(`  - incl. ${usd(captions.debtInterestUsd)} accrued borrow interest`);
+    lines.push(
+      `  - incl. ${usd(captions.debtInterestUsd)} borrow interest${captions.debtInterestSince != null ? ` since ${formatDate(captions.debtInterestSince)}` : ""}, counted from when the debt last started from zero`,
+    );
   }
   if (captions?.borrowRate) {
     lines.push(

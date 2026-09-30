@@ -36,6 +36,9 @@ export interface PositionCardMetaProps {
   redemptionCount?: number | null;
   /** What the liquidation count counts, added to its tip. */
   liquidationRule?: string;
+  /** Why the events and transactions differ, added to the count's tip after
+   *  the two figures (SparkLend: a liquidation's fee is its own row). */
+  countNote?: string;
 }
 
 // formatDuration treats a bare number as SECONDS. Unix seconds are ~1.7e9 today;
@@ -59,6 +62,7 @@ export function PositionCardMeta({
   liquidated,
   redemptionCount,
   liquidationRule,
+  countNote,
 }: PositionCardMetaProps) {
   const showTime = lastActivityAt != null && lastActivityAt > 0;
   const showEvents = eventCount != null && eventCount > 0;
@@ -91,7 +95,7 @@ export function PositionCardMeta({
           const label =
             `${n.toLocaleString("en-US")} ${eventCountNoun}${n === 1 ? "" : "s"}` +
             (eventTotal != null && eventTotal > 0 && eventTotal !== n
-              ? ` · ${eventTotal.toLocaleString("en-US")} event${eventTotal === 1 ? "" : "s"}`
+              ? ` · ${eventTotal.toLocaleString("en-US")} event${eventTotal === 1 ? "" : "s"}${countNote ? `: ${countNote}` : ""}`
               : "");
           return (
             <RevealTip tip={label} label={label} focusable className="focus-ring rounded-sm">

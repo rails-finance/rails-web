@@ -66,6 +66,7 @@ import {
   buildSpokeCards,
   groupBySpoke,
   computeAaveV4InterestPnl,
+  computeAaveV4InterestSinceZero,
   resolveFallbackCollateral,
 } from "@/lib/aave-v4/spoke-cards";
 import { AAVE_V4_FALLBACK_LT, isDollarRail } from "@/lib/aave-v4/liquidation-thresholds";
@@ -330,12 +331,19 @@ function AaveV4SpokePageInner({
     return {
       ...patched,
       interestPnl: computeAaveV4InterestPnl(patchedReserves, chainTruthPrices),
+      // The interest inside today's balances, for the card's "incl." lines:
+      // since each balance last started from zero, on this spoke's rows.
+      interestSinceZero: computeAaveV4InterestSinceZero(
+        sortedEvents.filter((e) => isAaveV4Event(e) && (e.context.data.spokeName ?? "Main") === spokeName),
+        patchedReserves,
+        chainTruthPrices,
+      ),
       // On-chain-oracle valuation of the headline totals, from the same chain
       // balances at Aave's own oracle price — lets On-chain-values show these
       // as chain-derived instead of middotting the DefiLlama figure.
       onchainUsd: computeOnchainUsd(chainPosition, oraclePrices),
     };
-  }, [eventActiveCard, eventActiveGroup, chainPosition, prices, chainTruthPrices, oraclePrices]);
+  }, [eventActiveCard, eventActiveGroup, chainPosition, prices, chainTruthPrices, oraclePrices, sortedEvents, spokeName]);
   const activeGroup = useMemo(() => {
     if (!eventActiveGroup) return undefined;
     if (!chainPosition || chainPosition.chainStale) {

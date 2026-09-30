@@ -15,8 +15,6 @@ import { AAVE_FAQ_URLS } from "@/components/transaction-timeline/explanation/sha
 import { SEAMLESS_DOCS_URL } from "@/lib/aave-v3/protocol-name";
 import { WRITTEN_OFF_KEY } from "@/lib/aave-v3/chain-truth-tower";
 
-/** Signed dollars for a net: "−$295". */
-const signedUsd = (n: number): string => `${n < 0 ? "−" : "+"}${formatCompactUsd(Math.abs(n))}`;
 
 /** "67.36 AAVE and 1.2 WETH" — each line's own token amount. */
 const tokenList = (lines: TowerLine[]): string =>
@@ -40,6 +38,12 @@ export interface AaveV3EconomicsOpts {
   /** The liquidation card states the split, the bonus and the net, so the
    *  pane keeps one line pointing at it (SparkLend). */
   liquidationOnCard?: boolean;
+  /** Dollar figures in whole dollars, as the panel's rows print them where
+   *  the tower sets `fullUsdAmounts` (SparkLend). */
+  fullUsd?: boolean;
+  /** Bullets the market adds after the flows (SparkLend: the debts behind
+   *  the debt side's price change). */
+  extraItems?: ReactNode[];
 }
 
 const sumScalar = (lines: TowerLine[], valued: boolean): number =>
@@ -56,8 +60,18 @@ function sideSymbol(side: TowerSideData): string | null {
   return syms.size === 1 ? [...syms][0] : null;
 }
 
-function fmt(scalar: number, valued: boolean, symbol: string | null): string {
-  return valued ? formatCompactUsd(scalar) : symbol ? `${formatCompact(scalar)} ${symbol}` : formatCompact(scalar);
+/** Whole dollars: "$6,412,345". */
+export const wholeUsd = (n: number): string => `$${Math.round(n).toLocaleString("en-US")}`;
+
+function fmtWith(full: boolean) {
+  return (scalar: number, valued: boolean, symbol: string | null): string =>
+    valued
+      ? full
+        ? wholeUsd(scalar)
+        : formatCompactUsd(scalar)
+      : symbol
+        ? `${formatCompact(scalar)} ${symbol}`
+        : formatCompact(scalar);
 }
 
 function Fig({ children }: { children: ReactNode }) {
@@ -66,6 +80,9 @@ function Fig({ children }: { children: ReactNode }) {
 
 export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3EconomicsOpts = {}): ReactNode {
   const label = opts.label ?? "Aave V3";
+  const fmt = fmtWith(opts.fullUsd === true);
+  const usdOnly = (n: number) => (opts.fullUsd ? wholeUsd(n) : formatCompactUsd(n));
+  const signedUsd = (n: number): string => `${n < 0 ? "−" : "+"}${usdOnly(Math.abs(n))}`;
   const valued = data.valued;
   const collSym = sideSymbol(data.collateral);
   const debtSym = sideSymbol(data.debt);
@@ -150,7 +167,7 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
             {" "}
             and earned <Fig>{fmt(collEarned, valued, collSym)}</Fig> of interest on it
             {valued && earnedLines.length > 1 ? (
-              <> ({earnedLines.map((l) => `${formatCompactUsd(l.usd ?? 0)} on ${l.symbol}`).join(" and ")})</>
+              <> ({earnedLines.map((l) => `${usdOnly(l.usd ?? 0)} on ${l.symbol}`).join(" and ")})</>
             ) : null}
           </>
         )}
@@ -175,7 +192,7 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
         {Math.abs(collPrice) >= 0.5 && (
           <>
             ; price moves while the tokens were held {collPrice > 0 ? "add" : "take away"}{" "}
-            <Fig>{formatCompactUsd(Math.abs(collPrice))}</Fig>
+            <Fig>{usdOnly(Math.abs(collPrice))}</Fig>
           </>
         )}
         {currentColl > 0 ? (
@@ -200,6 +217,17 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
           <>
             {" "}
             and <Fig>{fmt(debtInterest, valued, debtSym)}</Fig> of interest accrued on it
+            {opts.fullUsd &&
+            valued &&
+            interest?.symbol &&
+            (data.debt.earned ?? []).every((l) => l.flowLabel === "Interest repaid") &&
+            debtInterest - (interest.usd ?? 0) > 0.5 ? (
+              <>
+                {" "}
+                ({usdOnly(debtInterest - (interest.usd ?? 0))} paid in repayments of debts no longer held,{" "}
+                {usdOnly(interest.usd ?? 0)} on {interest.symbol} over its whole life)
+              </>
+            ) : null}
           </>
         )}
         {debtRepaid > 0 && (
@@ -227,7 +255,7 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
         {Math.abs(debtPrice) >= 0.5 && (
           <>
             ; price moves while the debt was owed {debtPrice > 0 ? "add" : "take away"}{" "}
-            <Fig>{formatCompactUsd(Math.abs(debtPrice))}</Fig>
+            <Fig>{usdOnly(Math.abs(debtPrice))}</Fig>
           </>
         )}
         {currentDebt > 0 ? (
@@ -316,6 +344,8 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
       </span>,
     );
   }
+
+  items.push(...(opts.extraItems ?? []));
 
   if (items.length === 0) return null;
 

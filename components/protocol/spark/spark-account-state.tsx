@@ -7,10 +7,15 @@
 // The receipts are the Aave V3 family's at-block receipts (SparkLend runs Aave
 // V3's account arithmetic), naming the SparkLend Pool.
 //
-// A liquidation states its "before" health factor at the prices the call ran
-// at (the balances before it, at block N's oracle prices): the end of N−1 can
-// sit above 1 when the oracle update that made the account liquidatable landed
-// in block N ahead of the call.
+// A liquidation states its "before" health factor and loan-to-value at the
+// prices the call ran at (the balances before it, at block N's oracle prices),
+// both on that one basis: the end of N−1 can sit above 1 when the oracle update
+// that made the account liquidatable landed in block N ahead of the call. A
+// line under the grid names the basis and gives the end-of-N−1 figures.
+//
+// E-mode always draws, "None" included, so a reader can tell the account's
+// limits are each asset's own figures; an account with no debt says it has no
+// health factor rather than leaving the grid empty.
 
 import type { ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -52,6 +57,19 @@ function Pair({ before, after, changed }: { before: Fig; after: Fig; changed: bo
       </span>
     </StateTransition>
   );
+}
+
+/** The at-call loan-to-value's receipt: the same balances and prices as the
+ *  at-call health factor. */
+function ltvAtCallProv(coords: V3Coords, ltv: number, endOfPrevious: number | null): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "oracle",
+    summary: `Loan-to-value at the moment of the liquidation — the account's debt before the call divided by its collateral before the call, both valued at the SparkLend oracle's prices in the liquidation's block, the prices the call ran at.${endOfPrevious != null ? ` At the end of the block before, at that block's prices, it was ${(endOfPrevious * 100).toFixed(2)}%.` : ""}`,
+    contract: coords.pool,
+    via: `Σ debt before × price at block ${coords.blockNumber ?? "N"} ÷ Σ collateral before × price = ${(ltv * 100).toFixed(2)}%`,
+    formula: "debt ÷ collateral",
+  };
 }
 
 /** The at-call health factor's receipt: the balances before the liquidation
@@ -99,13 +117,18 @@ export function SparkAccountState({
           }),
     };
   };
+  const ltvAtCall = isLiquidation && state.liqLtvAtCall != null ? state.liqLtvAtCall : null;
   const ltvFig = (when: "before" | "after"): Fig => {
     const a = when === "before" ? before : after;
-    const text = a.ltv == null ? "—" : `${(a.ltv * 100).toFixed(2)}%`;
+    const v = when === "before" && ltvAtCall != null ? ltvAtCall : a.ltv;
+    const text = v == null ? "—" : `${(v * 100).toFixed(2)}%`;
     return {
       text,
       value: text,
-      prov: currentLtvProv(when, coords, { debtUsd: a.debtUsd, collateralUsd: a.collateralUsd }),
+      prov:
+        when === "before" && ltvAtCall != null
+          ? ltvAtCallProv(coords, ltvAtCall, before.ltv)
+          : currentLtvProv(when, coords, { debtUsd: a.debtUsd, collateralUsd: a.collateralUsd }),
     };
   };
   const inEmode = state.emodeBefore.id !== 0 || state.emodeAfter.id !== 0;
@@ -132,7 +155,8 @@ export function SparkAccountState({
   };
 
   const hfChanged = hfBeforeValue !== after.hf;
-  const ltvChanged = (before.ltv ?? -1).toFixed(4) !== (after.ltv ?? -1).toFixed(4);
+  const ltvBeforeValue = ltvAtCall ?? before.ltv;
+  const ltvChanged = (ltvBeforeValue ?? -1).toFixed(4) !== (after.ltv ?? -1).toFixed(4);
   const emodeChanged = state.emodeBefore.id !== state.emodeAfter.id;
 
   const cards: { key: string; label: string; body: ReactNode }[] = [];
@@ -140,12 +164,16 @@ export function SparkAccountState({
     cards.push({
       key: "health-factor",
       label: "Health factor",
+      body: <Pair before={hfFig(hfBeforeValue, "before")} after={hfFig(after.hf, "after")} changed={hfChanged} />,
+    });
+  else
+    cards.push({
+      key: "health-factor",
+      label: "Health factor",
       body: (
         <>
-          <Pair before={hfFig(hfBeforeValue, "before")} after={hfFig(after.hf, "after")} changed={hfChanged} />
-          {isLiquidation && state.liqHfAtCall != null && (
-            <StatSubline>before: at the prices the liquidation ran at</StatSubline>
-          )}
+          <span className="text-sm font-semibold text-rb-500">None</span>
+          <StatSubline>no debt, so no health factor</StatSubline>
         </>
       ),
     });
@@ -181,10 +209,8 @@ export function SparkAccountState({
         </>
       ),
     });
-  // E-mode draws where the account used a category on either side, or had one
-  // at the previous event (the change is the news).
-  const emodeShown = inEmode || (state.emodePrevious != null && state.emodePrevious.id !== state.emodeBefore.id);
-  if (emodeShown)
+  // E-mode always draws: "None" says the limits above are each asset's own.
+  {
     cards.push({
       key: "emode",
       label: "E-mode",
@@ -207,9 +233,25 @@ export function SparkAccountState({
                   : ""}
               </StatSubline>
             )}
+          {state.emodeAfter.id === 0 && <StatSubline>limits are each asset&rsquo;s own</StatSubline>}
         </>
       ),
     });
+  }
+
+  // A liquidation's before figures are read at the prices the call ran at; the
+  // end of the block before is the second basis, named here once.
+  const priceMove = state.liqPriceMove;
+  const basis =
+    isLiquidation && state.liqHfAtCall != null ? (
+      <p className="mt-2 text-xs leading-relaxed text-rb-500" data-spark-liq-basis="">
+        Before: the balances before this transaction at the oracle prices the liquidation ran at
+        {priceMove ? ` (${priceMove.symbol} ${usd2(priceMove.to)})` : ""}. At the end of the block before
+        {priceMove ? `, with ${priceMove.symbol} at ${usd2(priceMove.from)},` : ""} the health factor was{" "}
+        {hfLabelV4(before.hf)}
+        {before.ltv != null ? ` and the loan-to-value ${(before.ltv * 100).toFixed(2)}%` : ""}.
+      </p>
+    ) : null;
 
   return (
     <div className="px-5 pb-2" data-spark-account-state="ready">
@@ -220,6 +262,11 @@ export function SparkAccountState({
           </div>
         ))}
       </div>
+      {basis}
     </div>
   );
 }
+
+/** An oracle price as the card's price chip states it ("$1,572.11"). */
+const usd2 = (p: number): string =>
+  `$${p.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;

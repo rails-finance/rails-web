@@ -14,6 +14,7 @@
 // getUserAccountData read is the only HF this card ever shows.
 
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
+import { formatDate } from "@/lib/date";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
@@ -24,6 +25,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import {
   positionSupplyProv,
@@ -79,6 +81,23 @@ export interface SparkPositionView {
    *  column is omitted rather than asserted. */
   chainHfStale?: boolean;
 }
+
+/** The count tip's reason for events outnumbering transactions. */
+const LIQ_FEE_ROW_NOTE = "a liquidation's fee to the Spark treasury is a row of its own";
+
+/** What the detail card's mode word means; the listing calls every such
+ *  position Open. */
+const MODE_TIPS: Record<string, string> = {
+  Borrowing: "The account owes debt now. The listing shows it as Open.",
+  "Supply only": "The account supplies assets and owes nothing. The listing shows it as Open.",
+  Liquidatable: "The health factor is below 1, so anyone can liquidate the account. The listing shows it as Open.",
+};
+
+const COLLATERAL_TIP =
+  "What the account supplies, valued at SparkLend's oracle prices (the price feed SparkLend liquidates with). A supply is held as spTokens, SparkLend's receipt token, whose balance grows as interest accrues.";
+
+const HF_TIP =
+  "The collateral, each asset counted up to its liquidation threshold, divided by the debt, at SparkLend's oracle prices. At or below 1, anyone can liquidate the account. The bar beside it shows how far the collateral can fall before that.";
 
 /** On-chain oracle USD for one reserve; null when SparkLend didn't price it. */
 function reserveUsd(v: SparkPositionView, address: string, amount: number): number | null {
@@ -169,14 +188,23 @@ function ReserveFootnoteLines({
   );
 }
 
-/** "incl. $X interest" — accrued interest already included in the column's
- *  balance above (it grew it), computed with the strict attribution gates
+/** "incl. $X interest since 12 Sep 2026" — the interest inside the column's
+ *  balance above: added since the balance last started from zero
  *  (computeSparkCardCaptions). Hidden below a cent — dust isn't worth a line. */
-function InterestCaption({ side, usd }: { side: "supply" | "debt"; usd: number | null | undefined }) {
+function InterestCaption({
+  side,
+  usd,
+  since,
+}: {
+  side: "supply" | "debt";
+  usd: number | null | undefined;
+  since?: number | null;
+}) {
   if (usd == null || usd < 0.01) return null;
   return (
     <div className="text-xs mt-0.5 text-rb-500">
       incl. <Prov info={sparkInterestCaptionProv(side)}>{formatUsd(usd)}</Prov> interest
+      {since != null ? ` since ${formatDate(since)}` : ""}
     </div>
   );
 }
@@ -213,7 +241,13 @@ function LiquidationFootnote({ v }: { v: SparkPositionView }) {
   if (read.single) {
     return (
       <div className="text-xs mt-0.5 text-rb-500 inline-flex items-center gap-1">
-        Liquidates at
+        <RevealTip
+          tip={`The ${read.single.symbol} price at which the health factor reaches 1, with the debt held as it is.`}
+          label="Liquidates at"
+          focusable
+        >
+          Liquidates at
+        </RevealTip>
         <TokenChipIcon symbol={read.single.symbol} size={14} filterable={false} />
         <Prov info={sparkLiqPriceProv(read.single.symbol)}>{fmtLiqPrice(read.single.liqPrice)}</Prov>
       </div>
@@ -360,6 +394,7 @@ export function SparkPositionCard({
               eventCount={v.txCount}
               eventTotal={v.eventTotal}
               liquidationCount={v.liquidationCount}
+              countNote={v.liquidationCount > 0 ? LIQ_FEE_ROW_NOTE : undefined}
             />
           }
           closedAt={v.status === "liquidated" && outcomeAt != null ? outcomeAt : v.lastActivityAt}
@@ -398,9 +433,11 @@ export function SparkPositionCard({
       <OpenPositionStats
         statusPill={
           receipts ? (
-            <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-              {modeWord}
-            </span>
+            <RevealTip tip={MODE_TIPS[modeWord]} label={`${modeWord}. ${MODE_TIPS[modeWord]}`} focusable>
+              <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
+                {modeWord}
+              </span>
+            </RevealTip>
           ) : (
             <LifecyclePill status={v.status} />
           )
@@ -419,6 +456,7 @@ export function SparkPositionCard({
             eventCount={v.txCount}
             eventTotal={v.eventTotal}
             liquidationCount={v.liquidationCount}
+            countNote={v.liquidationCount > 0 ? LIQ_FEE_ROW_NOTE : undefined}
           />
         }
         columns={[
@@ -429,6 +467,7 @@ export function SparkPositionCard({
           // USD total is never asserted.
           {
             label: CARD_VOCAB.collateral,
+            labelTip: isDetail ? COLLATERAL_TIP : undefined,
             assetIcons:
               v.supplies.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
@@ -454,7 +493,7 @@ export function SparkPositionCard({
                     <ReserveFootnoteLines reserves={suppliesRanked} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
                   </ReserveDisclosureList>
                 )}
-                <InterestCaption side="supply" usd={captions?.supplyInterestUsd} />
+                <InterestCaption side="supply" usd={captions?.supplyInterestUsd} since={captions?.supplyInterestSince} />
               </>
             ),
           },
@@ -486,7 +525,7 @@ export function SparkPositionCard({
                   </ReserveDisclosureList>
                 )}
                 <BorrowRateCaption rate={captions?.borrowRate} />
-                <InterestCaption side="debt" usd={captions?.debtInterestUsd} />
+                <InterestCaption side="debt" usd={captions?.debtInterestUsd} since={captions?.debtInterestSince} />
               </>
             ),
           },
@@ -499,6 +538,7 @@ export function SparkPositionCard({
             ? null
             : {
                 label: ratioLabel("pooled"),
+                labelTip: HF_TIP,
                 value:
                   v.healthFactor == null ? (
                     <StatValue color="text-rb-400">No debt</StatValue>

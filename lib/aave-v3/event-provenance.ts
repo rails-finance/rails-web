@@ -1308,31 +1308,28 @@ export const aaveV3DebtPrincipalProv = (sym: string): Provenance => ({
   via: `${V3_INDEX_VIA} · Σ (borrow − repay − liquidation cover − written off) · the history on record`,
 });
 
-/** The card's "incl. $X interest" stat caption — accrued interest included in
- *  one side's balance, valued in USD: per reserve, the current rebased balance
- *  (the scaled-balance reduction, equal to the aToken / variableDebtToken
- *  `balanceOf` at the indexed head) minus the net principal replayed from the
- *  position's own Pool events, × Aave's own oracle price, summed. Every leg
- *  on-chain → chain-derived. Gated by the caller (any reserve whose principal
- *  doesn't attribute cleanly nulls the caption — computeAaveV3CardCaptions). */
+/** The card's "incl. $X interest since <date>" stat caption — the interest
+ *  inside one side's balance, valued in USD: per reserve, the interest added
+ *  since the balance last started from zero (lib/shared/interest-since-zero),
+ *  × Aave's own oracle price, summed. Gated by the caller (a reserve whose
+ *  start is not among the rows nulls the caption — computeAaveV3CardCaptions). */
 export const aaveV3InterestCaptionProv = (side: "supply" | "debt"): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
   summary:
     side === "supply"
-      ? "Accrued supply interest inside the collateral balance above — per reserve, the balance the aToken reports, less what its events account for: every deposit, less every withdrawal and the collateral a liquidation seized. The difference is valued at the price the Pool's oracle reports. Interest grew the collateral, so it is part of the headline figure."
-      : "Accrued borrow interest inside the debt balance above — per reserve, the debt the variableDebtToken reports, less what its events account for: every draw, less every repayment, the debt a liquidation covered and the debt the Pool wrote off. The difference is valued at the price the Pool's oracle reports. Interest grew the debt, so it is part of the headline figure.",
+      ? "Supply interest inside the collateral balance above: per reserve, the interest added since the balance last started from zero (a balance under a cent counts as zero). Each row states the balance before and after it, so each row's before less the previous row's after is the interest between them, and the balance now less the last row's after is the interest since. Valued at the price the Pool's oracle reports now. Interest from before that start left with earlier withdrawals; the Lifetime flows panel counts all of it."
+      : "Borrow interest inside the debt balance above: per reserve, the interest added since the debt last started from zero. Each row states the debt before and after it, so each row's before less the previous row's after is the interest between them, and the debt now less the last row's after is the interest since. Valued at the price the Pool's oracle reports now. Interest from before that start was repaid; the Lifetime flows panel counts all of it.",
   contract: POOL,
-  via: "(balance the token reports − Σ net event principal) × IAaveOracle getAssetPrice, per reserve",
-  formula: "(current − net principal) × oracle price",
+  via: "Σ (row before − previous row after) + (balance now − last row after), since the balance last started from zero, × IAaveOracle getAssetPrice, per reserve",
+  formula: "interest since the balance started from zero × oracle price",
   inputs: [
     {
-      label: "current",
+      label: "balances",
       kind: "chain-derived",
       pclass: "indexed",
-      note: "scaled-balance reduction (interest included)",
+      note: "each row's balance before and after, and the balance now",
     },
-    { label: "net principal", kind: "chain-derived", pclass: "indexed", note: "Σ signed Pool event amounts" },
     { label: "oracle price", kind: "chain", note: "IAaveOracle getAssetPrice" },
   ],
 });

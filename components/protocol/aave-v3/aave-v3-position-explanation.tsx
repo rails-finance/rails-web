@@ -35,6 +35,9 @@ function joinSymbols(syms: string[]): string {
   return `${syms.slice(0, -1).join(", ")} and ${syms[syms.length - 1]}`;
 }
 
+/** " since 12 Sep 2026", or nothing without a date. */
+const sinceWords = (since: number | null | undefined): string => (since != null ? ` since ${formatDate(since)}` : "");
+
 export function AaveV3PositionExplanation({
   chain,
   captions,
@@ -194,8 +197,8 @@ export function AaveV3PositionExplanation({
     }
   }
 
-  // Accrued interest — the same aggregates the stat captions show ("incl. $X
-  // interest", hidden there below a cent), already included in the balances.
+  // The interest inside today's balances — the stat captions' figures ("incl.
+  // $X interest since …", hidden there below a cent).
   {
     const s = supplyInterestUsd != null && supplyInterestUsd >= 0.01;
     const d = hasDebt && debtInterestUsd != null && debtInterestUsd >= 0.01;
@@ -204,16 +207,19 @@ export function AaveV3PositionExplanation({
         <span key="interest">
           {s && (
             <>
-              <H>{formatUsd(supplyInterestUsd as number)}</H> of the collateral is accrued supply interest
+              <H>{formatUsd(supplyInterestUsd as number)}</H> of the collateral is supply interest added
+              {sinceWords(captions?.supplyInterestSince)}
             </>
           )}
           {s && d && <> and </>}
           {d && (
             <>
-              <H>{formatUsd(debtInterestUsd as number)}</H> of the debt is accrued borrow interest
+              <H>{formatUsd(debtInterestUsd as number)}</H> of the debt is borrow interest added
+              {sinceWords(captions?.debtInterestSince)}
             </>
-          )}{" "}
-          — already included in the figures above.
+          )}
+          , counted from when each balance last started from zero; the Lifetime flows panel counts the interest of
+          the whole life.
         </span>,
       );
     }

@@ -16,6 +16,7 @@
 // getUserAccountData read is the only HF this card ever shows.
 
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
+import { formatDate } from "@/lib/date";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
@@ -184,15 +185,23 @@ function ReserveFootnoteLines({
   );
 }
 
-/** "incl. $X interest" — accrued interest already included in the column's
- *  balance above (it grew it), computed with the strict attribution gates
+/** "incl. $X interest since 12 Sep 2026" — the interest inside the column's
+ *  balance above: added since the balance last started from zero
  *  (computeAaveV3CardCaptions). Hidden below a cent — dust isn't worth a line. */
-function InterestCaption({ side, usd }: { side: "supply" | "debt"; usd: number | null | undefined }) {
+function InterestCaption({
+  side,
+  usd,
+  since,
+}: {
+  side: "supply" | "debt";
+  usd: number | null | undefined;
+  since?: number | null;
+}) {
   const receipt = useAaveV3CardDeployment().interestCaption;
   if (usd == null || usd < 0.01 || !receipt) return null;
   return (
     <div className="text-xs mt-0.5 text-rb-500">
-      incl. <Prov info={receipt(side)}>{formatUsd(usd)}</Prov> interest
+      incl. <Prov info={receipt(side)}>{formatUsd(usd)}</Prov> interest{since != null ? ` since ${formatDate(since)}` : ""}
     </div>
   );
 }
@@ -613,7 +622,7 @@ function AaveV3PositionCardBody({
                     <ReserveFootnoteLines reserves={suppliesRanked} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
                   </ReserveDisclosureList>
                 )}
-                <InterestCaption side="supply" usd={captions?.supplyInterestUsd} />
+                <InterestCaption side="supply" usd={captions?.supplyInterestUsd} since={captions?.supplyInterestSince} />
               </>
             ),
           },
@@ -651,7 +660,7 @@ function AaveV3PositionCardBody({
                   </ReserveDisclosureList>
                 )}
                 <BorrowRateCaption rate={captions?.borrowRate} pool={captions?.pool} />
-                <InterestCaption side="debt" usd={captions?.debtInterestUsd} />
+                <InterestCaption side="debt" usd={captions?.debtInterestUsd} since={captions?.debtInterestSince} />
                 {/* The rate and interest captions weigh by price: their two
                     lines are held while the prices load. */}
                 {debtPending && captions?.borrowRate == null && (

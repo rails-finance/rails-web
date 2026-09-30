@@ -4488,7 +4488,7 @@ export function marketNoteRateStepContent(protocol: RateStepProtocol): LearnMore
           },
           {
             bold: "Where the rate is read",
-            text: "the reserve's own ReserveDataUpdated log around the account's own transactions: at or before its earlier action, and before its next touch but never from inside that touch's transaction, so a move the account caused is not stated as the market's.",
+            text: "the rate the Pool recorded for the reserve around the account's own transactions: at or before its earlier action, and before its next touch but never from inside that touch's transaction, so a move the account caused is not stated as the market's.",
           },
           {
             bold: "Which stretches are stated",
@@ -4496,7 +4496,9 @@ export function marketNoteRateStepContent(protocol: RateStepProtocol): LearnMore
           },
           {
             bold: "A live note",
-            text: "the same idea, but the later end is the Pool's getReserveData for the reserve, read at the chain head.",
+            text: spark
+              ? "the stretch from the account's last touch to now: the later end is the reserve's rate as the Pool gives it at the latest block. It is shown for any move of 0.01 points or more."
+              : "the stretch from the account's last touch to now: the later end is the reserve's rate as the Pool gives it at the latest block.",
           },
         ],
         links: spark

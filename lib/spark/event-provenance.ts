@@ -365,32 +365,28 @@ export const sparkDebtPrincipalProv = (sym: string): Provenance => ({
   via: `${SPARK_VIA} · Σ (borrow − repay − liquidation cover) · genesis → head`,
 });
 
-/** The card's "incl. $X interest" stat caption — accrued interest included in
- *  one side's balance, valued in USD: per reserve, the current rebased balance
- *  (the scaled-balance reduction, equal to the spToken / variableDebtToken
- *  `balanceOf` at the indexed head) minus the net principal replayed from the
- *  position's own Pool events, × SparkLend's own oracle price, summed. Every
- *  leg on-chain → chain-derived. Gated by the caller (any reserve whose
- *  principal doesn't attribute cleanly nulls the caption —
- *  computeAaveV3CardCaptions). */
+/** The card's "incl. $X interest since <date>" stat caption — the interest
+ *  inside one side's balance, valued in USD: per reserve, the interest added
+ *  since the balance last started from zero (lib/shared/interest-since-zero),
+ *  × SparkLend's own oracle price, summed. Gated by the caller (a reserve whose
+ *  start is not among the rows nulls the caption — computeAaveV3CardCaptions). */
 export const sparkInterestCaptionProv = (side: "supply" | "debt"): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
   summary:
     side === "supply"
-      ? "Accrued supply interest included in the collateral balance above — per reserve, the current rebased balance (equal to the spToken's balanceOf at the indexed head) minus the net principal replayed from the position's own Supply/Withdraw/LiquidationCall events and spToken transfers, valued at SparkLend's own on-chain oracle price. Interest grew the collateral, so it is part of the headline figure, not a separate holding."
-      : "Accrued borrow interest included in the debt balance above — per reserve, the current rebased debt (equal to the variableDebtToken's balanceOf at the indexed head) minus the net principal replayed from the position's own Borrow/Repay/LiquidationCall events, valued at SparkLend's own on-chain oracle price. Interest grew the debt, so it is part of the headline figure, not an amount repaid.",
+      ? "Supply interest inside the collateral balance above: per reserve, the interest added since the balance last started from zero (a balance under a cent counts as zero). Each row states the balance before and after it, so each row's before less the previous row's after is the interest between them, and the balance now less the last row's after is the interest since. Valued at the price the SparkLend oracle reports now. Interest from before that start left with earlier withdrawals; the Lifetime flows panel counts all of it."
+      : "Borrow interest inside the debt balance above: per reserve, the interest added since the debt last started from zero. Each row states the debt before and after it, so each row's before less the previous row's after is the interest between them, and the debt now less the last row's after is the interest since. Valued at the price the SparkLend oracle reports now. Interest from before that start was repaid; the Lifetime flows panel counts all of it.",
   contract: SPARK,
-  via: "(current rebased balance − Σ net event principal) × IAaveOracle getAssetPrice, per reserve",
-  formula: "(current − net principal) × oracle price",
+  via: "Σ (row before − previous row after) + (balance now − last row after), since the balance last started from zero, × IAaveOracle getAssetPrice, per reserve",
+  formula: "interest since the balance started from zero × oracle price",
   inputs: [
     {
-      label: "current",
+      label: "balances",
       kind: "chain-derived",
       pclass: "indexed",
-      note: "scaled-balance reduction (interest included)",
+      note: "each row's balance before and after (scaled balance × index), and the balance now",
     },
-    { label: "net principal", kind: "chain-derived", pclass: "indexed", note: "Σ signed Pool event amounts" },
     { label: "oracle price", kind: "chain", note: "IAaveOracle getAssetPrice" },
   ],
 });

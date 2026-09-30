@@ -247,7 +247,6 @@ function SideBlock({
   motion,
   when,
   assets,
-  first,
   atLive,
 }: {
   side: FlowSide;
@@ -260,7 +259,7 @@ function SideBlock({
   onPin: (k: string) => void;
   motion: string;
   assets: ReturnType<typeof assetsAt>;
-  /** The first bar drawn: the axis labels sit over it. */
+  /** The first bar drawn. Each bar carries the axis labels over it. */
   first: boolean;
   /** The last stop, where no "today" outline is drawn (`isLive` there is
    *  false on a closed position: its receipts read as the close's). */
@@ -296,7 +295,7 @@ function SideBlock({
         {heldTokens.length > 0 && <InlineAssetCluster symbols={heldTokens} size={16} overlap={5} max={3} />}
         <span className="text-xs text-rb-500">{word}</span>
       </div>
-      {first && <AxisLabels model={model} />}
+      <AxisLabels model={model} />
       <Strip
         side={side}
         segments={st.bar}

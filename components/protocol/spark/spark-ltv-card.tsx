@@ -19,11 +19,19 @@
 // show at once, nothing hides behind a toggle.)
 
 import { Prov } from "@/components/shared/provenance";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { pct } from "@/components/shared/ratio-bar";
 import { RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { accountDataProv, accountRatioProv, emodeProv } from "@/lib/spark/position-provenance";
 import type { SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
+
+const CAP_TIP =
+  "The most the account may borrow, as a share of its collateral's value: each collateral asset's own limit, weighted by value. A borrow that would pass it is refused.";
+const LIQ_LINE_TIP =
+  "The loan-to-value at which the account can be liquidated: each collateral asset's liquidation threshold, weighted by value. It sits a little above the cap.";
+const EMODE_OFF_TIP =
+  "The account uses no e-mode category (Pool.getUserEMode reads 0), so the cap and the liquidation line are each asset's own figures.";
 
 export function SparkLtvView({ chain }: { chain: SparkPositionChainResponse }) {
   // Meaningful only with both debt and collateral priced — otherwise the
@@ -49,21 +57,33 @@ export function SparkLtvView({ chain }: { chain: SparkPositionChainResponse }) {
         <Prov info={currentProv}>
           <RiskStrong>{pct(currentLtv)}</RiskStrong>
         </Prov>{" "}
-        of <Prov info={capProv}>{pct(maxLtv)}</Prov> cap
+        of <Prov info={capProv}>{pct(maxLtv)}</Prov>{" "}
+        <RevealTip tip={CAP_TIP} label="cap" focusable>
+          cap
+        </RevealTip>
       </RiskFigure>
       <RiskFigure>
         <Prov info={availProv}>{fmtUsd(chain.availableBorrowsUsd).display}</Prov> more to borrow
       </RiskFigure>
       <RiskFigure>
-        liquidation at <Prov info={liqProv}>{pct(liqThreshold)}</Prov>
+        <RevealTip tip={LIQ_LINE_TIP} label="liquidation at" focusable>
+          liquidation at
+        </RevealTip>{" "}
+        <Prov info={liqProv}>{pct(liqThreshold)}</Prov>
       </RiskFigure>
-      {chain.emode && chain.emode.id > 0 && (
+      {chain.emode && chain.emode.id > 0 ? (
         <RiskFigure label="E-mode">
           <Prov info={emodeProv(chain.emode.label ?? `category ${chain.emode.id}`, chain.emode.ltv, chain.emode.lt)}>
             {chain.emode.label ?? `category ${chain.emode.id}`}
           </Prov>
         </RiskFigure>
-      )}
+      ) : chain.emode ? (
+        <RiskFigure label="E-mode">
+          <RevealTip tip={EMODE_OFF_TIP} label="off" focusable>
+            off
+          </RevealTip>
+        </RiskFigure>
+      ) : null}
     </>
   );
 }

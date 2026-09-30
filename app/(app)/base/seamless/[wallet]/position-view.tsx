@@ -396,8 +396,8 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   // and only when the sweep read every block, because an attribution against
   // a partial history would call missed principal "interest".
   const captions = useMemo(
-    () => (view && data ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined) : null),
-    [view, data, sweptClean, lifetime],
+    () => (view && data ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents) : null),
+    [view, data, sweptClean, lifetime, aaveEvents],
   );
 
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
