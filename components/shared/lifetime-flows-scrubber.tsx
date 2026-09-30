@@ -43,8 +43,8 @@ import {
   FlowPanelShell,
   sumSwatch,
   KEEP_PANEL,
+  panelSplit,
   SegmentPanelBody,
-  type PanelPart,
 } from "@/components/shared/lifetime-flows-tip";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
@@ -59,7 +59,6 @@ import {
   prevEventDay,
   spokenUsd,
   stateAt,
-  type FlowAssetHeld,
   type FlowModel,
   type FlowSegment,
   type FlowSide,
@@ -92,9 +91,6 @@ const pct = (v: number, max: number) => `${Math.max(0, (v / max) * 100)}%`;
 
 /** "7 Feb '26": the timeline's day stamp (chain-truth-timeline). */
 const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
-
-/** A held line that names a token (the summed interest line names none). */
-const isToken = (h: FlowAssetHeld) => h.amount != null;
 
 /** The highlight key a segment answers to: its link group, else its own key. */
 const hlKey = (s: FlowSegment) => (s.link ? `link:${s.link}` : s.key);
@@ -211,9 +207,6 @@ function useReducedMotion(): boolean {
   return reduced;
 }
 
-/** A segment's assets, largest first, for its panel. */
-type AssetSplit = Map<string, PanelPart[]>;
-
 /** The open segment panel: the segment's key, and whether the keyboard
  *  opened it (focus then moves into the panel). */
 export type OpenPanel = { key: string; keyboard: boolean } | null;
@@ -248,8 +241,9 @@ function Strip({
   onOpen: (p: OpenPanel) => void;
   label: string;
   motion: string;
-  /** The open segment's panel body. */
-  panel: (s: FlowSegment) => ReactNode;
+  /** The open segment's panel body; `pick` moves the panel to another
+   *  segment on this strip. */
+  panel: (s: FlowSegment, pick: (key: string) => void) => ReactNode;
 }) {
   const shown = segments.filter((s) => s.width > 0);
   const [trackRef, trackPx, settled] = useTrackWidth();
@@ -337,7 +331,9 @@ function Strip({
           onClose={() => onOpen(null)}
           focusOnOpen={open.keyboard}
         >
-          {panel(openSeg)}
+          {panel(openSeg, (key) => {
+            if (shown.some((x) => x.key === key)) onOpen({ key, keyboard: false });
+          })}
         </FlowPanelShell>
       )}
     </div>
@@ -392,12 +388,7 @@ function SideBlock({
   // Each segment's assets: held from the stop's balances, flows from the
   // day rows' per-asset totals.
   const sideHeld = assets.held.filter((h) => h.side === side);
-  const split: AssetSplit = new Map();
-  split.set(
-    `${side}-held`,
-    sideHeld.map((h) => ({ symbol: h.symbol, usd: h.usd, token: isToken(h) })),
-  );
-  for (const b of model.buckets) if (b.side === side) split.set(b.key, assets.flows.get(b.key) ?? []);
+  const split = panelSplit(model, side, assets.flows);
   const rest = st.sources.find((x) => x.fill === "estimate")?.label ?? "Market move and interest";
 
   return (
@@ -415,13 +406,12 @@ function SideBlock({
         onOpen={onOpen}
         label={label}
         motion={motion}
-        panel={(s) => (
+        panel={(s, pick) => (
           <SegmentPanelBody
             side={side}
             seg={s}
-            title={s.label}
-            // The held segment's assets are the sum's total, listed under it.
-            parts={s.fill === "held" ? [] : (split.get(s.key) ?? [])}
+            split={split}
+            onPick={pick}
             st={st}
             held={sideHeld}
             when={when}

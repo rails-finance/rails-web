@@ -35,7 +35,7 @@ import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { Prov, provInspector } from "@/components/shared/provenance";
-import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { BreakdownRow } from "@/components/shared/amount-breakdown";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   flowAssetProv,
@@ -44,7 +44,14 @@ import {
   flowSegmentProv,
 } from "@/lib/shared/flows-timeline-provenance";
 import { apportionDollars, sideSumRows, wholeUsd } from "@/lib/shared/flows-sum";
-import type { FlowAssetHeld, FlowHatch, FlowSegment, FlowSide, FlowSideState } from "@/lib/shared/flows-timeline";
+import type {
+  FlowAssetHeld,
+  FlowHatch,
+  FlowModel,
+  FlowSegment,
+  FlowSide,
+  FlowSideState,
+} from "@/lib/shared/flows-timeline";
 
 // ── The bars' fills, and the sum's swatches ─────────────────────────────────
 
@@ -127,6 +134,27 @@ export const KEEP_PANEL = { "data-flow-keep-panel": "" } as const;
 
 /** One asset's part of a segment, as the segment's panel lists it. */
 export type PanelPart = { symbol: string; usd: number; token?: boolean };
+
+/** Each line's assets in a side's sum, by its segment's key, largest first:
+ *  the flows' per-asset running totals, and what was held as the bars'
+ *  window opens. */
+export function panelSplit(
+  model: FlowModel,
+  side: FlowSide,
+  flows: Map<string, { symbol: string; usd: number }[]>,
+): Map<string, PanelPart[]> {
+  const split = new Map<string, PanelPart[]>();
+  for (const b of model.buckets) if (b.side === side) split.set(b.key, flows.get(b.key) ?? []);
+  if (model.opening)
+    split.set(
+      `${side}-opening`,
+      model.opening.held
+        .filter((h) => h.side === side && h.usd >= 0.5)
+        .map((h) => ({ symbol: h.symbol, usd: h.usd, token: h.amount != null }))
+        .sort((x, y) => y.usd - x.usd),
+    );
+  return split;
+}
 
 /** Rows a segment's panel lists before it counts the rest. */
 const PANEL_ROWS = 6;
@@ -300,13 +328,14 @@ function PanelDate({ cursor }: { cursor: FlowCursor | null }) {
   );
 }
 
-/** A segment's panel body: its name and figure, its assets, then the side's
- *  sum. A busy bar's panel (`seg` the held segment, `busy`) names the side. */
+/** A segment's panel body: the date its figures are at, then its side's sum,
+ *  the same signed table whichever segment opened it, with that segment's row
+ *  highlighted and its assets open beneath it; then the basis line. On the
+ *  busy bars (`seg` the held segment) the total's row is the highlighted one. */
 export function SegmentPanelBody({
   side,
   seg,
-  title,
-  parts,
+  split,
   st,
   held,
   when,
@@ -314,13 +343,13 @@ export function SegmentPanelBody({
   daily,
   swatch,
   words,
+  onPick,
 }: {
   side: FlowSide;
   seg: FlowSegment;
-  /** The panel's heading: the segment's name, or on a busy bar the side's. */
-  title: string;
-  /** The segment's assets, largest first; none on a busy bar. */
-  parts: PanelPart[];
+  /** Each line's assets by its segment's key, largest first (the window's
+   *  opening under `${side}-opening`). */
+  split: Map<string, PanelPart[]>;
   st: FlowSideState;
   /** The side's assets held or owed at the date. */
   held: FlowAssetHeld[];
@@ -331,70 +360,60 @@ export function SegmentPanelBody({
   swatch: (s: FlowSegment) => CSSProperties | null;
   /** The balancing item's name, for the basis line. */
   words: { rest: string };
+  /** Moves the panel to another segment the bar draws (a click on its row). */
+  onPick?: (key: string) => void;
 }) {
   const cursor = useContext(FlowCursorContext);
-  const partDollars = apportionDollars(
-    parts.map((p) => p.usd),
-    Math.round(seg.value),
-  );
-  const shownParts = parts.slice(0, PANEL_ROWS);
   return (
-    <div className="flex flex-col gap-1" data-flow-tip={side}>
+    <div className="flex flex-col" data-flow-tip={side}>
       <PanelDate cursor={cursor} />
-      <div className="flex items-baseline gap-2 pr-6 text-sm font-semibold">
-        <span>{title}</span>
-        <span className="ml-auto tabular-nums">
-          <Prov info={flowSegmentProv(seg, side, when, isLive, daily)}>{wholeUsd(seg.value)}</Prov>
-        </span>
-      </div>
-      {shownParts.length > 0 && (
-        <ul className="flex flex-col gap-0.5" data-flow-panel-assets="">
-          {shownParts.map((p, i) => (
-            <li key={p.symbol} className="flex items-center gap-1.5 text-rb-500">
-              {p.token !== false && <TokenChipIcon symbol={p.symbol} size={14} />}
-              <span>{p.symbol}</span>
-              <span className="ml-auto tabular-nums">
-                <Prov info={flowAssetProv(p.symbol, seg, side, when, isLive, daily)}>{wholeUsd(partDollars[i])}</Prov>
-              </span>
-            </li>
-          ))}
-          {parts.length > PANEL_ROWS && <li className="text-rb-500">{parts.length - PANEL_ROWS} more</li>}
-        </ul>
-      )}
       <SideSumTable
         side={side}
         st={st}
+        seg={seg}
+        split={split}
         held={held}
         when={when}
         isLive={isLive}
         daily={daily}
         swatch={swatch}
         words={words}
+        onPick={onPick}
       />
     </div>
   );
 }
 
-/** The side's sum: one signed line per component, the total under a rule,
- *  and what makes up the total, asset by asset. */
+/** The row key of the side's total, highlighted for the held segment. */
+const TOTAL = "total";
+
+/** The side's sum: one signed line per component, the total under a rule
+ *  with what makes it up, asset by asset, and the basis line under it. A line
+ *  with assets opens them beneath it behind a chevron. */
 function SideSumTable({
   side,
   st,
+  seg,
+  split,
   held,
   when,
   isLive,
   daily,
   swatch,
   words,
+  onPick,
 }: {
   side: FlowSide;
   st: FlowSideState;
+  seg: FlowSegment;
+  split: Map<string, PanelPart[]>;
   held: FlowAssetHeld[];
   when: string;
   isLive: boolean;
   daily: boolean;
   swatch: (s: FlowSegment) => CSSProperties | null;
   words: { rest: string };
+  onPick?: (key: string) => void;
 }) {
   const cursor = useContext(FlowCursorContext);
   const sum = sideSumRows(st);
@@ -407,69 +426,101 @@ function SideSumTable({
     sum.total.dollars,
   );
   const rest = words.rest.toLowerCase();
-  const sw = (s: FlowSegment | null) => {
-    const style = s ? swatch(s) : null;
-    return <span aria-hidden className="inline-block size-2.5 shrink-0 rounded-[2px]" style={style ?? undefined} />;
+  // The clicked segment's row; a click on another row moves it.
+  const opened = seg.fill === "held" ? TOTAL : seg.key;
+  const [hl, setHl] = useState(opened);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set([opened]));
+  useEffect(() => {
+    setHl(opened);
+    setExpanded(new Set([opened]));
+  }, [opened]);
+  const partsOf = (key: string): PanelPart[] => split.get(key) ?? [];
+  const toggle = (key: string) =>
+    setExpanded((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const pick = (key: string, onBar: boolean) => {
+    setHl(key);
+    setExpanded((cur) => new Set(cur).add(key));
+    if (onBar && onPick && key !== seg.key) onPick(key);
   };
-  const provFor = (kind: string, seg: FlowSegment) =>
+  const provFor = (kind: string, s: FlowSegment) =>
     kind === "rest"
-      ? flowRemainderProv(seg.label, side, when)
+      ? flowRemainderProv(s.label, side, when)
       : kind === "opening"
-        ? flowOpeningProv(seg.label, side)
-        : flowSegmentProv(seg, side, when, isLive, daily);
+        ? flowOpeningProv(s.label, side)
+        : flowSegmentProv(s, side, when, isLive, daily);
+  const heldSeg = st.bar.find((b) => b.fill === "held");
   return (
-    <div className="mt-1.5 border-t pt-1.5" style={{ borderColor: "var(--rb-tooltip-border)" }}>
-      <p className="mb-1 text-[11px] leading-snug text-rb-500" data-flow-panel-basis="">
+    <>
+      <div className="flex flex-col tabular-nums" data-flow-tip-sum={side}>
+        {sum.lines.map((l) => {
+          const parts = l.kind === "rest" ? [] : partsOf(l.key);
+          const open = parts.length > 0 && expanded.has(l.key);
+          const listed = parts.slice(0, PANEL_ROWS);
+          const dollars = open
+            ? apportionDollars(
+                parts.map((p) => Math.abs(p.usd)),
+                Math.abs(l.dollars),
+              )
+            : [];
+          return (
+            <BreakdownRow
+              key={l.key}
+              rowKey={`${side}-${l.key}`}
+              label={l.label}
+              name={l.label}
+              sign={l.sign}
+              swatch={l.kind === "rest" ? null : swatch(l.seg)}
+              value={{ text: l.amount, prov: provFor(l.kind, l.seg) }}
+              parts={listed.map((p, i) => ({
+                symbol: p.symbol,
+                icon: p.token !== false,
+                usd: {
+                  text: wholeUsd(dollars[i] ?? 0),
+                  prov: flowAssetProv(p.symbol, l.seg, side, when, isLive, daily),
+                },
+              }))}
+              more={Math.max(0, parts.length - PANEL_ROWS)}
+              open={open}
+              onToggle={() => toggle(l.key)}
+              highlighted={hl === l.key}
+              onSelect={() => pick(l.key, l.kind === "out")}
+              attrs={{ "data-flow-sum-line": l.kind, "data-flow-sum-key": l.key }}
+            />
+          );
+        })}
+        <BreakdownRow
+          rowKey={`${side}-total`}
+          label={`${heldWord} ${at}`}
+          swatch={swatch(sum.total.seg)}
+          value={{ text: sum.total.amount, prov: flowSegmentProv(sum.total.seg, side, when, isLive, daily) }}
+          parts={heldAssets.map((h, i) => ({
+            symbol: h.symbol,
+            icon: h.amount != null,
+            usd: {
+              text: wholeUsd(heldDollars[i]),
+              prov: flowAssetProv(h.symbol, sum.total.seg, side, when, isLive, daily),
+            },
+          }))}
+          open
+          total
+          highlighted={hl === TOTAL}
+          onSelect={() => {
+            setHl(TOTAL);
+            if (onPick && heldSeg && heldSeg.key !== seg.key && heldSeg.width > 0) onPick(heldSeg.key);
+          }}
+          attrs={{ "data-flow-sum-line": "total" }}
+        />
+      </div>
+      <p className="mt-1.5 text-[11px] leading-snug text-rb-500" data-flow-panel-basis="">
         Each flow is valued at the price on its own day. {words.rest} is the remainder, {coll ? "held" : "owed"} {at}{" "}
         less the lines above it
         {rest === "interest earned" ? "." : ", so it holds price changes and interest together."}
       </p>
-      <table className="w-full border-collapse tabular-nums" data-flow-tip-sum={side}>
-        <tbody>
-          {sum.lines.map((l) => (
-            <tr key={l.key} data-flow-sum-line={l.kind}>
-              <td className="w-3 py-0.5 pr-0.5 text-right align-middle text-rb-500">{l.sign}</td>
-              <td className="w-4 py-0.5 align-middle">{sw(l.kind === "rest" ? null : l.seg)}</td>
-              <td className="py-0.5 pr-2 text-rb-500">{l.label}</td>
-              <td className="whitespace-nowrap py-0.5 text-right">
-                <Prov info={provFor(l.kind, l.seg)}>{l.amount}</Prov>
-              </td>
-            </tr>
-          ))}
-          <tr className="font-semibold" data-flow-sum-line="total">
-            <td className="border-t py-0.5" style={{ borderColor: "var(--rb-tooltip-border)" }} />
-            <td className="border-t py-0.5 align-middle" style={{ borderColor: "var(--rb-tooltip-border)" }}>
-              {sw(sum.total.seg)}
-            </td>
-            <td className="border-t py-0.5 pr-2" style={{ borderColor: "var(--rb-tooltip-border)" }}>
-              {heldWord} {at}
-            </td>
-            <td
-              className="whitespace-nowrap border-t py-0.5 text-right"
-              style={{ borderColor: "var(--rb-tooltip-border)" }}
-            >
-              <Prov info={flowSegmentProv(sum.total.seg, side, when, isLive, daily)}>{sum.total.amount}</Prov>
-            </td>
-          </tr>
-          {heldAssets.map((h, i) => (
-            <tr key={`${h.side}:${h.symbol}`} className="text-rb-500" data-flow-sum-line="asset">
-              <td />
-              <td />
-              <td className="py-0.5 pr-2">
-                <span className="inline-flex items-center gap-1.5 pl-2">
-                  {h.amount != null && <TokenChipIcon symbol={h.symbol} size={14} />}
-                  {h.symbol}
-                </span>
-              </td>
-              <td className="whitespace-nowrap py-0.5 text-right">
-                <Prov info={flowAssetProv(h.symbol, sum.total.seg, side, when, isLive, daily)}>
-                  {wholeUsd(heldDollars[i])}
-                </Prov>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    </>
   );
 }
