@@ -54,7 +54,6 @@ import { fetchAaveV3GroupedTimeline, type AaveV3GroupedTimelineResponse } from "
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
-import { operationsFromEvents } from "@/lib/shared/flows-busy";
 import { aaveV3FlowSeriesTimeline, lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
 import { fetchAaveV3FlowSeries, type AaveV3FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
@@ -609,20 +608,13 @@ export default function AaveV3PositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
-  // The busy treatments' operations and health line (lib/shared/flows-busy.ts):
-  // the operations only where the page holds every row.
-  const flowOperations = useMemo(
-    () => operationsFromEvents(aaveEvents, historyWindow.state === "whole" && (servedFolders?.length ?? 0) === 0),
-    [aaveEvents, historyWindow.state, servedFolders],
-  );
-  // A folder-served or windowed page reads the whole history as rows once the
-  // grouping is asked for (the export's read).
-  const loadFlowOperations = useCallback(async () => {
-    const all = await fetchAllHistory();
-    return all.missing > 0 ? null : operationsFromEvents(all.events, true);
-  }, [fetchAllHistory]);
+  // Lifetime's health line (lib/shared/flows-series.ts): today's threshold.
   const healthThreshold =
     chain && !chain.chainStale && chain.avgLiquidationThreshold > 0 ? chain.avgLiquidationThreshold : null;
+  const flowSeriesSource = useMemo(
+    () => ({ path: "/api/aave-v3/flows/series", params: { wallet, market } }),
+    [wallet, market],
+  );
   const flowTimeline = useMemo(
     () => (flowSeries ? aaveV3FlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
     [flowSeries, towerData, view],
@@ -750,8 +742,7 @@ export default function AaveV3PositionDetail({
                   flowTimeline ? (
                     <LifetimeFlowsScrubber
                       timeline={flowTimeline}
-                      operations={flowOperations}
-                      loadOperations={flowOperations ? undefined : loadFlowOperations}
+                      series={flowSeriesSource}
                       healthThreshold={healthThreshold}
                     />
                   ) : null

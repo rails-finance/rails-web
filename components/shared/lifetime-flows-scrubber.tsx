@@ -32,12 +32,14 @@ import { Prov } from "@/components/shared/provenance";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
-import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF, CTRL_ON, CTRL_ON_HOVER } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
   assetsAt,
   buildFlowModel,
+  DAY_MS,
   dayStart,
+  longDay,
   formatFlowUsd,
   nextEventDay,
   prevEventDay,
@@ -50,9 +52,21 @@ import {
   type FlowSide,
   type FlowSideState,
   type FlowTimeline,
+  windowModel,
 } from "@/lib/shared/flows-timeline";
-import { flowVariant, isBusy, type FlowOperations } from "@/lib/shared/flows-busy";
+import { isBusy } from "@/lib/shared/flows-busy";
 import { BusyFlows } from "@/components/shared/lifetime-flows-busy";
+import { LifetimeOverTime } from "@/components/shared/lifetime-flows-over-time";
+import {
+  binInputFromTimeline,
+  binSeries,
+  lifetimeBinFor,
+  windowFromDay,
+  WINDOW_ACTIVE_DAYS,
+  type FlowBinSeries,
+  type SeriesBin,
+} from "@/lib/shared/flows-series";
+import { fetchFlowBinSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 
 /** Days the slider advances per tick while playing, and the tick. */
 const PLAY_DAYS = 7;
@@ -128,7 +142,14 @@ export const FlowsLedgerNoteContext = createContext<((note: string | null) => vo
 /** The Key: each kind of exit the position has had over its life, and the
  *  dashed outline where it has other stops. The scrubber reports it; the panel
  *  draws it inside its Explanation, so the bars stand alone. */
-export type FlowsKeyItems = { items: { side: FlowSide; s: FlowSegment }[]; outline: string | null };
+export type FlowsKeyItems = {
+  items: { side: FlowSide; s: FlowSegment }[];
+  outline: string | null;
+  /** The Key's line on which view is which. */
+  views?: string;
+  /** The Explanation's line on the same. */
+  explain?: string;
+};
 export const FlowsKeyContext = createContext<((key: FlowsKeyItems | null) => void) | null>(null);
 
 /** Gap between neighbouring segments, the least width a non-zero segment
@@ -483,8 +504,8 @@ function SourceLine({
  *  draw, by name, for each kind of exit the position has had over its life.
  *  The segments' tips carry the figures. Where the position has other stops,
  *  the dashed outline too: where each bar ends at the last stop. */
-export function FlowsKey({ items, outline }: FlowsKeyItems) {
-  if (items.length === 0 && !outline) return null;
+export function FlowsKey({ items, outline, views }: FlowsKeyItems) {
+  if (items.length === 0 && !outline && !views) return null;
   return (
     <div className="mt-3 first:mt-0" data-flow-key="">
       <p className="text-xs font-semibold text-foreground">Key</p>
@@ -502,6 +523,11 @@ export function FlowsKey({ items, outline }: FlowsKeyItems) {
           </li>
         )}
       </ul>
+      {views && (
+        <p className="mt-1.5 text-xs leading-relaxed text-rb-500" data-flow-key-views="">
+          {views}
+        </p>
+      )}
     </div>
   );
 }
@@ -571,57 +597,149 @@ function AxisLabels({ model }: { model: FlowModel }) {
   );
 }
 
-/** `?flows=` from the address bar, read after mount so the server's render
- *  and the first client render agree. */
-function useFlowsParam(): string | null {
-  const [param, setParam] = useState<string | null>(null);
-  useEffect(() => setParam(new URLSearchParams(window.location.search).get("flows")), []);
-  return param;
-}
+/** Where the Lifetime view reads its series: the family's route
+ *  (`/api/spark/flows/series`) and the position's parameters. */
+export type FlowSeriesSource = { path: string; params: Record<string, string> };
 
+/** The two views (rails-ops reference/lifetime-flows-scrubber.md): the bars,
+ *  cut to the last WINDOW_ACTIVE_DAYS active days, and Lifetime, collateral
+ *  and debt per week or month from the open. The bars take the busy
+ *  treatment (lib/shared/flows-busy.ts) where their window is busy. */
 export function LifetimeFlowsScrubber({
   timeline,
-  operations,
-  loadOperations,
   healthThreshold,
+  series,
 }: {
   timeline: FlowTimeline;
-  /** The whole history's transactions grouped by what they did, where the
-   *  page holds every row (lib/shared/flows-busy.ts). */
-  operations?: FlowOperations | null;
-  /** Reads the grouping where the page holds only part of the rows; called
-   *  only when the grouping is drawn. */
-  loadOperations?: () => Promise<FlowOperations | null>;
-  /** The account's liquidation threshold now, for the busy treatment's
-   *  health factor over time. */
+  /** The account's liquidation threshold now, for Lifetime's health line. */
   healthThreshold?: number | null;
+  /** The family's series route; absent, Lifetime bins the timeline's own day
+   *  rows (a page that holds them all, Sky Savings). */
+  series?: FlowSeriesSource;
 }) {
   const model = useMemo(() => buildFlowModel(timeline), [timeline]);
-  const param = useFlowsParam();
+  const from = model ? windowFromDay(model.eventDays) : 0;
+  const bars = useMemo(() => (model ? windowModel(model, from) : null), [model, from]);
+  const busy = bars ? isBusy(bars) : false;
+  const [view, setView] = useState<"bars" | "lifetime">("bars");
   const ledgerNote = useContext(FlowsLedgerNoteContext);
   const reportKey = useContext(FlowsKeyContext);
-  const variant = model ? flowVariant(param, isBusy(model)) : null;
-  // The busy treatments draw no hatches, so the Explanation carries no Key.
-  const busyDrawn = variant != null;
+  const [hatches, setHatches] = useState<Omit<FlowsKeyItems, "views" | "explain"> | null>(null);
+
+  // Lifetime's series: read on first opening, from the family's route, or
+  // binned here from the page's rows.
+  const startDay = model ? model.start / DAY_MS : 0;
+  const bin: SeriesBin = model ? lifetimeBinFor((timeline.today ?? startDay + model.liveStop) - startDay) : "week";
+  const [lifetime, setLifetime] = useState<{ series: FlowBinSeries | null; failed: boolean } | null>(null);
+  const seriesKey = series ? `${series.path}?${new URLSearchParams(series.params).toString()}&bin=${bin}` : null;
+  useEffect(() => setLifetime(null), [seriesKey, timeline]);
   useEffect(() => {
-    if (busyDrawn) reportKey?.(null);
-  }, [busyDrawn, reportKey]);
-  if (!model) return null;
-  if (variant)
-    return (
-      <BusyFlows
-        model={model}
-        variant={variant}
-        operations={operations}
-        loadOperations={loadOperations}
-        healthThreshold={healthThreshold}
-        onLedgerNote={ledgerNote ?? undefined}
-      />
-    );
-  return <ScrubberBody model={model} />;
+    if (view !== "lifetime" || lifetime) return;
+    if (!series) {
+      const input = binInputFromTimeline(timeline);
+      setLifetime({ series: input ? binSeries(input, bin) : null, failed: !input });
+      return;
+    }
+    const ctl = new AbortController();
+    fetchFlowBinSeries(series.path, series.params, bin, ctl.signal)
+      .then((s) => setLifetime({ series: s, failed: false }))
+      .catch((err) => {
+        if (ctl.signal.aborted) return;
+        console.warn("Lifetime flows series not read:", err);
+        setLifetime({ series: null, failed: true });
+      });
+    return () => ctl.abort();
+    // `seriesKey` stands for `series`, which a caller may build afresh each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, lifetime, seriesKey, timeline, bin]);
+
+  const words = useMemo(() => (bars && model ? viewWords(model, bars, from, bin) : null), [model, bars, from, bin]);
+  useEffect(() => {
+    if (!words) return;
+    const drawn = view === "bars" && !busy ? hatches : null;
+    reportKey?.({
+      items: drawn?.items ?? [],
+      outline: drawn?.outline ?? null,
+      views: words.key,
+      explain: words.explain,
+    });
+  }, [reportKey, view, busy, hatches, words]);
+  useEffect(() => () => reportKey?.(null), [reportKey]);
+  useEffect(() => {
+    if (view === "lifetime") ledgerNote?.(null);
+  }, [view, ledgerNote]);
+
+  if (!model || !bars || !words) return null;
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="min-w-0 text-xs tabular-nums text-rb-500" data-flow-window-range="">
+          {words.range}
+        </p>
+        <button
+          type="button"
+          aria-pressed={view === "lifetime"}
+          onClick={() => setView((v) => (v === "lifetime" ? "bars" : "lifetime"))}
+          className={`${CTRL_GHOST} ${view === "lifetime" ? `${CTRL_ON} ${CTRL_ON_HOVER}` : CTRL_OFF} h-8 shrink-0 rounded-md px-2.5 text-xs font-semibold`}
+          data-flow-lifetime-toggle=""
+        >
+          Lifetime
+        </button>
+      </div>
+      {view === "lifetime" ? (
+        <LifetimeOverTime
+          model={model}
+          series={lifetime?.series ?? null}
+          failed={lifetime?.failed ?? false}
+          windowFrom={from > 0 ? startDay + from : null}
+          healthThreshold={healthThreshold ?? null}
+        />
+      ) : busy ? (
+        <BusyFlows model={bars} onLedgerNote={ledgerNote ?? undefined} />
+      ) : (
+        <ScrubberBody model={bars} onKey={setHatches} />
+      )}
+    </div>
+  );
 }
 
-function ScrubberBody({ model }: { model: FlowModel }) {
+/** The header's window, and the Key's and the Explanation's line on which
+ *  view is which. */
+function viewWords(
+  model: FlowModel,
+  bars: FlowModel,
+  from: number,
+  bin: SeriesBin,
+): { range: string; key: string; explain: string } {
+  const closed = !(model.heldAt[model.heldAt.length - 1] ?? []).some((h) => (h.amount ?? 0) > 0);
+  const opens = longDay(dayStart(bars, 0));
+  const ends = closed ? `close, ${longDay(dayStart(model, model.lastDay))}` : "today";
+  const days = bars.eventDays.length;
+  const range = `${opens} – ${ends} · ${days.toLocaleString("en-US")} active day${days === 1 ? "" : "s"}`;
+  const hasDebt = model.buckets.some((b) => b.side === "debt");
+  const what = hasDebt
+    ? `${model.labels.collateral.toLowerCase()} and ${model.labels.debt.toLowerCase()}`
+    : model.labels.collateral.toLowerCase();
+  const barsCover =
+    from > 0 ? `the last ${WINDOW_ACTIVE_DAYS} active days, from ${opens}` : `every active day since ${opens}`;
+  return {
+    range,
+    key: `Bars: ${barsCover} · Lifetime: ${what} by ${bin} since the open`,
+    explain:
+      `The bars cover ${from > 0 ? `the last ${WINDOW_ACTIVE_DAYS} days with events, from ${opens}, and start with what was held as it opens` : `every day with events since ${opens}`}; ` +
+      `Lifetime draws ${what} at the end of each ${bin} since the open, at the daily prices the index records` +
+      `${from > 0 ? ", with the bars' window shaded" : ""}, and leaves a gap where a held asset has no price that ${bin}.`,
+  };
+}
+
+function ScrubberBody({
+  model,
+  onKey,
+}: {
+  model: FlowModel;
+  /** The Key's hatches and outline, for the panel's Explanation. */
+  onKey: (key: Omit<FlowsKeyItems, "views" | "explain"> | null) => void;
+}) {
   const [stop, setStop] = useState(model.liveStop);
   const [playing, setPlaying] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
@@ -713,11 +831,10 @@ function ScrubberBody({ model }: { model: FlowModel }) {
   // The Key goes to the panel's Explanation. Its dashed outline, which marks
   // where each bar ends at the last stop, is named wherever there is another stop.
   const keyOutline = model.liveStop > 0 ? (closed ? "Length at close" : "Today's length") : null;
-  const reportKey = useContext(FlowsKeyContext);
   useEffect(() => {
-    reportKey?.({ items: keyItems, outline: keyOutline });
-  }, [reportKey, keyItems, keyOutline]);
-  useEffect(() => () => reportKey?.(null), [reportKey]);
+    onKey({ items: keyItems, outline: keyOutline });
+  }, [onKey, keyItems, keyOutline]);
+  useEffect(() => () => onKey(null), [onKey]);
   // The ledger under the panel shows the last stop; say so while the slider is elsewhere.
   const ledgerNote = useContext(FlowsLedgerNoteContext);
   const ledgerText = s.isLive ? null : closed ? "Shows the position at close" : "Shows the position today";

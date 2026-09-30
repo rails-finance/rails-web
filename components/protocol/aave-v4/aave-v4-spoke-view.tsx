@@ -343,7 +343,16 @@ function AaveV4SpokePageInner({
       // as chain-derived instead of middotting the DefiLlama figure.
       onchainUsd: computeOnchainUsd(chainPosition, oraclePrices),
     };
-  }, [eventActiveCard, eventActiveGroup, chainPosition, prices, chainTruthPrices, oraclePrices, sortedEvents, spokeName]);
+  }, [
+    eventActiveCard,
+    eventActiveGroup,
+    chainPosition,
+    prices,
+    chainTruthPrices,
+    oraclePrices,
+    sortedEvents,
+    spokeName,
+  ]);
   const activeGroup = useMemo(() => {
     if (!eventActiveGroup) return undefined;
     if (!chainPosition || chainPosition.chainStale) {
@@ -1083,7 +1092,10 @@ function AaveV4SpokeTowerBlock({
               <div className="flex min-h-[28px] items-center">{title}</div>
               <div className="mt-2">
                 <FlowsLedgerNoteContext.Provider value={setLedgerNote}>
-                  <LifetimeFlowsScrubber timeline={flowTimeline} />
+                  <LifetimeFlowsScrubber
+                    timeline={flowTimeline}
+                    series={{ path: "/api/aave-v4/flows/series", params: { wallet, spoke: spokeName } }}
+                  />
                 </FlowsLedgerNoteContext.Provider>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-2">

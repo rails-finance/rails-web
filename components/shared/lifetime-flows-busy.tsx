@@ -1,14 +1,12 @@
 "use client";
 
-// The Lifetime flows panel for busy, long-lived positions (lib/shared/flows-busy.ts):
-// the slider steps by bin (a day, a week or a month, by the position's span),
-// a density strip counts the transactions in each bin, and either
-//   rescaled   each bar is what is held or owed, on an axis fixed to the
-//              largest either has been, with the lifetime's throughput in one line;
-//   over-time  collateral and debt as lines over the bins, with the health
-//              factor under them where the page states a liquidation threshold.
-// With `operations`, the transactions grouped by the events inside each one.
-// Every figure is `stateAt(model, stop)` at a bin's last day, or the live stop.
+// The bars for a busy window (lib/shared/flows-busy.ts; rails-ops
+// reference/lifetime-flows-scrubber.md, "The two views"): each bar is what is
+// held or owed, on an axis fixed to the most either has been in the window,
+// with the window's throughput in one line, a density strip counting the
+// transactions in each bin (a day, a week or a month, by the window's span),
+// and the slider stepping by bin. Every figure is `stateAt(model, stop)` at a
+// bin's last day, or the live stop.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
@@ -17,7 +15,6 @@ import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
-import { shortAddress } from "@/lib/shared/vault-amount-text";
 import {
   assetsAt,
   axisFor,
@@ -30,23 +27,16 @@ import {
   type FlowSide,
   type FlowSideState,
 } from "@/lib/shared/flows-timeline";
-import {
-  binOf,
-  flowBins,
-  healthAt,
-  seriesByBin,
-  throughput,
-  type FlowBin,
-  type FlowOperations,
-  type FlowVariant,
-} from "@/lib/shared/flows-busy";
+import { flowBins, throughput, type FlowBin } from "@/lib/shared/flows-busy";
 
 const PLAY_MS = 220;
 const HUE: Record<FlowSide, string> = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
 const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
 const count = (n: number) => n.toLocaleString("en-US");
+/** The density strip's inset each side, matching the slider thumb's travel. */
+const PAD = 8;
 
-function useWidth(): [React.RefObject<HTMLDivElement | null>, number] {
+export function useWidth(): [React.RefObject<HTMLDivElement | null>, number] {
   const ref = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(0);
   useLayoutEffect(() => {
@@ -64,41 +54,14 @@ function useWidth(): [React.RefObject<HTMLDivElement | null>, number] {
 }
 
 export interface BusyFlowsProps {
+  /** The model, cut to the bars' window where it has one. */
   model: FlowModel;
-  variant: FlowVariant;
-  operations?: FlowOperations | null;
-  loadOperations?: () => Promise<FlowOperations | null>;
-  /** The account's liquidation threshold now (0.95), for the health factor
-   *  over time; absent, no health line. */
-  healthThreshold?: number | null;
   /** The Full breakdown's note while the slider is off its last stop. */
   onLedgerNote?: (note: string | null) => void;
 }
 
-export function BusyFlows({
-  model,
-  variant,
-  operations,
-  loadOperations,
-  healthThreshold,
-  onLedgerNote,
-}: BusyFlowsProps) {
-  const [loadedOps, setLoadedOps] = useState<FlowOperations | null>(null);
-  useEffect(() => {
-    if (!variant.ops || operations || !loadOperations) return;
-    let live = true;
-    loadOperations()
-      .then((o) => live && setLoadedOps(o))
-      .catch(() => {
-        // The grouping stays off; the chart reads as it does without it.
-      });
-    return () => {
-      live = false;
-    };
-  }, [variant.ops, operations, loadOperations]);
-  const ops = operations ?? loadedOps;
+export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
   const { unit, bins } = useMemo(() => flowBins(model), [model]);
-  const series = useMemo(() => seriesByBin(model, bins), [model, bins]);
   const through = useMemo(() => throughput(model), [model]);
   const last = bins.length; // the live stop's index
   const [at, setAt] = useState(last);
@@ -145,8 +108,11 @@ export function BusyFlows({
       : `Position on ${dateText}`;
   const liveReceipts = s.isLive && !closed;
   const unitWord = through.unit;
+  // The card's count, over the whole life: a window's first stop reads where
+  // the window opens.
   const through_ = s.txs ?? s.count;
-  const counter = `${count(through_)} of ${count(through.txs)} ${unitWord}${through.txs === 1 ? "" : "s"}`;
+  const total = model.totalTxs ?? model.totalEvents;
+  const counter = `${count(through_)} of ${count(total)} ${unitWord}${total === 1 ? "" : "s"}`;
   const binText = at >= last ? (closed ? "Close" : "Today") : bins[at].label;
 
   const ledgerText = s.isLive ? null : closed ? "Shows the position at close" : "Shows the position today";
@@ -159,29 +125,13 @@ export function BusyFlows({
   const per = unit === "day" ? "day" : unit === "week" ? "week" : "month";
 
   return (
-    <div className="text-sm" data-flows-variant={`${variant.chart}${variant.ops ? "+ops" : ""}`}>
+    <div className="text-sm" data-flows-busy="">
       <p className="mb-1 font-semibold tabular-nums text-foreground" aria-live="polite">
         {dateLine}
       </p>
       <Throughput t={through} hasDebt={hasDebt} />
 
-      {variant.chart === "rescaled" ? (
-        <Rescaled model={model} s={s} hasDebt={hasDebt} when={when} isLive={liveReceipts} assets={assets} />
-      ) : (
-        <OverTime
-          model={model}
-          s={s}
-          hasDebt={hasDebt}
-          when={when}
-          isLive={liveReceipts}
-          assets={assets}
-          series={series}
-          at={at}
-          bins={bins}
-          onPick={go}
-          healthThreshold={healthThreshold ?? null}
-        />
-      )}
+      <Rescaled model={model} s={s} hasDebt={hasDebt} when={when} isLive={liveReceipts} assets={assets} />
 
       <div className="relative mt-3">
         <Density bins={bins} at={at} per={per} unit={unitWord} onPick={go} />
@@ -233,8 +183,6 @@ export function BusyFlows({
             .join(", ")}.`}
         </p>
       )}
-
-      {variant.ops && ops && <Operations ops={ops} />}
     </div>
   );
 }
@@ -269,7 +217,7 @@ function Throughput({ t, hasDebt }: { t: ReturnType<typeof throughput>; hasDebt:
 
 // ── a: the bars at the scale of what is held ────────────────────────────────
 
-function Headline({
+export function Headline({
   side,
   st,
   model,
@@ -418,212 +366,6 @@ function Rescaled({
   );
 }
 
-// ── b: collateral and debt over time ────────────────────────────────────────
-
-const CHART_H = 150;
-const HEALTH_H = 44;
-/** The chart's inset each side, matching the slider thumb's travel. */
-const PAD = 8;
-
-function OverTime({
-  model,
-  s,
-  hasDebt,
-  when,
-  isLive,
-  assets,
-  series,
-  at,
-  bins,
-  onPick,
-  healthThreshold,
-}: {
-  model: FlowModel;
-  s: ReturnType<typeof stateAt>;
-  hasDebt: boolean;
-  when: string;
-  isLive: boolean;
-  assets: ReturnType<typeof assetsAt>;
-  series: ReturnType<typeof seriesByBin>;
-  at: number;
-  bins: FlowBin[];
-  onPick: (i: number) => void;
-  healthThreshold: number | null;
-}) {
-  const [ref, w] = useWidth();
-  const n = series.length;
-  const axis = useMemo(() => axisFor(Math.max(...series.map((p) => Math.max(p.collateral, p.debt)))), [series]);
-  const inner = Math.max(0, w - PAD * 2);
-  const x = (i: number) => PAD + (n > 1 ? (i / (n - 1)) * inner : inner / 2);
-  const y = (v: number) => CHART_H - (v / axis.max) * (CHART_H - 6);
-  const line = (k: "collateral" | "debt") => series.map((p, i) => `${i ? "L" : "M"}${x(i)},${y(p[k])}`).join("");
-  const area = (k: "collateral" | "debt") => `${line(k)}L${x(n - 1)},${CHART_H}L${x(0)},${CHART_H}Z`;
-  const health = healthThreshold ? series.map((p) => healthAt(p.collateral, p.debt, healthThreshold)) : null;
-  // The line's range: its own values with 1.00, the liquidation line, in view.
-  const hVals = health ? health.filter((h): h is number => h != null) : [];
-  const hMax = Math.min(3, Math.max(1.1, ...hVals) * 1.01);
-  const hMin = Math.max(0, Math.min(1, ...hVals) - (hMax - Math.min(1, ...hVals)) * 0.08);
-  const hy = (h: number) => HEALTH_H - 3 - ((Math.min(h, hMax) - hMin) / (hMax - hMin)) * (HEALTH_H - 6);
-  const hPath = health
-    ? health
-        .map((h, i) => (h == null ? null : `${x(i)},${hy(h)}`))
-        .reduce<string>((d, p, i) => (p == null ? d : `${d}${d === "" || health[i - 1] == null ? "M" : "L"}${p}`), "")
-    : "";
-  const pick = (clientX: number, el: Element) => {
-    const r = el.getBoundingClientRect();
-    const t = (clientX - r.left - PAD) / Math.max(1, r.width - PAD * 2);
-    onPick(Math.round(Math.max(0, Math.min(1, t)) * (n - 1)));
-  };
-  const hNow = health?.[at] ?? null;
-  const firstLabel = bins[0] ? dayStamp(dayStart(model, bins[0].from)) : "";
-  const midBin = bins[Math.floor(bins.length / 2)];
-  return (
-    <div>
-      <div className="flex flex-wrap gap-x-6 gap-y-2">
-        <Headline side="collateral" st={s.collateral} model={model} when={when} isLive={isLive} assets={assets} />
-        {hasDebt && <Headline side="debt" st={s.debt} model={model} when={when} isLive={isLive} assets={assets} />}
-      </div>
-      <div ref={ref} className="relative mt-3 select-none" data-flow-chart="">
-        {w > 0 && (
-          <svg
-            width={w}
-            height={CHART_H}
-            role="img"
-            aria-label={`${model.labels.collateral} and ${model.labels.debt.toLowerCase()} by ${bins.length > 0 ? "period" : "day"}, from ${firstLabel} to today.`}
-            className="block cursor-crosshair touch-none"
-            onPointerDown={(e) => pick(e.clientX, e.currentTarget)}
-            onPointerMove={(e) => e.buttons === 1 && pick(e.clientX, e.currentTarget)}
-          >
-            {axis.ticks.map((t) => (
-              <line
-                key={t}
-                x1={0}
-                x2={w}
-                y1={y(t)}
-                y2={y(t)}
-                className="stroke-rb-300/60 dark:stroke-rb-700"
-                strokeWidth={1}
-              />
-            ))}
-            <path d={area("collateral")} fill={HUE.collateral} fillOpacity={0.14} />
-            <path
-              d={line("collateral")}
-              fill="none"
-              stroke={HUE.collateral}
-              strokeWidth={1.75}
-              strokeLinejoin="round"
-            />
-            {hasDebt && (
-              <>
-                <path d={area("debt")} fill={HUE.debt} fillOpacity={0.12} />
-                <path d={line("debt")} fill="none" stroke={HUE.debt} strokeWidth={1.75} strokeLinejoin="round" />
-              </>
-            )}
-            <line
-              x1={x(at)}
-              x2={x(at)}
-              y1={0}
-              y2={CHART_H}
-              className="stroke-foreground"
-              strokeWidth={1}
-              strokeDasharray="3 3"
-            />
-            <circle
-              cx={x(at)}
-              cy={y(series[at].collateral)}
-              r={3.5}
-              fill={HUE.collateral}
-              className="stroke-background"
-              strokeWidth={1.5}
-            />
-            {hasDebt && (
-              <circle
-                cx={x(at)}
-                cy={y(series[at].debt)}
-                r={3.5}
-                fill={HUE.debt}
-                className="stroke-background"
-                strokeWidth={1.5}
-              />
-            )}
-          </svg>
-        )}
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 text-[11px] tabular-nums text-rb-500"
-          aria-hidden
-          data-prov-exempt=""
-        >
-          {axis.ticks.slice(1).map((t, k) => (
-            <span
-              key={t}
-              className={`absolute left-0 -translate-y-full rounded bg-background/70 pr-1${axis.ticks.length > 5 && k % 2 === 0 ? " max-sm:hidden" : ""}`}
-              style={{ top: y(t) }}
-            >
-              {formatFlowUsd(t)}
-            </span>
-          ))}
-        </div>
-      </div>
-      <div
-        className="mt-1 flex justify-between px-2 text-[11px] tabular-nums text-rb-500"
-        aria-hidden
-        data-prov-exempt=""
-      >
-        <span>{firstLabel}</span>
-        {midBin && <span className="max-sm:hidden">{dayStamp(dayStart(model, midBin.from))}</span>}
-        <span>Today</span>
-      </div>
-      <p className="mt-1 flex flex-wrap gap-x-4 text-xs text-rb-500">
-        <span className="inline-flex items-center gap-1.5">
-          <i aria-hidden className="inline-block h-0.5 w-4" style={{ background: HUE.collateral }} />
-          {model.labels.collateral}
-        </span>
-        {hasDebt && (
-          <span className="inline-flex items-center gap-1.5">
-            <i aria-hidden className="inline-block h-0.5 w-4" style={{ background: HUE.debt }} />
-            {model.labels.debt}
-          </span>
-        )}
-      </p>
-      {health && w > 0 && hPath && (
-        <div className="mt-3" data-flow-health="">
-          <p className="mb-1 flex flex-wrap items-baseline gap-x-2 text-xs text-rb-500">
-            <span>
-              Health factor at today&apos;s liquidation threshold, {Math.round((healthThreshold ?? 0) * 1000) / 10}%
-            </span>
-            {hNow != null && (
-              <Prov
-                info={{
-                  kind: "chain-derived",
-                  summary: `Health factor at ${when} — ${model.labels.collateral.toLowerCase()} held then × today's liquidation threshold, over the debt owed then.`,
-                  formula: "collateral × threshold ÷ debt",
-                }}
-              >
-                <span className="font-medium tabular-nums text-foreground">{hNow.toFixed(2)}</span>
-              </Prov>
-            )}
-          </p>
-          <svg width={w} height={HEALTH_H} aria-hidden className="block">
-            {hMin < 1 && (
-              <line
-                x1={0}
-                x2={w}
-                y1={hy(1)}
-                y2={hy(1)}
-                stroke="var(--color-red-500)"
-                strokeDasharray="2 3"
-                strokeWidth={1}
-              />
-            )}
-            <path d={hPath} fill="none" className="stroke-rb-500" strokeWidth={1.5} strokeLinejoin="round" />
-            {hNow != null && <circle cx={x(at)} cy={hy(hNow)} r={3} className="fill-foreground" />}
-          </svg>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── The density strip: transactions per bin ────────────────────────────────
 
 function Density({
@@ -706,52 +448,6 @@ function Density({
           </span>
         )}
       </div>
-    </div>
-  );
-}
-
-// ── c: the transactions grouped by what they did ────────────────────────────
-
-function Operations({ ops }: { ops: FlowOperations }) {
-  const max = Math.max(1, ...ops.kinds.map((k) => k.count));
-  return (
-    <div className="mt-4 border-t border-rb-200 pt-3 dark:border-rb-800" data-flow-ops="">
-      <p className="text-xs font-semibold text-foreground">What each transaction did</p>
-      <ul className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 text-xs">
-        {ops.kinds.map((k) => (
-          <li key={k.label} className="contents">
-            <span className="text-rb-600 dark:text-rb-300">{k.label}</span>
-            <span className="h-1.5 rounded-full bg-sunken">
-              <span className="block h-full rounded-full bg-rb-400" style={{ width: `${(k.count / max) * 100}%` }} />
-            </span>
-            <span className="tabular-nums text-foreground" data-prov-exempt="">
-              {count(k.count)}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {ops.executor && (
-        <p className="mt-2 text-xs leading-relaxed text-rb-500">
-          Sent from{" "}
-          <a
-            href={`https://etherscan.io/address/${ops.executor.address}`}
-            target="_blank"
-            rel="noreferrer"
-            className="font-mono text-foreground underline decoration-rb-300 underline-offset-2 hover:decoration-foreground"
-          >
-            {shortAddress(ops.executor.address)}
-          </a>{" "}
-          in{" "}
-          <span className="tabular-nums text-foreground" data-prov-exempt="">
-            {count(ops.executor.count)}
-          </span>{" "}
-          of the{" "}
-          <span className="tabular-nums text-foreground" data-prov-exempt="">
-            {count(ops.executor.known)}
-          </span>{" "}
-          transactions whose sender the index records.
-        </p>
-      )}
     </div>
   );
 }

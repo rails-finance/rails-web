@@ -217,6 +217,18 @@ export interface FlowModel {
   axis: { max: number; ticks: number[] };
   /** Each bar's length at the live stop, for the "today" outline. */
   today: { collateral: number; debt: number };
+  /** A model cut to a window (`windowModel`): what was held and owed when
+   *  the window opens, at the close of the day before, with the counts
+   *  through that day. The bars' sources start with it. */
+  opening?: {
+    /** Unix seconds of the window's first day. */
+    ts: number;
+    collateral: number;
+    debt: number;
+    held: FlowAssetHeld[];
+    events: number;
+    txs: number | null;
+  };
 }
 
 export interface FlowSegment {
@@ -666,6 +678,16 @@ function sideState(
     const v = cum[b.key] ?? 0;
     return { key: b.key, label: b.label, fill: "in", width: v, value: v };
   });
+  if (m.opening) {
+    const v = side === "collateral" ? m.opening.collateral : m.opening.debt;
+    exact.unshift({
+      key: `${side}-opening`,
+      label: `Held on ${longDay(m.opening.ts)}`,
+      fill: "in",
+      width: v,
+      value: v,
+    });
+  }
   const rest = total - exact.reduce((s, x) => s + x.value, 0);
   const oneRest = side === "collateral" ? m.words.rest : undefined;
   const balancing = oneRest
@@ -692,6 +714,81 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
     collateral: sideState(m, "collateral", cum, collNow, isLive ? (m.live.collateralInterestUsd ?? null) : null),
     debt: sideState(m, "debt", cum, debtNow, null),
     stale: isLive ? [] : (m.stale.get(stop) ?? []),
+  };
+}
+
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "3 Mar 2025": the window's dates. */
+export function longDay(tsSec: number): string {
+  const d = new Date(tsSec * 1000);
+  return `${d.getUTCDate()} ${MONTH_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+/** The model cut to the stops from `from` (a stop index) to the live one:
+ *  each running total less what it stood at when the window opens, the
+ *  counts kept whole, and the axis fixed to the window's own bars. What was
+ *  held and owed at the close of the day before is `opening`, from the same
+ *  replay. `from` at or before 0 returns the model unchanged. */
+export function windowModel(m: FlowModel, from: number): FlowModel {
+  if (from <= 0 || from >= m.liveStop) return m;
+  const base = rowAt(m, from - 1);
+  const baseCum: Record<string, number> = base >= 0 ? m.rows[base].cum : {};
+  const baseCells = new Map<string, number>();
+  for (let i = 0; i <= base; i++) for (const c of m.rows[i].cells) baseCells.set(`${c.bucket}|${c.symbol}`, c.usd);
+  const less = (cum: Record<string, number>) =>
+    Object.fromEntries(Object.entries(cum).map(([k, v]) => [k, v - (baseCum[k] ?? 0)]));
+  const rows = m.rows
+    .filter((r) => r.day >= from)
+    .map((r) => ({
+      ...r,
+      day: r.day - from,
+      cum: less(r.cum),
+      cells: r.cells.map((c) => ({ ...c, usd: c.usd - (baseCells.get(`${c.bucket}|${c.symbol}`) ?? 0) })),
+    }));
+  if (rows.length === 0) return m;
+  const shift = <T extends { day: number }>(xs: T[]) =>
+    xs.filter((x) => x.day >= from).map((x) => ({ ...x, day: x.day - from }));
+  const outOf = (side: FlowSide, c: Record<string, number>) =>
+    m.buckets.filter((b) => b.side === side && b.dir === "out").reduce((s, b) => s + (c[b.key] ?? 0), 0);
+  const liveStop = m.liveStop - from;
+  const valued = m.valued.slice(from);
+  const last = rows[rows.length - 1];
+  const today = {
+    collateral: m.live.collateralUsd + outOf("collateral", last.cum),
+    debt: m.live.debtUsd + outOf("debt", last.cum),
+  };
+  let peak = Math.max(today.collateral, today.debt);
+  let ri = 0;
+  for (let stop = 0; stop < liveStop; stop++) {
+    while (ri + 1 < rows.length && rows[ri + 1].day <= stop) ri++;
+    const c = rows[ri].day <= stop ? rows[ri].cum : {};
+    peak = Math.max(peak, valued[stop].collateral + outOf("collateral", c), valued[stop].debt + outOf("debt", c));
+  }
+  const before = m.valued[from - 1];
+  const baseRow = base >= 0 ? m.rows[base] : null;
+  return {
+    ...m,
+    rows,
+    start: m.start + from * DAY_MS,
+    lastDay: m.lastDay - from,
+    liveStop,
+    eventDays: m.eventDays.filter((d) => d >= from).map((d) => d - from),
+    ticks: shift(m.ticks),
+    repricings: shift(m.repricings),
+    valued,
+    stale: new Map([...m.stale].filter(([d]) => d >= from).map(([d, v]) => [d - from, v])),
+    heldAt: m.heldAt.slice(from),
+    axis: axisFor(peak),
+    today,
+    opening: {
+      ts: (m.start + from * DAY_MS) / 1000,
+      collateral: before?.collateral ?? 0,
+      debt: before?.debt ?? 0,
+      held: m.heldAt[from - 1] ?? [],
+      events: baseRow?.events ?? 0,
+      txs: baseRow?.txs ?? null,
+    },
   };
 }
 

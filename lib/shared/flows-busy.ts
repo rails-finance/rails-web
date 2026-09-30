@@ -1,53 +1,42 @@
-// Lifetime flows for busy, long-lived positions: the treatments a position
-// with hundreds of transactions can take in place of the per-event scrubber
-// (components/shared/lifetime-flows-busy.tsx). Pure functions of the model
-// `buildFlowModel` returns, tested offline in
+// Lifetime flows for busy, long-lived positions: the treatment the bars take
+// when the window they cover is busy (components/shared/lifetime-flows-busy.tsx;
+// rails-ops reference/lifetime-flows-scrubber.md, "The two views"): each bar
+// at the scale of what is held, the throughput in one line, a time-binned
+// density strip, and the slider stepping by bin. Pure functions of the model
+// `buildFlowModel` (or `windowModel`) returns, tested offline in
 // scripts/verify/verify-lifetime-flows-state.ts.
 //
-// Three treatments, chosen by `?flows=` for comparison:
-//   a  the bars scale to what is held, gross throughput in one line, a
-//      time-binned density strip, the slider stepping by bin;
-//   b  collateral and debt over time as a line chart sampled per bin;
-//   c  the transactions grouped by the events inside each one, beside a or b.
-// With no parameter the panel draws today's scrubber unless `BUSY_VARIANT` is
-// set, which makes the threshold (`isBusy`) pick the treatment on its own.
+// `groupOperations` (the transactions grouped by the events in each) is kept
+// for when the operation names are settled (rails-ops TO-DO-ui-jobs §207); no
+// page draws it.
 
 import { dayStart, type FlowModel } from "@/lib/shared/flows-timeline";
 
-/** A position with more events than this reads as busy. */
+/** A window with more events than this reads as busy. */
 export const BUSY_EVENTS = 200;
-/** Or one whose lifetime deposits exceed its collateral now this many times. */
+/** Or one whose deposits exceed the most its collateral has been this many times. */
 export const BUSY_TURNOVER = 5;
-/** The treatment a busy position takes with no `?flows=`; null keeps
- *  today's scrubber for everyone until one is chosen. */
-export const BUSY_VARIANT: FlowVariant | null = null;
-
-export type FlowVariant = { chart: "rescaled" | "over-time"; ops: boolean };
-
-/** The treatment `?flows=` asks for: "a" (rescaled), "b" (over time), "c"
- *  (operations, over a), "bc"; "default" or "0" forces today's scrubber;
- *  "auto" applies the threshold with a. Absent, the threshold with
- *  `BUSY_VARIANT`. */
-export function flowVariant(param: string | null, busy: boolean): FlowVariant | null {
-  const p = (param ?? "").toLowerCase();
-  if (p === "default" || p === "0") return null;
-  if (/^[abc]{1,2}$/.test(p)) return { chart: p.includes("b") ? "over-time" : "rescaled", ops: p.includes("c") };
-  if (p === "auto") return busy ? (BUSY_VARIANT ?? { chart: "rescaled", ops: false }) : null;
-  return busy ? BUSY_VARIANT : null;
-}
 
 /** The inflow buckets' running total on a side at the live stop. */
 function inflowAt(m: FlowModel, side: "collateral" | "debt", row = m.rows[m.rows.length - 1]): number {
   return m.buckets.filter((b) => b.side === side && b.dir === "in").reduce((s, b) => s + (row.cum[b.key] ?? 0), 0);
 }
 
+/** Events and transactions before the model's first stop (a window's opening). */
+const baseCounts = (m: FlowModel) => ({ events: m.opening?.events ?? 0, txs: m.opening?.txs ?? 0 });
+
+/** Busy: more than BUSY_EVENTS events in the model's stops, or deposits over
+ *  BUSY_TURNOVER times the most the collateral has been in them. Measured
+ *  against that peak, a position that deposited once and withdrew most of it
+ *  is not busy; one that cycles the same funds in and out is. */
 export function isBusy(m: FlowModel): boolean {
-  if (m.totalEvents > BUSY_EVENTS) return true;
-  const held = m.live.collateralUsd;
-  return held > 0 && inflowAt(m, "collateral") > BUSY_TURNOVER * held;
+  if (m.totalEvents - baseCounts(m).events > BUSY_EVENTS) return true;
+  const peak = Math.max(m.live.collateralUsd, ...m.valued.map((v) => v.collateral));
+  return peak > 0 && inflowAt(m, "collateral") > BUSY_TURNOVER * peak;
 }
 
-/** The whole life's throughput: what came in on each side, the transactions,
+/** The throughput over the model's stops (the window's, where it is cut to one):
+ *  what came in on each side, the transactions,
  *  and how many times over the deposits have replaced the collateral held now. */
 export function throughput(m: FlowModel): {
   deposited: number;
@@ -63,7 +52,7 @@ export function throughput(m: FlowModel): {
   return {
     deposited,
     borrowed,
-    txs: m.totalTxs ?? m.totalEvents,
+    txs: m.totalTxs != null ? m.totalTxs - baseCounts(m).txs : m.totalEvents - baseCounts(m).events,
     unit: m.totalTxs != null ? "transaction" : "event",
     turnover: ratio >= 2 ? roundTurnover(ratio) : null,
   };
@@ -124,7 +113,7 @@ export function flowBins(m: FlowModel): { unit: BinUnit; bins: FlowBin[] } {
   const count = (r: FlowModel["rows"][number]) => r.txs ?? r.events;
   const liqDays = new Set(m.ticks.filter((t) => t.tick === "liquidation").map((t) => t.day));
   let ri = 0;
-  let before = 0;
+  let before = m.totalTxs != null && m.rows[0]?.txs != null ? baseCounts(m).txs : baseCounts(m).events;
   const bins = ranges.map(({ from, to, label }) => {
     let through = before;
     let liquidation = false;
@@ -138,19 +127,6 @@ export function flowBins(m: FlowModel): { unit: BinUnit; bins: FlowBin[] } {
     return bin;
   });
   return { unit, bins };
-}
-
-/** The bin a stop falls in (the last bin for the live stop). */
-export function binOf(bins: FlowBin[], stop: number): number {
-  for (let i = 0; i < bins.length; i++) if (stop <= bins[i].to) return i;
-  return bins.length - 1;
-}
-
-/** Held and owed at the end of each bin, then at the live stop. */
-export function seriesByBin(m: FlowModel, bins: FlowBin[]): { stop: number; collateral: number; debt: number }[] {
-  const out = bins.map((b) => ({ stop: b.to, ...m.valued[Math.min(b.to, m.valued.length - 1)] }));
-  out.push({ stop: m.liveStop, collateral: m.live.collateralUsd, debt: m.live.debtUsd });
-  return out;
 }
 
 // ── Operations: each transaction named by the events inside it ─────────────
@@ -231,20 +207,3 @@ export function groupOperations(events: OpEvent[]): FlowOperations | null {
 /** Health factor from held and owed at one liquidation threshold. */
 export const healthAt = (collateral: number, debt: number, threshold: number): number | null =>
   debt > 0.5 && threshold > 0 ? (collateral * threshold) / debt : null;
-
-/** The grouping over a page's events, where the page holds the whole history
- *  as rows (no window, no folders); null otherwise. */
-export function operationsFromEvents(
-  events: { txHash: string; actionType: string; actionLabel?: string; context?: { data?: unknown } }[],
-  whole: boolean,
-): FlowOperations | null {
-  if (!whole) return null;
-  return groupOperations(
-    events.map((e) => ({
-      txHash: e.txHash,
-      actionType: e.actionType,
-      actionLabel: e.actionLabel,
-      txFrom: (e.context?.data as { txFrom?: string } | undefined)?.txFrom ?? null,
-    })),
-  );
-}

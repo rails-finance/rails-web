@@ -4,10 +4,11 @@
 // date scrubber (rails-ops reference/lifetime-flows-scrubber.md): the header
 // that collapses the panel, the scrubber, Full breakdown over the ledger
 // (flows-ledger.tsx) with the note naming the stop it shows, and the
-// Explanation with the scrubber's Key after its prose. The scrubber's busy
-// treatments (`?flows=`, lib/shared/flows-busy.ts) are drawn inside the
-// scrubber and report no Key. Until the scrubber's timeline lands, or where
-// its read fails, the ledger shows open with no Full breakdown control.
+// Explanation with the scrubber's Key after its prose. The scrubber reports
+// the Key's hatches where it draws them, and a line each for the Key and the
+// Explanation on which of its two views (the bars, Lifetime) is which. Until
+// the scrubber's timeline lands, or where its read fails, the ledger shows
+// open with no Full breakdown control.
 //
 // Mounted by the position views directly, with no <ChainTruthTower>, so the
 // towers can be removed without removing the scrubber (rails-ops
@@ -159,6 +160,11 @@ export function LifetimeFlowsPanel({
               scrubber != null && flowsKey ? (
                 <>
                   {explanation}
+                  {flowsKey.explain && (
+                    <p className="mt-2 first:mt-0" data-flow-views-explain="">
+                      {flowsKey.explain}
+                    </p>
+                  )}
                   <FlowsKey {...flowsKey} />
                 </>
               ) : (
