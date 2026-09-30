@@ -29,6 +29,7 @@ import {
   positionSharesProv,
   positionEscrowProv,
   interestEarnedProv,
+  interestEarnedLifetimeProv,
   poolExitRateProv,
   peakSharesProv,
   peakDepositedProv,
@@ -99,7 +100,7 @@ function ClaimStack({ v }: { v: MaplePositionView }) {
 }
 
 /** Per-pool share amounts, demoted beneath the claim — the exact lanes. */
-function ClaimFootnoteLines({ v }: { v: MaplePositionView }) {
+function ClaimFootnoteLines({ v, asOf = false }: { v: MaplePositionView; asOf?: boolean }) {
   const live = v.pools.filter((p) => p.shares + p.escrowedShares > 0);
   if (live.length === 0) return null;
   return (
@@ -119,6 +120,13 @@ function ClaimFootnoteLines({ v }: { v: MaplePositionView }) {
                 <Prov info={poolExitRateProv(p.assetSymbol, p.symbol, v.poolState[p.pool].blockNumber)}>
                   <span className="text-rb-500">@ {v.poolState[p.pool].exitRate.toFixed(4)}</span>
                 </Prov>
+                {/* The claim moves with the exit rate every block: say which. */}
+                {asOf && (
+                  <span className="text-rb-500">
+                    {" "}
+                    · as of block {v.poolState[p.pool].blockNumber.toLocaleString("en-US")}
+                  </span>
+                )}
               </>
             )}
           </div>
@@ -138,22 +146,40 @@ function InterestCaption({ captions }: { captions?: MapleCardCaptions }) {
   const it = captions?.interestEarned;
   if (!it || it.amount < 0.01) return null;
   return (
-    <div className="text-xs mt-0.5 text-rb-500">
-      incl.{" "}
-      <Prov info={interestEarnedProv(it.symbol)}>
-        <span>
-          <AmountText value={it.amount} format="compact" /> {it.symbol}
-        </span>
-      </Prov>{" "}
-      interest earned
-    </div>
+    <>
+      <div className="text-xs mt-0.5 text-rb-500">
+        incl.{" "}
+        <Prov info={interestEarnedProv(it.symbol)}>
+          <span>
+            <AmountText value={it.amount} format="compact" /> {it.symbol}
+          </span>
+        </Prov>{" "}
+        interest earned
+      </div>
+      {/* A pool the wallet has left: its interest is not in the claim above. */}
+      {(captions?.earnedElsewhere ?? []).map((e) => (
+        <div key={e.symbol} className="text-xs mt-0.5 text-rb-500">
+          <Prov info={interestEarnedLifetimeProv(e.symbol)}>
+            <span>
+              <AmountText value={e.amount} format="compact" /> {e.symbol}
+            </span>
+          </Prov>{" "}
+          earned in the {e.symbol} pool, all withdrawn
+        </div>
+      ))}
+    </>
   );
 }
 
 /** The queue column: escrowed shares, valued at the exit rate when read. */
 function QueueStack({ v }: { v: MaplePositionView }) {
   const queued = v.pools.filter((p) => p.escrowedShares > 0);
-  if (queued.length === 0) return <StatDash />;
+  if (queued.length === 0)
+    return (
+      <StatValue>
+        <span className="text-rb-500">None</span>
+      </StatValue>
+    );
   return (
     <div className="flex flex-col gap-1">
       {queued.map((p) => {
@@ -289,36 +315,41 @@ export function MaplePositionCard({
         leadingIdentity={
           <WalletPill wallet={v.wallet} ensName={null} filterProtocol="maple" bookmarkProtocol="maple" />
         }
-        identity={<PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} />}
+        identity={
+          <PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} countNounVisible={receipts} />
+        }
         columns={[
           {
             label: "Pool claim",
-            assetIcons:
-              liveCount > 0 ? (
-                <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster
-                    symbols={v.pools.filter((p) => p.shares + p.escrowedShares > 0).map((p) => p.assetSymbol)}
-                  />
-                  <ReserveDisclosureToggle disclosure={claimDisclosure} count={liveCount} />
-                </span>
-              ) : undefined,
+            // Beside a single claim the amount carries its own token badge, so
+            // the cluster draws only for the collapsed list of several.
+            assetIcons: claimDisclosure.collapsible ? (
+              <span className="inline-flex items-center gap-1">
+                <InlineAssetCluster
+                  symbols={v.pools.filter((p) => p.shares + p.escrowedShares > 0).map((p) => p.assetSymbol)}
+                />
+                <ReserveDisclosureToggle disclosure={claimDisclosure} count={liveCount} />
+              </span>
+            ) : undefined,
             value: claimDisclosure.collapsible ? null : <ClaimStack v={v} />,
             footnote: (
               <>
                 {claimDisclosure.collapsible ? (
                   <ReserveDisclosureList disclosure={claimDisclosure}>
                     <ClaimStack v={v} />
-                    <ClaimFootnoteLines v={v} />
+                    <ClaimFootnoteLines v={v} asOf={receipts} />
                   </ReserveDisclosureList>
                 ) : (
-                  <ClaimFootnoteLines v={v} />
+                  <ClaimFootnoteLines v={v} asOf={receipts} />
                 )}
                 <InterestCaption captions={captions} />
               </>
             ),
           },
           {
-            label: "Withdrawal queue",
+            // This wallet's queued shares; the pool band's "Pool queue" is
+            // everyone's.
+            label: "Queued by this wallet",
             value: <QueueStack v={v} />,
             footnote:
               v.requestCount > 0 ? (

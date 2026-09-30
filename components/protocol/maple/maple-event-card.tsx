@@ -15,12 +15,15 @@ import { MapleEventHeader } from "./maple-event-header";
 import { MapleEventDetail } from "./maple-event-detail";
 import { MapleEventExplainer, mapleLearnMoreContent } from "./maple-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import type { MapleRowTimes } from "@/lib/maple/row-times";
 
 export interface MapleEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "maple"; data: MapleContext } };
   isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
+  /** The previous row in this pool and a fill's request, where loaded. */
+  times?: MapleRowTimes;
 }
 
 // direction "right" = token moves away from the wallet (deposit / escrow),
@@ -37,7 +40,7 @@ const DIRECTION: Record<Exclude<MapleContext["eventType"], "transfer_in" | "tran
   request_fill: "left",
 };
 
-export function MapleEventCard({ event, isFirst, isLast, eventNumber }: MapleEventCardProps) {
+export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: MapleEventCardProps) {
   const ctx = event.context.data;
   const kind = ctx.eventType;
   const isTransfer = kind === "transfer_in" || kind === "transfer_out";
@@ -91,6 +94,9 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber }: MapleEve
               address: soleFlowAddress(event.flows, symbol),
               direction: DIRECTION[kind],
               value: mag,
+              // The token named beside every amount: a request moves shares,
+              // a fill pays the asset, and the icons alone look alike.
+              unit: symbol,
               prov: {
                 info: flanked.prov,
                 value: chainTruthDeltaValue(flanked.value, false),
@@ -104,6 +110,7 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber }: MapleEve
                     address: soleFlowAddress(event.flows, shares.symbol),
                     direction: (shares.value < 0 ? "right" : "left") as "left" | "right",
                     value: Math.abs(shares.value),
+                    unit: shares.symbol,
                     prov: {
                       info: shares.prov,
                       value: chainTruthDeltaValue(shares.value, false),
@@ -139,10 +146,18 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber }: MapleEve
           externalBy={extBy ?? undefined}
           wallet={event.wallet}
           flows={event.flows}
+          requestAt={times?.requestAt}
         />
       }
       detail={
-        <MapleEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} wallet={event.wallet} />
+        <MapleEventDetail
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          wallet={event.wallet}
+          timestamp={event.timestamp}
+          prevAt={times?.prevAt}
+        />
       }
       detailLabel="Position state"
       explainer={

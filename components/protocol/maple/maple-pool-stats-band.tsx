@@ -61,7 +61,7 @@ export function MaplePoolStatsBand({ poolState }: { poolState: Record<string, Ma
                   <span className="text-sm font-semibold">{cat.symbol}</span>
                   <span className="ml-auto text-xs tabular-nums text-rb-500">
                     <Prov info={poolExitRateProv(cat.assetSymbol, cat.symbol, s.blockNumber)}>
-                      <span title={`convertToExitAssets on one share, read at block ${s.blockNumber}`}>
+                      <span title={`Exit rate: what one share pays out on withdrawal, read at block ${s.blockNumber}`}>
                         exit {s.exitRate.toFixed(4)} {cat.assetSymbol}
                       </span>
                     </Prov>
@@ -94,7 +94,9 @@ export function MaplePoolStatsBand({ poolState }: { poolState: Record<string, Ma
                   </Stat>
                   <Stat
                     size="prominent"
-                    label="Withdrawal queue"
+                    // Everyone's queued withdrawals; the position card's
+                    // "Queued by this wallet" is the wallet's own.
+                    label="Pool queue"
                     note={
                       s.queueShares > 0
                         ? s.cash >= queueValue

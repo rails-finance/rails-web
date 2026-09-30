@@ -42,3 +42,12 @@ export function MapleResidualNote({ display, symbol, over }: { display: string; 
     </div>
   );
 }
+
+/** The pools card's tips on its two per-share rates, in lender words. The NAV
+ *  is glossed here once; everywhere else the page says "exit rate". */
+export const mapleNavTip = (block: number): string =>
+  `NAV (net asset value) per share: the pool's value divided by its shares, read at block ${block}. The exit rate beside it is what a withdrawal pays; the two differ only while a loan is marked as impaired.`;
+export const mapleExitTip = (block: number): string =>
+  `Exit rate: what one share pays out on withdrawal, read at block ${block}.`;
+export const MAPLE_NO_IMPAIRMENT_TIP =
+  "No loan is marked as impaired, so a share's value and what it pays out on withdrawal are the same.";
